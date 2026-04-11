@@ -2207,6 +2207,7 @@
     <script type="module">
       import * as bridge from "./src/bridge.js";
       import { loadAudioBuffer, mergeProjectAssets, normalizeAudioUrl } from "./src/audio/buffer.js";
+      import { startAutosave } from "./src/autosave.js";
       import { mountCommandPalette } from "./src/command-palette.js";
       import { initDragDrop } from "./src/dnd/index.js";
       import * as engine from "./src/engine/index.js";
@@ -2821,6 +2822,7 @@
         mountHelpHint(document.getElementById("top-menu"));
         createAudioAssetBufferSync(store);
         mountCommandPalette({ store, bridge, commands: createPaletteCommands() });
+        startAutosave({ store, bridge });
         window.addEventListener("keydown", onKeyDown);
 
         if (!store.state.tutorialComplete) {

@@ -98,6 +98,8 @@ function createInitialState() {
     timeline: createDefaultTimeline(),
     filePath: null,
     dirty: false,
+    autosaveTimer: null,
+    autosaveId: null,
     selectedClipId: null,
     searchQuery: "",
     favorites: [],

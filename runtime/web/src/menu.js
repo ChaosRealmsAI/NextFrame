@@ -1,3 +1,4 @@
+import { clearAutosave } from "./autosave.js";
 import { validateTimeline } from "./engine/index.js";
 import { showExportDialog } from "./export/dialog.js";
 import { createDefaultTimeline } from "./store.js";
@@ -475,12 +476,21 @@ export function initMenu({ bridge, store }) {
   }
 
   async function writeProject(path) {
+    const autosaveId = store.state.autosaveId;
     const contents = JSON.stringify(store.state.timeline, null, 2);
     await bridge.call("fs.write", { path, contents });
     store.mutate((state) => {
       state.filePath = path;
       state.dirty = false;
     });
+    if (typeof autosaveId === "string" && autosaveId.length > 0) {
+      void clearAutosave({ bridge, projectId: autosaveId }).catch((error) =>
+        logInfo(
+          bridge,
+          `autosave.clear failed for ${autosaveId}: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      );
+    }
     await rememberRecentProject(path);
   }
 
