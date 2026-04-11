@@ -1503,6 +1503,7 @@
     <script type="module">
       import * as bridge from "./src/bridge.js";
       import * as engine from "./src/engine/index.js";
+      import { installOnFrame } from "./src/export/onframe.js";
       import { initMenu } from "./src/menu.js";
       import { mountPreview } from "./src/preview/index.js";
       import { mountLibrary } from "./src/panels/library/index.js";
@@ -1694,7 +1695,10 @@
         }
 
         const previewEl = document.getElementById("center-preview");
-        if (previewEl) mountPreview(previewEl, { engine, store });
+        if (previewEl) {
+          const preview = mountPreview(previewEl, { engine, store });
+          installOnFrame({ engine, store, preview });
+        }
 
         const libraryEl = document.getElementById("left-library");
         if (libraryEl) mountLibrary(libraryEl, { store, scenes: SCENE_MANIFEST });

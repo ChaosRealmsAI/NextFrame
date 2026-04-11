@@ -38,6 +38,7 @@ export function mountPreview(container, { engine, store } = {}) {
   let ctx = null;
   let lastRect = { x: 0, y: 0, width: 0, height: 0 };
   let lastSnapshot = createSnapshot(store?.state);
+  let recordingMode = false;
 
   const readTime = () => {
     const value = Number(store?.state?.playhead);
@@ -81,6 +82,15 @@ export function mountPreview(container, { engine, store } = {}) {
     }
   };
 
+  const syncLoopState = (playing = Boolean(store?.state?.playing)) => {
+    if (recordingMode || !playing) {
+      loop.pause();
+      return;
+    }
+
+    loop.play();
+  };
+
   const loop = createLoop({
     tick(time, dt) {
       const timeline = getTimeline(store?.state);
@@ -105,11 +115,7 @@ export function mountPreview(container, { engine, store } = {}) {
       const nextSnapshot = createSnapshot(state);
 
       if (nextSnapshot.playing !== lastSnapshot.playing) {
-        if (nextSnapshot.playing) {
-          loop.play();
-        } else {
-          loop.pause();
-        }
+        syncLoopState(nextSnapshot.playing);
       }
 
       if (didLayoutChange(lastSnapshot, nextSnapshot)) {
@@ -126,15 +132,19 @@ export function mountPreview(container, { engine, store } = {}) {
 
   layoutCanvas();
   renderFrame(readTime());
-
-  if (lastSnapshot.playing) {
-    loop.play();
-  }
+  syncLoopState(lastSnapshot.playing);
 
   const api = {
     canvas,
-    play: () => loop.play(),
+    get ctx() {
+      return ctx;
+    },
+    play: () => syncLoopState(true),
     pause: () => loop.pause(),
+    setRecordingMode(active) {
+      recordingMode = Boolean(active);
+      syncLoopState();
+    },
     stop: () => loop.stop(),
     destroy() {
       unsubscribe();
