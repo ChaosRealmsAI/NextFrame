@@ -25,6 +25,33 @@ function filterAssets(assets, kind, query) {
   });
 }
 
+function getFavoriteSceneIds(store) {
+  if (typeof store?.state !== "object" || store.state == null) {
+    return [];
+  }
+
+  return Array.isArray(store.state.favorites)
+    ? [...new Set(store.state.favorites.map((sceneId) => String(sceneId)).filter(Boolean))]
+    : [];
+}
+
+function partitionScenes(scenes, favoriteSceneIds) {
+  const favoriteIds = new Set(favoriteSceneIds);
+  const favorites = [];
+  const rest = [];
+
+  scenes.forEach((scene) => {
+    if (favoriteIds.has(String(scene?.id ?? ""))) {
+      favorites.push(scene);
+      return;
+    }
+
+    rest.push(scene);
+  });
+
+  return { favorites, rest };
+}
+
 function createEmptyState(message) {
   const empty = document.createElement("div");
   empty.className = "empty-state library-empty-state";
@@ -33,6 +60,35 @@ function createEmptyState(message) {
     <strong>${message}</strong>
   `;
   return empty;
+}
+
+function createSectionHeader(title) {
+  const header = document.createElement("div");
+  header.textContent = title;
+  header.style.fontSize = "11px";
+  header.style.fontWeight = "700";
+  header.style.letterSpacing = "0.08em";
+  header.style.textTransform = "uppercase";
+  header.style.color = "rgba(203, 213, 225, 0.72)";
+  return header;
+}
+
+function createSection(title, items, renderItem) {
+  const section = document.createElement("section");
+  section.style.display = "grid";
+  section.style.gap = "10px";
+
+  const body = document.createElement("div");
+  body.style.display = "grid";
+  body.style.gap = "12px";
+  body.style.gridTemplateColumns = "1fr";
+
+  items.forEach((item) => {
+    body.appendChild(renderItem(item));
+  });
+
+  section.append(createSectionHeader(title), body);
+  return section;
 }
 
 export function mountLibrary(container, { store, scenes = [] } = {}) {
@@ -89,12 +145,15 @@ export function mountLibrary(container, { store, scenes = [] } = {}) {
   const count = header.querySelector('[data-role="count"]');
   let lastAssetsRef = store?.state?.assets;
   let lastSearchQuery = store?.state?.searchQuery;
+  let lastFavoritesKey = getFavoriteSceneIds(store).join("\u0000");
 
   function render() {
     const query = normalizeQuery(store?.state?.searchQuery);
     const assets = Array.isArray(store?.state?.assets) ? store.state.assets : [];
     let items = [];
     let isImportEmpty = false;
+    let favoriteScenes = [];
+    let otherScenes = [];
 
     tabsHost.replaceChildren(createLibraryTabs(activeTab, (nextTab) => {
       activeTab = nextTab;
@@ -102,12 +161,16 @@ export function mountLibrary(container, { store, scenes = [] } = {}) {
     }));
 
     if (activeTab === "scenes") {
-      items = scenes.filter((scene) => matchesQuery(query, [
+      const matchingScenes = scenes.filter((scene) => matchesQuery(query, [
         scene.name,
         scene.id,
         scene.category,
         scene.duration_hint,
       ]));
+      const partitionedScenes = partitionScenes(matchingScenes, getFavoriteSceneIds(store));
+      favoriteScenes = partitionedScenes.favorites;
+      otherScenes = partitionedScenes.rest;
+      items = [...favoriteScenes, ...otherScenes];
     } else if (activeTab === "media") {
       items = filterAssets(assets, "media", query);
       isImportEmpty = assets.filter((asset) => asset.kind === "video" || asset.kind === "image").length === 0;
@@ -128,8 +191,22 @@ export function mountLibrary(container, { store, scenes = [] } = {}) {
       return;
     }
 
+    if (activeTab === "scenes") {
+      if (favoriteScenes.length > 0) {
+        grid.appendChild(createSection("Favorites", favoriteScenes, (scene) => createSceneCard(scene, { store })));
+      }
+
+      if (otherScenes.length > 0 || favoriteScenes.length === 0) {
+        grid.appendChild(createSection("All Scenes", otherScenes.length > 0 ? otherScenes : items, (scene) => (
+          createSceneCard(scene, { store })
+        )));
+      }
+
+      return;
+    }
+
     items.forEach((item) => {
-      grid.appendChild(activeTab === "scenes" ? createSceneCard(item) : createAssetCard(item));
+      grid.appendChild(createAssetCard(item));
     });
   }
 
@@ -147,13 +224,19 @@ export function mountLibrary(container, { store, scenes = [] } = {}) {
 
   const unsubscribe = typeof store?.subscribe === "function"
     ? store.subscribe((nextState) => {
-      if (nextState.assets !== lastAssetsRef || nextState.searchQuery !== lastSearchQuery) {
+      const nextFavoritesKey = getFavoriteSceneIds({ state: nextState }).join("\u0000");
+      if (
+        nextState.assets !== lastAssetsRef
+        || nextState.searchQuery !== lastSearchQuery
+        || nextFavoritesKey !== lastFavoritesKey
+      ) {
         if (input.value !== nextState.searchQuery) {
           input.value = nextState.searchQuery;
         }
         render();
         lastAssetsRef = nextState.assets;
         lastSearchQuery = nextState.searchQuery;
+        lastFavoritesKey = nextFavoritesKey;
       }
     })
     : () => {};

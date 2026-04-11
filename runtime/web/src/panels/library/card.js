@@ -150,7 +150,65 @@ function createCardShell(title, hint, meta) {
   return card;
 }
 
-export function createSceneCard(scene) {
+function syncFavoriteButton(button, scene, store) {
+  const isFavorite = typeof store?.isFavorite === "function" && store.isFavorite(scene.id);
+  button.textContent = isFavorite ? "★" : "☆";
+  button.setAttribute("aria-label", isFavorite ? "Remove from favorites" : "Add to favorites");
+  button.setAttribute("aria-pressed", isFavorite ? "true" : "false");
+  button.title = isFavorite ? "Remove from favorites" : "Add to favorites";
+  button.style.color = isFavorite ? "#fbbf24" : "rgba(226, 232, 240, 0.92)";
+}
+
+function createFavoriteButton(scene, store) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.draggable = false;
+  button.className = "scene-favorite-button";
+  button.style.position = "absolute";
+  button.style.top = "8px";
+  button.style.right = "8px";
+  button.style.zIndex = "2";
+  button.style.display = "inline-flex";
+  button.style.alignItems = "center";
+  button.style.justifyContent = "center";
+  button.style.width = "28px";
+  button.style.height = "28px";
+  button.style.padding = "0";
+  button.style.border = "1px solid rgba(255, 255, 255, 0.12)";
+  button.style.borderRadius = "999px";
+  button.style.background = "rgba(15, 23, 42, 0.82)";
+  button.style.boxShadow = "0 8px 18px rgba(15, 23, 42, 0.34)";
+  button.style.cursor = "pointer";
+  button.style.fontSize = "16px";
+  button.style.lineHeight = "1";
+
+  syncFavoriteButton(button, scene, store);
+
+  const stopInteraction = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  button.addEventListener("pointerdown", stopInteraction);
+  button.addEventListener("mousedown", stopInteraction);
+  button.addEventListener("dragstart", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (typeof store?.toggleFavorite === "function") {
+      store.toggleFavorite(scene.id);
+      syncFavoriteButton(button, scene, store);
+    }
+  });
+
+  return button;
+}
+
+export function createSceneCard(scene, { store } = {}) {
   const accent = CATEGORY_COLORS[scene.category] || CATEGORY_COLORS.Default;
   const card = createCardShell(
     scene.name,
@@ -160,6 +218,7 @@ export function createSceneCard(scene) {
 
   card.classList.add("scene-card");
   card.style.borderColor = hexToRgba(accent, 0.32);
+  card.style.position = "relative";
 
   const thumb = document.createElement("div");
   thumb.className = "asset-thumb library-scene-thumb";
@@ -192,6 +251,7 @@ export function createSceneCard(scene) {
   thumb.appendChild(badge);
   renderSceneThumbnail(thumb, scene);
 
+  card.appendChild(createFavoriteButton(scene, store));
   card.prepend(thumb);
   makeDraggable(card, { type: "scene", id: scene.id });
 

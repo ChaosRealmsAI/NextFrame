@@ -71,6 +71,7 @@ function createInitialState() {
     dirty: false,
     selectedClipId: null,
     searchQuery: "",
+    favorites: [],
     assets: [],
     assetBuffers: new Map(),
     selection: {
@@ -170,6 +171,27 @@ function uniqueClipIds(clipIds) {
   return ids;
 }
 
+function getFavoriteSceneIds(state) {
+  const ids = [];
+  const seen = new Set();
+
+  (Array.isArray(state?.favorites) ? state.favorites : []).forEach((sceneId) => {
+    if (sceneId == null) {
+      return;
+    }
+
+    const normalized = String(sceneId);
+    if (normalized.length === 0 || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    ids.push(normalized);
+  });
+
+  return ids;
+}
+
 function getSelectionClipIds(state) {
   const clipIds = uniqueClipIds(state?.selection?.clipIds);
   const selectedClipId = state?.selectedClipId == null ? null : String(state.selectedClipId);
@@ -235,6 +257,14 @@ export const store = {
       resolvedState = {
         ...resolvedState,
         dirty: true,
+      };
+    }
+
+    const normalizedFavorites = getFavoriteSceneIds(resolvedState);
+    if (resolvedState.favorites !== normalizedFavorites) {
+      resolvedState = {
+        ...resolvedState,
+        favorites: normalizedFavorites,
       };
     }
 
@@ -398,6 +428,30 @@ export const store = {
         timelineTool: nextTool,
       },
     });
+  },
+  toggleFavorite(sceneId) {
+    const nextSceneId = sceneId == null ? "" : String(sceneId);
+    if (nextSceneId.length === 0) {
+      throw new TypeError("store.toggleFavorite(sceneId) requires a non-empty scene id");
+    }
+
+    const favorites = getFavoriteSceneIds(this.state);
+    const nextFavorites = favorites.includes(nextSceneId)
+      ? favorites.filter((favoriteId) => favoriteId !== nextSceneId)
+      : [...favorites, nextSceneId];
+
+    return this.replace({
+      ...this.state,
+      favorites: nextFavorites,
+    });
+  },
+  isFavorite(sceneId) {
+    const nextSceneId = sceneId == null ? "" : String(sceneId);
+    if (nextSceneId.length === 0) {
+      return false;
+    }
+
+    return getFavoriteSceneIds(this.state).includes(nextSceneId);
   },
 };
 
