@@ -1,4 +1,4 @@
-import { moveClipCommand } from "../commands.js";
+import { moveClipCommand, splitClipCommand } from "../commands.js";
 import {
   MIN_CLIP_DURATION,
   clampClipDuration,
@@ -278,6 +278,28 @@ export function attachClipInteractions(clipEl, clipId, store, zoom) {
       return;
     }
 
+    if (store.state.ui?.timelineTool === "blade") {
+      const lane = clipEl.parentElement;
+      if (!(lane instanceof HTMLElement)) {
+        return;
+      }
+
+      const laneRect = lane.getBoundingClientRect();
+      const splitTime = snapClipTime(zoom.pxToTime(event.clientX - laneRect.left));
+
+      store.dispatch?.(splitClipCommand({ clipId, splitTime }));
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    if (event.shiftKey) {
+      store.addToSelection?.(clipId);
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     teardownActiveInteraction();
 
     const mode = getInteractionMode(event, clipEl);
@@ -362,6 +384,7 @@ export function attachClipInteractions(clipEl, clipId, store, zoom) {
     window.addEventListener("mousemove", interaction.handleMouseMove);
     window.addEventListener("mouseup", interaction.handleMouseUp);
     event.preventDefault();
+    event.stopPropagation();
   };
 
   clipEl.addEventListener("mousedown", handleMouseDown);

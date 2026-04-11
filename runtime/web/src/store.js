@@ -33,11 +33,13 @@ function createInitialState() {
     selection: {
       trackId: null,
       clipId: null,
+      clipIds: [],
     },
     ui: {
       zoom: 1,
       timelineVisible: true,
       inspectorVisible: true,
+      timelineTool: "select",
     },
   };
 }
@@ -95,6 +97,65 @@ function findTrackIdByClipId(timeline, clipId) {
   }
 
   return null;
+}
+
+function uniqueClipIds(clipIds) {
+  const ids = [];
+  const seen = new Set();
+
+  (Array.isArray(clipIds) ? clipIds : []).forEach((clipId) => {
+    if (clipId == null) {
+      return;
+    }
+
+    const normalized = String(clipId);
+    if (normalized.length === 0 || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    ids.push(normalized);
+  });
+
+  return ids;
+}
+
+function getSelectionClipIds(state) {
+  const clipIds = uniqueClipIds(state?.selection?.clipIds);
+  const selectedClipId = state?.selectedClipId == null ? null : String(state.selectedClipId);
+
+  if (selectedClipId && !clipIds.includes(selectedClipId)) {
+    clipIds.push(selectedClipId);
+  }
+
+  return clipIds;
+}
+
+function resolveSelectionState(state, payload = {}) {
+  const clipIds = uniqueClipIds(payload.clipIds ?? (payload.clipId != null ? [payload.clipId] : []))
+    .filter((clipId) => Boolean(findTrackIdByClipId(state?.timeline, clipId)));
+  const preferredClipId = payload.clipId == null ? null : String(payload.clipId);
+  const clipId = preferredClipId && clipIds.includes(preferredClipId)
+    ? preferredClipId
+    : clipIds.at(-1) ?? null;
+
+  let trackId;
+  if (Object.prototype.hasOwnProperty.call(payload, "trackId") && payload.trackId !== undefined) {
+    trackId = payload.trackId == null ? null : String(payload.trackId);
+  } else if (clipId) {
+    trackId = findTrackIdByClipId(state?.timeline, clipId);
+  } else {
+    trackId = state?.selection?.trackId ?? null;
+  }
+
+  return {
+    selectedClipId: clipId,
+    selection: {
+      trackId,
+      clipId,
+      clipIds,
+    },
+  };
 }
 
 export const store = {
@@ -206,14 +267,67 @@ export const store = {
   },
   selectClip(clipId) {
     const nextClipId = clipId == null ? null : String(clipId);
-    const trackId = nextClipId ? findTrackIdByClipId(this.state.timeline, nextClipId) : null;
+    const nextSelection = resolveSelectionState(this.state, {
+      clipId: nextClipId,
+      clipIds: nextClipId ? [nextClipId] : [],
+    });
 
     return this.replace({
       ...this.state,
-      selectedClipId: trackId ? nextClipId : null,
-      selection: {
-        trackId,
-        clipId: trackId ? nextClipId : null,
+      ...nextSelection,
+    });
+  },
+  selectClips(clipIds, { clipId = null, trackId } = {}) {
+    const nextSelection = resolveSelectionState(this.state, {
+      trackId,
+      clipId,
+      clipIds,
+    });
+
+    return this.replace({
+      ...this.state,
+      ...nextSelection,
+    });
+  },
+  addToSelection(clipId) {
+    const nextClipId = clipId == null ? null : String(clipId);
+    if (!nextClipId) {
+      return this.state;
+    }
+
+    const nextSelection = resolveSelectionState(this.state, {
+      clipId: nextClipId,
+      clipIds: [...getSelectionClipIds(this.state), nextClipId],
+    });
+
+    return this.replace({
+      ...this.state,
+      ...nextSelection,
+    });
+  },
+  clearSelection({ trackId } = {}) {
+    const nextSelection = resolveSelectionState(this.state, {
+      trackId,
+      clipId: null,
+      clipIds: [],
+    });
+
+    return this.replace({
+      ...this.state,
+      ...nextSelection,
+    });
+  },
+  setTimelineTool(tool) {
+    const nextTool = tool === "blade" ? "blade" : "select";
+    if (this.state.ui?.timelineTool === nextTool) {
+      return this.state;
+    }
+
+    return this.replace({
+      ...this.state,
+      ui: {
+        ...this.state.ui,
+        timelineTool: nextTool,
       },
     });
   },

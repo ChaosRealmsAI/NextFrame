@@ -1,4 +1,11 @@
-import { clampClipDuration, getClipDuration, hasTrackOverlap, roundClipTime } from "./timeline/clip-range.js";
+import {
+  MIN_CLIP_DURATION,
+  clampClipDuration,
+  getClipDuration,
+  hasTrackOverlap,
+  roundClipTime,
+  snapClipTime,
+} from "./timeline/clip-range.js";
 
 function cloneValue(value) {
   if (value instanceof Map) {
@@ -28,6 +35,7 @@ function isPlainObject(value) {
 }
 
 const ABORT_COMMAND = Symbol("abort-command");
+let generatedClipId = 0;
 
 function assertCommand(command) {
   if (!command || typeof command !== "object") {
@@ -81,6 +89,15 @@ function sortClips(clips) {
   });
 }
 
+function createClipId() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  generatedClipId += 1;
+  return `clip-${Date.now()}-${generatedClipId}`;
+}
+
 function findTrackIndex(tracks, trackId) {
   return tracks.findIndex((track) => track?.id === trackId);
 }
@@ -112,6 +129,11 @@ function findClipLocation(tracks, clipId, preferredTrackId = null) {
   return null;
 }
 
+function findTrackIdByClipId(tracks, clipId) {
+  const location = findClipLocation(tracks, clipId);
+  return location ? tracks[location.trackIndex]?.id ?? null : null;
+}
+
 function normalizeClipStart(value, fallback = 0) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
@@ -130,6 +152,15 @@ function normalizeClipDuration(value, fallback = 0.1) {
   return clampClipDuration(numeric);
 }
 
+function normalizeSplitDuration(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return 0;
+  }
+
+  return Number(numeric.toFixed(4));
+}
+
 function getPreviousClip(prevState, clipId, trackId) {
   const tracks = Array.isArray(prevState?.timeline?.tracks) ? prevState.timeline.tracks : [];
   const location = findClipLocation(tracks, clipId, trackId);
@@ -141,6 +172,92 @@ function getPreviousClip(prevState, clipId, trackId) {
     trackId: tracks[location.trackIndex]?.id ?? trackId ?? null,
     clip: cloneValue(tracks[location.trackIndex].clips[location.clipIndex]),
   };
+}
+
+function uniqueClipIds(clipIds) {
+  const ids = [];
+  const seen = new Set();
+
+  (Array.isArray(clipIds) ? clipIds : []).forEach((clipId) => {
+    if (clipId == null) {
+      return;
+    }
+
+    const normalized = String(clipId);
+    if (normalized.length === 0 || seen.has(normalized)) {
+      return;
+    }
+
+    seen.add(normalized);
+    ids.push(normalized);
+  });
+
+  return ids;
+}
+
+function getSelectionClipIds(selection, selectedClipId = null) {
+  const clipIds = uniqueClipIds(selection?.clipIds);
+  const primaryClipId = selectedClipId == null ? null : String(selectedClipId);
+
+  if (primaryClipId && !clipIds.includes(primaryClipId)) {
+    clipIds.push(primaryClipId);
+  }
+
+  return clipIds;
+}
+
+function normalizeSelectionPayload(state, payload = {}) {
+  const tracks = Array.isArray(state?.timeline?.tracks) ? state.timeline.tracks : [];
+  const requestedClipIds = payload.clipIds ?? (payload.clipId != null ? [payload.clipId] : []);
+  const clipIds = uniqueClipIds(requestedClipIds).filter((clipId) => Boolean(findClipLocation(tracks, clipId)));
+  const preferredClipId = payload.clipId == null ? null : String(payload.clipId);
+  const clipId = preferredClipId && clipIds.includes(preferredClipId)
+    ? preferredClipId
+    : clipIds.at(-1) ?? null;
+
+  let trackId;
+  if (Object.prototype.hasOwnProperty.call(payload, "trackId") && payload.trackId !== undefined) {
+    trackId = payload.trackId == null ? null : String(payload.trackId);
+  } else if (clipId) {
+    trackId = findTrackIdByClipId(tracks, clipId);
+  } else {
+    trackId = state?.selection?.trackId ?? null;
+  }
+
+  return {
+    trackId,
+    clipId,
+    clipIds,
+    selectedClipId: clipId,
+  };
+}
+
+function applySelectionToState(state, payload = {}) {
+  const nextSelection = normalizeSelectionPayload(state, payload);
+
+  return {
+    ...state,
+    selectedClipId: nextSelection.selectedClipId,
+    selection: {
+      trackId: nextSelection.trackId,
+      clipId: nextSelection.clipId,
+      clipIds: nextSelection.clipIds,
+    },
+  };
+}
+
+function removeClipFromSelection(state, clipId) {
+  const removedClipId = clipId == null ? null : String(clipId);
+  const clipIds = getSelectionClipIds(state?.selection, state?.selectedClipId)
+    .filter((candidate) => candidate !== removedClipId);
+  const primaryClipId = state?.selectedClipId === removedClipId
+    ? clipIds.at(-1) ?? null
+    : state?.selectedClipId ?? null;
+
+  return applySelectionToState(state, {
+    clipId: primaryClipId,
+    clipIds,
+  });
 }
 
 export function moveClipCommand({ clipId, newStart, newDur }) {
@@ -213,12 +330,74 @@ export function moveClipCommand({ clipId, newStart, newDur }) {
   };
 }
 
+export function splitClipCommand({ clipId, splitTime, trackId = null, newClipId = null }) {
+  return {
+    type: "splitClip",
+    clipId,
+    splitTime,
+    trackId,
+    newClipId,
+  };
+}
+
+export function batchCommand(commands) {
+  return {
+    type: "batch",
+    commands: Array.isArray(commands) ? commands : [],
+  };
+}
+
 function createBuiltInCommand(command) {
   if (typeof command.exec === "function") {
     return command;
   }
 
   switch (command.type) {
+    case "batch": {
+      let inverseCommands = [];
+
+      return {
+        ...command,
+        exec(state) {
+          const commands = Array.isArray(command.commands) ? command.commands : [];
+          let nextState = state;
+          let didApply = false;
+
+          inverseCommands = [];
+
+          for (const entry of commands) {
+            const normalized = normalizeCommand(entry);
+            const previousState = cloneValue(nextState);
+            const draftState = cloneValue(nextState);
+            const result = normalized.exec(draftState);
+
+            if (result === ABORT_COMMAND) {
+              continue;
+            }
+
+            const resolvedState = result ?? draftState;
+            if (!resolvedState || typeof resolvedState !== "object") {
+              throw new TypeError(`Command "${normalized.type}" must return a state object`);
+            }
+
+            nextState = resolvedState;
+            didApply = true;
+
+            if (typeof normalized.invert === "function") {
+              const inverse = normalized.invert(nextState, previousState);
+              if (inverse) {
+                inverseCommands.unshift(inverse);
+              }
+            }
+          }
+
+          return didApply ? nextState : ABORT_COMMAND;
+        },
+        invert() {
+          return inverseCommands.length > 0 ? batchCommand(inverseCommands) : null;
+        },
+      };
+    }
     case "addClip":
       return {
         ...command,
@@ -265,16 +444,7 @@ function createBuiltInCommand(command) {
             clips: track.clips.filter((clip) => clip?.id !== command.clipId),
           };
 
-          const selection = state.selection?.clipId === command.clipId
-            ? { trackId: null, clipId: null }
-            : state.selection;
-          const selectedClipId = state.selectedClipId === command.clipId ? null : state.selectedClipId;
-
-          return {
-            ...withUpdatedTimeline(state, tracks),
-            selection,
-            selectedClipId,
-          };
+          return removeClipFromSelection(withUpdatedTimeline(state, tracks), command.clipId);
         },
         invert(nextState, prevState) {
           const previous = getPreviousClip(prevState, command.clipId, command.trackId);
@@ -321,15 +491,16 @@ function createBuiltInCommand(command) {
             clips: sortClips([...tracks[targetTrackIndex].clips, movedClip]),
           };
 
-          const selection = state.selection?.clipId === command.clipId
-            ? { trackId: targetTrackId, clipId: command.clipId }
-            : state.selection;
+          const nextState = withUpdatedTimeline(state, tracks);
+          if (state.selectedClipId !== command.clipId) {
+            return nextState;
+          }
 
-          return {
-            ...withUpdatedTimeline(state, tracks),
-            selection,
-            selectedClipId: state.selectedClipId,
-          };
+          return applySelectionToState(nextState, {
+            trackId: targetTrackId,
+            clipId: state.selectedClipId,
+            clipIds: getSelectionClipIds(state.selection, state.selectedClipId),
+          });
         },
         invert(nextState, prevState) {
           const previous = getPreviousClip(prevState, command.clipId, command.fromTrackId);
@@ -344,6 +515,122 @@ function createBuiltInCommand(command) {
             trackId: previous.trackId,
             start: previous.clip.start,
           };
+        },
+      };
+    case "splitClip":
+      return {
+        ...command,
+        exec(state) {
+          const tracks = cloneTracks(getTimelineState(state));
+          const location = findClipLocation(tracks, command.clipId, command.trackId);
+          if (!location) {
+            throw new Error(`splitClip: clip "${command.clipId}" not found`);
+          }
+
+          const track = tracks[location.trackIndex];
+          const clip = track.clips[location.clipIndex];
+          const clipStart = Number(clip?.start) || 0;
+          const clipDur = getClipDuration(clip);
+          const clipEnd = clipStart + clipDur;
+          const splitTime = snapClipTime(command.splitTime);
+
+          if (
+            splitTime <= clipStart
+            || splitTime >= clipEnd
+            || splitTime - clipStart < MIN_CLIP_DURATION
+            || clipEnd - splitTime < MIN_CLIP_DURATION
+          ) {
+            return ABORT_COMMAND;
+          }
+
+          const leftClip = {
+            ...clip,
+            start: clipStart,
+            dur: normalizeSplitDuration(splitTime - clipStart),
+          };
+          const rightClip = {
+            ...cloneValue(clip),
+            id: command.newClipId || createClipId(),
+            start: splitTime,
+            dur: normalizeSplitDuration(clipEnd - splitTime),
+          };
+
+          if (Object.prototype.hasOwnProperty.call(leftClip, "duration")) {
+            leftClip.duration = leftClip.dur;
+          }
+
+          if (Object.prototype.hasOwnProperty.call(rightClip, "duration")) {
+            rightClip.duration = rightClip.dur;
+          }
+
+          const nextClips = [...track.clips];
+          nextClips.splice(location.clipIndex, 1, leftClip, rightClip);
+          tracks[location.trackIndex] = {
+            ...track,
+            clips: sortClips(nextClips),
+          };
+
+          return withUpdatedTimeline(state, tracks);
+        },
+        invert(nextState, prevState) {
+          const previous = getPreviousClip(prevState, command.clipId, command.trackId);
+          if (!previous) {
+            return null;
+          }
+
+          const nextTracks = Array.isArray(nextState?.timeline?.tracks) ? nextState.timeline.tracks : [];
+          const nextTrackIndex = findTrackIndex(nextTracks, previous.trackId);
+          const previousTracks = Array.isArray(prevState?.timeline?.tracks) ? prevState.timeline.tracks : [];
+          const previousTrackIndex = findTrackIndex(previousTracks, previous.trackId);
+          if (nextTrackIndex < 0 || previousTrackIndex < 0) {
+            return null;
+          }
+
+          const previousIds = new Set(previousTracks[previousTrackIndex].clips.map((clip) => clip?.id));
+          const addedClip = nextTracks[nextTrackIndex].clips.find((clip) => !previousIds.has(clip?.id));
+          if (!addedClip?.id) {
+            return null;
+          }
+
+          return {
+            type: "restoreSplitClip",
+            trackId: previous.trackId,
+            clipId: command.clipId,
+            addedClipId: addedClip.id,
+            originalClip: previous.clip,
+            splitTime: command.splitTime,
+          };
+        },
+      };
+    case "restoreSplitClip":
+      return {
+        ...command,
+        exec(state) {
+          const tracks = cloneTracks(getTimelineState(state));
+          const originalLocation = findClipLocation(tracks, command.clipId, command.trackId);
+          const addedLocation = findClipLocation(tracks, command.addedClipId, command.trackId);
+          if (!originalLocation || !addedLocation) {
+            throw new Error(`restoreSplitClip: could not resolve split pair for "${command.clipId}"`);
+          }
+
+          const track = tracks[originalLocation.trackIndex];
+          const nextClips = track.clips.filter((clip) => clip?.id !== command.addedClipId);
+          const restoreIndex = nextClips.findIndex((clip) => clip?.id === command.clipId);
+          nextClips[restoreIndex] = cloneValue(command.originalClip);
+          tracks[originalLocation.trackIndex] = {
+            ...track,
+            clips: sortClips(nextClips),
+          };
+
+          return removeClipFromSelection(withUpdatedTimeline(state, tracks), command.addedClipId);
+        },
+        invert() {
+          return splitClipCommand({
+            clipId: command.clipId,
+            splitTime: command.splitTime,
+            trackId: command.trackId,
+            newClipId: command.addedClipId,
+          });
         },
       };
     case "setClipParam":
@@ -395,24 +682,41 @@ function createBuiltInCommand(command) {
           };
         },
       };
+    case "setSelection":
+      return {
+        ...command,
+        exec(state) {
+          return applySelectionToState(state, {
+            trackId: command.trackId,
+            clipId: command.clipId ?? null,
+            clipIds: command.clipIds ?? [],
+          });
+        },
+        invert(nextState, prevState) {
+          return {
+            type: "setSelection",
+            trackId: prevState?.selection?.trackId ?? null,
+            clipId: prevState?.selection?.clipId ?? null,
+            clipIds: getSelectionClipIds(prevState?.selection, prevState?.selectedClipId),
+          };
+        },
+      };
     case "selectClip":
       return {
         ...command,
         exec(state) {
-          return {
-            ...state,
-            selectedClipId: command.clipId ?? null,
-            selection: {
-              trackId: command.trackId ?? null,
-              clipId: command.clipId ?? null,
-            },
-          };
+          return applySelectionToState(state, {
+            trackId: command.trackId,
+            clipId: command.clipId ?? null,
+            clipIds: command.clipId == null ? [] : [command.clipId],
+          });
         },
         invert(nextState, prevState) {
           return {
-            type: "selectClip",
+            type: "setSelection",
             trackId: prevState?.selection?.trackId ?? null,
             clipId: prevState?.selection?.clipId ?? null,
+            clipIds: getSelectionClipIds(prevState?.selection, prevState?.selectedClipId),
           };
         },
       };
