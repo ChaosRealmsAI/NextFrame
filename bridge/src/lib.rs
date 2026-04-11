@@ -472,13 +472,38 @@ fn handle_scene_list(params: &Value) -> Result<Value, String> {
             "category": "Shapes & Layout"
         },
         {
+            "id": "starfield",
+            "name": "Starfield",
+            "category": "Backgrounds"
+        },
+        {
+            "id": "circleRipple",
+            "name": "Circle Ripple",
+            "category": "Shapes & Layout"
+        },
+        {
+            "id": "countdown",
+            "name": "Countdown",
+            "category": "Typography"
+        },
+        {
             "id": "barChartReveal",
             "name": "Bar Chart Reveal",
             "category": "Data Viz"
         },
         {
+            "id": "lineChart",
+            "name": "Line Chart",
+            "category": "Data Viz"
+        },
+        {
             "id": "lowerThirdVelvet",
             "name": "Lower Third Velvet",
+            "category": "Overlays"
+        },
+        {
+            "id": "cornerBadge",
+            "name": "Corner Badge",
             "category": "Overlays"
         }
     ]))
@@ -497,7 +522,7 @@ fn handle_timeline_load(params: &Value) -> Result<Value, String> {
 fn handle_timeline_save(params: &Value) -> Result<Value, String> {
     let path = require_string(params, "path")?;
     let path_buf = resolve_write_path(path)?;
-    let json_value = require_value(params, "json")?;
+    let json_value = require_value_alias(params, &["json", "timeline"])?;
     let serialized = serde_json::to_string_pretty(json_value).map_err(|error| {
         format!(
             "failed to serialize timeline for '{}': {error}",
@@ -525,6 +550,28 @@ fn require_value<'a>(params: &'a Value, key: &str) -> Result<&'a Value, String> 
     require_object(params)?
         .get(key)
         .ok_or_else(|| format!("missing params.{key}"))
+}
+
+fn require_value_alias<'a>(params: &'a Value, keys: &[&str]) -> Result<&'a Value, String> {
+    let object = require_object(params)?;
+
+    for key in keys {
+        if let Some(value) = object.get(*key) {
+            return Ok(value);
+        }
+    }
+
+    match keys {
+        [] => Err("missing required params value".to_string()),
+        [key] => Err(format!("missing params.{key}")),
+        _ => Err(format!(
+            "missing one of {}",
+            keys.iter()
+                .map(|key| format!("params.{key}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
+    }
 }
 
 fn require_string<'a>(params: &'a Value, key: &str) -> Result<&'a str, String> {
@@ -1725,8 +1772,9 @@ mod tests {
         assert!(response.ok);
 
         let scenes = response.result.as_array().expect("scene array");
-        assert_eq!(scenes.len(), 5);
+        assert_eq!(scenes.len(), 10);
         assert_eq!(scenes[0].get("id"), Some(&json!("auroraGradient")));
+        assert_eq!(scenes[9].get("id"), Some(&json!("cornerBadge")));
 
         let error_response = dispatch(request("scene.list", json!("bad params")));
         assert!(!error_response.ok);
@@ -1826,6 +1874,43 @@ mod tests {
                 "background": "#0b0b14",
                 "tracks": [
                     { "id": "track-2", "kind": "video", "clips": [] }
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn timeline_save_accepts_timeline_alias() {
+        let temp = TestDir::new("timeline-save-alias");
+        let timeline_path = temp.join("saved-timeline-alias.json");
+        let timeline_path_string = timeline_path.display().to_string();
+
+        let response = dispatch(request(
+            "timeline.save",
+            json!({
+                "path": timeline_path_string,
+                "timeline": {
+                    "version": "1",
+                    "duration": 45,
+                    "background": "#050814",
+                    "tracks": [
+                        { "id": "track-3", "kind": "video", "clips": [] }
+                    ]
+                }
+            }),
+        ));
+        assert!(response.ok);
+
+        let saved = fs::read_to_string(&timeline_path).expect("read saved timeline");
+        let saved_json: Value = serde_json::from_str(&saved).expect("parse saved timeline");
+        assert_eq!(
+            saved_json,
+            json!({
+                "version": "1",
+                "duration": 45,
+                "background": "#050814",
+                "tracks": [
+                    { "id": "track-3", "kind": "video", "clips": [] }
                 ]
             })
         );

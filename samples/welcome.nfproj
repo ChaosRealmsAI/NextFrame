@@ -1,0 +1,286 @@
+{
+  "version": "1",
+  "duration": 45,
+  "background": "#050814",
+  "assets": [
+    {
+      "id": "demo-tone",
+      "name": "Demo Audio",
+      "path": "../runtime/web/assets/demo-audio.wav",
+      "kind": "audio",
+      "duration": 2
+    }
+  ],
+  "tracks": [
+    {
+      "id": "v1",
+      "label": "V1",
+      "name": "Video 1",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "welcome-aurora",
+          "start": 0,
+          "dur": 10,
+          "scene": "auroraGradient",
+          "params": {
+            "hueA": 232,
+            "hueB": 154,
+            "hueC": 312,
+            "intensity": 1.26,
+            "grain": 0.05
+          }
+        },
+        {
+          "id": "welcome-grid",
+          "start": 10,
+          "dur": 8,
+          "scene": "neonGrid",
+          "params": {
+            "hueHorizon": 336,
+            "hueGrid": 286,
+            "scrollSpeed": 0.68,
+            "lineCount": 18,
+            "colCount": 26
+          }
+        },
+        {
+          "id": "welcome-starfield",
+          "start": 18,
+          "dur": 9,
+          "scene": "starfield",
+          "params": {
+            "hueBase": 218,
+            "hueShift": 96,
+            "drift": 0.08,
+            "density": 1.35,
+            "glow": 1.2
+          }
+        },
+        {
+          "id": "welcome-ripple",
+          "start": 27,
+          "dur": 8,
+          "scene": "circleRipple",
+          "params": {
+            "hueStart": 186,
+            "hueSpan": 210,
+            "ringCount": 10,
+            "interval": 0.22,
+            "lifespan": 2.4,
+            "thickness": 0.014
+          }
+        },
+        {
+          "id": "welcome-countdown",
+          "start": 35,
+          "dur": 10,
+          "scene": "countdown",
+          "params": {
+            "sequence": [
+              "5",
+              "4",
+              "3",
+              "2",
+              "1",
+              "GO"
+            ],
+            "subtitle": "EXPORT IN 45 SECONDS",
+            "hueStart": 18,
+            "hueEnd": 148,
+            "accentHue": 326
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2",
+      "label": "V2",
+      "name": "Video 2",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "welcome-headline",
+          "start": 2,
+          "dur": 6,
+          "scene": "kineticHeadline",
+          "params": {
+            "text": "AI CAN OPERATE NEXTFRAME",
+            "subtitle": "Prompt it. Inspect it. Save it.",
+            "hueStart": 34,
+            "hueEnd": 318,
+            "stagger": 0.12,
+            "size": 0.108
+          }
+        },
+        {
+          "id": "welcome-bars",
+          "start": 11,
+          "dur": 6,
+          "scene": "barChartReveal",
+          "params": {
+            "title": "SCENE COVERAGE",
+            "unit": "%",
+            "hueStart": 192,
+            "hueEnd": 332,
+            "stagger": 0.08,
+            "barDur": 0.92,
+            "data": [
+              {
+                "label": "Scenes",
+                "value": 100
+              },
+              {
+                "label": "Audio",
+                "value": 84
+              },
+              {
+                "label": "Bridge",
+                "value": 91
+              },
+              {
+                "label": "Export",
+                "value": 88
+              },
+              {
+                "label": "Save",
+                "value": 100
+              }
+            ]
+          }
+        },
+        {
+          "id": "welcome-line",
+          "start": 20,
+          "dur": 6,
+          "scene": "lineChart",
+          "params": {
+            "title": "PLAYHEAD CONFIDENCE",
+            "unit": "%",
+            "hueStart": 178,
+            "hueEnd": 304,
+            "drawStart": 0.18,
+            "drawEnd": 2.4,
+            "data": [
+              22,
+              29,
+              35,
+              46,
+              58,
+              68,
+              79,
+              92
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v3",
+      "label": "V3",
+      "name": "Video 3",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "welcome-lower-third",
+          "start": 29,
+          "dur": 6,
+          "scene": "lowerThirdVelvet",
+          "params": {
+            "title": "Bridge-Driven Demo",
+            "subtitle": "Open samples/welcome.nfproj on first launch",
+            "hueA": 24,
+            "hueB": 326,
+            "holdEnd": 4.9,
+            "fadeOut": 0.8
+          }
+        },
+        {
+          "id": "welcome-badge",
+          "start": 37,
+          "dur": 6,
+          "scene": "cornerBadge",
+          "params": {
+            "label": "LIVE AI",
+            "subtitle": "SCENES · TIMELINE · EXPORT",
+            "hue": 348,
+            "accentHue": 34,
+            "inset": 0.04
+          }
+        }
+      ]
+    },
+    {
+      "id": "a1",
+      "label": "A1",
+      "name": "Audio 1",
+      "kind": "audio",
+      "clips": [
+        {
+          "id": "welcome-tone-a",
+          "start": 4,
+          "dur": 2,
+          "assetId": "demo-tone",
+          "params": {
+            "src": "../runtime/web/assets/demo-audio.wav",
+            "volume": 0.16,
+            "gainAutomation": [
+              {
+                "time": 0,
+                "value": 0
+              },
+              {
+                "time": 0.12,
+                "value": 0.16
+              },
+              {
+                "time": 1.65,
+                "value": 0.16
+              },
+              {
+                "time": 2,
+                "value": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "a2",
+      "label": "A2",
+      "name": "Audio 2",
+      "kind": "audio",
+      "clips": [
+        {
+          "id": "welcome-tone-b",
+          "start": 24,
+          "dur": 2,
+          "assetId": "demo-tone",
+          "params": {
+            "src": "../runtime/web/assets/demo-audio.wav",
+            "volume": 0.12,
+            "gainAutomation": [
+              {
+                "time": 0,
+                "value": 0
+              },
+              {
+                "time": 0.1,
+                "value": 0.12
+              },
+              {
+                "time": 1.55,
+                "value": 0.12
+              },
+              {
+                "time": 2,
+                "value": 0
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
