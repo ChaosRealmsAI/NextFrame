@@ -1520,7 +1520,7 @@
 
     <script type="module">
       import * as bridge from "./src/bridge.js";
-      import { loadAudioBuffer, normalizeAudioUrl } from "./src/audio/buffer.js";
+      import { loadAudioBuffer, mergeProjectAssets, normalizeAudioUrl } from "./src/audio/buffer.js";
       import * as engine from "./src/engine/index.js";
       import { initMenu } from "./src/menu.js";
       import { mountPreview } from "./src/preview/index.js";
@@ -1648,10 +1648,11 @@
       function createAudioAssetBufferSync(store) {
         let requestId = 0;
         let lastAssetsRef = store.state.assets;
+        let lastTimelineAssetsRef = store.state.timeline?.assets;
 
         async function syncAssets(state) {
           const currentRequestId = ++requestId;
-          const assets = Array.isArray(state?.assets) ? state.assets : [];
+          const assets = mergeProjectAssets(state);
           const audioAssets = assets.filter((asset) => asset?.kind === "audio");
 
           if (audioAssets.length === 0) {
@@ -1697,8 +1698,10 @@
         }
 
         const unsubscribe = store.subscribe((nextState) => {
-          if (nextState.assets !== lastAssetsRef) {
+          const nextTimelineAssetsRef = nextState.timeline?.assets;
+          if (nextState.assets !== lastAssetsRef || nextTimelineAssetsRef !== lastTimelineAssetsRef) {
             lastAssetsRef = nextState.assets;
+            lastTimelineAssetsRef = nextTimelineAssetsRef;
             void syncAssets(nextState);
           }
         });

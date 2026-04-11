@@ -1,7 +1,6 @@
 let audioContext = null;
 let resumeListenerBound = false;
 let resumeListener = null;
-const pendingResolvers = new Set();
 
 function getAudioContextConstructor() {
   return globalThis.AudioContext || globalThis.webkitAudioContext || null;
@@ -11,23 +10,14 @@ function hasUserActivation() {
   return Boolean(globalThis.navigator?.userActivation?.isActive);
 }
 
-function resolvePending(context) {
-  for (const resolve of pendingResolvers) {
-    resolve(context);
-  }
-  pendingResolvers.clear();
-}
-
 function createAudioContext() {
   const AudioContextCtor = getAudioContextConstructor();
   if (!AudioContextCtor) {
-    resolvePending(null);
     return null;
   }
 
   if (!audioContext) {
     audioContext = new AudioContextCtor();
-    resolvePending(audioContext);
   }
 
   return audioContext;
@@ -98,27 +88,11 @@ export function getAudioContext() {
   return null;
 }
 
-export function waitForAudioContext() {
-  const context = getAudioContext();
-  if (context) {
-    return Promise.resolve(context);
-  }
-
-  if (!getAudioContextConstructor()) {
-    return Promise.resolve(null);
-  }
-
-  return new Promise((resolve) => {
-    pendingResolvers.add(resolve);
-  });
-}
-
 export function disposeAudioContextForTests() {
   if (audioContext && typeof audioContext.close === "function") {
     void audioContext.close();
   }
   audioContext = null;
-  resolvePending(null);
   if (resumeListenerBound) {
     detachResumeListener();
   }

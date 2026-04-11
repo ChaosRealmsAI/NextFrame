@@ -1,4 +1,4 @@
-import { normalizeAudioUrl } from "./buffer.js";
+import { createProjectAssetIndex, normalizeAudioUrl } from "./buffer.js";
 
 function readFiniteNumber(value, fallback = 0) {
   const parsed = Number(value);
@@ -34,54 +34,6 @@ function isAudioBufferLike(value) {
     && typeof value.getChannelData === "function";
 }
 
-function mergeAssets(state) {
-  const merged = [];
-  const seen = new Set();
-  const candidates = [
-    ...(Array.isArray(state?.timeline?.assets) ? state.timeline.assets : []),
-    ...(Array.isArray(state?.assets) ? state.assets : []),
-  ];
-
-  candidates.forEach((asset) => {
-    if (!asset || typeof asset !== "object") {
-      return;
-    }
-
-    const key = typeof asset.id === "string" && asset.id.length > 0
-      ? `id:${asset.id}`
-      : `path:${asset.path || asset.url || ""}`;
-
-    if (seen.has(key)) {
-      return;
-    }
-
-    seen.add(key);
-    merged.push(asset);
-  });
-
-  return merged;
-}
-
-function buildAssetIndex(state) {
-  const assets = mergeAssets(state);
-  const byId = new Map();
-  const byPath = new Map();
-
-  assets.forEach((asset) => {
-    if (typeof asset.id === "string" && asset.id.length > 0) {
-      byId.set(asset.id, asset);
-    }
-
-    const candidatePath = asset.path || asset.url;
-    const normalizedPath = normalizeAudioUrl(candidatePath);
-    if (normalizedPath) {
-      byPath.set(normalizedPath, asset);
-    }
-  });
-
-  return { byId, byPath };
-}
-
 function resolveClipSourceUrl(clip, assetIndex) {
   const params = clip?.params && typeof clip.params === "object" ? clip.params : {};
   const assetId = typeof params.assetId === "string" && params.assetId.length > 0
@@ -115,7 +67,7 @@ function collectScheduleEntries(state, playhead, horizon) {
     return [];
   }
 
-  const assetIndex = buildAssetIndex(state);
+  const assetIndex = createProjectAssetIndex(state);
   const tracks = Array.isArray(state?.timeline?.tracks) ? state.timeline.tracks : [];
   const windowStart = wrapTime(playhead, duration);
   const windowEnd = windowStart + horizon;

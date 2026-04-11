@@ -1,4 +1,4 @@
-import { normalizeAudioUrl } from "../audio/buffer.js";
+import { createProjectAssetIndex, normalizeAudioUrl } from "../audio/buffer.js";
 import { createClip } from "./clip.js";
 import { getTickStep } from "./ruler.js";
 
@@ -60,52 +60,6 @@ function createHeaderIcon(kind, active) {
   return badge;
 }
 
-function mergeAssets(state) {
-  const merged = [];
-  const seen = new Set();
-  const candidates = [
-    ...(Array.isArray(state?.timeline?.assets) ? state.timeline.assets : []),
-    ...(Array.isArray(state?.assets) ? state.assets : []),
-  ];
-
-  candidates.forEach((asset) => {
-    if (!asset || typeof asset !== "object") {
-      return;
-    }
-
-    const key = typeof asset.id === "string" && asset.id.length > 0
-      ? `id:${asset.id}`
-      : `path:${asset.path || asset.url || ""}`;
-
-    if (seen.has(key)) {
-      return;
-    }
-
-    seen.add(key);
-    merged.push(asset);
-  });
-
-  return merged;
-}
-
-function createAssetIndex(state) {
-  const byId = new Map();
-  const byUrl = new Map();
-
-  mergeAssets(state).forEach((asset) => {
-    if (typeof asset.id === "string" && asset.id.length > 0) {
-      byId.set(asset.id, asset);
-    }
-
-    const normalizedUrl = normalizeAudioUrl(asset.path || asset.url);
-    if (normalizedUrl) {
-      byUrl.set(normalizedUrl, asset);
-    }
-  });
-
-  return { byId, byUrl };
-}
-
 function resolveClipAudioBuffer(track, clip, state, assetIndex) {
   if (track?.kind !== "audio" || !(state?.assetBuffers instanceof Map)) {
     return null;
@@ -133,7 +87,7 @@ export function createTrackRow(track, { duration, zoom, store }) {
   const laneWidth = Math.max(zoom.timeToPx(safeDuration), 1);
   const majorStep = getTickStep(zoom.pxPerSecond);
   const minorStep = majorStep === 1 ? 0.5 : majorStep === 5 ? 1 : 2;
-  const assetIndex = createAssetIndex(store?.state);
+  const assetIndex = createProjectAssetIndex(store?.state);
 
   const row = document.createElement("div");
   row.className = "timeline-track-row";

@@ -1,4 +1,4 @@
-import { getAudioContext, waitForAudioContext } from "./context.js";
+let decodeAudioContext = null;
 
 const audioBufferCache = new Map();
 
@@ -33,6 +33,69 @@ export function normalizeAudioUrl(url) {
   }
 }
 
+export function mergeProjectAssets(state) {
+  const merged = [];
+  const seen = new Set();
+  const candidates = [
+    ...(Array.isArray(state?.timeline?.assets) ? state.timeline.assets : []),
+    ...(Array.isArray(state?.assets) ? state.assets : []),
+  ];
+
+  candidates.forEach((asset) => {
+    if (!asset || typeof asset !== "object") {
+      return;
+    }
+
+    const key = typeof asset.id === "string" && asset.id.length > 0
+      ? `id:${asset.id}`
+      : `path:${asset.path || asset.url || ""}`;
+
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    merged.push(asset);
+  });
+
+  return merged;
+}
+
+export function createProjectAssetIndex(state) {
+  const byId = new Map();
+  const byUrl = new Map();
+
+  mergeProjectAssets(state).forEach((asset) => {
+    if (typeof asset.id === "string" && asset.id.length > 0) {
+      byId.set(asset.id, asset);
+    }
+
+    const normalizedUrl = normalizeAudioUrl(asset.path || asset.url);
+    if (normalizedUrl) {
+      byUrl.set(normalizedUrl, asset);
+    }
+  });
+
+  return { byId, byUrl };
+}
+
+function getDecodeAudioContextConstructor() {
+  return globalThis.OfflineAudioContext || globalThis.webkitOfflineAudioContext || null;
+}
+
+function getDecodeAudioContext() {
+  const OfflineAudioContextCtor = getDecodeAudioContextConstructor();
+  if (!OfflineAudioContextCtor) {
+    return null;
+  }
+
+  if (!decodeAudioContext) {
+    decodeAudioContext = new OfflineAudioContextCtor(1, 1, 44100);
+  }
+
+  return decodeAudioContext;
+}
+
 export async function loadAudioBuffer(url) {
   const normalizedUrl = normalizeAudioUrl(url);
   if (!normalizedUrl) {
@@ -44,8 +107,8 @@ export async function loadAudioBuffer(url) {
   }
 
   const pending = (async () => {
-    const audioContext = getAudioContext() || await waitForAudioContext();
-    if (!audioContext) {
+    const audioContext = getDecodeAudioContext();
+    if (!audioContext || typeof audioContext.decodeAudioData !== "function") {
       return null;
     }
 
