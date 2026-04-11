@@ -4,9 +4,9 @@ import { createLoop } from "./loop.js";
 import { drawSafeArea } from "./safeArea.js";
 
 const DEFAULT_TIMELINE = {
-  version: 1,
-  duration: 0,
-  background: "#000",
+  version: "1",
+  duration: 30,
+  background: "#0b0b14",
   tracks: [],
 };
 
@@ -184,7 +184,7 @@ function getTimeline(state) {
   if (timeline && typeof timeline === "object") {
     return timeline.background
       ? timeline
-      : { ...timeline, background: "#000" };
+      : { ...timeline, background: "#0b0b14" };
   }
 
   return DEFAULT_TIMELINE;

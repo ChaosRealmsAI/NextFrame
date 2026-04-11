@@ -1,3 +1,5 @@
+#[cfg(not(test))]
+use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::env;
@@ -120,20 +122,23 @@ fn handle_fs_list_dir(params: &Value) -> Result<Value, String> {
 }
 
 fn handle_fs_dialog_open(params: &Value) -> Result<Value, String> {
-    let filters = require_array(params, "filters")?;
+    let filters = parse_dialog_filters(params)?;
+    let selected = show_open_dialog(&filters);
 
     Ok(json!({
-        "status": "unimplemented",
-        "filters": filters,
+        "path": selected.as_ref().map(|path| path.display().to_string()),
+        "canceled": selected.is_none(),
     }))
 }
 
 fn handle_fs_dialog_save(params: &Value) -> Result<Value, String> {
-    let default_name = require_string(params, "default_name")?;
+    let default_name = require_string_alias(params, &["defaultName", "default_name"])?;
+    let selected =
+        show_save_dialog(default_name).map(|path| with_default_extension(path, default_name));
 
     Ok(json!({
-        "status": "unimplemented",
-        "default_name": default_name,
+        "path": selected.as_ref().map(|path| path.display().to_string()),
+        "canceled": selected.is_none(),
     }))
 }
 
@@ -205,12 +210,13 @@ fn handle_timeline_save(params: &Value) -> Result<Value, String> {
         )
     })?;
 
-    fs::write(&path_buf, &serialized)
+    let bytes_written = serialized.len();
+    fs::write(&path_buf, serialized)
         .map_err(|error| format!("failed to write timeline '{}': {error}", path_buf.display()))?;
 
     Ok(json!({
         "path": path,
-        "bytesWritten": serialized.len(),
+        "bytesWritten": bytes_written,
     }))
 }
 
@@ -232,10 +238,136 @@ fn require_string<'a>(params: &'a Value, key: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("params.{key} must be a string"))
 }
 
+fn require_string_alias<'a>(params: &'a Value, keys: &[&str]) -> Result<&'a str, String> {
+    let object = require_object(params)?;
+
+    for key in keys {
+        if let Some(value) = object.get(*key) {
+            return value
+                .as_str()
+                .ok_or_else(|| format!("params.{key} must be a string"));
+        }
+    }
+
+    Err(format!("missing params.{}", keys[0]))
+}
+
 fn require_array<'a>(params: &'a Value, key: &str) -> Result<&'a Vec<Value>, String> {
     require_value(params, key)?
         .as_array()
         .ok_or_else(|| format!("params.{key} must be an array"))
+}
+
+fn parse_dialog_filters(params: &Value) -> Result<Vec<String>, String> {
+    let filters = require_array(params, "filters")?;
+    let mut extensions = Vec::new();
+
+    for (index, filter) in filters.iter().enumerate() {
+        match filter {
+            Value::String(extension) => {
+                if let Some(normalized) = normalize_extension(extension) {
+                    extensions.push(normalized);
+                } else {
+                    return Err(format!("params.filters[{index}] must not be empty"));
+                }
+            }
+            Value::Object(object) => {
+                let values = object
+                    .get("extensions")
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| {
+                        format!("params.filters[{index}].extensions must be an array")
+                    })?;
+
+                for (extension_index, value) in values.iter().enumerate() {
+                    let extension = value.as_str().ok_or_else(|| {
+                        format!(
+                            "params.filters[{index}].extensions[{extension_index}] must be a string"
+                        )
+                    })?;
+
+                    if let Some(normalized) = normalize_extension(extension) {
+                        extensions.push(normalized);
+                    } else {
+                        return Err(format!(
+                            "params.filters[{index}].extensions[{extension_index}] must not be empty"
+                        ));
+                    }
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "params.filters[{index}] must be a string or filter object"
+                ));
+            }
+        }
+    }
+
+    Ok(extensions)
+}
+
+fn normalize_extension(extension: &str) -> Option<String> {
+    let trimmed = extension.trim().trim_start_matches('.');
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn with_default_extension(path: PathBuf, default_name: &str) -> PathBuf {
+    if path.extension().is_some() {
+        return path;
+    }
+
+    let Some(extension) = Path::new(default_name)
+        .extension()
+        .and_then(|value| value.to_str())
+    else {
+        return path;
+    };
+
+    if extension.is_empty() {
+        return path;
+    }
+
+    path.with_extension(extension)
+}
+
+#[cfg(not(test))]
+fn show_open_dialog(filters: &[String]) -> Option<PathBuf> {
+    let mut dialog = FileDialog::new();
+
+    if !filters.is_empty() {
+        let filter_refs = filters.iter().map(String::as_str).collect::<Vec<_>>();
+        dialog = dialog.add_filter("Supported Files", &filter_refs);
+    }
+
+    dialog.pick_file()
+}
+
+#[cfg(test)]
+fn show_open_dialog(_filters: &[String]) -> Option<PathBuf> {
+    Some(env::temp_dir().join("dialog-open.nfproj"))
+}
+
+#[cfg(not(test))]
+fn show_save_dialog(default_name: &str) -> Option<PathBuf> {
+    let mut dialog = FileDialog::new().set_file_name(default_name);
+
+    if let Some(extension) = Path::new(default_name)
+        .extension()
+        .and_then(|value| value.to_str())
+    {
+        dialog = dialog.add_filter("NextFrame Projects", &[extension]);
+    }
+
+    dialog.save_file()
+}
+
+#[cfg(test)]
+fn show_save_dialog(default_name: &str) -> Option<PathBuf> {
+    Some(env::temp_dir().join(default_name))
 }
 
 fn validate_path(raw_path: &str) -> Result<PathBuf, String> {
@@ -327,6 +459,7 @@ fn home_dir() -> Option<PathBuf> {
 mod tests {
     use super::{dispatch, Request};
     use serde_json::{json, Value};
+    use std::env;
     use std::fs;
     use std::io;
     use std::path::{Path, PathBuf};
@@ -514,12 +647,19 @@ mod tests {
             "fs.dialogOpen",
             json!({
                 "filters": [
-                    { "name": "JSON", "extensions": ["json"] }
+                    ".nfproj"
                 ]
             }),
         ));
         assert!(response.ok);
-        assert_eq!(response.result.get("status"), Some(&json!("unimplemented")));
+        assert_eq!(
+            response.result.get("path"),
+            Some(&json!(env::temp_dir()
+                .join("dialog-open.nfproj")
+                .display()
+                .to_string()))
+        );
+        assert_eq!(response.result.get("canceled"), Some(&json!(false)));
 
         let error_response = dispatch(request("fs.dialogOpen", json!({})));
         assert!(!error_response.ok);
@@ -530,17 +670,21 @@ mod tests {
     fn fs_dialog_save_dispatch_happy_and_error() {
         let response = dispatch(request(
             "fs.dialogSave",
-            json!({ "default_name": "project.json" }),
+            json!({ "defaultName": "project.nfproj" }),
         ));
         assert!(response.ok);
         assert_eq!(
-            response.result.get("default_name"),
-            Some(&json!("project.json"))
+            response.result.get("path"),
+            Some(&json!(env::temp_dir()
+                .join("project.nfproj")
+                .display()
+                .to_string()))
         );
+        assert_eq!(response.result.get("canceled"), Some(&json!(false)));
 
         let error_response = dispatch(request("fs.dialogSave", json!({})));
         assert!(!error_response.ok);
-        assert_error_contains(&error_response.error, "missing params.default_name");
+        assert_error_contains(&error_response.error, "missing params.defaultName");
     }
 
     #[test]
@@ -580,12 +724,12 @@ mod tests {
     }
 
     #[test]
-    fn timeline_load_dispatch_happy_and_error() {
+    fn timeline_load_dispatch_happy_path() {
         let temp = TestDir::new("timeline-load");
         let timeline_path = temp.join("timeline.json");
         fs::write(
             &timeline_path,
-            r#"{"version":1,"tracks":[{"id":"track-1","clips":[]}]}"#,
+            r##"{"version":"1","duration":30,"background":"#0b0b14","tracks":[{"id":"track-1","kind":"video","clips":[]}]}"##,
         )
         .expect("write timeline");
 
@@ -597,13 +741,20 @@ mod tests {
         assert_eq!(
             response.result,
             json!({
-                "version": 1,
+                "version": "1",
+                "duration": 30,
+                "background": "#0b0b14",
                 "tracks": [
-                    { "id": "track-1", "clips": [] }
+                    { "id": "track-1", "kind": "video", "clips": [] }
                 ]
             })
         );
+    }
 
+    #[test]
+    fn timeline_load_dispatch_error_on_invalid_json() {
+        let temp = TestDir::new("timeline-load-invalid");
+        let timeline_path = temp.join("timeline.json");
         fs::write(&timeline_path, "not-json").expect("write invalid timeline");
         let error_response = dispatch(request(
             "timeline.load",
@@ -630,7 +781,7 @@ mod tests {
     }
 
     #[test]
-    fn timeline_save_dispatch_happy_and_error() {
+    fn timeline_save_dispatch_happy_path() {
         let temp = TestDir::new("timeline-save");
         let timeline_path = temp.join("saved-timeline.json");
         let timeline_path_string = timeline_path.display().to_string();
@@ -640,18 +791,38 @@ mod tests {
             json!({
                 "path": timeline_path_string,
                 "json": {
-                    "version": 2,
+                    "version": "1",
+                    "duration": 30,
+                    "background": "#0b0b14",
                     "tracks": [
-                        { "id": "track-2", "clips": [] }
+                        { "id": "track-2", "kind": "video", "clips": [] }
                     ]
                 }
             }),
         ));
         assert!(response.ok);
+        assert_eq!(
+            response.result.get("path"),
+            Some(&json!(timeline_path.display().to_string()))
+        );
 
         let saved = fs::read_to_string(&timeline_path).expect("read saved timeline");
-        assert!(saved.contains("\"version\": 2"));
+        let saved_json: Value = serde_json::from_str(&saved).expect("parse saved timeline");
+        assert_eq!(
+            saved_json,
+            json!({
+                "version": "1",
+                "duration": 30,
+                "background": "#0b0b14",
+                "tracks": [
+                    { "id": "track-2", "kind": "video", "clips": [] }
+                ]
+            })
+        );
+    }
 
+    #[test]
+    fn timeline_save_dispatch_error_on_disallowed_path() {
         let error_response = dispatch(request(
             "timeline.save",
             json!({

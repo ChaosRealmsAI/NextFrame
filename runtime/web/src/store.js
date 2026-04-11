@@ -4,21 +4,34 @@ const DEFAULT_PROJECT = {
   aspectRatio: 16 / 9,
 };
 
-const DEFAULT_TIMELINE = {
-  version: 1,
-  duration: 0,
-  background: "#000",
-  tracks: [],
-};
+export function createDefaultTimeline() {
+  return {
+    version: "1",
+    duration: 30,
+    background: "#0b0b14",
+    tracks: [],
+  };
+}
 
-export const store = {
-  state: {
+function createInitialState() {
+  return {
     playhead: 0,
     playing: false,
     showSafeArea: false,
     project: { ...DEFAULT_PROJECT },
-    timeline: { ...DEFAULT_TIMELINE },
-  },
+    timeline: createDefaultTimeline(),
+    filePath: null,
+    dirty: false,
+    ui: {
+      zoom: 1,
+      timelineVisible: true,
+      inspectorVisible: true,
+    },
+  };
+}
+
+export const store = {
+  state: createInitialState(),
   listeners: new Set(),
   subscribe(listener) {
     if (typeof listener !== "function") {
@@ -35,7 +48,13 @@ export const store = {
       throw new TypeError("store.mutate(recipe) requires a function");
     }
 
+    const prevDirty = this.state.dirty;
+    const prevTimeline = this.state.timeline;
     recipe(this.state);
+
+    if (this.state.timeline !== prevTimeline && this.state.dirty === prevDirty) {
+      this.state.dirty = true;
+    }
 
     for (const listener of this.listeners) {
       listener(this.state);

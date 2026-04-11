@@ -101,6 +101,12 @@
         gap: 6px;
       }
 
+      .menu-bar {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+
       .brand {
         display: flex;
         align-items: center;
@@ -126,7 +132,6 @@
         text-transform: uppercase;
       }
 
-      .menu-pill,
       .menu-button,
       .menu-chip {
         display: inline-flex;
@@ -141,14 +146,88 @@
         white-space: nowrap;
       }
 
-      .menu-pill {
-        font-size: 12px;
+      .menu-root {
+        position: relative;
       }
 
-      .menu-pill.active {
+      .menu-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 24px;
+        padding: 0 11px;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--text-dim);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .menu-root[data-open="true"] .menu-trigger,
+      .menu-trigger:hover {
         border-color: rgba(99, 102, 241, 0.38);
         background: var(--accent-soft);
         color: var(--text);
+      }
+
+      .menu-dropdown {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        min-width: 216px;
+        display: none;
+        flex-direction: column;
+        padding: 8px;
+        border: 1px solid var(--border-strong);
+        border-radius: 14px;
+        background:
+          linear-gradient(180deg, rgba(25, 25, 37, 0.98), rgba(16, 16, 24, 0.98));
+        box-shadow: var(--shadow-lg);
+        z-index: 50;
+      }
+
+      .menu-root[data-open="true"] .menu-dropdown {
+        display: flex;
+      }
+
+      .menu-item {
+        display: grid;
+        grid-template-columns: 16px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 32px;
+        padding: 0 10px;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .menu-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .menu-check {
+        color: var(--success);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .menu-shortcut {
+        color: var(--text-faint);
+        font-size: 11px;
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      }
+
+      .menu-divider {
+        height: 1px;
+        margin: 6px 2px;
+        background: rgba(255, 255, 255, 0.06);
       }
 
       .menu-button {
@@ -156,6 +235,7 @@
         border-color: var(--border);
         background: rgba(255, 255, 255, 0.02);
         color: var(--text);
+        cursor: pointer;
       }
 
       .menu-button.primary {
@@ -179,6 +259,11 @@
         border-radius: 50%;
         background: #22c55e;
         box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
+      }
+
+      .menu-chip.is-dirty .status-dot {
+        background: var(--warning);
+        box-shadow: 0 0 10px rgba(245, 158, 11, 0.9);
       }
 
       #workspace {
@@ -443,6 +528,12 @@
         justify-content: center;
         padding: 8px;
         container-type: size;
+      }
+
+      #preview-stage-slot > * {
+        transform: scale(var(--preview-zoom, 1));
+        transform-origin: center center;
+        transition: transform 140ms ease;
       }
 
       .preview-canvas-frame {
@@ -987,19 +1078,152 @@
             <div class="brand-badge" aria-hidden="true"></div>
             <div class="brand-name">NextFrame</div>
           </div>
-          <div class="menu-pill active">File</div>
-          <div class="menu-pill">Edit</div>
-          <div class="menu-pill">Clip</div>
-          <div class="menu-pill">Sequence</div>
-          <div class="menu-pill">View</div>
+          <nav class="menu-bar" aria-label="Application menu">
+            <div class="menu-root" data-menu-root="file" data-open="false">
+              <button
+                class="menu-trigger"
+                type="button"
+                data-menu-trigger="file"
+                aria-expanded="false"
+              >
+                File
+              </button>
+              <div class="menu-dropdown" role="menu" aria-label="File">
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="new">
+                  <span class="menu-check"></span>
+                  <span>New</span>
+                  <span class="menu-shortcut">Cmd+N</span>
+                </button>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="open">
+                  <span class="menu-check"></span>
+                  <span>Open…</span>
+                  <span class="menu-shortcut">Cmd+O</span>
+                </button>
+                <div class="menu-divider" role="separator"></div>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="save">
+                  <span class="menu-check"></span>
+                  <span>Save</span>
+                  <span class="menu-shortcut">Cmd+S</span>
+                </button>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="saveAs">
+                  <span class="menu-check"></span>
+                  <span>Save As…</span>
+                  <span class="menu-shortcut">Cmd+Shift+S</span>
+                </button>
+                <div class="menu-divider" role="separator"></div>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="close">
+                  <span class="menu-check"></span>
+                  <span>Close</span>
+                  <span class="menu-shortcut"></span>
+                </button>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="export">
+                  <span class="menu-check"></span>
+                  <span>Export…</span>
+                  <span class="menu-shortcut"></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="menu-root" data-menu-root="edit" data-open="false">
+              <button
+                class="menu-trigger"
+                type="button"
+                data-menu-trigger="edit"
+                aria-expanded="false"
+              >
+                Edit
+              </button>
+              <div class="menu-dropdown" role="menu" aria-label="Edit">
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="undo">
+                  <span class="menu-check"></span>
+                  <span>Undo</span>
+                  <span class="menu-shortcut">Cmd+Z</span>
+                </button>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="redo">
+                  <span class="menu-check"></span>
+                  <span>Redo</span>
+                  <span class="menu-shortcut">Cmd+Shift+Z</span>
+                </button>
+                <div class="menu-divider" role="separator"></div>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="cut">
+                  <span class="menu-check"></span>
+                  <span>Cut</span>
+                  <span class="menu-shortcut">Cmd+X</span>
+                </button>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="copy">
+                  <span class="menu-check"></span>
+                  <span>Copy</span>
+                  <span class="menu-shortcut">Cmd+C</span>
+                </button>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="paste">
+                  <span class="menu-check"></span>
+                  <span>Paste</span>
+                  <span class="menu-shortcut">Cmd+V</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="menu-root" data-menu-root="view" data-open="false">
+              <button
+                class="menu-trigger"
+                type="button"
+                data-menu-trigger="view"
+                aria-expanded="false"
+              >
+                View
+              </button>
+              <div class="menu-dropdown" role="menu" aria-label="View">
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="zoomIn">
+                  <span class="menu-check"></span>
+                  <span>Zoom In</span>
+                  <span class="menu-shortcut">Cmd+=</span>
+                </button>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="zoomOut">
+                  <span class="menu-check"></span>
+                  <span>Zoom Out</span>
+                  <span class="menu-shortcut">Cmd+-</span>
+                </button>
+                <button class="menu-item" type="button" role="menuitem" data-menu-action="zoomFit">
+                  <span class="menu-check"></span>
+                  <span>Zoom Fit</span>
+                  <span class="menu-shortcut">Shift+F</span>
+                </button>
+                <div class="menu-divider" role="separator"></div>
+                <button
+                  class="menu-item"
+                  type="button"
+                  role="menuitemcheckbox"
+                  data-menu-action="toggleTimeline"
+                  data-menu-check="timelineVisible"
+                  data-checked="true"
+                >
+                  <span class="menu-check">✓</span>
+                  <span>Toggle Timeline</span>
+                  <span class="menu-shortcut"></span>
+                </button>
+                <button
+                  class="menu-item"
+                  type="button"
+                  role="menuitemcheckbox"
+                  data-menu-action="toggleInspector"
+                  data-menu-check="inspectorVisible"
+                  data-checked="true"
+                >
+                  <span class="menu-check">✓</span>
+                  <span>Toggle Inspector</span>
+                  <span class="menu-shortcut"></span>
+                </button>
+              </div>
+            </div>
+          </nav>
         </div>
         <div class="menu-group">
-          <div class="menu-chip"><span class="status-dot"></span> Ready</div>
-          <div class="menu-button">Draft Sequence</div>
-        </div>
-        <div class="menu-group">
-          <div class="menu-button">Share</div>
-          <div class="menu-button primary">Export</div>
+          <div class="menu-chip" id="project-status">
+            <span class="status-dot"></span>
+            <span id="project-status-label">Ready</span>
+          </div>
+          <div class="menu-button" id="project-path-label" title="Untitled.nfproj">Untitled.nfproj</div>
+          <button class="menu-button primary" type="button" data-menu-action="export">Export…</button>
         </div>
       </header>
 
@@ -1147,7 +1371,7 @@
                 <span>1920×1080 • 30 fps • Draft preview</span>
               </div>
               <div class="preview-meta">
-                <div class="mini-chip">Fit</div>
+                <div class="mini-chip" id="preview-zoom-label">100%</div>
                 <div class="mini-chip">Safe Guides</div>
                 <div class="mini-chip">Proxy</div>
               </div>
@@ -1360,15 +1584,16 @@
       })();
     </script>
     <script type="module">
-      import { call } from "./src/bridge.js";
+      import * as bridge from "./src/bridge.js";
       import * as engine from "./src/engine/index.js";
+      import { initMenu } from "./src/menu.js";
       import { mountPreview } from "./src/preview/index.js";
       import { store } from "./src/store.js";
 
       (async () => {
         try {
-          const scenes = await call("scene.list", {});
-          await call("log", { level: "info", msg: `IPC ready: ${scenes?.length ?? 0} scenes` });
+          const scenes = await bridge.call("scene.list", {});
+          await bridge.call("log", { level: "info", msg: `IPC ready: ${scenes?.length ?? 0} scenes` });
           console.info("[NextFrame] IPC bridge ready", scenes);
         } catch (err) {
           console.warn("[NextFrame] IPC bridge unavailable:", err);
@@ -1380,6 +1605,8 @@
         if (container) {
           mountPreview(container, { engine, store });
         }
+
+        initMenu({ bridge, store });
       });
     </script>
   </body>
