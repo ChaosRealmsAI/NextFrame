@@ -3,6 +3,7 @@ import { createDispatcher, moveClipCommand } from "../../src/commands.js";
 import { registerScene, renderAt, SCENES, validateTimeline } from "../../src/engine/index.js";
 import { SCENE_MANIFEST } from "../../src/scenes/index.js";
 import { createDefaultTimeline, store } from "../../src/store.js";
+import { endScrubbing, setScrubPlayhead, startScrubbing } from "../../src/timeline/scrub.js";
 import { BASE_PX_PER_SECOND, createZoomController } from "../../src/timeline/zoom.js";
 import { describe, expect, it, skip } from "./runner.js";
 
@@ -12,6 +13,8 @@ function createBaseState(timeline = createDefaultTimeline()) {
   return {
     playhead: 0,
     playing: false,
+    scrubbing: false,
+    snapEnabled: true,
     showSafeArea: false,
     project: {
       width: 1920,
@@ -28,11 +31,13 @@ function createBaseState(timeline = createDefaultTimeline()) {
     selection: {
       trackId: null,
       clipId: null,
+      clipIds: [],
     },
     ui: {
       zoom: 1,
       timelineVisible: true,
       inspectorVisible: true,
+      timelineTool: "select",
     },
   };
 }
@@ -43,6 +48,8 @@ function resetGlobalStore(timeline = createDefaultTimeline()) {
   store.mutate((state) => {
     state.playhead = nextState.playhead;
     state.playing = nextState.playing;
+    state.scrubbing = nextState.scrubbing;
+    state.snapEnabled = nextState.snapEnabled;
     state.showSafeArea = nextState.showSafeArea;
     state.project = nextState.project;
     state.timeline = nextState.timeline;
@@ -62,8 +69,18 @@ function createLocalStore(timeline = createDefaultTimeline()) {
     state: createBaseState(timeline),
     listeners: new Set(),
     replace(nextState) {
-      const previousState = this.state;
+      const previousState = structuredClone(this.state);
       this.state = nextState;
+
+      for (const listener of this.listeners) {
+        listener(this.state, previousState);
+      }
+
+      return this.state;
+    },
+    mutate(recipe) {
+      const previousState = structuredClone(this.state);
+      recipe(this.state);
 
       for (const listener of this.listeners) {
         listener(this.state, previousState);
@@ -327,6 +344,53 @@ describe("BDD critical scenarios", () => {
         "Expected renderAt() to be frame-pure for equivalent final times",
       );
     });
+  });
+
+  it("SCRUB-02 throttles scrub playhead mutations and flushes the final value on end", () => {
+    const localStore = createLocalStore();
+    const dispatcher = createDispatcher(localStore);
+    localStore.dispatch = (command) => dispatcher.dispatch(command);
+
+    let onEndCalls = 0;
+    let playheadNotifications = 0;
+    const seenPlayheads = [];
+    const unsubscribe = localStore.subscribe((nextState, previousState) => {
+      if (nextState.playhead === previousState.playhead) {
+        return;
+      }
+
+      playheadNotifications += 1;
+      seenPlayheads.push(nextState.playhead);
+    });
+
+    try {
+      startScrubbing(localStore, {
+        onEnd() {
+          onEndCalls += 1;
+        },
+      });
+
+      expect(localStore.state.scrubbing).toBe(true, "Expected startScrubbing() to set store.state.scrubbing");
+
+      setScrubPlayhead(localStore, 1);
+      setScrubPlayhead(localStore, 2);
+      setScrubPlayhead(localStore, 3);
+
+      expect(playheadNotifications).toBe(
+        1,
+        "Expected scrub playhead changes inside one throttle window to notify subscribers once immediately",
+      );
+
+      endScrubbing(localStore);
+    } finally {
+      unsubscribe();
+    }
+
+    expect(localStore.state.scrubbing).toBe(false, "Expected endScrubbing() to clear store.state.scrubbing");
+    expect(localStore.state.playhead).toBe(3, "Expected endScrubbing() to flush the final pending playhead");
+    expect(playheadNotifications).toBe(2, "Expected endScrubbing() to emit one final playhead mutation");
+    expect(seenPlayheads).toEqual([1, 3]);
+    expect(onEndCalls).toBe(1, "Expected endScrubbing() to call the provided onEnd callback once");
   });
 
   it("UNDO-01 dispatch then undo restores the previous timeline state", () => {

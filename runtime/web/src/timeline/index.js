@@ -1,6 +1,6 @@
 import { batchCommand, splitClipCommand } from "../commands.js";
 import { createPlayhead } from "./playhead.js";
-import { formatTime, renderRuler } from "./ruler.js";
+import { attachRulerScrub, formatTime, renderRuler } from "./ruler.js";
 import { TRACK_HEADER_WIDTH, createTrackRow } from "./track.js";
 import { BASE_PX_PER_SECOND, createZoomController } from "./zoom.js";
 
@@ -556,8 +556,13 @@ export function mountTimeline(container, store) {
   ui.zoomOut.addEventListener("click", () => applyZoom(zoom.level / 1.25));
   ui.fit.addEventListener("click", fitTimeline);
   window.addEventListener("keydown", onKeydown);
+  const detachRulerScrub = attachRulerScrub(ui.rulerScroll, {
+    getDuration: () => duration,
+    store,
+    zoom,
+  });
 
-  const unsubscribe = store.subscribe((nextState) => {
+  const unsubscribe = store.subscribe((nextState, previousState) => {
     if (nextState.timeline !== lastTimelineRef) {
       const previousDuration = duration;
       currentTimeline = nextState.timeline || { duration: 1, tracks: [] };
@@ -600,6 +605,7 @@ export function mountTimeline(container, store) {
     ui.trackList.removeEventListener("mousedown", onTrackMouseDown);
     ui.tracksScroll.removeEventListener("scroll", onScroll);
     window.removeEventListener("keydown", onKeydown);
+    detachRulerScrub();
     container.__timelineUnmount = null;
     container.replaceChildren();
   };

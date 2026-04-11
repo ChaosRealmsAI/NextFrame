@@ -89,7 +89,7 @@ export function mountPreview(container, { engine, store } = {}) {
   };
 
   const syncLoopState = (playing = Boolean(store?.state?.playing)) => {
-    if (recordingMode || !playing) {
+    if (recordingMode || store?.state?.scrubbing || !playing) {
       loop.pause();
       return;
     }
@@ -121,14 +121,17 @@ export function mountPreview(container, { engine, store } = {}) {
     ? store.subscribe((state) => {
       const nextSnapshot = createSnapshot(state);
 
-      if (nextSnapshot.playing !== lastSnapshot.playing) {
-        if (nextSnapshot.playing) {
+      if (
+        nextSnapshot.playing !== lastSnapshot.playing
+        || nextSnapshot.scrubbing !== lastSnapshot.scrubbing
+      ) {
+        if (nextSnapshot.playing && !nextSnapshot.scrubbing) {
           audioMixer.syncToPlayhead(readTime(), true);
-          syncLoopState(true);
         } else {
           audioMixer.stop();
-          syncLoopState(false);
         }
+
+        syncLoopState(nextSnapshot.playing);
       }
 
       if (didLayoutChange(lastSnapshot, nextSnapshot)) {
@@ -142,7 +145,7 @@ export function mountPreview(container, { engine, store } = {}) {
       if (nextSnapshot.timeline !== lastSnapshot.timeline
         || nextSnapshot.assets !== lastSnapshot.assets
         || nextSnapshot.assetBuffers !== lastSnapshot.assetBuffers) {
-        audioMixer.syncToPlayhead(readTime(), Boolean(state?.playing));
+        audioMixer.syncToPlayhead(readTime(), Boolean(state?.playing) && !Boolean(state?.scrubbing));
       }
 
       lastSnapshot = nextSnapshot;
@@ -151,7 +154,7 @@ export function mountPreview(container, { engine, store } = {}) {
 
   layoutCanvas();
   renderFrame(readTime());
-  if (lastSnapshot.playing) {
+  if (lastSnapshot.playing && !lastSnapshot.scrubbing) {
     audioMixer.syncToPlayhead(readTime(), true);
   }
   syncLoopState(lastSnapshot.playing);
@@ -162,7 +165,9 @@ export function mountPreview(container, { engine, store } = {}) {
       return ctx;
     },
     play: () => {
-      audioMixer.syncToPlayhead(readTime(), true);
+      if (!store?.state?.scrubbing) {
+        audioMixer.syncToPlayhead(readTime(), true);
+      }
       syncLoopState(true);
     },
     pause: () => {
@@ -194,6 +199,7 @@ function createSnapshot(state) {
   return {
     playhead: readFiniteNumber(state?.playhead),
     playing: Boolean(state?.playing),
+    scrubbing: Boolean(state?.scrubbing),
     showSafeArea: Boolean(state?.showSafeArea),
     projectWidth: readFiniteNumber(state?.project?.width),
     projectHeight: readFiniteNumber(state?.project?.height),
@@ -212,10 +218,11 @@ function didLayoutChange(prev, next) {
 
 function didVisualChange(prev, next) {
   return prev.showSafeArea !== next.showSafeArea
+    || prev.scrubbing !== next.scrubbing
     || didLayoutChange(prev, next)
     || prev.playing !== next.playing
     || prev.timeline !== next.timeline
-    || (!next.playing && prev.playhead !== next.playhead);
+    || ((next.scrubbing || !next.playing) && prev.playhead !== next.playhead);
 }
 
 function getAspectRatio(project) {

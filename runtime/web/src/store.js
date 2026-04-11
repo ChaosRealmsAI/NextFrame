@@ -24,6 +24,7 @@ function createInitialState() {
   return {
     playhead: 0,
     playing: true,
+    scrubbing: false,
     snapEnabled: true,
     showSafeArea: false,
     project: { ...DEFAULT_PROJECT },
