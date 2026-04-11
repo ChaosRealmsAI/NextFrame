@@ -4,9 +4,9 @@
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
 #[cfg(test)]
 use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::io::ErrorKind;
@@ -21,6 +21,9 @@ const EXPORT_FAILED: &str = "failed";
 const EXPORT_ERROR_NOT_FOUND: &str = "recorder_not_found";
 const EXPORT_ERROR_ALREADY_RUNNING: &str = "export_already_running";
 const EXPORT_ERROR_CANCELED: &str = "canceled";
+const RECENT_DIR_NAME: &str = ".nextframe";
+const RECENT_FILE_NAME: &str = "recent.json";
+const RECENT_MAX_ENTRIES: usize = 10;
 
 struct ProcessHandle {
     child: Child,
@@ -73,6 +76,21 @@ struct FfmpegCommand {
 struct CommandOutput {
     success: bool,
     stderr: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct RecentProjectRecord {
+    path: String,
+    last_opened: u64,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct RecentProjectItem {
+    path: String,
+    name: String,
+    last_opened: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -128,6 +146,9 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
         "export.cancel" => handle_export_cancel(&params),
         "export.muxAudio" => handle_export_mux_audio(&params),
         "log" => handle_log(&params),
+        "recent.list" => handle_recent_list(&params),
+        "recent.add" => handle_recent_add(&params),
+        "recent.clear" => handle_recent_clear(&params),
         "scene.list" => handle_scene_list(&params),
         "timeline.load" => handle_timeline_load(&params),
         "timeline.save" => handle_timeline_save(&params),
@@ -452,6 +473,62 @@ fn handle_log(params: &Value) -> Result<Value, String> {
     }))
 }
 
+fn handle_recent_list(params: &Value) -> Result<Value, String> {
+    let _ = require_object(params)?;
+    let storage_path = ensure_recent_storage_file()?;
+    let records = normalize_recent_records(read_recent_records(&storage_path)?);
+
+    save_recent_records(&storage_path, &records)?;
+
+    serde_json::to_value(
+        records
+            .into_iter()
+            .map(|record| RecentProjectItem {
+                name: recent_project_name(&record.path),
+                path: record.path,
+                last_opened: record.last_opened,
+            })
+            .collect::<Vec<_>>(),
+    )
+    .map_err(|error| format!("failed to serialize recent projects: {error}"))
+}
+
+fn handle_recent_add(params: &Value) -> Result<Value, String> {
+    let path = require_string(params, "path")?;
+    let path_buf = resolve_home_existing_path(path)?;
+    ensure_recent_project_extension(&path_buf, path)?;
+
+    let storage_path = ensure_recent_storage_file()?;
+    let mut records = normalize_recent_records(read_recent_records(&storage_path)?);
+    let canonical_path = path_buf.display().to_string();
+
+    records.retain(|record| record.path != canonical_path);
+    records.insert(
+        0,
+        RecentProjectRecord {
+            path: canonical_path,
+            last_opened: unix_timestamp_secs()?,
+        },
+    );
+    records.truncate(RECENT_MAX_ENTRIES);
+
+    save_recent_records(&storage_path, &records)?;
+
+    Ok(json!({
+        "count": records.len(),
+    }))
+}
+
+fn handle_recent_clear(params: &Value) -> Result<Value, String> {
+    let _ = require_object(params)?;
+    let storage_path = ensure_recent_storage_file()?;
+    save_recent_records(&storage_path, &[])?;
+
+    Ok(json!({
+        "cleared": true,
+    }))
+}
+
 fn handle_scene_list(params: &Value) -> Result<Value, String> {
     require_object(params)?;
 
@@ -538,6 +615,150 @@ fn handle_timeline_save(params: &Value) -> Result<Value, String> {
         "path": path,
         "bytesWritten": bytes_written,
     }))
+}
+
+fn recent_storage_path() -> Result<PathBuf, String> {
+    #[cfg(test)]
+    if let Some(path) = recent_storage_path_override() {
+        return Ok(path);
+    }
+
+    let home = home_dir().ok_or_else(|| "home directory is unavailable".to_string())?;
+    let storage_path = home.join(RECENT_DIR_NAME).join(RECENT_FILE_NAME);
+    let raw_path = storage_path.display().to_string();
+    resolve_home_write_path(&raw_path)
+}
+
+fn ensure_recent_storage_file() -> Result<PathBuf, String> {
+    let storage_path = recent_storage_path()?;
+
+    if let Some(parent) = storage_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "failed to create recent file directory '{}': {error}",
+                parent.display()
+            )
+        })?;
+    }
+
+    match fs::metadata(&storage_path) {
+        Ok(metadata) if metadata.is_dir() => Err(format!(
+            "recent file path is a directory: {}",
+            storage_path.display()
+        )),
+        Ok(_) => Ok(storage_path),
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            fs::write(&storage_path, "[]").map_err(|write_error| {
+                format!(
+                    "failed to create recent file '{}': {write_error}",
+                    storage_path.display()
+                )
+            })?;
+            Ok(storage_path)
+        }
+        Err(error) => Err(format!(
+            "failed to inspect recent file '{}': {error}",
+            storage_path.display()
+        )),
+    }
+}
+
+fn read_recent_records(storage_path: &Path) -> Result<Vec<RecentProjectRecord>, String> {
+    let contents = fs::read_to_string(storage_path).map_err(|error| {
+        format!(
+            "failed to read recent file '{}': {error}",
+            storage_path.display()
+        )
+    })?;
+
+    if contents.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    serde_json::from_str(&contents).map_err(|error| {
+        format!(
+            "failed to parse recent file '{}': {error}",
+            storage_path.display()
+        )
+    })
+}
+
+fn save_recent_records(storage_path: &Path, records: &[RecentProjectRecord]) -> Result<(), String> {
+    let serialized = serde_json::to_string_pretty(records).map_err(|error| {
+        format!(
+            "failed to serialize recent file '{}': {error}",
+            storage_path.display()
+        )
+    })?;
+
+    fs::write(storage_path, serialized).map_err(|error| {
+        format!(
+            "failed to write recent file '{}': {error}",
+            storage_path.display()
+        )
+    })
+}
+
+fn normalize_recent_records(records: Vec<RecentProjectRecord>) -> Vec<RecentProjectRecord> {
+    let mut normalized = Vec::with_capacity(records.len().min(RECENT_MAX_ENTRIES));
+    let mut seen = HashSet::new();
+
+    for record in records {
+        if !is_recent_project_path(&record.path) {
+            continue;
+        }
+
+        if seen.insert(record.path.clone()) {
+            normalized.push(record);
+        }
+
+        if normalized.len() == RECENT_MAX_ENTRIES {
+            break;
+        }
+    }
+
+    normalized
+}
+
+fn is_recent_project_path(raw_path: &str) -> bool {
+    let Ok(path) = validate_path(raw_path) else {
+        return false;
+    };
+    let Ok(home) = home_root() else {
+        return false;
+    };
+
+    path.starts_with(&home) && has_recent_project_extension(&path)
+}
+
+fn recent_project_name(path: &str) -> String {
+    Path::new(path)
+        .file_name()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(path)
+        .to_string()
+}
+
+fn has_recent_project_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("nfproj"))
+}
+
+fn ensure_recent_project_extension(path: &Path, raw_path: &str) -> Result<(), String> {
+    if has_recent_project_extension(path) {
+        Ok(())
+    } else {
+        Err(format!("path must point to a .nfproj file: {raw_path}"))
+    }
+}
+
+fn unix_timestamp_secs() -> Result<u64, String> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .map_err(|error| format!("system clock before unix epoch: {error}"))
 }
 
 fn require_object(params: &Value) -> Result<&serde_json::Map<String, Value>, String> {
@@ -1366,6 +1587,45 @@ fn resolve_reveal_path(raw_path: &str) -> Result<PathBuf, String> {
     resolve_existing_path(raw_path).or_else(|_| resolve_write_path(raw_path))
 }
 
+fn resolve_home_existing_path(raw_path: &str) -> Result<PathBuf, String> {
+    let path = validate_path(raw_path)?;
+    let canonical = fs::canonicalize(&path)
+        .map_err(|error| format!("failed to resolve '{}': {error}", path.display()))?;
+
+    ensure_home_path(&canonical, raw_path)?;
+    Ok(canonical)
+}
+
+fn resolve_home_write_path(raw_path: &str) -> Result<PathBuf, String> {
+    let path = validate_path(raw_path)?;
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let existing_parent = nearest_existing_ancestor(parent)
+        .ok_or_else(|| format!("failed to resolve parent for '{}'", path.display()))?;
+    let canonical_parent = fs::canonicalize(&existing_parent).map_err(|error| {
+        format!(
+            "failed to resolve parent for '{}': {error}",
+            existing_parent.display()
+        )
+    })?;
+
+    ensure_home_path(&canonical_parent, raw_path)?;
+
+    match fs::symlink_metadata(&path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            let canonical_target = fs::canonicalize(&path)
+                .map_err(|error| format!("failed to resolve '{}': {error}", path.display()))?;
+            ensure_home_path(&canonical_target, raw_path)?;
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(format!("failed to inspect '{}': {error}", path.display()));
+        }
+    }
+
+    Ok(path)
+}
+
 fn nearest_existing_ancestor(path: &Path) -> Option<PathBuf> {
     let mut current = path;
 
@@ -1380,6 +1640,15 @@ fn nearest_existing_ancestor(path: &Path) -> Option<PathBuf> {
 
 fn ensure_allowed_path(path: &Path, raw_path: &str) -> Result<(), String> {
     if is_allowed_path(path) {
+        Ok(())
+    } else {
+        Err(format!("path is outside sandbox: {raw_path}"))
+    }
+}
+
+fn ensure_home_path(path: &Path, raw_path: &str) -> Result<(), String> {
+    let home = home_root()?;
+    if path.starts_with(&home) {
         Ok(())
     } else {
         Err(format!("path is outside sandbox: {raw_path}"))
@@ -1405,6 +1674,12 @@ fn allowed_roots() -> Vec<PathBuf> {
 
 fn canonical_or_raw(path: PathBuf) -> PathBuf {
     fs::canonicalize(&path).unwrap_or(path)
+}
+
+fn home_root() -> Result<PathBuf, String> {
+    home_dir()
+        .map(canonical_or_raw)
+        .ok_or_else(|| "home directory is unavailable".to_string())
 }
 
 fn expand_home_dir(path: &str) -> PathBuf {
@@ -1454,6 +1729,10 @@ impl Default for MockFfmpegState {
 static MOCK_FFMPEG_STATE: OnceLock<Mutex<MockFfmpegState>> = OnceLock::new();
 #[cfg(test)]
 static MOCK_FFMPEG_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+#[cfg(test)]
+static RECENT_STORAGE_PATH_OVERRIDE: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+#[cfg(test)]
+static RECENT_STORAGE_TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[cfg(test)]
 fn detect_ffmpeg_command_path() -> Result<Option<PathBuf>, String> {
@@ -1488,15 +1767,43 @@ fn reset_ffmpeg_path_cache_for_tests() {
 }
 
 #[cfg(test)]
+fn recent_storage_path_override() -> Option<PathBuf> {
+    recent_storage_path_override_state()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone()
+}
+
+#[cfg(test)]
+fn set_recent_storage_path_override_for_tests(path: Option<PathBuf>) {
+    let mut state = recent_storage_path_override_state()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    *state = path;
+}
+
+#[cfg(test)]
+fn recent_storage_path_override_state() -> &'static Mutex<Option<PathBuf>> {
+    RECENT_STORAGE_PATH_OVERRIDE.get_or_init(|| Mutex::new(None))
+}
+
+#[cfg(test)]
+fn recent_storage_test_lock() -> &'static Mutex<()> {
+    RECENT_STORAGE_TEST_LOCK.get_or_init(|| Mutex::new(()))
+}
+
+#[cfg(test)]
 #[allow(clippy::expect_used)]
 mod tests {
     use super::{
         build_ffmpeg_filter_complex, build_recorder_args, dispatch, home_dir, initialize,
-        mock_ffmpeg_state, recorder_binary_name, reset_ffmpeg_path_cache_for_tests,
-        resolve_recorder_launch_plan_with, resolve_write_path, CommandOutput, FfmpegCommand,
-        MockFfmpegState, RecorderLauncher, Request, MOCK_FFMPEG_TEST_LOCK,
+        mock_ffmpeg_state, recent_storage_test_lock, recorder_binary_name,
+        reset_ffmpeg_path_cache_for_tests, resolve_recorder_launch_plan_with, resolve_write_path,
+        set_recent_storage_path_override_for_tests, CommandOutput, FfmpegCommand, MockFfmpegState,
+        RecorderLauncher, Request, MOCK_FFMPEG_TEST_LOCK,
     };
     use serde_json::{json, Value};
+    use std::collections::HashSet;
     use std::env;
     use std::fs;
     use std::io;
@@ -1967,6 +2274,76 @@ mod tests {
     }
 
     #[test]
+    fn recent_add_dispatch_dedupes_and_caps_entries() {
+        let home = home_dir().expect("home dir");
+        let temp = TestDir::new_in(&home, "recent-add");
+        let _recent_override = RecentStorageOverrideGuard::new(temp.join(".nextframe/recent.json"));
+
+        for index in 0..12 {
+            let project_path = temp.join(&format!("project-{index}.nfproj"));
+            fs::write(&project_path, "{}").expect("write project");
+
+            let response = dispatch(request(
+                "recent.add",
+                json!({ "path": project_path.display().to_string() }),
+            ));
+            assert!(response.ok);
+        }
+
+        let duplicate_path = temp.join("project-5.nfproj");
+        let response = dispatch(request(
+            "recent.add",
+            json!({ "path": duplicate_path.display().to_string() }),
+        ));
+        assert!(response.ok);
+
+        let list_response = dispatch(request("recent.list", json!({})));
+        assert!(list_response.ok);
+
+        let entries = list_response
+            .result
+            .as_array()
+            .expect("recent entries array");
+        assert_eq!(entries.len(), 10);
+
+        let names = entries
+            .iter()
+            .map(|entry| {
+                entry
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .expect("recent entry name")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            names,
+            vec![
+                "project-5.nfproj",
+                "project-11.nfproj",
+                "project-10.nfproj",
+                "project-9.nfproj",
+                "project-8.nfproj",
+                "project-7.nfproj",
+                "project-6.nfproj",
+                "project-4.nfproj",
+                "project-3.nfproj",
+                "project-2.nfproj",
+            ]
+        );
+
+        let unique_paths = entries
+            .iter()
+            .map(|entry| {
+                entry
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .expect("recent entry path")
+            })
+            .collect::<HashSet<_>>();
+        assert_eq!(unique_paths.len(), entries.len());
+    }
+
+    #[test]
     fn resolve_write_path_expands_home_and_allows_missing_export_dirs() {
         let home = home_dir().expect("home dir");
         let result = resolve_write_path("~/Movies/NextFrame/render.mp4")
@@ -2410,17 +2787,41 @@ mod tests {
         })
     }
 
+    struct RecentStorageOverrideGuard {
+        _lock: MutexGuard<'static, ()>,
+    }
+
+    impl RecentStorageOverrideGuard {
+        fn new(path: PathBuf) -> Self {
+            let lock = recent_storage_test_lock()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            set_recent_storage_path_override_for_tests(Some(path));
+            Self { _lock: lock }
+        }
+    }
+
+    impl Drop for RecentStorageOverrideGuard {
+        fn drop(&mut self) {
+            set_recent_storage_path_override_for_tests(None);
+        }
+    }
+
     struct TestDir {
         path: PathBuf,
     }
 
     impl TestDir {
         fn new(label: &str) -> Self {
+            Self::new_in(&std::env::temp_dir(), label)
+        }
+
+        fn new_in(base: &Path, label: &str) -> Self {
             let unique = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("system time before unix epoch")
                 .as_nanos();
-            let path = std::env::temp_dir().join(format!(
+            let path = base.join(format!(
                 "nextframe-bridge-{label}-{}-{unique}",
                 process::id()
             ));

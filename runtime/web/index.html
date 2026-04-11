@@ -230,6 +230,31 @@
         display: flex;
       }
 
+      .menu-submenu {
+        position: relative;
+      }
+
+      .menu-submenu-dropdown {
+        position: absolute;
+        top: -8px;
+        left: calc(100% - 10px);
+        min-width: 216px;
+        display: none;
+        flex-direction: column;
+        padding: 8px;
+        border: 1px solid var(--border-strong);
+        border-radius: 14px;
+        background:
+          linear-gradient(180deg, rgba(25, 25, 37, 0.98), rgba(16, 16, 24, 0.98));
+        box-shadow: var(--shadow-lg);
+        z-index: 60;
+      }
+
+      .menu-submenu:hover .menu-submenu-dropdown,
+      .menu-submenu:focus-within .menu-submenu-dropdown {
+        display: flex;
+      }
+
       .menu-item {
         display: grid;
         grid-template-columns: 16px 1fr auto;
@@ -1713,6 +1738,21 @@
                   <span>Open…</span>
                   <span class="menu-shortcut">Cmd+O</span>
                 </button>
+                <div class="menu-submenu">
+                  <button
+                    class="menu-item"
+                    type="button"
+                    role="menuitem"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                  >
+                    <span class="menu-check"></span>
+                    <span>Open Recent</span>
+                    <span class="menu-shortcut">▸</span>
+                  </button>
+                  <div class="menu-submenu-dropdown" role="menu" aria-label="Open Recent" data-menu-recent-list>
+                  </div>
+                </div>
                 <div class="menu-divider" role="separator"></div>
                 <button class="menu-item" type="button" role="menuitem" data-menu-action="save">
                   <span class="menu-check"></span>

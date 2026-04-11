@@ -6,6 +6,7 @@ import { toast } from "./toast.js";
 const DEFAULT_SAVE_NAME = "Untitled.nfproj";
 const DEFAULT_STATUS = "Ready";
 const DEFAULT_BACKGROUND = "#0b0b14";
+const OPEN_RECENT_LABEL = "Open Recent";
 
 export function initMenu({ bridge, store }) {
   if (typeof bridge?.call !== "function") {
@@ -33,9 +34,12 @@ export function initMenu({ bridge, store }) {
   const inspectorPanel = document.getElementById("right-inspector");
   const inspectorSplitter = document.getElementById("inspector-splitter");
   const revealProjectItem = topMenu.querySelector('[data-menu-action="revealProject"]');
+  const recentMenuList = topMenu.querySelector("[data-menu-recent-list]");
 
   let openMenu = null;
   let noticeTimer = 0;
+  let recentEntries = [];
+  let recentMenuRequestId = 0;
 
   const render = (state) => {
     const isDirty = Boolean(state.dirty);
@@ -117,6 +121,10 @@ export function initMenu({ bridge, store }) {
         trigger.setAttribute("aria-expanded", String(isOpen));
       }
     }
+
+    if (name === "file") {
+      void refreshRecentMenu();
+    }
   };
 
   const showNotice = (message, { dirty = store.state.dirty } = {}) => {
@@ -156,7 +164,7 @@ export function initMenu({ bridge, store }) {
 
     event.preventDefault();
     closeMenus();
-    void runAction(item.dataset.menuAction);
+    void runAction(item.dataset.menuAction, item.dataset);
   };
 
   const onDocumentPointerDown = (event) => {
@@ -199,7 +207,89 @@ export function initMenu({ bridge, store }) {
     void runAction(action);
   };
 
-  async function runAction(action) {
+  function renderRecentMenu() {
+    if (!(recentMenuList instanceof HTMLElement)) {
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    const entries = recentEntries.slice(0, 10);
+
+    if (entries.length === 0) {
+      fragment.append(
+        createRecentMenuItem({
+          label: "No Recent Files",
+          disabled: true,
+        }),
+      );
+    } else {
+      for (const entry of entries) {
+        fragment.append(
+          createRecentMenuItem({
+            action: "openRecent",
+            label: entry.name || basename(entry.path) || entry.path,
+            path: entry.path,
+          }),
+        );
+      }
+    }
+
+    fragment.append(createMenuDivider());
+    fragment.append(
+      createRecentMenuItem({
+        action: "clearRecent",
+        label: "Clear Menu",
+        disabled: entries.length === 0,
+      }),
+    );
+    recentMenuList.replaceChildren(fragment);
+  }
+
+  async function refreshRecentMenu() {
+    if (!(recentMenuList instanceof HTMLElement)) {
+      return;
+    }
+
+    const requestId = ++recentMenuRequestId;
+
+    try {
+      const result = await bridge.call("recent.list", {});
+      if (requestId !== recentMenuRequestId) {
+        return;
+      }
+
+      recentEntries = Array.isArray(result)
+        ? result
+          .filter((entry) => typeof entry?.path === "string" && entry.path.length > 0)
+          .slice(0, 10)
+        : [];
+    } catch (error) {
+      if (requestId !== recentMenuRequestId) {
+        return;
+      }
+
+      recentEntries = [];
+      void logInfo(
+        bridge,
+        `${OPEN_RECENT_LABEL} refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    renderRecentMenu();
+  }
+
+  async function rememberRecentProject(path) {
+    try {
+      await bridge.call("recent.add", { path });
+    } catch (error) {
+      await logInfo(
+        bridge,
+        `recent.add failed for ${path}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  async function runAction(action, detail = {}) {
     try {
       switch (action) {
         case "new":
@@ -217,11 +307,17 @@ export function initMenu({ bridge, store }) {
         case "open":
           await openProject();
           return;
+        case "openRecent":
+          await openProjectAtPath(detail.menuRecentPath);
+          return;
         case "save":
           await saveProject();
           return;
         case "saveAs":
           await saveProjectAs();
+          return;
+        case "clearRecent":
+          await clearRecentMenu();
           return;
         case "close":
           store.mutate((state) => {
@@ -309,8 +405,15 @@ export function initMenu({ bridge, store }) {
       return;
     }
 
-    const file = await bridge.call("fs.read", { path });
-    const parsed = JSON.parse(String(file?.contents ?? ""));
+    await openProjectAtPath(path);
+  }
+
+  async function openProjectAtPath(path) {
+    if (typeof path !== "string" || path.length === 0) {
+      return;
+    }
+
+    const parsed = await bridge.call("timeline.load", { path });
     const validation = validateTimeline(parsed);
 
     if (!validation.ok) {
@@ -326,6 +429,7 @@ export function initMenu({ bridge, store }) {
       state.playhead = 0;
       state.dirty = false;
     });
+    await rememberRecentProject(path);
     showNotice(`Opened ${basename(path) ?? DEFAULT_SAVE_NAME}`);
     toast(`Opened ${basename(path) ?? DEFAULT_SAVE_NAME}`);
   }
@@ -363,6 +467,14 @@ export function initMenu({ bridge, store }) {
       state.filePath = path;
       state.dirty = false;
     });
+    await rememberRecentProject(path);
+  }
+
+  async function clearRecentMenu() {
+    await bridge.call("recent.clear", {});
+    recentEntries = [];
+    renderRecentMenu();
+    showNotice("Recent projects cleared", { dirty: store.state.dirty });
   }
 
   async function revealProject() {
@@ -377,6 +489,7 @@ export function initMenu({ bridge, store }) {
   topMenu.addEventListener("click", onClick);
   document.addEventListener("pointerdown", onDocumentPointerDown);
   window.addEventListener("keydown", onKeyDown);
+  renderRecentMenu();
   render(store.state);
 
   return {
@@ -389,6 +502,43 @@ export function initMenu({ bridge, store }) {
       closeMenus();
     },
   };
+}
+
+function createRecentMenuItem({ action = "", label, path = "", disabled = false }) {
+  const item = document.createElement("button");
+  item.className = "menu-item";
+  item.type = "button";
+  item.role = "menuitem";
+  item.disabled = disabled;
+
+  if (action) {
+    item.dataset.menuAction = action;
+  }
+
+  if (path) {
+    item.dataset.menuRecentPath = path;
+  }
+
+  item.append(createMenuSpan("menu-check"));
+  item.append(createMenuSpan("", label));
+  item.append(createMenuSpan("menu-shortcut"));
+  return item;
+}
+
+function createMenuDivider() {
+  const divider = document.createElement("div");
+  divider.className = "menu-divider";
+  divider.role = "separator";
+  return divider;
+}
+
+function createMenuSpan(className, text = "") {
+  const span = document.createElement("span");
+  if (className) {
+    span.className = className;
+  }
+  span.textContent = text;
+  return span;
 }
 
 function normalizeTimeline(timeline) {
