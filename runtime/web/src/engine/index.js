@@ -1,5 +1,6 @@
 const DEFAULT_BACKGROUND = "#0b0b14";
 const DPR_STATE = Symbol("nextframe.engine.dprState");
+const EMPTY_PARAMS = Object.freeze({});
 
 export const SCENES = new Map();
 
@@ -186,7 +187,7 @@ export function renderAt(ctx, timeline, t) {
       }
 
       const localT = t - clip.start;
-      const params = isPlainObject(clip.params) ? clip.params : {};
+      const params = isPlainObject(clip.params) ? clip.params : EMPTY_PARAMS;
 
       ctx.save();
       try {

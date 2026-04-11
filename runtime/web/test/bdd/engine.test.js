@@ -17,6 +17,7 @@ function createBaseState(timeline = createDefaultTimeline()) {
     scrubbing: false,
     snapEnabled: true,
     showSafeArea: false,
+    showPerf: false,
     project: {
       width: 1920,
       height: 1080,
@@ -53,6 +54,7 @@ function resetGlobalStore(timeline = createDefaultTimeline()) {
     state.scrubbing = nextState.scrubbing;
     state.snapEnabled = nextState.snapEnabled;
     state.showSafeArea = nextState.showSafeArea;
+    state.showPerf = nextState.showPerf;
     state.project = nextState.project;
     state.timeline = nextState.timeline;
     state.filePath = nextState.filePath;
@@ -199,6 +201,10 @@ function withTestScene(fn) {
 }
 
 describe("BDD critical scenarios", () => {
+  it("STORE-01 preview perf overlay defaults to off", () => {
+    expect(store.state.showPerf).toBe(false);
+  });
+
   it("TL-01 fresh timeline has 3 default tracks", () => {
     const timeline = createDefaultTimeline();
 

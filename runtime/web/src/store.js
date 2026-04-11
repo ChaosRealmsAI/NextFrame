@@ -64,6 +64,7 @@ function createInitialState() {
     scrubbing: false,
     snapEnabled: true,
     showSafeArea: false,
+    showPerf: false,
     project: { ...DEFAULT_PROJECT },
     timeline: createDefaultTimeline(),
     filePath: null,
