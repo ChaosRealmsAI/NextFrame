@@ -1,5 +1,6 @@
 import { validateTimeline } from "./engine/index.js";
 import { createProjectDocument, readProjectDocument } from "./project/document.js";
+import { normalizeTracks } from "./track-flags.js";
 import { toast } from "./toast.js";
 
 const AUTOSAVE_INTERVAL_MS = 30_000;
@@ -216,7 +217,7 @@ function normalizeTimeline(timeline) {
     ...timeline,
     background: typeof timeline?.background === "string" ? timeline.background : DEFAULT_BACKGROUND,
     assets: Array.isArray(timeline?.assets) ? timeline.assets : [],
-    tracks: Array.isArray(timeline?.tracks) ? timeline.tracks : [],
+    tracks: normalizeTracks(timeline?.tracks),
   };
 }
 

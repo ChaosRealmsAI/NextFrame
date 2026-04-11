@@ -1,5 +1,6 @@
 import { createDispatcher } from "./commands.js";
 import { createDefaultProject } from "./project/presets.js";
+import { normalizeTracks } from "./track-flags.js";
 import { THEMES } from "./theme.js";
 
 const TUTORIAL_COMPLETE_STORAGE_KEY = "nextframe.tutorial.complete";
@@ -72,11 +73,11 @@ export function createDefaultTimeline() {
     duration: 30,
     background: "#0b0b14",
     assets: [],
-    tracks: [
+    tracks: normalizeTracks([
       { id: "v1", label: "V1", name: "Video 1", kind: "video", clips: [] },
       { id: "v2", label: "V2", name: "Video 2", kind: "video", clips: [] },
       { id: "a1", label: "A1", name: "Audio 1", kind: "audio", clips: [] },
-    ],
+    ]),
   };
 }
 

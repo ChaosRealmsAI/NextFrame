@@ -7,7 +7,7 @@ function acceptsPayload(accepts, payload) {
     && accepts.includes(payload.type);
 }
 
-export function registerDropTarget(el, { accepts = [], onDrop } = {}) {
+export function registerDropTarget(el, { accepts = [], canAccept = null, onDrop } = {}) {
   if (!(el instanceof HTMLElement)) {
     throw new TypeError("registerDropTarget(el, options) requires an element");
   }
@@ -29,12 +29,21 @@ export function registerDropTarget(el, { accepts = [], onDrop } = {}) {
 
   const resolveAcceptedPayload = (event) => {
     const payload = readDragPayload(event.dataTransfer);
-    return acceptsPayload(accepts, payload) ? payload : null;
+    if (!acceptsPayload(accepts, payload)) {
+      return null;
+    }
+
+    if (typeof canAccept === "function" && !canAccept(payload, event)) {
+      return null;
+    }
+
+    return payload;
   };
 
   const handleDragEnter = (event) => {
     const payload = resolveAcceptedPayload(event);
     if (!payload) {
+      deactivate();
       return;
     }
 
@@ -46,6 +55,7 @@ export function registerDropTarget(el, { accepts = [], onDrop } = {}) {
   const handleDragOver = (event) => {
     const payload = resolveAcceptedPayload(event);
     if (!payload) {
+      deactivate();
       return;
     }
 
@@ -70,6 +80,7 @@ export function registerDropTarget(el, { accepts = [], onDrop } = {}) {
   const handleDrop = (event) => {
     const payload = resolveAcceptedPayload(event);
     if (!payload) {
+      deactivate();
       return;
     }
 

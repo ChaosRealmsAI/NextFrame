@@ -2,6 +2,7 @@ import { getDragDropContext } from "../dnd/index.js";
 import { readDragPayload } from "../dnd/source.js";
 import { registerDropTarget } from "../dnd/target.js";
 import { createProjectAssetIndex, normalizeAudioUrl } from "../audio/buffer.js";
+import { setTrackFlagCommand } from "../commands.js";
 import { createClip } from "./clip.js";
 import { hasTrackOverlap } from "./clip-range.js";
 import { getTickStep } from "./ruler.js";
@@ -166,7 +167,7 @@ function createMuteIcon(active) {
   return createSvgIcon(
     active
       ? [
-          { d: "M3 6H5.5L9 3.5V12.5L5.5 10H3Z", fill: "none", stroke: "currentColor", "stroke-width": "1.3", "stroke-linejoin": "round" },
+          { d: "M3 6H5.5L9 3.5V12.5L5.5 10H3Z", fill: "currentColor", stroke: "currentColor", "stroke-width": "1.1", "stroke-linejoin": "round" },
           { d: "M11 5L14 11", fill: "none", stroke: "currentColor", "stroke-width": "1.5", "stroke-linecap": "round" },
           { d: "M14 5L11 11", fill: "none", stroke: "currentColor", "stroke-width": "1.5", "stroke-linecap": "round" },
         ]
@@ -182,8 +183,8 @@ function createLockIcon(active) {
   return createSvgIcon(
     active
       ? [
-          { d: "M5 7V5.5C5 3.8 6.3 2.5 8 2.5C9.7 2.5 11 3.8 11 5.5V7", fill: "none", stroke: "currentColor", "stroke-width": "1.3", "stroke-linecap": "round" },
-          { d: "M4 7H12V13H4Z", fill: "none", stroke: "currentColor", "stroke-width": "1.3", "stroke-linejoin": "round" },
+          { d: "M5.2 7V5.6C5.2 4 6.5 2.8 8 2.8C9.5 2.8 10.8 4 10.8 5.6V7", fill: "none", stroke: "currentColor", "stroke-width": "1.3", "stroke-linecap": "round" },
+          { d: "M4 7H12V13H4Z", fill: "currentColor", stroke: "currentColor", "stroke-width": "1.1", "stroke-linejoin": "round" },
         ]
       : [
           { d: "M10.8 7V5.5C10.8 4.2 9.7 3.1 8.4 3.1C7.6 3.1 6.9 3.5 6.4 4.1", fill: "none", stroke: "currentColor", "stroke-width": "1.3", "stroke-linecap": "round" },
@@ -192,14 +193,42 @@ function createLockIcon(active) {
   );
 }
 
-function createHeaderIcon(kind, active) {
+function createSoloBadge(active) {
   const badge = document.createElement("span");
+  badge.className = "timeline-track-solo";
+  badge.textContent = "S";
+  if (active) {
+    badge.classList.add("is-active");
+  }
+  return badge;
+}
+
+function createHeaderButton({ kind, active, title, onClick }) {
+  const badge = document.createElement("button");
+  badge.type = "button";
   badge.className = "timeline-track-badge";
+  badge.dataset.flag = kind;
+  badge.setAttribute("aria-label", title);
+  badge.setAttribute("aria-pressed", active ? "true" : "false");
+  badge.title = title;
   if (active) {
     badge.classList.add("is-active");
   }
 
-  badge.appendChild(kind === "mute" ? createMuteIcon(active) : createLockIcon(active));
+  if (kind === "mute") {
+    badge.appendChild(createMuteIcon(active));
+  } else if (kind === "solo") {
+    badge.appendChild(createSoloBadge(active));
+  } else {
+    badge.appendChild(createLockIcon(active));
+  }
+
+  badge.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onClick?.();
+  });
+
   return badge;
 }
 
@@ -255,7 +284,37 @@ export function createTrackRow(track, { duration, zoom, store }) {
 
   const icons = document.createElement("div");
   icons.className = "timeline-track-actions";
-  icons.append(createHeaderIcon("mute", Boolean(track.muted)), createHeaderIcon("lock", Boolean(track.locked)));
+  const toggleTrackFlag = (flag) => {
+    if (!store?.dispatch || !track?.id) {
+      return;
+    }
+
+    store.dispatch(setTrackFlagCommand({
+      trackId: track.id,
+      flag,
+      value: !track?.[flag],
+    }));
+  };
+  icons.append(
+    createHeaderButton({
+      kind: "mute",
+      active: Boolean(track.muted),
+      title: "Mute track (M)",
+      onClick: () => toggleTrackFlag("muted"),
+    }),
+    createHeaderButton({
+      kind: "solo",
+      active: Boolean(track.solo),
+      title: "Solo track (S)",
+      onClick: () => toggleTrackFlag("solo"),
+    }),
+    createHeaderButton({
+      kind: "lock",
+      active: Boolean(track.locked),
+      title: "Lock track (L)",
+      onClick: () => toggleTrackFlag("locked"),
+    }),
+  );
 
   header.append(copy, icons);
 
@@ -294,6 +353,11 @@ export function createTrackRow(track, { duration, zoom, store }) {
   }
 
   function updateGhost(event) {
+    if (track.locked) {
+      hideGhost();
+      return;
+    }
+
     const payload = readDragPayload(event.dataTransfer);
     if (!payload || !accepts.includes(payload.type)) {
       hideGhost();
@@ -320,6 +384,9 @@ export function createTrackRow(track, { duration, zoom, store }) {
 
   registerDropTarget(lane, {
     accepts,
+    canAccept() {
+      return !track.locked;
+    },
     onDrop(payload, event) {
       const context = getDragDropContext();
       const preview = resolveDropPreview(payload, context);

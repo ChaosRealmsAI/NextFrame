@@ -1412,10 +1412,25 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        padding: 0;
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 8px;
         color: var(--text-faint);
         background: rgba(255, 255, 255, 0.03);
+        cursor: pointer;
+        appearance: none;
+        transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, transform 120ms ease;
+      }
+
+      .timeline-track-badge:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .timeline-track-badge:focus-visible {
+        outline: 2px solid rgba(125, 211, 252, 0.7);
+        outline-offset: 2px;
       }
 
       .timeline-track-badge.is-active {
@@ -1424,9 +1439,26 @@
         background: rgba(239, 68, 68, 0.12);
       }
 
+      .timeline-track-badge[data-flag="solo"].is-active {
+        border-color: rgba(245, 158, 11, 0.42);
+        background: rgba(245, 158, 11, 0.14);
+      }
+
+      .timeline-track-badge[data-flag="locked"].is-active {
+        border-color: rgba(148, 163, 184, 0.4);
+        background: rgba(148, 163, 184, 0.14);
+      }
+
       .timeline-track-icon {
         width: 14px;
         height: 14px;
+      }
+
+      .timeline-track-solo {
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: 0.02em;
       }
 
       .timeline-track-lane {

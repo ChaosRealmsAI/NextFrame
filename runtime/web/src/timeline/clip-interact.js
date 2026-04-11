@@ -278,6 +278,10 @@ export function attachClipInteractions(clipEl, clipId, store, zoom) {
       return;
     }
 
+    if (context.track?.locked) {
+      return;
+    }
+
     if (store.state.ui?.timelineTool === "blade") {
       const lane = clipEl.parentElement;
       if (!(lane instanceof HTMLElement)) {

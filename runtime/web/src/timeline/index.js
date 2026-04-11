@@ -85,6 +85,7 @@ function getTrackSignature(track) {
     label: track.label || "",
     name: track.name || "",
     muted: Boolean(track.muted),
+    solo: Boolean(track.solo),
     locked: Boolean(track.locked),
     clips: (track.clips || []).map((clip) => ({
       id: clip.id || "",

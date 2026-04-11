@@ -5,10 +5,14 @@ import {
   randomizeParamsCommand,
   setClipFieldCommand,
   setProjectAspectPresetCommand,
+  setTrackFlagCommand,
 } from "../../src/commands.js";
+import { createMixer } from "../../src/audio/mixer.js";
 import { registerScene, renderAt, SCENES, validateTimeline } from "../../src/engine/index.js";
 import { SCENE_MANIFEST } from "../../src/scenes/index.js";
 import { createDefaultTimeline, store } from "../../src/store.js";
+import { createTrackRow } from "../../src/timeline/track.js";
+import { attachClipInteractions } from "../../src/timeline/clip-interact.js";
 import { endScrubbing, setScrubPlayhead, startScrubbing } from "../../src/timeline/scrub.js";
 import { BASE_PX_PER_SECOND, createZoomController } from "../../src/timeline/zoom.js";
 import { describe, expect, it, skip } from "./runner.js";
@@ -206,6 +210,52 @@ function withTestScene(fn) {
   }
 }
 
+function createMockAudioBuffer(duration = 2) {
+  return {
+    duration,
+    numberOfChannels: 1,
+    getChannelData() {
+      return new Float32Array(1);
+    },
+  };
+}
+
+function createMockAudioContext() {
+  const starts = [];
+
+  return {
+    currentTime: 24,
+    state: "running",
+    destination: {},
+    starts,
+    resume() {
+      return Promise.resolve();
+    },
+    createGain() {
+      return {
+        gain: {
+          setValueAtTime() {},
+          linearRampToValueAtTime() {},
+        },
+        connect() {},
+        disconnect() {},
+      };
+    },
+    createBufferSource() {
+      return {
+        buffer: null,
+        connect() {},
+        disconnect() {},
+        addEventListener() {},
+        start(when, clipStart, clipDur) {
+          starts.push({ when, clipStart, clipDur, buffer: this.buffer });
+        },
+        stop() {},
+      };
+    },
+  };
+}
+
 describe("BDD critical scenarios", () => {
   it("STORE-01 preview perf overlay defaults to off", () => {
     expect(store.state.showPerf).toBe(false);
@@ -282,6 +332,9 @@ describe("BDD critical scenarios", () => {
     expect(timeline.tracks.every((track) => Array.isArray(track.clips) && track.clips.length === 0)).toBeTruthy(
       "Expected all default tracks to be empty",
     );
+    expect(
+      timeline.tracks.every((track) => track.muted === false && track.solo === false && track.locked === false),
+    ).toBeTruthy("Expected all default tracks to initialize muted/solo/locked flags to false");
   });
 
   it("TL-05 zoom changes pxPerSecond", () => {
@@ -419,6 +472,41 @@ describe("BDD critical scenarios", () => {
     expect(clip.params).toEqual(randomizedParams);
   });
 
+  it("TRACK-01 setTrackFlagCommand updates track flags with undo/redo", () => {
+    const localStore = createLocalStore();
+    const dispatcher = createDispatcher(localStore);
+
+    dispatcher.dispatch(setTrackFlagCommand({
+      trackId: "v1",
+      flag: "muted",
+      value: true,
+    }));
+    dispatcher.dispatch(setTrackFlagCommand({
+      trackId: "v1",
+      flag: "solo",
+      value: true,
+    }));
+
+    let track = findTrack(localStore.state.timeline, "v1");
+    expect(track.muted).toBe(true);
+    expect(track.solo).toBe(true);
+    expect(track.locked).toBe(false);
+
+    dispatcher.undo();
+    dispatcher.undo();
+
+    track = findTrack(localStore.state.timeline, "v1");
+    expect(track.muted).toBe(false);
+    expect(track.solo).toBe(false);
+
+    dispatcher.redo();
+    dispatcher.redo();
+
+    track = findTrack(localStore.state.timeline, "v1");
+    expect(track.muted).toBe(true);
+    expect(track.solo).toBe(true);
+  });
+
   it("CLIP-05 splitClip produces two clips", () => {
     if (typeof commandsModule.splitClipCommand !== "function") {
       skip("splitClipCommand() is not implemented in runtime/web/src/commands.js");
@@ -502,6 +590,48 @@ describe("BDD critical scenarios", () => {
     });
   });
 
+  it("SCRUB-04 renderAt skips muted tracks and only renders solo tracks when any solo is active", () => {
+    withTestScene(() => {
+      const timeline = {
+        ...createDefaultTimeline(),
+        tracks: [
+          {
+            id: "v1",
+            kind: "video",
+            muted: true,
+            solo: false,
+            locked: false,
+            clips: [createClip({ id: "clip-muted", params: { color: "#ff0000" } })],
+          },
+          {
+            id: "v2",
+            kind: "video",
+            muted: false,
+            solo: true,
+            locked: false,
+            clips: [createClip({ id: "clip-solo", params: { color: "#00ff00" } })],
+          },
+          {
+            id: "v3",
+            kind: "video",
+            muted: false,
+            solo: false,
+            locked: false,
+            clips: [createClip({ id: "clip-hidden", params: { color: "#0000ff" } })],
+          },
+        ],
+      };
+      const ctx = createMockContext();
+
+      renderAt(ctx, timeline, 1);
+
+      const renderedColors = ctx.operations
+        .filter((entry) => entry[0] === "fillStyle" && entry[1] !== "#0b0b14")
+        .map((entry) => entry[1]);
+      expect(renderedColors).toEqual(["#00ff00"]);
+    });
+  });
+
   it("SCRUB-02 throttles scrub playhead mutations and flushes the final value on end", () => {
     const localStore = createLocalStore();
     const dispatcher = createDispatcher(localStore);
@@ -578,6 +708,85 @@ describe("BDD critical scenarios", () => {
     );
   });
 
+  it("AUDIO-01 mixer skips muted tracks and respects solo-only playback", () => {
+    const audioContext = createMockAudioContext();
+    const audioBuffer = createMockAudioBuffer(4);
+    const timeline = {
+      ...createDefaultTimeline(),
+      duration: 4,
+      tracks: [
+        {
+          id: "a1",
+          kind: "audio",
+          muted: true,
+          solo: false,
+          locked: false,
+          clips: [{
+            id: "clip-muted-audio",
+            start: 0,
+            dur: 2,
+            assetId: "tone-a",
+            scene: "audio",
+            params: {},
+          }],
+        },
+        {
+          id: "a2",
+          kind: "audio",
+          muted: false,
+          solo: true,
+          locked: false,
+          clips: [{
+            id: "clip-solo-audio",
+            start: 0,
+            dur: 2,
+            assetId: "tone-b",
+            scene: "audio",
+            params: {},
+          }],
+        },
+        {
+          id: "a3",
+          kind: "audio",
+          muted: false,
+          solo: false,
+          locked: false,
+          clips: [{
+            id: "clip-non-solo-audio",
+            start: 0,
+            dur: 2,
+            assetId: "tone-c",
+            scene: "audio",
+            params: {},
+          }],
+        },
+      ],
+      assets: [
+        { id: "tone-a", kind: "audio", path: "file:///tone-a.wav" },
+        { id: "tone-b", kind: "audio", path: "file:///tone-b.wav" },
+        { id: "tone-c", kind: "audio", path: "file:///tone-c.wav" },
+      ],
+    };
+    const state = createBaseState(timeline);
+    state.loop = false;
+    state.assets = timeline.assets;
+    state.assetBuffers = new Map([
+      ["file:///tone-a.wav", audioBuffer],
+      ["file:///tone-b.wav", audioBuffer],
+      ["file:///tone-c.wav", audioBuffer],
+    ]);
+
+    const mixer = createMixer({
+      audioContext,
+      getState: () => state,
+    });
+
+    mixer.syncToPlayhead(0, true);
+
+    expect(audioContext.starts.length).toBe(1);
+    expect(audioContext.starts[0].buffer).toBe(audioBuffer);
+  });
+
   it("FILE-03 validateTimeline rejects malformed timelines and accepts valid ones", () => {
     const validTimeline = createDefaultTimeline();
     const validResult = validateTimeline(validTimeline);
@@ -607,6 +816,94 @@ describe("BDD critical scenarios", () => {
       invalidResult.errors.some((error) => error.includes("timeline.duration"))
         && invalidResult.errors.some((error) => error.includes("scene or assetId")),
     ).toBeTruthy("Expected validateTimeline() to report both structural and clip payload errors");
+  });
+
+  it("UI-01 track header buttons dispatch undoable track flag commands", () => {
+    if (typeof document === "undefined") {
+      skip("Track header interaction test requires a DOM environment");
+    }
+
+    const dispatched = [];
+    const row = createTrackRow({
+      id: "v1",
+      label: "V1",
+      name: "Video 1",
+      kind: "video",
+      muted: false,
+      solo: false,
+      locked: false,
+      clips: [],
+    }, {
+      duration: 10,
+      zoom: {
+        pxPerSecond: 20,
+        timeToPx: (time) => time * 20,
+        pxToTime: (pixels) => pixels / 20,
+      },
+      store: {
+        state: {
+          assets: [],
+          assetBuffers: new Map(),
+        },
+        dispatch(command) {
+          dispatched.push(command);
+        },
+      },
+    });
+
+    row.querySelector('[data-flag="solo"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(dispatched).toEqual([{
+      type: "setTrackFlag",
+      trackId: "v1",
+      flag: "solo",
+      value: true,
+    }]);
+  });
+
+  it("UI-02 locked tracks ignore clip mousedown interactions", () => {
+    if (typeof document === "undefined") {
+      skip("Clip interaction guard test requires a DOM environment");
+    }
+
+    const clipEl = document.createElement("div");
+    const clip = createClip({ id: "clip-locked" });
+    const track = {
+      id: "v1",
+      kind: "video",
+      muted: false,
+      solo: false,
+      locked: true,
+      clips: [clip],
+    };
+    const storeSelectionCalls = [];
+    const localStore = {
+      state: {
+        ...createBaseState({
+          ...createDefaultTimeline(),
+          tracks: [track],
+        }),
+      },
+      dispatch() {
+        throw new Error("Locked clip interaction should not dispatch commands");
+      },
+      selectClip(clipId) {
+        storeSelectionCalls.push(clipId);
+      },
+      addToSelection(clipId) {
+        storeSelectionCalls.push(clipId);
+      },
+    };
+
+    attachClipInteractions(clipEl, clip.id, localStore, createZoomController(1));
+    clipEl.dispatchEvent(new MouseEvent("mousedown", {
+      bubbles: true,
+      button: 0,
+      clientX: 10,
+      clientY: 10,
+    }));
+
+    expect(storeSelectionCalls.length).toBe(0);
   });
 
   it("INS-02 SCENE_MANIFEST exposes 12 scenes with parameter schemas", () => {

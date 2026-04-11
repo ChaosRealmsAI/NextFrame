@@ -8,6 +8,7 @@ import {
   snapClipTime,
 } from "./timeline/clip-range.js";
 import { createProjectFromPreset, normalizeProjectState } from "./project/presets.js";
+import { TRACK_FLAGS } from "./track-flags.js";
 
 function cloneValue(value) {
   if (value instanceof Map) {
@@ -646,6 +647,15 @@ export function setProjectAspectPresetCommand({ presetId }) {
   };
 }
 
+export function setTrackFlagCommand({ trackId, flag, value }) {
+  return {
+    type: "setTrackFlag",
+    trackId,
+    flag,
+    value,
+  };
+}
+
 function createBuiltInCommand(command) {
   if (typeof command.exec === "function") {
     return command;
@@ -1071,6 +1081,52 @@ function createBuiltInCommand(command) {
             field: command.field,
             value: previous.clip?.[command.field],
           };
+        },
+      };
+    case "setTrackFlag":
+      return {
+        ...command,
+        exec(state) {
+          if (typeof command.trackId !== "string" || command.trackId.length === 0) {
+            throw new TypeError("setTrackFlag requires a non-empty trackId");
+          }
+
+          if (!TRACK_FLAGS.includes(command.flag)) {
+            throw new TypeError(`setTrackFlag requires flag to be one of: ${TRACK_FLAGS.join(", ")}`);
+          }
+
+          const tracks = cloneTracks(getTimelineState(state));
+          const trackIndex = findTrackIndex(tracks, command.trackId);
+          if (trackIndex < 0) {
+            throw new Error(`setTrackFlag: track "${command.trackId}" not found`);
+          }
+
+          const track = tracks[trackIndex];
+          const nextValue = Boolean(command.value);
+          const previousValue = Boolean(track?.[command.flag]);
+          if (nextValue === previousValue) {
+            return ABORT_COMMAND;
+          }
+
+          tracks[trackIndex] = {
+            ...track,
+            [command.flag]: nextValue,
+          };
+
+          return withUpdatedTimeline(state, tracks);
+        },
+        invert(nextState, prevState) {
+          const previousTracks = Array.isArray(prevState?.timeline?.tracks) ? prevState.timeline.tracks : [];
+          const previousTrackIndex = findTrackIndex(previousTracks, command.trackId);
+          if (previousTrackIndex < 0) {
+            return null;
+          }
+
+          return setTrackFlagCommand({
+            trackId: command.trackId,
+            flag: command.flag,
+            value: Boolean(previousTracks[previousTrackIndex]?.[command.flag]),
+          });
         },
       };
     case "setProjectAspectPreset":

@@ -1,4 +1,5 @@
 import { createProjectAssetIndex, normalizeAudioUrl } from "./buffer.js";
+import { hasSoloTrack, shouldRenderTrack } from "../track-flags.js";
 
 function readFiniteNumber(value, fallback = 0) {
   const parsed = Number(value);
@@ -69,6 +70,7 @@ function collectScheduleEntries(state, playhead, horizon) {
 
   const assetIndex = createProjectAssetIndex(state);
   const tracks = Array.isArray(state?.timeline?.tracks) ? state.timeline.tracks : [];
+  const soloActive = hasSoloTrack(tracks);
   const loopEnabled = state?.loop !== false;
   const windowStart = loopEnabled
     ? wrapTime(playhead, duration)
@@ -79,7 +81,7 @@ function collectScheduleEntries(state, playhead, horizon) {
   const entries = [];
 
   tracks.forEach((track) => {
-    if (track?.kind !== "audio" || track?.muted) {
+    if (track?.kind !== "audio" || !shouldRenderTrack(track, soloActive)) {
       return;
     }
 

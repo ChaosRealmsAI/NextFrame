@@ -1,3 +1,5 @@
+import { hasSoloTrack, shouldRenderTrack } from "../track-flags.js";
+
 const DEFAULT_BACKGROUND = "#0b0b14";
 const DPR_STATE = Symbol("nextframe.engine.dprState");
 const EMPTY_PARAMS = Object.freeze({});
@@ -70,6 +72,12 @@ export function validateTimeline(timeline) {
       if (typeof track.kind !== "string" || track.kind.length === 0) {
         errors.push(`${trackPath}.kind must be a non-empty string`);
       }
+
+      ["muted", "locked", "solo"].forEach((flag) => {
+        if (flag in track && typeof track[flag] !== "boolean") {
+          errors.push(`${trackPath}.${flag} must be a boolean when provided`);
+        }
+      });
 
       if (!Array.isArray(track.clips)) {
         errors.push(`${trackPath}.clips must be an array`);
@@ -169,7 +177,12 @@ export function renderAt(ctx, timeline, t) {
   ctx.restore();
 
   const tracks = Array.isArray(timeline?.tracks) ? timeline.tracks : [];
+  const soloActive = hasSoloTrack(tracks);
   for (const track of tracks) {
+    if (!shouldRenderTrack(track, soloActive)) {
+      continue;
+    }
+
     const clips = Array.isArray(track?.clips) ? track.clips : [];
 
     for (const clip of clips) {
