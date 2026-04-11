@@ -14,6 +14,8 @@ mkdir -p spec
 
 generated_at="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 rounds_completed="$(find spec/rounds -maxdepth 1 -type f -name 'R*.md' ! -name '*-reviewer.md' | wc -l | tr -d ' ')"
+scene_files="$(ls runtime/web/src/scenes/*.js 2>/dev/null | wc -l | tr -d ' ')"
+bdd_test_files="$(ls runtime/web/test/bdd/*.test.js 2>/dev/null | wc -l | tr -d ' ')"
 
 tmp_files=()
 
@@ -255,25 +257,116 @@ fi
   printf 'Generated: %s\n\n' "$generated_at"
   printf '## Summary\n'
   printf -- '- Rounds completed: %s\n' "$rounds_completed"
+  printf -- '- Scene files: %s\n' "$scene_files"
+  printf -- '- BDD test files: %s\n' "$bdd_test_files"
   printf -- '- Cargo clippy: %s\n' "$clippy_status"
   printf -- '- Web lint: %s\n' "$web_lint_status"
   printf -- '- Cargo tests: %s passed / %s total\n' "$cargo_tests_passed" "$cargo_tests_total"
   printf -- '- BDD tests: %s passed / %s total\n' "$bdd_passed" "$bdd_total"
   printf -- '- Release build: %s\n\n' "$release_build_status"
 
+  cat <<'EOF'
+## Quick Start
+```bash
+cd NextFrame
+cargo run -p shell
+```
+
+## Features Shipped
+### Phase A: Architecture (R1-R5)
+- R1: Initialized the Cargo workspace, four-crate skeleton, and `runtime/web` scaffold.
+- R2: Brought up the native Wry/Tao shell window and loaded the local web runtime.
+- R3: Added the JSON-style JS↔Rust bridge for filesystem, scene, timeline, and logging calls.
+- R4: Built the frame-pure render core, easing helpers, and timeline validation pipeline.
+- R5: Ported the first five production scenes and wired the demo timeline into the engine.
+
+### Phase B: UI Shell (R6-R12)
+- R6: Replaced the placeholder page with the five-zone editor shell and dark desktop styling.
+- R7: Implemented the top menu system plus New/Open/Save/Export project file flows.
+- R8: Rendered the multi-track timeline UI with ruler, tracks, clips, zoom, and playhead visuals.
+- R9: Mounted the DPR-aware preview canvas with letterboxing, safe areas, and render loop plumbing.
+- R10: Shipped the library and inspector panels with live scene data and property editors.
+- R11: Bootstrapped autoplay so the app opens with a looping demo timeline instead of a blank screen.
+- R12: No standalone round file exists in this repo snapshot; shell work rolled forward into adjacent rounds.
+
+### Phase C: Editing (R13-R19)
+- R13: Enabled drag-and-drop from the scene library to create clips directly on timeline tracks.
+- R14: Added clip body drag, edge resize, overlap protection, and minimum duration guards.
+- R15: Introduced the Blade tool, clip splitting, shift multi-select, and marquee selection.
+- R16: Added delete, copy, paste, duplicate, and keyboard shortcuts for core timeline editing.
+- R17: Implemented magnetic snapping to grid, playhead, and neighboring clip edges.
+- R18: No standalone round file exists; undo-oriented command work landed incrementally in nearby editing rounds.
+- R19: No standalone round file exists in this repo snapshot; editing scope continued through later polish rounds.
+
+### Phase D: Preview & Audio (R20-R23)
+- R20: No standalone round file exists; playback behavior was delivered across preview bootstrap and transport polish work.
+- R21: No standalone round file exists in this repo snapshot; preview/audio scope resumed in R22.
+- R22: Added Web Audio mixing, clip waveform rendering, and multi-track playback plumbing.
+- R23: Smoothed scrubbing with throttled preview renders and less noisy playhead mutation flow.
+
+### Phase E: Export (R24-R26)
+- R24: Exposed the `window.__onFrame` recorder contract for deterministic frame stepping and capture.
+- R25: Wired File → Export to a recorder subprocess with presets, progress, and output handoff.
+- R26: Added ffmpeg audio muxing so exported MP4 files can include mixed project audio.
+
+### Phase F: Quality (R27-R30)
+- R27: Built the headless BDD suite covering critical user scenarios with a custom JS runner.
+- R28: Performed the architecture cleanup pass and added file-size checks for oversized modules.
+- R29: Closed the lint and warning sweep across Rust and JavaScript quality gates.
+- R30: Introduced the overnight verification report and scripted validation pipeline.
+- R31: No standalone round file exists in this repo snapshot; numbering resumes at R32 for the polish pass.
+
+### Polish: R32-R59
+- R32: Added first-launch polish with the welcome overlay and keyboard hint treatment.
+- R33: Expanded the scene library from 5 to 10 reusable frame-pure scenes.
+- R34: Documented AI-driven operation and shipped a sample `.nfproj` welcome project.
+- R35: Replaced placeholder scene cards with live-rendered library thumbnails.
+- R36: Upgraded the preview transport controls with scrub bar, loop toggle, and volume UI.
+- R37: Added timeline clip thumbnails so visual clips preview their hero frames inline.
+- R38: Shipped an interactive first-run tutorial with anchored tooltips across the editor.
+- R39: Added performance telemetry, frame-drop tracking, and a 60fps monitoring hook.
+- R40: Added a synced project title bar with filename and dirty-state indicator.
+- R41: Added clip color labels and freeform notes in the inspector.
+- R42: Added one-click randomized scene params driven by each scene schema.
+- R43: Added the project stats strip for clip counts, duration, categories, and dirty state.
+- R44: Added toast notifications for save, export, and error feedback.
+- R45: Added favorite scenes with persistence and top-of-library prioritization.
+- R46: Added a clickable timeline minimap for fast navigation across long projects.
+- R47: Added persistent recent files in the File menu via the Rust bridge.
+- R48: Added a Cmd+K command palette for keyboard-first control of editor actions.
+- R49: Added switchable color themes including the Velvet and Ice presets.
+- R50: Added autosave with background snapshots and recovery-oriented bridge endpoints.
+- R51: Added a dedicated live-editable text scene for title and overlay work.
+- R52: Added project aspect ratio presets for YouTube, TikTok, Instagram, and cinematic output.
+- R53: Added the `imageHero` scene with Ken Burns-style motion on still images.
+- R54: Made track mute, solo, and lock controls functional in editor state and rendering.
+- R55: Added loop-region in/out markers with draggable playback boundaries.
+- R56: Added right-click context menus for clips, tracks, and other editor surfaces.
+- R57: Added the bottom status bar with cursor time, tool state, selection, and autosave status.
+- R58: Added the `shapeBurst` motion graphics scene for geometric burst animation.
+- R59: Added the `fluidBackground` scene for animated soft-glow abstract backdrops.
+
+## Try It Now
+1. `cd NextFrame`
+2. `cargo run -p shell`
+3. The window opens, scenes auto-play
+4. Press `Cmd+K` to open the command palette.
+5. Press `B` for blade tool, click a clip to split
+6. Try `View > Theme > Velvet` for purple aesthetic
+7. `File > Export` to start to render MP4
+
+EOF
+
   printf '## What works (manual walkthrough)\n'
   printf '%s\n\n' "${manual_notes[0]}"
-  printf '1. Open `cargo run -p shell` → a `1440x900` Wry window opens.\n'
-  printf '2. The 5-zone CapCut-style layout loads: top menu, left library, center preview, right inspector, bottom timeline.\n'
-  printf '3. The preview plays the 30-second demo timeline automatically with the 5 shipped scenes on loop.\n'
-  printf '4. Drag a scene from the left library onto `V1` → a clip is created at the drop position.\n'
-  printf '5. Drag clip body to move, and drag clip edges to resize.\n'
-  printf '6. Press `B` for the Blade tool, then click a clip to split it.\n'
-  printf '7. Use `Shift`+click for multi-select, or drag a marquee box on empty timeline space to select multiple clips.\n'
-  printf '8. Press `Cmd+Z` to undo the last timeline action.\n'
-  printf '9. File → Save prompts for a `.nfproj` path and persists the current timeline.\n'
-  printf '10. File → Open loads an existing `.nfproj` file after validation.\n'
-  printf '11. File → Export opens the export dialog and can hand off MP4 generation to the recorder subprocess when that binary is available.\n\n'
+  printf '1. Launch `cargo run -p shell` and let the `1440x900` Wry window settle on the autoplaying demo timeline.\n'
+  printf '2. Call out the editor shell: top menu, scene library, preview canvas, inspector, and multi-track timeline.\n'
+  printf '3. Show that scenes are live by dragging a library card onto `V1`, then move and resize the created clip.\n'
+  printf '4. Press `B`, split a clip, then use `Shift`+click or a marquee drag to show multi-select editing.\n'
+  printf '5. Hit `Cmd+K` for the command palette and switch `View > Theme > Velvet` to show the polished shell variants.\n'
+  printf '6. Open File actions to show Save/Open, recent files, autosave support, and export entry points.\n'
+  printf '7. Finish in the timeline: loop a region, inspect clip params, and point out thumbnails, stats, and status feedback.\n'
+  printf '8. Start File → Export and explain that MP4 output works when the recorder and ffmpeg toolchain are installed.\n\n'
 
   printf '## Known issues / gaps\n'
   local_issue_index=0
@@ -296,6 +389,9 @@ fi
   printf -- '- `cargo test -p bridge`: %s. stdout/stderr summary: %s\n' "$bridge_test_status" "$bridge_test_summary"
   printf -- '- `cargo build --workspace --release`: %s. stdout/stderr summary: %s\n' "$release_build_status" "$release_build_summary"
   printf -- '- `node runtime/web/test/bdd/run.mjs`: %s. stdout/stderr summary: %s\n' "$bdd_status" "$bdd_summary"
+  printf '\n## Inventory Counts\n'
+  printf -- '- Scene files (`runtime/web/src/scenes/*.js`): %s\n' "$scene_files"
+  printf -- '- BDD test files (`runtime/web/test/bdd/*.test.js`): %s\n' "$bdd_test_files"
 } > "$REPORT_PATH"
 
 printf 'Wrote %s and %s\n' "$REPORT_PATH" "$LOG_PATH"
