@@ -2118,6 +2118,7 @@
     <script type="module">
       import * as bridge from "./src/bridge.js";
       import { loadAudioBuffer, mergeProjectAssets, normalizeAudioUrl } from "./src/audio/buffer.js";
+      import { mountCommandPalette } from "./src/command-palette.js";
       import { initDragDrop } from "./src/dnd/index.js";
       import * as engine from "./src/engine/index.js";
       import { installOnFrame } from "./src/export/onframe.js";
@@ -2233,6 +2234,13 @@
         }
 
         return Math.min(Math.max(playhead, 0), duration);
+      }
+
+      function runMenuAction(action) {
+        const button = document.querySelector(`[data-menu-action="${action}"]`);
+        if (button instanceof HTMLButtonElement && !button.disabled) {
+          button.click();
+        }
       }
 
       function areMapsEqual(left, right) {
@@ -2383,6 +2391,176 @@
       function getFirstVideoTrackId() {
         const videoTrack = (store.state.timeline?.tracks || []).find((track) => track?.kind === "video");
         return videoTrack?.id ?? null;
+      }
+
+      function normalizeLoadedTimeline(timeline) {
+        return {
+          ...timeline,
+          background: typeof timeline?.background === "string" ? timeline.background : "#0b0b14",
+          assets: Array.isArray(timeline?.assets) ? timeline.assets : [],
+          tracks: Array.isArray(timeline?.tracks) ? timeline.tracks : [],
+        };
+      }
+
+      async function openRecentProject() {
+        const entries = await bridge.call("recent.list", {});
+        const recentEntry = Array.isArray(entries)
+          ? entries.find((entry) => typeof entry?.path === "string" && entry.path.length > 0)
+          : null;
+        if (!recentEntry?.path) {
+          return;
+        }
+
+        const loadedTimeline = await bridge.call("timeline.load", { path: recentEntry.path });
+        const validation = engine.validateTimeline(loadedTimeline);
+        if (!validation.ok) {
+          throw new Error(validation.errors.join("\n"));
+        }
+
+        const timeline = normalizeLoadedTimeline(loadedTimeline);
+        store.mutate((state) => {
+          state.timeline = timeline;
+          state.assets = timeline.assets;
+          state.assetBuffers = new Map();
+          state.filePath = recentEntry.path;
+          state.playhead = 0;
+          state.dirty = false;
+        });
+
+        void bridge.call("recent.add", { path: recentEntry.path }).catch(() => {});
+      }
+
+      function selectAllClips() {
+        const clipEntries = (store.state.timeline?.tracks || [])
+          .flatMap((track) => (track?.clips || []).map((clip) => ({
+            trackId: track?.id ?? null,
+            clipId: clip?.id ?? null,
+          })))
+          .filter((entry) => entry.trackId && entry.clipId);
+        if (clipEntries.length === 0) {
+          return;
+        }
+
+        const lastEntry = clipEntries.at(-1);
+        store.dispatch({
+          type: "setSelection",
+          trackId: lastEntry?.trackId ?? null,
+          clipId: lastEntry?.clipId ?? null,
+          clipIds: clipEntries.map((entry) => entry.clipId),
+        });
+      }
+
+      function addTrack(kind) {
+        const normalizedKind = kind === "audio" ? "audio" : "video";
+        const idPrefix = normalizedKind === "audio" ? "a" : "v";
+        const labelPrefix = normalizedKind === "audio" ? "A" : "V";
+        const namePrefix = normalizedKind === "audio" ? "Audio" : "Video";
+
+        store.mutate((state) => {
+          const timeline = state.timeline || { version: "1", duration: 30, tracks: [] };
+          const tracks = Array.isArray(timeline.tracks) ? timeline.tracks : [];
+          const kindTracks = tracks.filter((track) => track?.kind === normalizedKind);
+
+          let nextIndex = kindTracks.length + 1;
+          let nextId = `${idPrefix}${nextIndex}`;
+          while (tracks.some((track) => track?.id === nextId)) {
+            nextIndex += 1;
+            nextId = `${idPrefix}${nextIndex}`;
+          }
+
+          state.timeline = {
+            ...timeline,
+            tracks: [
+              ...tracks,
+              {
+                id: nextId,
+                label: `${labelPrefix}${nextIndex}`,
+                name: `${namePrefix} ${nextIndex}`,
+                kind: normalizedKind,
+                clips: [],
+              },
+            ],
+          };
+        });
+      }
+
+      function toggleHelp() {
+        const helpButton = document.querySelector(".help-hint-badge");
+        if (helpButton instanceof HTMLButtonElement) {
+          helpButton.click();
+        }
+      }
+
+      function zoomTimeline(action) {
+        const button = document.querySelector(`#bottom-timeline [data-action="${action}"]`);
+        if (button instanceof HTMLButtonElement) {
+          button.click();
+        }
+      }
+
+      function createPaletteCommands() {
+        return [
+          { id: "file.new", label: "File: New Project", shortcut: "Cmd+N", run: () => runMenuAction("new") },
+          { id: "file.open", label: "File: Open", shortcut: "Cmd+O", run: () => runMenuAction("open") },
+          { id: "file.openRecent", label: "File: Open Recent", run: () => openRecentProject() },
+          { id: "file.save", label: "File: Save", shortcut: "Cmd+S", run: () => runMenuAction("save") },
+          { id: "file.saveAs", label: "File: Save As", shortcut: "Cmd+Shift+S", run: () => runMenuAction("saveAs") },
+          { id: "file.export", label: "File: Export", run: () => runMenuAction("export") },
+          { id: "file.close", label: "File: Close", run: () => runMenuAction("close") },
+          { id: "edit.undo", label: "Edit: Undo", shortcut: "Cmd+Z", run: () => store.undo?.() },
+          { id: "edit.redo", label: "Edit: Redo", shortcut: "Cmd+Shift+Z", run: () => store.redo?.() },
+          {
+            id: "edit.cut",
+            label: "Edit: Cut",
+            shortcut: "Cmd+X",
+            run: () => {
+              copySelectedClips();
+              removeSelectedClips();
+            },
+          },
+          { id: "edit.copy", label: "Edit: Copy", shortcut: "Cmd+C", run: () => copySelectedClips() },
+          { id: "edit.paste", label: "Edit: Paste", shortcut: "Cmd+V", run: () => pasteClipboardClips() },
+          { id: "edit.delete", label: "Edit: Delete", shortcut: "Delete", run: () => removeSelectedClips() },
+          { id: "edit.duplicate", label: "Edit: Duplicate", shortcut: "Cmd+D", run: () => duplicateSelectedClips() },
+          { id: "edit.selectAll", label: "Edit: Select All", shortcut: "Cmd+A", run: () => selectAllClips() },
+          { id: "view.zoomIn", label: "View: Zoom In", shortcut: "Cmd+=", run: () => zoomTimeline("zoom-in") },
+          { id: "view.zoomOut", label: "View: Zoom Out", shortcut: "Cmd+-", run: () => zoomTimeline("zoom-out") },
+          { id: "view.zoomFit", label: "View: Zoom Fit", shortcut: "Cmd+0", run: () => zoomTimeline("fit") },
+          {
+            id: "view.toggleSafeArea",
+            label: "View: Toggle Safe Area",
+            run: () => {
+              store.mutate((state) => {
+                state.showSafeArea = !state.showSafeArea;
+              });
+            },
+          },
+          {
+            id: "view.toggleFps",
+            label: "View: Toggle FPS",
+            shortcut: "P",
+            run: () => {
+              store.mutate((state) => {
+                state.showPerf = !state.showPerf;
+              });
+            },
+          },
+          { id: "view.toggleHelp", label: "View: Toggle Help", shortcut: "?", run: () => toggleHelp() },
+          { id: "timeline.bladeTool", label: "Timeline: Blade Tool", shortcut: "B", run: () => store.setTimelineTool?.("blade") },
+          { id: "timeline.moveTool", label: "Timeline: Move Tool", run: () => store.setTimelineTool?.("select") },
+          { id: "timeline.addVideoTrack", label: "Timeline: Add Video Track", run: () => addTrack("video") },
+          { id: "timeline.addAudioTrack", label: "Timeline: Add Audio Track", run: () => addTrack("audio") },
+          {
+            id: "scene.randomizeParams",
+            label: "Scene: Randomize Params",
+            run: () => {
+              const randomizeButton = document.querySelector(".inspector-action-button");
+              if (randomizeButton instanceof HTMLButtonElement && !randomizeButton.disabled) {
+                randomizeButton.click();
+              }
+            },
+          },
+        ];
       }
 
       function removeSelectedClips() {
@@ -2551,6 +2729,7 @@
         initMenu({ bridge, store });
         mountHelpHint(document.getElementById("top-menu"));
         createAudioAssetBufferSync(store);
+        mountCommandPalette({ store, bridge, commands: createPaletteCommands() });
         window.addEventListener("keydown", onKeyDown);
 
         if (!store.state.tutorialComplete) {
