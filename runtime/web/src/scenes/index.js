@@ -2,6 +2,7 @@ import { auroraGradient } from "./auroraGradient.js";
 import { circleRipple } from "./circleRipple.js";
 import { cornerBadge } from "./cornerBadge.js";
 import { countdown } from "./countdown.js";
+import { fluidBackground } from "./fluidBackground.js";
 import { imageHero } from "./imageHero.js";
 import { kineticHeadline } from "./kineticHeadline.js";
 import { lineChart } from "./lineChart.js";
@@ -47,6 +48,22 @@ const SCENE_REGISTRY = [
       hueC: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
       intensity: { type: "number", default: 1, min: 0, max: 1.5 },
       grain: { type: "number", default: 0.04, min: 0, max: 0.15 },
+    },
+  },
+  {
+    id: "fluidBackground",
+    fn: fluidBackground,
+    name: "Fluid Background",
+    category: "Backgrounds",
+    duration_hint: "5-30s",
+    params: {
+      blobCount: { type: "integer", default: 5, min: 1, max: 8 },
+      hueA: { type: "number", default: 210, min: 0, max: 360, ui: "hue" },
+      hueB: { type: "number", default: 290, min: 0, max: 360, ui: "hue" },
+      hueC: { type: "number", default: 340, min: 0, max: 360, ui: "hue" },
+      intensity: { type: "number", default: 0.6, min: 0, max: 1.5 },
+      drift: { type: "number", default: 0.4, min: 0, max: 1 },
+      blur: { type: "number", default: 80, min: 0, max: 160, unit: "px" },
     },
   },
   {
