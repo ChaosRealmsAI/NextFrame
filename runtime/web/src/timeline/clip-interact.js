@@ -9,6 +9,7 @@ import {
 import { computeSnap } from "./snap.js";
 
 const EDGE_HIT_WIDTH = 8;
+const DRAG_ACTIVATION_PX = 3;
 const MIN_CLIP_WIDTH = 44;
 const SNAP_GUIDE_FLASH_MS = 60;
 const TOOLTIP_OFFSET_X = 14;
@@ -145,6 +146,20 @@ function flashSnapGuide(interaction, time) {
   interaction.snapGuideTimer = window.setTimeout(() => {
     guide.hidden = true;
   }, SNAP_GUIDE_FLASH_MS);
+}
+
+function hasDragStarted(interaction, clientX) {
+  return Math.abs(clientX - interaction.originClientX) >= DRAG_ACTIVATION_PX;
+}
+
+function activateInteraction(interaction) {
+  if (interaction.dragActivated) {
+    return;
+  }
+
+  interaction.dragActivated = true;
+  document.body.style.userSelect = "none";
+  document.body.style.cursor = interaction.mode === "move" ? "grabbing" : "col-resize";
 }
 
 function maybeSnapTime(interaction, candidateTime, pointerState) {
@@ -287,6 +302,7 @@ export function attachClipInteractions(clipEl, clipId, store, zoom) {
       originalStyles,
       previousCursor: document.body.style.cursor,
       previousUserSelect: document.body.style.userSelect,
+      dragActivated: false,
       preview: {
         start: Number(context.clip.start) || 0,
         dur: originalDur,
@@ -298,16 +314,24 @@ export function attachClipInteractions(clipEl, clipId, store, zoom) {
     };
 
     const applyPreview = (moveEvent) => {
+      if (!interaction.dragActivated && !hasDragStarted(interaction, moveEvent.clientX)) {
+        hideTooltip();
+        hideSnapGuide(interaction);
+        return false;
+      }
+
+      activateInteraction(interaction);
       interaction.preview = resolvePreview(interaction, moveEvent.clientX, moveEvent);
       setPreviewState(clipEl, zoom, interaction.preview);
       updateTooltip(moveEvent, interaction.preview);
 
       if (interaction.preview.snapTime == null) {
         hideSnapGuide(interaction);
-        return;
+        return true;
       }
 
       flashSnapGuide(interaction, interaction.preview.snapTime);
+      return true;
     };
 
     interaction.handleMouseMove = (moveEvent) => {
@@ -315,9 +339,10 @@ export function attachClipInteractions(clipEl, clipId, store, zoom) {
     };
 
     interaction.handleMouseUp = (upEvent) => {
-      applyPreview(upEvent);
+      const didDrag = applyPreview(upEvent);
       const finalPreview = interaction.preview;
-      const changed = finalPreview.start !== interaction.originalStart || finalPreview.dur !== interaction.originalDur;
+      const changed = didDrag
+        && (finalPreview.start !== interaction.originalStart || finalPreview.dur !== interaction.originalDur);
 
       teardownActiveInteraction();
 
@@ -333,10 +358,7 @@ export function attachClipInteractions(clipEl, clipId, store, zoom) {
     };
 
     activeInteraction = interaction;
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = mode === "move" ? "grabbing" : "col-resize";
     store.selectClip?.(clipId);
-    applyPreview(event);
     window.addEventListener("mousemove", interaction.handleMouseMove);
     window.addEventListener("mouseup", interaction.handleMouseUp);
     event.preventDefault();
