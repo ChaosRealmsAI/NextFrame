@@ -2,6 +2,7 @@ import { auroraGradient } from "./auroraGradient.js";
 import { circleRipple } from "./circleRipple.js";
 import { cornerBadge } from "./cornerBadge.js";
 import { countdown } from "./countdown.js";
+import { dataPulse } from "./dataPulse.js";
 import { fluidBackground } from "./fluidBackground.js";
 import { imageHero } from "./imageHero.js";
 import { kineticHeadline } from "./kineticHeadline.js";
@@ -249,6 +250,22 @@ const SCENE_REGISTRY = [
       hueEnd: { type: "number", default: 310, min: 0, max: 360, ui: "hue" },
       drawStart: { type: "number", default: 0.2, min: 0, max: 2, unit: "s" },
       drawEnd: { type: "number", default: 2.6, min: 0.4, max: 6, unit: "s" },
+    },
+  },
+  {
+    id: "dataPulse",
+    fn: dataPulse,
+    name: "Data Pulse",
+    category: "Data Viz",
+    duration_hint: "5-30s loop",
+    params: {
+      bars: { type: "integer", default: 64, min: 8, max: 160 },
+      hueA: { type: "number", default: 180, min: 0, max: 360, ui: "hue" },
+      hueB: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
+      peak: { type: "number", default: 0.8, min: 0, max: 1.5 },
+      baseHeight: { type: "number", default: 0.15, min: 0, max: 0.6 },
+      smoothness: { type: "number", default: 0.25, min: 0, max: 1 },
+      glowAlpha: { type: "number", default: 0.4, min: 0, max: 1 },
     },
   },
   {
