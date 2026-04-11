@@ -14,6 +14,7 @@ import { lowerThirdVelvet } from "./lowerThirdVelvet.js";
 import { orbitRings } from "./orbitRings.js";
 import { pixelRain } from "./pixelRain.js";
 import { shapeBurst } from "./shapeBurst.js";
+import { spotlightSweep } from "./spotlightSweep.js";
 import { starfield } from "./starfield.js";
 import { textOverlay } from "./textOverlay.js";
 
@@ -151,6 +152,22 @@ const SCENE_REGISTRY = [
       drift: { type: "number", default: 0.06, min: 0, max: 0.2 },
       density: { type: "number", default: 1, min: 0.4, max: 2 },
       glow: { type: "number", default: 1, min: 0.4, max: 2 },
+    },
+  },
+  {
+    id: "spotlightSweep",
+    fn: spotlightSweep,
+    name: "Spotlight Sweep",
+    category: "Backgrounds",
+    duration_hint: "5-30s loop",
+    params: {
+      beamCount: { type: "integer", default: 3, min: 1, max: 8 },
+      hueA: { type: "number", default: 210, min: 0, max: 360, ui: "hue" },
+      hueB: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
+      sweepSpeed: { type: "number", default: 0.5, min: 0, max: 3 },
+      beamWidth: { type: "number", default: 0.4, min: 0.05, max: 1.2 },
+      intensity: { type: "number", default: 0.85, min: 0, max: 1.5 },
+      ambient: { type: "number", default: 0.05, min: 0, max: 0.3 },
     },
   },
   {
