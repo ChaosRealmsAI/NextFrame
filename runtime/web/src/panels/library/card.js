@@ -217,6 +217,8 @@ export function createSceneCard(scene, { store } = {}) {
   );
 
   card.classList.add("scene-card");
+  card.dataset.sceneId = scene.id || "";
+  card.dataset.assetKind = "scene";
   card.style.borderColor = hexToRgba(accent, 0.32);
   card.style.position = "relative";
 
@@ -264,6 +266,8 @@ export function createAssetCard(asset) {
   const hint = asset.path || asset.description || asset.kind || "asset";
   const meta = formatDuration(Number(asset.duration)) || String(asset.kind || "").toUpperCase();
   const card = createCardShell(name, hint, meta);
+  card.dataset.assetId = asset.id || "";
+  card.dataset.assetKind = asset.kind || "";
 
   const thumb = document.createElement("div");
   thumb.className = "asset-thumb";
