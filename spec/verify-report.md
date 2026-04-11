@@ -1,10 +1,10 @@
 # NextFrame v0.1 — Overnight Build Verification Report
 
-Generated: 2026-04-12 07:18:10 CST
+Generated: 2026-04-12 07:36:19 CST
 
 ## Summary
-- Rounds completed: 60
-- Scene files: 22
+- Rounds completed: 62
+- Scene files: 23
 - BDD test files: 8
 - Cargo clippy: PASS
 - Web lint: PASS
@@ -124,12 +124,12 @@ cargo run -p shell
 
 ## Verification command summaries
 - `cargo fmt --check`: PASS. stdout/stderr summary: No output captured.
-- `cargo clippy --workspace --all-targets -- -D warnings`: PASS. stdout/stderr summary:    Finished `dev` profile [unoptimized  debuginfo] target(s) in 0.10s
-- `node runtime/web/test/lint.mjs`: PASS. stdout/stderr summary: Checked 81 JavaScript file(s) under runtime/web/src with 0 TODO warning(s).
+- `cargo clippy --workspace --all-targets -- -D warnings`: PASS. stdout/stderr summary:    Finished `dev` profile [unoptimized  debuginfo] target(s) in 0.08s
+- `node runtime/web/test/lint.mjs`: PASS. stdout/stderr summary: Checked 82 JavaScript file(s) under runtime/web/src with 0 TODO warning(s).
 - `cargo test -p bridge`: PASS. stdout/stderr summary:    Finished `test` profile [unoptimized  debuginfo] target(s) in 0.06s     Running unittests src/lib.rs (target/debug/deps/bridge-2a4fbf10d9d5756b)|test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-- `cargo build --workspace --release`: PASS. stdout/stderr summary:    Finished `release` profile [optimized] target(s) in 0.08s
+- `cargo build --workspace --release`: PASS. stdout/stderr summary:    Finished `release` profile [optimized] target(s) in 0.05s
 - `node runtime/web/test/bdd/run.mjs`: PASS. stdout/stderr summary: ✓ 32 passed, 0 failed, 3 skipped
 
 ## Inventory Counts
-- Scene files (`runtime/web/src/scenes/*.js`): 22
+- Scene files (`runtime/web/src/scenes/*.js`): 23
 - BDD test files (`runtime/web/test/bdd/*.test.js`): 8

@@ -3,12 +3,12 @@ $ cargo fmt --check
 [exit 0]
 
 $ cargo clippy --workspace --all-targets -- -D warnings
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
 
 [exit 0]
 
 $ node runtime/web/test/lint.mjs
-Checked 81 JavaScript file(s) under runtime/web/src with 0 TODO warning(s).
+Checked 82 JavaScript file(s) under runtime/web/src with 0 TODO warning(s).
 
 [exit 0]
 
@@ -19,35 +19,35 @@ $ cargo test -p bridge
 running 35 tests
 test tests::build_ffmpeg_filter_complex_formats_delays_and_mix ... ok
 test tests::build_recorder_args_matches_expected_contract ... ok
-test tests::fs_dialog_save_dispatch_happy_and_error ... ok
 test tests::fs_dialog_open_dispatch_happy_and_error ... ok
+test tests::fs_dialog_save_dispatch_happy_and_error ... ok
 test tests::fs_read_rejects_parent_traversal_path ... ok
-test tests::export_mux_audio_copies_video_when_no_audio_sources ... ok
 test tests::fs_list_dir_rejects_symlink_escape ... ok
+test tests::export_mux_audio_copies_video_when_no_audio_sources ... ok
 test tests::fs_read_rejects_symlink_escape ... ok
-test tests::fs_write_rejects_absolute_system_path ... ok
-test tests::export_mux_audio_builds_expected_ffmpeg_command ... ok
-test tests::fs_write_dispatch_happy_and_error ... ok
-test tests::fs_read_dispatch_happy_and_error ... ok
-test tests::log_dispatch_happy_and_error ... ok
-test tests::fs_write_rejects_symlink_parent_escape ... ok
 test tests::fs_list_dir_dispatch_happy_and_error ... ok
 test tests::fs_reveal_dispatch_happy_and_error ... ok
+test tests::fs_read_dispatch_happy_and_error ... ok
+test tests::fs_write_rejects_absolute_system_path ... ok
+test tests::export_mux_audio_builds_expected_ffmpeg_command ... ok
+test tests::log_dispatch_happy_and_error ... ok
+test tests::fs_write_dispatch_happy_and_error ... ok
+test tests::fs_write_rejects_symlink_parent_escape ... ok
 test tests::resolve_write_path_expands_home_and_allows_missing_export_dirs ... ok
-test tests::scene_list_dispatch_happy_and_error ... ok
-test tests::export_mux_audio_reports_missing_ffmpeg ... ok
-test tests::fs_write_rejects_symlink_target_escape ... ok
 test tests::resolve_recorder_launch_plan_falls_back_to_cargo_manifest ... ok
+test tests::scene_list_dispatch_happy_and_error ... ok
+test tests::fs_write_rejects_symlink_target_escape ... ok
+test tests::export_mux_audio_surfaces_ffmpeg_stderr ... ok
+test tests::resolve_recorder_launch_plan_prefers_env_override ... ok
+test tests::timeline_save_dispatch_error_on_disallowed_path ... ok
 test tests::timeline_load_dispatch_error_on_invalid_json ... ok
 test tests::timeline_load_rejects_symlink_escape ... ok
-test tests::timeline_save_dispatch_error_on_disallowed_path ... ok
-test tests::timeline_load_dispatch_happy_path ... ok
-test tests::resolve_recorder_launch_plan_prefers_env_override ... ok
-test tests::export_mux_audio_surfaces_ffmpeg_stderr ... ok
-test tests::timeline_save_rejects_symlink_parent_escape ... ok
 test tests::timeline_save_accepts_timeline_alias ... ok
+test tests::timeline_load_dispatch_happy_path ... ok
+test tests::export_mux_audio_reports_missing_ffmpeg ... ok
 test tests::timeline_save_dispatch_happy_path ... ok
 test tests::timeline_save_rejects_symlink_target_escape ... ok
+test tests::timeline_save_rejects_symlink_parent_escape ... ok
 test tests::initialize_primes_ffmpeg_cache_before_mux_requests ... ok
 test tests::recent_add_dispatch_dedupes_and_caps_entries ... ok
 test tests::autosave_rejects_invalid_project_id ... ok
@@ -65,7 +65,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 [exit 0]
 
 $ cargo build --workspace --release
-    Finished `release` profile [optimized] target(s) in 0.08s
+    Finished `release` profile [optimized] target(s) in 0.05s
 
 [exit 0]
 
@@ -94,7 +94,7 @@ BDD critical scenarios
   ✓ FILE-03 validateTimeline rejects malformed timelines and accepts valid ones
   - UI-01 track header buttons dispatch undoable track flag commands (skipped: Track header interaction test requires a DOM environment)
   - UI-02 locked tracks ignore clip mousedown interactions (skipped: Clip interaction guard test requires a DOM environment)
-  ✓ INS-02 SCENE_MANIFEST exposes 20 scenes with parameter schemas
+  ✓ INS-02 SCENE_MANIFEST exposes 21 scenes with parameter schemas
 Loop region
   ✓ LOOP-01 normalizes default and clamped loop region values
   ✓ LOOP-02 updateLoopRegion syncs state.loop and preserves region shape
