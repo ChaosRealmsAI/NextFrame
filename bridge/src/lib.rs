@@ -32,6 +32,11 @@ struct ProcessTerminal {
     error: Option<String>,
 }
 
+struct ProcessRegistry {
+    export_start_reserved: bool,
+    handles: HashMap<u32, ProcessHandle>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum RecorderLauncher {
     Binary(PathBuf),
@@ -44,7 +49,7 @@ struct RecorderLaunchPlan {
     recorder_args: Vec<String>,
 }
 
-static PROCESS_REGISTRY: OnceLock<Mutex<HashMap<u32, ProcessHandle>>> = OnceLock::new();
+static PROCESS_REGISTRY: OnceLock<Mutex<ProcessRegistry>> = OnceLock::new();
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Request {
@@ -208,8 +213,8 @@ fn handle_export_start(params: &Value) -> Result<Value, String> {
         env::current_dir().map_err(|error| format!("failed to read current directory: {error}"))?;
 
     {
-        let mut processes = lock_process_registry()?;
-        if refresh_running_export_state(&mut processes)? {
+        let mut registry = lock_process_registry()?;
+        if !reserve_export_start(&mut registry)? {
             return Ok(json!({
                 "ok": false,
                 "error": EXPORT_ERROR_ALREADY_RUNNING,
@@ -217,62 +222,88 @@ fn handle_export_start(params: &Value) -> Result<Value, String> {
         }
     }
 
-    let Some(plan) = build_export_plan(&current_dir, &output_path, width, height, fps, duration)?
-    else {
-        return Ok(json!({
-            "ok": false,
-            "error": EXPORT_ERROR_NOT_FOUND,
-        }));
-    };
-
-    let Some(parent) = output_path.parent() else {
-        return Err(format!(
-            "failed to resolve parent for '{}'",
-            output_path.display()
-        ));
-    };
-    fs::create_dir_all(parent).map_err(|error| {
-        format!(
-            "failed to create export directory '{}': {error}",
-            parent.display()
-        )
-    })?;
-
-    let log_path = create_export_log_path()?;
-    let child = match spawn_recorder(&plan, &log_path) {
-        Ok(child) => child,
-        Err(error) => {
+    let start_result = (|| -> Result<Value, String> {
+        let Some(plan) =
+            build_export_plan(&current_dir, &output_path, width, height, fps, duration)?
+        else {
             return Ok(json!({
                 "ok": false,
-                "error": error,
-                "logPath": log_path.display().to_string(),
+                "error": EXPORT_ERROR_NOT_FOUND,
             }));
+        };
+
+        let Some(parent) = output_path.parent() else {
+            return Err(format!(
+                "failed to resolve parent for '{}'",
+                output_path.display()
+            ));
+        };
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "failed to create export directory '{}': {error}",
+                parent.display()
+            )
+        })?;
+
+        let log_path = create_export_log_path()?;
+        let child = match spawn_recorder(&plan, &log_path) {
+            Ok(child) => child,
+            Err(error) => {
+                return Ok(json!({
+                    "ok": false,
+                    "error": error,
+                    "logPath": log_path.display().to_string(),
+                }));
+            }
+        };
+        let pid = child.id();
+
+        let mut handle = ProcessHandle {
+            child,
+            output_path,
+            log_path: log_path.clone(),
+            duration_secs: duration,
+            started_at: Instant::now(),
+            terminal: None,
+        };
+
+        match lock_process_registry() {
+            Ok(mut registry) => {
+                registry.export_start_reserved = false;
+                registry.handles.insert(pid, handle);
+            }
+            Err(error) => {
+                let _ = handle.child.kill();
+                let _ = handle.child.wait();
+                return Err(error);
+            }
         }
-    };
-    let pid = child.id();
 
-    let handle = ProcessHandle {
-        child,
-        output_path,
-        log_path: log_path.clone(),
-        duration_secs: duration,
-        started_at: Instant::now(),
-        terminal: None,
-    };
+        Ok(json!({
+            "ok": true,
+            "pid": pid,
+            "logPath": log_path.display().to_string(),
+        }))
+    })();
 
-    lock_process_registry()?.insert(pid, handle);
+    let started = start_result
+        .as_ref()
+        .ok()
+        .and_then(|result| result.get("ok"))
+        .and_then(Value::as_bool)
+        == Some(true);
 
-    Ok(json!({
-        "ok": true,
-        "pid": pid,
-        "logPath": log_path.display().to_string(),
-    }))
+    if !started {
+        clear_export_start_reservation()?;
+    }
+
+    start_result
 }
 
 fn handle_export_status(params: &Value) -> Result<Value, String> {
     let pid = require_u32(params, "pid")?;
-    let mut processes = lock_process_registry()?;
-    let Some(handle) = processes.get_mut(&pid) else {
+    let mut registry = lock_process_registry()?;
+    let Some(handle) = registry.handles.get_mut(&pid) else {
         return Ok(json!({
             "state": EXPORT_FAILED,
             "percent": 0,
@@ -288,8 +319,8 @@ fn handle_export_status(params: &Value) -> Result<Value, String> {
 
 fn handle_export_cancel(params: &Value) -> Result<Value, String> {
     let pid = require_u32(params, "pid")?;
-    let mut processes = lock_process_registry()?;
-    let Some(handle) = processes.get_mut(&pid) else {
+    let mut registry = lock_process_registry()?;
+    let Some(handle) = registry.handles.get_mut(&pid) else {
         return Ok(json!({
             "ok": false,
             "error": "unknown_pid",
@@ -620,28 +651,41 @@ fn reveal_in_file_manager(_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn lock_process_registry(
-) -> Result<std::sync::MutexGuard<'static, HashMap<u32, ProcessHandle>>, String> {
+fn lock_process_registry() -> Result<std::sync::MutexGuard<'static, ProcessRegistry>, String> {
     process_registry()
         .lock()
         .map_err(|_| "process registry is unavailable".to_string())
 }
 
-fn process_registry() -> &'static Mutex<HashMap<u32, ProcessHandle>> {
-    PROCESS_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+fn process_registry() -> &'static Mutex<ProcessRegistry> {
+    PROCESS_REGISTRY.get_or_init(|| {
+        Mutex::new(ProcessRegistry {
+            export_start_reserved: false,
+            handles: HashMap::new(),
+        })
+    })
 }
 
-fn refresh_running_export_state(
-    processes: &mut HashMap<u32, ProcessHandle>,
-) -> Result<bool, String> {
-    for handle in processes.values_mut() {
+fn reserve_export_start(registry: &mut ProcessRegistry) -> Result<bool, String> {
+    if registry.export_start_reserved {
+        return Ok(false);
+    }
+
+    for handle in registry.handles.values_mut() {
         refresh_process_state(handle)?;
         if handle.terminal.is_none() {
-            return Ok(true);
+            return Ok(false);
         }
     }
 
-    Ok(false)
+    registry.export_start_reserved = true;
+    Ok(true)
+}
+
+fn clear_export_start_reservation() -> Result<(), String> {
+    let mut registry = lock_process_registry()?;
+    registry.export_start_reserved = false;
+    Ok(())
 }
 
 fn refresh_process_state(handle: &mut ProcessHandle) -> Result<(), String> {

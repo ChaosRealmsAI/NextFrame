@@ -259,7 +259,7 @@ export function showExportDialog({ store } = {}) {
     window.clearInterval(state.pollingTimer);
     state.pollingTimer = 0;
     setRunning(false);
-    revealButton.hidden = false;
+    revealButton.hidden = status?.state !== "done";
 
     if (status?.state === "done") {
       setError("");
