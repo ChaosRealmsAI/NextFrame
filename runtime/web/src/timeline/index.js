@@ -6,7 +6,7 @@ import { BASE_PX_PER_SECOND, createZoomController } from "./zoom.js";
 function getProjectDuration(timeline) {
   const clipDuration = (timeline?.tracks || []).reduce((maxEnd, track) => {
     const trackEnd = (track.clips || []).reduce((clipMax, clip) => {
-      return Math.max(clipMax, (Number(clip.start) || 0) + (Number(clip.duration) || 0));
+      return Math.max(clipMax, (Number(clip.start) || 0) + (Number(clip.duration ?? clip.dur) || 0));
     }, 0);
 
     return Math.max(maxEnd, trackEnd);
@@ -71,8 +71,9 @@ function getTrackSignature(track) {
       id: clip.id || "",
       category: clip.category || "",
       name: clip.name || "",
+      scene: clip.scene || "",
       start: Number(clip.start) || 0,
-      duration: Number(clip.duration) || 0,
+      duration: Number(clip.duration ?? clip.dur) || 0,
     })),
   });
 }

@@ -212,8 +212,6 @@ export function initMenu({ bridge, store }) {
           showNotice("Export is not implemented yet", { dirty: store.state.dirty });
           await logInfo(bridge, "Export requested but not implemented yet");
           return;
-        case "undo":
-        case "redo":
         case "cut":
         case "copy":
         case "paste":
@@ -221,6 +219,20 @@ export function initMenu({ bridge, store }) {
             dirty: store.state.dirty,
           });
           await logInfo(bridge, `${placeholderLabel(action)} requested but not implemented yet`);
+          return;
+        case "undo":
+          if (store.canUndo) {
+            store.undo();
+          } else {
+            showNotice("Nothing to undo", { dirty: store.state.dirty });
+          }
+          return;
+        case "redo":
+          if (store.canRedo) {
+            store.redo();
+          } else {
+            showNotice("Nothing to redo", { dirty: store.state.dirty });
+          }
           return;
         case "zoomIn":
           store.mutate((state) => {

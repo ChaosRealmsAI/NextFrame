@@ -17,20 +17,25 @@ export function createLoop({ tick, getTime }) {
   let playing = false;
   let stopped = false;
   let frameId = 0;
+  let lastFrameTime = null;
 
   const schedule = () => {
     if (!playing || stopped || frameId !== 0) {
       return;
     }
 
-    frameId = requestFrame(() => {
+    frameId = requestFrame((now) => {
       frameId = 0;
 
       if (!playing || stopped) {
         return;
       }
 
-      tick(getTime());
+      const previousFrameTime = lastFrameTime ?? now;
+      const dt = Math.max(0, (now - previousFrameTime) / 1000);
+      lastFrameTime = now;
+
+      tick(getTime(), dt, now);
       schedule();
     });
   };
@@ -42,6 +47,7 @@ export function createLoop({ tick, getTime }) {
       }
 
       playing = true;
+      lastFrameTime = null;
       schedule();
     },
     pause() {
@@ -50,6 +56,7 @@ export function createLoop({ tick, getTime }) {
       }
 
       playing = false;
+      lastFrameTime = null;
       if (frameId !== 0) {
         cancelFrame(frameId);
         frameId = 0;
@@ -63,6 +70,7 @@ export function createLoop({ tick, getTime }) {
 
       playing = false;
       stopped = true;
+      lastFrameTime = null;
     },
     isPlaying() {
       return playing && !stopped;

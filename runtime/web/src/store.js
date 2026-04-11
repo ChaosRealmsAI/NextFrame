@@ -1,3 +1,5 @@
+import { createDispatcher } from "./commands.js";
+
 const DEFAULT_PROJECT = {
   width: 1920,
   height: 1080,
@@ -16,18 +18,30 @@ export function createDefaultTimeline() {
 function createInitialState() {
   return {
     playhead: 0,
-    playing: false,
+    playing: true,
     showSafeArea: false,
     project: { ...DEFAULT_PROJECT },
     timeline: createDefaultTimeline(),
     filePath: null,
     dirty: false,
+    selection: {
+      trackId: null,
+      clipId: null,
+    },
     ui: {
       zoom: 1,
       timelineVisible: true,
       inspectorVisible: true,
     },
   };
+}
+
+function cloneState(state) {
+  if (typeof globalThis.structuredClone === "function") {
+    return globalThis.structuredClone(state);
+  }
+
+  return JSON.parse(JSON.stringify(state));
 }
 
 export const store = {
@@ -43,11 +57,37 @@ export const store = {
       this.listeners.delete(listener);
     };
   },
+  replace(nextState) {
+    if (!nextState || typeof nextState !== "object") {
+      throw new TypeError("store.replace(nextState) requires a state object");
+    }
+
+    const previousState = cloneState(this.state);
+    const previousDirty = this.state.dirty;
+    const previousTimeline = this.state.timeline;
+    let resolvedState = nextState;
+
+    if (resolvedState.timeline !== previousTimeline && resolvedState.dirty === previousDirty) {
+      resolvedState = {
+        ...resolvedState,
+        dirty: true,
+      };
+    }
+
+    this.state = resolvedState;
+
+    for (const listener of this.listeners) {
+      listener(this.state, previousState);
+    }
+
+    return this.state;
+  },
   mutate(recipe) {
     if (typeof recipe !== "function") {
       throw new TypeError("store.mutate(recipe) requires a function");
     }
 
+    const previousState = cloneState(this.state);
     const prevDirty = this.state.dirty;
     const prevTimeline = this.state.timeline;
     let dirtyAssigned = false;
@@ -71,9 +111,30 @@ export const store = {
     }
 
     for (const listener of this.listeners) {
-      listener(this.state);
+      listener(this.state, previousState);
     }
 
     return this.state;
   },
 };
+
+const dispatcher = createDispatcher(store);
+
+store.dispatch = (command) => dispatcher.dispatch(command);
+store.undo = () => dispatcher.undo();
+store.redo = () => dispatcher.redo();
+
+Object.defineProperties(store, {
+  canUndo: {
+    enumerable: true,
+    get() {
+      return dispatcher.canUndo;
+    },
+  },
+  canRedo: {
+    enumerable: true,
+    get() {
+      return dispatcher.canRedo;
+    },
+  },
+});
