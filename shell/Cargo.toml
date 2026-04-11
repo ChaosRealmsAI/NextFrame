@@ -5,6 +5,5 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-bridge = { path = "../bridge" }
-engine = { path = "../engine" }
-project = { path = "../project" }
+tao = "0.30"
+wry = "0.37"
