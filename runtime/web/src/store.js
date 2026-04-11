@@ -1,14 +1,9 @@
 import { createDispatcher } from "./commands.js";
+import { createDefaultProject } from "./project/presets.js";
 import { THEMES } from "./theme.js";
 
 const TUTORIAL_COMPLETE_STORAGE_KEY = "nextframe.tutorial.complete";
 const THEME_STORAGE_KEY = "nextframe.theme";
-
-const DEFAULT_PROJECT = {
-  width: 1920,
-  height: 1080,
-  aspectRatio: 16 / 9,
-};
 
 function getLocalStorage() {
   try {
@@ -85,6 +80,10 @@ export function createDefaultTimeline() {
   };
 }
 
+export function createDefaultProjectState() {
+  return createDefaultProject();
+}
+
 function createInitialState() {
   return {
     playhead: 0,
@@ -94,7 +93,7 @@ function createInitialState() {
     snapEnabled: true,
     showSafeArea: false,
     showPerf: false,
-    project: { ...DEFAULT_PROJECT },
+    project: createDefaultProjectState(),
     timeline: createDefaultTimeline(),
     filePath: null,
     dirty: false,

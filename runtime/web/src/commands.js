@@ -7,6 +7,7 @@ import {
   roundClipTime,
   snapClipTime,
 } from "./timeline/clip-range.js";
+import { createProjectFromPreset, normalizeProjectState } from "./project/presets.js";
 
 function cloneValue(value) {
   if (value instanceof Map) {
@@ -638,6 +639,13 @@ export function randomizeParamsCommand({ clipId, trackId = null, newParams }) {
   };
 }
 
+export function setProjectAspectPresetCommand({ presetId }) {
+  return {
+    type: "setProjectAspectPreset",
+    presetId,
+  };
+}
+
 function createBuiltInCommand(command) {
   if (typeof command.exec === "function") {
     return command;
@@ -1062,6 +1070,66 @@ function createBuiltInCommand(command) {
             trackId: previous.trackId,
             field: command.field,
             value: previous.clip?.[command.field],
+          };
+        },
+      };
+    case "setProjectAspectPreset":
+      return {
+        ...command,
+        exec(state) {
+          const nextProject = createProjectFromPreset(command.presetId);
+          const previousProject = normalizeProjectState(state?.project);
+
+          if (
+            nextProject.width === previousProject.width
+            && nextProject.height === previousProject.height
+            && nextProject.aspectRatio === previousProject.aspectRatio
+          ) {
+            return ABORT_COMMAND;
+          }
+
+          return {
+            ...state,
+            project: nextProject,
+            dirty: true,
+          };
+        },
+        invert(nextState, prevState) {
+          return {
+            type: "setProjectState",
+            project: normalizeProjectState(prevState?.project),
+            dirty: Boolean(prevState?.dirty),
+          };
+        },
+      };
+    case "setProjectState":
+      return {
+        ...command,
+        exec(state) {
+          const nextProject = normalizeProjectState(command.project);
+          const previousProject = normalizeProjectState(state?.project);
+          const nextDirty = Boolean(command.dirty);
+
+          if (
+            nextProject.width === previousProject.width
+            && nextProject.height === previousProject.height
+            && nextProject.aspectRatio === previousProject.aspectRatio
+            && nextDirty === Boolean(state?.dirty)
+          ) {
+            return ABORT_COMMAND;
+          }
+
+          return {
+            ...state,
+            project: nextProject,
+            dirty: nextDirty,
+          };
+        },
+        invert(nextState, prevState) {
+          return {
+            type: "setProjectState",
+            project: normalizeProjectState(prevState?.project),
+            dirty: Boolean(prevState?.dirty),
           };
         },
       };

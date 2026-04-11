@@ -1,4 +1,5 @@
 import { validateTimeline } from "./engine/index.js";
+import { createProjectDocument, readProjectDocument } from "./project/document.js";
 import { toast } from "./toast.js";
 
 const AUTOSAVE_INTERVAL_MS = 30_000;
@@ -37,7 +38,7 @@ export function startAutosave({ store, bridge } = {}) {
       writing = true;
       await bridge.call("autosave.write", {
         projectId,
-        timeline: store.state.timeline,
+        timeline: createProjectDocument(store.state),
       });
       toast("Autosaved", { type: "info", duration: 2000 });
     } catch (error) {
@@ -168,16 +169,18 @@ async function promptForRecovery({ store, bridge }) {
       const recovered = await bridge.call("autosave.recover", {
         projectId: entry.projectId,
       });
-      const validation = validateTimeline(recovered);
+      const projectDocument = readProjectDocument(recovered);
+      const validation = validateTimeline(projectDocument.timeline);
       if (!validation.ok) {
         throw new Error(validation.errors.join("\n"));
       }
 
-      const timeline = normalizeTimeline(recovered);
+      const timeline = normalizeTimeline(projectDocument.timeline);
       const filePath = getProjectFilePathFromAutosaveId(entry.projectId);
 
       store.mutate((state) => {
         state.timeline = timeline;
+        state.project = projectDocument.project;
         state.assets = timeline.assets;
         state.assetBuffers = new Map();
         state.filePath = filePath;

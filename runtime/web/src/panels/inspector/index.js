@@ -1,4 +1,5 @@
-import { randomizeParamsCommand, setClipFieldCommand } from "../../commands.js";
+import { randomizeParamsCommand, setClipFieldCommand, setProjectAspectPresetCommand } from "../../commands.js";
+import { ASPECT_PRESETS, createProjectFromPreset, findAspectPresetForProject } from "../../project/presets.js";
 import { SCENE_MANIFEST_BY_ID } from "../../scenes/index.js";
 import { renderField } from "./field.js";
 import {
@@ -131,6 +132,22 @@ function updateSelectedClipField(store, field, value) {
     }
 
     draftClip[field] = value;
+  });
+}
+
+function updateProjectAspectPreset(store, presetId) {
+  if (typeof presetId !== "string" || presetId.length === 0) {
+    return;
+  }
+
+  if (typeof store?.dispatch === "function") {
+    store.dispatch(setProjectAspectPresetCommand({ presetId }));
+    return;
+  }
+
+  store?.mutate((state) => {
+    state.project = createProjectFromPreset(presetId);
+    state.dirty = true;
   });
 }
 
@@ -285,18 +302,33 @@ export function mountInspector(container, { store } = {}) {
   const status = header.querySelector('[data-role="status"]');
   let lastSelectedClipId = store?.state?.selectedClipId ?? null;
   let lastTimelineRef = store?.state?.timeline;
+  let lastProjectRef = store?.state?.project;
 
   function renderEmptyState() {
-    status.textContent = "No Selection";
+    status.textContent = "Project";
     body.replaceChildren();
 
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.innerHTML = `
-      <div class="empty-glyph" aria-hidden="true"></div>
-      <strong>Select a clip to edit its properties</strong>
-    `;
-    body.appendChild(empty);
+    const projectSection = createInspectorSection("Project", "Canvas output and aspect ratio");
+    const selectedPreset = findAspectPresetForProject(store?.state?.project);
+
+    projectSection.body.append(
+      renderField({
+        label: "Aspect Preset",
+        name: "aspectPreset",
+        type: "select",
+        value: selectedPreset?.id ?? ASPECT_PRESETS[0].id,
+        options: ASPECT_PRESETS.map((preset) => ({
+          value: preset.id,
+          label: preset.name,
+        })),
+        onChange: (presetId) => {
+          updateProjectAspectPreset(store, presetId);
+        },
+      }),
+      createReadonlyRow("Resolution", formatProjectResolution(store?.state?.project)),
+    );
+
+    body.appendChild(projectSection.section);
   }
 
   function renderSelection() {
@@ -416,10 +448,15 @@ export function mountInspector(container, { store } = {}) {
 
   const unsubscribe = typeof store?.subscribe === "function"
     ? store.subscribe((nextState) => {
-      if (nextState.selectedClipId !== lastSelectedClipId || nextState.timeline !== lastTimelineRef) {
+      if (
+        nextState.selectedClipId !== lastSelectedClipId
+        || nextState.timeline !== lastTimelineRef
+        || (!nextState.selectedClipId && nextState.project !== lastProjectRef)
+      ) {
         renderSelection();
         lastSelectedClipId = nextState.selectedClipId ?? null;
         lastTimelineRef = nextState.timeline;
+        lastProjectRef = nextState.project;
       }
     })
     : () => {};
@@ -436,4 +473,10 @@ export function mountInspector(container, { store } = {}) {
 
   container[INSPECTOR_STATE] = api;
   return api;
+}
+
+function formatProjectResolution(project) {
+  const width = Number(project?.width) || 0;
+  const height = Number(project?.height) || 0;
+  return `${width}\u00d7${height}`;
 }
