@@ -311,6 +311,14 @@ mod tests {
     }
 
     #[test]
+    fn fs_read_rejects_parent_traversal_path() {
+        let response = dispatch(request("fs.read", json!({ "path": "../../../etc/passwd" })));
+
+        assert!(!response.ok);
+        assert_error_contains(&response.error, "outside sandbox");
+    }
+
+    #[test]
     fn fs_write_dispatch_happy_and_error() {
         let temp = TestDir::new("fs-write");
         let file_path = temp.join("write.txt");
@@ -337,6 +345,20 @@ mod tests {
         ));
         assert!(!error_response.ok);
         assert_error_contains(&error_response.error, "outside sandbox");
+    }
+
+    #[test]
+    fn fs_write_rejects_absolute_system_path() {
+        let response = dispatch(request(
+            "fs.write",
+            json!({
+                "path": absolute_write_rejection_path(),
+                "contents": "blocked write",
+            }),
+        ));
+
+        assert!(!response.ok);
+        assert_error_contains(&response.error, "outside sandbox");
     }
 
     #[test]
@@ -528,6 +550,14 @@ mod tests {
             "C:\\Windows\\system32\\drivers\\etc\\hosts".to_string()
         } else {
             "/etc/passwd".to_string()
+        }
+    }
+
+    fn absolute_write_rejection_path() -> String {
+        if cfg!(windows) {
+            "C:\\Windows\\system32\\drivers\\etc\\hosts".to_string()
+        } else {
+            "/etc/hosts".to_string()
         }
     }
 
