@@ -4,6 +4,7 @@ import { cornerBadge } from "./cornerBadge.js";
 import { countdown } from "./countdown.js";
 import { dataPulse } from "./dataPulse.js";
 import { fluidBackground } from "./fluidBackground.js";
+import { glitchText } from "./glitchText.js";
 import { imageHero } from "./imageHero.js";
 import { kineticHeadline } from "./kineticHeadline.js";
 import { lineChart } from "./lineChart.js";
@@ -107,6 +108,33 @@ const SCENE_REGISTRY = [
       hueEnd: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
       stagger: { type: "number", default: 0.18, min: 0.05, max: 0.5, unit: "s" },
       size: { type: "number", default: 0.12, min: 0.05, max: 0.25 },
+    },
+  },
+  {
+    id: "glitchText",
+    fn: glitchText,
+    name: "Glitch Text",
+    category: "Typography",
+    duration_hint: "2-12s loop",
+    params: {
+      text: { type: "string", default: "GLITCH" },
+      fontSize: { type: "number", default: 140, min: 24, max: 320 },
+      weight: {
+        type: "select",
+        default: "900",
+        options: ["300", "400", "500", "600", "700", "800", "900"],
+      },
+      baseHue: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
+      glitchAmount: { type: "number", default: 0.4, min: 0, max: 1.5 },
+      scanlines: {
+        type: "select",
+        default: true,
+        options: [
+          { value: "true", label: "true" },
+          { value: "false", label: "false" },
+        ],
+      },
+      burstFreq: { type: "number", default: 2.5, min: 0.1, max: 12 },
     },
   },
   {
