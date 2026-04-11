@@ -7,12 +7,15 @@ function easeOutCubic(x) {
   return 1 - (1 - x) ** 3;
 }
 
-function resolveSize(ctx, width, height) {
-  const fallbackWidth = ctx?.canvas?.clientWidth || ctx?.canvas?.width || 1;
-  const fallbackHeight = ctx?.canvas?.clientHeight || ctx?.canvas?.height || 1;
+function resolveSize(ctx) {
+  const rect = typeof ctx?.canvas?.getBoundingClientRect === "function"
+    ? ctx.canvas.getBoundingClientRect()
+    : null;
+  const fallbackWidth = rect?.width || ctx?.canvas?.clientWidth || ctx?.canvas?.width || 1;
+  const fallbackHeight = rect?.height || ctx?.canvas?.clientHeight || ctx?.canvas?.height || 1;
   return {
-    width: Number.isFinite(width) && width > 0 ? width : fallbackWidth,
-    height: Number.isFinite(height) && height > 0 ? height : fallbackHeight,
+    width: fallbackWidth,
+    height: fallbackHeight,
   };
 }
 
@@ -22,11 +25,9 @@ function resolveSize(ctx, width, height) {
  * @param {object} [params={}] - Headline text and styling parameters.
  * @param {CanvasRenderingContext2D} ctx - Target 2D rendering context.
  * @param {number} [_globalT=0] - Global timeline time in seconds.
- * @param {number} [W] - Canvas display width in CSS pixels.
- * @param {number} [H] - Canvas display height in CSS pixels.
  * @returns {void}
  */
-export function kineticHeadline(t, params = {}, ctx, _globalT = 0, W, H) {
+export function kineticHeadline(t, params = {}, ctx, _globalT = 0) {
   const {
     text = "NEXTFRAME",
     subtitle = "Frame-pure scene library",
@@ -36,7 +37,7 @@ export function kineticHeadline(t, params = {}, ctx, _globalT = 0, W, H) {
     size = 0.12,
   } = params;
 
-  const { width, height } = resolveSize(ctx, W, H);
+  const { width, height } = resolveSize(ctx);
   const background = ctx.createLinearGradient(0, 0, width, height);
   background.addColorStop(0, "#07060c");
   background.addColorStop(1, "#0e0a18");

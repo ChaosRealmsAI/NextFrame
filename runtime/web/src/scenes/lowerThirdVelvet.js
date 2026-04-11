@@ -13,12 +13,15 @@ function easeInCubic(x) {
   return x ** 3;
 }
 
-function resolveSize(ctx, width, height) {
-  const fallbackWidth = ctx?.canvas?.clientWidth || ctx?.canvas?.width || 1;
-  const fallbackHeight = ctx?.canvas?.clientHeight || ctx?.canvas?.height || 1;
+function resolveSize(ctx) {
+  const rect = typeof ctx?.canvas?.getBoundingClientRect === "function"
+    ? ctx.canvas.getBoundingClientRect()
+    : null;
+  const fallbackWidth = rect?.width || ctx?.canvas?.clientWidth || ctx?.canvas?.width || 1;
+  const fallbackHeight = rect?.height || ctx?.canvas?.clientHeight || ctx?.canvas?.height || 1;
   return {
-    width: Number.isFinite(width) && width > 0 ? width : fallbackWidth,
-    height: Number.isFinite(height) && height > 0 ? height : fallbackHeight,
+    width: fallbackWidth,
+    height: fallbackHeight,
   };
 }
 
@@ -28,11 +31,9 @@ function resolveSize(ctx, width, height) {
  * @param {object} [params={}] - Lower-third copy and styling parameters.
  * @param {CanvasRenderingContext2D} ctx - Target 2D rendering context.
  * @param {number} [_globalT=0] - Global timeline time in seconds.
- * @param {number} [W] - Canvas display width in CSS pixels.
- * @param {number} [H] - Canvas display height in CSS pixels.
  * @returns {void}
  */
-export function lowerThirdVelvet(t, params = {}, ctx, _globalT = 0, W, H) {
+export function lowerThirdVelvet(t, params = {}, ctx, _globalT = 0) {
   const {
     title = "NEXTFRAME",
     subtitle = "Scene Registry Demo",
@@ -42,7 +43,7 @@ export function lowerThirdVelvet(t, params = {}, ctx, _globalT = 0, W, H) {
     fadeOut = 0.6,
   } = params;
 
-  const { width, height } = resolveSize(ctx, W, H);
+  const { width, height } = resolveSize(ctx);
   const barHeight = Math.max(38, height * 0.085);
   const barY = height * 0.78;
   const padX = width * 0.08;

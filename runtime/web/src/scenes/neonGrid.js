@@ -12,12 +12,15 @@ function hash(i, salt = 0) {
   return ((x >>> 0) % 100000) / 100000;
 }
 
-function resolveSize(ctx, width, height) {
-  const fallbackWidth = ctx?.canvas?.clientWidth || ctx?.canvas?.width || 1;
-  const fallbackHeight = ctx?.canvas?.clientHeight || ctx?.canvas?.height || 1;
+function resolveSize(ctx) {
+  const rect = typeof ctx?.canvas?.getBoundingClientRect === "function"
+    ? ctx.canvas.getBoundingClientRect()
+    : null;
+  const fallbackWidth = rect?.width || ctx?.canvas?.clientWidth || ctx?.canvas?.width || 1;
+  const fallbackHeight = rect?.height || ctx?.canvas?.clientHeight || ctx?.canvas?.height || 1;
   return {
-    width: Number.isFinite(width) && width > 0 ? width : fallbackWidth,
-    height: Number.isFinite(height) && height > 0 ? height : fallbackHeight,
+    width: fallbackWidth,
+    height: fallbackHeight,
   };
 }
 
@@ -27,11 +30,9 @@ function resolveSize(ctx, width, height) {
  * @param {object} [params={}] - Grid and palette parameters.
  * @param {CanvasRenderingContext2D} ctx - Target 2D rendering context.
  * @param {number} [_globalT=0] - Global timeline time in seconds.
- * @param {number} [W] - Canvas display width in CSS pixels.
- * @param {number} [H] - Canvas display height in CSS pixels.
  * @returns {void}
  */
-export function neonGrid(t, params = {}, ctx, _globalT = 0, W, H) {
+export function neonGrid(t, params = {}, ctx, _globalT = 0) {
   const {
     hueHorizon = 320,
     hueGrid = 280,
@@ -40,7 +41,7 @@ export function neonGrid(t, params = {}, ctx, _globalT = 0, W, H) {
     colCount = 22,
   } = params;
 
-  const { width, height } = resolveSize(ctx, W, H);
+  const { width, height } = resolveSize(ctx);
   const horizonY = height * 0.55;
   const fade = smoothstep(0, 0.4, t);
 
