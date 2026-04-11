@@ -63,6 +63,8 @@ edit clips and tracks, and save the result back through `timeline.save`.
 - Any path containing `..` is rejected.
 - Absolute paths are rejected unless they are inside the current user's home directory or `std::env::temp_dir()`.
 - Relative paths are resolved relative to the shell process working directory.
+- Existing read/list/load targets are canonicalized before access, so symlinks cannot escape the allowed roots.
+- Write/save requests validate the canonicalized parent directory and reject symlink final targets that resolve outside the allowed roots.
 - All filesystem and timeline methods fail with `ok: false` and an error string when the sandbox blocks access.
 
 ## Timeline Data Model

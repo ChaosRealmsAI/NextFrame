@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::env;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -55,7 +56,7 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
 
 fn handle_fs_read(params: &Value) -> Result<Value, String> {
     let path = require_string(params, "path")?;
-    let path_buf = validate_path(path)?;
+    let path_buf = resolve_existing_path(path)?;
     let contents = fs::read_to_string(&path_buf)
         .map_err(|error| format!("failed to read '{}': {error}", path_buf.display()))?;
 
@@ -68,7 +69,7 @@ fn handle_fs_read(params: &Value) -> Result<Value, String> {
 fn handle_fs_write(params: &Value) -> Result<Value, String> {
     let path = require_string(params, "path")?;
     let contents = require_string(params, "contents")?;
-    let path_buf = validate_path(path)?;
+    let path_buf = resolve_write_path(path)?;
 
     fs::write(&path_buf, contents)
         .map_err(|error| format!("failed to write '{}': {error}", path_buf.display()))?;
@@ -81,7 +82,7 @@ fn handle_fs_write(params: &Value) -> Result<Value, String> {
 
 fn handle_fs_list_dir(params: &Value) -> Result<Value, String> {
     let path = require_string(params, "path")?;
-    let path_buf = validate_path(path)?;
+    let path_buf = resolve_existing_path(path)?;
     let mut entries = fs::read_dir(&path_buf)
         .map_err(|error| format!("failed to list '{}': {error}", path_buf.display()))?
         .map(|entry_result| {
@@ -185,7 +186,7 @@ fn handle_scene_list(params: &Value) -> Result<Value, String> {
 
 fn handle_timeline_load(params: &Value) -> Result<Value, String> {
     let path = require_string(params, "path")?;
-    let path_buf = validate_path(path)?;
+    let path_buf = resolve_existing_path(path)?;
     let contents = fs::read_to_string(&path_buf)
         .map_err(|error| format!("failed to read timeline '{}': {error}", path_buf.display()))?;
 
@@ -195,7 +196,7 @@ fn handle_timeline_load(params: &Value) -> Result<Value, String> {
 
 fn handle_timeline_save(params: &Value) -> Result<Value, String> {
     let path = require_string(params, "path")?;
-    let path_buf = validate_path(path)?;
+    let path_buf = resolve_write_path(path)?;
     let json_value = require_value(params, "json")?;
     let serialized = serde_json::to_string_pretty(json_value).map_err(|error| {
         format!(
@@ -246,21 +247,69 @@ fn validate_path(raw_path: &str) -> Result<PathBuf, String> {
         return Err(format!("path is outside sandbox: {raw_path}"));
     }
 
-    let path = PathBuf::from(raw_path);
+    Ok(PathBuf::from(raw_path))
+}
 
-    if path.is_absolute() && !is_allowed_absolute_path(&path) {
-        return Err(format!("path is outside sandbox: {raw_path}"));
+fn resolve_existing_path(raw_path: &str) -> Result<PathBuf, String> {
+    let path = validate_path(raw_path)?;
+    let canonical = fs::canonicalize(&path)
+        .map_err(|error| format!("failed to resolve '{}': {error}", path.display()))?;
+
+    ensure_allowed_path(&canonical, raw_path)?;
+    Ok(canonical)
+}
+
+fn resolve_write_path(raw_path: &str) -> Result<PathBuf, String> {
+    let path = validate_path(raw_path)?;
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|error| format!("failed to resolve parent for '{}': {error}", path.display()))?;
+
+    ensure_allowed_path(&canonical_parent, raw_path)?;
+
+    match fs::symlink_metadata(&path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            let canonical_target = fs::canonicalize(&path)
+                .map_err(|error| format!("failed to resolve '{}': {error}", path.display()))?;
+            ensure_allowed_path(&canonical_target, raw_path)?;
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(format!("failed to inspect '{}': {error}", path.display()));
+        }
     }
 
     Ok(path)
 }
 
-fn is_allowed_absolute_path(path: &Path) -> bool {
-    path.starts_with(env::temp_dir())
-        || home_dir()
-            .as_deref()
-            .map(|home| path.starts_with(home))
-            .unwrap_or(false)
+fn ensure_allowed_path(path: &Path, raw_path: &str) -> Result<(), String> {
+    if is_allowed_path(path) {
+        Ok(())
+    } else {
+        Err(format!("path is outside sandbox: {raw_path}"))
+    }
+}
+
+fn is_allowed_path(path: &Path) -> bool {
+    allowed_roots()
+        .into_iter()
+        .any(|root| path.starts_with(root))
+}
+
+fn allowed_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+
+    roots.push(canonical_or_raw(env::temp_dir()));
+    if let Some(home) = home_dir() {
+        roots.push(canonical_or_raw(home));
+    }
+
+    roots
+}
+
+fn canonical_or_raw(path: PathBuf) -> PathBuf {
+    fs::canonicalize(&path).unwrap_or(path)
 }
 
 fn home_dir() -> Option<PathBuf> {
@@ -279,6 +328,7 @@ mod tests {
     use super::{dispatch, Request};
     use serde_json::{json, Value};
     use std::fs;
+    use std::io;
     use std::path::{Path, PathBuf};
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -313,6 +363,22 @@ mod tests {
     #[test]
     fn fs_read_rejects_parent_traversal_path() {
         let response = dispatch(request("fs.read", json!({ "path": "../../../etc/passwd" })));
+
+        assert!(!response.ok);
+        assert_error_contains(&response.error, "outside sandbox");
+    }
+
+    #[test]
+    fn fs_read_rejects_symlink_escape() {
+        let temp = TestDir::new("fs-read-symlink");
+        let link_path = temp.join("passwd-link");
+        create_file_symlink(Path::new(&disallowed_absolute_path()), &link_path)
+            .expect("create symlink");
+
+        let response = dispatch(request(
+            "fs.read",
+            json!({ "path": link_path.display().to_string() }),
+        ));
 
         assert!(!response.ok);
         assert_error_contains(&response.error, "outside sandbox");
@@ -362,6 +428,43 @@ mod tests {
     }
 
     #[test]
+    fn fs_write_rejects_symlink_parent_escape() {
+        let temp = TestDir::new("fs-write-parent-symlink");
+        let link_path = temp.join("escape-dir");
+        create_dir_symlink(Path::new(&disallowed_dir_path()), &link_path).expect("create symlink");
+
+        let response = dispatch(request(
+            "fs.write",
+            json!({
+                "path": link_path.join("blocked.txt").display().to_string(),
+                "contents": "blocked write",
+            }),
+        ));
+
+        assert!(!response.ok);
+        assert_error_contains(&response.error, "outside sandbox");
+    }
+
+    #[test]
+    fn fs_write_rejects_symlink_target_escape() {
+        let temp = TestDir::new("fs-write-target-symlink");
+        let link_path = temp.join("hosts-link");
+        create_file_symlink(Path::new(&absolute_write_rejection_path()), &link_path)
+            .expect("create symlink");
+
+        let response = dispatch(request(
+            "fs.write",
+            json!({
+                "path": link_path.display().to_string(),
+                "contents": "blocked write",
+            }),
+        ));
+
+        assert!(!response.ok);
+        assert_error_contains(&response.error, "outside sandbox");
+    }
+
+    #[test]
     fn fs_list_dir_dispatch_happy_and_error() {
         let temp = TestDir::new("fs-list");
         fs::write(temp.join("b.txt"), "b").expect("write b");
@@ -388,6 +491,21 @@ mod tests {
         let error_response = dispatch(request("fs.listDir", json!({})));
         assert!(!error_response.ok);
         assert_error_contains(&error_response.error, "missing params.path");
+    }
+
+    #[test]
+    fn fs_list_dir_rejects_symlink_escape() {
+        let temp = TestDir::new("fs-list-symlink");
+        let link_path = temp.join("etc-link");
+        create_dir_symlink(Path::new(&disallowed_dir_path()), &link_path).expect("create symlink");
+
+        let response = dispatch(request(
+            "fs.listDir",
+            json!({ "path": link_path.display().to_string() }),
+        ));
+
+        assert!(!response.ok);
+        assert_error_contains(&response.error, "outside sandbox");
     }
 
     #[test]
@@ -496,6 +614,22 @@ mod tests {
     }
 
     #[test]
+    fn timeline_load_rejects_symlink_escape() {
+        let temp = TestDir::new("timeline-load-symlink");
+        let link_path = temp.join("timeline-link.json");
+        create_file_symlink(Path::new(&disallowed_absolute_path()), &link_path)
+            .expect("create symlink");
+
+        let response = dispatch(request(
+            "timeline.load",
+            json!({ "path": link_path.display().to_string() }),
+        ));
+
+        assert!(!response.ok);
+        assert_error_contains(&response.error, "outside sandbox");
+    }
+
+    #[test]
     fn timeline_save_dispatch_happy_and_error() {
         let temp = TestDir::new("timeline-save");
         let timeline_path = temp.join("saved-timeline.json");
@@ -529,6 +663,43 @@ mod tests {
         assert_error_contains(&error_response.error, "outside sandbox");
     }
 
+    #[test]
+    fn timeline_save_rejects_symlink_parent_escape() {
+        let temp = TestDir::new("timeline-save-parent-symlink");
+        let link_path = temp.join("escape-dir");
+        create_dir_symlink(Path::new(&disallowed_dir_path()), &link_path).expect("create symlink");
+
+        let response = dispatch(request(
+            "timeline.save",
+            json!({
+                "path": link_path.join("blocked.json").display().to_string(),
+                "json": minimal_timeline_json(),
+            }),
+        ));
+
+        assert!(!response.ok);
+        assert_error_contains(&response.error, "outside sandbox");
+    }
+
+    #[test]
+    fn timeline_save_rejects_symlink_target_escape() {
+        let temp = TestDir::new("timeline-save-target-symlink");
+        let link_path = temp.join("timeline-link.json");
+        create_file_symlink(Path::new(&absolute_write_rejection_path()), &link_path)
+            .expect("create symlink");
+
+        let response = dispatch(request(
+            "timeline.save",
+            json!({
+                "path": link_path.display().to_string(),
+                "json": minimal_timeline_json(),
+            }),
+        ));
+
+        assert!(!response.ok);
+        assert_error_contains(&response.error, "outside sandbox");
+    }
+
     fn request(method: &str, params: Value) -> Request {
         Request {
             id: format!("req-{method}"),
@@ -559,6 +730,28 @@ mod tests {
         } else {
             "/etc/hosts".to_string()
         }
+    }
+
+    fn disallowed_dir_path() -> String {
+        if cfg!(windows) {
+            "C:\\Windows\\System32".to_string()
+        } else {
+            "/etc".to_string()
+        }
+    }
+
+    fn minimal_timeline_json() -> Value {
+        json!({
+            "version": 1,
+            "metadata": {
+                "name": "Test Timeline",
+                "fps": 30,
+                "width": 1920,
+                "height": 1080,
+                "durationMs": 1000
+            },
+            "tracks": []
+        })
     }
 
     struct TestDir {
@@ -599,5 +792,25 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[cfg(unix)]
+    fn create_file_symlink(target: &Path, link: &Path) -> io::Result<()> {
+        std::os::unix::fs::symlink(target, link)
+    }
+
+    #[cfg(windows)]
+    fn create_file_symlink(target: &Path, link: &Path) -> io::Result<()> {
+        std::os::windows::fs::symlink_file(target, link)
+    }
+
+    #[cfg(unix)]
+    fn create_dir_symlink(target: &Path, link: &Path) -> io::Result<()> {
+        std::os::unix::fs::symlink(target, link)
+    }
+
+    #[cfg(windows)]
+    fn create_dir_symlink(target: &Path, link: &Path) -> io::Result<()> {
+        std::os::windows::fs::symlink_dir(target, link)
     }
 }
