@@ -274,6 +274,11 @@ function createFakeStore(overrides = {}) {
         assets: [],
         tracks: [],
       },
+      project: {
+        width: 1920,
+        height: 1080,
+        aspectRatio: 16 / 9,
+      },
       assets: [],
       assetBuffers: new Map(),
       filePath: null,
@@ -338,6 +343,11 @@ describe("Autosave", () => {
       expect(String(store.state.autosaveId).startsWith("untitled-")).toBe(true);
       expect(calls.map((entry) => entry.method)).toEqual(["autosave.list", "autosave.write"]);
       expect(calls[1].params.projectId).toBe(store.state.autosaveId);
+      expect(calls[1].params.timeline.project).toEqual({
+        width: 1920,
+        height: 1080,
+        aspectRatio: 16 / 9,
+      });
 
       const root = doc.getElementById("toast-root");
       expect(root).toBeTruthy();
@@ -360,6 +370,11 @@ describe("Autosave", () => {
       version: "1",
       duration: 42,
       tracks: [],
+      project: {
+        width: 1080,
+        height: 1350,
+        aspectRatio: 4 / 5,
+      },
     };
     const bridge = {
       call(method, params) {
@@ -401,6 +416,11 @@ describe("Autosave", () => {
       expect(store.state.autosaveId).toBe("path-%2FUsers%2Fdemo%2FRecovered.nfproj");
       expect(store.state.dirty).toBe(true);
       expect(store.state.timeline.duration).toBe(42);
+      expect(store.state.project).toEqual({
+        width: 1080,
+        height: 1350,
+        aspectRatio: 4 / 5,
+      });
       expect(calls.map((entry) => entry.method)).toEqual([
         "autosave.list",
         "autosave.recover",

@@ -1,7 +1,9 @@
 import { clearAutosave } from "./autosave.js";
 import { validateTimeline } from "./engine/index.js";
 import { showExportDialog } from "./export/dialog.js";
-import { createDefaultTimeline } from "./store.js";
+import { createProjectDocument, readProjectDocument } from "./project/document.js";
+import { findAspectPresetForProject } from "./project/presets.js";
+import { createDefaultProjectState, createDefaultTimeline } from "./store.js";
 import { THEMES } from "./theme.js";
 import { toast } from "./toast.js";
 
@@ -52,6 +54,7 @@ export function initMenu({ bridge, store }) {
     const themeName = typeof state.theme === "string" && Object.prototype.hasOwnProperty.call(THEMES, state.theme)
       ? state.theme
       : "default";
+    const aspectPresetId = findAspectPresetForProject(state.project)?.id ?? "";
 
     if (statusChip) {
       statusChip.classList.toggle("is-dirty", isDirty);
@@ -102,6 +105,7 @@ export function initMenu({ bridge, store }) {
     syncCheckmark("timelineVisible", isTimelineVisible);
     syncCheckmark("inspectorVisible", isInspectorVisible);
     syncRadioSelection("theme", themeName);
+    syncRadioSelection("aspectPreset", aspectPresetId);
   };
 
   const unsubscribe = store.subscribe(render);
@@ -301,6 +305,7 @@ export function initMenu({ bridge, store }) {
         case "new":
           store.mutate((state) => {
             state.timeline = createDefaultTimeline();
+            state.project = createDefaultProjectState();
             state.assets = [];
             state.assetBuffers = new Map();
             state.filePath = null;
@@ -328,6 +333,7 @@ export function initMenu({ bridge, store }) {
         case "close":
           store.mutate((state) => {
             state.timeline = createDefaultTimeline();
+            state.project = createDefaultProjectState();
             state.assets = [];
             state.assetBuffers = new Map();
             state.filePath = null;
@@ -403,6 +409,16 @@ export function initMenu({ bridge, store }) {
             state.theme = detail.menuTheme;
           });
           return;
+        case "setAspectPreset":
+          if (typeof store?.dispatch !== "function") {
+            return;
+          }
+
+          store.dispatch({
+            type: "setProjectAspectPreset",
+            presetId: detail.menuAspectPreset,
+          });
+          return;
         default:
           throw new Error(`Unknown menu action: ${action}`);
       }
@@ -429,15 +445,17 @@ export function initMenu({ bridge, store }) {
     }
 
     const parsed = await bridge.call("timeline.load", { path });
-    const validation = validateTimeline(parsed);
+    const projectDocument = readProjectDocument(parsed);
+    const validation = validateTimeline(projectDocument.timeline);
 
     if (!validation.ok) {
       throw new Error(validation.errors.join("\n"));
     }
 
     store.mutate((state) => {
-      const timeline = normalizeTimeline(parsed);
+      const timeline = normalizeTimeline(projectDocument.timeline);
       state.timeline = timeline;
+      state.project = projectDocument.project;
       state.assets = timeline.assets;
       state.assetBuffers = new Map();
       state.filePath = path;
@@ -477,7 +495,7 @@ export function initMenu({ bridge, store }) {
 
   async function writeProject(path) {
     const autosaveId = store.state.autosaveId;
-    const contents = JSON.stringify(store.state.timeline, null, 2);
+    const contents = JSON.stringify(createProjectDocument(store.state), null, 2);
     await bridge.call("fs.write", { path, contents });
     store.mutate((state) => {
       state.filePath = path;

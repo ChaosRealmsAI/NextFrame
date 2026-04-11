@@ -4,6 +4,7 @@ import {
   moveClipCommand,
   randomizeParamsCommand,
   setClipFieldCommand,
+  setProjectAspectPresetCommand,
 } from "../../src/commands.js";
 import { registerScene, renderAt, SCENES, validateTimeline } from "../../src/engine/index.js";
 import { SCENE_MANIFEST } from "../../src/scenes/index.js";
@@ -233,6 +234,39 @@ describe("BDD critical scenarios", () => {
 
     expect(Boolean(previousState)).toBe(true);
     expect(previousState === store.state).toBe(false);
+  });
+
+  it("STORE-03 aspect preset switching updates project state and supports undo/redo", () => {
+    const localStore = createLocalStore();
+    const dispatcher = createDispatcher(localStore);
+
+    expect(localStore.state.project.width).toBe(1920);
+    expect(localStore.state.project.height).toBe(1080);
+    expect(localStore.state.project.aspectRatio).toBe(16 / 9);
+    expect(localStore.state.dirty).toBe(false);
+
+    dispatcher.dispatch(setProjectAspectPresetCommand({
+      presetId: "tiktok-9-16",
+    }));
+
+    expect(localStore.state.project.width).toBe(1080);
+    expect(localStore.state.project.height).toBe(1920);
+    expect(localStore.state.project.aspectRatio).toBe(9 / 16);
+    expect(localStore.state.dirty).toBe(true);
+
+    dispatcher.undo();
+
+    expect(localStore.state.project.width).toBe(1920);
+    expect(localStore.state.project.height).toBe(1080);
+    expect(localStore.state.project.aspectRatio).toBe(16 / 9);
+    expect(localStore.state.dirty).toBe(false);
+
+    dispatcher.redo();
+
+    expect(localStore.state.project.width).toBe(1080);
+    expect(localStore.state.project.height).toBe(1920);
+    expect(localStore.state.project.aspectRatio).toBe(9 / 16);
+    expect(localStore.state.dirty).toBe(true);
   });
 
   it("TL-01 fresh timeline has 3 default tracks", () => {
