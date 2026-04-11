@@ -10,3 +10,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tao = "0.30"
 wry = "0.37"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+panic = "deny"

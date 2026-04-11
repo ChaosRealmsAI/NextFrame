@@ -172,6 +172,10 @@ run_check cargo clippy --workspace --all-targets -- -D warnings
 clippy_status="$RUN_STATUS"
 clippy_summary="$RUN_SUMMARY"
 
+run_check node runtime/web/test/lint.mjs
+web_lint_status="$RUN_STATUS"
+web_lint_summary="$RUN_SUMMARY"
+
 run_check cargo test -p bridge
 bridge_test_status="$RUN_STATUS"
 bridge_test_summary="$RUN_SUMMARY"
@@ -201,6 +205,10 @@ fi
 
 if [ "$clippy_status" != "PASS" ]; then
   known_issues+=("\`cargo clippy --workspace --all-targets -- -D warnings\` failed. stdout/stderr summary: $clippy_summary")
+fi
+
+if [ "$web_lint_status" != "PASS" ]; then
+  known_issues+=("\`node runtime/web/test/lint.mjs\` failed. stdout/stderr summary: $web_lint_summary")
 fi
 
 if [ "$bridge_test_status" != "PASS" ]; then
@@ -248,6 +256,7 @@ fi
   printf '## Summary\n'
   printf -- '- Rounds completed: %s\n' "$rounds_completed"
   printf -- '- Cargo clippy: %s\n' "$clippy_status"
+  printf -- '- Web lint: %s\n' "$web_lint_status"
   printf -- '- Cargo tests: %s passed / %s total\n' "$cargo_tests_passed" "$cargo_tests_total"
   printf -- '- BDD tests: %s passed / %s total\n' "$bdd_passed" "$bdd_total"
   printf -- '- Release build: %s\n\n' "$release_build_status"
@@ -283,6 +292,7 @@ fi
   printf '## Verification command summaries\n'
   printf -- '- `cargo fmt --check`: %s. stdout/stderr summary: %s\n' "$fmt_status" "$fmt_summary"
   printf -- '- `cargo clippy --workspace --all-targets -- -D warnings`: %s. stdout/stderr summary: %s\n' "$clippy_status" "$clippy_summary"
+  printf -- '- `node runtime/web/test/lint.mjs`: %s. stdout/stderr summary: %s\n' "$web_lint_status" "$web_lint_summary"
   printf -- '- `cargo test -p bridge`: %s. stdout/stderr summary: %s\n' "$bridge_test_status" "$bridge_test_summary"
   printf -- '- `cargo build --workspace --release`: %s. stdout/stderr summary: %s\n' "$release_build_status" "$release_build_summary"
   printf -- '- `node runtime/web/test/bdd/run.mjs`: %s. stdout/stderr summary: %s\n' "$bdd_status" "$bdd_summary"

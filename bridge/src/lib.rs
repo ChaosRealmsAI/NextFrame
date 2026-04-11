@@ -1,3 +1,5 @@
+#![deny(unused)]
+
 #[cfg(not(test))]
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
@@ -1439,6 +1441,7 @@ fn reset_ffmpeg_path_cache_for_tests() {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use super::{
         build_ffmpeg_filter_complex, build_recorder_args, dispatch, home_dir, initialize,

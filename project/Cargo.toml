@@ -6,3 +6,8 @@ rust-version.workspace = true
 
 [lib]
 path = "src/lib.rs"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+panic = "deny"
