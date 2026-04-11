@@ -69,12 +69,11 @@ export function mountPreview(container, { engine, store } = {}) {
     return nextRect;
   };
 
-  const renderFrame = (time) => {
+  const renderFrame = (time, timeline = getTimeline(store?.state)) => {
     if (!ctx) {
       return;
     }
 
-    const timeline = getTimeline(store?.state);
     engineApi.renderAt(ctx, timeline, time);
 
     if (store?.state?.showSafeArea) {
@@ -83,8 +82,13 @@ export function mountPreview(container, { engine, store } = {}) {
   };
 
   const loop = createLoop({
-    tick(time) {
-      renderFrame(time);
+    tick(time, dt) {
+      const timeline = getTimeline(store?.state);
+      const nextTime = store?.state?.playing
+        ? advancePlayhead(store, time, dt, timeline)
+        : time;
+
+      renderFrame(nextTime, timeline);
     },
     getTime: readTime,
   });
@@ -121,7 +125,11 @@ export function mountPreview(container, { engine, store } = {}) {
     : () => {};
 
   layoutCanvas();
-  renderFrame(0);
+  renderFrame(readTime());
+
+  if (lastSnapshot.playing) {
+    loop.play();
+  }
 
   const api = {
     canvas,
@@ -142,6 +150,7 @@ export function mountPreview(container, { engine, store } = {}) {
 
 function createSnapshot(state) {
   return {
+    playhead: readFiniteNumber(state?.playhead),
     playing: Boolean(state?.playing),
     showSafeArea: Boolean(state?.showSafeArea),
     projectWidth: readFiniteNumber(state?.project?.width),
@@ -161,7 +170,8 @@ function didVisualChange(prev, next) {
   return prev.showSafeArea !== next.showSafeArea
     || didLayoutChange(prev, next)
     || prev.playing !== next.playing
-    || prev.timeline !== next.timeline;
+    || prev.timeline !== next.timeline
+    || (!next.playing && prev.playhead !== next.playhead);
 }
 
 function getAspectRatio(project) {
@@ -192,4 +202,26 @@ function getTimeline(state) {
 
 function readFiniteNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function advancePlayhead(store, currentTime, dt, timeline) {
+  const duration = readFiniteNumber(timeline?.duration);
+  const nextTime = wrapTime(currentTime + dt, duration);
+
+  if (store && typeof store.mutate === "function" && nextTime !== currentTime) {
+    store.mutate((state) => {
+      state.playhead = nextTime;
+    });
+  }
+
+  return nextTime;
+}
+
+function wrapTime(time, duration) {
+  if (!(duration > 0)) {
+    return 0;
+  }
+
+  const normalized = time % duration;
+  return normalized >= 0 ? normalized : normalized + duration;
 }

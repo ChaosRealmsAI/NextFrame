@@ -1501,117 +1501,178 @@
     </div>
 
     <script type="module">
-      import { mountTimeline } from "./src/timeline/index.js";
-
-      const demoTimeline = {
-        duration: 30,
-        tracks: [
-          {
-            id: "track-v1",
-            label: "V1",
-            name: "Scene Plates",
-            muted: false,
-            locked: false,
-            clips: [
-              { id: "clip-v1-1", name: "City Opener", category: "Backgrounds", start: 0, duration: 6.5 },
-              { id: "clip-v1-2", name: "Shape Sweep", category: "Shapes", start: 7.2, duration: 5.1 },
-              { id: "clip-v1-3", name: "Metrics Wall", category: "DataViz", start: 15.1, duration: 6.4 },
-            ],
-          },
-          {
-            id: "track-v2",
-            label: "V2",
-            name: "Type + Overlays",
-            muted: false,
-            locked: true,
-            clips: [
-              { id: "clip-v2-1", name: "Intro Title", category: "Typography", start: 0.8, duration: 4.6 },
-              { id: "clip-v2-2", name: "Feature Callout", category: "Overlays", start: 9.4, duration: 4.8 },
-              { id: "clip-v2-3", name: "Accent Wipe", category: "Transitions", start: 20.2, duration: 4.4 },
-            ],
-          },
-          {
-            id: "track-a1",
-            label: "A1",
-            name: "Support Layer",
-            muted: true,
-            locked: false,
-            clips: [
-              { id: "clip-a1-1", name: "Lower Third", category: "Typography", start: 5.2, duration: 5.3 },
-              { id: "clip-a1-2", name: "Comparison Stack", category: "DataViz", start: 13.8, duration: 8.6 },
-            ],
-          },
-        ],
-      };
-
-      const createStore = (initialState) => {
-        let state = initialState;
-        const listeners = new Set();
-
-        return {
-          get state() {
-            return state;
-          },
-          setState(nextState) {
-            const previousState = state;
-            state = typeof nextState === "function"
-              ? nextState(state)
-              : { ...state, ...nextState };
-            listeners.forEach((listener) => listener(state, previousState));
-          },
-          subscribe(listener) {
-            listeners.add(listener);
-            return () => listeners.delete(listener);
-          },
-        };
-      };
-
-      const store = createStore({
-        timeline: demoTimeline,
-        playhead: 11.75,
-      });
-
-      window.nextFrameStore = store;
-
-      (() => {
-        const $ = (id) => document.getElementById(id), s = [...document.querySelectorAll(".splitter")];
-        const pane = { left: $("left-library"), right: $("right-inspector"), bottom: $("bottom-timeline") };
-        const top = $("top-row"), work = $("workspace"), range = { left: [180, 400], right: [220, 420], bottom: [180, 480] };
-        const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
-        let drag = "";
-        s.forEach((el) => el.addEventListener("mousedown", (e) => {
-          drag = el.dataset.resize;
-          el.classList.add("active");
-          document.body.classList.add("dragging");
-          e.preventDefault();
-        }));
-        window.addEventListener("mousemove", (e) => {
-          if (!drag) return;
-          const tr = top.getBoundingClientRect(), wr = work.getBoundingClientRect(), gap = 20;
-          const left = parseFloat(getComputedStyle(pane.left).flexBasis), right = parseFloat(getComputedStyle(pane.right).flexBasis);
-          if (drag === "left") pane.left.style.flexBasis = clamp(e.clientX - tr.left - 5, range.left[0], Math.max(range.left[0], Math.min(range.left[1], tr.width - right - 480 - gap))) + "px";
-          if (drag === "right") pane.right.style.flexBasis = clamp(tr.right - e.clientX - 5, range.right[0], Math.max(range.right[0], Math.min(range.right[1], tr.width - left - 480 - gap))) + "px";
-          if (drag === "bottom") pane.bottom.style.flexBasis = clamp(wr.bottom - e.clientY - 5, range.bottom[0], Math.max(range.bottom[0], Math.min(range.bottom[1], wr.height - 280 - 10))) + "px";
-        });
-        window.addEventListener("mouseup", () => {
-          if (!drag) return;
-          s.forEach((el) => el.classList.remove("active"));
-          document.body.classList.remove("dragging");
-          drag = "";
-        });
-
-        mountTimeline($("bottom-timeline"), store);
-      })();
-    </script>
-    <script type="module">
       import * as bridge from "./src/bridge.js";
       import * as engine from "./src/engine/index.js";
       import { initMenu } from "./src/menu.js";
       import { mountPreview } from "./src/preview/index.js";
       import { mountLibrary } from "./src/panels/library/index.js";
       import { mountInspector } from "./src/panels/inspector/index.js";
-      import { SCENE_MANIFEST } from "./src/scenes/index.js";
+      import { registerAllScenes, SCENE_MANIFEST } from "./src/scenes/index.js";
       import { store } from "./src/store.js";
+      import { mountTimeline } from "./src/timeline/index.js";
+
+      registerAllScenes(engine);
+      window.nextFrameStore = store;
+
+      function initWorkspaceChrome() {
+        const $ = (id) => document.getElementById(id);
+        const splitters = [...document.querySelectorAll(".splitter")];
+        const pane = {
+          left: $("left-library"),
+          right: $("right-inspector"),
+          bottom: $("bottom-timeline"),
+        };
+        const top = $("top-row");
+        const workspace = $("workspace");
+        const range = {
+          left: [180, 400],
+          right: [220, 420],
+          bottom: [180, 480],
+        };
+        const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+        let drag = "";
+
+        splitters.forEach((element) => element.addEventListener("mousedown", (event) => {
+          drag = element.dataset.resize;
+          element.classList.add("active");
+          document.body.classList.add("dragging");
+          event.preventDefault();
+        }));
+
+        window.addEventListener("mousemove", (event) => {
+          if (!drag) {
+            return;
+          }
+
+          const topRect = top.getBoundingClientRect();
+          const workspaceRect = workspace.getBoundingClientRect();
+          const gap = 20;
+          const left = parseFloat(getComputedStyle(pane.left).flexBasis);
+          const right = parseFloat(getComputedStyle(pane.right).flexBasis);
+
+          if (drag === "left") {
+            pane.left.style.flexBasis = `${clamp(
+              event.clientX - topRect.left - 5,
+              range.left[0],
+              Math.max(range.left[0], Math.min(range.left[1], topRect.width - right - 480 - gap)),
+            )}px`;
+          }
+
+          if (drag === "right") {
+            pane.right.style.flexBasis = `${clamp(
+              topRect.right - event.clientX - 5,
+              range.right[0],
+              Math.max(range.right[0], Math.min(range.right[1], topRect.width - left - 480 - gap)),
+            )}px`;
+          }
+
+          if (drag === "bottom") {
+            pane.bottom.style.flexBasis = `${clamp(
+              workspaceRect.bottom - event.clientY - 5,
+              range.bottom[0],
+              Math.max(range.bottom[0], Math.min(range.bottom[1], workspaceRect.height - 280 - 10)),
+            )}px`;
+          }
+        });
+
+        window.addEventListener("mouseup", () => {
+          if (!drag) {
+            return;
+          }
+
+          splitters.forEach((element) => element.classList.remove("active"));
+          document.body.classList.remove("dragging");
+          drag = "";
+        });
+
+        mountTimeline($("bottom-timeline"), store);
+      }
+
+      function isEditableTarget(target) {
+        if (!(target instanceof HTMLElement)) {
+          return false;
+        }
+
+        return target.isContentEditable
+          || target instanceof HTMLInputElement
+          || target instanceof HTMLTextAreaElement
+          || target instanceof HTMLSelectElement
+          || target instanceof HTMLButtonElement;
+      }
+
+      function clampPlayhead(playhead, duration) {
+        if (!(duration > 0)) {
+          return 0;
+        }
+
+        return Math.min(Math.max(playhead, 0), duration);
+      }
+
+      function togglePlaying() {
+        store.mutate((state) => {
+          state.playing = !state.playing;
+        });
+      }
+
+      function jogPlayhead(delta) {
+        if (store.state.playing) {
+          return;
+        }
+
+        const duration = Number(store.state.timeline?.duration) || 0;
+        const playhead = Number(store.state.playhead) || 0;
+        store.dispatch({
+          type: "setPlayhead",
+          playhead: clampPlayhead(playhead + delta, duration),
+        });
+      }
+
+      function onKeyDown(event) {
+        if (event.defaultPrevented || isEditableTarget(event.target)) {
+          return;
+        }
+
+        if (event.code === "Space" || event.key === " ") {
+          event.preventDefault();
+          togglePlaying();
+          return;
+        }
+
+        if (store.state.playing) {
+          return;
+        }
+
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          jogPlayhead(event.shiftKey ? -5 : -1);
+          return;
+        }
+
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          jogPlayhead(event.shiftKey ? 5 : 1);
+        }
+      }
+
+      async function bootstrapDemoTimeline() {
+        const response = await fetch("./src/demo-timeline.json");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ./src/demo-timeline.json (${response.status})`);
+        }
+
+        const timeline = await response.json();
+        const validation = engine.validateTimeline(timeline);
+        if (!validation.ok) {
+          throw new Error(validation.errors.join("\n"));
+        }
+
+        store.mutate((state) => {
+          state.timeline = timeline;
+          state.playhead = 0;
+          state.playing = true;
+          state.dirty = false;
+        });
+      }
 
       (async () => {
         try {
@@ -1623,7 +1684,15 @@
         }
       })();
 
-      window.addEventListener("DOMContentLoaded", () => {
+      async function initApp() {
+        initWorkspaceChrome();
+
+        try {
+          await bootstrapDemoTimeline();
+        } catch (error) {
+          console.error("[NextFrame] Demo timeline bootstrap failed:", error);
+        }
+
         const previewEl = document.getElementById("center-preview");
         if (previewEl) mountPreview(previewEl, { engine, store });
 
@@ -1634,7 +1703,10 @@
         if (inspectorEl) mountInspector(inspectorEl, { store, scenes: SCENE_MANIFEST });
 
         initMenu({ bridge, store });
-      });
+        window.addEventListener("keydown", onKeyDown);
+      }
+
+      void initApp();
     </script>
   </body>
 </html>
