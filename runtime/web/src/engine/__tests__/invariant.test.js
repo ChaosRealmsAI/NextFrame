@@ -1,12 +1,6 @@
-import assert from "node:assert/strict";
-import test from "node:test";
-
 import { SCENES, registerScene, renderAt } from "../index.js";
 
 const TEST_SCENE_ID = "spec/frame-pure-rect";
-const DOM_REQUIRED = typeof document === "undefined"
-  ? "requires document.createElement('canvas') support"
-  : false;
 
 function createTimeline() {
   return {
@@ -35,11 +29,29 @@ function createCanvasContext() {
   const canvas = document.createElement("canvas");
   canvas.width = 320;
   canvas.height = 120;
-  return canvas.getContext("2d");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Expected document.createElement('canvas') to provide a 2D context");
+  }
+
+  return ctx;
 }
 
 function readPixel(ctx, x, y) {
   return Array.from(ctx.getImageData(x, y, 1, 1).data);
+}
+
+function assertDeepEqual(actual, expected, message) {
+  const actualJson = JSON.stringify(actual);
+  const expectedJson = JSON.stringify(expected);
+  if (actualJson !== expectedJson) {
+    throw new Error(message || `Expected ${expectedJson} but received ${actualJson}`);
+  }
+}
+
+function runSpec(name, fn) {
+  fn();
+  return name;
 }
 
 function registerTestScene() {
@@ -61,49 +73,51 @@ function registerTestScene() {
   };
 }
 
-test("renders the expected pixel when sampling t=5 directly", { skip: DOM_REQUIRED }, () => {
-  const restoreScene = registerTestScene();
+if (typeof document !== "undefined") {
+  runSpec("renders the expected pixel when sampling t=5 directly", () => {
+    const restoreScene = registerTestScene();
 
-  try {
-    const ctx = createCanvasContext();
-    renderAt(ctx, createTimeline(), 5);
+    try {
+      const ctx = createCanvasContext();
+      renderAt(ctx, createTimeline(), 5);
 
-    assert.deepEqual(readPixel(ctx, 150, 25), [255, 0, 0, 255]);
-  } finally {
-    restoreScene();
-  }
-});
+      assertDeepEqual(readPixel(ctx, 150, 25), [255, 0, 0, 255]);
+    } finally {
+      restoreScene();
+    }
+  });
 
-test("rendering t=2 and then t=5 still lands the rect at x=150", { skip: DOM_REQUIRED }, () => {
-  const restoreScene = registerTestScene();
+  runSpec("rendering t=2 and then t=5 still lands the rect at x=150", () => {
+    const restoreScene = registerTestScene();
 
-  try {
-    const ctx = createCanvasContext();
-    const timeline = createTimeline();
+    try {
+      const ctx = createCanvasContext();
+      const timeline = createTimeline();
 
-    renderAt(ctx, timeline, 2);
-    renderAt(ctx, timeline, 5);
+      renderAt(ctx, timeline, 2);
+      renderAt(ctx, timeline, 5);
 
-    assert.deepEqual(readPixel(ctx, 150, 25), [255, 0, 0, 255]);
-  } finally {
-    restoreScene();
-  }
-});
+      assertDeepEqual(readPixel(ctx, 150, 25), [255, 0, 0, 255]);
+    } finally {
+      restoreScene();
+    }
+  });
 
-test("rendering t=5 after other frames matches a direct t=5 render", { skip: DOM_REQUIRED }, () => {
-  const restoreScene = registerTestScene();
+  runSpec("rendering t=5 after other frames matches a direct t=5 render", () => {
+    const restoreScene = registerTestScene();
 
-  try {
-    const timeline = createTimeline();
-    const directCtx = createCanvasContext();
-    const replayCtx = createCanvasContext();
+    try {
+      const timeline = createTimeline();
+      const directCtx = createCanvasContext();
+      const replayCtx = createCanvasContext();
 
-    renderAt(directCtx, timeline, 5);
-    renderAt(replayCtx, timeline, 2);
-    renderAt(replayCtx, timeline, 5);
+      renderAt(directCtx, timeline, 5);
+      renderAt(replayCtx, timeline, 2);
+      renderAt(replayCtx, timeline, 5);
 
-    assert.deepEqual(readPixel(replayCtx, 150, 25), readPixel(directCtx, 150, 25));
-  } finally {
-    restoreScene();
-  }
-});
+      assertDeepEqual(readPixel(replayCtx, 150, 25), readPixel(directCtx, 150, 25));
+    } finally {
+      restoreScene();
+    }
+  });
+}

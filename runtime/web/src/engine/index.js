@@ -103,6 +103,28 @@ export function validateTimeline(timeline) {
           errors.push(`${clipPath}.params must be an object when provided`);
         }
       });
+
+      for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex += 1) {
+        const clip = track.clips[clipIndex];
+        if (!isFiniteNumber(clip?.start) || !isFiniteNumber(clip?.dur) || clip.dur <= 0) {
+          continue;
+        }
+
+        const clipEnd = clip.start + clip.dur;
+        for (let otherIndex = clipIndex + 1; otherIndex < track.clips.length; otherIndex += 1) {
+          const otherClip = track.clips[otherIndex];
+          if (!isFiniteNumber(otherClip?.start) || !isFiniteNumber(otherClip?.dur) || otherClip.dur <= 0) {
+            continue;
+          }
+
+          const otherEnd = otherClip.start + otherClip.dur;
+          if (clip.start < otherEnd && otherClip.start < clipEnd) {
+            errors.push(
+              `${trackPath}.clips[${clipIndex}] overlaps ${trackPath}.clips[${otherIndex}]`,
+            );
+          }
+        }
+      }
     });
   }
 
