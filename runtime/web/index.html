@@ -2,49 +2,1413 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>NextFrame</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NextFrame Editor</title>
     <style>
       :root {
         color-scheme: dark;
+        --bg: #0b0b14;
+        --bg-alt: #10101a;
+        --surface: #14141e;
+        --surface-2: #181824;
+        --surface-3: #1d1d2b;
+        --border: #22222e;
+        --border-strong: #2d2d3b;
+        --text: #e6e6f0;
+        --text-dim: #a0a3b8;
+        --text-faint: #737892;
+        --accent: #6366f1;
+        --accent-soft: rgba(99, 102, 241, 0.18);
+        --success: #38bdf8;
+        --warning: #f59e0b;
+        --track-video: linear-gradient(135deg, #4f46e5, #7c3aed);
+        --track-video-alt: linear-gradient(135deg, #2563eb, #06b6d4);
+        --track-audio: linear-gradient(135deg, #0f766e, #14b8a6);
+        --shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.32);
+        --shadow-md: 0 14px 30px rgba(0, 0, 0, 0.24);
+        --radius-lg: 16px;
+        --radius-md: 12px;
+        --radius-sm: 8px;
+        --menu-h: 32px;
+        --library-size: 240px;
+        --inspector-size: 280px;
+        --timeline-size: 240px;
+        --library-min: 180px;
+        --library-max: 400px;
+        --inspector-min: 220px;
+        --inspector-max: 420px;
+        --timeline-min: 180px;
+        --timeline-max: 480px;
+        --preview-min: 480px;
+        --splitter-size: 10px;
+        --track-label-w: 88px;
+        --lane-h: 58px;
       }
 
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
       body {
         margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        background: #0b0b14;
-        color: #ffffff;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        width: 100%;
+        height: 100%;
+        min-width: 1200px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top left, rgba(99, 102, 241, 0.1), transparent 30%),
+          radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 26%),
+          linear-gradient(180deg, #0d0d18 0%, #090910 100%);
+        color: var(--text);
+        font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0.01em;
       }
 
-      main {
-        text-align: center;
+      body.dragging,
+      body.dragging * {
+        user-select: none;
       }
 
-      h1 {
-        margin: 0;
-        font-size: clamp(3rem, 7vw, 5.5rem);
+      button {
+        color: inherit;
+        font: inherit;
+      }
+
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      #top-menu {
+        flex: 0 0 var(--menu-h);
+        height: var(--menu-h);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--border);
+        background:
+          linear-gradient(180deg, rgba(22, 22, 34, 0.96), rgba(16, 16, 26, 0.94));
+      }
+
+      .menu-group {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 6px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding-right: 12px;
+        margin-right: 6px;
+        border-right: 1px solid var(--border);
+      }
+
+      .brand-badge {
+        width: 18px;
+        height: 18px;
+        border-radius: 6px;
+        background:
+          linear-gradient(135deg, rgba(99, 102, 241, 1), rgba(59, 130, 246, 0.85));
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 6px 14px rgba(99, 102, 241, 0.34);
+      }
+
+      .brand-name {
+        font-size: 12px;
         font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .menu-pill,
+      .menu-button,
+      .menu-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 24px;
+        padding: 0 10px;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--text-dim);
+        white-space: nowrap;
+      }
+
+      .menu-pill {
+        font-size: 12px;
+      }
+
+      .menu-pill.active {
+        border-color: rgba(99, 102, 241, 0.38);
+        background: var(--accent-soft);
+        color: var(--text);
+      }
+
+      .menu-button {
+        padding: 0 12px;
+        border-color: var(--border);
+        background: rgba(255, 255, 255, 0.02);
+        color: var(--text);
+      }
+
+      .menu-button.primary {
+        border-color: rgba(99, 102, 241, 0.55);
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(79, 70, 229, 0.88));
+        box-shadow: 0 10px 18px rgba(79, 70, 229, 0.24);
+      }
+
+      .menu-chip {
+        padding: 0 10px 0 8px;
+        border-color: var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 11px;
+        text-transform: uppercase;
         letter-spacing: 0.08em;
       }
 
-      #status {
-        margin-top: 1rem;
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #22c55e;
+        box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
+      }
+
+      #workspace {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+        gap: 0;
+      }
+
+      #top-row {
+        flex: 1 1 auto;
+        min-height: 280px;
+        display: flex;
+        min-width: 0;
+      }
+
+      .panel {
+        min-height: 0;
+        background:
+          linear-gradient(180deg, rgba(25, 25, 37, 0.96), rgba(20, 20, 30, 0.98));
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .panel-title {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .panel-title strong {
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .panel-title span {
+        color: var(--text-faint);
+        font-size: 11px;
+      }
+
+      .chip-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .mini-chip {
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.02);
+        color: var(--text-dim);
+        font-size: 11px;
+      }
+
+      #left-library {
+        flex: 0 0 var(--library-size);
+        min-width: var(--library-min);
+        max-width: var(--library-max);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .library-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 14px 16px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .search-field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 34px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text-faint);
+      }
+
+      .search-dot {
+        width: 8px;
+        height: 8px;
+        border: 2px solid currentColor;
+        border-radius: 50%;
+        position: relative;
+      }
+
+      .search-dot::after {
+        content: "";
+        position: absolute;
+        right: -5px;
+        bottom: -5px;
+        width: 2px;
+        height: 6px;
+        border-radius: 999px;
+        background: currentColor;
+        transform: rotate(-45deg);
+        transform-origin: center;
+      }
+
+      .filter-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .filter-chip {
+        height: 26px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.02);
+        color: var(--text-dim);
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .filter-chip.active {
+        border-color: rgba(99, 102, 241, 0.42);
+        background: rgba(99, 102, 241, 0.16);
+        color: var(--text);
+      }
+
+      .asset-grid {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: 12px 16px 16px;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 1fr;
+      }
+
+      .asset-card {
+        display: grid;
+        gap: 10px;
+        padding: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 12px;
+        background:
+          linear-gradient(180deg, rgba(30, 30, 42, 0.84), rgba(21, 21, 30, 0.92));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .asset-thumb {
+        position: relative;
+        aspect-ratio: 16 / 10;
+        border-radius: 10px;
+        overflow: hidden;
+        background:
+          linear-gradient(150deg, var(--thumb-a), var(--thumb-b)),
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 45%);
+      }
+
+      .asset-thumb::before,
+      .asset-thumb::after {
+        content: "";
+        position: absolute;
+        inset: auto;
+        border-radius: 999px;
+        opacity: 0.65;
+      }
+
+      .asset-thumb::before {
+        width: 56px;
+        height: 56px;
+        top: 16px;
+        right: 12px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .asset-thumb::after {
+        width: 90px;
+        height: 16px;
+        left: 12px;
+        bottom: 14px;
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .asset-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .asset-name {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .asset-name strong {
+        font-size: 12px;
+      }
+
+      .asset-name span,
+      .asset-length {
+        color: var(--text-faint);
+        font-size: 11px;
+      }
+
+      .asset-length {
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      }
+
+      #center-preview {
+        flex: 1 1 auto;
+        min-width: var(--preview-min);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .preview-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 18px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .preview-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--text-dim);
+      }
+
+      .preview-shell {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 18px 20px 20px;
+        gap: 16px;
+      }
+
+      #preview-stage-slot {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px;
+      }
+
+      #preview-stage {
+        position: relative;
+        width: 100%;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background:
+          linear-gradient(180deg, #111116 0%, #050507 100%);
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+          0 30px 70px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+      }
+
+      #preview-stage::before {
+        content: "";
+        position: absolute;
+        inset: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 14px;
+        opacity: 0.6;
+      }
+
+      #preview-stage::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0;
+        height: 38%;
+        background:
+          linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.58));
+      }
+
+      .preview-watermark {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        gap: 10px;
+      }
+
+      .preview-watermark strong {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .preview-watermark span {
+        color: var(--text-faint);
+        max-width: 360px;
+      }
+
+      .safe-badge {
+        position: absolute;
+        left: 18px;
+        top: 18px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(10, 10, 16, 0.75);
+        color: var(--text-dim);
+        font-size: 11px;
+      }
+
+      .transport {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        min-height: 44px;
+      }
+
+      .transport-button {
+        width: 38px;
+        height: 38px;
+        border: 1px solid rgba(99, 102, 241, 0.45);
+        border-radius: 50%;
+        background:
+          linear-gradient(135deg, rgba(99, 102, 241, 0.94), rgba(59, 130, 246, 0.9));
+        box-shadow: 0 12px 24px rgba(79, 70, 229, 0.25);
+        position: relative;
+      }
+
+      .transport-button::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-35%, -50%);
+        width: 0;
+        height: 0;
+        border-top: 7px solid transparent;
+        border-bottom: 7px solid transparent;
+        border-left: 11px solid #ffffff;
+      }
+
+      .time-display {
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 12px;
+        letter-spacing: 0.05em;
+      }
+
+      .transport-pill {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text-dim);
+        border: 1px solid var(--border);
+      }
+
+      #right-inspector {
+        flex: 0 0 var(--inspector-size);
+        min-width: var(--inspector-min);
+        max-width: var(--inspector-max);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .inspector-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        padding: 18px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .empty-state {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 14px;
+        padding: 20px;
+        border: 1px dashed rgba(99, 102, 241, 0.28);
+        border-radius: 14px;
+        background:
+          linear-gradient(180deg, rgba(99, 102, 241, 0.09), rgba(99, 102, 241, 0.03));
+        text-align: center;
+      }
+
+      .empty-glyph {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+        position: relative;
+      }
+
+      .empty-glyph::before,
+      .empty-glyph::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      .empty-glyph::before {
+        width: 24px;
+        height: 3px;
+        left: 16px;
+        top: 20px;
+      }
+
+      .empty-glyph::after {
+        width: 16px;
+        height: 16px;
+        right: 12px;
+        bottom: 12px;
+        opacity: 0.38;
+      }
+
+      .empty-state strong {
+        font-size: 15px;
+      }
+
+      .empty-state p {
+        margin: 0;
+        color: var(--text-dim);
+      }
+
+      .placeholder-group {
+        display: grid;
+        gap: 10px;
+      }
+
+      .placeholder-row {
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .placeholder-row::before,
+      .placeholder-row::after {
+        content: "";
+        display: block;
+        border-radius: 999px;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.09));
+      }
+
+      .placeholder-row::before {
+        width: 42%;
+        height: 8px;
+      }
+
+      .placeholder-row::after {
+        width: 68%;
+        height: 10px;
+      }
+
+      .splitter {
+        position: relative;
+        flex: 0 0 var(--splitter-size);
+        touch-action: none;
+      }
+
+      .splitter::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        border-radius: 999px;
+        background:
+          linear-gradient(180deg, rgba(99, 102, 241, 0.28), rgba(255, 255, 255, 0.08));
+        opacity: 0.45;
+        transition: opacity 0.14s ease, transform 0.14s ease;
+      }
+
+      .splitter:hover::before,
+      .splitter.active::before {
+        opacity: 0.95;
+        transform: scale(1.04);
+      }
+
+      .splitter-col {
+        cursor: col-resize;
+      }
+
+      .splitter-col::before {
+        width: 3px;
+        height: calc(100% - 24px);
+      }
+
+      .splitter-row {
+        width: 100%;
+        height: var(--splitter-size);
+        cursor: row-resize;
+      }
+
+      .splitter-row::before {
+        width: calc(100% - 24px);
+        height: 3px;
+      }
+
+      #bottom-timeline {
+        flex: 0 0 var(--timeline-size);
+        min-height: var(--timeline-min);
+        max-height: var(--timeline-max);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .timeline-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 16px 10px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .timeline-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 0 16px 16px;
+      }
+
+      .timeline-ruler {
+        display: grid;
+        grid-template-columns: var(--track-label-w) 1fr;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .timeline-ruler-label {
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        color: var(--text-faint);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .ruler-scale {
+        position: relative;
+        height: 40px;
+        display: grid;
+        grid-template-columns: repeat(31, minmax(0, 1fr));
+        gap: 0;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px) 0 0 / calc(100% / 30) 100%,
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+      }
+
+      .tick {
+        position: relative;
+        height: 100%;
+        padding-top: 5px;
+      }
+
+      .tick::before,
+      .tick::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .tick::before {
+        top: 0;
+        width: 1px;
+        height: 12px;
+      }
+
+      .tick::after {
+        top: 0;
+        width: 1px;
+        height: 5px;
+        transform: translateX(calc(50% - 1px));
+        opacity: 0.55;
+      }
+
+      .tick span {
+        display: inline-block;
+        padding-left: 8px;
+        color: var(--text-faint);
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 11px;
+      }
+
+      .timeline-tracks {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .track-row {
+        position: relative;
+        display: grid;
+        grid-template-columns: var(--track-label-w) 1fr;
+        min-height: var(--lane-h);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      }
+
+      .track-head {
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 3px;
+        color: var(--text-dim);
+      }
+
+      .track-head strong {
+        color: var(--text);
+      }
+
+      .track-lane {
+        position: relative;
+        overflow: hidden;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px) 0 0 / calc(100% / 30) 100%,
+          linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0));
+      }
+
+      .playhead {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 41%;
+        width: 2px;
+        background: #f43f5e;
+        box-shadow: 0 0 10px rgba(244, 63, 94, 0.45);
+        z-index: 4;
+      }
+
+      .playhead::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        background: #f43f5e;
+        transform: translate(-50%, -50%) rotate(45deg);
+        border-radius: 2px;
+      }
+
+      .clip {
+        position: absolute;
+        top: 8px;
+        height: calc(var(--lane-h) - 16px);
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 10px 18px rgba(0, 0, 0, 0.28);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 12px;
+        overflow: hidden;
+      }
+
+      .clip::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          repeating-linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.08) 0,
+            rgba(255, 255, 255, 0.08) 8px,
+            transparent 8px,
+            transparent 18px
+          );
+        opacity: 0.22;
+      }
+
+      .clip > span {
+        position: relative;
+        z-index: 1;
+      }
+
+      .clip-title {
+        font-weight: 600;
+      }
+
+      .clip-length {
         color: rgba(255, 255, 255, 0.72);
-        font-size: 0.95rem;
-        max-width: min(80vw, 56rem);
-        word-break: break-word;
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 11px;
+      }
+
+      .clip.video {
+        background: var(--track-video);
+      }
+
+      .clip.video-alt {
+        background: var(--track-video-alt);
+      }
+
+      .clip.audio {
+        background: var(--track-audio);
+      }
+
+      .clip.audio::after {
+        content: "";
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        height: 16px;
+        top: calc(50% - 8px);
+        background:
+          repeating-linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.44) 0,
+            rgba(255, 255, 255, 0.44) 4px,
+            transparent 4px,
+            transparent 11px
+          );
+        opacity: 0.34;
+        z-index: 0;
+      }
+
+      .clip.selected {
+        box-shadow:
+          0 0 0 2px rgba(99, 102, 241, 0.78),
+          0 10px 18px rgba(0, 0, 0, 0.3);
+      }
+
+      .scroll-shadow {
+        position: absolute;
+        inset: 0 0 auto;
+        height: 18px;
+        background: linear-gradient(180deg, rgba(11, 11, 20, 0.44), transparent);
+        pointer-events: none;
+      }
+
+      .muted {
+        color: var(--text-faint);
       }
     </style>
   </head>
   <body>
-    <main>
-      <h1>NextFrame</h1>
-      <div id="status"></div>
-    </main>
+    <div id="app">
+      <header id="top-menu">
+        <div class="menu-group">
+          <div class="brand">
+            <div class="brand-badge" aria-hidden="true"></div>
+            <div class="brand-name">NextFrame</div>
+          </div>
+          <div class="menu-pill active">File</div>
+          <div class="menu-pill">Edit</div>
+          <div class="menu-pill">Clip</div>
+          <div class="menu-pill">Sequence</div>
+          <div class="menu-pill">View</div>
+        </div>
+        <div class="menu-group">
+          <div class="menu-chip"><span class="status-dot"></span> Ready</div>
+          <div class="menu-button">Draft Sequence</div>
+        </div>
+        <div class="menu-group">
+          <div class="menu-button">Share</div>
+          <div class="menu-button primary">Export</div>
+        </div>
+      </header>
+
+      <main id="workspace">
+        <section id="top-row">
+          <aside id="left-library" class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <strong>Asset Library</strong>
+                <span>Imported media and reusable shots</span>
+              </div>
+              <div class="chip-row">
+                <div class="mini-chip">12 Items</div>
+              </div>
+            </div>
+            <div class="library-controls">
+              <div class="search-field">
+                <span class="search-dot" aria-hidden="true"></span>
+                Search media
+              </div>
+              <div class="filter-row">
+                <div class="filter-chip active">All</div>
+                <div class="filter-chip">Video</div>
+                <div class="filter-chip">Text</div>
+                <div class="filter-chip">Audio</div>
+              </div>
+            </div>
+            <div class="asset-grid">
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #4338ca; --thumb-b: #0f172a"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>City Opener</strong>
+                    <span>4K clip</span>
+                  </div>
+                  <div class="asset-length">00:08</div>
+                </div>
+              </article>
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #0f766e; --thumb-b: #0f172a"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>Product Macro</strong>
+                    <span>Close-up</span>
+                  </div>
+                  <div class="asset-length">00:05</div>
+                </div>
+              </article>
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #7c2d12; --thumb-b: #312e81"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>Gradient Title</strong>
+                    <span>Motion title</span>
+                  </div>
+                  <div class="asset-length">00:03</div>
+                </div>
+              </article>
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #1d4ed8; --thumb-b: #111827"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>Drone Sweep</strong>
+                    <span>Wide aerial</span>
+                  </div>
+                  <div class="asset-length">00:12</div>
+                </div>
+              </article>
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #9d174d; --thumb-b: #1f2937"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>Transition Bloom</strong>
+                    <span>Effect preset</span>
+                  </div>
+                  <div class="asset-length">00:02</div>
+                </div>
+              </article>
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #0f766e; --thumb-b: #134e4a"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>Ambient Bed</strong>
+                    <span>Music loop</span>
+                  </div>
+                  <div class="asset-length">00:30</div>
+                </div>
+              </article>
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #5b21b6; --thumb-b: #0f172a"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>Scene Marker</strong>
+                    <span>Overlay pack</span>
+                  </div>
+                  <div class="asset-length">00:04</div>
+                </div>
+              </article>
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #1e3a8a; --thumb-b: #164e63"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>Night Skyline</strong>
+                    <span>B-roll</span>
+                  </div>
+                  <div class="asset-length">00:09</div>
+                </div>
+              </article>
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #c2410c; --thumb-b: #7c2d12"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>Brand Palette</strong>
+                    <span>Color swatches</span>
+                  </div>
+                  <div class="asset-length">00:01</div>
+                </div>
+              </article>
+              <article class="asset-card">
+                <div class="asset-thumb" style="--thumb-a: #115e59; --thumb-b: #0f172a"></div>
+                <div class="asset-meta">
+                  <div class="asset-name">
+                    <strong>Voiceover Take 2</strong>
+                    <span>Narration</span>
+                  </div>
+                  <div class="asset-length">00:18</div>
+                </div>
+              </article>
+            </div>
+          </aside>
+
+          <div
+            id="library-splitter"
+            class="splitter splitter-col"
+            data-resize="left"
+            role="separator"
+            aria-label="Resize library"
+            aria-orientation="vertical"
+          ></div>
+
+          <section id="center-preview" class="panel">
+            <div class="preview-toolbar">
+              <div class="panel-title">
+                <strong>Program Monitor</strong>
+                <span>1920×1080 • 30 fps • Draft preview</span>
+              </div>
+              <div class="preview-meta">
+                <div class="mini-chip">Fit</div>
+                <div class="mini-chip">Safe Guides</div>
+                <div class="mini-chip">Proxy</div>
+              </div>
+            </div>
+            <div class="preview-shell">
+              <div id="preview-stage-slot">
+                <div id="preview-stage">
+                  <div class="safe-badge">16:9 Canvas</div>
+                  <div class="preview-watermark">
+                    <strong>Preview</strong>
+                    <span>Clip timing, scene composition, and overlays will render here.</span>
+                  </div>
+                </div>
+              </div>
+              <div class="transport">
+                <button class="transport-button" type="button" aria-label="Play or pause"></button>
+                <div class="time-display">00:00 / 00:30</div>
+                <div class="transport-pill">Space</div>
+                <div class="transport-pill">1080p</div>
+              </div>
+            </div>
+          </section>
+
+          <div
+            id="inspector-splitter"
+            class="splitter splitter-col"
+            data-resize="right"
+            role="separator"
+            aria-label="Resize inspector"
+            aria-orientation="vertical"
+          ></div>
+
+          <aside id="right-inspector" class="panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <strong>Inspector</strong>
+                <span>Contextual clip controls</span>
+              </div>
+              <div class="chip-row">
+                <div class="mini-chip">No Selection</div>
+              </div>
+            </div>
+            <div class="inspector-body">
+              <div class="empty-state">
+                <div class="empty-glyph" aria-hidden="true"></div>
+                <strong>Select a clip</strong>
+                <p>Choose an item in the timeline to edit transform, timing, text, effects, and blend modes.</p>
+              </div>
+              <div class="placeholder-group">
+                <div class="placeholder-row"></div>
+                <div class="placeholder-row"></div>
+                <div class="placeholder-row"></div>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <div
+          id="timeline-splitter"
+          class="splitter splitter-row"
+          data-resize="bottom"
+          role="separator"
+          aria-label="Resize timeline"
+          aria-orientation="horizontal"
+        ></div>
+
+        <section id="bottom-timeline" class="panel">
+          <div class="timeline-toolbar">
+            <div class="panel-title">
+              <strong>Timeline</strong>
+              <span>30 second sequence • Multi-track arrangement</span>
+            </div>
+            <div class="chip-row">
+              <div class="mini-chip">Snap</div>
+              <div class="mini-chip">Magnet</div>
+              <div class="mini-chip">1.00x</div>
+            </div>
+          </div>
+          <div class="timeline-body">
+            <div class="timeline-ruler">
+              <div class="timeline-ruler-label">Ruler</div>
+              <div class="ruler-scale" id="ruler-scale" aria-label="Timeline ruler"></div>
+            </div>
+            <div class="timeline-tracks">
+              <div class="track-row">
+                <div class="track-head">
+                  <strong>V1</strong>
+                  <span>Video 1</span>
+                </div>
+                <div class="track-lane">
+                  <div class="scroll-shadow"></div>
+                  <div class="playhead"></div>
+                  <div class="clip video selected" style="left: 3%; width: 34%;">
+                    <span class="clip-title">City Opener</span>
+                    <span class="clip-length">00:10</span>
+                  </div>
+                  <div class="clip video-alt" style="left: 39%; width: 27%;">
+                    <span class="clip-title">Product Macro</span>
+                    <span class="clip-length">00:08</span>
+                  </div>
+                  <div class="clip video" style="left: 68%; width: 21%;">
+                    <span class="clip-title">Outro Push</span>
+                    <span class="clip-length">00:06</span>
+                  </div>
+                </div>
+              </div>
+              <div class="track-row">
+                <div class="track-head">
+                  <strong>V2</strong>
+                  <span>Titles</span>
+                </div>
+                <div class="track-lane">
+                  <div class="playhead"></div>
+                  <div class="clip video-alt" style="left: 12%; width: 22%;">
+                    <span class="clip-title">Intro Title</span>
+                    <span class="clip-length">00:06</span>
+                  </div>
+                  <div class="clip video" style="left: 46%; width: 18%;">
+                    <span class="clip-title">CTA Lower Third</span>
+                    <span class="clip-length">00:05</span>
+                  </div>
+                </div>
+              </div>
+              <div class="track-row">
+                <div class="track-head">
+                  <strong>A1</strong>
+                  <span>Audio 1</span>
+                </div>
+                <div class="track-lane">
+                  <div class="playhead"></div>
+                  <div class="clip audio" style="left: 2%; width: 88%;">
+                    <span class="clip-title">Ambient Bed + Voiceover</span>
+                    <span class="clip-length">00:30</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
     <script>
-      document.getElementById("status").textContent = navigator.userAgent;
+      (function () {
+        const state = {
+          left: 240,
+          right: 280,
+          bottom: 240,
+        };
+
+        const limits = {
+          left: { min: 180, max: 400 },
+          right: { min: 220, max: 420 },
+          bottom: { min: 180, max: 480 },
+          centerMin: 480,
+          topMin: 280,
+        };
+
+        const elements = {
+          left: document.getElementById("left-library"),
+          right: document.getElementById("right-inspector"),
+          bottom: document.getElementById("bottom-timeline"),
+          topRow: document.getElementById("top-row"),
+          workspace: document.getElementById("workspace"),
+          previewSlot: document.getElementById("preview-stage-slot"),
+          previewStage: document.getElementById("preview-stage"),
+          splitters: Array.from(document.querySelectorAll(".splitter")),
+          rulerScale: document.getElementById("ruler-scale"),
+        };
+
+        function clamp(value, min, max) {
+          return Math.min(Math.max(value, min), max);
+        }
+
+        function resolveMax(minimum, computed, absolute) {
+          return Math.max(minimum, Math.min(absolute, computed));
+        }
+
+        function buildRuler() {
+          if (!elements.rulerScale) {
+            return;
+          }
+
+          const marks = [];
+          for (let second = 0; second <= 30; second += 1) {
+            marks.push('<div class="tick"><span>' + second + "s</span></div>");
+          }
+          elements.rulerScale.innerHTML = marks.join("");
+        }
+
+        function applySizes() {
+          elements.left.style.flexBasis = state.left + "px";
+          elements.right.style.flexBasis = state.right + "px";
+          elements.bottom.style.flexBasis = state.bottom + "px";
+          layoutPreview();
+        }
+
+        function layoutPreview() {
+          const slot = elements.previewSlot;
+          const stage = elements.previewStage;
+
+          if (!slot || !stage) {
+            return;
+          }
+
+          const availableWidth = Math.max(slot.clientWidth - 16, 0);
+          const availableHeight = Math.max(slot.clientHeight - 16, 0);
+          const ratio = 16 / 9;
+          let width = availableWidth;
+          let height = width / ratio;
+
+          if (height > availableHeight) {
+            height = availableHeight;
+            width = height * ratio;
+          }
+
+          stage.style.width = Math.max(0, Math.floor(width)) + "px";
+          stage.style.height = Math.max(0, Math.floor(height)) + "px";
+        }
+
+        function bindSplitter(splitter) {
+          splitter.addEventListener("pointerdown", function (event) {
+            const mode = splitter.dataset.resize;
+            splitter.classList.add("active");
+            document.body.classList.add("dragging");
+
+            function handleMove(moveEvent) {
+              const topBounds = elements.topRow.getBoundingClientRect();
+              const workspaceBounds = elements.workspace.getBoundingClientRect();
+              const splitterAllowance = elements.splitters.filter(function (item) {
+                return item.classList.contains("splitter-col");
+              }).length * splitter.offsetWidth;
+
+              if (mode === "left") {
+                const maxByCenter = resolveMax(
+                  limits.left.min,
+                  topBounds.width - state.right - limits.centerMin - splitterAllowance,
+                  limits.left.max
+                );
+                const desired = moveEvent.clientX - topBounds.left - splitter.offsetWidth / 2;
+                state.left = clamp(desired, limits.left.min, maxByCenter);
+              } else if (mode === "right") {
+                const maxByCenter = resolveMax(
+                  limits.right.min,
+                  topBounds.width - state.left - limits.centerMin - splitterAllowance,
+                  limits.right.max
+                );
+                const desired = topBounds.right - moveEvent.clientX - splitter.offsetWidth / 2;
+                state.right = clamp(desired, limits.right.min, maxByCenter);
+              } else if (mode === "bottom") {
+                const desired = workspaceBounds.bottom - moveEvent.clientY - splitter.offsetHeight / 2;
+                const maxByTop = resolveMax(
+                  limits.bottom.min,
+                  workspaceBounds.height - limits.topMin - splitter.offsetHeight,
+                  limits.bottom.max
+                );
+                state.bottom = clamp(desired, limits.bottom.min, maxByTop);
+              }
+
+              applySizes();
+            }
+
+            function handleUp() {
+              splitter.classList.remove("active");
+              document.body.classList.remove("dragging");
+              window.removeEventListener("pointermove", handleMove);
+              window.removeEventListener("pointerup", handleUp);
+            }
+
+            window.addEventListener("pointermove", handleMove);
+            window.addEventListener("pointerup", handleUp);
+            event.preventDefault();
+          });
+        }
+
+        buildRuler();
+        elements.splitters.forEach(bindSplitter);
+        applySizes();
+        window.addEventListener("resize", layoutPreview);
+
+        if (window.ResizeObserver) {
+          const observer = new ResizeObserver(layoutPreview);
+          observer.observe(elements.previewSlot);
+          observer.observe(elements.workspace);
+        }
+      })();
     </script>
   </body>
 </html>
