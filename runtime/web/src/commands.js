@@ -619,6 +619,16 @@ export function duplicateClipsCommand({ clipIds }) {
   };
 }
 
+export function setClipFieldCommand({ clipId, trackId = null, field, value }) {
+  return {
+    type: "setClipField",
+    clipId,
+    trackId,
+    field,
+    value,
+  };
+}
+
 function createBuiltInCommand(command) {
   if (typeof command.exec === "function") {
     return command;
@@ -951,6 +961,56 @@ function createBuiltInCommand(command) {
             trackId: previous.trackId,
             param: command.param,
             value: previous.clip?.params?.[command.param],
+          };
+        },
+      };
+    case "setClipField":
+      return {
+        ...command,
+        exec(state) {
+          if (typeof command.field !== "string" || command.field.length === 0) {
+            throw new TypeError("setClipField requires a non-empty field");
+          }
+
+          const tracks = cloneTracks(getTimelineState(state));
+          const location = findClipLocation(tracks, command.clipId, command.trackId);
+          if (!location) {
+            throw new Error(`setClipField: clip "${command.clipId}" not found`);
+          }
+
+          const track = tracks[location.trackIndex];
+          const clip = track.clips[location.clipIndex];
+          const nextClip = {
+            ...clip,
+          };
+
+          if (command.value === undefined) {
+            delete nextClip[command.field];
+          } else {
+            nextClip[command.field] = command.value;
+          }
+
+          const nextClips = [...track.clips];
+          nextClips[location.clipIndex] = nextClip;
+          tracks[location.trackIndex] = {
+            ...track,
+            clips: nextClips,
+          };
+
+          return withUpdatedTimeline(state, tracks);
+        },
+        invert(nextState, prevState) {
+          const previous = getPreviousClip(prevState, command.clipId, command.trackId);
+          if (!previous) {
+            return null;
+          }
+
+          return {
+            type: "setClipField",
+            clipId: command.clipId,
+            trackId: previous.trackId,
+            field: command.field,
+            value: previous.clip?.[command.field],
           };
         },
       };

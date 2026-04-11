@@ -81,7 +81,9 @@ function getTrackSignature(track) {
     clips: (track.clips || []).map((clip) => ({
       id: clip.id || "",
       category: clip.category || "",
+      label: clip.label || "",
       name: clip.name || "",
+      note: clip.note || "",
       scene: clip.scene || "",
       start: Number(clip.start) || 0,
       duration: Number(clip.duration ?? clip.dur) || 0,

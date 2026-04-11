@@ -1,4 +1,5 @@
 import { drawWaveform } from "../audio/waveform.js";
+import { getClipLabelColor, normalizeClipLabel } from "../clip-labels.js";
 import * as engine from "../engine/index.js";
 import { SCENE_MANIFEST } from "../scenes/index.js";
 import { attachClipInteractions } from "./clip-interact.js";
@@ -176,11 +177,14 @@ export function createClip(clip, zoom, options = {}) {
   const accent = trackKind === "audio"
     ? AUDIO_CLIP_ACCENT
     : CATEGORY_COLORS[category] || CATEGORY_COLORS.Backgrounds;
+  const colorLabel = normalizeClipLabel(clip.label);
+  const colorLabelStripe = getClipLabelColor(colorLabel);
   const width = Math.max(zoom.timeToPx(duration), MIN_CLIP_WIDTH);
 
   element.className = "timeline-clip";
   element.dataset.clipId = clip.id || "";
   element.dataset.category = category;
+  element.dataset.colorLabel = colorLabel || "none";
   element.dataset.trackKind = trackKind;
   element.style.left = `${zoom.timeToPx(clip.start)}px`;
   element.style.width = `${width}px`;
@@ -191,6 +195,14 @@ export function createClip(clip, zoom, options = {}) {
 
   if (trackKind === "audio") {
     element.classList.add("is-audio");
+  }
+
+  if (colorLabelStripe) {
+    const stripe = document.createElement("span");
+    stripe.className = "timeline-clip-label-stripe";
+    stripe.setAttribute("aria-hidden", "true");
+    stripe.style.backgroundColor = colorLabelStripe;
+    element.appendChild(stripe);
   }
 
   const preview = document.createElement("span");

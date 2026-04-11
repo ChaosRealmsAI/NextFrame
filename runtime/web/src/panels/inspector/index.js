@@ -1,6 +1,7 @@
+import { setClipFieldCommand } from "../../commands.js";
 import { SCENE_MANIFEST_BY_ID } from "../../scenes/index.js";
 import { renderField } from "./field.js";
-import { createInspectorSection, createReadonlyRow } from "./sections.js";
+import { createClipOrganizeSection, createInspectorSection, createReadonlyRow } from "./sections.js";
 
 const INSPECTOR_STATE = Symbol("nextframe.inspector.mount");
 
@@ -94,6 +95,31 @@ function updateSelectedClip(store, recipe) {
   });
 }
 
+function updateSelectedClipField(store, field, value) {
+  const clipId = store?.state?.selectedClipId;
+  if (typeof clipId !== "string" || clipId.length === 0) {
+    return;
+  }
+
+  if (typeof store?.dispatch === "function") {
+    store.dispatch(setClipFieldCommand({
+      clipId,
+      field,
+      value,
+    }));
+    return;
+  }
+
+  updateSelectedClip(store, (draftClip) => {
+    if (value === undefined) {
+      delete draftClip[field];
+      return;
+    }
+
+    draftClip[field] = value;
+  });
+}
+
 function clampToRange(value, param) {
   const [min, max] = Array.isArray(param?.range) ? param.range : [param?.min, param?.max];
   let nextValue = value;
@@ -164,6 +190,15 @@ export function mountInspector(container, { store } = {}) {
     body.replaceChildren();
 
     const transform = createInspectorSection("Transform", "Timing and track placement");
+    const organize = createClipOrganizeSection({
+      clip,
+      onLabelChange: (nextLabel) => {
+        updateSelectedClipField(store, "label", nextLabel || undefined);
+      },
+      onNoteChange: (nextNote) => {
+        updateSelectedClipField(store, "note", nextNote || undefined);
+      },
+    });
     const durationValue = Number(clip.dur ?? clip.duration) || 0;
 
     transform.body.append(
@@ -230,7 +265,7 @@ export function mountInspector(container, { store } = {}) {
         }));
       });
 
-      body.append(transform.section, sceneSection.section);
+      body.append(transform.section, organize.section, sceneSection.section);
       return;
     }
 
@@ -239,7 +274,7 @@ export function mountInspector(container, { store } = {}) {
       createReadonlyRow("Asset", asset?.name || asset?.label || clip.assetId || "Unknown asset"),
       createReadonlyRow("Kind", clip.assetKind || asset?.kind || "asset"),
     );
-    body.append(transform.section, sourceSection.section);
+    body.append(transform.section, organize.section, sourceSection.section);
   }
 
   const unsubscribe = typeof store?.subscribe === "function"

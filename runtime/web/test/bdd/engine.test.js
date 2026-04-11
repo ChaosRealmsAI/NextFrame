@@ -1,5 +1,5 @@
 import * as commandsModule from "../../src/commands.js";
-import { createDispatcher, moveClipCommand } from "../../src/commands.js";
+import { createDispatcher, moveClipCommand, setClipFieldCommand } from "../../src/commands.js";
 import { registerScene, renderAt, SCENES, validateTimeline } from "../../src/engine/index.js";
 import { SCENE_MANIFEST } from "../../src/scenes/index.js";
 import { createDefaultTimeline, store } from "../../src/store.js";
@@ -294,6 +294,48 @@ describe("BDD critical scenarios", () => {
     const movedClip = findTrack(localStore.state.timeline, "v1").clips.find((clip) => clip.id === "clip-move");
     expect(Boolean(movedClip)).toBeTruthy("Expected moveClipCommand() to keep the moved clip in the timeline");
     expect(movedClip.start).toBe(7.3);
+  });
+
+  it("CLIP-03 setClipField updates top-level clip label and note with undo", () => {
+    const timeline = createDefaultTimeline();
+    findTrack(timeline, "v1").clips.push(
+      createClip({
+        id: "clip-meta",
+      }),
+    );
+
+    const localStore = createLocalStore(timeline);
+    const dispatcher = createDispatcher(localStore);
+
+    dispatcher.dispatch(setClipFieldCommand({
+      clipId: "clip-meta",
+      field: "label",
+      value: "blue",
+    }));
+    dispatcher.dispatch(setClipFieldCommand({
+      clipId: "clip-meta",
+      field: "note",
+      value: "Needs cleanup",
+    }));
+
+    let clip = findTrack(localStore.state.timeline, "v1").clips.find((candidate) => candidate.id === "clip-meta");
+    expect(clip.label).toBe("blue");
+    expect(clip.note).toBe("Needs cleanup");
+
+    dispatcher.undo();
+    clip = findTrack(localStore.state.timeline, "v1").clips.find((candidate) => candidate.id === "clip-meta");
+    expect(Object.prototype.hasOwnProperty.call(clip, "note")).toBe(false);
+    expect(clip.label).toBe("blue");
+
+    dispatcher.undo();
+    clip = findTrack(localStore.state.timeline, "v1").clips.find((candidate) => candidate.id === "clip-meta");
+    expect(Object.prototype.hasOwnProperty.call(clip, "label")).toBe(false);
+
+    dispatcher.redo();
+    dispatcher.redo();
+    clip = findTrack(localStore.state.timeline, "v1").clips.find((candidate) => candidate.id === "clip-meta");
+    expect(clip.label).toBe("blue");
+    expect(clip.note).toBe("Needs cleanup");
   });
 
   it("CLIP-05 splitClip produces two clips", () => {
