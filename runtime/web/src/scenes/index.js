@@ -13,6 +13,7 @@ import { neonGrid } from "./neonGrid.js";
 import { barChartReveal } from "./barChartReveal.js";
 import { lowerThirdVelvet } from "./lowerThirdVelvet.js";
 import { orbitRings } from "./orbitRings.js";
+import { particleFlow } from "./particleFlow.js";
 import { pixelRain } from "./pixelRain.js";
 import { shapeBurst } from "./shapeBurst.js";
 import { spotlightSweep } from "./spotlightSweep.js";
@@ -212,6 +213,22 @@ const SCENE_REGISTRY = [
       density: { type: "number", default: 1.2, min: 0, max: 4 },
       charSize: { type: "number", default: 18, min: 8, max: 72, unit: "px" },
       glyphPalette: { type: "string", default: "01ABCDEF" },
+    },
+  },
+  {
+    id: "particleFlow",
+    fn: particleFlow,
+    name: "Particle Flow",
+    category: "Backgrounds",
+    duration_hint: "5-30s loop",
+    params: {
+      count: { type: "integer", default: 400, min: 40, max: 1200 },
+      hueA: { type: "number", default: 180, min: 0, max: 360, ui: "hue" },
+      hueB: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
+      fieldScale: { type: "number", default: 0.004, min: 0.0005, max: 0.03 },
+      speed: { type: "number", default: 80, min: 5, max: 240 },
+      trailLength: { type: "integer", default: 24, min: 4, max: 64 },
+      lineWidth: { type: "number", default: 1.2, min: 0.2, max: 4, unit: "px" },
     },
   },
   {
