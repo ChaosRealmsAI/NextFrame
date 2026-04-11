@@ -11,6 +11,7 @@ import { meshGrid } from "./meshGrid.js";
 import { neonGrid } from "./neonGrid.js";
 import { barChartReveal } from "./barChartReveal.js";
 import { lowerThirdVelvet } from "./lowerThirdVelvet.js";
+import { pixelRain } from "./pixelRain.js";
 import { shapeBurst } from "./shapeBurst.js";
 import { starfield } from "./starfield.js";
 import { textOverlay } from "./textOverlay.js";
@@ -149,6 +150,22 @@ const SCENE_REGISTRY = [
       drift: { type: "number", default: 0.06, min: 0, max: 0.2 },
       density: { type: "number", default: 1, min: 0.4, max: 2 },
       glow: { type: "number", default: 1, min: 0.4, max: 2 },
+    },
+  },
+  {
+    id: "pixelRain",
+    fn: pixelRain,
+    name: "Pixel Rain",
+    category: "Backgrounds",
+    duration_hint: "5-30s loop",
+    params: {
+      columns: { type: "integer", default: 48, min: 4, max: 160 },
+      hueStart: { type: "number", default: 140, min: 0, max: 360, ui: "hue" },
+      hueEnd: { type: "number", default: 200, min: 0, max: 360, ui: "hue" },
+      speed: { type: "number", default: 180, min: 20, max: 960 },
+      density: { type: "number", default: 1.2, min: 0, max: 4 },
+      charSize: { type: "number", default: 18, min: 8, max: 72, unit: "px" },
+      glyphPalette: { type: "string", default: "01ABCDEF" },
     },
   },
   {
