@@ -27,6 +27,7 @@ export function initMenu({ bridge, store }) {
   const timeDisplay = document.querySelector(".time-display");
   const previewSlot = document.getElementById("preview-stage-slot");
   const timelinePanel = document.getElementById("bottom-timeline");
+  const timelineStats = document.getElementById("timeline-stats");
   const timelineSplitter = document.getElementById("timeline-splitter");
   const inspectorPanel = document.getElementById("right-inspector");
   const inspectorSplitter = document.getElementById("inspector-splitter");
@@ -69,6 +70,10 @@ export function initMenu({ bridge, store }) {
 
     if (timelinePanel) {
       timelinePanel.hidden = !isTimelineVisible;
+    }
+
+    if (timelineStats) {
+      timelineStats.hidden = !isTimelineVisible;
     }
 
     if (timelineSplitter) {

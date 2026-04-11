@@ -1007,6 +1007,28 @@
         min-width: 0;
       }
 
+      .timeline-stats {
+        flex: 0 0 24px;
+        min-height: 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 16px;
+        color: #6b7280;
+        font: 11px/1 "SFMono-Regular", Menlo, Consolas, monospace;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+
+      .timeline-stats-item {
+        flex: 0 0 auto;
+        min-width: 0;
+      }
+
+      .timeline-stats-status[data-dirty="true"] {
+        color: rgba(245, 158, 11, 0.82);
+      }
+
       .timeline-toolbar {
         display: flex;
         align-items: center;
@@ -1937,6 +1959,7 @@
         ></div>
 
         <section id="bottom-timeline" class="panel"></section>
+        <div id="timeline-stats" class="timeline-stats"></div>
       </main>
     </div>
 
@@ -1958,6 +1981,7 @@
       import { store } from "./src/store.js";
       import { mountTitleBar } from "./src/title-bar.js";
       import { mountTimeline } from "./src/timeline/index.js";
+      import { mountStatsBar } from "./src/timeline/stats-bar.js";
       import { startTutorial } from "./src/tutorial/index.js";
       import { showWelcome } from "./src/welcome.js";
 
@@ -2036,6 +2060,7 @@
         });
 
         mountTimeline($("bottom-timeline"), store);
+        mountStatsBar($("timeline-stats"), store);
       }
 
       function isEditableTarget(target) {
