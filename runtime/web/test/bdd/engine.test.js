@@ -453,8 +453,8 @@ describe("BDD critical scenarios", () => {
     ).toBeTruthy("Expected validateTimeline() to report both structural and clip payload errors");
   });
 
-  it("INS-02 SCENE_MANIFEST exposes 5 scenes with parameter schemas", () => {
-    expect(SCENE_MANIFEST.length).toBe(5, "Expected the built-in scene manifest to list five critical scenes");
+  it("INS-02 SCENE_MANIFEST exposes 10 scenes with parameter schemas", () => {
+    expect(SCENE_MANIFEST.length).toBe(10, "Expected the built-in scene manifest to list ten built-in scenes");
     expect(
       SCENE_MANIFEST.every((scene) => {
         if (!scene || typeof scene.id !== "string" || typeof scene.name !== "string") {

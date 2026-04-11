@@ -1,8 +1,13 @@
 import { auroraGradient } from "./auroraGradient.js";
+import { circleRipple } from "./circleRipple.js";
+import { cornerBadge } from "./cornerBadge.js";
+import { countdown } from "./countdown.js";
 import { kineticHeadline } from "./kineticHeadline.js";
+import { lineChart } from "./lineChart.js";
 import { neonGrid } from "./neonGrid.js";
 import { barChartReveal } from "./barChartReveal.js";
 import { lowerThirdVelvet } from "./lowerThirdVelvet.js";
+import { starfield } from "./starfield.js";
 
 function cloneDefaultValue(value) {
   if (value == null || typeof value !== "object") {
@@ -71,6 +76,49 @@ const SCENE_REGISTRY = [
     },
   },
   {
+    id: "starfield",
+    fn: starfield,
+    name: "Starfield",
+    category: "Backgrounds",
+    duration_hint: "5-30s",
+    params: {
+      hueBase: { type: "number", default: 215, min: 0, max: 360, ui: "hue" },
+      hueShift: { type: "number", default: 110, min: 0, max: 180 },
+      drift: { type: "number", default: 0.06, min: 0, max: 0.2 },
+      density: { type: "number", default: 1, min: 0.4, max: 2 },
+      glow: { type: "number", default: 1, min: 0.4, max: 2 },
+    },
+  },
+  {
+    id: "circleRipple",
+    fn: circleRipple,
+    name: "Circle Ripple",
+    category: "Shapes & Layout",
+    duration_hint: "3-12s",
+    params: {
+      hueStart: { type: "number", default: 185, min: 0, max: 360, ui: "hue" },
+      hueSpan: { type: "number", default: 180, min: 30, max: 300 },
+      ringCount: { type: "integer", default: 9, min: 4, max: 16 },
+      interval: { type: "number", default: 0.26, min: 0.08, max: 1, unit: "s" },
+      lifespan: { type: "number", default: 2.1, min: 0.5, max: 6, unit: "s" },
+      thickness: { type: "number", default: 0.012, min: 0.004, max: 0.03 },
+    },
+  },
+  {
+    id: "countdown",
+    fn: countdown,
+    name: "Countdown",
+    category: "Typography",
+    duration_hint: "6s loop",
+    params: {
+      sequence: { type: "array", default: ["5", "4", "3", "2", "1", "GO"] },
+      subtitle: { type: "string", default: "SYSTEMS ARMED" },
+      hueStart: { type: "number", default: 18, min: 0, max: 360, ui: "hue" },
+      hueEnd: { type: "number", default: 145, min: 0, max: 360, ui: "hue" },
+      accentHue: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
+    },
+  },
+  {
     id: "barChartReveal",
     fn: barChartReveal,
     name: "Bar Chart Reveal",
@@ -98,6 +146,22 @@ const SCENE_REGISTRY = [
     },
   },
   {
+    id: "lineChart",
+    fn: lineChart,
+    name: "Line Chart",
+    category: "Data Viz",
+    duration_hint: "3-8s",
+    params: {
+      data: { type: "array", default: [18, 24, 31, 38, 43, 55, 66, 78] },
+      title: { type: "string", default: "ACTIVE USERS" },
+      unit: { type: "string", default: "%" },
+      hueStart: { type: "number", default: 182, min: 0, max: 360, ui: "hue" },
+      hueEnd: { type: "number", default: 310, min: 0, max: 360, ui: "hue" },
+      drawStart: { type: "number", default: 0.2, min: 0, max: 2, unit: "s" },
+      drawEnd: { type: "number", default: 2.6, min: 0.4, max: 6, unit: "s" },
+    },
+  },
+  {
     id: "lowerThirdVelvet",
     fn: lowerThirdVelvet,
     name: "Lower Third Velvet",
@@ -110,6 +174,20 @@ const SCENE_REGISTRY = [
       hueB: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
       holdEnd: { type: "number", default: 4, min: 0.5, max: 20, unit: "s" },
       fadeOut: { type: "number", default: 0.6, min: 0.1, max: 4, unit: "s" },
+    },
+  },
+  {
+    id: "cornerBadge",
+    fn: cornerBadge,
+    name: "Corner Badge",
+    category: "Overlays",
+    duration_hint: "2-12s",
+    params: {
+      label: { type: "string", default: "BREAKING" },
+      subtitle: { type: "string", default: "SCENE LIBRARY EXPANDS TO TEN" },
+      hue: { type: "number", default: 346, min: 0, max: 360, ui: "hue" },
+      accentHue: { type: "number", default: 32, min: 0, max: 360, ui: "hue" },
+      inset: { type: "number", default: 0.045, min: 0.01, max: 0.12 },
     },
   },
 ];
