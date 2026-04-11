@@ -88,6 +88,12 @@ pub struct Response {
     pub error: Option<String>,
 }
 
+pub fn initialize() -> Result<(), String> {
+    let _ = process_registry();
+    let _ = ffmpeg_command_path()?;
+    Ok(())
+}
+
 pub fn dispatch(req: Request) -> Response {
     let Request { id, method, params } = req;
 
@@ -1435,10 +1441,10 @@ fn reset_ffmpeg_path_cache_for_tests() {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_ffmpeg_filter_complex, build_recorder_args, dispatch, home_dir, mock_ffmpeg_state,
-        recorder_binary_name, reset_ffmpeg_path_cache_for_tests, resolve_recorder_launch_plan_with,
-        resolve_write_path, CommandOutput, FfmpegCommand, MockFfmpegState, RecorderLauncher,
-        Request, MOCK_FFMPEG_TEST_LOCK,
+        build_ffmpeg_filter_complex, build_recorder_args, dispatch, home_dir, initialize,
+        mock_ffmpeg_state, recorder_binary_name, reset_ffmpeg_path_cache_for_tests,
+        resolve_recorder_launch_plan_with, resolve_write_path, CommandOutput, FfmpegCommand,
+        MockFfmpegState, RecorderLauncher, Request, MOCK_FFMPEG_TEST_LOCK,
     };
     use serde_json::{json, Value};
     use std::env;
@@ -2010,6 +2016,53 @@ mod tests {
                 "Install ffmpeg to export with audio. `brew install ffmpeg`"
             ))
         );
+    }
+
+    #[test]
+    fn initialize_primes_ffmpeg_cache_before_mux_requests() {
+        let mock = MockFfmpegHarness::new();
+        mock.set_lookup_result(Ok(Some(PathBuf::from("/mock/bin/ffmpeg"))));
+        initialize().expect("initialize bridge");
+
+        {
+            let mut state = mock_ffmpeg_state()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            state.lookup_result = Ok(None);
+        }
+        mock.push_run_result(Ok(CommandOutput {
+            success: true,
+            stderr: String::new(),
+        }));
+
+        let temp = TestDir::new("mux-init-cache");
+        let video_path = temp.join("video-only.mp4");
+        let audio_path = temp.join("voiceover.mp3");
+        let output_path = temp.join("final.mp4");
+        fs::write(&video_path, "silent-video").expect("write source video");
+        fs::write(&audio_path, "audio").expect("write source audio");
+
+        let response = dispatch(request(
+            "export.muxAudio",
+            json!({
+                "videoPath": video_path.display().to_string(),
+                "audioSources": [
+                    {
+                        "path": audio_path.display().to_string(),
+                        "startTime": 0,
+                        "volume": 1
+                    }
+                ],
+                "outputPath": output_path.display().to_string(),
+            }),
+        ));
+
+        assert!(response.ok);
+        assert_eq!(response.result.get("ok"), Some(&json!(true)));
+
+        let invocations = mock.take_invocations();
+        assert_eq!(invocations.len(), 1);
+        assert_eq!(invocations[0].program, PathBuf::from("/mock/bin/ffmpeg"));
     }
 
     #[test]

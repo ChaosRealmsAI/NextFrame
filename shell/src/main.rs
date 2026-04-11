@@ -17,6 +17,10 @@ fn main() {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
+    if let Err(error) = bridge::initialize() {
+        eprintln!("bridge initialization warning: {error}");
+    }
+
     let mut event_loop_builder = EventLoopBuilder::<String>::with_user_event();
     let event_loop = event_loop_builder.build();
     let proxy = event_loop.create_proxy();
