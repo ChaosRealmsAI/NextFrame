@@ -2,7 +2,7 @@ import { getAudioContext } from "../audio/context.js";
 import { createMixer } from "../audio/mixer.js";
 import { renderAt as defaultRenderAt, setupDPR as defaultSetupDPR } from "../engine/index.js";
 import { computeLetterboxRect } from "./letterbox.js";
-import { createLoop } from "./loop.js";
+import { advancePlaybackTime, createLoop } from "./loop.js";
 import { createPerfMonitor } from "./perf.js";
 import { drawSafeArea } from "./safeArea.js";
 
@@ -351,40 +351,26 @@ function readFiniteNumber(value) {
 
 function advancePlayhead(store, currentTime, dt, timeline) {
   const duration = readFiniteNumber(timeline?.duration);
-  const loopEnabled = store?.state?.loop !== false;
   const canUpdatePlaybackState = typeof store?.updatePlaybackState === "function";
+  const nextPlayback = advancePlaybackTime(currentTime, dt, duration, store?.state?.loopRegion);
+  const shouldUpdate = nextPlayback.playhead !== currentTime || nextPlayback.playing !== Boolean(store?.state?.playing);
 
-  if (!loopEnabled) {
-    const nextTime = Math.min(Math.max(currentTime + dt, 0), duration);
-    const reachedEnd = duration > 0 && nextTime >= duration;
-
-    if (canUpdatePlaybackState && (nextTime !== currentTime || (reachedEnd && store.state.playing))) {
-      store.updatePlaybackState(nextTime, {
-        playing: reachedEnd ? false : store.state.playing,
-      });
-    } else if (store && typeof store.mutate === "function" && (nextTime !== currentTime || (reachedEnd && store.state.playing))) {
-      store.mutate((state) => {
-        state.playhead = nextTime;
-        if (reachedEnd) {
-          state.playing = false;
-        }
-      });
-    }
-
-    return nextTime;
+  if (!shouldUpdate) {
+    return nextPlayback.playhead;
   }
 
-  const nextTime = wrapTime(currentTime + dt, duration);
-
-  if (canUpdatePlaybackState && nextTime !== currentTime) {
-    store.updatePlaybackState(nextTime);
-  } else if (store && typeof store.mutate === "function" && nextTime !== currentTime) {
+  if (canUpdatePlaybackState) {
+    store.updatePlaybackState(nextPlayback.playhead, {
+      playing: nextPlayback.playing,
+    });
+  } else if (store && typeof store.mutate === "function") {
     store.mutate((state) => {
-      state.playhead = nextTime;
+      state.playhead = nextPlayback.playhead;
+      state.playing = nextPlayback.playing;
     });
   }
 
-  return nextTime;
+  return nextPlayback.playhead;
 }
 
 function togglePerfHud(store) {
@@ -471,13 +457,4 @@ function ensurePerfHudStyles() {
     }
   `;
   document.head.append(style);
-}
-
-function wrapTime(time, duration) {
-  if (!(duration > 0)) {
-    return 0;
-  }
-
-  const normalized = time % duration;
-  return normalized >= 0 ? normalized : normalized + duration;
 }

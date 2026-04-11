@@ -1,5 +1,7 @@
 import { batchCommand, splitClipCommand } from "../commands.js";
+import { readLoopRegion, updateLoopRegion } from "../loop-region.js";
 import { mountMinimap } from "./minimap.js";
+import { mountLoopRegion } from "./loop-region.js";
 import { createPlayhead } from "./playhead.js";
 import { attachRulerScrub, formatTime, renderRuler } from "./ruler.js";
 import { TRACK_HEADER_WIDTH, createTrackRow } from "./track.js";
@@ -147,10 +149,23 @@ export function mountTimeline(container, store) {
   const zoom = createZoomController(2);
   const playhead = createPlayhead();
   const minimap = mountMinimap(ui.minimap, store);
+  const loopShade = document.createElement("div");
   const trackRows = new Map();
   const trackSignatures = new Map();
   const bladeIndicator = document.createElement("div");
   const marquee = document.createElement("div");
+
+  ui.rulerCanvas.style.position = ui.rulerCanvas.style.position || "relative";
+  ui.tracksCanvas.style.position = ui.tracksCanvas.style.position || "relative";
+
+  loopShade.hidden = true;
+  loopShade.style.position = "absolute";
+  loopShade.style.top = "0";
+  loopShade.style.bottom = "0";
+  loopShade.style.pointerEvents = "none";
+  loopShade.style.background = "rgba(59, 130, 246, 0.12)";
+  loopShade.style.boxShadow = "inset 0 0 0 1px rgba(96, 165, 250, 0.2)";
+  loopShade.style.zIndex = "1";
 
   bladeIndicator.className = "timeline-blade-indicator";
   bladeIndicator.hidden = true;
@@ -158,7 +173,8 @@ export function mountTimeline(container, store) {
   marquee.hidden = true;
 
   ui.rulerCanvas.appendChild(playhead.marker);
-  ui.tracksCanvas.append(bladeIndicator, playhead.line, marquee);
+  ui.tracksCanvas.append(loopShade, bladeIndicator, playhead.line, marquee);
+  const loopRegion = mountLoopRegion(ui.rulerCanvas, store, zoom);
 
   let duration = 1;
   let currentTimeline = store.state.timeline || { duration: 1, tracks: [] };
@@ -236,6 +252,19 @@ export function mountTimeline(container, store) {
     ui.tracksCanvas.style.minWidth = "100%";
   }
 
+  function syncLoopRegionUI() {
+    const loopRegionState = readLoopRegion(store.state, { duration });
+    const inOffset = zoom.timeToPx(loopRegionState.in);
+    const outOffset = zoom.timeToPx(loopRegionState.out);
+
+    ui.rulerCanvas.dataset.timelineDuration = String(duration);
+    loopRegion.update({ duration });
+
+    loopShade.hidden = !loopRegionState.enabled || outOffset <= inOffset;
+    loopShade.style.left = `${TRACK_HEADER_WIDTH + inOffset}px`;
+    loopShade.style.width = `${Math.max(outOffset - inOffset, 0)}px`;
+  }
+
   function hideBladeIndicator() {
     bladeIndicator.hidden = true;
   }
@@ -293,6 +322,7 @@ export function mountTimeline(container, store) {
     syncClipSelectionState();
     lastPlayhead = Number(store.state.playhead) || 0;
     playhead.setTime(lastPlayhead, zoom);
+    syncLoopRegionUI();
     syncMinimap(forceRender);
   }
 
@@ -556,6 +586,32 @@ export function mountTimeline(container, store) {
       return;
     }
 
+    if (!hasShortcutModifier && !event.altKey && !event.shiftKey && key === "i") {
+      const playheadTime = Math.min(Math.max(Number(store.state.playhead) || 0, 0), duration);
+      event.preventDefault();
+      updateLoopRegion(store, (loopRegionState) => ({
+        in: Math.min(playheadTime, loopRegionState.out),
+      }));
+      return;
+    }
+
+    if (!hasShortcutModifier && !event.altKey && !event.shiftKey && key === "o") {
+      const playheadTime = Math.min(Math.max(Number(store.state.playhead) || 0, 0), duration);
+      event.preventDefault();
+      updateLoopRegion(store, (loopRegionState) => ({
+        out: Math.max(playheadTime, loopRegionState.in),
+      }));
+      return;
+    }
+
+    if (!hasShortcutModifier && !event.altKey && event.shiftKey && key === "l") {
+      event.preventDefault();
+      updateLoopRegion(store, (loopRegionState) => ({
+        enabled: !loopRegionState.enabled,
+      }));
+      return;
+    }
+
     if (!event.metaKey || event.altKey || event.ctrlKey) {
       return;
     }
@@ -628,6 +684,10 @@ export function mountTimeline(container, store) {
     if (getTimelineTool(nextState) !== getTimelineTool(previousState)) {
       syncToolbarState();
     }
+
+    if (nextState.loopRegion !== previousState.loopRegion) {
+      syncLoopRegionUI();
+    }
   });
 
   syncToolbarState();
@@ -646,6 +706,7 @@ export function mountTimeline(container, store) {
     ui.tracksScroll.removeEventListener("scroll", onScroll);
     window.removeEventListener("keydown", onKeydown);
     detachRulerScrub();
+    loopRegion.destroy();
     minimap.unmount();
     container.__timelineUnmount = null;
     container.replaceChildren();

@@ -9,6 +9,7 @@ import {
 } from "../../src/commands.js";
 import { createMixer } from "../../src/audio/mixer.js";
 import { registerScene, renderAt, SCENES, validateTimeline } from "../../src/engine/index.js";
+import { DEFAULT_LOOP_REGION } from "../../src/loop-region.js";
 import { SCENE_MANIFEST } from "../../src/scenes/index.js";
 import { createDefaultTimeline, store } from "../../src/store.js";
 import { createTrackRow } from "../../src/timeline/track.js";
@@ -23,7 +24,10 @@ function createBaseState(timeline = createDefaultTimeline()) {
   return {
     playhead: 0,
     playing: false,
-    loop: true,
+    loop: false,
+    loopRegion: {
+      ...DEFAULT_LOOP_REGION,
+    },
     scrubbing: false,
     snapEnabled: true,
     showSafeArea: false,
@@ -61,6 +65,7 @@ function resetGlobalStore(timeline = createDefaultTimeline()) {
     state.playhead = nextState.playhead;
     state.playing = nextState.playing;
     state.loop = nextState.loop;
+    state.loopRegion = nextState.loopRegion;
     state.scrubbing = nextState.scrubbing;
     state.snapEnabled = nextState.snapEnabled;
     state.showSafeArea = nextState.showSafeArea;

@@ -1,4 +1,5 @@
 import { createDispatcher } from "./commands.js";
+import { DEFAULT_LOOP_REGION, normalizeLoopRegion } from "./loop-region.js";
 import { createDefaultProject } from "./project/presets.js";
 import { normalizeTracks } from "./track-flags.js";
 import { THEMES } from "./theme.js";
@@ -89,7 +90,10 @@ function createInitialState() {
   return {
     playhead: 0,
     playing: true,
-    loop: true,
+    loop: false,
+    loopRegion: {
+      ...DEFAULT_LOOP_REGION,
+    },
     scrubbing: false,
     snapEnabled: true,
     showSafeArea: false,
@@ -297,6 +301,15 @@ export const store = {
       resolvedState = {
         ...resolvedState,
         favorites: normalizedFavorites,
+      };
+    }
+
+    const normalizedLoopRegion = normalizeLoopRegion(resolvedState.loopRegion);
+    if (resolvedState.loopRegion !== normalizedLoopRegion || resolvedState.loop !== normalizedLoopRegion.enabled) {
+      resolvedState = {
+        ...resolvedState,
+        loop: normalizedLoopRegion.enabled,
+        loopRegion: normalizedLoopRegion,
       };
     }
 

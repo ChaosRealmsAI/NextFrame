@@ -1,3 +1,5 @@
+import { readLoopRegion, updateLoopRegion } from "../loop-region.js";
+
 const MOUNT_STATE = Symbol("nextframe.preview.transport.mountState");
 const STYLE_ID = "nextframe-preview-transport-styles";
 const FRAME_INTERVAL = 1000 / 30;
@@ -149,9 +151,9 @@ export function mountTransport(container, { store, audioMixer } = {}) {
   });
 
   loopButton.addEventListener("click", () => {
-    updateStore(store, (state) => {
-      state.loop = state.loop !== false ? false : true;
-    });
+    updateLoopRegion(store, (loopRegion) => ({
+      enabled: !loopRegion.enabled,
+    }));
     renderQueued = true;
   });
 
@@ -187,9 +189,11 @@ export function mountTransport(container, { store, audioMixer } = {}) {
 }
 
 function readSnapshot(state) {
+  const loopRegion = readLoopRegion(state);
+
   return {
     duration: readDuration(state),
-    loop: state?.loop !== false,
+    loop: loopRegion.enabled,
     playhead: readTime(state?.playhead),
     playing: Boolean(state?.playing),
   };
@@ -239,10 +243,11 @@ function formatTime(value) {
 function togglePlaying(store) {
   const duration = readDuration(store?.state);
   const playhead = clampTime(readTime(store?.state?.playhead), duration);
+  const loopRegion = readLoopRegion(store?.state, { duration });
 
   updateStore(store, (state) => {
     if (!state.playing && duration > 0 && playhead >= duration) {
-      state.playhead = 0;
+      state.playhead = loopRegion.enabled ? loopRegion.in : 0;
     }
 
     state.playing = !state.playing;

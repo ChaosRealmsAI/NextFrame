@@ -1,4 +1,5 @@
 import { createProjectAssetIndex, normalizeAudioUrl } from "./buffer.js";
+import { readLoopRegion } from "../loop-region.js";
 import { hasSoloTrack, shouldRenderTrack } from "../track-flags.js";
 
 function readFiniteNumber(value, fallback = 0) {
@@ -10,22 +11,29 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function wrapTime(time, duration) {
-  if (!(duration > 0)) {
-    return 0;
+function readPlaybackWindow(state, playhead) {
+  const duration = readFiniteNumber(state?.timeline?.duration, 0);
+  const loopRegion = readLoopRegion(state, { duration });
+  const loopEnabled = loopRegion.enabled && loopRegion.out > loopRegion.in;
+  const clampedPlayhead = clamp(readFiniteNumber(playhead, 0), 0, duration);
+
+  if (!loopEnabled) {
+    return {
+      duration,
+      loopEnabled: false,
+      loopStart: 0,
+      loopEnd: duration,
+      playhead: clampedPlayhead,
+    };
   }
 
-  const normalized = time % duration;
-  return normalized >= 0 ? normalized : normalized + duration;
-}
-
-function wrapDelta(actual, expected, duration) {
-  if (!(duration > 0)) {
-    return actual - expected;
-  }
-
-  const delta = wrapTime(actual - expected + duration / 2, duration) - duration / 2;
-  return delta;
+  return {
+    duration,
+    loopEnabled: true,
+    loopStart: loopRegion.in,
+    loopEnd: loopRegion.out,
+    playhead: clampedPlayhead >= loopRegion.out ? loopRegion.in : clampedPlayhead,
+  };
 }
 
 function isAudioBufferLike(value) {
@@ -58,7 +66,8 @@ function resolveClipSourceUrl(clip, assetIndex) {
 }
 
 function collectScheduleEntries(state, playhead, horizon) {
-  const duration = readFiniteNumber(state?.timeline?.duration, 0);
+  const playbackWindow = readPlaybackWindow(state, playhead);
+  const duration = playbackWindow.duration;
   if (!(duration > 0)) {
     return [];
   }
@@ -71,12 +80,9 @@ function collectScheduleEntries(state, playhead, horizon) {
   const assetIndex = createProjectAssetIndex(state);
   const tracks = Array.isArray(state?.timeline?.tracks) ? state.timeline.tracks : [];
   const soloActive = hasSoloTrack(tracks);
-  const loopEnabled = state?.loop !== false;
-  const windowStart = loopEnabled
-    ? wrapTime(playhead, duration)
-    : clamp(readFiniteNumber(playhead, 0), 0, duration);
-  const windowEnd = loopEnabled
-    ? windowStart + horizon
+  const windowStart = playbackWindow.playhead;
+  const windowEnd = playbackWindow.loopEnabled
+    ? Math.min(playbackWindow.loopEnd, windowStart + horizon)
     : Math.min(duration, windowStart + horizon);
   const entries = [];
 
@@ -123,30 +129,24 @@ function collectScheduleEntries(state, playhead, horizon) {
       const volume = clamp(readFiniteNumber(params.volume, clip?.volume ?? 1), 0, 4);
       const gainAutomation = params.gainAutomation;
 
-      for (let cycleOffset = 0; clipStartTime + cycleOffset < windowEnd; cycleOffset += duration) {
-        const occurrenceStart = clipStartTime + cycleOffset;
-        const occurrenceEnd = occurrenceStart + clipPlayableDuration;
-        const intersectStart = Math.max(windowStart, occurrenceStart);
-        const intersectEnd = Math.min(windowEnd, occurrenceEnd);
+      const occurrenceStart = clipStartTime;
+      const occurrenceEnd = occurrenceStart + clipPlayableDuration;
+      const intersectStart = Math.max(windowStart, occurrenceStart);
+      const intersectEnd = Math.min(windowEnd, occurrenceEnd);
 
-        if (!(intersectEnd > intersectStart)) {
-          continue;
-        }
-
-        const clipOffset = intersectStart - occurrenceStart;
-        entries.push({
-          audioBuffer,
-          startTime: intersectStart - windowStart,
-          clipStart: sourceOffset + clipOffset,
-          clipDur: intersectEnd - intersectStart,
-          volume,
-          gainAutomation,
-        });
-
-        if (!loopEnabled) {
-          break;
-        }
+      if (!(intersectEnd > intersectStart)) {
+        return;
       }
+
+      const clipOffset = intersectStart - occurrenceStart;
+      entries.push({
+        audioBuffer,
+        startTime: intersectStart - windowStart,
+        clipStart: sourceOffset + clipOffset,
+        clipDur: intersectEnd - intersectStart,
+        volume,
+        gainAutomation,
+      });
     });
   });
 
@@ -277,11 +277,10 @@ export function createMixer({ audioContext, getAudioContext, getState = () => nu
     }
 
     const state = getState();
-    const duration = readFiniteNumber(state?.timeline?.duration, 0);
-    const loopEnabled = state?.loop !== false;
-    const normalizedPlayhead = loopEnabled
-      ? wrapTime(playhead, duration)
-      : clamp(readFiniteNumber(playhead, 0), 0, duration);
+    const playbackWindow = readPlaybackWindow(state, playhead);
+    const duration = playbackWindow.duration;
+    const loopEnabled = playbackWindow.loopEnabled;
+    const normalizedPlayhead = playbackWindow.playhead;
 
     if (activeAudioContext.state === "suspended" && typeof activeAudioContext.resume === "function") {
       const result = activeAudioContext.resume();
@@ -295,16 +294,16 @@ export function createMixer({ audioContext, getAudioContext, getState = () => nu
       || session.assets !== state?.assets
       || session.assetBuffers !== state?.assetBuffers
       || session.duration !== duration
-      || session.loopEnabled !== loopEnabled;
+      || session.loopEnabled !== loopEnabled
+      || session.loopStart !== playbackWindow.loopStart
+      || session.loopEnd !== playbackWindow.loopEnd;
 
     if (!sessionChanged && session) {
       const elapsed = Math.max(0, activeAudioContext.currentTime - session.audioTime);
       const expectedPlayhead = loopEnabled
-        ? wrapTime(session.playhead + elapsed, duration)
+        ? Math.min(session.playhead + elapsed, session.loopEnd)
         : Math.min(session.playhead + elapsed, duration);
-      const drift = loopEnabled
-        ? Math.abs(wrapDelta(normalizedPlayhead, expectedPlayhead, duration))
-        : Math.abs(normalizedPlayhead - expectedPlayhead);
+      const drift = Math.abs(normalizedPlayhead - expectedPlayhead);
       const didWrap = loopEnabled && normalizedPlayhead + 0.25 < session.lastObservedPlayhead;
 
       session.lastObservedPlayhead = normalizedPlayhead;
@@ -333,6 +332,8 @@ export function createMixer({ audioContext, getAudioContext, getState = () => nu
       assets: state?.assets,
       assetBuffers: state?.assetBuffers,
       loopEnabled,
+      loopStart: playbackWindow.loopStart,
+      loopEnd: playbackWindow.loopEnd,
       lastObservedPlayhead: normalizedPlayhead,
     };
   }
