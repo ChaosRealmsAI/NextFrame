@@ -911,8 +911,8 @@ describe("BDD critical scenarios", () => {
     expect(storeSelectionCalls.length).toBe(0);
   });
 
-  it("INS-02 SCENE_MANIFEST exposes 12 scenes with parameter schemas", () => {
-    expect(SCENE_MANIFEST.length).toBe(12, "Expected the built-in scene manifest to list twelve built-in scenes");
+  it("INS-02 SCENE_MANIFEST exposes 13 scenes with parameter schemas", () => {
+    expect(SCENE_MANIFEST.length).toBe(13, "Expected the built-in scene manifest to list thirteen built-in scenes");
     expect(
       SCENE_MANIFEST.every((scene) => {
         if (!scene || typeof scene.id !== "string" || typeof scene.name !== "string") {

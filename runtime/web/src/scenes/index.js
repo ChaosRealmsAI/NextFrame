@@ -8,6 +8,7 @@ import { lineChart } from "./lineChart.js";
 import { neonGrid } from "./neonGrid.js";
 import { barChartReveal } from "./barChartReveal.js";
 import { lowerThirdVelvet } from "./lowerThirdVelvet.js";
+import { shapeBurst } from "./shapeBurst.js";
 import { starfield } from "./starfield.js";
 import { textOverlay } from "./textOverlay.js";
 
@@ -141,6 +142,35 @@ const SCENE_REGISTRY = [
       hueStart: { type: "number", default: 18, min: 0, max: 360, ui: "hue" },
       hueEnd: { type: "number", default: 145, min: 0, max: 360, ui: "hue" },
       accentHue: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
+    },
+  },
+  {
+    id: "shapeBurst",
+    fn: shapeBurst,
+    name: "Shape Burst",
+    category: "Shapes & Layout",
+    duration_hint: "2-8s",
+    params: {
+      count: { type: "integer", default: 80, min: 8, max: 240 },
+      shape: {
+        type: "select",
+        default: "mixed",
+        options: ["circle", "triangle", "square", "mixed"],
+      },
+      hueStart: { type: "number", default: 200, min: 0, max: 360, ui: "hue" },
+      hueEnd: { type: "number", default: 320, min: 0, max: 360, ui: "hue" },
+      sizeMin: { type: "number", default: 12, min: 2, max: 96 },
+      sizeMax: { type: "number", default: 48, min: 4, max: 160 },
+      speed: { type: "number", default: 320, min: 40, max: 960 },
+      gravity: { type: "number", default: 120, min: -240, max: 720 },
+      fadeOut: {
+        type: "select",
+        default: true,
+        options: [
+          { value: "true", label: "true" },
+          { value: "false", label: "false" },
+        ],
+      },
     },
   },
   {
