@@ -787,15 +787,9 @@
       .timeline-ruler-scroll {
         position: relative;
         min-width: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-        scrollbar-width: none;
+        overflow: hidden;
         background:
           linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
-      }
-
-      .timeline-ruler-scroll::-webkit-scrollbar {
-        display: none;
       }
 
       .timeline-ruler-canvas {
