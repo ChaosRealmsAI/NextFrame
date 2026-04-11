@@ -1,4 +1,5 @@
 import { batchCommand, splitClipCommand } from "../commands.js";
+import { mountMinimap } from "./minimap.js";
 import { createPlayhead } from "./playhead.js";
 import { attachRulerScrub, formatTime, renderRuler } from "./ruler.js";
 import { TRACK_HEADER_WIDTH, createTrackRow } from "./track.js";
@@ -41,6 +42,12 @@ function createStructure(container) {
       </div>
     </div>
     <div class="timeline-body">
+      <div class="timeline-minimap-shell">
+        <div class="timeline-minimap-side">Overview</div>
+        <div class="timeline-minimap-frame">
+          <div class="timeline-minimap-strip" data-role="minimap"></div>
+        </div>
+      </div>
       <div class="timeline-ruler-shell">
         <div class="timeline-ruler-side">Tracks</div>
         <div class="timeline-ruler-scroll" data-role="ruler-scroll">
@@ -63,6 +70,7 @@ function createStructure(container) {
     zoomIn: container.querySelector('[data-action="zoom-in"]'),
     zoomOut: container.querySelector('[data-action="zoom-out"]'),
     fit: container.querySelector('[data-action="fit"]'),
+    minimap: container.querySelector('[data-role="minimap"]'),
     rulerScroll: container.querySelector('[data-role="ruler-scroll"]'),
     rulerCanvas: container.querySelector('[data-role="ruler-canvas"]'),
     tracksScroll: container.querySelector('[data-role="tracks-scroll"]'),
@@ -137,6 +145,7 @@ export function mountTimeline(container, store) {
   const ui = createStructure(container);
   const zoom = createZoomController(2);
   const playhead = createPlayhead();
+  const minimap = mountMinimap(ui.minimap, store);
   const trackRows = new Map();
   const trackSignatures = new Map();
   const bladeIndicator = document.createElement("div");
@@ -157,6 +166,23 @@ export function mountTimeline(container, store) {
   let lastAssetBuffersRef = store.state.assetBuffers;
   let lastPlayhead = Number(store.state.playhead) || 0;
   let activeMarquee = null;
+
+  function getLaneViewportWidth() {
+    return Math.max(ui.tracksScroll.clientWidth - TRACK_HEADER_WIDTH, 0);
+  }
+
+  function syncMinimap(forceRender = false) {
+    minimap.update({
+      duration,
+      forceRender,
+      onScrollTo: setScrollLeft,
+      playhead: Number(store.state.playhead) || 0,
+      scrollLeft: ui.tracksScroll.scrollLeft,
+      timeline: currentTimeline,
+      viewportWidth: getLaneViewportWidth(),
+      zoomPxPerSecond: zoom.pxPerSecond,
+    });
+  }
 
   function syncTrackRows(tracks, forceRender = false) {
     const nextIds = new Set();
@@ -266,6 +292,7 @@ export function mountTimeline(container, store) {
     syncClipSelectionState();
     lastPlayhead = Number(store.state.playhead) || 0;
     playhead.setTime(lastPlayhead, zoom);
+    syncMinimap(forceRender);
   }
 
   function syncZoomUI() {
@@ -276,6 +303,7 @@ export function mountTimeline(container, store) {
   function setScrollLeft(scrollLeft) {
     ui.tracksScroll.scrollLeft = Math.max(0, scrollLeft);
     ui.rulerScroll.scrollLeft = ui.tracksScroll.scrollLeft;
+    syncMinimap();
   }
 
   function getContentPoint(event) {
@@ -411,7 +439,7 @@ export function mountTimeline(container, store) {
   }
 
   function applyZoom(nextLevel, { preserveCenter = true } = {}) {
-    const laneViewportWidth = Math.max(ui.tracksScroll.clientWidth - TRACK_HEADER_WIDTH, 0);
+    const laneViewportWidth = getLaneViewportWidth();
     const centerTime = preserveCenter && laneViewportWidth > 0
       ? zoom.pxToTime(ui.tracksScroll.scrollLeft + laneViewportWidth / 2)
       : 0;
@@ -428,7 +456,7 @@ export function mountTimeline(container, store) {
   }
 
   function fitTimeline() {
-    const laneViewportWidth = Math.max(ui.tracksScroll.clientWidth - TRACK_HEADER_WIDTH - 24, 120);
+    const laneViewportWidth = Math.max(getLaneViewportWidth() - 24, 120);
     const fitLevel = laneViewportWidth / (BASE_PX_PER_SECOND * duration);
     applyZoom(fitLevel, { preserveCenter: false });
   }
@@ -464,6 +492,7 @@ export function mountTimeline(container, store) {
   function onScroll() {
     ui.rulerScroll.scrollLeft = ui.tracksScroll.scrollLeft;
     hideBladeIndicator();
+    syncMinimap();
   }
 
   function onToolClick(event) {
@@ -563,6 +592,12 @@ export function mountTimeline(container, store) {
     store,
     zoom,
   });
+  const resizeObserver = typeof ResizeObserver === "function"
+    ? new ResizeObserver(() => {
+        syncMinimap(true);
+      })
+    : null;
+  resizeObserver?.observe(ui.tracksScroll);
 
   const unsubscribe = store.subscribe((nextState, previousState) => {
     if (nextState.timeline !== lastTimelineRef) {
@@ -582,6 +617,7 @@ export function mountTimeline(container, store) {
     if (nextPlayhead !== lastPlayhead) {
       playhead.setTime(nextPlayhead, zoom);
       lastPlayhead = nextPlayhead;
+      syncMinimap();
     }
 
     if (nextState.selection !== previousState.selection || nextState.selectedClipId !== previousState.selectedClipId) {
@@ -601,6 +637,7 @@ export function mountTimeline(container, store) {
   const unmount = () => {
     teardownMarquee();
     unsubscribe();
+    resizeObserver?.disconnect();
     ui.toolbar.removeEventListener("click", onToolClick);
     ui.tracksScroll.removeEventListener("mousemove", updateBladeIndicator);
     ui.tracksScroll.removeEventListener("mouseleave", hideBladeIndicator);
@@ -608,6 +645,7 @@ export function mountTimeline(container, store) {
     ui.tracksScroll.removeEventListener("scroll", onScroll);
     window.removeEventListener("keydown", onKeydown);
     detachRulerScrub();
+    minimap.unmount();
     container.__timelineUnmount = null;
     container.replaceChildren();
   };

@@ -1113,6 +1113,86 @@
         gap: 0;
       }
 
+      .timeline-minimap-shell {
+        display: grid;
+        grid-template-columns: var(--track-label-w) minmax(0, 1fr);
+        align-items: stretch;
+        min-height: 40px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .timeline-minimap-side {
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        background: linear-gradient(180deg, rgba(34, 34, 42, 0.96), rgba(24, 24, 31, 0.98));
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        color: var(--text-faint);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .timeline-minimap-frame {
+        min-width: 0;
+        padding: 0 10px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
+      }
+
+      .timeline-minimap-strip {
+        position: relative;
+        height: 40px;
+        cursor: pointer;
+      }
+
+      .timeline-minimap-clips {
+        position: absolute;
+        inset: 0;
+      }
+
+      .timeline-minimap-row {
+        position: absolute;
+        left: 0;
+        right: 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .timeline-minimap-row:first-child {
+        border-top: 0;
+      }
+
+      .timeline-minimap-clip {
+        position: absolute;
+        top: 1px;
+        bottom: 1px;
+        border-radius: 999px;
+        opacity: 0.8;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+
+      .timeline-minimap-window {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        min-width: 1px;
+        border: 1px solid rgba(255, 255, 255, 0.42);
+        background: rgba(255, 255, 255, 0.12);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+        pointer-events: none;
+      }
+
+      .timeline-minimap-playhead {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.32);
+        pointer-events: none;
+      }
+
       .timeline-zoom-controls {
         display: flex;
         align-items: center;
