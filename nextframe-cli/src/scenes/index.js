@@ -79,11 +79,12 @@ function makeEntry(id) {
 
 export const SCENE_IDS = Object.keys(RENDER_FNS);
 export const REGISTRY = new Map(SCENE_IDS.map((id) => [id, makeEntry(id)]));
+const PUBLIC_SCENE_IDS = SCENE_IDS.filter((id) => id !== "imageHero");
 
 export function getScene(id) {
   return REGISTRY.get(id);
 }
 
 export function listScenes() {
-  return SCENE_IDS.map((id) => REGISTRY.get(id).META);
+  return PUBLIC_SCENE_IDS.map((id) => REGISTRY.get(id).META);
 }

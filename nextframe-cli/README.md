@@ -111,6 +111,7 @@ are mandatory per `spec/architecture/02-modules.md`.
 
 ## Links
 
+- `CONTRIBUTING.md` — extension workflow and local test entrypoint
 - `spec/architecture/00-principles.md` — 7 invariants
 - `spec/architecture/04-interfaces.md` — full API signatures
 - `spec/architecture/06-ai-loop.md` — 5-step AI rhythm
