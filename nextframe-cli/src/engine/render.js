@@ -3,6 +3,7 @@
 // Frame-pure: no caches, no random, no Date.
 
 import { createCanvas } from "@napi-rs/canvas";
+import "./fonts.js"; // side-effect: register CJK fonts
 import { REGISTRY } from "../scenes/index.js";
 import { resolveTimeline } from "./time.js";
 
