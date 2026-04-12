@@ -1,4 +1,5 @@
-import { REGISTRY, listScenes } from "../scenes/index.js";
+import { REGISTRY } from "../scenes/index.js";
+import { getSceneMeta, listSceneMeta } from "../scenes/meta.js";
 import { validateTimeline } from "../engine/validate.js";
 import { resolveTimeline, resolveExpression } from "../engine/time.js";
 import { describeAt } from "../engine/describe.js";
@@ -9,7 +10,7 @@ import { addClip, addMarker, moveClip, removeClip, resizeClip, setParam } from "
 export const TOOLS = {
   list_scenes: {
     schema: { name: "list_scenes", description: "List all scenes and their META", params: [] },
-    handler: () => ({ ok: true, value: listScenes() }),
+    handler: () => ({ ok: true, value: listSceneMeta() }),
   },
   get_scene_meta: {
     schema: {
@@ -18,9 +19,9 @@ export const TOOLS = {
       params: [{ name: "id", type: "string", required: true }],
     },
     handler: ({ id }) => {
-      const entry = REGISTRY.get(id);
-      if (!entry) return { ok: false, error: { code: "UNKNOWN_SCENE", message: `no scene "${id}"` } };
-      return { ok: true, value: entry.META };
+      const meta = getSceneMeta(id);
+      if (!meta) return { ok: false, error: { code: "UNKNOWN_SCENE", message: `no scene "${id}"` } };
+      return { ok: true, value: meta };
     },
   },
   validate_timeline: {

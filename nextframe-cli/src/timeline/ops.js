@@ -133,6 +133,7 @@ export function removeClip(timeline, clipId) {
     return { ok: false, error: { code: "CLIP_NOT_FOUND", message: `no clip "${clipId}"`, ref: clipId } };
   }
   found.track.clips.splice(found.index, 1);
+  next.tracks = tracksOf(next).filter((track) => (track.clips || []).length > 0);
   return { ok: true, value: next, removed: clipId };
 }
 

@@ -1,10 +1,10 @@
 // nextframe scenes — list all available scenes with META.
 import { parseFlags } from "./_io.js";
-import { listScenes } from "../scenes/index.js";
+import { listSceneMeta } from "../scenes/meta.js";
 
 export async function run(argv) {
   const { flags } = parseFlags(argv);
-  const scenes = listScenes();
+  const scenes = listSceneMeta();
   if (flags.json) {
     process.stdout.write(JSON.stringify({ ok: true, value: scenes }, null, 2) + "\n");
     return 0;
