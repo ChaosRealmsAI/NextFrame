@@ -7,6 +7,18 @@ const REPO_ROOT = resolve(HERE, "../../..");
 const WEB_ROOT = resolve(REPO_ROOT, "runtime/web/src");
 const SCENES_DIR = resolve(WEB_ROOT, "scenes");
 const ENGINE_DIR = resolve(WEB_ROOT, "engine");
+const CLI_SCENES_DIR = resolve(REPO_ROOT, "nextframe-cli/src/scenes");
+
+const NAMED_IMPORT_PATTERN = /^\s*import\s+\{([\s\S]*?)\}\s+from\s+["']([^"']+)["'];?\s*$/gm;
+const RE_EXPORT_PATTERN = /^\s*export\s+\{([\s\S]*?)\}\s+from\s+["']([^"']+)["'];?\s*$/gm;
+const RESIDUAL_ESM_PATTERN = /^\s*(import|export)\b/m;
+
+const RECORDER_COMPAT_SCENES = Object.freeze({
+  vignette: Object.freeze({
+    exportName: "vignette",
+    moduleId: toModuleId(resolve(CLI_SCENES_DIR, "vignette.js")),
+  }),
+});
 
 function toModuleId(filePath) {
   return relative(REPO_ROOT, filePath).split("\\").join("/");
@@ -38,14 +50,41 @@ function resolveImportId(fromModuleIdValue, specifier) {
   return toModuleId(resolve(dirname(fromModuleId(fromModuleIdValue)), specifier));
 }
 
+function parseNamedSpecifiers(source, moduleId) {
+  const specifiers = [];
+
+  for (const rawSpecifier of source.split(",")) {
+    const specifier = rawSpecifier.trim();
+    if (!specifier) {
+      continue;
+    }
+
+    const match = specifier.match(/^([A-Za-z0-9_$]+)(?:\s+as\s+([A-Za-z0-9_$]+))?$/);
+    if (!match) {
+      throw new Error(`Unsupported named import/export specifier in ${moduleId}: ${specifier}`);
+    }
+
+    specifiers.push({
+      imported: match[1],
+      local: match[2] || match[1],
+    });
+  }
+
+  return specifiers;
+}
+
+function formatDestructuredSpecifiers(specifiers) {
+  return specifiers
+    .map(({ imported, local }) => (imported === local ? imported : `${imported}: ${local}`))
+    .join(", ");
+}
+
 function collectDependencies(source, moduleId) {
   const dependencies = [];
-  const importPattern = /^\s*import\s+\{[^}]+\}\s+from\s+["']([^"']+)["'];?\s*$/gm;
-  const reExportPattern = /^\s*export\s+\{[^}]+\}\s+from\s+["']([^"']+)["'];?\s*$/gm;
 
-  for (const pattern of [importPattern, reExportPattern]) {
+  for (const pattern of [NAMED_IMPORT_PATTERN, RE_EXPORT_PATTERN]) {
     for (const match of source.matchAll(pattern)) {
-      dependencies.push(resolveImportId(moduleId, match[1]));
+      dependencies.push(resolveImportId(moduleId, match[2]));
     }
   }
 
@@ -54,60 +93,67 @@ function collectDependencies(source, moduleId) {
 
 function transformModuleSource(source, moduleId) {
   const exportNames = [];
-  const lines = [];
+  let transformed = source.replace(NAMED_IMPORT_PATTERN, (_match, specifierSource, specifier) => {
+    const dependencyId = resolveImportId(moduleId, specifier);
+    const bindings = formatDestructuredSpecifiers(parseNamedSpecifiers(specifierSource, moduleId));
+    return `const { ${bindings} } = __nfImport(${JSON.stringify(dependencyId)});`;
+  });
 
-  for (const line of source.split("\n")) {
-    const importMatch = line.match(/^\s*import\s+\{([^}]+)\}\s+from\s+["']([^"']+)["'];?\s*$/);
-    if (importMatch) {
-      const specifiers = importMatch[1]
-        .split(",")
-        .map((value) => value.trim())
-        .filter(Boolean)
-        .join(", ");
-      const dependencyId = resolveImportId(moduleId, importMatch[2]);
-      lines.push(`const { ${specifiers} } = __nfImport(${JSON.stringify(dependencyId)});`);
-      continue;
+  transformed = transformed.replace(RE_EXPORT_PATTERN, (_match, specifierSource, specifier) => {
+    const dependencyId = resolveImportId(moduleId, specifier);
+    const lines = [];
+
+    for (const { imported, local } of parseNamedSpecifiers(specifierSource, moduleId)) {
+      lines.push(
+        `const { ${imported}: __nfReExport_${local} } = __nfImport(${JSON.stringify(dependencyId)});`,
+      );
+      lines.push(`exports.${local} = __nfReExport_${local};`);
     }
 
-    const reExportMatch = line.match(/^\s*export\s+\{([^}]+)\}\s+from\s+["']([^"']+)["'];?\s*$/);
-    if (reExportMatch) {
-      const dependencyId = resolveImportId(moduleId, reExportMatch[2]);
-      for (const rawSpecifier of reExportMatch[1].split(",")) {
-        const [imported, exported] = rawSpecifier.split(/\s+as\s+/).map((value) => value.trim());
-        const exportName = exported || imported;
-        lines.push(
-          `const { ${imported}: __nfReExport_${exportName} } = __nfImport(${JSON.stringify(dependencyId)});`,
-        );
-        lines.push(`exports.${exportName} = __nfReExport_${exportName};`);
-      }
-      continue;
-    }
+    return lines.join("\n");
+  });
 
-    lines.push(line);
-  }
-
-  let transformed = lines.join("\n");
   transformed = transformed.replace(/^export function\s+([A-Za-z0-9_$]+)\s*\(/gm, (_match, name) => {
     exportNames.push(name);
     return `function ${name}(`;
   });
-  transformed = transformed.replace(/^export const\s+([A-Za-z0-9_$]+)\s*=/gm, (_match, name) => {
+  transformed = transformed.replace(/^export\s+(const|let|var)\s+([A-Za-z0-9_$]+)\s*=/gm, (_match, kind, name) => {
     exportNames.push(name);
-    return `const ${name} =`;
+    return `${kind} ${name} =`;
   });
 
   if (exportNames.length > 0) {
     transformed += `\n${exportNames.map((name) => `exports.${name} = ${name};`).join("\n")}\n`;
   }
 
+  if (RESIDUAL_ESM_PATTERN.test(transformed)) {
+    const residual = transformed.match(RESIDUAL_ESM_PATTERN)?.[0]?.trim() || "import/export";
+    throw new Error(`Failed to inline ESM syntax in ${moduleId}: ${residual}`);
+  }
+
   return transformed;
 }
 
-function buildRuntimeBundle() {
+function collectRecorderCompatSceneIds(timeline) {
+  const sceneIds = new Set();
+
+  for (const track of timeline?.tracks || []) {
+    for (const clip of track?.clips || []) {
+      if (RECORDER_COMPAT_SCENES[clip?.scene]) {
+        sceneIds.add(clip.scene);
+      }
+    }
+  }
+
+  return Array.from(sceneIds).sort();
+}
+
+function buildRuntimeBundle(extraModuleIds = []) {
   const entryIds = [
     toModuleId(resolve(WEB_ROOT, "track-flags.js")),
     ...listModuleIds(ENGINE_DIR),
     ...listModuleIds(SCENES_DIR),
+    ...extraModuleIds,
   ];
   const seen = new Set();
   const orderedIds = [];
@@ -144,8 +190,27 @@ function buildRuntimeBundle() {
 export function generateHarness(timeline, opts = {}) {
   const width = Number(opts.width) || timeline?.project?.width || 1920;
   const height = Number(opts.height) || timeline?.project?.height || 1080;
-  const bundle = buildRuntimeBundle();
+  const duration = Number(timeline?.duration) || 0;
+  const fps = Number(timeline?.project?.fps) || 30;
+  const compatSceneIds = collectRecorderCompatSceneIds(timeline);
+  const compatModuleIds = compatSceneIds.map((sceneId) => RECORDER_COMPAT_SCENES[sceneId].moduleId);
+  const bundle = buildRuntimeBundle(compatModuleIds);
   const serializedTimeline = serializeForScript(timeline);
+  const serializedRecorderMeta = serializeForScript({
+    width,
+    height,
+    duration,
+    fps,
+  });
+  const compatSceneRegistrationScript = compatSceneIds.map((sceneId) => {
+    const { moduleId, exportName } = RECORDER_COMPAT_SCENES[sceneId];
+    const bindingName = `__nfCompat_${sceneId.replace(/[^A-Za-z0-9_$]/g, "_")}`;
+    return `const ${bindingName} = __nfImport(${JSON.stringify(moduleId)}).${exportName};
+  if (typeof ${bindingName} !== "function") {
+    throw new Error("Recorder compatibility scene ${sceneId} is not available");
+  }
+  engine.registerScene(${JSON.stringify(sceneId)}, ${bindingName});`;
+  }).join("\n  ");
   const runtimeScript = escapeScriptContent(`
 (function() {
   const __nfModules = new Map();
@@ -189,6 +254,7 @@ export function generateHarness(timeline, opts = {}) {
   canvas.width = width;
   canvas.height = height;
   scenes.registerAllScenes(engine);
+  ${compatSceneRegistrationScript}
 
   function renderFrame(time) {
     engine.renderAt(ctx, timeline, Number.isFinite(time) ? time : 0);
@@ -236,7 +302,7 @@ export function generateHarness(timeline, opts = {}) {
 </head>
 <body>
   <canvas id="nf-canvas" width="${width}" height="${height}"></canvas>
-  <script>window.__TIMELINE = ${serializedTimeline};</script>
+  <script>window.__TIMELINE = ${serializedTimeline}; window.__onFrame_meta = ${serializedRecorderMeta};</script>
   <script>${runtimeScript}</script>
 </body>
 </html>
