@@ -1,0 +1,16 @@
+[package]
+name = "a-wry-snapshot"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+block2 = "0.6"
+image = { version = "0.25", default-features = false, features = ["png"] }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3.2", features = ["NSApplication", "NSBitmapImageRep", "NSImage", "NSImageRep"] }
+objc2-foundation = { version = "0.3.2", features = ["NSData", "NSDictionary", "NSError", "NSGeometry", "NSString", "NSThread", "NSURL"] }
+objc2-web-kit = { version = "0.3.2", features = ["WKNavigationDelegate", "WKSnapshotConfiguration", "WKWebView"] }
+tao = "0.35"
+wry = "0.55"
