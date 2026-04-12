@@ -1,94 +1,100 @@
 # 07 · Roadmap
 
-这份文档现在是“v0.1 已收口，v0.2 往哪走”的状态说明，不再把 v0.1 当成进行中。
+## 版本线
 
-## 当前状态
+| 版本 | 定位 | 状态 |
+|------|------|------|
+| v0.1 | CLI 渲染引擎 | ✅ released |
+| v0.2 | 桌面壳 + GPU 录制 | 🔧 进行中 |
+| v0.3 | HTML-first 混合渲染 + 可编辑预览 | 📐 设计中 |
 
-**当前位置：v0.1.0 released。**
+## v0.1 — CLI 渲染引擎 ✅
 
-仓库内可验证的发布信号：
-- `nextframe-cli/package.json` 版本是 `0.1.0`
-- CLI 已有 25 个子命令
-- AI tools 已有 12 个
-- registry 有 33 个 scene render functions，CLI 对外公开 32 个 scenes
-- `grep -c '^test(' nextframe-cli/test/*.test.js | awk ...` = 74
-- BDD / AI verify 条目里 `status=done` 或 `verify=pass` 的对象总数 = 45
+- 25 CLI 子命令、12 AI tools、39 scene 函数
+- napi-canvas CPU 渲染 + ffmpeg libx264 编码
+- 74 tests、6 architecture tests
+- frame-pure 渲染合约
 
-## v0.1 阶段回顾
+## v0.2 — 桌面壳 + GPU 录制 🔧
 
-| 阶段 | 状态 | 说明 |
-|---|---|---|
-| v0.1.3 Walking skeleton | ✅ | CLI 能端到端 render / frame / validate |
-| v0.1.4 Lint | ✅ | architecture / scene contract / guard 都落地 |
-| v0.1.5 Implement | ✅ | render、timeline ops、assets、browser scenes、AI tools 已实现 |
-| v0.1.6 Verify | ✅ | 测试与 BDD verify 条目已经收口 |
-| v0.1.0 Release | ✅ | `nextframe-cli@0.1.0` |
+**已完成：**
+- wry + tao 桌面壳（WKWebView）
+- bridge IPC（project/episode/segment CRUD）
+- recorder 迁移（4717 行 Rust）
+- harness HTML 生成器（timeline → 自包含 HTML）
+- GPU 录制管线：WKWebView → CALayer → VideoToolbox → MP4
+- 智能帧跳过（__hasFrameChanged）
+- 实测：4K 10s 视频 9.6s 渲染
 
-## v0.1.0 已完成的产物
+**进行中：**
+- CALayer 同步截图优化（opt-09）
+- 并行 WebView 渲染（opt-10）
+- 视觉质量修复
 
-### Runtime / CLI
-- 25 个 CLI subcommands
-- bake-html / bake-browser / bake-video
-- asset management 4 commands
-- `guide` AI onboarding
-- `probe` 导出探针
+## v0.3 — HTML-first 混合渲染（下一步）
 
-### Scene library
-- 33 registered render functions
-- 32 public scenes
-- browser scene family 已并入正式 surface
+### 核心变化
 
-### Quality / verification
-- 74 node tests
-- 6 architecture tests通过
-- 45 个 BDD / verify 条目标记为 `done` / `pass`
+**从"单 Canvas 合成"到"HTML 页面即画面"。**
 
-## v0.2 方向
+v0.1-v0.2 的 engine 把所有 clip 画到一个 `<canvas>` 上，用 JS 做合成。
+v0.3 的 engine 变成 DOM 编排器：
 
-用户已经确认 v0.2 的方向：**tao desktop app + CapCut-style UI**。
+- 每个 track = `<div>`（z-index）
+- 每个 clip = 子容器（CSS filter / blend / opacity / transform）
+- scene 选最适合的技术：Canvas / DOM / SVG / WebGL / Video
+- 浏览器 GPU 自动合成
 
-### 目标
-- 继续保持 CLI 为 ground truth
-- 在其上加桌面壳和可视化时间线
-- 让人类用户拥有 CapCut 风格的轨道交互、拖拽和预览
+### 改动范围
 
-### 计划中的 v0.2 分层
-- 桌面壳：`tao`
-- 预览与 UI：原生 Web/HTML/JS
-- 核心能力：继续复用 `nextframe-cli` 的 schema、engine、scene registry、bake pipeline
+| 模块 | 改动 | 说明 |
+|------|------|------|
+| harness-gen.js | **重写** | 从"一个 canvas"到"多层 DOM" |
+| engine (web) | **重写** | 从"canvas 合成器"到"DOM 编排器" |
+| scene 代码 | **部分改** | 文字类改 DOM，特效类保留 canvas |
+| effects | **简化** | 用 CSS opacity + transform 替代 JS |
+| filters | **简化** | 用 CSS filter 替代像素操作 |
+| blend | **简化** | 用 CSS mix-blend-mode |
+| recorder | **不改** | CALayer 截图不关心 HTML 内容 |
+| __onFrame 协议 | **不改** | JS 控制时间不变 |
+| timeline JSON | **不改** | 数据模型不变 |
 
-### v0.2 placeholder milestones
+### 新能力
 
-| 里程碑 | 内容 |
-|---|---|
-| v0.2.0 | tao shell prototype |
-| v0.2.1 | CapCut-style timeline / inspector / preview spec |
-| v0.2.2 | UI architecture + bridge contract |
-| v0.2.3 | desktop walking skeleton |
-| v0.2.4 | UI lint / architecture guard |
-| v0.2.5 | implementation |
-| v0.2.6 | AI-driven UI verify |
+- 文字永远清晰（DOM 系统字体渲染）
+- SVG 4K 无损缩放
+- backdrop-filter 毛玻璃
+- CSS Grid/Flex 自动布局
+- 编辑器可拖拽预览（DOM 元素天然可交互）
+- WebGL 着色器背景
 
-## 暂不进入 v0.2 之前的范围
+### v0.3 里程碑
 
-以下仍然不应回流到 v0.1.x：
+| 步骤 | 内容 |
+|------|------|
+| v0.3.0 | POC: 混合渲染 showcase ✅ |
+| v0.3.1 | harness-gen v2: 多层 DOM 生成 |
+| v0.3.2 | engine v2: DOM 编排器 |
+| v0.3.3 | scene 迁移: 文字类 → DOM |
+| v0.3.4 | 编辑器交互: 拖拽 + 写回 JSON |
+| v0.3.5 | 全量验证 + benchmark |
+
+## 暂不做
+
 - 插件系统
 - 云协作
 - 浏览器版
 - Windows 打包
 - 在线素材库
-- 高级关键帧系统
 
-## 版本叙述更新
+## 数字快照
 
-旧叙述里一些数字已经过时，v0.1.0 以后应统一改成：
-- scenes：33 registered / 32 public
-- subcommands：25
-- AI tools：12
-- tests：74
-- architecture tests：6
-- verified BDD objects：45
-
-## 一句话
-
-v0.1 已经是“发布态 CLI”；v0.2 的主任务不再是补 CLI，而是把它包进 tao 桌面应用，并做出 CapCut 风格的人类操作层。
+| 指标 | v0.1 | v0.2 (当前) |
+|------|------|------------|
+| Scenes | 33 | 39 |
+| CLI commands | 25 | 25 |
+| AI tools | 12 | 12 |
+| Tests | 74 | 131 |
+| Rust 代码 | 0 | ~5000 行 |
+| 10s 视频渲染 | ~360s (CPU) | ~10s (GPU) |
+| 4K 支持 | ❌ | ✅ 9.6s |
