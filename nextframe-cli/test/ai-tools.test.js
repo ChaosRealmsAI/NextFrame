@@ -119,3 +119,92 @@ test("ai-tools-7: suggest_clip_at returns only clips active at time t", () => {
     { track: "v2", id: "title", scene: "textOverlay" },
   ]);
 });
+
+test("ai-tools-8: find_clips filters by track, time, and param", () => {
+  const result = TOOLS.find_clips.handler({
+    timeline: makeTimeline(),
+    track: "v2",
+    at: 2,
+    param: "text",
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value, [
+    {
+      trackId: "v2",
+      clipId: "title",
+      scene: "textOverlay",
+      start: 1,
+      dur: 2,
+      params: { text: "HELLO" },
+    },
+  ]);
+});
+
+test("ai-tools-9: get_clip returns original clip details plus resolved start", () => {
+  const timeline = makeTimeline();
+  timeline.tracks[1].clips[0].start = { after: "marker-m1", gap: 0.5 };
+
+  const result = TOOLS.get_clip.handler({ timeline, clipId: "title" });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value.trackId, "v2");
+  assert.deepEqual(result.value.clip.start, { after: "marker-m1", gap: 0.5 });
+  assert.equal(result.value.resolvedStart, 5.5);
+  assert.equal(result.value.meta.id, "textOverlay");
+});
+
+test("ai-tools-10: apply_patch rejects raw add-clip start and validates applied ops", () => {
+  const rejected = TOOLS.apply_patch.handler({
+    timeline: makeTimeline(),
+    ops: [{ op: "add-clip", track: "v2", clip: { id: "bad", start: 3, dur: 1, scene: "vignette" } }],
+  });
+  const applied = TOOLS.apply_patch.handler({
+    timeline: makeTimeline(),
+    ops: [
+      { op: "move-clip", clipId: "later", start: 5 },
+      { op: "set-param", clipId: "title", key: "text", value: "UPDATED" },
+    ],
+  });
+
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.error.code, "RAW_SECONDS");
+
+  assert.equal(applied.ok, true);
+  assert.equal(applied.value.applied, 2);
+  assert.equal(applied.value.validation.ok, true);
+  assert.equal(applied.value.timeline.tracks[1].clips[0].params.text, "UPDATED");
+  assert.equal(applied.value.timeline.tracks[1].clips[1].start, 5);
+});
+
+test("ai-tools-11: assert_at reports passed and failed checks at time t", () => {
+  const result = TOOLS.assert_at.handler({
+    timeline: makeTimeline(),
+    t: 2.5,
+    checks: [
+      { type: "clip_visible", clipId: "bg" },
+      { type: "scene_active", scene: "textOverlay" },
+      { type: "clip_count", min: 2 },
+      { type: "chapter", chapter: "intro" },
+      { type: "clip_visible", clipId: "later" },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value.passed, 4);
+  assert.equal(result.value.total, 5);
+  assert.equal(result.value.failed.length, 1);
+  assert.deepEqual(result.value.failed[0], {
+    check: { type: "clip_visible", clipId: "later" },
+    expected: true,
+    actual: false,
+  });
+});
+
+test("ai-tools-12: render_ascii returns ASCII art for a rendered frame", async () => {
+  const result = await TOOLS.render_ascii.handler({ timeline: makeTimeline(), t: 2.5, width: 20 });
+
+  assert.equal(result.ok, true);
+  assert.equal(typeof result.value, "string");
+  assert.equal(result.value.split("\n").length, 24);
+});
