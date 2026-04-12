@@ -9,6 +9,7 @@ import "./cli-export.test.js";
 import "./browser-scenes.test.js";
 import "./safety-gates.test.js";
 import "./cli-timeline-ops.test.js";
+import "./cli-assets.test.js";
 import "./ai-tools.test.js";
 import "./video-scene.test.js";
 import "./html-scene.test.js";

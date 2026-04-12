@@ -7,45 +7,61 @@
       "id": "cli-assets-1",
       "version": "v0.1",
       "type": "feature",
-      "status": "todo",
+      "status": "done",
       "verify": "pending",
       "story": "As a user, I want to import an image asset into timeline metadata.",
       "given": "An image file exists on disk.",
       "when": "A future nextframe import-image command runs",
-      "then": ["assets[] gains a new image asset", "The asset has a stable id", "The command returns structured JSON"]
+      "then": [
+        "assets[] gains a new image asset",
+        "The asset has a stable id",
+        "The command returns structured JSON"
+      ]
     },
     {
       "id": "cli-assets-2",
       "version": "v0.1",
       "type": "feature",
-      "status": "todo",
+      "status": "done",
       "verify": "pending",
       "story": "As a user, I want to import an audio asset.",
       "given": "An audio file exists on disk.",
       "when": "A future nextframe import-audio command runs",
-      "then": ["assets[] gains a new audio asset", "The command validates the path", "The command returns {ok:true} on success"]
+      "then": [
+        "assets[] gains a new audio asset",
+        "The command validates the path",
+        "The command returns {ok:true} on success"
+      ]
     },
     {
       "id": "cli-assets-3",
       "version": "v0.1",
       "type": "feature",
-      "status": "todo",
+      "status": "done",
       "verify": "pending",
       "story": "As a user, I want to list project assets.",
       "given": "timeline.json includes multiple assets.",
       "when": "A future nextframe list-assets command runs",
-      "then": ["Assets are grouped by kind", "The output supports --json", "Missing files are flagged clearly"]
+      "then": [
+        "Assets are grouped by kind",
+        "The output supports --json",
+        "Missing files are flagged clearly"
+      ]
     },
     {
       "id": "cli-assets-4",
       "version": "v0.1",
       "type": "feature",
-      "status": "todo",
+      "status": "done",
       "verify": "pending",
       "story": "As a user, I want to remove an asset reference.",
       "given": "An asset id exists in assets[].",
       "when": "A future nextframe remove-asset command runs",
-      "then": ["The asset disappears from assets[]", "Dangling references are surfaced by validate", "The command stays JSON-only"]
+      "then": [
+        "The asset disappears from assets[]",
+        "Dangling references are surfaced by validate",
+        "The command stays JSON-only"
+      ]
     }
   ]
 }

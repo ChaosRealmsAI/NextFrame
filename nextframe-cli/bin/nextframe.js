@@ -22,6 +22,10 @@ const SUBCOMMANDS = {
   "add-marker": () => import("../src/cli/ops.js"),
   "list-clips": () => import("../src/cli/ops.js"),
   "dup-clip": () => import("../src/cli/ops.js"),
+  "import-image": () => import("../src/cli/assets.js"),
+  "import-audio": () => import("../src/cli/assets.js"),
+  "list-assets": () => import("../src/cli/assets.js"),
+  "remove-asset": () => import("../src/cli/assets.js"),
   scenes: () => import("../src/cli/scenes.js"),
   help: null,
 };
@@ -52,6 +56,10 @@ SUBCOMMANDS
   add-marker <timeline.json> ...              append a timeline marker
   list-clips <timeline.json> [--json]         list clips grouped by track
   dup-clip <timeline.json> <clipId> ...       duplicate a clip at a new time
+  import-image <timeline.json> <image-path>   add an image asset to timeline.assets[]
+  import-audio <timeline.json> <audio-path>   add an audio asset to timeline.assets[]
+  list-assets <timeline.json> [--json]        list assets grouped by kind
+  remove-asset <timeline.json> <asset-id>     remove an asset by id
 
 FLAGS
   --json     output structured JSON (for AI / scripts)
