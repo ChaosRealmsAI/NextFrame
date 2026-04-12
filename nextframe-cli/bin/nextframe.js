@@ -11,6 +11,7 @@ const SUBCOMMANDS = {
   describe: () => import("../src/cli/describe.js"),
   ascii: () => import("../src/cli/ascii.js"),
   new: () => import("../src/cli/new.js"),
+  "bake-video": () => import("../src/cli/bakeVideo.js"),
   "add-clip": () => import("../src/cli/ops.js"),
   "move-clip": () => import("../src/cli/ops.js"),
   "resize-clip": () => import("../src/cli/ops.js"),
@@ -37,6 +38,7 @@ SUBCOMMANDS
   describe <timeline.json> <t>                JSON of what is visible at t
   ascii <timeline.json> <t> [--width N]       ASCII art preview of a frame
   gantt <timeline.json>                       ASCII gantt
+  bake-video <timeline.json>                  pre-extract videoClip frames with ffmpeg
   scenes                                      list all scenes with META
   add-clip <timeline.json> ...                add a clip to a track
   move-clip <timeline.json> <clipId> ...      move a clip's start time
