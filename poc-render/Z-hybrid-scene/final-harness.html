@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NextFrame — Final Harness Structure</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* ===== 舞台：固定尺寸，所有内容在里面 ===== */
+  #stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: var(--bg, #05050c);
+  }
+
+  /* ===== 每个 track = 一个层 ===== */
+  .track {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* ===== 每个 clip = track 里的一个容器 ===== */
+  .clip {
+    position: absolute;
+    inset: 0;
+    display: none;           /* 默认隐藏，JS 控制显隐 */
+    /* filter / blend / opacity / transform 由 JS 每帧设置 */
+  }
+  .clip.active {
+    display: block;
+  }
+
+  /* ===== Scene 容器：canvas 或 DOM 内容放这里 ===== */
+  .clip canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ---- 控制条 ---- */
+  #controls {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    padding: 10px 20px;
+    background: rgba(0,0,0,0.92);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font: 13px -apple-system, sans-serif;
+    color: #aaa;
+    z-index: 9999;
+  }
+  #controls button {
+    background: #222;
+    border: 1px solid #444;
+    color: #fff;
+    padding: 5px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #controls input[type=range] { flex: 1; accent-color: #a78bfa; }
+  #controls .time { min-width: 90px; text-align: right; font-family: "SF Mono", monospace; font-size: 12px; }
+  #controls .info { font-size: 11px; color: #666; }
+</style>
+</head>
+<body>
+
+<!-- ========================================================
+     舞台：1920x1080，所有轨道叠在一起
+     ======================================================== -->
+<div id="stage">
+
+  <!-- Track 0: 背景层 (z-index: 0, blend: normal) -->
+  <div class="track" data-track-id="bg" style="z-index:0">
+    <!-- Clip: auroraGradient 0-10s — Canvas 2D 渲染 -->
+    <div class="clip" data-clip-id="bg-1" data-scene="auroraGradient" data-start="0" data-dur="10" data-blend="normal">
+      <canvas id="canvas-bg-1" width="1920" height="1080"></canvas>
+    </div>
+  </div>
+
+  <!-- Track 1: 标题层 (z-index: 1, blend: normal) -->
+  <div class="track" data-track-id="title" style="z-index:1">
+    <!-- Clip: 大标题 1-6s — DOM 渲染，CSS 控制 effect/filter -->
+    <div class="clip" data-clip-id="title-1" data-scene="headline" data-start="1" data-dur="5"
+         data-blend="normal" data-effect-enter="fadeIn:0.6" data-effect-exit="fadeOut:0.4">
+      <!-- DOM Scene：系统字体，CSS 渐变文字 -->
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <div style="font:900 110px -apple-system,'SF Pro Display',sans-serif;
+                    background:linear-gradient(135deg,#6ee7ff,#a78bfa,#f472b6,#fb923c);
+                    -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                    letter-spacing:-3px;filter:drop-shadow(0 0 40px rgba(167,139,250,0.3))">
+          NextFrame
+        </div>
+        <div style="margin-top:16px;font:500 20px 'SF Mono',Menlo,monospace;
+                    color:rgba(200,190,255,0.55);letter-spacing:5px;text-transform:uppercase">
+          AI-Native Video Editor
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Track 2: 数据卡片层 (z-index: 2) -->
+  <div class="track" data-track-id="cards" style="z-index:2">
+    <!-- Clip: 统计卡片 2-8s — DOM Grid 布局 -->
+    <div class="clip" data-clip-id="cards-1" data-scene="statCards" data-start="2" data-dur="6"
+         data-blend="normal" data-effect-enter="slideUp:0.8">
+      <div style="position:absolute;bottom:120px;left:50%;transform:translateX(-50%);
+                  display:grid;grid-template-columns:repeat(4,180px);gap:20px">
+        <div class="stat-card" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+                    border-radius:14px;padding:24px 16px;text-align:center;backdrop-filter:blur(16px)">
+          <div style="font-size:36px;font-weight:800;color:#fff">39</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:2px;margin-top:4px;text-transform:uppercase">Scenes</div>
+        </div>
+        <div class="stat-card" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+                    border-radius:14px;padding:24px 16px;text-align:center;backdrop-filter:blur(16px)">
+          <div style="font-size:36px;font-weight:800;color:#fff">4K</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:2px;margin-top:4px;text-transform:uppercase">Resolution</div>
+        </div>
+        <div class="stat-card" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+                    border-radius:14px;padding:24px 16px;text-align:center;backdrop-filter:blur(16px)">
+          <div style="font-size:36px;font-weight:800;color:#fff">&lt;10s</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:2px;margin-top:4px;text-transform:uppercase">Render</div>
+        </div>
+        <div class="stat-card" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+                    border-radius:14px;padding:24px 16px;text-align:center;backdrop-filter:blur(16px)">
+          <div style="font-size:36px;font-weight:800;color:#fff">GPU</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:2px;margin-top:4px;text-transform:uppercase">Accelerated</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Track 3: SVG 装饰层 (z-index: 3, blend: screen) -->
+  <div class="track" data-track-id="decoration" style="z-index:3">
+    <!-- Clip: SVG 环形装饰 0-10s -->
+    <div class="clip" data-clip-id="rings-1" data-scene="svgRings" data-start="0" data-dur="10" data-blend="screen">
+      <svg viewBox="0 0 1920 1080" style="width:100%;height:100%" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#6ee7ff" stop-opacity="0.12"/>
+            <stop offset="100%" stop-color="#a78bfa" stop-opacity="0.06"/>
+          </linearGradient>
+        </defs>
+        <circle id="ring1" cx="960" cy="420" r="220" fill="none" stroke="url(#rg)" stroke-width="0.8"/>
+        <circle id="ring2" cx="960" cy="420" r="260" fill="none" stroke="url(#rg)" stroke-width="0.5" stroke-dasharray="4 8"/>
+        <circle id="ring3" cx="960" cy="420" r="180" fill="none" stroke="rgba(244,114,182,0.05)" stroke-width="0.5" stroke-dasharray="2 6"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Track 4: 角标层 (z-index: 4) -->
+  <div class="track" data-track-id="badge" style="z-index:4">
+    <!-- Clip: 角标 0-10s — DOM -->
+    <div class="clip" data-clip-id="badge-1" data-scene="cornerBadge" data-start="0" data-dur="10"
+         data-blend="normal" data-effect-enter="fadeIn:0.5">
+      <div style="position:absolute;top:36px;right:40px;display:flex;align-items:center;gap:10px">
+        <span style="background:linear-gradient(135deg,#ef4444,#ec4899);color:#fff;font:700 13px -apple-system,sans-serif;
+                     padding:5px 14px;border-radius:6px;letter-spacing:1px">DEMO</span>
+        <span style="color:rgba(255,255,255,0.5);font:13px 'SF Mono',monospace">v0.2</span>
+      </div>
+      <!-- 角落标记 -->
+      <div style="position:absolute;top:24px;left:24px;width:32px;height:32px;border-top:1px solid rgba(255,255,255,0.1);border-left:1px solid rgba(255,255,255,0.1)"></div>
+      <div style="position:absolute;top:24px;right:24px;width:32px;height:32px;border-top:1px solid rgba(255,255,255,0.1);border-right:1px solid rgba(255,255,255,0.1)"></div>
+      <div style="position:absolute;bottom:24px;left:24px;width:32px;height:32px;border-bottom:1px solid rgba(255,255,255,0.1);border-left:1px solid rgba(255,255,255,0.1)"></div>
+      <div style="position:absolute;bottom:24px;right:24px;width:32px;height:32px;border-bottom:1px solid rgba(255,255,255,0.1);border-right:1px solid rgba(255,255,255,0.1)"></div>
+    </div>
+  </div>
+
+  <!-- Track 5: 进度条层 (z-index: 5) -->
+  <div class="track" data-track-id="progress" style="z-index:5">
+    <!-- Clip: 底部进度条 3-10s — DOM + CSS -->
+    <div class="clip" data-clip-id="progress-1" data-scene="progressBar" data-start="3" data-dur="7"
+         data-blend="normal" data-effect-enter="fadeIn:0.6" data-filter="none">
+      <div style="position:absolute;bottom:60px;left:160px;right:160px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font:11px 'SF Mono',monospace;color:rgba(255,255,255,0.25)">
+          <span>渲染开始</span><span>合成中</span><span>编码完成</span>
+        </div>
+        <div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">
+          <div id="progress-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#6ee7ff,#a78bfa,#f472b6);border-radius:2px;transition:width 0.1s"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ========================================================
+     引擎：时间控制 + 帧渲染
+     ======================================================== -->
+<script>
+const DURATION = 10;
+const FPS = 30;
+const W = 1920, H = 1080;
+
+// ===== 收集所有 clip 元素 =====
+const clips = Array.from(document.querySelectorAll('.clip')).map(el => ({
+  el,
+  id: el.dataset.clipId,
+  scene: el.dataset.scene,
+  start: parseFloat(el.dataset.start),
+  dur: parseFloat(el.dataset.dur),
+  blend: el.dataset.blend || 'normal',
+  effectEnter: el.dataset.effectEnter || null,  // "fadeIn:0.6"
+  effectExit: el.dataset.effectExit || null,    // "fadeOut:0.4"
+  filter: el.dataset.filter || 'none',
+}));
+
+// ===== Effect 计算：返回 { opacity, transform } =====
+function calcEffect(clip, localT) {
+  let opacity = 1;
+  let transform = 'none';
+
+  // Enter effect
+  if (clip.effectEnter) {
+    const [type, durStr] = clip.effectEnter.split(':');
+    const dur = parseFloat(durStr) || 0.5;
+    if (localT < dur) {
+      const p = Math.max(0, Math.min(1, localT / dur));
+      const eased = 1 - (1 - p) ** 3; // easeOutCubic
+      if (type === 'fadeIn') {
+        opacity = eased;
+      } else if (type === 'slideUp') {
+        opacity = eased;
+        transform = `translateY(${(1 - eased) * 40}px)`;
+      } else if (type === 'scaleIn') {
+        opacity = eased;
+        transform = `scale(${0.9 + 0.1 * eased})`;
+      }
+    }
+  }
+
+  // Exit effect
+  if (clip.effectExit) {
+    const [type, durStr] = clip.effectExit.split(':');
+    const dur = parseFloat(durStr) || 0.4;
+    const exitStart = clip.dur - dur;
+    if (localT > exitStart) {
+      const p = Math.max(0, Math.min(1, (localT - exitStart) / dur));
+      if (type === 'fadeOut') {
+        opacity *= (1 - p);
+      }
+    }
+  }
+
+  return { opacity, transform };
+}
+
+// ===== Canvas Scenes =====
+const canvasScenes = {
+  auroraGradient(t, ctx) {
+    ctx.fillStyle = '#05050c';
+    ctx.fillRect(0, 0, W, H);
+
+    const g1 = ctx.createRadialGradient(
+      W*0.35 + Math.sin(t*0.15)*180, H*0.35 + Math.cos(t*0.12)*100, 20,
+      W*0.4, H*0.4, W*0.55
+    );
+    g1.addColorStop(0, `hsla(${265+Math.sin(t*0.2)*20},75%,22%,0.9)`);
+    g1.addColorStop(0.5, `hsla(${280+Math.cos(t*0.15)*15},55%,10%,0.5)`);
+    g1.addColorStop(1, 'transparent');
+    ctx.fillStyle = g1;
+    ctx.fillRect(0, 0, W, H);
+
+    const g2 = ctx.createRadialGradient(
+      W*0.7+Math.cos(t*0.18)*140, H*0.55+Math.sin(t*0.14)*90, 15,
+      W*0.65, H*0.5, W*0.45
+    );
+    g2.addColorStop(0, `hsla(${330+Math.sin(t*0.25)*15},65%,18%,0.7)`);
+    g2.addColorStop(0.4, 'transparent');
+    ctx.fillStyle = g2;
+    ctx.fillRect(0, 0, W, H);
+
+    // 粒子
+    for (let i = 0; i < 50; i++) {
+      const seed = i * 137.508;
+      const px = (seed * 7.3 + t * (10 + i % 5)) % W;
+      const py = (seed * 3.7 + t * (5 + i % 3)) % H;
+      const alpha = 0.05 + (Math.sin(seed + t) * 0.5 + 0.5) * 0.2;
+      ctx.beginPath();
+      ctx.arc(px, py, 0.5 + (i % 3) * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${240 + i % 80},60%,70%,${alpha})`;
+      ctx.fill();
+    }
+  }
+};
+
+// ===== SVG 动画（JS 控制旋转角度）=====
+function updateSVG(t) {
+  const r1 = document.getElementById('ring1');
+  const r2 = document.getElementById('ring2');
+  const r3 = document.getElementById('ring3');
+  if (r1) r1.setAttribute('transform', `rotate(${t * 14.4} 960 420)`);
+  if (r2) r2.setAttribute('transform', `rotate(${-t * 10.3} 960 420)`);
+  if (r3) r3.setAttribute('transform', `rotate(${t * 20} 960 420)`);
+}
+
+// ===== 进度条 =====
+function updateProgress(localT, dur) {
+  const fill = document.getElementById('progress-fill');
+  if (fill) fill.style.width = Math.min(100, (localT / dur) * 100) + '%';
+}
+
+// ===== 核心：渲染一帧 =====
+function renderFrame(t) {
+  for (const clip of clips) {
+    const localT = t - clip.start;
+    const active = t >= clip.start && t < clip.start + clip.dur;
+
+    if (active) {
+      clip.el.classList.add('active');
+
+      // Effect → 设置 opacity + transform
+      const { opacity, transform } = calcEffect(clip, localT);
+      clip.el.style.opacity = opacity;
+      clip.el.style.transform = transform === 'none' ? '' : transform;
+
+      // Blend → 设置 mix-blend-mode
+      clip.el.style.mixBlendMode = clip.blend;
+
+      // Filter → 设置 CSS filter
+      if (clip.filter !== 'none') {
+        clip.el.style.filter = clip.filter;
+      }
+
+      // Scene 渲染
+      if (clip.scene === 'auroraGradient') {
+        const canvas = clip.el.querySelector('canvas');
+        if (canvas) canvasScenes.auroraGradient(t, canvas.getContext('2d'));
+      }
+      if (clip.scene === 'svgRings') {
+        updateSVG(t);
+      }
+      if (clip.scene === 'progressBar') {
+        updateProgress(localT, clip.dur);
+      }
+      // DOM scenes (headline, statCards, cornerBadge): 内容已在 HTML 里，只需控制显隐和 effect
+
+    } else {
+      clip.el.classList.remove('active');
+    }
+  }
+}
+
+// ===== Recorder 协议：__onFrame =====
+window.__onFrame = function(frame) {
+  renderFrame(Number(frame.time) || 0);
+  return true;
+};
+
+// ===== 浏览器预览控制 =====
+renderFrame(0);
+
+const controls = document.createElement('div');
+controls.id = 'controls';
+controls.innerHTML = `
+  <button id="play-btn">▶</button>
+  <input type="range" id="slider" min="0" max="${DURATION*1000}" value="0">
+  <span class="time" id="time-label">0.000s</span>
+  <span class="info">| ${DURATION}s @ ${FPS}fps | ${W}×${H} | tracks:${document.querySelectorAll('.track').length} clips:${clips.length}</span>
+`;
+document.body.appendChild(controls);
+
+const slider = document.getElementById('slider');
+const timeLabel = document.getElementById('time-label');
+const playBtn = document.getElementById('play-btn');
+let playing = false, startWall = 0, startTime = 0;
+
+function seek(t) {
+  t = Math.max(0, Math.min(DURATION, t));
+  slider.value = t * 1000;
+  timeLabel.textContent = t.toFixed(3) + 's';
+  renderFrame(t);
+}
+
+slider.addEventListener('input', () => { playing = false; playBtn.textContent = '▶'; seek(slider.value / 1000); });
+playBtn.addEventListener('click', () => {
+  if (playing) { playing = false; playBtn.textContent = '▶'; return; }
+  playing = true; playBtn.textContent = '⏸';
+  startWall = performance.now(); startTime = slider.value / 1000;
+  (function tick() {
+    if (!playing) return;
+    const t = startTime + (performance.now() - startWall) / 1000;
+    if (t >= DURATION) { seek(DURATION); playing = false; playBtn.textContent = '▶'; return; }
+    seek(t);
+    requestAnimationFrame(tick);
+  })();
+});
+
+seek(2.5);
+</script>
+
+</body>
+</html>
