@@ -1,9 +1,11 @@
 use super::{
-    autosave_storage_test_lock, build_ffmpeg_filter_complex, dispatch, home_dir, initialize,
-    mock_ffmpeg_state, recent_storage_test_lock, reset_ffmpeg_path_cache_for_tests,
+    autosave_storage_test_lock, build_ffmpeg_command, build_ffmpeg_filter_complex, dispatch,
+    handle_export_mux_audio, home_dir, initialize, mock_ffmpeg_state, parse_audio_sources,
+    recent_storage_test_lock, reset_ffmpeg_path_cache_for_tests, secs_to_millis,
     resolve_write_path, set_autosave_storage_path_override_for_tests,
     set_recent_storage_path_override_for_tests, AudioSource, CommandOutput, FfmpegCommand,
-    MockFfmpegState, Request, MOCK_FFMPEG_TEST_LOCK,
+    MockFfmpegState, Request, cleanup_intermediate_video, copy_video_output,
+    create_export_log_path, MOCK_FFMPEG_TEST_LOCK,
     // test-6: dialog helpers
     dialog::{normalize_extension, parse_dialog_filters, with_default_extension},
     // test-7: recorder_bridge types
@@ -2648,6 +2650,334 @@ fn export_status_json_formats_running_done_and_failed_states() {
         .and_then(Value::as_f64)
         .expect("failed percent");
     assert!((0.0..=100.0).contains(&failed_percent));
+}
+
+// === t3-4: export_runner tests ===
+
+#[test]
+fn create_export_log_path_returns_valid_path_in_temp_dir() {
+    let temp_dir = env::temp_dir();
+    let log_path = create_export_log_path().expect("create export log path");
+
+    assert!(log_path.is_absolute());
+    assert_eq!(log_path.parent(), Some(temp_dir.as_path()));
+    assert_eq!(log_path.extension().and_then(|ext| ext.to_str()), Some("log"));
+}
+
+#[test]
+fn create_export_log_path_includes_nextframe_export_in_filename() {
+    let log_path = create_export_log_path().expect("create export log path");
+    let file_name = log_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .expect("utf-8 log file name");
+
+    assert!(file_name.contains("nextframe-export"));
+}
+
+#[test]
+fn copy_video_output_with_same_src_and_dst_is_no_op() {
+    let temp = TestDir::new("copy-video-same-path");
+    let video_path = temp.join("clip.mp4");
+    fs::write(&video_path, b"same-path-video").expect("write input video");
+
+    copy_video_output(&video_path, &video_path).expect("copy should no-op");
+
+    assert_eq!(
+        fs::read(&video_path).expect("read original video after no-op"),
+        b"same-path-video"
+    );
+}
+
+#[test]
+fn copy_video_output_copies_file_contents() {
+    let temp = TestDir::new("copy-video");
+    let video_path = temp.join("source.mp4");
+    let output_path = temp.join("output.mp4");
+    let expected = b"copied-video-bytes";
+    fs::write(&video_path, expected).expect("write source video");
+
+    copy_video_output(&video_path, &output_path).expect("copy video output");
+
+    assert_eq!(fs::read(&output_path).expect("read copied output"), expected);
+}
+
+#[test]
+fn cleanup_intermediate_video_removes_file() {
+    let temp = TestDir::new("cleanup-video");
+    let video_path = temp.join("intermediate.mp4");
+    let output_path = temp.join("final.mp4");
+    fs::write(&video_path, b"intermediate-video").expect("write intermediate video");
+
+    cleanup_intermediate_video(&video_path, &output_path);
+
+    assert!(!video_path.exists());
+}
+
+#[test]
+fn cleanup_intermediate_video_with_same_src_and_dst_is_no_op() {
+    let temp = TestDir::new("cleanup-video-same-path");
+    let video_path = temp.join("final.mp4");
+    fs::write(&video_path, b"final-video").expect("write final video");
+
+    cleanup_intermediate_video(&video_path, &video_path);
+
+    assert_eq!(
+        fs::read(&video_path).expect("read final video after no-op cleanup"),
+        b"final-video"
+    );
+}
+
+// === t3-6: encoding + time edge case tests ===
+
+#[test]
+fn encoding_base64_encode_handles_exactly_one_byte_with_double_padding() {
+    assert_eq!(super::encoding::base64_encode(b"A"), "QQ==");
+}
+
+#[test]
+fn encoding_base64_encode_handles_exactly_two_bytes_with_single_padding() {
+    assert_eq!(super::encoding::base64_encode(b"AB"), "QUI=");
+}
+
+#[test]
+fn encoding_base64_encode_handles_binary_bytes() {
+    assert_eq!(super::encoding::base64_encode(&[0x00, 0xFF]), "AP8=");
+}
+
+#[test]
+fn encoding_percent_decode_url_path_decodes_consecutive_percent_sequences() {
+    let decoded = super::encoding::percent_decode_url_path(
+        "/%E4%BD%A0%E5%A5%BD%E4%B8%96%E7%95%8C/%F0%9F%8C%8D",
+    )
+    .expect("decode consecutive percent-encoded byte sequences");
+
+    assert_eq!(decoded, "/\u{4f60}\u{597d}\u{4e16}\u{754c}/\u{1f30d}");
+}
+
+#[test]
+fn encoding_percent_encode_path_handles_spaces_and_unicode_segments() {
+    let encoded = super::encoding::percent_encode_path("folder name/\u{4f60}\u{597d} \u{4e16}\u{754c}.txt");
+
+    assert_eq!(
+        encoded,
+        "folder%20name/%E4%BD%A0%E5%A5%BD%20%E4%B8%96%E7%95%8C.txt"
+    );
+}
+
+#[test]
+fn encoding_path_to_file_url_encodes_unicode_paths() {
+    let path = if cfg!(windows) {
+        PathBuf::from(r"C:\Temp\你好\clip.mp4")
+    } else {
+        PathBuf::from("/tmp/\u{4f60}\u{597d}/clip.mp4")
+    };
+
+    let url = super::encoding::path_to_file_url(&path);
+
+    if cfg!(windows) {
+        assert_eq!(url, "file:///C:/Temp/%E4%BD%A0%E5%A5%BD/clip.mp4");
+    } else {
+        assert_eq!(url, "file:///tmp/%E4%BD%A0%E5%A5%BD/clip.mp4");
+    }
+}
+
+#[test]
+fn time_epoch_days_to_date_handles_leap_year_dates() {
+    assert_eq!(time::epoch_days_to_date(18_320), (2020, 2, 28));
+    assert_eq!(time::epoch_days_to_date(18_321), (2020, 2, 29));
+    assert_eq!(time::epoch_days_to_date(18_322), (2020, 3, 1));
+}
+
+#[test]
+fn time_epoch_days_to_date_handles_end_of_month_boundaries() {
+    assert_eq!(time::epoch_days_to_date(18_658), (2021, 1, 31));
+    assert_eq!(time::epoch_days_to_date(18_659), (2021, 2, 1));
+    assert_eq!(time::epoch_days_to_date(18_747), (2021, 4, 30));
+    assert_eq!(time::epoch_days_to_date(18_748), (2021, 5, 1));
+}
+
+#[test]
+fn time_trim_float_handles_negative_numbers() {
+    assert_eq!(time::trim_float(-2.000), "-2");
+    assert_eq!(time::trim_float(-1.500), "-1.5");
+    assert_eq!(time::trim_float(-0.040), "-0.04");
+}
+
+#[test]
+fn time_trim_float_handles_very_small_decimals() {
+    assert_eq!(time::trim_float(0.004), "0.004");
+    assert_eq!(time::trim_float(0.010), "0.01");
+    assert_eq!(time::trim_float(0.0004), "0");
+}
+
+// === t3-7: ffmpeg edge case tests ===
+
+#[test]
+fn build_ffmpeg_command_with_single_audio_source() {
+    let command = build_ffmpeg_command(
+        PathBuf::from("/mock/bin/ffmpeg"),
+        Path::new("/tmp/video.mp4"),
+        &[AudioSource {
+            path: PathBuf::from("/tmp/voiceover.mp3"),
+            start_time: 0.0,
+            volume: 1.0,
+        }],
+        Path::new("/tmp/output.mp4"),
+    );
+
+    assert_eq!(
+        command,
+        FfmpegCommand {
+            program: PathBuf::from("/mock/bin/ffmpeg"),
+            args: vec![
+                "-y",
+                "-i",
+                "/tmp/video.mp4",
+                "-i",
+                "/tmp/voiceover.mp3",
+                "-filter_complex",
+                "[1:a]adelay=0:all=1,volume=1[a0];[a0]amix=inputs=1:normalize=0[aout]",
+                "-map",
+                "0:v",
+                "-map",
+                "[aout]",
+                "-c:v",
+                "copy",
+                "-c:a",
+                "aac",
+                "/tmp/output.mp4",
+            ]
+            .into_iter()
+            .map(|value| value.to_string())
+            .collect(),
+        }
+    );
+}
+
+#[test]
+fn build_ffmpeg_command_with_multiple_audio_sources_at_different_start_times() {
+    let command = build_ffmpeg_command(
+        PathBuf::from("/mock/bin/ffmpeg"),
+        Path::new("/tmp/video.mp4"),
+        &[
+            AudioSource {
+                path: PathBuf::from("/tmp/intro.wav"),
+                start_time: 0.125,
+                volume: 1.0,
+            },
+            AudioSource {
+                path: PathBuf::from("/tmp/music.wav"),
+                start_time: 2.75,
+                volume: 1.0,
+            },
+            AudioSource {
+                path: PathBuf::from("/tmp/outro.wav"),
+                start_time: 10.001,
+                volume: 1.0,
+            },
+        ],
+        Path::new("/tmp/output.mp4"),
+    );
+
+    assert_eq!(
+        command.args[10],
+        "[1:a]adelay=125:all=1,volume=1[a0];[2:a]adelay=2750:all=1,volume=1[a1];[3:a]adelay=10001:all=1,volume=1[a2];[a0][a1][a2]amix=inputs=3:normalize=0[aout]"
+    );
+}
+
+#[test]
+fn build_ffmpeg_command_with_volume_adjustments() {
+    let command = build_ffmpeg_command(
+        PathBuf::from("/mock/bin/ffmpeg"),
+        Path::new("/tmp/video.mp4"),
+        &[
+            AudioSource {
+                path: PathBuf::from("/tmp/dialog.wav"),
+                start_time: 0.0,
+                volume: 0.0,
+            },
+            AudioSource {
+                path: PathBuf::from("/tmp/bed.wav"),
+                start_time: 1.0,
+                volume: 1.5,
+            },
+            AudioSource {
+                path: PathBuf::from("/tmp/fx.wav"),
+                start_time: 2.0,
+                volume: 0.125,
+            },
+        ],
+        Path::new("/tmp/output.mp4"),
+    );
+
+    assert_eq!(
+        command.args[10],
+        "[1:a]adelay=0:all=1,volume=0[a0];[2:a]adelay=1000:all=1,volume=1.5[a1];[3:a]adelay=2000:all=1,volume=0.125[a2];[a0][a1][a2]amix=inputs=3:normalize=0[aout]"
+    );
+}
+
+#[test]
+fn secs_to_millis_rounds_with_expected_accuracy() {
+    assert_eq!(secs_to_millis(0.0), 0);
+    assert_eq!(secs_to_millis(0.0004), 0);
+    assert_eq!(secs_to_millis(0.0005), 1);
+    assert_eq!(secs_to_millis(1.2344), 1234);
+    assert_eq!(secs_to_millis(1.2345), 1235);
+    assert_eq!(secs_to_millis(-3.0), 0);
+    assert_eq!(secs_to_millis(f64::INFINITY), 0);
+}
+
+#[test]
+fn handle_export_mux_audio_returns_error_when_video_file_is_missing() {
+    let mock = MockFfmpegHarness::new();
+    let temp = TestDir::new("mux-missing-video");
+    let missing_video_path = temp.join("missing.mp4");
+    let audio_path = temp.join("voiceover.mp3");
+    let output_path = temp.join("final.mp4");
+    fs::write(&audio_path, "audio").expect("write source audio");
+
+    let error = handle_export_mux_audio(&json!({
+        "videoPath": missing_video_path.display().to_string(),
+        "audioSources": [
+            {
+                "path": audio_path.display().to_string(),
+                "startTime": 0,
+                "volume": 1
+            }
+        ],
+        "outputPath": output_path.display().to_string(),
+    }))
+    .expect_err("missing video should fail before ffmpeg runs");
+
+    assert!(mock.take_invocations().is_empty());
+    assert!(error.contains("failed to resolve"));
+    assert!(error.contains("missing.mp4"));
+}
+
+#[test]
+fn parse_audio_sources_accepts_empty_array() {
+    let sources = parse_audio_sources(&json!({
+        "audioSources": [],
+    }))
+    .expect("parse empty audio source array");
+
+    assert!(sources.is_empty());
+}
+
+#[test]
+fn parse_audio_sources_errors_when_path_is_missing() {
+    let error = parse_audio_sources(&json!({
+        "audioSources": [
+            {
+                "startTime": 0,
+                "volume": 1
+            }
+        ],
+    }))
+    .expect_err("missing path should be rejected");
+
+    assert_eq!(error, "params.audioSources[0].path must be a string");
 }
 
 fn lock_export_test() -> MutexGuard<'static, ()> {
