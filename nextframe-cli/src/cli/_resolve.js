@@ -3,6 +3,11 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 export const PROJECTS_ROOT = join(homedir(), "NextFrame", "projects");
+const CACHE_ENV_KEYS = Object.freeze({
+  html: "NEXTFRAME_HTML_CACHE_DIR",
+  video: "NEXTFRAME_VIDEO_CACHE_DIR",
+  browser: "NEXTFRAME_BROWSER_CACHE_DIR",
+});
 
 export function timelineUsage(command, segmentTail = "", legacyTail = segmentTail) {
   return [
@@ -16,7 +21,8 @@ export function resolveSegment(argv, options = {}) {
   if (!project || !episode || !segment) {
     return usageFailure(options.usage);
   }
-  const jsonPath = join(PROJECTS_ROOT, project, episode, `${segment}.json`);
+  const episodeDir = join(PROJECTS_ROOT, project, episode);
+  const jsonPath = join(episodeDir, `${segment}.json`);
   if (!existsSync(jsonPath)) {
     return {
       ok: false,
@@ -31,7 +37,10 @@ export function resolveSegment(argv, options = {}) {
     ok: true,
     legacy: false,
     jsonPath,
-    mp4Path: replaceJsonExtension(jsonPath, ".mp4"),
+    mp4Path: join(episodeDir, `${segment}.mp4`),
+    cachePath: join(episodeDir, ".cache"),
+    framesPath: join(episodeDir, ".frames"),
+    exportsPath: join(episodeDir, ".exports", "exports.json"),
     project,
     episode,
     segment,
@@ -52,8 +61,38 @@ export function defaultFramePath(jsonPath, tSpec) {
   return `${replaceJsonExtension(jsonPath, "")}-frame-${sanitizePathToken(tSpec)}.png`;
 }
 
+export function segmentFramePath(segment, framesPath, t) {
+  return join(framesPath, `${segment}-t${formatFrameTimeToken(t)}.png`);
+}
+
 export function timelineDir(jsonPath) {
   return dirname(resolve(jsonPath));
+}
+
+export function cacheDirs(cachePath) {
+  return {
+    html: join(cachePath, "html"),
+    video: join(cachePath, "video"),
+    browser: join(cachePath, "browser"),
+  };
+}
+
+export function configureProjectCacheEnv(cachePath) {
+  if (!cachePath) return () => {};
+  const dirs = cacheDirs(cachePath);
+  const previous = Object.fromEntries(
+    Object.entries(CACHE_ENV_KEYS).map(([key, envKey]) => [envKey, process.env[envKey]])
+  );
+
+  process.env[CACHE_ENV_KEYS.html] = dirs.html;
+  process.env[CACHE_ENV_KEYS.video] = dirs.video;
+  process.env[CACHE_ENV_KEYS.browser] = dirs.browser;
+
+  return () => {
+    for (const envKey of Object.values(CACHE_ENV_KEYS)) {
+      restoreEnv(envKey, previous[envKey]);
+    }
+  };
 }
 
 function resolveLegacyTimeline(argv, options) {
@@ -83,9 +122,25 @@ function replaceJsonExtension(path, replacement) {
   return `${path}${replacement}`;
 }
 
+function formatFrameTimeToken(value) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return sanitizePathToken(numeric.toFixed(2));
+  }
+  return sanitizePathToken(value);
+}
+
 function sanitizePathToken(value) {
   const token = String(value).trim().replace(/[^a-zA-Z0-9._-]+/g, "-");
   return token || "frame";
+}
+
+function restoreEnv(key, value) {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
 }
 
 function usageFailure(message) {

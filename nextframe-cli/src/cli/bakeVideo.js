@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
-import { resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
+import { cacheDirs, configureProjectCacheEnv, resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
 import { validateTimeline } from "../engine/validate.js";
 import {
+  CACHE_DIR,
   cachedFramePath,
   ensureVideoCacheDir,
   normalizeSourceFps,
@@ -99,68 +100,74 @@ export async function run(argv) {
     emit(resolved, flags);
     return resolved.error?.code === "USAGE" ? 3 : 2;
   }
+  const restoreCacheEnv = !resolved.legacy ? configureProjectCacheEnv(resolved.cachePath) : () => {};
+  const projectCacheDirs = !resolved.legacy ? cacheDirs(resolved.cachePath) : null;
 
-  const loaded = await loadTimeline(resolved.jsonPath);
-  if (!loaded.ok) {
-    emit(loaded, flags);
-    return 2;
-  }
-
-  const projectDir = timelineDir(resolved.jsonPath);
-  const validated = validateTimeline(loaded.value, { projectDir });
-  if (!validated.ok) {
-    emit({ ok: false, error: validated.error, errors: validated.errors, warnings: validated.warnings, hints: validated.hints }, flags);
-    return 2;
-  }
-
-  const collected = collectJobs(validated.resolved || validated.value, projectDir);
-  if (!collected.ok) {
-    emit(collected, flags);
-    return 2;
-  }
-
-  ensureVideoCacheDir();
-  const jobs = collected.value;
-  let extracted = 0;
-  let skipped = 0;
-
-  for (let index = 0; index < jobs.length; index++) {
-    const job = jobs[index];
-    if (!existsSync(job.inputPath)) {
-      emit({
-        ok: false,
-        error: {
-          code: "VIDEO_NOT_FOUND",
-          message: `video source not found: ${job.inputPath}`,
-          ref: job.clipId,
-        },
-      }, flags);
+  try {
+    const loaded = await loadTimeline(resolved.jsonPath);
+    if (!loaded.ok) {
+      emit(loaded, flags);
       return 2;
     }
 
-    if (existsSync(job.cachePath)) {
-      skipped += 1;
-      process.stderr.write(`bake-video ${index + 1}/${jobs.length} cached ${job.src} @ ${job.videoT.toFixed(3)}s\n`);
-      continue;
-    }
-
-    process.stderr.write(`bake-video ${index + 1}/${jobs.length} extracting ${job.src} @ ${job.videoT.toFixed(3)}s\n`);
-    const result = extractFrame(job);
-    if (!result.ok) {
-      emit(result, flags);
+    const projectDir = timelineDir(resolved.jsonPath);
+    const validated = validateTimeline(loaded.value, { projectDir });
+    if (!validated.ok) {
+      emit({ ok: false, error: validated.error, errors: validated.errors, warnings: validated.warnings, hints: validated.hints }, flags);
       return 2;
     }
-    extracted += 1;
-  }
 
-  emit({
-    ok: true,
-    value: {
-      clipsScanned: jobs.length,
-      extracted,
-      skipped,
-      cacheDir: "/tmp/nextframe-video-cache",
-    },
-  }, flags);
-  return 0;
+    const collected = collectJobs(validated.resolved || validated.value, projectDir);
+    if (!collected.ok) {
+      emit(collected, flags);
+      return 2;
+    }
+
+    ensureVideoCacheDir();
+    const jobs = collected.value;
+    let extracted = 0;
+    let skipped = 0;
+
+    for (let index = 0; index < jobs.length; index++) {
+      const job = jobs[index];
+      if (!existsSync(job.inputPath)) {
+        emit({
+          ok: false,
+          error: {
+            code: "VIDEO_NOT_FOUND",
+            message: `video source not found: ${job.inputPath}`,
+            ref: job.clipId,
+          },
+        }, flags);
+        return 2;
+      }
+
+      if (existsSync(job.cachePath)) {
+        skipped += 1;
+        process.stderr.write(`bake-video ${index + 1}/${jobs.length} cached ${job.src} @ ${job.videoT.toFixed(3)}s\n`);
+        continue;
+      }
+
+      process.stderr.write(`bake-video ${index + 1}/${jobs.length} extracting ${job.src} @ ${job.videoT.toFixed(3)}s\n`);
+      const result = extractFrame(job);
+      if (!result.ok) {
+        emit(result, flags);
+        return 2;
+      }
+      extracted += 1;
+    }
+
+    emit({
+      ok: true,
+      value: {
+        clipsScanned: jobs.length,
+        extracted,
+        skipped,
+        cacheDir: projectCacheDirs?.video || CACHE_DIR,
+      },
+    }, flags);
+    return 0;
+  } finally {
+    restoreCacheEnv();
+  }
 }

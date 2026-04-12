@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -55,6 +55,31 @@ function cleanup(...paths) {
   for (const path of paths) {
     if (path && existsSync(path)) unlinkSync(path);
   }
+}
+
+function createEpisodeTree(homeDir, { project, episode, segment, timeline }) {
+  const root = join(homeDir, "NextFrame", "projects");
+  const projectDir = join(root, project);
+  const episodeDir = join(projectDir, episode);
+  mkdirSync(episodeDir, { recursive: true });
+  writeFileSync(join(projectDir, "project.json"), JSON.stringify({
+    name: project,
+    created: "2026-01-01T00:00:00.000Z",
+    updated: "2026-01-01T00:00:00.000Z",
+  }));
+  writeFileSync(join(episodeDir, "episode.json"), JSON.stringify({
+    name: episode,
+    order: 1,
+    created: "2026-01-01T00:00:00.000Z",
+    updated: "2026-01-01T00:00:00.000Z",
+  }));
+  writeFileSync(join(episodeDir, `${segment}.json`), JSON.stringify(timeline));
+  return {
+    episodeDir,
+    mp4Path: join(episodeDir, `${segment}.mp4`),
+    framePath: join(episodeDir, ".frames", `${segment}-t3.50.png`),
+    exportsPath: join(episodeDir, ".exports", "exports.json"),
+  };
 }
 
 function ffprobeJson(path) {
@@ -159,5 +184,54 @@ test("cli-export-4: probe returns structured metadata and missing files fail cle
     assert.equal(missingOut.error.code, "NOT_FOUND");
   } finally {
     cleanup(tlPath, outPath);
+  }
+});
+
+test("cli-export-5: 3-level render and frame write to episode storage and exports reads the log", () => {
+  const homeDir = mkdtempSync(join(tmpdir(), "cli-export-home-"));
+  const timeline = tinyTimeline();
+  timeline.duration = 4;
+  timeline.tracks[0].clips[0].dur = 4;
+  timeline.tracks[1].clips[0].dur = 3;
+  const episode = createEpisodeTree(homeDir, {
+    project: "show",
+    episode: "ep01-canvas-intro",
+    segment: "showcase",
+    timeline,
+  });
+  const env = { ...process.env, HOME: homeDir };
+
+  try {
+    const render = runCli(["render", "show", "ep01-canvas-intro", "showcase", "--json"], { env });
+    assert.equal(render.status, 0, render.stderr);
+    const renderOut = JSON.parse(render.stdout);
+    assert.equal(renderOut.ok, true);
+    assert.equal(renderOut.value.outputPath, episode.mp4Path);
+    assert.ok(existsSync(episode.mp4Path));
+
+    const exportLog = JSON.parse(readFileSync(episode.exportsPath, "utf8"));
+    assert.equal(exportLog.length, 1);
+    assert.equal(exportLog[0].segment, "showcase");
+    assert.equal(exportLog[0].path, "showcase.mp4");
+    assert.equal(exportLog[0].duration, 4);
+    assert.ok(exportLog[0].size > 0);
+    assert.match(exportLog[0].timestamp, /^\d{4}-\d{2}-\d{2}T/);
+
+    const frame = runCli(["frame", "show", "ep01-canvas-intro", "showcase", "3.5", "--json"], { env });
+    assert.equal(frame.status, 0, frame.stderr);
+    const frameOut = JSON.parse(frame.stdout);
+    assert.equal(frameOut.ok, true);
+    assert.equal(frameOut.value.path, episode.framePath);
+    assert.ok(existsSync(episode.framePath));
+
+    const exportsRun = runCli(["exports", "show", "ep01-canvas-intro", "--json"], { env });
+    assert.equal(exportsRun.status, 0, exportsRun.stderr);
+    const exportsOut = JSON.parse(exportsRun.stdout);
+    assert.equal(exportsOut.ok, true);
+    assert.equal(exportsOut.path, episode.exportsPath);
+    assert.equal(exportsOut.exports.length, 1);
+    assert.equal(exportsOut.exports[0].path, "showcase.mp4");
+  } finally {
+    rmSync(homeDir, { recursive: true, force: true });
   }
 });

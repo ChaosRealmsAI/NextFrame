@@ -3,12 +3,15 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import { cachePathForScene } from "./_browser-scenes.js";
 
 const require = createRequire(import.meta.url);
 const { PNG } = require("pngjs");
 
 export const HTML_SLIDE_CACHE_DIR = "/tmp/nextframe-html-cache";
 export const HTML_SLIDE_DEFAULT_HTML = "<div style='width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#111;color:#fff;font:700 48px sans-serif'>Empty HTML</div>";
+const CACHE_ENV_KEY = "NEXTFRAME_HTML_CACHE_DIR";
+const BROWSER_CACHE_ENV_KEY = "NEXTFRAME_BROWSER_CACHE_DIR";
 
 const CHROME_CANDIDATES = [
   process.env.NEXTFRAME_CHROME,
@@ -26,29 +29,25 @@ export function htmlSlideCacheKey(html, width, height) {
   return createHash("sha256").update(`${width}x${height}:${normalizeHtmlSlide(html)}`).digest("hex").slice(0, 16);
 }
 
-export function htmlSlideCachePath(html, width, height) {
-  return join(HTML_SLIDE_CACHE_DIR, `${htmlSlideCacheKey(html, width, height)}.png`);
+export function htmlSlideCachePath(html, width, height, cacheDir) {
+  return join(resolveHtmlSlideCacheDir(cacheDir), `${htmlSlideCacheKey(html, width, height)}.png`);
 }
 
-export function ensureHtmlSlideCacheDir() {
-  mkdirSync(HTML_SLIDE_CACHE_DIR, { recursive: true });
+export function ensureHtmlSlideCacheDir(cacheDir) {
+  mkdirSync(resolveHtmlSlideCacheDir(cacheDir), { recursive: true });
 }
 
-export function readCachedHtmlSlideImage(html, width, height) {
-  const path = htmlSlideCachePath(html, width, height);
-  if (!existsSync(path)) {
-    return null;
-  }
+export function readCachedHtmlSlideImage(html, width, height, cacheDir) {
+  const path = resolveHtmlSlideReadPath(html, width, height, cacheDir);
+  if (!path) return null;
   const image = new Image();
   image.src = readFileSync(path);
   return image;
 }
 
-export function drawCachedHtmlSlide(ctx, html, width, height) {
-  const path = htmlSlideCachePath(html, width, height);
-  if (!existsSync(path)) {
-    return false;
-  }
+export function drawCachedHtmlSlide(ctx, html, width, height, cacheDir) {
+  const path = resolveHtmlSlideReadPath(html, width, height, cacheDir);
+  if (!path) return false;
   const png = PNG.sync.read(readFileSync(path));
   const data = png.data instanceof Uint8ClampedArray ? png.data : new Uint8ClampedArray(png.data);
   ctx.putImageData(new ImageData(data, png.width, png.height), 0, 0);
@@ -85,4 +84,23 @@ export function wrapHtmlSlideDocument(html, width, height) {
     "</body>",
     "</html>",
   ].join("");
+}
+
+function resolveHtmlSlideCacheDir(cacheDir) {
+  return cacheDir || process.env[CACHE_ENV_KEY] || HTML_SLIDE_CACHE_DIR;
+}
+
+function resolveHtmlSlideReadPath(html, width, height, cacheDir) {
+  const primaryPath = htmlSlideCachePath(html, width, height, cacheDir);
+  if (existsSync(primaryPath)) {
+    return primaryPath;
+  }
+  if (!process.env[BROWSER_CACHE_ENV_KEY]) {
+    return null;
+  }
+  const fallbackPath = cachePathForScene("htmlSlide", width, height, { html: normalizeHtmlSlide(html) });
+  if (!existsSync(fallbackPath)) {
+    return null;
+  }
+  return fallbackPath;
 }

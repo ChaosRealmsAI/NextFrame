@@ -1,14 +1,16 @@
 // nextframe render <timeline.json> <out.mp4>
 import { randomUUID } from "node:crypto";
 import { existsSync, unlinkSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
-import { resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
+import { configureProjectCacheEnv, resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
 import { exportMP4, muxMP4Audio } from "../targets/ffmpeg-mp4.js";
 import { exportRecorder } from "../targets/recorder.js";
 import { validateTimeline } from "../engine/validate.js";
 
-const USAGE = timelineUsage("render", " [out.mp4]", " <out.mp4>");
+const USAGE = timelineUsage("render", "", " <out.mp4>");
+const DEFAULT_CRF = 20;
 
 const HELP = `${USAGE}
 
@@ -61,7 +63,11 @@ export async function run(argv) {
     emit(resolved, flags);
     return resolved.error?.code === "USAGE" ? 3 : 2;
   }
-  const outPath = resolved.rest[0] || (!resolved.legacy ? resolved.mp4Path : null);
+  if (!resolved.legacy && resolved.rest.length > 0) {
+    emit({ ok: false, error: { code: "USAGE", message: USAGE } }, flags);
+    return 3;
+  }
+  const outPath = resolved.legacy ? resolved.rest[0] : resolved.mp4Path;
   const audioPath = flags.audio ? resolve(flags.audio) : null;
   if (!outPath) {
     emit({ ok: false, error: { code: "USAGE", message: USAGE } }, flags);
@@ -94,61 +100,133 @@ export async function run(argv) {
     emit({ ok: false, error: crf.error }, flags);
     return 2;
   }
-  const loaded = await loadTimeline(resolved.jsonPath);
-  if (!loaded.ok) {
-    emit(loaded, flags);
-    return 2;
-  }
-  // BDD cli-render-8 invariant: render must validate before touching ffmpeg.
-  const projectDir = timelineDir(resolved.jsonPath);
-  const v = validateTimeline(loaded.value, { projectDir });
-  if (v.errors && v.errors.length > 0) {
-    emit({ ok: false, error: v.errors[0], errors: v.errors, hints: v.hints }, flags);
-    return 2;
-  }
-  const opts = {};
-  if (flags.fps) opts.fps = Number(flags.fps);
-  if (crf.value !== undefined) opts.crf = crf.value;
-  if (flags.width) opts.width = Number(flags.width);
-  if (flags.height) opts.height = Number(flags.height);
-  opts.projectDir = projectDir;
-  opts.onProgress = (i, total) => {
-    if (!flags.quiet) {
-      process.stderr.write(`  rendered ${i}/${total} frames\r`);
+  const effectiveCrf = crf.value ?? DEFAULT_CRF;
+  const restoreCacheEnv = !resolved.legacy ? configureProjectCacheEnv(resolved.cachePath) : () => {};
+  try {
+    const loaded = await loadTimeline(resolved.jsonPath);
+    if (!loaded.ok) {
+      emit(loaded, flags);
+      return 2;
     }
-  };
-  const start = Date.now();
-  let r;
-  const exporter = target === "recorder" ? exportRecorder : exportMP4;
-  if (audioPath) {
-    const tempVideoPath = makeTempVideoPath(outPath);
-    const videoOnly = await exporter(loaded.value, tempVideoPath, opts);
-    if (!videoOnly.ok) {
-      r = toMuxFailure(videoOnly);
-    } else {
-      const muxed = await muxMP4Audio(tempVideoPath, audioPath, outPath);
-      if (!muxed.ok) {
-        r = muxed;
+
+    // BDD cli-render-8 invariant: render must validate before touching ffmpeg.
+    const projectDir = timelineDir(resolved.jsonPath);
+    const v = validateTimeline(loaded.value, { projectDir });
+    if (v.errors && v.errors.length > 0) {
+      emit({ ok: false, error: v.errors[0], errors: v.errors, hints: v.hints }, flags);
+      return 2;
+    }
+    const opts = {};
+    if (flags.fps) opts.fps = Number(flags.fps);
+    if (crf.value !== undefined) opts.crf = crf.value;
+    if (flags.width) opts.width = Number(flags.width);
+    if (flags.height) opts.height = Number(flags.height);
+    opts.projectDir = projectDir;
+    opts.onProgress = (i, total) => {
+      if (!flags.quiet) {
+        process.stderr.write(`  rendered ${i}/${total} frames\r`);
+      }
+    };
+    await mkdir(dirname(outPath), { recursive: true });
+    const start = Date.now();
+    let r;
+    const exporter = target === "recorder" ? exportRecorder : exportMP4;
+    if (audioPath) {
+      const tempVideoPath = makeTempVideoPath(outPath);
+      const videoOnly = await exporter(loaded.value, tempVideoPath, opts);
+      if (!videoOnly.ok) {
+        r = toMuxFailure(videoOnly);
       } else {
-        try {
-          unlinkSync(tempVideoPath);
-        } catch {}
-        r = { ok: true, value: { ...videoOnly.value, outputPath: outPath, audioPath } };
+        const muxed = await muxMP4Audio(tempVideoPath, audioPath, outPath);
+        if (!muxed.ok) {
+          r = muxed;
+        } else {
+          try {
+            unlinkSync(tempVideoPath);
+          } catch {}
+          r = { ok: true, value: { ...videoOnly.value, outputPath: outPath, audioPath } };
+        }
+      }
+    } else {
+      r = await exporter(loaded.value, outPath, opts);
+    }
+    if (!flags.quiet) process.stderr.write("\n");
+    const elapsed = ((Date.now() - start) / 1000).toFixed(2);
+    if (!r.ok) {
+      emit(r, flags);
+      return 2;
+    }
+    if (!resolved.legacy) {
+      const logged = await appendExportLog(resolved, outPath, r.value, effectiveCrf);
+      if (!logged.ok) {
+        emit(logged, flags);
+        return 2;
       }
     }
-  } else {
-    r = await exporter(loaded.value, outPath, opts);
+    if (flags.json) {
+      process.stdout.write(JSON.stringify({ ok: true, value: { ...r.value, elapsedSeconds: Number(elapsed) } }, null, 2) + "\n");
+    } else {
+      process.stdout.write(`wrote ${outPath} (${r.value.framesRendered} frames @ ${r.value.fps}fps, ${elapsed}s)\n`);
+    }
+    return 0;
+  } finally {
+    restoreCacheEnv();
   }
-  if (!flags.quiet) process.stderr.write("\n");
-  const elapsed = ((Date.now() - start) / 1000).toFixed(2);
-  if (!r.ok) {
-    emit(r, flags);
-    return 2;
+}
+
+async function appendExportLog(resolved, outPath, renderValue, crf) {
+  const exportDir = dirname(resolved.exportsPath);
+  let history = [];
+
+  await mkdir(exportDir, { recursive: true });
+  try {
+    const text = await readFile(resolved.exportsPath, "utf8");
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) {
+      return {
+        ok: false,
+        error: {
+          code: "EXPORT_LOG_INVALID",
+          message: `export log must be a JSON array: ${resolved.exportsPath}`,
+        },
+      };
+    }
+    history = parsed;
+  } catch (err) {
+    if (err.code !== "ENOENT") {
+      return {
+        ok: false,
+        error: {
+          code: "EXPORT_LOG_FAIL",
+          message: `cannot read export log: ${err.message}`,
+        },
+      };
+    }
   }
-  if (flags.json) {
-    process.stdout.write(JSON.stringify({ ok: true, value: { ...r.value, elapsedSeconds: Number(elapsed) } }, null, 2) + "\n");
-  } else {
-    process.stdout.write(`wrote ${outPath} (${r.value.framesRendered} frames @ ${r.value.fps}fps, ${elapsed}s)\n`);
+
+  const outputStat = await stat(outPath);
+  history.push({
+    segment: resolved.segment,
+    path: basename(outPath),
+    duration: renderValue.duration,
+    size: outputStat.size,
+    timestamp: new Date().toISOString(),
+    width: renderValue.width,
+    height: renderValue.height,
+    fps: renderValue.fps,
+    crf,
+  });
+
+  try {
+    await writeFile(resolved.exportsPath, JSON.stringify(history, null, 2) + "\n");
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: {
+        code: "EXPORT_LOG_FAIL",
+        message: `cannot write export log: ${err.message}`,
+      },
+    };
   }
-  return 0;
 }

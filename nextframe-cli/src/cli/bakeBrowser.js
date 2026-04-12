@@ -1,9 +1,9 @@
 import { dirname, resolve } from "node:path";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { loadTimeline, parseFlags, emit } from "./_io.js";
-import { resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
+import { configureProjectCacheEnv, resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
 import {
-  CACHE_DIRS,
+  cacheDirForScene,
   cachePathForScene,
   resolveLottieFrame,
 } from "../scenes/_browser-scenes.js";
@@ -36,7 +36,9 @@ export async function bakeBrowserScenes(timeline, opts = {}) {
     return { ok: true, value: { baked: 0, skipped: 0, width, height, jobs: [] } };
   }
 
-  for (const dir of Object.values(CACHE_DIRS)) mkdirSync(dir, { recursive: true });
+  for (const sceneId of SUPPORTED_SCENES) {
+    mkdirSync(cacheDirForScene(sceneId), { recursive: true });
+  }
 
   let browser = null;
   try {
@@ -94,20 +96,25 @@ export async function run(argv) {
     emit(resolved, flags);
     return resolved.error?.code === "USAGE" ? 3 : 2;
   }
+  const restoreCacheEnv = !resolved.legacy ? configureProjectCacheEnv(resolved.cachePath) : () => {};
 
-  const loaded = await loadTimeline(resolved.jsonPath);
-  if (!loaded.ok) {
-    emit(loaded, flags);
-    return 2;
+  try {
+    const loaded = await loadTimeline(resolved.jsonPath);
+    if (!loaded.ok) {
+      emit(loaded, flags);
+      return 2;
+    }
+
+    const baked = await bakeBrowserScenes(loaded.value, {
+      width: flags.width,
+      height: flags.height,
+      rootDir: timelineDir(resolved.jsonPath),
+    });
+    emit(baked, flags);
+    return baked.ok ? 0 : 2;
+  } finally {
+    restoreCacheEnv();
   }
-
-  const baked = await bakeBrowserScenes(loaded.value, {
-    width: flags.width,
-    height: flags.height,
-    rootDir: timelineDir(resolved.jsonPath),
-  });
-  emit(baked, flags);
-  return baked.ok ? 0 : 2;
 }
 
 function collectJobs(timeline, opts) {

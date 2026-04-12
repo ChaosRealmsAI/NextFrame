@@ -19,6 +19,7 @@ const SUBCOMMANDS = {
   "episode-list": () => import("../src/cli/episode-list.js"),
   "segment-new": () => import("../src/cli/segment-new.js"),
   "segment-list": () => import("../src/cli/segment-list.js"),
+  exports: () => import("../src/cli/exports.js"),
   "bake-video": () => import("../src/cli/bakeVideo.js"),
   "add-clip": () => import("../src/cli/ops.js"),
   "move-clip": () => import("../src/cli/ops.js"),
@@ -79,6 +80,7 @@ PROJECT MANAGEMENT
   episode-list <project> [--json]            list episodes for a project
   segment-new <project> <episode> <name>     create an empty segment timeline JSON
   segment-list <project> <episode> [--json]  list segment JSON files in an episode
+  exports <project> <episode> [--json]       list recorded render exports for an episode
 
 FLAGS
   --json     output structured JSON (for AI / scripts)
