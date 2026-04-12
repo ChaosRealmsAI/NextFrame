@@ -292,7 +292,7 @@ impl WebViewHost {
                         "#,
                     )?;
                     if on_frame_check.as_deref() == Some("missing") {
-                        eprintln!(
+                        trace_log!(
                             "warning: page is missing window.__onFrame after load; \
                              recorder output may stay static until the page defines it"
                         );

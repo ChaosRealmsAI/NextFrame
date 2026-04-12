@@ -1,5 +1,12 @@
 #![deny(unused)]
 
+/// Logging macro that auto-prepends file:line for AI-readable logs.
+macro_rules! trace_log {
+    ($($arg:tt)*) => {
+        eprintln!("[{}:{}] {}", file!(), line!(), format_args!($($arg)*))
+    };
+}
+
 use std::error::Error;
 use std::path::Component;
 use std::path::PathBuf;
@@ -21,14 +28,14 @@ enum UserEvent {
 
 fn main() {
     if let Err(error) = run() {
-        eprintln!("failed to start shell: {error}");
+        trace_log!("failed to start shell: {error}");
         std::process::exit(1);
     }
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
     if let Err(error) = bridge::initialize() {
-        eprintln!("bridge initialization warning: {error}");
+        trace_log!("bridge initialization warning: {error}");
     }
 
     let mut event_loop_builder = EventLoopBuilder::<UserEvent>::with_user_event();
@@ -40,7 +47,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         .with_title("NextFrame")
         .with_inner_size(LogicalSize::new(1440.0, 900.0))
         .build(&event_loop)?;
-    eprintln!("[shell] window created");
+    trace_log!("[shell] window created");
 
     let web_root = web_root()?;
     let projects_root = projects_root()?;
@@ -76,15 +83,15 @@ fn run() -> Result<(), Box<dyn Error>> {
                 title
             };
             if let Err(error) = title_proxy.send_event(UserEvent::WindowTitle(next_title)) {
-                eprintln!("failed to queue title update: {error}");
+                trace_log!("failed to queue title update: {error}");
             }
         })
         .with_on_page_load_handler(move |event, url| match event {
             PageLoadEvent::Started => {
-                eprintln!("[shell] page load started: {url}");
+                trace_log!("[shell] page load started: {url}");
             }
             PageLoadEvent::Finished => {
-                eprintln!("[shell] webview loaded");
+                trace_log!("[shell] webview loaded");
             }
         })
         .with_ipc_handler(move |request| {
@@ -97,11 +104,11 @@ fn run() -> Result<(), Box<dyn Error>> {
                         parsed_request.method == "log" || parsed_request.method == "shell.ready";
 
                     if !is_poll && !is_fire_and_forget {
-                        eprintln!("[ipc] {body_preview}");
+                        trace_log!("[ipc] {body_preview}");
                     }
 
                     if parsed_request.method == "shell.ready" {
-                        eprintln!("[shell] ready");
+                        trace_log!("[shell] ready");
                         return;
                     }
 
@@ -115,11 +122,11 @@ fn run() -> Result<(), Box<dyn Error>> {
                             if let Err(error) =
                                 proxy.send_event(UserEvent::IpcResponse(response_json))
                             {
-                                eprintln!("failed to queue IPC response: {error}");
+                                trace_log!("failed to queue IPC response: {error}");
                             }
                         }
                         Err(error) => {
-                            eprintln!("failed to serialize IPC response: {error}");
+                            trace_log!("failed to serialize IPC response: {error}");
                         }
                     }
                 }
@@ -130,11 +137,11 @@ fn run() -> Result<(), Box<dyn Error>> {
                             if let Err(error) =
                                 proxy.send_event(UserEvent::IpcResponse(response_json))
                             {
-                                eprintln!("failed to queue IPC response: {error}");
+                                trace_log!("failed to queue IPC response: {error}");
                             }
                         }
                         Err(error) => {
-                            eprintln!("failed to serialize IPC response: {error}");
+                            trace_log!("failed to serialize IPC response: {error}");
                         }
                     }
                 }
@@ -162,7 +169,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             Event::UserEvent(UserEvent::IpcResponse(response_json)) => {
                 let script = format!("window.__ipc.resolve({response_json});");
                 if let Err(error) = webview.evaluate_script(&script) {
-                    eprintln!("failed to deliver IPC response: {error}");
+                    trace_log!("failed to deliver IPC response: {error}");
                 }
             }
             Event::UserEvent(UserEvent::WindowTitle(title)) => {

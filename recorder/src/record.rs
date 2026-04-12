@@ -236,7 +236,7 @@ pub fn capture_frame(
         match host.snapshot_via_layer() {
             Ok(image) => {
                 if frame_index == 0 && is_cgimage_mostly_black(&image)? {
-                    eprintln!(
+                    trace_log!(
                         "  warn seg {} frame {}: {} produced a mostly black image; falling back to {}",
                         segment_index + 1,
                         frame_index + 1,
@@ -254,7 +254,7 @@ pub fn capture_frame(
                 }
             }
             Err(err) => {
-                eprintln!(
+                trace_log!(
                     "  warn seg {} frame {}: {} failed ({err}); falling back to {}",
                     segment_index + 1,
                     frame_index + 1,

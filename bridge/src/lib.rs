@@ -1,5 +1,8 @@
 #![deny(unused)]
 
+#[macro_use]
+mod trace;
+
 mod autosave;
 mod dialog;
 mod encoding;

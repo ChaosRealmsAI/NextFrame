@@ -149,7 +149,7 @@ pub(crate) fn cleanup_intermediate_video(video_path: &Path, output_path: &Path) 
 
     if let Err(error) = fs::remove_file(video_path) {
         if error.kind() != ErrorKind::NotFound {
-            eprintln!(
+            trace_log!(
                 "warning: failed to remove intermediate export '{}': {error}",
                 video_path.display()
             );

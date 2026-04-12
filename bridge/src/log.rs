@@ -6,7 +6,7 @@ pub(crate) fn handle_log(params: &Value) -> Result<Value, String> {
     let level = require_string(params, "level")?;
     let message = require_string(params, "msg")?;
 
-    eprintln!("[webview][{level}] {message}");
+    trace_log!("[webview][{level}] {message}");
 
     Ok(json!({
         "logged": true,

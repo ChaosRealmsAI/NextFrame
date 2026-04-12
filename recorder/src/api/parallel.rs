@@ -103,7 +103,7 @@ pub(super) fn record_parallel(
         if output.status.success() {
             println!("  [{}] done", idx + 1);
         } else {
-            eprintln!(
+            trace_log!(
                 "  [{}] FAILED (exit {}): {}",
                 idx + 1,
                 output.status,

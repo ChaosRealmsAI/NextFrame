@@ -113,7 +113,7 @@ pub(crate) fn run_parallel(
                 let _ = std::io::Read::read_to_string(&mut s, &mut buf);
                 buf
             });
-            eprintln!(
+            trace_log!(
                 "  [{}] FAILED (exit {}): {}",
                 idx + 1,
                 status,

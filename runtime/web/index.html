@@ -7,6 +7,16 @@
 <!-- IPC __ipc resolver — must be in <head> before any script calls bridgeCall -->
 <script>
 window.__ipc = window.__ipc || {};
+// Auto-append caller location to all console output (for AI log reading)
+['log','warn','error','info'].forEach(function(m){
+  var orig = console[m];
+  console[m] = function() {
+    var stack = new Error().stack || '';
+    var caller = stack.split('\n')[2] || '';
+    caller = caller.trim().replace(/^at\s+/, '');
+    orig.apply(console, [].concat(Array.prototype.slice.call(arguments), ['@' + caller]));
+  };
+});
 </script>
 <link rel="stylesheet" href="src/styles/editor.css">
 

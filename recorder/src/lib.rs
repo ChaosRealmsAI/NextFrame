@@ -1,5 +1,12 @@
 //! Shared recorder modules used by the CLI and benchmarks.
 
+/// Logging macro that auto-prepends file:line for AI-readable logs.
+macro_rules! trace_log {
+    ($($arg:tt)*) => {
+        eprintln!("[{}:{}] {}", file!(), line!(), format_args!($($arg)*))
+    };
+}
+
 extern crate self as recorder;
 
 use std::path::PathBuf;

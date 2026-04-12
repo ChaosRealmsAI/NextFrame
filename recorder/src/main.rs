@@ -1,5 +1,11 @@
 #![cfg(feature = "cli")]
 
+macro_rules! trace_log {
+    ($($arg:tt)*) => {
+        eprintln!("[{}:{}] {}", file!(), line!(), format_args!($($arg)*))
+    };
+}
+
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -123,7 +129,7 @@ impl From<CommonArgs> for RecordArgs {
 
 fn main() {
     if let Err(err) = run() {
-        eprintln!("\n  ✗ {err}");
+        trace_log!("\n  ✗ {err}");
         std::process::exit(1);
     }
 }

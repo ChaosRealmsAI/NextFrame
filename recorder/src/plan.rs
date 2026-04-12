@@ -76,12 +76,12 @@ pub fn build_segment_plans(frame_files: &[PathBuf]) -> Result<Vec<SegmentPlan>, 
         .map(|frame_path| {
             let metadata = parse_frame_file(frame_path)?;
             for warning in &metadata.warnings {
-                eprintln!("  warn {}: {}", metadata.html_path.display(), warning);
+                trace_log!("  warn {}: {}", metadata.html_path.display(), warning);
             }
             let audio_duration_sec = match probe_audio_duration(metadata.audio_path.as_deref()) {
                 Ok(dur) => dur,
                 Err(err) => {
-                    eprintln!("  warn {}: {err}", metadata.html_path.display());
+                    trace_log!("  warn {}: {err}", metadata.html_path.display());
                     0.0
                 }
             };

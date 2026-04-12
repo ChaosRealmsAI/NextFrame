@@ -127,7 +127,7 @@ fn handle_connection(mut stream: TcpStream, root: &Path) -> Result<(), String> {
     let path = match resolve_request_path(root, raw_path)? {
         ResolvedRequestPath::Found(path) => path,
         ResolvedRequestPath::NotFound => {
-            eprintln!("  http 404: {raw_path}");
+            trace_log!("  http 404: {raw_path}");
             return write_response(
                 &mut stream,
                 404,
@@ -138,7 +138,7 @@ fn handle_connection(mut stream: TcpStream, root: &Path) -> Result<(), String> {
             );
         }
         ResolvedRequestPath::Forbidden => {
-            eprintln!("  http 403: {raw_path}");
+            trace_log!("  http 403: {raw_path}");
             return write_response(
                 &mut stream,
                 403,

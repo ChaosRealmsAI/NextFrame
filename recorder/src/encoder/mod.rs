@@ -227,7 +227,7 @@ impl SegmentEncoder {
             let _ = fs::remove_file(&video_path);
         }
         if mux_result.is_err() {
-            eprintln!(
+            trace_log!(
                 "  warn leaving video-only segment at {} after mux failure ({})",
                 video_path.display(),
                 backend.label()

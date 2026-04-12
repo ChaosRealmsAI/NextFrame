@@ -129,8 +129,8 @@ fn record_single(
             Some(server)
         }
         Err(err) => {
-            eprintln!("  warn server disabled: {err}");
-            eprintln!("  warn falling back to file:// loadFileURL mode\n");
+            trace_log!("  warn server disabled: {err}");
+            trace_log!("  warn falling back to file:// loadFileURL mode\n");
             None
         }
     };
@@ -283,7 +283,7 @@ fn concat_output(
                 println!("  duration check: {actual:.1}s ≈ {expected_duration_sec:.1}s ✓");
             }
             _ => {
-                eprintln!("  warn: could not verify output duration");
+                trace_log!("  warn: could not verify output duration");
             }
         }
     }
