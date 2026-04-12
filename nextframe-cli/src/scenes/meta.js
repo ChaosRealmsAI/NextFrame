@@ -36,6 +36,7 @@ export const META_TABLE = {
   ccDesc: { category: "Series", description: "Italic mono centered description", duration_hint: 10, params: [p("text", "string", "我数过了。"), p("x", "number", 0.5), p("y", "number", 0.64), p("delay", "number", 1.0)] },
   pulseWave: { category: "Data Viz", description: "Horizontal soundwave-style pulsing bars", duration_hint: 8, params: [p("barCount", "number", 48, { range: [8, 128] }), p("hue", "number", 260, { range: [0, 360] }), p("speed", "number", 2.0, { range: [0.1, 10] }), p("amplitude", "number", 0.7, { range: [0.1, 1] }), p("gap", "number", 0.3, { range: [0, 1] })] },
   radialBurst: { category: "Shapes", description: "Rays shooting out from center with rotation and pulse", duration_hint: 8, params: [p("rayCount", "number", 24, { range: [4, 64] }), p("hue", "number", 35, { range: [0, 360] }), p("rotationSpeed", "number", 0.3, { range: [0, 2] }), p("pulseSpeed", "number", 1.5, { range: [0.1, 5] })] },
+  toolboxSlide: { category: "Series", description: "工具箱维度 — 6个工具图标 + JSON Schema + 增长条 + 瑞士军刀 + 100+", duration_hint: 32, params: [p("duration", "number", 32), p("p1Duration", "number", 12)] },
 };
 
 export function getSceneMeta(id) {
