@@ -20,6 +20,34 @@ use crate::progress::{PROGRESS_CANDIDATE_SELECTORS, ProgressRect};
 use super::{EvalResultSlot, SnapshotResultSlot, WebViewHost, pump_main_run_loop};
 
 impl WebViewHost {
+    /// Queries `window.__hasFrameChanged(prevT, curT)` when available.
+    pub fn has_frame_changed(
+        &self,
+        prev_time_sec: f64,
+        current_time_sec: f64,
+    ) -> Result<Option<bool>, String> {
+        let script = format!(
+            r#"
+            (() => {{
+              if (typeof window.__hasFrameChanged !== 'function') {{
+                return 'missing';
+              }}
+              return window.__hasFrameChanged({prev_time_sec:.6}, {current_time_sec:.6})
+                ? 'true'
+                : 'false';
+            }})()
+            "#
+        );
+        match self.eval_string(&script)?.as_deref() {
+            Some("true") => Ok(Some(true)),
+            Some("false") => Ok(Some(false)),
+            Some("missing") | None => Ok(None),
+            Some(other) => Err(format!(
+                "unexpected __hasFrameChanged result from page: {other}"
+            )),
+        }
+    }
+
     /// Captures an `NSImage` using `WKWebView.takeSnapshot` as the fallback path.
     pub fn snapshot_nsimage(&self) -> Result<Retained<NSImage>, String> {
         // Minimal flush — just pump run loop so WebKit can process the JS changes

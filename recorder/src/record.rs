@@ -114,7 +114,19 @@ pub fn record_segment(
         let batch_end = (frame_index + batch_size).min(total_frames);
         let mut decisions = Vec::with_capacity(batch_end - frame_index);
         for fi in frame_index..batch_end {
-            decisions.push((fi, clock.next(fi)));
+            let mut decision = clock.next(fi);
+            if !cli.no_skip {
+                let prev_time_sec = if fi == 0 {
+                    -1.0 / cli.fps as f64
+                } else {
+                    (fi - 1) as f64 / cli.fps as f64
+                };
+                if host.has_frame_changed(prev_time_sec, decision.timestamp_sec)? == Some(true) {
+                    decision.needs_capture = true;
+                }
+            }
+            clock.record_capture_decision(decision.needs_capture);
+            decisions.push((fi, decision));
         }
 
         autoreleasepool(|_| -> Result<(), String> {

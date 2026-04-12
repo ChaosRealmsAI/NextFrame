@@ -260,7 +260,7 @@ fn refresh_process_state(handle: &mut ProcessHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn export_status_json(handle: &ProcessHandle) -> Value {
+pub(crate) fn export_status_json(handle: &ProcessHandle) -> Value {
     let elapsed = handle.started_at.elapsed().as_secs_f64();
     let (state, percent, eta, error) = match &handle.terminal {
         Some(terminal) => (
@@ -291,7 +291,7 @@ fn export_status_json(handle: &ProcessHandle) -> Value {
     })
 }
 
-fn percent_complete(elapsed: f64, duration_secs: f64) -> f64 {
+pub(crate) fn percent_complete(elapsed: f64, duration_secs: f64) -> f64 {
     if duration_secs.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
         return 0.0;
     }
@@ -299,7 +299,7 @@ fn percent_complete(elapsed: f64, duration_secs: f64) -> f64 {
     ((elapsed / duration_secs) * 100.0).clamp(0.0, 100.0)
 }
 
-fn remaining_secs(elapsed: f64, duration_secs: f64) -> f64 {
+pub(crate) fn remaining_secs(elapsed: f64, duration_secs: f64) -> f64 {
     if duration_secs.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
         return 0.0;
     }
@@ -373,4 +373,3 @@ pub(crate) fn export_runtime() -> Result<&'static Runtime, String> {
 pub(crate) fn next_export_pid() -> u32 {
     NEXT_EXPORT_PID.fetch_add(1, Ordering::Relaxed)
 }
-

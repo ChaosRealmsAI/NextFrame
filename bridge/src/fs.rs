@@ -121,6 +121,10 @@ pub(crate) fn validate_path(raw_path: &str) -> Result<PathBuf, String> {
         return Err("path must not be empty".to_string());
     }
 
+    if normalized.contains('\0') {
+        return Err("path must not contain null bytes".to_string());
+    }
+
     if normalized.contains("..") {
         return Err(format!("path is outside sandbox: {raw_path}"));
     }

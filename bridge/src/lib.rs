@@ -137,6 +137,11 @@ use path::home_dir;
 #[cfg(test)]
 use recent::{recent_storage_test_lock, set_recent_storage_path_override_for_tests};
 #[cfg(test)]
+use export::{
+    build_export_request, export_runtime, export_status_json, next_export_pid,
+    percent_complete, remaining_secs, ExportTask, ProcessHandle, ProcessTerminal,
+};
+#[cfg(test)]
 use recorder_bridge::{
     build_recording_url, decode_file_url_path, resolve_recorder_frame_path_from_url,
     RecorderRequest,

@@ -39,7 +39,6 @@ async function runRecorder(binary, htmlFile, outputPath, opts) {
     "--dpr", String(opts.dpr),
     "--width", String(opts.width),
     "--height", String(opts.height),
-    "--no-skip",
   ];
 
   let child;

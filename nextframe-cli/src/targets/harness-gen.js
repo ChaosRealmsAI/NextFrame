@@ -20,6 +20,45 @@ const RECORDER_COMPAT_SCENES = Object.freeze({
   }),
 });
 
+const ANIMATED_SCENES = Object.freeze([
+  "auroraGradient",
+  "barChartReveal",
+  "circleRipple",
+  "countdown",
+  "dataPulse",
+  "fluidBackground",
+  "glitchText",
+  "htmlSlide",
+  "imageHero",
+  "kineticHeadline",
+  "lineChart",
+  "lottieAnim",
+  "lowerThirdVelvet",
+  "markdownSlide",
+  "meshGrid",
+  "neonGrid",
+  "orbitRings",
+  "particleFlow",
+  "pixelRain",
+  "pulseWave",
+  "radialBurst",
+  "shapeBurst",
+  "spotlightSweep",
+  "starfield",
+  "svgOverlay",
+  "toolboxSlide",
+  "videoClip",
+  "videoWindow",
+]);
+
+const STATIC_SCENES = Object.freeze([
+  "ccBigNumber",
+  "ccPill",
+  "cornerBadge",
+  "textOverlay",
+  "vignette",
+]);
+
 function toModuleId(filePath) {
   return relative(REPO_ROOT, filePath).split("\\").join("/");
 }
@@ -192,6 +231,8 @@ export function generateHarness(timeline, opts = {}) {
   const height = Number(opts.height) || timeline?.project?.height || 1080;
   const duration = Number(timeline?.duration) || 0;
   const fps = Number(timeline?.project?.fps) || 30;
+  const serializedAnimatedScenes = serializeForScript(ANIMATED_SCENES);
+  const serializedStaticScenes = serializeForScript(STATIC_SCENES);
   const compatSceneIds = collectRecorderCompatSceneIds(timeline);
   const compatModuleIds = compatSceneIds.map((sceneId) => RECORDER_COMPAT_SCENES[sceneId].moduleId);
   const bundle = buildRuntimeBundle(compatModuleIds);
@@ -243,8 +284,11 @@ export function generateHarness(timeline, opts = {}) {
   const height = ${JSON.stringify(height)};
   const engine = __nfImport("runtime/web/src/engine/index.js");
   const scenes = __nfImport("runtime/web/src/scenes/index.js");
+  const trackFlags = __nfImport("runtime/web/src/track-flags.js");
   const canvas = document.getElementById("nf-canvas");
   const ctx = canvas.getContext("2d");
+  const animatedScenes = new Set(${serializedAnimatedScenes});
+  const staticScenes = new Set(${serializedStaticScenes});
   let ready = false;
 
   if (!ctx) {
@@ -278,6 +322,68 @@ export function generateHarness(timeline, opts = {}) {
   Object.defineProperty(canvas, 'clientWidth', { get() { return _nfWidth; } });
   Object.defineProperty(canvas, 'clientHeight', { get() { return _nfHeight; } });
 
+  function classifyScene(sceneId) {
+    if (staticScenes.has(sceneId)) {
+      return false;
+    }
+    if (animatedScenes.has(sceneId)) {
+      return true;
+    }
+    // Default to animated for unknown scenes so skipping stays conservative.
+    return true;
+  }
+
+  function buildClipIndex() {
+    const indexed = [];
+    const tracks = Array.isArray(timeline?.tracks) ? timeline.tracks : [];
+    const soloActive = trackFlags.hasSoloTrack(tracks);
+
+    for (const track of tracks) {
+      if (track?.kind === "audio" || !trackFlags.shouldRenderTrack(track, soloActive)) {
+        continue;
+      }
+
+      for (const clip of Array.isArray(track?.clips) ? track.clips : []) {
+        const start = Number(clip?.start);
+        const dur = Number(clip?.dur);
+        if (!Number.isFinite(start) || !Number.isFinite(dur) || dur <= 0) {
+          continue;
+        }
+
+        const sceneId = typeof clip?.scene === "string" ? clip.scene : "";
+        indexed.push({
+          start,
+          end: start + dur,
+          animated: sceneId ? classifyScene(sceneId) : true,
+        });
+      }
+    }
+
+    return indexed;
+  }
+
+  const clipIndex = buildClipIndex();
+
+  function isActiveClip(clip, time) {
+    return time >= clip.start && time < clip.end;
+  }
+
+  function crossedBoundary(prevT, curT) {
+    const from = Math.min(prevT, curT);
+    const to = Math.max(prevT, curT);
+    if (!(to > from)) {
+      return false;
+    }
+
+    for (const clip of clipIndex) {
+      if ((clip.start > from && clip.start <= to) || (clip.end > from && clip.end <= to)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   function renderFrame(time) {
     try {
       engine.renderAt(ctx, timeline, Number.isFinite(time) ? time : 0);
@@ -298,6 +404,32 @@ export function generateHarness(timeline, opts = {}) {
       console.error("[harness] __onFrame error:", e.message);
     }
     return true;
+  };
+
+  window.__hasFrameChanged = function(prevT, curT) {
+    const prev = Number(prevT);
+    const cur = Number(curT);
+
+    if (!Number.isFinite(cur)) {
+      return true;
+    }
+    if (!Number.isFinite(prev) || prev < 0) {
+      return true;
+    }
+    if (cur === prev) {
+      return false;
+    }
+    if (crossedBoundary(prev, cur)) {
+      return true;
+    }
+
+    for (const clip of clipIndex) {
+      if (clip.animated && isActiveClip(clip, cur)) {
+        return true;
+      }
+    }
+
+    return false;
   };
 
   renderFrame(0);
