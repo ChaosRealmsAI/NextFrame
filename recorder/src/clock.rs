@@ -169,3 +169,99 @@ fn build_cue_times(metadata: &FrameMetadata) -> Vec<f64> {
     }
     vec![0.0]
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use super::{FrameDecision, SegmentClock};
+    use crate::parser::{FrameMetadata, SlideType, SubtitleCue};
+    use std::path::PathBuf;
+
+    fn metadata(
+        subtitles: Vec<SubtitleCue>,
+        cuemap: Vec<usize>,
+        total_cues: usize,
+    ) -> FrameMetadata {
+        FrameMetadata {
+            html_path: PathBuf::from("segment.html"),
+            slide_type: SlideType::Clip,
+            audio_path: None,
+            subtitles,
+            cuemap,
+            total_cues,
+            warnings: Vec::new(),
+        }
+    }
+
+    fn subtitle(start: f64, end: f64, text: &str) -> SubtitleCue {
+        SubtitleCue {
+            start,
+            end,
+            text: text.to_string(),
+        }
+    }
+
+    #[test]
+    fn segment_clock_creation_sets_expected_initial_state() {
+        let metadata = metadata(vec![subtitle(0.0, 2.5, "Intro")], vec![0], 1);
+        let clock = SegmentClock::new(&metadata, 10, 0.25, 5.0, 2.2, false, false);
+
+        assert_eq!(clock.total_frames(), 27);
+        assert_eq!(clock.skipped_frames(), 0);
+    }
+
+    #[test]
+    fn frame_timing_calculations_use_segment_timestamp_and_clamped_progress() {
+        let metadata = metadata(vec![subtitle(0.0, 5.0, "Narration")], vec![0], 1);
+        let mut clock = SegmentClock::new(&metadata, 10, 2.0, 10.0, 3.0, false, false);
+
+        let start = clock.next(0);
+        assert_eq!(start.timestamp_sec, 0.0);
+        assert_eq!(start.progress_pct, 20.0);
+        assert!(start.needs_capture);
+
+        let last = clock.next(clock.total_frames() - 1);
+        assert_eq!(last.timestamp_sec, 3.4);
+        assert_eq!(last.progress_pct, 50.0);
+    }
+
+    #[test]
+    fn cue_and_subtitle_changes_drive_capture_decisions() {
+        let metadata = metadata(
+            vec![
+                subtitle(0.0, 1.0, "Intro"),
+                subtitle(1.0, 3.0, "Body"),
+                subtitle(3.0, 4.0, "Outro"),
+            ],
+            vec![0, 2],
+            2,
+        );
+        let mut clock = SegmentClock::new(&metadata, 10, 0.0, 4.0, 4.0, false, false);
+
+        let intro = clock.next(0);
+        assert_frame(&intro, 0, "Intro", true);
+
+        let transition = clock.next(4);
+        assert_frame(&transition, 0, "Intro", true);
+
+        let stable = clock.next(5);
+        assert_frame(&stable, 0, "Intro", false);
+        assert_eq!(clock.skipped_frames(), 1);
+
+        let subtitle_change = clock.next(10);
+        assert_frame(&subtitle_change, 0, "Body", true);
+
+        let stable_after_subtitle = clock.next(15);
+        assert_frame(&stable_after_subtitle, 0, "Body", false);
+
+        let cue_change = clock.next(30);
+        assert_frame(&cue_change, 1, "Outro", true);
+    }
+
+    fn assert_frame(frame: &FrameDecision, cue_index: i32, subtitle_text: &str, needs_capture: bool) {
+        assert_eq!(frame.cue_index, cue_index);
+        assert_eq!(frame.subtitle_text, subtitle_text);
+        assert_eq!(frame.needs_capture, needs_capture);
+    }
+}
