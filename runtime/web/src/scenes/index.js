@@ -19,6 +19,9 @@ import { shapeBurst } from "./shapeBurst.js";
 import { spotlightSweep } from "./spotlightSweep.js";
 import { starfield } from "./starfield.js";
 import { textOverlay } from "./textOverlay.js";
+import { toolboxSlide } from "./toolboxSlide.js";
+import { pulseWave } from "./pulseWave.js";
+import { radialBurst } from "./radialBurst.js";
 
 function cloneDefaultValue(value) {
   if (value == null || typeof value !== "object") {
@@ -433,6 +436,30 @@ const SCENE_REGISTRY = [
       enterDur: { type: "number", default: 0.6, min: 0.1, max: 3, unit: "s" },
       holdDur: { type: "number", default: 2.5, min: 0, max: 12, unit: "s" },
     },
+  },
+  {
+    id: "toolboxSlide",
+    fn: toolboxSlide,
+    name: "Toolbox Slide",
+    category: "Series",
+    duration_hint: "32s",
+    params: { duration: { type: "number", default: 32 }, p1Duration: { type: "number", default: 12 } },
+  },
+  {
+    id: "pulseWave",
+    fn: pulseWave,
+    name: "Pulse Wave",
+    category: "Data Viz",
+    duration_hint: "8s",
+    params: { barCount: { type: "number", default: 48 }, hue: { type: "number", default: 260 }, speed: { type: "number", default: 2 }, amplitude: { type: "number", default: 0.7 } },
+  },
+  {
+    id: "radialBurst",
+    fn: radialBurst,
+    name: "Radial Burst",
+    category: "Shapes",
+    duration_hint: "8s",
+    params: { rayCount: { type: "number", default: 24 }, hue: { type: "number", default: 35 }, rotationSpeed: { type: "number", default: 0.3 } },
   },
 ];
 
