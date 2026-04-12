@@ -162,8 +162,18 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
     };
 
+    // AI command queue file — CLI writes commands here, shell polls and executes
+    let cmd_path = std::env::temp_dir().join("nextframe-cmd.js");
+    let result_path = std::env::temp_dir().join("nextframe-cmd-result.txt");
+    // Clear any stale commands
+    let _ = std::fs::remove_file(&cmd_path);
+    let _ = std::fs::remove_file(&result_path);
+    trace_log!("[shell] AI command queue: {}", cmd_path.display());
+
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        *control_flow = ControlFlow::WaitUntil(
+            std::time::Instant::now() + std::time::Duration::from_millis(200)
+        );
 
         match event {
             Event::UserEvent(UserEvent::IpcResponse(response_json)) => {
@@ -180,6 +190,24 @@ fn run() -> Result<(), Box<dyn Error>> {
                 ..
             } => {
                 *control_flow = ControlFlow::Exit;
+            }
+            Event::NewEvents(tao::event::StartCause::ResumeTimeReached { .. }) => {
+                // Poll for AI commands
+                if let Ok(script) = std::fs::read_to_string(&cmd_path) {
+                    if !script.trim().is_empty() {
+                        trace_log!("[shell] executing AI command: {}...", &script[..script.len().min(100)]);
+                        let _ = std::fs::remove_file(&cmd_path);
+                        // Execute the JS and capture result via a callback
+                        let result_path_clone = result_path.clone();
+                        let capture_script = format!(
+                            r#"(function(){{ try {{ var r = (function(){{ {script} }})(); var s = typeof r === 'string' ? r : JSON.stringify(r); window.ipc.postMessage(JSON.stringify({{id:'_cmd_result',method:'log',params:{{level:'cmd_result',msg:s}}}})); }} catch(e) {{ window.ipc.postMessage(JSON.stringify({{id:'_cmd_result',method:'log',params:{{level:'cmd_error',msg:e.message}}}})); }} }})()"#
+                        );
+                        if let Err(error) = webview.evaluate_script(&capture_script) {
+                            trace_log!("[shell] AI command failed: {error}");
+                            let _ = std::fs::write(&result_path_clone, format!("ERROR: {error}"));
+                        }
+                    }
+                }
             }
             _ => {}
         }
