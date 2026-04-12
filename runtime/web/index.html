@@ -1,3008 +1,2245 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Untitled — NextFrame</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        --nf-bg: #0b0b14;
-        --nf-surface: #14141e;
-        --nf-border: #22222e;
-        --nf-text: #e6e6f0;
-        --nf-accent: #6366f1;
-        --bg: var(--nf-bg);
-        --bg-alt: color-mix(in srgb, var(--nf-bg) 82%, white 18%);
-        --surface: var(--nf-surface);
-        --surface-2: color-mix(in srgb, var(--nf-surface) 90%, white 10%);
-        --surface-3: color-mix(in srgb, var(--nf-surface) 82%, white 18%);
-        --border: var(--nf-border);
-        --border-strong: color-mix(in srgb, var(--nf-border) 76%, white 24%);
-        --text: var(--nf-text);
-        --text-dim: color-mix(in srgb, var(--nf-text) 68%, var(--nf-bg) 32%);
-        --text-faint: color-mix(in srgb, var(--nf-text) 46%, var(--nf-bg) 54%);
-        --accent: var(--nf-accent);
-        --accent-soft: color-mix(in srgb, var(--nf-accent) 18%, transparent);
-        --success: #38bdf8;
-        --warning: #f59e0b;
-        --track-video: linear-gradient(135deg, #4f46e5, #7c3aed);
-        --track-video-alt: linear-gradient(135deg, #2563eb, #06b6d4);
-        --track-audio: linear-gradient(135deg, #0f766e, #14b8a6);
-        --shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.32);
-        --shadow-md: 0 14px 30px rgba(0, 0, 0, 0.24);
-        --radius-lg: 16px;
-        --radius-md: 12px;
-        --radius-sm: 8px;
-        --menu-h: 32px;
-        --library-size: 240px;
-        --inspector-size: 280px;
-        --timeline-size: 240px;
-        --library-min: 180px;
-        --library-max: 400px;
-        --inspector-min: 220px;
-        --inspector-max: 420px;
-        --timeline-min: 180px;
-        --timeline-max: 480px;
-        --preview-min: 480px;
-        --splitter-size: 10px;
-        --track-label-w: 120px;
-        --lane-h: 58px;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      html,
-      body {
-        margin: 0;
-        width: 100%;
-        height: 100%;
-        min-width: 1200px;
-        overflow: hidden;
-        background:
-          radial-gradient(circle at top left, color-mix(in srgb, var(--nf-accent) 14%, transparent), transparent 30%),
-          radial-gradient(circle at top right, color-mix(in srgb, var(--nf-surface) 44%, transparent), transparent 26%),
-          linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--nf-bg) 88%, white 12%) 0%,
-            color-mix(in srgb, var(--nf-bg) 92%, black 8%) 100%
-          );
-        color: var(--text);
-        font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        letter-spacing: 0.01em;
-      }
-
-      body.dragging,
-      body.dragging * {
-        user-select: none;
-      }
-
-      button {
-        color: inherit;
-        font: inherit;
-      }
-
-      #app {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        background:
-          linear-gradient(180deg, color-mix(in srgb, var(--nf-bg) 84%, white 16%), var(--nf-bg));
-      }
-
-      #top-menu {
-        flex: 0 0 var(--menu-h);
-        height: var(--menu-h);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        padding: 0 12px;
-        border-bottom: 1px solid var(--border);
-        background:
-          linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--nf-surface) 94%, white 6%),
-            color-mix(in srgb, var(--nf-bg) 92%, var(--nf-surface) 8%)
-          );
-      }
-
-      .menu-group {
-        display: flex;
-        align-items: center;
-        min-width: 0;
-        gap: 6px;
-      }
-
-      .menu-bar {
-        display: flex;
-        align-items: center;
-        gap: 2px;
-      }
-
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding-right: 12px;
-        margin-right: 6px;
-        border-right: 1px solid var(--border);
-      }
-
-      .brand-badge {
-        width: 18px;
-        height: 18px;
-        border-radius: 6px;
-        background:
-          linear-gradient(135deg, var(--nf-accent), color-mix(in srgb, var(--nf-accent) 66%, white 34%));
-        box-shadow:
-          0 0 0 1px rgba(255, 255, 255, 0.06),
-          0 6px 14px color-mix(in srgb, var(--nf-accent) 34%, transparent);
-      }
-
-      .brand-name {
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      #project-title {
-        flex: 0 1 280px;
-        min-width: 0;
-        display: flex;
-        align-items: center;
-      }
-
-      .project-title-label {
-        display: inline-flex;
-        align-items: center;
-        min-width: 0;
-        max-width: 100%;
-        height: 24px;
-        padding: 0 10px;
-        border: 1px solid rgba(160, 163, 184, 0.18);
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.02);
-        color: var(--text-faint);
-        font-size: 11px;
-        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
-        letter-spacing: 0.03em;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        cursor: pointer;
-        transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease;
-      }
-
-      .project-title-label:hover {
-        border-color: color-mix(in srgb, var(--nf-accent) 28%, transparent);
-        background: color-mix(in srgb, var(--nf-accent) 10%, transparent);
-        color: var(--text-dim);
-      }
-
-      .project-title-label[data-dirty="true"] {
-        color: rgba(245, 158, 11, 0.92);
-      }
-
-      .menu-button,
-      .menu-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        height: 24px;
-        padding: 0 10px;
-        border: 1px solid transparent;
-        border-radius: 999px;
-        background: transparent;
-        color: var(--text-dim);
-        white-space: nowrap;
-      }
-
-      .menu-root {
-        position: relative;
-      }
-
-      .menu-trigger {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        height: 24px;
-        padding: 0 11px;
-        border: 1px solid transparent;
-        border-radius: 999px;
-        background: transparent;
-        color: var(--text-dim);
-        font: inherit;
-        font-size: 12px;
-        cursor: pointer;
-      }
-
-      .menu-root[data-open="true"] .menu-trigger,
-      .menu-trigger:hover {
-        border-color: color-mix(in srgb, var(--nf-accent) 38%, transparent);
-        background: var(--accent-soft);
-        color: var(--text);
-      }
-
-      .menu-dropdown {
-        position: absolute;
-        top: calc(100% + 8px);
-        left: 0;
-        min-width: 216px;
-        display: none;
-        flex-direction: column;
-        padding: 8px;
-        border: 1px solid var(--border-strong);
-        border-radius: 14px;
-        background:
-          linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--nf-surface) 96%, white 4%),
-            color-mix(in srgb, var(--nf-bg) 90%, var(--nf-surface) 10%)
-          );
-        box-shadow: var(--shadow-lg);
-        z-index: 50;
-      }
-
-      .menu-root[data-open="true"] .menu-dropdown {
-        display: flex;
-      }
-
-      .menu-submenu {
-        position: relative;
-      }
-
-      .menu-submenu-dropdown {
-        position: absolute;
-        top: -8px;
-        left: calc(100% - 10px);
-        min-width: 216px;
-        display: none;
-        flex-direction: column;
-        padding: 8px;
-        border: 1px solid var(--border-strong);
-        border-radius: 14px;
-        background:
-          linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--nf-surface) 96%, white 4%),
-            color-mix(in srgb, var(--nf-bg) 90%, var(--nf-surface) 10%)
-          );
-        box-shadow: var(--shadow-lg);
-        z-index: 60;
-      }
-
-      .menu-submenu:hover .menu-submenu-dropdown,
-      .menu-submenu:focus-within .menu-submenu-dropdown {
-        display: flex;
-      }
-
-      .menu-item {
-        display: grid;
-        grid-template-columns: 16px 1fr auto;
-        align-items: center;
-        gap: 10px;
-        min-height: 32px;
-        padding: 0 10px;
-        border: 0;
-        border-radius: 10px;
-        background: transparent;
-        color: var(--text);
-        font: inherit;
-        text-align: left;
-        cursor: pointer;
-      }
-
-      .menu-item:hover {
-        background: rgba(255, 255, 255, 0.05);
-      }
-
-      .menu-item:disabled {
-        opacity: 0.45;
-        cursor: default;
-        pointer-events: none;
-      }
-
-      .menu-check {
-        color: var(--success);
-        font-size: 12px;
-        font-weight: 700;
-      }
-
-      .menu-shortcut {
-        color: var(--text-faint);
-        font-size: 11px;
-        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
-      }
-
-      .menu-divider {
-        height: 1px;
-        margin: 6px 2px;
-        background: rgba(255, 255, 255, 0.06);
-      }
-
-      .menu-button {
-        padding: 0 12px;
-        border-color: var(--border);
-        background: rgba(255, 255, 255, 0.02);
-        color: var(--text);
-        cursor: pointer;
-      }
-
-      .menu-button.primary {
-        border-color: color-mix(in srgb, var(--nf-accent) 55%, transparent);
-        background:
-          linear-gradient(
-            135deg,
-            color-mix(in srgb, var(--nf-accent) 90%, white 10%),
-            color-mix(in srgb, var(--nf-accent) 78%, var(--nf-bg) 22%)
-          );
-        box-shadow: 0 10px 18px color-mix(in srgb, var(--nf-accent) 24%, transparent);
-      }
-
-      .menu-chip {
-        padding: 0 10px 0 8px;
-        border-color: var(--border);
-        background: rgba(255, 255, 255, 0.03);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-
-      .status-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: #22c55e;
-        box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
-      }
-
-      .menu-chip.is-dirty .status-dot {
-        background: var(--warning);
-        box-shadow: 0 0 10px rgba(245, 158, 11, 0.9);
-      }
-
-      #workspace {
-        flex: 1 1 auto;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        padding: 12px;
-        gap: 0;
-      }
-
-      #top-row {
-        flex: 1 1 auto;
-        min-height: 280px;
-        display: flex;
-        min-width: 0;
-      }
-
-      .panel {
-        min-height: 0;
-        background:
-          linear-gradient(180deg, rgba(25, 25, 37, 0.96), rgba(20, 20, 30, 0.98));
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        box-shadow: var(--shadow-md);
-        overflow: hidden;
-      }
-
-      .panel-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 14px 16px 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-      }
-
-      .panel-title {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-
-      .panel-title strong {
-        font-size: 13px;
-        font-weight: 700;
-      }
-
-      .panel-title span {
-        color: var(--text-faint);
-        font-size: 11px;
-      }
-
-      .chip-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .mini-chip {
-        padding: 4px 8px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: rgba(255, 255, 255, 0.02);
-        color: var(--text-dim);
-        font-size: 11px;
-      }
-
-      #left-library {
-        flex: 0 0 var(--library-size);
-        min-width: var(--library-min);
-        max-width: var(--library-max);
-        display: flex;
-        flex-direction: column;
-      }
-
-      .library-controls {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        padding: 14px 16px 12px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-      }
-
-      .search-field {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        height: 34px;
-        padding: 0 12px;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.03);
-        color: var(--text-faint);
-      }
-
-      .search-dot {
-        width: 8px;
-        height: 8px;
-        border: 2px solid currentColor;
-        border-radius: 50%;
-        position: relative;
-      }
-
-      .search-dot::after {
-        content: "";
-        position: absolute;
-        right: -5px;
-        bottom: -5px;
-        width: 2px;
-        height: 6px;
-        border-radius: 999px;
-        background: currentColor;
-        transform: rotate(-45deg);
-        transform-origin: center;
-      }
-
-      .filter-row {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-      }
-
-      .filter-chip {
-        height: 26px;
-        padding: 0 10px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: rgba(255, 255, 255, 0.02);
-        color: var(--text-dim);
-        display: inline-flex;
-        align-items: center;
-      }
-
-      .filter-chip.active {
-        border-color: color-mix(in srgb, var(--nf-accent) 42%, transparent);
-        background: color-mix(in srgb, var(--nf-accent) 16%, transparent);
-        color: var(--text);
-      }
-
-      .asset-grid {
-        flex: 1 1 auto;
-        min-height: 0;
-        overflow: auto;
-        padding: 12px 16px 16px;
-        display: grid;
-        gap: 12px;
-        grid-template-columns: 1fr;
-      }
-
-      .asset-card {
-        display: grid;
-        gap: 10px;
-        padding: 10px;
-        border: 1px solid rgba(255, 255, 255, 0.04);
-        border-radius: 12px;
-        background:
-          linear-gradient(180deg, rgba(30, 30, 42, 0.84), rgba(21, 21, 30, 0.92));
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-        cursor: grab;
-      }
-
-      .asset-card:active {
-        cursor: grabbing;
-      }
-
-      .asset-thumb {
-        position: relative;
-        aspect-ratio: 16 / 10;
-        border-radius: 10px;
-        overflow: hidden;
-        background:
-          linear-gradient(150deg, var(--thumb-a), var(--thumb-b)),
-          radial-gradient(circle at top right, rgba(255, 255, 255, 0.22), transparent 45%);
-      }
-
-      .asset-thumb::before,
-      .asset-thumb::after {
-        content: "";
-        position: absolute;
-        inset: auto;
-        border-radius: 999px;
-        opacity: 0.65;
-      }
-
-      .asset-thumb::before {
-        width: 56px;
-        height: 56px;
-        top: 16px;
-        right: 12px;
-        background: rgba(255, 255, 255, 0.14);
-      }
-
-      .asset-thumb::after {
-        width: 90px;
-        height: 16px;
-        left: 12px;
-        bottom: 14px;
-        background: rgba(255, 255, 255, 0.18);
-      }
-
-      .asset-meta {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-      }
-
-      .asset-name {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-      }
-
-      .asset-name strong {
-        font-size: 12px;
-      }
-
-      .asset-name span,
-      .asset-length {
-        color: var(--text-faint);
-        font-size: 11px;
-      }
-
-      .asset-length {
-        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
-      }
-
-      #center-preview {
-        flex: 1 1 auto;
-        min-width: var(--preview-min);
-        display: flex;
-        flex-direction: column;
-      }
-
-      .preview-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 14px 18px 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-      }
-
-      .preview-meta {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        color: var(--text-dim);
-      }
-
-      .preview-shell {
-        flex: 1 1 auto;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        padding: 18px 20px 20px;
-        gap: 16px;
-      }
-
-      #preview-stage-slot {
-        flex: 1 1 auto;
-        min-height: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 8px;
-        container-type: size;
-      }
-
-      #preview-stage-slot > * {
-        transform: scale(var(--preview-zoom, 1));
-        transform-origin: center center;
-        transition: transform 140ms ease;
-      }
-
-      .preview-canvas-frame {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        border-radius: 20px;
-        background: #0b0b14;
-        box-shadow:
-          inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-          0 30px 70px rgba(0, 0, 0, 0.5);
-        overflow: hidden;
-      }
-
-      .preview-canvas {
-        position: absolute;
-        display: block;
-        border: 0;
-        border-radius: 20px;
-        background: #000;
-        box-shadow:
-          0 0 0 1px rgba(255, 255, 255, 0.06),
-          0 18px 40px rgba(0, 0, 0, 0.45);
-      }
-
-      #preview-stage {
-        position: relative;
-        width: min(100cqw, calc(100cqh * 16 / 9));
-        height: min(100cqh, calc(100cqw * 9 / 16));
-        max-width: 100%;
-        max-height: 100%;
-        border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        background:
-          linear-gradient(180deg, #111116 0%, #050507 100%);
-        box-shadow:
-          inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-          0 30px 70px rgba(0, 0, 0, 0.5);
-        overflow: hidden;
-      }
-
-      #preview-stage::before {
-        content: "";
-        position: absolute;
-        inset: 22px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 14px;
-        opacity: 0.6;
-      }
-
-      #preview-stage::after {
-        content: "";
-        position: absolute;
-        inset: auto 0 0;
-        height: 38%;
-        background:
-          linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.58));
-      }
-
-      .preview-watermark {
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        text-align: center;
-        gap: 10px;
-      }
-
-      .preview-watermark strong {
-        font-size: 20px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .preview-watermark span {
-        color: var(--text-faint);
-        max-width: 360px;
-      }
-
-      .safe-badge {
-        position: absolute;
-        left: 18px;
-        top: 18px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(10, 10, 16, 0.75);
-        color: var(--text-dim);
-        font-size: 11px;
-      }
-
-      .transport {
-        flex: 0 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 14px;
-        min-height: 44px;
-      }
-
-      .transport-button {
-        width: 38px;
-        height: 38px;
-        border: 1px solid color-mix(in srgb, var(--nf-accent) 45%, transparent);
-        border-radius: 50%;
-        background:
-          linear-gradient(
-            135deg,
-            color-mix(in srgb, var(--nf-accent) 94%, white 6%),
-            color-mix(in srgb, var(--nf-accent) 78%, var(--nf-bg) 22%)
-          );
-        box-shadow: 0 12px 24px color-mix(in srgb, var(--nf-accent) 25%, transparent);
-        position: relative;
-      }
-
-      .transport-button::before {
-        content: "";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-35%, -50%);
-        width: 0;
-        height: 0;
-        border-top: 7px solid transparent;
-        border-bottom: 7px solid transparent;
-        border-left: 11px solid #ffffff;
-      }
-
-      .time-display {
-        padding: 8px 12px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: rgba(255, 255, 255, 0.03);
-        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
-        font-size: 12px;
-        letter-spacing: 0.05em;
-      }
-
-      .transport-pill {
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.03);
-        color: var(--text-dim);
-        border: 1px solid var(--border);
-      }
-
-      #right-inspector {
-        flex: 0 0 var(--inspector-size);
-        min-width: var(--inspector-min);
-        max-width: var(--inspector-max);
-        display: flex;
-        flex-direction: column;
-      }
-
-      .inspector-body {
-        flex: 1 1 auto;
-        min-height: 0;
-        padding: 18px 16px 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-      }
-
-      .inspector-section {
-        display: grid;
-        gap: 12px;
-        padding: 14px;
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        border-radius: 14px;
-        background: rgba(15, 23, 42, 0.45);
-      }
-
-      .inspector-section-header {
-        display: grid;
-        gap: 4px;
-      }
-
-      .inspector-section-header strong {
-        font-size: 13px;
-        letter-spacing: 0.02em;
-      }
-
-      .inspector-section-header span {
-        color: var(--text-dim);
-        font-size: 12px;
-      }
-
-      .inspector-section-body {
-        display: grid;
-        gap: 12px;
-      }
-
-      .inspector-action-row {
-        display: flex;
-      }
-
-      .inspector-field,
-      .inspector-static-row {
-        display: grid;
-        gap: 8px;
-      }
-
-      .inspector-field-copy,
-      .inspector-static-label {
-        color: var(--text-dim);
-        font-size: 12px;
-      }
-
-      .inspector-field-label {
-        font-weight: 600;
-      }
-
-      .inspector-field-description {
-        color: var(--text-dim);
-        font-size: 11px;
-      }
-
-      .inspector-input,
-      .color-label-button,
-      .inspector-action-button {
-        border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        background: rgba(15, 23, 42, 0.72);
-        color: var(--text);
-      }
-
-      .inspector-input {
-        width: 100%;
-        min-width: 0;
-        padding: 10px 12px;
-        outline: none;
-      }
-
-      .inspector-input-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .inspector-input:focus {
-        border-color: rgba(96, 165, 250, 0.88);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
-      }
-
-      .inspector-field-inline-action {
-        width: 34px;
-        min-width: 34px;
-        height: 34px;
-        border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        background: rgba(15, 23, 42, 0.72);
-        color: var(--text-dim);
-        font: inherit;
-        font-size: 14px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, transform 120ms ease;
-      }
-
-      .inspector-field-inline-action:hover {
-        color: var(--text);
-        border-color: rgba(148, 163, 184, 0.34);
-      }
-
-      .inspector-field-inline-action.is-active {
-        color: #f8fafc;
-        border-color: rgba(96, 165, 250, 0.7);
-        background: rgba(37, 99, 235, 0.28);
-      }
-
-      .inspector-keyframes {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 8px;
-        align-items: center;
-      }
-
-      .inspector-keyframes-strip {
-        position: relative;
-        min-height: 30px;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        background:
-          linear-gradient(90deg, rgba(96, 165, 250, 0.08), rgba(59, 130, 246, 0.02)),
-          rgba(15, 23, 42, 0.56);
-        overflow: hidden;
-      }
-
-      .inspector-keyframes-strip::before {
-        content: "";
-        position: absolute;
-        inset: 50% 12px auto;
-        height: 1px;
-        background: rgba(148, 163, 184, 0.26);
-        transform: translateY(-50%);
-      }
-
-      .inspector-keyframes-playhead {
-        position: absolute;
-        top: 4px;
-        bottom: 4px;
-        width: 2px;
-        border-radius: 999px;
-        background: rgba(248, 250, 252, 0.85);
-        transform: translateX(-50%);
-        pointer-events: none;
-      }
-
-      .inspector-keyframes-marker {
-        position: absolute;
-        top: 50%;
-        width: 12px;
-        height: 12px;
-        border: 1px solid rgba(191, 219, 254, 0.68);
-        background: rgba(96, 165, 250, 0.9);
-        transform: translate(-50%, -50%) rotate(45deg);
-        cursor: grab;
-        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.92);
-      }
-
-      .inspector-keyframes-marker:active {
-        cursor: grabbing;
-      }
-
-      .inspector-keyframes-actions {
-        display: flex;
-      }
-
-      .inspector-keyframes-add {
-        width: 30px;
-        height: 30px;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        background: rgba(15, 23, 42, 0.72);
-        color: var(--text);
-        font: inherit;
-        font-size: 16px;
-        font-weight: 700;
-        cursor: pointer;
-      }
-
-      .inspector-static-value {
-        font-weight: 600;
-      }
-
-      .color-label-picker {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 8px;
-      }
-
-      .color-label-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        min-height: 38px;
-        padding: 8px 10px;
-        font: inherit;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
-      }
-
-      .inspector-action-button {
-        width: 100%;
-        min-height: 38px;
-        padding: 10px 12px;
-        font: inherit;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.01em;
-        cursor: pointer;
-        transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
-      }
-
-      .color-label-button::before {
-        content: "";
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        background: var(--color-label-swatch, rgba(148, 163, 184, 0.6));
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
-      }
-
-      .color-label-button[data-color-label="none"]::before {
-        background:
-          linear-gradient(135deg, transparent 41%, rgba(248, 113, 113, 0.94) 41%, rgba(248, 113, 113, 0.94) 59%, transparent 59%),
-          rgba(148, 163, 184, 0.32);
-      }
-
-      .color-label-button:hover {
-        border-color: rgba(148, 163, 184, 0.4);
-        background: rgba(30, 41, 59, 0.92);
-      }
-
-      .inspector-action-button:hover:not(:disabled) {
-        border-color: rgba(148, 163, 184, 0.4);
-        background: rgba(30, 41, 59, 0.92);
-      }
-
-      .color-label-button.is-active {
-        border-color: rgba(191, 219, 254, 0.92);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
-        background: rgba(30, 41, 59, 0.96);
-      }
-
-      .inspector-action-button:focus-visible {
-        border-color: rgba(96, 165, 250, 0.88);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
-      }
-
-      .inspector-action-button:disabled {
-        cursor: not-allowed;
-        opacity: 0.55;
-      }
-
-      .empty-state {
-        flex: 1 1 auto;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 14px;
-        padding: 20px;
-        border: 1px dashed rgba(99, 102, 241, 0.28);
-        border-radius: 14px;
-        background:
-          linear-gradient(180deg, rgba(99, 102, 241, 0.09), rgba(99, 102, 241, 0.03));
-        text-align: center;
-      }
-
-      .empty-glyph {
-        width: 56px;
-        height: 56px;
-        margin: 0 auto;
-        border-radius: 18px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-        position: relative;
-      }
-
-      .empty-glyph::before,
-      .empty-glyph::after {
-        content: "";
-        position: absolute;
-        border-radius: 999px;
-        background: var(--accent);
-      }
-
-      .empty-glyph::before {
-        width: 24px;
-        height: 3px;
-        left: 16px;
-        top: 20px;
-      }
-
-      .empty-glyph::after {
-        width: 16px;
-        height: 16px;
-        right: 12px;
-        bottom: 12px;
-        opacity: 0.38;
-      }
-
-      .empty-state strong {
-        font-size: 15px;
-      }
-
-      .empty-state p {
-        margin: 0;
-        color: var(--text-dim);
-      }
-
-      .placeholder-group {
-        display: grid;
-        gap: 10px;
-      }
-
-      .placeholder-row {
-        display: grid;
-        gap: 8px;
-        padding: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.04);
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.02);
-      }
-
-      .placeholder-row::before,
-      .placeholder-row::after {
-        content: "";
-        display: block;
-        border-radius: 999px;
-        background:
-          linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.09));
-      }
-
-      .placeholder-row::before {
-        width: 42%;
-        height: 8px;
-      }
-
-      .placeholder-row::after {
-        width: 68%;
-        height: 10px;
-      }
-
-      .splitter {
-        position: relative;
-        flex: 0 0 var(--splitter-size);
-        touch-action: none;
-      }
-
-      .splitter::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        margin: auto;
-        border-radius: 999px;
-        background:
-          linear-gradient(180deg, rgba(99, 102, 241, 0.28), rgba(255, 255, 255, 0.08));
-        opacity: 0.45;
-        transition: opacity 0.14s ease, transform 0.14s ease;
-      }
-
-      .splitter:hover::before,
-      .splitter.active::before {
-        opacity: 0.95;
-        transform: scale(1.04);
-      }
-
-      .splitter-col {
-        cursor: col-resize;
-      }
-
-      .splitter-col::before {
-        width: 3px;
-        height: calc(100% - 24px);
-      }
-
-      .splitter-row {
-        width: 100%;
-        height: var(--splitter-size);
-        cursor: row-resize;
-      }
-
-      .splitter-row::before {
-        width: calc(100% - 24px);
-        height: 3px;
-      }
-
-      #bottom-timeline {
-        flex: 0 0 var(--timeline-size);
-        min-height: var(--timeline-min);
-        max-height: var(--timeline-max);
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-      }
-
-      .timeline-stats {
-        flex: 0 0 24px;
-        min-height: 24px;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        padding: 0 16px;
-        color: #6b7280;
-        font: 11px/1 "SFMono-Regular", Menlo, Consolas, monospace;
-        white-space: nowrap;
-        overflow: hidden;
-      }
-
-      .timeline-stats-item {
-        flex: 0 0 auto;
-        min-width: 0;
-      }
-
-      .timeline-stats-status[data-dirty="true"] {
-        color: rgba(245, 158, 11, 0.82);
-      }
-
-      .status-bar {
-        flex: 0 0 22px;
-        min-height: 22px;
-        display: grid;
-        grid-template-columns: minmax(88px, max-content) minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
-        align-items: center;
-        gap: 16px;
-        padding: 0 16px;
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
-        background: linear-gradient(180deg, rgba(12, 12, 20, 0.86), rgba(9, 9, 16, 0.94));
-        color: var(--text-faint);
-        font: 11px/1 "SFMono-Regular", Menlo, Consolas, monospace;
-        letter-spacing: 0.02em;
-        white-space: nowrap;
-      }
-
-      .status-bar-segment {
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .status-bar-selection {
-        justify-self: start;
-      }
-
-      .status-bar-tool {
-        justify-self: center;
-      }
-
-      .status-bar-autosave {
-        justify-self: end;
-        color: var(--text-dim);
-      }
-
-      .status-bar-autosave[data-state="dirty"] {
-        color: rgba(245, 158, 11, 0.82);
-      }
-
-      .status-bar-link {
-        color: var(--text-faint);
-        text-decoration: none;
-      }
-
-      .status-bar-link:hover {
-        color: var(--text);
-        text-decoration: underline;
-      }
-
-      .status-bar-version {
-        justify-self: end;
-      }
-
-      .timeline-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 12px 16px 10px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-      }
-
-      .timeline-toolbar-main {
-        min-width: 0;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-      }
-
-      .timeline-tool-palette {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.03);
-      }
-
-      .timeline-tool-button {
-        min-width: 68px;
-        height: 30px;
-        padding: 0 12px;
-        border: 0;
-        border-radius: 9px;
-        color: var(--text-faint);
-        background: transparent;
-        font-weight: 600;
-      }
-
-      .timeline-tool-button.is-active {
-        color: var(--text);
-        background: rgba(56, 189, 248, 0.18);
-        box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.34);
-      }
-
-      .timeline-body {
-        flex: 1 1 auto;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        padding: 0 16px 16px;
-        gap: 0;
-      }
-
-      .timeline-minimap-shell {
-        display: grid;
-        grid-template-columns: var(--track-label-w) minmax(0, 1fr);
-        align-items: stretch;
-        min-height: 40px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      }
-
-      .timeline-minimap-side {
-        display: flex;
-        align-items: center;
-        padding: 0 14px;
-        background: linear-gradient(180deg, rgba(34, 34, 42, 0.96), rgba(24, 24, 31, 0.98));
-        border-right: 1px solid rgba(255, 255, 255, 0.05);
-        color: var(--text-faint);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-
-      .timeline-minimap-frame {
-        min-width: 0;
-        padding: 0 10px;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0));
-      }
-
-      .timeline-minimap-strip {
-        position: relative;
-        height: 40px;
-        cursor: pointer;
-      }
-
-      .timeline-minimap-clips {
-        position: absolute;
-        inset: 0;
-      }
-
-      .timeline-minimap-row {
-        position: absolute;
-        left: 0;
-        right: 0;
-        border-top: 1px solid rgba(255, 255, 255, 0.03);
-      }
-
-      .timeline-minimap-row:first-child {
-        border-top: 0;
-      }
-
-      .timeline-minimap-clip {
-        position: absolute;
-        top: 1px;
-        bottom: 1px;
-        border-radius: 999px;
-        opacity: 0.8;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
-      }
-
-      .timeline-minimap-window {
-        position: absolute;
-        top: 3px;
-        bottom: 3px;
-        min-width: 1px;
-        border: 1px solid rgba(255, 255, 255, 0.42);
-        background: rgba(255, 255, 255, 0.12);
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-        pointer-events: none;
-      }
-
-      .timeline-minimap-playhead {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background: rgba(255, 255, 255, 0.95);
-        box-shadow: 0 0 8px rgba(255, 255, 255, 0.32);
-        pointer-events: none;
-      }
-
-      .timeline-zoom-controls {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .timeline-zoom-button,
-      .timeline-fit-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 30px;
-        height: 30px;
-        padding: 0 10px;
-        border: 1px solid var(--border-strong);
-        border-radius: 9px;
-        background: rgba(255, 255, 255, 0.03);
-      }
-
-      .timeline-zoom-slider {
-        width: 168px;
-        accent-color: #ef4444;
-      }
-
-      .timeline-ruler-shell {
-        display: grid;
-        grid-template-columns: var(--track-label-w) minmax(0, 1fr);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      }
-
-      .timeline-ruler-side {
-        display: flex;
-        align-items: center;
-        padding: 0 14px;
-        background: linear-gradient(180deg, rgba(39, 39, 49, 0.96), rgba(28, 28, 36, 0.98));
-        border-right: 1px solid rgba(255, 255, 255, 0.05);
-        color: var(--text-faint);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-
-      .timeline-ruler-scroll {
-        position: relative;
-        min-width: 0;
-        overflow: hidden;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
-      }
-
-      .timeline-ruler-canvas {
-        position: relative;
-        height: 42px;
-      }
-
-      .timeline-ruler-tick {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-      }
-
-      .timeline-ruler-tick::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 1px;
-        background: rgba(255, 255, 255, 0.22);
-      }
-
-      .timeline-ruler-tick-minor::before {
-        height: 7px;
-      }
-
-      .timeline-ruler-tick-major::before {
-        height: 15px;
-      }
-
-      .timeline-ruler-tick span {
-        position: absolute;
-        top: 6px;
-        left: 8px;
-        display: inline-block;
-        color: var(--text-faint);
-        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
-        font-size: 11px;
-      }
-
-      .timeline-tracks-scroll {
-        flex: 1 1 auto;
-        min-height: 0;
-        overflow: auto;
-        position: relative;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.012), rgba(255, 255, 255, 0)),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0));
-        scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
-      }
-
-      .timeline-tracks-canvas {
-        position: relative;
-        min-height: 100%;
-      }
-
-      .timeline-track-list {
-        min-width: 100%;
-      }
-
-      .timeline-track-row {
-        position: relative;
-        display: grid;
-        min-height: 64px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        min-width: 100%;
-      }
-
-      .timeline-track-header {
-        position: sticky;
-        left: 0;
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 10px 12px;
-        background: linear-gradient(180deg, rgba(41, 41, 49, 0.98), rgba(30, 30, 38, 0.98));
-        border-right: 1px solid rgba(255, 255, 255, 0.05);
-        color: var(--text-dim);
-      }
-
-      .timeline-track-copy {
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-
-      .timeline-track-copy strong {
-        color: var(--text);
-      }
-
-      .timeline-track-copy span {
-        color: var(--text-faint);
-        font-size: 11px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .timeline-track-actions {
-        display: flex;
-        gap: 6px;
-      }
-
-      .timeline-track-badge {
-        width: 28px;
-        height: 28px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 8px;
-        color: var(--text-faint);
-        background: rgba(255, 255, 255, 0.03);
-        cursor: pointer;
-        appearance: none;
-        transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, transform 120ms ease;
-      }
-
-      .timeline-track-badge:hover {
-        color: var(--text);
-        border-color: rgba(255, 255, 255, 0.14);
-        background: rgba(255, 255, 255, 0.06);
-      }
-
-      .timeline-track-badge:focus-visible {
-        outline: 2px solid rgba(125, 211, 252, 0.7);
-        outline-offset: 2px;
-      }
-
-      .timeline-track-badge.is-active {
-        color: var(--text);
-        border-color: rgba(239, 68, 68, 0.38);
-        background: rgba(239, 68, 68, 0.12);
-      }
-
-      .timeline-track-badge[data-flag="solo"].is-active {
-        border-color: rgba(245, 158, 11, 0.42);
-        background: rgba(245, 158, 11, 0.14);
-      }
-
-      .timeline-track-badge[data-flag="locked"].is-active {
-        border-color: rgba(148, 163, 184, 0.4);
-        background: rgba(148, 163, 184, 0.14);
-      }
-
-      .timeline-track-icon {
-        width: 14px;
-        height: 14px;
-      }
-
-      .timeline-track-solo {
-        font-size: 12px;
-        font-weight: 700;
-        line-height: 1;
-        letter-spacing: 0.02em;
-      }
-
-      .timeline-track-lane {
-        position: relative;
-        min-height: 64px;
-        overflow: hidden;
-        transition: box-shadow 120ms ease, background-color 120ms ease;
-        background:
-          repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0, rgba(255, 255, 255, 0.025) 1px, transparent 1px, transparent var(--timeline-minor-step)),
-          repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0, rgba(255, 255, 255, 0.04) 1px, transparent 1px, transparent var(--timeline-major-step)),
-          linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0));
-      }
-
-      .timeline-track-lane.drop-accept {
-        background-color: rgba(56, 189, 248, 0.08);
-        box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.42);
-      }
-
-      .timeline-track-lane.drop-reject {
-        animation: timeline-drop-reject 100ms ease;
-      }
-
-      .timeline-playhead-line,
-      .timeline-playhead-marker {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background: #ef4444;
-        box-shadow: 0 0 10px rgba(239, 68, 68, 0.48);
-        z-index: 5;
-        pointer-events: none;
-      }
-
-      .timeline-snap-guide {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 1px;
-        background: rgba(125, 211, 252, 0.58);
-        box-shadow: 0 0 10px rgba(125, 211, 252, 0.24);
-        pointer-events: none;
-        z-index: 3;
-      }
-
-      .timeline-playhead-marker::before {
-        content: "";
-        position: absolute;
-        left: 50%;
-        top: 0;
-        width: 0;
-        height: 0;
-        transform: translate(-50%, 0);
-        border-left: 6px solid transparent;
-        border-right: 6px solid transparent;
-        border-bottom: 9px solid #ef4444;
-      }
-
-      .timeline-blade-indicator {
-        position: absolute;
-        width: 2px;
-        background: rgba(125, 211, 252, 0.95);
-        box-shadow: 0 0 12px rgba(56, 189, 248, 0.42);
-        z-index: 6;
-        pointer-events: none;
-      }
-
-      .timeline-clip {
-        position: absolute;
-        top: 10px;
-        height: 44px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 0 14px;
-        border-radius: 3px;
-        border: 1px solid var(--clip-accent);
-        background: linear-gradient(135deg, var(--clip-fill-start), var(--clip-fill-end));
-        box-shadow: 0 10px 18px rgba(0, 0, 0, 0.28);
-        overflow: hidden;
-        cursor: grab;
-      }
-
-      #bottom-timeline[data-timeline-tool="blade"] .timeline-track-lane,
-      #bottom-timeline[data-timeline-tool="blade"] .timeline-clip,
-      #bottom-timeline[data-timeline-tool="blade"] .timeline-clip-handle {
-        cursor: crosshair !important;
-      }
-
-      .timeline-clip::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 56%),
-          repeating-linear-gradient(
-            90deg,
-            rgba(255, 255, 255, 0.08) 0,
-            rgba(255, 255, 255, 0.08) 8px,
-            transparent 8px,
-            transparent 18px
-          );
-        opacity: 0.28;
-        z-index: 0;
-      }
-
-      .timeline-clip.has-thumbnail::before {
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 52%);
-        opacity: 0.22;
-      }
-
-      .timeline-clip-thumb {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0.98;
-        pointer-events: none;
-        z-index: 0;
-      }
-
-      .timeline-clip-preview {
-        position: absolute;
-        inset: 0;
-        opacity: 0;
-        pointer-events: none;
-        z-index: 1;
-        transition: opacity 80ms ease, background-color 80ms ease, box-shadow 80ms ease;
-      }
-
-      .timeline-clip-label-stripe {
-        position: absolute;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        width: 4px;
-        z-index: 2;
-        pointer-events: none;
-      }
-
-      .timeline-clip.is-audio::before {
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 60%),
-          linear-gradient(90deg, rgba(20, 184, 166, 0.1), rgba(45, 212, 191, 0.02));
-        opacity: 1;
-      }
-
-      .timeline-clip-waveform {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0.95;
-        pointer-events: none;
-        z-index: 0;
-      }
-
-      .timeline-clip-label {
-        position: relative;
-        z-index: 2;
-        min-width: 0;
-        font-weight: 600;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55);
-      }
-
-      .timeline-clip-handle {
-        position: absolute;
-        top: 5px;
-        bottom: 5px;
-        width: 6px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.26);
-        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-        z-index: 2;
-      }
-
-      .timeline-clip-handle-left {
-        left: 5px;
-      }
-
-      .timeline-clip-handle-right {
-        right: 5px;
-      }
-
-      .timeline-clip-flash {
-        animation: timeline-clip-flash 100ms ease-out;
-      }
-
-      .timeline-clip.is-interacting {
-        z-index: 4;
-      }
-
-      .timeline-clip.is-interacting .timeline-clip-preview {
-        opacity: 1;
-        background: rgba(125, 211, 252, 0.18);
-        box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.62);
-      }
-
-      .timeline-clip.is-invalid {
-        box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.62), 0 0 18px rgba(239, 68, 68, 0.26);
-      }
-
-      .timeline-clip.is-invalid .timeline-clip-preview {
-        opacity: 1;
-        background: rgba(248, 113, 113, 0.16);
-        box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.72);
-      }
-
-      .timeline-clip.is-selected {
-        box-shadow: 0 0 0 1px rgba(244, 114, 182, 0.88), 0 0 0 3px rgba(244, 114, 182, 0.2), 0 10px 18px rgba(0, 0, 0, 0.28);
-      }
-
-      .timeline-clip.is-selected .timeline-clip-preview {
-        opacity: 1;
-        background: rgba(244, 114, 182, 0.16);
-        box-shadow: inset 0 0 0 1px rgba(244, 114, 182, 0.42);
-      }
-
-      .timeline-clip.is-multi-selected {
-        box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.94), 0 0 0 3px rgba(59, 130, 246, 0.24), 0 10px 18px rgba(0, 0, 0, 0.28);
-      }
-
-      .timeline-clip.is-multi-selected .timeline-clip-preview {
-        opacity: 1;
-        background: rgba(59, 130, 246, 0.14);
-        box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.42);
-      }
-
-      .timeline-clip.is-selection-primary {
-        border-color: rgba(191, 219, 254, 0.96);
-      }
-
-      .timeline-clip-tooltip {
-        position: fixed;
-        top: 0;
-        left: 0;
-        padding: 6px 8px;
-        border-radius: 8px;
-        border: 1px solid rgba(125, 211, 252, 0.62);
-        background: rgba(14, 23, 38, 0.94);
-        color: rgba(230, 240, 255, 0.96);
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-        pointer-events: none;
-        white-space: nowrap;
-        z-index: 20;
-      }
-
-      .timeline-clip-tooltip.is-invalid {
-        border-color: rgba(248, 113, 113, 0.72);
-        color: rgba(254, 226, 226, 0.98);
-      }
-
-      .timeline-drop-ghost {
-        position: absolute;
-        top: 10px;
-        height: 44px;
-        display: flex;
-        align-items: center;
-        padding: 0 14px;
-        border: 1px dashed rgba(125, 211, 252, 0.72);
-        border-radius: 3px;
-        background: rgba(56, 189, 248, 0.16);
-        color: rgba(230, 230, 240, 0.86);
-        font-weight: 600;
-        opacity: 0.92;
-        overflow: hidden;
-        pointer-events: none;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-      }
-
-      .timeline-drop-ghost.is-invalid {
-        border-color: rgba(248, 113, 113, 0.78);
-        background: rgba(239, 68, 68, 0.16);
-        color: rgba(254, 226, 226, 0.9);
-      }
-
-      .timeline-marquee {
-        position: absolute;
-        border: 1px dashed rgba(96, 165, 250, 0.96);
-        background: rgba(59, 130, 246, 0.12);
-        box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.12);
-        z-index: 6;
-        pointer-events: none;
-      }
-
-      @keyframes timeline-drop-reject {
-        0% {
-          box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.78);
-        }
-
-        100% {
-          box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0);
-        }
-      }
-
-      @keyframes timeline-clip-flash {
-        0% {
-          transform: scaleY(0.96);
-          filter: brightness(1.3);
-        }
-
-        100% {
-          transform: scaleY(1);
-          filter: brightness(1);
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div id="app">
-      <header id="top-menu">
-        <div class="menu-group">
-          <div class="brand">
-            <div class="brand-badge" aria-hidden="true"></div>
-            <div class="brand-name">NextFrame</div>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>NextFrame</title>
+<!-- IPC bridge for Tao/Wry desktop shell -->
+<script type="module" src="src/bridge.js"></script>
+<style>
+/* ========================================================
+   NEXTFRAME v3 — Awwwards-grade editor prototype
+   Design DNA: 326 experiments distilled
+   ======================================================== */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Global easing — ONE curve everywhere */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Single accent + 3 RGBA tiers */
+  --accent: #8a6fae;
+  --accent-15: rgba(138,111,174,0.15);
+  --accent-06: rgba(138,111,174,0.06);
+  --accent-03: rgba(138,111,174,0.03);
+
+  /* Text opacity (obsidian-velvet 5-tier) */
+  --ink: #e8e4dc;
+  --ink-mid: rgba(232,228,220,0.55);
+  --ink-dim: rgba(232,228,220,0.25);
+  --ink-ghost: rgba(232,228,220,0.08);
+  --ink-faint: rgba(138,111,174,0.06);  /* accent-tinted, not pure white */
+
+  /* Warm neutral backgrounds */
+  --bg: #0a0a0f;
+  --bg-up: #111118;
+  --bg-surface: #17171f;
+  --bg-hover: #1d1d28;
+
+  /* Brand warm accent */
+  --warm: #da7756;
+  --warm-20: rgba(218,119,86,0.2);
+
+  /* Typography — system fonts for offline desktop */
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Helvetica Neue', system-ui, sans-serif;
+  --font-mono: 'SF Mono', Menlo, monospace;
+
+  /* Accent border (obsidian-velvet uses accent-tinted borders, not white) */
+  --border-a1: 1px solid rgba(138,111,174,0.1);
+  --border-a2: 1px solid rgba(138,111,174,0.25);
+  --border-a5: 1px solid rgba(138,111,174,0.5);
+
+  /* Layout */
+  --topbar-h: 52px;
+  --topbar-editor-h: 48px;
+  --timeline-h: 240px;
+  --inspector-w: 280px;
+  --playback-h: 36px;
+  --progress-h: 3px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input, select, button, textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+}
+
+button { cursor: pointer; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ink-ghost); border-radius: 3px; }
+
+/* ========================================================
+   STAGGER ANIMATION
+   ======================================================== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.stagger-in { opacity: 0; animation: fadeInUp 0.4s var(--ease) forwards; }
+.stagger-in:nth-child(1) { animation-delay: 0s; }
+.stagger-in:nth-child(2) { animation-delay: 0.08s; }
+.stagger-in:nth-child(3) { animation-delay: 0.16s; }
+.stagger-in:nth-child(4) { animation-delay: 0.24s; }
+.stagger-in:nth-child(5) { animation-delay: 0.32s; }
+.stagger-in:nth-child(6) { animation-delay: 0.40s; }
+.stagger-in:nth-child(7) { animation-delay: 0.48s; }
+.stagger-in:nth-child(8) { animation-delay: 0.56s; }
+
+/* ========================================================
+   VIEW SYSTEM
+   ======================================================== */
+.view { display: none; height: 100vh; flex-direction: column; }
+.view.active { display: flex; }
+
+.view-transition-enter {
+  animation: fadeInUp 0.4s var(--ease) forwards;
+}
+
+/* ========================================================
+   TOP BAR (shared structure)
+   ======================================================== */
+.topbar {
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+  background: var(--bg);
+  border-bottom: 1px solid var(--ink-faint);
+}
+
+.topbar-editor { height: var(--topbar-editor-h); }
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.logo-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent), var(--warm));
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* Command bar */
+.cmd-bar {
+  flex: 1;
+  max-width: 400px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.cmd-trigger {
+  width: 100%;
+  height: 30px;
+  background: rgba(138,111,174,0.04);
+  border: 1px solid rgba(138,111,174,0.1);
+  padding: 0 12px 0 34px;
+  color: var(--ink-dim);
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: border-color 0.3s var(--ease), color 0.3s var(--ease), background 0.3s var(--ease);
+  display: flex;
+  align-items: center;
+}
+
+.cmd-trigger:hover, .cmd-trigger:focus {
+  border-color: rgba(138,111,174,0.25);
+  color: var(--ink-mid);
+  background: var(--accent-06);
+}
+
+.cmd-trigger .search-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-dim);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.cmd-trigger .kbd {
+  margin-left: auto;
+  font-family: var(--font-body);
+  font-size: 0.6rem;
+  color: var(--ink-dim);
+  background: var(--bg-up);
+  padding: 0.05rem 0.35rem;
+  border: 1px solid rgba(232,228,220,0.06);
+}
+
+.cmd-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: rgba(14,14,22,0.95);
+  border: 1px solid rgba(138,111,174,0.15);
+  overflow: hidden;
+  display: none;
+  z-index: 200;
+  backdrop-filter: blur(20px);
+}
+
+.cmd-dropdown.show { display: block; }
+
+.cmd-dropdown-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.2s var(--ease);
+  font-size: 13px;
+  color: var(--ink-mid);
+}
+
+.cmd-dropdown-item:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+
+.cmd-dropdown-item .cmd-ai-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--accent-06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.cmd-dropdown-item .cmd-hint {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-left: auto;
+  font-family: var(--font-mono);
+}
+
+/* Avatar */
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-ghost);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: border-color 0.3s var(--ease);
+}
+
+.avatar:hover { border-color: var(--ink-dim); }
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* ========================================================
+   VIEW 1: HOME
+   ======================================================== */
+.home-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.home-inner {
+  width: 100%;
+  max-width: 1000px;
+  padding: 64px 32px 120px;
+}
+
+.greeting {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 18px;
+  color: var(--ink-mid);
+  margin-bottom: 48px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.section-label {
+  font-size: 0.6rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--ink-dim);
+}
+
+.btn-new {
+  height: 32px;
+  padding: 0 20px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid rgba(138,111,174,0.4);
+  font-size: 0.65rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.4s var(--ease), background 0.4s var(--ease), color 0.4s var(--ease);
+}
+
+.btn-new:hover { border-color: var(--accent); background: var(--accent-06); color: var(--ink); }
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+.project-card {
+  background: var(--bg-up);
+  border: 1px solid var(--ink-faint);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.4s var(--ease), transform 0.4s var(--ease);
+}
+
+.project-card:hover {
+  border-color: var(--accent-15);
+  transform: scale(1.008);
+}
+
+.card-thumb {
+  aspect-ratio: 16/9;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-thumb-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-thumb-inner.glow-accent {
+  background: radial-gradient(ellipse at 50% 60%, rgba(138,111,174,0.18) 0%, var(--bg-up) 70%);
+}
+
+.card-thumb-inner.glow-warm {
+  background: radial-gradient(ellipse at 50% 60%, rgba(218,119,86,0.15) 0%, var(--bg-up) 70%);
+}
+
+.card-thumb-inner.glow-blue {
+  background: radial-gradient(ellipse at 50% 60%, rgba(110,158,207,0.15) 0%, var(--bg-up) 70%);
+}
+
+.card-thumb-label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 20px;
+  color: var(--ink-dim);
+  letter-spacing: 0.02em;
+}
+
+.card-info {
+  padding: 16px;
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.card-meta {
+  font-size: 12px;
+  color: var(--ink-dim);
+  display: flex;
+  gap: 12px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--ink-faint);
+  margin-bottom: 32px;
+}
+
+.all-projects-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.all-projects-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.view-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--ink-faint);
+  border-radius: 999px;
+  padding: 2px;
+}
+
+.view-toggle-btn {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  transition: color 0.3s var(--ease), background 0.3s var(--ease);
+}
+
+.view-toggle-btn.active {
+  background: var(--accent-06);
+  color: var(--accent);
+  border: 1px solid var(--accent-15);
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-list-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.3s var(--ease);
+}
+
+.project-list-item:hover { background: var(--bg-up); }
+
+.list-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.list-dot.accent { background: var(--accent); }
+.list-dot.warm { background: var(--warm); }
+.list-dot.blue { background: #6e9ecf; }
+
+.list-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  flex: 1;
+}
+
+.list-meta {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+/* ========================================================
+   VIEW 2: PROJECT (Episodes)
+   ======================================================== */
+.back-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-mid);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.3s var(--ease);
+  flex-shrink: 0;
+  margin-right: 16px;
+}
+
+.back-link:hover { color: var(--ink); }
+
+.project-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.project-inner {
+  width: 100%;
+  max-width: 1000px;
+  padding: 56px 32px 120px;
+}
+
+.project-hero {
+  margin-bottom: 48px;
+}
+
+.project-title {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 2.5rem;
+  color: var(--ink);
+  margin-bottom: 8px;
+  letter-spacing: 0.05em;
+  font-style: italic;
+}
+
+.project-desc {
+  font-size: 14px;
+  color: var(--ink-mid);
+  max-width: 560px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+.project-stats {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.episode-card {
+  display: flex;
+  align-items: center;
+  background: var(--bg-up);
+  border: 1px solid var(--ink-faint);
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.4s var(--ease), transform 0.4s var(--ease);
+}
+
+.episode-card:hover {
+  border-color: var(--accent-15);
+  transform: scale(1.008);
+}
+
+.ep-thumb {
+  width: 160px;
+  aspect-ratio: 16/9;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.ep-thumb-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ep-thumb-label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.ep-info {
+  flex: 1;
+  padding: 16px 20px;
+}
+
+.ep-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-06);
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.ep-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.ep-meta {
+  font-size: 12px;
+  color: var(--ink-dim);
+  display: flex;
+  gap: 12px;
+}
+
+.btn-new-outline {
+  height: 36px;
+  padding: 0 24px;
+  border: 1px solid rgba(138,111,174,0.35);
+  color: var(--accent);
+  background: transparent;
+  font-size: 0.65rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.4s var(--ease), background 0.4s var(--ease), color 0.4s var(--ease);
+}
+
+.btn-new-outline:hover {
+  border-color: var(--accent);
+  background: var(--accent-06);
+  color: var(--ink);
+}
+
+/* ========================================================
+   VIEW 3: EDITOR
+   ======================================================== */
+.editor-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.bc-item {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-mid);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  position: relative;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.bc-item:hover {
+  color: var(--ink);
+  background: var(--bg-hover);
+}
+
+.bc-sep {
+  font-size: 12px;
+  color: var(--ink-dim);
+  padding: 0 1px;
+  user-select: none;
+}
+
+.bc-caret {
+  font-size: 9px;
+  margin-left: 2px;
+  opacity: 0.5;
+}
+
+/* Breadcrumb dropdown */
+.bc-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  background: rgba(14,14,22,0.95);
+  border: 1px solid rgba(138,111,174,0.15);
+  overflow: hidden;
+  display: none;
+  z-index: 300;
+  backdrop-filter: blur(20px);
+}
+
+.bc-dropdown.show { display: block; }
+
+.bc-dropdown-item {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--ink-mid);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.bc-dropdown-item:hover {
+  background: var(--bg-hover);
+  color: var(--ink);
+}
+
+.bc-dropdown-item .dot-active {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.bc-dropdown-item .dot-inactive {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.bc-dropdown-sep {
+  height: 1px;
+  background: var(--ink-faint);
+  margin: 4px 0;
+}
+
+.bc-dropdown-new {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s var(--ease);
+}
+
+.bc-dropdown-new:hover { background: var(--bg-hover); }
+
+/* Topbar buttons */
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--ink-dim);
+  font-size: 15px;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.btn-icon:hover {
+  color: var(--ink);
+  background: var(--bg-hover);
+}
+
+.btn-export {
+  height: 28px;
+  padding: 0 16px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid rgba(138,111,174,0.4);
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: border-color 0.4s var(--ease), background 0.4s var(--ease), color 0.4s var(--ease);
+}
+
+.btn-export:hover { border-color: var(--accent); background: var(--accent-06); color: var(--ink); }
+
+/* Preview area */
+.preview-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  background: var(--bg);
+  position: relative;
+}
+
+.preview-canvas-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 0;
+}
+
+/* Subtle radial glow behind canvas */
+.preview-canvas-wrap::before {
+  content: '';
+  position: absolute;
+  width: 80%;
+  height: 80%;
+  top: 10%;
+  left: 10%;
+  background: radial-gradient(ellipse at center, var(--accent-03) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.canvas-frame {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  aspect-ratio: 16/9;
+  background: #14120e;
+  border-radius: 4px;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.canvas-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 40% 50%, rgba(138,111,174,0.1) 0%, rgba(218,119,86,0.04) 40%, transparent 70%);
+}
+
+.canvas-element {
+  position: absolute;
+  cursor: move;
+  user-select: none;
+}
+
+.canvas-element.selected .sel-border { display: block; }
+.canvas-element.selected .rot-line { display: block; }
+
+.sel-border {
+  display: none;
+  position: absolute;
+  inset: -2px;
+  border: 1.5px dashed var(--accent);
+  pointer-events: none;
+}
+
+.sel-handle {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  border: 1px solid #fff;
+  border-radius: 50%;
+  pointer-events: all;
+  z-index: 5;
+}
+
+.sel-handle.tl { top: -5px; left: -5px; cursor: nwse-resize; }
+.sel-handle.tr { top: -5px; right: -5px; cursor: nesw-resize; }
+.sel-handle.bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.sel-handle.br { bottom: -5px; right: -5px; cursor: nwse-resize; }
+.sel-handle.rot { top: -24px; left: 50%; transform: translateX(-50%); cursor: grab; width: 9px; height: 9px; }
+
+.rot-line {
+  display: none;
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  width: 1px;
+  height: 16px;
+  background: var(--accent);
+  transform: translateX(-50%);
+}
+
+.canvas-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.canvas-text h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 64px;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--accent), var(--warm) 60%, #c9b06e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1;
+}
+
+.canvas-text p {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-mid);
+  margin-top: 10px;
+}
+
+.corner-badge {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.corner-badge .badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.corner-badge .badge-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.corner-badge .badge-sub {
+  font-size: 10px;
+  color: var(--ink-dim);
+  margin-left: 2px;
+}
+
+/* Playback bar */
+.playback-bar {
+  height: var(--playback-h);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 16px;
+  flex-shrink: 0;
+  border-top: 1px solid var(--ink-faint);
+  background: var(--bg-up);
+}
+
+.playback-left { display: flex; align-items: center; }
+.playback-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+
+/* Ghost button small (topbar) */
+.btn-ghost-sm {
+  height: 24px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--ink-dim);
+  border: 1px solid rgba(232,228,220,0.08);
+  font-size: 0.6rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 0.4s var(--ease), color 0.4s var(--ease);
+}
+
+.btn-ghost-sm:hover { border-color: rgba(138,111,174,0.4); color: var(--accent); }
+
+.timecode {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-dim);
+  letter-spacing: 0.5px;
+}
+
+.timecode .tc-current { color: var(--ink); }
+
+.play-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.play-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--ink-dim);
+  font-size: 12px;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.play-btn:hover { color: var(--ink); background: var(--bg-hover); }
+
+.play-btn.primary {
+  background: rgba(138,111,174,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(138,111,174,0.3);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  margin: 0 4px;
+  backdrop-filter: blur(10px);
+}
+
+.play-btn.primary:hover { background: rgba(138,111,174,0.2); border-color: var(--accent); color: var(--ink); }
+
+/* Inspector */
+.inspector {
+  width: var(--inspector-w);
+  min-width: var(--inspector-w);
+  background: var(--bg-up);
+  border-left: 1px solid var(--ink-faint);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.insp-header {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ink-faint);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.insp-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.insp-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-dim);
+  background: var(--ink-ghost);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.insp-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+
+.insp-section { margin-bottom: 16px; }
+
+.insp-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+  margin-bottom: 8px;
+}
+
+.insp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.insp-label {
+  width: 60px;
+  font-size: 11px;
+  color: var(--ink-dim);
+  flex-shrink: 0;
+}
+
+.insp-input {
+  flex: 1;
+  height: 26px;
+  background: var(--bg-surface);
+  border: 1px solid var(--ink-faint);
+  border-radius: 6px;
+  padding: 0 8px;
+  color: var(--ink);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  transition: border-color 0.2s var(--ease);
+}
+
+.insp-input:focus { border-color: var(--accent-15); }
+
+.insp-slider-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insp-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--ink-ghost);
+  border-radius: 2px;
+  outline: none;
+}
+
+.insp-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.insp-slider-val {
+  width: 38px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-mid);
+}
+
+.scene-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.scene-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid var(--ink-ghost);
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.scene-chip:hover { border-color: var(--ink-dim); }
+
+.scene-chip.active {
+  background: var(--accent-06);
+  border-color: var(--accent-15);
+  color: var(--accent);
+}
+
+/* Timeline */
+.timeline {
+  height: var(--timeline-h);
+  background: var(--bg-up);
+  border-top: 1px solid var(--ink-faint);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tl-header {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ink-faint);
+  flex-shrink: 0;
+}
+
+.tl-header-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+  flex: 1;
+}
+
+.tl-header-btn {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-left: 6px;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.tl-header-btn:hover {
+  color: var(--ink);
+  background: var(--bg-hover);
+}
+
+.tl-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.tl-tracks-header {
+  width: 64px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--ink-faint);
+  display: flex;
+  flex-direction: column;
+}
+
+.tl-track-label {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--ink-faint);
+}
+
+.tl-track-label:first-child {
+  margin-top: 20px; /* ruler offset */
+}
+
+.tl-lanes {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+}
+
+.tl-lanes-inner {
+  min-width: 100%;
+  width: 1600px;
+  position: relative;
+}
+
+/* Ruler */
+.tl-ruler {
+  height: 20px;
+  position: relative;
+  border-bottom: 1px solid var(--ink-faint);
+}
+
+.tl-ruler-tick {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tl-ruler-tick .tick-line {
+  width: 1px;
+  flex: 1;
+  background: var(--ink-faint);
+}
+
+.tl-ruler-tick.major .tick-line {
+  background: var(--ink-ghost);
+}
+
+.tl-ruler-tick .tick-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-dim);
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  white-space: nowrap;
+}
+
+/* Tracks */
+.tl-track {
+  height: 42px;
+  position: relative;
+  border-bottom: 1px solid var(--ink-faint);
+}
+
+/* Clips */
+.tl-clip {
+  position: absolute;
+  height: 34px;
+  top: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  cursor: pointer;
+  transition: filter 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.tl-clip:hover { filter: brightness(1.12); }
+
+.tl-clip.selected { border: 1.5px solid var(--accent) !important; }
+
+.tl-clip-label {
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Clip colors */
+.tl-clip.type-canvas {
+  background: rgba(218,119,86,0.25);
+  border: 1px solid rgba(218,119,86,0.1);
+}
+.tl-clip.type-canvas .tl-clip-label { color: rgba(218,119,86,0.85); }
+
+.tl-clip.type-html {
+  background: rgba(124,179,122,0.25);
+  border: 1px solid rgba(124,179,122,0.1);
+}
+.tl-clip.type-html .tl-clip-label { color: rgba(124,179,122,0.85); }
+
+.tl-clip.type-svg {
+  background: rgba(138,111,174,0.25);
+  border: 1px solid rgba(138,111,174,0.1);
+}
+.tl-clip.type-svg .tl-clip-label { color: rgba(138,111,174,0.85); }
+
+.tl-clip.type-md {
+  background: rgba(201,123,158,0.25);
+  border: 1px solid rgba(201,123,158,0.1);
+}
+.tl-clip.type-md .tl-clip-label { color: rgba(201,123,158,0.85); }
+
+.tl-clip.type-video {
+  background: rgba(110,158,207,0.25);
+  border: 1px solid rgba(110,158,207,0.1);
+}
+.tl-clip.type-video .tl-clip-label { color: rgba(110,158,207,0.85); }
+
+.tl-clip.type-multi {
+  background: rgba(218,119,86,0.2);
+  border: 1px solid rgba(218,119,86,0.08);
+}
+.tl-clip.type-multi .tl-clip-label { color: rgba(218,119,86,0.8); }
+
+/* Audio track */
+.tl-audio-bars {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 4px 8px;
+  pointer-events: none;
+}
+
+.tl-audio-bar {
+  flex: 1;
+  background: rgba(124,179,122,0.2);
+  border-radius: 1px;
+  min-height: 2px;
+}
+
+/* Playhead */
+.tl-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--warm);
+  z-index: 10;
+  pointer-events: none;
+  left: 120px;
+  transition: left 0.05s linear;
+}
+
+.tl-playhead-handle {
+  position: absolute;
+  top: -1px;
+  left: -5px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid var(--warm);
+}
+
+/* Progress bar (very bottom) */
+.progress-bar {
+  height: var(--progress-h);
+  background: var(--ink-faint);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.05s linear;
+}
+
+/* ========================================================
+   FULLSCREEN MODE
+   ======================================================== */
+.view.fullscreen .topbar,
+.view.fullscreen .inspector,
+.view.fullscreen .timeline,
+.view.fullscreen .progress-bar,
+.view.fullscreen .playback-bar { display: none; }
+
+.view.fullscreen .editor-main { height: 100vh; }
+
+.view.fullscreen .preview-area { position: relative; }
+
+.view.fullscreen .canvas-frame {
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.fullscreen-controls {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(14,14,22,0.85);
+  border: 1px solid rgba(138,111,174,0.15);
+  padding: 8px 20px;
+  backdrop-filter: blur(20px);
+  z-index: 999;
+  gap: 12px;
+  align-items: center;
+}
+
+.view.fullscreen .fullscreen-controls { display: flex; }
+
+.fullscreen-exit {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--ink-faint);
+  border-radius: 12px;
+  color: var(--ink-dim);
+  font-size: 14px;
+  z-index: 999;
+  backdrop-filter: blur(20px);
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.fullscreen-exit:hover { color: var(--ink); border-color: var(--ink-dim); }
+
+.view.fullscreen .fullscreen-exit { display: flex; }
+
+/* ========================================================
+   OVERLAY
+   ======================================================== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: none;
+}
+
+.overlay.show { display: block; }
+
+</style>
+</head>
+<body>
+
+<!-- Film Grain -->
+<svg style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.035;z-index:9999;mix-blend-mode:overlay">
+  <filter id="grain"><feTurbulence baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/></filter>
+  <rect width="100%" height="100%" filter="url(#grain)"/>
+</svg>
+
+<!-- Click-away overlay -->
+<div class="overlay" id="overlay"></div>
+
+<!-- ============================================================
+     VIEW 1: HOME
+     ============================================================ -->
+<div class="view active" id="view-home">
+  <div class="topbar">
+    <div class="logo" onclick="goHome()">
+      <div class="logo-mark"></div>
+      <span class="logo-text">NextFrame</span>
+    </div>
+    <div class="cmd-bar">
+      <div class="cmd-trigger" onclick="openCmd(this)">
+        <span class="search-icon">&#x2315;</span>
+        Search projects...
+        <span class="kbd">&#x2318;K</span>
+      </div>
+      <div class="cmd-dropdown" id="cmd-home">
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x2728;</span>Generate intro sequence<span class="cmd-hint">AI</span></div>
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F3A8;</span>Style transfer from reference<span class="cmd-hint">AI</span></div>
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F4DD;</span>Script to timeline<span class="cmd-hint">AI</span></div>
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F3B5;</span>Auto-sync to beat<span class="cmd-hint">AI</span></div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="avatar">Z</div>
+    </div>
+  </div>
+
+  <div class="home-content">
+    <div class="home-inner">
+      <div class="greeting stagger-in">Good evening</div>
+
+      <div class="section-header stagger-in">
+        <span class="section-label">Recent</span>
+        <button class="btn-new" onclick="goProject()">+ New Project</button>
+      </div>
+
+      <div class="project-grid">
+        <div class="project-card stagger-in" onclick="goProject()">
+          <div class="card-thumb"><div class="card-thumb-inner glow-accent"><span class="card-thumb-label">Show</span></div></div>
+          <div class="card-info">
+            <div class="card-title">Show</div>
+            <div class="card-meta"><span>3 episodes</span><span>edited 2h ago</span></div>
           </div>
-          <div id="project-title" aria-live="polite"></div>
-          <nav class="menu-bar" aria-label="Application menu">
-            <div class="menu-root" data-menu-root="file" data-open="false">
-              <button
-                class="menu-trigger"
-                type="button"
-                data-menu-trigger="file"
-                aria-expanded="false"
-              >
-                File
-              </button>
-              <div class="menu-dropdown" role="menu" aria-label="File">
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="new">
-                  <span class="menu-check"></span>
-                  <span>New</span>
-                  <span class="menu-shortcut">Cmd+N</span>
-                </button>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="open">
-                  <span class="menu-check"></span>
-                  <span>Open…</span>
-                  <span class="menu-shortcut">Cmd+O</span>
-                </button>
-                <div class="menu-submenu">
-                  <button
-                    class="menu-item"
-                    type="button"
-                    role="menuitem"
-                    aria-haspopup="menu"
-                    aria-expanded="false"
-                  >
-                    <span class="menu-check"></span>
-                    <span>Open Recent</span>
-                    <span class="menu-shortcut">▸</span>
-                  </button>
-                  <div class="menu-submenu-dropdown" role="menu" aria-label="Open Recent" data-menu-recent-list>
-                  </div>
-                </div>
-                <div class="menu-divider" role="separator"></div>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="save">
-                  <span class="menu-check"></span>
-                  <span>Save</span>
-                  <span class="menu-shortcut">Cmd+S</span>
-                </button>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="saveAs">
-                  <span class="menu-check"></span>
-                  <span>Save As…</span>
-                  <span class="menu-shortcut">Cmd+Shift+S</span>
-                </button>
-                <div class="menu-divider" role="separator"></div>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="close">
-                  <span class="menu-check"></span>
-                  <span>Close</span>
-                  <span class="menu-shortcut"></span>
-                </button>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="export">
-                  <span class="menu-check"></span>
-                  <span>Export…</span>
-                  <span class="menu-shortcut"></span>
-                </button>
-              </div>
-            </div>
-
-            <div class="menu-root" data-menu-root="edit" data-open="false">
-              <button
-                class="menu-trigger"
-                type="button"
-                data-menu-trigger="edit"
-                aria-expanded="false"
-              >
-                Edit
-              </button>
-              <div class="menu-dropdown" role="menu" aria-label="Edit">
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="undo">
-                  <span class="menu-check"></span>
-                  <span>Undo</span>
-                  <span class="menu-shortcut">Cmd+Z</span>
-                </button>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="redo">
-                  <span class="menu-check"></span>
-                  <span>Redo</span>
-                  <span class="menu-shortcut">Cmd+Shift+Z</span>
-                </button>
-                <div class="menu-divider" role="separator"></div>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="cut">
-                  <span class="menu-check"></span>
-                  <span>Cut</span>
-                  <span class="menu-shortcut">Cmd+X</span>
-                </button>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="copy">
-                  <span class="menu-check"></span>
-                  <span>Copy</span>
-                  <span class="menu-shortcut">Cmd+C</span>
-                </button>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="paste">
-                  <span class="menu-check"></span>
-                  <span>Paste</span>
-                  <span class="menu-shortcut">Cmd+V</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="menu-root" data-menu-root="view" data-open="false">
-              <button
-                class="menu-trigger"
-                type="button"
-                data-menu-trigger="view"
-                aria-expanded="false"
-              >
-                View
-              </button>
-              <div class="menu-dropdown" role="menu" aria-label="View">
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="zoomIn">
-                  <span class="menu-check"></span>
-                  <span>Zoom In</span>
-                  <span class="menu-shortcut">Cmd+=</span>
-                </button>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="zoomOut">
-                  <span class="menu-check"></span>
-                  <span>Zoom Out</span>
-                  <span class="menu-shortcut">Cmd+-</span>
-                </button>
-                <button class="menu-item" type="button" role="menuitem" data-menu-action="zoomFit">
-                  <span class="menu-check"></span>
-                  <span>Zoom Fit</span>
-                  <span class="menu-shortcut">Shift+F</span>
-                </button>
-                <div class="menu-divider" role="separator"></div>
-                <div class="menu-submenu">
-                  <button class="menu-item" type="button" role="menuitem" aria-haspopup="true">
-                    <span class="menu-check"></span>
-                    <span>Aspect</span>
-                    <span class="menu-shortcut">›</span>
-                  </button>
-                  <div class="menu-submenu-dropdown" role="menu" aria-label="Aspect">
-                    <button
-                      class="menu-item"
-                      type="button"
-                      role="menuitemradio"
-                      data-menu-action="setAspectPreset"
-                      data-menu-radio="aspectPreset"
-                      data-menu-value="youtube-16-9"
-                      data-menu-aspect-preset="youtube-16-9"
-                      data-checked="true"
-                      aria-checked="true"
-                    >
-                      <span class="menu-check">•</span>
-                      <span>16:9 YouTube</span>
-                      <span class="menu-shortcut"></span>
-                    </button>
-                    <button
-                      class="menu-item"
-                      type="button"
-                      role="menuitemradio"
-                      data-menu-action="setAspectPreset"
-                      data-menu-radio="aspectPreset"
-                      data-menu-value="tiktok-9-16"
-                      data-menu-aspect-preset="tiktok-9-16"
-                      data-checked="false"
-                      aria-checked="false"
-                    >
-                      <span class="menu-check"></span>
-                      <span>9:16 TikTok / Shorts</span>
-                      <span class="menu-shortcut"></span>
-                    </button>
-                    <button
-                      class="menu-item"
-                      type="button"
-                      role="menuitemradio"
-                      data-menu-action="setAspectPreset"
-                      data-menu-radio="aspectPreset"
-                      data-menu-value="instagram-1-1"
-                      data-menu-aspect-preset="instagram-1-1"
-                      data-checked="false"
-                      aria-checked="false"
-                    >
-                      <span class="menu-check"></span>
-                      <span>1:1 Instagram Square</span>
-                      <span class="menu-shortcut"></span>
-                    </button>
-                    <button
-                      class="menu-item"
-                      type="button"
-                      role="menuitemradio"
-                      data-menu-action="setAspectPreset"
-                      data-menu-radio="aspectPreset"
-                      data-menu-value="instagram-4-5"
-                      data-menu-aspect-preset="instagram-4-5"
-                      data-checked="false"
-                      aria-checked="false"
-                    >
-                      <span class="menu-check"></span>
-                      <span>4:5 Instagram Portrait</span>
-                      <span class="menu-shortcut"></span>
-                    </button>
-                    <button
-                      class="menu-item"
-                      type="button"
-                      role="menuitemradio"
-                      data-menu-action="setAspectPreset"
-                      data-menu-radio="aspectPreset"
-                      data-menu-value="cinema-21-9"
-                      data-menu-aspect-preset="cinema-21-9"
-                      data-checked="false"
-                      aria-checked="false"
-                    >
-                      <span class="menu-check"></span>
-                      <span>21:9 Cinematic</span>
-                      <span class="menu-shortcut"></span>
-                    </button>
-                  </div>
-                </div>
-                <div class="menu-divider" role="separator"></div>
-                <div class="menu-submenu">
-                  <button class="menu-item" type="button" role="menuitem" aria-haspopup="true">
-                    <span class="menu-check"></span>
-                    <span>Theme</span>
-                    <span class="menu-shortcut">›</span>
-                  </button>
-                  <div class="menu-submenu-dropdown" role="menu" aria-label="Theme">
-                    <button
-                      class="menu-item"
-                      type="button"
-                      role="menuitemradio"
-                      data-menu-action="setTheme"
-                      data-menu-radio="theme"
-                      data-menu-value="default"
-                      data-menu-theme="default"
-                      data-checked="true"
-                      aria-checked="true"
-                    >
-                      <span class="menu-check">•</span>
-                      <span>Default</span>
-                      <span class="menu-shortcut"></span>
-                    </button>
-                    <button
-                      class="menu-item"
-                      type="button"
-                      role="menuitemradio"
-                      data-menu-action="setTheme"
-                      data-menu-radio="theme"
-                      data-menu-value="velvet"
-                      data-menu-theme="velvet"
-                      data-checked="false"
-                      aria-checked="false"
-                    >
-                      <span class="menu-check"></span>
-                      <span>Velvet</span>
-                      <span class="menu-shortcut"></span>
-                    </button>
-                    <button
-                      class="menu-item"
-                      type="button"
-                      role="menuitemradio"
-                      data-menu-action="setTheme"
-                      data-menu-radio="theme"
-                      data-menu-value="ice"
-                      data-menu-theme="ice"
-                      data-checked="false"
-                      aria-checked="false"
-                    >
-                      <span class="menu-check"></span>
-                      <span>Ice</span>
-                      <span class="menu-shortcut"></span>
-                    </button>
-                  </div>
-                </div>
-                <div class="menu-divider" role="separator"></div>
-                <button
-                  class="menu-item"
-                  type="button"
-                  role="menuitem"
-                  data-menu-action="revealProject"
-                  disabled
-                >
-                  <span class="menu-check"></span>
-                  <span>Reveal Project in Finder</span>
-                  <span class="menu-shortcut"></span>
-                </button>
-                <div class="menu-divider" role="separator"></div>
-                <button
-                  class="menu-item"
-                  type="button"
-                  role="menuitemcheckbox"
-                  data-menu-action="toggleSnap"
-                  data-menu-check="snapEnabled"
-                  data-checked="true"
-                >
-                  <span class="menu-check">✓</span>
-                  <span>Toggle Snap</span>
-                  <span class="menu-shortcut">S</span>
-                </button>
-                <button
-                  class="menu-item"
-                  type="button"
-                  role="menuitemcheckbox"
-                  data-menu-action="toggleTimeline"
-                  data-menu-check="timelineVisible"
-                  data-checked="true"
-                >
-                  <span class="menu-check">✓</span>
-                  <span>Toggle Timeline</span>
-                  <span class="menu-shortcut"></span>
-                </button>
-                <button
-                  class="menu-item"
-                  type="button"
-                  role="menuitemcheckbox"
-                  data-menu-action="toggleInspector"
-                  data-menu-check="inspectorVisible"
-                  data-checked="true"
-                >
-                  <span class="menu-check">✓</span>
-                  <span>Toggle Inspector</span>
-                  <span class="menu-shortcut"></span>
-                </button>
-              </div>
-            </div>
-          </nav>
         </div>
-        <div class="menu-group">
-          <div class="menu-chip" id="project-status">
-            <span class="status-dot"></span>
-            <span id="project-status-label">Ready</span>
+        <div class="project-card stagger-in" onclick="goProject()">
+          <div class="card-thumb"><div class="card-thumb-inner glow-warm"><span class="card-thumb-label">Demo Reel</span></div></div>
+          <div class="card-info">
+            <div class="card-title">Demo Reel</div>
+            <div class="card-meta"><span>1 episode</span><span>edited 1d ago</span></div>
           </div>
-          <button class="menu-button primary" type="button" data-menu-action="export">Export…</button>
         </div>
-      </header>
+        <div class="project-card stagger-in">
+          <div class="card-thumb"><div class="card-thumb-inner glow-blue"><span class="card-thumb-label">Onboarding</span></div></div>
+          <div class="card-info">
+            <div class="card-title">Onboarding</div>
+            <div class="card-meta"><span>5 episodes</span><span>edited 3d ago</span></div>
+          </div>
+        </div>
+      </div>
 
-      <main id="workspace">
-        <section id="top-row">
-          <aside id="left-library" class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <strong>Asset Library</strong>
-                <span>Imported media and reusable shots</span>
-              </div>
-              <div class="chip-row">
-                <div class="mini-chip">12 Items</div>
-              </div>
-            </div>
-            <div class="library-controls">
-              <div class="search-field">
-                <span class="search-dot" aria-hidden="true"></span>
-                Search media
-              </div>
-              <div class="filter-row">
-                <div class="filter-chip active">All</div>
-                <div class="filter-chip">Video</div>
-                <div class="filter-chip">Text</div>
-                <div class="filter-chip">Audio</div>
-              </div>
-            </div>
-            <div class="asset-grid">
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #4338ca; --thumb-b: #0f172a"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>City Opener</strong>
-                    <span>4K clip</span>
-                  </div>
-                  <div class="asset-length">00:08</div>
-                </div>
-              </article>
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #0f766e; --thumb-b: #0f172a"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>Product Macro</strong>
-                    <span>Close-up</span>
-                  </div>
-                  <div class="asset-length">00:05</div>
-                </div>
-              </article>
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #7c2d12; --thumb-b: #312e81"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>Gradient Title</strong>
-                    <span>Motion title</span>
-                  </div>
-                  <div class="asset-length">00:03</div>
-                </div>
-              </article>
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #1d4ed8; --thumb-b: #111827"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>Drone Sweep</strong>
-                    <span>Wide aerial</span>
-                  </div>
-                  <div class="asset-length">00:12</div>
-                </div>
-              </article>
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #9d174d; --thumb-b: #1f2937"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>Transition Bloom</strong>
-                    <span>Effect preset</span>
-                  </div>
-                  <div class="asset-length">00:02</div>
-                </div>
-              </article>
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #0f766e; --thumb-b: #134e4a"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>Ambient Bed</strong>
-                    <span>Music loop</span>
-                  </div>
-                  <div class="asset-length">00:30</div>
-                </div>
-              </article>
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #5b21b6; --thumb-b: #0f172a"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>Scene Marker</strong>
-                    <span>Overlay pack</span>
-                  </div>
-                  <div class="asset-length">00:04</div>
-                </div>
-              </article>
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #1e3a8a; --thumb-b: #164e63"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>Night Skyline</strong>
-                    <span>B-roll</span>
-                  </div>
-                  <div class="asset-length">00:09</div>
-                </div>
-              </article>
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #c2410c; --thumb-b: #7c2d12"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>Brand Palette</strong>
-                    <span>Color swatches</span>
-                  </div>
-                  <div class="asset-length">00:01</div>
-                </div>
-              </article>
-              <article class="asset-card">
-                <div class="asset-thumb" style="--thumb-a: #115e59; --thumb-b: #0f172a"></div>
-                <div class="asset-meta">
-                  <div class="asset-name">
-                    <strong>Voiceover Take 2</strong>
-                    <span>Narration</span>
-                  </div>
-                  <div class="asset-length">00:18</div>
-                </div>
-              </article>
-            </div>
-          </aside>
+      <div class="divider stagger-in"></div>
 
-          <div
-            id="library-splitter"
-            class="splitter splitter-col"
-            data-resize="left"
-            role="separator"
-            aria-label="Resize library"
-            aria-orientation="vertical"
-          ></div>
+      <div class="all-projects-header stagger-in">
+        <span class="all-projects-title">All Projects</span>
+        <div class="view-toggle">
+          <button class="view-toggle-btn" id="toggle-grid">Grid</button>
+          <button class="view-toggle-btn active" id="toggle-list">List</button>
+        </div>
+      </div>
 
-          <section id="center-preview" class="panel">
-            <div class="preview-toolbar">
-              <div class="panel-title">
-                <strong>Program Monitor</strong>
-                <span>1920×1080 • 30 fps • Draft preview</span>
-              </div>
-              <div class="preview-meta">
-                <div class="mini-chip" id="preview-zoom-label">100%</div>
-                <div class="mini-chip">Safe Guides</div>
-                <div class="mini-chip">Proxy</div>
-              </div>
-            </div>
-            <div class="preview-shell">
-              <div id="preview-stage-slot">
-                <div id="preview-stage">
-                  <div class="safe-badge">16:9 Canvas</div>
-                  <div class="preview-watermark">
-                    <strong>Preview</strong>
-                    <span>Clip timing, scene composition, and overlays will render here.</span>
-                  </div>
-                </div>
-              </div>
-              <div id="preview-transport"></div>
-            </div>
-          </section>
+      <div class="project-list">
+        <div class="project-list-item stagger-in" onclick="goProject()">
+          <span class="list-dot accent"></span>
+          <span class="list-title">Show</span>
+          <span class="list-meta">3 episodes &middot; 52s &middot; 2h ago</span>
+        </div>
+        <div class="project-list-item stagger-in" onclick="goProject()">
+          <span class="list-dot warm"></span>
+          <span class="list-title">Demo Reel</span>
+          <span class="list-meta">1 episode &middot; 18s &middot; 1d ago</span>
+        </div>
+        <div class="project-list-item stagger-in">
+          <span class="list-dot blue"></span>
+          <span class="list-title">Onboarding</span>
+          <span class="list-meta">5 episodes &middot; 2m12s &middot; 3d ago</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-          <div
-            id="inspector-splitter"
-            class="splitter splitter-col"
-            data-resize="right"
-            role="separator"
-            aria-label="Resize inspector"
-            aria-orientation="vertical"
-          ></div>
+<!-- ============================================================
+     VIEW 2: PROJECT
+     ============================================================ -->
+<div class="view" id="view-project">
+  <div class="topbar">
+    <div class="back-link" onclick="goHome()">&#x2190;</div>
+    <div class="logo" onclick="goHome()">
+      <div class="logo-mark"></div>
+      <span class="logo-text">NextFrame</span>
+    </div>
+    <span style="color:var(--ink-dim);font-size:12px;margin:0 4px">/</span>
+    <span style="font-size:13px;font-weight:500;color:var(--ink)">Show</span>
+    <div class="cmd-bar">
+      <div class="cmd-trigger" onclick="openCmd(this)">
+        <span class="search-icon">&#x2315;</span>
+        Search episodes...
+        <span class="kbd">&#x2318;K</span>
+      </div>
+      <div class="cmd-dropdown" id="cmd-project">
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x2728;</span>Generate episode from script<span class="cmd-hint">AI</span></div>
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F504;</span>Batch re-render all<span class="cmd-hint">AI</span></div>
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F4CA;</span>Export analytics<span class="cmd-hint">AI</span></div>
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F3AC;</span>Preview full show<span class="cmd-hint">AI</span></div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="avatar">Z</div>
+    </div>
+  </div>
 
-          <aside id="right-inspector" class="panel">
-            <div class="panel-header">
-              <div class="panel-title">
-                <strong>Inspector</strong>
-                <span>Contextual clip controls</span>
-              </div>
-              <div class="chip-row">
-                <div class="mini-chip">No Selection</div>
-              </div>
-            </div>
-            <div class="inspector-body">
-              <div class="empty-state">
-                <div class="empty-glyph" aria-hidden="true"></div>
-                <strong>Select a clip</strong>
-                <p>Choose an item in the timeline to edit transform, timing, text, effects, and blend modes.</p>
-              </div>
-              <div class="placeholder-group">
-                <div class="placeholder-row"></div>
-                <div class="placeholder-row"></div>
-                <div class="placeholder-row"></div>
-              </div>
-            </div>
-          </aside>
-        </section>
+  <div class="project-content">
+    <div class="project-inner">
+      <div class="project-hero stagger-in">
+        <div class="project-title">Show</div>
+        <div class="project-desc">A three-part series demonstrating NextFrame's scene types: canvas, HTML, SVG, Markdown, and composited multi-layer sequences.</div>
+        <div class="project-stats">3 episodes &middot; 52s total</div>
+      </div>
 
-        <div
-          id="timeline-splitter"
-          class="splitter splitter-row"
-          data-resize="bottom"
-          role="separator"
-          aria-label="Resize timeline"
-          aria-orientation="horizontal"
-        ></div>
+      <div class="section-header stagger-in">
+        <span class="section-label">Episodes</span>
+      </div>
 
-        <section id="bottom-timeline" class="panel"></section>
-        <div id="timeline-stats" class="timeline-stats"></div>
-      </main>
+      <div class="episode-list">
+        <div class="episode-card stagger-in" onclick="goEditor()">
+          <div class="ep-thumb"><div class="ep-thumb-inner glow-accent"><span class="ep-thumb-label">EP01</span></div></div>
+          <div class="ep-info">
+            <span class="ep-badge">EP 01</span>
+            <div class="ep-title">Canvas Intro</div>
+            <div class="ep-meta"><span>3 segments &middot; 26s</span><span>edited 2h ago</span></div>
+          </div>
+        </div>
+        <div class="episode-card stagger-in" onclick="goEditor()">
+          <div class="ep-thumb"><div class="ep-thumb-inner glow-warm"><span class="ep-thumb-label">EP02</span></div></div>
+          <div class="ep-info">
+            <span class="ep-badge">EP 02</span>
+            <div class="ep-title">HTML Components</div>
+            <div class="ep-meta"><span>5 segments &middot; 14s</span><span>edited 2h ago</span></div>
+          </div>
+        </div>
+        <div class="episode-card stagger-in" onclick="goEditor()">
+          <div class="ep-thumb"><div class="ep-thumb-inner glow-blue"><span class="ep-thumb-label">EP03</span></div></div>
+          <div class="ep-info">
+            <span class="ep-badge">EP 03</span>
+            <div class="ep-title">SVG Animation</div>
+            <div class="ep-meta"><span>2 segments &middot; 12s</span><span>edited 5h ago</span></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-new-outline stagger-in">+ New Episode</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     VIEW 3: EDITOR
+     ============================================================ -->
+<div class="view" id="view-editor">
+  <div class="topbar topbar-editor">
+    <div class="logo" onclick="goHome()" style="margin-right:12px">
+      <div class="logo-mark" style="width:18px;height:18px;border-radius:5px"></div>
+    </div>
+    <div class="breadcrumb">
+      <div class="bc-item" id="bc-show" onclick="toggleBcDrop('bc-drop-show',event)">
+        Show<span class="bc-caret">&#x25BE;</span>
+        <div class="bc-dropdown" id="bc-drop-show">
+          <div class="bc-dropdown-item"><span class="dot-active"></span>Show</div>
+          <div class="bc-dropdown-item" onclick="goProject()"><span class="dot-inactive"></span>Demo Reel</div>
+          <div class="bc-dropdown-item"><span class="dot-inactive"></span>Onboarding</div>
+          <div class="bc-dropdown-sep"></div>
+          <div class="bc-dropdown-new">+ New Project</div>
+        </div>
+      </div>
+      <span class="bc-sep">/</span>
+      <div class="bc-item" id="bc-ep" onclick="toggleBcDrop('bc-drop-ep',event)">
+        EP01<span class="bc-caret">&#x25BE;</span>
+        <div class="bc-dropdown" id="bc-drop-ep">
+          <div class="bc-dropdown-item"><span class="dot-active"></span>EP01 &mdash; Canvas Intro</div>
+          <div class="bc-dropdown-item"><span class="dot-inactive"></span>EP02 &mdash; HTML Components</div>
+          <div class="bc-dropdown-item"><span class="dot-inactive"></span>EP03 &mdash; SVG Animation</div>
+          <div class="bc-dropdown-sep"></div>
+          <div class="bc-dropdown-new">+ New Episode</div>
+        </div>
+      </div>
+      <span class="bc-sep">/</span>
+      <div class="bc-item" id="bc-scene" onclick="toggleBcDrop('bc-drop-scene',event)">
+        content<span class="bc-caret">&#x25BE;</span>
+        <div class="bc-dropdown" id="bc-drop-scene">
+          <div class="bc-dropdown-item"><span class="dot-active"></span>content</div>
+          <div class="bc-dropdown-item"><span class="dot-inactive"></span>transitions</div>
+          <div class="bc-dropdown-item"><span class="dot-inactive"></span>audio</div>
+        </div>
+      </div>
     </div>
 
-    <script type="module">
-      import * as bridge from "./src/bridge.js";
-      import { loadAudioBuffer, mergeProjectAssets, normalizeAudioUrl } from "./src/audio/buffer.js";
-      import { startAutosave } from "./src/autosave.js";
-      import { mountCommandPalette } from "./src/command-palette.js";
-      import { mountContextMenu } from "./src/context-menu.js";
-      import { initDragDrop } from "./src/dnd/index.js";
-      import * as engine from "./src/engine/index.js";
-      import { installOnFrame } from "./src/export/onframe.js";
-      import { mountHelpHint } from "./src/help-hint.js";
-      import { initMenu } from "./src/menu.js";
-      import { mountPreview } from "./src/preview/index.js";
-      import { mountTransport } from "./src/preview/transport.js";
-      import { mountLibrary } from "./src/panels/library/index.js";
-      import { mountInspector } from "./src/panels/inspector/index.js";
-      import { registerAllScenes, SCENE_MANIFEST } from "./src/scenes/index.js";
-      import { mountStatusBar } from "./src/status-bar.js";
-      import { store } from "./src/store.js";
-      import { initTheme } from "./src/theme.js";
-      import { mountTitleBar } from "./src/title-bar.js";
-      import { mountTimeline } from "./src/timeline/index.js";
-      import { mountStatsBar } from "./src/timeline/stats-bar.js";
-      import { startTutorial } from "./src/tutorial/index.js";
-      import { showWelcome } from "./src/welcome.js";
-      import {
-        addTrack,
-        copySelectedClips,
-        cutSelectedClips,
-        duplicateSelectedClips,
-        removeSelectedClips,
-        pasteClipboardClips,
-      } from "./src/workspace-actions.js";
-
-      registerAllScenes(engine);
-      window.nextFrameStore = store;
-
-      function initWorkspaceChrome() {
-        const $ = (id) => document.getElementById(id);
-        const splitters = [...document.querySelectorAll(".splitter")];
-        const pane = {
-          left: $("left-library"),
-          right: $("right-inspector"),
-          bottom: $("bottom-timeline"),
-        };
-        const top = $("top-row");
-        const workspace = $("workspace");
-        const range = {
-          left: [180, 400],
-          right: [220, 420],
-          bottom: [180, 480],
-        };
-        const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-        let drag = "";
-
-        splitters.forEach((element) => element.addEventListener("mousedown", (event) => {
-          drag = element.dataset.resize;
-          element.classList.add("active");
-          document.body.classList.add("dragging");
-          event.preventDefault();
-        }));
-
-        window.addEventListener("mousemove", (event) => {
-          if (!drag) {
-            return;
-          }
-
-          const topRect = top.getBoundingClientRect();
-          const workspaceRect = workspace.getBoundingClientRect();
-          const gap = 20;
-          const left = parseFloat(getComputedStyle(pane.left).flexBasis);
-          const right = parseFloat(getComputedStyle(pane.right).flexBasis);
-
-          if (drag === "left") {
-            pane.left.style.flexBasis = `${clamp(
-              event.clientX - topRect.left - 5,
-              range.left[0],
-              Math.max(range.left[0], Math.min(range.left[1], topRect.width - right - 480 - gap)),
-            )}px`;
-          }
-
-          if (drag === "right") {
-            pane.right.style.flexBasis = `${clamp(
-              topRect.right - event.clientX - 5,
-              range.right[0],
-              Math.max(range.right[0], Math.min(range.right[1], topRect.width - left - 480 - gap)),
-            )}px`;
-          }
-
-          if (drag === "bottom") {
-            pane.bottom.style.flexBasis = `${clamp(
-              workspaceRect.bottom - event.clientY - 5,
-              range.bottom[0],
-              Math.max(range.bottom[0], Math.min(range.bottom[1], workspaceRect.height - 280 - 10)),
-            )}px`;
-          }
-        });
-
-        window.addEventListener("mouseup", () => {
-          if (!drag) {
-            return;
-          }
-
-          splitters.forEach((element) => element.classList.remove("active"));
-          document.body.classList.remove("dragging");
-          drag = "";
-        });
-
-        mountTimeline($("bottom-timeline"), store);
-        mountStatsBar($("timeline-stats"), store);
-        mountStatusBar($("app"), store);
-      }
-
-      function isEditableTarget(target) {
-        if (!(target instanceof HTMLElement)) {
-          return false;
-        }
-
-        return target.isContentEditable
-          || target instanceof HTMLInputElement
-          || target instanceof HTMLTextAreaElement
-          || target instanceof HTMLSelectElement
-          || target instanceof HTMLButtonElement;
-      }
-
-      function clampPlayhead(playhead, duration) {
-        if (!(duration > 0)) {
-          return 0;
-        }
-
-        return Math.min(Math.max(playhead, 0), duration);
-      }
-
-      function runMenuAction(action) {
-        const button = document.querySelector(`[data-menu-action="${action}"]`);
-        if (button instanceof HTMLButtonElement && !button.disabled) {
-          button.click();
-        }
-      }
-
-      function areMapsEqual(left, right) {
-        if (left === right) {
-          return true;
-        }
-
-        if (!(left instanceof Map) || !(right instanceof Map) || left.size !== right.size) {
-          return false;
-        }
-
-        for (const [key, value] of left.entries()) {
-          if (right.get(key) !== value) {
-            return false;
-          }
-        }
-
-        return true;
-      }
-
-      function createAudioAssetBufferSync(store) {
-        let requestId = 0;
-        let lastAssetsRef = store.state.assets;
-        let lastTimelineAssetsRef = store.state.timeline?.assets;
-
-        async function syncAssets(state) {
-          const currentRequestId = ++requestId;
-          const assets = mergeProjectAssets(state);
-          const audioAssets = assets.filter((asset) => asset?.kind === "audio");
-
-          if (audioAssets.length === 0) {
-            if (store.state.assetBuffers instanceof Map && store.state.assetBuffers.size > 0) {
-              store.mutate((draft) => {
-                draft.assetBuffers = new Map();
-              });
-            }
-            return;
-          }
-
-          const nextBuffers = new Map();
-
-          for (const asset of audioAssets) {
-            const audioUrl = normalizeAudioUrl(asset.path || asset.url);
-            if (!audioUrl) {
-              continue;
-            }
-
-            try {
-              const buffer = await loadAudioBuffer(audioUrl);
-              if (buffer) {
-                nextBuffers.set(audioUrl, buffer);
-              }
-            } catch (error) {
-              console.warn("[NextFrame] Failed to decode audio asset:", audioUrl, error);
-            }
-          }
-
-          if (currentRequestId !== requestId) {
-            return;
-          }
-
-          const previousBuffers = store.state.assetBuffers instanceof Map
-            ? store.state.assetBuffers
-            : new Map();
-
-          if (!areMapsEqual(previousBuffers, nextBuffers)) {
-            store.mutate((draft) => {
-              draft.assetBuffers = nextBuffers;
-            });
-          }
-        }
-
-        const unsubscribe = store.subscribe((nextState) => {
-          const nextTimelineAssetsRef = nextState.timeline?.assets;
-          if (nextState.assets !== lastAssetsRef || nextTimelineAssetsRef !== lastTimelineAssetsRef) {
-            lastAssetsRef = nextState.assets;
-            lastTimelineAssetsRef = nextTimelineAssetsRef;
-            void syncAssets(nextState);
-          }
-        });
-
-        void syncAssets(store.state);
-        return unsubscribe;
-      }
-
-      function togglePlaying() {
-        store.mutate((state) => {
-          state.playing = !state.playing;
-        });
-      }
-
-      function jogPlayhead(delta) {
-        if (store.state.playing) {
-          return;
-        }
-
-        const duration = Number(store.state.timeline?.duration) || 0;
-        const playhead = Number(store.state.playhead) || 0;
-        store.dispatch({
-          type: "setPlayhead",
-          playhead: clampPlayhead(playhead + delta, duration),
-        });
-      }
-
-      function normalizeLoadedTimeline(timeline) {
-        return {
-          ...timeline,
-          background: typeof timeline?.background === "string" ? timeline.background : "#0b0b14",
-          assets: Array.isArray(timeline?.assets) ? timeline.assets : [],
-          tracks: Array.isArray(timeline?.tracks) ? timeline.tracks : [],
-        };
-      }
-
-      async function openRecentProject() {
-        const entries = await bridge.call("recent.list", {});
-        const recentEntry = Array.isArray(entries)
-          ? entries.find((entry) => typeof entry?.path === "string" && entry.path.length > 0)
-          : null;
-        if (!recentEntry?.path) {
-          return;
-        }
-
-        const loadedTimeline = await bridge.call("timeline.load", { path: recentEntry.path });
-        const validation = engine.validateTimeline(loadedTimeline);
-        if (!validation.ok) {
-          throw new Error(validation.errors.join("\n"));
-        }
-
-        const timeline = normalizeLoadedTimeline(loadedTimeline);
-        const savedAt = Date.now();
-        store.mutate((state) => {
-          state.timeline = timeline;
-          state.assets = timeline.assets;
-          state.assetBuffers = new Map();
-          state.filePath = recentEntry.path;
-          state.playhead = 0;
-          state.dirty = false;
-          state.lastSavedAt = savedAt;
-          state.lastChangeAt = savedAt;
-        });
-
-        void bridge.call("recent.add", { path: recentEntry.path }).catch(() => {});
-      }
-
-      function selectAllClips() {
-        const clipEntries = (store.state.timeline?.tracks || [])
-          .flatMap((track) => (track?.clips || []).map((clip) => ({
-            trackId: track?.id ?? null,
-            clipId: clip?.id ?? null,
-          })))
-          .filter((entry) => entry.trackId && entry.clipId);
-        if (clipEntries.length === 0) {
-          return;
-        }
-
-        const lastEntry = clipEntries.at(-1);
-        store.dispatch({
-          type: "setSelection",
-          trackId: lastEntry?.trackId ?? null,
-          clipId: lastEntry?.clipId ?? null,
-          clipIds: clipEntries.map((entry) => entry.clipId),
-        });
-      }
-
-      function toggleHelp() {
-        const helpButton = document.querySelector(".help-hint-badge");
-        if (helpButton instanceof HTMLButtonElement) {
-          helpButton.click();
-        }
-      }
-
-      function zoomTimeline(action) {
-        const button = document.querySelector(`#bottom-timeline [data-action="${action}"]`);
-        if (button instanceof HTMLButtonElement) {
-          button.click();
-        }
-      }
-
-      function createPaletteCommands() {
-        return [
-          { id: "file.new", label: "File: New Project", shortcut: "Cmd+N", run: () => runMenuAction("new") },
-          { id: "file.open", label: "File: Open", shortcut: "Cmd+O", run: () => runMenuAction("open") },
-          { id: "file.openRecent", label: "File: Open Recent", run: () => openRecentProject() },
-          { id: "file.save", label: "File: Save", shortcut: "Cmd+S", run: () => runMenuAction("save") },
-          { id: "file.saveAs", label: "File: Save As", shortcut: "Cmd+Shift+S", run: () => runMenuAction("saveAs") },
-          { id: "file.export", label: "File: Export", run: () => runMenuAction("export") },
-          { id: "file.close", label: "File: Close", run: () => runMenuAction("close") },
-          { id: "edit.undo", label: "Edit: Undo", shortcut: "Cmd+Z", run: () => store.undo?.() },
-          { id: "edit.redo", label: "Edit: Redo", shortcut: "Cmd+Shift+Z", run: () => store.redo?.() },
-          {
-            id: "edit.cut",
-            label: "Edit: Cut",
-            shortcut: "Cmd+X",
-            run: () => cutSelectedClips(store),
-          },
-          { id: "edit.copy", label: "Edit: Copy", shortcut: "Cmd+C", run: () => copySelectedClips(store) },
-          { id: "edit.paste", label: "Edit: Paste", shortcut: "Cmd+V", run: () => pasteClipboardClips(store) },
-          { id: "edit.delete", label: "Edit: Delete", shortcut: "Delete", run: () => removeSelectedClips(store) },
-          { id: "edit.duplicate", label: "Edit: Duplicate", shortcut: "Cmd+D", run: () => duplicateSelectedClips(store) },
-          { id: "edit.selectAll", label: "Edit: Select All", shortcut: "Cmd+A", run: () => selectAllClips() },
-          { id: "view.zoomIn", label: "View: Zoom In", shortcut: "Cmd+=", run: () => zoomTimeline("zoom-in") },
-          { id: "view.zoomOut", label: "View: Zoom Out", shortcut: "Cmd+-", run: () => zoomTimeline("zoom-out") },
-          { id: "view.zoomFit", label: "View: Zoom Fit", shortcut: "Cmd+0", run: () => zoomTimeline("fit") },
-          {
-            id: "view.toggleSafeArea",
-            label: "View: Toggle Safe Area",
-            run: () => {
-              store.mutate((state) => {
-                state.showSafeArea = !state.showSafeArea;
-              });
-            },
-          },
-          {
-            id: "view.toggleFps",
-            label: "View: Toggle FPS",
-            shortcut: "P",
-            run: () => {
-              store.mutate((state) => {
-                state.showPerf = !state.showPerf;
-              });
-            },
-          },
-          { id: "view.toggleHelp", label: "View: Toggle Help", shortcut: "?", run: () => toggleHelp() },
-          { id: "timeline.bladeTool", label: "Timeline: Blade Tool", shortcut: "B", run: () => store.setTimelineTool?.("blade") },
-          { id: "timeline.moveTool", label: "Timeline: Move Tool", run: () => store.setTimelineTool?.("select") },
-          { id: "timeline.addVideoTrack", label: "Timeline: Add Video Track", run: () => addTrack(store, "video") },
-          { id: "timeline.addAudioTrack", label: "Timeline: Add Audio Track", run: () => addTrack(store, "audio") },
-          {
-            id: "scene.randomizeParams",
-            label: "Scene: Randomize Params",
-            run: () => {
-              const randomizeButton = document.querySelector(".inspector-action-button");
-              if (randomizeButton instanceof HTMLButtonElement && !randomizeButton.disabled) {
-                randomizeButton.click();
-              }
-            },
-          },
-        ];
-      }
-
-      function onKeyDown(event) {
-        if (event.defaultPrevented || isEditableTarget(event.target)) {
-          return;
-        }
-
-        const key = event.key.toLowerCase();
-        const hasShortcutModifier = (event.metaKey || event.ctrlKey) && !event.altKey;
-
-        if (event.code === "Space" || event.key === " ") {
-          event.preventDefault();
-          togglePlaying();
-          return;
-        }
-
-        if (!hasShortcutModifier && (event.key === "Delete" || event.key === "Backspace")) {
-          event.preventDefault();
-          removeSelectedClips(store);
-          return;
-        }
-
-        if (hasShortcutModifier && key === "c") {
-          event.preventDefault();
-          copySelectedClips(store);
-          return;
-        }
-
-        if (hasShortcutModifier && key === "x") {
-          event.preventDefault();
-          cutSelectedClips(store);
-          return;
-        }
-
-        if (hasShortcutModifier && key === "v") {
-          event.preventDefault();
-          pasteClipboardClips(store);
-          return;
-        }
-
-        if (hasShortcutModifier && key === "d") {
-          event.preventDefault();
-          duplicateSelectedClips(store);
-          return;
-        }
-
-        if (store.state.playing) {
-          return;
-        }
-
-        if (event.key === "ArrowLeft") {
-          event.preventDefault();
-          jogPlayhead(event.shiftKey ? -5 : -1);
-          return;
-        }
-
-        if (event.key === "ArrowRight") {
-          event.preventDefault();
-          jogPlayhead(event.shiftKey ? 5 : 1);
-        }
-      }
-
-      async function bootstrapDemoTimeline() {
-        const response = await fetch("./src/demo-timeline.json");
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ./src/demo-timeline.json (${response.status})`);
-        }
-
-        const timeline = await response.json();
-        const validation = engine.validateTimeline(timeline);
-        if (!validation.ok) {
-          throw new Error(validation.errors.join("\n"));
-        }
-
-        const savedAt = Date.now();
-        store.mutate((state) => {
-          state.timeline = timeline;
-          state.assets = Array.isArray(timeline.assets) ? timeline.assets : [];
-          state.assetBuffers = new Map();
-          state.playhead = 0;
-          state.playing = true;
-          state.dirty = false;
-          state.lastSavedAt = savedAt;
-          state.lastChangeAt = savedAt;
-        });
-      }
-
-      (async () => {
-        try {
-          const scenes = await bridge.call("scene.list", {});
-          await bridge.call("log", { level: "info", msg: `IPC ready: ${scenes?.length ?? 0} scenes` });
-          console.info("[NextFrame] IPC bridge ready", scenes);
-        } catch (err) {
-          console.warn("[NextFrame] IPC bridge unavailable:", err);
-        }
-      })();
-
-      async function initApp() {
-        initTheme(store);
-        initWorkspaceChrome();
-
-        try {
-          await bootstrapDemoTimeline();
-        } catch (error) {
-          console.error("[NextFrame] Demo timeline bootstrap failed:", error);
-        }
-
-        const previewEl = document.getElementById("center-preview");
-        if (previewEl) {
-          const preview = mountPreview(previewEl, { engine, store });
-          const transportEl = document.getElementById("preview-transport");
-          if (transportEl) {
-            mountTransport(transportEl, { store, audioMixer: preview.audioMixer });
-          }
-          installOnFrame({ engine, store, preview });
-          showWelcome(previewEl);
-        }
-
-        const libraryEl = document.getElementById("left-library");
-        if (libraryEl) mountLibrary(libraryEl, { store, scenes: SCENE_MANIFEST });
-
-        const inspectorEl = document.getElementById("right-inspector");
-        if (inspectorEl) mountInspector(inspectorEl, { store, scenes: SCENE_MANIFEST });
-
-        initDragDrop({ store, scenes: SCENE_MANIFEST });
-        const projectTitleEl = document.getElementById("project-title");
-        if (projectTitleEl) mountTitleBar(projectTitleEl, store);
-        initMenu({ bridge, store });
-        mountHelpHint(document.getElementById("top-menu"));
-        createAudioAssetBufferSync(store);
-        mountCommandPalette({ store, bridge, commands: createPaletteCommands() });
-        mountContextMenu({ store });
-        startAutosave({ store, bridge });
-        window.addEventListener("keydown", onKeyDown);
-
-        if (!store.state.tutorialComplete) {
-          startTutorial({
-            store,
-            anchors: {
-              welcome: previewEl,
-              library: libraryEl,
-              timeline: document.getElementById("bottom-timeline"),
-              inspector: inspectorEl,
-              export: document.querySelector('[data-menu-trigger="file"]'),
-            },
-          });
-        }
-      }
-
-      void initApp();
-    </script>
-  </body>
+    <div class="cmd-bar" style="max-width:320px">
+      <div class="cmd-trigger" onclick="openCmd(this)">
+        <span class="search-icon">&#x2315;</span>
+        Commands...
+        <span class="kbd">&#x2318;K</span>
+      </div>
+      <div class="cmd-dropdown" id="cmd-editor">
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x2728;</span>Generate next scene<span class="cmd-hint">AI</span></div>
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F3A8;</span>Apply style preset<span class="cmd-hint">AI</span></div>
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F504;</span>Auto-transition<span class="cmd-hint">AI</span></div>
+        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F4F7;</span>Snapshot to PNG<span class="cmd-hint">&#x2318;S</span></div>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <button class="btn-ghost-sm" onclick="navigator.clipboard.writeText('nextframe scene list --json')">COPY SKILLS</button>
+    </div>
+  </div>
+
+  <div class="editor-main">
+    <!-- Preview -->
+    <div class="preview-area">
+      <div class="preview-canvas-wrap">
+        <div class="canvas-frame">
+          <div class="canvas-inner" id="canvas-inner">
+            <div class="canvas-bg"></div>
+
+            <div class="canvas-element selected" id="canvas-el"
+                 style="left:10%;top:15%;width:80%;height:70%"
+                 onmousedown="startDrag(event)">
+              <div class="sel-border">
+                <div class="sel-handle tl"></div>
+                <div class="sel-handle tr"></div>
+                <div class="sel-handle bl"></div>
+                <div class="sel-handle br"></div>
+                <div class="sel-handle rot"></div>
+              </div>
+              <div class="rot-line"></div>
+              <div class="canvas-text">
+                <h1 id="canvas-title">CANVAS</h1>
+                <p id="canvas-sub">scene:canvas-intro &middot; 00:00.000</p>
+              </div>
+            </div>
+
+            <div class="corner-badge">
+              <span class="badge-dot"></span>
+              <span class="badge-label" id="badge-type">CANVAS</span>
+              <span class="badge-sub" id="badge-id">clip-01</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Playback bar -->
+      <div class="playback-bar">
+        <div class="playback-left">
+          <div class="timecode"><span class="tc-current" id="tc-current">00:02.400</span> / <span id="tc-total">00:26.000</span></div>
+        </div>
+        <div class="play-controls">
+          <button class="play-btn" title="Previous">&#x23EE;</button>
+          <button class="play-btn primary" id="btn-play" onclick="togglePlay()" title="Play/Pause">&#x25B6;</button>
+          <button class="play-btn" title="Next">&#x23ED;</button>
+        </div>
+        <div class="playback-right">
+          <button class="btn-icon" id="btn-fullscreen" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
+          <button class="btn-export" onclick="alert('Export coming soon')">EXPORT</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inspector -->
+    <div class="inspector" id="inspector">
+      <div class="insp-header">
+        <span class="insp-name" id="insp-scene-name">Canvas Intro</span>
+        <span class="insp-tag" id="insp-clip-id">clip-01</span>
+      </div>
+      <div class="insp-body">
+        <div class="insp-section">
+          <div class="insp-section-title">Scene Params</div>
+          <div class="insp-row">
+            <span class="insp-label">Duration</span>
+            <input class="insp-input" value="3.000s" readonly>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Ease</span>
+            <input class="insp-input" value="ease-out" readonly>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">BG</span>
+            <input class="insp-input" value="#14120e" readonly>
+          </div>
+          <div class="scene-chips">
+            <button class="scene-chip active">canvas</button>
+            <button class="scene-chip">html</button>
+            <button class="scene-chip">svg</button>
+            <button class="scene-chip">md</button>
+            <button class="scene-chip">video</button>
+          </div>
+        </div>
+
+        <div class="insp-section">
+          <div class="insp-section-title">Transform</div>
+          <div class="insp-row">
+            <span class="insp-label">X</span>
+            <input class="insp-input" id="inp-x" value="120" type="number">
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Y</span>
+            <input class="insp-input" id="inp-y" value="64" type="number">
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">W</span>
+            <input class="insp-input" value="608" readonly>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">H</span>
+            <input class="insp-input" value="300" readonly>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Rotation</span>
+            <input class="insp-input" value="0.0" readonly>
+          </div>
+        </div>
+
+        <div class="insp-section">
+          <div class="insp-section-title">Clip</div>
+          <div class="insp-row">
+            <span class="insp-label">Opacity</span>
+            <div class="insp-slider-wrap">
+              <input class="insp-slider" type="range" min="0" max="100" value="100" id="slider-opacity" oninput="syncSlider('opacity')">
+              <span class="insp-slider-val" id="val-opacity">100%</span>
+            </div>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Scale</span>
+            <div class="insp-slider-wrap">
+              <input class="insp-slider" type="range" min="10" max="200" value="100" id="slider-scale" oninput="syncSlider('scale')">
+              <span class="insp-slider-val" id="val-scale">1.00</span>
+            </div>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Blur</span>
+            <div class="insp-slider-wrap">
+              <input class="insp-slider" type="range" min="0" max="20" value="0" id="slider-blur" oninput="syncSlider('blur')">
+              <span class="insp-slider-val" id="val-blur">0px</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="timeline" id="timeline">
+    <div class="tl-header">
+      <span class="tl-header-label">Timeline</span>
+      <button class="tl-header-btn">Snap</button>
+      <button class="tl-header-btn">Zoom</button>
+    </div>
+    <div class="tl-body">
+      <div class="tl-tracks-header">
+        <div class="tl-track-label">V1</div>
+        <div class="tl-track-label">V2</div>
+        <div class="tl-track-label">A1</div>
+      </div>
+      <div class="tl-lanes" id="tl-lanes">
+        <div class="tl-lanes-inner">
+          <!-- Ruler -->
+          <div class="tl-ruler">
+            <div class="tl-ruler-tick major" style="left:0"><div class="tick-line"></div><span class="tick-label">0s</span></div>
+            <div class="tl-ruler-tick" style="left:61px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick" style="left:122px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick major" style="left:184px"><div class="tick-line"></div><span class="tick-label">3s</span></div>
+            <div class="tl-ruler-tick" style="left:245px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick" style="left:306px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick major" style="left:368px"><div class="tick-line"></div><span class="tick-label">6s</span></div>
+            <div class="tl-ruler-tick" style="left:429px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick" style="left:490px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick major" style="left:552px"><div class="tick-line"></div><span class="tick-label">9s</span></div>
+            <div class="tl-ruler-tick" style="left:613px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick" style="left:674px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick major" style="left:736px"><div class="tick-line"></div><span class="tick-label">12s</span></div>
+            <div class="tl-ruler-tick" style="left:797px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick" style="left:858px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick major" style="left:920px"><div class="tick-line"></div><span class="tick-label">15s</span></div>
+            <div class="tl-ruler-tick" style="left:981px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick" style="left:1042px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick major" style="left:1104px"><div class="tick-line"></div><span class="tick-label">18s</span></div>
+            <div class="tl-ruler-tick" style="left:1165px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick" style="left:1226px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick major" style="left:1288px"><div class="tick-line"></div><span class="tick-label">21s</span></div>
+            <div class="tl-ruler-tick" style="left:1349px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick" style="left:1410px"><div class="tick-line"></div></div>
+            <div class="tl-ruler-tick major" style="left:1472px"><div class="tick-line"></div><span class="tick-label">24s</span></div>
+            <div class="tl-ruler-tick" style="left:1533px"><div class="tick-line"></div></div>
+          </div>
+
+          <!-- V1 track -->
+          <div class="tl-track" id="track-v1">
+            <div class="tl-clip type-canvas selected" id="clip-01"
+                 data-name="Canvas Intro" data-type="CANVAS" data-id="clip-01" data-start="0" data-dur="3"
+                 style="left:0;width:184px" onclick="selectClip(this)">
+              <span class="tl-clip-label">Canvas Intro</span>
+            </div>
+            <div class="tl-clip type-html" id="clip-02"
+                 data-name="HTML Components" data-type="HTML" data-id="clip-02" data-start="3" data-dur="4"
+                 style="left:184px;width:245px" onclick="selectClip(this)">
+              <span class="tl-clip-label">HTML Components</span>
+            </div>
+            <div class="tl-clip type-svg" id="clip-03"
+                 data-name="SVG Morph" data-type="SVG" data-id="clip-03" data-start="7" data-dur="3.5"
+                 style="left:429px;width:214px" onclick="selectClip(this)">
+              <span class="tl-clip-label">SVG Morph</span>
+            </div>
+            <div class="tl-clip type-md" id="clip-04"
+                 data-name="Markdown Slide" data-type="MD" data-id="clip-04" data-start="10.5" data-dur="3"
+                 style="left:643px;width:184px" onclick="selectClip(this)">
+              <span class="tl-clip-label">Markdown Slide</span>
+            </div>
+            <div class="tl-clip type-video" id="clip-05"
+                 data-name="Video Overlay" data-type="VIDEO" data-id="clip-05" data-start="13.5" data-dur="5"
+                 style="left:827px;width:306px" onclick="selectClip(this)">
+              <span class="tl-clip-label">Video Overlay</span>
+            </div>
+            <div class="tl-clip type-multi" id="clip-06"
+                 data-name="Multi Composite" data-type="MULTI" data-id="clip-06" data-start="18.5" data-dur="7.5"
+                 style="left:1133px;width:460px" onclick="selectClip(this)">
+              <span class="tl-clip-label">Multi Composite</span>
+            </div>
+          </div>
+
+          <!-- V2 track -->
+          <div class="tl-track" id="track-v2">
+            <div class="tl-clip type-canvas" id="clip-07"
+                 data-name="Title Card" data-type="CANVAS" data-id="clip-07" data-start="0" data-dur="2"
+                 style="left:0;width:122px" onclick="selectClip(this)">
+              <span class="tl-clip-label">Title Card</span>
+            </div>
+            <div class="tl-clip type-svg" id="clip-08"
+                 data-name="Logo Sting" data-type="SVG" data-id="clip-08" data-start="22" data-dur="4"
+                 style="left:1349px;width:245px" onclick="selectClip(this)">
+              <span class="tl-clip-label">Logo Sting</span>
+            </div>
+          </div>
+
+          <!-- A1 track (audio bars) -->
+          <div class="tl-track" id="track-a1">
+            <div class="tl-audio-bars" id="audio-bars"></div>
+          </div>
+
+          <!-- Playhead -->
+          <div class="tl-playhead" id="tl-playhead">
+            <div class="tl-playhead-handle"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress-bar" id="progress-bar">
+    <div class="progress-fill" id="progress-fill"></div>
+  </div>
+
+  <!-- Fullscreen controls -->
+  <div class="fullscreen-controls">
+    <div class="timecode"><span class="tc-current" id="tc-fs-current">00:02.400</span> / 00:26.000</div>
+    <div class="play-controls">
+      <button class="play-btn" title="Previous">&#x23EE;</button>
+      <button class="play-btn primary" id="btn-play-fs" onclick="togglePlay()" title="Play/Pause">&#x25B6;</button>
+      <button class="play-btn" title="Next">&#x23ED;</button>
+    </div>
+  </div>
+  <button class="fullscreen-exit" onclick="toggleFullscreen()">&#x2715;</button>
+</div>
+
+
+<script>
+/* ============================================================
+   VIEW NAVIGATION
+   ============================================================ */
+function switchView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const target = document.getElementById(id);
+  target.classList.add('active');
+  target.classList.add('view-transition-enter');
+  // Re-trigger stagger
+  target.querySelectorAll('.stagger-in').forEach((el) => {
+    el.style.animation = 'none';
+    el.offsetHeight; // reflow
+    el.style.animation = '';
+  });
+  setTimeout(() => target.classList.remove('view-transition-enter'), 500);
+  closeAllDropdowns();
+}
+
+function goHome() { switchView('view-home'); }
+function goProject() { switchView('view-project'); }
+function goEditor() { switchView('view-editor'); }
+
+/* ============================================================
+   COMMAND BAR
+   ============================================================ */
+function openCmd(trigger) {
+  closeAllDropdowns();
+  const dd = trigger.parentElement.querySelector('.cmd-dropdown');
+  dd.classList.add('show');
+  showOverlay();
+}
+
+/* ============================================================
+   BREADCRUMB DROPDOWNS
+   ============================================================ */
+function toggleBcDrop(id, e) {
+  e.stopPropagation();
+  closeAllDropdowns();
+  const dd = document.getElementById(id);
+  dd.classList.toggle('show');
+  if (dd.classList.contains('show')) showOverlay();
+}
+
+/* ============================================================
+   OVERLAY (close-all)
+   ============================================================ */
+const overlay = document.getElementById('overlay');
+
+function showOverlay() {
+  overlay.classList.add('show');
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.cmd-dropdown, .bc-dropdown').forEach(d => d.classList.remove('show'));
+  overlay.classList.remove('show');
+}
+
+overlay.addEventListener('click', closeAllDropdowns);
+
+/* ============================================================
+   CLIP SELECTION
+   ============================================================ */
+const TOTAL_DURATION = 26;
+const PX_PER_SEC = 61.33; // ~1600px / 26s
+
+function selectClip(el) {
+  // Deselect all
+  document.querySelectorAll('.tl-clip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+
+  const name = el.dataset.name;
+  const type = el.dataset.type;
+  const id = el.dataset.id;
+  const start = parseFloat(el.dataset.start);
+
+  // Update inspector
+  document.getElementById('insp-scene-name').textContent = name;
+  document.getElementById('insp-clip-id').textContent = id;
+
+  // Update canvas
+  document.getElementById('canvas-title').textContent = type;
+  document.getElementById('canvas-sub').textContent = 'scene:' + name.toLowerCase().replace(/\s+/g, '-') + ' \u00B7 ' + formatTC(start);
+
+  // Update corner badge
+  document.getElementById('badge-type').textContent = type;
+  document.getElementById('badge-id').textContent = id;
+
+  // Move playhead to clip start
+  setPlayheadTime(start);
+
+  // Update scene chips
+  document.querySelectorAll('.scene-chip').forEach(c => c.classList.remove('active'));
+  const chipText = type.toLowerCase();
+  document.querySelectorAll('.scene-chip').forEach(c => {
+    if (c.textContent.toLowerCase() === chipText) c.classList.add('active');
+  });
+}
+
+function formatTC(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  const whole = Math.floor(s);
+  const ms = Math.round((s - whole) * 1000);
+  return String(m).padStart(2, '0') + ':' + String(whole).padStart(2, '0') + '.' + String(ms).padStart(3, '0');
+}
+
+function setPlayheadTime(t) {
+  currentTime = t;
+  const px = t * PX_PER_SEC;
+  document.getElementById('tl-playhead').style.left = px + 'px';
+  document.getElementById('tc-current').textContent = formatTC(t);
+  document.getElementById('tc-fs-current').textContent = formatTC(t);
+  document.getElementById('progress-fill').style.width = (t / TOTAL_DURATION * 100) + '%';
+}
+
+/* ============================================================
+   PLAY / PAUSE
+   ============================================================ */
+let isPlaying = false;
+let currentTime = 2.4;
+let playRAF = null;
+let lastTS = null;
+
+function togglePlay() {
+  isPlaying = !isPlaying;
+  const icon = isPlaying ? '\u23F8' : '\u25B6';
+  document.getElementById('btn-play').innerHTML = icon;
+  document.getElementById('btn-play-fs').innerHTML = icon;
+
+  if (isPlaying) {
+    lastTS = null;
+    playRAF = requestAnimationFrame(playLoop);
+  } else {
+    cancelAnimationFrame(playRAF);
+  }
+}
+
+function playLoop(ts) {
+  if (!lastTS) lastTS = ts;
+  const dt = (ts - lastTS) / 1000;
+  lastTS = ts;
+
+  currentTime += dt;
+  if (currentTime >= TOTAL_DURATION) {
+    currentTime = 0;
+  }
+
+  setPlayheadTime(currentTime);
+  if (isPlaying) playRAF = requestAnimationFrame(playLoop);
+}
+
+// Space bar
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.target.matches('input,textarea')) {
+    e.preventDefault();
+    togglePlay();
+  }
+  // Cmd+K
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    const activeView = document.querySelector('.view.active');
+    const trigger = activeView.querySelector('.cmd-trigger');
+    if (trigger) openCmd(trigger);
+  }
+  // Escape
+  if (e.key === 'Escape') {
+    closeAllDropdowns();
+    const ed = document.getElementById('view-editor');
+    if (ed.classList.contains('fullscreen')) toggleFullscreen();
+  }
+});
+
+/* ============================================================
+   FULLSCREEN
+   ============================================================ */
+function toggleFullscreen() {
+  document.getElementById('view-editor').classList.toggle('fullscreen');
+}
+
+/* ============================================================
+   CANVAS DRAG
+   ============================================================ */
+let dragging = false;
+let dragStartX, dragStartY, dragElStartX, dragElStartY;
+
+function startDrag(e) {
+  if (e.target.classList.contains('sel-handle')) return;
+  const el = document.getElementById('canvas-el');
+  dragging = true;
+  dragStartX = e.clientX;
+  dragStartY = e.clientY;
+  dragElStartX = el.offsetLeft;
+  dragElStartY = el.offsetTop;
+  e.preventDefault();
+}
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const el = document.getElementById('canvas-el');
+  const dx = e.clientX - dragStartX;
+  const dy = e.clientY - dragStartY;
+  el.style.left = (dragElStartX + dx) + 'px';
+  el.style.top = (dragElStartY + dy) + 'px';
+});
+
+document.addEventListener('mouseup', () => { dragging = false; });
+
+/* ============================================================
+   SLIDER SYNC
+   ============================================================ */
+function syncSlider(name) {
+  const slider = document.getElementById('slider-' + name);
+  const val = document.getElementById('val-' + name);
+  const v = parseFloat(slider.value);
+  if (name === 'opacity') val.textContent = v + '%';
+  else if (name === 'scale') val.textContent = (v / 100).toFixed(2);
+  else if (name === 'blur') val.textContent = v + 'px';
+}
+
+/* ============================================================
+   AUDIO BARS (generate)
+   ============================================================ */
+(function generateAudioBars() {
+  const container = document.getElementById('audio-bars');
+  const count = 200;
+  for (let i = 0; i < count; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'tl-audio-bar';
+    const h = Math.random() * 24 + 4;
+    bar.style.height = h + 'px';
+    container.appendChild(bar);
+  }
+})();
+
+/* ============================================================
+   INITIAL STATE
+   ============================================================ */
+setPlayheadTime(2.4);
+</script>
+
+</body>
 </html>
