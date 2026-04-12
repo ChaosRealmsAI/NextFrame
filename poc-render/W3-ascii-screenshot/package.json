@@ -1,0 +1,11 @@
+{
+  "name": "w3-ascii-screenshot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.80"
+  }
+}
