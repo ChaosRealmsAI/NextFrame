@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
-import { resolveTimeline, timelineUsage } from "./_resolve.js";
+import { configureProjectCacheEnv, resolveTimeline, timelineUsage } from "./_resolve.js";
 import {
   ensureHtmlSlideCacheDir,
   htmlSlideCachePath,
@@ -33,92 +33,99 @@ export async function run(argv) {
     emit(resolved, flags);
     return resolved.error?.code === "USAGE" ? 3 : 2;
   }
-
-  const loaded = await loadTimeline(resolved.jsonPath);
-  if (!loaded.ok) {
-    emit(loaded, flags);
-    return 2;
-  }
-
-  const timeline = loaded.value;
-  const width = timeline.project?.width || 1920;
-  const height = timeline.project?.height || 1080;
-  const slides = collectHtmlSlides(timeline, width, height);
-  if (slides.size === 0) {
-    emit({ ok: true, value: { baked: 0, rendered: 0, cached: 0, message: "no htmlSlide clips found" } }, flags);
-    return 0;
-  }
-
-  let puppeteer;
-  try {
-    ({ default: puppeteer } = await import("puppeteer-core"));
-  } catch {
-    emit({ ok: false, error: { code: "MISSING_PUPPETEER", message: "puppeteer-core not installed", hint: "npm install puppeteer-core" } }, flags);
-    return 2;
-  }
-
-  const chromePath = resolveChromeExecutable();
-  if (!chromePath) {
-    emit({
-      ok: false,
-      error: {
-        code: "CHROME_NOT_FOUND",
-        message: "cannot find a Chrome executable for htmlSlide baking",
-        hint: "set NEXTFRAME_CHROME or install Google Chrome in /Applications",
-      },
-    }, flags);
-    return 2;
-  }
-
-  ensureHtmlSlideCacheDir();
-  let browser;
+  const restoreCacheEnv = !resolved.legacy ? configureProjectCacheEnv(resolved.cachePath) : () => {};
+  let baked = 0;
   let rendered = 0;
   let cached = 0;
 
   try {
-    browser = await puppeteer.launch({
-      executablePath: chromePath,
-      headless: true,
-      args: ["--no-sandbox", "--disable-gpu", "--hide-scrollbars"],
-      defaultViewport: { width, height },
-    });
+    const loaded = await loadTimeline(resolved.jsonPath);
+    if (!loaded.ok) {
+      emit(loaded, flags);
+      return 2;
+    }
 
-    for (const [outPath, html] of slides) {
-      if (existsSync(outPath) && !flags.force) {
-        cached += 1;
-        continue;
+    const timeline = loaded.value;
+    const width = timeline.project?.width || 1920;
+    const height = timeline.project?.height || 1080;
+    const slides = collectHtmlSlides(timeline, width, height);
+    baked = slides.size;
+    if (slides.size === 0) {
+      emit({ ok: true, value: { baked: 0, rendered: 0, cached: 0, message: "no htmlSlide clips found" } }, flags);
+      return 0;
+    }
+
+    let puppeteer;
+    try {
+      ({ default: puppeteer } = await import("puppeteer-core"));
+    } catch {
+      emit({ ok: false, error: { code: "MISSING_PUPPETEER", message: "puppeteer-core not installed", hint: "npm install puppeteer-core" } }, flags);
+      return 2;
+    }
+
+    const chromePath = resolveChromeExecutable();
+    if (!chromePath) {
+      emit({
+        ok: false,
+        error: {
+          code: "CHROME_NOT_FOUND",
+          message: "cannot find a Chrome executable for htmlSlide baking",
+          hint: "set NEXTFRAME_CHROME or install Google Chrome in /Applications",
+        },
+      }, flags);
+      return 2;
+    }
+
+    ensureHtmlSlideCacheDir();
+    let browser;
+
+    try {
+      browser = await puppeteer.launch({
+        executablePath: chromePath,
+        headless: true,
+        args: ["--no-sandbox", "--disable-gpu", "--hide-scrollbars"],
+        defaultViewport: { width, height },
+      });
+
+      for (const [outPath, html] of slides) {
+        if (existsSync(outPath) && !flags.force) {
+          cached += 1;
+          continue;
+        }
+        const page = await browser.newPage();
+        try {
+          await page.setContent(wrapHtmlSlideDocument(html, width, height), { waitUntil: "load" });
+          await page.evaluate(() => document.fonts?.ready ?? Promise.resolve());
+          await page.screenshot({ path: outPath, type: "png", captureBeyondViewport: false });
+        } finally {
+          await page.close();
+        }
+        rendered += 1;
+        if (!flags.quiet) {
+          process.stderr.write(`  baked ${rendered + cached}/${slides.size}\r`);
+        }
       }
-      const page = await browser.newPage();
-      try {
-        await page.setContent(wrapHtmlSlideDocument(html, width, height), { waitUntil: "load" });
-        await page.evaluate(() => document.fonts?.ready ?? Promise.resolve());
-        await page.screenshot({ path: outPath, type: "png", captureBeyondViewport: false });
-      } finally {
-        await page.close();
+    } catch (err) {
+      emit({
+        ok: false,
+        error: {
+          code: "BAKE_HTML_FAILED",
+          message: err.message,
+        },
+      }, flags);
+      return 2;
+    } finally {
+      if (browser) {
+        await browser.close();
       }
-      rendered += 1;
       if (!flags.quiet) {
-        process.stderr.write(`  baked ${rendered + cached}/${slides.size}\r`);
+        process.stderr.write("\n");
       }
     }
-  } catch (err) {
-    emit({
-      ok: false,
-      error: {
-        code: "BAKE_HTML_FAILED",
-        message: err.message,
-      },
-    }, flags);
-    return 2;
   } finally {
-    if (browser) {
-      await browser.close();
-    }
-    if (!flags.quiet) {
-      process.stderr.write("\n");
-    }
+    restoreCacheEnv();
   }
 
-  emit({ ok: true, value: { baked: slides.size, rendered, cached } }, flags);
+  emit({ ok: true, value: { baked, rendered, cached } }, flags);
   return 0;
 }

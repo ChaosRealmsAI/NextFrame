@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
 export const CACHE_DIR = "/tmp/nextframe-video-cache";
+const CACHE_ENV_KEY = "NEXTFRAME_VIDEO_CACHE_DIR";
 
 const FRAME_IMAGE_CACHE = new Map();
 
@@ -25,13 +26,14 @@ export function frameKey(src, t, width, height) {
     .slice(0, 16);
 }
 
-export function ensureVideoCacheDir() {
-  mkdirSync(CACHE_DIR, { recursive: true });
+export function ensureVideoCacheDir(cacheDir) {
+  mkdirSync(resolveVideoCacheDir(cacheDir), { recursive: true });
 }
 
-export function cachedFramePath(src, t, width, height) {
-  ensureVideoCacheDir();
-  return join(CACHE_DIR, `${frameKey(src, t, width, height)}.png`);
+export function cachedFramePath(src, t, width, height, cacheDir) {
+  const resolvedCacheDir = resolveVideoCacheDir(cacheDir);
+  ensureVideoCacheDir(resolvedCacheDir);
+  return join(resolvedCacheDir, `${frameKey(src, t, width, height)}.png`);
 }
 
 export function resolveVideoInputPath(src, baseDir = process.cwd()) {
@@ -39,12 +41,16 @@ export function resolveVideoInputPath(src, baseDir = process.cwd()) {
   return isAbsolute(src) ? src : resolve(baseDir, src);
 }
 
-export function loadCachedFrame(src, t, width, height) {
-  const path = cachedFramePath(src, t, width, height);
+export function loadCachedFrame(src, t, width, height, cacheDir) {
+  const path = cachedFramePath(src, t, width, height, cacheDir);
   if (!existsSync(path)) return null;
   if (FRAME_IMAGE_CACHE.has(path)) return FRAME_IMAGE_CACHE.get(path);
   const image = new Image();
   image.src = readFileSync(path);
   FRAME_IMAGE_CACHE.set(path, image);
   return image;
+}
+
+function resolveVideoCacheDir(cacheDir) {
+  return cacheDir || process.env[CACHE_ENV_KEY] || CACHE_DIR;
 }

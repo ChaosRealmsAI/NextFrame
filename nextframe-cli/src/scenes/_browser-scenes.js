@@ -10,17 +10,23 @@ export const CACHE_DIRS = Object.freeze({
   markdownSlide: "/tmp/nextframe-md-cache",
   lottieAnim: "/tmp/nextframe-lottie-cache",
 });
+const CACHE_ENV_KEY = "NEXTFRAME_BROWSER_CACHE_DIR";
 
 const FALLBACK_BG = "#1a1510";
 const FALLBACK_INK = "#f5ece0";
 const FALLBACK_ACCENT = "#da7756";
 const FALLBACK_MUTED = "#d4b483";
 
-export function cachePathForScene(sceneId, width, height, params = {}, t = 0) {
-  const cacheDir = CACHE_DIRS[sceneId];
-  if (!cacheDir) throw new Error(`unknown browser scene "${sceneId}"`);
+export function cacheDirForScene(sceneId, cacheDir) {
+  const resolvedCacheDir = cacheDir || process.env[CACHE_ENV_KEY] || CACHE_DIRS[sceneId];
+  if (!resolvedCacheDir) throw new Error(`unknown browser scene "${sceneId}"`);
+  return resolvedCacheDir;
+}
+
+export function cachePathForScene(sceneId, width, height, params = {}, t = 0, cacheDir) {
+  const resolvedCacheDir = cacheDirForScene(sceneId, cacheDir);
   const key = cacheKeyForScene(sceneId, width, height, params, t);
-  return join(cacheDir, `${key}.png`);
+  return join(resolvedCacheDir, `${key}.png`);
 }
 
 export function cacheKeyForScene(sceneId, width, height, params = {}, t = 0) {
