@@ -2,12 +2,14 @@
 
 use bridge::{dispatch, Request, Response};
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::env;
 use std::ffi::OsString;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::{MutexGuard, OnceLock};
+use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -144,6 +146,22 @@ fn dispatch_request(method: &str, params: Value) -> Response {
     })
 }
 
+fn dispatch_request_with_id(id: impl Into<String>, method: &str, params: Value) -> Response {
+    dispatch(Request {
+        id: id.into(),
+        method: method.to_string(),
+        params,
+    })
+}
+
+fn assert_error_contains(error: Option<&str>, expected: &str) {
+    let error = error.expect("response should include an error");
+    assert!(
+        error.contains(expected),
+        "expected '{error}' to contain '{expected}'"
+    );
+}
+
 struct TestDir {
     path: PathBuf,
 }
@@ -165,6 +183,10 @@ impl TestDir {
 
     fn join(&self, child: &str) -> PathBuf {
         self.path.join(child)
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
     }
 }
 
@@ -557,6 +579,390 @@ fn dispatch_multiple_methods_support_a_real_user_session() {
     assert_eq!(dispatch_request("recent.list", json!({})).result, json!([]));
 }
 
+// === t3-5: error path integration tests ===
+
+#[test]
+fn dispatch_methods_with_missing_required_params_return_errors() {
+    let cases = [
+        ("autosave.write", "missing params.projectId"),
+        ("autosave.clear", "missing params.projectId"),
+        ("autosave.recover", "missing params.projectId"),
+        ("fs.read", "missing params.path"),
+        ("fs.write", "missing params.path"),
+        ("fs.listDir", "missing params.path"),
+        ("fs.dialogOpen", "missing params.filters"),
+        ("fs.dialogSave", "missing params.defaultName"),
+        ("fs.reveal", "missing params.path"),
+        ("fs.writeBase64", "missing params.path"),
+        ("export.start", "missing params.outputPath"),
+        ("export.status", "missing params.pid"),
+        ("export.cancel", "missing params.pid"),
+        ("export.muxAudio", "missing params.videoPath"),
+        ("log", "missing params.level"),
+        ("recent.add", "missing params.path"),
+        ("timeline.load", "missing params.path"),
+        ("timeline.save", "missing params.path"),
+        ("project.create", "missing params.name"),
+        ("episode.list", "missing params.project"),
+        ("episode.create", "missing params.project"),
+        ("segment.list", "missing params.project"),
+        ("segment.videoUrl", "missing params.project"),
+        ("preview.frame", "missing params.timelinePath"),
+        ("fs.mtime", "missing params.path"),
+    ];
+
+    for (method, expected_error) in cases {
+        let response = dispatch_request(method, json!({}));
+
+        assert!(
+            !response.ok,
+            "expected missing params for {method} to return an error"
+        );
+        assert_eq!(response.id, format!("req-{method}"));
+        assert_eq!(response.result, Value::Null);
+        assert_error_contains(response.error.as_deref(), expected_error);
+    }
+}
+
+#[test]
+fn dispatch_fs_read_with_nonexistent_path_returns_error() {
+    let temp = TestDir::new("integration-fs-read-missing");
+    let path = temp.join("missing.txt");
+
+    let response = dispatch_request(
+        "fs.read",
+        json!({ "path": path.display().to_string() }),
+    );
+
+    assert!(!response.ok);
+    assert_eq!(response.id, "req-fs.read");
+    assert_eq!(response.result, Value::Null);
+    assert_error_contains(response.error.as_deref(), "failed to resolve");
+}
+
+#[test]
+fn dispatch_fs_write_with_empty_path_returns_error() {
+    let response = dispatch_request(
+        "fs.write",
+        json!({
+            "path": "",
+            "contents": "no destination",
+        }),
+    );
+
+    assert!(!response.ok);
+    assert_eq!(response.id, "req-fs.write");
+    assert_eq!(response.result, Value::Null);
+    assert_eq!(response.error.as_deref(), Some("path must not be empty"));
+}
+
+#[test]
+fn dispatch_timeline_load_with_invalid_json_returns_parse_error() {
+    let temp = TestDir::new("integration-timeline-invalid");
+    let path = temp.join("broken.json");
+    fs::write(&path, "{ definitely not valid json").expect("write invalid json fixture");
+
+    let response = dispatch_request(
+        "timeline.load",
+        json!({ "path": path.display().to_string() }),
+    );
+
+    assert!(!response.ok);
+    assert_eq!(response.id, "req-timeline.load");
+    assert_eq!(response.result, Value::Null);
+    assert_error_contains(response.error.as_deref(), "failed to parse timeline");
+}
+
+#[test]
+fn dispatch_episode_create_with_nonexistent_project_returns_error() {
+    let temp = TestDir::new("integration-episode-create-missing-project");
+    let _home = HomeDirOverrideGuard::new(&temp.path);
+
+    let response = dispatch_request(
+        "episode.create",
+        json!({
+            "project": "missing-project",
+            "name": "ep-01",
+        }),
+    );
+
+    assert!(!response.ok);
+    assert_eq!(response.id, "req-episode.create");
+    assert_eq!(response.result, Value::Null);
+    assert_eq!(
+        response.error.as_deref(),
+        Some("project 'missing-project' not found")
+    );
+}
+
+#[test]
+fn dispatch_segment_video_url_rejects_parent_traversal() {
+    let response = dispatch_request(
+        "segment.videoUrl",
+        json!({
+            "project": "../alpha",
+            "episode": "ep-01",
+            "segment": "seg-01",
+        }),
+    );
+
+    assert!(!response.ok);
+    assert_eq!(response.id, "req-segment.videoUrl");
+    assert_eq!(response.result, Value::Null);
+    assert_error_contains(response.error.as_deref(), "invalid params.project");
+}
+
+#[test]
+fn dispatch_export_status_with_invalid_pid_returns_error() {
+    let response = dispatch_request("export.status", json!({ "pid": "bad-pid" }));
+
+    assert!(!response.ok);
+    assert_eq!(response.id, "req-export.status");
+    assert_eq!(response.result, Value::Null);
+    assert_eq!(
+        response.error.as_deref(),
+        Some("params.pid must be an unsigned integer")
+    );
+}
+
+#[test]
+fn dispatch_autosave_write_rejects_project_id_with_slash() {
+    let response = dispatch_request(
+        "autosave.write",
+        json!({
+            "projectId": "folder/name",
+            "timeline": { "tracks": [] },
+        }),
+    );
+
+    assert!(!response.ok);
+    assert_eq!(response.id, "req-autosave.write");
+    assert_eq!(response.result, Value::Null);
+    assert_error_contains(response.error.as_deref(), "invalid autosave project id");
+}
+
+// === t3-8: stress/concurrency tests ===
+
+#[test]
+fn dispatch_scene_list_is_consistent_across_100_requests() {
+    let expected = dispatch_request("scene.list", json!({}));
+    assert!(expected.ok);
+    let expected_result = expected.result.clone();
+
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+
+        for iteration in 0..100 {
+            handles.push(scope.spawn(move || {
+                dispatch_request_with_id(
+                    format!("req-scene.list-{iteration}"),
+                    "scene.list",
+                    json!({}),
+                )
+            }));
+        }
+
+        for handle in handles {
+            let response = handle.join().expect("join scene.list request");
+            assert!(response.ok, "scene.list failed: {:?}", response.error);
+            assert_eq!(response.result, expected_result);
+        }
+    });
+}
+
+#[test]
+fn dispatch_fs_write_and_read_20_times_without_cross_contamination() {
+    let temp = TestDir::new("integration-fs-stress");
+
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+
+        for iteration in 0..20 {
+            let path = temp.join(&format!("entry-{iteration}.txt"));
+            let content = format!("payload-{iteration}-{}", "x".repeat(2048 + iteration));
+
+            handles.push(scope.spawn(move || {
+                let write_response = dispatch_request_with_id(
+                    format!("req-fs.write-{iteration}"),
+                    "fs.write",
+                    json!({
+                        "path": path.display().to_string(),
+                        "contents": content,
+                    }),
+                );
+                assert!(write_response.ok, "fs.write failed: {:?}", write_response.error);
+
+                let read_response = dispatch_request_with_id(
+                    format!("req-fs.read-{iteration}"),
+                    "fs.read",
+                    json!({ "path": path.display().to_string() }),
+                );
+                assert!(read_response.ok, "fs.read failed: {:?}", read_response.error);
+
+                let read_back = read_response
+                    .result
+                    .get("contents")
+                    .and_then(Value::as_str)
+                    .expect("read contents")
+                    .to_string();
+
+                (path, read_back)
+            }));
+        }
+
+        for (iteration, handle) in handles.into_iter().enumerate() {
+            let (path, read_back) = handle.join().expect("join fs request");
+            let expected = format!("payload-{iteration}-{}", "x".repeat(2048 + iteration));
+            assert_eq!(read_back, expected);
+            assert_eq!(fs::read_to_string(&path).expect("read file from disk"), expected);
+        }
+    });
+}
+
+#[test]
+fn dispatch_project_create_then_list_returns_all_created_projects() {
+    let temp = TestDir::new("integration-project-stress-home");
+    let _home = HomeDirOverrideGuard::new(temp.path());
+
+    let project_names = (0..10)
+        .map(|iteration| format!("stress-project-{iteration}"))
+        .collect::<Vec<_>>();
+
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+
+        for name in &project_names {
+            let name = name.clone();
+            let expected_path = temp
+                .path()
+                .join("NextFrame")
+                .join("projects")
+                .join(&name)
+                .display()
+                .to_string();
+
+            handles.push(scope.spawn(move || {
+                let response = dispatch_request_with_id(
+                    format!("req-project.create-{name}"),
+                    "project.create",
+                    json!({ "name": name }),
+                );
+
+                assert!(response.ok, "project.create failed: {:?}", response.error);
+                assert_eq!(response.result.get("path"), Some(&json!(expected_path)));
+            }));
+        }
+
+        for handle in handles {
+            handle.join().expect("join project.create request");
+        }
+    });
+
+    let list_response =
+        dispatch_request_with_id("req-project.list-stress", "project.list", json!({}));
+    assert!(list_response.ok, "project.list failed: {:?}", list_response.error);
+
+    let projects = list_response
+        .result
+        .get("projects")
+        .and_then(Value::as_array)
+        .expect("project list array");
+
+    let listed_names = projects
+        .iter()
+        .filter_map(|project| project.get("name").and_then(Value::as_str))
+        .map(ToOwned::to_owned)
+        .collect::<HashSet<_>>();
+    let expected_names = project_names.into_iter().collect::<HashSet<_>>();
+
+    assert_eq!(projects.len(), 10);
+    assert_eq!(listed_names, expected_names);
+}
+
+#[test]
+fn dispatch_timeline_save_and_load_round_trips_large_json_payload() {
+    let temp = TestDir::new("integration-timeline-large");
+    let path = temp.join("timeline-large.json");
+    let large_payload = "timeline-payload-".repeat(70_000);
+    assert!(large_payload.len() > 1_000_000, "expected payload above 1MB");
+
+    let timeline = json!({
+        "version": "1",
+        "metadata": {
+            "name": "Large Timeline",
+            "fps": 30,
+            "width": 1920,
+            "height": 1080,
+        },
+        "tracks": [
+            {
+                "id": "track-large",
+                "kind": "video",
+                "clips": [
+                    {
+                        "id": "clip-large",
+                        "start": 0,
+                        "duration": 42,
+                        "text": large_payload,
+                    }
+                ]
+            }
+        ]
+    });
+
+    let save_response = dispatch_request_with_id(
+        "req-timeline.save-large",
+        "timeline.save",
+        json!({
+            "path": path.display().to_string(),
+            "json": timeline.clone(),
+        }),
+    );
+    assert!(save_response.ok, "timeline.save failed: {:?}", save_response.error);
+    assert!(
+        save_response
+            .result
+            .get("bytesWritten")
+            .and_then(Value::as_u64)
+            .expect("bytesWritten")
+            > 1_000_000
+    );
+
+    let load_response = dispatch_request_with_id(
+        "req-timeline.load-large",
+        "timeline.load",
+        json!({ "path": path.display().to_string() }),
+    );
+    assert!(load_response.ok, "timeline.load failed: {:?}", load_response.error);
+    assert_eq!(load_response.result, timeline);
+}
+
+#[test]
+fn dispatch_log_handles_50_rapid_requests_without_error() {
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+
+        for iteration in 0..50 {
+            handles.push(scope.spawn(move || {
+                dispatch_request_with_id(
+                    format!("req-log-{iteration}"),
+                    "log",
+                    json!({
+                        "level": "info",
+                        "msg": format!("stress log message {iteration}"),
+                    }),
+                )
+            }));
+        }
+
+        for handle in handles {
+            let response = handle.join().expect("join log request");
+            assert!(response.ok, "log failed: {:?}", response.error);
+            assert_eq!(response.result.get("logged"), Some(&json!(true)));
+        }
+    });
+}
+
 static HOME_ENV_TEST_LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
 
 struct HomeDirOverrideGuard {
@@ -576,10 +982,13 @@ impl HomeDirOverrideGuard {
         let homedrive = env::var_os("HOMEDRIVE");
         let homepath = env::var_os("HOMEPATH");
 
-        env::set_var("HOME", path);
-        env::remove_var("USERPROFILE");
-        env::remove_var("HOMEDRIVE");
-        env::remove_var("HOMEPATH");
+        // SAFETY: integration tests serialize HOME mutations with HOME_ENV_TEST_LOCK.
+        unsafe {
+            env::set_var("HOME", path);
+            env::remove_var("USERPROFILE");
+            env::remove_var("HOMEDRIVE");
+            env::remove_var("HOMEPATH");
+        }
 
         Self {
             _lock: lock,
@@ -608,8 +1017,11 @@ impl Drop for HomeDirOverrideGuard {
 }
 
 fn restore_env_var(key: &str, value: Option<&OsString>) {
-    match value {
-        Some(value) => env::set_var(key, value),
-        None => env::remove_var(key),
+    // SAFETY: integration tests serialize HOME mutations with HOME_ENV_TEST_LOCK.
+    unsafe {
+        match value {
+            Some(value) => env::set_var(key, value),
+            None => env::remove_var(key),
+        }
     }
 }
