@@ -22,6 +22,7 @@ import { starfield } from "./starfield.js";
 import { svgOverlay } from "./svgOverlay.js";
 import { textOverlay } from "./textOverlay.js";
 import { videoClip } from "./videoClip.js";
+import { videoWindow } from "./videoWindow.js";
 import { vignette } from "./vignette.js";
 import { ccFrame } from "./ccFrame.js";
 import { ccBigNumber } from "./ccBigNumber.js";
@@ -40,6 +41,7 @@ export const META_TABLE = {
   htmlSlide: { category: "Browser", description: "HTML+CSS rendered via headless Chrome", duration_hint: 10, params: [p("html", "string", "<div>Hello</div>", { semantic: "HTML content string" })] },
   imageHero: { category: "Media", description: "Hero image with ken-burns zoom and pan", duration_hint: 8, params: [p("src", "string", null, { semantic: "image path or url" }), p("fit", "enum", "cover", { options: ["cover", "contain"], semantic: "fit mode" }), p("zoomStart", "number", 1, { range: [0.5, 2.5], semantic: "start zoom" }), p("zoomEnd", "number", 1.15, { range: [0.5, 3], semantic: "end zoom" }), p("panX", "number", 0.05, { range: [-0.5, 0.5], semantic: "x pan" }), p("panY", "number", -0.03, { range: [-0.5, 0.5], semantic: "y pan" })] },
   videoClip: { category: "Browser", description: "Frame from external video file", duration_hint: 10, params: [p("src", "string", "", { semantic: "video file path" }), p("offset", "number", 0, { semantic: "source time offset" }), p("fps", "number", 30)] },
+  videoWindow: { category: "Browser", description: "Video in macOS window chrome", duration_hint: 10, params: [p("src", "string", ""), p("offset", "number", 0), p("fps", "number", 30), p("title", "string", "video.mp4"), p("insetX", "number", 0.12), p("insetY", "number", 0.10)] },
   kineticHeadline: { category: "Typography", description: "Big animated headline + subtitle reveal", duration_hint: 5, params: [p("text", "string", "NEXTFRAME", { required: true, semantic: "headline text" }), p("subtitle", "string", "Frame-pure scene library", { semantic: "subtitle" }), p("hueStart", "number", 30, { range: [0, 360], semantic: "start hue" }), p("hueEnd", "number", 320, { range: [0, 360], semantic: "end hue" }), p("stagger", "number", 0.18, { range: [0.05, 0.5], semantic: "letter stagger" }), p("size", "number", 0.12, { range: [0.05, 0.25], semantic: "font size ratio" })], ai_prompt_example: "Show product name in the body chapter" },
   glitchText: { category: "Typography", description: "Glitchy chromatic-aberration text effect", duration_hint: 4, params: [p("text", "string", "GLITCH", { required: true, semantic: "text" }), p("fontSize", "number", 140, { range: [24, 320], semantic: "font px" }), p("weight", "string", "900", { semantic: "font weight" }), p("baseHue", "number", 320, { range: [0, 360], semantic: "base hue" }), p("glitchAmount", "number", 0.4, { range: [0, 1.5], semantic: "glitch strength" }), p("scanlines", "boolean", true, { semantic: "scanline overlay" }), p("burstFreq", "number", 2.5, { range: [0.1, 12], semantic: "burst frequency" })] },
   neonGrid: { category: "Shapes", description: "Synthwave neon grid horizon", duration_hint: 12, params: [p("hueHorizon", "number", 320, { range: [0, 360], semantic: "horizon hue" }), p("hueGrid", "number", 280, { range: [0, 360], semantic: "grid hue" }), p("scrollSpeed", "number", 0.4, { range: [0, 2], semantic: "scroll speed" }), p("lineCount", "number", 16, { range: [8, 32], semantic: "horizontal lines" }), p("colCount", "number", 22, { range: [8, 48], semantic: "vertical lines" })] },
@@ -69,7 +71,7 @@ export const META_TABLE = {
   ccDesc: { category: "Series", description: "Italic mono centered description", duration_hint: 10, params: [p("text", "string", "我数过了。"), p("x", "number", 0.5), p("y", "number", 0.64), p("delay", "number", 1.0)] },
 };
 
-export const RENDER_FNS = { auroraGradient, barChartReveal, circleRipple, cornerBadge, countdown, dataPulse, fluidBackground, glitchText, htmlSlide, imageHero, videoClip, kineticHeadline, lineChart, lottieAnim, lowerThirdVelvet, markdownSlide, meshGrid, neonGrid, orbitRings, particleFlow, pixelRain, shapeBurst, spotlightSweep, starfield, svgOverlay, textOverlay, vignette, ccFrame, ccBigNumber, ccPill, ccNote, ccDesc };
+export const RENDER_FNS = { auroraGradient, barChartReveal, circleRipple, cornerBadge, countdown, dataPulse, fluidBackground, glitchText, htmlSlide, imageHero, videoClip, videoWindow, kineticHeadline, lineChart, lottieAnim, lowerThirdVelvet, markdownSlide, meshGrid, neonGrid, orbitRings, particleFlow, pixelRain, shapeBurst, spotlightSweep, starfield, svgOverlay, textOverlay, vignette, ccFrame, ccBigNumber, ccPill, ccNote, ccDesc };
 
 function defaultParamsOf(meta) {
   const out = {};
