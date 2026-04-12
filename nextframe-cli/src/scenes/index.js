@@ -102,7 +102,7 @@ function makeEntry(id) {
 export const SCENE_IDS = Object.keys(RENDER_FNS);
 assertNoDuplicateIds(SCENE_IDS);
 export const REGISTRY = new Map(SCENE_IDS.map((id) => [id, makeEntry(id)]));
-const PUBLIC_SCENE_IDS = SCENE_IDS.filter((id) => id !== "imageHero");
+const PUBLIC_SCENE_IDS = SCENE_IDS;
 
 export function getScene(id) {
   return REGISTRY.get(id);

@@ -13,7 +13,7 @@
 
 import { createServer } from "node:http";
 import { readFile, writeFile, stat } from "node:fs/promises";
-import { resolve as resolvePath, dirname, join } from "node:path";
+import { resolve as resolvePath, dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { renderAt } from "../src/engine/render.js";
@@ -25,6 +25,7 @@ import { exportMP4 } from "../src/targets/ffmpeg-mp4.js";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePath(HERE, "..");
 const PORT = Number(process.env.PORT || 5173);
+const WORKSPACE_ROOT = resolvePath(process.env.NEXTFRAME_WORKSPACE_ROOT || process.cwd());
 
 const MIME = {
   html: "text/html; charset=utf-8",
@@ -79,7 +80,16 @@ async function readBody(req) {
 function resolveTimelinePath(q) {
   const p = q.path;
   if (!p) return null;
-  return resolvePath(ROOT, p);
+  const abs = resolvePath(WORKSPACE_ROOT, p);
+  const relPath = relative(WORKSPACE_ROOT, abs);
+  if (relPath !== "" && (relPath.startsWith("..") || isAbsolute(relPath))) return "__BLOCKED__";
+  return abs;
+}
+
+function assertSafePath(res, abs) {
+  if (!abs) { err(res, 400, "missing path"); return false; }
+  if (abs === "__BLOCKED__") { err(res, 403, "path outside workspace", `allowed root: ${WORKSPACE_ROOT}`); return false; }
+  return true;
 }
 
 const server = createServer(async (req, res) => {
@@ -107,7 +117,7 @@ const server = createServer(async (req, res) => {
 
     if (method === "GET" && path === "/api/timeline") {
       const abs = resolveTimelinePath(q);
-      if (!abs) return err(res, 400, "missing path");
+      if (!assertSafePath(res, abs)) return;
       const text = await readFile(abs, "utf8");
       const timeline = JSON.parse(text);
       const validation = validateTimeline(timeline, { projectDir: dirname(abs) });
@@ -116,7 +126,7 @@ const server = createServer(async (req, res) => {
 
     if (method === "POST" && path === "/api/timeline") {
       const abs = resolveTimelinePath(q);
-      if (!abs) return err(res, 400, "missing path");
+      if (!assertSafePath(res, abs)) return;
       const body = await readBody(req);
       if (!body.timeline) return err(res, 400, "body.timeline required");
       const validation = validateTimeline(body.timeline, { projectDir: dirname(abs) });
@@ -127,7 +137,7 @@ const server = createServer(async (req, res) => {
 
     if (method === "GET" && path === "/api/frame") {
       const abs = resolveTimelinePath(q);
-      if (!abs) return err(res, 400, "missing path");
+      if (!assertSafePath(res, abs)) return;
       const t = Number(q.t ?? 0);
       if (!Number.isFinite(t)) return err(res, 400, "bad t");
       const text = await readFile(abs, "utf8");
@@ -146,7 +156,7 @@ const server = createServer(async (req, res) => {
 
     if (method === "GET" && path === "/api/gantt") {
       const abs = resolveTimelinePath(q);
-      if (!abs) return err(res, 400, "missing path");
+      if (!assertSafePath(res, abs)) return;
       const text = await readFile(abs, "utf8");
       const timeline = JSON.parse(text);
       const r = resolveTimeline(timeline);
@@ -162,8 +172,11 @@ const server = createServer(async (req, res) => {
     if (method === "POST" && path === "/api/render") {
       const body = await readBody(req);
       const abs = resolveTimelinePath({ path: body.path });
-      if (!abs) return err(res, 400, "missing path");
-      const outPath = body.out || join("/tmp", `nextframe-${Date.now()}.mp4`);
+      if (!assertSafePath(res, abs)) return;
+      const outPath = resolveTimelinePath({
+        path: body.out || join(dirname(abs), `nextframe-${Date.now()}.mp4`),
+      });
+      if (!assertSafePath(res, outPath)) return;
       const text = await readFile(abs, "utf8");
       const timeline = JSON.parse(text);
       const start = Date.now();
@@ -182,8 +195,8 @@ const server = createServer(async (req, res) => {
     }
 
     if (method === "GET" && path === "/api/mp4") {
-      const abs = q.path;
-      if (!abs) return err(res, 400, "missing path");
+      const abs = resolveTimelinePath(q);
+      if (!assertSafePath(res, abs)) return;
       return serveFile(res, abs, "mp4");
     }
 
@@ -191,7 +204,8 @@ const server = createServer(async (req, res) => {
       const body = await readBody(req);
       const prompt = body.prompt || "";
       const tlPath = resolveTimelinePath({ path: body.path });
-      if (!tlPath || !prompt) return err(res, 400, "path and prompt required");
+      if (!assertSafePath(res, tlPath)) return;
+      if (!prompt) return err(res, 400, "prompt required");
       // Kick off a background claude -p subprocess with a constrained system prompt
       // that tells sonnet to edit the timeline via shell commands. Return immediately
       // with a job id; client polls /api/ai-status.
@@ -286,6 +300,10 @@ RULES:
   - Always re-validate after any edit`;
 }
 
-server.listen(PORT, () => {
-  process.stdout.write(`nextframe preview server at http://localhost:${PORT}\n`);
-});
+export { server, WORKSPACE_ROOT, resolveTimelinePath };
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  server.listen(PORT, () => {
+    process.stdout.write(`nextframe preview server at http://localhost:${PORT}\n`);
+  });
+}

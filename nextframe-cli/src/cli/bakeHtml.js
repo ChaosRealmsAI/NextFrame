@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
 import {
   ensureHtmlSlideCacheDir,
@@ -8,9 +7,6 @@ import {
   resolveChromeExecutable,
   wrapHtmlSlideDocument,
 } from "../scenes/_html-cache.js";
-
-const require = createRequire(import.meta.url);
-const puppeteer = require("puppeteer-core");
 
 function collectHtmlSlides(timeline, width, height) {
   const slides = new Map();
@@ -50,6 +46,14 @@ export async function run(argv) {
   if (slides.size === 0) {
     emit({ ok: true, value: { baked: 0, rendered: 0, cached: 0, message: "no htmlSlide clips found" } }, flags);
     return 0;
+  }
+
+  let puppeteer;
+  try {
+    ({ default: puppeteer } = await import("puppeteer-core"));
+  } catch {
+    emit({ ok: false, error: { code: "MISSING_PUPPETEER", message: "puppeteer-core not installed", hint: "npm install puppeteer-core" } }, flags);
+    return 2;
   }
 
   const chromePath = resolveChromeExecutable();

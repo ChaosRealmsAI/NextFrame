@@ -15,5 +15,8 @@
   "dependencies": {
     "@napi-rs/canvas": "^0.1.65",
     "pngjs": "^7.0.0"
+  },
+  "optionalDependencies": {
+    "puppeteer-core": "^24.0.0"
   }
 }

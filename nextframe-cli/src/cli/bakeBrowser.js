@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { loadTimeline, parseFlags, emit } from "./_io.js";
@@ -15,7 +14,6 @@ import {
   svgDocument,
 } from "../scenes/_browser-documents.js";
 
-const require = createRequire(import.meta.url);
 const SUPPORTED_SCENES = ["htmlSlide", "svgOverlay", "markdownSlide", "lottieAnim"];
 const CHROME_CANDIDATES = [
   process.env.PUPPETEER_EXECUTABLE_PATH,
@@ -58,7 +56,13 @@ export async function run(argv) {
   try {
     const missingJobs = jobs.filter((job) => !existsSync(job.cachePath));
     if (missingJobs.length > 0) {
-      const puppeteer = require("puppeteer-core");
+      let puppeteer;
+      try {
+        ({ default: puppeteer } = await import("puppeteer-core"));
+      } catch {
+        emit({ ok: false, error: { code: "MISSING_PUPPETEER", message: "puppeteer-core not installed", hint: "npm install puppeteer-core" } }, flags);
+        return 2;
+      }
       browser = await puppeteer.launch({
         executablePath: findChromeExecutable(),
         headless: true,
