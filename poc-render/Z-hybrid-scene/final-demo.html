@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NextFrame — Hybrid Rendering Final Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #05050c; }
+  body { position: relative; font-family: -apple-system, "SF Pro Display", "PingFang SC", "Noto Sans SC", sans-serif; }
+
+  /* ============================================
+     Layer 0: Canvas — 流体渐变 + 粒子系统
+     ============================================ */
+  #layer-canvas { position: absolute; inset: 0; z-index: 0; }
+
+  /* ============================================
+     Layer 1: SVG — 矢量装饰 + 数据可视化
+     ============================================ */
+  #layer-svg { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+
+  /* ============================================
+     Layer 2: DOM — 文字排版 + CSS 动画
+     ============================================ */
+  #layer-dom { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+
+  /* ============================================
+     Layer 3: Video — 媒体素材
+     ============================================ */
+  #layer-media { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+
+  /* ---- 主标题：CSS gradient text + 入场动画 ---- */
+  .title {
+    position: absolute;
+    top: 220px; left: 0; right: 0;
+    text-align: center;
+    font-size: 120px;
+    font-weight: 900;
+    letter-spacing: -4px;
+    line-height: 1;
+    background: linear-gradient(135deg, #6ee7ff 0%, #a78bfa 35%, #f472b6 65%, #fb923c 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 60px rgba(167, 139, 250, 0.3));
+    animation: title-enter 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes title-enter {
+    0%   { opacity: 0; transform: translateY(40px) scale(0.92); filter: blur(12px) drop-shadow(0 0 60px rgba(167, 139, 250, 0.3)); }
+    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0) drop-shadow(0 0 60px rgba(167, 139, 250, 0.3)); }
+  }
+
+  /* ---- 副标题：monospace + 打字机效果 ---- */
+  .subtitle {
+    position: absolute;
+    top: 370px; left: 0; right: 0;
+    text-align: center;
+    font-family: "SF Mono", "Fira Code", Menlo, monospace;
+    font-size: 22px;
+    font-weight: 500;
+    color: rgba(200, 190, 255, 0.6);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    animation: fade-slide 0.8s 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* ---- 功能卡片：CSS Grid 布局 ---- */
+  .cards {
+    position: absolute;
+    top: 480px; left: 50%;
+    transform: translateX(-50%);
+    display: grid;
+    grid-template-columns: repeat(4, 200px);
+    gap: 24px;
+  }
+  .card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 28px 20px;
+    text-align: center;
+    backdrop-filter: blur(20px);
+    animation: card-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .card:nth-child(1) { animation-delay: 1.0s; }
+  .card:nth-child(2) { animation-delay: 1.15s; }
+  .card:nth-child(3) { animation-delay: 1.3s; }
+  .card:nth-child(4) { animation-delay: 1.45s; }
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(30px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .card-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    display: block;
+  }
+  .card-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .card-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  /* ---- 底部进度条：CSS 动画 ---- */
+  .progress-bar {
+    position: absolute;
+    bottom: 80px; left: 160px; right: 160px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    overflow: hidden;
+    animation: fade-slide 0.6s 1.8s both;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #6ee7ff, #a78bfa, #f472b6);
+    border-radius: 2px;
+    animation: progress 3s 2s ease-out forwards;
+  }
+  @keyframes progress {
+    to { width: 100%; }
+  }
+  .progress-labels {
+    position: absolute;
+    bottom: 92px; left: 160px; right: 160px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.25);
+    font-family: "SF Mono", monospace;
+    animation: fade-slide 0.6s 1.8s both;
+  }
+
+  /* ---- 角标 ---- */
+  .badge {
+    position: absolute;
+    top: 36px; right: 40px;
+    display: flex; align-items: center; gap: 10px;
+    animation: fade-slide 0.5s 0.5s both;
+  }
+  .badge-tag {
+    background: linear-gradient(135deg, #ef4444, #ec4899);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 5px 14px;
+    border-radius: 6px;
+    letter-spacing: 1px;
+  }
+  .badge-ver {
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    font-family: "SF Mono", monospace;
+  }
+
+  /* ---- 左上角 logo ---- */
+  .logo {
+    position: absolute;
+    top: 36px; left: 40px;
+    display: flex; align-items: center; gap: 10px;
+    animation: fade-slide 0.5s 0.3s both;
+  }
+  .logo-dot {
+    width: 10px; height: 10px;
+    background: #a78bfa;
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.6);
+  }
+  .logo-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 2px;
+  }
+
+  /* ---- 通用动画 ---- */
+  @keyframes fade-slide {
+    from { opacity: 0; transform: translateY(15px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---- 角落标记（纯 CSS） ---- */
+  .corner { position: absolute; width: 32px; height: 32px; border-color: rgba(255,255,255,0.1); border-style: solid; border-width: 0; }
+  .corner.tl { top: 24px; left: 24px; border-top-width: 1px; border-left-width: 1px; }
+  .corner.tr { top: 24px; right: 24px; border-top-width: 1px; border-right-width: 1px; }
+  .corner.bl { bottom: 24px; left: 24px; border-bottom-width: 1px; border-left-width: 1px; }
+  .corner.br { bottom: 24px; right: 24px; border-bottom-width: 1px; border-right-width: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ===== Layer 0: Canvas 2D — 流体渐变背景 + 粒子 ===== -->
+<canvas id="layer-canvas" width="1920" height="1080"></canvas>
+
+<!-- ===== Layer 1: SVG — 矢量环形装饰 + 数据曲线 ===== -->
+<svg id="layer-svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6ee7ff" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="curve-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6ee7ff" stop-opacity="0"/>
+      <stop offset="20%" stop-color="#6ee7ff" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#a78bfa" stop-opacity="0.8"/>
+      <stop offset="80%" stop-color="#f472b6" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#f472b6" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- 旋转环 -->
+  <g opacity="0.6">
+    <circle cx="960" cy="320" r="200" fill="none" stroke="url(#ring-grad)" stroke-width="0.8">
+      <animateTransform attributeName="transform" type="rotate" from="0 960 320" to="360 960 320" dur="25s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="960" cy="320" r="240" fill="none" stroke="url(#ring-grad)" stroke-width="0.5" stroke-dasharray="4 8">
+      <animateTransform attributeName="transform" type="rotate" from="360 960 320" to="0 960 320" dur="35s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="960" cy="320" r="160" fill="none" stroke="rgba(244,114,182,0.06)" stroke-width="0.5" stroke-dasharray="2 6">
+      <animateTransform attributeName="transform" type="rotate" from="0 960 320" to="360 960 320" dur="18s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- 底部数据曲线 -->
+  <g filter="url(#glow)">
+    <path fill="none" stroke="url(#curve-grad)" stroke-width="1.5" opacity="0.7">
+      <animate attributeName="d" dur="6s" repeatCount="indefinite"
+        values="M100,900 C300,860 500,880 700,840 S1100,800 1300,830 S1600,860 1820,820;
+                M100,880 C300,840 500,860 700,820 S1100,780 1300,810 S1600,840 1820,800;
+                M100,900 C300,860 500,880 700,840 S1100,800 1300,830 S1600,860 1820,820"/>
+    </path>
+  </g>
+
+  <!-- 散布的小点 -->
+  <g opacity="0.3">
+    <circle cx="300" cy="200" r="2" fill="#6ee7ff"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="3s" repeatCount="indefinite"/></circle>
+    <circle cx="1600" cy="180" r="1.5" fill="#a78bfa"><animate attributeName="opacity" values="0.3;0.9;0.3" dur="4s" repeatCount="indefinite"/></circle>
+    <circle cx="500" cy="700" r="2" fill="#f472b6"><animate attributeName="opacity" values="0.2;0.7;0.2" dur="3.5s" repeatCount="indefinite"/></circle>
+    <circle cx="1400" cy="650" r="1.5" fill="#6ee7ff"><animate attributeName="opacity" values="0.3;0.8;0.3" dur="2.8s" repeatCount="indefinite"/></circle>
+    <circle cx="960" cy="900" r="2" fill="#a78bfa"><animate attributeName="opacity" values="0.2;0.6;0.2" dur="4.2s" repeatCount="indefinite"/></circle>
+  </g>
+</svg>
+
+<!-- ===== Layer 2: DOM — 文字 + 排版 + CSS 动画 ===== -->
+<div id="layer-dom">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <span class="logo-text">NEXTFRAME</span>
+  </div>
+
+  <div class="badge">
+    <span class="badge-tag">HYBRID</span>
+    <span class="badge-ver">v0.2</span>
+  </div>
+
+  <div class="title">NextFrame</div>
+  <div class="subtitle">Canvas + DOM + SVG + WebGPU</div>
+
+  <div class="cards">
+    <div class="card">
+      <span class="card-icon">🎨</span>
+      <div class="card-value">Canvas</div>
+      <div class="card-label">渐变 · 粒子 · 特效</div>
+    </div>
+    <div class="card">
+      <span class="card-icon">📝</span>
+      <div class="card-value">DOM</div>
+      <div class="card-label">文字 · 排版 · 布局</div>
+    </div>
+    <div class="card">
+      <span class="card-icon">📐</span>
+      <div class="card-value">SVG</div>
+      <div class="card-label">图表 · 图标 · 矢量</div>
+    </div>
+    <div class="card">
+      <span class="card-icon">🎬</span>
+      <div class="card-value">Video</div>
+      <div class="card-label">视频 · 图片 · 媒体</div>
+    </div>
+  </div>
+
+  <div class="progress-labels">
+    <span>渲染开始</span>
+    <span>合成中</span>
+    <span>编码完成</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill"></div></div>
+
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+</div>
+
+<!-- ===== Canvas 渲染脚本 ===== -->
+<script>
+const canvas = document.getElementById('layer-canvas');
+const ctx = canvas.getContext('2d');
+const W = 1920, H = 1080;
+
+// 粒子系统
+const particles = Array.from({length: 80}, () => ({
+  x: Math.random() * W,
+  y: Math.random() * H,
+  r: Math.random() * 1.8 + 0.3,
+  vx: (Math.random() - 0.5) * 0.4,
+  vy: (Math.random() - 0.5) * 0.25,
+  hue: 240 + Math.random() * 80,
+  alpha: Math.random() * 0.35 + 0.05,
+}));
+
+function render(t) {
+  // 深色基底
+  ctx.fillStyle = '#05050c';
+  ctx.fillRect(0, 0, W, H);
+
+  // 光斑 1：蓝紫
+  const g1 = ctx.createRadialGradient(
+    W * 0.35 + Math.sin(t * 0.15) * 180, H * 0.35 + Math.cos(t * 0.12) * 100, 20,
+    W * 0.4, H * 0.4, W * 0.55
+  );
+  g1.addColorStop(0, `hsla(${265 + Math.sin(t * 0.2) * 20}, 75%, 22%, 0.9)`);
+  g1.addColorStop(0.5, `hsla(${280 + Math.cos(t * 0.15) * 15}, 55%, 10%, 0.5)`);
+  g1.addColorStop(1, 'transparent');
+  ctx.fillStyle = g1;
+  ctx.fillRect(0, 0, W, H);
+
+  // 光斑 2：粉红
+  const g2 = ctx.createRadialGradient(
+    W * 0.7 + Math.cos(t * 0.18) * 140, H * 0.55 + Math.sin(t * 0.14) * 90, 15,
+    W * 0.65, H * 0.5, W * 0.45
+  );
+  g2.addColorStop(0, `hsla(${330 + Math.sin(t * 0.25) * 15}, 65%, 18%, 0.7)`);
+  g2.addColorStop(0.4, `hsla(${345}, 45%, 8%, 0.3)`);
+  g2.addColorStop(1, 'transparent');
+  ctx.fillStyle = g2;
+  ctx.fillRect(0, 0, W, H);
+
+  // 光斑 3：青色（微弱）
+  const g3 = ctx.createRadialGradient(
+    W * 0.2 + Math.sin(t * 0.1) * 100, H * 0.7, 10,
+    W * 0.25, H * 0.65, W * 0.3
+  );
+  g3.addColorStop(0, `hsla(195, 70%, 15%, 0.4)`);
+  g3.addColorStop(1, 'transparent');
+  ctx.fillStyle = g3;
+  ctx.fillRect(0, 0, W, H);
+
+  // 粒子
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    if (p.x < -10) p.x = W + 10;
+    if (p.x > W + 10) p.x = -10;
+    if (p.y < -10) p.y = H + 10;
+    if (p.y > H + 10) p.y = -10;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${p.hue}, 60%, 70%, ${p.alpha})`;
+    ctx.fill();
+  }
+
+  // 噪点纹理（微弱 film grain）
+  const imgData = ctx.getImageData(0, 0, W, H);
+  const data = imgData.data;
+  for (let i = 0; i < data.length; i += 16) {
+    const noise = (Math.random() - 0.5) * 8;
+    data[i] += noise;
+    data[i + 1] += noise;
+    data[i + 2] += noise;
+  }
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// 动画循环
+let start = performance.now();
+(function loop() {
+  render((performance.now() - start) / 1000);
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
