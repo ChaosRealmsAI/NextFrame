@@ -19,3 +19,13 @@ export function assertSceneContract(id, entry) {
     if (!p.name || !p.type) throw new SceneContractError(`${id}: META.params entry missing name/type`);
   }
 }
+
+export function assertNoDuplicateIds(ids) {
+  const seen = new Set();
+  for (const id of ids) {
+    if (seen.has(id)) {
+      throw new SceneContractError(`duplicate scene id "${id}" — registry must not collide`);
+    }
+    seen.add(id);
+  }
+}
