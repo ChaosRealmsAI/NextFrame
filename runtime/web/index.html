@@ -1526,19 +1526,7 @@ button { cursor: pointer; }
       <div class="logo-mark"></div>
       <span class="logo-text">NextFrame</span>
     </div>
-    <div class="cmd-bar">
-      <div class="cmd-trigger" onclick="openCmd(this)">
-        <span class="search-icon">&#x2315;</span>
-        Search projects...
-        <span class="kbd">&#x2318;K</span>
-      </div>
-      <div class="cmd-dropdown" id="cmd-home">
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x2728;</span>Generate intro sequence<span class="cmd-hint">AI</span></div>
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F3A8;</span>Style transfer from reference<span class="cmd-hint">AI</span></div>
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F4DD;</span>Script to timeline<span class="cmd-hint">AI</span></div>
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F3B5;</span>Auto-sync to beat<span class="cmd-hint">AI</span></div>
-      </div>
-    </div>
+    <div style="flex:1"></div>
     <div class="topbar-right">
       <div class="avatar">Z</div>
     </div>
@@ -1620,19 +1608,7 @@ button { cursor: pointer; }
     </div>
     <span style="color:var(--ink-dim);font-size:12px;margin:0 4px">/</span>
     <span style="font-size:13px;font-weight:500;color:var(--ink)">Show</span>
-    <div class="cmd-bar">
-      <div class="cmd-trigger" onclick="openCmd(this)">
-        <span class="search-icon">&#x2315;</span>
-        Search episodes...
-        <span class="kbd">&#x2318;K</span>
-      </div>
-      <div class="cmd-dropdown" id="cmd-project">
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x2728;</span>Generate episode from script<span class="cmd-hint">AI</span></div>
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F504;</span>Batch re-render all<span class="cmd-hint">AI</span></div>
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F4CA;</span>Export analytics<span class="cmd-hint">AI</span></div>
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F3AC;</span>Preview full show<span class="cmd-hint">AI</span></div>
-      </div>
-    </div>
+    <div style="flex:1"></div>
     <div class="topbar-right">
       <div class="avatar">Z</div>
     </div>
@@ -1723,20 +1699,7 @@ button { cursor: pointer; }
       </div>
     </div>
 
-    <div class="cmd-bar" style="max-width:320px">
-      <div class="cmd-trigger" onclick="openCmd(this)">
-        <span class="search-icon">&#x2315;</span>
-        Commands...
-        <span class="kbd">&#x2318;K</span>
-      </div>
-      <div class="cmd-dropdown" id="cmd-editor">
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x2728;</span>Generate next scene<span class="cmd-hint">AI</span></div>
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F3A8;</span>Apply style preset<span class="cmd-hint">AI</span></div>
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F504;</span>Auto-transition<span class="cmd-hint">AI</span></div>
-        <div class="cmd-dropdown-item"><span class="cmd-ai-icon">&#x1F4F7;</span>Snapshot to PNG<span class="cmd-hint">&#x2318;S</span></div>
-      </div>
-    </div>
-
+    <div style="flex:1"></div>
     <div class="topbar-right">
       <button class="btn-ghost-sm" onclick="navigator.clipboard.writeText('nextframe scene list --json')">COPY SKILLS</button>
     </div>
@@ -2026,13 +1989,6 @@ function goEditor() { switchView('view-editor'); }
 /* ============================================================
    COMMAND BAR
    ============================================================ */
-function openCmd(trigger) {
-  closeAllDropdowns();
-  const dd = trigger.parentElement.querySelector('.cmd-dropdown');
-  dd.classList.add('show');
-  showOverlay();
-}
-
 /* ============================================================
    BREADCRUMB DROPDOWNS
    ============================================================ */
@@ -2159,12 +2115,6 @@ document.addEventListener('keydown', e => {
     togglePlay();
   }
   // Cmd+K
-  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-    e.preventDefault();
-    const activeView = document.querySelector('.view.active');
-    const trigger = activeView.querySelector('.cmd-trigger');
-    if (trigger) openCmd(trigger);
-  }
   // Escape
   if (e.key === 'Escape') {
     closeAllDropdowns();
