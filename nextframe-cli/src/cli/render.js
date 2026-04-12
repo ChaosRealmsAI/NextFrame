@@ -1,7 +1,7 @@
 // nextframe render <timeline.json> <out.mp4>
 import { randomUUID } from "node:crypto";
 import { existsSync, unlinkSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
 import { exportMP4, muxMP4Audio } from "../targets/ffmpeg-mp4.js";
 import { validateTimeline } from "../engine/validate.js";
@@ -35,11 +35,12 @@ function parseCrfFlag(raw) {
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
   const [path, outPath] = positional;
+  const audioPath = flags.audio ? resolve(flags.audio) : null;
   if (!path || !outPath) {
     emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe render <timeline> <out.mp4>" } }, flags);
     return 3;
   }
-  if (flags.audio && !existsSync(flags.audio)) {
+  if (audioPath && !existsSync(audioPath)) {
     emit({
       ok: false,
       error: {
@@ -87,20 +88,20 @@ export async function run(argv) {
   };
   const start = Date.now();
   let r;
-  if (flags.audio) {
+  if (audioPath) {
     const tempVideoPath = makeTempVideoPath(outPath);
     const videoOnly = await exportMP4(loaded.value, tempVideoPath, opts);
     if (!videoOnly.ok) {
       r = toMuxFailure(videoOnly);
     } else {
-      const muxed = await muxMP4Audio(tempVideoPath, flags.audio, outPath);
+      const muxed = await muxMP4Audio(tempVideoPath, audioPath, outPath);
       if (!muxed.ok) {
         r = muxed;
       } else {
         try {
           unlinkSync(tempVideoPath);
         } catch {}
-        r = { ok: true, value: { ...videoOnly.value, outputPath: outPath, audioPath: flags.audio } };
+        r = { ok: true, value: { ...videoOnly.value, outputPath: outPath, audioPath } };
       }
     }
   } else {
