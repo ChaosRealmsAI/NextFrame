@@ -164,13 +164,43 @@ function renderGrid(){
   el.querySelectorAll('.card').forEach(c=>{c.onclick=()=>showDetail(c.dataset.id)});
 }
 
-// ── Detail ──
+// ── Detail with live preview ──
+let detailState = null; // {scene, paramValues, t}
+let previewTimer = null;
+
 function showDetail(id){
   const s=SCENES.find(x=>x.id===id);if(!s)return;
+  detailState = {scene:s, paramValues:{}, t: s.dur * 0.4};
+  for(const p of s.params) detailState.paramValues[p.n] = p.d;
+
   const ol=document.getElementById('overlay');
   const dt=document.getElementById('detail');
-  const clip={id:'clip-1',start:0,dur:s.dur,scene:s.id,params:{}};
-  for(const p of s.params)clip.params[p.n]=p.d;
+
+  let paramsHtml = '';
+  for (const p of s.params) {
+    if (p.t === 'number' && p.r) {
+      const [mn,mx] = p.r.split('–').map(Number);
+      const step = (mx-mn) > 10 ? 1 : (mx-mn) > 1 ? 0.1 : 0.01;
+      paramsHtml += `<div class="dp-row"><div class="dp-name">${p.n}<span class="dp-type" id="dpv_${p.n}">${p.d}</span></div>
+        <div style="display:flex;gap:6px;align-items:center"><input type="range" style="flex:1;accent-color:var(--accent)" min="${mn}" max="${mx}" step="${step}" value="${p.d}" data-pn="${p.n}" data-pt="number">
+        <input style="width:50px;background:#0a0a0a;border:1px solid var(--border);border-radius:4px;padding:3px 5px;color:var(--ink);font-size:10px;font-family:monospace;text-align:right" type="number" min="${mn}" max="${mx}" step="${step}" value="${p.d}" data-pn="${p.n}" data-pt="number"></div>
+        <div class="dp-info">${p.s}</div></div>`;
+    } else if (p.t === 'string') {
+      paramsHtml += `<div class="dp-row"><div class="dp-name">${p.n}<span class="dp-type">string</span></div>
+        <input style="width:100%;background:#0a0a0a;border:1px solid var(--border);border-radius:4px;padding:4px 6px;color:var(--ink);font-size:11px;font-family:monospace" value="${String(p.d).replace(/"/g,'&quot;')}" data-pn="${p.n}" data-pt="string">
+        <div class="dp-info">${p.s}</div></div>`;
+    } else if (p.t === 'boolean') {
+      paramsHtml += `<div class="dp-row"><div class="dp-name">${p.n}<span class="dp-type">boolean</span></div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--muted)"><input type="checkbox" ${p.d?'checked':''} data-pn="${p.n}" data-pt="boolean"> ${p.s}</label></div>`;
+    } else if (p.t === 'enum') {
+      paramsHtml += `<div class="dp-row"><div class="dp-name">${p.n}<span class="dp-type">enum</span></div>
+        <select style="width:100%;background:#0a0a0a;border:1px solid var(--border);border-radius:4px;padding:4px;color:var(--ink);font-size:11px" data-pn="${p.n}" data-pt="enum">${(p.o||[p.d]).map(o=>`<option${o===p.d?' selected':''}>${o}</option>`).join('')}</select>
+        <div class="dp-info">${p.s}</div></div>`;
+    } else {
+      paramsHtml += `<div class="dp-row"><div class="dp-name">${p.n}<span class="dp-type">${p.t}</span></div>
+        <div class="dp-info">${p.s} · default: <span class="dp-default">${JSON.stringify(p.d)}</span></div></div>`;
+    }
+  }
 
   dt.innerHTML=`
     <div class="detail-top">
@@ -179,13 +209,18 @@ function showDetail(id){
       <button class="close-btn" id="close-detail">&times;</button>
     </div>
     <div class="detail-body">
-      <div class="detail-preview"><img src="thumbs/${s.id}.png" alt="${s.id}" onerror="this.style.background='#1a1a2e';this.style.aspectRatio='16/9'"></div>
+      <div class="detail-preview">
+        <img id="live-preview" src="thumbs/${s.id}.png" alt="${s.id}" style="width:100%;border-radius:8px">
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:var(--muted)">t =</span>
+          <input type="range" id="time-scrub" style="flex:1;accent-color:var(--accent)" min="0" max="${s.dur}" step="0.1" value="${detailState.t}">
+          <span style="font-size:11px;color:var(--dim);font-family:monospace;min-width:36px" id="time-val">${detailState.t.toFixed(1)}s</span>
+        </div>
+        <div style="margin-top:6px;font-size:10px;color:var(--dim);text-align:center" id="preview-status">Static thumbnail · edit params to see live preview</div>
+      </div>
       <div class="detail-params">
         <h4>Parameters (${s.params.length})</h4>
-        ${s.params.map(p=>`<div class="dp-row">
-          <div class="dp-name">${p.n}<span class="dp-type">${p.t}</span></div>
-          <div class="dp-info">${p.s} · default: <span class="dp-default">${JSON.stringify(p.d)}</span>${p.r?' · range: '+p.r:''}</div>
-        </div>`).join('')}
+        ${paramsHtml}
         <h4 style="margin-top:16px">Tags</h4>
         <div class="tag-row">${s.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
       </div>
@@ -193,15 +228,76 @@ function showDetail(id){
     <div class="detail-desc">${s.desc}</div>
     <div class="detail-usage">
       <h4>Quick Start</h4>
-      <code>nextframe add-clip timeline.json \\
+      <code id="detail-code">nextframe add-clip timeline.json \\
   --track=v1 \\
   --scene=${s.id} \\
   --start=0 \\
-  --duration=${s.dur}${s.params.length>0?'\n  --params=\''+JSON.stringify(Object.fromEntries(s.params.slice(0,2).map(p=>[p.n,p.d])))+'\'':''}</code>
+  --duration=${s.dur}</code>
     </div>
   `;
   ol.classList.add('show');
-  document.getElementById('close-detail').onclick=()=>ol.classList.remove('show');
+  document.getElementById('close-detail').onclick=()=>{ol.classList.remove('show');detailState=null};
+
+  // Bind param inputs
+  dt.querySelectorAll('[data-pn]').forEach(inp => {
+    const handler = () => {
+      const pn = inp.dataset.pn, pt = inp.dataset.pt;
+      if (pt === 'number') detailState.paramValues[pn] = Number(inp.value);
+      else if (pt === 'boolean') detailState.paramValues[pn] = inp.checked;
+      else detailState.paramValues[pn] = inp.value;
+      // Sync paired inputs (slider + number)
+      dt.querySelectorAll(`[data-pn="${pn}"]`).forEach(o => {
+        if (o !== inp) { if (o.type === 'checkbox') o.checked = inp.checked; else o.value = inp.value; }
+      });
+      const vd = document.getElementById('dpv_' + pn);
+      if (vd) vd.textContent = pt === 'boolean' ? inp.checked : inp.value;
+      schedulePreview();
+      updateCode();
+    };
+    inp.addEventListener('input', handler);
+    inp.addEventListener('change', handler);
+  });
+
+  // Time scrub
+  document.getElementById('time-scrub').oninput = function() {
+    detailState.t = Number(this.value);
+    document.getElementById('time-val').textContent = detailState.t.toFixed(1) + 's';
+    schedulePreview();
+  };
+}
+
+function schedulePreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(fetchPreview, 150);
+}
+
+function fetchPreview() {
+  if (!detailState) return;
+  const s = detailState.scene;
+  const params = new URLSearchParams({id: s.id, t: detailState.t, w: 640});
+  for (const [k,v] of Object.entries(detailState.paramValues)) {
+    params.set(k, String(v));
+  }
+  const statusEl = document.getElementById('preview-status');
+  statusEl.textContent = 'Rendering...';
+  const img = document.getElementById('live-preview');
+  const url = `/api/scene-preview?${params}`;
+  const tmp = new Image();
+  tmp.onload = () => { img.src = url; statusEl.textContent = 'Live preview · ' + new Date().toLocaleTimeString(); };
+  tmp.onerror = () => { statusEl.textContent = 'Preview requires: node preview/server.mjs'; };
+  tmp.src = url;
+}
+
+function updateCode() {
+  if (!detailState) return;
+  const s = detailState.scene;
+  const changed = {};
+  for (const p of s.params) {
+    if (detailState.paramValues[p.n] !== p.d) changed[p.n] = detailState.paramValues[p.n];
+  }
+  const paramsStr = Object.keys(changed).length > 0 ? `\n  --params='${JSON.stringify(changed)}'` : '';
+  const el = document.getElementById('detail-code');
+  if (el) el.textContent = `nextframe add-clip timeline.json \\\n  --track=v1 \\\n  --scene=${s.id} \\\n  --start=0 \\\n  --duration=${s.dur}${paramsStr}`;
 }
 
 document.getElementById('overlay').onclick=(e)=>{if(e.target.id==='overlay')document.getElementById('overlay').classList.remove('show')};

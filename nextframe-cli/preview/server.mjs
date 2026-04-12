@@ -19,7 +19,7 @@ import { spawn } from "node:child_process";
 import { renderAt } from "../src/engine/render.js";
 import { resolveTimeline } from "../src/engine/time.js";
 import { validateTimeline } from "../src/engine/validate.js";
-import { listScenes } from "../src/scenes/index.js";
+import { listScenes, REGISTRY, META_TABLE } from "../src/scenes/index.js"; // REGISTRY+META used in scene-preview route
 import { exportMP4 } from "../src/targets/ffmpeg-mp4.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -108,6 +108,55 @@ const server = createServer(async (req, res) => {
     }
     if (method === "GET" && path === "/app.css") {
       return serveFile(res, join(HERE, "app.css"), "css");
+    }
+
+    // Gallery + scene preview
+    if (method === "GET" && path === "/gallery") {
+      return serveFile(res, join(HERE, "gallery.html"), "html");
+    }
+    if (method === "GET" && path === "/scene-editor") {
+      return serveFile(res, join(HERE, "scene-editor-prototype.html"), "html");
+    }
+    if (method === "GET" && path.startsWith("/thumbs/")) {
+      const file = path.replace("/thumbs/", "");
+      if (file.includes("..") || file.includes("/")) return err(res, 403, "bad path");
+      return serveFile(res, join(HERE, "thumbs", file), "png");
+    }
+
+    // Scene preview: render a single scene with custom params
+    if (method === "GET" && path === "/api/scene-preview") {
+      const sceneId = q.id;
+      if (!sceneId) return err(res, 400, "missing id");
+      const entry = REGISTRY.get(sceneId);
+      if (!entry) return err(res, 404, `unknown scene: ${sceneId}`);
+      const t = Number(q.t ?? (entry.META.duration_hint || 5) * 0.4);
+      const width = Number(q.w) || 960;
+      const height = Math.round(width / (16/9));
+      const params = {};
+      const meta = META_TABLE[sceneId];
+      if (meta && meta.params) {
+        for (const p of meta.params) {
+          if (q[p.name] !== undefined) {
+            if (p.type === "number") params[p.name] = Number(q[p.name]);
+            else if (p.type === "boolean") params[p.name] = q[p.name] === "true";
+            else params[p.name] = q[p.name];
+          }
+        }
+      }
+      // Build a minimal single-clip timeline and use renderAt
+      const miniTimeline = {
+        schema: "nextframe/v0.1",
+        duration: (entry.META.duration_hint || 10),
+        background: "#1a1510",
+        project: { width, height, fps: 30 },
+        tracks: [{ id: "v1", kind: "video", clips: [{ id: "preview", start: 0, dur: (entry.META.duration_hint || 10), scene: sceneId, params }] }],
+      };
+      const frame = renderAt(miniTimeline, t, { width, height });
+      if (!frame.ok) return err(res, 500, frame.error.message);
+      const buf = await frame.canvas.encode("png");
+      res.writeHead(200, { "content-type": MIME.png, "cache-control": "no-store" });
+      res.end(buf);
+      return;
     }
 
     // API
