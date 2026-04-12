@@ -95,6 +95,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:v
   <div class="preview">
     <div class="preview-canvas">
       <img class="preview-img" id="pimg" src="">
+      <iframe id="pframe" style="display:none;width:960px;height:540px;border:none;border-radius:6px;box-shadow:0 4px 24px rgba(0,0,0,.5);background:#fff"></iframe>
       <div class="preview-status" id="pstatus">Loading...</div>
     </div>
     <div class="transport">
@@ -313,10 +314,25 @@ function schedulePreview() {
   previewTimer = setTimeout(fetchPreview, 120);
 }
 
+const BROWSER_SCENES = ['htmlSlide','svgOverlay','markdownSlide','lottieAnim'];
+
 function fetchPreview() {
   if (!scene) return;
   const img = document.getElementById('pimg');
+  const frame = document.getElementById('pframe');
   const status = document.getElementById('pstatus');
+
+  // Browser scenes: render natively in iframe
+  if (BROWSER_SCENES.includes(scene.id)) {
+    img.style.display = 'none';
+    frame.style.display = 'block';
+    renderBrowserPreview(frame, status);
+    return;
+  }
+
+  // Canvas/other scenes: server-side render
+  img.style.display = 'block';
+  frame.style.display = 'none';
   img.classList.add('loading');
   status.textContent = 'Rendering...';
 
@@ -331,12 +347,62 @@ function fetchPreview() {
     status.textContent = `Live · ${currentT.toFixed(1)}s · ${new Date().toLocaleTimeString()}`;
   };
   tmp.onerror = () => {
-    // Fallback to static thumbnail
     img.src = `/thumbs/${scene.id}.png`;
     img.classList.remove('loading');
     status.textContent = 'Static thumbnail · start server for live preview';
   };
   tmp.src = url;
+}
+
+function renderBrowserPreview(frame, status) {
+  const id = scene.id;
+  let html = '';
+
+  if (id === 'htmlSlide') {
+    const content = paramValues.html || '<div style="padding:40px;font-size:24px">Hello World</div>';
+    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#1a1510;color:#f5ece0;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}</style></head><body>${content}</body></html>`;
+  }
+  else if (id === 'svgOverlay') {
+    const svg = paramValues.svg || '<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><circle cx="100" cy="100" r="80" fill="#da7756" opacity="0.8"/><circle cx="100" cy="100" r="50" fill="none" stroke="#f5ece0" stroke-width="2"/><text x="100" y="108" text-anchor="middle" fill="#f5ece0" font-size="16" font-family="system-ui">SVG</text></svg>';
+    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0}body{background:#12111a;display:flex;align-items:center;justify-content:center;min-height:100vh}svg{max-width:80%;max-height:80%}</style></head><body>${svg}</body></html>`;
+  }
+  else if (id === 'markdownSlide') {
+    const md = (paramValues.md || '# Hello\n\nThis is **markdown**').replace(/\\n/g, '\n');
+    const theme = paramValues.theme || 'anthropic-warm';
+    const themes = {
+      'anthropic-warm': 'background:#1a1510;color:#f5ece0;',
+      'dark': 'background:#0d1117;color:#e6edf3;',
+      'light': 'background:#ffffff;color:#1f2937;',
+    };
+    const bg = themes[theme] || themes['anthropic-warm'];
+    // Simple markdown → HTML conversion (no external deps)
+    const rendered = md
+      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,.1);padding:2px 6px;border-radius:3px;font-size:0.9em">$1</code>')
+      .replace(/^- (.+)$/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;box-sizing:border-box}body{${bg}font-family:Georgia,serif;padding:48px 64px;min-height:100vh;line-height:1.8}h1{font-size:36px;margin-bottom:16px;border-bottom:1px solid rgba(218,119,86,.3);padding-bottom:12px}h2{font-size:28px;margin:20px 0 12px}h3{font-size:22px;margin:16px 0 8px}strong{color:#da7756}ul{padding-left:24px;margin:8px 0}li{margin:4px 0}code{font-family:monospace}</style></head><body>${rendered}</body></html>`;
+  }
+  else if (id === 'lottieAnim') {
+    const src = paramValues.src || '';
+    const frameNum = paramValues.frame || 0;
+    html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0}body{background:#12111a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;color:#f5ece0;font-family:system-ui}</style></head><body>
+      <div style="width:200px;height:200px;border:2px solid rgba(218,119,86,.3);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+        <svg viewBox="0 0 100 100" width="120" height="120"><circle cx="50" cy="50" r="35" fill="none" stroke="#da7756" stroke-width="3" stroke-dasharray="180" stroke-dashoffset="${180 - frameNum * 1.5}"><animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="2s" repeatCount="indefinite"/></circle><circle cx="50" cy="50" r="8" fill="#da7756"/></svg>
+      </div>
+      <div style="font-size:13px;color:#8a8078">Lottie Animation</div>
+      <div style="font-size:11px;color:#555;margin-top:4px">${src || 'No source file'} · frame ${frameNum}</div>
+    </body></html>`;
+  }
+
+  frame.srcdoc = html;
+  status.textContent = `Browser native · ${scene.id}`;
 }
 
 // Keyboard shortcuts
