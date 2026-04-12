@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Njia ya Mkato ya Chromium";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Hakimiliki 2026 Google LLC. Haki zote zimehifadhiwa.";
+NSAudioCaptureUsageDescription = "Chromium itakapopata idhini, tovuti zitaweza kukuomba idhini ya kufikia.";
+NSBluetoothAlwaysUsageDescription = "Chromium itakapopata idhini, tovuti zitaweza kukuomba idhini ya kufikia.";
+NSBluetoothPeripheralUsageDescription = "Chromium itakapopata idhini, tovuti zitaweza kukuomba idhini ya kufikia.";
+NSCameraUsageDescription = "Chromium itakapopata idhini, tovuti zitaweza kukuomba idhini ya kufikia.";
+NSHumanReadableCopyright = "Hakimiliki 2026 Google LLC. Haki zote zimehifadhiwa.";
+NSLocalNetworkUsageDescription = "Hii itakuruhusu kuchagua kwenye vifaa vinavyopatikana na kuonyesha maudhui kwenye vifaa hivyo.";
+NSLocationUsageDescription = "Chromium itakapopata idhini, tovuti zitaweza kukuomba idhini ya kufikia.";
+NSMicrophoneUsageDescription = "Chromium itakapopata idhini, tovuti zitaweza kukuomba idhini ya kufikia.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Chromium itakapopata idhini, tovuti zitaweza kukuomba idhini ya kufikia.";

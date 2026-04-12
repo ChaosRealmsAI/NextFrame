@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium пречица";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Ауторска права 2026. Google LLC. Сва права задржана.";
+NSAudioCaptureUsageDescription = "Када Chromium добије приступ, веб-сајтови ће моћи да затраже приступ.";
+NSBluetoothAlwaysUsageDescription = "Када Chromium добије приступ, веб-сајтови ће моћи да затраже приступ.";
+NSBluetoothPeripheralUsageDescription = "Када Chromium добије приступ, веб-сајтови ће моћи да затраже приступ.";
+NSCameraUsageDescription = "Када Chromium добије приступ, веб-сајтови ће моћи да затраже приступ.";
+NSHumanReadableCopyright = "Ауторска права 2026. Google LLC. Сва права задржана.";
+NSLocalNetworkUsageDescription = "То ће вам омогућити да бирате са доступних уређаја и да приказујете садржај на њима.";
+NSLocationUsageDescription = "Када Chromium добије приступ, веб-сајтови ће моћи да затраже приступ.";
+NSMicrophoneUsageDescription = "Када Chromium добије приступ, веб-сајтови ће моћи да затраже приступ.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Када Chromium добије приступ, веб-сајтови ће моћи да затраже приступ.";

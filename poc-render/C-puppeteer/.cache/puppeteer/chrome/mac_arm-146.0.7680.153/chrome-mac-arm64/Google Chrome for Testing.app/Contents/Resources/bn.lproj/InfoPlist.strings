@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium-এর শর্টকার্ট";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, কপিরাইট 2026 Google LLC সব স্বত্ব সংরক্ষিত আছে।";
+NSAudioCaptureUsageDescription = "Chromium অ্যাক্সেস পেলেই, ওয়েবসাইটগুলি আপনাকে অ্যাক্সেসের অনুরোধ করতে পারবে।";
+NSBluetoothAlwaysUsageDescription = "Chromium অ্যাক্সেস পেলেই, ওয়েবসাইটগুলি আপনাকে অ্যাক্সেসের অনুরোধ করতে পারবে।";
+NSBluetoothPeripheralUsageDescription = "Chromium অ্যাক্সেস পেলেই, ওয়েবসাইটগুলি আপনাকে অ্যাক্সেসের অনুরোধ করতে পারবে।";
+NSCameraUsageDescription = "Chromium অ্যাক্সেস পেলেই, ওয়েবসাইটগুলি আপনাকে অ্যাক্সেসের অনুরোধ করতে পারবে।";
+NSHumanReadableCopyright = "কপিরাইট 2026 Google LLC সব স্বত্ব সংরক্ষিত আছে।";
+NSLocalNetworkUsageDescription = "এর ফলে আপনি উপলভ্য ডিভাইসগুলি থেকে বেছে নিতে পারবেন এবং সেগুলিতে কন্টেন্ট দেখাতে পারবেন।";
+NSLocationUsageDescription = "Chromium অ্যাক্সেস পেলেই, ওয়েবসাইটগুলি আপনাকে অ্যাক্সেসের অনুরোধ করতে পারবে।";
+NSMicrophoneUsageDescription = "Chromium অ্যাক্সেস পেলেই, ওয়েবসাইটগুলি আপনাকে অ্যাক্সেসের অনুরোধ করতে পারবে।";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Chromium অ্যাক্সেস পেলেই, ওয়েবসাইটগুলি আপনাকে অ্যাক্সেসের অনুরোধ করতে পারবে।";

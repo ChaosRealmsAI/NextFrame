@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium ஷார்ட்கட்";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, பதிப்புரிமை 2026 Google LLC. அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.";
+NSAudioCaptureUsageDescription = "Chromiumமுக்கு அணுகல் கிடைத்தவுடன், இணையதளங்கள் உங்களிடம் அணுகலைக் கோர முடியும்.";
+NSBluetoothAlwaysUsageDescription = "Chromiumமுக்கு அணுகல் கிடைத்தவுடன், இணையதளங்கள் உங்களிடம் அணுகலைக் கோர முடியும்.";
+NSBluetoothPeripheralUsageDescription = "Chromiumமுக்கு அணுகல் கிடைத்தவுடன், இணையதளங்கள் உங்களிடம் அணுகலைக் கோர முடியும்.";
+NSCameraUsageDescription = "Chromiumமுக்கு அணுகல் கிடைத்தவுடன், இணையதளங்கள் உங்களிடம் அணுகலைக் கோர முடியும்.";
+NSHumanReadableCopyright = "பதிப்புரிமை 2026 Google LLC. அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.";
+NSLocalNetworkUsageDescription = "கிடைக்கக்கூடிய சாதனங்களில் இருந்து தேர்ந்தெடுக்கவும், அவற்றில் உள்ளடக்கத்தைக் காட்டவும் இது அனுமதிக்கும்.";
+NSLocationUsageDescription = "Chromiumமுக்கு அணுகல் கிடைத்தவுடன், இணையதளங்கள் உங்களிடம் அணுகலைக் கோர முடியும்.";
+NSMicrophoneUsageDescription = "Chromiumமுக்கு அணுகல் கிடைத்தவுடன், இணையதளங்கள் உங்களிடம் அணுகலைக் கோர முடியும்.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Chromiumமுக்கு அணுகல் கிடைத்தவுடன், இணையதளங்கள் உங்களிடம் அணுகலைக் கோர முடியும்.";

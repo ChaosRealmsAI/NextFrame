@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium-kortpad";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Kopiereg 2026 Google LLC. Alle regte voorbehou.";
+NSAudioCaptureUsageDescription = "Sodra Chromium toegang het, sal webwerwe jou kan vra vir toegang.";
+NSBluetoothAlwaysUsageDescription = "Sodra Chromium toegang het, sal webwerwe jou kan vra vir toegang.";
+NSBluetoothPeripheralUsageDescription = "Sodra Chromium toegang het, sal webwerwe jou kan vra vir toegang.";
+NSCameraUsageDescription = "Sodra Chromium toegang het, sal webwerwe jou kan vra vir toegang.";
+NSHumanReadableCopyright = "Kopiereg 2026 Google LLC. Alle regte voorbehou.";
+NSLocalNetworkUsageDescription = "Hiermee sal jy uit beskikbare toestelle kan kies en inhoud daarop kan wys.";
+NSLocationUsageDescription = "Sodra Chromium toegang het, sal webwerwe jou kan vra vir toegang.";
+NSMicrophoneUsageDescription = "Sodra Chromium toegang het, sal webwerwe jou kan vra vir toegang.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Sodra Chromium toegang het, sal webwerwe jou kan vra vir toegang.";

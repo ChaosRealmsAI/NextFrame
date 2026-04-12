@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium-Verknüpfung";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Copyright 2026 Google LLC. Alle Rechte vorbehalten.";
+NSAudioCaptureUsageDescription = "Sobald Chromium Zugriff hat, können Websites dich um Zugriff bitten.";
+NSBluetoothAlwaysUsageDescription = "Sobald Chromium Zugriff hat, können Websites dich um Zugriff bitten.";
+NSBluetoothPeripheralUsageDescription = "Sobald Chromium Zugriff hat, können Websites dich um Zugriff bitten.";
+NSCameraUsageDescription = "Sobald Chromium Zugriff hat, können Websites dich um Zugriff bitten.";
+NSHumanReadableCopyright = "Copyright 2026 Google LLC. Alle Rechte vorbehalten.";
+NSLocalNetworkUsageDescription = "So kannst du aus verfügbaren Geräten auswählen und Inhalte darauf anzeigen lassen.";
+NSLocationUsageDescription = "Sobald Chromium Zugriff hat, können Websites dich um Zugriff bitten.";
+NSMicrophoneUsageDescription = "Sobald Chromium Zugriff hat, können Websites dich um Zugriff bitten.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Sobald Chromium Zugriff hat, können Websites dich um Zugriff bitten.";

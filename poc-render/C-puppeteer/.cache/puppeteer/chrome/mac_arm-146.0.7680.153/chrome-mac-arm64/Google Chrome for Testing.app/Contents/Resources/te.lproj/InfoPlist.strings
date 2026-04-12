@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium షార్ట్‌కట్";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, కాపీరైట్ 2026 సర్వ హక్కులు Google LLCకి రిజర్వ్ అయ్యాయి.";
+NSAudioCaptureUsageDescription = "ఓసారి Chromiumకి యాక్సెస్ లభించాక, ఆపై వెబ్‌సైట్‌లకు ఏమైనా యాక్సెస్‌ కావాలంటే అవి మిమ్మల్ని అడగవచ్చు.";
+NSBluetoothAlwaysUsageDescription = "ఓసారి Chromiumకి యాక్సెస్ లభించాక, ఆపై వెబ్‌సైట్‌లకు ఏమైనా యాక్సెస్‌ కావాలంటే అవి మిమ్మల్ని అడగవచ్చు.";
+NSBluetoothPeripheralUsageDescription = "ఓసారి Chromiumకి యాక్సెస్ లభించాక, ఆపై వెబ్‌సైట్‌లకు ఏమైనా యాక్సెస్‌ కావాలంటే అవి మిమ్మల్ని అడగవచ్చు.";
+NSCameraUsageDescription = "ఓసారి Chromiumకి యాక్సెస్ లభించాక, ఆపై వెబ్‌సైట్‌లకు ఏమైనా యాక్సెస్‌ కావాలంటే అవి మిమ్మల్ని అడగవచ్చు.";
+NSHumanReadableCopyright = "కాపీరైట్ 2026 సర్వ హక్కులు Google LLCకి రిజర్వ్ అయ్యాయి.";
+NSLocalNetworkUsageDescription = "ఇది అందుబాటులో ఉన్న పరికరాల నుండి ఎంచుకోవడానికి, వాటిలో కంటెంట్‌ను డిస్‌ప్లే చేయడానికి మిమ్మల్ని అనుమతిస్తుంది.";
+NSLocationUsageDescription = "ఓసారి Chromiumకి యాక్సెస్ లభించాక, ఆపై వెబ్‌సైట్‌లకు ఏమైనా యాక్సెస్‌ కావాలంటే అవి మిమ్మల్ని అడగవచ్చు.";
+NSMicrophoneUsageDescription = "ఓసారి Chromiumకి యాక్సెస్ లభించాక, ఆపై వెబ్‌సైట్‌లకు ఏమైనా యాక్సెస్‌ కావాలంటే అవి మిమ్మల్ని అడగవచ్చు.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "ఓసారి Chromiumకి యాక్సెస్ లభించాక, ఆపై వెబ్‌సైట్‌లకు ఏమైనా యాక్సెస్‌ కావాలంటే అవి మిమ్మల్ని అడగవచ్చు.";

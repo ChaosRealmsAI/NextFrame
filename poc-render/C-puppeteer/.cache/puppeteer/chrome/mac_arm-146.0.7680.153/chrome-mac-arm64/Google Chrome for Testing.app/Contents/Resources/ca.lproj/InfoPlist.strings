@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Drecera de Chromium";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Copyright 2026 Google LLC. Tots els drets reservats.";
+NSAudioCaptureUsageDescription = "Un cop Chromium tingui accés, els llocs web et podran demanar accés.";
+NSBluetoothAlwaysUsageDescription = "Un cop Chromium tingui accés, els llocs web et podran demanar accés.";
+NSBluetoothPeripheralUsageDescription = "Un cop Chromium tingui accés, els llocs web et podran demanar accés.";
+NSCameraUsageDescription = "Un cop Chromium tingui accés, els llocs web et podran demanar accés.";
+NSHumanReadableCopyright = "Copyright 2026 Google LLC. Tots els drets reservats.";
+NSLocalNetworkUsageDescription = "Això et permetrà seleccionar un dels dispositius disponibles i mostrar-hi contingut.";
+NSLocationUsageDescription = "Un cop Chromium tingui accés, els llocs web et podran demanar accés.";
+NSMicrophoneUsageDescription = "Un cop Chromium tingui accés, els llocs web et podran demanar accés.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Un cop Chromium tingui accés, els llocs web et podran demanar accés.";

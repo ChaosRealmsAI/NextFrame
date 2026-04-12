@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium શૉર્ટકટ";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, કૉપિરાઇટ 2026 Google LLC. સર્વાધિકાર સુરક્ષિત.";
+NSAudioCaptureUsageDescription = "એકવાર Chromiumને ઍક્સેસ મળે, તે પછી વેબસાઇટ તમારી પાસે ઍક્સેસ માગી શકશે.";
+NSBluetoothAlwaysUsageDescription = "એકવાર Chromiumને ઍક્સેસ મળે, તે પછી વેબસાઇટ તમારી પાસે ઍક્સેસ માગી શકશે.";
+NSBluetoothPeripheralUsageDescription = "એકવાર Chromiumને ઍક્સેસ મળે, તે પછી વેબસાઇટ તમારી પાસે ઍક્સેસ માગી શકશે.";
+NSCameraUsageDescription = "એકવાર Chromiumને ઍક્સેસ મળે, તે પછી વેબસાઇટ તમારી પાસે ઍક્સેસ માગી શકશે.";
+NSHumanReadableCopyright = "કૉપિરાઇટ 2026 Google LLC. સર્વાધિકાર સુરક્ષિત.";
+NSLocalNetworkUsageDescription = "આ તમને ઉપલબ્ધ ડિવાઇસમાંથી પસંદ કરવાની અને તેમના પર કન્ટેન્ટ બતાવવાની મંજૂરી આપશે.";
+NSLocationUsageDescription = "એકવાર Chromiumને ઍક્સેસ મળે, તે પછી વેબસાઇટ તમારી પાસે ઍક્સેસ માગી શકશે.";
+NSMicrophoneUsageDescription = "એકવાર Chromiumને ઍક્સેસ મળે, તે પછી વેબસાઇટ તમારી પાસે ઍક્સેસ માગી શકશે.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "એકવાર Chromiumને ઍક્સેસ મળે, તે પછી વેબસાઇટ તમારી પાસે ઍક્સેસ માગી શકશે.";

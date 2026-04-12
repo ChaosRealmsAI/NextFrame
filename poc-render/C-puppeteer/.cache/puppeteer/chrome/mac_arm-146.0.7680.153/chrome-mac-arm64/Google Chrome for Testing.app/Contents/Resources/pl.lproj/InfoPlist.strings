@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Skrót w Chromium";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Copyright 2026 Google LLC. Wszelkie prawa zastrzeżone.";
+NSAudioCaptureUsageDescription = "Gdy Chromium będzie mieć dostęp, strony będą mogły prosić Cię o dostęp.";
+NSBluetoothAlwaysUsageDescription = "Gdy Chromium będzie mieć dostęp, strony będą mogły prosić Cię o dostęp.";
+NSBluetoothPeripheralUsageDescription = "Gdy Chromium będzie mieć dostęp, strony będą mogły prosić Cię o dostęp.";
+NSCameraUsageDescription = "Gdy Chromium będzie mieć dostęp, strony będą mogły prosić Cię o dostęp.";
+NSHumanReadableCopyright = "Copyright 2026 Google LLC. Wszelkie prawa zastrzeżone.";
+NSLocalNetworkUsageDescription = "Umożliwi Ci to wybranie dostępnych urządzeń i wyświetlanie na nich treści.";
+NSLocationUsageDescription = "Gdy Chromium będzie mieć dostęp, strony będą mogły prosić Cię o dostęp.";
+NSMicrophoneUsageDescription = "Gdy Chromium będzie mieć dostęp, strony będą mogły prosić Cię o dostęp.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Gdy Chromium będzie mieć dostęp, strony będą mogły prosić Cię o dostęp.";

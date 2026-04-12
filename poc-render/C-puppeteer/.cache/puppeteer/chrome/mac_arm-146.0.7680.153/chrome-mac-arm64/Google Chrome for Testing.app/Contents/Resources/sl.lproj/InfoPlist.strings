@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Bližnjica za Chromium";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Copyright 2026 Google LLC. Vse pravice pridržane.";
+NSAudioCaptureUsageDescription = "Ko bo imel Chromium dostop, vas bodo spletna mesta lahko pozvala k omogočanju dostopa.";
+NSBluetoothAlwaysUsageDescription = "Ko bo imel Chromium dostop, vas bodo spletna mesta lahko pozvala k omogočanju dostopa.";
+NSBluetoothPeripheralUsageDescription = "Ko bo imel Chromium dostop, vas bodo spletna mesta lahko pozvala k omogočanju dostopa.";
+NSCameraUsageDescription = "Ko bo imel Chromium dostop, vas bodo spletna mesta lahko pozvala k omogočanju dostopa.";
+NSHumanReadableCopyright = "Copyright 2026 Google LLC. Vse pravice pridržane.";
+NSLocalNetworkUsageDescription = "Tako boste lahko izbirali med razpoložljivimi napravami in v njih prikazali vsebino.";
+NSLocationUsageDescription = "Ko bo imel Chromium dostop, vas bodo spletna mesta lahko pozvala k omogočanju dostopa.";
+NSMicrophoneUsageDescription = "Ko bo imel Chromium dostop, vas bodo spletna mesta lahko pozvala k omogočanju dostopa.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Ko bo imel Chromium dostop, vas bodo spletna mesta lahko pozvala k omogočanju dostopa.";

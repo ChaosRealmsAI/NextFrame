@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Odkaz na Chromium";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Copyright 2026 Google LLC. Všetky práva vyhradené.";
+NSAudioCaptureUsageDescription = "Keď Chromium získa prístup, weby vás budú môcť žiadať o prístup.";
+NSBluetoothAlwaysUsageDescription = "Keď Chromium získa prístup, weby vás budú môcť žiadať o prístup.";
+NSBluetoothPeripheralUsageDescription = "Keď Chromium získa prístup, weby vás budú môcť žiadať o prístup.";
+NSCameraUsageDescription = "Keď Chromium získa prístup, weby vás budú môcť žiadať o prístup.";
+NSHumanReadableCopyright = "Copyright 2026 Google LLC. Všetky práva vyhradené.";
+NSLocalNetworkUsageDescription = "Budete si môcť vybrať z dostupných zariadení a zobraziť v nich obsah.";
+NSLocationUsageDescription = "Keď Chromium získa prístup, weby vás budú môcť žiadať o prístup.";
+NSMicrophoneUsageDescription = "Keď Chromium získa prístup, weby vás budú môcť žiadať o prístup.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Keď Chromium získa prístup, weby vás budú môcť žiadať o prístup.";

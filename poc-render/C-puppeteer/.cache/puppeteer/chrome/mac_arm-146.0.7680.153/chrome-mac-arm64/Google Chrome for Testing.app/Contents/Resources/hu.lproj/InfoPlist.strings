@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium-parancsikon";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Copyright 2026 Google LLC. Minden jog fenntartva.";
+NSAudioCaptureUsageDescription = "Miután hozzáférést biztosított a Chromiumnak, a webhelyek is hozzáférést kérhetnek.";
+NSBluetoothAlwaysUsageDescription = "Miután hozzáférést biztosított a Chromiumnak, a webhelyek is hozzáférést kérhetnek.";
+NSBluetoothPeripheralUsageDescription = "Miután hozzáférést biztosított a Chromiumnak, a webhelyek is hozzáférést kérhetnek.";
+NSCameraUsageDescription = "Miután hozzáférést biztosított a Chromiumnak, a webhelyek is hozzáférést kérhetnek.";
+NSHumanReadableCopyright = "Copyright 2026 Google LLC. Minden jog fenntartva.";
+NSLocalNetworkUsageDescription = "Ez lehetővé teszi, hogy válasszon a rendelkezésre álló eszközök közül, és tartalmakat jelenítsen meg rajtuk.";
+NSLocationUsageDescription = "Miután hozzáférést biztosított a Chromiumnak, a webhelyek is hozzáférést kérhetnek.";
+NSMicrophoneUsageDescription = "Miután hozzáférést biztosított a Chromiumnak, a webhelyek is hozzáférést kérhetnek.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Miután hozzáférést biztosított a Chromiumnak, a webhelyek is hozzáférést kérhetnek.";

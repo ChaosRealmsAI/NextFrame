@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium-genvej";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Copyright 2026 Google LLC. Alle rettigheder forbeholdes.";
+NSAudioCaptureUsageDescription = "Når Chromium har adgang, kan websites bede dig om adgang.";
+NSBluetoothAlwaysUsageDescription = "Når Chromium har adgang, kan websites bede dig om adgang.";
+NSBluetoothPeripheralUsageDescription = "Når Chromium har adgang, kan websites bede dig om adgang.";
+NSCameraUsageDescription = "Når Chromium har adgang, kan websites bede dig om adgang.";
+NSHumanReadableCopyright = "Copyright 2026 Google LLC. Alle rettigheder forbeholdes.";
+NSLocalNetworkUsageDescription = "Dette giver dig mulighed for at vælge mellem tilgængelige enheder og vise indhold på dem.";
+NSLocationUsageDescription = "Når Chromium har adgang, kan websites bede dig om adgang.";
+NSMicrophoneUsageDescription = "Når Chromium har adgang, kan websites bede dig om adgang.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Når Chromium har adgang, kan websites bede dig om adgang.";

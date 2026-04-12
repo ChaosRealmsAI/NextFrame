@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "‏میان‌بر Chromium";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, ‏حق نشر 2026 Google LLC.‎ کلیه حقوق محفوظ است.";
+NSAudioCaptureUsageDescription = "‏وقتی Chromium دسترسی داشته باشد، وب‌سایت‌ها می‌توانند مجوز دسترسی درخواست کنند.";
+NSBluetoothAlwaysUsageDescription = "‏وقتی Chromium دسترسی داشته باشد، وب‌سایت‌ها می‌توانند مجوز دسترسی درخواست کنند.";
+NSBluetoothPeripheralUsageDescription = "‏وقتی Chromium دسترسی داشته باشد، وب‌سایت‌ها می‌توانند مجوز دسترسی درخواست کنند.";
+NSCameraUsageDescription = "‏وقتی Chromium دسترسی داشته باشد، وب‌سایت‌ها می‌توانند مجوز دسترسی درخواست کنند.";
+NSHumanReadableCopyright = "‏حق نشر 2026 Google LLC.‎ کلیه حقوق محفوظ است.";
+NSLocalNetworkUsageDescription = "این کار به شما امکان می‌دهد از بین دستگاه‌های دردسترس انتخاب کنید و محتوا را در آن‌ها نمایش دهید.";
+NSLocationUsageDescription = "‏وقتی Chromium دسترسی داشته باشد، وب‌سایت‌ها می‌توانند مجوز دسترسی درخواست کنند.";
+NSMicrophoneUsageDescription = "‏وقتی Chromium دسترسی داشته باشد، وب‌سایت‌ها می‌توانند مجوز دسترسی درخواست کنند.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "‏وقتی Chromium دسترسی داشته باشد، وب‌سایت‌ها می‌توانند مجوز دسترسی درخواست کنند.";

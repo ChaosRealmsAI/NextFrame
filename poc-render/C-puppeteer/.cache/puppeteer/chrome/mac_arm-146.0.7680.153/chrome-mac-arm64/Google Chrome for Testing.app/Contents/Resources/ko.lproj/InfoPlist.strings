@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium 바로가기";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Copyright 2026 Google LLC. All rights reserved.";
+NSAudioCaptureUsageDescription = "Chromium에 액세스 권한을 부여하면 웹사이트에서 액세스 권한을 요청할 수 있게 됩니다.";
+NSBluetoothAlwaysUsageDescription = "Chromium에 액세스 권한을 부여하면 웹사이트에서 액세스 권한을 요청할 수 있게 됩니다.";
+NSBluetoothPeripheralUsageDescription = "Chromium에 액세스 권한을 부여하면 웹사이트에서 액세스 권한을 요청할 수 있게 됩니다.";
+NSCameraUsageDescription = "Chromium에 액세스 권한을 부여하면 웹사이트에서 액세스 권한을 요청할 수 있게 됩니다.";
+NSHumanReadableCopyright = "Copyright 2026 Google LLC. All rights reserved.";
+NSLocalNetworkUsageDescription = "이렇게 하면 사용 가능한 기기 중에서 선택하고 해당 기기에 콘텐츠를 표시할 수 있습니다.";
+NSLocationUsageDescription = "Chromium에 액세스 권한을 부여하면 웹사이트에서 액세스 권한을 요청할 수 있게 됩니다.";
+NSMicrophoneUsageDescription = "Chromium에 액세스 권한을 부여하면 웹사이트에서 액세스 권한을 요청할 수 있게 됩니다.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Chromium에 액세스 권한을 부여하면 웹사이트에서 액세스 권한을 요청할 수 있게 됩니다.";

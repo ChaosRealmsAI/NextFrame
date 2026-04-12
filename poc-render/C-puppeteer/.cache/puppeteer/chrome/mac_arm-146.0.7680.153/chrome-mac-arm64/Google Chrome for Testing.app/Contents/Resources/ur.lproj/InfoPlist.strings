@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "‏‫Chromium شارٹ کٹ";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, ‏کاپی رائٹ2026 Google LLC۔ جملہ حقوق محفوظ ہیں۔";
+NSAudioCaptureUsageDescription = "‏Chromium کو رسائی مل جانے کے بعد، ویب سائٹس آپ سے رسائی طلب کر سکیں گی۔";
+NSBluetoothAlwaysUsageDescription = "‏Chromium کو رسائی مل جانے کے بعد، ویب سائٹس آپ سے رسائی طلب کر سکیں گی۔";
+NSBluetoothPeripheralUsageDescription = "‏Chromium کو رسائی مل جانے کے بعد، ویب سائٹس آپ سے رسائی طلب کر سکیں گی۔";
+NSCameraUsageDescription = "‏Chromium کو رسائی مل جانے کے بعد، ویب سائٹس آپ سے رسائی طلب کر سکیں گی۔";
+NSHumanReadableCopyright = "‏کاپی رائٹ2026 Google LLC۔ جملہ حقوق محفوظ ہیں۔";
+NSLocalNetworkUsageDescription = "یہ آپ کو دستیاب آلات میں سے انتخاب کرنے اور ان پر مواد ڈسپلے کرنے کی اجازت دے گا۔";
+NSLocationUsageDescription = "‏Chromium کو رسائی مل جانے کے بعد، ویب سائٹس آپ سے رسائی طلب کر سکیں گی۔";
+NSMicrophoneUsageDescription = "‏Chromium کو رسائی مل جانے کے بعد، ویب سائٹس آپ سے رسائی طلب کر سکیں گی۔";
+NSWebBrowserPublicKeyCredentialUsageDescription = "‏Chromium کو رسائی مل جانے کے بعد، ویب سائٹس آپ سے رسائی طلب کر سکیں گی۔";

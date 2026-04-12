@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Pintasan Chromium";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Hak cipta 2026 Google LLC. Semua hak dilindungi undang-undang.";
+NSAudioCaptureUsageDescription = "Setelah Chromium memiliki akses, situs dapat meminta akses dari Anda.";
+NSBluetoothAlwaysUsageDescription = "Setelah Chromium memiliki akses, situs dapat meminta akses dari Anda.";
+NSBluetoothPeripheralUsageDescription = "Setelah Chromium memiliki akses, situs dapat meminta akses dari Anda.";
+NSCameraUsageDescription = "Setelah Chromium memiliki akses, situs dapat meminta akses dari Anda.";
+NSHumanReadableCopyright = "Hak cipta 2026 Google LLC. Semua hak dilindungi undang-undang.";
+NSLocalNetworkUsageDescription = "Tindakan ini akan memungkinkan Anda memilih dari perangkat yang tersedia dan menampilkan konten di perangkat tersebut.";
+NSLocationUsageDescription = "Setelah Chromium memiliki akses, situs dapat meminta akses dari Anda.";
+NSMicrophoneUsageDescription = "Setelah Chromium memiliki akses, situs dapat meminta akses dari Anda.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Setelah Chromium memiliki akses, situs dapat meminta akses dari Anda.";

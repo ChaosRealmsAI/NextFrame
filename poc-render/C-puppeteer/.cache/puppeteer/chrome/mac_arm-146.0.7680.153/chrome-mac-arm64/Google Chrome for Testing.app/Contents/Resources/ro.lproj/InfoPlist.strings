@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Comandă rapidă pentru Chromium";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Drept de autor 2026 Google LLC. Toate drepturile rezervate.";
+NSAudioCaptureUsageDescription = "Odată ce Chromium are acces, site-urile web îți vor putea solicita accesul.";
+NSBluetoothAlwaysUsageDescription = "Odată ce Chromium are acces, site-urile web îți vor putea solicita accesul.";
+NSBluetoothPeripheralUsageDescription = "Odată ce Chromium are acces, site-urile web îți vor putea solicita accesul.";
+NSCameraUsageDescription = "Odată ce Chromium are acces, site-urile web îți vor putea solicita accesul.";
+NSHumanReadableCopyright = "Drept de autor 2026 Google LLC. Toate drepturile rezervate.";
+NSLocalNetworkUsageDescription = "Astfel, vei putea să selectezi dintre dispozitivele disponibile și să afișezi conținut pe acestea.";
+NSLocationUsageDescription = "Odată ce Chromium are acces, site-urile web îți vor putea solicita accesul.";
+NSMicrophoneUsageDescription = "Odată ce Chromium are acces, site-urile web îți vor putea solicita accesul.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Odată ce Chromium are acces, site-urile web îți vor putea solicita accesul.";

@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium ಶಾರ್ಟ್‌ಕಟ್";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, ಕೃತಿಸ್ವಾಮ್ಯ 2026 Google LLC. ಎಲ್ಲ ಹಕ್ಕುಗಳನ್ನು ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ.";
+NSAudioCaptureUsageDescription = "Chromium ಒಮ್ಮೆ ಪ್ರವೇಶವನ್ನು ಪಡೆದ ಬಳಿಕ, ಪ್ರವೇಶಕ್ಕಾಗಿ ನಿಮ್ಮನ್ನು ಕೇಳಲು ವೆಬ್‍ಸೈಟ್‍ಗಳಿಗೆ ಸಾಧ್ಯವಾಗುತ್ತದೆ.";
+NSBluetoothAlwaysUsageDescription = "Chromium ಒಮ್ಮೆ ಪ್ರವೇಶವನ್ನು ಪಡೆದ ಬಳಿಕ, ಪ್ರವೇಶಕ್ಕಾಗಿ ನಿಮ್ಮನ್ನು ಕೇಳಲು ವೆಬ್‍ಸೈಟ್‍ಗಳಿಗೆ ಸಾಧ್ಯವಾಗುತ್ತದೆ.";
+NSBluetoothPeripheralUsageDescription = "Chromium ಒಮ್ಮೆ ಪ್ರವೇಶವನ್ನು ಪಡೆದ ಬಳಿಕ, ಪ್ರವೇಶಕ್ಕಾಗಿ ನಿಮ್ಮನ್ನು ಕೇಳಲು ವೆಬ್‍ಸೈಟ್‍ಗಳಿಗೆ ಸಾಧ್ಯವಾಗುತ್ತದೆ.";
+NSCameraUsageDescription = "Chromium ಒಮ್ಮೆ ಪ್ರವೇಶವನ್ನು ಪಡೆದ ಬಳಿಕ, ಪ್ರವೇಶಕ್ಕಾಗಿ ನಿಮ್ಮನ್ನು ಕೇಳಲು ವೆಬ್‍ಸೈಟ್‍ಗಳಿಗೆ ಸಾಧ್ಯವಾಗುತ್ತದೆ.";
+NSHumanReadableCopyright = "ಕೃತಿಸ್ವಾಮ್ಯ 2026 Google LLC. ಎಲ್ಲ ಹಕ್ಕುಗಳನ್ನು ಕಾಯ್ದಿರಿಸಲಾಗಿದೆ.";
+NSLocalNetworkUsageDescription = "ಲಭ್ಯವಿರುವ ಸಾಧನಗಳಿಂದ ಆಯ್ಕೆ ಮಾಡಲು ಮತ್ತು ಅವುಗಳಲ್ಲಿ ಕಂಟೆಂಟ್‌ ಅನ್ನು ಪ್ರದರ್ಶಿಸಲು ಇದು ನಿಮಗೆ ಅನುಮತಿಸುತ್ತದೆ.";
+NSLocationUsageDescription = "Chromium ಒಮ್ಮೆ ಪ್ರವೇಶವನ್ನು ಪಡೆದ ಬಳಿಕ, ಪ್ರವೇಶಕ್ಕಾಗಿ ನಿಮ್ಮನ್ನು ಕೇಳಲು ವೆಬ್‍ಸೈಟ್‍ಗಳಿಗೆ ಸಾಧ್ಯವಾಗುತ್ತದೆ.";
+NSMicrophoneUsageDescription = "Chromium ಒಮ್ಮೆ ಪ್ರವೇಶವನ್ನು ಪಡೆದ ಬಳಿಕ, ಪ್ರವೇಶಕ್ಕಾಗಿ ನಿಮ್ಮನ್ನು ಕೇಳಲು ವೆಬ್‍ಸೈಟ್‍ಗಳಿಗೆ ಸಾಧ್ಯವಾಗುತ್ತದೆ.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Chromium ಒಮ್ಮೆ ಪ್ರವೇಶವನ್ನು ಪಡೆದ ಬಳಿಕ, ಪ್ರವೇಶಕ್ಕಾಗಿ ನಿಮ್ಮನ್ನು ಕೇಳಲು ವೆಬ್‍ಸೈಟ್‍ಗಳಿಗೆ ಸಾಧ್ಯವಾಗುತ್ತದೆ.";

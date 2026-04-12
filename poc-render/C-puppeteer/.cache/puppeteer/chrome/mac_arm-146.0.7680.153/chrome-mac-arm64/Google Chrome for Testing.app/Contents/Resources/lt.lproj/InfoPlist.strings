@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "„Chromium“ spartusis klavišas";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Autorių teisės „Google LLC.“, 2026 m. Visos teisės saugomos.";
+NSAudioCaptureUsageDescription = "Kai „Chromium“ galės pasiekti duomenis, svetainės taip pat galės prašyti suteikti leidimą juos pasiekti.";
+NSBluetoothAlwaysUsageDescription = "Kai „Chromium“ galės pasiekti duomenis, svetainės taip pat galės prašyti suteikti leidimą juos pasiekti.";
+NSBluetoothPeripheralUsageDescription = "Kai „Chromium“ galės pasiekti duomenis, svetainės taip pat galės prašyti suteikti leidimą juos pasiekti.";
+NSCameraUsageDescription = "Kai „Chromium“ galės pasiekti duomenis, svetainės taip pat galės prašyti suteikti leidimą juos pasiekti.";
+NSHumanReadableCopyright = "Autorių teisės „Google LLC.“, 2026 m. Visos teisės saugomos.";
+NSLocalNetworkUsageDescription = "Galėsite pasirinkti iš pasiekiamų įrenginių ir pateikti turinį juose.";
+NSLocationUsageDescription = "Kai „Chromium“ galės pasiekti duomenis, svetainės taip pat galės prašyti suteikti leidimą juos pasiekti.";
+NSMicrophoneUsageDescription = "Kai „Chromium“ galės pasiekti duomenis, svetainės taip pat galės prašyti suteikti leidimą juos pasiekti.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Kai „Chromium“ galės pasiekti duomenis, svetainės taip pat galės prašyti suteikti leidimą juos pasiekti.";

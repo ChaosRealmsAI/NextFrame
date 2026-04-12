@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Пряк път към Chromium";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Авторски права 2026 г. Google LLC. Всички права запазени.";
+NSAudioCaptureUsageDescription = "След като Chromium получи достъп, уебсайтовете ще могат да искат достъп от вас.";
+NSBluetoothAlwaysUsageDescription = "След като Chromium получи достъп, уебсайтовете ще могат да искат достъп от вас.";
+NSBluetoothPeripheralUsageDescription = "След като Chromium получи достъп, уебсайтовете ще могат да искат достъп от вас.";
+NSCameraUsageDescription = "След като Chromium получи достъп, уебсайтовете ще могат да искат достъп от вас.";
+NSHumanReadableCopyright = "Авторски права 2026 г. Google LLC. Всички права запазени.";
+NSLocalNetworkUsageDescription = "Това ще ви даде възможност да избирате от наличните устройства и да показвате съдържание на тях.";
+NSLocationUsageDescription = "След като Chromium получи достъп, уебсайтовете ще могат да искат достъп от вас.";
+NSMicrophoneUsageDescription = "След като Chromium получи достъп, уебсайтовете ще могат да искат достъп от вас.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "След като Chromium получи достъп, уебсайтовете ще могат да искат достъп от вас.";

@@ -1,0 +1,11 @@
+"Chromium Shortcut" = "Chromium-pikanäppäin";
+CFBundleGetInfoString = "Google Chrome for Testing 146.0.7680.153, Copyright 2026 Google LLC. Kaikki oikeudet pidätetään.";
+NSAudioCaptureUsageDescription = "Kun Chromiumilla on käyttöoikeus, sivustot voivat pyytää sitä sinulta.";
+NSBluetoothAlwaysUsageDescription = "Kun Chromiumilla on käyttöoikeus, sivustot voivat pyytää sitä sinulta.";
+NSBluetoothPeripheralUsageDescription = "Kun Chromiumilla on käyttöoikeus, sivustot voivat pyytää sitä sinulta.";
+NSCameraUsageDescription = "Kun Chromiumilla on käyttöoikeus, sivustot voivat pyytää sitä sinulta.";
+NSHumanReadableCopyright = "Copyright 2026 Google LLC. Kaikki oikeudet pidätetään.";
+NSLocalNetworkUsageDescription = "Näin voit valita käytettävissä olevista laitteista ja näyttää niillä sisältöä.";
+NSLocationUsageDescription = "Kun Chromiumilla on käyttöoikeus, sivustot voivat pyytää sitä sinulta.";
+NSMicrophoneUsageDescription = "Kun Chromiumilla on käyttöoikeus, sivustot voivat pyytää sitä sinulta.";
+NSWebBrowserPublicKeyCredentialUsageDescription = "Kun Chromiumilla on käyttöoikeus, sivustot voivat pyytää sitä sinulta.";

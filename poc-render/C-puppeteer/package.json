@@ -1,0 +1,13 @@
+{
+  "name": "c-puppeteer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Headless Puppeteer renderer for auroraGradient.js",
+  "main": "index.js",
+  "scripts": {
+    "render": "node index.js"
+  },
+  "dependencies": {
+    "puppeteer": "^24.7.2"
+  }
+}

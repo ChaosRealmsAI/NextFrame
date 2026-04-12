@@ -1,0 +1,14 @@
+{
+  "name": "b-node-canvas",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "render": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "canvas": "^3.2.0"
+  }
+}
