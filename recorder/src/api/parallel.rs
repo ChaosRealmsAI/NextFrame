@@ -66,6 +66,7 @@ pub(super) fn record_parallel(
             dpr: args.dpr,
             jobs: args.jobs,
             no_skip: args.no_skip,
+            skip_aggressive: args.skip_aggressive,
             headed: args.headed,
             width: args.width,
             height: args.height,
@@ -226,6 +227,9 @@ fn build_cli_args(args: &RecordArgs) -> Vec<OsString> {
     }
     if args.no_skip {
         cli_args.push(OsString::from("--no-skip"));
+    }
+    if args.skip_aggressive {
+        cli_args.push(OsString::from("--skip-aggressive"));
     }
     if args.headed {
         cli_args.push(OsString::from("--headed"));

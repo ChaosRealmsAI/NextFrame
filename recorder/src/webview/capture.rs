@@ -5,10 +5,10 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use block2::RcBlock;
+use objc2::MainThreadMarker;
 use objc2::msg_send;
 use objc2::rc::{Retained, autoreleasepool};
 use objc2::runtime::AnyObject;
-use objc2::MainThreadMarker;
 use objc2_app_kit::NSImage;
 use objc2_core_graphics::CGImage;
 use objc2_foundation::{NSError, NSString};
@@ -91,12 +91,7 @@ impl WebViewHost {
             .ok_or_else(|| "snapshot completion did not return an image".to_string())?
     }
 
-    fn query_element_rect(
-        &self,
-        selectors: &[&str],
-        dpr: f64,
-        hide: bool,
-    ) -> Option<ProgressRect> {
+    fn query_element_rect(&self, selectors: &[&str], dpr: f64, hide: bool) -> Option<ProgressRect> {
         let selectors_json = serde_json::to_string(selectors).ok()?;
         let visibility = if hide {
             "el.style.setProperty('visibility', 'hidden', 'important');"

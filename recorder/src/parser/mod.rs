@@ -16,10 +16,10 @@ use manifest::{
 use srt::extract_srt_array;
 
 // Re-export public types so `use crate::parser::X` continues to work.
-pub use types::SubtitleCue;
-pub(crate) use types::{FrameMetadata, SlideType};
 #[allow(unused_imports)]
 pub(crate) use timeline::parse_nextframe_timeline;
+pub use types::SubtitleCue;
+pub(crate) use types::{FrameMetadata, SlideType};
 
 pub fn detect_slide_type(html_content: &str) -> SlideType {
     if html_content.contains("<clip-slide") || html_content.contains("clip-slide.js") {
@@ -121,10 +121,7 @@ pub fn parse_frame_file(path: &Path) -> Result<FrameMetadata, String> {
     })
 }
 
-fn resolve_relative(
-    html_path: &Path,
-    rel: String,
-) -> Result<std::path::PathBuf, String> {
+fn resolve_relative(html_path: &Path, rel: String) -> Result<std::path::PathBuf, String> {
     let parent = html_path
         .parent()
         .ok_or_else(|| format!("{} has no parent directory", html_path.display()))?;

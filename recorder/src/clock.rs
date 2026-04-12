@@ -39,6 +39,7 @@ impl SegmentClock {
         total_duration_sec: f64,
         duration_sec: f64,
         no_skip: bool,
+        skip_aggressive: bool,
     ) -> Self {
         let total_frames = ((duration_sec + 0.5) * fps as f64).ceil().max(1.0) as usize;
         let cue_times = build_cue_times(metadata);
@@ -52,7 +53,11 @@ impl SegmentClock {
             subtitles: metadata.subtitles.clone(),
             total_cues: metadata.total_cues,
             no_skip,
-            transition_frames: (0.8 * fps as f64).ceil() as usize,
+            transition_frames: if skip_aggressive {
+                (0.3 * fps as f64).ceil() as usize
+            } else {
+                (0.5 * fps as f64).ceil() as usize
+            },
             capture_until: 0,
             last_cue: -1,
             last_subtitle: String::new(),
@@ -85,21 +90,16 @@ impl SegmentClock {
         let cue_changed = cue_index != self.last_cue;
         let subtitle_changed = subtitle_text != self.last_subtitle;
 
-        if cue_changed {
-            self.capture_until = frame_index + self.transition_frames;
-        }
-        if subtitle_changed {
-            self.capture_until = self.capture_until.max(frame_index + 3);
+        if cue_changed || subtitle_changed {
+            self.capture_until = self
+                .capture_until
+                .max(frame_index.saturating_add(self.transition_frames));
         }
 
         let needs_capture = if self.no_skip {
             true
         } else {
-            frame_index == 0
-                || cue_changed
-                || subtitle_changed
-                || frame_index < self.capture_until
-                || frame_index.is_multiple_of(3)
+            frame_index == 0 || cue_changed || subtitle_changed || frame_index < self.capture_until
         };
         if !needs_capture {
             self.skipped_frames += 1;

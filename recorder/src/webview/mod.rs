@@ -11,18 +11,17 @@ use std::time::{Duration, Instant};
 
 use objc2::msg_send;
 use objc2::rc::Retained;
+use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSFloatingWindowLevel,
     NSImage, NSWindow, NSWindowStyleMask,
 };
 use objc2_foundation::{
-    NSDate, NSDefaultRunLoopMode, NSPoint, NSRect, NSRunLoop, NSSize, NSString, NSURL,
-    NSURLRequest,
+    NSDate, NSDefaultRunLoopMode, NSPoint, NSRect, NSRunLoop, NSSize, NSString, NSURL, NSURLRequest,
 };
 use objc2_web_kit::{
     WKAudiovisualMediaTypes, WKWebView, WKWebViewConfiguration, WKWebsiteDataStore,
 };
-use objc2::{MainThreadMarker, MainThreadOnly};
 
 #[allow(unused_imports)]
 pub(crate) use parallel::ParallelHost;

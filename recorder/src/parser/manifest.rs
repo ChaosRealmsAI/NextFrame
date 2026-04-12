@@ -16,8 +16,7 @@ use super::types::SubtitleCue;
 
 // Known-good regex literal — unwrap is safe at compile-time init
 #[allow(clippy::unwrap_used)]
-pub(super) static STEM_NUMBER_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(\d+)").unwrap());
+pub(super) static STEM_NUMBER_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d+)").unwrap());
 
 // Known-good regex literal — unwrap is safe at compile-time init
 #[allow(clippy::unwrap_used)]
@@ -73,9 +72,7 @@ pub(super) fn max_data_cue(html: &str) -> Option<usize> {
         .max()
 }
 
-pub(super) fn load_manifest_fallback(
-    html_path: &Path,
-) -> Result<Option<ManifestFallback>, String> {
+pub(super) fn load_manifest_fallback(html_path: &Path) -> Result<Option<ManifestFallback>, String> {
     let manifest_path = html_path
         .parent()
         .into_iter()

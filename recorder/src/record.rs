@@ -96,6 +96,7 @@ pub fn record_segment(
         total_duration_sec,
         plan.effective_duration_sec,
         cli.no_skip,
+        cli.skip_aggressive,
     );
 
     let mut capture_method = CaptureMethod::TakeSnapshot;

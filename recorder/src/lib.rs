@@ -14,6 +14,7 @@ pub struct CommonArgs {
     pub dpr: f64,
     pub jobs: Option<usize>,
     pub no_skip: bool,
+    pub skip_aggressive: bool,
     pub headed: bool,
     pub width: f64,
     pub height: f64,

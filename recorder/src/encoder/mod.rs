@@ -23,8 +23,8 @@ use objc2_foundation::{NSError, NSString};
 use crate::capture::cgimage_from_nsimage;
 use crate::progress::ProgressOverlay;
 
-pub use ffmpeg::{concat_segments, probe_audio_duration};
 use ffmpeg::mux_audio_track;
+pub use ffmpeg::{concat_segments, probe_audio_duration};
 use pixel_buffer::{create_pixel_buffer_from_cgimage, frame_time};
 use settings::{
     lookup_class, ns_error_ptr_to_string, nsurl_from_path, pixel_buffer_attributes,
@@ -400,4 +400,3 @@ impl SegmentEncoder {
 pub fn detect_backend() -> EncoderBackend {
     EncoderBackend::VideoToolbox
 }
-

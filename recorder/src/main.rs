@@ -63,6 +63,10 @@ struct CommonArgs {
     #[arg(long)]
     pub no_skip: bool,
 
+    /// Use a shorter 0.3s capture window after cue/subtitle changes
+    #[arg(long)]
+    pub skip_aggressive: bool,
+
     /// Show the recording window (for debugging)
     #[arg(long)]
     pub headed: bool,
@@ -108,6 +112,7 @@ impl From<CommonArgs> for RecordArgs {
             dpr: args.dpr,
             jobs: args.jobs,
             no_skip: args.no_skip,
+            skip_aggressive: args.skip_aggressive,
             headed: args.headed,
             width: args.width,
             height: args.height,

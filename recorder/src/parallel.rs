@@ -71,6 +71,9 @@ pub(crate) fn run_parallel(
         if cli.no_skip {
             cmd.arg("--no-skip");
         }
+        if cli.skip_aggressive {
+            cmd.arg("--skip-aggressive");
+        }
         if cli.headed {
             cmd.arg("--headed");
         }

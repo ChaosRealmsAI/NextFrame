@@ -8,8 +8,7 @@ use regex::Regex;
 use serde_json::Value;
 
 use super::js_extract::{
-    extract_assignment_array, extract_object_literals, extract_object_number,
-    extract_object_string,
+    extract_assignment_array, extract_object_literals, extract_object_number, extract_object_string,
 };
 use super::types::{RawSubtitleCue, SubtitleCue};
 
