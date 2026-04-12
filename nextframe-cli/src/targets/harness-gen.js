@@ -253,11 +253,32 @@ export function generateHarness(timeline, opts = {}) {
 
   canvas.width = width;
   canvas.height = height;
+  // Force CSS size to match pixel size — prevents DPR scaling in WKWebView
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
   scenes.registerAllScenes(engine);
   ${compatSceneRegistrationScript}
 
+  // Monkey-patch getDisplaySize if the engine uses getBoundingClientRect
+  // which returns wrong values in headless WKWebView
+  const origGetContext = canvas.getContext;
+  const _nfWidth = width;
+  const _nfHeight = height;
+
+  // Override getBoundingClientRect on canvas to return fixed size
+  canvas.getBoundingClientRect = function() {
+    return { x: 0, y: 0, width: _nfWidth, height: _nfHeight, top: 0, left: 0, right: _nfWidth, bottom: _nfHeight };
+  };
+  // Also set clientWidth/clientHeight
+  Object.defineProperty(canvas, 'clientWidth', { get() { return _nfWidth; } });
+  Object.defineProperty(canvas, 'clientHeight', { get() { return _nfHeight; } });
+
   function renderFrame(time) {
-    engine.renderAt(ctx, timeline, Number.isFinite(time) ? time : 0);
+    try {
+      engine.renderAt(ctx, timeline, Number.isFinite(time) ? time : 0);
+    } catch(e) {
+      console.error("[harness] renderAt error at t=" + time + ":", e.message, e.stack);
+    }
     if (!ready) {
       ready = true;
       window.__READY = true;
@@ -266,7 +287,11 @@ export function generateHarness(timeline, opts = {}) {
 
   window.__READY = false;
   window.__onFrame = function(frame = {}) {
-    renderFrame(Number(frame.time) || 0);
+    try {
+      renderFrame(Number(frame.time) || 0);
+    } catch(e) {
+      console.error("[harness] __onFrame error:", e.message);
+    }
     return true;
   };
 
