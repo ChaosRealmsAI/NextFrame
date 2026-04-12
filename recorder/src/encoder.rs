@@ -135,13 +135,15 @@ impl SegmentEncoder {
     }
 
     /// Appends an `NSImage` frame to the segment.
-    pub fn write_nsimage(&mut self, image: &NSImage) -> Result<(), String> {
+    #[allow(dead_code)]
+    pub(crate) fn write_nsimage(&mut self, image: &NSImage) -> Result<(), String> {
         let cg_image = cgimage_from_nsimage(image)?;
         self.write_cgimage(&cg_image)
     }
 
     /// Appends a `CGImage` frame to the segment.
-    pub fn write_cgimage(&mut self, image: &CGImage) -> Result<(), String> {
+    #[allow(dead_code)]
+    pub(crate) fn write_cgimage(&mut self, image: &CGImage) -> Result<(), String> {
         self.write_cgimage_with_progress(image, None)
     }
 

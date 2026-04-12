@@ -21,15 +21,15 @@ pub struct CommonArgs {
 }
 
 pub mod api;
-pub mod capture;
-pub mod clock;
-pub mod encoder;
-pub mod overlay;
-pub mod parallel;
-pub mod parser;
-pub mod plan;
-pub mod progress;
-pub mod record;
-pub mod server;
+pub(crate) mod capture;
+pub(crate) mod clock;
+pub(crate) mod encoder;
+pub(crate) mod overlay;
+pub(crate) mod parallel;
+pub(crate) mod parser;
+pub(crate) mod plan;
+pub(crate) mod progress;
+pub(crate) mod record;
+pub(crate) mod server;
 pub mod util;
-pub mod webview;
+pub(crate) mod webview;

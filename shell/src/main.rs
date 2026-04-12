@@ -134,14 +134,8 @@ fn web_root() -> Result<PathBuf, Box<dyn Error>> {
 }
 
 fn projects_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home = home_dir().ok_or("home directory is unavailable")?;
+    let home = bridge::path::home_dir().ok_or("home directory is unavailable")?;
     Ok(home.join("NextFrame").join("projects"))
-}
-
-fn home_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
 }
 
 fn protocol_response(root: &std::path::Path, relative_path: &str) -> wry::http::Response<std::borrow::Cow<'static, [u8]>> {

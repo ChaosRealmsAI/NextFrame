@@ -27,9 +27,11 @@ use crate::capture;
 use crate::progress::{PROGRESS_CANDIDATE_SELECTORS, ProgressRect};
 
 /// Default recorder viewport width in CSS pixels.
-pub const VIEW_WIDTH: f64 = 1920.0;
+#[allow(dead_code)]
+pub(crate) const VIEW_WIDTH: f64 = 1920.0;
 /// Default recorder viewport height in CSS pixels.
-pub const VIEW_HEIGHT: f64 = 1080.0;
+#[allow(dead_code)]
+pub(crate) const VIEW_HEIGHT: f64 = 1080.0;
 const OFFSCREEN_ORIGIN_X: f64 = -10000.0;
 const OFFSCREEN_ORIGIN_Y: f64 = -10000.0;
 type SnapshotResultSlot = Rc<RefCell<Option<Result<Retained<NSImage>, String>>>>;
@@ -49,7 +51,8 @@ pub struct WebViewHost {
 }
 
 /// Owns multiple `WebViewHost` instances for parallel experiments and benchmarks.
-pub struct ParallelHost {
+#[allow(dead_code)]
+pub(crate) struct ParallelHost {
     hosts: Vec<WebViewHost>,
 }
 
@@ -140,13 +143,15 @@ impl WebViewHost {
     }
 
     /// Moves the host window to the requested screen position.
-    pub fn set_window_origin(&self, x: f64, y: f64) {
+    #[allow(dead_code)]
+    pub(crate) fn set_window_origin(&self, x: f64, y: f64) {
         self.window.setFrameOrigin(NSPoint::new(x, y));
         self.sync_view_hierarchy();
     }
 
     /// Updates the host window title.
-    pub fn set_window_title(&self, title: &str) {
+    #[allow(dead_code)]
+    pub(crate) fn set_window_title(&self, title: &str) {
         self.window.setTitle(&NSString::from_str(title));
     }
 
@@ -629,14 +634,15 @@ impl WebViewHost {
     }
 }
 
+#[allow(dead_code)]
 impl ParallelHost {
     /// Creates a set of hosts with staggered window placement.
-    pub fn new(count: usize, headed: bool, dpr: f64) -> Result<Self, String> {
+    pub(crate) fn new(count: usize, headed: bool, dpr: f64) -> Result<Self, String> {
         Self::with_size(count, headed, dpr, VIEW_WIDTH, VIEW_HEIGHT)
     }
 
     /// Creates a set of hosts with custom viewport size.
-    pub fn with_size(
+    pub(crate) fn with_size(
         count: usize,
         headed: bool,
         dpr: f64,
@@ -666,22 +672,22 @@ impl ParallelHost {
     }
 
     /// Returns the number of managed hosts.
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.hosts.len()
     }
 
     /// Reports whether there are no managed hosts.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.hosts.is_empty()
     }
 
     /// Returns a host by index.
-    pub fn host(&self, index: usize) -> Option<&WebViewHost> {
+    pub(crate) fn host(&self, index: usize) -> Option<&WebViewHost> {
         self.hosts.get(index)
     }
 
     /// Returns all managed hosts.
-    pub fn hosts(&self) -> &[WebViewHost] {
+    pub(crate) fn hosts(&self) -> &[WebViewHost] {
         &self.hosts
     }
 }

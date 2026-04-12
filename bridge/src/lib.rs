@@ -7,7 +7,7 @@ mod export;
 mod ffmpeg;
 mod fs;
 mod log;
-mod path;
+pub mod path;
 mod project;
 mod recent;
 mod recorder_bridge;

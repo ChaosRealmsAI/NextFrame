@@ -18,14 +18,15 @@ pub struct SubtitleCue {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SlideType {
+pub(crate) enum SlideType {
     Bridge,
     Clip,
     Unknown,
 }
 
 impl SlideType {
-    pub fn label(self) -> &'static str {
+    #[allow(dead_code)]
+    pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Bridge => "bridge",
             Self::Clip => "clip",
@@ -36,17 +37,18 @@ impl SlideType {
 
 #[derive(Debug, Clone)]
 /// All metadata extracted from a recorder HTML frame file.
-pub struct FrameMetadata {
-    pub html_path: PathBuf,
-    pub slide_type: SlideType,
-    pub audio_path: Option<PathBuf>,
-    pub subtitles: Vec<SubtitleCue>,
-    pub cuemap: Vec<usize>,
-    pub total_cues: usize,
-    pub warnings: Vec<String>,
+pub(crate) struct FrameMetadata {
+    pub(crate) html_path: PathBuf,
+    pub(crate) slide_type: SlideType,
+    pub(crate) audio_path: Option<PathBuf>,
+    pub(crate) subtitles: Vec<SubtitleCue>,
+    pub(crate) cuemap: Vec<usize>,
+    pub(crate) total_cues: usize,
+    pub(crate) warnings: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct NextframeTimeline {
     #[serde(default)]
     fps: Option<f64>,
@@ -65,36 +67,42 @@ struct NextframeTimeline {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct NextframeProject {
     #[serde(default)]
     fps: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct NextframeMeta {
     #[serde(default)]
     fps: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct NextframeChapter {
     id: String,
     start: f64,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct NextframeMarker {
     id: String,
     t: f64,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct NextframeTrack {
     #[serde(default)]
     clips: Vec<NextframeClip>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct NextframeClip {
     #[serde(default)]
     id: Option<String>,
@@ -125,12 +133,14 @@ struct NextframeClip {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct ClipTiming {
     start_sec: f64,
     duration_sec: f64,
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct RawSubtitleCue {
     start: Option<f64>,
     end: Option<f64>,
@@ -286,7 +296,8 @@ pub fn parse_frame_file(path: &Path) -> Result<FrameMetadata, String> {
 }
 
 /// Parses a NextFrame `timeline.json` file into recorder segment metadata.
-pub fn parse_nextframe_timeline(path: &Path) -> Result<Vec<FrameMetadata>, String> {
+#[allow(dead_code)]
+pub(crate) fn parse_nextframe_timeline(path: &Path) -> Result<Vec<FrameMetadata>, String> {
     let timeline_path = path
         .canonicalize()
         .map_err(|err| format!("failed to canonicalize {}: {err}", path.display()))?;
@@ -374,6 +385,7 @@ pub fn parse_nextframe_timeline(path: &Path) -> Result<Vec<FrameMetadata>, Strin
     Ok(segments.into_iter().map(|(_, metadata)| metadata).collect())
 }
 
+#[allow(dead_code)]
 fn build_timeline_anchors(timeline: &NextframeTimeline) -> HashMap<String, f64> {
     let mut anchors = HashMap::new();
     for chapter in &timeline.chapters {
@@ -387,6 +399,7 @@ fn build_timeline_anchors(timeline: &NextframeTimeline) -> HashMap<String, f64> 
     anchors
 }
 
+#[allow(dead_code)]
 fn extract_clip_timing(
     clip: &NextframeClip,
     fps: f64,
@@ -428,6 +441,7 @@ fn extract_clip_timing(
     })
 }
 
+#[allow(dead_code)]
 fn parse_timeline_time_ref(value: Option<&Value>, anchors: &HashMap<String, f64>) -> Option<f64> {
     match value? {
         Value::Number(number) => number.as_f64(),
@@ -440,6 +454,7 @@ fn parse_timeline_time_ref(value: Option<&Value>, anchors: &HashMap<String, f64>
     }
 }
 
+#[allow(dead_code)]
 fn build_timeline_clip_subtitles(
     clip: &NextframeClip,
     global_audio_cues: &[SubtitleCue],
@@ -476,6 +491,7 @@ fn build_timeline_clip_subtitles(
     slice_global_cues(global_audio_cues, timing.start_sec, timing.duration_sec)
 }
 
+#[allow(dead_code)]
 fn find_array_field<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a [Value]> {
     let object = value.as_object()?;
     for key in keys {
@@ -494,6 +510,7 @@ fn find_array_field<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a [Value]> 
     None
 }
 
+#[allow(dead_code)]
 fn extract_subtitles_from_value(value: &Value, default_duration: f64) -> Vec<SubtitleCue> {
     find_array_field(value, &["subtitles", "subtitleCues", "captions"])
         .or_else(|| find_array_field(value, &["timestamps", "audioTimestamps", "wordTimestamps"]))
@@ -501,6 +518,7 @@ fn extract_subtitles_from_value(value: &Value, default_duration: f64) -> Vec<Sub
         .unwrap_or_default()
 }
 
+#[allow(dead_code)]
 fn parse_subtitle_array(entries: &[Value], default_duration: f64) -> Vec<SubtitleCue> {
     if entries.is_empty() {
         return Vec::new();
@@ -578,6 +596,7 @@ fn parse_subtitle_array(entries: &[Value], default_duration: f64) -> Vec<Subtitl
     cues
 }
 
+#[allow(dead_code)]
 fn extract_time_field(object: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<f64> {
     for key in keys {
         if let Some(value) = object.get(*key)
@@ -594,6 +613,7 @@ fn extract_time_field(object: &serde_json::Map<String, Value>, keys: &[&str]) ->
     None
 }
 
+#[allow(dead_code)]
 fn normalize_clip_relative_cues(
     cues: Vec<SubtitleCue>,
     clip_start_sec: f64,
@@ -623,6 +643,7 @@ fn normalize_clip_relative_cues(
     normalized
 }
 
+#[allow(dead_code)]
 fn slice_global_cues(
     cues: &[SubtitleCue],
     clip_start_sec: f64,
@@ -642,6 +663,7 @@ fn slice_global_cues(
         .collect()
 }
 
+#[allow(dead_code)]
 fn preserve_clip_duration(subtitles: &mut Vec<SubtitleCue>, clip_duration_sec: f64) {
     if !clip_duration_sec.is_finite() || clip_duration_sec <= 0.0 {
         return;
@@ -668,6 +690,7 @@ fn preserve_clip_duration(subtitles: &mut Vec<SubtitleCue>, clip_duration_sec: f
     }
 }
 
+#[allow(dead_code)]
 fn extract_text_subtitle(params: &Value) -> Option<String> {
     ["text", "subtitle"]
         .iter()
@@ -678,6 +701,7 @@ fn extract_text_subtitle(params: &Value) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
+#[allow(dead_code)]
 fn extract_clip_cuemap(clip: &NextframeClip) -> Vec<usize> {
     if !clip.cuemap.is_empty() {
         return clip.cuemap.clone();
@@ -685,12 +709,14 @@ fn extract_clip_cuemap(clip: &NextframeClip) -> Vec<usize> {
     extract_usize_array(&clip.params, &["cuemap", "cueMap"]).unwrap_or_default()
 }
 
+#[allow(dead_code)]
 fn extract_clip_total_cues(clip: &NextframeClip) -> Option<usize> {
     clip.total_cues
         .or(clip.total_cues_camel)
         .or_else(|| extract_usize_field(&clip.params, &["total_cues", "totalCues", "total"]))
 }
 
+#[allow(dead_code)]
 fn extract_usize_array(value: &Value, keys: &[&str]) -> Option<Vec<usize>> {
     let object = value.as_object()?;
     for key in keys {
@@ -707,6 +733,7 @@ fn extract_usize_array(value: &Value, keys: &[&str]) -> Option<Vec<usize>> {
     None
 }
 
+#[allow(dead_code)]
 fn extract_usize_field(value: &Value, keys: &[&str]) -> Option<usize> {
     let object = value.as_object()?;
     for key in keys {
@@ -720,6 +747,7 @@ fn extract_usize_field(value: &Value, keys: &[&str]) -> Option<usize> {
     None
 }
 
+#[allow(dead_code)]
 fn extract_audio_src(value: &Value) -> Option<&str> {
     value
         .as_object()?
@@ -729,6 +757,7 @@ fn extract_audio_src(value: &Value) -> Option<&str> {
         .filter(|src| !src.is_empty())
 }
 
+#[allow(dead_code)]
 fn extract_clip_audio_src(clip: &NextframeClip) -> Option<&str> {
     clip.params
         .as_object()
@@ -742,6 +771,7 @@ fn extract_clip_audio_src(clip: &NextframeClip) -> Option<&str> {
         })
 }
 
+#[allow(dead_code)]
 fn detect_timeline_slide_type(scene: &str) -> SlideType {
     if scene.to_ascii_lowercase().contains("bridge") {
         SlideType::Bridge
@@ -750,6 +780,7 @@ fn detect_timeline_slide_type(scene: &str) -> SlideType {
     }
 }
 
+#[allow(dead_code)]
 fn resolve_path_from(base_path: &Path, rel: &str) -> Result<PathBuf, String> {
     let path = Path::new(rel);
     if path.is_absolute() {

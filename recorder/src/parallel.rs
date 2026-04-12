@@ -7,7 +7,8 @@ use crate::CommonArgs;
 use crate::encoder::concat_segments;
 use crate::util::create_temp_dir;
 
-pub fn run_parallel(
+#[allow(dead_code)]
+pub(crate) fn run_parallel(
     cli: &CommonArgs,
     frame_files: &[PathBuf],
     out: &Path,
