@@ -4,21 +4,30 @@ const _ipcPending = new Map();
 let _ipcNextId = 0;
 window.__ipc = window.__ipc || {};
 window.__ipc.resolve = function(response) {
+  console.log("[bridge] resolve raw:", typeof response === "string" ? response.substring(0, 200) : response);
   const payload = typeof response === "string" ? JSON.parse(response) : response || {};
   const entry = _ipcPending.get(payload.id);
-  if (!entry) return;
+  if (!entry) { console.warn("[bridge] no pending entry for id:", payload.id); return; }
   _ipcPending.delete(payload.id);
-  if (payload.ok) entry.resolve(payload.result);
-  else entry.reject(new Error(payload.error || "IPC failed"));
+  if (payload.ok) { console.log("[bridge] resolved:", payload.id); entry.resolve(payload.result); }
+  else { console.error("[bridge] rejected:", payload.error); entry.reject(new Error(payload.error || "IPC failed")); }
 };
 function bridgeCall(method, params) {
-  if (typeof window.ipc?.postMessage !== "function") {
+  // wry 0.55 injects window.ipc via webkit.messageHandlers — may also be directly on window.ipc
+  var postFn = null;
+  if (typeof window.ipc?.postMessage === "function") {
+    postFn = function(s) { window.ipc.postMessage(s); };
+  } else if (typeof window.webkit?.messageHandlers?.ipc?.postMessage === "function") {
+    postFn = function(s) { window.webkit.messageHandlers.ipc.postMessage(s); };
+  }
+  if (!postFn) {
+    console.warn("[bridge] IPC unavailable — no postMessage found");
     return Promise.reject(new Error("IPC unavailable"));
   }
   const id = "ipc-" + Date.now() + "-" + (++_ipcNextId);
   return new Promise((resolve, reject) => {
     _ipcPending.set(id, { resolve, reject });
-    try { window.ipc.postMessage(JSON.stringify({ id, method, params })); }
+    try { postFn(JSON.stringify({ id, method, params })); }
     catch (e) { _ipcPending.delete(id); reject(e); }
   });
 }

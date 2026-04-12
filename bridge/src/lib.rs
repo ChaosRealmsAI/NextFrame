@@ -19,16 +19,18 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
+use nextframe_recorder::api::{record_segments, RecordArgs, RecordOutput};
+
 const EXPORT_RUNNING: &str = "running";
 const EXPORT_DONE: &str = "done";
 const EXPORT_FAILED: &str = "failed";
 const EXPORT_ERROR_ALREADY_RUNNING: &str = "export_already_running";
 const EXPORT_ERROR_CANCELED: &str = "canceled";
-const EXPORT_ERROR_API_UNAVAILABLE: &str = "embedded_recorder_api_unavailable";
 const RECENT_DIR_NAME: &str = ".nextframe";
 const RECENT_FILE_NAME: &str = "recent.json";
 const RECENT_MAX_ENTRIES: usize = 10;
 const AUTOSAVE_DIR_NAME: &str = "autosave";
+const DEFAULT_EXPORT_CRF: u8 = 20;
 
 struct ProcessHandle {
     export_task: ExportTask,
@@ -63,6 +65,7 @@ struct RecorderRequest {
     height: u32,
     fps: u32,
     duration: f64,
+    crf: u8,
 }
 
 static PROCESS_REGISTRY: OnceLock<Mutex<ProcessRegistry>> = OnceLock::new();
@@ -291,6 +294,7 @@ fn handle_export_start(params: &Value) -> Result<Value, String> {
     let height = require_positive_u32(params, "height")?;
     let fps = require_positive_u32(params, "fps")?;
     let duration = require_positive_f64(params, "duration")?;
+    let crf = read_optional_u8_in_range(params, "crf", 0, 51)?.unwrap_or(DEFAULT_EXPORT_CRF);
     let current_dir =
         env::current_dir().map_err(|error| format!("failed to read current directory: {error}"))?;
 
@@ -305,8 +309,15 @@ fn handle_export_start(params: &Value) -> Result<Value, String> {
     }
 
     let start_result = (|| -> Result<Value, String> {
-        let request =
-            build_export_request(&current_dir, &output_path, width, height, fps, duration)?;
+        let request = build_export_request(
+            &current_dir,
+            &output_path,
+            width,
+            height,
+            fps,
+            duration,
+            crf,
+        )?;
 
         let Some(parent) = output_path.parent() else {
             return Err(format!(
@@ -653,8 +664,7 @@ fn handle_project_list(_params: &Value) -> Result<Value, String> {
     }
 
     let mut projects: Vec<Value> = Vec::new();
-    let entries =
-        fs::read_dir(&root).map_err(|e| format!("failed to read projects dir: {e}"))?;
+    let entries = fs::read_dir(&root).map_err(|e| format!("failed to read projects dir: {e}"))?;
 
     for entry_result in entries {
         let entry = entry_result.map_err(|e| format!("dir entry error: {e}"))?;
@@ -668,8 +678,7 @@ fn handle_project_list(_params: &Value) -> Result<Value, String> {
         }
         let content = fs::read_to_string(&project_json)
             .map_err(|e| format!("failed to read {}: {e}", project_json.display()))?;
-        let meta: Value =
-            serde_json::from_str(&content).unwrap_or_else(|_| json!({}));
+        let meta: Value = serde_json::from_str(&content).unwrap_or_else(|_| json!({}));
 
         // count episode subdirs
         let episode_count = fs::read_dir(&path)
@@ -711,8 +720,7 @@ fn handle_project_create(params: &Value) -> Result<Value, String> {
         return Err(format!("project '{}' already exists", name));
     }
 
-    fs::create_dir_all(&project_dir)
-        .map_err(|e| format!("failed to create project dir: {e}"))?;
+    fs::create_dir_all(&project_dir).map_err(|e| format!("failed to create project dir: {e}"))?;
 
     let now = iso_now();
     let meta = json!({
@@ -754,8 +762,7 @@ fn handle_episode_list(params: &Value) -> Result<Value, String> {
         }
         let content = fs::read_to_string(&episode_json)
             .map_err(|e| format!("failed to read {}: {e}", episode_json.display()))?;
-        let meta: Value =
-            serde_json::from_str(&content).unwrap_or_else(|_| json!({}));
+        let meta: Value = serde_json::from_str(&content).unwrap_or_else(|_| json!({}));
 
         // count segment .json files (excluding episode.json)
         let mut segment_count = 0;
@@ -769,8 +776,7 @@ fn handle_episode_list(params: &Value) -> Result<Value, String> {
                     segment_count += 1;
                     if let Ok(seg_content) = fs::read_to_string(&seg_path) {
                         if let Ok(seg_val) = serde_json::from_str::<Value>(&seg_content) {
-                            if let Some(dur) = seg_val.get("duration").and_then(Value::as_f64)
-                            {
+                            if let Some(dur) = seg_val.get("duration").and_then(Value::as_f64) {
                                 total_duration += dur;
                             }
                         }
@@ -816,8 +822,7 @@ fn handle_episode_create(params: &Value) -> Result<Value, String> {
         })
         .unwrap_or(0);
 
-    fs::create_dir_all(&episode_dir)
-        .map_err(|e| format!("failed to create episode dir: {e}"))?;
+    fs::create_dir_all(&episode_dir).map_err(|e| format!("failed to create episode dir: {e}"))?;
 
     let now = iso_now();
     let meta = json!({
@@ -916,8 +921,8 @@ fn handle_preview_frame(params: &Value) -> Result<Value, String> {
     let out_path = tmp_dir.join(format!("frame-{}.png", t));
 
     // find nextframe CLI
-    let cli_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../nextframe-cli/bin/nextframe.js");
+    let cli_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../nextframe-cli/bin/nextframe.js");
 
     let status = Command::new("node")
         .arg(&cli_path)
@@ -987,8 +992,7 @@ fn handle_fs_mtime(params: &Value) -> Result<Value, String> {
     if !path_buf.exists() {
         return Ok(json!({ "mtime": null }));
     }
-    let metadata = fs::metadata(&path_buf)
-        .map_err(|e| format!("failed to read metadata: {e}"))?;
+    let metadata = fs::metadata(&path_buf).map_err(|e| format!("failed to read metadata: {e}"))?;
     let mtime = metadata
         .modified()
         .map_err(|e| format!("failed to get mtime: {e}"))?
@@ -1011,9 +1015,7 @@ fn iso_now() -> String {
     let seconds = time_secs % 60;
     // approximate date from epoch days (good enough for display)
     let (year, month, day) = epoch_days_to_date(days);
-    format!(
-        "{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z"
-    )
+    format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
 }
 
 fn epoch_days_to_date(days: u64) -> (u64, u64, u64) {
@@ -1442,6 +1444,27 @@ fn require_positive_f64(params: &Value, key: &str) -> Result<f64, String> {
     }
 }
 
+fn read_optional_u8_in_range(
+    params: &Value,
+    key: &str,
+    min: u8,
+    max: u8,
+) -> Result<Option<u8>, String> {
+    let Some(value) = require_object(params)?.get(key) else {
+        return Ok(None);
+    };
+
+    let raw = value
+        .as_u64()
+        .ok_or_else(|| format!("params.{key} must be an unsigned integer"))?;
+    let parsed = u8::try_from(raw).map_err(|_| format!("params.{key} is out of range"))?;
+    if parsed < min || parsed > max {
+        return Err(format!("params.{key} must be between {min} and {max}"));
+    }
+
+    Ok(Some(parsed))
+}
+
 fn parse_audio_sources(params: &Value) -> Result<Vec<AudioSource>, String> {
     let sources = require_array(params, "audioSources")?;
     let mut parsed = Vec::with_capacity(sources.len());
@@ -1778,6 +1801,7 @@ fn build_export_request(
     height: u32,
     fps: u32,
     duration: f64,
+    crf: u8,
 ) -> Result<RecorderRequest, String> {
     Ok(RecorderRequest {
         url: build_recording_url(current_dir)?,
@@ -1786,6 +1810,7 @@ fn build_export_request(
         height,
         fps,
         duration,
+        crf,
     })
 }
 
@@ -1864,15 +1889,94 @@ fn run_embedded_recorder(
         request.fps,
         trim_float(request.duration)
     )
-    .map_err(|error| format!("failed to write export log '{}': {error}", log_path.display()))?;
+    .map_err(|error| {
+        format!(
+            "failed to write export log '{}': {error}",
+            log_path.display()
+        )
+    })?;
 
     if cancel_requested.load(Ordering::SeqCst) {
         return Err(EXPORT_ERROR_CANCELED.to_string());
     }
 
-    // TODO: Replace this placeholder with the real embedded API call once
-    // `nextframe_recorder::api::record_segments(args)` is available.
-    Err(EXPORT_ERROR_API_UNAVAILABLE.to_string())
+    let current_dir =
+        env::current_dir().map_err(|error| format!("failed to read current directory: {error}"))?;
+    let frame_path = resolve_recorder_frame_path_from_url(&request.url, &current_dir)?;
+    let args = RecordArgs {
+        frames: vec![frame_path.clone()],
+        dir: None,
+        out: request.output_path.clone(),
+        fps: request.fps as usize,
+        crf: request.crf,
+        dpr: 2.0,
+        jobs: None,
+        no_skip: false,
+        headed: false,
+        width: request.width as f64,
+        height: request.height as f64,
+        parallel: None,
+    };
+
+    writeln!(
+        log_file,
+        "Resolved recorder frame '{}' from '{}'",
+        frame_path.display(),
+        request.url
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write export log '{}': {error}",
+            log_path.display()
+        )
+    })?;
+    writeln!(
+        log_file,
+        "Recorder args: {}",
+        serde_json::to_string(&args)
+            .map_err(|error| format!("failed to serialize recorder args: {error}"))?
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write export log '{}': {error}",
+            log_path.display()
+        )
+    })?;
+
+    if cancel_requested.load(Ordering::SeqCst) {
+        return Err(EXPORT_ERROR_CANCELED.to_string());
+    }
+
+    let output: RecordOutput = record_segments(args).map_err(|error| {
+        let _ = writeln!(log_file, "Recorder failed: {error}");
+        error
+    })?;
+
+    writeln!(log_file, "Recorder output:").map_err(|error| {
+        format!(
+            "failed to write export log '{}': {error}",
+            log_path.display()
+        )
+    })?;
+    serde_json::to_writer_pretty(&mut log_file, &output).map_err(|error| {
+        format!(
+            "failed to write export log '{}': {error}",
+            log_path.display()
+        )
+    })?;
+    writeln!(log_file).map_err(|error| {
+        format!(
+            "failed to write export log '{}': {error}",
+            log_path.display()
+        )
+    })?;
+
+    if cancel_requested.load(Ordering::SeqCst) {
+        let _ = writeln!(log_file, "Cancellation requested during recording");
+        return Err(EXPORT_ERROR_CANCELED.to_string());
+    }
+
+    Ok(())
 }
 
 fn copy_video_output(video_path: &Path, output_path: &Path) -> Result<(), String> {
@@ -2049,6 +2153,108 @@ fn trim_float(value: f64) -> String {
         rendered.pop();
     }
     rendered
+}
+
+fn resolve_recorder_frame_path_from_url(url: &str, current_dir: &Path) -> Result<PathBuf, String> {
+    let url_without_fragment = url.split('#').next().unwrap_or(url);
+    let url_without_query = url_without_fragment
+        .split('?')
+        .next()
+        .unwrap_or(url_without_fragment);
+
+    if let Some(path) = url_without_query.strip_prefix("file://") {
+        return decode_file_url_path(path);
+    }
+
+    if let Some(remainder) = url_without_query
+        .strip_prefix("http://")
+        .or_else(|| url_without_query.strip_prefix("https://"))
+    {
+        return resolve_http_recorder_frame_path(remainder, current_dir);
+    }
+
+    Err(format!("unsupported recorder url: {url}"))
+}
+
+fn decode_file_url_path(path: &str) -> Result<PathBuf, String> {
+    let normalized = path.strip_prefix("localhost").unwrap_or(path);
+    let decoded = percent_decode_url_path(normalized)?;
+
+    if decoded.is_empty() {
+        return Err("file URL does not contain a path".to_string());
+    }
+
+    Ok(PathBuf::from(decoded))
+}
+
+fn resolve_http_recorder_frame_path(
+    remainder: &str,
+    current_dir: &Path,
+) -> Result<PathBuf, String> {
+    let slash_index = remainder
+        .find('/')
+        .ok_or_else(|| format!("recorder URL does not contain a path: http://{remainder}"))?;
+    let (authority, path) = remainder.split_at(slash_index);
+    let host = authority.split(':').next().unwrap_or(authority);
+    if host != "localhost" && host != "127.0.0.1" {
+        return Err(format!("unsupported recorder host: {host}"));
+    }
+
+    let decoded = percent_decode_url_path(path)?;
+    if decoded.is_empty() || decoded == "/" {
+        return Err("recorder URL path does not point to an HTML file".to_string());
+    }
+
+    let absolute_candidate = PathBuf::from(&decoded);
+    if absolute_candidate.is_file() {
+        return Ok(absolute_candidate);
+    }
+
+    let relative = decoded.trim_start_matches('/');
+    let relative_candidate = current_dir.join(relative);
+    if relative_candidate.is_file() {
+        return Ok(relative_candidate);
+    }
+
+    Err(format!(
+        "failed to resolve recorder frame path from URL path '{decoded}'"
+    ))
+}
+
+fn percent_decode_url_path(value: &str) -> Result<String, String> {
+    let bytes = value.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0usize;
+
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            if index + 2 >= bytes.len() {
+                return Err(format!("invalid percent-encoding in URL path: {value}"));
+            }
+
+            let hi = decode_hex_digit(bytes[index + 1])
+                .ok_or_else(|| format!("invalid percent-encoding in URL path: {value}"))?;
+            let lo = decode_hex_digit(bytes[index + 2])
+                .ok_or_else(|| format!("invalid percent-encoding in URL path: {value}"))?;
+            decoded.push((hi << 4) | lo);
+            index += 3;
+            continue;
+        }
+
+        decoded.push(bytes[index]);
+        index += 1;
+    }
+
+    String::from_utf8(decoded).map_err(|error| format!("invalid UTF-8 in URL path: {error}"))
+}
+
+fn decode_hex_digit(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 fn path_to_file_url(path: &Path) -> String {
@@ -2386,9 +2592,9 @@ mod tests {
     use super::{
         autosave_storage_test_lock, build_ffmpeg_filter_complex, dispatch, home_dir, initialize,
         mock_ffmpeg_state, recent_storage_test_lock, reset_ffmpeg_path_cache_for_tests,
-        resolve_write_path,
-        set_autosave_storage_path_override_for_tests, set_recent_storage_path_override_for_tests,
-        CommandOutput, FfmpegCommand, MockFfmpegState, Request, MOCK_FFMPEG_TEST_LOCK,
+        resolve_write_path, set_autosave_storage_path_override_for_tests,
+        set_recent_storage_path_override_for_tests, CommandOutput, FfmpegCommand, MockFfmpegState,
+        Request, MOCK_FFMPEG_TEST_LOCK,
     };
     use serde_json::{json, Value};
     use std::collections::HashSet;

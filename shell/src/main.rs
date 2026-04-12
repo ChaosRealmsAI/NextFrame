@@ -36,11 +36,36 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let webview_url = webview_url()?;
     let webview_builder = WebViewBuilder::new()
-        .with_initialization_script("window.__ipc = window.__ipc || {};")
+        .with_initialization_script(r#"
+            window.__ipc = window.__ipc || {};
+            document.title = 'NextFrame [IPC Ready]';
+            (function() {
+                var orig = {log: console.log, warn: console.warn, error: console.error};
+                function forward(level, args) {
+                    try {
+                        var msg = Array.from(args).map(function(a) {
+                            return typeof a === 'string' ? a : JSON.stringify(a);
+                        }).join(' ');
+                        if (window.ipc && window.ipc.postMessage) {
+                            window.ipc.postMessage(JSON.stringify({id:'_log',method:'log',params:{level:level,msg:msg}}));
+                        } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.ipc) {
+                            window.webkit.messageHandlers.ipc.postMessage(JSON.stringify({id:'_log',method:'log',params:{level:level,msg:msg}}));
+                        }
+                    } catch(e) {}
+                }
+                console.log = function() { orig.log.apply(console, arguments); forward('info', arguments); };
+                console.warn = function() { orig.warn.apply(console, arguments); forward('warn', arguments); };
+                console.error = function() { orig.error.apply(console, arguments); forward('error', arguments); };
+                window.addEventListener('error', function(e) { forward('error', ['[uncaught] ' + e.message + ' at ' + e.filename + ':' + e.lineno]); });
+                window.addEventListener('unhandledrejection', function(e) { forward('error', ['[unhandled-rejection] ' + (e.reason && e.reason.message || e.reason)]); });
+            })();
+        "#)
         .with_ipc_handler(move |request| {
+            eprintln!("[shell] IPC received: {}", &request.body()[..request.body().len().min(200)]);
             let response = parse_request(request.body())
                 .map(bridge::dispatch)
                 .unwrap_or_else(invalid_request_response);
+            eprintln!("[shell] IPC response ok={}", response.ok);
 
             match serde_json::to_string(&response) {
                 Ok(response_json) => {
@@ -53,7 +78,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 }
             }
         })
-        .with_url(webview_url);
+        .with_url(&webview_url);
 
     #[cfg(target_os = "macos")]
     let webview_builder = webview_builder

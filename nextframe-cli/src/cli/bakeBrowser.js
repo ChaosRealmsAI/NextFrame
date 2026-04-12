@@ -25,6 +25,67 @@ const CHROME_CANDIDATES = [
   "/usr/bin/chromium-browser",
 ].filter(Boolean);
 
+export async function bakeBrowserScenes(timeline, opts = {}) {
+  const width = Number(opts.width) || timeline.project?.width || 1920;
+  const height = Number(opts.height) || timeline.project?.height || 1080;
+  const rootDir = resolve(opts.rootDir || process.cwd());
+  const jobs = collectJobs(timeline, { width, height, rootDir });
+
+  if (jobs.length === 0) {
+    return { ok: true, value: { baked: 0, skipped: 0, width, height, jobs: [] } };
+  }
+
+  for (const dir of Object.values(CACHE_DIRS)) mkdirSync(dir, { recursive: true });
+
+  let browser = null;
+  try {
+    const missingJobs = jobs.filter((job) => !existsSync(job.cachePath));
+    if (missingJobs.length > 0) {
+      let puppeteer;
+      try {
+        ({ default: puppeteer } = await import("puppeteer-core"));
+      } catch {
+        return {
+          ok: false,
+          error: {
+            code: "MISSING_PUPPETEER",
+            message: "puppeteer-core not installed",
+            hint: "npm install puppeteer-core",
+          },
+        };
+      }
+      browser = await puppeteer.launch({
+        executablePath: findChromeExecutable(),
+        headless: true,
+        args: ["--no-sandbox", "--disable-gpu", "--hide-scrollbars"],
+        defaultViewport: { width, height },
+      });
+      const page = await browser.newPage();
+      for (const job of missingJobs) {
+        await bakeJob(page, job);
+      }
+    }
+
+    return {
+      ok: true,
+      value: {
+        baked: jobs.filter((job) => job.status === "baked").length,
+        skipped: jobs.filter((job) => job.status === "cached").length,
+        width,
+        height,
+        jobs: jobs.map(({ clipId, scene, cachePath, status }) => ({ clipId, scene, cachePath, status })),
+      },
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: { code: "BAKE_BROWSER_FAILED", message: err.message },
+    };
+  } finally {
+    if (browser) await browser.close();
+  }
+}
+
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
   const [timelinePath] = positional;
@@ -39,57 +100,13 @@ export async function run(argv) {
     return 2;
   }
 
-  const timeline = loaded.value;
-  const width = Number(flags.width) || timeline.project?.width || 1920;
-  const height = Number(flags.height) || timeline.project?.height || 1080;
-  const rootDir = dirname(resolve(timelinePath));
-  const jobs = collectJobs(timeline, { width, height, rootDir });
-
-  if (jobs.length === 0) {
-    emit({ ok: true, value: { baked: 0, skipped: 0, width, height, jobs: [] } }, flags);
-    return 0;
-  }
-
-  for (const dir of Object.values(CACHE_DIRS)) mkdirSync(dir, { recursive: true });
-
-  let browser = null;
-  try {
-    const missingJobs = jobs.filter((job) => !existsSync(job.cachePath));
-    if (missingJobs.length > 0) {
-      let puppeteer;
-      try {
-        ({ default: puppeteer } = await import("puppeteer-core"));
-      } catch {
-        emit({ ok: false, error: { code: "MISSING_PUPPETEER", message: "puppeteer-core not installed", hint: "npm install puppeteer-core" } }, flags);
-        return 2;
-      }
-      browser = await puppeteer.launch({
-        executablePath: findChromeExecutable(),
-        headless: true,
-        args: ["--no-sandbox", "--disable-gpu", "--hide-scrollbars"],
-        defaultViewport: { width, height },
-      });
-      const page = await browser.newPage();
-      for (const job of missingJobs) {
-        await bakeJob(page, job);
-      }
-    }
-
-    const result = {
-      baked: jobs.filter((job) => job.status === "baked").length,
-      skipped: jobs.filter((job) => job.status === "cached").length,
-      width,
-      height,
-      jobs: jobs.map(({ clipId, scene, cachePath, status }) => ({ clipId, scene, cachePath, status })),
-    };
-    emit({ ok: true, value: result }, flags);
-    return 0;
-  } catch (err) {
-    emit({ ok: false, error: { code: "BAKE_BROWSER_FAILED", message: err.message } }, flags);
-    return 2;
-  } finally {
-    if (browser) await browser.close();
-  }
+  const baked = await bakeBrowserScenes(loaded.value, {
+    width: flags.width,
+    height: flags.height,
+    rootDir: dirname(resolve(timelinePath)),
+  });
+  emit(baked, flags);
+  return baked.ok ? 0 : 2;
 }
 
 function collectJobs(timeline, opts) {

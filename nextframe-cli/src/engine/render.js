@@ -21,6 +21,9 @@ import "./fonts.js"; // side-effect: register CJK fonts
 import { REGISTRY } from "../scenes/index.js";
 import { guarded } from "./_guard.js";
 import { resolveTimeline } from "./time.js";
+import { resolveKeyframes } from "./keyframes.js";
+import { applyEnterEffect, applyExitEffect } from "../effects/index.js";
+import { applyFilters } from "../filters/index.js";
 
 /**
  * Render the timeline at time t into a fresh canvas.
@@ -66,12 +69,15 @@ export function renderAt(timeline, t, opts = {}) {
       const localT = t - start;
       const defaultBlend = firstLayer ? "source-over" : "lighten";
       const blend = typeof clip.blend === "string" ? clip.blend : defaultBlend;
+      const resolvedParams = resolveKeyframes(clip.params || {}, localT);
+      const hasEffects = clip.effects && (clip.effects.enter || clip.effects.exit);
+      const hasFilters = clip.filters && clip.filters.length > 0;
 
-      if (blend === "source-over" && firstLayer) {
+      if (blend === "source-over" && firstLayer && !hasEffects && !hasFilters) {
         // Direct draw into main canvas — scene fully owns background.
         try {
           ctx.save();
-          entry.render(localT, clip.params || {}, ctx, t);
+          entry.render(localT, resolvedParams, ctx, t);
         } finally {
           ctx.restore();
         }
@@ -81,7 +87,9 @@ export function renderAt(timeline, t, opts = {}) {
         try {
           off = createCanvas(width, height);
           const offCtx = off.getContext("2d");
-          entry.render(localT, clip.params || {}, offCtx, t);
+          entry.render(localT, resolvedParams, offCtx, t);
+          // Apply filters (post-processing on pixels)
+          if (hasFilters) applyFilters(offCtx, width, height, clip.filters);
         } catch (err) {
           drawCrashMarker(ctx, width, height, clip.scene, err);
           continue;
@@ -89,6 +97,9 @@ export function renderAt(timeline, t, opts = {}) {
         try {
           ctx.save();
           ctx.globalCompositeOperation = blend;
+          // Apply enter/exit effects (ctx transforms before drawing)
+          if (clip.effects?.enter) applyEnterEffect(ctx, localT, clip.effects.enter, width, height);
+          if (clip.effects?.exit) applyExitEffect(ctx, localT, dur, clip.effects.exit, width, height);
           ctx.drawImage(off, 0, 0);
         } finally {
           ctx.restore();

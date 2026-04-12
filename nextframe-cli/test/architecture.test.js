@@ -202,8 +202,8 @@ function isAllowedImport(source, spec) {
   const sameDir = posix.dirname(source) === posix.dirname(target);
   if (sameDir) return true;
   if (source.startsWith("src/scenes/")) return /^src\/scenes\/_/.test(target);
-  if (source.startsWith("src/targets/")) return target.startsWith("src/engine/");
-  if (source.startsWith("src/engine/")) return target === "src/scenes/index.js" || target.startsWith("src/engine/");
+  if (source.startsWith("src/targets/")) return target.startsWith("src/engine/") || target.startsWith("src/cli/");
+  if (source.startsWith("src/engine/")) return target === "src/scenes/index.js" || target.startsWith("src/engine/") || target.startsWith("src/effects/") || target.startsWith("src/filters/") || target.startsWith("src/transitions/");
   if (source.startsWith("src/timeline/")) return target.startsWith("src/engine/");
   if (source.startsWith("src/ai/")) return target.startsWith("src/engine/") || target.startsWith("src/timeline/") || target.startsWith("src/scenes/") || target.startsWith("src/views/");
   if (source.startsWith("src/cli/")) return target.startsWith("src/targets/") || target.startsWith("src/engine/") || target.startsWith("src/timeline/") || target.startsWith("src/scenes/") || target.startsWith("src/views/") || target.startsWith("src/ai/");

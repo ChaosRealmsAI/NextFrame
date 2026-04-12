@@ -4,7 +4,21 @@ import { existsSync, unlinkSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
 import { exportMP4, muxMP4Audio } from "../targets/ffmpeg-mp4.js";
+import { exportRecorder } from "../targets/recorder.js";
 import { validateTimeline } from "../engine/validate.js";
+
+const HELP = `usage: nextframe render <timeline> <out.mp4>
+
+flags:
+  --target <name>  export backend (supported: ffmpeg, recorder)
+  --fps <n>        override export fps
+  --crf <n>        override video quality (0..51)
+  --width <n>      override render width
+  --height <n>     override render height
+  --audio <path>   mux external audio into the output mp4
+  --quiet          suppress progress output
+  --json           output structured JSON
+`;
 
 function toMuxFailure(result) {
   if (result?.ok || !result?.error) return result;
@@ -33,6 +47,11 @@ function parseCrfFlag(raw) {
 }
 
 export async function run(argv) {
+  if (argv.includes("--help") || argv.includes("-h")) {
+    process.stdout.write(HELP);
+    return 0;
+  }
+
   const { positional, flags } = parseFlags(argv);
   const [path, outPath] = positional;
   const audioPath = flags.audio ? resolve(flags.audio) : null;
@@ -52,12 +71,12 @@ export async function run(argv) {
     return 2;
   }
   const target = flags.target || "ffmpeg";
-  if (target !== "ffmpeg") {
+  if (target !== "ffmpeg" && target !== "recorder") {
     emit({
       ok: false,
       error: {
         code: "UNKNOWN_TARGET",
-        hint: "supported: ffmpeg",
+        hint: "supported: ffmpeg, recorder",
       },
     }, flags);
     return 2;
@@ -81,6 +100,9 @@ export async function run(argv) {
   const opts = {};
   if (flags.fps) opts.fps = Number(flags.fps);
   if (crf.value !== undefined) opts.crf = crf.value;
+  if (flags.width) opts.width = Number(flags.width);
+  if (flags.height) opts.height = Number(flags.height);
+  opts.projectDir = dirname(resolve(path));
   opts.onProgress = (i, total) => {
     if (!flags.quiet) {
       process.stderr.write(`  rendered ${i}/${total} frames\r`);
@@ -88,9 +110,10 @@ export async function run(argv) {
   };
   const start = Date.now();
   let r;
+  const exporter = target === "recorder" ? exportRecorder : exportMP4;
   if (audioPath) {
     const tempVideoPath = makeTempVideoPath(outPath);
-    const videoOnly = await exportMP4(loaded.value, tempVideoPath, opts);
+    const videoOnly = await exporter(loaded.value, tempVideoPath, opts);
     if (!videoOnly.ok) {
       r = toMuxFailure(videoOnly);
     } else {
@@ -105,7 +128,7 @@ export async function run(argv) {
       }
     }
   } else {
-    r = await exportMP4(loaded.value, outPath, opts);
+    r = await exporter(loaded.value, outPath, opts);
   }
   if (!flags.quiet) process.stderr.write("\n");
   const elapsed = ((Date.now() - start) / 1000).toFixed(2);
