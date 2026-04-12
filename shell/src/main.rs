@@ -34,38 +34,46 @@ fn run() -> Result<(), Box<dyn Error>> {
         .with_inner_size(LogicalSize::new(1440.0, 900.0))
         .build(&event_loop)?;
 
-    let webview_url = webview_url()?;
+    let web_root = web_root()?;
+    let web_root_for_protocol = web_root.clone();
+
     let webview_builder = WebViewBuilder::new()
-        .with_initialization_script(r#"
-            window.__ipc = window.__ipc || {};
-            document.title = 'NextFrame [IPC Ready]';
-            (function() {
-                var orig = {log: console.log, warn: console.warn, error: console.error};
-                function forward(level, args) {
-                    try {
-                        var msg = Array.from(args).map(function(a) {
-                            return typeof a === 'string' ? a : JSON.stringify(a);
-                        }).join(' ');
-                        if (window.ipc && window.ipc.postMessage) {
-                            window.ipc.postMessage(JSON.stringify({id:'_log',method:'log',params:{level:level,msg:msg}}));
-                        } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.ipc) {
-                            window.webkit.messageHandlers.ipc.postMessage(JSON.stringify({id:'_log',method:'log',params:{level:level,msg:msg}}));
-                        }
-                    } catch(e) {}
-                }
-                console.log = function() { orig.log.apply(console, arguments); forward('info', arguments); };
-                console.warn = function() { orig.warn.apply(console, arguments); forward('warn', arguments); };
-                console.error = function() { orig.error.apply(console, arguments); forward('error', arguments); };
-                window.addEventListener('error', function(e) { forward('error', ['[uncaught] ' + e.message + ' at ' + e.filename + ':' + e.lineno]); });
-                window.addEventListener('unhandledrejection', function(e) { forward('error', ['[unhandled-rejection] ' + (e.reason && e.reason.message || e.reason)]); });
-            })();
-        "#)
+        .with_initialization_script(
+            "window.__ipc = window.__ipc || {};"
+        )
+        .with_custom_protocol("nf".into(), move |_webview_id, request| {
+            let uri = request.uri().to_string();
+            let path = uri
+                .strip_prefix("nf://localhost/")
+                .or_else(|| uri.strip_prefix("nf://localhost"))
+                .unwrap_or("index.html");
+            let path = if path.is_empty() { "index.html" } else { path };
+
+            let file_path = web_root_for_protocol.join(path);
+            let content = std::fs::read(&file_path).unwrap_or_else(|_| {
+                format!("404: {}", file_path.display()).into_bytes()
+            });
+
+            let mime = match file_path.extension().and_then(|e| e.to_str()) {
+                Some("html") => "text/html",
+                Some("css") => "text/css",
+                Some("js") => "application/javascript",
+                Some("json") => "application/json",
+                Some("png") => "image/png",
+                Some("svg") => "image/svg+xml",
+                _ => "application/octet-stream",
+            };
+
+            wry::http::Response::builder()
+                .header("Content-Type", mime)
+                .body(std::borrow::Cow::<[u8]>::Owned(content))
+                .unwrap_or_else(|_| wry::http::Response::new(std::borrow::Cow::Owned(Vec::new())))
+        })
         .with_ipc_handler(move |request| {
-            eprintln!("[shell] IPC received: {}", &request.body()[..request.body().len().min(200)]);
+            eprintln!("[ipc] {}", &request.body()[..request.body().len().min(300)]);
             let response = parse_request(request.body())
                 .map(bridge::dispatch)
                 .unwrap_or_else(invalid_request_response);
-            eprintln!("[shell] IPC response ok={}", response.ok);
 
             match serde_json::to_string(&response) {
                 Ok(response_json) => {
@@ -78,11 +86,11 @@ fn run() -> Result<(), Box<dyn Error>> {
                 }
             }
         })
-        .with_url(&webview_url);
+        .with_url("nf://localhost/index.html");
 
     #[cfg(target_os = "macos")]
     let webview_builder = webview_builder
-        .with_accept_first_mouse(false)
+        .with_accept_first_mouse(true)
         .with_background_throttling(BackgroundThrottlingPolicy::Disabled);
 
     let webview = webview_builder.build(&window)?;
@@ -121,10 +129,9 @@ fn invalid_request_response(error: serde_json::Error) -> Response {
     }
 }
 
-fn webview_url() -> Result<String, Box<dyn Error>> {
+fn web_root() -> Result<PathBuf, Box<dyn Error>> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../runtime/web/index.html")
+        .join("../runtime/web")
         .canonicalize()?;
-
-    Ok(format!("file://{}", path.display()))
+    Ok(path)
 }

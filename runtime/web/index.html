@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=1440">
 <title>NextFrame</title>
-<!-- IPC bridge loaded by shell initialization script -->
+<!-- IPC __ipc resolver — must be in <head> before any script calls bridgeCall -->
+<script>
+window.__ipc = window.__ipc || {};
+</script>
 <link rel="stylesheet" href="src/styles/editor.css">
 
 </head>

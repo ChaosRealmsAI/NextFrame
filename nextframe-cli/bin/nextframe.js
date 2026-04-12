@@ -33,6 +33,8 @@ const SUBCOMMANDS = {
   "list-assets": () => import("../src/cli/assets.js"),
   "remove-asset": () => import("../src/cli/assets.js"),
   scenes: () => import("../src/cli/scenes.js"),
+  "debug-screenshot": () => import("../src/cli/debug-screenshot.js"),
+  "debug-log": () => import("../src/cli/debug-log.js"),
   guide: () => import("../src/cli/guide.js"),
   help: null,
 };
