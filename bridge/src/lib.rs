@@ -171,6 +171,7 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
         "episode.create" => handle_episode_create(&params),
         "segment.list" => handle_segment_list(&params),
         "preview.frame" => handle_preview_frame(&params),
+        "fs.mtime" => handle_fs_mtime(&params),
         _ => Err(format!("unknown method: {method}")),
     }
 }
@@ -978,6 +979,23 @@ fn base64_encode(data: &[u8]) -> String {
         }
     }
     result
+}
+
+fn handle_fs_mtime(params: &Value) -> Result<Value, String> {
+    let path = require_string(params, "path")?;
+    let path_buf = PathBuf::from(path);
+    if !path_buf.exists() {
+        return Ok(json!({ "mtime": null }));
+    }
+    let metadata = fs::metadata(&path_buf)
+        .map_err(|e| format!("failed to read metadata: {e}"))?;
+    let mtime = metadata
+        .modified()
+        .map_err(|e| format!("failed to get mtime: {e}"))?
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    Ok(json!({ "mtime": mtime as u64 }))
 }
 
 fn iso_now() -> String {

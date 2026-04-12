@@ -1117,10 +1117,14 @@ async function goEditor(project, episode, segment) {
     }
 
     currentTimeline = timeline || {};
+    TOTAL_DURATION = finiteNumber(currentTimeline.duration, 10);
     renderTimeline(currentTimeline);
     renderProjectDropdown();
     renderEpisodeDropdown();
     renderSegmentDropdown();
+    // start watching for CLI changes + render first frame
+    startWatching(selectedSegment.path);
+    setPlayheadTime(0);
   } catch (error) {
     if (requestId !== editorLoadSeq) {
       return;
@@ -1169,6 +1173,54 @@ function handleKeydown(event) {
       toggleFullscreen();
     }
   }
+}
+
+/* === File watcher (polling) === */
+var _watchPath = null;
+var _watchMtime = 0;
+var _watchInterval = null;
+
+function startWatching(path) {
+  stopWatching();
+  _watchPath = path;
+  _watchMtime = 0;
+  // get initial mtime
+  bridgeCall("fs.mtime", { path: path }).then(function(r) {
+    _watchMtime = (r && r.mtime) || 0;
+  }).catch(function() {});
+  // poll every 2 seconds
+  _watchInterval = setInterval(function() {
+    if (!_watchPath) return;
+    bridgeCall("fs.mtime", { path: _watchPath }).then(function(r) {
+      var newMtime = (r && r.mtime) || 0;
+      if (newMtime > 0 && _watchMtime > 0 && newMtime !== _watchMtime) {
+        _watchMtime = newMtime;
+        // file changed — reload timeline
+        reloadCurrentTimeline();
+      } else if (_watchMtime === 0) {
+        _watchMtime = newMtime;
+      }
+    }).catch(function() {});
+  }, 2000);
+}
+
+function stopWatching() {
+  if (_watchInterval) clearInterval(_watchInterval);
+  _watchInterval = null;
+  _watchPath = null;
+}
+
+function reloadCurrentTimeline() {
+  if (!currentSegment) return;
+  bridgeCall("timeline.load", { path: currentSegment }).then(function(result) {
+    if (!result) return;
+    currentTimeline = result;
+    TOTAL_DURATION = finiteNumber(result.duration, 10);
+    renderTimeline(result);
+    // re-render current frame
+    _previewSeq++;
+    renderPreviewFrame(currentTime);
+  }).catch(function() {});
 }
 
 function initApp() {
