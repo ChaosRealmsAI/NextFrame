@@ -56,11 +56,13 @@ let currentSegment = null;
 let currentSegmentPath = null;
 let currentTimeline = null;
 let currentSelectedClipId = null;
+let currentPreviewVideoUrl = null;
 
 let projectsCache = [];
 let episodesCache = [];
 let segmentsCache = [];
 let episodesCacheProject = null;
+let exportsCache = [];
 
 let homeLoadSeq = 0;
 let projectLoadSeq = 0;
@@ -88,6 +90,10 @@ function escapeAttr(value) {
 
 function jsLiteral(value) {
   return JSON.stringify(String(value ?? ""));
+}
+
+function buildNfdataUrl(parts) {
+  return "nfdata://localhost/" + parts.map((part) => encodeURIComponent(String(part ?? ""))).join("/");
 }
 
 function pluralize(count, singular, plural) {
@@ -201,6 +207,19 @@ function findEpisodeEntry(episodeName) {
 
 function findSegmentEntry(segmentName) {
   return segmentsCache.find((entry) => entry?.name === segmentName) || null;
+}
+
+function getCurrentEpisodePath() {
+  const episodeEntry = findEpisodeEntry(currentEpisode);
+  if (episodeEntry?.path) {
+    return episodeEntry.path;
+  }
+  if (currentSegmentPath) {
+    const normalized = String(currentSegmentPath);
+    const slashIndex = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
+    return slashIndex >= 0 ? normalized.slice(0, slashIndex) : null;
+  }
+  return null;
 }
 
 function getProjectDisplayName() {
@@ -446,18 +465,45 @@ function renderSegmentDropdown() {
 }
 
 /* === exports-panel.js === */
+function getPlayerVideo() {
+  const container = document.getElementById("player-canvas-inner");
+  if (!container) {
+    return null;
+  }
+
+  let video = document.getElementById("player-video");
+  if (video) {
+    return video;
+  }
+
+  video = document.createElement("video");
+  video.id = "player-video";
+  video.playsInline = true;
+  video.preload = "metadata";
+  video.style.position = "absolute";
+  video.style.inset = "0";
+  video.style.width = "100%";
+  video.style.height = "100%";
+  video.style.objectFit = "contain";
+  video.style.background = "#000";
+  container.insertBefore(video, container.firstChild);
+  return video;
+}
+
 function animatePlayer() {
-  if (!playerPlaying) {
+  const video = getPlayerVideo();
+  if (!video) {
     return;
   }
 
-  const elapsed = (performance.now() - playerStart) / 1000;
-  const pct = Math.min(100, (elapsed / playerDur) * 100);
+  const duration = finiteNumber(video.duration, playerDur);
+  const current = finiteNumber(video.currentTime, 0);
+  const pct = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
   document.getElementById("player-progress-fill").style.width = pct + "%";
   document.getElementById("player-tc").textContent =
-    formatTC(elapsed) + " / " + formatTC(playerDur);
+    formatTC(current) + " / " + formatTC(duration);
 
-  if (pct >= 100) {
+  if (video.paused || video.ended) {
     playerPlaying = false;
     document.getElementById("player-big-play").classList.remove("playing");
     document.getElementById("player-play-btn").innerHTML = "&#9654;";
@@ -474,52 +520,170 @@ function toggleExports() {
   document.getElementById("exports-panel").classList.toggle("show");
 }
 
-function openPlayer(name, dur, size, detail) {
+function renderExportsList(entries, emptyMessage) {
+  const container = document.getElementById("exports-list");
+  if (!container) {
+    return;
+  }
+
+  const safeEntries = Array.isArray(entries) ? entries : [];
+  exportsCache = safeEntries;
+
+  if (!safeEntries.length) {
+    container.innerHTML =
+      `<div class="export-item" style="cursor:default">` +
+      `<div class="export-thumb"><span class="export-play-icon">&#9675;</span></div>` +
+      `<div class="export-info">` +
+      `<div class="export-name">${escapeHtml(emptyMessage || "No exports yet")}</div>` +
+      `<div class="export-meta">Rendered MP4 files for this episode will appear here.</div>` +
+      `</div>` +
+      `</div>`;
+    return;
+  }
+
+  container.innerHTML = safeEntries.map((entry) => {
+    const stem = String(entry?.name || "").replace(/\.mp4$/i, "");
+    const segment = findSegmentEntry(stem);
+    const duration = finiteNumber(segment?.duration, 0);
+    const durationMeta = duration > 0
+      ? formatCompactDuration(duration) + " · segment " + prettifyLabel(stem)
+      : "MP4 export · segment " + prettifyLabel(stem);
+    const detail = duration > 0
+      ? "Timeline duration " + formatPreciseTime(duration)
+      : "Timeline duration unavailable";
+    const url = buildNfdataUrl([currentProject, currentEpisode, entry.name]);
+
+    return (
+      `<div class="export-item" onclick='openPlayer(${jsLiteral(entry.name)}, ${jsLiteral(url)}, ${jsLiteral(detail)})'>` +
+      `<div class="export-thumb"><span class="export-play-icon">&#9654;</span></div>` +
+      `<div class="export-info">` +
+      `<div class="export-name">${escapeHtml(entry.name || "export.mp4")}</div>` +
+      `<div class="export-meta">${escapeHtml(durationMeta)}</div>` +
+      `<div class="export-meta">${escapeHtml(detail)}</div>` +
+      `</div>` +
+      `</div>`
+    );
+  }).join("");
+}
+
+function openPlayer(name, url, detail) {
+  const video = getPlayerVideo();
+  if (!video) {
+    return;
+  }
+
   document.getElementById("exports-overlay").classList.remove("show");
   document.getElementById("exports-panel").classList.remove("show");
   document.getElementById("player-title").textContent = name;
   document.getElementById("player-detail").textContent = detail;
-  playerDur = parseFloat(dur) || 26;
+  video.pause();
+  video.src = url;
+  video.load();
+  playerDur = 26;
   document.getElementById("player-tc").textContent = "00:00 / " + formatTC(playerDur);
   document.getElementById("player-progress-fill").style.width = "0%";
   document.getElementById("player-big-play").classList.remove("playing");
   playerPlaying = false;
   document.getElementById("player-overlay").classList.add("show");
   document.getElementById("player-modal").classList.add("show");
+
+  video.onloadedmetadata = function() {
+    playerDur = finiteNumber(video.duration, playerDur);
+    document.getElementById("player-tc").textContent = "00:00 / " + formatTC(playerDur);
+  };
 }
 
 function closePlayer() {
+  const video = getPlayerVideo();
   playerPlaying = false;
   if (playerAnim) {
     cancelAnimationFrame(playerAnim);
+    playerAnim = null;
+  }
+  if (video) {
+    video.pause();
   }
   document.getElementById("player-overlay").classList.remove("show");
   document.getElementById("player-modal").classList.remove("show");
 }
 
 function togglePlayerPlay() {
-  playerPlaying = !playerPlaying;
+  const video = getPlayerVideo();
   const bigPlay = document.getElementById("player-big-play");
   const button = document.getElementById("player-play-btn");
-  if (playerPlaying) {
+  if (!video) {
+    return;
+  }
+
+  if (video.paused) {
+    playerPlaying = true;
     bigPlay.classList.add("playing");
     button.innerHTML = "&#10074;&#10074;";
-    playerStart = performance.now();
+    const playResult = video.play();
+    if (playResult && typeof playResult.catch === "function") {
+      playResult.catch(function() {
+        playerPlaying = false;
+        bigPlay.classList.remove("playing");
+        button.innerHTML = "&#9654;";
+      });
+    }
+    if (playerAnim) {
+      cancelAnimationFrame(playerAnim);
+    }
     animatePlayer();
   } else {
+    playerPlaying = false;
+    video.pause();
     bigPlay.classList.remove("playing");
     button.innerHTML = "&#9654;";
     if (playerAnim) {
       cancelAnimationFrame(playerAnim);
+      playerAnim = null;
     }
   }
 }
 
 function seekPlayer(event) {
+  const video = getPlayerVideo();
+  if (!video) {
+    return;
+  }
+
   const rect = event.currentTarget.getBoundingClientRect();
-  const pct = (event.clientX - rect.left) / rect.width;
+  const pct = Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1);
+  const duration = finiteNumber(video.duration, playerDur);
+  if (duration > 0) {
+    video.currentTime = pct * duration;
+  }
   document.getElementById("player-progress-fill").style.width = pct * 100 + "%";
-  playerStart = performance.now() - pct * playerDur * 1000;
+  document.getElementById("player-tc").textContent =
+    formatTC(duration > 0 ? video.currentTime : 0) + " / " + formatTC(duration);
+}
+
+async function refreshExportsPanel(requestId) {
+  const episodePath = getCurrentEpisodePath();
+  if (!episodePath) {
+    renderExportsList([], "Open an episode to view exports");
+    return;
+  }
+
+  try {
+    const result = await bridgeCall("fs.listDir", { path: episodePath });
+    if (requestId !== editorLoadSeq) {
+      return;
+    }
+
+    const entries = Array.isArray(result?.entries) ? result.entries : [];
+    const exports = entries
+      .filter((entry) => !entry?.isDir && /\.mp4$/i.test(String(entry?.name || "")))
+      .sort((left, right) => String(left?.name || "").localeCompare(String(right?.name || "")));
+    renderExportsList(exports);
+  } catch (error) {
+    if (requestId !== editorLoadSeq) {
+      return;
+    }
+    renderExportsList([], getBridgeMessage(error));
+  }
 }
 
 /* === timeline.js === */
@@ -539,6 +703,23 @@ function setPlaybackState(nextPlaying) {
     playRAF = null;
   }
   lastTS = null;
+
+  const previewVideo = document.getElementById("preview-video");
+  if (previewVideo && currentPreviewVideoUrl) {
+    if (isPlaying) {
+      syncPreviewVideoTime(true);
+      const playResult = previewVideo.play();
+      if (playResult && typeof playResult.catch === "function") {
+        playResult.catch(function() {
+          isPlaying = false;
+          setPlayButtonIcons();
+        });
+      }
+    } else {
+      previewVideo.pause();
+    }
+  }
+
   if (isPlaying) {
     playRAF = requestAnimationFrame(playLoop);
   }
@@ -571,16 +752,104 @@ function stringifyClipParams(params) {
 
 function setPreviewPlaceholder(title, subtitle, preserveFrame) {
   const img = document.getElementById("preview-frame-img");
+  const video = document.getElementById("preview-video");
   const placeholder = document.getElementById("preview-placeholder");
   if (img && !preserveFrame) {
     img.style.display = "none";
     img.removeAttribute("src");
   }
+  if (video) {
+    video.pause();
+    video.style.display = "none";
+    if (!preserveFrame) {
+      video.removeAttribute("src");
+      video.load();
+    }
+  }
   if (placeholder) {
     placeholder.style.display = "flex";
   }
   setText("canvas-title", title || "TIMELINE");
-  setText("canvas-sub", subtitle || "Load a segment to preview rendered frames");
+  setText("canvas-sub", subtitle || "Load a segment to preview video");
+}
+
+function syncPreviewVideoTime(force) {
+  const video = document.getElementById("preview-video");
+  if (!video || !currentPreviewVideoUrl) {
+    return;
+  }
+
+  const duration = finiteNumber(video.duration, TOTAL_DURATION);
+  const targetTime = duration > 0 ? Math.min(currentTime, duration) : currentTime;
+  if (force || Math.abs(finiteNumber(video.currentTime, 0) - targetTime) > 0.08) {
+    try {
+      video.currentTime = targetTime;
+    } catch (error) {
+      console.warn("[preview] failed to seek video", error);
+    }
+  }
+}
+
+function setPreviewVideoSource(videoUrl) {
+  const video = document.getElementById("preview-video");
+  const img = document.getElementById("preview-frame-img");
+  const placeholder = document.getElementById("preview-placeholder");
+  if (!video) {
+    return;
+  }
+
+  currentPreviewVideoUrl = videoUrl || null;
+  if (img) {
+    img.style.display = "none";
+    img.removeAttribute("src");
+  }
+  if (placeholder) {
+    placeholder.style.display = "none";
+  }
+
+  if (video.getAttribute("src") !== currentPreviewVideoUrl) {
+    video.pause();
+    if (currentPreviewVideoUrl) {
+      video.src = currentPreviewVideoUrl;
+    } else {
+      video.removeAttribute("src");
+    }
+    video.load();
+  }
+
+  video.style.display = currentPreviewVideoUrl ? "block" : "none";
+  syncPreviewVideoTime(true);
+}
+
+async function refreshSegmentPreviewVideo(requestId) {
+  if (!currentProject || !currentEpisode || !currentSegment) {
+    currentPreviewVideoUrl = null;
+    setPreviewPlaceholder("TIMELINE", "Select a segment");
+    return;
+  }
+
+  try {
+    const result = await bridgeCall("segment.videoUrl", {
+      project: currentProject,
+      episode: currentEpisode,
+      segment: currentSegment,
+    });
+    if (requestId !== editorLoadSeq) {
+      return;
+    }
+
+    if (result?.exists) {
+      setPreviewVideoSource(buildNfdataUrl([currentProject, currentEpisode, currentSegment + ".mp4"]));
+      return;
+    }
+  } catch (error) {
+    if (requestId !== editorLoadSeq) {
+      return;
+    }
+  }
+
+  currentPreviewVideoUrl = null;
+  setPreviewPlaceholder("NO VIDEO YET", "No video yet - run `nextframe render` to export");
 }
 
 function updateInspectorContext() {
@@ -641,6 +910,7 @@ function renderPreviewFrame(t) {
 }
 
 function setPlayheadTime(time) {
+  const options = arguments[1] || {};
   currentTime = TOTAL_DURATION > 0
     ? Math.min(Math.max(finiteNumber(time, 0), 0), TOTAL_DURATION)
     : 0;
@@ -659,8 +929,9 @@ function setPlayheadTime(time) {
     fill.style.width = (TOTAL_DURATION > 0 ? (currentTime / TOTAL_DURATION) * 100 : 0) + "%";
   }
 
-  // request frame render for preview
-  requestPreviewFrame(currentTime);
+  if (currentPreviewVideoUrl && options.syncVideo !== false) {
+    syncPreviewVideoTime(false);
+  }
 }
 
 function playLoop(timestamp) {
@@ -675,6 +946,20 @@ function playLoop(timestamp) {
 
   if (!lastTS) {
     lastTS = timestamp;
+  }
+
+  const previewVideo = document.getElementById("preview-video");
+  if (previewVideo && currentPreviewVideoUrl) {
+    setPlayheadTime(previewVideo.currentTime, { syncVideo: false });
+    if (previewVideo.ended) {
+      setPlaybackState(false);
+      setPlayheadTime(0, { syncVideo: false });
+      return;
+    }
+    if (isPlaying) {
+      playRAF = requestAnimationFrame(playLoop);
+    }
+    return;
   }
 
   const delta = (timestamp - lastTS) / 1000;
@@ -716,8 +1001,10 @@ function selectClip(element) {
   setReadout("insp-start", formatPreciseTime(start));
   setReadout("insp-duration", duration.toFixed(3) + "s");
   setReadout("insp-params", paramsText);
-  setText("canvas-title", prettifyLabel(scene || name || type || "Clip").toUpperCase());
-  setText("canvas-sub", "scene:" + slugify(scene || name || type || "clip") + " · " + formatPreciseTime(start));
+  if (currentPreviewVideoUrl) {
+    setText("canvas-title", prettifyLabel(scene || name || type || "Clip").toUpperCase());
+    setText("canvas-sub", "scene:" + slugify(scene || name || type || "clip") + " · " + formatPreciseTime(start));
+  }
   setText("badge-type", (kind || type || "clip").toUpperCase());
   setText("badge-id", id || "--");
 
@@ -750,8 +1037,10 @@ function resetSelection(message) {
   setReadout("insp-start", "00:00.000");
   setReadout("insp-duration", "0.000s");
   setReadout("insp-params", currentTimeline ? "Select a clip to inspect its params." : "Select a clip to inspect its params.");
-  setText("canvas-title", "TIMELINE");
-  setText("canvas-sub", currentSegment ? "segment:" + slugify(currentSegment) : "Load a segment to preview rendered frames");
+  if (currentPreviewVideoUrl) {
+    setText("canvas-title", "TIMELINE");
+    setText("canvas-sub", currentSegment ? "segment:" + slugify(currentSegment) : "Load a segment to preview video");
+  }
   setText("badge-type", "TIMELINE");
   setText("badge-id", currentSegment || "--");
   updateInspectorContext();
@@ -872,8 +1161,9 @@ function renderEditorNotice(message) {
 
   setPlaybackState(false);
   setTotalDuration(0);
+  currentPreviewVideoUrl = null;
   resetSelection(message);
-  setPreviewPlaceholder("TIMELINE", message || "Load a segment to preview rendered frames");
+  setPreviewPlaceholder("TIMELINE", message || "Load a segment to preview video");
 }
 
 let _timelineScrubTarget = null;
@@ -975,7 +1265,8 @@ function initTimeline() {
   setText("tc-total", formatPreciseTime(TOTAL_DURATION));
   setText("tc-fs-total", formatPreciseTime(TOTAL_DURATION));
   updateInspectorContext();
-  setPreviewPlaceholder("TIMELINE", "Load a segment to preview rendered frames");
+  setPreviewPlaceholder("TIMELINE", "Load a segment to preview video");
+  renderExportsList([], "Open an episode to view exports");
   renderEditorNotice("Select a segment");
 }
 
@@ -1229,13 +1520,16 @@ async function goEditor(project, episode, segment) {
   currentSegmentPath = null;
   currentTimeline = null;
   currentSelectedClipId = null;
+  currentPreviewVideoUrl = null;
   segmentsCache = [];
+  exportsCache = [];
 
   switchView("view-editor");
   updateInspectorContext();
   renderProjectDropdown();
   renderEpisodeDropdown();
   renderSegmentDropdown();
+  renderExportsList([], currentEpisode ? "Loading exports..." : "Open an episode to view exports");
 
   if (!currentProject || !currentEpisode) {
     renderEditorNotice("Select an episode");
@@ -1274,6 +1568,7 @@ async function goEditor(project, episode, segment) {
     renderProjectDropdown();
     renderEpisodeDropdown();
     renderSegmentDropdown();
+    void refreshExportsPanel(requestId);
 
     if (!currentSegmentPath) {
       renderEditorNotice("No segments yet");
@@ -1287,6 +1582,7 @@ async function goEditor(project, episode, segment) {
 
     currentTimeline = timeline || {};
     renderTimeline(currentTimeline);
+    await refreshSegmentPreviewVideo(requestId);
     updateInspectorContext();
     renderProjectDropdown();
     renderEpisodeDropdown();
@@ -1301,10 +1597,13 @@ async function goEditor(project, episode, segment) {
     currentSegmentPath = null;
     currentTimeline = null;
     currentSelectedClipId = null;
+    currentPreviewVideoUrl = null;
+    exportsCache = [];
     updateInspectorContext();
     renderProjectDropdown();
     renderEpisodeDropdown();
     renderSegmentDropdown();
+    renderExportsList([], getBridgeMessage(error));
     renderEditorNotice(getBridgeMessage(error));
   }
 }
@@ -1392,10 +1691,20 @@ function reloadCurrentTimeline() {
     if (!result) return;
     currentTimeline = result;
     renderTimeline(result, selectedClipId);
-    // re-render current frame
-    _previewSeq++;
-    renderPreviewFrame(currentTime);
+    syncPreviewVideoTime(true);
   }).catch(function() {});
+}
+
+function initPreviewVideo() {
+  const video = document.getElementById("preview-video");
+  if (!video) {
+    return;
+  }
+
+  video.preload = "metadata";
+  video.addEventListener("loadedmetadata", function() {
+    syncPreviewVideoTime(true);
+  });
 }
 
 function initApp() {
@@ -1403,6 +1712,7 @@ function initApp() {
   initCustomSelect();
   initCanvasDrag();
   initTimeline();
+  initPreviewVideo();
   document.addEventListener("mousemove", moveTimelineScrub);
   document.addEventListener("mouseup", endTimelineScrub);
   renderProjectDropdown();

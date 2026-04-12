@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
+import { resolveTimeline, timelineUsage } from "./_resolve.js";
 import {
   ensureHtmlSlideCacheDir,
   htmlSlideCachePath,
@@ -27,13 +28,13 @@ function collectHtmlSlides(timeline, width, height) {
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
-  const [path] = positional;
-  if (!path) {
-    emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe bake-html <timeline.json>" } }, flags);
-    return 3;
+  const resolved = resolveTimeline(positional, { usage: timelineUsage("bake-html") });
+  if (!resolved.ok) {
+    emit(resolved, flags);
+    return resolved.error?.code === "USAGE" ? 3 : 2;
   }
 
-  const loaded = await loadTimeline(path);
+  const loaded = await loadTimeline(resolved.jsonPath);
   if (!loaded.ok) {
     emit(loaded, flags);
     return 2;

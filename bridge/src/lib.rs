@@ -183,6 +183,7 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
         "episode.list" => handle_episode_list(&params),
         "episode.create" => handle_episode_create(&params),
         "segment.list" => handle_segment_list(&params),
+        "segment.videoUrl" => handle_segment_video_url(&params),
         "preview.frame" => handle_preview_frame(&params),
         "fs.mtime" => handle_fs_mtime(&params),
         _ => Err(format!("unknown method: {method}")),
@@ -653,8 +654,10 @@ fn handle_timeline_save(params: &Value) -> Result<Value, String> {
 // ---------------------------------------------------------------------------
 
 fn projects_root() -> PathBuf {
-    let home = env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-    PathBuf::from(home).join("NextFrame").join("projects")
+    home_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join("NextFrame")
+        .join("projects")
 }
 
 fn handle_project_list(_params: &Value) -> Result<Value, String> {
@@ -902,6 +905,30 @@ fn handle_segment_list(params: &Value) -> Result<Value, String> {
     });
 
     Ok(json!({ "segments": segments }))
+}
+
+fn handle_segment_video_url(params: &Value) -> Result<Value, String> {
+    let project = require_string(params, "project")?;
+    let episode = require_string(params, "episode")?;
+    let segment = require_string(params, "segment")?;
+
+    validate_project_component(project, "project")?;
+    validate_project_component(episode, "episode")?;
+    validate_project_component(segment, "segment")?;
+
+    let video_path = projects_root()
+        .join(project)
+        .join(episode)
+        .join(format!("{segment}.mp4"));
+
+    if !video_path.is_file() {
+        return Ok(json!({ "exists": false }));
+    }
+
+    Ok(json!({
+        "exists": true,
+        "path": video_path.display().to_string(),
+    }))
 }
 
 fn handle_preview_frame(params: &Value) -> Result<Value, String> {
@@ -1393,6 +1420,18 @@ fn require_string<'a>(params: &'a Value, key: &str) -> Result<&'a str, String> {
     require_value(params, key)?
         .as_str()
         .ok_or_else(|| format!("params.{key} must be a string"))
+}
+
+fn validate_project_component(value: &str, label: &str) -> Result<(), String> {
+    if value.is_empty() {
+        return Err(format!("params.{label} must be a non-empty string"));
+    }
+
+    if value == "." || value == ".." || value.contains(['/', '\\']) {
+        return Err(format!("invalid params.{label}: {value}"));
+    }
+
+    Ok(())
 }
 
 fn require_string_alias<'a>(params: &'a Value, keys: &[&str]) -> Result<&'a str, String> {

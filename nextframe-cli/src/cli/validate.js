@@ -1,21 +1,21 @@
 // nextframe validate <timeline.json>
-import { dirname, resolve } from "node:path";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
+import { resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
 import { validateTimeline } from "../engine/validate.js";
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
-  const [path] = positional;
-  if (!path) {
-    emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe validate <timeline.json>" } }, flags);
-    return 3;
+  const resolved = resolveTimeline(positional, { usage: timelineUsage("validate") });
+  if (!resolved.ok) {
+    emit(resolved, flags);
+    return resolved.error?.code === "USAGE" ? 3 : 2;
   }
-  const loaded = await loadTimeline(path);
+  const loaded = await loadTimeline(resolved.jsonPath);
   if (!loaded.ok) {
     emit(loaded, flags);
     return 2;
   }
-  const result = validateTimeline(loaded.value, { projectDir: dirname(resolve(path)) });
+  const result = validateTimeline(loaded.value, { projectDir: timelineDir(resolved.jsonPath) });
   if (flags.json) {
     process.stdout.write(JSON.stringify(result, null, 2) + "\n");
   } else {

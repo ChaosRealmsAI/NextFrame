@@ -2,13 +2,14 @@ import { existsSync } from "node:fs";
 import { parse as parsePath, isAbsolute, resolve as resolvePath } from "node:path";
 
 import { parseFlags, loadTimeline, saveTimeline, emit } from "./_io.js";
+import { resolveTimeline, timelineUsage } from "./_resolve.js";
 import { ensureTimelineCollections } from "../timeline/ops.js";
 
 const FLAG_USAGE = {
-  "import-image": "usage: nextframe import-image <timeline.json> <image-path> [--id=ID]",
-  "import-audio": "usage: nextframe import-audio <timeline.json> <audio-path> [--id=ID]",
-  "list-assets": "usage: nextframe list-assets <timeline.json> [--json]",
-  "remove-asset": "usage: nextframe remove-asset <timeline.json> <asset-id>",
+  "import-image": timelineUsage("import-image", " <image-path> [--id=ID]"),
+  "import-audio": timelineUsage("import-audio", " <audio-path> [--id=ID]"),
+  "list-assets": timelineUsage("list-assets", " [--json]"),
+  "remove-asset": timelineUsage("remove-asset", " <asset-id>"),
 };
 
 const KIND_ORDER = new Map([
@@ -19,20 +20,20 @@ const KIND_ORDER = new Map([
 export async function run(argv, ctx) {
   const { positional, flags } = parseFlags(argv);
   const sub = ctx.subcommand;
-  const timelinePath = positional[0];
-  if (!timelinePath) {
-    emitUsage(sub, flags);
-    return 3;
+  const resolved = resolveTimeline(positional, { usage: FLAG_USAGE[sub] });
+  if (!resolved.ok) {
+    emit(resolved, flags);
+    return resolved.error?.code === "USAGE" ? 3 : 2;
   }
 
-  const loaded = await loadTimeline(timelinePath);
+  const loaded = await loadTimeline(resolved.jsonPath);
   if (!loaded.ok) {
     emit(loaded, flags);
     return 2;
   }
 
   const timeline = ensureTimelineCollections(loaded.value);
-  const outcome = execute(sub, timeline, positional, flags);
+  const outcome = execute(sub, timeline, resolved.rest, flags);
   if (!outcome.ok) {
     emit(outcome, flags);
     return 2;
@@ -43,7 +44,7 @@ export async function run(argv, ctx) {
     return 0;
   }
 
-  const saved = await saveTimeline(timelinePath, outcome.timeline);
+  const saved = await saveTimeline(resolved.jsonPath, outcome.timeline);
   if (!saved.ok) {
     emit(saved, flags);
     return 2;
@@ -54,10 +55,10 @@ export async function run(argv, ctx) {
 }
 
 function execute(sub, timeline, positional, flags) {
-  if (sub === "import-image") return execImport(timeline, positional[1], flags.id, "image");
-  if (sub === "import-audio") return execImport(timeline, positional[1], flags.id, "audio");
+  if (sub === "import-image") return execImport(timeline, positional[0], flags.id, "image");
+  if (sub === "import-audio") return execImport(timeline, positional[0], flags.id, "audio");
   if (sub === "list-assets") return execList(timeline);
-  if (sub === "remove-asset") return execRemove(timeline, positional[1]);
+  if (sub === "remove-asset") return execRemove(timeline, positional[0]);
   return { ok: false, error: { code: "BAD_SUBCOMMAND", message: `unknown ${sub}` } };
 }
 
@@ -163,7 +164,7 @@ function resolveAssetPath(path) {
 }
 
 function emitUsage(sub, flags) {
-  emit({ ok: false, error: { code: "USAGE", message: FLAG_USAGE[sub] || `usage: nextframe ${sub} <timeline.json>` } }, flags);
+  emit({ ok: false, error: { code: "USAGE", message: FLAG_USAGE[sub] || timelineUsage(sub) } }, flags);
 }
 
 function usageError(sub) {

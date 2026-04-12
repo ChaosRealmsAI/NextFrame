@@ -1,4 +1,5 @@
 import { parseFlags, loadTimeline, saveTimeline, emit, parseTime } from "./_io.js";
+import { resolveTimeline as resolveTimelineArg, timelineUsage } from "./_resolve.js";
 import {
   addClip,
   addMarker,
@@ -14,31 +15,31 @@ import { resolveTimeline } from "../engine/time.js";
 import { getScene } from "../scenes/index.js";
 
 const FLAG_USAGE = {
-  "add-clip": "usage: nextframe add-clip <timeline> --track=ID --scene=SCENE_ID --start=T --duration=N [--id=CLIP_ID] [--params=k=v,...]",
-  "move-clip": "usage: nextframe move-clip <timeline> <clipId> --to=T",
-  "resize-clip": "usage: nextframe resize-clip <timeline> <clipId> --duration=N",
-  "remove-clip": "usage: nextframe remove-clip <timeline> <clipId>",
-  "set-param": "usage: nextframe set-param <timeline> <clipId> --KEY=VALUE [--KEY2=VALUE2]",
-  "add-marker": "usage: nextframe add-marker <timeline> --id=ID --at=T [--label=TEXT]",
-  "list-clips": "usage: nextframe list-clips <timeline> [--json]",
-  "dup-clip": "usage: nextframe dup-clip <timeline> <srcClipId> --to=T",
+  "add-clip": timelineUsage("add-clip", " --track=ID --scene=SCENE_ID --start=T --duration=N [--id=CLIP_ID] [--params=k=v,...]"),
+  "move-clip": timelineUsage("move-clip", " <clipId> --to=T"),
+  "resize-clip": timelineUsage("resize-clip", " <clipId> --duration=N"),
+  "remove-clip": timelineUsage("remove-clip", " <clipId>"),
+  "set-param": timelineUsage("set-param", " <clipId> --KEY=VALUE [--KEY2=VALUE2]"),
+  "add-marker": timelineUsage("add-marker", " --id=ID --at=T [--label=TEXT]"),
+  "list-clips": timelineUsage("list-clips", " [--json]"),
+  "dup-clip": timelineUsage("dup-clip", " <srcClipId> --to=T"),
 };
 
 export async function run(argv, ctx) {
   const { positional, flags } = parseFlags(argv);
   const sub = ctx.subcommand;
-  const path = positional[0];
-  if (!path) {
-    emitUsage(sub, flags);
-    return 3;
+  const resolved = resolveTimelineArg(positional, { usage: FLAG_USAGE[sub] });
+  if (!resolved.ok) {
+    emit(resolved, flags);
+    return resolved.error?.code === "USAGE" ? 3 : 2;
   }
-  const loaded = await loadTimeline(path);
+  const loaded = await loadTimeline(resolved.jsonPath);
   if (!loaded.ok) {
     emit(loaded, flags);
     return 2;
   }
   const timeline = ensureTimelineCollections(loaded.value);
-  const outcome = execute(sub, timeline, positional, flags);
+  const outcome = execute(sub, timeline, resolved.rest, flags);
   if (!outcome.ok) {
     emit(outcome, flags);
     return 2;
@@ -47,12 +48,12 @@ export async function run(argv, ctx) {
     writeListOutput(outcome, flags);
     return 0;
   }
-  const saved = await saveTimeline(path, outcome.value);
+  const saved = await saveTimeline(resolved.jsonPath, outcome.value);
   if (!saved.ok) {
     emit(saved, flags);
     return 2;
   }
-  writeMutationOutput(sub, path, outcome, flags);
+  writeMutationOutput(sub, resolved.jsonPath, outcome, flags);
   return 0;
 }
 
@@ -69,7 +70,7 @@ function execute(sub, timeline, positional, flags) {
 }
 
 function execAddClip(timeline, positional, flags) {
-  const trackId = flags.track || positional[1];
+  const trackId = flags.track || positional[0];
   if (!trackId) return usageError("add-clip");
   const withTrack = ensureTrack(timeline, trackId);
   if (flags.scene || flags.start !== undefined || flags.duration !== undefined || flags.id || flags.params) {
@@ -85,7 +86,7 @@ function execAddClip(timeline, positional, flags) {
       params: parseParams(flags.params),
     });
   }
-  const clipJson = positional[2];
+  const clipJson = positional[1];
   if (!clipJson) return usageError("add-clip");
   let clip;
   try {
@@ -97,15 +98,15 @@ function execAddClip(timeline, positional, flags) {
 }
 
 function execMoveClip(timeline, positional, flags) {
-  const clipId = positional[1];
-  const target = flags.to ?? positional[2];
+  const clipId = positional[0];
+  const target = flags.to ?? positional[1];
   if (!clipId || target === undefined) return usageError("move-clip");
   return moveClip(timeline, clipId, normalizeTimeRefs(parseTimeValue(target), timeline));
 }
 
 function execResizeClip(timeline, positional, flags) {
-  const clipId = positional[1];
-  const target = flags.duration ?? positional[2];
+  const clipId = positional[0];
+  const target = flags.duration ?? positional[1];
   if (!clipId || target === undefined) return usageError("resize-clip");
   const dur = parseNumber(target, "BAD_DURATION", "duration must be numeric");
   if (dur.error) return dur.error;
@@ -113,17 +114,17 @@ function execResizeClip(timeline, positional, flags) {
 }
 
 function execRemoveClip(timeline, positional) {
-  const clipId = positional[1];
+  const clipId = positional[0];
   if (!clipId) return usageError("remove-clip");
   return removeClip(timeline, clipId);
 }
 
 function execSetParam(timeline, positional, flags) {
-  const clipId = positional[1];
+  const clipId = positional[0];
   if (!clipId) return usageError("set-param");
   const entries = Object.entries(flags).filter(([key]) => key !== "json");
   if (entries.length === 0) {
-    const fallbackEntries = positional.slice(2).map(splitKeyValue);
+    const fallbackEntries = positional.slice(1).map(splitKeyValue);
     if (fallbackEntries.some((entry) => !entry.ok)) {
       return fallbackEntries.find((entry) => !entry.ok);
     }
@@ -148,8 +149,8 @@ function execListClips(timeline) {
 }
 
 function execDupClip(timeline, positional, flags) {
-  const clipId = positional[1];
-  const target = flags.to ?? positional[2];
+  const clipId = positional[0];
+  const target = flags.to ?? positional[1];
   if (!clipId || target === undefined) return usageError("dup-clip");
   return duplicateClip(timeline, clipId, normalizeTimeRefs(parseTimeValue(target), timeline));
 }
@@ -242,7 +243,7 @@ function resolveClipStart(timeline, clipId) {
 }
 
 function emitUsage(sub, flags) {
-  emit({ ok: false, error: { code: "USAGE", message: FLAG_USAGE[sub] || `usage: nextframe ${sub} <timeline>` } }, flags);
+  emit({ ok: false, error: { code: "USAGE", message: FLAG_USAGE[sub] || timelineUsage(sub) } }, flags);
 }
 
 function usageError(sub) {

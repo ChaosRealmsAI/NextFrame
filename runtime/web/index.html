@@ -158,41 +158,7 @@ window.__ipc = window.__ipc || {};
       <span class="exports-title">EXPORT HISTORY</span>
       <button class="exports-close" onclick="toggleExports()">&times;</button>
     </div>
-    <div class="exports-list">
-      <div class="export-item" onclick="openPlayer('content.mp4','26s','12.4 MB','1920×1080 · 30fps · h264 · crf 23')">
-        <div class="export-thumb"><span class="export-play-icon">&#9654;</span></div>
-        <div class="export-info">
-          <div class="export-name">content.mp4</div>
-          <div class="export-meta">1920×1080 · 26s · 12.4 MB</div>
-          <div class="export-meta">crf 23 · 2 min ago</div>
-        </div>
-      </div>
-      <div class="export-item" onclick="openPlayer('intro.mp4','5s','2.1 MB','1920×1080 · 30fps · h264 · crf 23')">
-        <div class="export-thumb"><span class="export-play-icon">&#9654;</span></div>
-        <div class="export-info">
-          <div class="export-name">intro.mp4</div>
-          <div class="export-meta">1920×1080 · 5s · 2.1 MB</div>
-          <div class="export-meta">crf 23 · 1h ago</div>
-        </div>
-      </div>
-      <div class="export-item" onclick="openPlayer('outro.mp4','3s','1.2 MB','1920×1080 · 30fps · h264 · crf 18')">
-        <div class="export-thumb"><span class="export-play-icon">&#9654;</span></div>
-        <div class="export-info">
-          <div class="export-name">outro.mp4</div>
-          <div class="export-meta">1920×1080 · 3s · 1.2 MB</div>
-          <div class="export-meta">crf 18 · yesterday</div>
-        </div>
-      </div>
-      <div class="export-item export-progress">
-        <div class="export-thumb"><span class="export-spin">&#9676;</span></div>
-        <div class="export-info">
-          <div class="export-name">EP02-full.mp4</div>
-          <div class="export-meta">rendering... 67%</div>
-          <div class="export-bar"><div class="export-bar-fill" style="width:67%"></div></div>
-          <div class="export-meta">ETA 0:12</div>
-        </div>
-      </div>
-    </div>
+    <div class="exports-list" id="exports-list"></div>
   </div>
 
   <!-- Settings Panel -->
@@ -338,8 +304,8 @@ window.__ipc = window.__ipc || {};
         <div class="canvas-frame">
           <div class="canvas-inner" id="canvas-inner">
             <div class="canvas-bg"></div>
-            <!-- Rendered frame preview (from CLI nextframe frame) -->
             <img id="preview-frame-img" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none" alt="">
+            <video id="preview-video" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none" playsinline></video>
             <div id="preview-placeholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px">
               <div class="canvas-text">
                 <h1 id="canvas-title">CANVAS</h1>

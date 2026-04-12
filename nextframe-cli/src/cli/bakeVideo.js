@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
+import { resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
 import { validateTimeline } from "../engine/validate.js";
 import {
   cachedFramePath,
@@ -94,26 +94,26 @@ function extractFrame(job) {
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
-  const [timelinePath] = positional;
-  if (!timelinePath) {
-    emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe bake-video <timeline.json>" } }, flags);
-    return 3;
+  const resolved = resolveTimeline(positional, { usage: timelineUsage("bake-video") });
+  if (!resolved.ok) {
+    emit(resolved, flags);
+    return resolved.error?.code === "USAGE" ? 3 : 2;
   }
 
-  const loaded = await loadTimeline(timelinePath);
+  const loaded = await loadTimeline(resolved.jsonPath);
   if (!loaded.ok) {
     emit(loaded, flags);
     return 2;
   }
 
-  const timelineDir = dirname(resolve(timelinePath));
-  const validated = validateTimeline(loaded.value, { projectDir: timelineDir });
+  const projectDir = timelineDir(resolved.jsonPath);
+  const validated = validateTimeline(loaded.value, { projectDir });
   if (!validated.ok) {
     emit({ ok: false, error: validated.error, errors: validated.errors, warnings: validated.warnings, hints: validated.hints }, flags);
     return 2;
   }
 
-  const collected = collectJobs(validated.resolved || validated.value, timelineDir);
+  const collected = collectJobs(validated.resolved || validated.value, projectDir);
   if (!collected.ok) {
     emit(collected, flags);
     return 2;

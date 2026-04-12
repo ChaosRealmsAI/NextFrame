@@ -9,6 +9,9 @@ import { resolve as resolvePath, isAbsolute } from "node:path";
 import { resolveTimeline } from "./time.js";
 import { guarded } from "./_guard.js";
 import { REGISTRY } from "../scenes/index.js";
+import { EFFECT_IDS } from "../effects/index.js";
+import { FILTER_IDS } from "../filters/index.js";
+import { TRANSITION_IDS } from "../transitions/index.js";
 
 const SUPPORTED_SCHEMAS = new Set(["nextframe/v0.1"]);
 
@@ -70,6 +73,27 @@ export function validateTimeline(timeline, opts = {}) {
           ref: clip.id,
           hint: `available: ${[...REGISTRY.keys()].slice(0, 8).join(", ")}...`,
         });
+      }
+    }
+  }
+
+  // Validate effect/filter/transition type names
+  for (const trk of resolved.tracks || []) {
+    for (const clip of trk.clips || []) {
+      if (clip.effects?.enter?.type && !EFFECT_IDS.includes(clip.effects.enter.type)) {
+        warnings.push({ code: "UNKNOWN_EFFECT", message: `clip "${clip.id}" enter effect "${clip.effects.enter.type}" not found`, ref: clip.id, hint: `available: ${EFFECT_IDS.join(", ")}` });
+      }
+      if (clip.effects?.exit?.type && !EFFECT_IDS.includes(clip.effects.exit.type)) {
+        warnings.push({ code: "UNKNOWN_EFFECT", message: `clip "${clip.id}" exit effect "${clip.effects.exit.type}" not found`, ref: clip.id, hint: `available: ${EFFECT_IDS.join(", ")}` });
+      }
+      for (const f of clip.filters || []) {
+        const ft = typeof f === "string" ? f : f.type;
+        if (ft && !FILTER_IDS.includes(ft)) {
+          warnings.push({ code: "UNKNOWN_FILTER", message: `clip "${clip.id}" filter "${ft}" not found`, ref: clip.id, hint: `available: ${FILTER_IDS.join(", ")}` });
+        }
+      }
+      if (clip.transition?.type && !TRANSITION_IDS.includes(clip.transition.type)) {
+        warnings.push({ code: "UNKNOWN_TRANSITION", message: `clip "${clip.id}" transition "${clip.transition.type}" not found`, ref: clip.id, hint: `available: ${TRANSITION_IDS.join(", ")}` });
       }
     }
   }

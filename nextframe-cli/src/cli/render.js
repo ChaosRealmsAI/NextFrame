@@ -3,11 +3,14 @@ import { randomUUID } from "node:crypto";
 import { existsSync, unlinkSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
+import { resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
 import { exportMP4, muxMP4Audio } from "../targets/ffmpeg-mp4.js";
 import { exportRecorder } from "../targets/recorder.js";
 import { validateTimeline } from "../engine/validate.js";
 
-const HELP = `usage: nextframe render <timeline> <out.mp4>
+const USAGE = timelineUsage("render", " [out.mp4]", " <out.mp4>");
+
+const HELP = `${USAGE}
 
 flags:
   --target <name>  export backend (supported: ffmpeg, recorder)
@@ -53,10 +56,15 @@ export async function run(argv) {
   }
 
   const { positional, flags } = parseFlags(argv);
-  const [path, outPath] = positional;
+  const resolved = resolveTimeline(positional, { usage: USAGE });
+  if (!resolved.ok) {
+    emit(resolved, flags);
+    return resolved.error?.code === "USAGE" ? 3 : 2;
+  }
+  const outPath = resolved.rest[0] || (!resolved.legacy ? resolved.mp4Path : null);
   const audioPath = flags.audio ? resolve(flags.audio) : null;
-  if (!path || !outPath) {
-    emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe render <timeline> <out.mp4>" } }, flags);
+  if (!outPath) {
+    emit({ ok: false, error: { code: "USAGE", message: USAGE } }, flags);
     return 3;
   }
   if (audioPath && !existsSync(audioPath)) {
@@ -86,13 +94,14 @@ export async function run(argv) {
     emit({ ok: false, error: crf.error }, flags);
     return 2;
   }
-  const loaded = await loadTimeline(path);
+  const loaded = await loadTimeline(resolved.jsonPath);
   if (!loaded.ok) {
     emit(loaded, flags);
     return 2;
   }
   // BDD cli-render-8 invariant: render must validate before touching ffmpeg.
-  const v = validateTimeline(loaded.value, { projectDir: dirname(resolve(path)) });
+  const projectDir = timelineDir(resolved.jsonPath);
+  const v = validateTimeline(loaded.value, { projectDir });
   if (v.errors && v.errors.length > 0) {
     emit({ ok: false, error: v.errors[0], errors: v.errors, hints: v.hints }, flags);
     return 2;
@@ -102,7 +111,7 @@ export async function run(argv) {
   if (crf.value !== undefined) opts.crf = crf.value;
   if (flags.width) opts.width = Number(flags.width);
   if (flags.height) opts.height = Number(flags.height);
-  opts.projectDir = dirname(resolve(path));
+  opts.projectDir = projectDir;
   opts.onProgress = (i, total) => {
     if (!flags.quiet) {
       process.stderr.write(`  rendered ${i}/${total} frames\r`);

@@ -1,16 +1,17 @@
 // nextframe gantt <timeline.json>
 import { parseFlags, loadTimeline, emit } from "./_io.js";
+import { resolveTimeline as resolveTimelineArg, timelineUsage } from "./_resolve.js";
 import { renderGantt } from "../views/gantt.js";
 import { resolveTimeline } from "../engine/time.js";
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
-  const [path] = positional;
-  if (!path) {
-    emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe gantt <timeline>" } }, flags);
-    return 3;
+  const resolvedArg = resolveTimelineArg(positional, { usage: timelineUsage("gantt") });
+  if (!resolvedArg.ok) {
+    emit(resolvedArg, flags);
+    return resolvedArg.error?.code === "USAGE" ? 3 : 2;
   }
-  const loaded = await loadTimeline(path);
+  const loaded = await loadTimeline(resolvedArg.jsonPath);
   if (!loaded.ok) {
     emit(loaded, flags);
     return 2;

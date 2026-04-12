@@ -42,33 +42,34 @@ const SUBCOMMANDS = {
 const HELP = `nextframe — frame-pure CLI video editor for AI
 
 USAGE
-  nextframe <subcommand> [args] [--json]
+  nextframe <command> <project> <episode> <segment> [args]
+  nextframe <command> <timeline.json> [args]     (legacy)
 
 SUBCOMMANDS
   new <out.json>                              create empty timeline
-  validate <timeline.json>                    run safety gates
-  frame <timeline.json> <t> <out.png>         render single frame
-  render <timeline.json> <out.mp4>            export full timeline to mp4
+  validate <project> <episode> <segment>      run safety gates
+  frame <project> <episode> <segment> <t>     render single frame
+  render <project> <episode> <segment>        export full timeline to mp4
   probe <out.mp4>                             inspect export metadata with ffprobe
-  bake-html <timeline.json>                   pre-render htmlSlide clips into PNG cache
-  describe <timeline.json> <t>                JSON of what is visible at t
-  ascii <timeline.json> <t> [--width N]       ASCII art preview of a frame
-  gantt <timeline.json>                       ASCII gantt
-  bake-video <timeline.json>                  pre-extract videoClip frames with ffmpeg
+  bake-html <project> <episode> <segment>     pre-render htmlSlide clips into PNG cache
+  describe <project> <episode> <segment> <t>  JSON of what is visible at t
+  ascii <project> <episode> <segment> <t>     ASCII art preview of a frame
+  gantt <project> <episode> <segment>         ASCII gantt
+  bake-video <project> <episode> <segment>    pre-extract videoClip frames with ffmpeg
   scenes                                      list all scenes with META
-  bake-browser <timeline.json>                bake html/svg/markdown/lottie browser scenes
-  add-clip <timeline.json> ...                add a clip to a track
-  move-clip <timeline.json> <clipId> ...      move a clip's start time
-  resize-clip <timeline.json> <clipId> ...    resize clip duration
-  remove-clip <timeline.json> <clipId>        remove a clip
-  set-param <timeline.json> <clipId> ...      update clip params
-  add-marker <timeline.json> ...              append a timeline marker
-  list-clips <timeline.json> [--json]         list clips grouped by track
-  dup-clip <timeline.json> <clipId> ...       duplicate a clip at a new time
-  import-image <timeline.json> <image-path>   add an image asset to timeline.assets[]
-  import-audio <timeline.json> <audio-path>   add an audio asset to timeline.assets[]
-  list-assets <timeline.json> [--json]        list assets grouped by kind
-  remove-asset <timeline.json> <asset-id>     remove an asset by id
+  bake-browser <project> <episode> <segment>  bake html/svg/markdown/lottie browser scenes
+  add-clip <project> <episode> <segment> ...  add a clip to a track
+  move-clip <project> <episode> <segment> ... move a clip's start time
+  resize-clip <project> <episode> <segment>   resize clip duration
+  remove-clip <project> <episode> <segment>   remove a clip
+  set-param <project> <episode> <segment> ... update clip params
+  add-marker <project> <episode> <segment>    append a timeline marker
+  list-clips <project> <episode> <segment>    list clips grouped by track
+  dup-clip <project> <episode> <segment> ...  duplicate a clip at a new time
+  import-image <project> <episode> <segment>  add an image asset to timeline.assets[]
+  import-audio <project> <episode> <segment>  add an audio asset to timeline.assets[]
+  list-assets <project> <episode> <segment>   list assets grouped by kind
+  remove-asset <project> <episode> <segment>  remove an asset by id
   guide                                       AI onboarding: conventions, workflow, naming
 
 PROJECT MANAGEMENT

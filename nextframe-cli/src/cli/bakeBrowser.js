@@ -1,6 +1,7 @@
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { loadTimeline, parseFlags, emit } from "./_io.js";
+import { resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
 import {
   CACHE_DIRS,
   cachePathForScene,
@@ -88,13 +89,13 @@ export async function bakeBrowserScenes(timeline, opts = {}) {
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
-  const [timelinePath] = positional;
-  if (!timelinePath) {
-    emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe bake-browser <timeline.json>" } }, flags);
-    return 3;
+  const resolved = resolveTimeline(positional, { usage: timelineUsage("bake-browser") });
+  if (!resolved.ok) {
+    emit(resolved, flags);
+    return resolved.error?.code === "USAGE" ? 3 : 2;
   }
 
-  const loaded = await loadTimeline(timelinePath);
+  const loaded = await loadTimeline(resolved.jsonPath);
   if (!loaded.ok) {
     emit(loaded, flags);
     return 2;
@@ -103,7 +104,7 @@ export async function run(argv) {
   const baked = await bakeBrowserScenes(loaded.value, {
     width: flags.width,
     height: flags.height,
-    rootDir: dirname(resolve(timelinePath)),
+    rootDir: timelineDir(resolved.jsonPath),
   });
   emit(baked, flags);
   return baked.ok ? 0 : 2;
