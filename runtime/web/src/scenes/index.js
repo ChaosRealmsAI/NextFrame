@@ -22,6 +22,10 @@ import { textOverlay } from "./textOverlay.js";
 import { toolboxSlide } from "./toolboxSlide.js";
 import { pulseWave } from "./pulseWave.js";
 import { radialBurst } from "./radialBurst.js";
+import { iconCardGrid } from "./iconCardGrid.js";
+import { codeBlock } from "./codeBlock.js";
+import { horizontalBars } from "./horizontalBars.js";
+import { quoteBlock } from "./quoteBlock.js";
 
 function cloneDefaultValue(value) {
   if (value == null || typeof value !== "object") {
@@ -460,6 +464,22 @@ const SCENE_REGISTRY = [
     category: "Shapes",
     duration_hint: "8s",
     params: { rayCount: { type: "number", default: 24 }, hue: { type: "number", default: 35 }, rotationSpeed: { type: "number", default: 0.3 } },
+  },
+  {
+    id: "iconCardGrid", fn: iconCardGrid, name: "Icon Card Grid", category: "Overlays", duration_hint: "8s",
+    params: { cards: { type: "array", default: [] }, staggerStart: { type: "number", default: 0 } },
+  },
+  {
+    id: "codeBlock", fn: codeBlock, name: "Code Block", category: "Overlays", duration_hint: "10s",
+    params: { lines: { type: "array", default: [] }, title: { type: "string", default: "code" }, badge: { type: "string", default: "JSON" } },
+  },
+  {
+    id: "horizontalBars", fn: horizontalBars, name: "Horizontal Bars", category: "Data Viz", duration_hint: "8s",
+    params: { bars: { type: "array", default: [] }, enterAt: { type: "number", default: 0 } },
+  },
+  {
+    id: "quoteBlock", fn: quoteBlock, name: "Quote Block", category: "Typography", duration_hint: "8s",
+    params: { quote: { type: "string", default: "" }, explain: { type: "string", default: "" } },
   },
 ];
 

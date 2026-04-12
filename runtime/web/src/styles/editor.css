@@ -829,8 +829,8 @@ button { cursor: pointer; }
 
 .canvas-frame {
   position: relative;
-  width: 100%;
-  max-width: 760px;
+  width: 90%;
+  max-width: 960px;
   aspect-ratio: 16/9;
   background: #14120e;
   border-radius: 4px;
