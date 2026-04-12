@@ -82,6 +82,38 @@
       "kind": "video",
       "clips": [
         {
+          "id": "clip-welcome",
+          "start": 1,
+          "dur": 2,
+          "scene": "textOverlay",
+          "params": {
+            "text": "王宇轩你好",
+            "fontSize": 160,
+            "color": "#ffe99c",
+            "align": "center",
+            "anchor": "center",
+            "weight": "800",
+            "letterSpacing": 0.02,
+            "enterDur": 0.5,
+            "holdDur": 1.1
+          }
+        },
+        {
+          "id": "clip-intro",
+          "start": 3,
+          "dur": 1.0,
+          "scene": "glitchText",
+          "params": {
+            "text": "WELCOME",
+            "fontSize": 120,
+            "weight": "900",
+            "baseHue": 300,
+            "glitchAmount": 0.5,
+            "scanlines": true,
+            "burstFreq": 3
+          }
+        },
+        {
           "id": "clip-kinetic",
           "start": { "at": "chapter-reveal" },
           "dur": 4,
