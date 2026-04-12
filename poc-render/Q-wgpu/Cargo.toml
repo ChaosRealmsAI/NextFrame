@@ -1,0 +1,13 @@
+[package]
+name = "q_wgpu"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+
+[workspace]
+
+[dependencies]
+bytemuck = { version = "1.24", features = ["derive"] }
+png = "0.17"
+pollster = "0.4"
+wgpu = "29.0.1"
