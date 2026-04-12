@@ -46,6 +46,7 @@ const ANIMATED_SCENES = Object.freeze([
   "spotlightSweep",
   "starfield",
   "svgOverlay",
+  "textOverlay",
   "toolboxSlide",
   "videoClip",
   "videoWindow",
@@ -55,7 +56,6 @@ const STATIC_SCENES = Object.freeze([
   "ccBigNumber",
   "ccPill",
   "cornerBadge",
-  "textOverlay",
   "vignette",
 ]);
 
