@@ -807,16 +807,23 @@ function renderTimelineRuler(duration) {
   return ticks.join("");
 }
 
-function renderClipHtml(clip, track, trackIndex, clipIndex) {
+function percentOfTotal(value, total) {
+  const safeValue = Math.max(0, finiteNumber(value, 0));
+  const safeTotal = Math.max(0, finiteNumber(total, 0));
+  return safeTotal > 0 ? (safeValue / safeTotal) * 100 : 0;
+}
+
+function renderClipHtml(clip, track, trackIndex, clipIndex, totalDuration) {
   const start = Math.max(0, finiteNumber(clip?.start, 0));
   const duration = Math.max(0, finiteNumber(clip?.dur ?? clip?.duration, 0));
   const label = deriveClipLabel(clip, clipIndex);
   const type = deriveClipType(clip, track);
   const scene = String(clip?.scene || clip?.type || label || "clip");
+  const sceneLabel = prettifyLabel(scene);
   const kind = deriveClipClass(clip, track).replace(/^type-/, "");
   const id = String(clip?.id || ("clip-" + (trackIndex + 1) + "-" + (clipIndex + 1)));
-  const left = TOTAL_DURATION > 0 ? (start / TOTAL_DURATION) * 100 : 0;
-  const width = TOTAL_DURATION > 0 ? (duration / TOTAL_DURATION) * 100 : 0;
+  const left = percentOfTotal(start, totalDuration);
+  const width = percentOfTotal(duration, totalDuration);
   return (
     `<div class="tl-clip ${deriveClipClass(clip, track)}" id="${escapeAttr(id)}"` +
     ` data-name="${escapeAttr(label)}"` +
@@ -827,8 +834,9 @@ function renderClipHtml(clip, track, trackIndex, clipIndex) {
     ` data-start="${escapeAttr(String(start))}"` +
     ` data-dur="${escapeAttr(String(duration))}"` +
     ` data-params="${escapeAttr(stringifyClipParams(clip?.params))}"` +
+    ` title="${escapeAttr(scene + " · " + id)}"` +
     ` style="left:${left}%;width:${width}%;min-width:12px" onclick="selectClip(this)">` +
-    `<span class="tl-clip-label">${escapeHtml(label)}</span>` +
+    `<span class="tl-clip-label">${escapeHtml(sceneLabel)}</span>` +
     `</div>`
   );
 }
@@ -917,7 +925,7 @@ function renderTimeline(timeline, preferredClipId) {
   const trackRows = tracks.map((track, trackIndex) => {
     const clips = Array.isArray(track?.clips) ? track.clips : [];
     const clipHtml = clips.length
-      ? clips.map((clip, clipIndex) => renderClipHtml(clip, track, trackIndex, clipIndex)).join("")
+      ? clips.map((clip, clipIndex) => renderClipHtml(clip, track, trackIndex, clipIndex, duration)).join("")
       : `<div style="padding:12px;color:var(--ink-dim);font-size:11px">No clips</div>`;
     return `<div class="tl-track" id="track-${escapeAttr(String(track?.id || ("track-" + (trackIndex + 1))))}">${clipHtml}</div>`;
   }).join("");
@@ -1141,7 +1149,9 @@ function renderProjectState(projectName, episodes, message) {
 }
 
 async function goProject(projectName) {
-  if (typeof projectName === "string") {
+  if (arguments.length === 0) {
+    currentProject = null;
+  } else if (typeof projectName === "string") {
     currentProject = projectName || null;
   }
 
