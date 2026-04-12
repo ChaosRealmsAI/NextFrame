@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>I-hot-reload</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "SF Mono", "Roboto Mono", monospace;
+        background:
+          radial-gradient(circle at top, rgba(52, 92, 168, 0.32), transparent 40%),
+          linear-gradient(180deg, #0a0d16, #04050a 75%);
+        color: #edf2ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .shell {
+        width: min(100%, 1320px);
+        display: grid;
+        gap: 16px;
+      }
+
+      .panel {
+        display: grid;
+        gap: 10px;
+        padding: 14px 16px;
+        border: 1px solid rgba(184, 203, 255, 0.18);
+        border-radius: 16px;
+        background: rgba(7, 10, 18, 0.75);
+        backdrop-filter: blur(14px);
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        font-size: 13px;
+      }
+
+      .meta span {
+        color: #9eb2df;
+      }
+
+      .meta strong {
+        color: #f5f8ff;
+        font-weight: 600;
+      }
+
+      .viewport {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 18px;
+        overflow: hidden;
+        border: 1px solid rgba(184, 203, 255, 0.18);
+        background: #03040a;
+      }
+
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="panel">
+        <div class="meta">
+          <div><span>Status</span> <strong id="status">booting</strong></div>
+          <div><span>Clip</span> <strong id="clip">-</strong></div>
+          <div><span>Global t</span> <strong id="global-time">0.000s</strong></div>
+          <div><span>Reload latency</span> <strong id="latency">-</strong></div>
+          <div><span>Hue A</span> <strong id="hue-a">-</strong></div>
+        </div>
+      </div>
+      <div class="viewport">
+        <canvas id="preview" width="1920" height="1080"></canvas>
+      </div>
+    </div>
+
+    <script type="module">
+      import { auroraGradient } from "../auroraGradient.js";
+
+      const canvas = document.getElementById("preview");
+      const ctx = canvas.getContext("2d");
+      const statusEl = document.getElementById("status");
+      const clipEl = document.getElementById("clip");
+      const globalTimeEl = document.getElementById("global-time");
+      const latencyEl = document.getElementById("latency");
+      const hueAEl = document.getElementById("hue-a");
+
+      let timeline = null;
+      let pendingMeasurement = null;
+      let lastRenderedSignature = "";
+
+      function timelineSignature(data) {
+        return JSON.stringify(data);
+      }
+
+      function findActiveClip(data, t) {
+        const duration = Number(data?.duration || 0);
+        if (!duration || !Array.isArray(data?.clips) || data.clips.length === 0) {
+          return null;
+        }
+
+        const wrappedTime = ((t % duration) + duration) % duration;
+        for (const clip of data.clips) {
+          const start = Number(clip.start || 0);
+          const clipDuration = Number(clip.duration || 0);
+          if (wrappedTime >= start && wrappedTime < start + clipDuration) {
+            return {
+              clip,
+              globalTime: wrappedTime,
+              localTime: wrappedTime - start,
+            };
+          }
+        }
+
+        const lastClip = data.clips[data.clips.length - 1];
+        return {
+          clip: lastClip,
+          globalTime: wrappedTime,
+          localTime: Math.max(0, wrappedTime - Number(lastClip.start || 0)),
+        };
+      }
+
+      async function loadTimeline(reason) {
+        const nextTimeline = await fetch(`/timeline.json?ts=${Date.now()}`, {
+          cache: "no-store",
+        }).then((response) => response.json());
+
+        timeline = nextTimeline;
+        lastRenderedSignature = "";
+        statusEl.textContent = `timeline loaded (${reason})`;
+      }
+
+      function renderFrame() {
+        const nowSeconds = Date.now() / 1000;
+
+        if (!timeline) {
+          requestAnimationFrame(renderFrame);
+          return;
+        }
+
+        const active = findActiveClip(timeline, nowSeconds);
+        if (!active) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          statusEl.textContent = "timeline empty";
+          requestAnimationFrame(renderFrame);
+          return;
+        }
+
+        auroraGradient(active.localTime, active.clip.params || {}, ctx, active.globalTime);
+
+        clipEl.textContent = `${active.clip.id} @ ${active.localTime.toFixed(3)}s`;
+        globalTimeEl.textContent = `${active.globalTime.toFixed(3)}s / ${timeline.duration.toFixed(3)}s`;
+        hueAEl.textContent = String(active.clip.params?.hueA ?? "-");
+        window.__activeClipId = active.clip.id;
+        window.__activeClipHueA = active.clip.params?.hueA ?? null;
+
+        const signature = timelineSignature(timeline);
+        if (pendingMeasurement && signature !== lastRenderedSignature) {
+          const latency = Date.now() - pendingMeasurement.changedAt;
+          latencyEl.textContent = `${latency} ms`;
+          statusEl.textContent = `reloaded via websocket (${pendingMeasurement.reason})`;
+          window.__lastReloadLatencyMs = latency;
+          window.__lastReloadHueA = active.clip.params?.hueA ?? null;
+          pendingMeasurement = null;
+        }
+
+        lastRenderedSignature = signature;
+        requestAnimationFrame(renderFrame);
+      }
+
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      const socket = new WebSocket(`${protocol}://${location.host}/ws`);
+
+      socket.addEventListener("open", () => {
+        statusEl.textContent = "websocket connected";
+      });
+
+      socket.addEventListener("message", async (event) => {
+        const message = JSON.parse(event.data);
+        if (message.type !== "timeline-updated") {
+          return;
+        }
+
+        pendingMeasurement = {
+          changedAt: message.changedAt,
+          reason: "fs.watch",
+        };
+        await loadTimeline("watch event");
+      });
+
+      socket.addEventListener("close", () => {
+        statusEl.textContent = "websocket disconnected";
+      });
+
+      window.__previewReady = false;
+      await loadTimeline("initial");
+      window.__previewReady = true;
+      requestAnimationFrame(renderFrame);
+    </script>
+  </body>
+</html>

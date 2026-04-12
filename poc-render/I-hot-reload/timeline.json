@@ -1,0 +1,44 @@
+{
+  "duration": 18,
+  "clips": [
+    {
+      "id": "dawn-hush",
+      "scene": "auroraGradient",
+      "start": 0,
+      "duration": 6,
+      "params": {
+        "hueA": 270,
+        "hueB": 205,
+        "hueC": 320,
+        "intensity": 0.9,
+        "grain": 0.03
+      }
+    },
+    {
+      "id": "cyan-drift",
+      "scene": "auroraGradient",
+      "start": 6,
+      "duration": 6,
+      "params": {
+        "hueA": 195,
+        "hueB": 160,
+        "hueC": 245,
+        "intensity": 1.05,
+        "grain": 0.035
+      }
+    },
+    {
+      "id": "magenta-bloom",
+      "scene": "auroraGradient",
+      "start": 12,
+      "duration": 6,
+      "params": {
+        "hueA": 320,
+        "hueB": 255,
+        "hueC": 35,
+        "intensity": 1.2,
+        "grain": 0.05
+      }
+    }
+  ]
+}

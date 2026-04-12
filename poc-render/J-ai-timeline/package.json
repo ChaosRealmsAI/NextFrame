@@ -1,0 +1,12 @@
+{
+  "name": "j-ai-timeline",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node render.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.80"
+  }
+}

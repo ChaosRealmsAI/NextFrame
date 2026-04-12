@@ -1,0 +1,66 @@
+[
+  {
+    "id": "auroraGradient",
+    "name": "Aurora Gradient",
+    "category": "Backgrounds",
+    "params": {
+      "hueA": { "type": "number", "default": 270, "min": 0, "max": 360, "ui": "hue" },
+      "hueB": { "type": "number", "default": 200, "min": 0, "max": 360, "ui": "hue" },
+      "hueC": { "type": "number", "default": 320, "min": 0, "max": 360, "ui": "hue" },
+      "intensity": { "type": "number", "default": 1, "min": 0, "max": 1.5 },
+      "grain": { "type": "number", "default": 0.04, "min": 0, "max": 0.15 }
+    },
+    "default_params": {
+      "hueA": 270,
+      "hueB": 200,
+      "hueC": 320,
+      "intensity": 1,
+      "grain": 0.04
+    },
+    "duration_hint": "10-30s"
+  },
+  {
+    "id": "kineticHeadline",
+    "name": "Kinetic Headline",
+    "category": "Typography",
+    "params": {
+      "text": { "type": "string", "default": "NEXTFRAME" },
+      "subtitle": { "type": "string", "default": "Frame-pure scene library" },
+      "hueStart": { "type": "number", "default": 30, "min": 0, "max": 360, "ui": "hue" },
+      "hueEnd": { "type": "number", "default": 320, "min": 0, "max": 360, "ui": "hue" },
+      "stagger": { "type": "number", "default": 0.18, "min": 0.05, "max": 0.5, "unit": "s" },
+      "size": { "type": "number", "default": 0.12, "min": 0.05, "max": 0.25 }
+    },
+    "default_params": {
+      "text": "NEXTFRAME",
+      "subtitle": "Frame-pure scene library",
+      "hueStart": 30,
+      "hueEnd": 320,
+      "stagger": 0.18,
+      "size": 0.12
+    },
+    "duration_hint": "3-6s"
+  },
+  {
+    "id": "lowerThirdVelvet",
+    "name": "Lower Third Velvet",
+    "category": "Overlays",
+    "params": {
+      "title": { "type": "string", "default": "NEXTFRAME" },
+      "subtitle": { "type": "string", "default": "Scene Registry Demo" },
+      "hueA": { "type": "number", "default": 20, "min": 0, "max": 360, "ui": "hue" },
+      "hueB": { "type": "number", "default": 320, "min": 0, "max": 360, "ui": "hue" },
+      "holdEnd": { "type": "number", "default": 4, "min": 0.5, "max": 20, "unit": "s" },
+      "fadeOut": { "type": "number", "default": 0.6, "min": 0.1, "max": 4, "unit": "s" }
+    },
+    "default_params": {
+      "title": "NEXTFRAME",
+      "subtitle": "Scene Registry Demo",
+      "hueA": 20,
+      "hueB": 320,
+      "holdEnd": 4,
+      "fadeOut": 0.6
+    },
+    "duration_hint": "4-8s"
+  }
+]

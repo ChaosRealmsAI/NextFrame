@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "prompt": "Create a 12-second tech product launch video timeline with intro aurora background, big product name reveal, then a tagline lower-third.",
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "duration": 12,
+  "clips": [
+    {
+      "id": "bg-aurora",
+      "sceneId": "auroraGradient",
+      "layer": 0,
+      "start": 0,
+      "duration": 12,
+      "params": {
+        "hueA": 268,
+        "hueB": 198,
+        "hueC": 322,
+        "intensity": 1.15,
+        "grain": 0.05
+      }
+    },
+    {
+      "id": "hero-headline",
+      "sceneId": "kineticHeadline",
+      "layer": 1,
+      "start": 2.4,
+      "duration": 4.8,
+      "params": {
+        "text": "NOVA ONE",
+        "subtitle": "The AI workstation for instant product storytelling",
+        "hueStart": 182,
+        "hueEnd": 328,
+        "stagger": 0.22,
+        "size": 0.145
+      }
+    },
+    {
+      "id": "tagline-lower-third",
+      "sceneId": "lowerThirdVelvet",
+      "layer": 2,
+      "start": 8,
+      "duration": 4,
+      "params": {
+        "title": "NOW SHIPPING",
+        "subtitle": "Launch faster with an AI-native creative stack",
+        "hueA": 26,
+        "hueB": 322,
+        "holdEnd": 3.2,
+        "fadeOut": 0.6
+      }
+    }
+  ]
+}

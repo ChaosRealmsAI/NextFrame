@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>POC F: Hit-Test via Id-Map Double Buffering</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #09111f;
+        --panel: rgba(10, 19, 35, 0.88);
+        --line: rgba(167, 194, 255, 0.18);
+        --text: #eef4ff;
+        --muted: #95a5c7;
+        --accent: #7fd0ff;
+        --accent-strong: #ffd166;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top, rgba(53, 94, 181, 0.24), transparent 36%),
+          radial-gradient(circle at bottom right, rgba(255, 209, 102, 0.12), transparent 28%),
+          linear-gradient(180deg, #07101c 0%, #04070e 100%);
+      }
+
+      .shell {
+        width: min(1440px, 100%);
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .panel {
+        padding: 18px 18px 14px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--panel);
+        box-shadow: 0 20px 80px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(16px);
+      }
+
+      .header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 24px;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 14px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 1.35rem;
+        letter-spacing: 0.02em;
+      }
+
+      .subtitle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        max-width: 60ch;
+        line-height: 1.45;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+
+      .toolbar button {
+        appearance: none;
+        border: 1px solid rgba(127, 208, 255, 0.26);
+        border-radius: 999px;
+        padding: 10px 14px;
+        color: var(--text);
+        background: rgba(14, 26, 47, 0.92);
+        cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+      }
+
+      .toolbar button:hover {
+        transform: translateY(-1px);
+        border-color: rgba(127, 208, 255, 0.52);
+      }
+
+      .toolbar button.active {
+        background: rgba(127, 208, 255, 0.16);
+        border-color: rgba(127, 208, 255, 0.8);
+      }
+
+      .stats {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .viewport {
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: #050914;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16 / 9;
+      }
+
+      #idCanvas {
+        display: none;
+      }
+
+      .footer {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .notes {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .notes strong {
+        color: var(--accent-strong);
+      }
+
+      .log {
+        margin: 0;
+        padding: 12px 14px;
+        min-height: 92px;
+        border-radius: 12px;
+        border: 1px solid rgba(167, 194, 255, 0.12);
+        background: rgba(4, 8, 15, 0.8);
+        color: #b9d4ff;
+        font: 0.92rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        white-space: pre-wrap;
+      }
+
+      @media (max-width: 900px) {
+        .shell {
+          padding: 14px;
+        }
+
+        .header,
+        .toolbar {
+          gap: 10px;
+        }
+
+        .stats {
+          width: 100%;
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="panel">
+        <div class="header">
+          <div>
+            <h1 class="title">POC F: Hit-Test via Id-Map Double Buffering</h1>
+            <p class="subtitle">
+              `mousedown` samples a hidden 1920×1080 id canvas, decodes the pixel into an element id,
+              and uses that id to start dragging scene parameters.
+            </p>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <button type="button" data-scene="orbits" class="active">Scene: Orbits</button>
+          <button type="button" data-scene="text">Scene: Text</button>
+          <span class="stats" id="stats">rendering…</span>
+        </div>
+
+        <div class="viewport">
+          <canvas id="mainCanvas" width="1920" height="1080"></canvas>
+          <canvas id="idCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        </div>
+
+        <div class="footer">
+          <p class="notes" id="notes"></p>
+          <pre class="log" id="log">interaction log ready</pre>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const WIDTH = 1920;
+      const HEIGHT = 1080;
+
+      const mainCanvas = document.getElementById("mainCanvas");
+      const idCanvas = document.getElementById("idCanvas");
+      const mainCtx = mainCanvas.getContext("2d", { alpha: false });
+      const idCtx = idCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
+      const logEl = document.getElementById("log");
+      const notesEl = document.getElementById("notes");
+      const statsEl = document.getElementById("stats");
+      const buttons = [...document.querySelectorAll("[data-scene]")];
+
+      mainCtx.imageSmoothingEnabled = true;
+      idCtx.imageSmoothingEnabled = false;
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+      function encodeId(id) {
+        return [
+          id & 255,
+          (id >> 8) & 255,
+          (id >> 16) & 255,
+          255,
+        ];
+      }
+
+      function decodeId(pixel) {
+        return pixel[0] | (pixel[1] << 8) | (pixel[2] << 16);
+      }
+
+      function makeIdMap() {
+        let nextNumericId = 1;
+        const scopedToNumeric = new Map();
+        const numericToMeta = new Map();
+        let liveFrameIds = new Set();
+        let currentScene = "orbits";
+
+        return {
+          beginFrame(sceneName) {
+            currentScene = sceneName;
+            liveFrameIds = new Set();
+          },
+          register(elementId) {
+            const scopedId = currentScene + ":" + elementId;
+            let numericId = scopedToNumeric.get(scopedId);
+            if (!numericId) {
+              numericId = nextNumericId++;
+              scopedToNumeric.set(scopedId, numericId);
+              numericToMeta.set(numericId, { scene: currentScene, elementId });
+            }
+            liveFrameIds.add(numericId);
+            const [r, g, b] = encodeId(numericId);
+            return {
+              numericId,
+              color: "rgb(" + r + ", " + g + ", " + b + ")",
+            };
+          },
+          lookup(numericId) {
+            if (!numericId || !liveFrameIds.has(numericId)) {
+              return null;
+            }
+            return numericToMeta.get(numericId) || null;
+          },
+        };
+      }
+
+      const idMap = makeIdMap();
+
+      function drawBackdrop(ctx, topColor, bottomColor) {
+        const gradient = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+        gradient.addColorStop(0, topColor);
+        gradient.addColorStop(1, bottomColor);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      }
+
+      function circleLayout(circle) {
+        return {
+          left: circle.x - circle.radius,
+          top: circle.y - circle.radius,
+          size: circle.radius * 2,
+        };
+      }
+
+      function textLayout(params, ctx) {
+        const centerX = WIDTH / 2 + params.offsetX;
+        const baselineY = HEIGHT / 2 + params.offsetY;
+        ctx.save();
+        ctx.font = "700 118px Georgia, serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "alphabetic";
+        const metrics = ctx.measureText(params.title);
+        ctx.restore();
+
+        const ascent = metrics.actualBoundingBoxAscent || 92;
+        const descent = metrics.actualBoundingBoxDescent || 24;
+        return {
+          centerX,
+          baselineY,
+          width: metrics.width,
+          ascent,
+          descent,
+          left: centerX - metrics.width / 2,
+          top: baselineY - ascent,
+          height: ascent + descent,
+        };
+      }
+
+      const scenes = {
+        orbits: {
+          render(t, params, ctx) {
+            drawBackdrop(ctx, "#081227", "#030710");
+
+            ctx.save();
+            ctx.globalAlpha = 0.65;
+            for (let i = 0; i < 40; i += 1) {
+              const twinkle = 0.3 + 0.7 * Math.sin(t * 1.2 + i * 1.7) ** 2;
+              const x = (i * 317) % WIDTH;
+              const y = (i * 173) % HEIGHT;
+              ctx.fillStyle = "rgba(255,255,255," + (0.15 * twinkle).toFixed(3) + ")";
+              ctx.fillRect(x, y, 2, 2);
+            }
+            ctx.restore();
+
+            params.circles.forEach((circle, index) => {
+              const halo = 22 + Math.sin(t * 1.8 + index) * 5;
+
+              ctx.save();
+              ctx.strokeStyle = "rgba(160, 194, 255, 0.18)";
+              ctx.lineWidth = 4;
+              ctx.beginPath();
+              ctx.arc(circle.x, circle.y, circle.radius + 30, 0, Math.PI * 2);
+              ctx.stroke();
+
+              const glow = ctx.createRadialGradient(
+                circle.x,
+                circle.y,
+                circle.radius * 0.3,
+                circle.x,
+                circle.y,
+                circle.radius + 40 + halo
+              );
+              glow.addColorStop(0, circle.color);
+              glow.addColorStop(1, "rgba(0,0,0,0)");
+              ctx.fillStyle = glow;
+              ctx.beginPath();
+              ctx.arc(circle.x, circle.y, circle.radius + 44 + halo, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = circle.color;
+              ctx.beginPath();
+              ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+              ctx.fill();
+
+              ctx.fillStyle = "rgba(255,255,255,0.82)";
+              ctx.beginPath();
+              ctx.arc(circle.x - circle.radius * 0.24, circle.y - circle.radius * 0.24, circle.radius * 0.3, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            });
+
+            ctx.save();
+            ctx.fillStyle = "rgba(238, 244, 255, 0.88)";
+            ctx.font = "600 28px Segoe UI, sans-serif";
+            ctx.fillText("Drag any circle to mutate its params", 46, 54);
+            ctx.restore();
+          },
+          renderIds(_t, params, ctx, registry) {
+            params.circles.forEach((circle) => {
+              const slot = registry.register(circle.id);
+              const box = circleLayout(circle);
+              ctx.fillStyle = slot.color;
+              ctx.fillRect(box.left, box.top, box.size, box.size);
+            });
+          },
+        },
+        text: {
+          render(t, params, ctx) {
+            drawBackdrop(ctx, "#111b36", "#060812");
+
+            const sweep = ctx.createRadialGradient(
+              WIDTH * 0.52,
+              HEIGHT * 0.4,
+              120,
+              WIDTH * 0.52,
+              HEIGHT * 0.4,
+              720
+            );
+            sweep.addColorStop(0, "rgba(127, 208, 255, 0.26)");
+            sweep.addColorStop(0.55, "rgba(127, 208, 255, 0.06)");
+            sweep.addColorStop(1, "rgba(0, 0, 0, 0)");
+            ctx.fillStyle = sweep;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            const wave = Math.sin(t * 1.6) * 6;
+            const title = textLayout(params, ctx);
+
+            ctx.save();
+            ctx.textAlign = "center";
+            ctx.textBaseline = "alphabetic";
+            ctx.shadowBlur = 36;
+            ctx.shadowColor = "rgba(127, 208, 255, 0.34)";
+            ctx.fillStyle = "#eef4ff";
+            ctx.font = "700 118px Georgia, serif";
+            ctx.fillText(params.title, title.centerX, title.baselineY + wave);
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "rgba(180, 201, 241, 0.82)";
+            ctx.font = "400 32px Georgia, serif";
+            ctx.fillText("Drag the title block using the hidden id buffer", title.centerX, title.baselineY + 70 + wave);
+            ctx.restore();
+          },
+          renderIds(_t, params, ctx, registry) {
+            const slot = registry.register("title");
+            const box = textLayout(params, ctx);
+            const paddingX = 24;
+            const paddingY = 18;
+            ctx.fillStyle = slot.color;
+            ctx.fillRect(
+              box.left - paddingX,
+              box.top - paddingY,
+              box.width + paddingX * 2,
+              box.height + paddingY * 2
+            );
+          },
+        },
+      };
+
+      const sceneState = {
+        activeScene: "orbits",
+        startedAt: performance.now(),
+        drag: null,
+        frameCount: 0,
+        averageMainMs: 0,
+        averageIdMs: 0,
+        averageTotalMs: 0,
+        notes: {
+          orbits: "Orbits scene: each circle gets its own encoded id rect on the hidden canvas. <strong>Drag a circle</strong> to mutate its `x`/`y` params.",
+          text: "Text scene: the title draws normally on the visible canvas, while the hidden canvas stores a single rect hit target. <strong>Drag the title</strong> to mutate `offsetX`/`offsetY`.",
+        },
+      };
+
+      const paramsByScene = {
+        orbits: {
+          circles: [
+            { id: "orbit-circle-1", x: 310, y: 255, radius: 78, color: "rgba(122, 215, 255, 0.96)" },
+            { id: "orbit-circle-2", x: 705, y: 330, radius: 66, color: "rgba(255, 155, 197, 0.94)" },
+            { id: "orbit-circle-3", x: 1025, y: 570, radius: 90, color: "rgba(167, 124, 255, 0.9)" },
+            { id: "orbit-circle-4", x: 1380, y: 355, radius: 72, color: "rgba(124, 252, 184, 0.92)" },
+            { id: "orbit-circle-5", x: 1620, y: 760, radius: 84, color: "rgba(255, 209, 102, 0.9)" },
+          ],
+        },
+        text: {
+          title: "NextFrame",
+          offsetX: 0,
+          offsetY: 0,
+        },
+      };
+
+      function log(message) {
+        const stamp = new Date().toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const next = "[" + stamp + "] " + message;
+        logEl.textContent = next + "\n" + logEl.textContent.split("\n").slice(0, 9).join("\n");
+        console.log(message);
+      }
+
+      function updateSceneButtons() {
+        buttons.forEach((button) => {
+          button.classList.toggle("active", button.dataset.scene === sceneState.activeScene);
+        });
+        notesEl.innerHTML = sceneState.notes[sceneState.activeScene];
+      }
+
+      function getCanvasPoint(event) {
+        const rect = mainCanvas.getBoundingClientRect();
+        const scaleX = WIDTH / rect.width;
+        const scaleY = HEIGHT / rect.height;
+        return {
+          x: clamp(Math.floor((event.clientX - rect.left) * scaleX), 0, WIDTH - 1),
+          y: clamp(Math.floor((event.clientY - rect.top) * scaleY), 0, HEIGHT - 1),
+        };
+      }
+
+      function pickElement(point) {
+        const pixel = idCtx.getImageData(point.x, point.y, 1, 1).data;
+        return idMap.lookup(decodeId(pixel));
+      }
+
+      function beginDrag(hit, point) {
+        if (hit.scene === "orbits") {
+          const params = paramsByScene.orbits;
+          const circle = params.circles.find((entry) => entry.id === hit.elementId);
+          if (!circle) {
+            return null;
+          }
+          return {
+            type: "circle",
+            elementId: hit.elementId,
+            move(nextPoint) {
+              circle.x = clamp(nextPoint.x, circle.radius, WIDTH - circle.radius);
+              circle.y = clamp(nextPoint.y, circle.radius, HEIGHT - circle.radius);
+            },
+          };
+        }
+
+        if (hit.scene === "text" && hit.elementId === "title") {
+          const params = paramsByScene.text;
+          const title = textLayout(params, mainCtx);
+          const pointerOffsetX = point.x - title.centerX;
+          const pointerOffsetY = point.y - title.baselineY;
+          return {
+            type: "title",
+            elementId: hit.elementId,
+            move(nextPoint) {
+              params.offsetX = clamp(nextPoint.x - pointerOffsetX - WIDTH / 2, -720, 720);
+              params.offsetY = clamp(nextPoint.y - pointerOffsetY - HEIGHT / 2, -360, 360);
+            },
+          };
+        }
+
+        return null;
+      }
+
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          sceneState.activeScene = button.dataset.scene;
+          sceneState.drag = null;
+          updateSceneButtons();
+          log("scene switched to " + sceneState.activeScene);
+        });
+      });
+
+      mainCanvas.addEventListener("mousedown", (event) => {
+        if (event.button !== 0) {
+          return;
+        }
+        const point = getCanvasPoint(event);
+        const hit = pickElement(point);
+        if (!hit) {
+          log("hit test: empty @ " + point.x + ", " + point.y);
+          sceneState.drag = null;
+          return;
+        }
+        log("hit test: " + hit.scene + "/" + hit.elementId + " @ " + point.x + ", " + point.y);
+        sceneState.drag = beginDrag(hit, point);
+      });
+
+      window.addEventListener("mousemove", (event) => {
+        if (!sceneState.drag) {
+          return;
+        }
+        sceneState.drag.move(getCanvasPoint(event));
+      });
+
+      window.addEventListener("mouseup", () => {
+        if (!sceneState.drag) {
+          return;
+        }
+        log("drag end: " + sceneState.drag.elementId);
+        sceneState.drag = null;
+      });
+
+      window.addEventListener("mouseleave", () => {
+        sceneState.drag = null;
+      });
+
+      function renderFrame(now) {
+        const t = (now - sceneState.startedAt) / 1000;
+        const scene = scenes[sceneState.activeScene];
+        const params = paramsByScene[sceneState.activeScene];
+
+        const drawStart = performance.now();
+        scene.render(t, params, mainCtx);
+        const mainDone = performance.now();
+
+        idCtx.setTransform(1, 0, 0, 1, 0, 0);
+        idCtx.fillStyle = "rgb(0, 0, 0)";
+        idCtx.fillRect(0, 0, WIDTH, HEIGHT);
+        idMap.beginFrame(sceneState.activeScene);
+        scene.renderIds(t, params, idCtx, idMap);
+        const idDone = performance.now();
+
+        const mainMs = mainDone - drawStart;
+        const idMs = idDone - mainDone;
+        const totalMs = idDone - drawStart;
+        sceneState.frameCount += 1;
+        sceneState.averageMainMs += (mainMs - sceneState.averageMainMs) * 0.1;
+        sceneState.averageIdMs += (idMs - sceneState.averageIdMs) * 0.1;
+        sceneState.averageTotalMs += (totalMs - sceneState.averageTotalMs) * 0.1;
+
+        if (sceneState.frameCount % 12 === 0) {
+          statsEl.textContent =
+            "avg main " + sceneState.averageMainMs.toFixed(2) +
+            "ms | avg ids " + sceneState.averageIdMs.toFixed(2) +
+            "ms | avg total " + sceneState.averageTotalMs.toFixed(2) + "ms";
+        }
+
+        requestAnimationFrame(renderFrame);
+      }
+
+      updateSceneButtons();
+      log("ready: click or drag on the visible canvas");
+      requestAnimationFrame(renderFrame);
+    </script>
+  </body>
+</html>
