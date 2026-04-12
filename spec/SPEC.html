@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>NextFrame · 产品规格</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0a14;
+    --surface: #14141e;
+    --surface-2: #1e1e2c;
+    --border: #2a2a3a;
+    --text: #e8e8f0;
+    --text-dim: #8a8aa0;
+    --accent: #6366f1;
+    --accent-2: #ec4899;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 48px 32px; }
+  header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #0a0a14 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 80px 32px 60px;
+    text-align: center;
+  }
+  header h1 {
+    font-size: 64px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #6366f1, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+    letter-spacing: -0.03em;
+  }
+  header .tagline {
+    font-size: 20px;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+  header .version {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 4px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  section { margin-top: 64px; }
+  h2 {
+    font-size: 32px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+  h2 .num {
+    color: var(--text-dim);
+    font-weight: 400;
+    margin-right: 12px;
+    font-family: var(--mono);
+  }
+  h2 + .lead {
+    color: var(--text-dim);
+    font-size: 17px;
+    margin-bottom: 32px;
+    max-width: 720px;
+  }
+  h3 { font-size: 20px; font-weight: 700; margin: 24px 0 12px; }
+  p { margin-bottom: 12px; color: var(--text); }
+  code {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--surface-2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .thesis {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.05));
+    border: 1px solid var(--accent);
+    border-radius: 16px;
+    padding: 32px;
+    margin: 32px 0;
+    text-align: center;
+  }
+  .thesis .formula {
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 16px 0;
+  }
+  .thesis .why {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-top: 16px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform .15s, border-color .15s;
+  }
+  .card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .card .name {
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .desc {
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .card .meta {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+  .badge.done { background: rgba(34, 197, 94, 0.15); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.3); }
+  .badge.partial { background: rgba(245, 158, 11, 0.15); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+  .badge.todo { background: rgba(239, 68, 68, 0.15); color: var(--red); border: 1px solid rgba(239, 68, 68, 0.3); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    background: var(--surface);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  th, td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  th {
+    background: var(--surface-2);
+    font-weight: 600;
+    color: var(--text-dim);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.fast { color: var(--green); font-family: var(--mono); font-weight: 700; }
+  td.mid { color: var(--amber); font-family: var(--mono); }
+  td.slow { color: var(--red); font-family: var(--mono); }
+  td.num { font-family: var(--mono); }
+  .feature-list {
+    counter-reset: feat;
+    list-style: none;
+    margin: 16px 0;
+  }
+  .feature-list li {
+    counter-increment: feat;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px 16px 56px;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .feature-list li::before {
+    content: counter(feat);
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    width: 28px;
+    height: 28px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    font-family: var(--mono);
+  }
+  .feature-list li.advanced::before { background: var(--accent-2); }
+  .feature-list li.future::before { background: var(--text-dim); }
+  .feature-list .feat-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .feature-list .feat-desc { color: var(--text-dim); font-size: 13px; }
+  .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .gallery .item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .gallery img {
+    width: 100%;
+    height: auto;
+    display: block;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: #000;
+  }
+  .gallery .label {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+  }
+  .scope {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .scope .col {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .scope .col h4 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    color: var(--text-dim);
+  }
+  .scope ul { list-style: none; }
+  .scope li {
+    padding: 6px 0;
+    font-size: 14px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .scope .yes::before { content: "✓"; color: var(--green); font-weight: 700; }
+  .scope .no::before { content: "✗"; color: var(--red); font-weight: 700; }
+  footer {
+    margin-top: 80px;
+    padding: 32px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    border-top: 1px solid var(--border);
+  }
+  .pill {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin: 0 4px 4px 0;
+  }
+  .winner {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), transparent);
+    border-color: var(--green);
+  }
+  .winner td:first-child::after {
+    content: " 🏆";
+  }
+  .roadmap {
+    display: flex;
+    gap: 16px;
+    margin-top: 24px;
+    overflow-x: auto;
+  }
+  .roadmap .phase {
+    flex: 1;
+    min-width: 280px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .roadmap .phase.now { border-color: var(--accent); }
+  .roadmap h4 { font-size: 14px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 12px; letter-spacing: 0.05em; }
+  .roadmap .ver { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+  .roadmap .when { font-size: 12px; color: var(--text-dim); font-family: var(--mono); margin-bottom: 12px; }
+  .roadmap ul { list-style: none; }
+  .roadmap li { padding: 4px 0; font-size: 13px; color: var(--text); }
+  .roadmap li::before { content: "• "; color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NextFrame</h1>
+  <p class="tagline">AI-native frame-pure desktop video editor</p>
+  <span class="version">v0.1 · spec draft · 2026-04-12</span>
+</header>
+
+<div class="container">
+
+<!-- ================ THESIS ================ -->
+<section>
+  <h2><span class="num">00</span>核心命题</h2>
+  <p class="lead">NextFrame 的全部决策都从这一行推导。</p>
+  <div class="thesis">
+    <div>视频不是"时间线 + 时间状态"，而是函数：</div>
+    <div class="formula">render(timeline, t) → frame</div>
+    <div>给定 timeline 和任意 t，直接算出那一帧。无 cache、无累积状态。</div>
+    <div class="why">这是和剪映/Premiere/Final Cut <strong>本质上不一样</strong>的地方。它们底层是 timeline cursor + state machine，frame-pure 是函数。</div>
+  </div>
+  <p>这一点成立，下面所有东西就免费：录制、scrub、AI 编辑、并行渲染、撤销、测试。</p>
+</section>
+
+<!-- ================ POC EVIDENCE ================ -->
+<section>
+  <h2><span class="num">01</span>已验证的事实</h2>
+  <p class="lead">19 个 POC 并行验证核心命题。每条都有真实可执行的代码 + 输出。</p>
+
+  <h3>渲染路径：5 条都能出帧</h3>
+  <table>
+    <thead><tr><th>POC</th><th>引擎</th><th>时间</th><th>LOC</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr class="winner"><td>Q wgpu</td><td>GPU shader</td><td class="fast">3.69ms</td><td class="num">765</td><td>WGSL 移植，~14× 快过 CPU Rust</td></tr>
+      <tr><td>S wasm</td><td>Rust → WASM</td><td class="fast">49ms</td><td class="num">423</td><td>28KB binary，跨平台单文件</td></tr>
+      <tr><td>E rust-skia</td><td>tiny-skia</td><td class="fast">51ms</td><td class="num">397</td><td>纯 Rust port，最快 CPU</td></tr>
+      <tr><td>D napi-canvas</td><td>Skia (Node)</td><td class="mid">377ms</td><td class="num">56</td><td>JS scene drop-in，Chrome 同款渲染器</td></tr>
+      <tr><td>B node-canvas</td><td>Cairo (Node)</td><td class="mid">402ms</td><td class="num">77</td><td>JS scene drop-in，最便宜</td></tr>
+      <tr><td>A wry-snapshot</td><td>WKWebView</td><td class="slow">658ms</td><td class="num">386</td><td>同 NextFrame 桌面 shell 的引擎</td></tr>
+      <tr><td>C puppeteer</td><td>Chromium</td><td class="slow">883ms</td><td class="num">142</td><td>最高保真度，最重</td></tr>
+    </tbody>
+  </table>
+
+  <h3>架构 + 闭环验证</h3>
+  <div class="grid">
+    <div class="card">
+      <div class="name">H · 帧 → MP4 ✅</div>
+      <div class="desc">150 帧 1080p @ 30fps 全独立，ffmpeg 拼接。第一个端到端 5s 真视频。</div>
+      <div class="meta">3.4MB · h264 · 150/150 帧唯一</div>
+    </div>
+    <div class="card">
+      <div class="name">K · 8 worker 并行 ✅</div>
+      <div class="desc">300 帧分给 8 进程同时算，3.76× 加速比。frame-pure 的并行红利是真的。</div>
+      <div class="meta">130s → 35s</div>
+    </div>
+    <div class="card">
+      <div class="name">O · 音频时钟 ✅</div>
+      <div class="desc">音频是 master clock，44100/30 = 1470 整数对齐，零量化误差。1080p + AAC mono.mp4。</div>
+      <div class="meta">video + audio 流</div>
+    </div>
+    <div class="card">
+      <div class="name">M · 视频 clip ✅</div>
+      <div class="desc">外部 mp4 通过 ffmpeg seek 转伪 frame-pure，按 (src, t) 缓存，确定性。</div>
+      <div class="meta">~70ms 首帧 / 缓存命中 0ms</div>
+    </div>
+    <div class="card">
+      <div class="name">N · 跨分辨率 ✅</div>
+      <div class="desc">同 scene 在 4K / 1080p / 9:16 / 1:1 / 720 全部自适应，无 artifact。</div>
+      <div class="meta">5 输出</div>
+    </div>
+    <div class="card">
+      <div class="name">L · 多轨叠加 ✅</div>
+      <div class="desc">2 track 同 t，4 种 blend mode（screen/multiply/overlay/source-over）全过。</div>
+      <div class="meta">z-order 正确</div>
+    </div>
+    <div class="card">
+      <div class="name">P · 字幕 SRT ✅</div>
+      <div class="desc">scene 读外部 SRT 文件，按 t 选当前 cue 渲染。frame-pure 守住。</div>
+      <div class="meta">3 时间点 3 PNG</div>
+    </div>
+    <div class="card">
+      <div class="name">T · 视频 seek + speed ✅</div>
+      <div class="desc">scene 控制视频播放时间和速度（0.5×/2×/-1×），所有帧确定性。</div>
+      <div class="meta">4 速度变体</div>
+    </div>
+    <div class="card">
+      <div class="name">F · hit-test 双缓冲</div>
+      <div class="desc">scene 同步画隐藏的 id-canvas，click → readPixel → 元素 id。frame-pure 不变。</div>
+      <div class="meta">+8MB / scene</div>
+    </div>
+    <div class="card">
+      <div class="name">G · element tree</div>
+      <div class="desc">scene 不是函数是数据。geometric hit-test 自然，2.1× 写代码量。</div>
+      <div class="meta">39ms / 442 LOC</div>
+    </div>
+    <div class="card">
+      <div class="name">J · AI 写 timeline ✅</div>
+      <div class="desc">从 SCENE_MANIFEST 描述 → LLM 输出 JSON → 直接渲染。</div>
+      <div class="meta">证明 AI-native 可行</div>
+    </div>
+    <div class="card">
+      <div class="name">I · 文件监听 hot-reload</div>
+      <div class="desc">编辑 timeline.json → ws 推送 → 浏览器下一帧用新版。AI/人编辑闭环。</div>
+      <div class="meta">~100ms 延迟</div>
+    </div>
+    <div class="card">
+      <div class="name">R · scene 模块热重载</div>
+      <div class="desc">改 scene.js → fs.watch → ESM cache-bust 重 import → 下一帧用新代码。</div>
+      <div class="meta">~200ms 延迟</div>
+    </div>
+    <div class="card">
+      <div class="name">U · 21 scene 全图 ✅</div>
+      <div class="desc">所有 21 个内置 scene 渲到一张 contact sheet，1.3s 全完。</div>
+      <div class="meta">21 缩略图 + gallery.html</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================ SCENE GALLERY ================ -->
+<section>
+  <h2><span class="num">02</span>视觉资产 · 21 个内置 scene</h2>
+  <p class="lead">这是 NextFrame 的"内容词汇库"。每个都是 frame-pure 函数，可参数化。</p>
+
+  <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 16px; text-align: center;">
+    <img src="../poc-render/U-scene-gallery/contact-sheet.png" alt="21 scene contact sheet" style="max-width: 100%; height: auto; border-radius: 8px;">
+    <div style="margin-top: 12px; font-size: 12px; color: var(--text-dim);">
+      Aurora · KineticHeadline · NeonGrid · BarChartReveal · LowerThirdVelvet · Starfield · CircleRipple · Countdown · LineChart · CornerBadge · TextOverlay · ImageHero · ShapeBurst · FluidBackground · MeshGrid · DataPulse · PixelRain · OrbitRings · SpotlightSweep · GlitchText · ParticleFlow
+    </div>
+  </div>
+</section>
+
+<!-- ================ MODULES ================ -->
+<section>
+  <h2><span class="num">03</span>架构 · 9 个大模块</h2>
+  <p class="lead">物理定律到 GUI 壳子，每层职责清晰。</p>
+  <div class="grid">
+    <div class="card">
+      <div class="name">Engine <span class="badge done">✓</span></div>
+      <div class="desc">帧纯渲染核心：<code>renderAt(ctx, timeline, t)</code> + scene 调度 + 时间轴校验 + 缓动数学。<br><strong>项目的物理定律。</strong></div>
+    </div>
+    <div class="card">
+      <div class="name">Scenes <span class="badge done">✓ 21</span></div>
+      <div class="desc">视觉词汇库：N 个 <code>(t,params,ctx)→pixels</code> 函数。NextFrame 的"内容"。</div>
+    </div>
+    <div class="card">
+      <div class="name">Timeline 模型 <span class="badge partial">部分</span></div>
+      <div class="desc">JSON 文档 + 操作原语（addClip / moveClip / split）。<strong>AI 和 GUI 共用。</strong></div>
+    </div>
+    <div class="card">
+      <div class="name">Render Targets <span class="badge partial">7 路验证</span></div>
+      <div class="desc">CPU Rust / GPU wgpu / Canvas / Skia / WASM / WKWebView / Chromium。可选。</div>
+    </div>
+    <div class="card">
+      <div class="name">Export Pipeline <span class="badge done">✓ POC H</span></div>
+      <div class="desc">timeline → 帧序列 → ffmpeg → MP4。可加音频混音（O 验证）。</div>
+    </div>
+    <div class="card">
+      <div class="name">AI Bridge <span class="badge done">✓</span></div>
+      <div class="desc">JSON 操作接口：fs / scene.list / timeline.* / render / export。<strong>AI-native 入口。</strong></div>
+    </div>
+    <div class="card">
+      <div class="name">Asset Pipeline <span class="badge done">✓ M+T</span></div>
+      <div class="desc">用户图/视频/音频/SRT 怎么进 frame-pure 模型 — 通过 cache + seek 包装。</div>
+    </div>
+    <div class="card">
+      <div class="name">Shell <span class="badge partial">骨架</span></div>
+      <div class="desc">桌面窗口：wry+tao 开窗 + native 菜单/对话框。人类界面容器。</div>
+    </div>
+    <div class="card">
+      <div class="name">Editor UI <span class="badge todo">v0.2</span></div>
+      <div class="desc">人类 GUI：5 区布局、库、预览、时间线、属性面板。<strong>可选层。</strong></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================ FEATURES ================ -->
+<section>
+  <h2><span class="num">04</span>用户能做的事 · 三层</h2>
+  <p class="lead">每条都是用户视角的动作。不写技术。</p>
+
+  <h3>核心 6 件（缺一不算 NextFrame）</h3>
+  <ol class="feature-list">
+    <li>
+      <div class="feat-name">打开/保存 .nfproj</div>
+      <div class="feat-desc">timeline JSON 文档生命周期。可被 AI、CLI、GUI 读写。</div>
+    </li>
+    <li>
+      <div class="feat-name">浏览 scene 库 + 拖到时间线</div>
+      <div class="feat-desc">21 个内置 scene 可视化挑选 + 拖出 clip。</div>
+    </li>
+    <li>
+      <div class="feat-name">预览播放 / 拖动时间线</div>
+      <div class="feat-desc">看到自己的工作。frame-pure 让任意 t 都能立刻渲。</div>
+    </li>
+    <li>
+      <div class="feat-name">改 scene 参数 → 即时看见结果</div>
+      <div class="feat-desc">这是"frame-pure"对用户的真实意义：<strong>无延迟</strong>。</div>
+    </li>
+    <li>
+      <div class="feat-name">导出 MP4</div>
+      <div class="feat-desc">终点产物。video + audio 流。</div>
+    </li>
+    <li>
+      <div class="feat-name">AI 一句话 → 完整 timeline</div>
+      <div class="feat-desc">"做一个 12 秒的产品发布开场" → JSON。<strong>AI-native 的真表达。</strong></div>
+    </li>
+  </ol>
+
+  <h3>进阶 6 件（区分 NextFrame 和"剪映 clone"）</h3>
+  <ol class="feature-list">
+    <li class="advanced">
+      <div class="feat-name">预览里直接拖动 scene 元素</div>
+      <div class="feat-desc">点 scene 里的某个元素 → 出选中框 → 拖 → 改参数 → 下一帧立即生效。Direct manipulation。</div>
+    </li>
+    <li class="advanced">
+      <div class="feat-name">关键帧 / 参数动画</div>
+      <div class="feat-desc">任意数值参数都可以打 keyframe，scene 自然有动画。</div>
+    </li>
+    <li class="advanced">
+      <div class="feat-name">多轨道 layer 合成</div>
+      <div class="feat-desc">V1 + V2 同时画，z 顺序、blend mode（screen/multiply/overlay…）。</div>
+    </li>
+    <li class="advanced">
+      <div class="feat-name">导入用户素材</div>
+      <div class="feat-desc">视频、图片、音频、字幕真世界资产塞进 frame-pure 模型。</div>
+    </li>
+    <li class="advanced">
+      <div class="feat-name">AI 操作产品（不只是生成）</div>
+      <div class="feat-desc">AI 能 click、能 drag、能截图看结果、能改 JSON 修 bug。CLI + bridge 即可。</div>
+    </li>
+    <li class="advanced">
+      <div class="feat-name">模板 / preset</div>
+      <div class="feat-desc">起手式：开 NextFrame → 选模板 → 改文字 → 出片。</div>
+    </li>
+  </ol>
+
+  <h3>未来 5 件（v0.2+）</h3>
+  <ol class="feature-list">
+    <li class="future"><div class="feat-name">实时协作 / 多人编辑</div></li>
+    <li class="future"><div class="feat-name">云渲染 / 分布式 export（K POC 已证）</div></li>
+    <li class="future"><div class="feat-name">插件系统（社区写 scene）</div></li>
+    <li class="future"><div class="feat-name">移动端 / Web 版</div></li>
+    <li class="future"><div class="feat-name">直播流 / OBS 替代</div></li>
+  </ol>
+</section>
+
+<!-- ================ TECH DECISIONS ================ -->
+<section>
+  <h2><span class="num">05</span>技术决策（POC 已答）</h2>
+  <p class="lead">19 个 POC 把所有"用什么"问题都问完了。</p>
+
+  <h3>渲染引擎选什么？</h3>
+  <p><strong>分两条路并存：</strong></p>
+  <ul style="margin-left: 24px; margin-top: 8px;">
+    <li><strong>开发期 / 编辑器预览</strong>：D napi-canvas（drop-in JS scene，377ms 单帧，作者写 scene 不用 port 到任何其他语言）</li>
+    <li><strong>导出期 / 终极性能</strong>：Q wgpu（3.69ms 单帧，14× 快，scene 需要 port 到 WGSL，但只有"top scene"需要 port）</li>
+    <li><strong>跨平台单文件</strong>：S wasm（49ms，28KB，浏览器/node/CLI 都能跑）</li>
+  </ul>
+
+  <h3>scene 模型 — 函数 or 数据？</h3>
+  <p>POC F 和 G 给了答案：<strong>frame-pure 函数留作"内置库的实现方式"</strong>，因为写起来短 2.1×。但<strong>预览里的 direct manipulation 通过 G 的 element-tree 模型表达</strong>，编辑器把函数渲染的结果当背景，覆一层可拖拽的元素树。两者并存。</p>
+
+  <h3>AI 怎么操作？</h3>
+  <p>POC J 证明：<strong>不需要 GUI 自动化</strong>。AI 直接读 SCENE_MANIFEST + 写 timeline.json + 调 <code>nextframe render --t X</code> 看结果。CLI + JSON 是 AI-native 的全部。</p>
+
+  <h3>导出靠谁？</h3>
+  <p>POC H 证明：<strong>自己写 ffmpeg pipe 几十行就够</strong>。不需要外部 recorder 二进制。</p>
+
+  <h3>音频怎么同步？</h3>
+  <p>POC O 证明：<strong>audio 是 master clock</strong>，video frame 从 sample index 推导。44100Hz / 30fps = 1470，整数对齐，零误差。</p>
+</section>
+
+<!-- ================ SCOPE ================ -->
+<section>
+  <h2><span class="num">06</span>边界 · 做和不做</h2>
+  <div class="scope">
+    <div class="col">
+      <h4>做</h4>
+      <ul>
+        <li class="yes">frame-pure scene 库（持续扩）</li>
+        <li class="yes">JSON timeline 作为 source of truth</li>
+        <li class="yes">CLI 能完整使用 NextFrame</li>
+        <li class="yes">desktop 单文件二进制</li>
+        <li class="yes">macOS 优先（先打透）</li>
+        <li class="yes">本地优先（不依赖云）</li>
+        <li class="yes">AI agent first-class user</li>
+        <li class="yes">video + audio + 字幕 真混音</li>
+        <li class="yes">Direct manipulation in preview</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>不做</h4>
+      <ul>
+        <li class="no">3A 游戏 CG / 电影级 VFX</li>
+        <li class="no">骨骼动画 / Live2D</li>
+        <li class="no">DAW（不是音乐制作工具）</li>
+        <li class="no">AI 视频生成本身（只编辑 AI 素材）</li>
+        <li class="no">移动端 / 浏览器云端版（v0.1）</li>
+        <li class="no">直播推流（v0.2）</li>
+        <li class="no">跨平台 Linux/Windows（v0.2）</li>
+        <li class="no">框架（不用 Tauri/Electron/React/Vue）</li>
+        <li class="no">"剪映 clone"（不复制别人的 UX）</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================ ROADMAP ================ -->
+<section>
+  <h2><span class="num">07</span>路线图</h2>
+  <p class="lead">骨架 → 闭环 → 体验 → 扩展。一次只做一件事。</p>
+
+  <div class="roadmap">
+    <div class="phase now">
+      <h4>当前</h4>
+      <div class="ver">v0.0.1 → v0.1</div>
+      <div class="when">2026-04（POC 阶段）</div>
+      <ul>
+        <li>19 POC 跑完 ✓</li>
+        <li>定方案（Q+D+G）</li>
+        <li>建 nextframe-cli</li>
+        <li>render / export 走通</li>
+        <li>10 最佳 scene 整理</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <h4>下一站</h4>
+      <div class="ver">v0.1</div>
+      <div class="when">~3 周</div>
+      <ul>
+        <li>CLI 端到端完整</li>
+        <li>AI bridge + sandbox</li>
+        <li>21 scene → 10 精选</li>
+        <li>nextframe serve（hot-reload 预览）</li>
+        <li>nextframe render / export 子命令</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <h4>之后</h4>
+      <div class="ver">v0.2</div>
+      <div class="when">~3 个月</div>
+      <ul>
+        <li>桌面 GUI（基于 v0.1 核心）</li>
+        <li>直接拖拽预览（POC G→产品）</li>
+        <li>素材导入面板</li>
+        <li>keyframes UI</li>
+        <li>导出对话框 + ffmpeg mux</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <h4>再之后</h4>
+      <div class="ver">v0.3</div>
+      <div class="when">~6 个月</div>
+      <ul>
+        <li>scene 插件系统</li>
+        <li>云分布式 export</li>
+        <li>Linux/Windows</li>
+        <li>模板市场</li>
+        <li>多人协作</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ================ DECISIONS NEEDED ================ -->
+<section>
+  <h2><span class="num">08</span>等你决定的事</h2>
+  <ul style="margin-left: 24px; line-height: 2;">
+    <li><strong>核心命题接受？</strong> "frame-pure + JSON + AI-native" 是 NextFrame 的不变式吗？</li>
+    <li><strong>核心 6 + 进阶 6 = NextFrame v1。</strong>这个范围你接受吗？删/加哪几条？</li>
+    <li><strong>Editor UI 是 v0.1 还是 v0.2？</strong>v0.1 ≡ "CLI + AI + JSON" 的话，GUI 推到 v0.2，工程量减半。</li>
+    <li><strong>直接拖元素（功能 7）算 v0.1 还是 v0.2？</strong>影响 scene 模型架构选择。</li>
+    <li><strong>21 个 scene 哪 10 个值得留？</strong>你看 contact sheet 选。</li>
+  </ul>
+</section>
+
+<footer>
+  NextFrame · v0.1 spec draft · 2026-04-12 · 19 POC validated · poc-render/ for sources<br>
+  打开 <code>poc-render/U-scene-gallery/gallery.html</code> 看完整 scene 库
+</footer>
+
+</div>
+
+</body>
+</html>
