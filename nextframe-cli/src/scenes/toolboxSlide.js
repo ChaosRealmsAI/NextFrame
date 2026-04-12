@@ -331,9 +331,7 @@ export function toolboxSlide(t, params = {}, ctx) {
   const dur = params.duration || 32;
   const p1End = params.p1Duration || 12;
 
-  // background
-  ctx.fillStyle = BG;
-  ctx.fillRect(0, 0, W, H);
+  // no background — transparent layer, composited with other tracks
 
   const pad = { x: W * 0.06, y: H * 0.06 };
 
