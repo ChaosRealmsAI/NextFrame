@@ -18,6 +18,7 @@ import { pixelRain } from "./pixelRain.js";
 import { shapeBurst } from "./shapeBurst.js";
 import { spotlightSweep } from "./spotlightSweep.js";
 import { starfield } from "./starfield.js";
+import { svgOverlay } from "./svgOverlay.js";
 import { textOverlay } from "./textOverlay.js";
 import { vignette } from "./vignette.js";
 import { ccFrame } from "./ccFrame.js";
@@ -25,6 +26,8 @@ import { ccBigNumber } from "./ccBigNumber.js";
 import { ccPill } from "./ccPill.js";
 import { ccNote } from "./ccNote.js";
 import { ccDesc } from "./ccDesc.js";
+import { markdownSlide } from "./markdownSlide.js";
+import { lottieAnim } from "./lottieAnim.js";
 import { assertSceneContract, assertNoDuplicateIds } from "./_contract.js";
 
 const p = (name, type, fallback, extra = {}) => ({ name, type, default: fallback, ...extra });
@@ -52,6 +55,9 @@ export const META_TABLE = {
   cornerBadge: { category: "Overlays", description: "Corner ribbon badge with label and subtitle", duration_hint: 5, params: [p("label", "string", "BREAKING", { semantic: "headline label" }), p("subtitle", "string", "SCENE LIBRARY EXPANDS", { semantic: "small text" }), p("hue", "number", 346, { range: [0, 360], semantic: "main hue" }), p("accentHue", "number", 32, { range: [0, 360], semantic: "accent hue" }), p("inset", "number", 0.045, { range: [0.01, 0.12], semantic: "inset ratio" })] },
   textOverlay: { category: "Overlays", description: "Generic positioned text overlay", duration_hint: 4, params: [p("text", "string", "Your text here", { required: true, semantic: "text" }), p("fontSize", "number", 96, { range: [16, 240], semantic: "font px" }), p("color", "string", "#ffffff", { semantic: "text color hex" }), p("align", "enum", "center", { options: ["left", "center", "right"], semantic: "align" }), p("anchor", "enum", "center", { options: ["top-left", "top-center", "top-right", "center", "bottom-left", "bottom-center", "bottom-right"], semantic: "anchor" }), p("weight", "string", "800", { semantic: "font weight" }), p("letterSpacing", "number", -0.02, { range: [-0.2, 0.3], semantic: "letter spacing" }), p("enterDur", "number", 0.6, { range: [0.1, 3], semantic: "enter dur s" }), p("holdDur", "number", 2.5, { range: [0, 12], semantic: "hold dur s" })] },
   vignette: { category: "Overlays", description: "Radial darken toward corners", duration_hint: 10, params: [p("intensity", "number", 0.7, { range: [0, 1], semantic: "darken strength" }), p("hue", "number", 240, { range: [0, 360], semantic: "corner tint hue" }), p("radius", "number", 0.75, { range: [0.2, 1.2], semantic: "gradient radius" })] },
+  svgOverlay: { category: "Browser", description: "SVG markup rendered via Chrome", duration_hint: 8, params: [p("svg", "string", "<svg></svg>")] },
+  markdownSlide: { category: "Browser", description: "Markdown rendered as styled slide", duration_hint: 8, params: [p("md", "string", "# Hello"), p("theme", "string", "anthropic-warm")] },
+  lottieAnim: { category: "Browser", description: "Lottie JSON animation frame", duration_hint: 6, params: [p("src", "string", ""), p("frame", "number", 0)] },
   ccFrame: { category: "Series", description: "Anthropic-warm slide shell with brand chrome", duration_hint: 72, params: [p("tag", "string", "OPC · 王宇轩"), p("series", "string", "《深入浅出 Claude Code 源代码》"), p("subtitle", "string", "以终为始：从最终提示词倒推逻辑"), p("ep", "string", "E01"), p("duration", "number", 72.42)] },
   ccBigNumber: { category: "Series", description: "Giant serif number + label", duration_hint: 10, params: [p("number", "string", "87"), p("label", "string", "类提示词")] },
   ccPill: { category: "Series", description: "Monospace label pill with accent border", duration_hint: 10, params: [p("text", "string", "ANTHROPIC CONFIDENTIAL · LEAKED"), p("x", "number", 0.5), p("y", "number", 0.28)] },
@@ -59,7 +65,7 @@ export const META_TABLE = {
   ccDesc: { category: "Series", description: "Italic mono centered description", duration_hint: 10, params: [p("text", "string", "我数过了。"), p("x", "number", 0.5), p("y", "number", 0.64), p("delay", "number", 1.0)] },
 };
 
-export const RENDER_FNS = { auroraGradient, barChartReveal, circleRipple, cornerBadge, countdown, dataPulse, fluidBackground, glitchText, imageHero, kineticHeadline, lineChart, lowerThirdVelvet, meshGrid, neonGrid, orbitRings, particleFlow, pixelRain, shapeBurst, spotlightSweep, starfield, textOverlay, vignette, ccFrame, ccBigNumber, ccPill, ccNote, ccDesc };
+export const RENDER_FNS = { auroraGradient, barChartReveal, circleRipple, cornerBadge, countdown, dataPulse, fluidBackground, glitchText, imageHero, kineticHeadline, lineChart, lowerThirdVelvet, meshGrid, neonGrid, orbitRings, particleFlow, pixelRain, shapeBurst, spotlightSweep, starfield, svgOverlay, markdownSlide, lottieAnim, textOverlay, vignette, ccFrame, ccBigNumber, ccPill, ccNote, ccDesc };
 
 function defaultParamsOf(meta) {
   const out = {};

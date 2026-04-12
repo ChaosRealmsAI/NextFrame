@@ -10,6 +10,7 @@ const SUBCOMMANDS = {
   gantt: () => import("../src/cli/gantt.js"),
   describe: () => import("../src/cli/describe.js"),
   ascii: () => import("../src/cli/ascii.js"),
+  "bake-browser": () => import("../src/cli/bakeBrowser.js"),
   new: () => import("../src/cli/new.js"),
   "add-clip": () => import("../src/cli/ops.js"),
   "move-clip": () => import("../src/cli/ops.js"),
@@ -38,6 +39,7 @@ SUBCOMMANDS
   ascii <timeline.json> <t> [--width N]       ASCII art preview of a frame
   gantt <timeline.json>                       ASCII gantt
   scenes                                      list all scenes with META
+  bake-browser <timeline.json>                bake html/svg/markdown/lottie browser scenes
   add-clip <timeline.json> ...                add a clip to a track
   move-clip <timeline.json> <clipId> ...      move a clip's start time
   resize-clip <timeline.json> <clipId> ...    resize clip duration

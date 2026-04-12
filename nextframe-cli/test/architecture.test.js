@@ -17,7 +17,7 @@ const ROOT = resolve(HERE, "..");
 const SRC_ROOT = resolve(ROOT, "src");
 const PREVIEW_ROOT = resolve(ROOT, "preview");
 const IMPORT_RE = /^\s*import\s+(?:[^"'`]*?\s+from\s+)?["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)/gm;
-const REQUIRED_SUBCOMMANDS = ["new", "validate", "frame", "render", "describe", "gantt", "scenes", "add-clip", "move-clip", "resize-clip", "remove-clip", "set-param"];
+const REQUIRED_SUBCOMMANDS = ["new", "validate", "frame", "render", "describe", "gantt", "scenes", "bake-browser", "add-clip", "move-clip", "resize-clip", "remove-clip", "set-param"];
 
 test("arch-1 layer graph", () => {
   const files = [...walk(resolve(ROOT, "src"), [".js"]), ...walk(resolve(ROOT, "preview"), [".js", ".mjs"])];
