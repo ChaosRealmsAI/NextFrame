@@ -1,7 +1,10 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub fn absolute_path(path: &Path) -> Result<PathBuf, String> {
     if path.is_absolute() {
@@ -15,12 +18,13 @@ pub fn absolute_path(path: &Path) -> Result<PathBuf, String> {
 
 pub fn create_temp_dir() -> Result<PathBuf, String> {
     let unique = format!(
-        "recorder-{}-{}",
+        "recorder-{}-{}-{}",
         std::process::id(),
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
-            .as_millis()
+            .as_millis(),
+        TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed)
     );
     let dir = env::temp_dir().join(unique);
     fs::create_dir_all(&dir)
@@ -84,4 +88,45 @@ pub fn free_memory_mb() -> Option<f64> {
         })
         .sum::<f64>();
     Some(pages * page_size / 1024.0 / 1024.0)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn absolute_path_converts_relative_paths() -> Result<(), String> {
+        let relative = Path::new("relative/path.html");
+        let absolute = absolute_path(relative)?;
+
+        assert_eq!(absolute, env::current_dir().map_err(|err| err.to_string())?.join(relative));
+        assert!(absolute.is_absolute());
+        Ok(())
+    }
+
+    #[test]
+    fn absolute_path_preserves_absolute_paths() -> Result<(), String> {
+        let path = env::temp_dir().join("already-absolute.html");
+
+        assert_eq!(absolute_path(&path)?, path);
+        Ok(())
+    }
+
+    #[test]
+    fn auto_jobs_returns_positive_count() {
+        assert!(auto_jobs(1.0) > 0);
+    }
+
+    #[test]
+    fn create_temp_dir_creates_directory() -> Result<(), String> {
+        let dir = create_temp_dir()?;
+
+        assert!(dir.exists());
+        assert!(dir.is_dir());
+
+        fs::remove_dir_all(dir).map_err(|err| err.to_string())?;
+        Ok(())
+    }
 }

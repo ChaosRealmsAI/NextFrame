@@ -6,6 +6,11 @@ mod srt;
 pub(crate) mod timeline;
 mod types;
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
+mod tests;
+
 use std::fs;
 use std::path::Path;
 
@@ -22,7 +27,10 @@ pub use types::SubtitleCue;
 pub(crate) use types::{FrameMetadata, SlideType};
 
 pub fn detect_slide_type(html_content: &str) -> SlideType {
-    if html_content.contains("<clip-slide") || html_content.contains("clip-slide.js") {
+    if html_content.contains("<clip-slide")
+        || html_content.contains("clip-slide.js")
+        || html_content.contains("<video")
+    {
         SlideType::Clip
     } else if html_content.contains("<bridge-slide") || html_content.contains("bridge-slide.js") {
         SlideType::Bridge
