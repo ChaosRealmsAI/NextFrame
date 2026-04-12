@@ -144,6 +144,8 @@ use export::{
 #[cfg(test)]
 use export_runner::{cleanup_intermediate_video, copy_video_output, create_export_log_path};
 #[cfg(test)]
+use ffmpeg::{build_ffmpeg_command, parse_audio_sources, secs_to_millis};
+#[cfg(test)]
 use recorder_bridge::{
     build_recording_url, decode_file_url_path, resolve_recorder_frame_path_from_url,
     RecorderRequest,

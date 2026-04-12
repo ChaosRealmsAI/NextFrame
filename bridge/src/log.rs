@@ -8,6 +8,12 @@ pub(crate) fn handle_log(params: &Value) -> Result<Value, String> {
 
     trace_log!("[webview][{level}] {message}");
 
+    // AI command results — write to result file for CLI to read
+    if level == "cmd_result" || level == "cmd_error" {
+        let result_path = std::env::temp_dir().join("nextframe-cmd-result.txt");
+        let _ = std::fs::write(&result_path, message);
+    }
+
     Ok(json!({
         "logged": true,
         "level": level,

@@ -24,36 +24,36 @@ pub(super) static DATA_CUE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"data-cue\s*=\s*['"](\d+)['"]"#).unwrap());
 
 #[derive(Debug, Deserialize)]
-struct SegmentsManifest {
+pub(super) struct SegmentsManifest {
     #[serde(rename = "audioBase")]
     #[serde(default)]
-    audio_base: Option<String>,
+    pub(super) audio_base: Option<String>,
     #[serde(rename = "srtBase")]
     #[serde(default)]
-    srt_base: Option<String>,
+    pub(super) srt_base: Option<String>,
     #[serde(default)]
-    cover: Option<SpecialSegment>,
+    pub(super) cover: Option<SpecialSegment>,
     #[serde(default)]
-    ending: Option<SpecialSegment>,
+    pub(super) ending: Option<SpecialSegment>,
     #[serde(default)]
-    segments: Vec<ManifestSegment>,
+    pub(super) segments: Vec<ManifestSegment>,
 }
 
 #[derive(Debug, Deserialize)]
-struct SpecialSegment {
+pub(super) struct SpecialSegment {
     #[serde(default)]
-    audio: Option<String>,
+    pub(super) audio: Option<String>,
     #[serde(default)]
-    srt: Option<String>,
+    pub(super) srt: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct ManifestSegment {
-    id: usize,
+pub(super) struct ManifestSegment {
+    pub(super) id: usize,
     #[serde(default)]
-    audio: Option<String>,
+    pub(super) audio: Option<String>,
     #[serde(default)]
-    srt: Option<String>,
+    pub(super) srt: Option<String>,
 }
 
 #[derive(Debug)]
@@ -72,6 +72,13 @@ pub(super) fn max_data_cue(html: &str) -> Option<usize> {
         .max()
 }
 
+pub(super) fn parse_segments_manifest(source: &str) -> Result<SegmentsManifest, String> {
+    let mut manifest: SegmentsManifest = serde_json::from_str(source)
+        .map_err(|err| format!("failed to parse segments manifest: {err}"))?;
+    manifest.segments.sort_by_key(|entry| entry.id);
+    Ok(manifest)
+}
+
 pub(super) fn load_manifest_fallback(html_path: &Path) -> Result<Option<ManifestFallback>, String> {
     let manifest_path = html_path
         .parent()
@@ -86,7 +93,7 @@ pub(super) fn load_manifest_fallback(html_path: &Path) -> Result<Option<Manifest
 
     let manifest_source = fs::read_to_string(&manifest_path)
         .map_err(|err| format!("failed to read {}: {err}", manifest_path.display()))?;
-    let manifest: SegmentsManifest = serde_json::from_str(&manifest_source)
+    let manifest = parse_segments_manifest(&manifest_source)
         .map_err(|err| format!("failed to parse {}: {err}", manifest_path.display()))?;
     let manifest_dir = manifest_path
         .parent()
