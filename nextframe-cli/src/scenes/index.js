@@ -6,6 +6,7 @@ import { countdown } from "./countdown.js";
 import { dataPulse } from "./dataPulse.js";
 import { fluidBackground } from "./fluidBackground.js";
 import { glitchText } from "./glitchText.js";
+import { htmlSlide } from "./htmlSlide.js";
 import { imageHero } from "./imageHero.js";
 import { kineticHeadline } from "./kineticHeadline.js";
 import { lineChart } from "./lineChart.js";
@@ -33,6 +34,7 @@ const p = (name, type, fallback, extra = {}) => ({ name, type, default: fallback
 export const META_TABLE = {
   auroraGradient: { category: "Backgrounds", description: "Drifting hue gradient with deterministic film grain", duration_hint: 12, params: [p("hueA", "number", 270, { range: [0, 360], semantic: "primary hue" }), p("hueB", "number", 200, { range: [0, 360], semantic: "secondary hue" }), p("hueC", "number", 320, { range: [0, 360], semantic: "tertiary hue" }), p("intensity", "number", 1, { range: [0, 1.5], semantic: "color intensity" }), p("grain", "number", 0.04, { range: [0, 0.15], semantic: "film grain" })], ai_prompt_example: "Use as a background for the entire video with hueA=270 violet" },
   fluidBackground: { category: "Backgrounds", description: "Multi-blob fluid background, blurred and drifting", duration_hint: 12, params: [p("blobCount", "number", 5, { range: [1, 8], semantic: "blob count" }), p("hueA", "number", 210, { range: [0, 360], semantic: "primary hue" }), p("hueB", "number", 290, { range: [0, 360], semantic: "secondary hue" }), p("hueC", "number", 340, { range: [0, 360], semantic: "tertiary hue" }), p("intensity", "number", 0.6, { range: [0, 1.5], semantic: "intensity" }), p("drift", "number", 0.4, { range: [0, 1], semantic: "drift speed" }), p("blur", "number", 80, { range: [0, 160], semantic: "blur radius px" })] },
+  htmlSlide: { category: "Browser", description: "HTML+CSS rendered via headless Chrome", duration_hint: 10, params: [p("html", "string", "<div>Hello</div>", { semantic: "HTML content string" })] },
   imageHero: { category: "Media", description: "Hero image with ken-burns zoom and pan", duration_hint: 8, params: [p("src", "string", null, { semantic: "image path or url" }), p("fit", "enum", "cover", { options: ["cover", "contain"], semantic: "fit mode" }), p("zoomStart", "number", 1, { range: [0.5, 2.5], semantic: "start zoom" }), p("zoomEnd", "number", 1.15, { range: [0.5, 3], semantic: "end zoom" }), p("panX", "number", 0.05, { range: [-0.5, 0.5], semantic: "x pan" }), p("panY", "number", -0.03, { range: [-0.5, 0.5], semantic: "y pan" })] },
   videoClip: { category: "Browser", description: "Frame from external video file", duration_hint: 10, params: [p("src", "string", "", { semantic: "video file path" }), p("offset", "number", 0, { semantic: "source time offset" }), p("fps", "number", 30)] },
   kineticHeadline: { category: "Typography", description: "Big animated headline + subtitle reveal", duration_hint: 5, params: [p("text", "string", "NEXTFRAME", { required: true, semantic: "headline text" }), p("subtitle", "string", "Frame-pure scene library", { semantic: "subtitle" }), p("hueStart", "number", 30, { range: [0, 360], semantic: "start hue" }), p("hueEnd", "number", 320, { range: [0, 360], semantic: "end hue" }), p("stagger", "number", 0.18, { range: [0.05, 0.5], semantic: "letter stagger" }), p("size", "number", 0.12, { range: [0.05, 0.25], semantic: "font size ratio" })], ai_prompt_example: "Show product name in the body chapter" },
@@ -61,7 +63,7 @@ export const META_TABLE = {
   ccDesc: { category: "Series", description: "Italic mono centered description", duration_hint: 10, params: [p("text", "string", "我数过了。"), p("x", "number", 0.5), p("y", "number", 0.64), p("delay", "number", 1.0)] },
 };
 
-export const RENDER_FNS = { auroraGradient, barChartReveal, circleRipple, cornerBadge, countdown, dataPulse, fluidBackground, glitchText, imageHero, videoClip, kineticHeadline, lineChart, lowerThirdVelvet, meshGrid, neonGrid, orbitRings, particleFlow, pixelRain, shapeBurst, spotlightSweep, starfield, textOverlay, vignette, ccFrame, ccBigNumber, ccPill, ccNote, ccDesc };
+export const RENDER_FNS = { auroraGradient, barChartReveal, circleRipple, cornerBadge, countdown, dataPulse, fluidBackground, glitchText, htmlSlide, imageHero, videoClip, kineticHeadline, lineChart, lowerThirdVelvet, meshGrid, neonGrid, orbitRings, particleFlow, pixelRain, shapeBurst, spotlightSweep, starfield, textOverlay, vignette, ccFrame, ccBigNumber, ccPill, ccNote, ccDesc };
 
 function defaultParamsOf(meta) {
   const out = {};

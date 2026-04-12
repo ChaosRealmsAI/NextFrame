@@ -7,6 +7,7 @@ const SUBCOMMANDS = {
   frame: () => import("../src/cli/frame.js"),
   render: () => import("../src/cli/render.js"),
   probe: () => import("../src/cli/probe.js"),
+  "bake-html": () => import("../src/cli/bakeHtml.js"),
   gantt: () => import("../src/cli/gantt.js"),
   describe: () => import("../src/cli/describe.js"),
   ascii: () => import("../src/cli/ascii.js"),
@@ -35,6 +36,7 @@ SUBCOMMANDS
   frame <timeline.json> <t> <out.png>         render single frame
   render <timeline.json> <out.mp4>            export full timeline to mp4
   probe <out.mp4>                             inspect export metadata with ffprobe
+  bake-html <timeline.json>                   pre-render htmlSlide clips into PNG cache
   describe <timeline.json> <t>                JSON of what is visible at t
   ascii <timeline.json> <t> [--width N]       ASCII art preview of a frame
   gantt <timeline.json>                       ASCII gantt

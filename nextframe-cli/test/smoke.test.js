@@ -36,7 +36,8 @@ test("scenes lists public entries with full META", () => {
   const r = runJSON(["scenes"]);
   assert.equal(r.ok, true);
   assert.ok(r.value.length >= 22, `expected at least 22 public scenes, got ${r.value.length}`);
-  assert.ok(r.value.some((scene) => scene.id === "videoClip"), "videoClip missing from scenes list");
+  assert.ok(r.value.some((scene) => scene.id === "videoClip"), "videoClip missing");
+  assert.ok(r.value.some((scene) => scene.id === "htmlSlide"), "htmlSlide missing");
   for (const s of r.value) {
     assert.ok(s.id, `scene missing id`);
     assert.ok(s.category, `${s.id} missing category`);
@@ -83,12 +84,10 @@ test("timeline ops round trip: new → set-param → move-clip → resize → re
   assert.equal(r.ok, true);
   r = runJSON(["move-clip", p, "clip-1", "1"]);
   assert.equal(r.ok, true);
-  // The default timeline has duration=5 clip-1 moves to 1 so 1+3=4 ≤ 5 ok
   r = runJSON(["remove-clip", p, "clip-1"]);
   assert.equal(r.ok, true);
   r = runJSON(["add-clip", p, "v1", '{"id":"c2","start":0,"dur":5,"scene":"starfield","params":{}}']);
   assert.equal(r.ok, true);
-  // Final timeline renders
   const tl = JSON.parse(run(["validate", p, "--json"]).stdout);
   assert.equal(tl.ok, true);
 });
