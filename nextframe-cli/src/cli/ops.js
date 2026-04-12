@@ -12,7 +12,7 @@ import {
   setParam,
 } from "../timeline/ops.js";
 import { resolveTimeline } from "../engine/time.js";
-import { getScene } from "../scenes/index.js";
+import { getSceneMeta } from "../scenes/meta.js";
 
 const FLAG_USAGE = {
   "add-clip": timelineUsage("add-clip", " --track=ID --scene=SCENE_ID --start=T --duration=N [--id=CLIP_ID] [--params=k=v,...]"),
@@ -325,7 +325,7 @@ function validateSceneParam(timeline, clipId, key, value) {
   if (!clip) {
     return { ok: false, error: { code: "CLIP_NOT_FOUND", message: `no clip "${clipId}"`, ref: clipId } };
   }
-  const meta = getScene(clip.scene)?.META;
+  const meta = getSceneMeta(clip.scene);
   if (!meta) {
     return { ok: false, error: { code: "UNKNOWN_SCENE", message: `unknown scene "${clip.scene}"`, ref: clip.scene } };
   }

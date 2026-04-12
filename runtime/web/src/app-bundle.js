@@ -1386,13 +1386,14 @@ function renderEditorNotice(message) {
     return;
   }
   prepareTimelineContainer(container);
+  const noticeDuration = Math.max(0, finiteNumber(TOTAL_DURATION, 0));
 
   container.innerHTML =
     `<div class="tl-tracks-header" style="width:148px">` +
     `<div class="tl-track-label">-</div>` +
     `</div>` +
     `<div class="tl-lanes">` +
-    `<div class="tl-lanes-inner" style="width:${Math.max(100, Math.round(duration * 80))}px">` +
+    `<div class="tl-lanes-inner" style="width:${Math.max(100, Math.round(noticeDuration * 80))}px">` +
     `<div class="tl-ruler">` +
     `<div class="tl-ruler-tick major" style="left:0px"><div class="tick-line"></div><span class="tick-label">0s</span></div>` +
     `</div>` +

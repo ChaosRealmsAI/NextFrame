@@ -179,7 +179,7 @@ test("cli-ops-5: resize-clip updates duration and returns OUT_OF_RANGE when need
   cleanup(path);
 });
 
-test("cli-ops-6: remove-clip deletes only the selected clip", () => {
+test("cli-ops-6: remove-clip deletes the selected clip and prunes empty tracks", () => {
   const path = tmpPath("cli-ops-6");
   runJson(["new", path, "--duration=10", "--json"]);
   runJson([
@@ -204,8 +204,8 @@ test("cli-ops-6: remove-clip deletes only the selected clip", () => {
   assert.equal(out.ok, true);
   assert.equal(out.removed, "kineticHeadline-1");
   const timeline = readTimeline(path);
+  assert.deepEqual(timeline.tracks.map((track) => track.id), ["v1"]);
   assert.deepEqual(timeline.tracks[0].clips.map((clip) => clip.id), ["auroraGradient-1"]);
-  assert.deepEqual(timeline.tracks[1].clips, []);
   cleanup(path);
 });
 
