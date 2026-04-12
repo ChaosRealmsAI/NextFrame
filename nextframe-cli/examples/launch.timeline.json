@@ -87,8 +87,8 @@
           "dur": 2,
           "scene": "textOverlay",
           "params": {
-            "text": "王宇轩你好",
-            "fontSize": 160,
+            "text": "HELLO YUXUAN",
+            "fontSize": 140,
             "color": "#ffe99c",
             "align": "center",
             "anchor": "center",

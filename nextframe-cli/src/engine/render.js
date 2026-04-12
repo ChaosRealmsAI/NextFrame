@@ -1,5 +1,17 @@
 // Frame renderer — given a (resolved) timeline and time t, draws into a
 // napi-canvas Canvas. Walks tracks bottom-up (tracks[0] is back).
+//
+// Multi-track compositing:
+//   - First active clip drawn directly to main canvas (source-over, sets bg).
+//   - Every subsequent active clip is drawn to its own offscreen canvas,
+//     then composited onto the main canvas with clip.blend (default "lighten"
+//     for tracks > 0, "source-over" for track 0). This lets overlay scenes
+//     (text, shapes) show through the background scene below — every scene
+//     in the v0.1 library currently paints a full opaque background, so
+//     without this step the topmost track always wins.
+//
+// Per-clip override: set { "blend": "source-over" | "lighten" | "screen" |
+// "add" | "multiply" | "overlay" | "darken" | "difference" } on the clip.
 // Frame-pure: no caches, no random, no Date.
 
 import { createCanvas } from "@napi-rs/canvas";
@@ -26,12 +38,16 @@ export function renderAt(timeline, t, opts = {}) {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
-  // Background
+  // Main-canvas background (lowest layer).
   ctx.fillStyle = resolved.background || "#000000";
   ctx.fillRect(0, 0, width, height);
 
+  let firstLayer = true;
+
   // Walk tracks bottom-up
-  for (const trk of resolved.tracks || []) {
+  const tracks = resolved.tracks || [];
+  for (let ti = 0; ti < tracks.length; ti++) {
+    const trk = tracks[ti];
     if (trk.muted) continue;
     if (trk.kind === "audio") continue; // v0.1: ignore audio tracks for video render
     for (const clip of trk.clips || []) {
@@ -41,32 +57,66 @@ export function renderAt(timeline, t, opts = {}) {
       if (t < start || t > start + dur) continue;
       const entry = REGISTRY.get(clip.scene);
       if (!entry) {
-        // Draw a red placeholder rect
-        ctx.fillStyle = "#ff0044";
-        ctx.fillRect(0, 0, width, 32);
-        ctx.fillStyle = "#fff";
-        ctx.font = "20px sans-serif";
-        ctx.fillText(`unknown scene: ${clip.scene}`, 12, 22);
+        drawMissingSceneMarker(ctx, width, clip.scene);
         continue;
       }
       const localT = t - start;
-      try {
-        ctx.save();
-        entry.render(localT, clip.params || {}, ctx, t);
-        ctx.restore();
-      } catch (err) {
-        ctx.restore();
-        // Frame-pure rule: a single scene crash must not poison the whole frame
-        ctx.fillStyle = "rgba(255,0,0,0.7)";
-        ctx.fillRect(0, height - 40, width, 40);
-        ctx.fillStyle = "#fff";
-        ctx.font = "16px sans-serif";
-        ctx.fillText(`scene "${clip.scene}" crashed: ${err.message}`, 12, height - 14);
+      const defaultBlend = firstLayer ? "source-over" : "lighten";
+      const blend = typeof clip.blend === "string" ? clip.blend : defaultBlend;
+
+      if (blend === "source-over" && firstLayer) {
+        // Direct draw into main canvas — scene fully owns background.
+        try {
+          ctx.save();
+          entry.render(localT, clip.params || {}, ctx, t);
+        } finally {
+          ctx.restore();
+        }
+      } else {
+        // Offscreen canvas — scene draws its full frame, we composite it.
+        let off;
+        try {
+          off = createCanvas(width, height);
+          const offCtx = off.getContext("2d");
+          entry.render(localT, clip.params || {}, offCtx, t);
+        } catch (err) {
+          drawCrashMarker(ctx, width, height, clip.scene, err);
+          continue;
+        }
+        try {
+          ctx.save();
+          ctx.globalCompositeOperation = blend;
+          ctx.drawImage(off, 0, 0);
+        } finally {
+          ctx.restore();
+        }
       }
+
+      firstLayer = false;
     }
   }
 
   return { ok: true, canvas, value: { width, height, t } };
+}
+
+function drawMissingSceneMarker(ctx, width, sceneId) {
+  ctx.save();
+  ctx.fillStyle = "#ff0044";
+  ctx.fillRect(0, 0, width, 32);
+  ctx.fillStyle = "#fff";
+  ctx.font = "20px sans-serif";
+  ctx.fillText(`unknown scene: ${sceneId}`, 12, 22);
+  ctx.restore();
+}
+
+function drawCrashMarker(ctx, width, height, sceneId, err) {
+  ctx.save();
+  ctx.fillStyle = "rgba(255,0,0,0.7)";
+  ctx.fillRect(0, height - 40, width, 40);
+  ctx.fillStyle = "#fff";
+  ctx.font = "16px sans-serif";
+  ctx.fillText(`scene "${sceneId}" crashed: ${err.message}`, 12, height - 14);
+  ctx.restore();
 }
 
 function needsResolve(timeline) {
