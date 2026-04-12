@@ -1223,7 +1223,8 @@ button { cursor: pointer; }
 #tl-tracks {
   display: flex;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .tl-tracks-header {
@@ -1259,7 +1260,6 @@ button { cursor: pointer; }
 
 .tl-lanes-inner {
   min-width: 100%;
-  width: 1600px;
   position: relative;
 }
 

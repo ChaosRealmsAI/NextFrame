@@ -1392,7 +1392,7 @@ function renderEditorNotice(message) {
     `<div class="tl-track-label">-</div>` +
     `</div>` +
     `<div class="tl-lanes">` +
-    `<div class="tl-lanes-inner" style="width:100%">` +
+    `<div class="tl-lanes-inner" style="width:${Math.max(100, Math.round(duration * 80))}px">` +
     `<div class="tl-ruler">` +
     `<div class="tl-ruler-tick major" style="left:0px"><div class="tick-line"></div><span class="tick-label">0s</span></div>` +
     `</div>` +
@@ -1468,7 +1468,7 @@ function renderTimeline(timeline, preferredClipId) {
   container.innerHTML =
     `<div class="tl-tracks-header" style="width:148px">${labels}</div>` +
     `<div class="tl-lanes">` +
-    `<div class="tl-lanes-inner" style="width:100%">` +
+    `<div class="tl-lanes-inner" style="width:${Math.max(100, Math.round(duration * 80))}px">` +
     `<div class="tl-ruler">${renderTimelineRuler(duration)}</div>` +
     trackRows +
     `<div class="tl-playhead" id="tl-playhead"><div class="tl-playhead-handle"></div></div>` +
