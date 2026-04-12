@@ -256,7 +256,12 @@ export function generateHarness(timeline, opts = {}) {
   // Force CSS size to match pixel size — prevents DPR scaling in WKWebView
   canvas.style.width = width + "px";
   canvas.style.height = height + "px";
-  scenes.registerAllScenes(engine);
+  try {
+    scenes.registerAllScenes(engine);
+  } catch(e) {
+    console.error("[harness] registerAllScenes failed:", e.message, e.stack);
+  }
+  console.log("[harness] registered scenes:", engine.SCENES ? engine.SCENES.size : "unknown");
   ${compatSceneRegistrationScript}
 
   // Monkey-patch getDisplaySize if the engine uses getBoundingClientRect

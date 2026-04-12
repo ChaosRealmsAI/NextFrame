@@ -11,7 +11,7 @@ use objc2::rc::{Retained, autoreleasepool};
 use objc2::runtime::AnyObject;
 use objc2_app_kit::NSImage;
 use objc2_core_graphics::CGImage;
-use objc2_foundation::{NSError, NSString};
+use objc2_foundation::{NSError, NSNumber, NSString};
 use objc2_web_kit::WKSnapshotConfiguration;
 
 use crate::capture;
@@ -54,6 +54,21 @@ impl WebViewHost {
     pub(super) fn take_snapshot_image(&self) -> Result<Retained<NSImage>, String> {
         let mtm = MainThreadMarker::new().ok_or("snapshot capture must run on the main thread")?;
         let config = unsafe { WKSnapshotConfiguration::new(mtm) };
+        let backing = self.window.convertRectToBacking(self.web_view.bounds());
+        let backing_scale = if self.view_width > 0.0 {
+            backing.size.width / self.view_width
+        } else {
+            1.0
+        }
+        .max(1.0);
+        let snapshot_width = NSNumber::numberWithUnsignedInteger(
+            ((self.target_pixel_size().0 as f64) / backing_scale)
+                .round()
+                .max(1.0) as usize,
+        );
+        unsafe {
+            config.setSnapshotWidth(Some(&snapshot_width));
+        }
         let slot: SnapshotResultSlot = Rc::new(RefCell::new(None));
         let slot_clone = slot.clone();
         let block = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {

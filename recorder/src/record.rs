@@ -99,7 +99,7 @@ pub fn record_segment(
         cli.skip_aggressive,
     );
 
-    let mut capture_method = CaptureMethod::TakeSnapshot;
+    let mut capture_method = CaptureMethod::LayerRender;
     println!(
         "  segment {} capture: {}",
         index + 1,
@@ -108,7 +108,7 @@ pub fn record_segment(
 
     let mut last_image: Option<Retained<CGImage>> = None;
     let total_frames = clock.total_frames();
-    let batch_size = 5usize;
+    let batch_size = if cli.no_skip { 1usize } else { 5usize };
     let mut frame_index = 0usize;
     while frame_index < total_frames {
         let batch_end = (frame_index + batch_size).min(total_frames);
@@ -236,7 +236,7 @@ pub fn capture_frame(
         match host.snapshot_via_layer() {
             Ok(image) => {
                 if frame_index == 0 && is_cgimage_mostly_black(&image)? {
-                    trace_log!(
+                    eprintln!(
                         "  warn seg {} frame {}: {} produced a mostly black image; falling back to {}",
                         segment_index + 1,
                         frame_index + 1,
@@ -254,7 +254,7 @@ pub fn capture_frame(
                 }
             }
             Err(err) => {
-                trace_log!(
+                eprintln!(
                     "  warn seg {} frame {}: {} failed ({err}); falling back to {}",
                     segment_index + 1,
                     frame_index + 1,

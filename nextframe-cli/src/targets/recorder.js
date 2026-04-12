@@ -36,8 +36,10 @@ async function runRecorder(binary, htmlFile, outputPath, opts) {
     "--out", outputPath,
     "--fps", String(opts.fps),
     "--crf", String(opts.crf),
+    "--dpr", String(opts.dpr),
     "--width", String(opts.width),
     "--height", String(opts.height),
+    "--no-skip",
   ];
 
   let child;
@@ -102,6 +104,7 @@ export async function exportRecorder(timeline, outputPath, opts = {}) {
   const fps = opts.fps || resolved.project?.fps || 30;
   const width = opts.width || resolved.project?.width || 1920;
   const height = opts.height || resolved.project?.height || 1080;
+  const dpr = Number.isFinite(opts.dpr) && opts.dpr > 0 ? opts.dpr : 1;
   const duration = resolved.duration;
   const totalFrames = Math.round(duration * fps);
   const crf = normalizeCrf(opts.crf);
@@ -124,6 +127,7 @@ export async function exportRecorder(timeline, outputPath, opts = {}) {
     const recorded = await runRecorder(binary, htmlPath, outputPath, {
       fps,
       crf,
+      dpr,
       width,
       height,
     });

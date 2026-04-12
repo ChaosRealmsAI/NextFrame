@@ -129,10 +129,9 @@ impl WebViewHost {
 
     /// Returns the current capture size in backing pixels.
     pub fn target_pixel_size(&self) -> (usize, usize) {
-        let backing = self.window.convertRectToBacking(self.web_view.bounds());
         (
-            backing.size.width.round().max(1.0) as usize,
-            backing.size.height.round().max(1.0) as usize,
+            (self.view_width * self.dpr).round().max(1.0) as usize,
+            (self.view_height * self.dpr).round().max(1.0) as usize,
         )
     }
 
@@ -292,7 +291,7 @@ impl WebViewHost {
                         "#,
                     )?;
                     if on_frame_check.as_deref() == Some("missing") {
-                        trace_log!(
+                        eprintln!(
                             "warning: page is missing window.__onFrame after load; \
                              recorder output may stay static until the page defines it"
                         );
