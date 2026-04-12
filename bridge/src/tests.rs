@@ -4,9 +4,14 @@ use super::{
     resolve_write_path, set_autosave_storage_path_override_for_tests,
     set_recent_storage_path_override_for_tests, AudioSource, CommandOutput, FfmpegCommand,
     MockFfmpegState, Request, MOCK_FFMPEG_TEST_LOCK,
+    // test-6: dialog helpers
+    dialog::{normalize_extension, parse_dialog_filters, with_default_extension},
     // test-7: recorder_bridge types
     build_recording_url, decode_file_url_path, resolve_recorder_frame_path_from_url,
     RecorderRequest,
+    // test-8: export helpers
+    build_export_request, export_runtime, export_status_json, next_export_pid,
+    percent_complete, remaining_secs, ExportTask, ProcessHandle, ProcessTerminal,
     // test-2: validation helpers
     validation::{
         read_optional_u8_in_range, require_array, require_object, require_positive_f64,
@@ -27,7 +32,7 @@ use std::process;
 use std::sync::{MutexGuard, OnceLock};
 use std::thread;
 use std::time::Duration;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 #[test]
 fn fs_read_dispatch_happy_and_error() {

@@ -101,7 +101,12 @@ mod tests {
         let relative = Path::new("relative/path.html");
         let absolute = absolute_path(relative)?;
 
-        assert_eq!(absolute, env::current_dir().map_err(|err| err.to_string())?.join(relative));
+        assert_eq!(
+            absolute,
+            env::current_dir()
+                .map_err(|err| err.to_string())?
+                .join(relative)
+        );
         assert!(absolute.is_absolute());
         Ok(())
     }

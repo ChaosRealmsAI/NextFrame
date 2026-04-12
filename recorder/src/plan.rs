@@ -192,7 +192,10 @@ mod tests {
 
         let files = collect_frame_files(&test_args(Some(dir.clone()), Vec::new()))?;
 
-        assert_eq!(files, vec![a.canonicalize().unwrap(), b.canonicalize().unwrap()]);
+        assert_eq!(
+            files,
+            vec![a.canonicalize().unwrap(), b.canonicalize().unwrap()]
+        );
 
         fs::remove_dir_all(dir).map_err(|err| err.to_string())?;
         Ok(())

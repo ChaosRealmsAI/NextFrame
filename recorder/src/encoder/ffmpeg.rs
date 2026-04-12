@@ -183,3 +183,76 @@ pub(super) fn mux_audio_track(
         String::from_utf8_lossy(&output.stderr)
     ))
 }
+
+#[allow(clippy::unwrap_used)]
+#[allow(clippy::expect_used)]
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use super::{build_concat_segments_args, parse_probe_audio_duration_output, secs_to_hms};
+
+    #[test]
+    fn builds_concat_segments_ffmpeg_args() {
+        let segment_paths = vec![
+            PathBuf::from("segment-0.mp4"),
+            PathBuf::from("segment 1.mp4"),
+            PathBuf::from("segment-2.mp4"),
+        ];
+        let args = build_concat_segments_args(&segment_paths, Path::new("final.mp4"));
+
+        assert_eq!(
+            args,
+            vec![
+                "-y",
+                "-i",
+                "segment-0.mp4",
+                "-i",
+                "segment 1.mp4",
+                "-i",
+                "segment-2.mp4",
+                "-filter_complex",
+                "[0:v][0:a][1:v][1:a][2:v][2:a]concat=n=3:v=1:a=1[v][a]",
+                "-map",
+                "[v]",
+                "-map",
+                "[a]",
+                "-c:v",
+                "h264_videotoolbox",
+                "-q:v",
+                "65",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-movflags",
+                "+faststart",
+                "final.mp4",
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_valid_probe_audio_duration_output() {
+        let duration = parse_probe_audio_duration_output(Path::new("audio.wav"), b"12.34567\n")
+            .expect("duration should parse");
+
+        assert!((duration - 12.34567).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn rejects_invalid_probe_audio_duration_output() {
+        let err = parse_probe_audio_duration_output(Path::new("audio.wav"), b"not-a-duration\n")
+            .expect_err("invalid duration should fail");
+
+        assert!(err.contains("audio.wav"));
+        assert!(err.contains("failed to parse ffprobe duration"));
+    }
+
+    #[test]
+    fn formats_seconds_to_hms() {
+        assert_eq!(secs_to_hms(0.0), "00:00:00.000");
+        assert_eq!(secs_to_hms(65.432), "00:01:05.432");
+        assert_eq!(secs_to_hms(3_661.25), "01:01:01.250");
+    }
+}
