@@ -316,13 +316,29 @@ function schedulePreview() {
 
 const BROWSER_SCENES = ['htmlSlide','svgOverlay','markdownSlide','lottieAnim'];
 
+function browserParamsChanged() {
+  if (!scene) return false;
+  for (const p of scene.params || []) {
+    if (paramValues[p.name] !== p.default) return true;
+  }
+  return false;
+}
+
 function fetchPreview() {
   if (!scene) return;
   const img = document.getElementById('pimg');
   const frame = document.getElementById('pframe');
   const status = document.getElementById('pstatus');
 
-  // Browser scenes: render natively in iframe
+  // Browser scenes: show thumbnail by default, switch to iframe when params change
+  if (BROWSER_SCENES.includes(scene.id) && !browserParamsChanged()) {
+    img.style.display = 'block';
+    frame.style.display = 'none';
+    img.src = `/thumbs/${scene.id}.png`;
+    img.classList.remove('loading');
+    status.textContent = 'Thumbnail · edit params to see live preview';
+    return;
+  }
   if (BROWSER_SCENES.includes(scene.id)) {
     img.style.display = 'none';
     frame.style.display = 'block';
