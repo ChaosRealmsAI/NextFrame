@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --bg-elevated: #12121e;
+  --bg-surface: #18182a;
+  --bg-hover: #1e1e30;
+  --text: #e8e4dc;
+  --text-80: rgba(232,228,220,0.8);
+  --text-60: rgba(232,228,220,0.6);
+  --text-40: rgba(232,228,220,0.4);
+  --text-20: rgba(232,228,220,0.2);
+  --accent: #8a6fae;
+  --accent-60: rgba(138,111,174,0.6);
+  --accent-20: rgba(138,111,174,0.2);
+  --accent-08: rgba(138,111,174,0.08);
+  --border: rgba(232,228,220,0.055);
+  --border-accent: rgba(138,111,174,0.22);
+  --warm: #da7756;
+  --warm-20: rgba(218,119,86,0.2);
+  --green: #7cb37a;
+  --blue: #6e9ecf;
+  --pink: #c97b9e;
+  --yellow: #c9b06e;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 100px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  width:100%; height:100%; overflow:hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.14); }
+
+/* ===== TOPBAR ===== */
+.topbar {
+  height:56px; display:flex; align-items:center; padding:0 24px;
+  border-bottom:1px solid var(--border);
+  background: var(--bg);
+  position:relative; z-index:100;
+  flex-shrink:0;
+}
+.topbar.compact { height:48px; }
+
+.logo {
+  display:flex; align-items:center; gap:10px; cursor:pointer;
+  flex-shrink:0;
+}
+.logo-icon {
+  width:24px; height:24px; border-radius:6px;
+  background: linear-gradient(135deg, var(--accent), var(--warm));
+}
+.logo-text {
+  font-weight:600; font-size:14px; letter-spacing:-0.02em;
+  color:var(--text);
+}
+
+.topbar-center { flex:1; display:flex; justify-content:center; }
+.topbar-right { display:flex; align-items:center; gap:12px; flex-shrink:0; }
+
+/* Search / Command Bar */
+.cmd-bar {
+  width:320px; height:34px; display:flex; align-items:center; gap:8px;
+  background: var(--bg-elevated);
+  border:1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding:0 14px;
+  cursor:pointer;
+  transition: border-color 0.3s var(--ease);
+  position:relative;
+}
+.cmd-bar:hover { border-color: var(--border-accent); }
+.cmd-bar .search-icon { color:var(--text-40); font-size:13px; }
+.cmd-bar .cmd-text { color:var(--text-40); font-size:12px; flex:1; }
+.cmd-bar .cmd-hint {
+  font-size:11px; color:var(--text-20);
+  border:1px solid var(--border);
+  border-radius:4px; padding:1px 6px;
+  font-family:var(--font-mono);
+}
+
+/* Avatar */
+.avatar {
+  width:30px; height:30px; border-radius:50%;
+  background: var(--accent-20);
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:600; color:var(--accent);
+  cursor:pointer;
+  border:1px solid var(--border);
+}
+
+.icon-btn {
+  width:32px; height:32px; border-radius:8px; border:none;
+  background:transparent; color:var(--text-60); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition: all 0.2s var(--ease);
+  font-size:15px;
+}
+.icon-btn:hover { background:var(--bg-hover); color:var(--text); }
+
+.btn-accent {
+  height:32px; padding:0 18px; border-radius:var(--radius-pill);
+  background:var(--accent); color:#fff; border:none;
+  font-size:12px; font-weight:500; cursor:pointer;
+  transition: all 0.25s var(--ease);
+  font-family:var(--font-sans);
+}
+.btn-accent:hover { filter:brightness(1.15); transform:translateY(-1px); }
+
+.btn-outline {
+  height:32px; padding:0 18px; border-radius:var(--radius-pill);
+  background:transparent; color:var(--accent);
+  border:1px solid var(--border-accent);
+  font-size:12px; font-weight:500; cursor:pointer;
+  transition: all 0.25s var(--ease);
+  font-family:var(--font-sans);
+}
+.btn-outline:hover { background:var(--accent-08); }
+
+/* ===== BREADCRUMB ===== */
+.breadcrumb { display:flex; align-items:center; gap:4px; margin-left:16px; }
+.breadcrumb-sep { color:var(--text-20); font-size:12px; }
+.breadcrumb-item {
+  display:flex; align-items:center; gap:3px;
+  color:var(--text-60); font-size:13px; font-weight:400;
+  cursor:pointer; padding:4px 8px; border-radius:6px;
+  transition: all 0.2s var(--ease);
+  position:relative;
+}
+.breadcrumb-item:hover { color:var(--text); background:var(--bg-hover); }
+.breadcrumb-item .caret { font-size:9px; opacity:0.5; }
+
+/* Dropdown */
+.dropdown {
+  position:absolute; top:calc(100% + 6px); left:0;
+  min-width:200px; padding:6px;
+  background:var(--bg-elevated);
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  backdrop-filter:blur(20px);
+  z-index:200;
+  opacity:0; transform:translateY(-4px); pointer-events:none;
+  transition: all 0.25s var(--ease);
+}
+.dropdown.open { opacity:1; transform:translateY(0); pointer-events:auto; }
+.dropdown-item {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; border-radius:8px;
+  font-size:13px; color:var(--text-80);
+  cursor:pointer; transition: background 0.15s;
+}
+.dropdown-item:hover { background:var(--bg-hover); }
+.dropdown-item .dot {
+  width:6px; height:6px; border-radius:50%;
+  border:1.5px solid var(--text-40);
+  flex-shrink:0;
+}
+.dropdown-item.active .dot {
+  background:var(--accent);
+  border-color:var(--accent);
+}
+.dropdown-divider { height:1px; background:var(--border); margin:4px 0; }
+.dropdown-item.add { color:var(--accent); }
+
+/* CMD palette dropdown */
+.cmd-palette {
+  position:absolute; top:calc(100% + 8px); left:50%; transform:translateX(-50%) translateY(-4px);
+  width:400px; padding:8px;
+  background:var(--bg-elevated);
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  backdrop-filter:blur(20px);
+  z-index:200;
+  opacity:0; pointer-events:none;
+  transition: all 0.25s var(--ease);
+}
+.cmd-palette.open { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+.cmd-palette-input {
+  width:100%; height:36px; border:none; background:transparent;
+  color:var(--text); font-size:14px; padding:0 12px;
+  outline:none; font-family:var(--font-sans);
+}
+.cmd-palette-input::placeholder { color:var(--text-40); }
+.cmd-section-label {
+  font-size:10px; font-weight:600; text-transform:uppercase;
+  letter-spacing:0.08em; color:var(--text-40);
+  padding:8px 12px 4px;
+}
+.cmd-item {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; border-radius:8px;
+  cursor:pointer; transition:background 0.15s;
+}
+.cmd-item:hover { background:var(--bg-hover); }
+.cmd-item-icon {
+  width:28px; height:28px; border-radius:6px;
+  background:var(--accent-08); color:var(--accent);
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px;
+}
+.cmd-item-text { font-size:13px; color:var(--text-80); }
+.cmd-item-hint { margin-left:auto; font-size:11px; color:var(--text-20); font-family:var(--font-mono); }
+
+/* ===== VIEWS ===== */
+.view { display:none; flex-direction:column; height:100vh; }
+.view.active { display:flex; }
+
+.view-content {
+  flex:1; overflow-y:auto; overflow-x:hidden;
+}
+
+/* ===== VIEW 1: HOME ===== */
+.home-content {
+  max-width:1100px; margin:0 auto; padding:48px 32px 80px;
+}
+
+.home-greeting {
+  font-family:var(--font-display);
+  font-style:italic;
+  font-size:16px;
+  color:var(--text-40);
+  margin-bottom:32px;
+  font-weight:300;
+}
+
+.section-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:20px;
+}
+.section-title {
+  font-size:13px; font-weight:600; color:var(--text-60);
+  text-transform:uppercase; letter-spacing:0.08em;
+}
+
+.project-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:16px; margin-bottom:40px;
+}
+
+.project-card {
+  background:var(--bg-elevated);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  overflow:hidden; cursor:pointer;
+  transition: all 0.35s var(--ease);
+}
+.project-card:hover {
+  border-color:var(--border-accent);
+  transform:scale(1.01);
+}
+
+.card-thumb {
+  aspect-ratio:16/9; position:relative;
+  overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+}
+.card-thumb .play-overlay {
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.3); opacity:0;
+  transition:opacity 0.3s var(--ease);
+}
+.project-card:hover .play-overlay { opacity:1; }
+.play-overlay .play-tri {
+  width:40px; height:40px; border-radius:50%;
+  background:rgba(255,255,255,0.15);
+  backdrop-filter:blur(8px);
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:14px;
+}
+
+.card-info { padding:14px 16px 16px; }
+.card-title { font-size:14px; font-weight:500; margin-bottom:4px; }
+.card-meta { font-size:12px; color:var(--text-40); }
+
+.divider { height:1px; background:var(--border); margin:8px 0 32px; }
+
+.view-toggle {
+  display:flex; gap:2px;
+  background:var(--bg-surface);
+  border-radius:var(--radius-pill);
+  padding:2px;
+}
+.view-toggle button {
+  padding:5px 14px; border:none; border-radius:var(--radius-pill);
+  background:transparent; color:var(--text-40);
+  font-size:12px; cursor:pointer; font-family:var(--font-sans);
+  transition: all 0.2s var(--ease);
+}
+.view-toggle button.active {
+  background:var(--bg-hover); color:var(--text);
+}
+
+.new-project-btn {
+  position:absolute; top:48px; right:32px;
+}
+
+/* ===== VIEW 2: PROJECT ===== */
+.project-content {
+  max-width:1100px; margin:0 auto; padding:48px 32px 80px;
+}
+.project-hero-title {
+  font-family:var(--font-display);
+  font-size:36px; font-weight:400;
+  letter-spacing:-0.02em;
+  margin-bottom:6px;
+}
+.project-hero-desc { font-size:14px; color:var(--text-60); margin-bottom:12px; }
+.project-stats { font-size:12px; color:var(--text-40); margin-bottom:28px; }
+
+.episode-list { display:flex; flex-direction:column; gap:12px; margin-top:20px; }
+
+.episode-card {
+  display:flex; gap:20px; align-items:center;
+  background:var(--bg-elevated);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:12px; cursor:pointer;
+  transition: all 0.35s var(--ease);
+}
+.episode-card:hover {
+  border-color:var(--border-accent);
+  transform:scale(1.005);
+}
+
+.ep-thumb {
+  width:200px; aspect-ratio:16/9; border-radius:var(--radius-md);
+  overflow:hidden; flex-shrink:0; position:relative;
+}
+.ep-info { flex:1; padding:4px 0; }
+.ep-badge {
+  display:inline-block; padding:2px 10px; border-radius:var(--radius-pill);
+  font-size:10px; font-weight:600; letter-spacing:0.06em;
+  margin-bottom:6px;
+}
+.ep-title { font-size:16px; font-weight:500; margin-bottom:4px; }
+.ep-meta { font-size:12px; color:var(--text-40); }
+
+/* ===== VIEW 3: EDITOR ===== */
+.editor-layout {
+  flex:1; display:flex; flex-direction:column; overflow:hidden;
+}
+.editor-main { flex:1; display:flex; overflow:hidden; min-height:0; }
+
+/* Canvas / Preview */
+.preview-area {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:16px; min-width:0;
+  position:relative;
+}
+.canvas-wrap {
+  width:100%; max-width:760px; aspect-ratio:16/9;
+  background:var(--bg-elevated);
+  border:1px solid var(--border);
+  border-radius:var(--radius-md);
+  position:relative; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+}
+.canvas-inner {
+  position:relative; width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center;
+}
+.canvas-text {
+  font-family:var(--font-display);
+  font-size:64px; font-weight:400;
+  background:linear-gradient(135deg, var(--accent), var(--warm));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  user-select:none;
+}
+/* Selection handles */
+.selection-box {
+  position:absolute; inset:20%; pointer-events:none;
+  border:1.5px dashed var(--accent-60);
+  border-radius:4px;
+}
+.sel-handle {
+  position:absolute; width:8px; height:8px;
+  background:var(--accent); border-radius:2px;
+}
+.sel-handle.tl { top:-4px; left:-4px; }
+.sel-handle.tr { top:-4px; right:-4px; }
+.sel-handle.bl { bottom:-4px; left:-4px; }
+.sel-handle.br { bottom:-4px; right:-4px; }
+.sel-rotate {
+  position:absolute; top:-24px; left:50%; transform:translateX(-50%);
+  width:12px; height:12px; border:1.5px solid var(--accent-60);
+  border-radius:50%; background:var(--bg);
+}
+
+/* Playback bar */
+.playback-bar {
+  display:flex; align-items:center; gap:12px;
+  margin-top:12px;
+}
+.playback-time { font-family:var(--font-mono); font-size:12px; color:var(--text-60); }
+.playback-btn {
+  width:32px; height:32px; border-radius:50%; border:none;
+  background:var(--bg-elevated); color:var(--text-80);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-size:12px;
+  border:1px solid var(--border);
+  transition: all 0.2s var(--ease);
+}
+.playback-btn:hover { border-color:var(--border-accent); color:var(--text); }
+.playback-btn.play-main {
+  width:36px; height:36px; background:var(--accent);
+  border-color:var(--accent); color:#fff; font-size:13px;
+}
+.playback-btn.play-main:hover { filter:brightness(1.15); }
+
+/* Inspector */
+.inspector {
+  width:280px; border-left:1px solid var(--border);
+  background:var(--bg); overflow-y:auto; flex-shrink:0;
+}
+.insp-section { padding:16px; border-bottom:1px solid var(--border); }
+.insp-section-title {
+  font-size:10px; font-weight:600; text-transform:uppercase;
+  letter-spacing:0.08em; color:var(--text-40); margin-bottom:12px;
+}
+.insp-row {
+  display:flex; align-items:center; margin-bottom:8px;
+}
+.insp-label {
+  width:60px; font-size:12px; color:var(--text-40); flex-shrink:0;
+}
+.insp-input {
+  flex:1; height:28px; background:var(--bg-elevated);
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:0 8px; color:var(--text); font-size:12px;
+  font-family:var(--font-mono); outline:none;
+  transition:border-color 0.2s;
+}
+.insp-input:focus { border-color:var(--border-accent); }
+.insp-input-pair {
+  display:flex; gap:6px; flex:1;
+}
+.insp-input-pair .insp-input { flex:1; }
+
+.insp-slider-wrap {
+  flex:1; display:flex; align-items:center; gap:8px;
+}
+.insp-slider {
+  flex:1; -webkit-appearance:none; height:3px;
+  background:var(--bg-hover); border-radius:2px; outline:none;
+}
+.insp-slider::-webkit-slider-thumb {
+  -webkit-appearance:none; width:12px; height:12px;
+  background:var(--accent); border-radius:50%; cursor:pointer;
+}
+.insp-slider-val {
+  font-size:11px; color:var(--text-60); font-family:var(--font-mono);
+  width:32px; text-align:right;
+}
+
+.scene-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.scene-chip {
+  padding:4px 12px; border-radius:var(--radius-pill);
+  font-size:11px; border:1px solid var(--border);
+  color:var(--text-60); cursor:pointer;
+  transition:all 0.2s var(--ease);
+}
+.scene-chip:hover { border-color:var(--border-accent); color:var(--text); }
+.scene-chip.active { background:var(--accent-08); border-color:var(--accent-60); color:var(--accent); }
+
+/* ===== TIMELINE ===== */
+.timeline {
+  height:260px; border-top:1px solid var(--border);
+  background:var(--bg); display:flex; flex-direction:column;
+  flex-shrink:0;
+}
+.tl-header {
+  height:36px; display:flex; align-items:center;
+  padding:0 16px; border-bottom:1px solid var(--border);
+  gap:12px;
+}
+.tl-title { font-size:12px; font-weight:600; color:var(--text-60); }
+.tl-controls { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.tl-control-label { font-size:11px; color:var(--text-40); }
+.tl-toggle {
+  width:28px; height:16px; border-radius:8px;
+  background:var(--bg-hover); border:1px solid var(--border);
+  cursor:pointer; position:relative;
+  transition:background 0.2s;
+}
+.tl-toggle.on { background:var(--accent-20); border-color:var(--accent-60); }
+.tl-toggle::after {
+  content:''; position:absolute;
+  width:10px; height:10px; border-radius:50%;
+  background:var(--text-60); top:2px; left:2px;
+  transition:transform 0.2s var(--ease);
+}
+.tl-toggle.on::after { transform:translateX(12px); background:var(--accent); }
+
+.tl-body { flex:1; display:flex; overflow:hidden; }
+
+/* Track headers */
+.tl-track-headers {
+  width:80px; flex-shrink:0; border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+}
+.tl-track-h {
+  height:36px; display:flex; align-items:center;
+  padding:0 8px; gap:4px; border-bottom:1px solid var(--border);
+  font-size:11px; font-weight:600; color:var(--text-60);
+}
+.tl-track-h .tl-track-icons {
+  margin-left:auto; display:flex; gap:2px;
+}
+.tl-track-h .tl-track-icon {
+  width:18px; height:18px; display:flex; align-items:center; justify-content:center;
+  border-radius:4px; cursor:pointer; color:var(--text-40); font-size:10px;
+  transition:color 0.15s;
+}
+.tl-track-h .tl-track-icon:hover { color:var(--text); }
+
+/* Track area */
+.tl-tracks-area {
+  flex:1; display:flex; flex-direction:column;
+  overflow-x:auto; position:relative;
+}
+
+/* Ruler */
+.tl-ruler {
+  height:22px; border-bottom:1px solid var(--border);
+  position:relative; flex-shrink:0;
+}
+.tl-tick {
+  position:absolute; top:0; height:100%;
+  display:flex; flex-direction:column; align-items:center;
+}
+.tl-tick-line { width:1px; flex:1; background:var(--border); }
+.tl-tick-label {
+  font-size:9px; color:var(--text-40); font-family:var(--font-mono);
+  padding-top:2px;
+}
+.tl-tick-minor .tl-tick-line { height:6px; flex:none; }
+.tl-tick-minor .tl-tick-label { display:none; }
+
+/* Clips area */
+.tl-clips { flex:1; position:relative; }
+
+.tl-track-row {
+  height:36px; border-bottom:1px solid var(--border);
+  position:relative;
+}
+
+.tl-clip {
+  position:absolute; top:3px; height:30px;
+  border-radius:6px; cursor:pointer;
+  display:flex; align-items:center; padding:0 10px;
+  font-size:11px; font-weight:500;
+  transition: all 0.2s var(--ease);
+  overflow:hidden; white-space:nowrap;
+}
+.tl-clip:hover { filter:brightness(1.15); }
+.tl-clip.selected {
+  box-shadow: 0 0 0 1.5px var(--accent), 0 0 12px var(--accent-20);
+}
+
+/* Audio wave mock */
+.tl-wave {
+  position:absolute; top:3px; height:30px;
+  display:flex; align-items:end; gap:1px; padding:4px 0;
+  opacity:0.5;
+}
+.tl-wave-bar {
+  width:2px; border-radius:1px;
+  background:var(--green);
+}
+
+/* Playhead */
+.tl-playhead {
+  position:absolute; top:0; bottom:0; width:2px;
+  background:var(--warm); z-index:10;
+  pointer-events:none;
+  transition: left 0.05s linear;
+}
+.tl-playhead::before {
+  content:''; position:absolute; top:-1px; left:-5px;
+  width:12px; height:8px; background:var(--warm);
+  clip-path:polygon(0 0, 100% 0, 50% 100%);
+}
+
+/* ===== FULLSCREEN MODE ===== */
+.fullscreen-mode .topbar,
+.fullscreen-mode .inspector,
+.fullscreen-mode .timeline {
+  display:none !important;
+}
+.fullscreen-mode .preview-area { padding:0; }
+.fullscreen-mode .canvas-wrap {
+  max-width:100%; width:100%; height:100%;
+  border-radius:0; border:none; aspect-ratio:auto;
+}
+.fullscreen-mode .playback-bar { display:none; }
+.fs-exit {
+  display:none; position:absolute; top:16px; right:16px;
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(0,0,0,0.5); backdrop-filter:blur(8px);
+  border:1px solid var(--border); color:var(--text);
+  cursor:pointer; font-size:16px; z-index:50;
+  align-items:center; justify-content:center;
+}
+.fullscreen-mode .fs-exit { display:flex; }
+
+/* ===== TRANSITIONS ===== */
+.view-enter {
+  animation: viewIn 0.4s var(--ease) both;
+}
+@keyframes viewIn {
+  from { opacity:0; transform:translateY(16px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+/* ===== RADIAL GLOWS ===== */
+.glow-purple {
+  background: radial-gradient(ellipse at 30% 40%, rgba(138,111,174,0.08) 0%, transparent 60%),
+              var(--bg-elevated);
+}
+.glow-warm {
+  background: radial-gradient(ellipse at 50% 50%, rgba(218,119,86,0.06) 0%, transparent 60%),
+              var(--bg-elevated);
+}
+.glow-blue {
+  background: radial-gradient(ellipse at 60% 40%, rgba(110,158,207,0.07) 0%, transparent 60%),
+              var(--bg-elevated);
+}
+.glow-pink {
+  background: radial-gradient(ellipse at 40% 60%, rgba(201,123,158,0.07) 0%, transparent 60%),
+              var(--bg-elevated);
+}
+.glow-green {
+  background: radial-gradient(ellipse at 50% 40%, rgba(124,179,122,0.06) 0%, transparent 60%),
+              var(--bg-elevated);
+}
+.glow-canvas {
+  background: radial-gradient(ellipse at 50% 50%, rgba(138,111,174,0.06) 0%, transparent 50%),
+              var(--bg-elevated);
+}
+</style>
+</head>
+<body>
+
+<!-- Film Grain -->
+<svg style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.03;z-index:9999">
+  <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter>
+  <rect width="100%" height="100%" filter="url(#grain)"/>
+</svg>
+
+<!-- ========== VIEW 1: HOME ========== -->
+<div class="view active" id="view-home">
+  <div class="topbar">
+    <div class="logo" onclick="goHome()">
+      <div class="logo-icon"></div>
+      <span class="logo-text">NextFrame</span>
+    </div>
+    <div class="topbar-center">
+      <div class="cmd-bar" onclick="toggleCmdPalette(this)">
+        <span class="search-icon">&#x2315;</span>
+        <span class="cmd-text">Search or ask AI...</span>
+        <span class="cmd-hint">&#x2318;K</span>
+        <div class="cmd-palette" id="cmd-home">
+          <input class="cmd-palette-input" placeholder="Type a command or question..." onclick="event.stopPropagation()">
+          <div class="cmd-section-label">AI Suggestions</div>
+          <div class="cmd-item"><div class="cmd-item-icon">&#x2728;</div><div class="cmd-item-text">Generate scene from prompt</div><div class="cmd-item-hint">ai</div></div>
+          <div class="cmd-item"><div class="cmd-item-icon">&#x270F;</div><div class="cmd-item-text">Edit selected clip style</div><div class="cmd-item-hint">ai</div></div>
+          <div class="cmd-section-label">Actions</div>
+          <div class="cmd-item"><div class="cmd-item-icon">+</div><div class="cmd-item-text">New project</div><div class="cmd-item-hint">&#x2318;N</div></div>
+          <div class="cmd-item"><div class="cmd-item-icon">&#x2699;</div><div class="cmd-item-text">Settings</div><div class="cmd-item-hint">&#x2318;,</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn">&#x2699;</button>
+      <div class="avatar">Z</div>
+    </div>
+  </div>
+  <div class="view-content">
+    <div class="home-content view-enter" style="position:relative">
+      <button class="btn-accent new-project-btn">+ New Project</button>
+      <div class="home-greeting">Good evening</div>
+      <div class="section-header">
+        <div class="section-title">Recent</div>
+      </div>
+      <div class="project-grid">
+        <div class="project-card" onclick="goProject()">
+          <div class="card-thumb glow-purple">
+            <div class="play-overlay"><div class="play-tri">&#9654;</div></div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Show</div>
+            <div class="card-meta">3 episodes &middot; 52s &middot; edited 2h ago</div>
+          </div>
+        </div>
+        <div class="project-card">
+          <div class="card-thumb glow-warm">
+            <div class="play-overlay"><div class="play-tri">&#9654;</div></div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Product Launch</div>
+            <div class="card-meta">1 episode &middot; 30s &middot; edited 1d ago</div>
+          </div>
+        </div>
+        <div class="project-card">
+          <div class="card-thumb glow-blue">
+            <div class="play-overlay"><div class="play-tri">&#9654;</div></div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Tutorial Series</div>
+            <div class="card-meta">5 episodes &middot; 3m 20s &middot; edited 3d ago</div>
+          </div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="section-header">
+        <div class="section-title">All Projects</div>
+        <div class="view-toggle">
+          <button class="active">Grid</button>
+          <button>List</button>
+        </div>
+      </div>
+      <div class="project-grid">
+        <div class="project-card" onclick="goProject()">
+          <div class="card-thumb glow-purple">
+            <div class="play-overlay"><div class="play-tri">&#9654;</div></div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Show</div>
+            <div class="card-meta">3 episodes &middot; 52s &middot; edited 2h ago</div>
+          </div>
+        </div>
+        <div class="project-card">
+          <div class="card-thumb glow-pink">
+            <div class="play-overlay"><div class="play-tri">&#9654;</div></div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Brand Story</div>
+            <div class="card-meta">2 episodes &middot; 1m 15s &middot; edited 5d ago</div>
+          </div>
+        </div>
+        <div class="project-card">
+          <div class="card-thumb glow-green">
+            <div class="play-overlay"><div class="play-tri">&#9654;</div></div>
+          </div>
+          <div class="card-info">
+            <div class="card-title">Onboarding</div>
+            <div class="card-meta">4 episodes &middot; 2m 40s &middot; edited 1w ago</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== VIEW 2: PROJECT ========== -->
+<div class="view" id="view-project">
+  <div class="topbar">
+    <div class="logo" onclick="goHome()">
+      <div class="logo-icon"></div>
+      <span class="logo-text">NextFrame</span>
+    </div>
+    <div class="breadcrumb">
+      <span class="breadcrumb-sep">/</span>
+      <div class="breadcrumb-item" onclick="toggleDropdown(event, 'dd-proj-show')">
+        Show <span class="caret">&#x25BE;</span>
+        <div class="dropdown" id="dd-proj-show">
+          <div class="dropdown-item active"><div class="dot"></div>Show</div>
+          <div class="dropdown-item"><div class="dot"></div>Product Launch</div>
+          <div class="dropdown-item"><div class="dot"></div>Tutorial Series</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item add">+ New Project</div>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-center">
+      <div class="cmd-bar" onclick="toggleCmdPalette(this)">
+        <span class="search-icon">&#x2315;</span>
+        <span class="cmd-text">Search or ask AI...</span>
+        <span class="cmd-hint">&#x2318;K</span>
+        <div class="cmd-palette">
+          <input class="cmd-palette-input" placeholder="Type a command or question..." onclick="event.stopPropagation()">
+          <div class="cmd-section-label">AI Suggestions</div>
+          <div class="cmd-item"><div class="cmd-item-icon">&#x2728;</div><div class="cmd-item-text">Generate new episode</div></div>
+          <div class="cmd-item"><div class="cmd-item-icon">&#x1F3AC;</div><div class="cmd-item-text">Auto-arrange episodes</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn">&#x2699;</button>
+      <div class="avatar">Z</div>
+    </div>
+  </div>
+  <div class="view-content">
+    <div class="project-content view-enter">
+      <div class="project-hero-title">Show</div>
+      <div class="project-hero-desc">NextFrame showcase series</div>
+      <div class="project-stats">3 episodes &middot; 52s total &middot; Last edited 2h ago</div>
+      <button class="btn-outline" onclick="goEditor()">+ New Episode</button>
+      <div class="episode-list">
+        <div class="episode-card" onclick="goEditor()">
+          <div class="ep-thumb glow-purple"></div>
+          <div class="ep-info">
+            <div class="ep-badge" style="background:var(--accent-20);color:var(--accent)">EP01</div>
+            <div class="ep-title">Introduction</div>
+            <div class="ep-meta">4 segments &middot; 18s &middot; edited 2h ago</div>
+          </div>
+        </div>
+        <div class="episode-card" onclick="goEditor()">
+          <div class="ep-thumb glow-warm"></div>
+          <div class="ep-info">
+            <div class="ep-badge" style="background:var(--warm-20);color:var(--warm)">EP02</div>
+            <div class="ep-title">Core Features</div>
+            <div class="ep-meta">6 segments &middot; 22s &middot; edited 4h ago</div>
+          </div>
+        </div>
+        <div class="episode-card" onclick="goEditor()">
+          <div class="ep-thumb glow-blue"></div>
+          <div class="ep-info">
+            <div class="ep-badge" style="background:rgba(110,158,207,0.2);color:var(--blue)">EP03</div>
+            <div class="ep-title">AI Workflows</div>
+            <div class="ep-meta">3 segments &middot; 12s &middot; edited 1d ago</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== VIEW 3: EDITOR ========== -->
+<div class="view" id="view-editor">
+  <div class="topbar compact" id="editor-topbar">
+    <div class="logo" onclick="goHome()">
+      <div class="logo-icon"></div>
+    </div>
+    <div class="breadcrumb">
+      <span class="breadcrumb-sep">/</span>
+      <div class="breadcrumb-item" onclick="toggleDropdown(event, 'dd-ed-show')">
+        Show <span class="caret">&#x25BE;</span>
+        <div class="dropdown" id="dd-ed-show">
+          <div class="dropdown-item active"><div class="dot"></div>Show</div>
+          <div class="dropdown-item"><div class="dot"></div>Product Launch</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item add">+ New Project</div>
+        </div>
+      </div>
+      <span class="breadcrumb-sep">/</span>
+      <div class="breadcrumb-item" onclick="toggleDropdown(event, 'dd-ed-ep')">
+        EP01 <span class="caret">&#x25BE;</span>
+        <div class="dropdown" id="dd-ed-ep">
+          <div class="dropdown-item active"><div class="dot"></div>EP01 Introduction</div>
+          <div class="dropdown-item"><div class="dot"></div>EP02 Core Features</div>
+          <div class="dropdown-item"><div class="dot"></div>EP03 AI Workflows</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item add">+ New Episode</div>
+        </div>
+      </div>
+      <span class="breadcrumb-sep">/</span>
+      <div class="breadcrumb-item" onclick="toggleDropdown(event, 'dd-ed-seg')">
+        content <span class="caret">&#x25BE;</span>
+        <div class="dropdown" id="dd-ed-seg">
+          <div class="dropdown-item active"><div class="dot"></div>content</div>
+          <div class="dropdown-item"><div class="dot"></div>intro</div>
+          <div class="dropdown-item"><div class="dot"></div>outro</div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item add">+ New Segment</div>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-center">
+      <div class="cmd-bar" onclick="toggleCmdPalette(this)" style="width:280px">
+        <span class="search-icon">&#x2315;</span>
+        <span class="cmd-text">Ask AI...</span>
+        <span class="cmd-hint">&#x2318;K</span>
+        <div class="cmd-palette">
+          <input class="cmd-palette-input" placeholder="Describe what you want..." onclick="event.stopPropagation()">
+          <div class="cmd-section-label">AI Actions</div>
+          <div class="cmd-item"><div class="cmd-item-icon">&#x2728;</div><div class="cmd-item-text">Generate scene from prompt</div><div class="cmd-item-hint">ai</div></div>
+          <div class="cmd-item"><div class="cmd-item-icon">&#x270F;</div><div class="cmd-item-text">Edit selected clip style</div><div class="cmd-item-hint">ai</div></div>
+          <div class="cmd-item"><div class="cmd-item-icon">&#x1F3B5;</div><div class="cmd-item-text">Add background music</div><div class="cmd-item-hint">ai</div></div>
+          <div class="cmd-item"><div class="cmd-item-icon">&#x1F504;</div><div class="cmd-item-text">Auto-pace clips to music</div><div class="cmd-item-hint">ai</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
+      <button class="btn-accent">Export</button>
+    </div>
+  </div>
+
+  <div class="editor-layout" id="editor-layout">
+    <div class="editor-main">
+      <!-- Preview -->
+      <div class="preview-area">
+        <div class="canvas-wrap glow-canvas">
+          <div class="canvas-inner">
+            <div class="canvas-text" id="canvas-label">CANVAS</div>
+            <div class="selection-box" id="sel-box">
+              <div class="sel-handle tl"></div>
+              <div class="sel-handle tr"></div>
+              <div class="sel-handle bl"></div>
+              <div class="sel-handle br"></div>
+              <div class="sel-rotate"></div>
+            </div>
+          </div>
+          <button class="fs-exit" onclick="toggleFullscreen()">&#x2715;</button>
+        </div>
+        <div class="playback-bar">
+          <span class="playback-time" id="pb-time">00:00.00</span>
+          <button class="playback-btn">&#x23EE;</button>
+          <button class="playback-btn play-main" id="play-btn" onclick="togglePlay()">&#9654;</button>
+          <button class="playback-btn">&#x23ED;</button>
+          <span class="playback-time">00:18.00</span>
+        </div>
+      </div>
+
+      <!-- Inspector -->
+      <div class="inspector" id="inspector">
+        <div class="insp-section">
+          <div class="insp-section-title">Scene Params</div>
+          <div class="insp-row">
+            <span class="insp-label">Name</span>
+            <input class="insp-input" value="Title Card" id="insp-name">
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Type</span>
+            <input class="insp-input" value="title" id="insp-type" readonly style="color:var(--accent)">
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Duration</span>
+            <input class="insp-input" value="4.0s" id="insp-dur">
+          </div>
+        </div>
+        <div class="insp-section">
+          <div class="insp-section-title">Transform</div>
+          <div class="insp-row">
+            <span class="insp-label">Position</span>
+            <div class="insp-input-pair">
+              <input class="insp-input" value="0" id="insp-x">
+              <input class="insp-input" value="0" id="insp-y">
+            </div>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Scale</span>
+            <div class="insp-slider-wrap">
+              <input type="range" class="insp-slider" min="0" max="200" value="100" id="insp-scale">
+              <span class="insp-slider-val" id="insp-scale-val">100%</span>
+            </div>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Rotation</span>
+            <div class="insp-slider-wrap">
+              <input type="range" class="insp-slider" min="0" max="360" value="0" id="insp-rot">
+              <span class="insp-slider-val" id="insp-rot-val">0&deg;</span>
+            </div>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Opacity</span>
+            <div class="insp-slider-wrap">
+              <input type="range" class="insp-slider" min="0" max="100" value="100" id="insp-opa">
+              <span class="insp-slider-val" id="insp-opa-val">100%</span>
+            </div>
+          </div>
+        </div>
+        <div class="insp-section">
+          <div class="insp-section-title">Clip</div>
+          <div class="insp-row">
+            <span class="insp-label">Ease In</span>
+            <input class="insp-input" value="spring">
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Ease Out</span>
+            <input class="insp-input" value="spring">
+          </div>
+        </div>
+        <div class="insp-section">
+          <div class="insp-section-title">Scene Type</div>
+          <div class="scene-chips">
+            <div class="scene-chip active">title</div>
+            <div class="scene-chip">image</div>
+            <div class="scene-chip">code</div>
+            <div class="scene-chip">browser</div>
+            <div class="scene-chip">terminal</div>
+            <div class="scene-chip">split</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline" id="timeline">
+      <div class="tl-header">
+        <span class="tl-title">Timeline</span>
+        <div class="tl-controls">
+          <span class="tl-control-label">Snap</span>
+          <div class="tl-toggle on" onclick="this.classList.toggle('on')"></div>
+          <span class="tl-control-label" style="margin-left:8px">Zoom</span>
+          <input type="range" class="insp-slider" style="width:80px" min="1" max="5" value="3">
+        </div>
+      </div>
+      <div class="tl-body">
+        <div class="tl-track-headers">
+          <div class="tl-track-h" style="height:22px;border-bottom:1px solid var(--border);font-size:9px;color:var(--text-20)"></div>
+          <div class="tl-track-h"><span>V1</span><div class="tl-track-icons"><span class="tl-track-icon">&#x1F441;</span><span class="tl-track-icon">&#x1F512;</span></div></div>
+          <div class="tl-track-h"><span>V2</span><div class="tl-track-icons"><span class="tl-track-icon">&#x1F441;</span><span class="tl-track-icon">&#x1F512;</span></div></div>
+          <div class="tl-track-h"><span>V3</span><div class="tl-track-icons"><span class="tl-track-icon">&#x1F441;</span><span class="tl-track-icon">&#x1F512;</span></div></div>
+          <div class="tl-track-h"><span>V4</span><div class="tl-track-icons"><span class="tl-track-icon">&#x1F441;</span><span class="tl-track-icon">&#x1F512;</span></div></div>
+          <div class="tl-track-h"><span>A1</span><div class="tl-track-icons"><span class="tl-track-icon">&#x1F50A;</span><span class="tl-track-icon">&#x1F512;</span></div></div>
+        </div>
+        <div class="tl-tracks-area" id="tl-tracks-area">
+          <!-- Ruler -->
+          <div class="tl-ruler" id="tl-ruler"></div>
+          <!-- Clips -->
+          <div class="tl-clips" id="tl-clips">
+            <!-- V1 -->
+            <div class="tl-track-row" id="track-v1"></div>
+            <!-- V2 -->
+            <div class="tl-track-row" id="track-v2"></div>
+            <!-- V3 -->
+            <div class="tl-track-row" id="track-v3"></div>
+            <!-- V4 -->
+            <div class="tl-track-row" id="track-v4"></div>
+            <!-- A1 -->
+            <div class="tl-track-row" id="track-a1"></div>
+            <!-- Playhead -->
+            <div class="tl-playhead" id="tl-playhead" style="left:120px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== DATA =====
+const clips = [
+  { id:'c1', track:'v1', name:'Title Card', type:'title', color:'var(--accent)',  left:40, width:160, dur:'4.0s' },
+  { id:'c2', track:'v1', name:'Hero Shot',  type:'image', color:'var(--warm)',    left:200, width:200, dur:'5.0s' },
+  { id:'c3', track:'v1', name:'Code Demo',  type:'code',  color:'var(--green)',   left:400, width:240, dur:'6.0s' },
+  { id:'c4', track:'v2', name:'Logo',       type:'image', color:'var(--pink)',    left:40, width:100, dur:'2.5s' },
+  { id:'c5', track:'v2', name:'Subtitle',   type:'title', color:'var(--yellow)',  left:200, width:140, dur:'3.5s' },
+  { id:'c6', track:'v3', name:'BG Gradient',type:'image', color:'var(--blue)',    left:40, width:600, dur:'15.0s' },
+  { id:'c7', track:'v4', name:'Transition', type:'title', color:'var(--accent)',  left:195, width:10, dur:'0.3s' },
+];
+const audioWaveWidth = 600;
+
+let selectedClip = clips[0];
+let isPlaying = false;
+let playInterval = null;
+let playheadPos = 120;
+
+// ===== VIEW NAVIGATION =====
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  // re-trigger enter animation
+  const inner = document.querySelector('#' + id + ' .view-enter');
+  if (inner) {
+    inner.style.animation = 'none';
+    inner.offsetHeight; // reflow
+    inner.style.animation = '';
+  }
+  closeAllDropdowns();
+}
+function goHome() { showView('view-home'); }
+function goProject() { showView('view-project'); }
+function goEditor() { showView('view-editor'); }
+
+// ===== DROPDOWNS =====
+function toggleDropdown(e, id) {
+  e.stopPropagation();
+  const dd = document.getElementById(id);
+  const wasOpen = dd.classList.contains('open');
+  closeAllDropdowns();
+  if (!wasOpen) dd.classList.add('open');
+}
+function closeAllDropdowns() {
+  document.querySelectorAll('.dropdown, .cmd-palette').forEach(d => d.classList.remove('open'));
+}
+document.addEventListener('click', closeAllDropdowns);
+
+// ===== CMD PALETTE =====
+function toggleCmdPalette(bar) {
+  const p = bar.querySelector('.cmd-palette');
+  if (!p) return;
+  const wasOpen = p.classList.contains('open');
+  closeAllDropdowns();
+  if (!wasOpen) {
+    p.classList.add('open');
+    const inp = p.querySelector('input');
+    if (inp) setTimeout(() => inp.focus(), 50);
+  }
+}
+
+// ===== TIMELINE RENDERING =====
+function renderTimeline() {
+  // Ruler
+  const ruler = document.getElementById('tl-ruler');
+  ruler.innerHTML = '';
+  const totalW = 700;
+  for (let s = 0; s <= 18; s++) {
+    const x = 40 + (s / 18) * (totalW - 40);
+    const isMajor = s % 2 === 0;
+    const tick = document.createElement('div');
+    tick.className = 'tl-tick' + (isMajor ? '' : ' tl-tick-minor');
+    tick.style.left = x + 'px';
+    tick.innerHTML = '<div class="tl-tick-line"></div>' +
+      (isMajor ? '<div class="tl-tick-label">' + String(s).padStart(2,'0') + 's</div>' : '');
+    ruler.appendChild(tick);
+  }
+
+  // Clips
+  clips.forEach(c => {
+    const track = document.getElementById('track-' + c.track);
+    if (!track) return;
+    const el = document.createElement('div');
+    el.className = 'tl-clip' + (c === selectedClip ? ' selected' : '');
+    el.style.left = c.left + 'px';
+    el.style.width = c.width + 'px';
+    el.style.background = c.color;
+    el.style.color = '#fff';
+    el.textContent = c.name;
+    el.dataset.id = c.id;
+    el.onclick = (e) => { e.stopPropagation(); selectClip(c); };
+    track.appendChild(el);
+  });
+
+  // Audio wave
+  const a1 = document.getElementById('track-a1');
+  const wave = document.createElement('div');
+  wave.className = 'tl-wave';
+  wave.style.left = '40px';
+  wave.style.width = audioWaveWidth + 'px';
+  for (let i = 0; i < 200; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'tl-wave-bar';
+    const h = 4 + Math.random() * 20;
+    bar.style.height = h + 'px';
+    wave.appendChild(bar);
+  }
+  a1.appendChild(wave);
+}
+
+function selectClip(c) {
+  selectedClip = c;
+  // Update clip selection visuals
+  document.querySelectorAll('.tl-clip').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === c.id);
+  });
+  // Update inspector
+  document.getElementById('insp-name').value = c.name;
+  document.getElementById('insp-type').value = c.type;
+  document.getElementById('insp-dur').value = c.dur;
+  // Update canvas label
+  document.getElementById('canvas-label').textContent = c.name.toUpperCase();
+  // Update scene chips
+  document.querySelectorAll('.scene-chip').forEach(ch => {
+    ch.classList.toggle('active', ch.textContent === c.type);
+  });
+}
+
+// ===== PLAYBACK =====
+function togglePlay() {
+  isPlaying = !isPlaying;
+  const btn = document.getElementById('play-btn');
+  btn.innerHTML = isPlaying ? '&#x23F8;' : '&#9654;';
+  if (isPlaying) {
+    playInterval = setInterval(() => {
+      playheadPos += 2;
+      if (playheadPos > 660) { playheadPos = 40; }
+      document.getElementById('tl-playhead').style.left = playheadPos + 'px';
+      // Update timecode
+      const t = ((playheadPos - 40) / 620) * 18;
+      const sec = Math.floor(t);
+      const fr = Math.floor((t - sec) * 100);
+      document.getElementById('pb-time').textContent =
+        '00:' + String(sec).padStart(2,'0') + '.' + String(fr).padStart(2,'0');
+    }, 40);
+  } else {
+    clearInterval(playInterval);
+  }
+}
+
+// ===== FULLSCREEN =====
+function toggleFullscreen() {
+  const layout = document.getElementById('view-editor');
+  layout.classList.toggle('fullscreen-mode');
+}
+
+// ===== INSPECTOR SLIDERS =====
+document.getElementById('insp-scale').addEventListener('input', function() {
+  document.getElementById('insp-scale-val').textContent = this.value + '%';
+});
+document.getElementById('insp-rot').addEventListener('input', function() {
+  document.getElementById('insp-rot-val').innerHTML = this.value + '&deg;';
+});
+document.getElementById('insp-opa').addEventListener('input', function() {
+  document.getElementById('insp-opa-val').textContent = this.value + '%';
+});
+
+// Scene chip click
+document.querySelectorAll('.scene-chip').forEach(ch => {
+  ch.addEventListener('click', function() {
+    document.querySelectorAll('.scene-chip').forEach(c => c.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('insp-type').value = this.textContent;
+  });
+});
+
+// ===== KEYBOARD =====
+document.addEventListener('keydown', function(e) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    const activeView = document.querySelector('.view.active');
+    const bar = activeView.querySelector('.cmd-bar');
+    if (bar) toggleCmdPalette(bar);
+  }
+  if (e.key === 'Escape') {
+    closeAllDropdowns();
+    const layout = document.getElementById('view-editor');
+    if (layout.classList.contains('fullscreen-mode')) toggleFullscreen();
+  }
+  if (e.key === ' ' && document.querySelector('#view-editor.active')) {
+    e.preventDefault();
+    togglePlay();
+  }
+});
+
+// ===== INIT =====
+renderTimeline();
+</script>
+</body>
+</html>
