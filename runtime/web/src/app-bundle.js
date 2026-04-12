@@ -44,11 +44,14 @@ let overlay = null;
 let currentProject = null;
 let currentEpisode = null;
 let currentSegment = null;
+let currentSegmentPath = null;
 let currentTimeline = null;
+let currentSelectedClipId = null;
 
 let projectsCache = [];
 let episodesCache = [];
 let segmentsCache = [];
+let episodesCacheProject = null;
 
 let homeLoadSeq = 0;
 let projectLoadSeq = 0;
@@ -187,6 +190,10 @@ function findEpisodeEntry(episodeName) {
   return episodesCache.find((entry) => entry?.name === episodeName) || null;
 }
 
+function findSegmentEntry(segmentName) {
+  return segmentsCache.find((entry) => entry?.name === segmentName) || null;
+}
+
 function getProjectDisplayName() {
   return currentProject || "Projects";
 }
@@ -206,15 +213,18 @@ function getBridgeMessage(error) {
 }
 
 function deriveTimelineDuration(timeline) {
-  const direct = finiteNumber(timeline?.duration, NaN);
-  if (Number.isFinite(direct) && direct > 0) {
-    return direct;
-  }
-  const meta = finiteNumber(timeline?.meta?.duration, NaN);
-  if (Number.isFinite(meta) && meta > 0) {
-    return meta;
-  }
-  return 0;
+  const direct = finiteNumber(timeline?.duration, 0);
+  const meta = finiteNumber(timeline?.meta?.duration, 0);
+  const tracks = Array.isArray(timeline?.tracks) ? timeline.tracks : [];
+  const derived = tracks.reduce((maxEnd, track) => {
+    const clips = Array.isArray(track?.clips) ? track.clips : [];
+    return clips.reduce((clipMax, clip) => {
+      const start = Math.max(0, finiteNumber(clip?.start, 0));
+      const duration = Math.max(0, finiteNumber(clip?.dur ?? clip?.duration, 0));
+      return Math.max(clipMax, start + duration);
+    }, maxEnd);
+  }, 0);
+  return Math.max(direct, meta, derived);
 }
 
 function deriveTrackLabel(track, index) {
@@ -253,6 +263,13 @@ function setValue(id, value) {
   const element = document.getElementById(id);
   if (element) {
     element.value = value;
+  }
+}
+
+function setReadout(id, value) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.textContent = value;
   }
 }
 
@@ -367,13 +384,12 @@ function renderEpisodeDropdown() {
 
   const entries = episodesCache.length
     ? episodesCache
-    : (currentEpisode ? [{ name: currentEpisode, firstSegment: currentSegment }] : []);
+    : (currentEpisode ? [{ name: currentEpisode }] : []);
 
   const items = entries.map((episode) => {
     const active = episode?.name === currentEpisode;
-    const hasTarget = Boolean(episode?.firstSegment || currentSegment);
-    const click = !active && currentProject && hasTarget
-      ? ` onclick="event.stopPropagation(); goEditor(${jsLiteral(currentProject)}, ${jsLiteral(episode?.name || "")}, ${jsLiteral(episode?.firstSegment || currentSegment || "")})"`
+    const click = !active && currentProject
+      ? ` onclick="event.stopPropagation(); goEditor(${jsLiteral(currentProject)}, ${jsLiteral(episode?.name || "")}, null)"`
       : "";
     return (
       `<div class="bc-dropdown-item"${click}>` +
@@ -396,6 +412,15 @@ function renderSegmentDropdown() {
   const entries = segmentsCache.length
     ? segmentsCache
     : (currentSegment ? [{ name: currentSegment }] : []);
+
+  if (!entries.length) {
+    dropdown.innerHTML =
+      `<div class="bc-dropdown-item">` +
+      `<span class="dot-inactive"></span>` +
+      `No segments` +
+      `</div>`;
+    return;
+  }
 
   dropdown.innerHTML = entries.map((segment) => {
     const active = segment?.name === currentSegment;
@@ -521,21 +546,65 @@ function setTotalDuration(duration) {
 let _previewTimer = null;
 let _previewSeq = 0;
 let _previewRendering = false;
+let _previewPendingTime = null;
+
+function getCurrentSegmentPath() {
+  return currentSegmentPath || findSegmentEntry(currentSegment)?.path || null;
+}
+
+function stringifyClipParams(params) {
+  if (!params || typeof params !== "object" || Array.isArray(params)) {
+    return "No params";
+  }
+  const keys = Object.keys(params);
+  return keys.length ? JSON.stringify(params, null, 2) : "No params";
+}
+
+function setPreviewPlaceholder(title, subtitle, preserveFrame) {
+  const img = document.getElementById("preview-frame-img");
+  const placeholder = document.getElementById("preview-placeholder");
+  if (img && !preserveFrame) {
+    img.style.display = "none";
+    img.removeAttribute("src");
+  }
+  if (placeholder) {
+    placeholder.style.display = "flex";
+  }
+  setText("canvas-title", title || "TIMELINE");
+  setText("canvas-sub", subtitle || "Load a segment to preview rendered frames");
+}
+
+function updateInspectorContext() {
+  setReadout("insp-project", currentProject || "--");
+  setReadout("insp-episode", currentEpisode || "--");
+  setReadout("insp-segment", currentSegment || "--");
+}
 
 function requestPreviewFrame(t) {
-  if (!currentSegment || !currentTimeline) return;
+  const timelinePath = getCurrentSegmentPath();
+  if (!timelinePath || !currentTimeline) return;
   clearTimeout(_previewTimer);
-  // debounce 200ms to avoid flooding during playback
-  _previewTimer = setTimeout(function() { renderPreviewFrame(t); }, 200);
+  _previewPendingTime = Math.max(0, finiteNumber(t, 0));
+  _previewTimer = setTimeout(function() {
+    renderPreviewFrame(_previewPendingTime);
+  }, 200);
 }
 
 function renderPreviewFrame(t) {
-  if (_previewRendering || !currentSegment) return;
+  const timelinePath = getCurrentSegmentPath();
+  if (!timelinePath || !currentTimeline) {
+    return;
+  }
+  if (_previewRendering) {
+    _previewPendingTime = t;
+    return;
+  }
   _previewRendering = true;
+  _previewPendingTime = null;
   var seq = ++_previewSeq;
 
   bridgeCall("preview.frame", {
-    timelinePath: currentSegment,
+    timelinePath: timelinePath,
     t: Math.round(t * 100) / 100,
     width: 960,
     height: 540,
@@ -548,10 +617,17 @@ function renderPreviewFrame(t) {
       img.style.display = "block";
       if (placeholder) placeholder.style.display = "none";
     }
-  }).catch(function() {
-    // silently fail — keep showing placeholder or last frame
+  }).catch(function(error) {
+    if (seq !== _previewSeq) return;
+    const hasFrame = Boolean(document.getElementById("preview-frame-img")?.getAttribute("src"));
+    setPreviewPlaceholder("PREVIEW", getBridgeMessage(error), hasFrame);
   }).finally(function() {
     _previewRendering = false;
+    if (_previewPendingTime != null) {
+      const nextTime = _previewPendingTime;
+      _previewPendingTime = null;
+      renderPreviewFrame(nextTime);
+    }
   });
 }
 
@@ -616,24 +692,32 @@ function selectClip(element) {
     .forEach((clip) => clip.classList.remove("selected"));
   element.classList.add("selected");
 
-  const { name, type, id } = element.dataset;
+  const { id, kind, scene } = element.dataset;
+  const name = element.dataset.name || scene || "Clip";
+  const type = element.dataset.type || "CLIP";
   const start = finiteNumber(element.dataset.start, 0);
   const duration = finiteNumber(element.dataset.dur, 0);
+  const paramsText = element.dataset.params || "No params";
+  currentSelectedClipId = id || null;
 
-  setText("insp-scene-name", name || "Clip");
+  setText("insp-scene-name", scene || name || "Clip");
   setText("insp-clip-id", id || "--");
-  setText("canvas-title", type || "CLIP");
-  setText("canvas-sub", "scene:" + slugify(name || type || "clip") + " · " + formatPreciseTime(start));
-  setText("badge-type", type || "CLIP");
+  setReadout("insp-scene-readout", scene || name || "Clip");
+  setReadout("insp-clip-readout", id || "--");
+  setReadout("insp-start", formatPreciseTime(start));
+  setReadout("insp-duration", duration.toFixed(3) + "s");
+  setReadout("insp-params", paramsText);
+  setText("canvas-title", prettifyLabel(scene || name || type || "Clip").toUpperCase());
+  setText("canvas-sub", "scene:" + slugify(scene || name || type || "clip") + " · " + formatPreciseTime(start));
+  setText("badge-type", (kind || type || "clip").toUpperCase());
   setText("badge-id", id || "--");
-  setValue("insp-duration", duration.toFixed(3) + "s");
 
   setPlayheadTime(start);
 
   document
     .querySelectorAll(".scene-chip")
     .forEach((chip) => chip.classList.remove("active"));
-  const chipText = String(type || "").toLowerCase();
+  const chipText = String(kind || "").toLowerCase();
   document.querySelectorAll(".scene-chip").forEach((chip) => {
     if (chip.textContent.toLowerCase() === chipText) {
       chip.classList.add("active");
@@ -642,6 +726,7 @@ function selectClip(element) {
 }
 
 function resetSelection(message) {
+  currentSelectedClipId = null;
   document
     .querySelectorAll(".tl-clip")
     .forEach((clip) => clip.classList.remove("selected"));
@@ -651,11 +736,16 @@ function resetSelection(message) {
 
   setText("insp-scene-name", message || "No clip selected");
   setText("insp-clip-id", "--");
+  setReadout("insp-scene-readout", message || "No clip selected");
+  setReadout("insp-clip-readout", "--");
+  setReadout("insp-start", "00:00.000");
+  setReadout("insp-duration", "0.000s");
+  setReadout("insp-params", currentTimeline ? "Select a clip to inspect its params." : "Select a clip to inspect its params.");
   setText("canvas-title", "TIMELINE");
-  setText("canvas-sub", currentSegment ? "segment:" + slugify(currentSegment) : "scene:none");
+  setText("canvas-sub", currentSegment ? "segment:" + slugify(currentSegment) : "Load a segment to preview rendered frames");
   setText("badge-type", "TIMELINE");
-  setText("badge-id", "--");
-  setValue("insp-duration", "0.000s");
+  setText("badge-id", currentSegment || "--");
+  updateInspectorContext();
   setPlayheadTime(0);
 }
 
@@ -722,17 +812,22 @@ function renderClipHtml(clip, track, trackIndex, clipIndex) {
   const duration = Math.max(0, finiteNumber(clip?.dur ?? clip?.duration, 0));
   const label = deriveClipLabel(clip, clipIndex);
   const type = deriveClipType(clip, track);
+  const scene = String(clip?.scene || clip?.type || label || "clip");
+  const kind = deriveClipClass(clip, track).replace(/^type-/, "");
   const id = String(clip?.id || ("clip-" + (trackIndex + 1) + "-" + (clipIndex + 1)));
-  const left = start * PX_PER_SEC;
-  const width = Math.max(duration * PX_PER_SEC, 12);
+  const left = TOTAL_DURATION > 0 ? (start / TOTAL_DURATION) * 100 : 0;
+  const width = TOTAL_DURATION > 0 ? (duration / TOTAL_DURATION) * 100 : 0;
   return (
     `<div class="tl-clip ${deriveClipClass(clip, track)}" id="${escapeAttr(id)}"` +
     ` data-name="${escapeAttr(label)}"` +
+    ` data-scene="${escapeAttr(scene)}"` +
     ` data-type="${escapeAttr(type)}"` +
+    ` data-kind="${escapeAttr(kind)}"` +
     ` data-id="${escapeAttr(id)}"` +
     ` data-start="${escapeAttr(String(start))}"` +
     ` data-dur="${escapeAttr(String(duration))}"` +
-    ` style="left:${left}px;width:${width}px" onclick="selectClip(this)">` +
+    ` data-params="${escapeAttr(stringifyClipParams(clip?.params))}"` +
+    ` style="left:${left}%;width:${width}%;min-width:12px" onclick="selectClip(this)">` +
     `<span class="tl-clip-label">${escapeHtml(label)}</span>` +
     `</div>`
   );
@@ -761,9 +856,45 @@ function renderEditorNotice(message) {
   setPlaybackState(false);
   setTotalDuration(0);
   resetSelection(message);
+  setPreviewPlaceholder("TIMELINE", message || "Load a segment to preview rendered frames");
 }
 
-function renderTimeline(timeline) {
+let _timelineScrubTarget = null;
+
+function updatePlayheadFromPointer(event, lanes) {
+  if (!(TOTAL_DURATION > 0) || !lanes) {
+    return;
+  }
+  const inner = lanes.querySelector(".tl-lanes-inner");
+  if (!inner) {
+    return;
+  }
+  const rect = inner.getBoundingClientRect();
+  const offset = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+  const time = rect.width > 0 ? (offset / rect.width) * TOTAL_DURATION : 0;
+  setPlayheadTime(time);
+}
+
+function beginTimelineScrub(event) {
+  if (event.button !== 0 || event.target.closest(".tl-clip")) {
+    return;
+  }
+  _timelineScrubTarget = event.currentTarget;
+  updatePlayheadFromPointer(event, _timelineScrubTarget);
+  event.preventDefault();
+}
+
+function moveTimelineScrub(event) {
+  if (_timelineScrubTarget) {
+    updatePlayheadFromPointer(event, _timelineScrubTarget);
+  }
+}
+
+function endTimelineScrub() {
+  _timelineScrubTarget = null;
+}
+
+function renderTimeline(timeline, preferredClipId) {
   const container = document.getElementById("tl-tracks");
   if (!container) {
     return;
@@ -771,6 +902,7 @@ function renderTimeline(timeline) {
 
   const tracks = Array.isArray(timeline?.tracks) ? timeline.tracks : [];
   const duration = deriveTimelineDuration(timeline);
+  TOTAL_DURATION = duration;
   const width = Math.max(Math.ceil(duration * PX_PER_SEC) + 80, 1000);
 
   if (!tracks.length) {
@@ -782,7 +914,7 @@ function renderTimeline(timeline) {
     `<div class="tl-track-label">${escapeHtml(deriveTrackLabel(track, index))}</div>`
   ).join("");
 
-  const lanes = tracks.map((track, trackIndex) => {
+  const trackRows = tracks.map((track, trackIndex) => {
     const clips = Array.isArray(track?.clips) ? track.clips : [];
     const clipHtml = clips.length
       ? clips.map((clip, clipIndex) => renderClipHtml(clip, track, trackIndex, clipIndex)).join("")
@@ -795,7 +927,7 @@ function renderTimeline(timeline) {
     `<div class="tl-lanes">` +
     `<div class="tl-lanes-inner" style="width:${width}px">` +
     `<div class="tl-ruler">${renderTimelineRuler(duration)}</div>` +
-    lanes +
+    trackRows +
     `<div class="tl-playhead" id="tl-playhead"><div class="tl-playhead-handle"></div></div>` +
     `</div>` +
     `</div>`;
@@ -803,9 +935,19 @@ function renderTimeline(timeline) {
   setPlaybackState(false);
   setTotalDuration(duration);
 
-  const firstClip = container.querySelector(".tl-clip");
-  if (firstClip) {
-    selectClip(firstClip);
+  const laneScroller = container.querySelector(".tl-lanes");
+  if (laneScroller) {
+    laneScroller.addEventListener("mousedown", beginTimelineScrub);
+  }
+
+  const clipElements = Array.from(container.querySelectorAll(".tl-clip"));
+  const selectedClip = preferredClipId
+    ? clipElements.find((clip) => clip.dataset.id === preferredClipId)
+    : null;
+  if (selectedClip) {
+    selectClip(selectedClip);
+  } else if (clipElements[0]) {
+    selectClip(clipElements[0]);
   } else {
     resetSelection("No clips");
   }
@@ -815,6 +957,8 @@ function initTimeline() {
   setPlayButtonIcons();
   setText("tc-total", formatPreciseTime(TOTAL_DURATION));
   setText("tc-fs-total", formatPreciseTime(TOTAL_DURATION));
+  updateInspectorContext();
+  setPreviewPlaceholder("TIMELINE", "Load a segment to preview rendered frames");
   renderEditorNotice("Select a segment");
 }
 
@@ -978,9 +1122,9 @@ function renderProjectState(projectName, episodes, message) {
     const orderLabel = Number.isFinite(finiteNumber(episode?.order, NaN))
       ? "order " + finiteNumber(episode?.order, 0)
       : "bridge";
-    const canOpen = Boolean(currentProject && episode?.firstSegment);
+    const canOpen = Boolean(currentProject);
     const click = canOpen
-      ? ` onclick='goEditor(${jsLiteral(currentProject)}, ${jsLiteral(episode?.name || "")}, ${jsLiteral(episode?.firstSegment || "")})'`
+      ? ` onclick='goEditor(${jsLiteral(currentProject)}, ${jsLiteral(episode?.name || "")}, null)'`
       : "";
 
     return (
@@ -997,21 +1141,28 @@ function renderProjectState(projectName, episodes, message) {
 }
 
 async function goProject(projectName) {
-  if (typeof projectName === "string" && projectName) {
-    currentProject = projectName;
+  if (typeof projectName === "string") {
+    currentProject = projectName || null;
   }
 
+  stopWatching();
+  setPlaybackState(false);
   currentEpisode = null;
   currentSegment = null;
+  currentSegmentPath = null;
   segmentsCache = [];
   currentTimeline = null;
+  currentSelectedClipId = null;
 
   switchView("view-project");
+  updateInspectorContext();
   renderProjectDropdown();
   renderEpisodeDropdown();
   renderSegmentDropdown();
 
   if (!currentProject) {
+    episodesCache = [];
+    episodesCacheProject = null;
     renderProjectState(null, [], "Select a project");
     return;
   }
@@ -1025,31 +1176,8 @@ async function goProject(projectName) {
       return;
     }
 
-    const episodes = Array.isArray(result?.episodes) ? result.episodes : [];
-    const enriched = await Promise.all(episodes.map(async (episode) => {
-      try {
-        const segmentResult = await bridgeCall("segment.list", {
-          project: currentProject,
-          episode: episode?.name,
-        });
-        const segmentEntries = Array.isArray(segmentResult?.segments) ? segmentResult.segments : [];
-        return {
-          ...episode,
-          firstSegment: segmentEntries[0]?.name || null,
-        };
-      } catch {
-        return {
-          ...episode,
-          firstSegment: null,
-        };
-      }
-    }));
-
-    if (requestId !== projectLoadSeq) {
-      return;
-    }
-
-    episodesCache = enriched;
+    episodesCache = Array.isArray(result?.episodes) ? result.episodes : [];
+    episodesCacheProject = currentProject;
     renderProjectState(currentProject, episodesCache);
     renderProjectDropdown();
     renderEpisodeDropdown();
@@ -1058,6 +1186,7 @@ async function goProject(projectName) {
       return;
     }
     episodesCache = [];
+    episodesCacheProject = null;
     renderProjectState(currentProject, [], getBridgeMessage(error));
     renderProjectDropdown();
     renderEpisodeDropdown();
@@ -1066,17 +1195,25 @@ async function goProject(projectName) {
 
 /* === editor.js === */
 async function goEditor(project, episode, segment) {
-  if (typeof project === "string" && project) {
-    currentProject = project;
+  if (typeof project === "string") {
+    currentProject = project || null;
   }
-  if (typeof episode === "string" && episode) {
-    currentEpisode = episode;
+  if (typeof episode === "string") {
+    currentEpisode = episode || null;
   }
-  if (typeof segment === "string" && segment) {
-    currentSegment = segment;
+  if (arguments.length >= 3) {
+    currentSegment = (typeof segment === "string" && segment) ? segment : null;
   }
 
+  stopWatching();
+  setPlaybackState(false);
+  currentSegmentPath = null;
+  currentTimeline = null;
+  currentSelectedClipId = null;
+  segmentsCache = [];
+
   switchView("view-editor");
+  updateInspectorContext();
   renderProjectDropdown();
   renderEpisodeDropdown();
   renderSegmentDropdown();
@@ -1090,6 +1227,17 @@ async function goEditor(project, episode, segment) {
 
   const requestId = ++editorLoadSeq;
   try {
+    if (episodesCacheProject !== currentProject || !findEpisodeEntry(currentEpisode)) {
+      const episodeResult = await bridgeCall("episode.list", { project: currentProject });
+      if (requestId !== editorLoadSeq) {
+        return;
+      }
+      episodesCache = Array.isArray(episodeResult?.episodes) ? episodeResult.episodes : [];
+      episodesCacheProject = currentProject;
+      renderProjectDropdown();
+      renderEpisodeDropdown();
+    }
+
     const segmentResult = await bridgeCall("segment.list", {
       project: currentProject,
       episode: currentEpisode,
@@ -1099,39 +1247,42 @@ async function goEditor(project, episode, segment) {
     }
 
     segmentsCache = Array.isArray(segmentResult?.segments) ? segmentResult.segments : [];
-    const selectedSegment = segmentsCache.find((entry) => entry?.name === currentSegment) || segmentsCache[0] || null;
+    const selectedSegment = findSegmentEntry(currentSegment) || segmentsCache[0] || null;
     currentSegment = selectedSegment?.name || null;
+    currentSegmentPath = selectedSegment?.path || null;
 
+    updateInspectorContext();
     renderProjectDropdown();
     renderEpisodeDropdown();
     renderSegmentDropdown();
 
-    if (!selectedSegment?.path) {
+    if (!currentSegmentPath) {
       renderEditorNotice("No segments yet");
       return;
     }
 
-    const timeline = await bridgeCall("timeline.load", { path: selectedSegment.path });
+    const timeline = await bridgeCall("timeline.load", { path: currentSegmentPath });
     if (requestId !== editorLoadSeq) {
       return;
     }
 
     currentTimeline = timeline || {};
-    TOTAL_DURATION = finiteNumber(currentTimeline.duration, 10);
     renderTimeline(currentTimeline);
+    updateInspectorContext();
     renderProjectDropdown();
     renderEpisodeDropdown();
     renderSegmentDropdown();
-    // start watching for CLI changes + render first frame
-    startWatching(selectedSegment.path);
-    setPlayheadTime(0);
+    startWatching(currentSegmentPath);
   } catch (error) {
     if (requestId !== editorLoadSeq) {
       return;
     }
     segmentsCache = [];
     currentSegment = null;
+    currentSegmentPath = null;
     currentTimeline = null;
+    currentSelectedClipId = null;
+    updateInspectorContext();
     renderProjectDropdown();
     renderEpisodeDropdown();
     renderSegmentDropdown();
@@ -1145,6 +1296,10 @@ function switchView(id) {
   const target = document.getElementById(id);
   if (!target) {
     return;
+  }
+  if (id !== "view-editor") {
+    stopWatching();
+    setPlaybackState(false);
   }
   target.classList.add("active");
   target.classList.add("view-transition-enter");
@@ -1211,12 +1366,13 @@ function stopWatching() {
 }
 
 function reloadCurrentTimeline() {
-  if (!currentSegment) return;
-  bridgeCall("timeline.load", { path: currentSegment }).then(function(result) {
+  const timelinePath = getCurrentSegmentPath();
+  if (!timelinePath) return;
+  const selectedClipId = currentSelectedClipId;
+  bridgeCall("timeline.load", { path: timelinePath }).then(function(result) {
     if (!result) return;
     currentTimeline = result;
-    TOTAL_DURATION = finiteNumber(result.duration, 10);
-    renderTimeline(result);
+    renderTimeline(result, selectedClipId);
     // re-render current frame
     _previewSeq++;
     renderPreviewFrame(currentTime);
@@ -1228,6 +1384,8 @@ function initApp() {
   initCustomSelect();
   initCanvasDrag();
   initTimeline();
+  document.addEventListener("mousemove", moveTimelineScrub);
+  document.addEventListener("mouseup", endTimelineScrub);
   renderProjectDropdown();
   renderEpisodeDropdown();
   renderSegmentDropdown();

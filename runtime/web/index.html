@@ -372,26 +372,30 @@
     <!-- Inspector -->
     <div class="inspector" id="inspector">
       <div class="insp-header">
-        <span class="insp-name" id="insp-scene-name">Canvas Intro</span>
-        <span class="insp-tag" id="insp-clip-id">clip-01</span>
+        <span class="insp-name" id="insp-scene-name">No clip selected</span>
+        <span class="insp-tag" id="insp-clip-id">--</span>
       </div>
       <div class="insp-body">
         <div class="insp-section">
-          <div class="insp-section-title">Scene Params</div>
+          <div class="insp-section-title">Clip</div>
+          <div class="insp-row">
+            <span class="insp-label">Scene</span>
+            <div class="insp-input" id="insp-scene-readout" style="display:flex;align-items:center">No clip selected</div>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Clip ID</span>
+            <div class="insp-input" id="insp-clip-readout" style="display:flex;align-items:center">--</div>
+          </div>
+          <div class="insp-row">
+            <span class="insp-label">Start</span>
+            <div class="insp-input" id="insp-start" style="display:flex;align-items:center">00:00.000</div>
+          </div>
           <div class="insp-row">
             <span class="insp-label">Duration</span>
-            <input class="insp-input" id="insp-duration" value="3.000s" readonly>
-          </div>
-          <div class="insp-row">
-            <span class="insp-label">Ease</span>
-            <input class="insp-input" value="ease-out" readonly>
-          </div>
-          <div class="insp-row">
-            <span class="insp-label">BG</span>
-            <input class="insp-input" value="#14120e" readonly>
+            <div class="insp-input" id="insp-duration" style="display:flex;align-items:center">0.000s</div>
           </div>
           <div class="scene-chips">
-            <button class="scene-chip active">canvas</button>
+            <button class="scene-chip">canvas</button>
             <button class="scene-chip">html</button>
             <button class="scene-chip">svg</button>
             <button class="scene-chip">md</button>
@@ -400,52 +404,24 @@
         </div>
 
         <div class="insp-section">
-          <div class="insp-section-title">Transform</div>
+          <div class="insp-section-title">Segment</div>
           <div class="insp-row">
-            <span class="insp-label">X</span>
-            <input class="insp-input" id="inp-x" value="120" type="number">
+            <span class="insp-label">Project</span>
+            <div class="insp-input" id="insp-project" style="display:flex;align-items:center">--</div>
           </div>
           <div class="insp-row">
-            <span class="insp-label">Y</span>
-            <input class="insp-input" id="inp-y" value="64" type="number">
+            <span class="insp-label">Episode</span>
+            <div class="insp-input" id="insp-episode" style="display:flex;align-items:center">--</div>
           </div>
           <div class="insp-row">
-            <span class="insp-label">W</span>
-            <input class="insp-input" value="608" readonly>
-          </div>
-          <div class="insp-row">
-            <span class="insp-label">H</span>
-            <input class="insp-input" value="300" readonly>
-          </div>
-          <div class="insp-row">
-            <span class="insp-label">Rotation</span>
-            <input class="insp-input" value="0.0" readonly>
+            <span class="insp-label">Segment</span>
+            <div class="insp-input" id="insp-segment" style="display:flex;align-items:center">--</div>
           </div>
         </div>
 
         <div class="insp-section">
-          <div class="insp-section-title">Clip</div>
-          <div class="insp-row">
-            <span class="insp-label">Opacity</span>
-            <div class="insp-slider-wrap">
-              <input class="insp-slider" type="range" min="0" max="100" value="100" id="slider-opacity" oninput="syncSlider('opacity')">
-              <span class="insp-slider-val" id="val-opacity">100%</span>
-            </div>
-          </div>
-          <div class="insp-row">
-            <span class="insp-label">Scale</span>
-            <div class="insp-slider-wrap">
-              <input class="insp-slider" type="range" min="10" max="200" value="100" id="slider-scale" oninput="syncSlider('scale')">
-              <span class="insp-slider-val" id="val-scale">1.00</span>
-            </div>
-          </div>
-          <div class="insp-row">
-            <span class="insp-label">Blur</span>
-            <div class="insp-slider-wrap">
-              <input class="insp-slider" type="range" min="0" max="20" value="0" id="slider-blur" oninput="syncSlider('blur')">
-              <span class="insp-slider-val" id="val-blur">0px</span>
-            </div>
-          </div>
+          <div class="insp-section-title">Params</div>
+          <div class="insp-input" id="insp-params" style="height:auto;min-height:140px;padding:8px;display:block;white-space:pre-wrap;line-height:1.45">Select a clip to inspect its params.</div>
         </div>
       </div>
     </div>
