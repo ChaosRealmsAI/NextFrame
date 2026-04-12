@@ -1,6 +1,6 @@
 # nextframe-cli v0.1.0
 
-> Frame-pure CLI video editor for AI. 7 scene types, 33 scenes, 75 tests.
+> Frame-pure CLI video editor for AI. 7 scene types, 33 scenes, 79 tests.
 > `(timeline.json, t) → pixels → mp4`
 
 ## Quick start
@@ -112,7 +112,7 @@ src/cli/                   one file per subcommand group
 src/ai/tools.js            12 AI tool functions (TOOLS map)
 src/views/                 gantt + ASCII art
 preview/                   HTML preview server + vanilla-JS UI
-test/                      75 tests (node:test)
+test/                      79 tests (node:test)
 ```
 
 ## Scene contract
