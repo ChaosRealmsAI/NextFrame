@@ -241,19 +241,24 @@ mod tests {
 
         let intro = clock.next(0);
         assert_frame(&intro, 0, "Intro", true);
+        clock.record_capture_decision(intro.needs_capture);
 
         let transition = clock.next(4);
         assert_frame(&transition, 0, "Intro", true);
+        clock.record_capture_decision(transition.needs_capture);
 
         let stable = clock.next(5);
         assert_frame(&stable, 0, "Intro", false);
+        clock.record_capture_decision(stable.needs_capture);
         assert_eq!(clock.skipped_frames(), 1);
 
         let subtitle_change = clock.next(10);
         assert_frame(&subtitle_change, 0, "Body", true);
+        clock.record_capture_decision(subtitle_change.needs_capture);
 
         let stable_after_subtitle = clock.next(15);
         assert_frame(&stable_after_subtitle, 0, "Body", false);
+        clock.record_capture_decision(stable_after_subtitle.needs_capture);
 
         let cue_change = clock.next(30);
         assert_frame(&cue_change, 1, "Outro", true);
