@@ -12,7 +12,9 @@ use std::fs;
 use std::io::ErrorKind;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Command, Stdio};
+#[cfg(not(test))]
+use std::process::ExitStatus;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -2176,6 +2178,7 @@ fn create_export_log_path() -> Result<PathBuf, String> {
     Ok(env::temp_dir().join(format!("nextframe-export-{timestamp}.log")))
 }
 
+#[cfg(not(test))]
 fn format_exit_status(status: ExitStatus) -> String {
     match status.code() {
         Some(code) => format!("exit_code_{code}"),

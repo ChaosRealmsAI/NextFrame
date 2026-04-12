@@ -171,9 +171,13 @@ struct ManifestSegment {
     srt: Option<String>,
 }
 
+// Known-good regex literals — unwrap is safe at compile-time init
+#[allow(clippy::unwrap_used)]
 static DATA_CUE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"data-cue\s*=\s*['"](\d+)['"]"#).unwrap());
+#[allow(clippy::unwrap_used)]
 static STEM_NUMBER_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d+)").unwrap());
+#[allow(clippy::unwrap_used)]
 static SRT_TIME_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?m)^(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})$",
