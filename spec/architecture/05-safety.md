@@ -1,265 +1,157 @@
 # 05 · 防呆机制
 
-NextFrame 的所有"safety net"。每条都是免费的（pure logic 或 metadata），强制执行。
+v0.1.0 的 safety net 以 `src/engine/validate.js`、`src/ai/tools.js` 和对应测试为准。
 
----
+## 设计原则
 
-## 设计哲学
+1. 结构化错误优先于抛异常
+2. 能在 metadata 层发现的问题，不拖到 ffmpeg
+3. warning 不阻塞编辑，error 阻塞 render
+4. AI mutation 必须带 validate 闭环
 
-1. **免费 > 付费**：能用 metadata 解决就不用 vision API
-2. **拦在源头**：apply_patch 调用前 validate，不要让坏数据进 timeline
-3. **AI hint 友好**：每个错误都给"AI 怎么修"的 hint
-4. **永远不静默失败**：宁可大声 error，不可悄悄吞
-5. **可解释**：每个拒绝都有 code / message / ref / hint 4 字段
+## 当前 6 道 gate
 
----
+`validateTimeline()` 当前覆盖的 6 项检查如下。
 
-## 6 道防呆闸
+| # | Gate | 失败动作 |
+|---|---|---|
+| 1 | Schema / required fields | error |
+| 2 | Symbolic time resolve / cycle / range | error |
+| 3 | Asset existence | warning |
+| 4 | Unknown scene references | error |
+| 5 | Same-track overlap | warning |
+| 6 | Duplicate track / clip ids | error |
 
-每次 `apply_patch` 或 `validate_timeline` 都跑这 6 道：
+`test/safety-gates.test.js` 正在逐项验证这 6 个 gate。
 
-| # | 闸 | 触发 | 失败动作 |
-|---|---|---|---|
-| **1** | Schema 校验 | timeline 字段类型/必填 | reject patch + error |
-| **2** | Symbolic time resolve | `{after:'X'}` 里 X 必须存在 | reject + hint "available markers: ..." |
-| **3** | Asset 存在 | 引用的 mp4/png/srt/font 在磁盘 | warning + fallback placeholder |
-| **4** | Reference 完整 | 没有 dangling clipId / sceneId | reject + hint "did you mean ..." |
-| **5** | AI assertion 通过 | apply_patch 后 describe_frame 必须满足 expected | rollback + give error to LLM |
-| **6** | Diff sanity | patch 改的字段数 ≤ N（N 由 op 类型决定）| warning |
+## Gate 1 · Schema / required fields
 
-详细每道：
+检查内容：
+- timeline 必须是 object
+- `schema` 必须是 `nextframe/v0.1`
+- `duration > 0`
+- `project.width/height/fps > 0`
+- `tracks` 必须是非空数组
 
----
+典型错误：
+- `BAD_TIMELINE`
+- `BAD_SCHEMA`
+- `BAD_DURATION`
+- `BAD_PROJECT`
+- `NO_TRACKS`
 
-### 闸 1 · Schema 校验
+## Gate 2 · Symbolic time
 
-跑 `validate_timeline()`。检查：
+检查内容：
+- `{at|after|before|sync|until|offset}` 必须能 resolve
+- 引用必须存在
+- 不能形成 cycle
+- resolve 后不能超出 `[0, timeline.duration]`
 
-- `timeline.schema` 字符串匹配支持版本
-- `timeline.duration` > 0
-- `timeline.project.{width,height,fps}` 存在且 > 0
-- 每个 `track.id` 唯一
-- 每个 `clip.id` 全 timeline 唯一
-- 每个 `clip.scene` 在 SCENE_REGISTRY 里
-- `clip.start` + `clip.dur`（resolve 后）在 `[0, timeline.duration]`
-- 同 track clip 不重叠
-- params 类型符合 SCENE_META.params schema
+典型错误：
+- `TIME_REF_NOT_FOUND`
+- `TIME_CYCLE`
+- `TIME_OUT_OF_RANGE`
 
-**输出**：`{ok, errors[], warnings[], hints[]}`
+## Gate 3 · Asset existence
 
-**测试**：50+ test fixtures，正负 case 全覆盖。
+检查内容：
+- `assets[].path` 指向的文件是否存在
 
----
+行为：
+- 缺失资产不会让 `validateTimeline()` 失败
+- 只产生 `MISSING_ASSET` warning
 
-### 闸 2 · 符号时间 resolve
+这和 v0.1 的“路径索引型资产管理”一致：可以先编辑，再补文件。
 
-跑 `resolveTimeline()`。检查：
+## Gate 4 · Scene references
 
-- 每个 `TimeExpression` 引用的 anchor 存在
-- 没有循环引用（cycle detection via topo sort）
-- resolve 后值在 `[0, duration]` 内
+检查内容：
+- `clip.scene` 必须在 `REGISTRY` 中存在
 
-**失败 hint**：列出所有可用 anchor 名给 AI。
+典型错误：
+- `UNKNOWN_SCENE`
 
-**示例 error**：
-```json
-{
-  "code": "TIME_REF_NOT_FOUND",
-  "message": "clip 'clip-headline' references {after: 'clip-aurorra'}",
-  "ref": "clip-headline",
-  "hint": "Did you mean 'clip-aurora'? Available: clip-aurora, clip-chart, marker-drum-1"
-}
-```
+错误会附带：
+- `ref = clipId`
+- `hint = available scenes ...`
 
----
+## Gate 5 · Same-track overlap
 
-### 闸 3 · Asset 存在
+检查内容：
+- 同一条 track 中按 start 排序后，clip 之间是否重叠
 
-每次 `validate_timeline` 或 `export`，scan 所有 `assets[].path`，确认文件存在 + 在沙盒内。
+行为：
+- 重叠仅发 `CLIP_OVERLAP` warning
+- 不阻止 validate success
 
-**沙盒规则**：
-- path 必须在项目目录或用户 home 目录下
-- 不允许 `..` 越界
-- 不允许绝对路径越权（`/etc/passwd` 拒绝）
-- symlink 解析后再检查
+## Gate 6 · Duplicate ids
 
-**失败动作**：
-- v0.1 lint：warning + 渲染时画 placeholder（红色 "missing: filename.mp4"）
-- v0.2 GUI：弹"重新链接"对话框
+检查内容：
+- `track.id` 全局唯一
+- `clip.id` 全局唯一
 
----
+典型错误：
+- `DUP_TRACK_ID`
+- `DUP_CLIP_ID`
 
-### 闸 4 · Reference 完整
+## Render 和 safety 的关系
 
-graph traversal 检查：
+v0.1.0 有一个关键修复：`render` 在碰 ffmpeg 之前就必须先 validate。
 
-- `chapter.start` / `chapter.end` 引用的 marker 存在
-- `clip.start` / `clip.dur` 引用的 anchor 存在
-- `keyframe.t` 引用的 anchor 存在
-- 删除一个 clip 前，warning 所有引用它的 patches
+也就是说：
+- `nextframe render` 会先调用 `validateTimeline()`
+- 如果有 error，直接退出
+- 不会继续调用 ffmpeg
 
-**失败 hint**：列出所有引用 + suggest 删除/修复。
+这就是 `cli-render-8` 对应的实现约束。
 
----
+## apply_patch 的额外约束
 
-### 闸 5 · AI assertion
+AI patch 路径在 `src/ai/tools.js`，和单纯的 `validateTimeline()` 不同，它还做两件事：
 
-每次 `apply_patch` 后，**强制 AI 提交一个 expected 断言**：
+### 1. mutation 后自动 validate
+
+`apply_patch` 会：
+- 依次执行 op
+- 每次在最终结果上调用 `validateTimeline()`
+- 把 validation report 一起返回
+
+所以它是“改动 + 校验”一体化入口。
+
+### 2. 拒绝 raw numeric add-clip.start
+
+`apply_patch` 有一条显式铁律：
 
 ```js
-apply_patch_with_assertion({
-  patch: { op: 'moveClip', clipId: 'X', start: { after: 'Y' }},
-  expected: [
-    { at: 'clip-X.start - 0.1', predicate: 'clip-X.visible == false' },
-    { at: 'clip-X.start + 0.1', predicate: 'clip-X.visible == true' },
-  ]
-});
+{ op: "add-clip", clip: { start: 3 } }  // reject
 ```
 
-engine resolve patch → describe_frame at expected 时间点 → assert predicate。
+会返回：
+- `RAW_SECONDS`
 
-**任何一条 false → rollback patch + return error 给 AI**：
+目的：
+- AI add-clip 时强制使用 symbolic start
+- 避免自动编排里把时间关系写死成脆弱的数字
 
-```json
-{
-  "code": "ASSERTION_FAILED",
-  "message": "After moveClip clip-X to {after: clip-Y}, expected clip-X visible at t=clip-X.start+0.1, but got visible:false",
-  "ref": "clip-X",
-  "hint": "clip-X 的 phase 可能没正确 reset。检查 scene's enter phase 时长 vs gap"
-}
-```
+注：
+- 这条规则是 AI patch surface 的规则
+- 不是整个 runtime 都禁止 numeric time
 
-**这是闭环的关键**。AI 不能盲目改完 patch 就走。
+## 不是 validate gate、但仍属 safety 范围的事项
 
----
+当前实现里，下面这些不再写成 `validateTimeline()` 的 gate：
+- AI assertion DSL
+- diff sanity
+- vision spot-check
+- autosave / crash recovery
 
-### 闸 6 · Diff sanity
+这些在早期设计里出现过，但 v0.1.0 尚未作为统一 validator gate 落地。
 
-每次 patch 后比较 oldTimeline 和 newTimeline 的 jsondiff size。
+## 验证命令
 
-**预期值**（每个 op）：
-- `moveClip`：1 字段改 → diff size = 1
-- `setParam`：1 字段改 → diff size = 1
-- `addClip`：1 array push → diff size ≤ 5
-- `removeClip`：1 array splice → diff size = 1
-- `splitClip`：array splice + 1 add → diff size ≤ 8
-
-**超过 → warning**："这次 patch 改了 50 个字段，远超 moveClip 的预期 1 个。是否有意？"
-
-防止 AI 因为某个 bug rewrite 整个 timeline。
-
----
-
-## 防呆专门给 AI 的扩展
-
-### 7. 命令循环检测
-
-如果 AI 在最近 N 次 patch 中相同 op + 相同 clipId 出现 ≥ 3 次 → flag "stuck loop"，要求 AI 换思路或升级人工。
-
-### 8. 时间分辨率检查
-
-任何 raw time 不在 0.1s 网格上 → warning + auto-quantize。
-
-### 9. 字体可用性检查
-
-scene META 声明的 font 在系统不存在 → warning + fallback 到 system-ui。
-
-### 10. 字幕长度检查
-
-subtitle clip 时长 > 7s → warning "用户来不及读"。
-subtitle clip 时长 < 0.5s → warning "一闪而过"。
-
-### 11. 字幕字数密度检查
-
-`textOverlay` 等 scene 的 text 长度 / clip duration > 5 字符/秒 → warning "速度过快"。
-
-### 12. 颜色对比度检查
-
-`textOverlay` 的 color vs 同位置背景颜色 → 计算 WCAG contrast ratio < 4.5:1 → warning "可读性差"。
-
-由 W7 vision 验证：当 metadata flag 这条时，调一次 vision spot-check 确认。
-
----
-
-## Lint 4 个等级
-
-```
-ERROR    阻止 render / save / export，必须修
-WARNING  允许继续但显眼提示，e.g. 字幕过长
-INFO     轻微提示，e.g. 命名建议
-HINT     AI 友好的修复建议，e.g. "试试加上 fontSize: 80"
-```
-
-CLI：
 ```bash
-nextframe lint project.nfproj
-# Errors: 2  Warnings: 5  Hints: 3
-# ❌ ERROR clip-headline: TIME_REF_NOT_FOUND ...
-# ⚠️ WARN  clip-subtitle: SUBTITLE_TOO_LONG (8.2s) ...
-# 💡 HINT  clip-x: try setting fontSize=80 for better readability
+cd nextframe-cli
+node --test test/safety-gates.test.js
+node --test test/cli-render.test.js
 ```
-
-`--strict` flag：把 warning 升级为 error，CI 用。
-
----
-
-## Vision spot-check（W7 决策）
-
-**只在以下场景调 vision LLM**：
-
-1. 闸 12 颜色对比度 < 4.5:1 → spot-check 确认
-2. 闸 10 字幕过长 → spot-check 确认能否塞下
-3. export 前对 chapter 边界帧 + peak action 帧做最终 vision pass
-4. AI 自己 request `vision_check(t, "look at this frame, is X visible?")`
-
-**vision spot-check 的 budget**：
-- 1 个 timeline / 1 次 export ≤ 5 次 vision call
-- 超过自动降级到只跑 metadata 检查 + warn
-
-**provider**：
-- v0.1：用本 Claude 进程的 Read tool 看本地 PNG（W7 已验证可行，0 API cost）
-- v0.2：可选配 Anthropic API key 用更新的 vision
-
----
-
-## 故障恢复
-
-### Scene 渲染异常
-
-scene 函数抛 error → engine catch → 画黑底红字 "Scene 'X' crashed: <message>" → 继续渲染其他 scene。
-
-**单 scene crash 不污染整帧** — 这是 frame-pure 的红利。
-
-### Engine 自身异常
-
-`renderAt` 抛 → 上层 try/catch → 返回 `{ok:false, error}` → CLI 退出码 2。
-
-### Export 中途失败
-
-frame N 出错 → 继续渲下一帧，最后报告 missed frames + 用前一帧 placeholder 填补 → 继续 ffmpeg pipe。
-
-最坏情况：mp4 可播但有几帧黑屏 + log 标记。
-
-### Crash recovery
-
-每次 patch 后写 `.nfproj.autosave`，下次启动检测，提示用户恢复。
-
----
-
-## Tests
-
-每个闸 fixture 在 `tests/safety/{N}-{name}.test.js`：
-
-- 50+ "should pass" cases
-- 50+ "should fail" cases 每个带 expected error code
-- E2E：故意构造一个坏 timeline 跑 lint，期望返回的 errors 数 + codes 严格匹配
-
-CI 强制 100% 闸覆盖（每个闸至少 5 个正负 case）。
-
----
-
-## 引用
-
-- [00-principles](./00-principles.md) — 错误是 value 的原则
-- [04-interfaces](./04-interfaces.md) — ValidationError 字段定义
-- [06-ai-loop](./06-ai-loop.md) — 闸 5 的 AI 闭环细节

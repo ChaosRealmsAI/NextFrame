@@ -1,209 +1,181 @@
 # 01 · 分层架构
 
-NextFrame 是 5 层栈，**严格单向依赖**。
+NextFrame v0.1.0 的依赖图以代码和 `test/architecture.test.js` 为准，不再按早期的“workflows / bridge / GUI”草图描述。它更像一个受约束的 DAG，而不是完美直线分层。
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ L5 · Editor UI (optional · v0.2)                            │
-│      desktop GUI · web preview · drag/drop                   │
-├─────────────────────────────────────────────────────────────┤
-│ L4 · Surface (CLI · Bridge · IPC)                           │
-│      nextframe-cli · JSON-RPC bridge · file watcher          │
-├─────────────────────────────────────────────────────────────┤
-│ L3 · Workflows (composed tasks)                             │
-│      ai-edit · export · serve · validate · render-batch      │
-├─────────────────────────────────────────────────────────────┤
-│ L2 · Engine + Domain                                         │
-│      timeline · scenes · validate · resolve symbolic time    │
-│      describe · gantt · ascii-screenshot                     │
-├─────────────────────────────────────────────────────────────┤
-│ L1 · Render Targets                                          │
-│      napi-canvas (preview) · wgpu (export) · wasm (portable) │
-└─────────────────────────────────────────────────────────────┘
+preview/
+   ↓
+bin/ + src/cli/
+   ↓
+src/ai/ + src/timeline/
+   ↓
+src/engine/
+   ↓
+src/scenes/
+
+src/views/   -> src/engine/
+src/targets/ -> src/engine/
 ```
 
 ## 依赖规则
 
-| 层 | 可以 import |
+| 区域 | 可依赖 |
 |---|---|
-| L5 | L4, L3, L2 (read-only), L1 (read-only) |
-| L4 | L3, L2, L1 |
-| L3 | L2, L1 |
-| L2 | L1 |
-| L1 | （只 std + 自己的 dep） |
+| `preview/*` | `src/*` |
+| `src/cli/*` | `src/ai/*`, `src/timeline/*`, `src/engine/*`, `src/views/*`, `src/targets/*`, `src/scenes/*` |
+| `src/ai/*` | `src/engine/*`, `src/timeline/*`, `src/views/*`, `src/scenes/*` |
+| `src/timeline/*` | `src/engine/*` |
+| `src/views/*` | `src/engine/*` |
+| `src/targets/*` | `src/engine/*` |
+| `src/engine/*` | `src/scenes/index.js`, same-dir engine modules |
+| `src/scenes/*` | scene helpers、自身依赖、`node:*`、`@napi-rs/canvas` |
 
-**反向依赖一票否决**。
+更细的硬规则由 `arch-1 layer graph` 测试执行。
 
-**跨 2 层禁止**：例如 L5 不能直接调 L1。如果 GUI 想触发渲染，必须 → L4 (CLI/bridge) → L3 (workflow) → L2 (engine) → L1 (target)。
+## L1 · Scene 层
 
-**同层互相**：允许但少用。例如 L2 内部 timeline 可以引用 scenes，但 scenes 不能引用 timeline（保持 frame-pure）。
+### Scene registry 与 scene 实现
 
----
+关键文件：
+- `nextframe-cli/src/scenes/index.js`
+- `nextframe-cli/src/scenes/_contract.js`
 
-## 每层详细职责
+公共 scene 文件：
+- Backgrounds: `auroraGradient`, `fluidBackground`, `starfield`, `spotlightSweep`, `pixelRain`, `particleFlow`, `orbitRings`
+- Typography: `kineticHeadline`, `glitchText`, `countdown`
+- Shapes: `circleRipple`, `meshGrid`, `neonGrid`, `shapeBurst`
+- Data Viz: `barChartReveal`, `lineChart`, `dataPulse`
+- Overlays: `lowerThirdVelvet`, `cornerBadge`, `textOverlay`, `vignette`
+- Series: `ccFrame`, `ccBigNumber`, `ccPill`, `ccNote`, `ccDesc`
+- Browser: `htmlSlide`, `svgOverlay`, `markdownSlide`, `lottieAnim`, `videoClip`, `videoWindow`
+- Hidden extension example: `imageHero`
 
-### L1 · Render Targets
+Browser / cache helpers：
+- `src/scenes/_browser-scenes.js`
+- `src/scenes/_png-decode.js`
+- `src/scenes/_browser-documents.js`
+- `src/scenes/_browser-markdown.js`
+- `src/scenes/_html-cache.js`
+- `src/scenes/_video-cache.js`
+- `src/scenes/_image-cache.js`
 
-**职责**：把指令变像素。不知道 timeline 是什么、不知道 scene 是什么。
+## L2 · Engine 层
 
-只暴露 1 个能力：`drawCommands(cmds: DrawCommand[]) → Pixels`
+关键文件：
+- `src/engine/render.js`
+- `src/engine/validate.js`
+- `src/engine/time.js`
+- `src/engine/describe.js`
+- `src/engine/_guard.js`
 
-模块：
-- `targets/napi-canvas/` — Skia-backed Canvas2D，编辑器实时预览用
-- `targets/wgpu/` — GPU shader，导出加速用
-- `targets/wasm/` — Rust→WASM，跨平台 / 浏览器版
+职责：
+- resolve symbolic time
+- validate timeline
+- render frame
+- aggregate describe metadata
 
-**规则**：
-- 不 import L2 / L3 / L4 / L5
-- 内部数据结构纯粹（DrawCommand 是简单 enum）
-- 每个 target 实现同一个接口 `RenderTarget`
-- 单测覆盖：相同输入 → 相同输出（cross-target 像素 diff）
+## Engine adapters · Views / Targets
 
----
+这两组模块都依赖 engine，但不被 engine 反向依赖。
 
-### L2 · Engine + Domain
+### Views
 
-**职责**：理解 timeline 和 scene。frame-pure 的家。
+关键文件：
+- `src/views/gantt.js`
+- `src/views/ascii.js`
 
-模块：
-- `engine/` — `renderAt(target, timeline, t)` + scene 调度 + 时间分发
-- `engine/validate.js` — schema + 不变式检查
-- `engine/resolve-time.js` — symbolic time → raw seconds
-- `engine/describe.js` — `describe(timeline, t) → SceneDescription[]`
-- `engine/gantt.js` — `renderGantt(timeline) → ASCII string`
-- `engine/ascii-shot.js` — `pngToAscii(buffer) → ASCII string`
-- `scenes/` — 21+ frame-pure scene 函数 + 各自的 describe
-- `timeline/` — JSON schema + ops（addClip / moveClip / split / setParam）
+职责：
+- 把 engine 结果格式化为 ASCII 视图
+- 提供给 AI / CLI 做低成本观察
 
-**规则**：
-- 只 import L1
-- 不知道 CLI / bridge / GUI 存在
-- 每个 scene 必须 export `render` + `describe` + `META`（详见 [02-modules](./02-modules.md)）
-- engine 不修改 timeline，timeline ops 是纯函数（in→out 都是新 timeline）
+### Targets
 
----
+关键文件：
+- `src/targets/napi-canvas.js`
+- `src/targets/ffmpeg-mp4.js`
 
-### L3 · Workflows
+职责：
+- `napi-canvas`：单帧 PNG 输出
+- `ffmpeg-mp4`：MP4 导出与音频 mux
 
-**职责**：组合 L2 完成完整任务。任务有副作用（读写文件、调外部进程）但状态无副作用。
+v0.1 的真实 target 形态不是早期草图里的 `wgpu/wasm` 多实现，而是：
+- still frame: `napi-canvas`
+- video export: `ffmpeg + libx264`
 
-模块：
-- `workflows/ai-edit.js` — 调 LLM API → 解析输出 → apply patches → 验证
-- `workflows/export.js` — 帧序列 + ffmpeg pipe → MP4
-- `workflows/serve.js` — file watcher + ws + http server → 浏览器预览
-- `workflows/render-batch.js` — 并行 N worker 渲染指定帧范围
-- `workflows/validate-project.js` — 资产存在检查 + lint
+## L3 · AI / Timeline 层
 
-**规则**：
-- import L2 + L1
-- 不知道 CLI 长什么样
-- 每个 workflow 是一个 async 函数，返回 `{ok, result, errors, hints}`
-- 副作用集中在这一层（fs / spawn / network）
-- 单测：mock fs + spawn
+### Timeline mutation 层
 
----
+关键文件：
+- `src/timeline/ops.js`
 
-### L4 · Surface · CLI / Bridge / IPC
+提供的纯函数：
+- `addClip`
+- `removeClip`
+- `moveClip`
+- `resizeClip`
+- `setParam`
+- `addMarker`
+- `duplicateClip`
+- `findClips`
+- `getClip`
 
-**职责**：给外部用户（CLI 用户、AI agent、GUI app）一个调用入口。
+### AI tool 层
 
-模块：
-- `surface/cli/` — clap 子命令路由
-- `surface/bridge/` — JSON-RPC 风格的 IPC（给 GUI 或外部 SDK）
-- `surface/ipc/` — wry shell 的 IPC handler（v0.2 GUI 用）
+关键文件：
+- `src/ai/tools.js`
 
-**规则**：
-- import L3 + L2 + L1
-- 这一层是"包装"，不该有业务逻辑
-- 每个 CLI 子命令是 thin wrapper 调一个 workflow
-- 输入解析在这层（clap arg parse），错误格式化在这层
-- 不该有 frame-pure / scene / engine 的概念暴露
+职责：
+- 暴露 12 个结构化工具给 AI
+- 包装时间解析、描述、断言、ASCII 渲染
+- 在 `apply_patch` 中执行 mutation + validate 闭环
 
----
+## L4 · CLI 层
 
-### L5 · Editor UI（可选）
+入口：
+- `bin/nextframe.js`
 
-**职责**：给人类视觉化操作。**v0.1 不做**，v0.2 加。
+CLI 模块：
+- `src/cli/_io.js`
+- `src/cli/new.js`
+- `src/cli/validate.js`
+- `src/cli/frame.js`
+- `src/cli/render.js`
+- `src/cli/probe.js`
+- `src/cli/describe.js`
+- `src/cli/gantt.js`
+- `src/cli/ascii.js`
+- `src/cli/scenes.js`
+- `src/cli/guide.js`
+- `src/cli/ops.js`
+- `src/cli/assets.js`
+- `src/cli/bakeHtml.js`
+- `src/cli/bakeBrowser.js`
+- `src/cli/bakeVideo.js`
 
-模块：
-- `editor/shell.rs` — wry + tao 桌面壳
-- `editor/ui/` — 5 区布局 HTML/JS
-- `editor/preview.js` — 嵌入式 preview canvas
-- `editor/inspector.js` — 属性面板
+L4 做的事：
+- 路由 25 个子命令
+- 解析 flags / positional args
+- 格式化 stdout / stderr / JSON 输出
+- 调 lower layers，不放业务状态
 
-**规则**：
-- 只 import L4（通过 bridge / IPC）
-- **不直接 import L2 / L1**！必须经过 surface 层
-- 这条最重要 — 保证 GUI 是"另一个 client"，不是嵌入业务逻辑
-- 如果 v0.2 改了 GUI 不影响 CLI / AI
+## L5 · preview/（可选 client）
 
----
+`preview/` 目前只是一个薄 client，不是产品主路径。它只能向下读 `src/*`，不能反向让核心逻辑依赖 preview。
 
 ## 架构测试
 
-提供一个脚本 `scripts/check-layers.sh`：
+当前自动化检查：
+- `arch-1`：层级 import 图
+- `arch-2`：scene contract
+- `arch-3`：error contract
+- `arch-4`：extension registry
+- `arch-5`：file size cap
+- `arch-6`：guard runtime
+
+验证命令：
 
 ```bash
-# 检查反向依赖
-grep -rE 'from "../surface' src/engine/    # L2 不能 import L4
-grep -rE 'from "../workflows' src/engine/  # L2 不能 import L3
-grep -rE 'from "../engine' src/targets/    # L1 不能 import L2
-
-# 检查跨层
-grep -rE 'from "../../targets' src/surface/  # L4 不能跨过 L3
-grep -rE 'from "../../engine' src/editor/    # L5 不能跨过 L4
+cd nextframe-cli
+node --test test/architecture.test.js
 ```
-
-**任何 hit 都是 PR 拒绝。**
-
----
-
-## 命名约定
-
-文件 / 目录就用层级命名，让 import 路径自带语义：
-
-```
-src/
-  targets/      ← L1
-    napi/
-    wgpu/
-    wasm/
-  engine/       ← L2
-    scenes/
-    timeline/
-    validate.js
-    describe.js
-  workflows/    ← L3
-    ai-edit.js
-    export.js
-    serve.js
-  surface/      ← L4
-    cli/
-    bridge/
-  editor/       ← L5（v0.2）
-    shell.rs
-    ui/
-```
-
-import 路径 `"../engine/..."` 立刻知道这是 L2。
-
----
-
-## v0.1 简化
-
-v0.1 不做 L5。整个栈只 4 层：
-
-```
-nextframe-cli (L4 surface)
-       │
-       ▼
-ai-edit / export / serve (L3 workflows)
-       │
-       ▼
-engine + scenes (L2)
-       │
-       ▼
-napi-canvas + wgpu (L1)
-```
-
-这是最小可发布的 NextFrame。

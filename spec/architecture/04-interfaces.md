@@ -1,32 +1,30 @@
 # 04 · 接口契约
 
-所有跨层 / 跨模块的 API 完整签名。改这些 = bump major schema。
+所有公开接口以 v0.1.0 代码为准。这里记录 timeline、AI tools、CLI 和 render flags 的稳定表面。
 
----
+## Timeline JSON
 
-## Timeline JSON Schema
-
-```typescript
+```ts
 type Timeline = {
-  schema: "nextframe/v0.1";        // version
-  duration: number;                 // raw seconds, locked
-  background: string;               // hex color
+  schema: "nextframe/v0.1";
+  duration: number;
+  background?: string;
   project: {
-    width: number;                  // 1920
-    height: number;                 // 1080
-    aspectRatio: number;            // 16/9
-    fps: number;                    // 30
+    width: number;
+    height: number;
+    aspectRatio?: number;
+    fps: number;
   };
-  chapters?: Chapter[];             // 命名时间段
-  markers?: Marker[];               // 命名时间点
+  chapters?: Chapter[];
+  markers?: Marker[];
   tracks: Track[];
-  assets?: Asset[];                 // 引用的外部资源
+  assets?: Asset[];
 };
 
 type Chapter = {
-  id: string;                       // unique within timeline
-  name?: string;                    // human label
-  start: TimeValue;                 // raw or symbolic
+  id: string;
+  name?: string;
+  start: TimeValue;
   end: TimeValue;
 };
 
@@ -37,7 +35,7 @@ type Marker = {
 };
 
 type Track = {
-  id: string;                       // 'v1', 'v2', 'a1' 等 stable
+  id: string;
   name?: string;
   kind: "video" | "audio";
   muted?: boolean;
@@ -46,356 +44,183 @@ type Track = {
 };
 
 type Clip = {
-  id: string;                       // stable, AI 引用用
+  id: string;
   start: TimeValue;
   dur: TimeValue;
-  scene: string;                    // sceneId
-  params?: Record<string, ParamValue>;
-  label?: string;                   // user color label
-  note?: string;                    // user free text
-};
-
-type ParamValue = string | number | boolean | { keyframes: Keyframe[] };
-
-type Keyframe = {
-  t: TimeValue;
-  value: number | string;
-  ease?: "linear" | "ease-out" | "ease-in" | "bezier";
+  scene: string;
+  params?: Record<string, any>;
+  blend?: string;
+  label?: string;
+  note?: string;
 };
 
 type Asset = {
   id: string;
-  path: string;                     // sandboxed
-  kind: "video" | "audio" | "image" | "subtitle" | "font";
+  path: string;
+  kind: "image" | "audio" | "video" | "subtitle" | "font";
   metadata?: Record<string, any>;
 };
 ```
 
----
-
 ## SymbolicTime
 
-```typescript
+```ts
 type TimeValue = number | TimeExpression;
 
 type TimeExpression =
-  | { at: string }                          // 'project-start' | 'project-end' | 'chapter-X' | 'chapter-X.start' | 'chapter-X.end' | 'marker-Y' | 'clip-Z' | 'clip-Z.start' | 'clip-Z.end'
-  | { after: string; gap?: number }         // after some clip/marker, optional positive gap in seconds
-  | { before: string; gap?: number }        // before some clip/marker, optional positive gap in seconds
-  | { sync: string }                        // alias of at, semantic-clear for "synced to subtitle/cue"
-  | { until: string }                       // ends at the named anchor
-  | { offset: string; by: number }          // raw offset from anchor
-  ;
+  | { at: string }
+  | { after: string; gap?: number }
+  | { before: string; gap?: number }
+  | { sync: string }
+  | { until: string }
+  | { offset: string; by: number };
 ```
 
-**Rules**：
-- Resolve 顺序：build dep graph → topo sort → quantize 0.1s
-- Cycle detection on resolve
-- Reference must exist (chapter id / marker id / clip id)
-- After resolve, all values are positive numbers in `[0, timeline.duration]`
+解析规则：
+- `resolveTimeline()` / `resolveExpression()` 负责解析
+- 解析后量化到 `0.1s`
+- dangling ref / cycle / range overflow 返回结构化错误
 
----
+## Engine surface
 
-## Engine API (L2)
-
-```typescript
-// engine/index.js
-
-export function renderAt(
-  target: RenderTarget,
-  timeline: Timeline,
-  t: number  // raw seconds, after resolve
-): void;
-
-export function validateTimeline(
-  timeline: unknown
-): {
-  ok: boolean;
-  errors: ValidationError[];
-  warnings: ValidationWarning[];
-  hints: AIHint[];
-};
-
-export function resolveTimeline(timeline: Timeline): Timeline;
-// All TimeValues become numbers.
-
-export function describeFrame(
-  timeline: Timeline,
-  t: number
-): FrameDescription;
-
-export function renderGantt(timeline: Timeline): string;  // ASCII
-
-export function pngToAscii(buffer: Buffer, width = 80): string;
+```ts
+renderAt(timeline, t, opts?) -> { ok, canvas?, value?, error? }
+validateTimeline(timeline, opts?) -> { ok, error?, errors[], warnings[], hints[], resolved? }
+resolveTimeline(timeline) -> { ok, value?, lookup?, error? }
+resolveExpression(expr, lookup, duration) -> { ok, value?, error? }
+describeAt(timeline, t, viewport?) -> { ok, value?, error? }
+renderGantt(timeline) -> string
+pngToAscii(buffer, width?, height?) -> string
 ```
 
-```typescript
-type ValidationError = {
-  code: string;          // 'CLIP_OVERLAP' | 'TIME_OUT_OF_RANGE' | 'MISSING_ASSET' | ...
-  message: string;
-  path?: string;         // JSON path
-  ref?: string;          // clipId / chapterId etc
-  hint?: string;         // AI fix suggestion
-};
+## Scene surface
 
-type FrameDescription = {
-  t: number;
-  chapter: string | null;
-  active_clips: ClipDescription[];
-};
+每个 scene 在 registry 中必须满足：
 
-type ClipDescription = {
-  clipId: string;
-  sceneId: string;
-  phase: "enter" | "hold" | "exit";
-  progress: number;       // 0..1 within phase
-  elements: SceneElement[];
-  boundingBox?: BoundingBox;
-};
-
-type SceneElement = {
-  id: string;
-  type: "text" | "rect" | "circle" | "image" | "line" | "shape";
-  visible: boolean;
-  opacity: number;
-  // Type-specific:
-  content?: string;       // text
-  fontSize?: number;
-  fontFamily?: string;
-  x?: number;
-  y?: number;
-  w?: number;
-  h?: number;
-  fill?: string;
-  stroke?: string;
-};
-```
-
----
-
-## Scene API (L2)
-
-每个 scene 文件必须 export 3 件事：
-
-```typescript
-// 1. Render function
-export function {sceneName}(
-  t: number,            // local clip time, seconds
-  params: object,       // user-provided
-  ctx: CanvasRenderingContext2D | similar,
-  globalT?: number      // optional global timeline time
-): void;
-
-// 2. Describe function
-export function describe(
-  t: number,
-  params: object,
-  viewport: { width: number; height: number }
-): ClipDescription;
-
-// 3. Metadata
-export const META: {
-  id: string;
-  category: "Backgrounds" | "Typography" | "Shapes" | "Data Viz" | "Transitions" | "Overlays" | "Audio";
-  description: string;
-  duration_hint: number;
-  params: ParamMeta[];
-  ai_prompt_example?: string;
-};
-
-type ParamMeta = {
-  name: string;
-  type: "string" | "number" | "boolean" | "color" | "enum";
-  required?: boolean;
-  default?: any;
-  range?: [number, number];
-  options?: any[];        // for enum
-  semantic: string;       // for AI: what does this mean?
-};
-```
-
----
-
-## Timeline Ops API (L2)
-
-```typescript
-// engine/timeline/ops.js — all pure functions
-
-export function addClip(
-  timeline: Timeline,
-  trackId: string,
-  clip: Clip
-): { ok: boolean; value?: Timeline; error?: ValidationError };
-
-export function removeClip(timeline, clipId): Result<Timeline>;
-export function moveClip(timeline, clipId, newStart: TimeValue): Result<Timeline>;
-export function setDur(timeline, clipId, newDur: TimeValue): Result<Timeline>;
-export function setParam(timeline, clipId, key: string, value: any): Result<Timeline>;
-export function splitClip(timeline, clipId, t: TimeValue): Result<Timeline>;
-export function findClips(timeline, predicate: ClipPredicate): string[];
-export function getClip(timeline, clipId): Clip | null;
-
-type ClipPredicate = {
-  sceneId?: string;
-  trackId?: string;
-  hasParam?: { key: string; value?: any };
-  inChapter?: string;
-  textContent?: string;  // search params for matching text
-};
-
-type Result<T> = { ok: true; value: T } | { ok: false; error: ValidationError };
-```
-
----
-
-## AI Tool Surface (L3)
-
-详见 [06-ai-loop](./06-ai-loop.md)。简化版：
-
-```typescript
-// workflows/ai-tools.js
-
-export function find_clips(timeline, predicate: ClipPredicate): string[];
-export function get_clip(timeline, clipId: string): Clip | null;
-export function describe_frame(timeline, t: TimeValue): FrameDescription;
-export function apply_patch(timeline, patch: Patch): Result<Timeline>;
-export function assert_at(
-  timeline,
-  t: TimeValue,
-  predicate: AssertionDSL
-): { pass: boolean; message: string };
-export function render_ascii(timeline, t: TimeValue): string;
-export function ascii_gantt(timeline): string;
-
-type Patch =
-  | { op: "addClip"; track: string; clip: Clip }
-  | { op: "removeClip"; clipId: string }
-  | { op: "moveClip"; clipId: string; start: TimeValue }
-  | { op: "setDur"; clipId: string; dur: TimeValue }
-  | { op: "setParam"; clipId: string; key: string; value: any }
-  | { op: "splitClip"; clipId: string; t: TimeValue }
-  | { op: "addMarker"; id: string; t: TimeValue }
-  | { op: "addChapter"; id: string; start: TimeValue; end: TimeValue }
-  ;
-
-type AssertionDSL = string;
-// Example: "clip-headline.opacity > 0.8"
-// Example: "clip-headline.elements.title.visible == true"
-// Example: "active_clips.length >= 2"
-```
-
----
-
-## CLI (L4)
-
-```bash
-nextframe new <project-path>
-  # Create empty .nfproj at path
-
-nextframe ai-edit <project> "<natural language prompt>"
-  [--mode create|edit|fix]
-  [--max-iter 5]
-  # Calls workflows/ai-edit, applies all patches
-
-nextframe set-dur <project> <clipId> <seconds>
-nextframe move-clip <project> <clipId> <symbolicTime>
-  # symbolicTime examples: "after:clip-x" / "at:marker-y" / "3.5"
-nextframe set-param <project> <clipId> <key> <value>
-nextframe split-clip <project> <clipId> <symbolicTime>
-
-nextframe render <project> --t <symbolicTime> --out <png-path>
-  [--width 1920] [--height 1080]
-  [--target napi-canvas|wgpu|wasm]
-
-nextframe export <project> --out <mp4-path>
-  [--fps 30] [--target wgpu] [--audio]
-
-nextframe serve <project>
-  [--port 8765]
-  # Hot-reload preview at http://localhost:8765
-
-nextframe lint <project>
-  [--strict]
-  # Run all 6 safety gates
-
-nextframe describe <project> --t <symbolicTime>
-  [--json]
-nextframe gantt <project>
-nextframe ascii <project> --t <symbolicTime>
-
-nextframe scenes
-  [--json]
-  # List all available scenes with META
-```
-
-**Common flags**:
-- `--json` — output structured JSON for AI parsing
-- `--quiet` — minimal output
-- `--verbose` — debug info
-- `--no-color` — strip ANSI
-
-**Exit codes**:
-- 0 — success
-- 1 — lint warning (still completed)
-- 2 — error (operation failed)
-- 3 — usage error (bad args)
-
----
-
-## Render Target Trait (L1)
-
-```typescript
-interface RenderTarget {
-  width: number;
-  height: number;
-  draw(cmds: DrawCommand[]): void;
-  readPixels(): Buffer;       // RGBA
-  savePNG(path: string): Promise<void>;
-  destroy(): void;
+```ts
+{
+  id: string,
+  render: (t, params, ctx, globalT?) => void,
+  describe: (t, params, viewport?) => ClipDescription,
+  META: {
+    id: string,
+    category: string,
+    description: string,
+    duration_hint: number,
+    params: ParamSpec[],
+    ai_prompt_example?: string
+  }
 }
-
-type DrawCommand =
-  | { op: "fillRect"; x; y; w; h; color }
-  | { op: "fillText"; x; y; text; font; color }
-  | { op: "drawImage"; src; x; y; w; h }
-  | { op: "beginPath" }
-  | { op: "arc"; cx; cy; r; start; end }
-  | { op: "fill"; color }
-  | { op: "stroke"; color; width }
-  | { op: "save" }
-  | { op: "restore" }
-  | { op: "translate"; x; y }
-  | { op: "rotate"; rad }
-  | { op: "scale"; x; y }
-  | { op: "globalAlpha"; alpha }
-  | { op: "compositeOp"; mode }
-  ;
 ```
 
-**注**：v0.1 不强制 DrawCommand 抽象层，scenes 直接调 ctx 方法（与 Canvas2D API 一致）。v0.2 想做 wgpu 共享时再加。
+v0.1 public categories：
+- `Backgrounds`
+- `Typography`
+- `Shapes`
+- `Data Viz`
+- `Overlays`
+- `Series`
+- `Browser`
 
----
+Registry 内另有隐藏 `Media` 类别：`imageHero`。
 
-## File formats
+## AI Tool Surface（12 tools）
 
-### `.nfproj` (project file)
+```ts
+list_scenes() -> { ok, value: SceneMeta[] }
+get_scene_meta({id}) -> { ok, value: SceneMeta } | { ok:false, error }
+validate_timeline({timeline}) -> { ok, value: ValidationReport }
+resolve_time({timeline, expr}) -> { ok, value: number } | { ok:false, error }
+describe_frame({timeline, t}) -> { ok, value: FrameDescription } | { ok:false, error }
+find_clips({timeline, scene?, track?, at?, param?}) -> { ok, value: ClipMatch[] }
+get_clip({timeline, clipId}) -> { ok, value: ClipDetails } | { ok:false, error }
+apply_patch({timeline, ops}) -> { ok, value: {timeline, validation, applied} } | { ok:false, error }
+assert_at({timeline, t, checks}) -> { ok, value: {t, passed, failed, total} } | { ok:false, error }
+render_ascii({timeline, t, width?}) -> { ok, value: string } | { ok:false, error }
+gantt_ascii({timeline, width?}) -> { ok, value: string } | { ok:false, error }
+suggest_clip_at({timeline, t}) -> { ok, value: ActiveClipRef[] } | { ok:false, error }
+```
 
-JSON document conforming to Timeline schema above. Plain text. UTF-8.
+新增并已实现的工具：
+- `find_clips`
+- `get_clip`
+- `apply_patch`
+- `assert_at`
+- `render_ascii`
 
-### Resource files
+## CLI（25 subcommands）
 
-- Video: any ffmpeg-supported codec
-- Audio: WAV / MP3 / AAC / FLAC
-- Image: PNG / JPG / WebP
-- Subtitle: SRT / VTT
-- Font: TTF / OTF
+| 命令 | 用途 |
+|---|---|
+| `new <out.json>` | 创建空 timeline |
+| `validate <timeline.json>` | 跑 safety gates |
+| `frame <timeline.json> <t> <out.png>` | 输出单帧 PNG |
+| `render <timeline.json> <out.mp4>` | 导出 MP4 |
+| `probe <file.mp4>` | 用 ffprobe 检查导出 |
+| `describe <timeline.json> <t>` | 输出结构化帧描述 |
+| `gantt <timeline.json>` | ASCII gantt |
+| `ascii <timeline.json> <t>` | ASCII 单帧预览 |
+| `scenes` | 列 public scene META |
+| `guide` | AI onboarding 入口 |
+| `bake-html <timeline.json>` | 预烘焙 `htmlSlide` |
+| `bake-browser <timeline.json>` | 预烘焙 browser scenes |
+| `bake-video <timeline.json>` | 预提取 `videoClip` 帧 |
+| `add-clip` | 添加 clip |
+| `move-clip` | 移动 clip |
+| `resize-clip` | 修改 clip duration |
+| `remove-clip` | 删除 clip |
+| `set-param` | 更新 params |
+| `add-marker` | 添加 marker |
+| `list-clips` | 列 clip |
+| `dup-clip` | 复制 clip |
+| `import-image` | 添加 image asset |
+| `import-audio` | 添加 audio asset |
+| `list-assets` | 列 asset |
+| `remove-asset` | 删除 asset |
 
-All paths in `assets[].path` are sandboxed (no `..` escaping project dir or home dir, see [05-safety](./05-safety.md)).
+## Render flags
 
----
+`nextframe render` 当前支持：
 
-## Backwards compatibility
+| flag | 含义 |
+|---|---|
+| `--json` | 结构化输出 |
+| `--fps=<N>` | 覆盖输出 fps |
+| `--audio=<path>` | 在导出后 mux 外部音频 |
+| `--crf=<0..51>` | libx264 质量参数 |
+| `--target=ffmpeg` | 选择视频导出目标，v0.1 仅支持 `ffmpeg` |
 
-Schema version in `timeline.schema` field. Engine refuses to load timeline with newer schema than it understands. Migrations live in `engine/migrations/{from}->{to}.js`.
+`nextframe frame` / `bake-browser` 额外支持：
+- `--width`
+- `--height`
 
-v0.1 schema is `"nextframe/v0.1"`. v0.2 will be `"nextframe/v0.2"` etc.
+## Probe command
+
+`nextframe probe <file.mp4> [--json]` 返回：
+
+```ts
+{
+  path: string,
+  format: string | null,
+  duration: number,
+  size: number,
+  video: { codec, width, height, fps } | null,
+  audio: { codec, sample_rate, channels } | null,
+  streams: number
+}
+```
+
+## Error contract
+
+所有公共路径都应返回：
+
+```ts
+{ ok: true, value?: any }
+{ ok: false, error: { code: string, message: string, hint?: string, ref?: string } }
+```
+
+CLI exit code：
+- `0` success
+- `1` warning
+- `2` error
+- `3` usage
