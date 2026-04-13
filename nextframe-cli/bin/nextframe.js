@@ -43,61 +43,79 @@ const SUBCOMMANDS = {
   help: null,
 };
 
-const HELP = `nextframe — frame-pure CLI video editor for AI
+const HELP = `nextframe — AI-native video editor CLI (v0.3)
 
-USAGE
-  nextframe <command> <project> <episode> <segment> [args]
-  nextframe <command> <timeline.json> [args]     (legacy)
+  Timeline JSON → multi-layer HTML → browser playback
 
-SUBCOMMANDS
-  new <out.json>                              create empty timeline
-  validate <project> <episode> <segment>      run safety gates
-  frame <project> <episode> <segment> <t>     render single frame
-  render <project> <episode> <segment>        export full timeline to mp4
-  probe <out.mp4>                             inspect export metadata with ffprobe
-  bake-html <project> <episode> <segment>     pre-render htmlSlide clips into PNG cache
-  describe <project> <episode> <segment> <t>  JSON of what is visible at t
-  ascii <project> <episode> <segment> <t>     ASCII art preview of a frame
-  gantt <project> <episode> <segment>         ASCII gantt
-  bake-video <project> <episode> <segment>    pre-extract videoClip frames with ffmpeg
-  scenes                                      list all v0.3 scenes from registry
-  scenes <id>                                 show single scene details
-  build <timeline.json> [-o out.html]         bundle timeline + scenes → HTML
-  bake-browser <project> <episode> <segment>  bake html/svg/markdown/lottie browser scenes
-  add-clip <project> <episode> <segment> ...  add a clip to a track
-  move-clip <project> <episode> <segment> ... move a clip's start time
-  resize-clip <project> <episode> <segment>   resize clip duration
-  remove-clip <project> <episode> <segment>   remove a clip
-  set-param <project> <episode> <segment> ... update clip params
-  add-marker <project> <episode> <segment>    append a timeline marker
-  list-clips <project> <episode> <segment>    list clips grouped by track
-  dup-clip <project> <episode> <segment> ...  duplicate a clip at a new time
-  import-image <project> <episode> <segment>  add an image asset to timeline.assets[]
-  import-audio <project> <episode> <segment>  add an audio asset to timeline.assets[]
-  list-assets <project> <episode> <segment>   list assets grouped by kind
-  remove-asset <project> <episode> <segment>  remove an asset by id
-  guide                                       AI onboarding: conventions, workflow, naming
+QUICK START (for AI)
+  1. nextframe scenes                           see 48 available components
+  2. Write timeline.json with layers[]          (see FORMAT below)
+  3. nextframe validate timeline.json           check for errors
+  4. nextframe build timeline.json -o out.html  generate playable HTML
+  5. open out.html                              preview in browser
 
-PROJECT MANAGEMENT
-  project-new <name>                          create a project folder under ~/NextFrame/projects
-  project-list [--root=PATH] [--json]        list projects with episode counts
-  episode-new <project> <name>               create an episode inside a project
-  episode-list <project> [--json]            list episodes for a project
-  segment-new <project> <episode> <name>     create an empty segment timeline JSON
-  segment-list <project> <episode> [--json]  list segment JSON files in an episode
-  exports <project> <episode> [--json]       list recorded render exports for an episode
+  No matching scene? Write one:
+    runtime/web/src/scenes-v2/myScene.js        create/update/destroy format
+    Add to runtime/web/src/scenes-v2/index.js   register it
+
+COMMANDS — v0.3 (use these)
+  scenes                         list all 48 scene components (grouped by category)
+  scenes <id>                    show single scene: type, params, defaults
+  validate <timeline.json>       run 6 safety gates (format, scenes, time, ids)
+  build <timeline.json> -o X     bundle timeline + all scenes into single HTML
+
+TIMELINE FORMAT (v0.3 flat layers)
+  {
+    "width": 1920, "height": 1080, "fps": 30, "duration": 20,
+    "background": "#05050c",
+    "layers": [
+      { "id": "bg", "scene": "auroraGradient", "start": 0, "dur": 20,
+        "params": { "hueA": 265 } },
+      { "id": "title", "scene": "headline", "start": 1, "dur": 5,
+        "params": { "text": "Hello", "fontSize": 96 },
+        "enter": "fadeIn 0.8s", "exit": "fadeOut 0.5s",
+        "transition": "dissolve 0.5s" }
+    ]
+  }
+
+LAYER PROPERTIES
+  id, scene, start, dur, params       required
+  enter       fadeIn/slideUp/slideDown/slideLeft/slideRight/scaleIn + duration
+  exit        fadeOut/slideDown/scaleOut + duration
+  transition  dissolve/wipeLeft/wipeRight/wipeUp/wipeDown/slideLeft/slideRight/slideUp/slideDown/zoomIn
+  blend       normal/screen/lighten/multiply/overlay
+  filter      CSS filter string (blur/grayscale/sepia)
+  opacity     0-1
+  x/y/w/h     position and size
+
+SCENE TYPES
+  dom         text, layout, cards (localT normalized 0~1)
+  canvas      2D effects, backgrounds (localT in seconds)
+  svg         data visualization, diagrams (localT in seconds)
+  webgl       GPU shader effects (localT in seconds)
+  media       video/image embed (localT in seconds)
+
+CREATING NEW SCENES
+  export default {
+    id: "myScene", type: "dom", name: "My Scene",
+    category: "Typography", defaultParams: { text: "Hi" },
+    create(container, params) { /* return DOM refs */ },
+    update(els, localT, params) { /* animate per frame */ },
+    destroy(els) { els.root.remove(); }
+  };
+
+COMMANDS — legacy v0.1 (still available)
+  new/validate/frame/render/probe/gantt/describe/ascii
+  add-clip/move-clip/resize-clip/remove-clip/set-param
+  project-new/project-list/episode-new/episode-list
+  segment-new/segment-list/exports/guide
 
 FLAGS
   --json     output structured JSON (for AI / scripts)
-  --width    override render width
-  --height   override render height
-  --fps      override fps for export
+  -o FILE    output file path (for build)
 
 EXIT CODES
-  0  success
-  1  warning (operation completed)
-  2  error
-  3  usage error
+  0 success | 1 warning | 2 error | 3 usage error
 `;
 
 async function main() {
