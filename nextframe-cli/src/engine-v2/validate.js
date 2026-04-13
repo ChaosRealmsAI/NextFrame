@@ -61,13 +61,12 @@ export function validateTimeline(timeline) {
   }
 
   // Gate 7: fullscreen content overlap detection
-  // Background scenes (aurora, starfield, vignette, shader*, fluid, neon) are OK to overlap.
+  // Background scenes (aurora, starfield, vignette, fluid, neon) are OK to overlap.
   // Content scenes (headline, bulletList, barChart, etc.) should NOT overlap fullscreen.
   const BG_SCENES = new Set([
     'auroraGradient','fluidBackground','neonGrid','vignette','starfield','particleFlow',
     'circleRipple','meshGrid','radialBurst','confetti','waveform','pulseWave',
-    'shaderGradient','shaderNoise','shaderGlitch','shaderChromatic','shaderPlasma',
-    'shaderTunnel','shaderRipple','shaderFirefly','svgRings',
+    'matrixRain','gridPattern','svgRings',
     'subtitleBar','marquee','lowerThird','cornerBadge',
     'audioTrack','syncSubs','videoClip',
     'slideChrome','slideFrame',

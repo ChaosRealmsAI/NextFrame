@@ -5,7 +5,7 @@ export default {
   type: "canvas",
   name: "Spectrum Waterfall",
   category: "Effects",
-  tags: ["spectrum", "waterfall", "frequency", "audio", "neon", "music", "visualization", "shader"],
+  tags: ["spectrum", "waterfall", "frequency", "audio", "neon", "music", "visualization", ],
   description: "频谱瀑布图 — 霓虹色频率能量从顶部流向底部，形成电子音乐风格的瀑布效果",
   usage: "电子音乐可视化、音频分析场景、作为视频背景层",
   themes: ["dark", "neon"],

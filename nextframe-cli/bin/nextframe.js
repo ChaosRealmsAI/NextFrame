@@ -111,7 +111,7 @@ LAYOUT（同时多个内容层必须用 x/y/w/h 分区）
   画中画：  主 全屏, 小窗 x=65% y=5% w=30% h=30%
 
 SCENE TYPES
-  dom=文字/布局  canvas=特效/背景  svg=图表  webgl=GPU着色器  media=视频/音频
+  dom=文字/布局  canvas=特效/背景  svg=图表  media=视频/音频
 
 CREATING SCENES（必须遵守 SCENE_SPEC.md 接口规范）
   必填字段：id, type, name, category, tags[], description, params{}, create, update, destroy

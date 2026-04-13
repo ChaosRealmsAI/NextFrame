@@ -8,7 +8,7 @@
 export default {
   // ── 身份（必填）──
   id: "headline",                      // 唯一 ID，必须等于文件名（不含 .js）
-  type: "dom",                         // dom | canvas | svg | webgl | media
+  type: "dom",                         // dom | canvas | svg | media
   name: "Kinetic Headline",            // 人类可读名
   
   // ── 分类（必填）──
@@ -58,7 +58,6 @@ export default {
 | Data Viz | 数据图表 | barChart, lineChart, pieChart |
 | Backgrounds | 背景效果 | auroraGradient, fluidBackground |
 | Effects | 视觉特效 | particleFlow, circleRipple, confetti |
-| Shader | GPU 着色器 | shaderGradient, shaderGlitch |
 | Overlay | 叠加层 | subtitleBar, lowerThird, marquee |
 | Layout | 布局容器 | featureGrid, card3d |
 | Cards | 卡片/标注 | calloutCard, infoCard |
@@ -69,7 +68,7 @@ export default {
 
 ## tags 建议词
 
-背景: background, gradient, particles, stars, noise, shader
+背景: background, gradient, particles, stars, noise
 文字: text, title, subtitle, heading, paragraph, code, typewriter
 数据: chart, bar, line, pie, radar, progress, number, counter
 布局: grid, card, list, table, split, sidebar
@@ -81,7 +80,7 @@ export default {
 ## Lint 检查（validate 时自动执行）
 
 1. id: string, 非空，**必须等于文件名**（headline.js → id:"headline"）
-2. type: 必须是 dom/canvas/svg/webgl/media 之一
+2. type: 必须是 dom/canvas/svg/media 之一
 3. name: string, 非空
 4. category: 必须在分类表里
 5. tags: 数组, 3-8 个 string
