@@ -45,16 +45,23 @@ CORE PRINCIPLE: 一个视觉元素 = 一个 layer（轨道）
   每个 layer 独立控制：位置(x/y/w/h)、时间(start/dur)、动画(enter/exit/keyframes)
   桌面端可看到每条轨道，单独调整
 
-WORKFLOW
-  1. nextframe scenes              查看组件
-  2. nextframe scenes <id>         查看组件参数
-  3. 设计轨道：列出每个视觉元素，每个一层
-  4. 写 timeline.json              每个元素一个 layer
-  5. nextframe validate <json>     检查格式 + 重叠
-  6. nextframe build <json> -o X   生成 HTML
-  7. nextframe preview <json>      截图 + 布局检查
-  8. 看 preview 输出，调整位置/时间
-  9. 没有合适组件？自己写一个 scene → 注册到 index.js
+WORKFLOW（必须走项目三级结构）
+  1. nextframe project-new <name>                   创建项目
+  2. nextframe episode-new <project> <name>          创建集
+  3. nextframe segment-new <project> <episode> <name> 创建段（生成 timeline JSON）
+  4. nextframe scenes / scenes <id>                  查看组件 + 参数
+  5. 设计轨道：列出每个视觉元素，每个一层
+  6. 编辑 ~/NextFrame/projects/<project>/<episode>/<segment>.json
+  7. nextframe validate <project> <episode> <segment> 检查格式 + 重叠
+  8. nextframe build <project> <episode> <segment>    生成 HTML（输出到同目录）
+  9. nextframe preview <project> <episode> <segment>  截图 + 布局检查
+  10. 看 preview 输出，调整 → 回到 7
+  11. 没有合适组件？自己写 scene → 注册到 index.js
+
+  存储路径：~/NextFrame/projects/{project}/{episode}/{segment}.json
+  桌面端自动扫描此目录，CLI 创建的内容桌面端立即可见
+
+  也支持直接文件路径：nextframe build path/to/file.json -o out.html
 
 COMMANDS
   new <out.json>                         create v0.3 timeline
