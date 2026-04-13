@@ -152,7 +152,7 @@ function getPipelineClipsBySource(videos) {
 
 /* ─── Expanded clip state (global, managed by index.js event binding) ─── */
 if (typeof pipelineClipsExpandedClip === "undefined") {
-  let pipelineClipsExpandedClip = -1;
+  globalThis.pipelineClipsExpandedClip = -1;
 }
 
 /* ─── Render clip detail panel (expanded view for a single clip) ─── */
