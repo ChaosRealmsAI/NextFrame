@@ -15,6 +15,7 @@ use objc2_foundation::{NSError, NSNumber, NSString};
 use objc2_web_kit::WKSnapshotConfiguration;
 
 use crate::capture;
+use crate::plan::VideoLayerInfo;
 use crate::progress::{PROGRESS_CANDIDATE_SELECTORS, ProgressRect};
 
 use super::{EvalResultSlot, SnapshotResultSlot, WebViewHost, pump_main_run_loop};
@@ -110,13 +111,67 @@ impl WebViewHost {
     pub fn query_page_audio_src(&self) -> Option<String> {
         let script = r#"
         (() => {
-          if (typeof window.__audioSrc === 'string' && window.__audioSrc) return window.__audioSrc;
-          var audio = document.querySelector('audio[src]');
-          if (audio && audio.src) return audio.src;
+          const resolve = (src) => {
+            if (typeof src !== 'string' || !src) return null;
+            try {
+              return new URL(src, document.baseURI).href;
+            } catch (_) {
+              return src;
+            }
+          };
+          if (typeof window.__audioSrc === 'string' && window.__audioSrc) {
+            return resolve(window.__audioSrc);
+          }
+          var audio = document.querySelector('audio');
+          if (audio && (audio.currentSrc || audio.src)) {
+            return resolve(audio.currentSrc || audio.src);
+          }
           return null;
         })()
         "#;
         self.eval_string(script).ok()?.filter(|s| !s.is_empty())
+    }
+
+    /// Queries the page timeline for `videoClip` layers so recorder can
+    /// composite them after the layer-tree capture pass.
+    pub fn query_video_layers(&self) -> Vec<VideoLayerInfo> {
+        let script = r#"
+        (() => {
+          const timeline = typeof TIMELINE === 'object' && TIMELINE ? TIMELINE : null;
+          const totalDuration = timeline && typeof timeline.duration === 'number' ? timeline.duration : 0;
+          const resolve = (src) => {
+            if (typeof src !== 'string' || !src) return null;
+            try {
+              return new URL(src, document.baseURI).href;
+            } catch (_) {
+              return src;
+            }
+          };
+          const stringify = (value, fallback) => {
+            if (value == null || value === '') return fallback;
+            return String(value);
+          };
+          const layers = timeline && Array.isArray(timeline.layers) ? timeline.layers : [];
+          return JSON.stringify(
+            layers
+              .filter((layer) => layer && layer.scene === 'videoClip' && layer.params && layer.params.src)
+              .map((layer) => ({
+                src: resolve(layer.params.src) || String(layer.params.src),
+                x: stringify(layer.x, '0'),
+                y: stringify(layer.y, '0'),
+                w: stringify(layer.w, '100%'),
+                h: stringify(layer.h, '100%'),
+                start: Number.isFinite(layer.start) ? layer.start : 0,
+                dur: Number.isFinite(layer.dur) ? layer.dur : totalDuration,
+              }))
+          );
+        })()
+        "#;
+        self.eval_string(script)
+            .ok()
+            .flatten()
+            .and_then(|result| serde_json::from_str::<Vec<VideoLayerInfo>>(&result).ok())
+            .unwrap_or_default()
     }
 
     /// Queries the pixel-space rect of the slide progress slot and hides the DOM bar so the

@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use objc2::rc::{Retained, autoreleasepool};
@@ -33,6 +33,70 @@ fn urlencoding_decode(input: &str) -> String {
         }
     }
     result
+}
+
+fn strip_query_and_fragment(input: &str) -> &str {
+    let end = input
+        .find(|ch| ch == '?' || ch == '#')
+        .unwrap_or(input.len());
+    &input[..end]
+}
+
+pub(crate) fn resolve_media_src(
+    src: &str,
+    server_base_url: Option<&str>,
+    root: &Path,
+    html_path: &Path,
+) -> Option<PathBuf> {
+    let raw = strip_query_and_fragment(src.trim());
+    if raw.is_empty() {
+        return None;
+    }
+
+    if let Some(stripped) = raw.strip_prefix("file://") {
+        let decoded = urlencoding_decode(stripped.trim_start_matches("localhost/"));
+        let path = PathBuf::from(decoded);
+        return path.exists().then_some(path);
+    }
+
+    if raw.starts_with("http://") || raw.starts_with("https://") {
+        if let Some(base_url) = server_base_url
+            && let Some(relative) = raw.strip_prefix(base_url)
+        {
+            let path = root.join(urlencoding_decode(relative.trim_start_matches('/')));
+            if path.exists() {
+                return Some(path);
+            }
+        }
+        if let Some((_, path_part)) = raw.split_once("://")
+            && let Some((_, slash_and_path)) = path_part.split_once('/')
+        {
+            let path = root.join(urlencoding_decode(slash_and_path));
+            if path.exists() {
+                return Some(path);
+            }
+        }
+        return None;
+    }
+
+    let decoded = urlencoding_decode(raw);
+    let absolute = PathBuf::from(&decoded);
+    if absolute.is_absolute() && absolute.exists() {
+        return Some(absolute);
+    }
+    if decoded.starts_with('/') {
+        let from_root = root.join(decoded.trim_start_matches('/'));
+        if from_root.exists() {
+            return Some(from_root);
+        }
+        if absolute.exists() {
+            return Some(absolute);
+        }
+    }
+
+    let parent = html_path.parent().unwrap_or_else(|| Path::new("."));
+    let relative = parent.join(decoded);
+    relative.exists().then_some(relative)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -96,6 +160,7 @@ pub fn record_segment(
     } else {
         plan.effective_duration_sec
     };
+    let server_base_url = server.map(|server| server.base_url());
 
     // Trigger one __onFrame at t=0 so all scene components get created
     // (audioTrack sets window.__audioSrc during create, videoClip initializes, etc.)
@@ -103,47 +168,33 @@ pub fn record_segment(
         0, "", 0.0, index, total_segments, segment_titles, segment_durations, 0.0,
     )?;
     host.flush_render(Duration::from_millis(200))?;
+    let video_layers = host.query_video_layers();
+    if !video_layers.is_empty() {
+        println!(
+            "  segment {}: detected {} videoClip layer(s)",
+            index + 1,
+            video_layers.len()
+        );
+    }
 
     // Query page audio source (v0.3 audioTrack component sets window.__audioSrc)
     let audio_override = if plan.metadata.audio_path.is_none() {
-        let raw_src = host.query_page_audio_src();
-        println!("  segment {}: __audioSrc query = {:?}", index + 1, raw_src);
-        if let Some(src) = raw_src {
-            // Convert URL to local path (file:// or http:// relative)
-            let audio_path = if let Some(stripped) = src.strip_prefix("file://") {
-                let decoded = urlencoding_decode(stripped);
-                let p = std::path::PathBuf::from(decoded);
-                if p.exists() {
-                    println!("  segment {}: page audio: {}", index + 1, p.display());
-                    Some(p)
-                } else {
-                    None
-                }
-            } else if src.starts_with("http") {
-                // HTTP URL from local server — extract relative path
-                let root = plan.metadata.html_path.parent().unwrap_or(std::path::Path::new("."));
-                let filename = src.rsplit('/').next().unwrap_or("");
-                let decoded = urlencoding_decode(filename);
-                let p = root.join(&decoded);
-                if p.exists() {
-                    println!("  segment {}: page audio: {}", index + 1, p.display());
-                    Some(p)
-                } else {
-                    None
-                }
+        if let Some(src) = host.query_page_audio_src() {
+            let audio_path = resolve_media_src(
+                &src,
+                server_base_url.as_deref(),
+                root,
+                &plan.metadata.html_path,
+            );
+            if let Some(path) = &audio_path {
+                println!("  segment {}: page audio: {}", index + 1, path.display());
             } else {
-                // Relative path — resolve against HTML file's directory
-                let root = plan.metadata.html_path.parent().unwrap_or(std::path::Path::new("."));
-                let decoded = urlencoding_decode(&src);
-                let p = root.join(&decoded);
-                if p.exists() {
-                    println!("  segment {}: page audio: {}", index + 1, p.display());
-                    Some(p)
-                } else {
-                    eprintln!("  segment {}: audio src '{}' not found at {}", index + 1, src, p.display());
-                    None
-                }
-            };
+                eprintln!(
+                    "  warn seg {}: could not resolve page audio src {}",
+                    index + 1,
+                    src
+                );
+            }
             audio_path
         } else {
             None
@@ -364,7 +415,67 @@ pub fn record_segment(
         path: segment_path,
         total_frames: frames_recorded,
         skipped_frames: clock.skipped_frames(),
+        video_layers,
     })
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::resolve_media_src;
+    use std::fs;
+    use std::path::Path;
+
+    #[test]
+    fn resolves_relative_media_against_html_parent() {
+        let root = crate::util::create_temp_dir().unwrap();
+        let html = root.join("demo.html");
+        let media = root.join("clip.mp4");
+        fs::write(&html, "<html></html>").unwrap();
+        fs::write(&media, b"clip").unwrap();
+
+        let resolved = resolve_media_src("clip.mp4", None, &root, &html);
+
+        assert_eq!(resolved.as_deref(), Some(media.as_path()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn resolves_server_media_url_to_root_path() {
+        let root = crate::util::create_temp_dir().unwrap();
+        let html = root.join("slides").join("demo.html");
+        let media_dir = root.join("videos");
+        let media = media_dir.join("clip.mp4");
+        fs::create_dir_all(html.parent().unwrap()).unwrap();
+        fs::create_dir_all(&media_dir).unwrap();
+        fs::write(&html, "<html></html>").unwrap();
+        fs::write(&media, b"clip").unwrap();
+
+        let resolved = resolve_media_src(
+            "http://127.0.0.1:9000/videos/clip.mp4?cache=1",
+            Some("http://127.0.0.1:9000"),
+            &root,
+            &html,
+        );
+
+        assert_eq!(resolved.as_deref(), Some(media.as_path()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn resolves_percent_encoded_file_url() {
+        let root = crate::util::create_temp_dir().unwrap();
+        let html = root.join("demo.html");
+        let media = root.join("clip name.mp4");
+        fs::write(&html, "<html></html>").unwrap();
+        fs::write(&media, b"clip").unwrap();
+        let url = format!("file://{}", media.display()).replace(' ', "%20");
+
+        let resolved = resolve_media_src(&url, None, Path::new("/"), &html);
+
+        assert_eq!(resolved.as_deref(), Some(media.as_path()));
+        let _ = fs::remove_dir_all(root);
+    }
 }
 
 pub fn capture_frame(

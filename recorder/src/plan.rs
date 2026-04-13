@@ -13,10 +13,22 @@ pub struct SegmentPlan {
     pub effective_duration_sec: f64,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct VideoLayerInfo {
+    pub src: String,
+    pub x: String,
+    pub y: String,
+    pub w: String,
+    pub h: String,
+    pub start: f64,
+    pub dur: f64,
+}
+
 pub struct SegmentSummary {
     pub path: PathBuf,
     pub total_frames: usize,
     pub skipped_frames: usize,
+    pub video_layers: Vec<VideoLayerInfo>,
 }
 
 pub fn collect_frame_files(cli: &CommonArgs) -> Result<Vec<PathBuf>, String> {
@@ -178,6 +190,8 @@ mod tests {
             width: 1280.0,
             height: 720.0,
             parallel: None,
+            frame_range: None,
+            render_scale: 1.0,
         }
     }
 

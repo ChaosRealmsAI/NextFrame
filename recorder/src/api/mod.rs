@@ -8,7 +8,7 @@ use objc2::MainThreadMarker;
 use serde::{Deserialize, Serialize};
 
 use crate::CommonArgs;
-use crate::overlay::{overlay_video, write_perf_log};
+use crate::overlay::{build_video_overlay_specs, overlay_video, overlay_video_layers, write_perf_log};
 use crate::parser::SlideType;
 use crate::plan::{build_segment_plans, collect_frame_files, detect_root};
 use crate::record::record_segment;
@@ -203,7 +203,20 @@ fn record_single(
             offset_sec += plan.effective_duration_sec;
             total_frames += summary.total_frames;
 
-            if plan.metadata.slide_type == SlideType::Clip
+            let video_layer_overlays = build_video_overlay_specs(
+                &summary.video_layers,
+                &root,
+                &plan.metadata.html_path,
+                cli.width,
+                cli.height,
+                cli.dpr,
+            )?;
+            if !video_layer_overlays.is_empty() {
+                overlay_video_layers(&summary.path, &video_layer_overlays)?;
+            }
+
+            if summary.video_layers.is_empty()
+                && plan.metadata.slide_type == SlideType::Clip
                 && let Some(ref audio) = plan.metadata.audio_path
             {
                 let ext = audio.extension().and_then(|ext| ext.to_str()).unwrap_or("");

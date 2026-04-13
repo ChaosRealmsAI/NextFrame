@@ -215,6 +215,8 @@ mod tests {
             width: 1280.0,
             height: 720.0,
             parallel: None,
+            frame_range: None,
+            render_scale: 1.0,
         }
     }
 
