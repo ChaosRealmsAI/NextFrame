@@ -5,6 +5,8 @@ import {
   smoothstep,
   easeOutCubic,
   clamp,
+  getSafeZone,
+  getStageSize,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -31,9 +33,11 @@ export default {
   },
 
   create(container, params) {
-    const W = container.clientWidth || 1920;
-    const H = container.clientHeight || 1080;
+    const { width: fallbackW, height: fallbackH } = getStageSize(container);
+    const W = Math.max(container.clientWidth || fallbackW, 1);
+    const H = Math.max(container.clientHeight || fallbackH, 1);
     const S = Math.min(W, H);
+    const safeZone = getSafeZone(W, H);
 
     const text = String(params.text || "");
     const author = String(params.author || "");
@@ -41,14 +45,12 @@ export default {
     const quoteMarkSize = S * 0.06;
     const authorSize = S * 0.02;
     const accentColor = params.accentColor || "#a78bfa";
-    const padding = S * 0.06;
-
     const root = createRoot(container, [
       "display:flex",
       "flex-direction:column",
       "align-items:center",
       "justify-content:center",
-      `padding:${Math.round(padding)}px`,
+      `padding:${Math.round(safeZone.top)}px ${Math.round(safeZone.right)}px ${Math.round(safeZone.bottom)}px ${Math.round(safeZone.left)}px`,
       "box-sizing:border-box",
     ].join(";"));
 
@@ -57,6 +59,7 @@ export default {
       "flex-direction:column",
       "align-items:center",
       "max-width:70ch",
+      "width:100%",
       "text-align:center",
     ].join(";"));
 
@@ -82,6 +85,8 @@ export default {
       "opacity:0",
       "will-change:opacity",
       "text-align:center",
+      "word-break:break-word",
+      "overflow-wrap:break-word",
     ].join(";"), text);
     quoteWrap.appendChild(quoteText);
 

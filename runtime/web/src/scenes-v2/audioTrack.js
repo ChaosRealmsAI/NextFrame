@@ -2,6 +2,7 @@ import {
   clamp,
   toNumber,
   resolveAssetUrl,
+  getStageSize,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -27,6 +28,9 @@ export default {
   },
 
   create(container, params) {
+    const { width: fallbackW, height: fallbackH } = getStageSize(container);
+    const W = Math.max(container.clientWidth || fallbackW, 1);
+    const H = Math.max(container.clientHeight || fallbackH, 1);
     const src = resolveAssetUrl(params.src || "");
     const volume = toNumber(params.volume, 1);
 
@@ -41,7 +45,7 @@ export default {
 
     container.appendChild(audio);
 
-    return { audio, ready: false, lastT: -1, playing: false, duration: 0 };
+    return { audio, ready: false, lastT: -1, playing: false, duration: 0, W, H };
   },
 
   update(els, localT, params) {

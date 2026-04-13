@@ -1,4 +1,4 @@
-import { smoothstep, clamp, toNumber, toBoolean, normalizeArray, SANS_FONT_STACK, MONO_FONT_STACK } from "../scenes-v2-shared.js";
+import { smoothstep, clamp, toNumber, toBoolean, normalizeArray, SANS_FONT_STACK, MONO_FONT_STACK, getStageSize } from "../scenes-v2-shared.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -24,8 +24,9 @@ export default {
   },
 
   create(container, params) {
-    const W = container.clientWidth  || 1920;
-    const H = container.clientHeight || 1080;
+    const { width: fallbackW, height: fallbackH } = getStageSize(container);
+    const W = Math.max(container.clientWidth || fallbackW, 1);
+    const H = Math.max(container.clientHeight || fallbackH, 1);
     const S = Math.min(W, H);
 
     const data   = normalizeArray(params.data,   this.params.data.default);

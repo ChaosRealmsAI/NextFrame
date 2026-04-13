@@ -6,6 +6,8 @@ import {
   easeOutCubic,
   clamp,
   normalizeArray,
+  getSafeZone,
+  getStageSize,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -32,22 +34,22 @@ export default {
   },
 
   create(container, params) {
-    const W = container.clientWidth || 1920;
-    const H = container.clientHeight || 1080;
+    const { width: fallbackW, height: fallbackH } = getStageSize(container);
+    const W = Math.max(container.clientWidth || fallbackW, 1);
+    const H = Math.max(container.clientHeight || fallbackH, 1);
     const S = Math.min(W, H);
+    const safeZone = getSafeZone(W, H);
 
     const items = normalizeArray(params.items, ["Item 1", "Item 2", "Item 3"]);
     const fontSize = S * (params.fontSize || 0.028);
     const bulletColor = params.bulletColor || "#a78bfa";
     const bulletSize = S * 0.008;
     const gap = S * 0.018;
-    const padding = S * 0.04;
-
     const root = createRoot(container, [
       "display:flex",
       "flex-direction:column",
       "justify-content:center",
-      `padding:${Math.round(padding)}px`,
+      `padding:${Math.round(safeZone.top)}px ${Math.round(safeZone.right)}px ${Math.round(safeZone.bottom)}px ${Math.round(safeZone.left)}px`,
       "box-sizing:border-box",
     ].join(";"));
 
@@ -82,6 +84,8 @@ export default {
         "font-weight:400",
         "color:#f0f0f0",
         "line-height:1.5",
+        "word-break:break-word",
+        "overflow-wrap:break-word",
       ].join(";"), String(items[i]));
 
       row.appendChild(dot);

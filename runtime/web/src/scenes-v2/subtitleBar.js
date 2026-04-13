@@ -5,6 +5,8 @@ import {
   clamp,
   smoothstep,
   toNumber,
+  getSafeZone,
+  getStageSize,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -30,9 +32,11 @@ export default {
   },
 
   create(container, params) {
-    const W = container.clientWidth || 1920;
-    const H = container.clientHeight || 1080;
+    const { width: fallbackW, height: fallbackH } = getStageSize(container);
+    const W = Math.max(container.clientWidth || fallbackW, 1);
+    const H = Math.max(container.clientHeight || fallbackH, 1);
     const S = Math.min(W, H);
+    const safeZone = getSafeZone(W, H);
 
     const text = String(params.text || "Subtitle text");
     const fontRatio = toNumber(params.fontSize, 0.025);
@@ -40,22 +44,27 @@ export default {
     const bgColor = String(params.bgColor || "rgba(0,0,0,0.6)");
     const radius = Math.round(S * 0.008);
     const padding = Math.round(S * 0.012);
-    const bottomMargin = Math.round(S * 0.05);
-
-    const root = createRoot(container, "display:flex;align-items:flex-end;justify-content:center");
+    const root = createRoot(container, [
+      "display:flex",
+      "align-items:flex-end",
+      "justify-content:center",
+      `padding:${Math.round(safeZone.top)}px ${Math.round(safeZone.right)}px ${Math.round(safeZone.bottom)}px ${Math.round(safeZone.left)}px`,
+      "box-sizing:border-box",
+    ].join(";"));
 
     const bar = createNode("div", [
       `background:${bgColor}`,
       `border-radius:${radius}px`,
       `padding:${padding}px ${Math.round(padding * 1.5)}px`,
-      `margin-bottom:${bottomMargin}px`,
       `font-size:${fontSize}px`,
       `font-family:${SANS_FONT_STACK}`,
       "font-weight:400",
       "color:#ffffff",
       "line-height:1.5",
       "text-align:center",
-      `max-width:${Math.round(S * 0.8)}px`,
+      "max-width:100%",
+      "word-break:break-word",
+      "overflow-wrap:break-word",
       "opacity:0",
       "will-change:opacity",
     ].join(";"));

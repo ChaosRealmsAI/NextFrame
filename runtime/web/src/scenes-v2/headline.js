@@ -7,6 +7,8 @@ import {
   clamp,
   normalizeArray,
   makeLinearGradient,
+  getSafeZone,
+  getStageSize,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -34,9 +36,11 @@ export default {
   },
 
   create(container, params) {
-    const W = container.clientWidth || 1920;
-    const H = container.clientHeight || 1080;
+    const { width: fallbackW, height: fallbackH } = getStageSize(container);
+    const W = Math.max(container.clientWidth || fallbackW, 1);
+    const H = Math.max(container.clientHeight || fallbackH, 1);
     const S = Math.min(W, H);
+    const safeZone = getSafeZone(W, H);
 
     const text = String(params.text || "TITLE");
     const subtitle = String(params.subtitle || "");
@@ -45,14 +49,29 @@ export default {
     const colors = normalizeArray(params.gradient, ["#6ee7ff", "#a78bfa", "#f472b6"]);
     const gradientCSS = makeLinearGradient(colors);
 
-    const root = createRoot(container, "display:flex;flex-direction:column;align-items:center;justify-content:center");
+    const root = createRoot(container, [
+      "display:flex",
+      "flex-direction:column",
+      "align-items:center",
+      "justify-content:center",
+      `padding:${Math.round(safeZone.top)}px ${Math.round(safeZone.right)}px ${Math.round(safeZone.bottom)}px ${Math.round(safeZone.left)}px`,
+      "box-sizing:border-box",
+    ].join(";"));
 
     const titleWrap = createNode("div", [
       "display:flex",
       "flex-wrap:wrap",
       "justify-content:center",
+      "align-content:center",
       "align-items:baseline",
       `gap:${Math.round(S * 0.005)}px`,
+      "width:100%",
+      "max-width:90%",
+      "padding:0 5%",
+      "box-sizing:border-box",
+      "text-align:center",
+      "word-break:break-word",
+      "overflow-wrap:break-word",
       "will-change:transform,opacity",
     ].join(";"));
 
@@ -87,6 +106,9 @@ export default {
         "font-weight:400",
         "color:rgba(255,255,255,0.6)",
         `margin-top:${Math.round(S * 0.015)}px`,
+        "max-width:90%",
+        "padding:0 5%",
+        "box-sizing:border-box",
         "opacity:0",
         "will-change:opacity",
         "text-align:center",

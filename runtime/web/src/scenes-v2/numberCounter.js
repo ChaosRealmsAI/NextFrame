@@ -6,6 +6,8 @@ import {
   easeOutCubic,
   smoothstep,
   toNumber,
+  getSafeZone,
+  getStageSize,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -33,21 +35,30 @@ export default {
   },
 
   create(container, params) {
-    const W = container.clientWidth || 1920;
-    const H = container.clientHeight || 1080;
+    const { width: fallbackW, height: fallbackH } = getStageSize(container);
+    const W = Math.max(container.clientWidth || fallbackW, 1);
+    const H = Math.max(container.clientHeight || fallbackH, 1);
     const S = Math.min(W, H);
+    const safeZone = getSafeZone(W, H);
 
     const color = String(params.color || "#6ee7ff");
     const label = String(params.label || "Total");
     const numberSize = Math.round(S * 0.1);
     const labelSize = Math.round(S * 0.025);
 
-    const root = createRoot(container, "display:flex;align-items:center;justify-content:center");
+    const root = createRoot(container, [
+      "display:flex",
+      "align-items:center",
+      "justify-content:center",
+      `padding:${Math.round(safeZone.top)}px ${Math.round(safeZone.right)}px ${Math.round(safeZone.bottom)}px ${Math.round(safeZone.left)}px`,
+      "box-sizing:border-box",
+    ].join(";"));
 
     const wrap = createNode("div", [
       "display:flex",
       "flex-direction:column",
       "align-items:center",
+      "max-width:100%",
       `gap:${Math.round(S * 0.012)}px`,
     ].join(";"));
 
@@ -60,6 +71,9 @@ export default {
       "font-variant-numeric:tabular-nums",
       "opacity:0",
       "will-change:opacity",
+      "text-align:center",
+      "word-break:break-word",
+      "overflow-wrap:break-word",
     ].join(";"), "0");
 
     const labelEl = createNode("div", [
@@ -71,6 +85,9 @@ export default {
       "letter-spacing:0.1em",
       "opacity:0",
       "will-change:opacity",
+      "text-align:center",
+      "word-break:break-word",
+      "overflow-wrap:break-word",
     ].join(";"), label);
 
     wrap.appendChild(numberEl);

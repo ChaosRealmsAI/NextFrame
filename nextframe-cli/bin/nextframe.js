@@ -4,6 +4,7 @@ const SUBCOMMANDS = {
   new: () => import("../src/cli/new.js"),
   validate: () => import("../src/cli/validate.js"),
   build: () => import("../src/cli/build.js"),
+  "lint-scenes": () => import("../src/cli/lint-scenes.js"),
   scenes: () => import("../src/cli/scenes.js"),
   preview: () => import("../src/cli/preview.js"),
   frame: () => import("../src/cli/frame.js"),
@@ -79,6 +80,7 @@ COMMANDS
   new <out.json>                         create v0.3 timeline
   validate <timeline>                    6 gates + overlap check
   build <timeline> [--output=out.html]   bundle → playable HTML
+  lint-scenes                            audit scene component metadata + sizing
   scenes [id]                            list/inspect components
   preview <timeline> [--times=0,3,5]     screenshot + layout map
   frame <timeline> <t> <out.png>         render one frame

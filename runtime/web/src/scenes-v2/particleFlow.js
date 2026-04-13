@@ -1,4 +1,4 @@
-import { clamp, toNumber, smoothstep, hashFloat } from "../scenes-v2-shared.js";
+import { clamp, toNumber, smoothstep, hashFloat, getStageSize } from "../scenes-v2-shared.js";
 
 export default {
   id: "particleFlow",
@@ -21,8 +21,9 @@ export default {
   },
 
   create(container, params) {
-    const W = container.clientWidth  || 1920;
-    const H = container.clientHeight || 1080;
+    const { width: fallbackW, height: fallbackH } = getStageSize(container);
+    const W = Math.max(container.clientWidth || fallbackW, 1);
+    const H = Math.max(container.clientHeight || fallbackH, 1);
     const S = Math.min(W, H);
 
     const canvas = document.createElement("canvas");

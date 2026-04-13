@@ -62,6 +62,57 @@ export function normalizeArray(value, fallback = []) {
   return Array.isArray(value) ? value : fallback;
 }
 
+export function getSafeZone(W, H) {
+  const isVertical = H > W;
+  return {
+    top: isVertical ? H * 0.15 : H * 0.05,
+    bottom: isVertical ? H * 0.10 : H * 0.05,
+    left: isVertical ? W * 0.05 : W * 0.03,
+    right: isVertical ? W * 0.05 : W * 0.03,
+  };
+}
+
+function pickStageDimension(...values) {
+  for (const value of values) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 1) {
+      return numeric;
+    }
+  }
+  return 1;
+}
+
+export function getStageSize(container) {
+  const rect = typeof container?.getBoundingClientRect === "function"
+    ? container.getBoundingClientRect()
+    : null;
+  const parent = container?.parentElement || null;
+  const parentRect = typeof parent?.getBoundingClientRect === "function"
+    ? parent.getBoundingClientRect()
+    : null;
+  const docEl = typeof document !== "undefined" ? document.documentElement : null;
+  const win = typeof window !== "undefined" ? window : null;
+
+  return {
+    width: pickStageDimension(
+      container?.clientWidth,
+      rect?.width,
+      parent?.clientWidth,
+      parentRect?.width,
+      docEl?.clientWidth,
+      win?.innerWidth,
+    ),
+    height: pickStageDimension(
+      container?.clientHeight,
+      rect?.height,
+      parent?.clientHeight,
+      parentRect?.height,
+      docEl?.clientHeight,
+      win?.innerHeight,
+    ),
+  };
+}
+
 export function createRoot(container, extraStyles = "") {
   const root = document.createElement("div");
   root.style.cssText = [
