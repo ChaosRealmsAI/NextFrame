@@ -76,7 +76,7 @@ export async function run(argv) {
   await page.goto("file://" + htmlPath, { waitUntil: "domcontentloaded" });
   await new Promise((r) => setTimeout(r, 500));
 
-  const BG_IDS = /^(bg|vignette|stars|dark|overlay|rings|particles|noise|shader|wave|ripple|marquee|subtitle|lower|badge|firefl|confetti)/i;
+  const BG_IDS = /^(bg|vignette|stars|dark|overlay|rings|particles|noise|shader|wave|ripple|marquee|subtitle|lower|badge|firefl|confetti|chrome|frame|subs|sub-)/i;
   const screenshots = [];
   const issues = [];
 

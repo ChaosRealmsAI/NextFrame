@@ -1,0 +1,189 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 30,
+  "background": "#1a1510",
+  "layers": [
+    {
+      "id": "chrome-bg",
+      "scene": "slideChrome",
+      "start": 0,
+      "dur": 30,
+      "params": {
+        "brand": "Tech Deep Dive",
+        "series": "系统编程语言对比",
+        "ep": "EP1",
+        "tag": "PERF",
+        "title": "Rust vs Go",
+        "tagExtra": "性能对比深度解析",
+        "dimNum": 1,
+        "totalDims": 4,
+        "bgColor": "#1a1510",
+        "accentColor": "#da7756",
+        "textColor": "#f5ece0"
+      }
+    },
+    {
+      "id": "z1-headline",
+      "scene": "headline",
+      "start": 0,
+      "dur": 6,
+      "x": "3%",
+      "y": "20%",
+      "w": "94%",
+      "h": "55%",
+      "params": {
+        "text": "Rust vs Go",
+        "subtitle": "系统编程语言性能终极对比",
+        "fontSize": 96,
+        "gradient": ["#da7756", "#f5ece0", "#da7756"],
+        "stagger": 0.07
+      }
+    },
+    {
+      "id": "z2-barchart",
+      "scene": "barChart",
+      "start": 6,
+      "dur": 8,
+      "x": "3%",
+      "y": "18%",
+      "w": "48%",
+      "h": "68%",
+      "params": {
+        "data": [72, 95, 88, 61, 99, 70, 85, 55],
+        "labels": ["编译 Rust", "编译 Go", "运行 Rust", "运行 Go", "内存 Rust", "内存 Go", "并发 Rust", "并发 Go"],
+        "colors": ["#da7756", "#4ade80", "#da7756", "#4ade80", "#da7756", "#4ade80", "#da7756", "#4ade80"],
+        "barWidth": 80,
+        "gap": 12,
+        "showLabels": true,
+        "showValues": true
+      }
+    },
+    {
+      "id": "z3-radar",
+      "scene": "radarChart",
+      "start": 6,
+      "dur": 8,
+      "x": "52%",
+      "y": "18%",
+      "w": "45%",
+      "h": "68%",
+      "params": {
+        "data": [90, 85, 95, 70, 80],
+        "labels": ["运行速度", "内存效率", "安全性", "开发速度", "并发模型"],
+        "color": "#da7756",
+        "fillOpacity": 0.3,
+        "maxValue": 100
+      }
+    },
+    {
+      "id": "z4-terminal",
+      "scene": "terminalCode",
+      "start": 14,
+      "dur": 8,
+      "x": "3%",
+      "y": "18%",
+      "w": "52%",
+      "h": "68%",
+      "params": {
+        "title": "rust — ownership.rs",
+        "lineHeight": 1.7,
+        "lines": [
+          { "tokens": [{ "text": "fn ", "color": "#da7756" }, { "text": "take_ownership", "color": "#f5ece0" }, { "text": "(s: String) -> String {", "color": "#a0c4ff" }] },
+          { "tokens": [{ "text": "    println!", "color": "#da7756" }, { "text": "(\"Got: {}\", s);", "color": "#f5ece0" }] },
+          { "tokens": [{ "text": "    s  ", "color": "#4ade80" }, { "text": "// 所有权转移回来", "color": "#888" }] },
+          { "tokens": [{ "text": "}", "color": "#f5ece0" }] },
+          { "tokens": [] },
+          { "tokens": [{ "text": "fn ", "color": "#da7756" }, { "text": "borrow_check", "color": "#f5ece0" }, { "text": "(s: &str) {", "color": "#a0c4ff" }] },
+          { "tokens": [{ "text": "    println!", "color": "#da7756" }, { "text": "(\"Borrow: {}\", s);", "color": "#f5ece0" }] },
+          { "tokens": [{ "text": "    ", "color": "#888" }, { "text": "// 无 GC，无内存泄漏", "color": "#888" }] },
+          { "tokens": [{ "text": "}", "color": "#f5ece0" }] },
+          { "tokens": [] },
+          { "tokens": [{ "text": "fn ", "color": "#da7756" }, { "text": "main", "color": "#f5ece0" }, { "text": "() {", "color": "#a0c4ff" }] },
+          { "tokens": [{ "text": "    let s = String::from(", "color": "#f5ece0" }, { "text": "\"hello Rust\"", "color": "#4ade80" }, { "text": ");", "color": "#f5ece0" }] },
+          { "tokens": [{ "text": "    let s2 = take_ownership(s);", "color": "#f5ece0" }] },
+          { "tokens": [{ "text": "    borrow_check(&s2);", "color": "#f5ece0" }] },
+          { "tokens": [{ "text": "}", "color": "#f5ece0" }] }
+        ]
+      }
+    },
+    {
+      "id": "z5-callout",
+      "scene": "calloutCard",
+      "start": 14,
+      "dur": 8,
+      "x": "57%",
+      "y": "18%",
+      "w": "40%",
+      "h": "68%",
+      "params": {
+        "icon": "🐹",
+        "title": "Go 的简洁哲学",
+        "description": "Go 用 GC 换简单：自动内存管理让并发程序更易写。goroutine 轻量、channel 优雅，编译极快。代价是运行时 GC 停顿，无法精确控制内存。适合网络服务、云原生场景。",
+        "bgColor": "rgba(26,21,16,0.9)",
+        "borderColor": "#4ade80"
+      }
+    },
+    {
+      "id": "z6-bullets",
+      "scene": "bulletList",
+      "start": 22,
+      "dur": 6,
+      "x": "3%",
+      "y": "18%",
+      "w": "94%",
+      "h": "68%",
+      "params": {
+        "items": [
+          "Rust 零成本抽象：运行时与 C 持平，无 GC 停顿",
+          "Go 开发效率领先：编译快 3x，goroutine 并发简单直觉",
+          "内存安全：Rust 编译期保证，Go 依赖 GC + race detector",
+          "选型建议：系统/嵌入式/高性能 → Rust；网络服务/团队效率 → Go"
+        ],
+        "fontSize": 30,
+        "bulletColor": "#da7756",
+        "stagger": 0.1
+      }
+    },
+    {
+      "id": "z7-bignumber",
+      "scene": "bigNumber",
+      "start": 26,
+      "dur": 4,
+      "x": "3%",
+      "y": "18%",
+      "w": "94%",
+      "h": "68%",
+      "params": {
+        "number": "10x",
+        "label": "Rust 运行时性能优势（vs Go 在 CPU 密集型任务）",
+        "numColor": "#da7756",
+        "numSize": 120,
+        "fontFamily": "serif"
+      }
+    },
+    {
+      "id": "subs-main",
+      "scene": "syncSubs",
+      "start": 0,
+      "dur": 30,
+      "params": {
+        "segments": [
+          { "text": "今天我们深入对比 Rust 和 Go 的性能差异", "start_ms": 0, "end_ms": 5000 },
+          { "text": "柱状图：4 个维度的真实性能数据", "start_ms": 6000, "end_ms": 10000 },
+          { "text": "雷达图：综合能力全景对比", "start_ms": 10000, "end_ms": 14000 },
+          { "text": "Rust 所有权系统：编译期内存安全的秘密", "start_ms": 14000, "end_ms": 18000 },
+          { "text": "Go 的哲学：用 GC 换开发简洁", "start_ms": 18000, "end_ms": 22000 },
+          { "text": "总结：场景决定选型，没有银弹", "start_ms": 22000, "end_ms": 26000 },
+          { "text": "CPU 密集型任务：Rust 比 Go 快约 10 倍", "start_ms": 26000, "end_ms": 30000 }
+        ],
+        "fontSize": 26,
+        "color": "#f5ece0",
+        "bgColor": "rgba(26,21,16,0.8)",
+        "position": "bottom",
+        "highlightColor": "#da7756"
+      }
+    }
+  ]
+}

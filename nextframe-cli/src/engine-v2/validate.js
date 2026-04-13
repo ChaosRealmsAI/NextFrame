@@ -70,6 +70,7 @@ export function validateTimeline(timeline) {
     'shaderTunnel','shaderRipple','shaderFirefly','svgRings',
     'subtitleBar','marquee','lowerThird','cornerBadge',
     'audioTrack','syncSubs','videoClip',
+    'slideChrome','slideFrame',
   ]);
   const contentLayers = timeline.layers.filter(l => {
     if (BG_SCENES.has(l.scene)) return false;
