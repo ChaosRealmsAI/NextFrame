@@ -2154,23 +2154,22 @@ function playPipelineAudio(btn, filePath) {
   // Reset all play buttons
   document.querySelectorAll(".pl-play-btn.playing").forEach(function(b) { b.classList.remove("playing"); b.innerHTML = "&#9654;"; });
 
-  // Build URL — use bridge to resolve path then play
-  bridgeCall("fs.read", { path: filePath }, 3000).then(function() {
-    // fs.read succeeded means file exists. Build nfdata URL for audio playback.
-    var parts = filePath.replace("~/NextFrame/projects/", "").split("/");
-    var url = buildNfdataUrl(parts);
-    _plAudio = new Audio(url);
-    _plAudio.play();
+  // Build nfdata URL directly and play
+  var parts = filePath.replace("~/NextFrame/projects/", "").split("/");
+  var url = buildNfdataUrl(parts);
+  console.log("[pipeline] playing audio:", url);
+  _plAudio = new Audio(url);
+  _plAudio.play().then(function() {
     btn.classList.add("playing");
     btn.innerHTML = "&#9646;&#9646;";
-    _plAudio.onended = function() {
-      btn.classList.remove("playing");
-      btn.innerHTML = "&#9654;";
-      _plAudio = null;
-    };
   }).catch(function(e) {
-    console.error("[pipeline] audio play failed:", e);
+    console.error("[pipeline] audio play failed:", e, url);
   });
+  _plAudio.onended = function() {
+    btn.classList.remove("playing");
+    btn.innerHTML = "&#9654;";
+    _plAudio = null;
+  };
 }
 
 function playPipelineVideo(filePath) {
