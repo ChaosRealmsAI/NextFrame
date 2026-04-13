@@ -2,9 +2,9 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;
 
-use crate::path::home_dir;
-use crate::time::iso_now;
-use crate::validation::require_string;
+use crate::util::path::home_dir;
+use crate::util::time::iso_now;
+use crate::util::validation::require_string;
 
 pub(crate) fn projects_root() -> PathBuf {
     home_dir()

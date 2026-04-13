@@ -265,7 +265,8 @@ fn path_canonical_or_raw_canonicalizes_existing_and_preserves_missing() {
 #[test]
 fn validate_path_rejects_empty_string() {
     let error =
-        super::super::fs::validate_path("   ").expect_err("empty path should be rejected");
+        super::super::storage::fs::validate_path("   ")
+            .expect_err("empty path should be rejected");
 
     assert_eq!(error, "path must not be empty");
 }
@@ -273,7 +274,8 @@ fn validate_path_rejects_empty_string() {
 #[test]
 fn validate_path_rejects_null_bytes() {
     let error =
-        super::super::fs::validate_path("bad\0path").expect_err("null bytes should be rejected");
+        super::super::storage::fs::validate_path("bad\0path")
+            .expect_err("null bytes should be rejected");
 
     assert_eq!(error, "path must not contain null bytes");
 }
@@ -283,7 +285,7 @@ fn resolve_existing_path_errors_for_missing_file() {
     let temp = TestDir::new("fs-resolve-missing");
     let missing_path = temp.join("missing.txt");
 
-    let error = super::super::fs::resolve_existing_path(&missing_path.display().to_string())
+    let error = super::super::storage::fs::resolve_existing_path(&missing_path.display().to_string())
         .expect_err("missing path should fail to resolve");
 
     assert!(error.contains("failed to resolve"));
@@ -291,7 +293,7 @@ fn resolve_existing_path_errors_for_missing_file() {
 
 #[test]
 fn is_allowed_path_rejects_paths_outside_allowed_roots() {
-    assert!(!super::super::fs::is_allowed_path(Path::new(
+    assert!(!super::super::storage::fs::is_allowed_path(Path::new(
         &disallowed_absolute_path()
     )));
 }
@@ -303,7 +305,7 @@ fn nearest_existing_ancestor_returns_closest_existing_parent() {
     fs::create_dir_all(&existing_parent).expect("create existing parent");
     let missing_descendant = existing_parent.join("missing/child/file.txt");
 
-    let ancestor = super::super::fs::nearest_existing_ancestor(&missing_descendant)
+    let ancestor = super::super::storage::fs::nearest_existing_ancestor(&missing_descendant)
         .expect("existing ancestor should be found");
 
     assert_eq!(ancestor, existing_parent);

@@ -4,9 +4,9 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use crate::encoding::base64_decode;
-use crate::path::{canonical_or_raw, expand_home_dir, home_dir, home_root};
-use crate::validation::{require_string, require_string_alias};
+use crate::codec::encoding::base64_decode;
+use crate::util::path::{canonical_or_raw, expand_home_dir, home_dir, home_root};
+use crate::util::validation::{require_string, require_string_alias};
 
 pub(crate) fn handle_fs_read(params: &Value) -> Result<Value, String> {
     let path = require_string(params, "path")?;

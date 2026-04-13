@@ -10,8 +10,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use nextframe_recorder::api::{record_segments, RecordArgs, RecordOutput};
 
 use crate::export::EXPORT_ERROR_CANCELED;
-use crate::recorder_bridge::{resolve_recorder_frame_path_from_url, RecorderRequest};
-use crate::time::trim_float;
+use crate::util::time::trim_float;
+use super::recorder_bridge::{resolve_recorder_frame_path_from_url, RecorderRequest};
 
 pub(crate) fn run_embedded_recorder(
     request: RecorderRequest,

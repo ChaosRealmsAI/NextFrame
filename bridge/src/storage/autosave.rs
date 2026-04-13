@@ -7,10 +7,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::UNIX_EPOCH;
 
-use crate::fs::resolve_home_write_path;
-use crate::path::home_dir;
-use crate::recent::{has_recent_project_extension, RECENT_DIR_NAME};
-use crate::validation::{require_string_alias, require_value_alias};
+use crate::util::path::home_dir;
+use crate::util::validation::{require_string_alias, require_value_alias};
+use super::fs::resolve_home_write_path;
+use super::recent::{has_recent_project_extension, RECENT_DIR_NAME};
 
 pub(crate) const AUTOSAVE_DIR_NAME: &str = "autosave";
 

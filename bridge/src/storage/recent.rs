@@ -7,10 +7,10 @@ use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::sync::{Mutex, OnceLock};
 
-use crate::fs::{resolve_home_existing_path, resolve_home_write_path, validate_path};
-use crate::path::{home_dir, home_root};
-use crate::time::unix_timestamp_secs;
-use crate::validation::{require_object, require_string};
+use crate::util::path::{home_dir, home_root};
+use crate::util::time::unix_timestamp_secs;
+use crate::util::validation::{require_object, require_string};
+use super::fs::{resolve_home_existing_path, resolve_home_write_path, validate_path};
 
 pub(crate) const RECENT_DIR_NAME: &str = ".nextframe";
 pub(crate) const RECENT_FILE_NAME: &str = "recent.json";

@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 
-use crate::fs::resolve_existing_path;
-use crate::time::trim_float;
-use crate::validation::{require_array, require_string_alias};
+use crate::storage::fs::resolve_existing_path;
+use crate::util::time::trim_float;
+use crate::util::validation::{require_array, require_string_alias};
 use serde_json::{json, Value};
 
 pub(crate) static FFMPEG_PATH_CACHE: OnceLock<Mutex<Option<Option<PathBuf>>>> = OnceLock::new();
@@ -35,7 +35,7 @@ pub(crate) fn handle_export_mux_audio(params: &Value) -> Result<Value, String> {
     let video_path_raw = require_string_alias(params, &["videoPath", "video_path"])?;
     let output_path_raw = require_string_alias(params, &["outputPath", "output_path"])?;
     let video_path = resolve_existing_path(video_path_raw)?;
-    let output_path = crate::fs::resolve_write_path(output_path_raw)?;
+    let output_path = crate::storage::fs::resolve_write_path(output_path_raw)?;
     let audio_sources = parse_audio_sources(params)?;
 
     if let Some(parent) = output_path.parent() {
@@ -48,8 +48,8 @@ pub(crate) fn handle_export_mux_audio(params: &Value) -> Result<Value, String> {
     }
 
     if audio_sources.is_empty() {
-        crate::export_runner::copy_video_output(&video_path, &output_path)?;
-        crate::export_runner::cleanup_intermediate_video(&video_path, &output_path);
+        crate::export::runner::copy_video_output(&video_path, &output_path)?;
+        crate::export::runner::cleanup_intermediate_video(&video_path, &output_path);
         return Ok(json!({
             "ok": true,
             "outputPath": output_path.display().to_string(),
@@ -83,7 +83,7 @@ pub(crate) fn handle_export_mux_audio(params: &Value) -> Result<Value, String> {
         }));
     }
 
-    crate::export_runner::cleanup_intermediate_video(&video_path, &output_path);
+    crate::export::runner::cleanup_intermediate_video(&video_path, &output_path);
 
     Ok(json!({
         "ok": true,

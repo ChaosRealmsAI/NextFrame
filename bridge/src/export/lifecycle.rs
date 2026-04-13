@@ -9,13 +9,13 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
-use crate::export_runner::{create_export_log_path, run_embedded_recorder};
-use crate::fs::resolve_write_path;
-use crate::recorder_bridge::{build_recording_url, RecorderRequest};
-use crate::validation::{
+use crate::storage::fs::resolve_write_path;
+use crate::util::validation::{
     read_optional_u8_in_range, require_positive_f64, require_positive_u32, require_string_alias,
     require_u32,
 };
+use super::recorder_bridge::{build_recording_url, RecorderRequest};
+use super::runner::{create_export_log_path, run_embedded_recorder};
 
 pub(crate) const EXPORT_RUNNING: &str = "running";
 pub(crate) const EXPORT_QUEUED: &str = "queued";
@@ -158,6 +158,7 @@ pub(crate) fn handle_export_start(params: &Value) -> Result<Value, String> {
     }))
 }
 
+#[allow(clippy::expect_used)]
 pub(crate) fn handle_export_status(params: &Value) -> Result<Value, String> {
     let pid = require_u32(params, "pid")?;
     let mut registry = lock_process_registry()?;
@@ -451,8 +452,8 @@ pub(crate) fn next_export_pid() -> u32 {
 }
 
 pub(crate) fn handle_export_log(params: &Value) -> Result<Value, String> {
-    let path_str = crate::validation::require_string(params, "path")?;
-    let path = crate::fs::resolve_existing_path(path_str)?;
+    let path_str = crate::util::validation::require_string(params, "path")?;
+    let path = crate::storage::fs::resolve_existing_path(path_str)?;
     let content = fs::read_to_string(&path)
         .map_err(|e| format!("failed to read '{}': {e}", path.display()))?;
 

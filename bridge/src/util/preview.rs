@@ -4,8 +4,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-use crate::encoding::base64_encode;
-use crate::validation::require_string;
+use crate::codec::encoding::base64_encode;
+use crate::util::validation::require_string;
 
 pub(crate) fn handle_preview_frame(params: &Value) -> Result<Value, String> {
     use std::io::Read as _;

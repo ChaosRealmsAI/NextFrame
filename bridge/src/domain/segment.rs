@@ -1,8 +1,8 @@
 use serde_json::{json, Value};
 use std::fs;
 
-use crate::project::projects_root;
-use crate::validation::{require_string, validate_project_component};
+use crate::util::validation::{require_string, validate_project_component};
+use super::project::projects_root;
 
 pub(crate) fn handle_segment_list(params: &Value) -> Result<Value, String> {
     let project = require_string(params, "project")?;

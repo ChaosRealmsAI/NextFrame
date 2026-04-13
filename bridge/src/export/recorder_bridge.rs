@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::encoding::{path_to_file_url, percent_decode_url_path};
+use crate::codec::encoding::{path_to_file_url, percent_decode_url_path};
 
 pub(crate) fn build_recording_url(current_dir: &Path) -> Result<String, String> {
     let web_path = current_dir
