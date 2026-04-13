@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame — 素材</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0c;--surface:#111114;--card:#161619;
+  --border:rgba(255,255,255,0.06);--border-hover:rgba(255,255,255,0.1);
+  --text:#e4e4e8;--secondary:#8888a0;--muted:#48485a;
+  --accent:#7c6aef;--accent-dim:rgba(124,106,239,0.1);--accent-border:rgba(124,106,239,0.3);
+  --success:#3eb370;--radius:8px;
+  --font-body:-apple-system,'Helvetica Neue',system-ui,sans-serif;
+  --font-mono:'SF Mono',Menlo,monospace;
+}
+html{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;background:var(--bg)}
+
+/* Top Bar */
+.topbar{height:44px;display:flex;align-items:center;padding:0 20px;background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.topbar-left{display:flex;align-items:center;gap:8px;flex:1}
+.logo-mark{width:16px;height:16px;border-radius:4px;background:linear-gradient(135deg,#7c6aef,#da7756);flex-shrink:0}
+.logo-text{font-size:14px;font-weight:600;color:var(--text)}
+.breadcrumb{font-size:13px;color:var(--secondary);display:flex;align-items:center;gap:6px}
+.breadcrumb .sep{color:var(--muted);font-size:11px}
+.topbar-center{position:absolute;left:50%;transform:translateX(-50%);font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);font-weight:500}
+.topbar-right{flex:1;text-align:right;font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+/* Sections */
+.section{padding:24px}
+.section-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
+.section-label{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);font-weight:500}
+.section-meta{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+/* Source cards row */
+.sources-row{display:flex;gap:16px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin;scrollbar-color:var(--muted) transparent}
+.sources-row::-webkit-scrollbar{height:4px}
+.sources-row::-webkit-scrollbar-track{background:transparent}
+.sources-row::-webkit-scrollbar-thumb{background:var(--muted);border-radius:2px}
+
+.source-card{width:280px;flex-shrink:0;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;transition:transform 0.2s,border-color 0.2s,box-shadow 0.2s;cursor:default}
+.source-card:hover{transform:translateY(-2px);border-color:var(--border-hover);box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+
+.source-preview{position:relative;width:100%;aspect-ratio:16/9;background:#0a0a0c;overflow:hidden}
+.source-preview .gradient-overlay{position:absolute;inset:0;opacity:0.25}
+.source-1 .gradient-overlay{background:linear-gradient(135deg,rgba(100,80,200,0.5),rgba(40,30,80,0.3))}
+.source-2 .gradient-overlay{background:linear-gradient(135deg,rgba(40,160,80,0.4),rgba(20,60,30,0.3))}
+.source-3 .gradient-overlay{background:linear-gradient(135deg,rgba(200,130,60,0.4),rgba(80,50,20,0.3))}
+.source-4 .gradient-overlay{background:linear-gradient(135deg,rgba(100,110,130,0.4),rgba(40,45,55,0.3))}
+
+.play-btn{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.2s;z-index:2}
+.play-btn:hover{background:rgba(255,255,255,0.25)}
+.play-btn svg{width:18px;height:18px;fill:#fff;margin-left:2px}
+.play-btn.small{width:32px;height:32px}
+.play-btn.small svg{width:12px;height:12px;margin-left:1px}
+.play-btn.large{width:64px;height:64px}
+.play-btn.large svg{width:24px;height:24px;margin-left:3px}
+
+.pill{font-family:var(--font-mono);font-size:9px;padding:2px 6px;border-radius:3px;background:rgba(0,0,0,0.7);color:rgba(255,255,255,0.8);position:absolute;z-index:2}
+.pill-bl{bottom:8px;left:8px}
+.pill-br{bottom:8px;right:8px}
+.pill-tl{top:8px;left:8px}
+.pill-tr{top:8px;right:8px}
+.pill-bc{bottom:8px;left:50%;transform:translateX(-50%);background:var(--accent-dim);color:var(--accent)}
+
+.source-info{padding:12px 14px;background:var(--card)}
+.source-filename{font-size:13px;font-weight:500;color:var(--text);margin-bottom:4px}
+.source-meta{font-family:var(--font-mono);font-size:11px;color:var(--secondary);margin-bottom:6px}
+.clip-count-pill{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;background:var(--accent-dim);color:var(--accent);font-weight:500}
+
+/* Clips list */
+.clips-list{display:flex;flex-direction:column;gap:10px;padding:0 24px 40px}
+
+.clip-card{display:flex;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.2s;cursor:default}
+.clip-card:hover{border-color:var(--border-hover)}
+
+.clip-preview{position:relative;width:160px;flex-shrink:0;aspect-ratio:16/9;background:#0a0a0c;overflow:hidden}
+.clip-preview .gradient-overlay{position:absolute;inset:0;opacity:0.2}
+
+.clip-info{flex:1;padding:12px 16px;display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0}
+.clip-name{font-size:14px;font-weight:500;color:var(--text)}
+.clip-source{font-size:11px;color:var(--secondary);display:flex;align-items:center;gap:5px}
+.clip-source .dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.clip-tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag-pill{font-size:10px;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,0.05);color:var(--muted)}
+.clip-usage{font-size:11px}
+.clip-usage.used{color:var(--accent)}
+.clip-usage.unused{color:var(--muted)}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.25s}
+.modal-overlay.active{opacity:1;pointer-events:all}
+
+.modal-panel{width:90vw;max-width:800px;border-radius:12px;overflow:hidden;transform:scale(0.96);transition:transform 0.25s}
+.modal-overlay.active .modal-panel{transform:scale(1)}
+
+.modal-video{position:relative;width:100%;aspect-ratio:16/9;background:#050508;overflow:hidden}
+.modal-video .gradient-overlay{position:absolute;inset:0;opacity:0.3}
+
+.modal-controls{height:48px;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px}
+.transport-btn{width:24px;height:24px;background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;transition:color 0.15s;border-radius:4px}
+.transport-btn:hover{color:var(--accent)}
+.progress-wrap{flex:1;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;margin:0 12px;overflow:hidden;cursor:pointer}
+.progress-fill{height:100%;width:35%;background:linear-gradient(90deg,var(--accent),#9b8aff);border-radius:2px;transition:width 0.3s}
+.modal-timecode{font-family:var(--font-mono);font-size:11px;color:var(--muted);white-space:nowrap}
+
+.modal-info{height:36px;background:var(--card);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.modal-info-left{font-size:13px;color:var(--text)}
+.modal-info-right{display:flex;align-items:center;gap:12px}
+.modal-specs{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.close-btn{background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 2px;transition:color 0.15s;line-height:1}
+.close-btn:hover{color:var(--text)}
+</style>
+</head>
+<body>
+
+<!-- Film Grain -->
+<svg style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.03;z-index:9999;mix-blend-mode:overlay">
+  <filter id="grain"><feTurbulence baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/></filter>
+  <rect width="100%" height="100%" filter="url(#grain)"/>
+</svg>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo-mark"></div>
+    <span class="logo-text">NextFrame</span>
+    <div class="breadcrumb">
+      <span class="sep">/</span><span>Show</span><span class="sep">/</span><span>EP01</span>
+    </div>
+  </div>
+  <div class="topbar-center">素材</div>
+  <div class="topbar-right">4 sources &middot; 8 clips</div>
+</div>
+
+<!-- Section 1: Sources -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-label">SOURCES</span>
+  </div>
+  <div class="sources-row">
+
+    <!-- Source 1 -->
+    <div class="source-card source-1">
+      <div class="source-preview">
+        <div class="gradient-overlay"></div>
+        <button class="play-btn" onclick="openModal('interview-raw.mp4','1080p &middot; 30fps','source-1','00:00 / 03:24')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+        <span class="pill pill-bl">1080p</span>
+        <span class="pill pill-br">03:24</span>
+      </div>
+      <div class="source-info">
+        <div class="source-filename">interview-raw.mp4</div>
+        <div class="source-meta">245MB &middot; h264 &middot; 30fps</div>
+        <span class="clip-count-pill">3 clips</span>
+      </div>
+    </div>
+
+    <!-- Source 2 -->
+    <div class="source-card source-2">
+      <div class="source-preview">
+        <div class="gradient-overlay"></div>
+        <button class="play-btn" onclick="openModal('screen-recording.mp4','1080p &middot; 30fps','source-2','00:00 / 05:12')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+        <span class="pill pill-bl">1080p</span>
+        <span class="pill pill-br">05:12</span>
+      </div>
+      <div class="source-info">
+        <div class="source-filename">screen-recording.mp4</div>
+        <div class="source-meta">380MB &middot; h264 &middot; 30fps</div>
+        <span class="clip-count-pill">2 clips</span>
+      </div>
+    </div>
+
+    <!-- Source 3 -->
+    <div class="source-card source-3">
+      <div class="source-preview">
+        <div class="gradient-overlay"></div>
+        <button class="play-btn" onclick="openModal('office-broll.mp4','4K &middot; 24fps','source-3','00:00 / 01:48')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+        <span class="pill pill-bl">4K</span>
+        <span class="pill pill-br">01:48</span>
+      </div>
+      <div class="source-info">
+        <div class="source-filename">office-broll.mp4</div>
+        <div class="source-meta">520MB &middot; h265 &middot; 24fps</div>
+        <span class="clip-count-pill">2 clips</span>
+      </div>
+    </div>
+
+    <!-- Source 4 -->
+    <div class="source-card source-4">
+      <div class="source-preview">
+        <div class="gradient-overlay"></div>
+        <button class="play-btn" onclick="openModal('founder-talk.mp4','1080p &middot; 30fps','source-4','00:00 / 08:30')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+        <span class="pill pill-bl">1080p</span>
+        <span class="pill pill-br">08:30</span>
+      </div>
+      <div class="source-info">
+        <div class="source-filename">founder-talk.mp4</div>
+        <div class="source-meta">610MB &middot; h264 &middot; 30fps</div>
+        <span class="clip-count-pill">1 clip</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Section 2: All Clips -->
+<div class="section" style="padding-top:8px">
+  <div class="section-header">
+    <span class="section-label">ALL CLIPS</span>
+    <span class="section-meta">8 clips &middot; 291.1s</span>
+  </div>
+</div>
+
+<div class="clips-list">
+
+  <!-- Clip 1 -->
+  <div class="clip-card">
+    <div class="clip-preview source-1">
+      <div class="gradient-overlay"></div>
+      <button class="play-btn small" onclick="openModal('用户介绍自己','1080p &middot; 30fps','source-1','00:12 / 00:28')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+      <span class="pill pill-tl">00:12.4</span>
+      <span class="pill pill-tr">00:28.8</span>
+      <span class="pill pill-bc">16.4s</span>
+    </div>
+    <div class="clip-info">
+      <div class="clip-name">用户介绍自己</div>
+      <div class="clip-source"><span class="dot"></span>from interview-raw.mp4</div>
+      <div class="clip-tags"><span class="tag-pill">intro</span><span class="tag-pill">talking-head</span></div>
+      <div class="clip-usage used">&rarr; 段 2</div>
+    </div>
+  </div>
+
+  <!-- Clip 2 -->
+  <div class="clip-card">
+    <div class="clip-preview source-1">
+      <div class="gradient-overlay"></div>
+      <button class="play-btn small" onclick="openModal('使用痛点描述','1080p &middot; 30fps','source-1','00:45 / 01:15')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+      <span class="pill pill-tl">00:45.0</span>
+      <span class="pill pill-tr">01:15.2</span>
+      <span class="pill pill-bc">30.2s</span>
+    </div>
+    <div class="clip-info">
+      <div class="clip-name">使用痛点描述</div>
+      <div class="clip-source"><span class="dot"></span>from interview-raw.mp4</div>
+      <div class="clip-tags"><span class="tag-pill">pain-point</span></div>
+      <div class="clip-usage used">&rarr; 段 1</div>
+    </div>
+  </div>
+
+  <!-- Clip 3 -->
+  <div class="clip-card">
+    <div class="clip-preview source-1">
+      <div class="gradient-overlay"></div>
+      <button class="play-btn small" onclick="openModal('使用感受','1080p &middot; 30fps','source-1','02:10 / 02:38')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+      <span class="pill pill-tl">02:10.0</span>
+      <span class="pill pill-tr">02:38.5</span>
+      <span class="pill pill-bc">28.5s</span>
+    </div>
+    <div class="clip-info">
+      <div class="clip-name">使用感受</div>
+      <div class="clip-source"><span class="dot"></span>from interview-raw.mp4</div>
+      <div class="clip-tags"><span class="tag-pill">testimonial</span></div>
+      <div class="clip-usage unused">未使用</div>
+    </div>
+  </div>
+
+  <!-- Clip 4 -->
+  <div class="clip-card">
+    <div class="clip-preview source-2">
+      <div class="gradient-overlay"></div>
+      <button class="play-btn small" onclick="openModal('创建项目流程','1080p &middot; 30fps','source-2','00:08 / 00:45')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+      <span class="pill pill-tl">00:08.0</span>
+      <span class="pill pill-tr">00:45.0</span>
+      <span class="pill pill-bc">37.0s</span>
+    </div>
+    <div class="clip-info">
+      <div class="clip-name">创建项目流程</div>
+      <div class="clip-source"><span class="dot"></span>from screen-recording.mp4</div>
+      <div class="clip-tags"><span class="tag-pill">tutorial</span><span class="tag-pill">screen</span></div>
+      <div class="clip-usage used">&rarr; 段 3</div>
+    </div>
+  </div>
+
+  <!-- Clip 5 -->
+  <div class="clip-card">
+    <div class="clip-preview source-2">
+      <div class="gradient-overlay"></div>
+      <button class="play-btn small" onclick="openModal('导出成品','1080p &middot; 30fps','source-2','03:20 / 04:05')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+      <span class="pill pill-tl">03:20.0</span>
+      <span class="pill pill-tr">04:05.0</span>
+      <span class="pill pill-bc">45.0s</span>
+    </div>
+    <div class="clip-info">
+      <div class="clip-name">导出成品</div>
+      <div class="clip-source"><span class="dot"></span>from screen-recording.mp4</div>
+      <div class="clip-tags"><span class="tag-pill">tutorial</span><span class="tag-pill">export</span></div>
+      <div class="clip-usage used">&rarr; 段 4</div>
+    </div>
+  </div>
+
+  <!-- Clip 6 -->
+  <div class="clip-card">
+    <div class="clip-preview source-3">
+      <div class="gradient-overlay"></div>
+      <button class="play-btn small" onclick="openModal('办公室全景','4K &middot; 24fps','source-3','00:00 / 00:22')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+      <span class="pill pill-tl">00:00.0</span>
+      <span class="pill pill-tr">00:22.0</span>
+      <span class="pill pill-bc">22.0s</span>
+    </div>
+    <div class="clip-info">
+      <div class="clip-name">办公室全景</div>
+      <div class="clip-source"><span class="dot"></span>from office-broll.mp4</div>
+      <div class="clip-tags"><span class="tag-pill">broll</span><span class="tag-pill">establishing</span></div>
+      <div class="clip-usage unused">未使用</div>
+    </div>
+  </div>
+
+  <!-- Clip 7 -->
+  <div class="clip-card">
+    <div class="clip-preview source-3">
+      <div class="gradient-overlay"></div>
+      <button class="play-btn small" onclick="openModal('团队协作','4K &middot; 24fps','source-3','00:45 / 01:12')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+      <span class="pill pill-tl">00:45.0</span>
+      <span class="pill pill-tr">01:12.0</span>
+      <span class="pill pill-bc">27.0s</span>
+    </div>
+    <div class="clip-info">
+      <div class="clip-name">团队协作</div>
+      <div class="clip-source"><span class="dot"></span>from office-broll.mp4</div>
+      <div class="clip-tags"><span class="tag-pill">broll</span><span class="tag-pill">team</span></div>
+      <div class="clip-usage used">&rarr; 段 3</div>
+    </div>
+  </div>
+
+  <!-- Clip 8 -->
+  <div class="clip-card">
+    <div class="clip-preview source-4">
+      <div class="gradient-overlay"></div>
+      <button class="play-btn small" onclick="openModal('创业初心','1080p &middot; 30fps','source-4','01:20 / 02:45')"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+      <span class="pill pill-tl">01:20.0</span>
+      <span class="pill pill-tr">02:45.0</span>
+      <span class="pill pill-bc">85.0s</span>
+    </div>
+    <div class="clip-info">
+      <div class="clip-name">创业初心</div>
+      <div class="clip-source"><span class="dot"></span>from founder-talk.mp4</div>
+      <div class="clip-tags"><span class="tag-pill">interview</span><span class="tag-pill">founder</span></div>
+      <div class="clip-usage used">&rarr; 段 5</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+  <div class="modal-panel">
+    <div class="modal-video" id="modalVideo">
+      <div class="gradient-overlay" id="modalGradient"></div>
+      <button class="play-btn large"><svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg></button>
+    </div>
+    <div class="modal-controls">
+      <button class="transport-btn">&#9198;</button>
+      <button class="transport-btn">&#9664;&#9664;</button>
+      <button class="transport-btn" style="color:var(--text);font-size:14px">&#9654;</button>
+      <button class="transport-btn">&#9654;&#9654;</button>
+      <button class="transport-btn">&#9197;</button>
+      <div class="progress-wrap"><div class="progress-fill" id="progressFill"></div></div>
+      <span class="modal-timecode" id="modalTimecode">00:00 / 00:00</span>
+    </div>
+    <div class="modal-info">
+      <span class="modal-info-left" id="modalName"></span>
+      <div class="modal-info-right">
+        <span class="modal-specs" id="modalSpecs"></span>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const modal = document.getElementById('modal');
+const gradientMap = {
+  'source-1': 'linear-gradient(135deg,rgba(100,80,200,0.5),rgba(40,30,80,0.3))',
+  'source-2': 'linear-gradient(135deg,rgba(40,160,80,0.4),rgba(20,60,30,0.3))',
+  'source-3': 'linear-gradient(135deg,rgba(200,130,60,0.4),rgba(80,50,20,0.3))',
+  'source-4': 'linear-gradient(135deg,rgba(100,110,130,0.4),rgba(40,45,55,0.3))'
+};
+
+function openModal(name, specs, sourceClass, timecode) {
+  document.getElementById('modalName').textContent = name;
+  document.getElementById('modalSpecs').textContent = specs;
+  document.getElementById('modalTimecode').textContent = timecode;
+  document.getElementById('modalGradient').style.background = gradientMap[sourceClass] || gradientMap['source-1'];
+  // Random-ish progress
+  const parts = timecode.split(' / ');
+  if (parts.length === 2) {
+    const toSec = s => { const p = s.split(':'); return (+p[0])*60 + parseFloat(p[1]||0); };
+    const cur = toSec(parts[0]), tot = toSec(parts[1]);
+    document.getElementById('progressFill').style.width = (tot > 0 ? (cur/tot)*100 : 0) + '%';
+  }
+  modal.classList.add('active');
+}
+
+function closeModal(e) {
+  if (e && e.target !== modal && !e.target.classList.contains('close-btn')) return;
+  modal.classList.remove('active');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') modal.classList.remove('active'); });
+</script>
+</body>
+</html>

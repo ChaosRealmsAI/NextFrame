@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame · Clips</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --accent: #7c6aef;
+  --accent-15: rgba(124,106,239,0.15);
+  --accent-06: rgba(124,106,239,0.06);
+  --accent-03: rgba(124,106,239,0.03);
+  --bg: #0a0a0c;
+  --surface: #111114;
+  --card: #161619;
+  --ink: #e4e4e8;
+  --ink-55: rgba(228,228,232,0.55);
+  --ink-25: rgba(228,228,232,0.25);
+  --ink-08: rgba(228,228,232,0.08);
+  --ink-03: rgba(228,228,232,0.03);
+  --border: 1px solid rgba(255,255,255,0.06);
+  --border-hover: 1px solid rgba(255,255,255,0.12);
+  --mono: 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  --sans: -apple-system, 'Helvetica Neue', system-ui, sans-serif;
+  --serif: Georgia, 'Times New Roman', serif;
+  --green: #3eb370;
+}
+
+html, body {
+  height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--ink);
+  font-family: var(--sans); font-size: 13px;
+  line-height: 1.5; font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Film grain */
+.grain { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.03; z-index: 9999; mix-blend-mode: overlay; }
+
+/* ─── Topbar ─── */
+.topbar {
+  height: 44px; display: flex; align-items: center;
+  padding: 0 20px; border-bottom: var(--border);
+  background: var(--bg); flex-shrink: 0;
+}
+.topbar-brand { font-family: var(--serif); font-size: 14px; font-weight: 400; letter-spacing: 0.04em; color: var(--ink); }
+.topbar-sep { color: var(--ink-25); margin: 0 8px; font-size: 12px; }
+.topbar-crumb { font-size: 12px; color: var(--ink-55); }
+.topbar-title { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-left: auto; }
+.topbar-stat { font-family: var(--mono); font-size: 11px; color: var(--ink-25); margin-left: auto; }
+
+/* ─── Layout ─── */
+.layout { display: flex; height: calc(100vh - 44px); }
+
+.sidebar {
+  width: 300px; flex-shrink: 0;
+  border-right: var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── Sidebar: Sources ─── */
+.sidebar-header {
+  padding: 16px 16px 12px;
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-25);
+  border-bottom: var(--border);
+}
+
+.source-list { flex: 1; overflow-y: auto; padding: 8px; }
+.source-list::-webkit-scrollbar { width: 4px; }
+.source-list::-webkit-scrollbar-thumb { background: var(--ink-08); border-radius: 2px; }
+
+.source-item {
+  border-radius: 8px; overflow: hidden;
+  margin-bottom: 6px; cursor: pointer;
+  border: 1px solid transparent;
+  transition: border-color 0.3s var(--ease);
+}
+.source-item:hover { border-color: rgba(255,255,255,0.06); }
+.source-item.active { border-color: rgba(124,106,239,0.3); background: var(--accent-03); }
+
+.source-thumb {
+  width: 100%; aspect-ratio: 16/9;
+  background: var(--surface); position: relative;
+  overflow: hidden;
+}
+.source-thumb-gradient {
+  position: absolute; inset: 0;
+  opacity: 0.4;
+}
+.source-play {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: rgba(255,255,255,0.7);
+  transition: background 0.3s var(--ease);
+  cursor: pointer;
+}
+.source-play:hover { background: rgba(124,106,239,0.3); }
+.source-pill {
+  position: absolute; bottom: 6px;
+  font-family: var(--mono); font-size: 9px;
+  padding: 1px 6px; border-radius: 3px;
+  background: rgba(0,0,0,0.65); color: rgba(255,255,255,0.7);
+}
+.source-pill.left { left: 6px; }
+.source-pill.right { right: 6px; }
+
+.source-info { padding: 8px 10px; }
+.source-name { font-size: 12px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
+.source-meta { font-family: var(--mono); font-size: 10px; color: var(--ink-25); }
+.source-clips-badge {
+  display: inline-block; margin-top: 4px;
+  font-size: 10px; padding: 1px 8px; border-radius: 3px;
+  background: var(--accent-06); color: var(--accent);
+}
+
+/* ─── Main: Source Detail ─── */
+.main-header {
+  padding: 16px 24px;
+  border-bottom: var(--border);
+  display: flex; align-items: baseline; gap: 12px;
+}
+.main-source-name { font-size: 15px; font-weight: 500; }
+.main-source-specs { font-family: var(--mono); font-size: 11px; color: var(--ink-25); }
+
+/* Timeline strip */
+.timeline-strip {
+  padding: 16px 24px;
+  border-bottom: var(--border);
+}
+.timeline-bar {
+  height: 32px; background: var(--surface);
+  border-radius: 4px; position: relative;
+  overflow: hidden;
+}
+.timeline-clip {
+  position: absolute; top: 4px; bottom: 4px;
+  background: var(--accent-15);
+  border: 1px solid rgba(124,106,239,0.25);
+  border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 9px; color: var(--accent);
+  transition: background 0.2s var(--ease);
+}
+.timeline-clip:hover { background: rgba(124,106,239,0.25); }
+.timeline-ticks {
+  display: flex; justify-content: space-between;
+  padding-top: 4px;
+  font-family: var(--mono); font-size: 9px; color: var(--ink-25);
+}
+
+/* Clip list */
+.clip-list {
+  flex: 1; overflow-y: auto; padding: 12px 24px;
+}
+.clip-list::-webkit-scrollbar { width: 4px; }
+.clip-list::-webkit-scrollbar-thumb { background: var(--ink-08); border-radius: 2px; }
+
+.clip-card {
+  display: flex; gap: 0;
+  background: var(--card);
+  border: var(--border); border-radius: 8px;
+  overflow: hidden; margin-bottom: 8px;
+  transition: border-color 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.clip-card:hover { border-color: rgba(255,255,255,0.1); transform: translateY(-1px); }
+
+.clip-thumb {
+  width: 160px; flex-shrink: 0;
+  aspect-ratio: 16/9;
+  background: var(--surface); position: relative;
+  overflow: hidden;
+}
+.clip-thumb-play {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  transition: background 0.3s var(--ease);
+}
+.clip-thumb-play:hover { background: rgba(124,106,239,0.3); }
+.clip-tc {
+  position: absolute; font-family: var(--mono); font-size: 8px;
+  padding: 1px 4px; border-radius: 2px;
+  background: rgba(0,0,0,0.6); color: rgba(255,255,255,0.6);
+}
+.clip-tc.in { top: 4px; left: 4px; }
+.clip-tc.out { top: 4px; right: 4px; }
+.clip-tc.dur {
+  bottom: 4px; left: 50%; transform: translateX(-50%);
+  background: var(--accent-15); color: var(--accent);
+}
+
+.clip-info { padding: 12px 16px; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.clip-name { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+.clip-source-ref { font-size: 11px; color: var(--ink-25); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
+.clip-source-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.clip-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+.clip-tag {
+  font-size: 10px; padding: 1px 8px; border-radius: 3px;
+  background: var(--ink-03); color: var(--ink-25);
+}
+.clip-segment { font-size: 11px; color: var(--accent); }
+.clip-segment.unused { color: var(--ink-25); }
+
+/* ─── Modal ─── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(12px);
+  align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+
+.modal {
+  width: 90%; max-width: 720px;
+  border-radius: 12px; overflow: hidden;
+  border: var(--border);
+  background: var(--surface);
+}
+.modal-video {
+  width: 100%; aspect-ratio: 16/9;
+  background: #050508; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-big-play {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  transition: background 0.3s var(--ease);
+}
+.modal-big-play:hover { background: rgba(124,106,239,0.2); }
+
+.modal-controls {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; border-top: var(--border);
+}
+.modal-transport { display: flex; gap: 4px; }
+.modal-btn {
+  width: 28px; height: 28px; border-radius: 4px;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--ink-25); font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.modal-btn:hover { color: var(--ink); background: var(--ink-08); }
+.modal-btn.play { background: var(--accent); color: #fff; border-radius: 50%; }
+.modal-btn.play:hover { background: #6a58dd; }
+
+.modal-progress { flex: 1; height: 3px; background: var(--ink-08); border-radius: 2px; overflow: hidden; }
+.modal-progress-fill { height: 100%; width: 35%; background: var(--accent); border-radius: 2px; }
+
+.modal-tc { font-family: var(--mono); font-size: 11px; color: var(--ink-25); }
+
+.modal-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; border-top: var(--border);
+}
+.modal-label { font-size: 12px; color: var(--ink-55); }
+.modal-specs { font-family: var(--mono); font-size: 10px; color: var(--ink-25); }
+.modal-close {
+  font-size: 18px; color: var(--ink-25); cursor: pointer;
+  background: none; border: none;
+  transition: color 0.2s var(--ease);
+}
+.modal-close:hover { color: var(--ink); }
+
+/* ─── Footer ─── */
+.footer {
+  height: 32px; display: flex; align-items: center;
+  padding: 0 24px; border-top: var(--border);
+  font-family: var(--mono); font-size: 10px; color: var(--ink-25);
+  flex-shrink: 0;
+  justify-content: space-between;
+}
+
+/* Stagger */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.stagger { opacity: 0; animation: fadeInUp 0.4s var(--ease) forwards; }
+.stagger:nth-child(1) { animation-delay: 0s; }
+.stagger:nth-child(2) { animation-delay: 0.08s; }
+.stagger:nth-child(3) { animation-delay: 0.16s; }
+.stagger:nth-child(4) { animation-delay: 0.24s; }
+.stagger:nth-child(5) { animation-delay: 0.32s; }
+.stagger:nth-child(6) { animation-delay: 0.40s; }
+.stagger:nth-child(7) { animation-delay: 0.48s; }
+.stagger:nth-child(8) { animation-delay: 0.56s; }
+</style>
+</head>
+<body>
+
+<svg class="grain"><filter id="g"><feTurbulence baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#g)"/></svg>
+
+<!-- Topbar -->
+<div class="topbar">
+  <span class="topbar-brand">NextFrame</span>
+  <span class="topbar-sep">/</span>
+  <span class="topbar-crumb">Show</span>
+  <span class="topbar-sep">/</span>
+  <span class="topbar-crumb">EP01</span>
+  <span class="topbar-title">CLIPS</span>
+  <span class="topbar-stat">4 sources &middot; 8 clips</span>
+</div>
+
+<div class="layout">
+
+  <!-- Sidebar: Sources -->
+  <div class="sidebar">
+    <div class="sidebar-header">SOURCES</div>
+    <div class="source-list" id="sourceList"></div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="main-header">
+      <span class="main-source-name" id="mainSourceName">interview-raw.mp4</span>
+      <span class="main-source-specs" id="mainSourceSpecs">1920&times;1080 &middot; 30fps &middot; h264 &middot; 03:24 &middot; 245MB</span>
+    </div>
+
+    <div class="timeline-strip">
+      <div class="timeline-bar" id="timelineBar"></div>
+      <div class="timeline-ticks" id="timelineTicks"></div>
+    </div>
+
+    <div class="clip-list" id="clipList"></div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <span id="footerLeft">3 clips &middot; 75.1s</span>
+  <span>NextFrame v0.4</span>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-video">
+      <div class="modal-big-play">&#9654;</div>
+    </div>
+    <div class="modal-controls">
+      <div class="modal-transport">
+        <button class="modal-btn">&#9198;</button>
+        <button class="modal-btn play">&#9654;</button>
+        <button class="modal-btn">&#9197;</button>
+      </div>
+      <div class="modal-progress"><div class="modal-progress-fill"></div></div>
+      <span class="modal-tc" id="modalTc">00:12 / 00:28</span>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-label" id="modalLabel">interview-raw.mp4 &middot; C1 &#x7528;&#x6237;&#x4ECB;&#x7ECD;</span>
+      <span class="modal-specs" id="modalSpecs">1080p &middot; 30fps</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SOURCES = [
+  { name: "interview-raw.mp4", dur: "03:24", durSec: 204, res: "1080p", w: 1920, h: 1080, fps: 30, codec: "h264", size: "245MB", hue: "220,60%,50%" },
+  { name: "screen-recording.mp4", dur: "05:12", durSec: 312, res: "1080p", w: 1920, h: 1080, fps: 30, codec: "h264", size: "380MB", hue: "150,40%,40%" },
+  { name: "office-broll.mp4", dur: "01:48", durSec: 108, res: "4K", w: 3840, h: 2160, fps: 24, codec: "h265", size: "520MB", hue: "30,50%,45%" },
+  { name: "founder-talk.mp4", dur: "08:30", durSec: 510, res: "1080p", w: 1920, h: 1080, fps: 30, codec: "h264", size: "610MB", hue: "260,30%,35%" }
+];
+
+var CLIPS = [
+  { id: "C1", name: "用户介绍自己", src: 0, inSec: 12.4, outSec: 28.8, tags: ["intro","talking-head"], seg: "段 2" },
+  { id: "C2", name: "使用痛点描述", src: 0, inSec: 45, outSec: 75.2, tags: ["pain-point"], seg: "段 1" },
+  { id: "C3", name: "使用感受", src: 0, inSec: 130, outSec: 158.5, tags: ["testimonial"], seg: null },
+  { id: "C4", name: "创建项目流程", src: 1, inSec: 8, outSec: 45, tags: ["tutorial","screen"], seg: "段 3" },
+  { id: "C5", name: "导出成品", src: 1, inSec: 200, outSec: 245, tags: ["tutorial","export"], seg: "段 4" },
+  { id: "C6", name: "办公室全景", src: 2, inSec: 0, outSec: 22, tags: ["broll","establishing"], seg: null },
+  { id: "C7", name: "团队协作", src: 2, inSec: 45, outSec: 72, tags: ["broll","team"], seg: "段 3" },
+  { id: "C8", name: "创业初心", src: 3, inSec: 80, outSec: 165, tags: ["interview","founder"], seg: "段 5" }
+];
+
+var activeSource = 0;
+
+function tc(sec) {
+  var m = Math.floor(sec / 60);
+  var s = (sec % 60).toFixed(1);
+  return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+}
+
+function renderSources() {
+  var html = "";
+  SOURCES.forEach(function(src, i) {
+    var clips = CLIPS.filter(function(c) { return c.src === i; });
+    html += '<div class="source-item stagger' + (i === activeSource ? " active" : "") + '" onclick="selectSource(' + i + ')">' +
+      '<div class="source-thumb">' +
+        '<div class="source-thumb-gradient" style="background:linear-gradient(135deg,hsla(' + src.hue + ',0.3),transparent)"></div>' +
+        '<div class="source-play" onclick="event.stopPropagation();openModal(\'' + src.name + '\',\'00:00 / ' + src.dur + '\',\'' + src.res + ' &middot; ' + src.fps + 'fps\')">&#9654;</div>' +
+        '<span class="source-pill left">' + src.res + '</span>' +
+        '<span class="source-pill right">' + src.dur + '</span>' +
+      '</div>' +
+      '<div class="source-info">' +
+        '<div class="source-name">' + src.name + '</div>' +
+        '<div class="source-meta">' + src.size + ' &middot; ' + src.codec + ' &middot; ' + src.fps + 'fps</div>' +
+        '<span class="source-clips-badge">' + clips.length + ' clips</span>' +
+      '</div>' +
+    '</div>';
+  });
+  document.getElementById("sourceList").innerHTML = html;
+}
+
+function selectSource(i) {
+  activeSource = i;
+  renderSources();
+  renderMain();
+}
+
+function renderMain() {
+  var src = SOURCES[activeSource];
+  var clips = CLIPS.filter(function(c) { return c.src === activeSource; });
+
+  document.getElementById("mainSourceName").textContent = src.name;
+  document.getElementById("mainSourceSpecs").innerHTML = src.w + "&times;" + src.h + " &middot; " + src.fps + "fps &middot; " + src.codec + " &middot; " + src.dur + " &middot; " + src.size;
+
+  // Timeline
+  var barHtml = "";
+  clips.forEach(function(clip) {
+    var left = (clip.inSec / src.durSec * 100).toFixed(1);
+    var width = ((clip.outSec - clip.inSec) / src.durSec * 100).toFixed(1);
+    barHtml += '<div class="timeline-clip" style="left:' + left + '%;width:' + width + '%" onclick="openModal(\'' + clip.id + ' ' + clip.name + '\',\'' + tc(clip.inSec) + ' / ' + tc(clip.outSec) + '\',\'' + src.res + ' &middot; ' + src.fps + 'fps\')">' + clip.id + '</div>';
+  });
+  document.getElementById("timelineBar").innerHTML = barHtml;
+
+  // Ticks
+  var ticks = [];
+  var step = src.durSec <= 120 ? 15 : (src.durSec <= 300 ? 30 : 60);
+  for (var t = 0; t <= src.durSec; t += step) {
+    ticks.push('<span>' + tc(t) + '</span>');
+  }
+  if (src.durSec % step !== 0) ticks.push('<span>' + tc(src.durSec) + '</span>');
+  document.getElementById("timelineTicks").innerHTML = ticks.join("");
+
+  // Clips
+  var listHtml = "";
+  clips.forEach(function(clip, i) {
+    var dur = (clip.outSec - clip.inSec).toFixed(1);
+    var tagsHtml = clip.tags.map(function(t) { return '<span class="clip-tag">' + t + '</span>'; }).join("");
+    listHtml += '<div class="clip-card stagger">' +
+      '<div class="clip-thumb" style="background:linear-gradient(135deg,hsla(' + src.hue + ',0.2),var(--surface))">' +
+        '<div class="clip-thumb-play" onclick="openModal(\'' + clip.id + ' ' + clip.name + '\',\'' + tc(clip.inSec) + ' / ' + tc(clip.outSec) + '\',\'' + src.res + ' &middot; ' + src.fps + 'fps\')">&#9654;</div>' +
+        '<span class="clip-tc in">' + tc(clip.inSec) + '</span>' +
+        '<span class="clip-tc out">' + tc(clip.outSec) + '</span>' +
+        '<span class="clip-tc dur">' + dur + 's</span>' +
+      '</div>' +
+      '<div class="clip-info">' +
+        '<div class="clip-name">' + clip.name + '</div>' +
+        '<div class="clip-source-ref"><span class="clip-source-dot"></span>' + src.name + '</div>' +
+        '<div class="clip-tags">' + tagsHtml + '</div>' +
+        '<div class="clip-segment' + (clip.seg ? '' : ' unused') + '">' + (clip.seg ? '&rarr; ' + clip.seg : '未使用') + '</div>' +
+      '</div>' +
+    '</div>';
+  });
+  document.getElementById("clipList").innerHTML = listHtml;
+
+  var totalDur = clips.reduce(function(s, c) { return s + (c.outSec - c.inSec); }, 0);
+  var unused = clips.filter(function(c) { return !c.seg; }).length;
+  document.getElementById("footerLeft").textContent = clips.length + " clips \u00b7 " + totalDur.toFixed(1) + "s" + (unused ? " \u00b7 " + unused + " unused" : "");
+}
+
+function openModal(label, timecode, specs) {
+  document.getElementById("modalLabel").textContent = label;
+  document.getElementById("modalTc").textContent = timecode;
+  document.getElementById("modalSpecs").textContent = specs;
+  document.getElementById("modal").classList.add("show");
+}
+function closeModal() { document.getElementById("modal").classList.remove("show"); }
+document.addEventListener("keydown", function(e) { if (e.key === "Escape") closeModal(); });
+
+renderSources();
+renderMain();
+</script>
+</body>
+</html>
