@@ -41,6 +41,15 @@ import typewriter from './typewriter.js';
 import videoClip from './videoClip.js';
 import vignette from './vignette.js';
 import waveform from './waveform.js';
+// WebGL shader scenes
+import shaderGradient from './shaderGradient.js';
+import shaderNoise from './shaderNoise.js';
+import shaderGlitch from './shaderGlitch.js';
+import shaderChromatic from './shaderChromatic.js';
+import shaderPlasma from './shaderPlasma.js';
+import shaderTunnel from './shaderTunnel.js';
+import shaderRipple from './shaderRipple.js';
+import shaderFirefly from './shaderFirefly.js';
 
 const ALL_SCENES = [
   // Canvas — backgrounds & effects
@@ -58,6 +67,9 @@ const ALL_SCENES = [
   timelineViz, flowChart,
   // Media
   imageHero, videoClip,
+  // WebGL — GPU shader effects
+  shaderGradient, shaderNoise, shaderGlitch, shaderChromatic,
+  shaderPlasma, shaderTunnel, shaderRipple, shaderFirefly,
 ];
 
 // Map: id → scene object

@@ -1,0 +1,5648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NextFrame — Generated Video</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: #111; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding-top: 20px; }
+  #stage { box-shadow: 0 0 80px rgba(100,80,200,0.15); }
+  .nf-layer { will-change: opacity, transform; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+// ===== Shared Utilities =====
+const SANS_FONT_STACK = '-apple-system, "SF Pro Display", "PingFang SC", sans-serif';
+const MONO_FONT_STACK = '"SF Mono", "Fira Code", Menlo, monospace';
+const SERIF_FONT_STACK = '"Iowan Old Style", "Times New Roman", "Songti SC", serif';
+
+function clamp(value, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function lerp(start, end, progress) {
+  return start + ((end - start) * progress);
+}
+
+function smoothstep(edge0, edge1, value) {
+  if (edge0 === edge1) {
+    return value >= edge1 ? 1 : 0;
+  }
+
+  const progress = clamp((value - edge0) / (edge1 - edge0));
+  return progress * progress * (3 - (2 * progress));
+}
+
+function easeOutCubic(value) {
+  return 1 - ((1 - value) ** 3);
+}
+
+function easeInCubic(value) {
+  return value ** 3;
+}
+
+function easeOutBack(value) {
+  const overshoot = 1.70158;
+  const shifted = value - 1;
+  return 1 + ((overshoot + 1) * (shifted ** 3)) + (overshoot * (shifted ** 2));
+}
+
+function toNumber(value, fallback) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function toBoolean(value, fallback = false) {
+  if (value === true || value === false) {
+    return value;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  return fallback;
+}
+
+function normalizeLines(value) {
+  return String(value ?? "").replace(/\r\n/g, "\n").split("\n");
+}
+
+function normalizeArray(value, fallback = []) {
+  return Array.isArray(value) ? value : fallback;
+}
+
+function createRoot(container, extraStyles = "") {
+  const root = document.createElement("div");
+  root.style.cssText = [
+    "position:absolute",
+    "inset:0",
+    "overflow:hidden",
+    "pointer-events:none",
+    extraStyles,
+  ].filter(Boolean).join(";");
+  container.appendChild(root);
+  return root;
+}
+
+function setStyle(element, styles) {
+  element.style.cssText = styles;
+  return element;
+}
+
+function createNode(tagName, styles = "", text = "") {
+  const element = document.createElement(tagName);
+  if (styles) {
+    element.style.cssText = styles;
+  }
+  if (text) {
+    element.textContent = text;
+  }
+  return element;
+}
+
+function setVisible(element, visible) {
+  element.style.display = visible ? "" : "none";
+}
+
+function hashString(value) {
+  let result = 2166136261;
+  const text = String(value ?? "");
+
+  for (let index = 0; index < text.length; index += 1) {
+    result ^= text.charCodeAt(index);
+    result = Math.imul(result, 16777619);
+  }
+
+  return result >>> 0;
+}
+
+function hashFloat(seed, salt = "") {
+  let value = (Math.imul((seed | 0) ^ 0x9e3779b9, 1597334677) ^ hashString(salt)) >>> 0;
+  value ^= value >>> 15;
+  value = Math.imul(value, 2246822519) >>> 0;
+  value ^= value >>> 13;
+  value = Math.imul(value, 3266489917) >>> 0;
+  value ^= value >>> 16;
+  return value / 4294967295;
+}
+
+function makeLinearGradient(colors, fallback = ["#ffffff"]) {
+  const palette = normalizeArray(colors, fallback).filter(Boolean);
+  return `linear-gradient(135deg, ${(palette.length > 0 ? palette : fallback).join(", ")})`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function sanitizeUrl(url) {
+  const value = String(url ?? "").trim();
+  if (!value) {
+    return "";
+  }
+
+  if (/^(https?:|mailto:|#|\/)/i.test(value)) {
+    return value;
+  }
+
+  return "";
+}
+
+function sanitizeHtml(value) {
+  const template = document.createElement("template");
+  template.innerHTML = String(value ?? "");
+
+  const blockedTags = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "LINK", "META"]);
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT);
+  const blocked = [];
+
+  while (walker.nextNode()) {
+    const element = walker.currentNode;
+    if (!(element instanceof HTMLElement)) {
+      continue;
+    }
+
+    if (blockedTags.has(element.tagName)) {
+      blocked.push(element);
+      continue;
+    }
+
+    [...element.attributes].forEach((attribute) => {
+      const name = attribute.name.toLowerCase();
+      if (name.startsWith("on")) {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+
+      if ((name === "href" || name === "src") && sanitizeUrl(attribute.value) !== attribute.value) {
+        element.removeAttribute(attribute.name);
+      }
+    });
+  }
+
+  blocked.forEach((element) => element.remove());
+  return template.innerHTML;
+}
+
+function formatInlineMarkdown(value) {
+  const codeTokens = [];
+  let text = escapeHtml(value);
+
+  text = text.replace(/`([^`]+)`/g, (_, code) => {
+    const token = `__CODE_${codeTokens.length}__`;
+    codeTokens.push(`<code>${escapeHtml(code)}</code>`);
+    return token;
+  });
+
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => {
+    const safeUrl = sanitizeUrl(url);
+    if (!safeUrl) {
+      return escapeHtml(label);
+    }
+
+    return `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noreferrer">${escapeHtml(label)}</a>`;
+  });
+
+  text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+
+  codeTokens.forEach((token, index) => {
+    text = text.replace(`__CODE_${index}__`, token);
+  });
+
+  return text;
+}
+
+function markdownToHtml(markdown) {
+  const lines = String(markdown ?? "").replace(/\r\n/g, "\n").split("\n");
+  const html = [];
+  const paragraph = [];
+  let listItems = [];
+  let inCode = false;
+  let codeFence = "";
+  let codeLines = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) {
+      return;
+    }
+
+    html.push(`<p>${formatInlineMarkdown(paragraph.join(" "))}</p>`);
+    paragraph.length = 0;
+  };
+
+  const flushList = () => {
+    if (listItems.length === 0) {
+      return;
+    }
+
+    html.push(`<ul>${listItems.join("")}</ul>`);
+    listItems = [];
+  };
+
+  const flushCode = () => {
+    if (!inCode) {
+      return;
+    }
+
+    const languageClass = codeFence ? ` class="language-${escapeHtml(codeFence)}"` : "";
+    html.push(`<pre><code${languageClass}>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+    inCode = false;
+    codeFence = "";
+    codeLines = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const fenceMatch = line.match(/^```([\w-]+)?$/);
+    if (fenceMatch) {
+      if (inCode) {
+        flushCode();
+      } else {
+        flushParagraph();
+        flushList();
+        inCode = true;
+        codeFence = fenceMatch[1] || "";
+        codeLines = [];
+      }
+      continue;
+    }
+
+    if (inCode) {
+      codeLines.push(rawLine);
+      continue;
+    }
+
+    if (!line.trim()) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      flushParagraph();
+      flushList();
+      const level = headingMatch[1].length;
+      html.push(`<h${level}>${formatInlineMarkdown(headingMatch[2])}</h${level}>`);
+      continue;
+    }
+
+    if (/^---+$/.test(line)) {
+      flushParagraph();
+      flushList();
+      html.push("<hr />");
+      continue;
+    }
+
+    const quoteMatch = line.match(/^>\s?(.*)$/);
+    if (quoteMatch) {
+      flushParagraph();
+      flushList();
+      html.push(`<blockquote><p>${formatInlineMarkdown(quoteMatch[1])}</p></blockquote>`);
+      continue;
+    }
+
+    const listMatch = line.match(/^[-*]\s+(.*)$/);
+    if (listMatch) {
+      flushParagraph();
+      listItems.push(`<li>${formatInlineMarkdown(listMatch[1])}</li>`);
+      continue;
+    }
+
+    paragraph.push(line.trim());
+  }
+
+  flushParagraph();
+  flushList();
+  flushCode();
+
+  return html.join("");
+}
+
+
+// ===== Scene Components =====
+const SCENE_REGISTRY = {};
+
+
+// --- auroraGradient ---
+SCENE_REGISTRY["auroraGradient"] = (function() {
+  
+return {
+  id: "auroraGradient",
+  type: "canvas",
+  name: "Aurora Gradient",
+  category: "Backgrounds",
+  defaultParams: {
+    hueA: 220,
+    hueB: 280,
+    hueC: 180,
+    intensity: 0.7,
+    grain: 0.03,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const hueA = toNumber(params.hueA, 220);
+    const hueB = toNumber(params.hueB, 280);
+    const hueC = toNumber(params.hueC, 180);
+    const intensity = clamp(toNumber(params.intensity, 0.7), 0, 1);
+    const grain = clamp(toNumber(params.grain, 0.03), 0, 0.2);
+
+    // Dark background
+    ctx.fillStyle = "#0a0a14";
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.globalCompositeOperation = "lighter";
+
+    const t = localT * 0.15;
+    const orbs = [
+      { hue: hueA, cx: 0.3 + 0.2 * Math.sin(t * 0.7), cy: 0.4 + 0.15 * Math.cos(t * 0.5), r: 0.45 },
+      { hue: hueB, cx: 0.7 + 0.15 * Math.cos(t * 0.6), cy: 0.3 + 0.2 * Math.sin(t * 0.8), r: 0.5 },
+      { hue: hueC, cx: 0.5 + 0.25 * Math.sin(t * 0.4 + 1), cy: 0.7 + 0.1 * Math.cos(t * 0.9), r: 0.4 },
+      { hue: (hueA + hueB) / 2, cx: 0.4 + 0.1 * Math.cos(t * 1.1), cy: 0.5 + 0.15 * Math.sin(t * 0.3), r: 0.35 },
+    ];
+
+    for (const orb of orbs) {
+      const cx = orb.cx * W;
+      const cy = orb.cy * H;
+      const radius = orb.r * Math.max(W, H);
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      const alpha = intensity * 0.35;
+      grad.addColorStop(0, `hsla(${orb.hue}, 80%, 55%, ${alpha})`);
+      grad.addColorStop(0.4, `hsla(${orb.hue}, 70%, 40%, ${alpha * 0.5})`);
+      grad.addColorStop(1, `hsla(${orb.hue}, 60%, 20%, 0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    ctx.globalCompositeOperation = "source-over";
+
+    // Film grain
+    if (grain > 0) {
+      const imageData = ctx.getImageData(0, 0, W, H);
+      const data = imageData.data;
+      const strength = grain * 40;
+      // Simple pseudo-random grain based on position + time
+      let seed = (localT * 1000) | 0;
+      for (let i = 0; i < data.length; i += 4) {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        const noise = ((seed >> 16) / 32767 - 0.5) * strength;
+        data[i] = clamp(data[i] + noise, 0, 255);
+        data[i + 1] = clamp(data[i + 1] + noise, 0, 255);
+        data[i + 2] = clamp(data[i + 2] + noise, 0, 255);
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
+  },
+
+  destroy(canvas) {
+    canvas.remove();
+  },
+};
+
+})();
+
+
+// --- barChart ---
+SCENE_REGISTRY["barChart"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const FONT = '-apple-system, "SF Pro Display", sans-serif';
+const PALETTE = ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80", "#fbbf24"];
+
+function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+return {
+  id: "barChart",
+  type: "svg",
+  name: "Bar Chart",
+  category: "Data Viz",
+  defaultParams: {
+    data: [85, 45, 70, 55, 90, 35],
+    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    colors: PALETTE,
+    barWidth: 80,
+    gap: 30,
+    showLabels: true,
+    showValues: true,
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const data = normalizeArray(params.data, [85, 45, 70, 55, 90, 35]);
+    const labels = normalizeArray(params.labels, []);
+    const colors = normalizeArray(params.colors, PALETTE);
+    const barW = toNumber(params.barWidth, 80);
+    const gap = toNumber(params.gap, 30);
+    const showLabels = params.showLabels !== false;
+    const showValues = params.showValues !== false;
+    const maxVal = Math.max(...data, 1);
+
+    const padL = 160, padR = 160, padT = 120, padB = 140;
+    const chartW = 1920 - padL - padR;
+    const chartH = 1080 - padT - padB;
+    const totalBarW = data.length * barW + (data.length - 1) * gap;
+    const offsetX = padL + (chartW - totalBarW) / 2;
+
+    // grid lines
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (chartH / 4) * i;
+      svg.appendChild(svgEl("line", {
+        x1: padL, y1: y, x2: 1920 - padR, y2: y,
+        stroke: "rgba(255,255,255,0.08)", "stroke-width": "1",
+      }));
+    }
+
+    // baseline
+    svg.appendChild(svgEl("line", {
+      x1: padL, y1: padT + chartH, x2: 1920 - padR, y2: padT + chartH,
+      stroke: "rgba(255,255,255,0.2)", "stroke-width": "2",
+    }));
+
+    const bars = [];
+    const valueTxts = [];
+    const labelTxts = [];
+
+    data.forEach((val, i) => {
+      const x = offsetX + i * (barW + gap);
+      const fullH = (val / maxVal) * chartH;
+      const color = colors[i % colors.length];
+
+      const rect = svgEl("rect", {
+        x: String(x), y: String(padT + chartH),
+        width: String(barW), height: "0",
+        rx: "4", fill: color, opacity: "0.9",
+      });
+      svg.appendChild(rect);
+      bars.push({ rect, fullH, val });
+
+      if (showValues) {
+        const txt = svgEl("text", {
+          x: String(x + barW / 2), y: String(padT + chartH),
+          fill: "rgba(255,255,255,0.85)", "font-size": "22",
+          "font-family": FONT, "font-weight": "600",
+          "text-anchor": "middle", opacity: "0",
+        });
+        txt.textContent = String(val);
+        svg.appendChild(txt);
+        valueTxts.push(txt);
+      }
+
+      if (showLabels && labels[i]) {
+        const lbl = svgEl("text", {
+          x: String(x + barW / 2), y: String(padT + chartH + 40),
+          fill: "rgba(255,255,255,0.6)", "font-size": "20",
+          "font-family": FONT, "text-anchor": "middle",
+        });
+        lbl.textContent = labels[i];
+        svg.appendChild(lbl);
+        labelTxts.push(lbl);
+      }
+    });
+
+    return { svg, bars, valueTxts, labelTxts, chartH, padT };
+  },
+
+  update(els, localT, params) {
+    const stagger = 0.12;
+    const dur = 0.8;
+
+    els.bars.forEach((b, i) => {
+      const start = i * stagger;
+      const raw = clamp((localT - start) / dur, 0, 1);
+      const t = raw > 0 ? easeOutBack(raw) : 0;
+      const h = b.fullH * clamp(t, 0, 1.15);
+      const y = els.padT + els.chartH - h;
+      b.rect.setAttribute("y", String(y));
+      b.rect.setAttribute("height", String(Math.max(0, h)));
+
+      if (els.valueTxts[i]) {
+        els.valueTxts[i].setAttribute("y", String(y - 12));
+        els.valueTxts[i].setAttribute("opacity", String(clamp(raw * 3, 0, 1)));
+      }
+    });
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- bulletList ---
+SCENE_REGISTRY["bulletList"] = (function() {
+  
+return {
+  id: "bulletList",
+  type: "dom",
+  name: "Bullet List",
+  category: "Typography",
+  defaultParams: {
+    items: ["First point", "Second point", "Third point"],
+    fontSize: 28,
+    bulletColor: "#a78bfa",
+    stagger: 0.08,
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;flex-direction:column;justify-content:center;padding:8% 12%");
+    const items = normalizeArray(params.items, ["Item"]);
+    const fontSize = toNumber(params.fontSize, 28);
+    const bulletColor = params.bulletColor || "#a78bfa";
+    const rows = items.map((text) => {
+      const row = createNode("div", [
+        "display:flex",
+        "align-items:flex-start",
+        "gap:0.6em",
+        "margin-bottom:0.7em",
+        "will-change:transform,opacity",
+        "opacity:0",
+        "transform:translateX(-30px)",
+      ].join(";"));
+      const dot = createNode("span", [
+        `width:10px`,
+        `height:10px`,
+        `min-width:10px`,
+        `border-radius:50%`,
+        `background:${bulletColor}`,
+        `margin-top:${fontSize * 0.35}px`,
+        `box-shadow:0 0 12px ${bulletColor}66`,
+      ].join(";"));
+      const label = createNode("span", [
+        `font-family:${SANS_FONT_STACK}`,
+        `font-size:${fontSize}px`,
+        "font-weight:500",
+        "color:rgba(255,255,255,0.92)",
+        "line-height:1.5",
+        "letter-spacing:0.01em",
+      ].join(";"), text);
+      row.appendChild(dot);
+      row.appendChild(label);
+      root.appendChild(row);
+      return row;
+    });
+    return { root, rows };
+  },
+
+  update(els, localT, params) {
+    const stagger = toNumber(params.stagger, 0.08);
+    const exitAlpha = 1 - smoothstep(0.85, 1, localT);
+    els.rows.forEach((row, i) => {
+      const enterT = smoothstep(0.02 + i * stagger, 0.12 + i * stagger, localT);
+      const progress = easeOutCubic(enterT);
+      const x = (1 - progress) * -30;
+      const alpha = progress * exitAlpha;
+      row.style.opacity = alpha;
+      row.style.transform = `translateX(${x}px)`;
+    });
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- calloutCard ---
+SCENE_REGISTRY["calloutCard"] = (function() {
+  
+return {
+  id: "calloutCard",
+  type: "dom",
+  name: "Callout Card",
+  category: "Overlay",
+  defaultParams: {
+    icon: "\uD83D\uDE80",
+    title: "Launch Ready",
+    description: "Everything is set up and ready to go. Just hit publish.",
+    bgColor: "rgba(30,30,50,0.85)",
+    borderColor: "#a78bfa",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center");
+    const border = params.borderColor || "#a78bfa";
+    const card = createNode("div", [
+      `background:${params.bgColor || "rgba(30,30,50,0.85)"}`,
+      `border:1px solid ${border}33`,
+      "border-radius:16px",
+      "padding:32px 36px",
+      "max-width:420px",
+      "width:85%",
+      `box-shadow:0 12px 40px rgba(0,0,0,0.4), 0 0 0 1px ${border}11`,
+      "backdrop-filter:blur(12px)",
+      "-webkit-backdrop-filter:blur(12px)",
+      "will-change:transform,opacity",
+      "opacity:0",
+      "transform:scale(0.8)",
+    ].join(";"));
+    const iconEl = createNode("div", [
+      "font-size:40px",
+      "margin-bottom:14px",
+      "line-height:1",
+    ].join(";"), params.icon || "\uD83D\uDE80");
+    const titleEl = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:22px",
+      "font-weight:700",
+      "color:rgba(255,255,255,0.95)",
+      "margin-bottom:8px",
+      "letter-spacing:0.01em",
+    ].join(";"), params.title || "");
+    const descEl = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:15px",
+      "font-weight:400",
+      "color:rgba(255,255,255,0.6)",
+      "line-height:1.6",
+    ].join(";"), params.description || "");
+    card.appendChild(iconEl);
+    card.appendChild(titleEl);
+    card.appendChild(descEl);
+    root.appendChild(card);
+    return { root, card };
+  },
+
+  update(els, localT) {
+    const exitAlpha = 1 - smoothstep(0.85, 1, localT);
+    const enterT = smoothstep(0, 0.12, localT);
+    const scale = 0.8 + 0.2 * easeOutBack(enterT);
+    els.card.style.opacity = enterT * exitAlpha;
+    els.card.style.transform = `scale(${scale})`;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- card3d ---
+SCENE_REGISTRY["card3d"] = (function() {
+  
+return {
+  id: "card3d",
+  type: "dom",
+  name: "3D Card Flip",
+  category: "Motion Graphics",
+  defaultParams: {
+    frontTitle: "Front",
+    frontSubtitle: "",
+    backContent: "Back side",
+    bgColor: "rgba(30,30,50,0.9)",
+    rotateAxis: "Y",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center;perspective:1200px");
+    const bgColor = params.bgColor || "rgba(30,30,50,0.9)";
+    const axis = (params.rotateAxis || "Y").toUpperCase() === "X" ? "X" : "Y";
+
+    const card = createNode("div", [
+      "position:relative;width:360px;height:240px",
+      "transform-style:preserve-3d",
+      "will-change:transform;opacity:0",
+    ].join(";"));
+
+    const faceBase = [
+      "position:absolute;inset:0;display:flex;flex-direction:column",
+      "align-items:center;justify-content:center;backface-visibility:hidden",
+      `background:${bgColor};border-radius:16px`,
+      `border:1px solid rgba(255,255,255,0.1)`,
+      `box-shadow:0 8px 32px rgba(0,0,0,0.4)`,
+      `font-family:${SANS_FONT_STACK}`,
+    ].join(";");
+
+    const front = createNode("div", faceBase);
+    const title = createNode("div", [
+      "font-size:28px;font-weight:700;color:#fff",
+      "letter-spacing:-0.01em",
+    ].join(";"), params.frontTitle || "Front");
+    front.appendChild(title);
+    if (params.frontSubtitle) {
+      const sub = createNode("div", "font-size:14px;color:rgba(255,255,255,0.5);margin-top:8px", params.frontSubtitle);
+      front.appendChild(sub);
+    }
+
+    const back = createNode("div", [
+      faceBase,
+      `transform:rotate${axis}(180deg)`,
+    ].join(";"));
+    const backText = createNode("div", "font-size:18px;color:rgba(255,255,255,0.8);padding:24px;text-align:center;line-height:1.5", params.backContent || "Back side");
+    back.appendChild(backText);
+
+    card.appendChild(front);
+    card.appendChild(back);
+    root.appendChild(card);
+    return { root, card, axis };
+  },
+
+  update(els, localT) {
+    const fadeIn = smoothstep(0, 0.1, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    els.card.style.opacity = fadeIn * fadeOut;
+
+    // 0~0.15: flip from 180 to 0 (back→front), 0.15~0.85: show front (0), 0.85~1: flip to 180
+    let deg;
+    if (localT < 0.15) {
+      const t = easeOutCubic(smoothstep(0, 0.15, localT));
+      deg = 180 - t * 180;
+    } else if (localT > 0.85) {
+      const t = easeOutCubic(smoothstep(0.85, 1, localT));
+      deg = t * 180;
+    } else {
+      deg = 0;
+    }
+    els.card.style.transform = `rotate${els.axis}(${deg}deg)`;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- circleRipple ---
+SCENE_REGISTRY["circleRipple"] = (function() {
+  
+return {
+  id: "circleRipple",
+  type: "canvas",
+  name: "Circle Ripple",
+  category: "Effects",
+  defaultParams: {
+    count: 5,
+    speed: 1,
+    color: "#7c6ef0",
+    strokeWidth: 2,
+    maxRadius: 0.8,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W / 2;
+    const cy = H / 2;
+
+    const count = clamp(toNumber(params.count, 5), 1, 20) | 0;
+    const speed = toNumber(params.speed, 1);
+    const color = params.color || "#7c6ef0";
+    const strokeWidth = clamp(toNumber(params.strokeWidth, 2), 0.5, 10);
+    const maxRadiusFrac = clamp(toNumber(params.maxRadius, 0.8), 0.2, 1.5);
+    const maxRadius = maxRadiusFrac * Math.min(W, H) / 2;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Each ring has a staggered phase; cycle period = count spacing
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = strokeWidth;
+
+    for (let i = 0; i < count; i++) {
+      // Progress 0..1 for this ring, looping
+      const phase = ((localT * speed * 0.3) - i * (1 / count)) % 1;
+      const p = phase < 0 ? phase + 1 : phase;
+
+      const radius = p * maxRadius;
+      // Fade in quickly, fade out at the edge
+      const alpha = smoothstep(0, 0.1, p) * smoothstep(1, 0.7, p);
+
+      if (alpha < 0.01) continue;
+
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+  },
+
+  destroy(canvas) {
+    canvas.remove();
+  },
+};
+
+})();
+
+
+// --- codeBlock ---
+SCENE_REGISTRY["codeBlock"] = (function() {
+  
+const THEMES = {
+  dark: { bg: "rgba(15,15,25,0.85)", text: "#e2e8f0", line: "rgba(255,255,255,0.15)", border: "rgba(255,255,255,0.08)" },
+  light: { bg: "rgba(245,245,250,0.9)", text: "#1e293b", line: "rgba(0,0,0,0.2)", border: "rgba(0,0,0,0.1)" },
+};
+
+return {
+  id: "codeBlock",
+  type: "dom",
+  name: "Code Block",
+  category: "Code",
+  defaultParams: {
+    code: 'function hello() {\n  console.log("Hello, world!");\n  return 42;\n}',
+    language: "javascript",
+    fontSize: 18,
+    theme: "dark",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6% 8%");
+    const theme = THEMES[params.theme] || THEMES.dark;
+    const fontSize = toNumber(params.fontSize, 18);
+    const card = createNode("div", [
+      `background:${theme.bg}`,
+      "border-radius:12px",
+      `border:1px solid ${theme.border}`,
+      "padding:20px 24px",
+      "max-width:720px",
+      "width:100%",
+      "box-shadow:0 8px 32px rgba(0,0,0,0.3)",
+      "will-change:opacity,transform",
+      "opacity:0",
+    ].join(";"));
+    const header = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:12px",
+      "font-weight:500",
+      `color:${theme.line}`,
+      "margin-bottom:12px",
+      "letter-spacing:0.08em",
+      "text-transform:uppercase",
+    ].join(";"), params.language || "");
+    card.appendChild(header);
+    const lines = normalizeLines(params.code || "");
+    const lineEls = lines.map((text, i) => {
+      const row = createNode("div", [
+        "display:flex",
+        "gap:1em",
+        "will-change:opacity",
+        "opacity:0",
+      ].join(";"));
+      const num = createNode("span", [
+        `font-family:${MONO_FONT_STACK}`,
+        `font-size:${fontSize}px`,
+        `color:${theme.line}`,
+        "min-width:2em",
+        "text-align:right",
+        "user-select:none",
+        "line-height:1.7",
+      ].join(";"), String(i + 1));
+      const code = createNode("span", [
+        `font-family:${MONO_FONT_STACK}`,
+        `font-size:${fontSize}px`,
+        `color:${theme.text}`,
+        "white-space:pre",
+        "line-height:1.7",
+      ].join(";"));
+      row.appendChild(num);
+      row.appendChild(code);
+      card.appendChild(row);
+      return { row, code, fullText: text };
+    });
+    root.appendChild(card);
+    return { root, card, lineEls };
+  },
+
+  update(els, localT) {
+    const exitAlpha = 1 - smoothstep(0.85, 1, localT);
+    const cardT = smoothstep(0, 0.08, localT);
+    els.card.style.opacity = cardT * exitAlpha;
+    els.card.style.transform = `translateY(${(1 - cardT) * 15}px)`;
+    const totalLines = els.lineEls.length;
+    const typeWindow = 0.6 / Math.max(1, totalLines);
+    els.lineEls.forEach((item, i) => {
+      const lineStart = 0.06 + i * typeWindow;
+      const lineEnd = lineStart + typeWindow * 1.5;
+      const lineT = smoothstep(lineStart, lineEnd, localT);
+      item.row.style.opacity = (lineT > 0 ? 1 : 0) * exitAlpha;
+      const charCount = Math.round(lerp(0, item.fullText.length, lineT));
+      item.code.textContent = item.fullText.slice(0, charCount);
+    });
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- confetti ---
+SCENE_REGISTRY["confetti"] = (function() {
+  
+const DEFAULT_COLORS = ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80", "#fbbf24"];
+
+return {
+  id: "confetti",
+  type: "canvas",
+  name: "Confetti",
+  category: "Effects",
+  defaultParams: {
+    count: 100,
+    colors: DEFAULT_COLORS,
+    gravity: 0.5,
+    spread: 60,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+
+    const count = clamp(toNumber(params.count, 100), 10, 500) | 0;
+    const colors = normalizeArray(params.colors, DEFAULT_COLORS);
+    const spread = toNumber(params.spread, 60);
+
+    let seed = 42;
+    const rng = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+
+    const particles = [];
+    for (let i = 0; i < count; i++) {
+      const angle = ((rng() - 0.5) * spread * Math.PI) / 180 - Math.PI / 2;
+      const velocity = 300 + rng() * 400;
+      particles.push({
+        x: 0.5, y: 0.7,
+        vx: Math.cos(angle) * velocity * (rng() * 0.5 + 0.75),
+        vy: Math.sin(angle) * velocity * (rng() * 0.5 + 0.75),
+        w: 6 + rng() * 8, h: 4 + rng() * 6,
+        rot: rng() * Math.PI * 2,
+        rotSpeed: (rng() - 0.5) * 12,
+        color: colors[i % colors.length] || "#fff",
+        shape: rng() > 0.5 ? "rect" : "circle",
+      });
+    }
+    canvas._data = { particles };
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    const W = canvas.width;
+    const H = canvas.height;
+    const gravity = toNumber(params.gravity, 0.5) * 800;
+    const t = localT;
+
+    ctx.clearRect(0, 0, W, H);
+    const { particles } = canvas._data;
+
+    for (const p of particles) {
+      const px = (p.x + p.vx * t / W) * W;
+      const py = (p.y + p.vy * t / H + 0.5 * gravity * t * t / H) * H;
+      if (py > H + 20) continue;
+
+      const rot = p.rot + p.rotSpeed * t;
+      const alpha = clamp(1 - t * 0.3, 0.2, 1);
+
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(rot);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+
+      if (p.shape === "circle") {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.w * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(-p.w * 0.5, -p.h * 0.5, p.w, p.h);
+      }
+      ctx.restore();
+    }
+  },
+
+  destroy(canvas) { canvas._data = null; canvas.remove(); },
+};
+
+})();
+
+
+// --- featureGrid ---
+SCENE_REGISTRY["featureGrid"] = (function() {
+  
+const DEFAULT_FEATURES = [
+  { icon: "\u26a1", title: "Fast", desc: "Lightning speed rendering" },
+  { icon: "\ud83c\udfa8", title: "Beautiful", desc: "Stunning visual quality" },
+  { icon: "\ud83e\udde0", title: "Smart", desc: "AI-powered editing" },
+  { icon: "\ud83d\udd12", title: "Secure", desc: "Your data stays yours" },
+];
+
+return {
+  id: "featureGrid",
+  type: "dom",
+  name: "Feature Grid",
+  category: "Layout",
+  defaultParams: {
+    features: DEFAULT_FEATURES,
+    columns: 2,
+    stagger: 0.05,
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center;padding:40px");
+    const features = normalizeArray(params.features, DEFAULT_FEATURES);
+    const cols = toNumber(params.columns, 2);
+
+    const grid = createNode("div", [
+      "display:grid",
+      `grid-template-columns:repeat(${cols}, 1fr)`,
+      "gap:20px;max-width:680px;width:100%",
+    ].join(";"));
+
+    const cards = features.map((f) => {
+      const card = createNode("div", [
+        "background:rgba(255,255,255,0.05)",
+        "border:1px solid rgba(255,255,255,0.1)",
+        "border-radius:14px;padding:24px",
+        "will-change:transform,opacity;opacity:0",
+        "transform:scale(0.7)",
+        "backdrop-filter:blur(4px)",
+      ].join(";"));
+
+      const icon = createNode("div", [
+        "font-size:32px;margin-bottom:10px",
+      ].join(";"), f.icon || "");
+      const title = createNode("div", [
+        `font-family:${SANS_FONT_STACK}`,
+        "font-size:18px;font-weight:700;color:#fff",
+        "margin-bottom:6px",
+      ].join(";"), f.title || "");
+      const desc = createNode("div", [
+        `font-family:${SANS_FONT_STACK}`,
+        "font-size:13px;color:rgba(255,255,255,0.55)",
+        "line-height:1.4",
+      ].join(";"), f.desc || "");
+
+      card.appendChild(icon);
+      card.appendChild(title);
+      card.appendChild(desc);
+      grid.appendChild(card);
+      return card;
+    });
+
+    root.appendChild(grid);
+    return { root, cards };
+  },
+
+  update(els, localT, params) {
+    const stagger = toNumber(params.stagger, 0.05);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+
+    els.cards.forEach((card, i) => {
+      const start = 0.03 + i * stagger;
+      const enterT = smoothstep(start, start + 0.12, localT);
+      const scale = 0.7 + easeOutBack(enterT) * 0.3;
+      const alpha = enterT * fadeOut;
+      card.style.opacity = alpha;
+      card.style.transform = `scale(${scale})`;
+    });
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- flowChart ---
+SCENE_REGISTRY["flowChart"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const DEFAULT_STEPS = [
+  { label: "Input" }, { label: "Process" }, { label: "Validate" }, { label: "Output" },
+];
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  if (attrs) { for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); }
+  return el;
+}
+
+return {
+  id: "flowChart",
+  type: "svg",
+  name: "Flow Chart",
+  category: "Data Viz",
+  defaultParams: {
+    steps: DEFAULT_STEPS,
+    color: "#6ee7ff",
+    arrowColor: "#a78bfa",
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const steps = normalizeArray(params.steps, DEFAULT_STEPS);
+    const color = params.color || "#6ee7ff";
+    const arrowColor = params.arrowColor || "#a78bfa";
+    const count = clamp(steps.length, 2, 6);
+    const boxW = 200, boxH = 80, cy = 540;
+    const totalW = count * boxW + (count - 1) * 100;
+    const startX = (1920 - totalW) / 2;
+
+    // Defs: arrow marker + glow
+    const defs = svgEl("defs");
+    const marker = svgEl("marker", {
+      id: "fcArrow", viewBox: "0 0 10 10", refX: "10", refY: "5",
+      markerWidth: "8", markerHeight: "8", orient: "auto-start-reverse",
+    });
+    const path = svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: arrowColor });
+    marker.appendChild(path);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    const boxes = [];
+    const arrows = [];
+
+    for (let i = 0; i < count; i++) {
+      const x = startX + i * (boxW + 100);
+      const g = svgEl("g", { opacity: "0" });
+
+      const rect = svgEl("rect", {
+        x: String(x), y: String(cy - boxH / 2),
+        width: String(boxW), height: String(boxH),
+        rx: "12", fill: "rgba(255,255,255,0.06)",
+        stroke: color, "stroke-width": "1.5",
+      });
+      g.appendChild(rect);
+
+      const text = svgEl("text", {
+        x: String(x + boxW / 2), y: String(cy + 6),
+        fill: "#fff", "font-size": "17", "text-anchor": "middle",
+        "font-family": "-apple-system, sans-serif", "font-weight": "600",
+      });
+      text.textContent = (steps[i] && steps[i].label) || `Step ${i + 1}`;
+      g.appendChild(text);
+
+      svg.appendChild(g);
+      boxes.push(g);
+
+      // Arrow between boxes
+      if (i < count - 1) {
+        const ax1 = x + boxW + 8;
+        const ax2 = x + boxW + 100 - 8;
+        const arrow = svgEl("line", {
+          x1: String(ax1), y1: String(cy),
+          x2: String(ax2), y2: String(cy),
+          stroke: arrowColor, "stroke-width": "2",
+          "marker-end": "url(#fcArrow)", opacity: "0",
+        });
+        svg.appendChild(arrow);
+        arrows.push(arrow);
+      }
+    }
+
+    return { svg, boxes, arrows };
+  },
+
+  update(els, localT) {
+    const total = els.boxes.length + els.arrows.length;
+    const progress = Math.min(1, localT / Math.max(total * 0.5, 2));
+
+    let idx = 0;
+    for (let i = 0; i < els.boxes.length; i++) {
+      const threshold = (idx + 1) / (total + 1);
+      els.boxes[i].setAttribute("opacity", progress >= threshold ? "1" : "0");
+      idx++;
+      if (i < els.arrows.length) {
+        const aThreshold = (idx + 1) / (total + 1);
+        els.arrows[i].setAttribute("opacity", progress >= aThreshold ? "1" : "0");
+        idx++;
+      }
+    }
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- fluidBackground ---
+SCENE_REGISTRY["fluidBackground"] = (function() {
+  
+return {
+  id: "fluidBackground",
+  type: "canvas",
+  name: "Fluid Background",
+  category: "Backgrounds",
+  defaultParams: {
+    colors: ["#4a00e0", "#8e2de2", "#00d2ff", "#ff6b6b"],
+    speed: 1,
+    blur: 80,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+
+    // Pre-compute blob motion parameters
+    const colors = Array.isArray(params.colors) && params.colors.length > 0
+      ? params.colors
+      : ["#4a00e0", "#8e2de2", "#00d2ff", "#ff6b6b"];
+    const blobCount = colors.length;
+    const blobs = [];
+    let seed = 311;
+    const rng = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    for (let i = 0; i < blobCount; i++) {
+      blobs.push({
+        cx: 0.2 + rng() * 0.6,
+        cy: 0.2 + rng() * 0.6,
+        freqX: 0.2 + rng() * 0.3,
+        freqY: 0.15 + rng() * 0.25,
+        phaseX: rng() * Math.PI * 2,
+        phaseY: rng() * Math.PI * 2,
+        ampX: 0.15 + rng() * 0.15,
+        ampY: 0.15 + rng() * 0.15,
+        radius: 0.25 + rng() * 0.15,
+        color: colors[i],
+      });
+    }
+    canvas._data = { blobs };
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const speed = toNumber(params.speed, 1);
+    const blur = clamp(toNumber(params.blur, 80), 0, 200);
+    const { blobs } = canvas._data;
+    const t = localT * speed;
+
+    // Dark base
+    ctx.fillStyle = "#0a0a18";
+    ctx.fillRect(0, 0, W, H);
+
+    // Apply blur filter for fluid look
+    ctx.filter = blur > 0 ? `blur(${blur}px)` : "none";
+    ctx.globalCompositeOperation = "lighter";
+
+    for (const blob of blobs) {
+      const cx = (blob.cx + Math.sin(t * blob.freqX + blob.phaseX) * blob.ampX) * W;
+      const cy = (blob.cy + Math.cos(t * blob.freqY + blob.phaseY) * blob.ampY) * H;
+      const radius = blob.radius * Math.max(W, H);
+
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, blob.color + "aa");
+      grad.addColorStop(0.5, blob.color + "55");
+      grad.addColorStop(1, "transparent");
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    ctx.filter = "none";
+    ctx.globalCompositeOperation = "source-over";
+  },
+
+  destroy(canvas) {
+    canvas._data = null;
+    canvas.remove();
+  },
+};
+
+})();
+
+
+// --- headline ---
+SCENE_REGISTRY["headline"] = (function() {
+  
+const DEFAULT_GRADIENT = ["#6ee7ff", "#a78bfa", "#f472b6"];
+
+return {
+  id: "headline",
+  type: "dom",
+  name: "Kinetic Headline",
+  category: "Typography",
+  defaultParams: {
+    text: "NEXTFRAME",
+    subtitle: "AI Video Editor",
+    fontSize: 72,
+    gradient: DEFAULT_GRADIENT,
+    stagger: 0.06,
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;flex-direction:column;align-items:center;justify-content:center");
+    const wordsWrap = createNode("div", "display:flex;flex-wrap:wrap;justify-content:center;gap:0 0.3em");
+    const words = String(params.text || "NEXTFRAME").trim().split(/\s+/).filter(Boolean);
+    const fontSize = toNumber(params.fontSize, 72);
+    const grad = makeLinearGradient(normalizeArray(params.gradient, DEFAULT_GRADIENT));
+    const spans = words.map((w) => {
+      const span = createNode("span", [
+        `font-family:${SANS_FONT_STACK}`,
+        `font-size:${fontSize}px`,
+        "font-weight:900",
+        "letter-spacing:-0.02em",
+        `background:${grad}`,
+        "-webkit-background-clip:text",
+        "-webkit-text-fill-color:transparent",
+        "background-clip:text",
+        "will-change:transform,opacity",
+        "display:inline-block",
+        "opacity:0",
+        "transform:translateY(30px)",
+        `text-shadow:0 0 40px rgba(110,231,255,0.3)`,
+      ].join(";"), w);
+      wordsWrap.appendChild(span);
+      return span;
+    });
+    root.appendChild(wordsWrap);
+    const sub = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      `font-size:${Math.max(14, fontSize * 0.22)}px`,
+      "font-weight:400",
+      "color:rgba(255,255,255,0.55)",
+      "letter-spacing:0.08em",
+      "margin-top:0.6em",
+      "will-change:opacity",
+      "opacity:0",
+    ].join(";"), params.subtitle || "");
+    root.appendChild(sub);
+    return { root, spans, sub };
+  },
+
+  update(els, localT, params) {
+    const stagger = toNumber(params.stagger, 0.06);
+    const exitStart = 0.85;
+    const exitAlpha = 1 - smoothstep(exitStart, 1, localT);
+    els.spans.forEach((span, i) => {
+      const enterT = smoothstep(0.0 + i * stagger, 0.12 + i * stagger, localT);
+      const progress = easeOutCubic(enterT);
+      const y = (1 - progress) * 30;
+      const alpha = progress * exitAlpha;
+      span.style.opacity = alpha;
+      span.style.transform = `translateY(${y}px)`;
+    });
+    const subEnter = smoothstep(0.1 + els.spans.length * stagger, 0.2 + els.spans.length * stagger, localT);
+    els.sub.style.opacity = subEnter * exitAlpha;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- horizontalBars ---
+SCENE_REGISTRY["horizontalBars"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const FONT = '-apple-system, "SF Pro Display", sans-serif';
+const PALETTE = ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80", "#fbbf24"];
+
+function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+return {
+  id: "horizontalBars",
+  type: "svg",
+  name: "Horizontal Bar Chart",
+  category: "Data Viz",
+  defaultParams: {
+    data: [90, 72, 65, 50, 38, 25],
+    labels: ["React", "Python", "Rust", "Go", "Swift", "Kotlin"],
+    colors: PALETTE,
+    height: 44,
+    gap: 20,
+    showValues: true,
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const data = normalizeArray(params.data, [90, 72, 65, 50, 38, 25]);
+    const labels = normalizeArray(params.labels, []);
+    const colors = normalizeArray(params.colors, PALETTE);
+    const barH = toNumber(params.height, 44);
+    const gap = toNumber(params.gap, 20);
+    const showValues = params.showValues !== false;
+    const maxVal = Math.max(...data, 1);
+
+    const labelW = 200;
+    const padL = 200, padR = 200, padT = 100;
+    const chartW = 1920 - padL - labelW - padR;
+    const totalH = data.length * barH + (data.length - 1) * gap;
+    const offsetY = padT + (880 - totalH) / 2;
+
+    const bars = [];
+    const valTxts = [];
+
+    data.forEach((val, i) => {
+      const y = offsetY + i * (barH + gap);
+      const fullW = (val / maxVal) * chartW;
+      const color = colors[i % colors.length];
+
+      // label
+      if (labels[i]) {
+        const lbl = svgEl("text", {
+          x: String(padL - 16), y: String(y + barH / 2 + 6),
+          fill: "rgba(255,255,255,0.7)", "font-size": "22",
+          "font-family": FONT, "text-anchor": "end",
+        });
+        lbl.textContent = labels[i];
+        svg.appendChild(lbl);
+      }
+
+      // bg track
+      svg.appendChild(svgEl("rect", {
+        x: String(padL), y: String(y),
+        width: String(chartW), height: String(barH),
+        rx: "4", fill: "rgba(255,255,255,0.04)",
+      }));
+
+      // bar
+      const rect = svgEl("rect", {
+        x: String(padL), y: String(y),
+        width: "0", height: String(barH),
+        rx: "4", fill: color, opacity: "0.9",
+      });
+      svg.appendChild(rect);
+      bars.push({ rect, fullW, val });
+
+      // value text
+      if (showValues) {
+        const txt = svgEl("text", {
+          x: String(padL + 8), y: String(y + barH / 2 + 6),
+          fill: "rgba(255,255,255,0.85)", "font-size": "18",
+          "font-family": FONT, "font-weight": "600", opacity: "0",
+        });
+        txt.textContent = String(val);
+        svg.appendChild(txt);
+        valTxts.push(txt);
+      }
+    });
+
+    return { svg, bars, valTxts, padL };
+  },
+
+  update(els, localT) {
+    const stagger = 0.1;
+    const dur = 0.7;
+
+    els.bars.forEach((b, i) => {
+      const start = i * stagger;
+      const raw = clamp((localT - start) / dur, 0, 1);
+      const t = easeOutCubic(raw);
+      const w = b.fullW * t;
+      b.rect.setAttribute("width", String(Math.max(0, w)));
+
+      if (els.valTxts[i]) {
+        els.valTxts[i].setAttribute("x", String(els.padL + w + 12));
+        els.valTxts[i].setAttribute("opacity", String(clamp((raw - 0.3) * 3, 0, 1)));
+      }
+    });
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- imageHero ---
+SCENE_REGISTRY["imageHero"] = (function() {
+  
+return {
+  id: "imageHero",
+  type: "media",
+  name: "Image Hero",
+  category: "Media",
+  defaultParams: {
+    src: "",
+    alt: "",
+    objectFit: "cover",
+    zoomStart: 1,
+    zoomEnd: 1.15,
+    panX: 0,
+    panY: 0,
+  },
+
+  create(container, params) {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:absolute;inset:0;overflow:hidden";
+    const img = document.createElement("img");
+    img.style.cssText = [
+      "width:100%;height:100%",
+      `object-fit:${params.objectFit || "cover"}`,
+      "display:block;will-change:transform",
+    ].join(";");
+    img.alt = params.alt || "";
+    if (params.src) img.src = params.src;
+    wrap.appendChild(img);
+    container.appendChild(wrap);
+    return { wrap, img };
+  },
+
+  update(els, localT, params) {
+    const duration = toNumber(localT, 0);
+    // Normalize to 0-1 over a 10s assumed max, clamped
+    const progress = clamp(duration / 10, 0, 1);
+    const zoomStart = toNumber(params.zoomStart, 1);
+    const zoomEnd = toNumber(params.zoomEnd, 1.15);
+    const panX = toNumber(params.panX, 0);
+    const panY = toNumber(params.panY, 0);
+    const scale = lerp(zoomStart, zoomEnd, progress);
+    const tx = panX * progress;
+    const ty = panY * progress;
+    els.img.style.transform = `scale(${scale}) translate(${tx}px, ${ty}px)`;
+  },
+
+  destroy(els) { els.wrap.remove(); },
+};
+
+})();
+
+
+// --- lineChart ---
+SCENE_REGISTRY["lineChart"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const FONT = '-apple-system, "SF Pro Display", sans-serif';
+
+function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+return {
+  id: "lineChart",
+  type: "svg",
+  name: "Line Chart",
+  category: "Data Viz",
+  defaultParams: {
+    data: [20, 55, 35, 80, 50, 90, 65],
+    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+    color: "#6ee7ff",
+    strokeWidth: 3,
+    showDots: true,
+    showArea: true,
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const data = normalizeArray(params.data, [20, 55, 35, 80, 50, 90, 65]);
+    const labels = normalizeArray(params.labels, []);
+    const color = params.color || "#6ee7ff";
+    const sw = toNumber(params.strokeWidth, 3);
+    const showDots = params.showDots !== false;
+    const showArea = params.showArea !== false;
+
+    const padL = 160, padR = 160, padT = 100, padB = 140;
+    const chartW = 1920 - padL - padR;
+    const chartH = 1080 - padT - padB;
+    const maxVal = Math.max(...data, 1);
+    const n = data.length;
+
+    // grid
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (chartH / 4) * i;
+      svg.appendChild(svgEl("line", {
+        x1: String(padL), y1: String(y), x2: String(1920 - padR), y2: String(y),
+        stroke: "rgba(255,255,255,0.08)", "stroke-width": "1",
+      }));
+    }
+
+    // compute points
+    const points = data.map((v, i) => ({
+      x: padL + (n > 1 ? (i / (n - 1)) * chartW : chartW / 2),
+      y: padT + chartH - (v / maxVal) * chartH,
+    }));
+    const pointsStr = points.map((p) => `${p.x},${p.y}`).join(" ");
+
+    // gradient for area
+    const defs = svgEl("defs");
+    const grad = svgEl("linearGradient", { id: "lineAreaGrad", x1: "0", y1: "0", x2: "0", y2: "1" });
+    const stop1 = svgEl("stop", { offset: "0%", "stop-color": color, "stop-opacity": "0.3" });
+    const stop2 = svgEl("stop", { offset: "100%", "stop-color": color, "stop-opacity": "0" });
+    grad.appendChild(stop1);
+    grad.appendChild(stop2);
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    // area fill
+    let area = null;
+    if (showArea) {
+      const baseY = padT + chartH;
+      const areaD = `M${points[0].x},${baseY} ` +
+        points.map((p) => `L${p.x},${p.y}`).join(" ") +
+        ` L${points[n - 1].x},${baseY} Z`;
+      area = svgEl("path", {
+        d: areaD, fill: "url(#lineAreaGrad)", opacity: "0",
+      });
+      svg.appendChild(area);
+    }
+
+    // line
+    const line = svgEl("polyline", {
+      points: pointsStr, fill: "none", stroke: color,
+      "stroke-width": String(sw), "stroke-linecap": "round", "stroke-linejoin": "round",
+    });
+    svg.appendChild(line);
+
+    // measure total length
+    const totalLen = (() => {
+      let len = 0;
+      for (let i = 1; i < points.length; i++) {
+        const dx = points[i].x - points[i - 1].x;
+        const dy = points[i].y - points[i - 1].y;
+        len += Math.sqrt(dx * dx + dy * dy);
+      }
+      return len;
+    })();
+    line.setAttribute("stroke-dasharray", String(totalLen));
+    line.setAttribute("stroke-dashoffset", String(totalLen));
+
+    // dots
+    const dots = [];
+    if (showDots) {
+      points.forEach((p) => {
+        const c = svgEl("circle", {
+          cx: String(p.x), cy: String(p.y), r: "6",
+          fill: color, stroke: "#1a1a2e", "stroke-width": "2", opacity: "0",
+        });
+        svg.appendChild(c);
+        dots.push(c);
+      });
+    }
+
+    // labels
+    labels.forEach((lbl, i) => {
+      if (!points[i]) return;
+      const txt = svgEl("text", {
+        x: String(points[i].x), y: String(padT + chartH + 40),
+        fill: "rgba(255,255,255,0.6)", "font-size": "20",
+        "font-family": FONT, "text-anchor": "middle",
+      });
+      txt.textContent = lbl;
+      svg.appendChild(txt);
+    });
+
+    return { svg, line, area, dots, totalLen };
+  },
+
+  update(els, localT) {
+    const drawT = smoothstep(0, 1.5, localT);
+    els.line.setAttribute("stroke-dashoffset", String(els.totalLen * (1 - drawT)));
+
+    if (els.area) {
+      els.area.setAttribute("opacity", String(clamp(drawT * 1.5, 0, 1)));
+    }
+
+    els.dots.forEach((dot, i) => {
+      const threshold = (i / Math.max(els.dots.length - 1, 1)) * 1.5;
+      const a = smoothstep(threshold, threshold + 0.2, localT);
+      dot.setAttribute("opacity", String(a));
+      const scale = 0.5 + a * 0.5;
+      dot.setAttribute("r", String(6 * scale));
+    });
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- logoReveal ---
+SCENE_REGISTRY["logoReveal"] = (function() {
+  
+return {
+  id: "logoReveal",
+  type: "dom",
+  name: "Logo Reveal",
+  category: "Media",
+  defaultParams: {
+    src: "",
+    size: 200,
+    glowColor: "#6ee7ff",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center");
+    const size = toNumber(params.size, 200);
+    const glowColor = params.glowColor || "#6ee7ff";
+
+    const wrap = createNode("div", [
+      "position:relative",
+      `width:${size}px;height:${size}px`,
+      "will-change:opacity,transform",
+      "opacity:0",
+    ].join(";"));
+
+    const img = document.createElement("img");
+    img.style.cssText = "width:100%;height:100%;object-fit:contain;display:block;position:relative;z-index:1";
+    if (params.src) img.src = params.src;
+    wrap.appendChild(img);
+
+    const glow = createNode("div", [
+      "position:absolute;top:0;left:-40%;width:30%;height:100%",
+      `background:linear-gradient(90deg,transparent,${glowColor}88,transparent)`,
+      "will-change:transform;opacity:0;z-index:2",
+      "pointer-events:none;filter:blur(8px)",
+    ].join(";"));
+    wrap.appendChild(glow);
+
+    root.appendChild(wrap);
+    return { root, wrap, glow };
+  },
+
+  update(els, localT, params) {
+    const fadeIn = smoothstep(0, 0.12, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    const scale = 0.8 + easeOutCubic(fadeIn) * 0.2;
+
+    els.wrap.style.opacity = fadeIn * fadeOut;
+    els.wrap.style.transform = `scale(${scale})`;
+
+    // Glow sweep: active between 0.1 and 0.5
+    const sweepT = smoothstep(0.1, 0.5, localT);
+    const glowX = -40 + sweepT * 180; // percent
+    els.glow.style.opacity = sweepT < 1 ? 0.9 : 0;
+    els.glow.style.transform = `translateX(${glowX}%)`;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- lowerThird ---
+SCENE_REGISTRY["lowerThird"] = (function() {
+  
+const ALIGN = { left: "flex-start", center: "center", right: "flex-end" };
+
+return {
+  id: "lowerThird",
+  type: "dom",
+  name: "Lower Third",
+  category: "Overlay",
+  defaultParams: {
+    title: "John Doe",
+    subtitle: "Creative Director",
+    accentColor: "#6ee7ff",
+    position: "left",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, [
+      "display:flex",
+      `justify-content:${ALIGN[params.position] || ALIGN.left}`,
+      "align-items:flex-end",
+      "padding:0 5% 8%",
+    ].join(";"));
+    const accent = params.accentColor || "#6ee7ff";
+    const wrap = createNode("div", [
+      "will-change:transform,opacity",
+      "opacity:0",
+      "transform:translateX(-40px)",
+    ].join(";"));
+    const bar = createNode("div", [
+      `background:${accent}`,
+      "height:3px",
+      "width:0",
+      "margin-bottom:8px",
+      "border-radius:2px",
+      `box-shadow:0 0 12px ${accent}66`,
+      "will-change:width",
+    ].join(";"));
+    const title = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:24px",
+      "font-weight:700",
+      "color:rgba(255,255,255,0.95)",
+      "letter-spacing:0.02em",
+      "margin-bottom:2px",
+    ].join(";"), params.title || "");
+    const subtitle = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:14px",
+      "font-weight:400",
+      `color:${accent}`,
+      "letter-spacing:0.06em",
+      "opacity:0",
+      "will-change:opacity",
+    ].join(";"), params.subtitle || "");
+    wrap.appendChild(bar);
+    wrap.appendChild(title);
+    wrap.appendChild(subtitle);
+    root.appendChild(wrap);
+    return { root, wrap, bar, subtitle };
+  },
+
+  update(els, localT) {
+    const exitAlpha = 1 - smoothstep(0.85, 1, localT);
+    const slideT = easeOutCubic(smoothstep(0, 0.12, localT));
+    els.wrap.style.opacity = slideT * exitAlpha;
+    els.wrap.style.transform = `translateX(${(1 - slideT) * -40}px)`;
+    const barT = smoothstep(0.05, 0.15, localT);
+    els.bar.style.width = `${barT * 60}px`;
+    const subT = smoothstep(0.1, 0.18, localT);
+    els.subtitle.style.opacity = subT * exitAlpha;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- marquee ---
+SCENE_REGISTRY["marquee"] = (function() {
+  
+return {
+  id: "marquee",
+  type: "dom",
+  name: "Marquee",
+  category: "Typography",
+  defaultParams: {
+    text: "BREAKING NEWS — NEXTFRAME AI VIDEO EDITOR",
+    fontSize: 24,
+    speed: 100,
+    color: "#fff",
+    bgColor: "rgba(0,0,0,0.6)",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:flex-end;padding-bottom:60px");
+    const fontSize = toNumber(params.fontSize, 24);
+    const bgColor = params.bgColor || "rgba(0,0,0,0.6)";
+    const color = params.color || "#fff";
+
+    const bar = createNode("div", [
+      "width:100%;overflow:hidden;position:relative",
+      `background:${bgColor}`,
+      "padding:12px 0",
+      "backdrop-filter:blur(8px)",
+      "will-change:opacity;opacity:0",
+    ].join(";"));
+
+    // Duplicate text for seamless loop
+    const fullText = String(params.text || "MARQUEE");
+    const repeated = `${fullText}    \u2014    ${fullText}    \u2014    `;
+    const textEl = createNode("span", [
+      `font-family:${SANS_FONT_STACK}`,
+      `font-size:${fontSize}px`,
+      "font-weight:600",
+      `color:${color}`,
+      "white-space:nowrap",
+      "display:inline-block",
+      "will-change:transform",
+      "letter-spacing:0.02em",
+    ].join(";"), repeated);
+
+    bar.appendChild(textEl);
+    root.appendChild(bar);
+    return { root, bar, textEl };
+  },
+
+  update(els, localT, params) {
+    const fadeIn = smoothstep(0, 0.08, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    els.bar.style.opacity = fadeIn * fadeOut;
+
+    const speed = toNumber(params.speed, 100);
+    // localT is 0~1; map to pixel offset
+    const totalDuration = 1; // the full 0~1 range
+    const pixelOffset = localT * speed * 10; // scale up for visible movement
+    // Loop by using modulo of half the text width (since we duplicated)
+    const textWidth = els.textEl.offsetWidth * 0.5;
+    const offset = textWidth > 0 ? pixelOffset % textWidth : pixelOffset;
+    els.textEl.style.transform = `translateX(${-offset}px)`;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- meshGrid ---
+SCENE_REGISTRY["meshGrid"] = (function() {
+  
+return {
+  id: "meshGrid",
+  type: "canvas",
+  name: "Mesh Grid",
+  category: "Effects",
+  defaultParams: {
+    cols: 20,
+    rows: 12,
+    color: "#4a6fa5",
+    amplitude: 8,
+    frequency: 1,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const cols = clamp(toNumber(params.cols, 20), 3, 60) | 0;
+    const rows = clamp(toNumber(params.rows, 12), 3, 40) | 0;
+    const color = params.color || "#4a6fa5";
+    const amp = toNumber(params.amplitude, 8);
+    const freq = toNumber(params.frequency, 1);
+
+    ctx.clearRect(0, 0, W, H);
+
+    const cellW = W / cols;
+    const cellH = H / rows;
+    const t = localT * freq * 0.5;
+
+    // Compute displaced grid points
+    const points = new Array((cols + 1) * (rows + 1));
+    for (let r = 0; r <= rows; r++) {
+      for (let c = 0; c <= cols; c++) {
+        const bx = c * cellW;
+        const by = r * cellH;
+        // Displacement using sin waves for organic motion
+        const dx = Math.sin(t + c * 0.4 + r * 0.3) * amp;
+        const dy = Math.cos(t * 0.8 + c * 0.3 - r * 0.5) * amp;
+        points[r * (cols + 1) + c] = [bx + dx, by + dy];
+      }
+    }
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.8;
+    ctx.globalAlpha = 0.6;
+
+    // Draw horizontal lines
+    for (let r = 0; r <= rows; r++) {
+      ctx.beginPath();
+      for (let c = 0; c <= cols; c++) {
+        const [px, py] = points[r * (cols + 1) + c];
+        if (c === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+
+    // Draw vertical lines
+    for (let c = 0; c <= cols; c++) {
+      ctx.beginPath();
+      for (let r = 0; r <= rows; r++) {
+        const [px, py] = points[r * (cols + 1) + c];
+        if (r === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+
+    // Draw dots at intersections
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = color;
+    for (let r = 0; r <= rows; r++) {
+      for (let c = 0; c <= cols; c++) {
+        const [px, py] = points[r * (cols + 1) + c];
+        ctx.beginPath();
+        ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.globalAlpha = 1;
+  },
+
+  destroy(canvas) {
+    canvas.remove();
+  },
+};
+
+})();
+
+
+// --- neonGrid ---
+SCENE_REGISTRY["neonGrid"] = (function() {
+  
+return {
+  id: "neonGrid",
+  type: "canvas",
+  name: "Neon Grid",
+  category: "Backgrounds",
+  defaultParams: {
+    gridColor: "#ff2d95",
+    skyColor: "#0a001a",
+    speed: 1,
+    perspective: 0.6,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const gridColor = params.gridColor || "#ff2d95";
+    const skyColor = params.skyColor || "#0a001a";
+    const speed = toNumber(params.speed, 1);
+    const persp = clamp(toNumber(params.perspective, 0.6), 0.3, 0.85);
+
+    // Sky background
+    const horizonY = H * persp;
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
+    skyGrad.addColorStop(0, skyColor);
+    skyGrad.addColorStop(0.6, skyColor);
+    skyGrad.addColorStop(1, "#1a0030");
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, W, horizonY);
+
+    // Ground gradient
+    const groundGrad = ctx.createLinearGradient(0, horizonY, 0, H);
+    groundGrad.addColorStop(0, "#1a0030");
+    groundGrad.addColorStop(1, "#0a0015");
+    ctx.fillStyle = groundGrad;
+    ctx.fillRect(0, horizonY, W, H - horizonY);
+
+    // Sun glow at horizon
+    const sunGrad = ctx.createRadialGradient(W / 2, horizonY, 0, W / 2, horizonY, W * 0.3);
+    sunGrad.addColorStop(0, "rgba(255, 45, 149, 0.3)");
+    sunGrad.addColorStop(0.5, "rgba(255, 45, 149, 0.1)");
+    sunGrad.addColorStop(1, "transparent");
+    ctx.fillStyle = sunGrad;
+    ctx.fillRect(0, horizonY * 0.5, W, H * 0.5);
+
+    // Horizontal grid lines (perspective projected)
+    const gridLines = 20;
+    const t = (localT * speed * 0.08) % 1;
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i < gridLines; i++) {
+      // z goes from 0 (horizon) to 1 (bottom), with scroll offset
+      const rawZ = (i / gridLines + t / gridLines);
+      const z = rawZ > 1 ? rawZ - 1 : rawZ;
+      // Perspective: exponential mapping gives density near horizon
+      const perspZ = z * z;
+      const y = horizonY + perspZ * (H - horizonY);
+
+      const alpha = clamp(perspZ * 2, 0.05, 0.8);
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+
+    // Vertical grid lines (converging to vanishing point)
+    const vLines = 16;
+    ctx.globalAlpha = 0.5;
+    const vanishX = W / 2;
+
+    for (let i = -vLines / 2; i <= vLines / 2; i++) {
+      const bottomX = vanishX + (i / (vLines / 2)) * W * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(vanishX, horizonY);
+      ctx.lineTo(bottomX, H);
+      ctx.stroke();
+    }
+
+    // Horizon glow line
+    ctx.globalAlpha = 0.9;
+    ctx.shadowColor = gridColor;
+    ctx.shadowBlur = 15;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, horizonY);
+    ctx.lineTo(W, horizonY);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  },
+
+  destroy(canvas) {
+    canvas.remove();
+  },
+};
+
+})();
+
+
+// --- numberCounter ---
+SCENE_REGISTRY["numberCounter"] = (function() {
+  
+return {
+  id: "numberCounter",
+  type: "dom",
+  name: "Number Counter",
+  category: "Data",
+  defaultParams: {
+    value: 1234,
+    prefix: "",
+    suffix: "",
+    label: "Total Views",
+    color: "#6ee7ff",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;flex-direction:column;align-items:center;justify-content:center");
+    const color = params.color || "#6ee7ff";
+    const numWrap = createNode("div", [
+      "display:flex",
+      "align-items:baseline",
+      "gap:0.05em",
+      "will-change:transform,opacity",
+      "opacity:0",
+    ].join(";"));
+    const prefix = createNode("span", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:36px",
+      "font-weight:300",
+      `color:${color}`,
+    ].join(";"), params.prefix || "");
+    const digits = createNode("span", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:80px",
+      "font-weight:900",
+      `color:${color}`,
+      "letter-spacing:-0.02em",
+      `text-shadow:0 0 40px ${color}44`,
+      "font-variant-numeric:tabular-nums",
+    ].join(";"), "0");
+    const suffix = createNode("span", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:36px",
+      "font-weight:300",
+      `color:${color}`,
+      "margin-left:0.1em",
+    ].join(";"), params.suffix || "");
+    numWrap.appendChild(prefix);
+    numWrap.appendChild(digits);
+    numWrap.appendChild(suffix);
+    const label = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:16px",
+      "font-weight:500",
+      "color:rgba(255,255,255,0.5)",
+      "letter-spacing:0.12em",
+      "text-transform:uppercase",
+      "margin-top:0.5em",
+      "will-change:opacity",
+      "opacity:0",
+    ].join(";"), params.label || "");
+    root.appendChild(numWrap);
+    root.appendChild(label);
+    return { root, numWrap, digits, label, targetValue: toNumber(params.value, 0) };
+  },
+
+  update(els, localT) {
+    const exitAlpha = 1 - smoothstep(0.85, 1, localT);
+    const enterT = smoothstep(0, 0.1, localT);
+    els.numWrap.style.opacity = enterT * exitAlpha;
+    els.numWrap.style.transform = `scale(${0.8 + 0.2 * easeOutCubic(enterT)})`;
+    const countT = easeOutCubic(smoothstep(0.05, 0.4, localT));
+    const current = Math.round(els.targetValue * countT);
+    els.digits.textContent = current.toLocaleString();
+    const labelT = smoothstep(0.15, 0.25, localT);
+    els.label.style.opacity = labelT * exitAlpha;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- parallaxStack ---
+SCENE_REGISTRY["parallaxStack"] = (function() {
+  
+const DEFAULT_LAYERS = [
+  { text: "Background", speed: 0.3, color: "rgba(110,231,255,0.4)", size: 48 },
+  { text: "Middle", speed: 0.6, color: "rgba(167,139,250,0.6)", size: 64 },
+  { text: "Foreground", speed: 1, color: "#ffffff", size: 80 },
+];
+
+return {
+  id: "parallaxStack",
+  type: "dom",
+  name: "Parallax Stack",
+  category: "Motion Graphics",
+  defaultParams: {
+    layers: DEFAULT_LAYERS,
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center");
+    const layers = normalizeArray(params.layers, DEFAULT_LAYERS);
+    const divs = layers.map((layer) => {
+      const size = toNumber(layer.size, 48);
+      const color = layer.color || "#ffffff";
+      const div = createNode("div", [
+        "position:absolute;text-align:center;white-space:nowrap",
+        `font-family:${SANS_FONT_STACK}`,
+        `font-size:${size}px;font-weight:700`,
+        `color:${color}`,
+        "will-change:transform,opacity;opacity:0",
+        `text-shadow:0 0 20px ${color}44`,
+      ].join(";"), layer.text || "");
+      root.appendChild(div);
+      return { div, speed: toNumber(layer.speed, 0.5) };
+    });
+    return { root, divs };
+  },
+
+  update(els, localT) {
+    const fadeIn = smoothstep(0, 0.15, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    const alpha = fadeIn * fadeOut;
+
+    // Parallax offset: each layer moves at different speed
+    const baseOffset = (localT - 0.5) * 200; // px range
+
+    els.divs.forEach((item, i) => {
+      const enterT = easeOutCubic(smoothstep(0.02 + i * 0.04, 0.15 + i * 0.04, localT));
+      const y = baseOffset * item.speed + (1 - enterT) * 60;
+      item.div.style.opacity = enterT * alpha;
+      item.div.style.transform = `translateY(${y}px)`;
+    });
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- particleFlow ---
+SCENE_REGISTRY["particleFlow"] = (function() {
+  
+return {
+  id: "particleFlow",
+  type: "canvas",
+  name: "Particle Flow",
+  category: "Effects",
+  defaultParams: {
+    count: 150,
+    speed: 1,
+    color: "#6ea8fe",
+    size: 2,
+    direction: 0,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+
+    const count = clamp(toNumber(params.count, 150), 10, 1000) | 0;
+    const particles = new Float64Array(count * 4); // x, y, speed_mult, size_mult
+    let seed = 137;
+    const rng = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    for (let i = 0; i < count; i++) {
+      particles[i * 4] = rng();       // x position 0..1
+      particles[i * 4 + 1] = rng();   // y position 0..1
+      particles[i * 4 + 2] = 0.3 + rng() * 0.7; // speed multiplier
+      particles[i * 4 + 3] = 0.4 + rng() * 0.6; // size multiplier
+    }
+    canvas._data = { particles, count };
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const speed = toNumber(params.speed, 1);
+    const color = params.color || "#6ea8fe";
+    const size = clamp(toNumber(params.size, 2), 0.5, 10);
+    const angle = toNumber(params.direction, 0) * Math.PI / 180;
+
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+
+    ctx.clearRect(0, 0, W, H);
+
+    const { particles, count } = canvas._data;
+    const t = localT * speed * 0.05;
+
+    for (let i = 0; i < count; i++) {
+      const ox = particles[i * 4];
+      const oy = particles[i * 4 + 1];
+      const sm = particles[i * 4 + 2];
+      const szm = particles[i * 4 + 3];
+
+      // Flow along direction, wrap around
+      let px = (ox + t * sm * dx) % 1;
+      let py = (oy + t * sm * dy) % 1;
+      if (px < 0) px += 1;
+      if (py < 0) py += 1;
+
+      const x = px * W;
+      const y = py * H;
+      const r = size * szm;
+
+      // Glow effect: larger transparent circle + solid core
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+      grad.addColorStop(0, color);
+      grad.addColorStop(0.3, color);
+      grad.addColorStop(1, "transparent");
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, r * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+
+  destroy(canvas) {
+    canvas._data = null;
+    canvas.remove();
+  },
+};
+
+})();
+
+
+// --- pieChart ---
+SCENE_REGISTRY["pieChart"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const FONT = '-apple-system, "SF Pro Display", sans-serif';
+const PALETTE = ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80", "#fbbf24"];
+const TAU = Math.PI * 2;
+
+function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+function polarToCart(cx, cy, r, angle) {
+  return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+}
+
+function arcPath(cx, cy, r, startAngle, endAngle) {
+  if (endAngle - startAngle >= TAU - 0.001) {
+    const mid = startAngle + Math.PI;
+    const s = polarToCart(cx, cy, r, startAngle);
+    const m = polarToCart(cx, cy, r, mid);
+    return `M${s.x},${s.y} A${r},${r} 0 1,1 ${m.x},${m.y} A${r},${r} 0 1,1 ${s.x},${s.y}`;
+  }
+  const s = polarToCart(cx, cy, r, startAngle);
+  const e = polarToCart(cx, cy, r, endAngle);
+  const large = endAngle - startAngle > Math.PI ? 1 : 0;
+  return `M${s.x},${s.y} A${r},${r} 0 ${large},1 ${e.x},${e.y}`;
+}
+
+function sectorPath(cx, cy, outerR, innerR, startAngle, endAngle) {
+  if (innerR <= 0) {
+    const a = arcPath(cx, cy, outerR, startAngle, endAngle);
+    return endAngle - startAngle >= TAU - 0.001
+      ? a + " Z"
+      : a + ` L${cx},${cy} Z`;
+  }
+  const oStart = polarToCart(cx, cy, outerR, startAngle);
+  const oEnd = polarToCart(cx, cy, outerR, endAngle);
+  const iEnd = polarToCart(cx, cy, innerR, endAngle);
+  const iStart = polarToCart(cx, cy, innerR, startAngle);
+  const large = endAngle - startAngle > Math.PI ? 1 : 0;
+  return [
+    `M${oStart.x},${oStart.y}`,
+    `A${outerR},${outerR} 0 ${large},1 ${oEnd.x},${oEnd.y}`,
+    `L${iEnd.x},${iEnd.y}`,
+    `A${innerR},${innerR} 0 ${large},0 ${iStart.x},${iStart.y}`,
+    "Z",
+  ].join(" ");
+}
+
+return {
+  id: "pieChart",
+  type: "svg",
+  name: "Pie Chart",
+  category: "Data Viz",
+  defaultParams: {
+    data: [35, 25, 20, 12, 8],
+    labels: ["Design", "Dev", "Marketing", "Research", "Ops"],
+    colors: PALETTE,
+    innerRadius: 0,
+    showLabels: true,
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const data = normalizeArray(params.data, [35, 25, 20, 12, 8]);
+    const labels = normalizeArray(params.labels, []);
+    const colors = normalizeArray(params.colors, PALETTE);
+    const innerR = toNumber(params.innerRadius, 0);
+    const showLabels = params.showLabels !== false;
+
+    const cx = 960, cy = 540, outerR = 340;
+    const total = data.reduce((s, v) => s + v, 0) || 1;
+
+    // compute angles
+    let cumAngle = -Math.PI / 2;
+    const slices = data.map((val, i) => {
+      const sweep = (val / total) * TAU;
+      const start = cumAngle;
+      cumAngle += sweep;
+      return { val, start, sweep, color: colors[i % colors.length], label: labels[i] || "" };
+    });
+
+    // shadow filter
+    const defs = svgEl("defs");
+    const filter = svgEl("filter", { id: "pieShadow", x: "-20%", y: "-20%", width: "140%", height: "140%" });
+    const blur = svgEl("feDropShadow", { dx: "0", dy: "4", stdDeviation: "8", "flood-color": "rgba(0,0,0,0.4)" });
+    filter.appendChild(blur);
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+
+    const paths = slices.map((s) => {
+      const path = svgEl("path", {
+        d: sectorPath(cx, cy, outerR, innerR, s.start, s.start),
+        fill: s.color, opacity: "0.9", filter: "url(#pieShadow)",
+      });
+      svg.appendChild(path);
+      return path;
+    });
+
+    const lblEls = [];
+    if (showLabels) {
+      slices.forEach((s) => {
+        const midAngle = s.start + s.sweep / 2;
+        const lblR = outerR + 40;
+        const pos = polarToCart(cx, cy, lblR, midAngle);
+        const anchor = pos.x > cx ? "start" : "end";
+        const txt = svgEl("text", {
+          x: String(pos.x), y: String(pos.y + 6),
+          fill: "rgba(255,255,255,0.7)", "font-size": "20",
+          "font-family": FONT, "text-anchor": anchor, opacity: "0",
+        });
+        txt.textContent = s.label;
+        svg.appendChild(txt);
+        lblEls.push(txt);
+      });
+    }
+
+    return { svg, paths, slices, cx, cy, outerR, innerR, lblEls };
+  },
+
+  update(els, localT) {
+    const stagger = 0.15;
+    const dur = 0.6;
+
+    els.slices.forEach((s, i) => {
+      const start = i * stagger;
+      const raw = clamp((localT - start) / dur, 0, 1);
+      const t = easeOutCubic(raw);
+      const curSweep = s.sweep * t;
+      const d = sectorPath(els.cx, els.cy, els.outerR, els.innerR, s.start, s.start + Math.max(curSweep, 0.001));
+      els.paths[i].setAttribute("d", d);
+
+      if (els.lblEls[i]) {
+        els.lblEls[i].setAttribute("opacity", String(clamp((raw - 0.5) * 4, 0, 1)));
+      }
+    });
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- progressBar ---
+SCENE_REGISTRY["progressBar"] = (function() {
+  
+return {
+  id: "progressBar",
+  type: "dom",
+  name: "Progress Bar",
+  category: "Data",
+  defaultParams: {
+    progress: 75,
+    label: "Project Progress",
+    color: "#6ee7ff",
+    height: 12,
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 12%");
+    const color = params.color || "#6ee7ff";
+    const barHeight = toNumber(params.height, 12);
+    const labelRow = createNode("div", [
+      "display:flex",
+      "justify-content:space-between",
+      "width:100%",
+      "max-width:560px",
+      "margin-bottom:12px",
+      "will-change:opacity",
+      "opacity:0",
+    ].join(";"));
+    const labelEl = createNode("span", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:15px",
+      "font-weight:500",
+      "color:rgba(255,255,255,0.7)",
+      "letter-spacing:0.04em",
+    ].join(";"), params.label || "");
+    const pctEl = createNode("span", [
+      `font-family:${SANS_FONT_STACK}`,
+      "font-size:15px",
+      "font-weight:700",
+      `color:${color}`,
+      "font-variant-numeric:tabular-nums",
+    ].join(";"), "0%");
+    labelRow.appendChild(labelEl);
+    labelRow.appendChild(pctEl);
+    const track = createNode("div", [
+      "width:100%",
+      "max-width:560px",
+      `height:${barHeight}px`,
+      "background:rgba(255,255,255,0.08)",
+      `border-radius:${barHeight}px`,
+      "overflow:hidden",
+      "will-change:opacity",
+      "opacity:0",
+    ].join(";"));
+    const fill = createNode("div", [
+      `height:100%`,
+      "width:0%",
+      `background:linear-gradient(90deg, ${color}, ${color}cc)`,
+      `border-radius:${barHeight}px`,
+      `box-shadow:0 0 16px ${color}44`,
+      "will-change:width",
+    ].join(";"));
+    track.appendChild(fill);
+    root.appendChild(labelRow);
+    root.appendChild(track);
+    return { root, labelRow, pctEl, track, fill, target: toNumber(params.progress, 75) };
+  },
+
+  update(els, localT) {
+    const exitAlpha = 1 - smoothstep(0.85, 1, localT);
+    const showT = smoothstep(0, 0.08, localT);
+    els.labelRow.style.opacity = showT * exitAlpha;
+    els.track.style.opacity = showT * exitAlpha;
+    const fillT = easeOutCubic(smoothstep(0.06, 0.45, localT));
+    const pct = lerp(0, els.target, fillT);
+    els.fill.style.width = `${pct}%`;
+    els.pctEl.textContent = `${Math.round(pct)}%`;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- progressRing ---
+SCENE_REGISTRY["progressRing"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const FONT = '-apple-system, "SF Pro Display", sans-serif';
+
+function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+return {
+  id: "progressRing",
+  type: "svg",
+  name: "Progress Ring",
+  category: "Data Viz",
+  defaultParams: {
+    progress: 75,
+    color: "#6ee7ff",
+    bgColor: "rgba(255,255,255,0.08)",
+    strokeWidth: 28,
+    label: "Progress",
+    showPercent: true,
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const color = params.color || "#6ee7ff";
+    const bgColor = params.bgColor || "rgba(255,255,255,0.08)";
+    const sw = toNumber(params.strokeWidth, 28);
+    const progress = clamp(toNumber(params.progress, 75), 0, 100);
+    const showPercent = params.showPercent !== false;
+    const label = params.label || "";
+
+    const cx = 960, cy = 500, r = 260;
+    const circumference = 2 * Math.PI * r;
+
+    // glow filter
+    const defs = svgEl("defs");
+    const filter = svgEl("filter", { id: "ringGlow", x: "-30%", y: "-30%", width: "160%", height: "160%" });
+    const blur = svgEl("feGaussianBlur", { stdDeviation: "6", result: "blur" });
+    const merge = svgEl("feMerge");
+    const m1 = svgEl("feMergeNode", { in: "blur" });
+    const m2 = svgEl("feMergeNode", { in: "SourceGraphic" });
+    merge.appendChild(m1);
+    merge.appendChild(m2);
+    filter.appendChild(blur);
+    filter.appendChild(merge);
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+
+    // bg ring
+    svg.appendChild(svgEl("circle", {
+      cx: String(cx), cy: String(cy), r: String(r),
+      fill: "none", stroke: bgColor, "stroke-width": String(sw),
+    }));
+
+    // progress arc
+    const arc = svgEl("circle", {
+      cx: String(cx), cy: String(cy), r: String(r),
+      fill: "none", stroke: color, "stroke-width": String(sw),
+      "stroke-linecap": "round",
+      "stroke-dasharray": String(circumference),
+      "stroke-dashoffset": String(circumference),
+      transform: `rotate(-90 ${cx} ${cy})`,
+      filter: "url(#ringGlow)",
+    });
+    svg.appendChild(arc);
+
+    // percent text
+    const pctText = svgEl("text", {
+      x: String(cx), y: String(cy + 20),
+      fill: "rgba(255,255,255,0.95)", "font-size": "96",
+      "font-family": FONT, "font-weight": "700",
+      "text-anchor": "middle", opacity: "0",
+    });
+    pctText.textContent = "0%";
+    svg.appendChild(pctText);
+
+    // label
+    const lblText = svgEl("text", {
+      x: String(cx), y: String(cy + 70),
+      fill: "rgba(255,255,255,0.5)", "font-size": "28",
+      "font-family": FONT, "font-weight": "400",
+      "text-anchor": "middle", opacity: "0",
+    });
+    lblText.textContent = label;
+    svg.appendChild(lblText);
+
+    return { svg, arc, pctText, lblText, circumference, progress, showPercent };
+  },
+
+  update(els, localT) {
+    const raw = clamp(localT / 1.8, 0, 1);
+    const t = easeOutCubic(raw);
+    const curProgress = els.progress * t;
+    const offset = els.circumference * (1 - curProgress / 100);
+    els.arc.setAttribute("stroke-dashoffset", String(offset));
+
+    if (els.showPercent) {
+      els.pctText.textContent = `${Math.round(curProgress)}%`;
+      els.pctText.setAttribute("opacity", String(clamp(raw * 3, 0, 1)));
+    }
+    els.lblText.setAttribute("opacity", String(clamp((raw - 0.2) * 3, 0, 1)));
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- pulseWave ---
+SCENE_REGISTRY["pulseWave"] = (function() {
+  
+return {
+  id: "pulseWave",
+  type: "canvas",
+  name: "Pulse Wave",
+  category: "Effects",
+  defaultParams: {
+    bars: 32,
+    color: "#a855f7",
+    minHeight: 0.05,
+    maxHeight: 0.8,
+    beatFreq: 2,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+
+    // Pre-compute per-bar frequency offsets for varied motion
+    const barCount = clamp(toNumber(params.bars, 32), 4, 128) | 0;
+    const offsets = new Float64Array(barCount);
+    let seed = 73;
+    for (let i = 0; i < barCount; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      offsets[i] = (seed / 0x7fffffff) * Math.PI * 2;
+    }
+    canvas._data = { offsets };
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const barCount = clamp(toNumber(params.bars, 32), 4, 128) | 0;
+    const color = params.color || "#a855f7";
+    const minH = clamp(toNumber(params.minHeight, 0.05), 0, 0.5);
+    const maxH = clamp(toNumber(params.maxHeight, 0.8), 0.1, 1);
+    const beatFreq = toNumber(params.beatFreq, 2);
+
+    const { offsets } = canvas._data;
+
+    ctx.clearRect(0, 0, W, H);
+
+    const gap = 2;
+    const totalGap = gap * (barCount - 1);
+    const barWidth = Math.max(1, (W - totalGap) / barCount);
+    const centerY = H / 2;
+    const t = localT * beatFreq;
+
+    for (let i = 0; i < barCount; i++) {
+      const offset = i < offsets.length ? offsets[i] : i;
+      // Combine multiple frequencies for organic "audio" look
+      const wave1 = Math.sin(t * 3.5 + offset) * 0.4;
+      const wave2 = Math.sin(t * 2.1 + offset * 1.7) * 0.3;
+      const wave3 = Math.sin(t * 5.8 + offset * 0.5) * 0.15;
+      const beat = Math.pow(Math.abs(Math.sin(t * Math.PI)), 3) * 0.15;
+
+      const raw = 0.5 + wave1 + wave2 + wave3 + beat;
+      const normalized = clamp(raw, 0, 1);
+      const heightFrac = lerp(minH, maxH, normalized);
+      const barH = heightFrac * H * 0.5;
+
+      const x = i * (barWidth + gap);
+
+      // Gradient per bar
+      const grad = ctx.createLinearGradient(x, centerY - barH, x, centerY + barH);
+      grad.addColorStop(0, color);
+      grad.addColorStop(0.5, color + "cc");
+      grad.addColorStop(1, color);
+
+      ctx.fillStyle = grad;
+
+      // Round-capped bars using roundRect
+      const rx = Math.min(barWidth / 2, 4);
+      ctx.beginPath();
+      ctx.roundRect(x, centerY - barH, barWidth, barH * 2, rx);
+      ctx.fill();
+    }
+  },
+
+  destroy(canvas) {
+    canvas._data = null;
+    canvas.remove();
+  },
+};
+
+})();
+
+
+// --- quoteBlock ---
+SCENE_REGISTRY["quoteBlock"] = (function() {
+  
+return {
+  id: "quoteBlock",
+  type: "dom",
+  name: "Quote Block",
+  category: "Typography",
+  defaultParams: {
+    text: "Design is not just what it looks like. Design is how it works.",
+    author: "Steve Jobs",
+    fontSize: 32,
+    accentColor: "#a78bfa",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8% 12%");
+    const fontSize = toNumber(params.fontSize, 32);
+    const accent = params.accentColor || "#a78bfa";
+    const quoteOpen = createNode("div", [
+      `font-size:${fontSize * 2.5}px`,
+      `font-family:${SERIF_FONT_STACK}`,
+      `color:${accent}`,
+      "line-height:1",
+      "will-change:opacity,transform",
+      "opacity:0",
+      `text-shadow:0 0 30px ${accent}44`,
+    ].join(";"), "\u201C");
+    const body = createNode("div", [
+      `font-family:${SERIF_FONT_STACK}`,
+      `font-size:${fontSize}px`,
+      "font-weight:400",
+      "font-style:italic",
+      "color:rgba(255,255,255,0.9)",
+      "line-height:1.6",
+      "text-align:center",
+      "max-width:680px",
+      "letter-spacing:0.01em",
+      "will-change:opacity,transform",
+      "opacity:0",
+    ].join(";"), params.text || "");
+    const authorEl = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      `font-size:${Math.max(13, fontSize * 0.45)}px`,
+      "font-weight:500",
+      "color:rgba(255,255,255,0.5)",
+      "margin-top:1.2em",
+      "letter-spacing:0.1em",
+      "text-transform:uppercase",
+      "will-change:opacity",
+      "opacity:0",
+    ].join(";"), params.author ? `\u2014 ${params.author}` : "");
+    root.appendChild(quoteOpen);
+    root.appendChild(body);
+    root.appendChild(authorEl);
+    return { root, quoteOpen, body, authorEl };
+  },
+
+  update(els, localT) {
+    const exitAlpha = 1 - smoothstep(0.85, 1, localT);
+    const qT = easeOutCubic(smoothstep(0, 0.1, localT));
+    els.quoteOpen.style.opacity = qT * exitAlpha;
+    els.quoteOpen.style.transform = `scale(${0.6 + 0.4 * qT})`;
+    const bT = easeOutCubic(smoothstep(0.05, 0.15, localT));
+    els.body.style.opacity = bT * exitAlpha;
+    els.body.style.transform = `translateY(${(1 - bT) * 20}px)`;
+    const aT = smoothstep(0.12, 0.22, localT);
+    els.authorEl.style.opacity = aT * exitAlpha;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- radarChart ---
+SCENE_REGISTRY["radarChart"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const FONT = '-apple-system, "SF Pro Display", sans-serif';
+const TAU = Math.PI * 2;
+
+function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+function polarXY(cx, cy, r, angle) {
+  return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+}
+
+return {
+  id: "radarChart",
+  type: "svg",
+  name: "Radar Chart",
+  category: "Data Viz",
+  defaultParams: {
+    data: [85, 60, 75, 90, 50, 70],
+    labels: ["Speed", "Power", "Range", "Armor", "Stealth", "Tech"],
+    color: "#6ee7ff",
+    fillOpacity: 0.25,
+    maxValue: 100,
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const data = normalizeArray(params.data, [85, 60, 75, 90, 50, 70]);
+    const labels = normalizeArray(params.labels, []);
+    const color = params.color || "#6ee7ff";
+    const fillOp = toNumber(params.fillOpacity, 0.25);
+    const maxVal = toNumber(params.maxValue, 100);
+    const n = data.length;
+
+    const cx = 960, cy = 540, outerR = 340;
+    const angleStep = TAU / n;
+    const startAngle = -Math.PI / 2;
+
+    // grid rings
+    for (let ring = 1; ring <= 4; ring++) {
+      const r = (outerR / 4) * ring;
+      const pts = [];
+      for (let i = 0; i < n; i++) {
+        const a = startAngle + i * angleStep;
+        const p = polarXY(cx, cy, r, a);
+        pts.push(`${p.x},${p.y}`);
+      }
+      svg.appendChild(svgEl("polygon", {
+        points: pts.join(" "), fill: "none",
+        stroke: "rgba(255,255,255,0.08)", "stroke-width": "1",
+      }));
+    }
+
+    // axis lines
+    for (let i = 0; i < n; i++) {
+      const a = startAngle + i * angleStep;
+      const p = polarXY(cx, cy, outerR, a);
+      svg.appendChild(svgEl("line", {
+        x1: String(cx), y1: String(cy), x2: String(p.x), y2: String(p.y),
+        stroke: "rgba(255,255,255,0.1)", "stroke-width": "1",
+      }));
+    }
+
+    // labels
+    for (let i = 0; i < n; i++) {
+      const a = startAngle + i * angleStep;
+      const p = polarXY(cx, cy, outerR + 35, a);
+      const anchor = Math.abs(p.x - cx) < 10 ? "middle" : p.x > cx ? "start" : "end";
+      const txt = svgEl("text", {
+        x: String(p.x), y: String(p.y + 6),
+        fill: "rgba(255,255,255,0.6)", "font-size": "20",
+        "font-family": FONT, "text-anchor": anchor,
+      });
+      txt.textContent = labels[i] || "";
+      svg.appendChild(txt);
+    }
+
+    // data polygon
+    const dataShape = svgEl("polygon", {
+      points: Array(n).fill(`${cx},${cy}`).join(" "),
+      fill: color, "fill-opacity": String(fillOp),
+      stroke: color, "stroke-width": "2.5",
+    });
+    svg.appendChild(dataShape);
+
+    // data dots
+    const dots = [];
+    for (let i = 0; i < n; i++) {
+      const dot = svgEl("circle", {
+        cx: String(cx), cy: String(cy), r: "5",
+        fill: color, stroke: "#1a1a2e", "stroke-width": "2", opacity: "0",
+      });
+      svg.appendChild(dot);
+      dots.push(dot);
+    }
+
+    // precompute target points
+    const targets = data.map((v, i) => {
+      const ratio = clamp(v / maxVal, 0, 1);
+      const a = startAngle + i * angleStep;
+      return polarXY(cx, cy, outerR * ratio, a);
+    });
+
+    return { svg, dataShape, dots, targets, cx, cy, n };
+  },
+
+  update(els, localT) {
+    const raw = clamp(localT / 1.5, 0, 1);
+    const t = easeOutCubic(raw);
+
+    const pts = [];
+    for (let i = 0; i < els.n; i++) {
+      const tgt = els.targets[i];
+      const x = els.cx + (tgt.x - els.cx) * t;
+      const y = els.cy + (tgt.y - els.cy) * t;
+      pts.push(`${x},${y}`);
+      els.dots[i].setAttribute("cx", String(x));
+      els.dots[i].setAttribute("cy", String(y));
+      els.dots[i].setAttribute("opacity", String(clamp((raw - 0.3) * 3, 0, 1)));
+    }
+    els.dataShape.setAttribute("points", pts.join(" "));
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- radialBurst ---
+SCENE_REGISTRY["radialBurst"] = (function() {
+  
+return {
+  id: "radialBurst",
+  type: "canvas",
+  name: "Radial Burst",
+  category: "Effects",
+  defaultParams: {
+    rays: 24,
+    color: "#e0c3fc",
+    rotation: 1,
+    spread: 0.4,
+    fadeLength: 0.6,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+
+    // Pre-compute per-ray properties
+    const rayCount = clamp(toNumber(params.rays, 24), 4, 120) | 0;
+    const rayData = new Float64Array(rayCount * 3); // angleSeed, lengthMult, widthMult
+    let seed = 257;
+    const rng = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    for (let i = 0; i < rayCount; i++) {
+      rayData[i * 3] = rng() * 0.2 - 0.1;     // angle jitter
+      rayData[i * 3 + 1] = 0.5 + rng() * 0.5;  // length multiplier
+      rayData[i * 3 + 2] = 0.4 + rng() * 0.6;  // width multiplier
+    }
+    canvas._data = { rayData, rayCount };
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W / 2;
+    const cy = H / 2;
+
+    const color = params.color || "#e0c3fc";
+    const rotation = toNumber(params.rotation, 1);
+    const spread = clamp(toNumber(params.spread, 0.4), 0.05, 1);
+    const fadeLen = clamp(toNumber(params.fadeLength, 0.6), 0.1, 1);
+
+    const { rayData, rayCount } = canvas._data;
+    const maxLen = Math.hypot(cx, cy) * fadeLen;
+
+    ctx.clearRect(0, 0, W, H);
+
+    const baseAngle = localT * rotation * 0.2;
+    const angleStep = (Math.PI * 2) / rayCount;
+    const halfWidth = spread * angleStep * 0.5;
+
+    for (let i = 0; i < rayCount; i++) {
+      const jitter = rayData[i * 3];
+      const lenMult = rayData[i * 3 + 1];
+      const widMult = rayData[i * 3 + 2];
+
+      const angle = baseAngle + i * angleStep + jitter;
+      const len = maxLen * lenMult;
+      const hw = halfWidth * widMult;
+
+      // Pulsing alpha
+      const pulse = 0.5 + 0.5 * Math.sin(localT * 2 + i * 0.7);
+      const alpha = clamp(0.15 + pulse * 0.35, 0, 1);
+
+      // Draw ray as a gradient triangle from center outward
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, len);
+      grad.addColorStop(0, color);
+      grad.addColorStop(0.6, color + "88");
+      grad.addColorStop(1, "transparent");
+
+      ctx.fillStyle = grad;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(angle - hw) * len, cy + Math.sin(angle - hw) * len);
+      ctx.lineTo(cx + Math.cos(angle + hw) * len, cy + Math.sin(angle + hw) * len);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
+  },
+
+  destroy(canvas) {
+    canvas._data = null;
+    canvas.remove();
+  },
+};
+
+})();
+
+
+// --- shaderChromatic ---
+SCENE_REGISTRY["shaderChromatic"] = (function() {
+  
+function compileShader(gl, type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  return s;
+}
+
+function createProgram(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+
+const VS = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const FS = `
+  precision mediump float;
+  varying vec2 v_uv;
+  uniform float u_time, u_intensity, u_angle;
+  uniform bool u_pulse;
+
+  void main() {
+    float inten = u_intensity;
+    if (u_pulse) {
+      inten *= 0.5 + 0.5 * sin(u_time * 2.0);
+    }
+    float a = u_angle;
+    vec2 dir = vec2(cos(a), sin(a)) * inten;
+
+    // Chromatic offset — shift R forward, B backward, G stays
+    vec2 uvR = v_uv + dir;
+    vec2 uvB = v_uv - dir;
+
+    // Radial vignette intensity — stronger at edges
+    float dist = length(v_uv - 0.5) * 2.0;
+    float edge = smoothstep(0.2, 1.4, dist);
+    float strength = edge * 0.6;
+
+    // Color fringes visible as semi-transparent overlay
+    float r = strength * smoothstep(0.0, 0.5, fract(uvR.x * 20.0 + uvR.y * 10.0 + u_time));
+    float b = strength * smoothstep(0.0, 0.5, fract(uvB.x * 20.0 + uvB.y * 10.0 - u_time));
+
+    float alpha = max(r, b) * 0.4;
+    gl_FragColor = vec4(r * 0.8, 0.0, b * 0.8, alpha);
+  }
+`;
+
+return {
+  id: "shaderChromatic",
+  type: "webgl",
+  name: "Chromatic Aberration",
+  category: "Shader",
+  defaultParams: { intensity: 0.01, angle: 0, pulse: true },
+
+  create(container) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    const gl = canvas.getContext("webgl", { premultipliedAlpha: false }) || canvas.getContext("experimental-webgl", { premultipliedAlpha: false });
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    const program = createProgram(gl, VS, FS);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    return { canvas, gl, program };
+  },
+
+  update(state, localT, params) {
+    const { canvas, gl, program } = state;
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), localT);
+    gl.uniform1f(gl.getUniformLocation(program, "u_intensity"), toNumber(params.intensity, 0.01));
+    gl.uniform1f(gl.getUniformLocation(program, "u_angle"), toNumber(params.angle, 0));
+    gl.uniform1i(gl.getUniformLocation(program, "u_pulse"), params.pulse !== false ? 1 : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+
+  destroy(state) { state.canvas.remove(); }
+};
+
+})();
+
+
+// --- shaderFirefly ---
+SCENE_REGISTRY["shaderFirefly"] = (function() {
+  
+function compileShader(gl, type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  return s;
+}
+
+function createProgram(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+
+const VS = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+function hexToVec3(hex) {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255];
+}
+
+const FS = `
+  precision mediump float;
+  varying vec2 v_uv;
+  uniform float u_time, u_count, u_glowSize, u_speed;
+  uniform vec3 u_color;
+  uniform vec2 u_res;
+
+  // Hash functions for pseudo-random per-particle values
+  float hash(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+  vec2 hash2(float n) {
+    return vec2(hash(n), hash(n + 57.0));
+  }
+
+  void main() {
+    vec2 aspect = vec2(u_res.x / u_res.y, 1.0);
+    vec2 p = v_uv * aspect;
+    float t = u_time * u_speed;
+
+    vec3 col = vec3(0.02, 0.02, 0.04); // Dark background
+    float maxN = u_count;
+
+    for (float i = 0.0; i < 300.0; i++) {
+      if (i >= maxN) break;
+
+      // Per-particle random base position and motion
+      vec2 base = hash2(i * 13.7);
+      float phase = hash(i * 7.3) * 6.2832;
+      float spd = 0.3 + hash(i * 3.1) * 0.7;
+
+      vec2 pos = base * aspect;
+      pos.x += sin(t * spd * 0.6 + phase) * 0.15;
+      pos.y += cos(t * spd * 0.4 + phase * 1.3) * 0.12;
+      pos.x = mod(pos.x, aspect.x);
+      pos.y = mod(pos.y, 1.0);
+
+      float dist = length(p - pos);
+      // Glow falloff
+      float glow = u_glowSize / (dist * dist + u_glowSize * 0.5);
+      // Flicker
+      float flicker = 0.5 + 0.5 * sin(t * 3.0 + phase * 2.0);
+      glow *= flicker;
+      glow = min(glow, 3.0);
+
+      col += u_color * glow * 0.008;
+    }
+
+    col = min(col, vec3(1.0));
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+return {
+  id: "shaderFirefly",
+  type: "webgl",
+  name: "GPU Fireflies",
+  category: "Shader",
+  defaultParams: { count: 200, color: "#ffd93d", glowSize: 0.02, speed: 0.5 },
+
+  create(container) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    const program = createProgram(gl, VS, FS);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    return { canvas, gl, program };
+  },
+
+  update(state, localT, params) {
+    const { canvas, gl, program } = state;
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), localT);
+    gl.uniform1f(gl.getUniformLocation(program, "u_count"), Math.min(toNumber(params.count, 200), 300));
+    gl.uniform1f(gl.getUniformLocation(program, "u_glowSize"), toNumber(params.glowSize, 0.02));
+    gl.uniform1f(gl.getUniformLocation(program, "u_speed"), toNumber(params.speed, 0.5));
+    gl.uniform2f(gl.getUniformLocation(program, "u_res"), canvas.width, canvas.height);
+    const c = hexToVec3(params.color || "#ffd93d");
+    gl.uniform3f(gl.getUniformLocation(program, "u_color"), c[0], c[1], c[2]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+
+  destroy(state) { state.canvas.remove(); }
+};
+
+})();
+
+
+// --- shaderGlitch ---
+SCENE_REGISTRY["shaderGlitch"] = (function() {
+  
+function compileShader(gl, type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  return s;
+}
+
+function createProgram(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+
+const VS = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const FS = `
+  precision mediump float;
+  varying vec2 v_uv;
+  uniform float u_time, u_intensity, u_blockSize, u_colorSplit;
+  uniform vec2 u_res;
+  uniform bool u_scanlines;
+
+  float hash(float n) { return fract(sin(n) * 43758.5453); }
+  float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+  void main() {
+    vec2 uv = v_uv;
+    float t = floor(u_time * 8.0);
+
+    // Block displacement — random rows shift horizontally
+    float blockY = floor(uv.y * u_res.y / u_blockSize);
+    float shift = (hash(blockY + t * 37.0) - 0.5) * u_intensity * 0.15;
+    float trigger = step(0.7 - u_intensity * 0.3, hash(blockY * 3.0 + t));
+    uv.x += shift * trigger;
+
+    // RGB channel separation
+    float r = hash2(vec2(t, 1.0)) * u_colorSplit * u_intensity;
+    float g = hash2(vec2(t, 2.0)) * u_colorSplit * u_intensity;
+
+    // Sample as transparent overlay — use luminance stripes
+    float lum = 0.0;
+    float stripe = mod(uv.x * u_res.x * 0.5 + uv.y * u_res.y * 0.3, 80.0) / 80.0;
+    lum = smoothstep(0.3, 0.7, stripe) * 0.15 * u_intensity;
+
+    float cr = lum + hash2(vec2(floor((uv + vec2(r, 0.0)) * u_res / 4.0))) * 0.05 * u_intensity;
+    float cg = lum * 0.6;
+    float cb = lum + hash2(vec2(floor((uv - vec2(g, 0.0)) * u_res / 4.0))) * 0.05 * u_intensity;
+
+    // Scanlines
+    float scan = 1.0;
+    if (u_scanlines) {
+      scan = 0.85 + 0.15 * sin(uv.y * u_res.y * 3.14159);
+    }
+
+    float alpha = clamp((cr + cg + cb) * 3.0 * scan, 0.0, 0.6);
+    gl_FragColor = vec4(cr * scan, cg * scan, cb * scan, alpha);
+  }
+`;
+
+return {
+  id: "shaderGlitch",
+  type: "webgl",
+  name: "Glitch Effect",
+  category: "Shader",
+  defaultParams: { intensity: 0.5, blockSize: 16, colorSplit: 0.02, scanlines: true },
+
+  create(container) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    const gl = canvas.getContext("webgl", { premultipliedAlpha: false }) || canvas.getContext("experimental-webgl", { premultipliedAlpha: false });
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    const program = createProgram(gl, VS, FS);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    return { canvas, gl, program };
+  },
+
+  update(state, localT, params) {
+    const { canvas, gl, program } = state;
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), localT);
+    gl.uniform1f(gl.getUniformLocation(program, "u_intensity"), toNumber(params.intensity, 0.5));
+    gl.uniform1f(gl.getUniformLocation(program, "u_blockSize"), toNumber(params.blockSize, 16));
+    gl.uniform1f(gl.getUniformLocation(program, "u_colorSplit"), toNumber(params.colorSplit, 0.02));
+    gl.uniform2f(gl.getUniformLocation(program, "u_res"), canvas.width, canvas.height);
+    gl.uniform1i(gl.getUniformLocation(program, "u_scanlines"), params.scanlines !== false ? 1 : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+
+  destroy(state) { state.canvas.remove(); }
+};
+
+})();
+
+
+// --- shaderGradient ---
+SCENE_REGISTRY["shaderGradient"] = (function() {
+  
+function compileShader(gl, type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  return s;
+}
+
+function createProgram(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+
+const VS = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() {
+    v_uv = a_pos * 0.5 + 0.5;
+    gl_Position = vec4(a_pos, 0.0, 1.0);
+  }
+`;
+
+const FS = `
+  precision mediump float;
+  varying vec2 v_uv;
+  uniform float u_time;
+  uniform vec3 u_c1, u_c2, u_c3;
+  uniform float u_speed;
+
+  void main() {
+    float t = u_time * u_speed;
+    vec2 p1 = vec2(0.3 + 0.2 * sin(t * 0.7), 0.4 + 0.15 * cos(t * 0.5));
+    vec2 p2 = vec2(0.7 + 0.15 * cos(t * 0.6), 0.3 + 0.2 * sin(t * 0.8));
+    vec2 p3 = vec2(0.5 + 0.25 * sin(t * 0.4), 0.7 + 0.1 * cos(t * 0.9));
+    vec2 p4 = vec2(0.4 + 0.1 * cos(t * 1.1), 0.55 + 0.15 * sin(t * 0.3));
+
+    float d1 = 1.0 - smoothstep(0.0, 0.5, length(v_uv - p1));
+    float d2 = 1.0 - smoothstep(0.0, 0.55, length(v_uv - p2));
+    float d3 = 1.0 - smoothstep(0.0, 0.45, length(v_uv - p3));
+    float d4 = 1.0 - smoothstep(0.0, 0.4, length(v_uv - p4));
+
+    vec3 col = vec3(0.04, 0.03, 0.06);
+    col += u_c1 * d1 * 0.6;
+    col += u_c2 * d2 * 0.6;
+    col += u_c3 * d3 * 0.5;
+    col += mix(u_c1, u_c2, 0.5) * d4 * 0.4;
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+function hexToVec3(hex) {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255];
+}
+
+return {
+  id: "shaderGradient",
+  type: "webgl",
+  name: "GPU Gradient",
+  category: "Shader",
+  defaultParams: { color1: "#1a0a3e", color2: "#0a2a4e", color3: "#2a0a2e", speed: 0.3 },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    const program = createProgram(gl, VS, FS);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    return { canvas, gl, program, buf, loc };
+  },
+
+  update(state, localT, params) {
+    const { canvas, gl, program } = state;
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), localT);
+    gl.uniform1f(gl.getUniformLocation(program, "u_speed"), toNumber(params.speed, 0.3));
+    const c1 = hexToVec3(params.color1 || "#1a0a3e");
+    const c2 = hexToVec3(params.color2 || "#0a2a4e");
+    const c3 = hexToVec3(params.color3 || "#2a0a2e");
+    gl.uniform3f(gl.getUniformLocation(program, "u_c1"), c1[0], c1[1], c1[2]);
+    gl.uniform3f(gl.getUniformLocation(program, "u_c2"), c2[0], c2[1], c2[2]);
+    gl.uniform3f(gl.getUniformLocation(program, "u_c3"), c3[0], c3[1], c3[2]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+
+  destroy(state) { state.canvas.remove(); }
+};
+
+})();
+
+
+// --- shaderNoise ---
+SCENE_REGISTRY["shaderNoise"] = (function() {
+  
+function compileShader(gl, type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  return s;
+}
+
+function createProgram(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+
+const VS = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const FS = `
+  precision mediump float;
+  varying vec2 v_uv;
+  uniform float u_time, u_scale, u_speed;
+  uniform int u_octaves;
+  uniform vec3 u_c1, u_c2;
+
+  vec3 mod289(vec3 x) { return x - floor(x * (1.0/289.0)) * 289.0; }
+  vec2 mod289v2(vec2 x) { return x - floor(x * (1.0/289.0)) * 289.0; }
+  vec3 permute(vec3 x) { return mod289((x * 34.0 + 1.0) * x); }
+
+  float snoise(vec2 v) {
+    const vec4 C = vec4(0.211324865, 0.366025404, -0.577350269, 0.024390244);
+    vec2 i = floor(v + dot(v, C.yy));
+    vec2 x0 = v - i + dot(i, C.xx);
+    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+    i = mod289v2(i);
+    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+    m = m * m; m = m * m;
+    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+    vec3 h = abs(x) - 0.5;
+    vec3 ox = floor(x + 0.5);
+    vec3 a0 = x - ox;
+    m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+    vec3 g;
+    g.x = a0.x * x0.x + h.x * x0.y;
+    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+    return 130.0 * dot(m, g);
+  }
+
+  void main() {
+    vec2 p = v_uv * u_scale;
+    float t = u_time * u_speed;
+    float val = 0.0; float amp = 0.5; float freq = 1.0;
+    for (int i = 0; i < 8; i++) {
+      if (i >= u_octaves) break;
+      val += amp * snoise(p * freq + t * 0.3 * float(i + 1));
+      freq *= 2.0; amp *= 0.5;
+    }
+    val = val * 0.5 + 0.5;
+    vec3 col = mix(u_c1 * 0.15, u_c2 * 0.8, val);
+    col += vec3(0.03, 0.02, 0.05);
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+function hexToVec3(hex) {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255];
+}
+
+return {
+  id: "shaderNoise",
+  type: "webgl",
+  name: "Simplex Noise",
+  category: "Shader",
+  defaultParams: { scale: 3.0, speed: 0.5, color1: "#6ee7ff", color2: "#a78bfa", octaves: 4 },
+
+  create(container) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    const program = createProgram(gl, VS, FS);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    return { canvas, gl, program };
+  },
+
+  update(state, localT, params) {
+    const { canvas, gl, program } = state;
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), localT);
+    gl.uniform1f(gl.getUniformLocation(program, "u_scale"), toNumber(params.scale, 3.0));
+    gl.uniform1f(gl.getUniformLocation(program, "u_speed"), toNumber(params.speed, 0.5));
+    gl.uniform1i(gl.getUniformLocation(program, "u_octaves"), toNumber(params.octaves, 4));
+    const c1 = hexToVec3(params.color1 || "#6ee7ff");
+    const c2 = hexToVec3(params.color2 || "#a78bfa");
+    gl.uniform3f(gl.getUniformLocation(program, "u_c1"), c1[0], c1[1], c1[2]);
+    gl.uniform3f(gl.getUniformLocation(program, "u_c2"), c2[0], c2[1], c2[2]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+
+  destroy(state) { state.canvas.remove(); }
+};
+
+})();
+
+
+// --- shaderPlasma ---
+SCENE_REGISTRY["shaderPlasma"] = (function() {
+  
+function compileShader(gl, type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  return s;
+}
+
+function createProgram(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+
+const VS = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const FS = `
+  precision mediump float;
+  varying vec2 v_uv;
+  uniform float u_time, u_speed, u_scale;
+  uniform int u_colors;
+
+  vec3 palette(float t, int mode) {
+    if (mode == 1) {
+      return vec3(0.5 + 0.5 * cos(6.2832 * t),
+                   0.5 + 0.5 * cos(6.2832 * (t + 0.33)),
+                   0.5 + 0.5 * cos(6.2832 * (t + 0.67)));
+    }
+    if (mode == 2) {
+      return vec3(0.5 + 0.5 * sin(6.2832 * t + 0.0),
+                   0.5 + 0.5 * sin(6.2832 * t + 2.094),
+                   0.5 + 0.5 * sin(6.2832 * t + 4.189));
+    }
+    // mode 3+: deeper tones
+    return vec3(0.4 + 0.4 * cos(6.2832 * (t + 0.0)),
+                 0.3 + 0.3 * cos(6.2832 * (t + 0.15)),
+                 0.5 + 0.5 * cos(6.2832 * (t + 0.6)));
+  }
+
+  void main() {
+    vec2 p = (v_uv - 0.5) * u_scale;
+    float t = u_time * u_speed;
+    float v = sin(p.x * 10.0 + t);
+    v += sin(p.y * 10.0 + t * 0.7);
+    v += sin((p.x + p.y) * 7.0 + t * 1.3);
+    v += sin(length(p) * 12.0 - t * 0.9);
+    v *= 0.25;
+    v = v * 0.5 + 0.5;
+
+    vec3 col = palette(v + t * 0.05, u_colors);
+    col *= 0.75;
+    col += vec3(0.03, 0.02, 0.05);
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+return {
+  id: "shaderPlasma",
+  type: "webgl",
+  name: "Plasma Effect",
+  category: "Shader",
+  defaultParams: { speed: 1.0, scale: 4.0, colors: 3 },
+
+  create(container) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    const program = createProgram(gl, VS, FS);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    return { canvas, gl, program };
+  },
+
+  update(state, localT, params) {
+    const { canvas, gl, program } = state;
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), localT);
+    gl.uniform1f(gl.getUniformLocation(program, "u_speed"), toNumber(params.speed, 1.0));
+    gl.uniform1f(gl.getUniformLocation(program, "u_scale"), toNumber(params.scale, 4.0));
+    gl.uniform1i(gl.getUniformLocation(program, "u_colors"), toNumber(params.colors, 3));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+
+  destroy(state) { state.canvas.remove(); }
+};
+
+})();
+
+
+// --- shaderRipple ---
+SCENE_REGISTRY["shaderRipple"] = (function() {
+  
+function compileShader(gl, type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  return s;
+}
+
+function createProgram(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+
+const VS = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const FS = `
+  precision mediump float;
+  varying vec2 v_uv;
+  uniform float u_time, u_freq, u_amp, u_speed;
+  uniform vec2 u_center, u_res;
+
+  void main() {
+    vec2 aspect = vec2(u_res.x / u_res.y, 1.0);
+    vec2 p = (v_uv - u_center) * aspect;
+    float dist = length(p);
+    float t = u_time * u_speed;
+
+    // Expanding ripple rings
+    float wave = sin(dist * u_freq * 6.2832 - t * 6.2832) * u_amp;
+    wave *= smoothstep(0.8, 0.0, dist); // Fade at edges
+
+    // Distort UV
+    vec2 offset = normalize(p + 0.001) * wave;
+    vec2 uv = v_uv + offset;
+
+    // Dark water-like background with ripple highlights
+    float ring = abs(sin(dist * u_freq * 6.2832 - t * 6.2832));
+    ring = pow(ring, 4.0) * smoothstep(0.8, 0.0, dist);
+
+    vec3 deepColor = vec3(0.03, 0.05, 0.1);
+    vec3 rippleColor = vec3(0.15, 0.35, 0.55);
+    vec3 highlight = vec3(0.3, 0.6, 0.9);
+
+    vec3 col = deepColor;
+    col += rippleColor * ring * 0.6;
+    col += highlight * pow(ring, 8.0) * 0.4;
+
+    // Secondary ripple layer
+    float wave2 = sin(dist * u_freq * 3.14 - t * 4.0 + 1.5);
+    col += vec3(0.08, 0.15, 0.25) * max(wave2, 0.0) * 0.3 * smoothstep(0.6, 0.0, dist);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+return {
+  id: "shaderRipple",
+  type: "webgl",
+  name: "Water Ripple",
+  category: "Shader",
+  defaultParams: { frequency: 10, amplitude: 0.02, speed: 2.0, center: [0.5, 0.5] },
+
+  create(container) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    const program = createProgram(gl, VS, FS);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    return { canvas, gl, program };
+  },
+
+  update(state, localT, params) {
+    const { canvas, gl, program } = state;
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), localT);
+    gl.uniform1f(gl.getUniformLocation(program, "u_freq"), toNumber(params.frequency, 10));
+    gl.uniform1f(gl.getUniformLocation(program, "u_amp"), toNumber(params.amplitude, 0.02));
+    gl.uniform1f(gl.getUniformLocation(program, "u_speed"), toNumber(params.speed, 2.0));
+    gl.uniform2f(gl.getUniformLocation(program, "u_res"), canvas.width, canvas.height);
+    const c = Array.isArray(params.center) ? params.center : [0.5, 0.5];
+    gl.uniform2f(gl.getUniformLocation(program, "u_center"), toNumber(c[0], 0.5), toNumber(c[1], 0.5));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+
+  destroy(state) { state.canvas.remove(); }
+};
+
+})();
+
+
+// --- shaderTunnel ---
+SCENE_REGISTRY["shaderTunnel"] = (function() {
+  
+function compileShader(gl, type, source) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, source);
+  gl.compileShader(s);
+  return s;
+}
+
+function createProgram(gl, vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compileShader(gl, gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compileShader(gl, gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  return p;
+}
+
+const VS = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+function hexToVec3(hex) {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255];
+}
+
+const FS = `
+  precision mediump float;
+  varying vec2 v_uv;
+  uniform float u_time, u_speed, u_rings, u_twist;
+  uniform vec3 u_color;
+  uniform vec2 u_res;
+
+  void main() {
+    vec2 p = (v_uv - 0.5) * vec2(u_res.x / u_res.y, 1.0);
+    float r = length(p);
+    float a = atan(p.y, p.x);
+
+    float t = u_time * u_speed;
+    // Tunnel: map radius to depth, angle to horizontal
+    float depth = 0.3 / (r + 0.001);
+    float tex_u = a / 3.14159 + t * u_twist * 0.1;
+    float tex_v = depth + t * 2.0;
+
+    // Ring pattern
+    float rings = sin(tex_v * u_rings) * 0.5 + 0.5;
+    float spiral = sin(tex_u * 6.0 + tex_v * 2.0) * 0.5 + 0.5;
+    float pattern = rings * 0.7 + spiral * 0.3;
+
+    // Fade to center (bright) and edges (dark)
+    float fade = smoothstep(0.0, 0.15, r) * (1.0 - smoothstep(0.5, 1.2, r));
+
+    vec3 col = u_color * pattern * fade;
+    // Add glow near center
+    col += u_color * 0.3 * smoothstep(0.15, 0.0, r);
+    col += vec3(0.02);
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+return {
+  id: "shaderTunnel",
+  type: "webgl",
+  name: "Tunnel / Wormhole",
+  category: "Shader",
+  defaultParams: { speed: 0.5, rings: 8, color: "#6ee7ff", twist: 2.0 },
+
+  create(container) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    const program = createProgram(gl, VS, FS);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(program, "a_pos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    return { canvas, gl, program };
+  },
+
+  update(state, localT, params) {
+    const { canvas, gl, program } = state;
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program, "u_time"), localT);
+    gl.uniform1f(gl.getUniformLocation(program, "u_speed"), toNumber(params.speed, 0.5));
+    gl.uniform1f(gl.getUniformLocation(program, "u_rings"), toNumber(params.rings, 8));
+    gl.uniform1f(gl.getUniformLocation(program, "u_twist"), toNumber(params.twist, 2.0));
+    gl.uniform2f(gl.getUniformLocation(program, "u_res"), canvas.width, canvas.height);
+    const c = hexToVec3(params.color || "#6ee7ff");
+    gl.uniform3f(gl.getUniformLocation(program, "u_color"), c[0], c[1], c[2]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  },
+
+  destroy(state) { state.canvas.remove(); }
+};
+
+})();
+
+
+// --- splitText ---
+SCENE_REGISTRY["splitText"] = (function() {
+  
+return {
+  id: "splitText",
+  type: "dom",
+  name: "Split Text",
+  category: "Typography",
+  defaultParams: {
+    text: "CREATIVE",
+    fontSize: 96,
+    color: "#ffffff",
+    splitDelay: 0.05,
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center;overflow:hidden");
+    const fontSize = toNumber(params.fontSize, 96);
+    const color = params.color || "#ffffff";
+    const wrap = createNode("div", "position:relative;display:flex;flex-direction:column;align-items:center;gap:0");
+    const topHalf = createNode("div", [
+      "overflow:hidden",
+      `height:${fontSize * 0.55}px`,
+      "will-change:transform,opacity",
+      "opacity:0",
+    ].join(";"));
+    const topText = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      `font-size:${fontSize}px`,
+      "font-weight:900",
+      `color:${color}`,
+      "letter-spacing:0.04em",
+      "line-height:1",
+    ].join(";"), params.text || "CREATIVE");
+    topHalf.appendChild(topText);
+    const bottomHalf = createNode("div", [
+      "overflow:hidden",
+      `height:${fontSize * 0.55}px`,
+      "will-change:transform,opacity",
+      "opacity:0",
+    ].join(";"));
+    const bottomText = createNode("div", [
+      `font-family:${SANS_FONT_STACK}`,
+      `font-size:${fontSize}px`,
+      "font-weight:900",
+      `color:${color}`,
+      "letter-spacing:0.04em",
+      "line-height:1",
+      `margin-top:${-fontSize * 0.55}px`,
+    ].join(";"), params.text || "CREATIVE");
+    bottomHalf.appendChild(bottomText);
+    wrap.appendChild(topHalf);
+    wrap.appendChild(bottomHalf);
+    root.appendChild(wrap);
+    return { root, topHalf, bottomHalf };
+  },
+
+  update(els, localT, params) {
+    const delay = toNumber(params.splitDelay, 0.05);
+    const exitAlpha = 1 - smoothstep(0.85, 1, localT);
+    const topT = easeOutCubic(smoothstep(0, 0.12, localT));
+    const botT = easeOutCubic(smoothstep(delay, 0.12 + delay, localT));
+    els.topHalf.style.opacity = topT * exitAlpha;
+    els.topHalf.style.transform = `translateY(${(1 - topT) * -40}px)`;
+    els.bottomHalf.style.opacity = botT * exitAlpha;
+    els.bottomHalf.style.transform = `translateY(${(1 - botT) * 40}px)`;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- starfield ---
+SCENE_REGISTRY["starfield"] = (function() {
+  
+return {
+  id: "starfield",
+  type: "canvas",
+  name: "Starfield",
+  category: "Effects",
+  defaultParams: {
+    count: 200,
+    speed: 1,
+    depth: 1,
+    color: "#ffffff",
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+
+    const count = clamp(toNumber(params.count, 200), 10, 2000) | 0;
+    const stars = new Float64Array(count * 3); // x, y, z
+    let seed = 42;
+    const rng = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    for (let i = 0; i < count; i++) {
+      stars[i * 3] = (rng() - 0.5) * 2;     // x: -1..1
+      stars[i * 3 + 1] = (rng() - 0.5) * 2; // y: -1..1
+      stars[i * 3 + 2] = rng();              // z: 0..1
+    }
+    canvas._data = { stars, count };
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W / 2;
+    const cy = H / 2;
+
+    const speed = toNumber(params.speed, 1);
+    const depth = clamp(toNumber(params.depth, 1), 0.1, 3);
+    const color = params.color || "#ffffff";
+
+    ctx.clearRect(0, 0, W, H);
+
+    const { stars, count } = canvas._data;
+    const t = localT * speed * 0.1;
+
+    for (let i = 0; i < count; i++) {
+      const sx = stars[i * 3];
+      const sy = stars[i * 3 + 1];
+      const sz0 = stars[i * 3 + 2];
+
+      // z cycles from 0..1 based on time, wrapping around
+      let z = (sz0 - t * 0.3) % 1;
+      if (z < 0) z += 1;
+      z = clamp(z, 0.001, 1);
+
+      const scale = depth / z;
+      const px = cx + sx * scale * cx;
+      const py = cy + sy * scale * cy;
+
+      if (px < -10 || px > W + 10 || py < -10 || py > H + 10) continue;
+
+      const alpha = clamp(1 - z, 0.1, 1);
+      const radius = clamp((1 - z) * 2.5, 0.5, 3);
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(px, py, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  },
+
+  destroy(canvas) {
+    canvas._data = null;
+    canvas.remove();
+  },
+};
+
+})();
+
+
+// --- subtitleBar ---
+SCENE_REGISTRY["subtitleBar"] = (function() {
+  
+return {
+  id: "subtitleBar",
+  type: "dom",
+  name: "Subtitle Bar",
+  category: "Overlay",
+  defaultParams: {
+    text: "This is a subtitle that types in character by character.",
+    fontSize: 22,
+    bgColor: "rgba(0,0,0,0.7)",
+    textColor: "#ffffff",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:flex-end;justify-content:center;padding-bottom:8%");
+    const fontSize = toNumber(params.fontSize, 22);
+    const bar = createNode("div", [
+      `background:${params.bgColor || "rgba(0,0,0,0.7)"}`,
+      "padding:12px 28px",
+      "border-radius:8px",
+      "max-width:80%",
+      "backdrop-filter:blur(8px)",
+      "-webkit-backdrop-filter:blur(8px)",
+      "will-change:opacity",
+      "opacity:0",
+    ].join(";"));
+    const textEl = createNode("span", [
+      `font-family:${SANS_FONT_STACK}`,
+      `font-size:${fontSize}px`,
+      "font-weight:400",
+      `color:${params.textColor || "#ffffff"}`,
+      "line-height:1.5",
+      "letter-spacing:0.01em",
+    ].join(";"));
+    const cursor = createNode("span", [
+      "display:inline-block",
+      "width:2px",
+      `height:${fontSize}px`,
+      `background:${params.textColor || "#ffffff"}`,
+      "margin-left:2px",
+      "vertical-align:text-bottom",
+      "will-change:opacity",
+    ].join(";"));
+    bar.appendChild(textEl);
+    bar.appendChild(cursor);
+    root.appendChild(bar);
+    const fullText = String(params.text || "");
+    return { root, bar, textEl, cursor, fullText };
+  },
+
+  update(els, localT) {
+    const exitAlpha = 1 - smoothstep(0.85, 1, localT);
+    const barT = smoothstep(0, 0.06, localT);
+    els.bar.style.opacity = barT * exitAlpha;
+    const typeT = smoothstep(0.04, 0.7, localT);
+    const charCount = Math.round(lerp(0, els.fullText.length, typeT));
+    els.textEl.textContent = els.fullText.slice(0, charCount);
+    const blink = Math.sin(localT * 80) > 0 ? 1 : 0.2;
+    els.cursor.style.opacity = typeT < 1 ? blink : 0;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- svgRings ---
+SCENE_REGISTRY["svgRings"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const PALETTE = ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80", "#fbbf24"];
+
+function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+return {
+  id: "svgRings",
+  type: "svg",
+  name: "Decorative Rings",
+  category: "Motion Graphics",
+  defaultParams: {
+    count: 4,
+    colors: PALETTE,
+    speed: 1,
+    strokeWidth: 3,
+    dashArray: "20 10",
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const count = toNumber(params.count, 4);
+    const colors = normalizeArray(params.colors, PALETTE);
+    const sw = toNumber(params.strokeWidth, 3);
+    const dash = params.dashArray || "20 10";
+
+    const cx = 960, cy = 540;
+    const minR = 120, maxR = 420;
+
+    // glow filter
+    const defs = svgEl("defs");
+    const filter = svgEl("filter", { id: "ringBlur", x: "-20%", y: "-20%", width: "140%", height: "140%" });
+    const blur = svgEl("feGaussianBlur", { stdDeviation: "3", result: "blur" });
+    const merge = svgEl("feMerge");
+    merge.appendChild(svgEl("feMergeNode", { in: "blur" }));
+    merge.appendChild(svgEl("feMergeNode", { in: "SourceGraphic" }));
+    filter.appendChild(blur);
+    filter.appendChild(merge);
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+
+    const rings = [];
+    for (let i = 0; i < count; i++) {
+      const r = minR + ((maxR - minR) / Math.max(count - 1, 1)) * i;
+      const color = colors[i % colors.length];
+      const direction = i % 2 === 0 ? 1 : -1;
+      const speedMul = 0.6 + (i * 0.3);
+
+      const g = svgEl("g");
+      const circle = svgEl("circle", {
+        cx: String(cx), cy: String(cy), r: String(r),
+        fill: "none", stroke: color, "stroke-width": String(sw + i * 0.5),
+        "stroke-dasharray": dash, "stroke-linecap": "round",
+        opacity: String(0.5 + i * 0.1), filter: "url(#ringBlur)",
+      });
+      g.appendChild(circle);
+      svg.appendChild(g);
+      rings.push({ g, direction, speedMul, cx, cy });
+    }
+
+    return { svg, rings, speed: toNumber(params.speed, 1) };
+  },
+
+  update(els, localT) {
+    els.rings.forEach((ring) => {
+      const deg = localT * 40 * els.speed * ring.speedMul * ring.direction;
+      ring.g.setAttribute("transform", `rotate(${deg} ${ring.cx} ${ring.cy})`);
+    });
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- timelineViz ---
+SCENE_REGISTRY["timelineViz"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const DEFAULT_EVENTS = [
+  { label: "Start", date: "Q1" },
+  { label: "Develop", date: "Q2" },
+  { label: "Test", date: "Q3" },
+  { label: "Launch", date: "Q4" },
+];
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  if (attrs) { for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); }
+  return el;
+}
+
+return {
+  id: "timelineViz",
+  type: "svg",
+  name: "Timeline",
+  category: "Data Viz",
+  defaultParams: {
+    events: DEFAULT_EVENTS,
+    color: "#a78bfa",
+    dotSize: 8,
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const events = normalizeArray(params.events, DEFAULT_EVENTS);
+    const color = params.color || "#a78bfa";
+    const dotR = toNumber(params.dotSize, 8);
+    const count = events.length;
+    const marginX = 240;
+    const cy = 540;
+    const lineY = cy;
+
+    // Glow filter
+    const defs = svgEl("defs");
+    const filter = svgEl("filter", { id: "tlGlow", x: "-50%", y: "-50%", width: "200%", height: "200%" });
+    filter.appendChild(svgEl("feGaussianBlur", { stdDeviation: "4", result: "blur" }));
+    const merge = svgEl("feMerge");
+    merge.appendChild(svgEl("feMergeNode", { in: "blur" }));
+    merge.appendChild(svgEl("feMergeNode", { in: "SourceGraphic" }));
+    filter.appendChild(merge);
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+
+    // Horizontal line
+    const line = svgEl("line", {
+      x1: String(marginX), y1: String(lineY),
+      x2: String(1920 - marginX), y2: String(lineY),
+      stroke: color, "stroke-width": "2", opacity: "0.3",
+    });
+    svg.appendChild(line);
+
+    const nodes = [];
+    for (let i = 0; i < count; i++) {
+      const x = marginX + ((1920 - 2 * marginX) / Math.max(count - 1, 1)) * i;
+      const g = svgEl("g", { opacity: "0" });
+
+      const dot = svgEl("circle", {
+        cx: String(x), cy: String(cy), r: String(dotR),
+        fill: color, filter: "url(#tlGlow)",
+      });
+      g.appendChild(dot);
+
+      const label = svgEl("text", {
+        x: String(x), y: String(cy - 28),
+        fill: "#fff", "font-size": "18", "text-anchor": "middle",
+        "font-family": "-apple-system, sans-serif", "font-weight": "600",
+      });
+      label.textContent = events[i].label || "";
+      g.appendChild(label);
+
+      const date = svgEl("text", {
+        x: String(x), y: String(cy + 36),
+        fill: "rgba(255,255,255,0.45)", "font-size": "13", "text-anchor": "middle",
+        "font-family": "-apple-system, sans-serif",
+      });
+      date.textContent = events[i].date || "";
+      g.appendChild(date);
+
+      svg.appendChild(g);
+      nodes.push(g);
+    }
+
+    return { svg, nodes };
+  },
+
+  update(els, localT) {
+    const count = els.nodes.length;
+    for (let i = 0; i < count; i++) {
+      const threshold = (i + 1) / (count + 1);
+      // localT is seconds; reveal over first few seconds
+      const progress = Math.min(1, localT / Math.max(count * 0.8, 2));
+      const opacity = progress >= threshold ? 1 : 0;
+      els.nodes[i].setAttribute("opacity", String(opacity));
+    }
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- treeMap ---
+SCENE_REGISTRY["treeMap"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const FONT = '-apple-system, "SF Pro Display", sans-serif';
+const PALETTE = ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80", "#fbbf24"];
+
+function svgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+// simple squarified treemap layout
+function layoutTreemap(items, x, y, w, h, gap) {
+  const total = items.reduce((s, it) => s + it.value, 0) || 1;
+  const rects = [];
+  const sorted = items.map((it, i) => ({ ...it, idx: i })).sort((a, b) => b.value - a.value);
+  let cx = x, cy = y, cw = w, ch = h;
+  let remaining = total;
+
+  for (let i = 0; i < sorted.length;) {
+    const isHoriz = cw >= ch;
+    let rowItems = [];
+    let rowSum = 0;
+    const side = isHoriz ? ch : cw;
+
+    // greedily add items to current row
+    for (let j = i; j < sorted.length; j++) {
+      const trial = [...rowItems, sorted[j]];
+      const trialSum = rowSum + sorted[j].value;
+      const rowLen = (trialSum / remaining) * (isHoriz ? cw : ch);
+      const worst = Math.max(...trial.map((it) => {
+        const s = (it.value / trialSum) * side;
+        return Math.max(rowLen / s, s / rowLen);
+      }));
+      if (rowItems.length > 0 && worst > Math.max(...rowItems.map((it) => {
+        const s = (it.value / rowSum) * side;
+        const rl = (rowSum / remaining) * (isHoriz ? cw : ch);
+        return Math.max(rl / s, s / rl);
+      }))) break;
+      rowItems.push(sorted[j]);
+      rowSum = trialSum;
+      j; // eslint placeholder
+    }
+
+    if (rowItems.length === 0) { rowItems = [sorted[i]]; rowSum = sorted[i].value; }
+
+    const rowLen = (rowSum / remaining) * (isHoriz ? cw : ch);
+    let offset = 0;
+
+    rowItems.forEach((it) => {
+      const ratio = it.value / rowSum;
+      const itemLen = ratio * side;
+      const rx = isHoriz ? cx + offset : cx;
+      const ry = isHoriz ? cy : cy + offset;
+      const rw = isHoriz ? itemLen : rowLen;
+      const rh = isHoriz ? rowLen : itemLen;
+      rects.push({
+        x: rx + gap / 2, y: ry + gap / 2,
+        w: Math.max(0, rw - gap), h: Math.max(0, rh - gap),
+        label: it.label, value: it.value, color: it.color, idx: it.idx,
+      });
+      offset += itemLen;
+    });
+
+    i += rowItems.length;
+    remaining -= rowSum;
+    if (isHoriz) { cx += rowLen; cw -= rowLen; }
+    else { cy += rowLen; ch -= rowLen; }
+  }
+
+  return rects;
+}
+
+return {
+  id: "treeMap",
+  type: "svg",
+  name: "Tree Map",
+  category: "Data Viz",
+  defaultParams: {
+    data: [
+      { label: "Videos", value: 45, color: "#6ee7ff" },
+      { label: "Images", value: 30, color: "#a78bfa" },
+      { label: "Audio", value: 20, color: "#f472b6" },
+      { label: "Docs", value: 15, color: "#fb923c" },
+      { label: "Code", value: 12, color: "#4ade80" },
+      { label: "Other", value: 8, color: "#fbbf24" },
+    ],
+    gap: 6,
+    borderRadius: 6,
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const raw = normalizeArray(params.data, []);
+    const items = raw.map((d, i) => ({
+      label: d.label || `Item ${i + 1}`,
+      value: toNumber(d.value, 10),
+      color: d.color || PALETTE[i % PALETTE.length],
+    }));
+    const gap = toNumber(params.gap, 6);
+    const br = toNumber(params.borderRadius, 6);
+
+    const pad = 100;
+    const layout = layoutTreemap(items, pad, pad, 1920 - pad * 2, 1080 - pad * 2, gap);
+
+    // shadow filter
+    const defs = svgEl("defs");
+    const filter = svgEl("filter", { id: "tmShadow", x: "-10%", y: "-10%", width: "120%", height: "120%" });
+    filter.appendChild(svgEl("feDropShadow", { dx: "0", dy: "2", stdDeviation: "4", "flood-color": "rgba(0,0,0,0.3)" }));
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+
+    const blocks = layout.map((r) => {
+      const g = svgEl("g", { transform: `translate(${r.x + r.w / 2}, ${r.y + r.h / 2}) scale(0)` });
+
+      const rect = svgEl("rect", {
+        x: String(-r.w / 2), y: String(-r.h / 2),
+        width: String(r.w), height: String(r.h),
+        rx: String(br), fill: r.color, opacity: "0.85",
+        filter: "url(#tmShadow)",
+      });
+      g.appendChild(rect);
+
+      // label if block is big enough
+      if (r.w > 70 && r.h > 40) {
+        const fontSize = Math.min(24, r.w / (r.label.length * 0.7), r.h / 2.5);
+        const txt = svgEl("text", {
+          x: "0", y: String(fontSize * 0.15),
+          fill: "rgba(0,0,0,0.7)", "font-size": String(Math.max(12, fontSize)),
+          "font-family": FONT, "font-weight": "600", "text-anchor": "middle",
+        });
+        txt.textContent = r.label;
+        g.appendChild(txt);
+      }
+
+      svg.appendChild(g);
+      return { g, cx: r.x + r.w / 2, cy: r.y + r.h / 2, idx: r.idx };
+    });
+
+    return { svg, blocks };
+  },
+
+  update(els, localT) {
+    const stagger = 0.12;
+    const dur = 0.6;
+
+    els.blocks.forEach((b) => {
+      const start = b.idx * stagger;
+      const raw = clamp((localT - start) / dur, 0, 1);
+      const scale = raw > 0 ? clamp(easeOutBack(raw), 0, 1.15) : 0;
+      b.g.setAttribute("transform", `translate(${b.cx}, ${b.cy}) scale(${scale})`);
+    });
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
+// --- typewriter ---
+SCENE_REGISTRY["typewriter"] = (function() {
+  
+return {
+  id: "typewriter",
+  type: "dom",
+  name: "Typewriter",
+  category: "Typography",
+  defaultParams: {
+    text: "Hello, World!",
+    fontSize: 32,
+    speed: 20,
+    cursor: true,
+    cursorColor: "#6ee7ff",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center;padding:40px");
+    const fontSize = toNumber(params.fontSize, 32);
+    const cursorColor = params.cursorColor || "#6ee7ff";
+
+    const wrap = createNode("div", [
+      "display:inline-flex;align-items:baseline",
+      `font-family:${MONO_FONT_STACK}`,
+      `font-size:${fontSize}px`,
+      "color:#fff;line-height:1.5",
+      "will-change:opacity",
+    ].join(";"));
+
+    const textSpan = createNode("span", "white-space:pre-wrap;word-break:break-word");
+    const cursorSpan = createNode("span", [
+      `color:${cursorColor}`,
+      "font-weight:400;margin-left:1px",
+      "will-change:opacity",
+    ].join(";"), "\u2588");
+
+    wrap.appendChild(textSpan);
+    if (params.cursor !== false) wrap.appendChild(cursorSpan);
+    root.appendChild(wrap);
+
+    return { root, textSpan, cursorSpan, fullText: String(params.text || "Hello, World!") };
+  },
+
+  update(els, localT, params) {
+    const fadeIn = smoothstep(0, 0.05, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    els.root.style.opacity = fadeIn * fadeOut;
+
+    const speed = toNumber(params.speed, 20);
+    const totalChars = els.fullText.length;
+    // Map localT (0~1) to typing progress
+    const typeDuration = totalChars / speed; // seconds at this speed
+    const normalizedSpeed = typeDuration > 0 ? 1 / typeDuration : 10;
+    // Typing happens between 0.05 and 0.8
+    const typeT = smoothstep(0.05, 0.05 + 0.75 * (totalChars / (speed * 4 + totalChars)), localT);
+    const charCount = Math.min(totalChars, Math.floor(typeT * (totalChars + 1)));
+
+    els.textSpan.textContent = els.fullText.slice(0, charCount);
+
+    // Cursor blink (using localT as a proxy for time)
+    if (els.cursorSpan) {
+      const blink = Math.sin(localT * 80) > 0 ? 1 : 0.15;
+      const showCursor = charCount < totalChars ? 1 : blink;
+      els.cursorSpan.style.opacity = showCursor;
+    }
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- videoClip ---
+SCENE_REGISTRY["videoClip"] = (function() {
+  
+return {
+  id: "videoClip",
+  type: "media",
+  name: "Video Clip",
+  category: "Media",
+  defaultParams: {
+    src: "",
+    poster: "",
+    muted: true,
+    loop: false,
+    objectFit: "cover",
+  },
+
+  create(container, params) {
+    const video = document.createElement("video");
+    video.style.cssText = [
+      "position:absolute;inset:0;width:100%;height:100%",
+      `object-fit:${params.objectFit || "cover"}`,
+      "display:block;background:#000",
+    ].join(";");
+    video.playsInline = true;
+    video.muted = params.muted !== false;
+    video.loop = params.loop === true;
+    video.preload = "auto";
+    if (params.poster) video.poster = params.poster;
+    if (params.src) video.src = params.src;
+    container.appendChild(video);
+    return video;
+  },
+
+  update(video, localT) {
+    const t = toNumber(localT, 0);
+    if (!video.duration || !Number.isFinite(video.duration)) return;
+    const target = clamp(t, 0, video.duration);
+    if (Math.abs(video.currentTime - target) > 0.1) {
+      video.currentTime = target;
+    }
+  },
+
+  destroy(video) {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    video.remove();
+  },
+};
+
+})();
+
+
+// --- vignette ---
+SCENE_REGISTRY["vignette"] = (function() {
+  
+return {
+  id: "vignette",
+  type: "canvas",
+  name: "Vignette",
+  category: "Effects",
+  defaultParams: {
+    intensity: 0.7,
+    color: "#000000",
+    radius: 0.5,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
+    }
+    const W = canvas.width;
+    const H = canvas.height;
+    const cx = W / 2;
+    const cy = H / 2;
+
+    const intensity = clamp(toNumber(params.intensity, 0.7), 0, 1);
+    const color = params.color || "#000000";
+    const radiusFrac = clamp(toNumber(params.radius, 0.5), 0.1, 1);
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Elliptical vignette: use the diagonal as the outer radius
+    const diag = Math.hypot(cx, cy);
+    const innerRadius = diag * radiusFrac;
+    const outerRadius = diag * 1.1;
+
+    const grad = ctx.createRadialGradient(cx, cy, innerRadius, cx, cy, outerRadius);
+    grad.addColorStop(0, "transparent");
+    grad.addColorStop(0.5, color + alphaHex(intensity * 0.4));
+    grad.addColorStop(1, color + alphaHex(intensity));
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  },
+
+  destroy(canvas) {
+    canvas.remove();
+  },
+};
+
+/** Convert 0..1 alpha to 2-char hex suffix */
+function alphaHex(alpha) {
+  const val = Math.round(clamp(alpha, 0, 1) * 255);
+  return val.toString(16).padStart(2, "0");
+}
+
+})();
+
+
+// --- waveform ---
+SCENE_REGISTRY["waveform"] = (function() {
+  
+return {
+  id: "waveform",
+  type: "canvas",
+  name: "Waveform",
+  category: "Effects",
+  defaultParams: {
+    bars: 64,
+    color: "#6ee7ff",
+    mirrorY: true,
+    beatSpeed: 2,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+
+    const barCount = clamp(toNumber(params.bars, 64), 8, 256) | 0;
+    const offsets = new Float64Array(barCount);
+    let seed = 197;
+    for (let i = 0; i < barCount; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      offsets[i] = (seed / 0x7fffffff) * Math.PI * 2;
+    }
+    canvas._data = { offsets };
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const barCount = clamp(toNumber(params.bars, 64), 8, 256) | 0;
+    const color = params.color || "#6ee7ff";
+    const mirror = params.mirrorY !== false;
+    const beatSpeed = toNumber(params.beatSpeed, 2);
+    const { offsets } = canvas._data;
+    const t = localT * beatSpeed;
+
+    ctx.clearRect(0, 0, W, H);
+
+    const gap = 2;
+    const totalGap = gap * (barCount - 1);
+    const barW = Math.max(1, (W * 0.7 - totalGap) / barCount);
+    const startX = W * 0.15;
+    const centerY = H / 2;
+    const maxBarH = H * 0.35;
+
+    for (let i = 0; i < barCount; i++) {
+      const off = i < offsets.length ? offsets[i] : i;
+      const w1 = Math.sin(t * 3.2 + off) * 0.35;
+      const w2 = Math.sin(t * 1.8 + off * 1.4) * 0.3;
+      const w3 = Math.sin(t * 5.5 + off * 0.6) * 0.2;
+      const beat = Math.pow(Math.abs(Math.sin(t * Math.PI * 0.5)), 4) * 0.15;
+      const raw = clamp(0.5 + w1 + w2 + w3 + beat, 0, 1);
+      const barH = lerp(maxBarH * 0.05, maxBarH, raw);
+      const x = startX + i * (barW + gap);
+
+      // Glow: draw a wider transparent version behind
+      const glowGrad = ctx.createLinearGradient(x, centerY - barH, x, centerY + (mirror ? barH : 0));
+      glowGrad.addColorStop(0, color + "44");
+      glowGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = glowGrad;
+      const glowW = barW + 4;
+      ctx.fillRect(x - 2, centerY - barH, glowW, barH + (mirror ? barH : 0));
+
+      // Main bar
+      const grad = ctx.createLinearGradient(x, centerY - barH, x, centerY);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, color + "88");
+      ctx.fillStyle = grad;
+
+      const rx = Math.min(barW / 2, 3);
+      ctx.beginPath();
+      ctx.roundRect(x, centerY - barH, barW, barH, [rx, rx, 0, 0]);
+      ctx.fill();
+
+      if (mirror) {
+        const mGrad = ctx.createLinearGradient(x, centerY, x, centerY + barH);
+        mGrad.addColorStop(0, color + "66");
+        mGrad.addColorStop(1, color + "11");
+        ctx.fillStyle = mGrad;
+        ctx.beginPath();
+        ctx.roundRect(x, centerY, barW, barH, [0, 0, rx, rx]);
+        ctx.fill();
+      }
+    }
+  },
+
+  destroy(canvas) { canvas._data = null; canvas.remove(); },
+};
+
+})();
+
+
+// ===== Engine =====
+/**
+ * NextFrame Engine v2 — Runtime for timeline → HTML playback
+ *
+ * Manages layer lifecycle, renderFrame(t), enter/exit effects,
+ * filter/blend CSS mapping. Supports DOM/Canvas/SVG scene types.
+ *
+ * Usage:
+ *   const engine = createEngine(stageEl, timeline, sceneRegistry);
+ *   engine.renderFrame(2.5);   // render at t=2.5s
+ *   engine.destroy();          // cleanup
+ */
+
+// ─── Easing (uses shared utils when available, standalone fallbacks) ───
+// In bundled mode, easeOutCubic/easeInCubic/clamp come from scenes-v2-shared.js
+// In ESM mode, we import them
+
+function clamp01(v) { return clamp(v, 0, 1); }
+
+// ─── Enter/Exit Effect Calculator ──────────────────────────────
+// Format: "fadeIn 0.8s" or "slideUp 0.6s" or "scaleIn 0.5s" or "none"
+function parseEffect(str) {
+  if (!str || str === 'none') return null;
+  const parts = str.trim().split(/\s+/);
+  const type = parts[0];
+  const dur = parseFloat(parts[1]) || 0.5;
+  return { type, dur };
+}
+
+function calcEnterEffect(effect, localT) {
+  if (!effect) return { opacity: 1, transform: '' };
+  if (localT >= effect.dur) return { opacity: 1, transform: '' };
+  const p = easeOutCubic(clamp01(localT / effect.dur));
+  switch (effect.type) {
+    case 'fadeIn':
+      return { opacity: p, transform: '' };
+    case 'slideUp':
+      return { opacity: p, transform: `translateY(${(1 - p) * 40}px)` };
+    case 'slideDown':
+      return { opacity: p, transform: `translateY(${(p - 1) * 40}px)` };
+    case 'slideLeft':
+      return { opacity: p, transform: `translateX(${(1 - p) * 60}px)` };
+    case 'slideRight':
+      return { opacity: p, transform: `translateX(${(p - 1) * 60}px)` };
+    case 'scaleIn':
+      return { opacity: p, transform: `scale(${0.85 + 0.15 * p})` };
+    default:
+      return { opacity: p, transform: '' };
+  }
+}
+
+function calcExitEffect(effect, localT, dur) {
+  if (!effect) return { opacity: 1, transform: '' };
+  const exitStart = dur - effect.dur;
+  if (localT < exitStart) return { opacity: 1, transform: '' };
+  const p = easeInCubic(clamp01((localT - exitStart) / effect.dur));
+  switch (effect.type) {
+    case 'fadeOut':
+      return { opacity: 1 - p, transform: '' };
+    case 'slideDown':
+      return { opacity: 1 - p, transform: `translateY(${p * 40}px)` };
+    case 'scaleOut':
+      return { opacity: 1 - p, transform: `scale(${1 - 0.15 * p})` };
+    default:
+      return { opacity: 1 - p, transform: '' };
+  }
+}
+
+// ─── Transition Calculator ─────────────────────────────────────
+// Format: "dissolve 0.5s" or "wipeLeft 0.8s" or "wipeUp 0.6s" or "none"
+function parseTransition(str) {
+  if (!str || str === 'none') return null;
+  const parts = str.trim().split(/\s+/);
+  const type = parts[0];
+  const dur = parseFloat(parts[1]) || 0.5;
+  return { type, dur };
+}
+
+function calcTransitionStyle(transition, progress) {
+  if (!transition) return {};
+  const p = easeOutCubic(clamp01(progress));
+  switch (transition.type) {
+    case 'dissolve':
+      return { opacity: p };
+    case 'wipeLeft':
+      return { clipPath: `inset(0 ${(1 - p) * 100}% 0 0)` };
+    case 'wipeRight':
+      return { clipPath: `inset(0 0 0 ${(1 - p) * 100}%)` };
+    case 'wipeUp':
+      return { clipPath: `inset(0 0 ${(1 - p) * 100}% 0)` };
+    case 'wipeDown':
+      return { clipPath: `inset(${(1 - p) * 100}% 0 0 0)` };
+    case 'slideLeft':
+      return { transform: `translateX(${(1 - p) * 100}%)` };
+    case 'slideRight':
+      return { transform: `translateX(${(p - 1) * 100}%)` };
+    case 'slideUp':
+      return { transform: `translateY(${(1 - p) * 100}%)` };
+    case 'slideDown':
+      return { transform: `translateY(${(p - 1) * 100}%)` };
+    case 'zoomIn':
+      return { opacity: p, transform: `scale(${0.5 + 0.5 * p})` };
+    default:
+      return { opacity: p };
+  }
+}
+
+// ─── Layer Style Resolver ──────────────────────────────────────
+// Converts layer properties to CSS on the container div
+function applyLayerStyle(el, layer) {
+  const s = el.style;
+  // Position & size (defaults to full-screen)
+  if (layer.x || layer.y || layer.w || layer.h) {
+    s.position = 'absolute';
+    s.left = layer.x || '0';
+    s.top = layer.y || '0';
+    s.width = layer.w || '100%';
+    s.height = layer.h || '100%';
+    if (layer.anchor === 'center') {
+      s.transform = 'translate(-50%, -50%)';
+    }
+  } else {
+    s.position = 'absolute';
+    s.inset = '0';
+  }
+  if (layer.borderRadius) s.borderRadius = layer.borderRadius;
+  if (layer.shadow && layer.shadow !== 'none') s.boxShadow = layer.shadow;
+  if (layer.clipPath && layer.clipPath !== 'none') s.clipPath = layer.clipPath;
+}
+
+// ─── Engine ────────────────────────────────────────────────────
+function createEngine(stageEl, timeline, sceneRegistry) {
+  const { width = 1920, height = 1080, fps = 30, duration = 10, background = '#05050c' } = timeline;
+  const layers = timeline.layers || [];
+
+  // Setup stage
+  stageEl.style.cssText = `position:relative;width:${width}px;height:${height}px;overflow:hidden;background:${background}`;
+
+  // State for each layer
+  const layerStates = [];
+
+  // Create DOM structure for each layer
+  for (let i = 0; i < layers.length; i++) {
+    const layer = layers[i];
+    const scene = sceneRegistry[layer.scene];
+
+    // Container div (the "track")
+    const container = document.createElement('div');
+    container.className = 'nf-layer';
+    container.dataset.layerId = layer.id;
+    container.style.cssText = `position:absolute;inset:0;z-index:${i};pointer-events:none;display:none;overflow:hidden`;
+    applyLayerStyle(container, layer);
+    stageEl.appendChild(container);
+
+    // Scene content container
+    const sceneContainer = document.createElement('div');
+    sceneContainer.style.cssText = 'position:absolute;inset:0';
+    container.appendChild(sceneContainer);
+
+    const state = {
+      layer,
+      scene,
+      container,
+      sceneContainer,
+      sceneEls: null,        // returned by scene.create()
+      created: false,
+      wasActive: false,
+      enterEffect: parseEffect(layer.enter),
+      exitEffect: parseEffect(layer.exit),
+      transition: parseTransition(layer.transition),
+    };
+    layerStates.push(state);
+  }
+
+  // ─── renderFrame(t) ───
+  function renderFrame(t) {
+    for (const state of layerStates) {
+      const { layer, scene, container, sceneContainer } = state;
+      const start = layer.start || 0;
+      const dur = layer.dur || duration;
+      const localT = t - start;
+      const active = t >= start && t < start + dur;
+
+      if (active) {
+        // Lazy create scene on first activation
+        if (!state.created && scene) {
+          try {
+            state.sceneEls = scene.create(sceneContainer, layer.params || {});
+          } catch (_) {
+            // WebGL may fail in headless — skip gracefully
+            state.sceneEls = null;
+          }
+          state.created = true;
+        }
+
+        container.style.display = 'block';
+
+        // Update scene content
+        // DOM scenes use normalized time (0~1), Canvas/SVG scenes use seconds
+        if (scene && state.sceneEls != null) {
+          const sceneT = scene.type === 'dom' ? (localT / dur) : localT;
+          scene.update(state.sceneEls, sceneT, layer.params || {});
+        }
+
+        // Calculate effects
+        const enter = calcEnterEffect(state.enterEffect, localT);
+        const exit = calcExitEffect(state.exitEffect, localT, dur);
+
+        // Calculate transition (applied at layer start)
+        let transOpacity = 1;
+        let transTransform = '';
+        let transClipPath = '';
+        if (state.transition && localT < state.transition.dur) {
+          const tp = clamp01(localT / state.transition.dur);
+          const ts = calcTransitionStyle(state.transition, tp);
+          if (ts.opacity != null) transOpacity = ts.opacity;
+          if (ts.transform) transTransform = ts.transform;
+          if (ts.clipPath) transClipPath = ts.clipPath;
+        }
+
+        const opacity = enter.opacity * exit.opacity * transOpacity * (layer.opacity != null ? layer.opacity : 1);
+        const transforms = [enter.transform, exit.transform, transTransform].filter(Boolean).join(' ');
+
+        // Apply visual properties
+        container.style.opacity = opacity;
+        if (transClipPath) {
+          container.style.clipPath = transClipPath;
+        } else if (layer.clipPath && layer.clipPath !== 'none') {
+          container.style.clipPath = layer.clipPath;
+        } else {
+          container.style.clipPath = '';
+        }
+        if (transforms) {
+          container.style.transform = transforms;
+        } else if (!layer.x && !layer.y) {
+          container.style.transform = '';
+        }
+
+        // Blend mode
+        if (layer.blend && layer.blend !== 'normal') {
+          container.style.mixBlendMode = layer.blend;
+        }
+
+        // CSS filter
+        if (layer.filter && layer.filter !== 'none') {
+          container.style.filter = layer.filter;
+        }
+
+        // Rotation (if not handled by enter/exit transforms)
+        if (layer.rotation) {
+          container.style.transform += ` rotate(${layer.rotation}deg)`;
+        }
+
+        state.wasActive = true;
+      } else {
+        // Hide inactive layers
+        if (state.wasActive) {
+          container.style.display = 'none';
+          container.style.opacity = '';
+          container.style.transform = '';
+          container.style.filter = '';
+          state.wasActive = false;
+        }
+      }
+    }
+  }
+
+  // ─── Destroy ───
+  function destroy() {
+    for (const state of layerStates) {
+      if (state.created && state.scene) {
+        try { state.scene.destroy(state.sceneEls); } catch (_) {}
+      }
+      state.container.remove();
+    }
+    layerStates.length = 0;
+  }
+
+  // ─── Recorder protocol ───
+  window.__onFrame = function (frame) {
+    renderFrame(Number(frame.time) || 0);
+    return true;
+  };
+
+  return {
+    renderFrame,
+    destroy,
+    get width() { return width; },
+    get height() { return height; },
+    get fps() { return fps; },
+    get duration() { return duration; },
+    get layerCount() { return layers.length; },
+  };
+}
+
+// ─── Player Controls (browser preview) ────────────────────────
+function createPlayer(engine, stageEl) {
+  const { duration, fps, width, height } = engine;
+  let playing = false;
+  let startWall = 0;
+  let startTime = 0;
+  let currentTime = 0;
+
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;padding:10px 20px;background:rgba(0,0,0,0.92);display:flex;align-items:center;gap:12px;font:13px -apple-system,sans-serif;color:#aaa;z-index:9999';
+
+  const playBtn = document.createElement('button');
+  playBtn.textContent = '\u25B6';
+  playBtn.style.cssText = 'background:#222;border:1px solid #444;color:#fff;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:13px';
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = '0';
+  slider.max = String(duration * 1000);
+  slider.value = '0';
+  slider.style.cssText = 'flex:1;accent-color:#a78bfa';
+
+  const timeLabel = document.createElement('span');
+  timeLabel.style.cssText = 'min-width:90px;text-align:right;font-family:"SF Mono",monospace;font-size:12px';
+
+  const info = document.createElement('span');
+  info.style.cssText = 'font-size:11px;color:#666';
+  info.textContent = `| ${duration}s @ ${fps}fps | ${width}\u00d7${height} | layers:${engine.layerCount}`;
+
+  bar.append(playBtn, slider, timeLabel, info);
+  document.body.appendChild(bar);
+
+  function seek(t) {
+    t = Math.max(0, Math.min(duration, t));
+    currentTime = t;
+    slider.value = String(t * 1000);
+    timeLabel.textContent = t.toFixed(3) + 's';
+    engine.renderFrame(t);
+  }
+
+  slider.addEventListener('input', () => {
+    playing = false;
+    playBtn.textContent = '\u25B6';
+    seek(Number(slider.value) / 1000);
+  });
+
+  playBtn.addEventListener('click', togglePlay);
+
+  function togglePlay() {
+    if (playing) {
+      playing = false;
+      playBtn.textContent = '\u25B6';
+      return;
+    }
+    playing = true;
+    playBtn.textContent = '\u23F8';
+    startWall = performance.now();
+    startTime = currentTime >= duration ? 0 : currentTime;
+    tick();
+  }
+
+  function tick() {
+    if (!playing) return;
+    const t = startTime + (performance.now() - startWall) / 1000;
+    if (t >= duration) {
+      seek(duration);
+      playing = false;
+      playBtn.textContent = '\u25B6';
+      return;
+    }
+    seek(t);
+    requestAnimationFrame(tick);
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+    if (e.code === 'ArrowLeft') { e.preventDefault(); seek(currentTime - 1); }
+    if (e.code === 'ArrowRight') { e.preventDefault(); seek(currentTime + 1); }
+    if (e.code === 'Home') { e.preventDefault(); seek(0); }
+    if (e.code === 'End') { e.preventDefault(); seek(duration); }
+  });
+
+  seek(0);
+
+  return {
+    seek,
+    play: togglePlay,
+    get currentTime() { return currentTime; },
+    destroy() { bar.remove(); },
+  };
+}
+
+
+// ===== Timeline Data =====
+const TIMELINE = {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 30,
+  "background": "#000000",
+  "layers": [
+    {
+      "id": "bg-gradient",
+      "scene": "shaderGradient",
+      "start": 0,
+      "dur": 30,
+      "params": {
+        "color1": "#1a0a3e",
+        "color2": "#0a2a4e",
+        "color3": "#2a0a2e",
+        "speed": 0.3
+      }
+    },
+    {
+      "id": "noise-overlay",
+      "scene": "shaderNoise",
+      "start": 0,
+      "dur": 10,
+      "params": {
+        "scale": 3,
+        "speed": 0.5,
+        "color1": "#6ee7ff",
+        "color2": "#a78bfa",
+        "octaves": 4
+      },
+      "blend": "screen",
+      "opacity": 0.4,
+      "exit": "fadeOut 0.5s"
+    },
+    {
+      "id": "plasma",
+      "scene": "shaderPlasma",
+      "start": 10,
+      "dur": 10,
+      "params": {
+        "speed": 1,
+        "scale": 4,
+        "colors": 3
+      },
+      "blend": "screen",
+      "opacity": 0.5,
+      "transition": "dissolve 1s",
+      "exit": "fadeOut 0.5s"
+    },
+    {
+      "id": "tunnel",
+      "scene": "shaderTunnel",
+      "start": 20,
+      "dur": 10,
+      "params": {
+        "speed": 0.5,
+        "rings": 8,
+        "color": "#6ee7ff",
+        "twist": 2
+      },
+      "transition": "dissolve 1s",
+      "exit": "fadeOut 0.5s"
+    },
+    {
+      "id": "fireflies",
+      "scene": "shaderFirefly",
+      "start": 5,
+      "dur": 20,
+      "params": {
+        "count": 200,
+        "color": "#ffd93d",
+        "glowSize": 0.02,
+        "speed": 0.5
+      },
+      "blend": "screen",
+      "opacity": 0.6
+    },
+    {
+      "id": "ripple",
+      "scene": "shaderRipple",
+      "start": 12,
+      "dur": 6,
+      "params": {
+        "frequency": 10,
+        "amplitude": 0.02,
+        "speed": 2
+      },
+      "blend": "screen",
+      "opacity": 0.3,
+      "enter": "fadeIn 0.5s",
+      "exit": "fadeOut 0.5s"
+    },
+    {
+      "id": "title",
+      "scene": "headline",
+      "start": 1,
+      "dur": 6,
+      "params": {
+        "text": "WebGL Shaders",
+        "subtitle": "GPU-Accelerated Visual Effects",
+        "fontSize": 100,
+        "gradient": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6"
+        ]
+      },
+      "enter": "fadeIn 0.8s",
+      "exit": "fadeOut 0.5s"
+    },
+    {
+      "id": "glitch-overlay",
+      "scene": "shaderGlitch",
+      "start": 8,
+      "dur": 3,
+      "params": {
+        "intensity": 0.5,
+        "blockSize": 16,
+        "colorSplit": 0.02,
+        "scanlines": true
+      },
+      "blend": "screen",
+      "enter": "fadeIn 0.3s",
+      "exit": "fadeOut 0.3s"
+    },
+    {
+      "id": "chromatic",
+      "scene": "shaderChromatic",
+      "start": 15,
+      "dur": 5,
+      "params": {
+        "intensity": 0.01,
+        "angle": 0,
+        "pulse": true
+      },
+      "blend": "screen",
+      "opacity": 0.5,
+      "enter": "fadeIn 0.5s",
+      "exit": "fadeOut 0.5s"
+    },
+    {
+      "id": "end-title",
+      "scene": "headline",
+      "start": 24,
+      "dur": 6,
+      "params": {
+        "text": "48 Components",
+        "subtitle": "Canvas · DOM · SVG · WebGL",
+        "fontSize": 96,
+        "gradient": [
+          "#ffd93d",
+          "#ff6b6b",
+          "#a78bfa"
+        ]
+      },
+      "transition": "zoomIn 0.8s",
+      "exit": "fadeOut 1s"
+    }
+  ]
+};
+
+// ===== Boot =====
+const stage = document.getElementById('stage');
+const engine = createEngine(stage, TIMELINE, SCENE_REGISTRY);
+const player = createPlayer(engine, stage);
+</script>
+</body>
+</html>

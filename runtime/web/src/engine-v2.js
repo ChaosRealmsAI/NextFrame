@@ -183,7 +183,12 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
       if (active) {
         // Lazy create scene on first activation
         if (!state.created && scene) {
-          state.sceneEls = scene.create(sceneContainer, layer.params || {});
+          try {
+            state.sceneEls = scene.create(sceneContainer, layer.params || {});
+          } catch (_) {
+            // WebGL may fail in headless — skip gracefully
+            state.sceneEls = null;
+          }
           state.created = true;
         }
 
