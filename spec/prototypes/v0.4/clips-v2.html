@@ -33,12 +33,78 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .grain { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.03; z-index: 9999; mix-blend-mode: overlay; }
 
 /* ─── Topbar ─── */
-.topbar { height: 44px; display: flex; align-items: center; padding: 0 20px; border-bottom: var(--border); background: var(--bg); flex-shrink: 0; }
-.topbar-brand { font-family: var(--serif); font-size: 14px; letter-spacing: 0.04em; }
-.topbar-sep { color: var(--ink-25); margin: 0 8px; font-size: 12px; }
-.topbar-crumb { font-size: 12px; color: var(--ink-55); }
-.topbar-title { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-left: auto; }
-.topbar-stat { font-family: var(--mono); font-size: 11px; color: var(--ink-25); margin-left: auto; }
+.topbar { height: 48px; display: flex; align-items: center; padding: 0 16px; border-bottom: var(--border); background: var(--bg); flex-shrink: 0; gap: 0; }
+.topbar-brand { font-family: var(--serif); font-size: 15px; font-weight: 400; letter-spacing: 0.04em; margin-right: 6px; flex-shrink: 0; }
+.topbar-sep { color: var(--ink-25); margin: 0 4px; font-size: 14px; flex-shrink: 0; }
+
+/* Vercel-style dropdown selector */
+.topbar-select {
+  position: relative; cursor: pointer; flex-shrink: 0;
+}
+.topbar-select-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 6px;
+  font-size: 13px; font-weight: 500; color: var(--ink);
+  transition: background 0.15s var(--ease);
+  border: 1px solid transparent;
+}
+.topbar-select-btn:hover { background: var(--ink-08); }
+.topbar-select-btn .caret { font-size: 10px; color: var(--ink-55); transition: transform 0.2s var(--ease); }
+.topbar-select.open .caret { transform: rotate(180deg); }
+.topbar-dropdown {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0;
+  min-width: 200px; background: var(--surface); border: var(--border);
+  border-radius: 8px; overflow: hidden; z-index: 100;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+.topbar-select.open .topbar-dropdown { display: block; }
+.dd-label { padding: 8px 12px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-25); }
+.dd-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; font-size: 13px; color: var(--ink-55); cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.dd-item:hover { background: var(--ink-08); color: var(--ink); }
+.dd-item.active { color: var(--ink); }
+.dd-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dd-dot.on { background: var(--accent); }
+.dd-dot.off { background: var(--ink-25); }
+.dd-sep { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
+
+/* Pipeline tabs */
+.topbar-tabs { display: flex; align-items: center; height: 100%; margin-left: auto; gap: 0; }
+.topbar-tab {
+  height: 100%; display: flex; align-items: center;
+  padding: 0 14px; font-size: 13px; color: var(--ink-55);
+  border-bottom: 2px solid transparent;
+  cursor: pointer; transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
+  white-space: nowrap;
+}
+.topbar-tab:hover { color: var(--ink); }
+.topbar-tab.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 500; }
+
+/* Right section */
+.topbar-right { display: flex; align-items: center; gap: 8px; margin-left: 16px; flex-shrink: 0; }
+.topbar-icon-btn {
+  width: 32px; height: 32px; border-radius: 6px; border: none; cursor: pointer;
+  background: transparent; color: var(--ink-55); font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.topbar-icon-btn:hover { background: var(--ink-08); color: var(--ink); }
+.topbar-lang {
+  padding: 4px 10px; border-radius: 5px; border: var(--border); background: transparent;
+  color: var(--ink-55); font-size: 12px; cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+.topbar-lang:hover { border-color: rgba(255,255,255,0.12); color: var(--ink); }
+.topbar-avatar {
+  width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--ink-25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 500; color: var(--ink-55); cursor: pointer;
+  transition: border-color 0.15s var(--ease);
+}
+.topbar-avatar:hover { border-color: var(--ink); }
 
 /* ─── Layout ─── */
 .layout { display: flex; height: calc(100vh - 44px); }
@@ -202,10 +268,58 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 <div class="topbar">
   <span class="topbar-brand">NextFrame</span>
-  <span class="topbar-sep">/</span><span class="topbar-crumb">Show</span>
-  <span class="topbar-sep">/</span><span class="topbar-crumb">EP01</span>
-  <span class="topbar-title">CLIPS</span>
-  <span class="topbar-stat">4 sources &middot; 8 clips</span>
+  <span class="topbar-sep">/</span>
+
+  <!-- Project selector -->
+  <div class="topbar-select" id="selProject" onclick="toggleDd('selProject')">
+    <div class="topbar-select-btn">
+      <span>Show</span>
+      <span class="caret">&#x25BE;</span>
+    </div>
+    <div class="topbar-dropdown">
+      <div class="dd-label">Projects</div>
+      <div class="dd-item active"><span class="dd-dot on"></span>Show</div>
+      <div class="dd-item"><span class="dd-dot off"></span>Demo Reel</div>
+      <div class="dd-item"><span class="dd-dot off"></span>Onboarding</div>
+      <div class="dd-sep"></div>
+      <div class="dd-item" style="color:var(--ink-25)">+ New Project</div>
+    </div>
+  </div>
+
+  <span class="topbar-sep">/</span>
+
+  <!-- Episode selector -->
+  <div class="topbar-select" id="selEpisode" onclick="toggleDd('selEpisode')">
+    <div class="topbar-select-btn">
+      <span>EP01</span>
+      <span class="caret">&#x25BE;</span>
+    </div>
+    <div class="topbar-dropdown">
+      <div class="dd-label">Episodes</div>
+      <div class="dd-item active"><span class="dd-dot on"></span>EP01 &mdash; 产品介绍</div>
+      <div class="dd-item"><span class="dd-dot off"></span>EP02 &mdash; 用户案例</div>
+      <div class="dd-item"><span class="dd-dot off"></span>EP03 &mdash; 技术深度</div>
+      <div class="dd-sep"></div>
+      <div class="dd-item" style="color:var(--ink-25)">+ New Episode</div>
+    </div>
+  </div>
+
+  <!-- Pipeline tabs -->
+  <div class="topbar-tabs">
+    <div class="topbar-tab">脚本</div>
+    <div class="topbar-tab">音频</div>
+    <div class="topbar-tab active">素材</div>
+    <div class="topbar-tab">原子</div>
+    <div class="topbar-tab">拼装</div>
+    <div class="topbar-tab">产出</div>
+  </div>
+
+  <!-- Right: settings -->
+  <div class="topbar-right">
+    <button class="topbar-lang">EN</button>
+    <button class="topbar-icon-btn" title="Settings">&#x2699;</button>
+    <div class="topbar-avatar">Z</div>
+  </div>
 </div>
 
 <div class="layout">
@@ -428,6 +542,19 @@ function openM(label, timecode, specs) {
 }
 function closeModal() { document.getElementById("modal").classList.remove("show"); }
 document.addEventListener("keydown", function(e) { if(e.key==="Escape") closeModal(); });
+
+// Dropdown toggle
+function toggleDd(id) {
+  var el = document.getElementById(id);
+  var wasOpen = el.classList.contains("open");
+  document.querySelectorAll(".topbar-select.open").forEach(function(s) { s.classList.remove("open"); });
+  if (!wasOpen) el.classList.add("open");
+}
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".topbar-select")) {
+    document.querySelectorAll(".topbar-select.open").forEach(function(s) { s.classList.remove("open"); });
+  }
+});
 
 renderSrc(); renderMain();
 </script>
