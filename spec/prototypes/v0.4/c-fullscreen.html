@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame v0.4 — Video Production Pipeline</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0c0a09;
+  --surface: #1c1917;
+  --card: #292524;
+  --card-hover: #44403c;
+  --accent: linear-gradient(135deg, #7c3aed, #6366f1);
+  --accent-solid: #7c3aed;
+  --accent2: #6366f1;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #fb7185;
+  --text: #f5f5f4;
+  --text2: #a8a29e;
+  --text3: #57534e;
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+}
+
+html, body {
+  height: 100%; width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── TOP BAR ─── */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 48px; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  background: rgba(12,10,9,0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.topbar-brand {
+  font-size: 15px; font-weight: 700;
+  background: var(--accent); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  letter-spacing: -0.3px;
+}
+.topbar-dots {
+  display: flex; gap: 24px; align-items: center;
+}
+.topbar-dot {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  cursor: pointer; transition: all 0.2s;
+}
+.topbar-dot .dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid var(--text3);
+  transition: all 0.3s;
+}
+.topbar-dot.active .dot,
+.topbar-dot.completed .dot {
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
+  box-shadow: 0 0 12px rgba(124,58,237,0.5);
+}
+.topbar-dot.completed .dot {
+  background: var(--success);
+  border-color: var(--success);
+  box-shadow: 0 0 12px rgba(52,211,153,0.4);
+}
+.topbar-dot .dot-label {
+  font-size: 10px; color: var(--text3);
+  transition: color 0.3s;
+  white-space: nowrap;
+}
+.topbar-dot.active .dot-label { color: var(--text); }
+.topbar-right {
+  font-size: 13px; color: var(--text2);
+  display: flex; align-items: center; gap: 12px;
+}
+.topbar-right .gear {
+  width: 20px; height: 20px; opacity: 0.5; cursor: pointer;
+  transition: opacity 0.2s;
+}
+.topbar-right .gear:hover { opacity: 0.8; }
+
+/* ─── STAGES CONTAINER ─── */
+.stages-track {
+  display: flex;
+  width: 500vw;
+  height: 100vh;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.stage {
+  width: 100vw; height: 100vh;
+  padding: 72px 48px 48px;
+  overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.stage::-webkit-scrollbar { width: 4px; }
+.stage::-webkit-scrollbar-track { background: transparent; }
+.stage::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 2px; }
+
+.stage-header {
+  margin-bottom: 32px;
+  opacity: 0; transform: translateY(20px);
+  transition: all 0.5s 0.2s;
+}
+.stage.visible .stage-header {
+  opacity: 1; transform: translateY(0);
+}
+.stage-title {
+  font-size: 42px; font-weight: 800; letter-spacing: -1.5px;
+  margin-bottom: 8px;
+}
+.stage-subtitle {
+  font-size: 16px; color: var(--text2); font-weight: 400;
+}
+.stage-content {
+  flex: 1;
+  opacity: 0; transform: translateY(30px);
+  transition: all 0.6s 0.35s;
+}
+.stage.visible .stage-content {
+  opacity: 1; transform: translateY(0);
+}
+
+/* ─── NAV ARROWS ─── */
+.nav-arrow {
+  position: fixed; top: 50%; transform: translateY(-50%);
+  z-index: 90;
+  width: 48px; height: 80px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: var(--text2);
+  font-size: 22px; cursor: pointer;
+  transition: all 0.25s;
+  backdrop-filter: blur(10px);
+}
+.nav-arrow:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+}
+.nav-arrow.left { left: 0; border-radius: 0 var(--radius) var(--radius) 0; }
+.nav-arrow.right { right: 0; border-radius: var(--radius) 0 0 var(--radius); }
+.nav-arrow.hidden { opacity: 0; pointer-events: none; }
+
+/* ─── BOTTOM DOTS ─── */
+.bottom-nav {
+  position: fixed; bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex; gap: 12px;
+  padding: 8px 16px;
+  background: rgba(28,25,23,0.8);
+  border-radius: 20px;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.bottom-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text3);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.bottom-dot.active {
+  background: var(--accent-solid);
+  width: 24px; border-radius: 4px;
+  box-shadow: 0 0 12px rgba(124,58,237,0.5);
+}
+
+/* ─── NEXT BUTTON ─── */
+.next-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 28px;
+  background: var(--accent);
+  border: none; border-radius: var(--radius);
+  color: white; font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px rgba(124,58,237,0.3);
+}
+.next-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 30px rgba(124,58,237,0.4);
+}
+
+/* ─── PILL / BADGE ─── */
+.pill {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px; font-weight: 500;
+}
+.pill-accent {
+  background: rgba(124,58,237,0.15);
+  color: #a78bfa;
+}
+.pill-success {
+  background: rgba(52,211,153,0.12);
+  color: var(--success);
+}
+.pill-warning {
+  background: rgba(251,191,36,0.12);
+  color: var(--warning);
+}
+.pill-selector {
+  display: inline-flex; gap: 0;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.pill-selector button {
+  padding: 8px 18px;
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-size: 13px; cursor: pointer;
+  transition: all 0.2s;
+}
+.pill-selector button.active {
+  background: var(--accent);
+  color: white;
+}
+
+/* ═══════════════════════════════════════
+   STAGE 1: SCRIPT
+   ═══════════════════════════════════════ */
+.script-cards {
+  display: flex; gap: 20px;
+  overflow-x: auto;
+  padding-bottom: 16px;
+  flex: 1;
+}
+.script-cards::-webkit-scrollbar { height: 4px; }
+.script-cards::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 2px; }
+
+.script-card {
+  min-width: 300px; max-width: 300px;
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  display: flex; flex-direction: column;
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+.script-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  border-color: rgba(255,255,255,0.08);
+}
+.script-card-header {
+  font-size: 13px; color: var(--text2); margin-bottom: 4px;
+}
+.script-card-header-line {
+  height: 3px; width: 60px; border-radius: 2px;
+  background: var(--accent);
+  margin: 8px 0 16px;
+}
+.script-card-narration {
+  font-size: 15px; line-height: 1.6;
+  color: var(--text);
+  margin-bottom: 16px;
+  flex: 1;
+}
+.script-card-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 0 -24px 16px;
+}
+.script-card-visual-label {
+  font-size: 11px; color: var(--text3); text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 6px;
+}
+.script-card-visual {
+  font-size: 13px; color: var(--text2); margin-bottom: 12px;
+  line-height: 1.5;
+}
+.script-card-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: auto;
+}
+.script-card-duration {
+  font-size: 12px; color: var(--text3); font-family: var(--mono);
+}
+.script-card-add {
+  min-width: 200px;
+  border: 2px dashed rgba(255,255,255,0.08);
+  border-radius: var(--radius-lg);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 8px;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+.script-card-add:hover {
+  border-color: rgba(124,58,237,0.4);
+  color: var(--text2);
+}
+.script-card-add .plus { font-size: 32px; font-weight: 300; }
+.script-card-add span { font-size: 13px; }
+
+.script-bottom {
+  display: flex; justify-content: flex-end;
+  padding-top: 20px;
+}
+
+/* ═══════════════════════════════════════
+   STAGE 2: AUDIO
+   ═══════════════════════════════════════ */
+.audio-layout {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 32px;
+  flex: 1;
+}
+.voice-gallery {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  align-content: start;
+}
+.voice-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.voice-card:hover { border-color: rgba(255,255,255,0.08); }
+.voice-card.selected {
+  border-color: var(--accent-solid);
+  box-shadow: 0 0 24px rgba(124,58,237,0.2);
+}
+.voice-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+}
+.voice-name { font-size: 14px; font-weight: 600; }
+.voice-desc { font-size: 12px; color: var(--text2); text-align: center; }
+.voice-listen {
+  font-size: 11px; color: var(--accent-solid);
+  background: rgba(124,58,237,0.1);
+  border: none; padding: 4px 12px;
+  border-radius: 12px; cursor: pointer;
+}
+.voice-settings {
+  grid-column: 1 / -1;
+  display: flex; gap: 24px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+}
+.voice-setting-label {
+  font-size: 12px; color: var(--text2);
+}
+.voice-setting-value {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  font-family: var(--mono);
+}
+
+.audio-results {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.audio-results-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.audio-results-stats {
+  font-size: 13px; color: var(--text2);
+}
+.audio-seg {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  transition: background 0.2s;
+}
+.audio-seg:hover { background: var(--card-hover); }
+.audio-seg-num {
+  font-size: 12px; font-weight: 700; color: var(--text3);
+  font-family: var(--mono);
+  width: 24px;
+}
+.audio-seg-wave {
+  flex: 1; height: 32px; border-radius: 4px;
+  position: relative; overflow: hidden;
+}
+.audio-seg-wave.done {
+  background: rgba(52,211,153,0.1);
+}
+.audio-seg-wave.pending {
+  background: rgba(255,255,255,0.04);
+}
+.audio-seg-wave-bars {
+  display: flex; align-items: center; gap: 2px;
+  height: 100%; padding: 4px 8px;
+}
+.audio-seg-wave-bars .bar {
+  width: 3px; border-radius: 2px;
+  background: var(--success);
+  animation: wavePulse 1.5s ease-in-out infinite;
+}
+.audio-seg-wave.pending .bar {
+  background: var(--text3);
+  animation: none;
+}
+@keyframes wavePulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.audio-seg-play {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(52,211,153,0.15);
+  border: none;
+  color: var(--success);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 11px;
+}
+.audio-seg-dur {
+  font-size: 12px; color: var(--text2);
+  font-family: var(--mono);
+  min-width: 40px; text-align: right;
+}
+.audio-seg-pending-text {
+  flex: 1; font-size: 13px; color: var(--text3);
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════
+   STAGE 3: ATOMS
+   ═══════════════════════════════════════ */
+.atoms-stats {
+  display: flex; gap: 16px; align-items: center;
+  margin-bottom: 24px;
+  font-size: 13px; color: var(--text2);
+}
+.atoms-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  flex: 1;
+}
+.atom-card {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.04);
+  transition: all 0.3s;
+}
+.atom-card:hover {
+  border-color: rgba(124,58,237,0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+}
+.atom-preview {
+  height: 180px;
+  background: #0f0e0d;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.atom-info {
+  padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.atom-type {
+  font-size: 12px; font-family: var(--mono);
+}
+.atom-confidence {
+  font-size: 12px; color: var(--text2);
+}
+.atom-actions {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.atom-swap {
+  font-size: 12px; color: var(--accent-solid);
+  background: none; border: none; cursor: pointer;
+  padding: 0;
+}
+.atom-swap:hover { text-decoration: underline; }
+
+/* ─── Atom Previews ─── */
+.atom-counter {
+  font-size: 72px; font-weight: 900;
+  font-family: var(--mono);
+  background: var(--accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+}
+.atom-counter-unit {
+  font-size: 16px; color: var(--text3);
+  position: absolute; bottom: -4px; right: -36px;
+  -webkit-text-fill-color: var(--text3);
+}
+.atom-logo {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; font-weight: 900; color: white;
+  box-shadow: 0 0 40px rgba(124,58,237,0.4), 0 0 80px rgba(124,58,237,0.2);
+  animation: logoPulse 3s ease-in-out infinite;
+}
+@keyframes logoPulse {
+  0%, 100% { box-shadow: 0 0 40px rgba(124,58,237,0.4); }
+  50% { box-shadow: 0 0 60px rgba(124,58,237,0.6), 0 0 100px rgba(124,58,237,0.3); }
+}
+.atom-flow {
+  display: flex; align-items: center; gap: 8px;
+}
+.atom-flow-node {
+  width: 44px; height: 44px;
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.atom-flow-arrow {
+  color: var(--text3); font-size: 18px;
+}
+.atom-chart {
+  display: flex; align-items: flex-end; gap: 16px;
+  height: 100px;
+}
+.atom-chart-bar {
+  width: 48px; border-radius: 6px 6px 0 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end;
+  padding-bottom: 8px;
+}
+.atom-chart-label {
+  font-size: 10px; color: var(--text3);
+  margin-top: 4px;
+  position: absolute; bottom: -18px;
+  white-space: nowrap;
+}
+.atom-cta-btn {
+  padding: 14px 40px;
+  background: var(--accent);
+  border-radius: 28px;
+  font-size: 15px; font-weight: 700; color: white;
+  box-shadow: 0 4px 30px rgba(124,58,237,0.4);
+  animation: ctaGlow 2s ease-in-out infinite;
+}
+@keyframes ctaGlow {
+  0%, 100% { box-shadow: 0 4px 30px rgba(124,58,237,0.4); }
+  50% { box-shadow: 0 4px 50px rgba(124,58,237,0.6), 0 0 80px rgba(99,102,241,0.2); }
+}
+
+/* ═══════════════════════════════════════
+   STAGE 4: ASSEMBLY / TIMELINE
+   ═══════════════════════════════════════ */
+.timeline-previews {
+  display: flex; gap: 8px;
+  margin-bottom: 24px;
+}
+.timeline-thumb {
+  flex: 1; height: 64px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--text3);
+  border: 1px solid rgba(255,255,255,0.04);
+  position: relative;
+  overflow: hidden;
+}
+.timeline-thumb::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+.timeline-container {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 0;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.timeline-ruler {
+  display: flex; height: 28px;
+  background: rgba(0,0,0,0.3);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding-left: 80px;
+  position: relative;
+}
+.timeline-ruler-mark {
+  flex: 1;
+  font-size: 10px; color: var(--text3);
+  font-family: var(--mono);
+  padding-top: 8px;
+  border-left: 1px solid rgba(255,255,255,0.04);
+  padding-left: 6px;
+}
+.timeline-tracks {
+  position: relative;
+}
+.timeline-track {
+  display: flex; align-items: center;
+  height: 48px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.timeline-track-label {
+  width: 80px; padding: 0 12px;
+  font-size: 12px; color: var(--text2);
+  display: flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.15);
+  height: 100%;
+  border-right: 1px solid rgba(255,255,255,0.04);
+}
+.timeline-track-content {
+  flex: 1; height: 100%;
+  display: flex; align-items: center;
+  padding: 6px 4px;
+  gap: 3px;
+  position: relative;
+}
+.timeline-block {
+  height: 34px;
+  border-radius: 6px;
+  display: flex; align-items: center;
+  padding: 0 10px;
+  font-size: 10px; font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.2s;
+}
+.timeline-block:hover { opacity: 0.85; }
+.tl-audio { background: linear-gradient(135deg, rgba(52,211,153,0.25), rgba(52,211,153,0.15)); color: var(--success); border: 1px solid rgba(52,211,153,0.2); }
+.tl-visual { background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(99,102,241,0.15)); color: #a78bfa; border: 1px solid rgba(124,58,237,0.2); }
+.tl-subtitle { background: rgba(251,191,36,0.12); color: var(--warning); border: 1px solid rgba(251,191,36,0.15); height: 22px; }
+.tl-transition {
+  width: 20px; height: 20px;
+  background: var(--card);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  transform: rotate(45deg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 7px; color: var(--text3);
+  position: absolute;
+}
+.tl-transition span { transform: rotate(-45deg); }
+
+.playhead {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: calc(80px + 35%);
+  width: 2px;
+  background: var(--error);
+  z-index: 10;
+  pointer-events: none;
+}
+.playhead::before {
+  content: '';
+  position: absolute; top: -4px; left: -5px;
+  width: 12px; height: 8px;
+  background: var(--error);
+  border-radius: 2px 2px 4px 4px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.timeline-bottom {
+  display: flex; justify-content: center;
+  padding: 16px;
+  font-size: 13px; color: var(--text2);
+  gap: 16px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.timeline-bottom span {
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* ═══════════════════════════════════════
+   STAGE 5: OUTPUT
+   ═══════════════════════════════════════ */
+.output-center {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 24px;
+  flex: 1;
+  justify-content: center;
+}
+.output-preview {
+  width: 100%; max-width: 800px;
+  aspect-ratio: 16/9;
+  background: #0f0e0d;
+  border-radius: var(--radius-lg);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+.output-preview::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, rgba(124,58,237,0.08), transparent 70%);
+}
+.play-overlay {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  z-index: 1;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.play-overlay:hover {
+  background: rgba(255,255,255,0.15);
+  transform: scale(1.05);
+}
+.play-overlay::after {
+  content: '';
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 12px 0 12px 22px;
+  border-color: transparent transparent transparent white;
+  margin-left: 4px;
+}
+
+.output-progress {
+  width: 100%; max-width: 800px;
+  display: flex; align-items: center; gap: 12px;
+}
+.output-progress-bar {
+  flex: 1; height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.output-progress-fill {
+  width: 0%; height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.output-progress-time {
+  font-size: 12px; color: var(--text3);
+  font-family: var(--mono);
+}
+
+.output-settings {
+  display: flex; gap: 24px; align-items: center;
+  padding: 16px 24px;
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.output-setting-group {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.output-setting-label {
+  font-size: 11px; color: var(--text3); text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.quality-dots {
+  display: flex; gap: 4px;
+}
+.quality-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--accent-solid);
+}
+.quality-dot.off {
+  background: var(--text3);
+  opacity: 0.3;
+}
+.render-btn {
+  padding: 16px 48px;
+  background: var(--accent);
+  border: none; border-radius: var(--radius);
+  color: white; font-size: 17px; font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 30px rgba(124,58,237,0.35);
+}
+.render-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 40px rgba(124,58,237,0.5);
+}
+.output-estimate {
+  font-size: 13px; color: var(--text3);
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-brand">NextFrame</div>
+  <div class="topbar-dots" id="topDots">
+    <div class="topbar-dot active" data-idx="0">
+      <div class="dot"></div>
+      <div class="dot-label">脚本</div>
+    </div>
+    <div class="topbar-dot" data-idx="1">
+      <div class="dot"></div>
+      <div class="dot-label">音频</div>
+    </div>
+    <div class="topbar-dot" data-idx="2">
+      <div class="dot"></div>
+      <div class="dot-label">画面</div>
+    </div>
+    <div class="topbar-dot" data-idx="3">
+      <div class="dot"></div>
+      <div class="dot-label">时间线</div>
+    </div>
+    <div class="topbar-dot" data-idx="4">
+      <div class="dot"></div>
+      <div class="dot-label">导出</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span>产品介绍视频 · 第一集</span>
+    <svg class="gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 008.73 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 8.73a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+    </svg>
+  </div>
+</div>
+
+<!-- NAV ARROWS -->
+<div class="nav-arrow left hidden" id="navLeft">&#8249;</div>
+<div class="nav-arrow right" id="navRight">&#8250;</div>
+
+<!-- BOTTOM DOTS -->
+<div class="bottom-nav" id="bottomNav">
+  <div class="bottom-dot active" data-idx="0"></div>
+  <div class="bottom-dot" data-idx="1"></div>
+  <div class="bottom-dot" data-idx="2"></div>
+  <div class="bottom-dot" data-idx="3"></div>
+  <div class="bottom-dot" data-idx="4"></div>
+</div>
+
+<!-- STAGES TRACK -->
+<div class="stages-track" id="track">
+
+  <!-- ═══ STAGE 1: SCRIPT ═══ -->
+  <div class="stage visible" data-stage="0">
+    <div class="stage-header">
+      <div class="stage-title">写脚本</div>
+      <div class="stage-subtitle">为每一段写旁白和视觉提示</div>
+    </div>
+    <div class="stage-content">
+      <div class="script-cards">
+        <!-- Segment 1 -->
+        <div class="script-card">
+          <div class="script-card-header">段落 1</div>
+          <div class="script-card-header-line"></div>
+          <div class="script-card-narration">每天，我们花 3 小时在重复性工作上。整理素材、调整字幕、反复渲染...</div>
+          <div class="script-card-divider"></div>
+          <div class="script-card-visual-label">画面</div>
+          <div class="script-card-visual">数字统计动画：「3」小时大字居中，周围散落时钟碎片</div>
+          <div class="script-card-footer">
+            <span class="pill pill-warning">痛点共鸣</span>
+            <span class="script-card-duration">~8s</span>
+          </div>
+        </div>
+        <!-- Segment 2 -->
+        <div class="script-card">
+          <div class="script-card-header">段落 2</div>
+          <div class="script-card-header-line"></div>
+          <div class="script-card-narration">如果有一个工具，能把这些时间还给你？</div>
+          <div class="script-card-divider"></div>
+          <div class="script-card-visual-label">画面</div>
+          <div class="script-card-visual">产品 Logo 从光点汇聚成形，发光揭示</div>
+          <div class="script-card-footer">
+            <span class="pill pill-accent">悬念</span>
+            <span class="script-card-duration">~6s</span>
+          </div>
+        </div>
+        <!-- Segment 3 -->
+        <div class="script-card">
+          <div class="script-card-header">段落 3</div>
+          <div class="script-card-header-line"></div>
+          <div class="script-card-narration">NextFrame 用 AI 自动生成专业视频。从脚本、配音到画面，一条龙搞定。</div>
+          <div class="script-card-divider"></div>
+          <div class="script-card-visual-label">画面</div>
+          <div class="script-card-visual">工作流演示：脚本 → 音频 → 画面 → 成片，节点依次亮起</div>
+          <div class="script-card-footer">
+            <span class="pill pill-accent">核心卖点</span>
+            <span class="script-card-duration">~10s</span>
+          </div>
+        </div>
+        <!-- Segment 4 -->
+        <div class="script-card">
+          <div class="script-card-header">段落 4</div>
+          <div class="script-card-header-line"></div>
+          <div class="script-card-narration">从脚本到成片，5 分钟完成。传统流程要 3 小时。</div>
+          <div class="script-card-divider"></div>
+          <div class="script-card-visual-label">画面</div>
+          <div class="script-card-visual">时间对比柱状图：左「3h」矮柱 vs 右「5min」高亮柱</div>
+          <div class="script-card-footer">
+            <span class="pill pill-success">数据证明</span>
+            <span class="script-card-duration">~8s</span>
+          </div>
+        </div>
+        <!-- Segment 5 -->
+        <div class="script-card">
+          <div class="script-card-header">段落 5</div>
+          <div class="script-card-header-line"></div>
+          <div class="script-card-narration">现在就开始，免费试用 NextFrame。你的第一支视频，5 分钟后就能看到。</div>
+          <div class="script-card-divider"></div>
+          <div class="script-card-visual-label">画面</div>
+          <div class="script-card-visual">CTA 行动号召：大按钮「免费开始」+ 粒子光效背景</div>
+          <div class="script-card-footer">
+            <span class="pill pill-success">行动号召</span>
+            <span class="script-card-duration">~7s</span>
+          </div>
+        </div>
+        <!-- Add card -->
+        <div class="script-card-add">
+          <div class="plus">+</div>
+          <span>添加段落</span>
+        </div>
+      </div>
+      <div class="script-bottom">
+        <button class="next-btn" onclick="goTo(1)">下一步: 生成音频 <span style="font-size:18px">&#8250;</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STAGE 2: AUDIO ═══ -->
+  <div class="stage" data-stage="1">
+    <div class="stage-header">
+      <div class="stage-title">生成音频</div>
+      <div class="stage-subtitle">选择声音，一键合成旁白</div>
+    </div>
+    <div class="stage-content">
+      <div class="audio-layout">
+        <div>
+          <div class="voice-gallery">
+            <div class="voice-card selected">
+              <div class="voice-avatar" style="background:linear-gradient(135deg,#7c3aed,#6366f1)"></div>
+              <div class="voice-name">晓云</div>
+              <div class="voice-desc">温暖女声，自然流畅</div>
+              <button class="voice-listen">试听</button>
+            </div>
+            <div class="voice-card">
+              <div class="voice-avatar" style="background:linear-gradient(135deg,#059669,#34d399)"></div>
+              <div class="voice-name">浩然</div>
+              <div class="voice-desc">磁性男声，沉稳大气</div>
+              <button class="voice-listen">试听</button>
+            </div>
+            <div class="voice-card">
+              <div class="voice-avatar" style="background:linear-gradient(135deg,#ea580c,#fb923c)"></div>
+              <div class="voice-name">思远</div>
+              <div class="voice-desc">年轻男声，活力四射</div>
+              <button class="voice-listen">试听</button>
+            </div>
+            <div class="voice-card">
+              <div class="voice-avatar" style="background:linear-gradient(135deg,#db2777,#f472b6)"></div>
+              <div class="voice-name">婉儿</div>
+              <div class="voice-desc">甜美女声，亲和力强</div>
+              <button class="voice-listen">试听</button>
+            </div>
+            <div class="voice-settings">
+              <div>
+                <div class="voice-setting-label">语速</div>
+                <div class="voice-setting-value">1.0x</div>
+              </div>
+              <div>
+                <div class="voice-setting-label">音调</div>
+                <div class="voice-setting-value">+0</div>
+              </div>
+              <div>
+                <div class="voice-setting-label">停顿</div>
+                <div class="voice-setting-value">0.5s</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="audio-results">
+          <div class="audio-results-header">
+            <button class="next-btn" style="padding:10px 20px;font-size:13px">全部生成</button>
+            <div class="audio-results-stats">3/5 已完成 · 总时长 42.6s</div>
+          </div>
+          <!-- Done segments -->
+          <div class="audio-seg">
+            <div class="audio-seg-num">01</div>
+            <div class="audio-seg-wave done">
+              <div class="audio-seg-wave-bars" id="wave1"></div>
+            </div>
+            <button class="audio-seg-play">&#9654;</button>
+            <div class="audio-seg-dur">8.2s</div>
+          </div>
+          <div class="audio-seg">
+            <div class="audio-seg-num">02</div>
+            <div class="audio-seg-wave done">
+              <div class="audio-seg-wave-bars" id="wave2"></div>
+            </div>
+            <button class="audio-seg-play">&#9654;</button>
+            <div class="audio-seg-dur">6.1s</div>
+          </div>
+          <div class="audio-seg">
+            <div class="audio-seg-num">03</div>
+            <div class="audio-seg-wave done">
+              <div class="audio-seg-wave-bars" id="wave3"></div>
+            </div>
+            <button class="audio-seg-play">&#9654;</button>
+            <div class="audio-seg-dur">10.3s</div>
+          </div>
+          <!-- Pending -->
+          <div class="audio-seg">
+            <div class="audio-seg-num" style="color:var(--text3)">04</div>
+            <div class="audio-seg-wave pending">
+              <div class="audio-seg-wave-bars" id="wave4"></div>
+            </div>
+            <div class="audio-seg-dur" style="color:var(--text3)">--</div>
+          </div>
+          <div class="audio-seg">
+            <div class="audio-seg-num" style="color:var(--text3)">05</div>
+            <div class="audio-seg-wave pending">
+              <div class="audio-seg-wave-bars" id="wave5"></div>
+            </div>
+            <div class="audio-seg-dur" style="color:var(--text3)">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STAGE 3: ATOMS ═══ -->
+  <div class="stage" data-stage="2">
+    <div class="stage-header">
+      <div class="stage-title">选择画面</div>
+      <div class="stage-subtitle">AI 为每段匹配最佳视觉组件</div>
+    </div>
+    <div class="stage-content">
+      <div class="atoms-stats">
+        <span class="pill pill-success">5/5 已匹配</span>
+        <span>平均匹配度 93%</span>
+      </div>
+      <div class="atoms-grid">
+        <!-- Atom 1: Counter -->
+        <div class="atom-card">
+          <div class="atom-preview">
+            <div class="atom-counter" style="position:relative">
+              3
+              <span class="atom-counter-unit">小时</span>
+            </div>
+          </div>
+          <div class="atom-info">
+            <div class="atom-actions">
+              <span class="pill pill-accent atom-type">numberCounter</span>
+              <button class="atom-swap">换一个</button>
+            </div>
+            <div class="atom-confidence">AI 匹配度 96%</div>
+          </div>
+        </div>
+        <!-- Atom 2: Logo -->
+        <div class="atom-card">
+          <div class="atom-preview">
+            <div class="atom-logo">N</div>
+          </div>
+          <div class="atom-info">
+            <div class="atom-actions">
+              <span class="pill pill-accent atom-type">logoReveal</span>
+              <button class="atom-swap">换一个</button>
+            </div>
+            <div class="atom-confidence">AI 匹配度 94%</div>
+          </div>
+        </div>
+        <!-- Atom 3: Flow -->
+        <div class="atom-card">
+          <div class="atom-preview">
+            <div class="atom-flow">
+              <div class="atom-flow-node" style="background:rgba(124,58,237,0.2);color:#a78bfa">&#9998;</div>
+              <div class="atom-flow-arrow">&#8594;</div>
+              <div class="atom-flow-node" style="background:rgba(52,211,153,0.2);color:var(--success)">&#9835;</div>
+              <div class="atom-flow-arrow">&#8594;</div>
+              <div class="atom-flow-node" style="background:rgba(251,191,36,0.2);color:var(--warning)">&#9881;</div>
+              <div class="atom-flow-arrow">&#8594;</div>
+              <div class="atom-flow-node" style="background:rgba(251,113,133,0.2);color:var(--error)">&#9654;</div>
+            </div>
+          </div>
+          <div class="atom-info">
+            <div class="atom-actions">
+              <span class="pill pill-accent atom-type">flowChart</span>
+              <button class="atom-swap">换一个</button>
+            </div>
+            <div class="atom-confidence">AI 匹配度 91%</div>
+          </div>
+        </div>
+        <!-- Atom 4: Chart -->
+        <div class="atom-card">
+          <div class="atom-preview">
+            <div class="atom-chart">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+                <div style="width:48px;height:90px;background:linear-gradient(to top,rgba(251,113,133,0.3),rgba(251,113,133,0.6));border-radius:6px 6px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;font-size:11px;color:var(--error);font-weight:700">3h</div>
+                <div style="font-size:10px;color:var(--text3)">传统</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+                <div style="width:48px;height:32px;background:var(--accent);border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center;font-size:11px;color:white;font-weight:700">5m</div>
+                <div style="font-size:10px;color:var(--text3)">NextFrame</div>
+              </div>
+            </div>
+          </div>
+          <div class="atom-info">
+            <div class="atom-actions">
+              <span class="pill pill-accent atom-type">barChart</span>
+              <button class="atom-swap">换一个</button>
+            </div>
+            <div class="atom-confidence">AI 匹配度 95%</div>
+          </div>
+        </div>
+        <!-- Atom 5: CTA -->
+        <div class="atom-card">
+          <div class="atom-preview">
+            <div class="atom-cta-btn">免费开始</div>
+          </div>
+          <div class="atom-info">
+            <div class="atom-actions">
+              <span class="pill pill-accent atom-type">ctaButton</span>
+              <button class="atom-swap">换一个</button>
+            </div>
+            <div class="atom-confidence">AI 匹配度 89%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STAGE 4: ASSEMBLY ═══ -->
+  <div class="stage" data-stage="3">
+    <div class="stage-header">
+      <div class="stage-title">编排时间线</div>
+      <div class="stage-subtitle">音频 + 画面 + 字幕自动对齐</div>
+    </div>
+    <div class="stage-content" style="display:flex;flex-direction:column">
+      <div class="timeline-previews">
+        <div class="timeline-thumb">
+          <span style="font-size:24px;font-weight:900;background:var(--accent);-webkit-background-clip:text;-webkit-text-fill-color:transparent">3</span>
+        </div>
+        <div class="timeline-thumb">
+          <span style="font-size:20px;font-weight:900;color:var(--accent-solid)">N</span>
+        </div>
+        <div class="timeline-thumb">
+          <span style="font-size:11px;color:var(--text3)">&#9998; &#8594; &#9835; &#8594; &#9654;</span>
+        </div>
+        <div class="timeline-thumb">
+          <span style="font-size:11px;color:var(--text3)">3h vs 5m</span>
+        </div>
+        <div class="timeline-thumb">
+          <span style="font-size:11px;color:var(--accent-solid);font-weight:600">CTA</span>
+        </div>
+      </div>
+      <div class="timeline-container">
+        <div class="timeline-ruler">
+          <div class="timeline-ruler-mark">0s</div>
+          <div class="timeline-ruler-mark">5s</div>
+          <div class="timeline-ruler-mark">10s</div>
+          <div class="timeline-ruler-mark">15s</div>
+          <div class="timeline-ruler-mark">20s</div>
+          <div class="timeline-ruler-mark">25s</div>
+          <div class="timeline-ruler-mark">30s</div>
+          <div class="timeline-ruler-mark">35s</div>
+          <div class="timeline-ruler-mark">40s</div>
+        </div>
+        <div class="timeline-tracks">
+          <div class="playhead"></div>
+          <!-- Audio track -->
+          <div class="timeline-track">
+            <div class="timeline-track-label">&#127908; 音频</div>
+            <div class="timeline-track-content">
+              <div class="timeline-block tl-audio" style="width:19%">段落 1</div>
+              <div class="timeline-block tl-audio" style="width:14%">段落 2</div>
+              <div class="timeline-block tl-audio" style="width:24%">段落 3</div>
+              <div class="timeline-block tl-audio" style="width:19%">段落 4</div>
+              <div class="timeline-block tl-audio" style="width:16%">段落 5</div>
+            </div>
+          </div>
+          <!-- Visual track -->
+          <div class="timeline-track">
+            <div class="timeline-track-label">&#127912; 画面</div>
+            <div class="timeline-track-content">
+              <div class="timeline-block tl-visual" style="width:19%">counter</div>
+              <div class="timeline-block tl-visual" style="width:14%">logo</div>
+              <div class="timeline-block tl-visual" style="width:24%">flow</div>
+              <div class="timeline-block tl-visual" style="width:19%">chart</div>
+              <div class="timeline-block tl-visual" style="width:16%">cta</div>
+            </div>
+          </div>
+          <!-- Subtitle track -->
+          <div class="timeline-track">
+            <div class="timeline-track-label">&#128172; 字幕</div>
+            <div class="timeline-track-content">
+              <div class="timeline-block tl-subtitle" style="width:18%"></div>
+              <div style="width:1%"></div>
+              <div class="timeline-block tl-subtitle" style="width:13%"></div>
+              <div style="width:1%"></div>
+              <div class="timeline-block tl-subtitle" style="width:23%"></div>
+              <div style="width:1%"></div>
+              <div class="timeline-block tl-subtitle" style="width:18%"></div>
+              <div style="width:1%"></div>
+              <div class="timeline-block tl-subtitle" style="width:15%"></div>
+            </div>
+          </div>
+          <!-- Transition track -->
+          <div class="timeline-track">
+            <div class="timeline-track-label">&#10024; 转场</div>
+            <div class="timeline-track-content">
+              <div class="tl-transition" style="left:18.5%"><span style="font-size:7px">&#10023;</span></div>
+              <div class="tl-transition" style="left:32%"><span style="font-size:7px">&#10023;</span></div>
+              <div class="tl-transition" style="left:56%"><span style="font-size:7px">&#10023;</span></div>
+              <div class="tl-transition" style="left:75%"><span style="font-size:7px">&#10023;</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="timeline-bottom">
+          <span>42.6s</span>
+          <span style="color:var(--text3)">&#183;</span>
+          <span>5 段</span>
+          <span style="color:var(--text3)">&#183;</span>
+          <span>4 转场</span>
+          <span style="color:var(--text3)">&#183;</span>
+          <span>3 轨道</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STAGE 5: OUTPUT ═══ -->
+  <div class="stage" data-stage="4">
+    <div class="stage-header">
+      <div class="stage-title">导出成片</div>
+      <div class="stage-subtitle">预览确认，一键渲染</div>
+    </div>
+    <div class="stage-content">
+      <div class="output-center">
+        <div class="output-preview">
+          <div class="play-overlay"></div>
+        </div>
+        <div class="output-progress">
+          <div class="output-progress-bar">
+            <div class="output-progress-fill"></div>
+          </div>
+          <div class="output-progress-time">00:00 / 00:42</div>
+        </div>
+        <div class="output-settings">
+          <div class="output-setting-group">
+            <div class="output-setting-label">分辨率</div>
+            <div class="pill-selector">
+              <button>720p</button>
+              <button class="active">1080p</button>
+              <button>4K</button>
+            </div>
+          </div>
+          <div class="output-setting-group">
+            <div class="output-setting-label">格式</div>
+            <div class="pill-selector">
+              <button class="active">MP4</button>
+              <button>WebM</button>
+            </div>
+          </div>
+          <div class="output-setting-group">
+            <div class="output-setting-label">质量</div>
+            <div class="quality-dots">
+              <div class="quality-dot"></div>
+              <div class="quality-dot"></div>
+              <div class="quality-dot"></div>
+              <div class="quality-dot off"></div>
+            </div>
+          </div>
+        </div>
+        <button class="render-btn">开始渲染</button>
+        <div class="output-estimate">预计 12 秒 · 1080p · MP4</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Navigation ───
+let current = 0;
+const total = 5;
+const track = document.getElementById('track');
+const topDots = document.querySelectorAll('.topbar-dot');
+const bottomDots = document.querySelectorAll('.bottom-dot');
+const stages = document.querySelectorAll('.stage');
+const navLeft = document.getElementById('navLeft');
+const navRight = document.getElementById('navRight');
+
+function goTo(idx) {
+  if (idx < 0 || idx >= total) return;
+  current = idx;
+  track.style.transform = `translateX(-${current * 100}vw)`;
+
+  // Update top dots
+  topDots.forEach((d, i) => {
+    d.classList.remove('active', 'completed');
+    if (i === current) d.classList.add('active');
+    else if (i < current) d.classList.add('completed');
+  });
+
+  // Update bottom dots
+  bottomDots.forEach((d, i) => {
+    d.classList.remove('active');
+    if (i === current) d.classList.add('active');
+  });
+
+  // Visibility for animations
+  stages.forEach((s, i) => {
+    s.classList.toggle('visible', i === current);
+  });
+
+  // Arrows
+  navLeft.classList.toggle('hidden', current === 0);
+  navRight.classList.toggle('hidden', current === total - 1);
+}
+
+// Click handlers
+topDots.forEach(d => d.addEventListener('click', () => goTo(+d.dataset.idx)));
+bottomDots.forEach(d => d.addEventListener('click', () => goTo(+d.dataset.idx)));
+navLeft.addEventListener('click', () => goTo(current - 1));
+navRight.addEventListener('click', () => goTo(current + 1));
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goTo(current + 1);
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') goTo(current - 1);
+});
+
+// ─── Generate waveform bars ───
+function makeWave(id, count, done) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  for (let i = 0; i < count; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    const h = done ? (8 + Math.random() * 20) : 4;
+    bar.style.height = h + 'px';
+    bar.style.animationDelay = (i * 0.05) + 's';
+    el.appendChild(bar);
+  }
+}
+makeWave('wave1', 40, true);
+makeWave('wave2', 40, true);
+makeWave('wave3', 40, true);
+makeWave('wave4', 40, false);
+makeWave('wave5', 40, false);
+
+// ─── Pill selector interactivity ───
+document.querySelectorAll('.pill-selector').forEach(sel => {
+  sel.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sel.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+});
+
+// Init
+goTo(0);
+</script>
+</body>
+</html>
