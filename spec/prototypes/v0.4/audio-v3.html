@@ -64,12 +64,12 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .topbar-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--ink-25); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--ink-55); cursor: pointer; transition: border-color 0.15s var(--ease); }
 .topbar-avatar:hover { border-color: var(--ink); }
 
-/* ─── Principles bar ─── */
-.principles { padding: 10px 20px; border-bottom: var(--border); display: flex; gap: 20px; align-items: center; }
-.p-item { display: flex; align-items: center; gap: 6px; }
-.p-key { font-size: 11px; color: var(--ink-25); }
-.p-val { font-size: 12px; color: var(--ink-55); font-weight: 500; }
-.p-sep { width: 1px; height: 14px; background: rgba(255,255,255,0.06); }
+/* ─── Info strip (replaces principles) ─── */
+.info-strip { padding: 0 20px; height: 36px; border-bottom: var(--border); display: flex; align-items: center; font-size: 12px; color: var(--ink-25); gap: 0; overflow: hidden; }
+.info-strip span { white-space: nowrap; }
+.info-sep { margin: 0 10px; color: rgba(255,255,255,0.15); }
+.info-val { color: var(--ink-55); }
+.info-accent { color: var(--accent); }
 
 /* ─── Segment filter ─── */
 .seg-filter { padding: 8px 20px; border-bottom: var(--border); display: flex; gap: 6px; align-items: center; }
@@ -173,6 +173,31 @@ td.col-audio {
   white-space: nowrap;
 }
 
+/* ─── Play button ─── */
+.play-btn {
+  width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--accent); color: #fff; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.15s var(--ease);
+  flex-shrink: 0;
+}
+.play-btn:hover { opacity: 0.8; }
+.play-btn.playing { background: var(--ink-25); }
+
+/* ─── Karaoke chars ─── */
+.s-text .ch { transition: color 0.1s var(--ease), text-shadow 0.1s var(--ease); }
+.s-text .ch.spoken { color: var(--ink); }
+.s-text .ch.current { color: var(--accent); text-shadow: 0 0 8px rgba(124,106,239,0.5); }
+.s-text .ch.unspoken { color: var(--ink-25); }
+
+/* playing row highlight */
+tr.playing { background: var(--accent-03); }
+tr.playing td.col-text { color: var(--accent); }
+
+/* progress bar under sentence */
+.s-progress { height: 2px; background: var(--ink-08); border-radius: 1px; margin-top: 3px; overflow: hidden; grid-column: 1 / -1; }
+.s-progress-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.15s linear; }
+
 /* pending segment dim */
 tr.seg-pending td.col-text { color: var(--ink-55); }
 tr.seg-pending .s-text { color: var(--ink-25); }
@@ -222,14 +247,14 @@ tr.seg-pending .s-text { color: var(--ink-25); }
   </div>
 </div>
 
-<div class="principles">
-  <div class="p-item"><span class="p-key">受众</span><span class="p-val">25-35岁创作者</span></div>
-  <div class="p-item"><span class="p-key">语气</span><span class="p-val">专业友好</span></div>
-  <div class="p-item"><span class="p-key">风格</span><span class="p-val">数据驱动</span></div>
-  <div class="p-item"><span class="p-key">节奏</span><span class="p-val">快→慢→快</span></div>
-  <div class="p-sep"></div>
-  <div class="p-item"><span class="p-key">声线</span><span class="p-val">晓晓</span></div>
-  <div class="p-item"><span class="p-key">语速</span><span class="p-val">1.0x</span></div>
+<div class="info-strip">
+  <span>声线</span><span class="info-sep">·</span><span class="info-accent">晓晓</span>
+  <span class="info-sep">·</span><span>语速</span><span class="info-sep">·</span><span class="info-val">1.0x</span>
+  <span class="info-sep">|</span>
+  <span>受众 <span class="info-val">25-35岁创作者</span></span>
+  <span class="info-sep">·</span><span>语气 <span class="info-val">专业友好</span></span>
+  <span class="info-sep">·</span><span>风格 <span class="info-val">数据驱动</span></span>
+  <span class="info-sep">·</span><span>节奏 <span class="info-val">快→慢→快</span></span>
 </div>
 
 <div class="seg-filter">
@@ -253,6 +278,7 @@ tr.seg-pending .s-text { color: var(--ink-25); }
         <td class="col-text">每天，我们花 3 小时在重复性工作上。这些时间，本可以用来做更有价值的事。</td>
         <td class="col-audio">
           <div class="audio-head">
+            <button class="play-btn" onclick="event.stopPropagation();playKaraoke(this)">&#9654;</button>
             <span class="status-tag generated">已生成</span>
             <span class="audio-duration">8.2s</span>
           </div>
@@ -275,6 +301,7 @@ tr.seg-pending .s-text { color: var(--ink-25); }
         <td class="col-text">如果有一个工具，能把这些时间还给你？NextFrame，让视频制作像写文档一样简单。</td>
         <td class="col-audio">
           <div class="audio-head">
+            <button class="play-btn" onclick="event.stopPropagation();playKaraoke(this)">&#9654;</button>
             <span class="status-tag generated">已生成</span>
             <span class="audio-duration">10.5s</span>
           </div>
@@ -297,6 +324,7 @@ tr.seg-pending .s-text { color: var(--ink-25); }
         <td class="col-text">从脚本到音频，从画面到成片——AI 全自动编排，你只需要审核。</td>
         <td class="col-audio">
           <div class="audio-head">
+            <button class="play-btn" onclick="event.stopPropagation();playKaraoke(this)">&#9654;</button>
             <span class="status-tag generated">已生成</span>
             <span class="audio-duration">9.8s</span>
           </div>
@@ -361,6 +389,55 @@ function filterSeg(idx) {
   document.querySelectorAll("tbody tr[data-seg]").forEach(function(row) {
     row.style.display = (idx === -1 || row.dataset.seg == idx) ? "" : "none";
   });
+}
+
+// Wrap sentence text in per-char spans on load
+document.querySelectorAll(".s-text").forEach(function(el) {
+  var text = el.textContent;
+  el.innerHTML = text.split("").map(function(c) {
+    return '<span class="ch unspoken">' + c + '</span>';
+  }).join("");
+});
+
+// Karaoke playback
+var karaokeTimer = null;
+var karaokeBtn = null;
+
+function playKaraoke(btn) {
+  // Stop previous
+  if (karaokeTimer) { clearInterval(karaokeTimer); karaokeTimer = null; }
+  if (karaokeBtn) {
+    karaokeBtn.innerHTML = "&#9654;";
+    karaokeBtn.classList.remove("playing");
+    karaokeBtn.closest("tr").classList.remove("playing");
+    // Reset all chars
+    karaokeBtn.closest("td").querySelectorAll(".ch").forEach(function(c) { c.className = "ch unspoken"; });
+  }
+
+  if (karaokeBtn === btn) { karaokeBtn = null; return; } // toggle off
+
+  karaokeBtn = btn;
+  btn.innerHTML = "&#9646;&#9646;";
+  btn.classList.add("playing");
+  var tr = btn.closest("tr");
+  tr.classList.add("playing");
+
+  var chars = tr.querySelectorAll(".s-text .ch");
+  var idx = 0;
+
+  karaokeTimer = setInterval(function() {
+    if (idx > 0) chars[idx - 1].className = "ch spoken";
+    if (idx >= chars.length) {
+      clearInterval(karaokeTimer); karaokeTimer = null;
+      btn.innerHTML = "&#9654;";
+      btn.classList.remove("playing");
+      tr.classList.remove("playing");
+      karaokeBtn = null;
+      return;
+    }
+    chars[idx].className = "ch current";
+    idx++;
+  }, 150);
 }
 </script>
 </body>
