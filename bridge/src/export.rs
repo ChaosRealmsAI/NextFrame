@@ -1,5 +1,5 @@
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,18 +18,18 @@ use crate::validation::{
 };
 
 pub(crate) const EXPORT_RUNNING: &str = "running";
+pub(crate) const EXPORT_QUEUED: &str = "queued";
 pub(crate) const EXPORT_DONE: &str = "done";
 pub(crate) const EXPORT_FAILED: &str = "failed";
-pub(crate) const EXPORT_ERROR_ALREADY_RUNNING: &str = "export_already_running";
 pub(crate) const EXPORT_ERROR_CANCELED: &str = "canceled";
 pub(crate) const DEFAULT_EXPORT_CRF: u8 = 20;
 
 pub(crate) struct ProcessHandle {
-    pub(crate) export_task: ExportTask,
+    pub(crate) export_task: Option<ExportTask>,
     pub(crate) output_path: PathBuf,
     pub(crate) log_path: PathBuf,
     pub(crate) duration_secs: f64,
-    pub(crate) started_at: Instant,
+    pub(crate) started_at: Option<Instant>,
     pub(crate) terminal: Option<ProcessTerminal>,
 }
 
@@ -44,9 +44,16 @@ pub(crate) struct ProcessTerminal {
     pub(crate) error: Option<String>,
 }
 
+pub(crate) struct QueuedJob {
+    pub(crate) pid: u32,
+    pub(crate) request: RecorderRequest,
+    pub(crate) log_path: PathBuf,
+}
+
 pub(crate) struct ProcessRegistry {
-    pub(crate) export_start_reserved: bool,
     pub(crate) handles: HashMap<u32, ProcessHandle>,
+    queue: VecDeque<QueuedJob>,
+    active_pid: Option<u32>,
 }
 
 pub(crate) static PROCESS_REGISTRY: OnceLock<Mutex<ProcessRegistry>> = OnceLock::new();
@@ -64,43 +71,59 @@ pub(crate) fn handle_export_start(params: &Value) -> Result<Value, String> {
     let current_dir =
         env::current_dir().map_err(|error| format!("failed to read current directory: {error}"))?;
 
-    {
-        let mut registry = lock_process_registry()?;
-        if !reserve_export_start(&mut registry)? {
-            return Ok(json!({
-                "ok": false,
-                "error": EXPORT_ERROR_ALREADY_RUNNING,
-            }));
-        }
-    }
+    let request = build_export_request(
+        &current_dir,
+        &output_path,
+        width,
+        height,
+        fps,
+        duration,
+        crf,
+    )?;
 
-    let start_result = (|| -> Result<Value, String> {
-        let request = build_export_request(
-            &current_dir,
-            &output_path,
-            width,
-            height,
-            fps,
-            duration,
-            crf,
-        )?;
+    let Some(parent) = output_path.parent() else {
+        return Err(format!(
+            "failed to resolve parent for '{}'",
+            output_path.display()
+        ));
+    };
+    fs::create_dir_all(parent).map_err(|error| {
+        format!(
+            "failed to create export directory '{}': {error}",
+            parent.display()
+        )
+    })?;
 
-        let Some(parent) = output_path.parent() else {
-            return Err(format!(
-                "failed to resolve parent for '{}'",
-                output_path.display()
-            ));
-        };
-        fs::create_dir_all(parent).map_err(|error| {
-            format!(
-                "failed to create export directory '{}': {error}",
-                parent.display()
-            )
-        })?;
+    let log_path = create_export_log_path()?;
+    let pid = next_export_pid();
 
-        let log_path = create_export_log_path()?;
-        let export_task = match spawn_recorder_task(request, log_path.clone()) {
-            Ok(task) => task,
+    let mut registry = lock_process_registry()?;
+
+    let should_start_now = registry.active_pid.is_none()
+        || registry
+            .active_pid
+            .and_then(|active| registry.handles.get_mut(&active))
+            .map_or(true, |handle| {
+                let _ = refresh_process_state(handle);
+                handle.terminal.is_some()
+            });
+
+    if should_start_now {
+        match spawn_recorder_task(request, log_path.clone()) {
+            Ok(task) => {
+                registry.active_pid = Some(pid);
+                registry.handles.insert(
+                    pid,
+                    ProcessHandle {
+                        export_task: Some(task),
+                        output_path,
+                        log_path: log_path.clone(),
+                        duration_secs: duration,
+                        started_at: Some(Instant::now()),
+                        terminal: None,
+                    },
+                );
+            }
             Err(error) => {
                 return Ok(json!({
                     "ok": false,
@@ -108,51 +131,43 @@ pub(crate) fn handle_export_start(params: &Value) -> Result<Value, String> {
                     "logPath": log_path.display().to_string(),
                 }));
             }
-        };
-        let pid = next_export_pid();
-
-        let handle = ProcessHandle {
-            export_task,
-            output_path,
-            log_path: log_path.clone(),
-            duration_secs: duration,
-            started_at: Instant::now(),
-            terminal: None,
-        };
-
-        match lock_process_registry() {
-            Ok(mut registry) => {
-                registry.export_start_reserved = false;
-                registry.handles.insert(pid, handle);
-            }
-            Err(error) => return Err(error),
         }
-
-        Ok(json!({
-            "ok": true,
-            "pid": pid,
-            "logPath": log_path.display().to_string(),
-        }))
-    })();
-
-    let started = start_result
-        .as_ref()
-        .ok()
-        .and_then(|result| result.get("ok"))
-        .and_then(Value::as_bool)
-        == Some(true);
-
-    if !started {
-        clear_export_start_reservation()?;
+    } else {
+        registry.queue.push_back(QueuedJob {
+            pid,
+            request,
+            log_path: log_path.clone(),
+        });
+        registry.handles.insert(
+            pid,
+            ProcessHandle {
+                export_task: None,
+                output_path,
+                log_path: log_path.clone(),
+                duration_secs: duration,
+                started_at: None,
+                terminal: None,
+            },
+        );
     }
 
-    start_result
+    Ok(json!({
+        "ok": true,
+        "pid": pid,
+        "logPath": log_path.display().to_string(),
+    }))
 }
 
 pub(crate) fn handle_export_status(params: &Value) -> Result<Value, String> {
     let pid = require_u32(params, "pid")?;
     let mut registry = lock_process_registry()?;
-    let Some(handle) = registry.handles.get_mut(&pid) else {
+
+    drain_finished_and_start_next(&mut registry)?;
+
+    // Refresh state first (needs &mut)
+    if let Some(handle) = registry.handles.get_mut(&pid) {
+        refresh_process_state(handle)?;
+    } else {
         return Ok(json!({
             "state": EXPORT_FAILED,
             "percent": 0,
@@ -160,15 +175,20 @@ pub(crate) fn handle_export_status(params: &Value) -> Result<Value, String> {
             "outputPath": Value::Null,
             "error": "unknown_pid",
         }));
-    };
+    }
 
-    refresh_process_state(handle)?;
-    Ok(export_status_json(handle))
+    // Now borrow immutably for json formatting
+    let handle = registry.handles.get(&pid).expect("checked above");
+    Ok(export_status_json(handle, &registry.queue, pid))
 }
 
 pub(crate) fn handle_export_cancel(params: &Value) -> Result<Value, String> {
     let pid = require_u32(params, "pid")?;
     let mut registry = lock_process_registry()?;
+
+    // Remove from queue if queued
+    registry.queue.retain(|job| job.pid != pid);
+
     let Some(handle) = registry.handles.get_mut(&pid) else {
         return Ok(json!({
             "ok": false,
@@ -178,21 +198,72 @@ pub(crate) fn handle_export_cancel(params: &Value) -> Result<Value, String> {
 
     refresh_process_state(handle)?;
     if handle.terminal.is_none() {
-        handle
-            .export_task
-            .cancel_requested
-            .store(true, Ordering::SeqCst);
-        handle.export_task.join_handle.abort();
+        if let Some(task) = &handle.export_task {
+            task.cancel_requested.store(true, Ordering::SeqCst);
+            task.join_handle.abort();
+        }
         handle.terminal = Some(ProcessTerminal {
             state: EXPORT_FAILED,
             error: Some(EXPORT_ERROR_CANCELED.to_string()),
         });
     }
 
+    // If this was the active job, start next
+    if registry.active_pid == Some(pid) {
+        registry.active_pid = None;
+        start_next_queued(&mut registry)?;
+    }
+
     Ok(json!({
         "ok": true,
         "pid": pid,
     }))
+}
+
+/// Check if active job finished, start next queued job if so.
+fn drain_finished_and_start_next(registry: &mut ProcessRegistry) -> Result<(), String> {
+    if let Some(active) = registry.active_pid {
+        if let Some(handle) = registry.handles.get_mut(&active) {
+            refresh_process_state(handle)?;
+            if handle.terminal.is_some() {
+                registry.active_pid = None;
+                start_next_queued(registry)?;
+            }
+        } else {
+            registry.active_pid = None;
+            start_next_queued(registry)?;
+        }
+    }
+    Ok(())
+}
+
+fn start_next_queued(registry: &mut ProcessRegistry) -> Result<(), String> {
+    while let Some(job) = registry.queue.pop_front() {
+        let Some(handle) = registry.handles.get_mut(&job.pid) else {
+            continue;
+        };
+
+        // Skip if already canceled
+        if handle.terminal.is_some() {
+            continue;
+        }
+
+        match spawn_recorder_task(job.request, job.log_path) {
+            Ok(task) => {
+                handle.export_task = Some(task);
+                handle.started_at = Some(Instant::now());
+                registry.active_pid = Some(job.pid);
+                return Ok(());
+            }
+            Err(error) => {
+                handle.terminal = Some(ProcessTerminal {
+                    state: EXPORT_FAILED,
+                    error: Some(error),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 fn lock_process_registry() -> Result<std::sync::MutexGuard<'static, ProcessRegistry>, String> {
@@ -204,32 +275,11 @@ fn lock_process_registry() -> Result<std::sync::MutexGuard<'static, ProcessRegis
 pub(crate) fn process_registry() -> &'static Mutex<ProcessRegistry> {
     PROCESS_REGISTRY.get_or_init(|| {
         Mutex::new(ProcessRegistry {
-            export_start_reserved: false,
             handles: HashMap::new(),
+            queue: VecDeque::new(),
+            active_pid: None,
         })
     })
-}
-
-fn reserve_export_start(registry: &mut ProcessRegistry) -> Result<bool, String> {
-    if registry.export_start_reserved {
-        return Ok(false);
-    }
-
-    for handle in registry.handles.values_mut() {
-        refresh_process_state(handle)?;
-        if handle.terminal.is_none() {
-            return Ok(false);
-        }
-    }
-
-    registry.export_start_reserved = true;
-    Ok(true)
-}
-
-fn clear_export_start_reservation() -> Result<(), String> {
-    let mut registry = lock_process_registry()?;
-    registry.export_start_reserved = false;
-    Ok(())
 }
 
 fn refresh_process_state(handle: &mut ProcessHandle) -> Result<(), String> {
@@ -237,8 +287,11 @@ fn refresh_process_state(handle: &mut ProcessHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    let completion = handle
-        .export_task
+    let Some(task) = &handle.export_task else {
+        return Ok(());
+    };
+
+    let completion = task
         .completion
         .lock()
         .map_err(|_| "export task state is unavailable".to_string())?
@@ -260,8 +313,31 @@ fn refresh_process_state(handle: &mut ProcessHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn export_status_json(handle: &ProcessHandle) -> Value {
-    let elapsed = handle.started_at.elapsed().as_secs_f64();
+pub(crate) fn export_status_json(
+    handle: &ProcessHandle,
+    queue: &VecDeque<QueuedJob>,
+    pid: u32,
+) -> Value {
+    // Queued but not yet started
+    if handle.export_task.is_none() && handle.terminal.is_none() {
+        let position = queue
+            .iter()
+            .position(|job| job.pid == pid)
+            .map_or(0, |pos| pos + 1);
+        return json!({
+            "state": EXPORT_QUEUED,
+            "percent": 0,
+            "eta": 0,
+            "position": position,
+            "outputPath": handle.output_path.display().to_string(),
+            "logPath": handle.log_path.display().to_string(),
+            "error": Value::Null,
+        });
+    }
+
+    let elapsed = handle
+        .started_at
+        .map_or(0.0, |start| start.elapsed().as_secs_f64());
     let (state, percent, eta, error) = match &handle.terminal {
         Some(terminal) => (
             terminal.state,

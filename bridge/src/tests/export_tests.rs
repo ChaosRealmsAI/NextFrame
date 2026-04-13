@@ -349,6 +349,7 @@ fn remaining_secs_returns_reasonable_estimate() {
 fn export_status_json_formats_running_done_and_failed_states() {
     let _lock = lock_export_test();
     let temp = TestDir::new("export-status");
+    let empty_queue = std::collections::VecDeque::new();
 
     let running = test_process_handle(
         temp.join("running.mp4"),
@@ -356,7 +357,7 @@ fn export_status_json_formats_running_done_and_failed_states() {
         10.0,
         None,
     );
-    let running_json = export_status_json(&running);
+    let running_json = export_status_json(&running, &empty_queue, 1);
     assert_eq!(running_json.get("state"), Some(&json!("running")));
     assert_eq!(running_json.get("error"), Some(&Value::Null));
     assert_eq!(
@@ -388,7 +389,7 @@ fn export_status_json_formats_running_done_and_failed_states() {
         }),
     );
     assert_eq!(
-        export_status_json(&done),
+        export_status_json(&done, &empty_queue, 2),
         json!({
             "state": "done",
             "percent": 100.0,
@@ -408,7 +409,7 @@ fn export_status_json_formats_running_done_and_failed_states() {
             error: Some("encode failed".to_string()),
         }),
     );
-    let failed_json = export_status_json(&failed);
+    let failed_json = export_status_json(&failed, &empty_queue, 3);
     assert_eq!(failed_json.get("state"), Some(&json!("failed")));
     assert_eq!(failed_json.get("eta"), Some(&json!(0.0)));
     assert_eq!(failed_json.get("error"), Some(&json!("encode failed")));

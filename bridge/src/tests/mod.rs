@@ -375,17 +375,17 @@ fn test_process_handle(
     terminal: Option<ProcessTerminal>,
 ) -> ProcessHandle {
     ProcessHandle {
-        export_task: ExportTask {
+        export_task: Some(ExportTask {
             join_handle: export_runtime()
                 .expect("initialize export runtime")
                 .spawn(async {}),
             completion: std::sync::Arc::new(std::sync::Mutex::new(None)),
             cancel_requested: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
-        },
+        }),
         output_path,
         log_path,
         duration_secs,
-        started_at: Instant::now(),
+        started_at: Some(Instant::now()),
         terminal,
     }
 }
