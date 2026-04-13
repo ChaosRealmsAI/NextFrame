@@ -60,17 +60,18 @@ CORE PRINCIPLE: 一个视觉元素 = 一个 layer（轨道）
   桌面端可看到每条轨道，单独调整
 
 WORKFLOW（必须走项目三级结构）
-  1. nextframe project-new <name>                   创建项目
-  2. nextframe episode-new <project> <name>          创建集
-  3. nextframe segment-new <project> <episode> <name> 创建段（生成 timeline JSON）
-  4. nextframe scenes / scenes <id>                  查看组件 + 参数
-  5. 设计轨道：列出每个视觉元素，每个一层
-  6. 编辑 ~/NextFrame/projects/<project>/<episode>/<segment>.json
-  7. nextframe validate <project> <episode> <segment> 检查格式 + 重叠
-  8. nextframe build <project> <episode> <segment>    生成 HTML（输出到同目录）
-  9. nextframe preview <project> <episode> <segment>  截图 + 布局检查
-  10. 看 preview 输出，调整 → 回到 7
-  11. 没有合适组件？自己写 scene → 注册到 index.js
+  1. 选比例（第一步！决定用哪套组件）：
+     --width=1920 --height=1080  → 16:9 横屏 → 用默认组件（headline, barChart...）
+     --width=1080 --height=1920  → 9:16 竖屏 → 用 _portrait 组件（headline_portrait...）
+     --width=1440 --height=1080  → 4:3 PPT   → 用 _43 组件（headline_43...）
+  2. nextframe project-new <name>
+  3. nextframe episode-new <project> <name>
+  4. nextframe segment-new <project> <ep> <name> --width=W --height=H
+  5. nextframe scenes → 只用匹配比例的组件！
+     validate 会 ERROR 如果组件比例不匹配 timeline
+  6. 设计轨道：每个视觉元素一层
+  7. 编辑 JSON → validate → build → preview → Read 截图验证
+  8. 没有合适组件？按 SCENE_SPEC.md 写，加正确的 ratio 字段
 
   存储路径：~/NextFrame/projects/{project}/{episode}/{segment}.json
   桌面端自动扫描此目录，CLI 创建的内容桌面端立即可见
