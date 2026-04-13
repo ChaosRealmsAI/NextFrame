@@ -224,7 +224,7 @@ pub(super) fn record_parallel(
             (args.height * args.dpr).round() as usize,
         ),
         "parallel",
-        PerfLogContext {
+        PerfLogContext { output_path: Some(out),
             frame_files,
             video_overlay: None,
             html_duration_sec,
@@ -470,7 +470,7 @@ pub(super) fn record_parallel_single(
             (args.height * args.dpr).round() as usize,
         ),
         "parallel",
-        PerfLogContext {
+        PerfLogContext { output_path: Some(out),
             frame_files: &frame_files,
             video_overlay: None,
             html_duration_sec: page_probe.duration_sec,

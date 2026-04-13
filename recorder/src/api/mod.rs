@@ -298,6 +298,7 @@ fn record_single(
         pixel_size,
         backend.label(),
         PerfLogContext {
+            output_path: Some(out),
             frame_files,
             video_overlay: None,
             html_duration_sec,

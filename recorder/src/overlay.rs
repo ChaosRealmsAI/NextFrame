@@ -194,6 +194,7 @@ fn build_video_layer_filter(layers: &[VideoOverlaySpec]) -> String {
 }
 
 pub struct PerfLogContext<'a> {
+    pub output_path: Option<&'a Path>,
     pub frame_files: &'a [PathBuf],
     pub video_overlay: Option<&'a Path>,
     pub html_duration_sec: Option<f64>,
@@ -342,9 +343,17 @@ pub fn write_perf_log(
         &command_args,
     );
 
-    let log_path = env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|p| p.join("perf.jsonl")))
+    // Write perf log next to the output MP4 file for easy project-level analysis.
+    // Fallback: next to the recorder binary, then /tmp.
+    let log_path = context
+        .output_path
+        .as_ref()
+        .and_then(|p| p.parent().map(|d| d.join("perf.jsonl")))
+        .or_else(|| {
+            env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(|p| p.join("perf.jsonl")))
+        })
         .unwrap_or_else(|| PathBuf::from("/tmp/recorder-perf.jsonl"));
 
     if let Ok(mut f) = fs::OpenOptions::new()
