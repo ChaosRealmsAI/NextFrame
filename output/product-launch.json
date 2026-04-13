@@ -1,16 +1,25 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 30,
   "background": "#05020f",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg-tunnel",
       "scene": "shaderTunnel",
       "start": 0,
       "dur": 30,
-      "params": { "speed": 0.4, "rings": 10, "color": "#a78bfa", "twist": 3 },
+      "params": {
+        "speed": 0.4,
+        "rings": 10,
+        "color": "#a78bfa",
+        "twist": 3
+      },
       "opacity": 0.3,
       "blend": "screen"
     },
@@ -19,16 +28,24 @@
       "scene": "starfield",
       "start": 0,
       "dur": 30,
-      "params": { "count": 300, "speed": 0.6, "depth": 1.5, "color": "#6ee7ff" }
+      "params": {
+        "count": 300,
+        "speed": 0.6,
+        "depth": 1.5,
+        "color": "#6ee7ff"
+      }
     },
     {
       "id": "vignette-global",
       "scene": "vignette",
       "start": 0,
       "dur": 30,
-      "params": { "intensity": 0.75, "color": "#000000", "radius": 0.45 }
+      "params": {
+        "intensity": 0.75,
+        "color": "#000000",
+        "radius": 0.45
+      }
     },
-
     {
       "id": "intro-headline",
       "scene": "headline",
@@ -46,13 +63,20 @@
       "exit": "fadeOut 0.5s",
       "transition": "dissolve 0.5s"
     },
-
     {
       "id": "confetti-burst",
       "scene": "confetti",
       "start": 5,
       "dur": 4,
-      "params": { "count": 120, "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#fbbf24"] },
+      "params": {
+        "count": 120,
+        "colors": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6",
+          "#fbbf24"
+        ]
+      },
       "blend": "screen",
       "enter": "fadeIn 0.3s",
       "exit": "fadeOut 0.8s"
@@ -73,7 +97,6 @@
       "exit": "fadeOut 0.5s",
       "transition": "dissolve 0.5s"
     },
-
     {
       "id": "feature-grid-main",
       "scene": "featureGrid",
@@ -82,10 +105,26 @@
       "params": {
         "columns": 2,
         "items": [
-          { "icon": "⚡", "title": "AI Engine", "desc": "Neural inference at 10x speed" },
-          { "icon": "🔄", "title": "Real-time", "desc": "Sub-16ms frame processing" },
-          { "icon": "🌐", "title": "Cross-platform", "desc": "macOS · Linux · Windows" },
-          { "icon": "🔓", "title": "Open Source", "desc": "Apache 2.0 · 14k GitHub stars" }
+          {
+            "icon": "⚡",
+            "title": "AI Engine",
+            "desc": "Neural inference at 10x speed"
+          },
+          {
+            "icon": "🔄",
+            "title": "Real-time",
+            "desc": "Sub-16ms frame processing"
+          },
+          {
+            "icon": "🌐",
+            "title": "Cross-platform",
+            "desc": "macOS · Linux · Windows"
+          },
+          {
+            "icon": "🔓",
+            "title": "Open Source",
+            "desc": "Apache 2.0 · 14k GitHub stars"
+          }
         ],
         "accentColor": "#a78bfa",
         "bgColor": "rgba(167,139,250,0.08)"
@@ -94,15 +133,30 @@
       "exit": "fadeOut 0.5s",
       "transition": "wipeLeft 0.6s"
     },
-
     {
       "id": "line-chart-perf",
       "scene": "lineChart",
       "start": 14,
       "dur": 5,
       "params": {
-        "data": [12, 28, 45, 62, 74, 88, 96],
-        "labels": ["Q1'23", "Q2'23", "Q3'23", "Q4'23", "Q1'24", "Q2'24", "Now"],
+        "data": [
+          12,
+          28,
+          45,
+          62,
+          74,
+          88,
+          96
+        ],
+        "labels": [
+          "Q1'23",
+          "Q2'23",
+          "Q3'23",
+          "Q4'23",
+          "Q1'24",
+          "Q2'24",
+          "Now"
+        ],
         "color": "#6ee7ff",
         "strokeWidth": 4,
         "showDots": true,
@@ -112,7 +166,6 @@
       "exit": "fadeOut 0.5s",
       "transition": "dissolve 0.5s"
     },
-
     {
       "id": "code-block-main",
       "scene": "codeBlock",
@@ -134,13 +187,17 @@
       "scene": "shaderGlitch",
       "start": 19,
       "dur": 4,
-      "params": { "intensity": 0.3, "blockSize": 12, "colorSplit": 0.015, "scanlines": true },
+      "params": {
+        "intensity": 0.3,
+        "blockSize": 12,
+        "colorSplit": 0.015,
+        "scanlines": true
+      },
       "opacity": 0.4,
       "blend": "screen",
       "enter": "fadeIn 0.5s",
       "exit": "fadeOut 0.5s"
     },
-
     {
       "id": "timeline-roadmap",
       "scene": "timelineViz",
@@ -148,9 +205,21 @@
       "dur": 4,
       "params": {
         "items": [
-          { "label": "Beta", "date": "Mar 2024", "desc": "Early access — 2,000 users" },
-          { "label": "GA", "date": "Sep 2024", "desc": "General availability" },
-          { "label": "Enterprise", "date": "Jan 2025", "desc": "SOC2 · SLA · Dedicated infra" }
+          {
+            "label": "Beta",
+            "date": "Mar 2024",
+            "desc": "Early access — 2,000 users"
+          },
+          {
+            "label": "GA",
+            "date": "Sep 2024",
+            "desc": "General availability"
+          },
+          {
+            "label": "Enterprise",
+            "date": "Jan 2025",
+            "desc": "SOC2 · SLA · Dedicated infra"
+          }
         ],
         "color": "#a78bfa",
         "accentColor": "#f472b6"
@@ -159,13 +228,21 @@
       "exit": "fadeOut 0.5s",
       "transition": "dissolve 0.5s"
     },
-
     {
       "id": "confetti-outro",
       "scene": "confetti",
       "start": 27,
       "dur": 3,
-      "params": { "count": 200, "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#34d399", "#fbbf24"] },
+      "params": {
+        "count": 200,
+        "colors": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6",
+          "#34d399",
+          "#fbbf24"
+        ]
+      },
       "blend": "screen",
       "enter": "fadeIn 0.3s"
     },

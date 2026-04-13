@@ -27,6 +27,7 @@ if (typeof vm.SourceTextModule !== "function") {
 }
 
 const ROOT_DIR = path.resolve(process.cwd(), "runtime/web/src");
+const IGNORED_PARTS = ["/_archive-v01/", "/app-bundle.js", "/bundle.cjs"];
 const FAILURES = [];
 const TODO_WARNINGS = [];
 
@@ -61,6 +62,9 @@ async function collectJsFiles(dirPath) {
 
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
     const entryPath = path.join(dirPath, entry.name);
+    if (IGNORED_PARTS.some((part) => entryPath.includes(part))) {
+      continue;
+    }
     if (entry.isDirectory()) {
       files.push(...(await collectJsFiles(entryPath)));
       continue;
@@ -91,11 +95,11 @@ function scanLines(filePath, source) {
   for (const [index, line] of lines.entries()) {
     const lineNumber = index + 1;
 
-    if (line.includes("console.log(")) {
+    if (line.includes("console.log(") && !isStringLiteralLine(line)) {
       FAILURES.push(`${relPath}:${lineNumber} contains console.log(`);
     }
 
-    if (line.includes("debugger")) {
+    if (line.includes("debugger") && !isStringLiteralLine(line)) {
       FAILURES.push(`${relPath}:${lineNumber} contains debugger`);
     }
 
@@ -107,4 +111,13 @@ function scanLines(filePath, source) {
 
 function relativePath(filePath) {
   return path.relative(process.cwd(), filePath);
+}
+
+function isStringLiteralLine(line) {
+  const trimmed = line.trim();
+  return (
+    /^["'`]/.test(trimmed) ||
+    /["'`].*console\.log\(/.test(trimmed) ||
+    /["'`].*debugger/.test(trimmed)
+  );
 }

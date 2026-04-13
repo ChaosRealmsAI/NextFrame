@@ -1,9 +1,13 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 30,
   "background": "#0a0404",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg-shader",
@@ -28,7 +32,6 @@
         "radius": 0.45
       }
     },
-
     {
       "id": "cover-title",
       "scene": "headline",
@@ -40,11 +43,14 @@
         "text": "Claude Code 源码揭秘",
         "subtitle": "Agent Loop 的秘密",
         "fontSize": 96,
-        "gradient": ["#ff6b35", "#ff9a56", "#ffb347"],
+        "gradient": [
+          "#ff6b35",
+          "#ff9a56",
+          "#ffb347"
+        ],
         "stagger": 0.07
       }
     },
-
     {
       "id": "four-slots-grid",
       "scene": "featureGrid",
@@ -56,14 +62,29 @@
         "columns": 2,
         "stagger": 0.06,
         "features": [
-          { "icon": "⚙️", "title": "System Prompt", "desc": "身份 + 规则 + 工具描述 — 每轮重新注入" },
-          { "icon": "💬", "title": "User Message", "desc": "你写的 1 行，系统拼的 87 类" },
-          { "icon": "🔧", "title": "Tools / Functions", "desc": "动态注册，按需注入，可调用" },
-          { "icon": "📦", "title": "Context Window", "desc": "历史对话 + 文件内容 + 项目结构" }
+          {
+            "icon": "⚙️",
+            "title": "System Prompt",
+            "desc": "身份 + 规则 + 工具描述 — 每轮重新注入"
+          },
+          {
+            "icon": "💬",
+            "title": "User Message",
+            "desc": "你写的 1 行，系统拼的 87 类"
+          },
+          {
+            "icon": "🔧",
+            "title": "Tools / Functions",
+            "desc": "动态注册，按需注入，可调用"
+          },
+          {
+            "icon": "📦",
+            "title": "Context Window",
+            "desc": "历史对话 + 文件内容 + 项目结构"
+          }
         ]
       }
     },
-
     {
       "id": "code-panel",
       "scene": "codeBlock",
@@ -101,7 +122,6 @@
         "borderColor": "#ff6b35"
       }
     },
-
     {
       "id": "bar-chart-panel",
       "scene": "barChart",
@@ -114,9 +134,57 @@
       "enter": "slideRight 0.7s",
       "exit": "fadeOut 0.4s",
       "params": {
-        "data": [98, 95, 91, 87, 83, 79, 76, 73, 69, 65, 61, 58, 54, 50, 45],
-        "labels": ["身份", "工具", "历史", "文件", "规则", "路径", "Git", "Mem", "环境", "Lang", "时区", "平台", "权限", "任务", "元数据"],
-        "colors": ["#ff6b35", "#ff8c42", "#ff9a56", "#ffb347", "#ffc462", "#ffd27f", "#ffe09d", "#ffecb3", "#ff6b35", "#ff8c42", "#ff9a56", "#ffb347", "#ffc462", "#ffd27f", "#ffe09d"],
+        "data": [
+          98,
+          95,
+          91,
+          87,
+          83,
+          79,
+          76,
+          73,
+          69,
+          65,
+          61,
+          58,
+          54,
+          50,
+          45
+        ],
+        "labels": [
+          "身份",
+          "工具",
+          "历史",
+          "文件",
+          "规则",
+          "路径",
+          "Git",
+          "Mem",
+          "环境",
+          "Lang",
+          "时区",
+          "平台",
+          "权限",
+          "任务",
+          "元数据"
+        ],
+        "colors": [
+          "#ff6b35",
+          "#ff8c42",
+          "#ff9a56",
+          "#ffb347",
+          "#ffc462",
+          "#ffd27f",
+          "#ffe09d",
+          "#ffecb3",
+          "#ff6b35",
+          "#ff8c42",
+          "#ff9a56",
+          "#ffb347",
+          "#ffc462",
+          "#ffd27f",
+          "#ffe09d"
+        ],
         "barWidth": 48,
         "gap": 12,
         "showLabels": true,
@@ -143,7 +211,6 @@
         "showPercent": true
       }
     },
-
     {
       "id": "agent-loop-flow",
       "scene": "flowChart",
@@ -153,17 +220,26 @@
       "exit": "fadeOut 0.4s",
       "params": {
         "steps": [
-          { "label": "User Input" },
-          { "label": "拼装提示词" },
-          { "label": "Call Claude" },
-          { "label": "执行 Tools" },
-          { "label": "输出结果" }
+          {
+            "label": "User Input"
+          },
+          {
+            "label": "拼装提示词"
+          },
+          {
+            "label": "Call Claude"
+          },
+          {
+            "label": "执行 Tools"
+          },
+          {
+            "label": "输出结果"
+          }
         ],
         "color": "#ff6b35",
         "arrowColor": "#ffb347"
       }
     },
-
     {
       "id": "quote-ending",
       "scene": "quoteBlock",
@@ -188,11 +264,14 @@
         "text": "NextFrame",
         "subtitle": "AI-Native Video Editor",
         "fontSize": 72,
-        "gradient": ["#ff6b35", "#ffb347", "#ff9a56"],
+        "gradient": [
+          "#ff6b35",
+          "#ffb347",
+          "#ff9a56"
+        ],
         "stagger": 0.05
       }
     },
-
     {
       "id": "subtitle-0-5",
       "scene": "subtitleBar",

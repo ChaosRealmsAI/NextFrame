@@ -1,23 +1,40 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 25,
   "background": "#0a0a14",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg",
       "scene": "fluidBackground",
       "start": 0,
       "dur": 25,
-      "params": { "colors": ["#1a0a2e", "#0a1a2e", "#0a0a1e"], "speed": 0.3, "blur": 80 }
+      "params": {
+        "colors": [
+          "#1a0a2e",
+          "#0a1a2e",
+          "#0a0a1e"
+        ],
+        "speed": 0.3,
+        "blur": 80
+      }
     },
     {
       "id": "stars",
       "scene": "starfield",
       "start": 0,
       "dur": 25,
-      "params": { "count": 150, "speed": 15, "depth": 3, "color": "#ffffff" },
+      "params": {
+        "count": 150,
+        "speed": 15,
+        "depth": 3,
+        "color": "#ffffff"
+      },
       "blend": "screen",
       "opacity": 0.4
     },
@@ -30,7 +47,11 @@
         "text": "Product Launch",
         "subtitle": "2026 Roadmap",
         "fontSize": 120,
-        "gradient": ["#ff6b6b", "#ffd93d", "#6bcb77"]
+        "gradient": [
+          "#ff6b6b",
+          "#ffd93d",
+          "#6bcb77"
+        ]
       },
       "enter": "fadeIn 1s",
       "exit": "fadeOut 0.5s"
@@ -41,7 +62,13 @@
       "start": 5,
       "dur": 5,
       "params": {
-        "items": ["Market Analysis", "Product Strategy", "Engineering Timeline", "Budget Allocation", "Q&A"],
+        "items": [
+          "Market Analysis",
+          "Product Strategy",
+          "Engineering Timeline",
+          "Budget Allocation",
+          "Q&A"
+        ],
         "fontSize": 32,
         "bulletColor": "#ffd93d",
         "stagger": 0.25
@@ -69,8 +96,20 @@
       "start": 12,
       "dur": 5,
       "params": {
-        "data": [85, 72, 90, 65, 78],
-        "labels": ["Speed", "Quality", "Scale", "Cost", "UX"],
+        "data": [
+          85,
+          72,
+          90,
+          65,
+          78
+        ],
+        "labels": [
+          "Speed",
+          "Quality",
+          "Scale",
+          "Cost",
+          "UX"
+        ],
         "color": "#6ee7ff",
         "fillOpacity": 0.3,
         "maxValue": 100
@@ -99,9 +138,24 @@
       "start": 17,
       "dur": 5,
       "params": {
-        "data": [95, 82, 68, 45],
-        "labels": ["Backend", "Frontend", "Mobile", "DevOps"],
-        "colors": ["#4ade80", "#6ee7ff", "#a78bfa", "#f472b6"],
+        "data": [
+          95,
+          82,
+          68,
+          45
+        ],
+        "labels": [
+          "Backend",
+          "Frontend",
+          "Mobile",
+          "DevOps"
+        ],
+        "colors": [
+          "#4ade80",
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6"
+        ],
         "height": 40,
         "gap": 20
       },
@@ -127,7 +181,13 @@
       "scene": "circleRipple",
       "start": 0,
       "dur": 25,
-      "params": { "count": 4, "speed": 0.5, "color": "#a78bfa", "strokeWidth": 1, "maxRadius": 500 },
+      "params": {
+        "count": 4,
+        "speed": 0.5,
+        "color": "#a78bfa",
+        "strokeWidth": 1,
+        "maxRadius": 500
+      },
       "blend": "screen",
       "opacity": 0.15
     },
@@ -136,7 +196,11 @@
       "scene": "vignette",
       "start": 0,
       "dur": 25,
-      "params": { "intensity": 0.5, "color": "#000000", "radius": 0.7 }
+      "params": {
+        "intensity": 0.5,
+        "color": "#000000",
+        "radius": 0.7
+      }
     }
   ]
 }

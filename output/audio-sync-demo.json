@@ -1,30 +1,44 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 12,
   "background": "#05050c",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg",
       "scene": "auroraGradient",
       "start": 0,
       "dur": 12,
-      "params": { "hueA": 265, "hueB": 200, "hueC": 330, "intensity": 0.9 }
+      "params": {
+        "hueA": 265,
+        "hueB": 200,
+        "hueC": 330,
+        "intensity": 0.9
+      }
     },
     {
       "id": "vignette",
       "scene": "vignette",
       "start": 0,
       "dur": 12,
-      "params": { "intensity": 0.5 }
+      "params": {
+        "intensity": 0.5
+      }
     },
     {
       "id": "narration-audio",
       "scene": "audioTrack",
       "start": 0,
       "dur": 12,
-      "params": { "src": "narration.mp3", "volume": 0.9 }
+      "params": {
+        "src": "narration.mp3",
+        "volume": 0.9
+      }
     },
     {
       "id": "title",
@@ -35,7 +49,11 @@
         "text": "指数曲线的终局",
         "subtitle": "Dario Amodei 访谈解读",
         "fontSize": 90,
-        "gradient": ["#e8c47a", "#ffd93d", "#ff6b6b"]
+        "gradient": [
+          "#e8c47a",
+          "#ffd93d",
+          "#ff6b6b"
+        ]
       },
       "enter": "fadeIn 0.8s",
       "exit": "fadeOut 0.5s"
@@ -46,14 +64,33 @@
       "start": 3,
       "dur": 5,
       "params": {
-        "data": [10, 15, 25, 45, 80, 150, 300],
-        "labels": ["2020", "2021", "2022", "2023", "2024", "2025", "2026"],
+        "data": [
+          10,
+          15,
+          25,
+          45,
+          80,
+          150,
+          300
+        ],
+        "labels": [
+          "2020",
+          "2021",
+          "2022",
+          "2023",
+          "2024",
+          "2025",
+          "2026"
+        ],
         "color": "#e8c47a",
         "strokeWidth": 3,
         "showDots": true,
         "showArea": true
       },
-      "x": "5%", "y": "5%", "w": "90%", "h": "70%",
+      "x": "5%",
+      "y": "5%",
+      "w": "90%",
+      "h": "70%",
       "transition": "wipeLeft 0.6s",
       "exit": "fadeOut 0.4s"
     },
@@ -78,11 +115,31 @@
       "dur": 12,
       "params": {
         "segments": [
-          {"text": "指数曲线正在逼近终点。", "start_ms": 321, "end_ms": 2945},
-          {"text": "Dario 说，大众完全没意识到，", "start_ms": 3066, "end_ms": 5250},
-          {"text": "我们离终局有多近。", "start_ms": 5610, "end_ms": 6812},
-          {"text": "这不是危言耸听，", "start_ms": 7474, "end_ms": 8736},
-          {"text": "是他真的算过。", "start_ms": 9277, "end_ms": 11000}
+          {
+            "text": "指数曲线正在逼近终点。",
+            "start_ms": 321,
+            "end_ms": 2945
+          },
+          {
+            "text": "Dario 说，大众完全没意识到，",
+            "start_ms": 3066,
+            "end_ms": 5250
+          },
+          {
+            "text": "我们离终局有多近。",
+            "start_ms": 5610,
+            "end_ms": 6812
+          },
+          {
+            "text": "这不是危言耸听，",
+            "start_ms": 7474,
+            "end_ms": 8736
+          },
+          {
+            "text": "是他真的算过。",
+            "start_ms": 9277,
+            "end_ms": 11000
+          }
         ],
         "fontSize": 28,
         "color": "#ffffff",

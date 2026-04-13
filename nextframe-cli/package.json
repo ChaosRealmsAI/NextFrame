@@ -7,7 +7,7 @@
     "nextframe": "bin/nextframe.js"
   },
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/index.js"
   },
   "engines": {
     "node": ">=20"

@@ -1,25 +1,36 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 40,
   "background": "#05050c",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg",
       "scene": "shaderGradient",
       "start": 0,
       "dur": 40,
-      "params": { "color1": "#0a0520", "color2": "#0a1530", "color3": "#150a25", "speed": 0.2 }
+      "params": {
+        "color1": "#0a0520",
+        "color2": "#0a1530",
+        "color3": "#150a25",
+        "speed": 0.2
+      }
     },
     {
       "id": "vignette",
       "scene": "vignette",
       "start": 0,
       "dur": 40,
-      "params": { "intensity": 0.5, "radius": 0.7 }
+      "params": {
+        "intensity": 0.5,
+        "radius": 0.7
+      }
     },
-
     {
       "id": "s1-title",
       "scene": "headline",
@@ -29,23 +40,49 @@
         "text": "NextFrame Engine",
         "subtitle": "48 Components × 4 Render Types × Infinite Layouts",
         "fontSize": 100,
-        "gradient": ["#ff6b6b", "#ffd93d", "#6bcb77", "#6ee7ff", "#a78bfa"]
+        "gradient": [
+          "#ff6b6b",
+          "#ffd93d",
+          "#6bcb77",
+          "#6ee7ff",
+          "#a78bfa"
+        ]
       },
       "enter": "fadeIn 1s",
       "exit": "fadeOut 0.5s"
     },
-
     {
       "id": "s2-left-chart",
       "scene": "barChart",
       "start": 5,
       "dur": 6,
       "params": {
-        "data": [85, 92, 78, 95, 88],
-        "labels": ["DOM", "Canvas", "SVG", "WebGL", "Media"],
-        "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#ffd93d", "#4ade80"]
+        "data": [
+          85,
+          92,
+          78,
+          95,
+          88
+        ],
+        "labels": [
+          "DOM",
+          "Canvas",
+          "SVG",
+          "WebGL",
+          "Media"
+        ],
+        "colors": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6",
+          "#ffd93d",
+          "#4ade80"
+        ]
       },
-      "x": "3%", "y": "5%", "w": "46%", "h": "90%",
+      "x": "3%",
+      "y": "5%",
+      "w": "46%",
+      "h": "90%",
       "transition": "wipeLeft 0.6s",
       "exit": "fadeOut 0.4s"
     },
@@ -55,30 +92,65 @@
       "start": 5.3,
       "dur": 5.7,
       "params": {
-        "data": [16, 12, 10, 8, 2],
-        "labels": ["DOM", "Canvas", "SVG", "WebGL", "Media"],
-        "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#ffd93d", "#4ade80"],
+        "data": [
+          16,
+          12,
+          10,
+          8,
+          2
+        ],
+        "labels": [
+          "DOM",
+          "Canvas",
+          "SVG",
+          "WebGL",
+          "Media"
+        ],
+        "colors": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6",
+          "#ffd93d",
+          "#4ade80"
+        ],
         "innerRadius": 50
       },
-      "x": "52%", "y": "5%", "w": "45%", "h": "90%",
+      "x": "52%",
+      "y": "5%",
+      "w": "45%",
+      "h": "90%",
       "transition": "wipeRight 0.6s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "s3-top-line",
       "scene": "lineChart",
       "start": 11,
       "dur": 6,
       "params": {
-        "data": [10, 20, 28, 40, 48],
-        "labels": ["v0.1", "v0.2", "v0.3", "v0.4", "v1.0"],
+        "data": [
+          10,
+          20,
+          28,
+          40,
+          48
+        ],
+        "labels": [
+          "v0.1",
+          "v0.2",
+          "v0.3",
+          "v0.4",
+          "v1.0"
+        ],
         "color": "#6ee7ff",
         "strokeWidth": 3,
         "showDots": true,
         "showArea": true
       },
-      "x": "3%", "y": "3%", "w": "94%", "h": "45%",
+      "x": "3%",
+      "y": "3%",
+      "w": "94%",
+      "h": "45%",
       "transition": "slideUp 0.5s",
       "exit": "fadeOut 0.4s"
     },
@@ -94,7 +166,10 @@
         "label": "Quality",
         "showPercent": true
       },
-      "x": "3%", "y": "52%", "w": "30%", "h": "45%",
+      "x": "3%",
+      "y": "52%",
+      "w": "30%",
+      "h": "45%",
       "transition": "zoomIn 0.5s",
       "exit": "fadeOut 0.3s"
     },
@@ -109,7 +184,10 @@
         "label": "Components",
         "color": "#a78bfa"
       },
-      "x": "35%", "y": "52%", "w": "30%", "h": "45%",
+      "x": "35%",
+      "y": "52%",
+      "w": "30%",
+      "h": "45%",
       "transition": "zoomIn 0.5s",
       "exit": "fadeOut 0.3s"
     },
@@ -124,11 +202,13 @@
         "color": "#ffd93d",
         "height": 20
       },
-      "x": "67%", "y": "52%", "w": "30%", "h": "45%",
+      "x": "67%",
+      "y": "52%",
+      "w": "30%",
+      "h": "45%",
       "transition": "zoomIn 0.5s",
       "exit": "fadeOut 0.3s"
     },
-
     {
       "id": "s4-code",
       "scene": "codeBlock",
@@ -139,7 +219,10 @@
         "language": "javascript",
         "fontSize": 18
       },
-      "x": "3%", "y": "5%", "w": "55%", "h": "90%",
+      "x": "3%",
+      "y": "5%",
+      "w": "55%",
+      "h": "90%",
       "transition": "slideLeft 0.6s",
       "exit": "fadeOut 0.4s"
     },
@@ -155,7 +238,10 @@
         "bgColor": "rgba(110,231,255,0.08)",
         "borderColor": "#6ee7ff"
       },
-      "x": "60%", "y": "8%", "w": "37%", "h": "38%",
+      "x": "60%",
+      "y": "8%",
+      "w": "37%",
+      "h": "38%",
       "transition": "wipeRight 0.5s",
       "exit": "fadeOut 0.3s"
     },
@@ -171,11 +257,13 @@
         "bgColor": "rgba(167,139,250,0.08)",
         "borderColor": "#a78bfa"
       },
-      "x": "60%", "y": "52%", "w": "37%", "h": "38%",
+      "x": "60%",
+      "y": "52%",
+      "w": "37%",
+      "h": "38%",
       "transition": "wipeRight 0.5s",
       "exit": "fadeOut 0.3s"
     },
-
     {
       "id": "s5-features",
       "scene": "featureGrid",
@@ -183,15 +271,34 @@
       "dur": 6,
       "params": {
         "features": [
-          { "icon": "🎨", "title": "Canvas 2D", "desc": "Particles, gradients, waveforms" },
-          { "icon": "📝", "title": "DOM + CSS", "desc": "Text, cards, layouts" },
-          { "icon": "📊", "title": "SVG", "desc": "Charts, diagrams, icons" },
-          { "icon": "⚡", "title": "WebGL", "desc": "Shaders, GPU effects" }
+          {
+            "icon": "🎨",
+            "title": "Canvas 2D",
+            "desc": "Particles, gradients, waveforms"
+          },
+          {
+            "icon": "📝",
+            "title": "DOM + CSS",
+            "desc": "Text, cards, layouts"
+          },
+          {
+            "icon": "📊",
+            "title": "SVG",
+            "desc": "Charts, diagrams, icons"
+          },
+          {
+            "icon": "⚡",
+            "title": "WebGL",
+            "desc": "Shaders, GPU effects"
+          }
         ],
         "columns": 2,
         "stagger": 0.05
       },
-      "x": "5%", "y": "5%", "w": "50%", "h": "90%",
+      "x": "5%",
+      "y": "5%",
+      "w": "50%",
+      "h": "90%",
       "transition": "dissolve 0.8s",
       "exit": "fadeOut 0.4s"
     },
@@ -201,17 +308,31 @@
       "start": 22.5,
       "dur": 5.5,
       "params": {
-        "data": [95, 90, 85, 80, 92],
-        "labels": ["Render", "Layout", "Animation", "Effects", "AI-Ready"],
+        "data": [
+          95,
+          90,
+          85,
+          80,
+          92
+        ],
+        "labels": [
+          "Render",
+          "Layout",
+          "Animation",
+          "Effects",
+          "AI-Ready"
+        ],
         "color": "#a78bfa",
         "fillOpacity": 0.25,
         "maxValue": 100
       },
-      "x": "55%", "y": "10%", "w": "42%", "h": "80%",
+      "x": "55%",
+      "y": "10%",
+      "w": "42%",
+      "h": "80%",
       "transition": "zoomIn 0.6s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "s6-timeline",
       "scene": "timelineViz",
@@ -219,11 +340,26 @@
       "dur": 5,
       "params": {
         "events": [
-          { "label": "CLI + Scenes", "date": "v0.1" },
-          { "label": "Recorder", "date": "v0.2" },
-          { "label": "HTML Engine", "date": "v0.3" },
-          { "label": "AI Agent", "date": "v0.4" },
-          { "label": "Launch", "date": "v1.0" }
+          {
+            "label": "CLI + Scenes",
+            "date": "v0.1"
+          },
+          {
+            "label": "Recorder",
+            "date": "v0.2"
+          },
+          {
+            "label": "HTML Engine",
+            "date": "v0.3"
+          },
+          {
+            "label": "AI Agent",
+            "date": "v0.4"
+          },
+          {
+            "label": "Launch",
+            "date": "v1.0"
+          }
         ],
         "color": "#ffd93d",
         "dotSize": 10
@@ -231,7 +367,6 @@
       "transition": "wipeUp 0.6s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "s7-end",
       "scene": "headline",
@@ -241,18 +376,26 @@
         "text": "Built for AI",
         "subtitle": "Timeline JSON → HTML → Browser → Video",
         "fontSize": 110,
-        "gradient": ["#6ee7ff", "#a78bfa", "#f472b6"]
+        "gradient": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6"
+        ]
       },
       "transition": "dissolve 1s",
       "exit": "fadeOut 1s"
     },
-
     {
       "id": "fireflies",
       "scene": "shaderFirefly",
       "start": 0,
       "dur": 40,
-      "params": { "count": 150, "color": "#ffd93d", "glowSize": 0.015, "speed": 0.4 },
+      "params": {
+        "count": 150,
+        "color": "#ffd93d",
+        "glowSize": 0.015,
+        "speed": 0.4
+      },
       "blend": "screen",
       "opacity": 0.4
     },
@@ -261,7 +404,16 @@
       "scene": "confetti",
       "start": 33,
       "dur": 7,
-      "params": { "count": 100, "colors": ["#ff6b6b","#ffd93d","#6bcb77","#6ee7ff","#a78bfa"] },
+      "params": {
+        "count": 100,
+        "colors": [
+          "#ff6b6b",
+          "#ffd93d",
+          "#6bcb77",
+          "#6ee7ff",
+          "#a78bfa"
+        ]
+      },
       "blend": "screen",
       "opacity": 0.5
     },

@@ -352,6 +352,34 @@ function getTimelineTracks(timeline) {
   });
 }
 
+// v0.1 → v0.3 scene ID mapping
+var SCENE_ALIASES = {
+  kineticHeadline: "headline",
+  htmlSlide: "headline",
+  svgOverlay: "headline",
+  markdownSlide: "headline",
+  videoClip: "headline",
+  cornerBadge: "lowerThird",
+  orbitRings: "circleRipple",
+  lowerThirdVelvet: "lowerThird",
+  textOverlay: "headline",
+  barChartReveal: "barChart",
+  dataPulse: "barChart",
+  shapeBurst: "confetti",
+  spotlightSweep: "auroraGradient",
+  pixelRain: "particleFlow",
+  glitchText: "headline",
+  countdown: "numberCounter",
+  lineChart: "lineChart",
+  imageHero: "imageHero",
+};
+
+function resolveSceneId(id) {
+  if (!id) return id;
+  if (window.__engineV2 && window.__engineV2.SCENE_REGISTRY && window.__engineV2.SCENE_REGISTRY[id]) return id;
+  return SCENE_ALIASES[id] || id;
+}
+
 function buildPreviewTimeline(timeline) {
   const source = timeline && typeof timeline === "object" ? timeline : {};
   const project = source.project && typeof source.project === "object" ? source.project : {};
@@ -385,7 +413,7 @@ function buildPreviewTimeline(timeline) {
       const timing = deriveClipTiming(clip);
       layers.push(Object.assign({}, clip, {
         id: clip?.id || ((track?.id || ("track-" + (trackIndex + 1))) + "-" + (clipIndex + 1)),
-        scene: clip?.scene || clip?.type || "",
+        scene: resolveSceneId(clip?.scene || clip?.type || ""),
         start: timing.start,
         dur: timing.duration,
       }));
@@ -1072,7 +1100,11 @@ function initDOMPreview(timeline) {
   if (placeholder) {
     placeholder.style.display = "none";
   }
-  requestPreviewFrame(currentTime);
+  // Render initial frame — use a small t so enter animations have started
+  if (previewEngine && previewEngine.renderFrame) {
+    previewEngine.renderFrame(Math.max(0.5, currentTime || 0));
+    window.__previewEngine = previewEngine; // expose for CLI control
+  }
   return true;
 }
 

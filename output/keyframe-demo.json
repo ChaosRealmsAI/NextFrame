@@ -1,33 +1,112 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 15,
   "background": "#05050c",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg",
       "scene": "shaderGradient",
       "start": 0,
       "dur": 15,
-      "params": { "color1": "#0a0520", "color2": "#0a1530", "color3": "#150a25" }
+      "params": {
+        "color1": "#0a0520",
+        "color2": "#0a1530",
+        "color3": "#150a25"
+      }
     },
     {
       "id": "vignette",
       "scene": "vignette",
       "start": 0,
       "dur": 15,
-      "params": { "intensity": 0.5 }
+      "params": {
+        "intensity": 0.5
+      }
     },
     {
       "id": "title-slide",
       "scene": "headline",
       "start": 0,
       "dur": 5,
-      "params": { "text": "Keyframes", "subtitle": "Any property, any time, any curve", "fontSize": 100, "gradient": ["#ff6b6b", "#ffd93d", "#6ee7ff"] },
-      "opacity": { "keys": [[0, 0], [1, 1], [4, 1], [5, 0]], "ease": "easeOut" },
-      "scale": { "keys": [[0, 0.8], [1.5, 1], [4, 1], [5, 1.2]], "ease": "easeOut" },
-      "rotation": { "keys": [[0, -5], [1.5, 0], [4, 0], [5, 5]], "ease": "easeOut" }
+      "params": {
+        "text": "Keyframes",
+        "subtitle": "Any property, any time, any curve",
+        "fontSize": 100,
+        "gradient": [
+          "#ff6b6b",
+          "#ffd93d",
+          "#6ee7ff"
+        ]
+      },
+      "opacity": {
+        "keys": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            4,
+            1
+          ],
+          [
+            5,
+            0
+          ]
+        ],
+        "ease": "easeOut"
+      },
+      "scale": {
+        "keys": [
+          [
+            0,
+            0.8
+          ],
+          [
+            1.5,
+            1
+          ],
+          [
+            4,
+            1
+          ],
+          [
+            5,
+            1.2
+          ]
+        ],
+        "ease": "easeOut"
+      },
+      "rotation": {
+        "keys": [
+          [
+            0,
+            -5
+          ],
+          [
+            1.5,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            5
+          ]
+        ],
+        "ease": "easeOut"
+      }
     },
     {
       "id": "chart-fly-in",
@@ -35,27 +114,144 @@
       "start": 5,
       "dur": 5,
       "params": {
-        "data": [40, 70, 55, 90, 65],
-        "labels": ["A", "B", "C", "D", "E"],
-        "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#ffd93d", "#4ade80"]
+        "data": [
+          40,
+          70,
+          55,
+          90,
+          65
+        ],
+        "labels": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E"
+        ],
+        "colors": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6",
+          "#ffd93d",
+          "#4ade80"
+        ]
       },
-      "x": { "keys": [[0, "100%"], [1.5, "10%"]], "ease": "easeOut" },
+      "x": {
+        "keys": [
+          [
+            0,
+            "100%"
+          ],
+          [
+            1.5,
+            "10%"
+          ]
+        ],
+        "ease": "easeOut"
+      },
       "y": "10%",
       "w": "80%",
       "h": "80%",
-      "opacity": { "keys": [[0, 0], [0.5, 1], [4, 1], [5, 0]] },
-      "rotation": { "keys": [[0, 10], [1.5, 0]], "ease": "easeOut" }
+      "opacity": {
+        "keys": [
+          [
+            0,
+            0
+          ],
+          [
+            0.5,
+            1
+          ],
+          [
+            4,
+            1
+          ],
+          [
+            5,
+            0
+          ]
+        ]
+      },
+      "rotation": {
+        "keys": [
+          [
+            0,
+            10
+          ],
+          [
+            1.5,
+            0
+          ]
+        ],
+        "ease": "easeOut"
+      }
     },
     {
       "id": "ring-pulse",
       "scene": "progressRing",
       "start": 10,
       "dur": 5,
-      "params": { "progress": 100, "color": "#4ade80", "strokeWidth": 14, "label": "Done", "showPercent": true },
-      "x": "35%", "y": "20%", "w": "30%", "h": "55%",
-      "scale": { "keys": [[0, 0], [1, 1.15], [1.5, 1]], "ease": "easeOut" },
-      "opacity": { "keys": [[0, 0], [0.5, 1], [4, 1], [5, 0]] },
-      "rotation": { "keys": [[0, 0], [5, 360]], "ease": "linear" }
+      "params": {
+        "progress": 100,
+        "color": "#4ade80",
+        "strokeWidth": 14,
+        "label": "Done",
+        "showPercent": true
+      },
+      "x": "35%",
+      "y": "20%",
+      "w": "30%",
+      "h": "55%",
+      "scale": {
+        "keys": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            1.15
+          ],
+          [
+            1.5,
+            1
+          ]
+        ],
+        "ease": "easeOut"
+      },
+      "opacity": {
+        "keys": [
+          [
+            0,
+            0
+          ],
+          [
+            0.5,
+            1
+          ],
+          [
+            4,
+            1
+          ],
+          [
+            5,
+            0
+          ]
+        ]
+      },
+      "rotation": {
+        "keys": [
+          [
+            0,
+            0
+          ],
+          [
+            5,
+            360
+          ]
+        ],
+        "ease": "linear"
+      }
     }
   ]
 }

@@ -260,6 +260,7 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
 
   // ─── renderFrame(t) ───
   function renderFrame(t) {
+    resetMediaStallTimer();
     for (const state of layerStates) {
       const { layer, scene, container, sceneContainer } = state;
       const start = layer.start || 0;

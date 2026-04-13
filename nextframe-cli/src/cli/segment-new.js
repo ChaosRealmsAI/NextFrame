@@ -3,12 +3,19 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { parseFlags, emit } from "./_io.js";
+import { createTimelineTemplate } from "../engine-v2/timeline.js";
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
   const [projectName, episodeName, name] = positional;
   if (!projectName || !episodeName || !name) {
-    emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe segment-new <project> <episode> <name> [--root=PATH] [--duration=N --fps=N]" } }, flags);
+    emit({
+      ok: false,
+      error: {
+        code: "USAGE",
+        message: "usage: nextframe segment-new <project> <episode> <name> [--root=PATH] [--duration=N --fps=N --width=N --height=N]",
+      },
+    }, flags);
     return 3;
   }
 
@@ -30,16 +37,16 @@ export async function run(argv) {
 
   const stamp = new Date().toISOString();
   try {
-    const timeline = makeEmptyTimeline(flags);
+    const timeline = createTimelineTemplate(flags);
     await writeFile(path, JSON.stringify(timeline, null, 2) + "\n", { flag: "wx" });
     project.updated = stamp;
     await writeFile(projectFile, JSON.stringify(project, null, 2) + "\n");
-  } catch (err) {
-    if (err.code === "EEXIST") {
+  } catch (error) {
+    if (error.code === "EEXIST") {
       emit({ ok: false, error: { code: "SEGMENT_EXISTS", message: `segment already exists: ${path}` } }, flags);
       return 2;
     }
-    emit({ ok: false, error: { code: "CREATE_FAIL", message: err.message } }, flags);
+    emit({ ok: false, error: { code: "CREATE_FAIL", message: error.message } }, flags);
     return 2;
   }
 
@@ -50,22 +57,6 @@ export async function run(argv) {
     process.stdout.write(`created ${path}\n`);
   }
   return 0;
-}
-
-function makeEmptyTimeline(flags) {
-  return {
-    width: finiteOr(flags.width, 1920),
-    height: finiteOr(flags.height, 1080),
-    fps: finiteOr(flags.fps, 30),
-    duration: finiteOr(flags.duration, 10),
-    background: "#05050c",
-    layers: [],
-  };
-}
-
-function finiteOr(raw, fallback) {
-  const value = Number(raw);
-  return Number.isFinite(value) ? value : fallback;
 }
 
 async function loadJson(path) {

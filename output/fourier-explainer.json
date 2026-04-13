@@ -1,9 +1,13 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 25,
   "background": "#05050c",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg-shader",
@@ -83,8 +87,26 @@
       "dur": 5,
       "params": {
         "title": "频谱分量 — Frequency Spectrum",
-        "labels": ["10Hz", "25Hz", "50Hz", "75Hz", "100Hz", "120Hz", "200Hz", "400Hz"],
-        "values": [8, 22, 95, 18, 35, 88, 12, 5],
+        "labels": [
+          "10Hz",
+          "25Hz",
+          "50Hz",
+          "75Hz",
+          "100Hz",
+          "120Hz",
+          "200Hz",
+          "400Hz"
+        ],
+        "values": [
+          8,
+          22,
+          95,
+          18,
+          35,
+          88,
+          12,
+          5
+        ],
         "color": "#7c3aed"
       },
       "enter": "scaleIn 0.7s",
@@ -99,10 +121,22 @@
       "params": {
         "title": "四大核心应用",
         "items": [
-          { "title": "音频处理", "desc": "均衡器、降噪、MP3 压缩编码" },
-          { "title": "图像压缩", "desc": "JPEG / WebP 频域 DCT 编码" },
-          { "title": "无线通信", "desc": "OFDM 多载波 4G/5G 技术" },
-          { "title": "医学成像", "desc": "MRI 磁共振频域重建" }
+          {
+            "title": "音频处理",
+            "desc": "均衡器、降噪、MP3 压缩编码"
+          },
+          {
+            "title": "图像压缩",
+            "desc": "JPEG / WebP 频域 DCT 编码"
+          },
+          {
+            "title": "无线通信",
+            "desc": "OFDM 多载波 4G/5G 技术"
+          },
+          {
+            "title": "医学成像",
+            "desc": "MRI 磁共振频域重建"
+          }
         ],
         "columns": 2
       },

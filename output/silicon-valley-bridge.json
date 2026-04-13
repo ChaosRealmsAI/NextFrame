@@ -1,9 +1,13 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 35,
   "background": "#05050c",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg-aurora",
@@ -29,7 +33,6 @@
         "radius": 0.45
       }
     },
-
     {
       "id": "cover-headline",
       "scene": "headline",
@@ -39,13 +42,16 @@
         "text": "指数曲线的终局",
         "subtitle": "Dario Amodei 访谈解读",
         "fontSize": 96,
-        "gradient": ["#e8c47a", "#f5e0a0", "#e8c47a"],
+        "gradient": [
+          "#e8c47a",
+          "#f5e0a0",
+          "#e8c47a"
+        ],
         "stagger": 0.08
       },
       "enter": "fadeIn 0.8s",
       "exit": "fadeOut 0.6s"
     },
-
     {
       "id": "bullets-overview",
       "scene": "bulletList",
@@ -64,7 +70,6 @@
       "enter": "slideUp 0.7s",
       "exit": "fadeOut 0.5s"
     },
-
     {
       "id": "compute-chart",
       "scene": "lineChart",
@@ -75,8 +80,24 @@
       "w": "54%",
       "h": "84%",
       "params": {
-        "data": [12, 18, 30, 55, 90, 140, 220],
-        "labels": ["2020", "2021", "2022", "2023", "2024", "2025", "2026"],
+        "data": [
+          12,
+          18,
+          30,
+          55,
+          90,
+          140,
+          220
+        ],
+        "labels": [
+          "2020",
+          "2021",
+          "2022",
+          "2023",
+          "2024",
+          "2025",
+          "2026"
+        ],
         "color": "#e8c47a",
         "strokeWidth": 4,
         "showDots": true,
@@ -104,16 +125,30 @@
       "enter": "scaleIn 0.8s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "rl-vs-compute-chart",
       "scene": "barChart",
       "start": 16,
       "dur": 6,
       "params": {
-        "data": [35, 100, 45, 220],
-        "labels": ["RL 2022", "RL 2026", "Compute 2022", "Compute 2026"],
-        "colors": ["#6ee7ff", "#6ee7ff", "#e8c47a", "#e8c47a"],
+        "data": [
+          35,
+          100,
+          45,
+          220
+        ],
+        "labels": [
+          "RL 2022",
+          "RL 2026",
+          "Compute 2022",
+          "Compute 2026"
+        ],
+        "colors": [
+          "#6ee7ff",
+          "#6ee7ff",
+          "#e8c47a",
+          "#e8c47a"
+        ],
         "barWidth": 160,
         "gap": 80,
         "showLabels": true,
@@ -122,7 +157,6 @@
       "enter": "slideUp 0.7s",
       "exit": "fadeOut 0.5s"
     },
-
     {
       "id": "big-blob-bullets",
       "scene": "bulletList",
@@ -159,8 +193,24 @@
       "w": "34%",
       "h": "80%",
       "params": {
-        "data": [82, 90, 75, 60, 88, 70, 65],
-        "labels": ["Reasoning", "Knowledge", "Tools", "Memory", "Multimodal", "Agency", "Alignment"],
+        "data": [
+          82,
+          90,
+          75,
+          60,
+          88,
+          70,
+          65
+        ],
+        "labels": [
+          "Reasoning",
+          "Knowledge",
+          "Tools",
+          "Memory",
+          "Multimodal",
+          "Agency",
+          "Alignment"
+        ],
         "color": "#6ee7ff",
         "fillOpacity": 0.3,
         "maxValue": 100
@@ -168,7 +218,6 @@
       "enter": "scaleIn 0.7s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "milestones-timeline",
       "scene": "timelineViz",
@@ -176,12 +225,30 @@
       "dur": 5,
       "params": {
         "events": [
-          { "label": "GPT-3", "date": "2020" },
-          { "label": "InstructGPT", "date": "2022" },
-          { "label": "GPT-4", "date": "2023" },
-          { "label": "Claude 3", "date": "2024" },
-          { "label": "Inflection", "date": "2025" },
-          { "label": "AGI?", "date": "2026+" }
+          {
+            "label": "GPT-3",
+            "date": "2020"
+          },
+          {
+            "label": "InstructGPT",
+            "date": "2022"
+          },
+          {
+            "label": "GPT-4",
+            "date": "2023"
+          },
+          {
+            "label": "Claude 3",
+            "date": "2024"
+          },
+          {
+            "label": "Inflection",
+            "date": "2025"
+          },
+          {
+            "label": "AGI?",
+            "date": "2026+"
+          }
         ],
         "color": "#e8c47a",
         "dotSize": 10
@@ -189,7 +256,6 @@
       "enter": "fadeIn 0.7s",
       "exit": "fadeOut 0.5s"
     },
-
     {
       "id": "closing-quote",
       "scene": "quoteBlock",
@@ -204,7 +270,6 @@
       "enter": "fadeIn 0.8s",
       "exit": "fadeOut 0.5s"
     },
-
     {
       "id": "bottom-marquee",
       "scene": "marquee",

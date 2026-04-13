@@ -1,19 +1,31 @@
-// engine-v2/describe.js — describe what is active at a given time t.
+import { getScene } from "./scenes.js";
+import { listActiveLayers } from "./timeline.js";
 
 export function describeAt(timeline, t) {
-  const active = [];
-  for (const layer of timeline.layers || []) {
-    const end = layer.start + layer.dur;
-    if (t >= layer.start && t < end) {
-      const localT = t - layer.start;
-      active.push({
-        id: layer.id,
-        scene: layer.scene,
-        localT: Math.round(localT * 1000) / 1000,
-        progress: Math.round((localT / layer.dur) * 1000) / 1000,
-        params: layer.params || {},
-      });
-    }
-  }
-  return { ok: true, value: { time: t, active, count: active.length } };
+  const active = listActiveLayers(timeline, t).map((layer) => {
+    const meta = getScene(layer.scene);
+    return {
+      id: layer.id,
+      scene: layer.scene,
+      localT: layer.localT,
+      progress: layer.progress,
+      params: layer.params || {},
+      x: layer.x ?? null,
+      y: layer.y ?? null,
+      w: layer.w ?? null,
+      h: layer.h ?? null,
+      zIndex: layer.zIndex ?? null,
+      category: meta?.category || null,
+      type: meta?.type || null,
+    };
+  });
+
+  return {
+    ok: true,
+    value: {
+      t,
+      active,
+      activeCount: active.length,
+    },
+  };
 }

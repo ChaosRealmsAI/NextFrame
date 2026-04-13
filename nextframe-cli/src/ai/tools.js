@@ -1,161 +1,243 @@
-// AI tool definitions — v0.3 layers[] format.
-import { REGISTRY, listScenes, getScene } from '../engine-v2/registry.js';
-import { validateTimeline } from '../engine-v2/validate.js';
-import { describeAt } from '../engine-v2/describe.js';
-import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from '../engine-v2/ops.js';
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+import { describeAt } from "../engine-v2/describe.js";
+import { addLayer, listLayers, moveLayer, removeLayer, resizeLayer, setLayerProps } from "../engine-v2/ops.js";
+import { getScene, listScenes } from "../engine-v2/scenes.js";
+import { cloneTimeline, findLayer, listActiveLayers } from "../engine-v2/timeline.js";
+import { validateTimeline } from "../engine-v2/validate.js";
+import { captureFrameToFile } from "../targets/browser.js";
+import { pngToAscii } from "../views/ascii.js";
+import { renderGantt } from "../views/gantt.js";
 
 export const TOOLS = {
-  list_scenes: {
-    schema: { name: "list_scenes", description: "List all v0.3 scenes from registry", params: [] },
-    handler: () => ({ ok: true, value: listScenes() }),
-  },
-  get_scene: {
-    schema: {
-      name: "get_scene",
-      description: "Get scene metadata by id",
-      params: [{ name: "id", type: "string", required: true }],
-    },
-    handler: ({ id }) => {
+  list_scenes: makeTool("list_scenes", "List all v0.3 scenes", [], () => ({ ok: true, value: listScenes() })),
+  get_scene: makeTool(
+    "get_scene",
+    "Get one v0.3 scene",
+    [{ name: "id", type: "string", required: true }],
+    ({ id }) => {
       const scene = getScene(id);
-      if (!scene) return { ok: false, error: { code: "UNKNOWN_SCENE", message: `no scene "${id}"` } };
-      return { ok: true, value: scene };
+      return scene
+        ? { ok: true, value: scene }
+        : { ok: false, error: { code: "UNKNOWN_SCENE", message: `unknown scene "${id}"` } };
     },
-  },
-  validate_timeline: {
-    schema: {
-      name: "validate_timeline",
-      description: "Validate v0.3 layers[] timeline",
-      params: [{ name: "timeline", type: "object", required: true }],
+  ),
+  validate_timeline: makeTool(
+    "validate_timeline",
+    "Validate a v0.3 timeline",
+    [{ name: "timeline", type: "object", required: true }],
+    ({ timeline }) => ({ ok: true, value: validateTimeline(timeline) }),
+  ),
+  describe_frame: makeTool(
+    "describe_frame",
+    "Describe active layers at time t",
+    [
+      { name: "timeline", type: "object", required: true },
+      { name: "t", type: "number", required: true },
+    ],
+    ({ timeline, t }) => {
+      const described = describeAt(timeline, Number(t) || 0);
+      if (!described.ok) return described;
+      return {
+        ok: true,
+        value: {
+          t: described.value.t,
+          active_layers: described.value.active,
+        },
+      };
     },
-    handler: ({ timeline }) => validateTimeline(timeline),
-  },
-  describe_frame: {
-    schema: {
-      name: "describe_frame",
-      description: "Describe active layers at time t",
-      params: [{ name: "timeline", type: "object", required: true }, { name: "t", type: "number", required: true }],
-    },
-    handler: ({ timeline, t }) => describeAt(timeline, t),
-  },
-  find_layers: {
-    schema: {
-      name: "find_layers",
-      description: "Search layers by scene or time",
-      params: [{ name: "timeline", type: "object", required: true }, { name: "scene", type: "string" }, { name: "at", type: "number" }],
-    },
-    handler: ({ timeline, scene, at }) => {
-      const matches = [];
-      for (const layer of timeline.layers || []) {
-        if (scene && layer.scene !== scene) continue;
-        if (typeof at === "number" && (at < layer.start || at >= layer.start + layer.dur)) continue;
-        matches.push({ id: layer.id, scene: layer.scene, start: layer.start, dur: layer.dur, end: layer.start + layer.dur });
+  ),
+  list_layers: makeTool(
+    "list_layers",
+    "List layers with timing",
+    [{ name: "timeline", type: "object", required: true }],
+    ({ timeline }) => listLayers(timeline),
+  ),
+  get_layer: makeTool(
+    "get_layer",
+    "Get one layer by id",
+    [
+      { name: "timeline", type: "object", required: true },
+      { name: "layerId", type: "string", required: true },
+    ],
+    ({ timeline, layerId }) => {
+      const layer = findLayer(timeline, layerId);
+      if (!layer) {
+        return { ok: false, error: { code: "NOT_FOUND", message: `layer "${layerId}" not found` } };
       }
+      return { ok: true, value: layer };
+    },
+  ),
+  find_layers: makeTool(
+    "find_layers",
+    "Filter layers by scene, time, or param name",
+    [
+      { name: "timeline", type: "object", required: true },
+      { name: "scene", type: "string" },
+      { name: "at", type: "number" },
+      { name: "param", type: "string" },
+    ],
+    ({ timeline, scene, at, param }) => {
+      const time = at === undefined ? null : Number(at);
+      const matches = (timeline?.layers || []).filter((layer) => {
+        if (scene && layer.scene !== scene) return false;
+        if (param && !Object.hasOwn(layer.params || {}, param)) return false;
+        if (time !== null && !(time >= Number(layer.start) && time < Number(layer.start) + Number(layer.dur))) {
+          return false;
+        }
+        return true;
+      });
       return { ok: true, value: matches };
     },
-  },
-  get_layer: {
-    schema: {
-      name: "get_layer",
-      description: "Get full layer details by id",
-      params: [{ name: "timeline", type: "object", required: true }, { name: "layerId", type: "string", required: true }],
-    },
-    handler: ({ timeline, layerId }) => {
-      const layer = (timeline.layers || []).find(l => l.id === layerId);
-      if (!layer) return { ok: false, error: { code: "NOT_FOUND", message: `no layer "${layerId}"` } };
-      return { ok: true, value: { ...layer, sceneMeta: REGISTRY.get(layer.scene) || null } };
-    },
-  },
-  list_layers: {
-    schema: {
-      name: "list_layers",
-      description: "List all layers with timing",
-      params: [{ name: "timeline", type: "object", required: true }],
-    },
-    handler: ({ timeline }) => listLayers(timeline),
-  },
-  apply_patch: {
-    schema: {
-      name: "apply_patch",
-      description: "Apply layer mutations then validate",
-      params: [{ name: "timeline", type: "object", required: true }, { name: "ops", type: "array", required: true }],
-    },
-    handler: ({ timeline, ops }) => {
-      if (!Array.isArray(ops)) return { ok: false, error: { code: "BAD_OPS", message: "ops must be an array" } };
-      const tl = JSON.parse(JSON.stringify(timeline));
+  ),
+  apply_layer_ops: makeTool(
+    "apply_layer_ops",
+    "Apply v0.3 layer operations",
+    [
+      { name: "timeline", type: "object", required: true },
+      { name: "ops", type: "array", required: true },
+    ],
+    ({ timeline, ops }) => {
+      if (!Array.isArray(ops)) {
+        return { ok: false, error: { code: "BAD_OPS", message: "ops must be an array" } };
+      }
+      const working = cloneTimeline(timeline);
       let applied = 0;
       for (const op of ops) {
-        const result = applyLayerOp(tl, op);
+        const result = applyLayerOp(working, op);
         if (!result.ok) return result;
         applied += 1;
       }
-      return { ok: true, value: { timeline: tl, validation: validateTimeline(tl), applied } };
+      return {
+        ok: true,
+        value: {
+          timeline: working,
+          applied,
+          validation: validateTimeline(working),
+        },
+      };
     },
-  },
-  assert_at: {
-    schema: {
-      name: "assert_at",
-      description: "Assert conditions at time t",
-      params: [{ name: "timeline", type: "object", required: true }, { name: "t", type: "number", required: true }, { name: "checks", type: "array", required: true }],
-    },
-    handler: ({ timeline, t, checks }) => {
-      if (!Array.isArray(checks)) return { ok: false, error: { code: "BAD_CHECKS", message: "checks must be an array" } };
-      const frame = describeAt(timeline, t);
-      if (!frame.ok) return frame;
+  ),
+  assert_frame: makeTool(
+    "assert_frame",
+    "Evaluate assertions at time t",
+    [
+      { name: "timeline", type: "object", required: true },
+      { name: "t", type: "number", required: true },
+      { name: "checks", type: "array", required: true },
+    ],
+    ({ timeline, t, checks }) => {
+      if (!Array.isArray(checks)) {
+        return { ok: false, error: { code: "BAD_CHECKS", message: "checks must be an array" } };
+      }
+      const active = listActiveLayers(timeline, Number(t) || 0);
       const failed = [];
       let passed = 0;
       for (const check of checks) {
-        const result = evaluateCheck(frame.value, check);
-        if (!result.ok) return result;
-        if (result.value.pass) passed += 1;
-        else failed.push({ check, expected: result.value.expected, actual: result.value.actual });
+        const outcome = evaluateCheck(timeline, active, check, Number(t) || 0);
+        if (!outcome.ok) return outcome;
+        if (outcome.value.pass) passed += 1;
+        else failed.push({ check, expected: outcome.value.expected, actual: outcome.value.actual });
       }
-      return { ok: true, value: { t, passed, failed, total: checks.length } };
+      return { ok: true, value: { t: Number(t) || 0, passed, total: checks.length, failed } };
     },
-  },
+  ),
+  gantt_ascii: makeTool(
+    "gantt_ascii",
+    "Render an ASCII gantt for a v0.3 timeline",
+    [
+      { name: "timeline", type: "object", required: true },
+      { name: "width", type: "number" },
+    ],
+    ({ timeline, width }) => ({ ok: true, value: renderGantt(timeline, Number(width) || 72) }),
+  ),
+  render_ascii: makeTool(
+    "render_ascii",
+    "Render one frame to ASCII",
+    [
+      { name: "timeline", type: "object", required: true },
+      { name: "t", type: "number", required: true },
+      { name: "width", type: "number" },
+    ],
+    async ({ timeline, t, width }) => {
+      const tempDir = await mkdtemp(join(tmpdir(), "nextframe-ascii-"));
+      const framePath = join(tempDir, "frame.png");
+      try {
+        const captured = await captureFrameToFile(timeline, framePath, { t: Number(t) || 0 });
+        if (!captured.ok) return captured;
+        const png = await readFile(framePath);
+        return {
+          ok: true,
+          value: await pngToAscii(png, Number(width) || 80, 24),
+        };
+      } finally {
+        await rm(tempDir, { recursive: true, force: true });
+      }
+    },
+  ),
 };
 
-export const TOOL_DEFINITIONS = Object.fromEntries(Object.entries(TOOLS).map(([name, tool]) => [name, { description: tool.schema.description }]));
+export const TOOL_DEFINITIONS = Object.fromEntries(
+  Object.entries(TOOLS).map(([name, tool]) => [name, { description: tool.schema.description }]),
+);
+
+function makeTool(name, description, params, handler) {
+  return {
+    schema: {
+      name,
+      description,
+      params,
+    },
+    handler,
+  };
+}
 
 function applyLayerOp(timeline, op) {
   if (!op || typeof op !== "object") {
     return { ok: false, error: { code: "BAD_OP", message: "op must be an object" } };
   }
   switch (op.op) {
-    case "add-layer":
-      return addLayer(timeline, op.layer || op);
-    case "remove-layer":
+    case "add_layer":
+      return addLayer(timeline, op.layer);
+    case "remove_layer":
       return removeLayer(timeline, op.id || op.layerId);
-    case "move-layer":
+    case "move_layer":
       return moveLayer(timeline, op.id || op.layerId, op.start);
-    case "resize-layer":
+    case "resize_layer":
       return resizeLayer(timeline, op.id || op.layerId, op.dur);
-    case "set-prop":
-      return setLayerProp(timeline, op.id || op.layerId, op.key, op.value);
+    case "set_layer_props":
+      return setLayerProps(timeline, op.id || op.layerId, op.props || {});
     default:
       return { ok: false, error: { code: "UNSUPPORTED_OP", message: `unsupported op "${op.op}"` } };
   }
 }
 
-function evaluateCheck(frame, check) {
+function evaluateCheck(timeline, active, check, t) {
   if (!check || typeof check !== "object") {
     return { ok: false, error: { code: "BAD_CHECK", message: "check must be an object" } };
   }
-  const active = frame.active || [];
   switch (check.type) {
     case "layer_visible": {
-      const actual = active.some((l) => l.id === check.layerId);
-      const expected = check.visible ?? true;
-      return { ok: true, value: { pass: actual === expected, expected, actual } };
+      const actual = active.some((layer) => layer.id === check.layerId);
+      return { ok: true, value: { pass: actual, expected: true, actual } };
     }
     case "scene_active": {
-      const actual = active.some((l) => l.scene === check.scene);
-      const expected = check.active ?? true;
-      return { ok: true, value: { pass: actual === expected, expected, actual } };
+      const actual = active.some((layer) => layer.scene === check.scene);
+      return { ok: true, value: { pass: actual, expected: true, actual } };
     }
     case "layer_count": {
       const actual = active.length;
-      const expected = check.min ?? 0;
+      const expected = Number(check.min) || 0;
       return { ok: true, value: { pass: actual >= expected, expected: { min: expected }, actual } };
+    }
+    case "chapter_active": {
+      const actual = (timeline?.chapters || []).some((chapter) => {
+        const end = chapter.end === undefined ? Infinity : Number(chapter.end);
+        return chapter.id === check.chapter && t >= Number(chapter.start) && t < end;
+      });
+      return { ok: true, value: { pass: actual, expected: true, actual } };
     }
     default:
       return { ok: false, error: { code: "UNSUPPORTED_CHECK", message: `unsupported check "${check.type}"` } };

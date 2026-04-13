@@ -1,23 +1,38 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 30,
   "background": "#000000",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg-gradient",
       "scene": "shaderGradient",
       "start": 0,
       "dur": 30,
-      "params": { "color1": "#1a0a3e", "color2": "#0a2a4e", "color3": "#2a0a2e", "speed": 0.3 }
+      "params": {
+        "color1": "#1a0a3e",
+        "color2": "#0a2a4e",
+        "color3": "#2a0a2e",
+        "speed": 0.3
+      }
     },
     {
       "id": "noise-overlay",
       "scene": "shaderNoise",
       "start": 0,
       "dur": 10,
-      "params": { "scale": 3.0, "speed": 0.5, "color1": "#6ee7ff", "color2": "#a78bfa", "octaves": 4 },
+      "params": {
+        "scale": 3,
+        "speed": 0.5,
+        "color1": "#6ee7ff",
+        "color2": "#a78bfa",
+        "octaves": 4
+      },
       "blend": "screen",
       "opacity": 0.4,
       "exit": "fadeOut 0.5s"
@@ -27,7 +42,11 @@
       "scene": "shaderPlasma",
       "start": 10,
       "dur": 10,
-      "params": { "speed": 1.0, "scale": 4.0, "colors": 3 },
+      "params": {
+        "speed": 1,
+        "scale": 4,
+        "colors": 3
+      },
       "blend": "screen",
       "opacity": 0.5,
       "transition": "dissolve 1s",
@@ -38,7 +57,12 @@
       "scene": "shaderTunnel",
       "start": 20,
       "dur": 10,
-      "params": { "speed": 0.5, "rings": 8, "color": "#6ee7ff", "twist": 2.0 },
+      "params": {
+        "speed": 0.5,
+        "rings": 8,
+        "color": "#6ee7ff",
+        "twist": 2
+      },
       "transition": "dissolve 1s",
       "exit": "fadeOut 0.5s"
     },
@@ -47,7 +71,12 @@
       "scene": "shaderFirefly",
       "start": 5,
       "dur": 20,
-      "params": { "count": 200, "color": "#ffd93d", "glowSize": 0.02, "speed": 0.5 },
+      "params": {
+        "count": 200,
+        "color": "#ffd93d",
+        "glowSize": 0.02,
+        "speed": 0.5
+      },
       "blend": "screen",
       "opacity": 0.6
     },
@@ -56,7 +85,11 @@
       "scene": "shaderRipple",
       "start": 12,
       "dur": 6,
-      "params": { "frequency": 10, "amplitude": 0.02, "speed": 2.0 },
+      "params": {
+        "frequency": 10,
+        "amplitude": 0.02,
+        "speed": 2
+      },
       "blend": "screen",
       "opacity": 0.3,
       "enter": "fadeIn 0.5s",
@@ -71,7 +104,11 @@
         "text": "WebGL Shaders",
         "subtitle": "GPU-Accelerated Visual Effects",
         "fontSize": 100,
-        "gradient": ["#6ee7ff", "#a78bfa", "#f472b6"]
+        "gradient": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6"
+        ]
       },
       "enter": "fadeIn 0.8s",
       "exit": "fadeOut 0.5s"
@@ -81,7 +118,12 @@
       "scene": "shaderGlitch",
       "start": 8,
       "dur": 3,
-      "params": { "intensity": 0.5, "blockSize": 16, "colorSplit": 0.02, "scanlines": true },
+      "params": {
+        "intensity": 0.5,
+        "blockSize": 16,
+        "colorSplit": 0.02,
+        "scanlines": true
+      },
       "blend": "screen",
       "enter": "fadeIn 0.3s",
       "exit": "fadeOut 0.3s"
@@ -91,7 +133,11 @@
       "scene": "shaderChromatic",
       "start": 15,
       "dur": 5,
-      "params": { "intensity": 0.01, "angle": 0, "pulse": true },
+      "params": {
+        "intensity": 0.01,
+        "angle": 0,
+        "pulse": true
+      },
       "blend": "screen",
       "opacity": 0.5,
       "enter": "fadeIn 0.5s",
@@ -106,7 +152,11 @@
         "text": "48 Components",
         "subtitle": "Canvas · DOM · SVG · WebGL",
         "fontSize": 96,
-        "gradient": ["#ffd93d", "#ff6b6b", "#a78bfa"]
+        "gradient": [
+          "#ffd93d",
+          "#ff6b6b",
+          "#a78bfa"
+        ]
       },
       "transition": "zoomIn 0.8s",
       "exit": "fadeOut 1s"

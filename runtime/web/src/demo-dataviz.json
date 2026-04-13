@@ -1,23 +1,38 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 18,
   "background": "#08080f",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg",
       "scene": "neonGrid",
       "start": 0,
       "dur": 18,
-      "params": { "gridColor": "#1a1a3e", "skyColor": "#0a0a1a", "speed": 0.3, "perspective": 0.6 }
+      "params": {
+        "gridColor": "#1a1a3e",
+        "skyColor": "#0a0a1a",
+        "speed": 0.3,
+        "perspective": 0.6
+      }
     },
     {
       "id": "particles",
       "scene": "particleFlow",
       "start": 0,
       "dur": 18,
-      "params": { "count": 80, "speed": 30, "color": "#6ee7ff", "size": 2, "direction": 45 },
+      "params": {
+        "count": 80,
+        "speed": 30,
+        "color": "#6ee7ff",
+        "size": 2,
+        "direction": 45
+      },
       "blend": "screen",
       "opacity": 0.3
     },
@@ -30,7 +45,11 @@
         "text": "Q4 Report",
         "subtitle": "Performance Metrics",
         "fontSize": 96,
-        "gradient": ["#4ade80", "#6ee7ff", "#a78bfa"]
+        "gradient": [
+          "#4ade80",
+          "#6ee7ff",
+          "#a78bfa"
+        ]
       },
       "enter": "scaleIn 0.6s",
       "exit": "fadeOut 0.5s"
@@ -41,9 +60,30 @@
       "start": 3,
       "dur": 6,
       "params": {
-        "data": [42, 78, 55, 91, 68, 85],
-        "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-        "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80", "#fbbf24"]
+        "data": [
+          42,
+          78,
+          55,
+          91,
+          68,
+          85
+        ],
+        "labels": [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun"
+        ],
+        "colors": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6",
+          "#fb923c",
+          "#4ade80",
+          "#fbbf24"
+        ]
       },
       "enter": "slideUp 0.8s",
       "exit": "fadeOut 0.4s"
@@ -54,9 +94,27 @@
       "start": 5,
       "dur": 5,
       "params": {
-        "data": [35, 25, 20, 15, 5],
-        "labels": ["Product", "Engineering", "Marketing", "Sales", "Other"],
-        "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80"],
+        "data": [
+          35,
+          25,
+          20,
+          15,
+          5
+        ],
+        "labels": [
+          "Product",
+          "Engineering",
+          "Marketing",
+          "Sales",
+          "Other"
+        ],
+        "colors": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6",
+          "#fb923c",
+          "#4ade80"
+        ],
         "innerRadius": 60
       },
       "enter": "fadeIn 0.8s",
@@ -68,8 +126,26 @@
       "start": 8,
       "dur": 6,
       "params": {
-        "data": [20, 35, 28, 55, 42, 70, 65, 88],
-        "labels": ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"],
+        "data": [
+          20,
+          35,
+          28,
+          55,
+          42,
+          70,
+          65,
+          88
+        ],
+        "labels": [
+          "W1",
+          "W2",
+          "W3",
+          "W4",
+          "W5",
+          "W6",
+          "W7",
+          "W8"
+        ],
         "color": "#a78bfa",
         "strokeWidth": 3,
         "showDots": true,
@@ -128,7 +204,11 @@
       "scene": "vignette",
       "start": 0,
       "dur": 18,
-      "params": { "intensity": 0.5, "color": "#000000", "radius": 0.75 }
+      "params": {
+        "intensity": 0.5,
+        "color": "#000000",
+        "radius": 0.75
+      }
     }
   ]
 }

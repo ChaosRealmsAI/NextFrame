@@ -1,168 +1,83 @@
 import { spawn, spawnSync } from "node:child_process";
-import { once } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { bakeBrowserScenes } from "../cli/bakeBrowser.js";
-import { guarded } from "../engine/_guard.js";
-import { resolveTimeline } from "../engine/time.js";
-import { exportMP4 } from "./ffmpeg-mp4.js";
-import { generateHarness } from "./harness-gen.js";
+import { once } from "node:events";
 
-function normalizeCrf(value) {
-  if (value === undefined || value === null) return 20;
-  const crf = Number(value);
-  if (!Number.isInteger(crf) || crf < 0 || crf > 51) return null;
-  return crf;
-}
+import { buildHTMLDocument, timelineBaseHref } from "../engine-v2/build.js";
+import { timelineMetrics } from "../engine-v2/timeline.js";
 
-function recorderBinary(opts = {}) {
-  return opts.recorderPath || "nextframe-recorder";
-}
-
-function isRecorderAvailable(binary) {
+export async function exportRecorder(timeline, outputPath, opts = {}) {
+  const binary = opts.recorderPath || "nextframe-recorder";
   const probe = spawnSync(binary, ["--help"], { stdio: "ignore" });
-  return probe.error?.code !== "ENOENT";
-}
+  if (probe.error?.code === "ENOENT") {
+    return {
+      ok: false,
+      error: {
+        code: "RECORDER_NOT_FOUND",
+        message: `${binary} not found in PATH`,
+      },
+    };
+  }
 
-function warnRecorderFallback(binary) {
-  process.stderr.write(`warning: ${binary} not found in PATH, falling back to ffmpeg\n`);
-}
+  const { width, height, fps } = timelineMetrics(timeline);
+  const tempDir = await mkdtemp(join(tmpdir(), "nextframe-recorder-"));
+  const htmlPath = join(tempDir, "render.html");
+  const html = buildHTMLDocument(timeline, {
+    mode: "headless",
+    baseHref: timelineBaseHref(opts.baseDir || process.cwd()),
+  });
+  await writeFile(htmlPath, html, "utf8");
 
-async function runRecorder(binary, htmlFile, outputPath, opts) {
   const args = [
     "slide",
-    htmlFile,
+    htmlPath,
     "--out", outputPath,
-    "--fps", String(opts.fps),
-    "--crf", String(opts.crf),
-    "--dpr", String(opts.dpr),
-    "--width", String(opts.width),
-    "--height", String(opts.height),
+    "--fps", String(Number(opts.fps) || fps),
+    "--crf", String(Number.isInteger(Number(opts.crf)) ? Number(opts.crf) : 20),
+    "--dpr", String(Number(opts.dpr) > 0 ? Number(opts.dpr) : 1),
+    "--width", String(Number(opts.width) || width),
+    "--height", String(Number(opts.height) || height),
   ];
 
-  let child;
   try {
-    child = spawn(binary, args, { stdio: ["ignore", "ignore", "pipe"] });
-  } catch (err) {
-    return {
-      ok: false,
-      error: {
-        code: err.code === "ENOENT" ? "RECORDER_NOT_FOUND" : "RECORDER_SPAWN",
-        message: err.message,
-      },
-    };
-  }
-
-  let stderr = "";
-  let spawnError = null;
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk) => {
-    stderr += chunk;
-  });
-  child.on("error", (err) => {
-    spawnError = err;
-  });
-
-  const [exitCode] = await once(child, "close");
-  if (spawnError) {
-    return {
-      ok: false,
-      error: {
-        code: spawnError.code === "ENOENT" ? "RECORDER_NOT_FOUND" : "RECORDER_SPAWN",
-        message: spawnError.message,
-      },
-    };
-  }
-  if (exitCode !== 0) {
-    return {
-      ok: false,
-      error: {
-        code: "RECORDER_FAILED",
-        message: `nextframe-recorder exited ${exitCode}`,
-        hint: stderr.split("\n").slice(-5).join("\n"),
-      },
-    };
-  }
-  return { ok: true };
-}
-
-/**
- * Export a timeline to an MP4 file via the Rust recorder CLI.
- * Falls back to ffmpeg when nextframe-recorder is unavailable in PATH.
- * @param {object} timeline
- * @param {string} outputPath
- * @param {{fps?: number, crf?: number, width?: number, height?: number, projectDir?: string, recorderPath?: string, onProgress?: (frameIdx: number, total: number) => void}} [opts]
- * @returns {Promise<{ok: true, value: object} | {ok: false, error: object}>}
- */
-export async function exportRecorder(timeline, outputPath, opts = {}) {
-  const r = resolveTimeline(timeline);
-  if (!r.ok) return guarded("exportRecorder", { ok: false, error: r.error });
-  const resolved = r.value;
-
-  const fps = opts.fps || resolved.project?.fps || 30;
-  const width = opts.width || resolved.project?.width || 1920;
-  const height = opts.height || resolved.project?.height || 1080;
-  const dpr = Number.isFinite(opts.dpr) && opts.dpr > 0 ? opts.dpr : 1;
-  const duration = resolved.duration;
-  const totalFrames = Math.round(duration * fps);
-  const crf = normalizeCrf(opts.crf);
-  if (crf === null) {
-    return guarded("exportRecorder", { ok: false, error: { code: "BAD_CRF", hint: "0..51" } });
-  }
-
-  const binary = recorderBinary(opts);
-  if (!isRecorderAvailable(binary)) {
-    warnRecorderFallback(binary);
-    return exportViaFfmpegFallback(timeline, outputPath, opts, { width, height });
-  }
-
-  const harnessDir = await mkdtemp(join(tmpdir(), "nextframe-recorder-"));
-  try {
-    const htmlPath = join(harnessDir, "harness.html");
-    const html = generateHarness(resolved, { width, height });
-    await writeFile(htmlPath, html, "utf8");
-
-    const recorded = await runRecorder(binary, htmlPath, outputPath, {
-      fps,
-      crf,
-      dpr,
-      width,
-      height,
+    const child = spawn(binary, args, { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
     });
-    if (!recorded.ok) {
-      if (recorded.error.code === "RECORDER_NOT_FOUND") {
-        warnRecorderFallback(binary);
-        return exportViaFfmpegFallback(timeline, outputPath, opts, { width, height });
-      }
-      return guarded("exportRecorder", recorded);
+    const [exitCode] = await once(child, "close");
+    if (exitCode !== 0) {
+      return {
+        ok: false,
+        error: {
+          code: "RECORDER_FAILED",
+          message: `nextframe-recorder exited ${exitCode}`,
+          hint: stderr.trim(),
+        },
+      };
     }
-
-    return guarded("exportRecorder", {
+    return {
       ok: true,
       value: {
         outputPath,
-        width,
-        height,
-        fps,
-        duration,
-        framesRendered: totalFrames,
+        width: Number(opts.width) || width,
+        height: Number(opts.height) || height,
+        fps: Number(opts.fps) || fps,
+        duration: timelineMetrics(timeline).duration,
+        framesRendered: Math.round(timelineMetrics(timeline).duration * (Number(opts.fps) || fps)),
       },
-    });
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: "RECORDER_SPAWN",
+        message: error.message,
+      },
+    };
   } finally {
-    await rm(harnessDir, { recursive: true, force: true });
+    await rm(tempDir, { recursive: true, force: true });
   }
-}
-
-async function exportViaFfmpegFallback(timeline, outputPath, opts, size) {
-  const baked = await bakeBrowserScenes(timeline, {
-    width: size.width,
-    height: size.height,
-    rootDir: opts.projectDir,
-  });
-  if (!baked.ok) {
-    return guarded("exportRecorder", baked);
-  }
-
-  return exportMP4(timeline, outputPath, opts);
 }

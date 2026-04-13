@@ -1,23 +1,40 @@
 {
+  "schema": "nextframe/v0.3",
   "width": 1920,
   "height": 1080,
   "fps": 30,
   "duration": 45,
   "background": "#05050c",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
   "layers": [
     {
       "id": "bg-fluid",
       "scene": "fluidBackground",
       "start": 0,
       "dur": 45,
-      "params": { "colors": ["#0a0a2e", "#1a0a2e", "#0a1a2e"], "speed": 0.2, "blur": 100 }
+      "params": {
+        "colors": [
+          "#0a0a2e",
+          "#1a0a2e",
+          "#0a1a2e"
+        ],
+        "speed": 0.2,
+        "blur": 100
+      }
     },
     {
       "id": "stars",
       "scene": "starfield",
       "start": 0,
       "dur": 45,
-      "params": { "count": 120, "speed": 10, "depth": 3, "color": "#ffffff" },
+      "params": {
+        "count": 120,
+        "speed": 10,
+        "depth": 3,
+        "color": "#ffffff"
+      },
       "blend": "screen",
       "opacity": 0.3
     },
@@ -26,9 +43,12 @@
       "scene": "vignette",
       "start": 0,
       "dur": 45,
-      "params": { "intensity": 0.5, "color": "#000000", "radius": 0.7 }
+      "params": {
+        "intensity": 0.5,
+        "color": "#000000",
+        "radius": 0.7
+      }
     },
-
     {
       "id": "cover",
       "scene": "headline",
@@ -38,12 +58,16 @@
         "text": "NextFrame Showcase",
         "subtitle": "40 Components · 10 Transitions · Infinite Creativity",
         "fontSize": 100,
-        "gradient": ["#ff6b6b", "#ffd93d", "#6bcb77", "#6ee7ff"]
+        "gradient": [
+          "#ff6b6b",
+          "#ffd93d",
+          "#6bcb77",
+          "#6ee7ff"
+        ]
       },
       "enter": "fadeIn 1s",
       "exit": "fadeOut 0.5s"
     },
-
     {
       "id": "s1-typewriter",
       "scene": "typewriter",
@@ -59,7 +83,6 @@
       "transition": "dissolve 0.8s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "s2-feature",
       "scene": "featureGrid",
@@ -67,10 +90,26 @@
       "dur": 5,
       "params": {
         "features": [
-          { "icon": "🎨", "title": "Canvas 2D", "desc": "Aurora, particles, waveforms" },
-          { "icon": "📝", "title": "DOM Text", "desc": "Headlines, code, typewriter" },
-          { "icon": "📊", "title": "SVG Charts", "desc": "Bar, line, pie, radar" },
-          { "icon": "🎬", "title": "Media", "desc": "Video, image, logo reveal" }
+          {
+            "icon": "🎨",
+            "title": "Canvas 2D",
+            "desc": "Aurora, particles, waveforms"
+          },
+          {
+            "icon": "📝",
+            "title": "DOM Text",
+            "desc": "Headlines, code, typewriter"
+          },
+          {
+            "icon": "📊",
+            "title": "SVG Charts",
+            "desc": "Bar, line, pie, radar"
+          },
+          {
+            "icon": "🎬",
+            "title": "Media",
+            "desc": "Video, image, logo reveal"
+          }
         ],
         "columns": 2,
         "stagger": 0.06
@@ -78,21 +117,40 @@
       "transition": "wipeLeft 0.6s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "s3-bar",
       "scene": "barChart",
       "start": 14,
       "dur": 5,
       "params": {
-        "data": [10, 28, 40, 55, 72, 90],
-        "labels": ["Canvas", "DOM", "SVG", "Media", "3D", "All"],
-        "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80", "#fbbf24"]
+        "data": [
+          10,
+          28,
+          40,
+          55,
+          72,
+          90
+        ],
+        "labels": [
+          "Canvas",
+          "DOM",
+          "SVG",
+          "Media",
+          "3D",
+          "All"
+        ],
+        "colors": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6",
+          "#fb923c",
+          "#4ade80",
+          "#fbbf24"
+        ]
       },
       "transition": "slideUp 0.6s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "s4-card",
       "scene": "card3d",
@@ -108,7 +166,6 @@
       "transition": "zoomIn 0.6s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "s5-code",
       "scene": "codeBlock",
@@ -123,7 +180,6 @@
       "transition": "wipeRight 0.7s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "s6-timeline",
       "scene": "timelineViz",
@@ -131,11 +187,26 @@
       "dur": 5,
       "params": {
         "events": [
-          { "label": "v0.1 CLI", "date": "Jan" },
-          { "label": "v0.2 Recorder", "date": "Feb" },
-          { "label": "v0.3 HTML Engine", "date": "Mar" },
-          { "label": "v0.4 AI Agent", "date": "Apr" },
-          { "label": "v1.0 Launch", "date": "Jun" }
+          {
+            "label": "v0.1 CLI",
+            "date": "Jan"
+          },
+          {
+            "label": "v0.2 Recorder",
+            "date": "Feb"
+          },
+          {
+            "label": "v0.3 HTML Engine",
+            "date": "Mar"
+          },
+          {
+            "label": "v0.4 AI Agent",
+            "date": "Apr"
+          },
+          {
+            "label": "v1.0 Launch",
+            "date": "Jun"
+          }
         ],
         "color": "#a78bfa",
         "dotSize": 10
@@ -143,7 +214,6 @@
       "transition": "slideLeft 0.6s",
       "exit": "fadeOut 0.4s"
     },
-
     {
       "id": "s7-confetti",
       "scene": "confetti",
@@ -151,13 +221,19 @@
       "dur": 4,
       "params": {
         "count": 120,
-        "colors": ["#ff6b6b", "#ffd93d", "#6bcb77", "#6ee7ff", "#a78bfa", "#f472b6"],
+        "colors": [
+          "#ff6b6b",
+          "#ffd93d",
+          "#6bcb77",
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6"
+        ],
         "gravity": 0.4,
         "spread": 70
       },
       "transition": "dissolve 0.5s"
     },
-
     {
       "id": "s7-counter",
       "scene": "numberCounter",
@@ -172,7 +248,6 @@
       "transition": "zoomIn 0.5s",
       "exit": "fadeOut 0.3s"
     },
-
     {
       "id": "s8-wave",
       "scene": "waveform",
@@ -188,7 +263,6 @@
       "blend": "screen",
       "opacity": 0.6
     },
-
     {
       "id": "ending",
       "scene": "headline",
@@ -198,12 +272,15 @@
         "text": "Built for AI",
         "subtitle": "nextframe.dev",
         "fontSize": 120,
-        "gradient": ["#6ee7ff", "#a78bfa", "#f472b6"]
+        "gradient": [
+          "#6ee7ff",
+          "#a78bfa",
+          "#f472b6"
+        ]
       },
       "transition": "dissolve 1s",
       "exit": "fadeOut 1s"
     },
-
     {
       "id": "marquee-bottom",
       "scene": "marquee",
