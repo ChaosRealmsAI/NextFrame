@@ -3,33 +3,29 @@
 #[macro_use]
 mod util;
 
+mod domain;
 mod encoding;
-mod episode;
 mod export;
 mod export_runner;
 mod ffmpeg;
-mod project;
 mod recorder_bridge;
-mod scene;
-mod segment;
 mod storage;
-mod timeline;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use episode::{handle_episode_create, handle_episode_list};
+use domain::{
+    handle_episode_create, handle_episode_list, handle_project_create, handle_project_list,
+    handle_scene_list, handle_segment_list, handle_segment_video_url, handle_timeline_load,
+    handle_timeline_save,
+};
 use export::{handle_export_cancel, handle_export_start, handle_export_status, process_registry};
 use ffmpeg::{ffmpeg_command_path, handle_export_mux_audio};
-use project::{handle_project_create, handle_project_list};
-use scene::handle_scene_list;
-use segment::{handle_segment_list, handle_segment_video_url};
 use storage::{
     handle_autosave_clear, handle_autosave_list, handle_autosave_recover, handle_autosave_write,
     handle_fs_list_dir, handle_fs_mtime, handle_fs_read, handle_fs_write, handle_fs_write_base64,
     handle_recent_add, handle_recent_clear, handle_recent_list,
 };
-use timeline::{handle_timeline_load, handle_timeline_save};
 use util::dialog::{handle_fs_dialog_open, handle_fs_dialog_save, handle_fs_reveal};
 use util::{handle_compose_generate, handle_log, handle_preview_frame};
 
