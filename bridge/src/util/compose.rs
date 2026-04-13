@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use crate::fs::{resolve_existing_path, resolve_write_path};
+use crate::storage::fs::{resolve_existing_path, resolve_write_path};
 use crate::util::validation::require_string;
 
 fn replace_json_extension(path: &Path) -> PathBuf {

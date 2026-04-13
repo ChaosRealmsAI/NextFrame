@@ -7,7 +7,7 @@ use std::process::Command;
 #[cfg(not(test))]
 use std::process::ExitStatus;
 
-use crate::fs::resolve_reveal_path;
+use crate::storage::fs::resolve_reveal_path;
 use crate::util::validation::{require_array, require_string, require_string_alias};
 
 pub(crate) fn handle_fs_dialog_open(params: &Value) -> Result<Value, String> {

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 
-use crate::fs::resolve_existing_path;
+use crate::storage::fs::resolve_existing_path;
 use crate::util::time::trim_float;
 use crate::util::validation::{require_array, require_string_alias};
 use serde_json::{json, Value};
@@ -35,7 +35,7 @@ pub(crate) fn handle_export_mux_audio(params: &Value) -> Result<Value, String> {
     let video_path_raw = require_string_alias(params, &["videoPath", "video_path"])?;
     let output_path_raw = require_string_alias(params, &["outputPath", "output_path"])?;
     let video_path = resolve_existing_path(video_path_raw)?;
-    let output_path = crate::fs::resolve_write_path(output_path_raw)?;
+    let output_path = crate::storage::fs::resolve_write_path(output_path_raw)?;
     let audio_sources = parse_audio_sources(params)?;
 
     if let Some(parent) = output_path.parent() {

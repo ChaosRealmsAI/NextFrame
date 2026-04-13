@@ -200,7 +200,7 @@ fn handle_fs_write_base64_writes_decoded_bytes() {
     let expected_bytes = b"\0bridge\xffbytes\n";
     let encoded = encoding::base64_encode(expected_bytes);
 
-    let response = super::super::fs::handle_fs_write_base64(&json!({
+    let response = super::super::storage::fs::handle_fs_write_base64(&json!({
         "path": file_path.display().to_string(),
         "data": format!("data:application/octet-stream;base64,{encoded}"),
     }))
@@ -224,7 +224,7 @@ fn handle_fs_write_base64_rejects_invalid_data() {
     let temp = TestDir::new("fs-write-base64-invalid");
     let file_path = temp.join("output.bin");
 
-    let error = super::super::fs::handle_fs_write_base64(&json!({
+    let error = super::super::storage::fs::handle_fs_write_base64(&json!({
         "path": file_path.display().to_string(),
         "data": "%%%not-base64%%%",
     }))
@@ -248,7 +248,7 @@ fn handle_fs_mtime_returns_reasonable_value_for_existing_file() {
         .unwrap_or_default()
         .as_millis() as u64;
 
-    let response = super::super::fs::handle_fs_mtime(&json!({
+    let response = super::super::storage::fs::handle_fs_mtime(&json!({
         "path": file_path.display().to_string(),
     }))
     .expect("mtime should succeed");

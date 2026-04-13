@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 use std::fs;
 
-use crate::fs::{resolve_existing_path, resolve_write_path};
+use crate::storage::fs::{resolve_existing_path, resolve_write_path};
 use crate::util::validation::{require_string, require_value_alias};
 
 pub(crate) fn handle_timeline_load(params: &Value) -> Result<Value, String> {
