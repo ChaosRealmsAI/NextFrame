@@ -1,0 +1,14 @@
+{
+  "schema": "nextframe/v0.3",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 32,
+  "background": "#1a1510",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
+  "layers": [
+    { "id": "dim-tools", "scene": "dimToolsSlide", "start": 0, "dur": 32 }
+  ]
+}

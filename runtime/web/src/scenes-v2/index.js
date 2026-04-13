@@ -43,6 +43,7 @@ import typewriter from './typewriter.js';
 import videoClip from './videoClip.js';
 import vignette from './vignette.js';
 import waveform from './waveform.js';
+import dimToolsSlide from './dimToolsSlide.js';
 // WebGL shader scenes
 import shaderGradient from './shaderGradient.js';
 import shaderNoise from './shaderNoise.js';
@@ -66,7 +67,7 @@ const ALL_SCENES = [
   lowerThird, numberCounter, splitText, subtitleBar,
   progressBar, calloutCard, typewriter, marquee,
   featureGrid, card3d, parallaxStack, logoReveal,
-  slideFrame,
+  slideFrame, dimToolsSlide,
   // SVG — data viz & decoration
   barChart, lineChart, pieChart, progressRing,
   svgRings, radarChart, horizontalBars, treeMap,
