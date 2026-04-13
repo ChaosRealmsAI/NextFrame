@@ -469,33 +469,17 @@ function pickTime(value, keys) {
   return undefined;
 }
 
-function countWords(text) {
-  const parts = String(text || "").trim().split(/\s+/).filter(Boolean);
-  return parts.length;
-}
+function countWords(text) { return String(text || "").trim().split(/\s+/).filter(Boolean).length; }
 
-function toPositiveInteger(value) {
-  const num = Number(value);
-  return Number.isInteger(num) && num > 0 ? num : undefined;
-}
+function toPositiveInteger(value) { const num = Number(value); return Number.isInteger(num) && num > 0 ? num : undefined; }
 
-function toFinite(value, fallback) {
-  const num = Number(value);
-  if (Number.isFinite(num)) return num;
-  return fallback;
-}
+function toFinite(value, fallback) { const num = Number(value); return Number.isFinite(num) ? num : fallback; }
 
-function round3(value) {
-  return Math.round(Number(value) * 1000) / 1000;
-}
+function round3(value) { return Math.round(Number(value) * 1000) / 1000; }
 
-function isNonEmptyString(value) {
-  return typeof value === "string" && value.trim().length > 0;
-}
+function isNonEmptyString(value) { return typeof value === "string" && value.trim().length > 0; }
 
-function valueOrUndefined(value) {
-  return isNonEmptyString(value) ? value : undefined;
-}
+function valueOrUndefined(value) { return isNonEmptyString(value) ? value : undefined; }
 
 function toSourceJsonPath(sourceDirOrFile) {
   const resolved = resolve(sourceDirOrFile);
