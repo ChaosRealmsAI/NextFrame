@@ -64,23 +64,26 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .topbar-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--ink-25); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--ink-55); cursor: pointer; transition: border-color 0.15s var(--ease); }
 .topbar-avatar:hover { border-color: var(--ink); }
 
-/* ─── Info strip (replaces principles) ─── */
-.info-strip { padding: 0 20px; height: 36px; border-bottom: var(--border); display: flex; align-items: center; font-size: 12px; color: var(--ink-25); gap: 0; overflow: hidden; }
-.info-strip span { white-space: nowrap; }
-.info-sep { margin: 0 10px; color: rgba(255,255,255,0.15); }
-.info-val { color: var(--ink-55); }
-.info-accent { color: var(--accent); }
-
-/* ─── Segment filter ─── */
-.seg-filter { padding: 8px 20px; border-bottom: var(--border); display: flex; gap: 6px; align-items: center; }
-.seg-filter-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-25); margin-right: 8px; }
+/* ─── Toolbar: info chips + segment filter in one row ─── */
+.toolbar { padding: 10px 20px; border-bottom: var(--border); display: flex; align-items: center; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; padding: 4px 12px; border-radius: 5px;
+  background: var(--card); border: var(--border);
+}
+.chip-label { color: var(--ink-25); }
+.chip-val { color: var(--ink); font-weight: 500; }
+.chip-accent { color: var(--accent); font-weight: 500; }
+.chip-green { background: rgba(62,179,112,0.08); border-color: rgba(62,179,112,0.12); }
+.chip-green .chip-val { color: var(--green); }
+.toolbar-sep { width: 1px; height: 18px; background: rgba(255,255,255,0.08); margin: 0 4px; flex-shrink: 0; }
 .seg-pill { font-size: 12px; padding: 4px 14px; border-radius: 5px; border: 1px solid transparent; background: transparent; color: var(--ink-55); cursor: pointer; transition: all 0.15s var(--ease); }
 .seg-pill:hover { background: var(--ink-08); color: var(--ink); }
 .seg-pill.active { background: var(--accent-15); color: var(--accent); border-color: rgba(124,106,239,0.2); }
 
 /* ─── Table layout ─── */
 .audio-table {
-  width: 100%; height: calc(100vh - 48px - 40px - 36px - 32px);
+  width: 100%; height: calc(100vh - 48px - 46px - 32px);
   overflow-y: auto;
 }
 .audio-table::-webkit-scrollbar { width: 3px; }
@@ -98,7 +101,7 @@ th {
 }
 
 td {
-  padding: 24px 24px;
+  padding: 28px 28px;
   border-bottom: var(--border);
   vertical-align: top;
 }
@@ -144,12 +147,15 @@ td.col-audio {
 
 .sentence-row {
   display: grid;
-  grid-template-columns: 160px 1fr auto;
+  grid-template-columns: 150px 1fr auto;
   align-items: baseline;
-  padding: 5px 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  transition: background 0.15s var(--ease);
   gap: 12px;
 }
-.sentence-row + .sentence-row { border-top: 1px solid rgba(255,255,255,0.03); }
+.sentence-row:hover { background: var(--ink-03); }
+.sentence-list { display: flex; flex-direction: column; gap: 2px; }
 
 .s-timecode {
   font-family: var(--mono);
@@ -247,18 +253,12 @@ tr.seg-pending .s-text { color: var(--ink-25); }
   </div>
 </div>
 
-<div class="info-strip">
-  <span>声线</span><span class="info-sep">·</span><span class="info-accent">晓晓</span>
-  <span class="info-sep">·</span><span>语速</span><span class="info-sep">·</span><span class="info-val">1.0x</span>
-  <span class="info-sep">|</span>
-  <span>受众 <span class="info-val">25-35岁创作者</span></span>
-  <span class="info-sep">·</span><span>语气 <span class="info-val">专业友好</span></span>
-  <span class="info-sep">·</span><span>风格 <span class="info-val">数据驱动</span></span>
-  <span class="info-sep">·</span><span>节奏 <span class="info-val">快→慢→快</span></span>
-</div>
-
-<div class="seg-filter">
-  <span class="seg-filter-label">段落</span>
+<div class="toolbar">
+  <div class="chip"><span class="chip-label">声线</span><span class="chip-accent">晓晓</span></div>
+  <div class="chip"><span class="chip-label">语速</span><span class="chip-val">1.0x</span></div>
+  <div class="chip chip-green"><span class="chip-label">已生成</span><span class="chip-val">3/5</span></div>
+  <div class="chip"><span class="chip-label">总时长</span><span class="chip-val">28.5s</span></div>
+  <div class="toolbar-sep"></div>
   <span class="seg-pill active" onclick="filterSeg(-1)">全部</span>
   <span class="seg-pill" onclick="filterSeg(0)">段 1</span>
   <span class="seg-pill" onclick="filterSeg(1)">段 2</span>
