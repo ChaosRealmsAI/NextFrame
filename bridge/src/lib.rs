@@ -6,9 +6,7 @@ mod util;
 mod domain;
 mod encoding;
 mod export;
-mod export_runner;
 mod ffmpeg;
-mod recorder_bridge;
 mod storage;
 
 use serde::{Deserialize, Serialize};
@@ -117,16 +115,15 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
 #[cfg(test)]
 use export::{
     build_export_request, export_runtime, export_status_json, next_export_pid, percent_complete,
-    remaining_secs, ExportTask, ProcessHandle, ProcessTerminal,
+    remaining_secs, build_recording_url, cleanup_intermediate_video, copy_video_output,
+    create_export_log_path, decode_file_url_path, resolve_recorder_frame_path_from_url,
+    ExportTask, ProcessHandle, ProcessTerminal, RecorderRequest,
 };
 #[cfg(test)]
-use export_runner::{cleanup_intermediate_video, copy_video_output, create_export_log_path};
-#[cfg(test)]
-use ffmpeg::{build_ffmpeg_command, parse_audio_sources, secs_to_millis};
-#[cfg(test)]
 use ffmpeg::{
-    build_ffmpeg_filter_complex, mock_ffmpeg_state, reset_ffmpeg_path_cache_for_tests, AudioSource,
-    CommandOutput, FfmpegCommand, MockFfmpegState, MOCK_FFMPEG_TEST_LOCK,
+    build_ffmpeg_command, build_ffmpeg_filter_complex, mock_ffmpeg_state, parse_audio_sources,
+    reset_ffmpeg_path_cache_for_tests, secs_to_millis, AudioSource, CommandOutput,
+    FfmpegCommand, MockFfmpegState, MOCK_FFMPEG_TEST_LOCK,
 };
 #[cfg(test)]
 use path::home_dir;
@@ -134,11 +131,6 @@ use path::home_dir;
 use storage::{
     autosave_storage_test_lock, recent_storage_test_lock, resolve_write_path,
     set_autosave_storage_path_override_for_tests, set_recent_storage_path_override_for_tests,
-};
-#[cfg(test)]
-use recorder_bridge::{
-    build_recording_url, decode_file_url_path, resolve_recorder_frame_path_from_url,
-    RecorderRequest,
 };
 
 #[cfg(test)]

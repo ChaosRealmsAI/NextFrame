@@ -48,8 +48,8 @@ pub(crate) fn handle_export_mux_audio(params: &Value) -> Result<Value, String> {
     }
 
     if audio_sources.is_empty() {
-        crate::export_runner::copy_video_output(&video_path, &output_path)?;
-        crate::export_runner::cleanup_intermediate_video(&video_path, &output_path);
+        crate::export::runner::copy_video_output(&video_path, &output_path)?;
+        crate::export::runner::cleanup_intermediate_video(&video_path, &output_path);
         return Ok(json!({
             "ok": true,
             "outputPath": output_path.display().to_string(),
@@ -83,7 +83,7 @@ pub(crate) fn handle_export_mux_audio(params: &Value) -> Result<Value, String> {
         }));
     }
 
-    crate::export_runner::cleanup_intermediate_video(&video_path, &output_path);
+    crate::export::runner::cleanup_intermediate_video(&video_path, &output_path);
 
     Ok(json!({
         "ok": true,
