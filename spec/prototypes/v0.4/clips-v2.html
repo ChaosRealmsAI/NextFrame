@@ -187,17 +187,24 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 .cd-zoom-ticks { display: flex; justify-content: space-between; padding-top: 4px; font-family: var(--mono); font-size: 11px; color: var(--ink-25); }
 
-/* Subtitle track */
-.cd-subs { padding: 8px 16px; border-bottom: var(--border); }
-.cd-subs-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-25); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
-.cd-subs-label .dot { width: 5px; height: 5px; border-radius: 50%; }
-.cd-subs-label .dot.on { background: var(--green); }
-.cd-subs-label .dot.off { background: var(--ink-25); }
-.cd-sub-track { display: flex; gap: 2px; }
-.cd-sub-block { flex: 1; height: 32px; background: rgba(224,160,64,0.08); border: 1px solid rgba(224,160,64,0.15); border-radius: 3px; display: flex; align-items: center; padding: 0 8px; font-size: 12px; color: var(--yellow); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; transition: background 0.2s var(--ease); }
-.cd-sub-block:hover { background: rgba(224,160,64,0.15); }
-.cd-sub-block.active { border-color: var(--yellow); background: rgba(224,160,64,0.15); }
-.cd-sub-none { font-size: 10px; color: var(--ink-25); font-style: italic; }
+/* Subtitle track — karaoke level */
+.cd-subs { padding: 10px 16px; border-bottom: var(--border); }
+.cd-subs-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-55); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.cd-subs-tag { font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 500; }
+.cd-subs-tag.on { background: rgba(62,179,112,0.12); color: var(--green); }
+.cd-subs-tag.off { background: var(--ink-08); color: var(--ink-25); }
+.cd-sub-lines { display: flex; flex-direction: column; gap: 4px; }
+.cd-sub-line { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(224,160,64,0.04); border: 1px solid rgba(224,160,64,0.08); border-radius: 4px; transition: background 0.15s var(--ease); }
+.cd-sub-line:hover { background: rgba(224,160,64,0.08); }
+.cd-sub-tc { font-family: var(--mono); font-size: 11px; color: var(--ink-55); white-space: nowrap; flex-shrink: 0; width: 110px; }
+.cd-sub-text { font-size: 13px; color: var(--ink); }
+.cd-sub-text .char { display: inline; }
+.cd-sub-dur { font-family: var(--mono); font-size: 11px; color: var(--yellow); margin-left: auto; flex-shrink: 0; }
+.cd-sub-none { font-size: 12px; color: var(--ink-25); font-style: italic; }
+
+/* Path display */
+.cd-path { font-family: var(--mono); font-size: 11px; color: var(--ink-55); padding: 6px 16px; border-bottom: var(--border); user-select: all; }
+.src-path { font-family: var(--mono); font-size: 10px; color: var(--ink-55); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Clip info panel */
 .cd-info { padding: 10px 16px; display: flex; gap: 20px; flex-wrap: wrap; }
@@ -375,10 +382,10 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 <script>
 var S = [
-  { n:"interview-raw.mp4", dur:"03:24", ds:204, res:"1080p", w:1920, h:1080, fps:30, cod:"h264", sz:"245MB", hue:"220,60%,50%" },
-  { n:"screen-recording.mp4", dur:"05:12", ds:312, res:"1080p", w:1920, h:1080, fps:30, cod:"h264", sz:"380MB", hue:"150,40%,40%" },
-  { n:"office-broll.mp4", dur:"01:48", ds:108, res:"4K", w:3840, h:2160, fps:24, cod:"h265", sz:"520MB", hue:"30,50%,45%" },
-  { n:"founder-talk.mp4", dur:"08:30", ds:510, res:"1080p", w:1920, h:1080, fps:30, cod:"h264", sz:"610MB", hue:"260,30%,35%" }
+  { n:"interview-raw.mp4", path:"/Users/Zhuanz/NextFrame/projects/Show/EP01/sources/interview-raw.mp4", dur:"03:24", ds:204, res:"1080p", w:1920, h:1080, fps:30, cod:"h264", sz:"245MB", hue:"220,60%,50%" },
+  { n:"screen-recording.mp4", path:"/Users/Zhuanz/NextFrame/projects/Show/EP01/sources/screen-recording.mp4", dur:"05:12", ds:312, res:"1080p", w:1920, h:1080, fps:30, cod:"h264", sz:"380MB", hue:"150,40%,40%" },
+  { n:"office-broll.mp4", path:"/Users/Zhuanz/NextFrame/projects/Show/EP01/sources/office-broll.mp4", dur:"01:48", ds:108, res:"4K", w:3840, h:2160, fps:24, cod:"h265", sz:"520MB", hue:"30,50%,45%" },
+  { n:"founder-talk.mp4", path:"/Users/Zhuanz/NextFrame/projects/Show/EP01/sources/founder-talk.mp4", dur:"08:30", ds:510, res:"1080p", w:1920, h:1080, fps:30, cod:"h264", sz:"610MB", hue:"260,30%,35%" }
 ];
 
 var C = [
@@ -411,11 +418,9 @@ function renderSrc() {
     h += '<div class="src-item'+(i===aS?' active':'')+'" onclick="selSrc('+i+')">' +
       '<div class="src-thumb">' +
         '<div class="src-grad" style="background:linear-gradient(135deg,hsla('+s.hue+',0.3),transparent)"></div>' +
-        '<div class="src-play" onclick="event.stopPropagation();openM(\''+s.n+'\',\'00:00 / '+s.dur+'\',\''+s.res+' · '+s.fps+'fps\')">&#9654;</div>' +
-        '<div class="src-expand" onclick="event.stopPropagation();openM(\''+s.n+'\',\'00:00 / '+s.dur+'\',\''+s.res+' · '+s.fps+'fps\')">&#x26F6;</div>' +
         '<span class="src-pill l">'+s.res+'</span><span class="src-pill r">'+s.dur+'</span>' +
       '</div>' +
-      '<div class="src-info"><div class="src-name">'+s.n+'</div><div class="src-meta">'+s.sz+' · '+s.cod+' · '+s.fps+'fps</div><span class="src-badge">'+cn+' clips</span></div></div>';
+      '<div class="src-info"><div class="src-name">'+s.n+'</div><div class="src-path">'+s.path+'</div><div class="src-meta">'+s.sz+' · '+s.cod+' · '+s.fps+'fps</div><span class="src-badge">'+cn+' clips</span></div></div>';
   });
   document.getElementById("srcList").innerHTML = h;
 }
@@ -451,15 +456,22 @@ function renderMain() {
     var c = clips[aC], dur = (c.o - c.i).toFixed(1);
     var subHtml = "";
     if (c.subs && c.subs.length > 0) {
-      var totalDur = c.o - c.i;
-      subHtml = '<div class="cd-subs"><div class="cd-subs-label"><span class="dot on"></span>SUBTITLES · ' + c.subs.length + ' sentences</div><div class="cd-sub-track">';
-      c.subs.forEach(function(sub,si) {
-        var bw = ((sub.e - sub.s) / totalDur * 100).toFixed(1);
-        subHtml += '<div class="cd-sub-block" style="flex:'+bw+'" title="'+tc(sub.s)+' → '+tc(sub.e)+'">'+sub.t+'</div>';
+      subHtml = '<div class="cd-subs"><div class="cd-subs-label">SUBTITLES <span class="cd-subs-tag on">卡拉OK对齐 ✓</span> <span style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-55)">' + c.subs.length + ' 句</span></div><div class="cd-sub-lines">';
+      c.subs.forEach(function(sub) {
+        var charDur = (sub.e - sub.s) / sub.t.length;
+        var charsHtml = sub.t.split("").map(function(ch, ci) {
+          var ct = (sub.s + ci * charDur).toFixed(2);
+          return '<span class="char" title="' + ct + 's">' + ch + '</span>';
+        }).join("");
+        subHtml += '<div class="cd-sub-line">' +
+          '<span class="cd-sub-tc">' + tc(sub.s) + ' → ' + tc(sub.e) + '</span>' +
+          '<span class="cd-sub-text">' + charsHtml + '</span>' +
+          '<span class="cd-sub-dur">' + (sub.e - sub.s).toFixed(1) + 's</span>' +
+        '</div>';
       });
       subHtml += '</div></div>';
     } else {
-      subHtml = '<div class="cd-subs"><div class="cd-subs-label"><span class="dot off"></span>SUBTITLES</div><div class="cd-sub-none">无字幕数据</div></div>';
+      subHtml = '<div class="cd-subs"><div class="cd-subs-label">SUBTITLES <span class="cd-subs-tag off">无字幕</span></div><div class="cd-sub-none">暂无字幕数据 — nextframe sub-import</div></div>';
     }
 
     // Zoom ticks
@@ -468,12 +480,10 @@ function renderMain() {
     for (var zt = c.i; zt <= c.o; zt += zstep) ztks.push('<span>'+tc(zt)+'</span>');
     if (Math.abs(c.o - (c.i + Math.floor((c.o-c.i)/zstep)*zstep)) > 0.5) ztks.push('<span>'+tc(c.o)+'</span>');
 
-    det.innerHTML = '<div class="fade-in"><div class="cd-top">' +
-      '<div class="cd-preview" style="background:linear-gradient(135deg,hsla('+s.hue+',0.15) 0%,#050508 100%)">' +
-        '<div class="cd-play-big" onclick="openM(\''+c.id+' '+c.nm+'\',\''+tc(c.i)+' / '+tc(c.o)+'\',\''+s.res+' · '+s.fps+'fps\')">&#9654;</div>' +
-        '<div class="cd-transport"><button class="cd-btn">&#x23EE;</button><button class="cd-btn">&#x25C0;</button><button class="cd-btn play-sm">&#9654;</button><button class="cd-btn">&#x25B6;</button><button class="cd-btn">&#x23ED;</button><div class="cd-progress"><div class="cd-progress-fill"></div></div><span class="cd-tc">'+tc(c.i)+' / '+tc(c.o)+'</span></div>' +
-      '</div>' +
-      '<div class="cd-right">' +
+    var clipPath = s.path.replace(s.n, 'clips/' + c.id + '-' + c.nm.replace(/\s/g,'_') + '.mp4');
+
+    det.innerHTML = '<div class="fade-in">' +
+      '<div class="cd-right" style="display:flex;flex-direction:column">' +
         '<div class="cd-zoom"><div class="cd-zoom-label"><span>PRECISION TIMELINE</span><span>'+dur+'s · '+Math.round(dur*s.fps)+' frames</span></div>' +
           '<div class="cd-zoom-bar" id="zoomBar" onmousemove="showFrameTip(event)" onmouseleave="hideFrameTip()">' +
             '<div class="cd-zoom-fill"></div>' +
@@ -492,8 +502,10 @@ function renderMain() {
           (c.hasTl ? '<div class="cd-info-item"><div class="cd-info-label">TIMELINE</div><div class="cd-info-value" style="color:var(--accent)">&#10003; synced</div></div>' : '<div class="cd-info-item"><div class="cd-info-label">TIMELINE</div><div class="cd-info-value" style="color:var(--ink-25)">&#x2013;</div></div>') +
           (c.seg ? '<div class="cd-info-item"><div class="cd-info-label">SEGMENT</div><div class="cd-info-value" style="color:var(--accent)">'+c.seg+'</div></div>' : '') +
         '</div>' +
+        '<div class="cd-path">SOURCE: '+s.path+'</div>' +
+        '<div class="cd-path">CLIP: '+clipPath+'</div>' +
       '</div>' +
-    '</div></div>';
+    '</div>';
     det.classList.add("show");
   } else {
     det.innerHTML = "";
@@ -511,7 +523,7 @@ function renderMain() {
     if (c.seg) statusTags += '<span class="cr-status-tag seg">' + c.seg + '</span>';
 
     lh += '<div class="clip-row'+(aC===idx?' selected':'')+'" onclick="selClip('+idx+')">' +
-      '<div class="cr-thumb"><div class="cr-grad" style="background:linear-gradient(135deg,hsla('+s.hue+',0.25),transparent)"></div><div class="cr-play" onclick="event.stopPropagation();openM(\''+c.id+' '+c.nm+'\',\''+tc(c.i)+' / '+tc(c.o)+'\',\''+s.res+' · '+s.fps+'fps\')">&#9654;</div><span class="cr-dur">'+dur+'s</span></div>' +
+      '<div class="cr-thumb"><div class="cr-grad" style="background:linear-gradient(135deg,hsla('+s.hue+',0.25),transparent)"></div><span class="cr-dur">'+dur+'s</span></div>' +
       '<div class="cr-info"><div class="cr-name">'+c.nm+'</div><div class="cr-range">'+tc(c.i)+' → '+tc(c.o)+'</div><div class="cr-tags">'+tags+'</div></div>' +
       '<div class="cr-status-tags">'+statusTags+'</div>' +
     '</div>';
