@@ -156,6 +156,7 @@ window.__ipc = window.__ipc || {};
     <div style="flex:1"></div>
     <div class="topbar-right">
       <button class="btn-ghost-sm" onclick="toggleExports()">EXPORTS</button>
+      <button class="btn-ghost-sm" onclick="previewComposed()">PREVIEW</button>
       <button class="btn-ghost-sm" onclick="toggleSettings()">SETTINGS</button>
       <button class="btn-ghost-sm" onclick="navigator.clipboard.writeText('nextframe scene list --json')">COPY SKILLS</button>
     </div>
@@ -340,7 +341,7 @@ window.__ipc = window.__ipc || {};
         </div>
         <div class="playback-right">
           <button class="btn-icon" id="btn-fullscreen" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
-          <button class="btn-export" onclick="alert('Export coming soon')">EXPORT</button>
+          <button class="btn-export" onclick="previewComposed()">PREVIEW</button>
         </div>
       </div>
     </div>
@@ -435,42 +436,28 @@ window.__ipc = window.__ipc || {};
 
 <script src="src/app-bundle.js"></script>
 
-<!-- Render engine — ES module, loaded after IIFE bundle -->
+<!-- DOM preview engine — ES module, loaded after IIFE bundle -->
 <script type="module">
-import * as engine from "./src/engine/index.js";
-import { registerAllScenes } from "./src/scenes/index.js";
+import { createEngine } from "./src/engine-v2.js";
+import { SCENE_REGISTRY } from "./src/scenes-v2/index.js";
 
-registerAllScenes(engine);
-
-// Expose to global for app-bundle.js to call
-window.__renderEngine = {
-  renderAt: engine.renderAt,
-  scenes: engine.SCENES,
+window.__engineV2 = {
+  createEngine,
+  SCENE_REGISTRY,
   ready: true,
 };
 
-// Notify app-bundle that engine is ready
-if (typeof window.__onEngineReady === "function") {
-  window.__onEngineReady();
+if (typeof window.__onEngineV2Ready === "function") {
+  window.__onEngineV2Ready();
 }
-console.log("[engine] loaded, " + engine.SCENES.size + " scenes registered");
+console.log("[engine-v2] loaded, " + Object.keys(SCENE_REGISTRY).length + " scenes registered");
 </script>
 
 <!-- AI操作能力：截图 + 诊断 -->
 <script>
 // 截图：把整个页面截为 PNG，通过 IPC 写到磁盘
 window.__captureScreen = function(outPath) {
-  var el = document.body;
-  // 用 canvas 截取 render-canvas 内容（如果有的话）
-  var renderCanvas = document.getElementById("render-canvas");
-  if (renderCanvas && renderCanvas.width > 0) {
-    var dataUrl = renderCanvas.toDataURL("image/png");
-    if (typeof bridgeCall === "function") {
-      bridgeCall("fs.writeBase64", { path: outPath || "/tmp/nf-capture.png", data: dataUrl });
-      return "capture sent: " + outPath;
-    }
-  }
-  return "no canvas to capture";
+  return "DOM preview capture is not implemented";
 };
 
 // 页面全貌截图：用 html2canvas 思路 — 直接把整个 viewport 画到一个大 canvas
@@ -480,16 +467,9 @@ window.__captureViewport = function(outPath) {
   c.width = w * 2; c.height = h * 2;
   var ctx = c.getContext("2d");
   ctx.scale(2, 2);
-  // 无法直接截 DOM，但可以截所有 canvas
   // 先填背景
   ctx.fillStyle = getComputedStyle(document.body).backgroundColor || "#0a0a0f";
   ctx.fillRect(0, 0, w, h);
-  // 叠加 render-canvas
-  var rc = document.getElementById("render-canvas");
-  if (rc) {
-    var rect = rc.getBoundingClientRect();
-    try { ctx.drawImage(rc, rect.left, rect.top, rect.width, rect.height); } catch(e) {}
-  }
   // 写文件
   var dataUrl = c.toDataURL("image/png");
   if (typeof bridgeCall === "function") {
@@ -505,11 +485,14 @@ window.__diagnose = function() {
     currentProject: typeof currentProject !== "undefined" ? currentProject : null,
     currentEpisode: typeof currentEpisode !== "undefined" ? currentEpisode : null,
     currentSegment: typeof currentSegment !== "undefined" ? currentSegment : null,
-    engineReady: !!(window.__renderEngine && window.__renderEngine.ready),
-    scenesCount: window.__renderEngine ? window.__renderEngine.scenes.size : 0,
+    engineReady: !!(window.__engineV2 && window.__engineV2.ready),
+    scenesCount: window.__engineV2 ? Object.keys(window.__engineV2.SCENE_REGISTRY || {}).length : 0,
     timelineDuration: typeof TOTAL_DURATION !== "undefined" ? TOTAL_DURATION : null,
     currentTime: typeof currentTime !== "undefined" ? currentTime : null,
-    canvasSize: (function() { var c = document.getElementById("render-canvas"); return c ? c.width + "x" + c.height : "none"; })(),
+    stageSize: (function() {
+      var stage = document.getElementById("preview-stage-host");
+      return stage ? stage.style.width + "x" + stage.style.height : "none";
+    })(),
     trackCount: document.querySelectorAll(".tl-track,.track-lane").length,
     clipCount: document.querySelectorAll(".tl-clip,.clip").length,
     viewActive: document.querySelector(".view.active")?.id || "none",

@@ -12,6 +12,7 @@ const SUBCOMMANDS = {
   describe: () => import("../src/cli/describe.js"),
   ascii: () => import("../src/cli/ascii.js"),
   "bake-browser": () => import("../src/cli/bakeBrowser.js"),
+  compose: () => import("../src/cli/compose.js"),
   new: () => import("../src/cli/new.js"),
   "project-new": () => import("../src/cli/project-new.js"),
   "project-list": () => import("../src/cli/project-list.js"),
@@ -21,6 +22,7 @@ const SUBCOMMANDS = {
   "segment-list": () => import("../src/cli/segment-list.js"),
   exports: () => import("../src/cli/exports.js"),
   "bake-video": () => import("../src/cli/bakeVideo.js"),
+  compose: () => import("../src/cli/compose.js"),
   "add-clip": () => import("../src/cli/ops.js"),
   "move-clip": () => import("../src/cli/ops.js"),
   "resize-clip": () => import("../src/cli/ops.js"),
@@ -34,8 +36,6 @@ const SUBCOMMANDS = {
   "list-assets": () => import("../src/cli/assets.js"),
   "remove-asset": () => import("../src/cli/assets.js"),
   scenes: () => import("../src/cli/scenes.js"),
-  build: () => import("../src/cli/build.js"),
-  preview: () => import("../src/cli/preview.js"),
   "app-eval": () => import("../src/cli/app-eval.js"),
   "app-screenshot": () => import("../src/cli/app-screenshot.js"),
   "debug-screenshot": () => import("../src/cli/debug-screenshot.js"),
@@ -44,107 +44,61 @@ const SUBCOMMANDS = {
   help: null,
 };
 
-const HELP = `nextframe — AI-native video editor CLI (v0.3)
+const HELP = `nextframe — frame-pure CLI video editor for AI
 
-  Timeline JSON → multi-layer HTML → browser playback
+USAGE
+  nextframe <command> <project> <episode> <segment> [args]
+  nextframe <command> <timeline.json> [args]     (legacy)
 
-QUICK START (for AI)
-  1. nextframe scenes                           see 48 available components
-  2. Write timeline.json with layers[]          (see FORMAT below)
-  3. nextframe validate timeline.json           check for errors
-  4. nextframe build timeline.json -o out.html  generate playable HTML
-  5. open out.html                              preview in browser
+SUBCOMMANDS
+  new <out.json>                              create empty timeline
+  validate <project> <episode> <segment>      run safety gates
+  frame <project> <episode> <segment> <t>     render single frame
+  render <project> <episode> <segment>        export full timeline to mp4
+  probe <out.mp4>                             inspect export metadata with ffprobe
+  bake-html <project> <episode> <segment>     pre-render htmlSlide clips into PNG cache
+  describe <project> <episode> <segment> <t>  JSON of what is visible at t
+  ascii <project> <episode> <segment> <t>     ASCII art preview of a frame
+  gantt <project> <episode> <segment>         ASCII gantt
+  bake-video <project> <episode> <segment>    pre-extract videoClip frames with ffmpeg
+  compose <project> <episode> <segment>       compose a self-contained HTML preview
+  scenes                                      list all scenes with META
+  bake-browser <project> <episode> <segment>  bake html/svg/markdown/lottie browser scenes
+  compose <project> <episode> <segment>       compose a self-contained HTML preview
+  add-clip <project> <episode> <segment> ...  add a clip to a track
+  move-clip <project> <episode> <segment> ... move a clip's start time
+  resize-clip <project> <episode> <segment>   resize clip duration
+  remove-clip <project> <episode> <segment>   remove a clip
+  set-param <project> <episode> <segment> ... update clip params
+  add-marker <project> <episode> <segment>    append a timeline marker
+  list-clips <project> <episode> <segment>    list clips grouped by track
+  dup-clip <project> <episode> <segment> ...  duplicate a clip at a new time
+  import-image <project> <episode> <segment>  add an image asset to timeline.assets[]
+  import-audio <project> <episode> <segment>  add an audio asset to timeline.assets[]
+  list-assets <project> <episode> <segment>   list assets grouped by kind
+  remove-asset <project> <episode> <segment>  remove an asset by id
+  guide                                       AI onboarding: conventions, workflow, naming
 
-  No matching scene? Write one:
-    runtime/web/src/scenes-v2/myScene.js        create/update/destroy format
-    Add to runtime/web/src/scenes-v2/index.js   register it
-
-COMMANDS — v0.3 (use these)
-  scenes                         list all 48 scene components (grouped by category)
-  scenes <id>                    show single scene: type, params, defaults
-  validate <timeline.json>       run 6 safety gates (format, scenes, time, ids)
-  build <timeline.json> -o X     bundle timeline + all scenes into single HTML
-  preview <timeline.json>        screenshot key frames (auto-detect) → AI self-check
-  preview <tl.json> --time 5     screenshot at specific time
-  preview <tl.json> --auto       auto-detect transition frames + check for issues
-
-TIMELINE FORMAT (v0.3 flat layers)
-  {
-    "width": 1920, "height": 1080, "fps": 30, "duration": 20,
-    "background": "#05050c",
-    "layers": [
-      { "id": "bg", "scene": "auroraGradient", "start": 0, "dur": 20,
-        "params": { "hueA": 265 } },
-      { "id": "title", "scene": "headline", "start": 1, "dur": 5,
-        "params": { "text": "Hello", "fontSize": 96 },
-        "enter": "fadeIn 0.8s", "exit": "fadeOut 0.5s",
-        "transition": "dissolve 0.5s" }
-    ]
-  }
-
-LAYOUT RULES (critical — read this!)
-  ★ Same time = only ONE fullscreen content layer, unless positioned with x/y/w/h
-  ★ Background layers (aurora, starfield, shader*, vignette) CAN overlap
-  ★ Think like CSS layout — each layer is a positioned div on a 1920x1080 stage:
-
-  Common layouts (use x/y/w/h on the LAYER, not the scene):
-    fullscreen    (default)     → no x/y/w/h needed
-    left-half     → x="0"    y="0"    w="50%"  h="100%"
-    right-half    → x="50%"  y="0"    w="50%"  h="100%"
-    top-half      → x="0"    y="0"    w="100%" h="50%"
-    bottom-half   → x="0"    y="50%"  w="100%" h="50%"
-    center-box    → x="15%"  y="15%"  w="70%"  h="70%"
-    top-bar       → x="0"    y="0"    w="100%" h="15%"
-    bottom-bar    → x="0"    y="85%"  w="100%" h="15%"
-    left-sidebar  → x="0"    y="0"    w="30%"  h="100%"
-    main-content  → x="30%"  y="0"    w="70%"  h="100%"
-    pip(画中画)   → x="65%"  y="5%"   w="30%"  h="30%"
-
-  2 layers side-by-side at same time:
-    { "scene": "barChart",  "x":"5%", "y":"10%", "w":"45%", "h":"80%" }
-    { "scene": "pieChart",  "x":"52%","y":"10%", "w":"45%", "h":"80%" }
-
-  ★ validate will WARN on fullscreen content overlap — fix all warnings before build
-  ★ preview shows each layer's position — use it to verify layout
-
-LAYER PROPERTIES
-  id, scene, start, dur, params       required
-  enter       fadeIn/slideUp/slideDown/slideLeft/slideRight/scaleIn + duration
-  exit        fadeOut/slideDown/scaleOut + duration
-  transition  dissolve/wipeLeft/wipeRight/wipeUp/wipeDown/slideLeft/slideRight/slideUp/slideDown/zoomIn
-  blend       normal/screen/lighten/multiply/overlay
-  filter      CSS filter string (blur/grayscale/sepia)
-  opacity     0-1
-  x/y/w/h     position and size (use to avoid fullscreen overlap)
-
-SCENE TYPES
-  dom         text, layout, cards (localT normalized 0~1)
-  canvas      2D effects, backgrounds (localT in seconds)
-  svg         data visualization, diagrams (localT in seconds)
-  webgl       GPU shader effects (localT in seconds)
-  media       video/image embed (localT in seconds)
-
-CREATING NEW SCENES
-  export default {
-    id: "myScene", type: "dom", name: "My Scene",
-    category: "Typography", defaultParams: { text: "Hi" },
-    create(container, params) { /* return DOM refs */ },
-    update(els, localT, params) { /* animate per frame */ },
-    destroy(els) { els.root.remove(); }
-  };
-
-COMMANDS — legacy v0.1 (still available)
-  new/validate/frame/render/probe/gantt/describe/ascii
-  add-clip/move-clip/resize-clip/remove-clip/set-param
-  project-new/project-list/episode-new/episode-list
-  segment-new/segment-list/exports/guide
+PROJECT MANAGEMENT
+  project-new <name>                          create a project folder under ~/NextFrame/projects
+  project-list [--root=PATH] [--json]        list projects with episode counts
+  episode-new <project> <name>               create an episode inside a project
+  episode-list <project> [--json]            list episodes for a project
+  segment-new <project> <episode> <name>     create an empty segment timeline JSON
+  segment-list <project> <episode> [--json]  list segment JSON files in an episode
+  exports <project> <episode> [--json]       list recorded render exports for an episode
 
 FLAGS
   --json     output structured JSON (for AI / scripts)
-  -o FILE    output file path (for build)
+  --width    override render width
+  --height   override render height
+  --fps      override fps for export
 
 EXIT CODES
-  0 success | 1 warning | 2 error | 3 usage error
+  0  success
+  1  warning (operation completed)
+  2  error
+  3  usage error
 `;
 
 async function main() {

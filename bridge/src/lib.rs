@@ -4,6 +4,7 @@
 mod trace;
 
 mod autosave;
+mod compose;
 mod dialog;
 mod encoding;
 mod episode;
@@ -29,6 +30,7 @@ use serde_json::Value;
 use autosave::{
     handle_autosave_clear, handle_autosave_list, handle_autosave_recover, handle_autosave_write,
 };
+use compose::handle_compose_generate;
 use dialog::{handle_fs_dialog_open, handle_fs_dialog_save, handle_fs_reveal};
 use export::{handle_export_cancel, handle_export_start, handle_export_status, process_registry};
 use ffmpeg::{ffmpeg_command_path, handle_export_mux_audio};
@@ -90,6 +92,7 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
         "autosave.list" => handle_autosave_list(&params),
         "autosave.clear" => handle_autosave_clear(&params),
         "autosave.recover" => handle_autosave_recover(&params),
+        "compose.generate" => handle_compose_generate(&params),
         "fs.read" => handle_fs_read(&params),
         "fs.write" => handle_fs_write(&params),
         "fs.listDir" => handle_fs_list_dir(&params),
