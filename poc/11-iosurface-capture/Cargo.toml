@@ -1,0 +1,48 @@
+[package]
+name = "iosurface-capture-poc"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[[bin]]
+name = "iosurface-poc"
+path = "src/main.rs"
+
+[dependencies]
+objc2 = { version = "0.6", features = ["exception"] }
+objc2-foundation = { version = "0.3.2", features = [
+    "NSObject", "NSString", "NSURL", "NSArray",
+    "NSError", "NSGeometry", "NSData", "NSValue",
+    "NSRunLoop", "NSThread", "NSDictionary", "NSDate",
+    "NSURLRequest",
+    "objc2-core-foundation",
+] }
+objc2-app-kit = { version = "0.3.2", features = [
+    "NSApplication", "NSWindow", "NSView", "NSResponder",
+    "NSGraphics", "NSImage", "NSBitmapImageRep", "NSImageRep",
+] }
+objc2-web-kit = { version = "0.3.2", features = [
+    "WKWebView", "WKWebViewConfiguration",
+    "WKSnapshotConfiguration",
+    "WKNavigation", "WKNavigationDelegate",
+    "WKUserContentController", "WKUserScript",
+    "block2",
+] }
+objc2-quartz-core = { version = "0.3.2", features = [
+    "CALayer",
+    "objc2-core-graphics",
+] }
+objc2-core-graphics = { version = "0.3.2", features = [
+    "CGBitmapContext",
+    "CGColorSpace",
+    "CGContext",
+    "CGGeometry",
+    "CGImage",
+] }
+block2 = "0.6"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+panic = "deny"
