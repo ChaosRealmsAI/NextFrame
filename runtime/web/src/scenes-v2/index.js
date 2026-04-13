@@ -10,6 +10,7 @@ import circleRipple from './circleRipple.js';
 import codeBlock from './codeBlock.js';
 import confetti from './confetti.js';
 import featureGrid from './featureGrid.js';
+import agentLoop from './agentLoop.js';
 import flowChart from './flowChart.js';
 import fluidBackground from './fluidBackground.js';
 import headline from './headline.js';
@@ -64,7 +65,7 @@ const ALL_SCENES = [
   // SVG — data viz & decoration
   barChart, lineChart, pieChart, progressRing,
   svgRings, radarChart, horizontalBars, treeMap,
-  timelineViz, flowChart,
+  timelineViz, flowChart, agentLoop,
   // Media
   imageHero, videoClip,
   // WebGL — GPU shader effects

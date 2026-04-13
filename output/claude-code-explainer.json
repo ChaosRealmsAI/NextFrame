@@ -1,0 +1,269 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 30,
+  "background": "#0a0404",
+  "layers": [
+    {
+      "id": "bg-shader",
+      "scene": "shaderGradient",
+      "start": 0,
+      "dur": 30,
+      "params": {
+        "color1": "#1a0a08",
+        "color2": "#1a0808",
+        "color3": "#0a0808",
+        "speed": 0.2
+      }
+    },
+    {
+      "id": "vignette",
+      "scene": "vignette",
+      "start": 0,
+      "dur": 30,
+      "params": {
+        "intensity": 0.75,
+        "color": "#000000",
+        "radius": 0.45
+      }
+    },
+
+    {
+      "id": "cover-title",
+      "scene": "headline",
+      "start": 0,
+      "dur": 5,
+      "enter": "scaleIn 0.8s",
+      "exit": "fadeOut 0.5s",
+      "params": {
+        "text": "Claude Code 源码揭秘",
+        "subtitle": "Agent Loop 的秘密",
+        "fontSize": 96,
+        "gradient": ["#ff6b35", "#ff9a56", "#ffb347"],
+        "stagger": 0.07
+      }
+    },
+
+    {
+      "id": "four-slots-grid",
+      "scene": "featureGrid",
+      "start": 5,
+      "dur": 5,
+      "enter": "fadeIn 0.6s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "columns": 2,
+        "stagger": 0.06,
+        "features": [
+          { "icon": "⚙️", "title": "System Prompt", "desc": "身份 + 规则 + 工具描述 — 每轮重新注入" },
+          { "icon": "💬", "title": "User Message", "desc": "你写的 1 行，系统拼的 87 类" },
+          { "icon": "🔧", "title": "Tools / Functions", "desc": "动态注册，按需注入，可调用" },
+          { "icon": "📦", "title": "Context Window", "desc": "历史对话 + 文件内容 + 项目结构" }
+        ]
+      }
+    },
+
+    {
+      "id": "code-panel",
+      "scene": "codeBlock",
+      "start": 10,
+      "dur": 5,
+      "x": "0%",
+      "y": "0%",
+      "w": "60%",
+      "h": "100%",
+      "enter": "slideRight 0.6s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "language": "typescript",
+        "fontSize": 16,
+        "theme": "dark",
+        "code": "// Prompt Assembly — every turn rebuilt\nfunction buildPrompt(ctx: Context): Prompt {\n  return [\n    injectSystemIdentity(ctx),     // slot 1\n    injectToolDefinitions(ctx),    // slot 2\n    injectProjectContext(ctx),     // slot 3\n    injectConversationHistory(ctx) // slot 4\n  ].flat();\n}\n\n// 87 injection classes per turn\n// You wrote 1 line.\n// The system assembled 87."
+      }
+    },
+    {
+      "id": "callout-87",
+      "scene": "calloutCard",
+      "start": 10,
+      "dur": 5,
+      "x": "62%",
+      "y": "20%",
+      "w": "35%",
+      "h": "60%",
+      "enter": "slideLeft 0.7s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "icon": "🔥",
+        "title": "87 类注入",
+        "description": "每一轮对话，Claude Code 重新拼装完整提示词。你写了 1 行，系统拼了 87 类。每一轮，重新拼一遍。",
+        "bgColor": "rgba(26,10,8,0.92)",
+        "borderColor": "#ff6b35"
+      }
+    },
+
+    {
+      "id": "bar-chart-panel",
+      "scene": "barChart",
+      "start": 15,
+      "dur": 5,
+      "x": "3%",
+      "y": "5%",
+      "w": "50%",
+      "h": "90%",
+      "enter": "slideRight 0.7s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "data": [98, 95, 91, 87, 83, 79, 76, 73, 69, 65, 61, 58, 54, 50, 45],
+        "labels": ["身份", "工具", "历史", "文件", "规则", "路径", "Git", "Mem", "环境", "Lang", "时区", "平台", "权限", "任务", "元数据"],
+        "colors": ["#ff6b35", "#ff8c42", "#ff9a56", "#ffb347", "#ffc462", "#ffd27f", "#ffe09d", "#ffecb3", "#ff6b35", "#ff8c42", "#ff9a56", "#ffb347", "#ffc462", "#ffd27f", "#ffe09d"],
+        "barWidth": 48,
+        "gap": 12,
+        "showLabels": true,
+        "showValues": false
+      }
+    },
+    {
+      "id": "progress-ring-panel",
+      "scene": "progressRing",
+      "start": 15,
+      "dur": 5,
+      "x": "55%",
+      "y": "10%",
+      "w": "42%",
+      "h": "80%",
+      "enter": "scaleIn 0.8s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "progress": 98,
+        "color": "#ff6b35",
+        "bgColor": "rgba(255,107,53,0.12)",
+        "strokeWidth": 24,
+        "label": "自动化覆盖率",
+        "showPercent": true
+      }
+    },
+
+    {
+      "id": "agent-loop-flow",
+      "scene": "flowChart",
+      "start": 20,
+      "dur": 5,
+      "enter": "fadeIn 0.6s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "steps": [
+          { "label": "User Input" },
+          { "label": "拼装提示词" },
+          { "label": "Call Claude" },
+          { "label": "执行 Tools" },
+          { "label": "输出结果" }
+        ],
+        "color": "#ff6b35",
+        "arrowColor": "#ffb347"
+      }
+    },
+
+    {
+      "id": "quote-ending",
+      "scene": "quoteBlock",
+      "start": 25,
+      "dur": 3,
+      "enter": "scaleIn 0.7s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "text": "你写了 1 行，系统拼了 87 类。每一轮，重新拼一遍。",
+        "author": "Claude Code 内部原理",
+        "fontSize": 38,
+        "accentColor": "#ff6b35"
+      }
+    },
+    {
+      "id": "end-title",
+      "scene": "headline",
+      "start": 28,
+      "dur": 2,
+      "enter": "fadeIn 0.5s",
+      "params": {
+        "text": "NextFrame",
+        "subtitle": "AI-Native Video Editor",
+        "fontSize": 72,
+        "gradient": ["#ff6b35", "#ffb347", "#ff9a56"],
+        "stagger": 0.05
+      }
+    },
+
+    {
+      "id": "subtitle-0-5",
+      "scene": "subtitleBar",
+      "start": 0,
+      "dur": 5,
+      "params": {
+        "text": "Claude Code 是如何在每一轮对话中重新拼装完整提示词的？",
+        "fontSize": 22,
+        "bgColor": "rgba(0,0,0,0.75)",
+        "textColor": "#ffffff"
+      }
+    },
+    {
+      "id": "subtitle-5-10",
+      "scene": "subtitleBar",
+      "start": 5,
+      "dur": 5,
+      "params": {
+        "text": "核心架构：4 个槽位 — System / User / Tools / Context",
+        "fontSize": 22,
+        "bgColor": "rgba(0,0,0,0.75)",
+        "textColor": "#ffffff"
+      }
+    },
+    {
+      "id": "subtitle-10-15",
+      "scene": "subtitleBar",
+      "start": 10,
+      "dur": 5,
+      "params": {
+        "text": "提示词拼装过程：每一轮对话，4 个槽位全部重新注入",
+        "fontSize": 22,
+        "bgColor": "rgba(0,0,0,0.75)",
+        "textColor": "#ffffff"
+      }
+    },
+    {
+      "id": "subtitle-15-20",
+      "scene": "subtitleBar",
+      "start": 15,
+      "dur": 5,
+      "params": {
+        "text": "15 个维度覆盖率分析 — 98% 自动化，无需手动配置",
+        "fontSize": 22,
+        "bgColor": "rgba(0,0,0,0.75)",
+        "textColor": "#ffffff"
+      }
+    },
+    {
+      "id": "subtitle-20-25",
+      "scene": "subtitleBar",
+      "start": 20,
+      "dur": 5,
+      "params": {
+        "text": "Agent Loop：Input → 拼装提示词 → Call Claude → 执行 Tools → 输出",
+        "fontSize": 22,
+        "bgColor": "rgba(0,0,0,0.75)",
+        "textColor": "#ffffff"
+      }
+    },
+    {
+      "id": "subtitle-25-30",
+      "scene": "subtitleBar",
+      "start": 25,
+      "dur": 5,
+      "params": {
+        "text": "以终为始，从最终提示词倒推 Claude Code 逻辑",
+        "fontSize": 22,
+        "bgColor": "rgba(0,0,0,0.75)",
+        "textColor": "#ffffff"
+      }
+    }
+  ]
+}

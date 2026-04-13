@@ -1,0 +1,226 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 35,
+  "background": "#05050c",
+  "layers": [
+    {
+      "id": "bg-aurora",
+      "scene": "auroraGradient",
+      "start": 0,
+      "dur": 35,
+      "params": {
+        "hueA": 255,
+        "hueB": 230,
+        "hueC": 200,
+        "intensity": 0.55,
+        "grain": 0.025
+      }
+    },
+    {
+      "id": "bg-vignette",
+      "scene": "vignette",
+      "start": 0,
+      "dur": 35,
+      "params": {
+        "intensity": 0.85,
+        "color": "#000000",
+        "radius": 0.45
+      }
+    },
+
+    {
+      "id": "cover-headline",
+      "scene": "headline",
+      "start": 0,
+      "dur": 5,
+      "params": {
+        "text": "指数曲线的终局",
+        "subtitle": "Dario Amodei 访谈解读",
+        "fontSize": 96,
+        "gradient": ["#e8c47a", "#f5e0a0", "#e8c47a"],
+        "stagger": 0.08
+      },
+      "enter": "fadeIn 0.8s",
+      "exit": "fadeOut 0.6s"
+    },
+
+    {
+      "id": "bullets-overview",
+      "scene": "bulletList",
+      "start": 5,
+      "dur": 5,
+      "params": {
+        "items": [
+          "技术指数增长已超预期，Scaling 假设仍成立",
+          "大众尚未感知 — 能力拐点即将到来",
+          "两条路径：Compute Scaling + RL Scaling"
+        ],
+        "fontSize": 38,
+        "bulletColor": "#e8c47a",
+        "stagger": 0.12
+      },
+      "enter": "slideUp 0.7s",
+      "exit": "fadeOut 0.5s"
+    },
+
+    {
+      "id": "compute-chart",
+      "scene": "lineChart",
+      "start": 10,
+      "dur": 6,
+      "x": "3%",
+      "y": "8%",
+      "w": "54%",
+      "h": "84%",
+      "params": {
+        "data": [12, 18, 30, 55, 90, 140, 220],
+        "labels": ["2020", "2021", "2022", "2023", "2024", "2025", "2026"],
+        "color": "#e8c47a",
+        "strokeWidth": 4,
+        "showDots": true,
+        "showArea": true
+      },
+      "enter": "fadeIn 0.6s",
+      "exit": "fadeOut 0.4s"
+    },
+    {
+      "id": "compute-counter",
+      "scene": "numberCounter",
+      "start": 10,
+      "dur": 6,
+      "x": "59%",
+      "y": "20%",
+      "w": "38%",
+      "h": "60%",
+      "params": {
+        "value": 100,
+        "prefix": "",
+        "suffix": "x",
+        "label": "Compute Growth 2020→2026",
+        "color": "#e8c47a"
+      },
+      "enter": "scaleIn 0.8s",
+      "exit": "fadeOut 0.4s"
+    },
+
+    {
+      "id": "rl-vs-compute-chart",
+      "scene": "barChart",
+      "start": 16,
+      "dur": 6,
+      "params": {
+        "data": [35, 100, 45, 220],
+        "labels": ["RL 2022", "RL 2026", "Compute 2022", "Compute 2026"],
+        "colors": ["#6ee7ff", "#6ee7ff", "#e8c47a", "#e8c47a"],
+        "barWidth": 160,
+        "gap": 80,
+        "showLabels": true,
+        "showValues": true
+      },
+      "enter": "slideUp 0.7s",
+      "exit": "fadeOut 0.5s"
+    },
+
+    {
+      "id": "big-blob-bullets",
+      "scene": "bulletList",
+      "start": 22,
+      "dur": 5,
+      "x": "2%",
+      "y": "5%",
+      "w": "58%",
+      "h": "90%",
+      "params": {
+        "items": [
+          "Reasoning depth — 推理深度",
+          "World knowledge — 世界知识",
+          "Tool use — 工具调用",
+          "Memory — 长期记忆",
+          "Multimodal — 多模态",
+          "Agency — 自主行动",
+          "Alignment — 价值对齐"
+        ],
+        "fontSize": 30,
+        "bulletColor": "#e8c47a",
+        "stagger": 0.1
+      },
+      "enter": "slideRight 0.6s",
+      "exit": "fadeOut 0.4s"
+    },
+    {
+      "id": "big-blob-radar",
+      "scene": "radarChart",
+      "start": 22,
+      "dur": 5,
+      "x": "62%",
+      "y": "10%",
+      "w": "34%",
+      "h": "80%",
+      "params": {
+        "data": [82, 90, 75, 60, 88, 70, 65],
+        "labels": ["Reasoning", "Knowledge", "Tools", "Memory", "Multimodal", "Agency", "Alignment"],
+        "color": "#6ee7ff",
+        "fillOpacity": 0.3,
+        "maxValue": 100
+      },
+      "enter": "scaleIn 0.7s",
+      "exit": "fadeOut 0.4s"
+    },
+
+    {
+      "id": "milestones-timeline",
+      "scene": "timelineViz",
+      "start": 27,
+      "dur": 5,
+      "params": {
+        "events": [
+          { "label": "GPT-3", "date": "2020" },
+          { "label": "InstructGPT", "date": "2022" },
+          { "label": "GPT-4", "date": "2023" },
+          { "label": "Claude 3", "date": "2024" },
+          { "label": "Inflection", "date": "2025" },
+          { "label": "AGI?", "date": "2026+" }
+        ],
+        "color": "#e8c47a",
+        "dotSize": 10
+      },
+      "enter": "fadeIn 0.7s",
+      "exit": "fadeOut 0.5s"
+    },
+
+    {
+      "id": "closing-quote",
+      "scene": "quoteBlock",
+      "start": 32,
+      "dur": 3,
+      "params": {
+        "text": "指数增长的终局不是平台期——而是一个我们还没有词汇描述的世界。",
+        "author": "Dario Amodei · Anthropic",
+        "fontSize": 34,
+        "accentColor": "#e8c47a"
+      },
+      "enter": "fadeIn 0.8s",
+      "exit": "fadeOut 0.5s"
+    },
+
+    {
+      "id": "bottom-marquee",
+      "scene": "marquee",
+      "start": 0,
+      "dur": 35,
+      "x": "0",
+      "y": "93%",
+      "w": "100%",
+      "h": "7%",
+      "params": {
+        "text": "Scaling 假设  ·  Compute × 100  ·  RL Scaling 新路径  ·  Big Blob 7变量  ·  指数曲线临界点  ·  Dario Amodei 访谈解读  ·  NextFrame AI  ·",
+        "fontSize": 22,
+        "speed": 80,
+        "color": "#e8c47a",
+        "bgColor": "rgba(10,5,20,0.75)"
+      }
+    }
+  ]
+}
