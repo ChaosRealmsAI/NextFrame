@@ -1,0 +1,7 @@
+/target
+/.vox-cache/
+/.ally/
+/manifest.json
+/*.mp3
+/*.srt
+.DS_Store

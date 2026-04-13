@@ -1,0 +1,190 @@
+{
+  "segments": [
+    {
+      "text": "今天天气真不错，",
+      "start_ms": 221,
+      "end_ms": 1203,
+      "words": [
+        {
+          "word": "今",
+          "start_ms": 221,
+          "end_ms": 341
+        },
+        {
+          "word": "天",
+          "start_ms": 341,
+          "end_ms": 441
+        },
+        {
+          "word": "天",
+          "start_ms": 441,
+          "end_ms": 601
+        },
+        {
+          "word": "气",
+          "start_ms": 601,
+          "end_ms": 722
+        },
+        {
+          "word": "真",
+          "start_ms": 722,
+          "end_ms": 882
+        },
+        {
+          "word": "不",
+          "start_ms": 882,
+          "end_ms": 1022
+        },
+        {
+          "word": "错",
+          "start_ms": 1022,
+          "end_ms": 1203
+        }
+      ]
+    },
+    {
+      "text": "我们一起去公园散步吧，",
+      "start_ms": 1824,
+      "end_ms": 3167,
+      "words": [
+        {
+          "word": "我",
+          "start_ms": 1824,
+          "end_ms": 1904
+        },
+        {
+          "word": "们",
+          "start_ms": 1904,
+          "end_ms": 2005
+        },
+        {
+          "word": "一",
+          "start_ms": 2005,
+          "end_ms": 2105
+        },
+        {
+          "word": "起",
+          "start_ms": 2105,
+          "end_ms": 2185
+        },
+        {
+          "word": "去",
+          "start_ms": 2185,
+          "end_ms": 2305
+        },
+        {
+          "word": "公",
+          "start_ms": 2305,
+          "end_ms": 2426
+        },
+        {
+          "word": "园",
+          "start_ms": 2426,
+          "end_ms": 2526
+        },
+        {
+          "word": "散",
+          "start_ms": 2526,
+          "end_ms": 2706
+        },
+        {
+          "word": "步",
+          "start_ms": 2706,
+          "end_ms": 2847
+        },
+        {
+          "word": "吧",
+          "start_ms": 2847,
+          "end_ms": 3167
+        }
+      ]
+    },
+    {
+      "text": "傅里叶变换和大语言模型的幻觉问题。",
+      "start_ms": 3749,
+      "end_ms": 6896,
+      "words": [
+        {
+          "word": "傅",
+          "start_ms": 3749,
+          "end_ms": 3869
+        },
+        {
+          "word": "里",
+          "start_ms": 3869,
+          "end_ms": 3929
+        },
+        {
+          "word": "叶",
+          "start_ms": 3929,
+          "end_ms": 4069
+        },
+        {
+          "word": "变",
+          "start_ms": 4069,
+          "end_ms": 4290
+        },
+        {
+          "word": "换",
+          "start_ms": 4290,
+          "end_ms": 4611
+        },
+        {
+          "word": "和",
+          "start_ms": 4611,
+          "end_ms": 4771
+        },
+        {
+          "word": "大",
+          "start_ms": 4771,
+          "end_ms": 4951
+        },
+        {
+          "word": "语",
+          "start_ms": 4951,
+          "end_ms": 5052
+        },
+        {
+          "word": "言",
+          "start_ms": 5052,
+          "end_ms": 5152
+        },
+        {
+          "word": "模",
+          "start_ms": 5152,
+          "end_ms": 5312
+        },
+        {
+          "word": "型",
+          "start_ms": 5312,
+          "end_ms": 5412
+        },
+        {
+          "word": "的",
+          "start_ms": 5412,
+          "end_ms": 5533
+        },
+        {
+          "word": "幻",
+          "start_ms": 5533,
+          "end_ms": 5673
+        },
+        {
+          "word": "觉",
+          "start_ms": 5673,
+          "end_ms": 5773
+        },
+        {
+          "word": "问",
+          "start_ms": 5773,
+          "end_ms": 5954
+        },
+        {
+          "word": "题",
+          "start_ms": 5954,
+          "end_ms": 6896
+        }
+      ]
+    }
+  ]
+}
