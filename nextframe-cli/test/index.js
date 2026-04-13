@@ -1,18 +1,5 @@
-// Aggregator for node --test — some Node versions don't auto-discover
-// multiple files when given a directory. Importing here ensures the
-// whole suite runs with `node --test test/` or `node --test test/index.js`.
-import "./smoke.test.js";
-import "./architecture.test.js";
-import "./scene-contract.test.js";
-import "./cli-render.test.js";
-import "./cli-export.test.js";
-import "./browser-scenes.test.js";
-import "./safety-gates.test.js";
-import "./cli-timeline-ops.test.js";
-import "./cli-assets.test.js";
-import "./cli-project-hierarchy.test.js";
-import "./ai-tools.test.js";
-import "./video-scene.test.js";
-import "./html-scene.test.js";
-import "./keyframes.test.js";
-import "./effects-filters.test.js";
+import "./v3-ai.test.js";
+import "./v3-architecture.test.js";
+import "./v3-cli.test.js";
+import "./v3-render.test.js";
+import "./v4-pipeline.test.js";

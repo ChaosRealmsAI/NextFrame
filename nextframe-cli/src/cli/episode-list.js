@@ -69,7 +69,7 @@ async function listSegments(path) {
   const entries = await readdir(path, { withFileTypes: true });
   const segments = [];
   for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith(".json") || entry.name === "episode.json") continue;
+    if (!entry.isFile() || !entry.name.endsWith(".json") || entry.name === "episode.json" || entry.name === "pipeline.json") continue;
     const segment = await loadJson(join(path, entry.name));
     segments.push({ duration: finiteOr(segment.duration, 0) });
   }

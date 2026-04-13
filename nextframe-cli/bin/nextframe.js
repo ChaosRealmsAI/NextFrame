@@ -10,8 +10,20 @@ const SUBCOMMANDS = {
   render: () => import("../src/cli/render.js"),
   "project-new": () => import("../src/cli/project-new.js"),
   "project-list": () => import("../src/cli/project-list.js"),
+  "project-config": () => import("../src/cli/project-config.js"),
   "episode-new": () => import("../src/cli/episode-new.js"),
   "episode-list": () => import("../src/cli/episode-list.js"),
+  "pipeline-get": () => import("../src/cli/pipeline-get.js"),
+  "script-set": () => import("../src/cli/script-set.js"),
+  "script-get": () => import("../src/cli/script-get.js"),
+  "audio-set": () => import("../src/cli/audio-set.js"),
+  "audio-get": () => import("../src/cli/audio-get.js"),
+  "atom-add": () => import("../src/cli/atom-add.js"),
+  "atom-list": () => import("../src/cli/atom-list.js"),
+  "atom-remove": () => import("../src/cli/atom-remove.js"),
+  "output-add": () => import("../src/cli/output-add.js"),
+  "output-list": () => import("../src/cli/output-list.js"),
+  "output-publish": () => import("../src/cli/output-publish.js"),
   "segment-new": () => import("../src/cli/segment-new.js"),
   "segment-list": () => import("../src/cli/segment-list.js"),
   "layer-add": () => import("../src/cli/layers.js"),
@@ -74,7 +86,14 @@ COMMANDS
 
 Project (三级存储)
   project-new / episode-new / segment-new
-  project-list / episode-list / segment-list
+  project-list / episode-list / segment-list / project-config
+
+Pipeline (v0.4)
+  pipeline-get
+  script-set / script-get
+  audio-set / audio-get
+  atom-add / atom-list / atom-remove
+  output-add / output-list / output-publish
 
 Layer CRUD
   layer-list / layer-add / layer-move / layer-resize / layer-set / layer-remove
