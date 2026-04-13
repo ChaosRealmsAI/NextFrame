@@ -1,121 +1,101 @@
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+// engine-v2/build.js — bundle timeline + scenes into single self-contained HTML.
+// ESM refactor of runtime/web/src/bundle.cjs.
 
-import { timelineMetrics } from "./timeline.js";
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SRC_DIR = resolve(HERE, "../../../runtime/web/src");
+const SRC_DIR = resolve(HERE, '../../../runtime/web/src');
 
-export function buildHTMLDocument(timeline, opts = {}) {
-  const { width, height, fps, duration, background } = timelineMetrics(timeline);
-  const mode = opts.mode === "headless" ? "headless" : "player";
-  const baseHref = typeof opts.baseHref === "string" && opts.baseHref ? opts.baseHref : "";
-  const sharedCode = stripESM(readFileSync(resolve(SRC_DIR, "scenes-v2-shared.js"), "utf8"));
-  const engineCode = stripESM(readFileSync(resolve(SRC_DIR, "engine-v2.js"), "utf8"));
-  const sceneDir = resolve(SRC_DIR, "scenes-v2");
-  const sceneFiles = readdirSync(sceneDir).filter((name) => name.endsWith(".js") && name !== "index.js").sort();
-  const sceneBootstrap = sceneFiles.map((file) => {
-    const id = file.slice(0, -3);
-    const code = stripESM(readFileSync(resolve(sceneDir, file), "utf8"));
-    return `SCENE_REGISTRY["${id}"] = (function() {\n${code}\n})();`;
-  }).join("\n\n");
+/** Strip ES module syntax so code can be embedded in a <script> tag */
+function stripESM(code) {
+  return code
+    .replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '')
+    .replace(/^import\s*\{[^}]*\}\s*from\s+['"].*?['"];?\s*$/gm, '')
+    .replace(/^export\s+default\s+/gm, 'return ')
+    .replace(/^export\s*\{[^}]*\};?\s*$/gm, '')
+    .replace(/^export\s+(function|const|let|var|class)\s/gm, '$1 ');
+}
 
-  const bootScript = mode === "headless"
-    ? [
-        "window.__NEXTFRAME_ENGINE = createEngine(stage, TIMELINE, SCENE_REGISTRY);",
-        "window.__NEXTFRAME_PLAYER = null;",
-        "window.__NEXTFRAME_ENGINE.renderFrame(0);",
-      ].join("\n")
-    : [
-        "window.__NEXTFRAME_ENGINE = createEngine(stage, TIMELINE, SCENE_REGISTRY);",
-        "window.__NEXTFRAME_PLAYER = createPlayer(window.__NEXTFRAME_ENGINE, stage);",
-      ].join("\n");
+export function buildHTML(timeline, outputPath) {
+  try {
+    // Read shared utilities
+    const sharedCode = stripESM(readFileSync(resolve(SRC_DIR, 'scenes-v2-shared.js'), 'utf-8'));
 
-  return `<!DOCTYPE html>
+    // Read engine
+    const engineCode = stripESM(readFileSync(resolve(SRC_DIR, 'engine-v2.js'), 'utf-8'));
+
+    // Read all scene files
+    const sceneDir = resolve(SRC_DIR, 'scenes-v2');
+    const sceneFiles = readdirSync(sceneDir).filter(f => f.endsWith('.js') && f !== 'index.js');
+    const sceneCodes = [];
+    for (const file of sceneFiles) {
+      const id = file.replace('.js', '');
+      const code = stripESM(readFileSync(resolve(sceneDir, file), 'utf-8'));
+      sceneCodes.push({ id, code });
+    }
+
+    const { width = 1920, height = 1080, fps = 30, duration = 10, background = '#05050c' } = timeline;
+
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>NextFrame v0.3</title>
-${baseHref ? `<base href="${escapeHtml(baseHref)}">` : ""}
+<title>NextFrame — Generated Video</title>
 <style>
-  * { box-sizing: border-box; }
-  html, body { margin: 0; background: ${background}; }
-  body[data-mode="headless"] { overflow: hidden; }
-  #stage { width: ${width}px; height: ${height}px; background: ${background}; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: #111; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding-top: 20px; }
+  #stage { box-shadow: 0 0 80px rgba(100,80,200,0.15); }
+  .nf-layer { will-change: opacity, transform; }
 </style>
 </head>
-<body data-mode="${mode}">
+<body>
 <div id="stage"></div>
 <script>
+// ===== Shared Utilities =====
 ${sharedCode}
 
+// ===== Scene Components =====
 const SCENE_REGISTRY = {};
-${sceneBootstrap}
 
+${sceneCodes.map(({ id, code }) => `
+// --- ${id} ---
+SCENE_REGISTRY["${id}"] = (function() {
+  ${code}
+})();
+`).join('\n')}
+
+// ===== Engine =====
 ${engineCode}
 
-const TIMELINE = ${serializeForScript(timeline)};
-const stage = document.getElementById("stage");
-window.__NEXTFRAME_TIMELINE = TIMELINE;
-window.__NEXTFRAME_MODE = ${JSON.stringify(mode)};
-${bootScript}
-window.__NEXTFRAME_READY = true;
+// ===== Timeline Data =====
+const TIMELINE = ${JSON.stringify(timeline, null, 2)};
+
+// ===== Boot =====
+const stage = document.getElementById('stage');
+const engine = createEngine(stage, TIMELINE, SCENE_REGISTRY);
+const player = createPlayer(engine, stage);
 </script>
 </body>
 </html>
 `;
-}
 
-export function buildHTML(timeline, outputPath, opts = {}) {
-  try {
-    const html = buildHTMLDocument(timeline, opts);
-    writeFileSync(outputPath, html, "utf8");
-    const { width, height, fps, duration } = timelineMetrics(timeline);
-
+    writeFileSync(outputPath, html, 'utf-8');
+    const size = Math.round(html.length / 1024);
     return {
       ok: true,
       value: {
         path: outputPath,
-        width,
-        height,
+        size: `${size}KB`,
+        dimensions: `${width}x${height}`,
         fps,
-        duration,
-        layers: Array.isArray(timeline.layers) ? timeline.layers.length : 0,
+        duration: `${duration}s`,
+        layers: timeline.layers.length,
+        scenes: sceneCodes.length,
       },
     };
-  } catch (error) {
-    return {
-      ok: false,
-      error: {
-        code: "BUILD_FAIL",
-        message: error.message,
-      },
-    };
+  } catch (err) {
+    return { ok: false, error: { code: 'BUILD_FAIL', message: err.message } };
   }
-}
-
-export function timelineBaseHref(dirPath) {
-  return `${pathToFileURL(dirPath).href.replace(/\/?$/, "/")}`;
-}
-
-function stripESM(code) {
-  return code
-    .replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, "")
-    .replace(/^import\s*\{[^}]*\}\s*from\s+['"].*?['"];?\s*$/gm, "")
-    .replace(/^export\s+default\s+/gm, "return ")
-    .replace(/^export\s*\{[^}]*\};?\s*$/gm, "")
-    .replace(/^export\s+(function|const|let|var|class)\s/gm, "$1 ");
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/"/g, "&quot;");
-}
-
-function serializeForScript(value) {
-  return JSON.stringify(value)
-    .replace(/</g, "\\u003C")
-    .replace(/<\/script/gi, "<\\/script")
-    .replace(/\u2028/g, "\\u2028")
-    .replace(/\u2029/g, "\\u2029");
 }

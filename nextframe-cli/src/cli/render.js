@@ -1,18 +1,62 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-
+// nextframe render <timeline.json> <out.mp4>
+import { randomUUID } from "node:crypto";
+import { existsSync, unlinkSync } from "node:fs";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { parseFlags, loadTimeline, emit } from "./_io.js";
-import { resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
-import { validateTimeline } from "../engine-v2/validate.js";
-import { timelineMetrics } from "../engine-v2/timeline.js";
-import { captureFrames, encodeFramesToMp4 } from "../targets/browser.js";
-import { muxMP4Audio } from "../targets/ffmpeg-mp4.js";
+import { configureProjectCacheEnv, resolveTimeline, timelineDir, timelineUsage } from "./_resolve.js";
+import { exportMP4, muxMP4Audio } from "../targets/ffmpeg-mp4.js";
 import { exportRecorder } from "../targets/recorder.js";
+import { validateTimeline } from "../engine/validate.js";
 
 const USAGE = timelineUsage("render", "", " <out.mp4>");
+const DEFAULT_CRF = 20;
+
+const HELP = `${USAGE}
+
+flags:
+  --target <name>  export backend (supported: ffmpeg, recorder)
+  --fps <n>        override export fps
+  --crf <n>        override video quality (0..51)
+  --width <n>      override render width
+  --height <n>     override render height
+  --audio <path>   mux external audio into the output mp4
+  --quiet          suppress progress output
+  --json           output structured JSON
+`;
+
+function toMuxFailure(result) {
+  if (result?.ok || !result?.error) return result;
+  if (result.error.code !== "FFMPEG_SPAWN" && result.error.code !== "FFMPEG_FAILED") return result;
+  return {
+    ok: false,
+    error: {
+      code: "MUX_FAIL",
+      message: result.error.message,
+      hint: result.error.hint,
+    },
+  };
+}
+
+function makeTempVideoPath(outPath) {
+  return join(dirname(outPath), `.nextframe-video-${randomUUID()}.mp4`);
+}
+
+function parseCrfFlag(raw) {
+  if (raw === undefined) return { ok: true, value: undefined };
+  const crf = Number(raw);
+  if (!Number.isInteger(crf) || crf < 0 || crf > 51) {
+    return { ok: false, error: { code: "BAD_CRF", hint: "0..51" } };
+  }
+  return { ok: true, value: crf };
+}
 
 export async function run(argv) {
+  if (argv.includes("--help") || argv.includes("-h")) {
+    process.stdout.write(HELP);
+    return 0;
+  }
+
   const { positional, flags } = parseFlags(argv);
   const resolved = resolveTimeline(positional, { usage: USAGE });
   if (!resolved.ok) {
@@ -23,91 +67,166 @@ export async function run(argv) {
     emit({ ok: false, error: { code: "USAGE", message: USAGE } }, flags);
     return 3;
   }
-
-  const outPath = resolved.legacy ? (resolved.rest[0] || resolved.mp4Path) : resolved.mp4Path;
+  const outPath = resolved.legacy ? resolved.rest[0] : resolved.mp4Path;
+  const audioPath = flags.audio ? resolve(flags.audio) : null;
   if (!outPath) {
     emit({ ok: false, error: { code: "USAGE", message: USAGE } }, flags);
     return 3;
   }
-
-  const loaded = await loadTimeline(resolved.jsonPath);
-  if (!loaded.ok) {
-    emit(loaded, flags);
+  if (audioPath && !existsSync(audioPath)) {
+    emit({
+      ok: false,
+      error: {
+        code: "AUDIO_NOT_FOUND",
+        message: `no such audio file: ${flags.audio}`,
+        hint: "check --audio path",
+      },
+    }, flags);
     return 2;
   }
-  const validation = validateTimeline(loaded.value);
-  if (!validation.ok) {
-    emit({ ok: false, error: { code: "VALIDATION_FAILED", message: validation.errors[0]?.message || "validation failed" }, ...validation }, flags);
+  const target = flags.target || "ffmpeg";
+  if (target !== "ffmpeg" && target !== "recorder") {
+    emit({
+      ok: false,
+      error: {
+        code: "UNKNOWN_TARGET",
+        hint: "supported: ffmpeg, recorder",
+      },
+    }, flags);
     return 2;
   }
-
-  const target = flags.target || "browser";
-  const metrics = timelineMetrics(loaded.value);
-  const effectiveFps = Number(flags.fps) || metrics.fps;
-  const effectiveCrf = Number.isInteger(Number(flags.crf)) ? Number(flags.crf) : 20;
-  const audioPath = typeof flags.audio === "string" ? flags.audio : null;
-
-  let rendered;
-  if (target === "recorder") {
-    rendered = await exportRecorder(loaded.value, outPath, {
-      fps: effectiveFps,
-      crf: effectiveCrf,
-      baseDir: timelineDir(resolved.jsonPath),
-    });
-  } else if (target === "browser") {
-    rendered = await exportViaBrowser(loaded.value, outPath, {
-      fps: effectiveFps,
-      crf: effectiveCrf,
-      baseDir: timelineDir(resolved.jsonPath),
-    });
-  } else {
-    emit({ ok: false, error: { code: "BAD_TARGET", message: `unsupported target "${target}"` } }, flags);
+  const crf = parseCrfFlag(flags.crf);
+  if (!crf.ok) {
+    emit({ ok: false, error: crf.error }, flags);
     return 2;
   }
-
-  if (!rendered.ok) {
-    emit(rendered, flags);
-    return 2;
-  }
-
-  let finalValue = rendered.value;
-  if (audioPath) {
-    const muxedPath = `${outPath.replace(/\.mp4$/i, "")}.muxed.mp4`;
-    const muxed = await muxMP4Audio(outPath, audioPath, muxedPath, {});
-    if (!muxed.ok) {
-      emit(muxed, flags);
+  const effectiveCrf = crf.value ?? DEFAULT_CRF;
+  const restoreCacheEnv = !resolved.legacy ? configureProjectCacheEnv(resolved.cachePath) : () => {};
+  try {
+    const loaded = await loadTimeline(resolved.jsonPath);
+    if (!loaded.ok) {
+      emit(loaded, flags);
       return 2;
     }
-    finalValue = { ...finalValue, audioPath, muxedPath };
-  }
 
-  emit({ ok: true, value: finalValue }, flags);
-  return 0;
+    // BDD cli-render-8 invariant: render must validate before touching ffmpeg.
+    const projectDir = timelineDir(resolved.jsonPath);
+    const v = validateTimeline(loaded.value, { projectDir });
+    if (v.errors && v.errors.length > 0) {
+      emit({ ok: false, error: v.errors[0], errors: v.errors, hints: v.hints }, flags);
+      return 2;
+    }
+    const opts = {};
+    if (flags.fps) opts.fps = Number(flags.fps);
+    if (crf.value !== undefined) opts.crf = crf.value;
+    if (flags.width) opts.width = Number(flags.width);
+    if (flags.height) opts.height = Number(flags.height);
+    opts.projectDir = projectDir;
+    opts.onProgress = (i, total) => {
+      if (!flags.quiet) {
+        process.stderr.write(`  rendered ${i}/${total} frames\r`);
+      }
+    };
+    await mkdir(dirname(outPath), { recursive: true });
+    const start = Date.now();
+    let r;
+    const exporter = target === "recorder" ? exportRecorder : exportMP4;
+    if (audioPath) {
+      const tempVideoPath = makeTempVideoPath(outPath);
+      const videoOnly = await exporter(loaded.value, tempVideoPath, opts);
+      if (!videoOnly.ok) {
+        r = toMuxFailure(videoOnly);
+      } else {
+        const muxed = await muxMP4Audio(tempVideoPath, audioPath, outPath);
+        if (!muxed.ok) {
+          r = muxed;
+        } else {
+          try {
+            unlinkSync(tempVideoPath);
+          } catch {}
+          r = { ok: true, value: { ...videoOnly.value, outputPath: outPath, audioPath } };
+        }
+      }
+    } else {
+      r = await exporter(loaded.value, outPath, opts);
+    }
+    if (!flags.quiet) process.stderr.write("\n");
+    const elapsed = ((Date.now() - start) / 1000).toFixed(2);
+    if (!r.ok) {
+      emit(r, flags);
+      return 2;
+    }
+    if (!resolved.legacy) {
+      const logged = await appendExportLog(resolved, outPath, r.value, effectiveCrf);
+      if (!logged.ok) {
+        emit(logged, flags);
+        return 2;
+      }
+    }
+    if (flags.json) {
+      process.stdout.write(JSON.stringify({ ok: true, value: { ...r.value, elapsedSeconds: Number(elapsed) } }, null, 2) + "\n");
+    } else {
+      process.stdout.write(`wrote ${outPath} (${r.value.framesRendered} frames @ ${r.value.fps}fps, ${elapsed}s)\n`);
+    }
+    return 0;
+  } finally {
+    restoreCacheEnv();
+  }
 }
 
-async function exportViaBrowser(timeline, outPath, opts) {
-  const { fps, duration, width, height } = { ...timelineMetrics(timeline), fps: opts.fps };
-  const frameCount = Math.max(1, Math.ceil(duration * fps));
-  const times = Array.from({ length: frameCount }, (_value, index) => index / fps);
-  const frameDir = await mkdtemp(join(tmpdir(), "nextframe-browser-render-"));
+async function appendExportLog(resolved, outPath, renderValue, crf) {
+  const exportDir = dirname(resolved.exportsPath);
+  let history = [];
+
+  await mkdir(exportDir, { recursive: true });
+  try {
+    const text = await readFile(resolved.exportsPath, "utf8");
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed)) {
+      return {
+        ok: false,
+        error: {
+          code: "EXPORT_LOG_INVALID",
+          message: `export log must be a JSON array: ${resolved.exportsPath}`,
+        },
+      };
+    }
+    history = parsed;
+  } catch (err) {
+    if (err.code !== "ENOENT") {
+      return {
+        ok: false,
+        error: {
+          code: "EXPORT_LOG_FAIL",
+          message: `cannot read export log: ${err.message}`,
+        },
+      };
+    }
+  }
+
+  const outputStat = await stat(outPath);
+  history.push({
+    segment: resolved.segment,
+    path: basename(outPath),
+    duration: renderValue.duration,
+    size: outputStat.size,
+    timestamp: new Date().toISOString(),
+    width: renderValue.width,
+    height: renderValue.height,
+    fps: renderValue.fps,
+    crf,
+  });
 
   try {
-    const captured = await captureFrames(timeline, times, frameDir, { baseDir: opts.baseDir });
-    if (!captured.ok) return captured;
-    const encoded = await encodeFramesToMp4(frameDir, outPath, { fps, crf: opts.crf });
-    if (!encoded.ok) return encoded;
+    await writeFile(resolved.exportsPath, JSON.stringify(history, null, 2) + "\n");
+    return { ok: true };
+  } catch (err) {
     return {
-      ok: true,
-      value: {
-        outputPath: outPath,
-        width,
-        height,
-        fps,
-        duration,
-        framesRendered: frameCount,
+      ok: false,
+      error: {
+        code: "EXPORT_LOG_FAIL",
+        message: `cannot write export log: ${err.message}`,
       },
     };
-  } finally {
-    await rm(frameDir, { recursive: true, force: true });
   }
 }

@@ -1,21 +1,14 @@
 import { parseFlags, saveTimeline, emit } from "./_io.js";
-import { createTimelineTemplate } from "../engine-v2/timeline.js";
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
   const [outPath] = positional;
   if (!outPath) {
-    emit({
-      ok: false,
-      error: {
-        code: "USAGE",
-        message: "usage: nextframe new <out.json> [--duration=N --fps=N --width=N --height=N --background=#hex]",
-      },
-    }, flags);
+    emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe new <out.json> [--duration=N --fps=N --width=N --height=N]" } }, flags);
     return 3;
   }
 
-  const timeline = createTimelineTemplate(flags);
+  const timeline = flags.seed ? makeLegacySeedTimeline() : makeEmptyTimeline(flags);
   const saved = await saveTimeline(outPath, timeline);
   if (!saved.ok) {
     emit(saved, flags);
@@ -29,4 +22,61 @@ export async function run(argv) {
     process.stdout.write(`created ${outPath}\n`);
   }
   return 0;
+}
+
+function makeEmptyTimeline(flags) {
+  const width = finiteOr(flags.width, 1920);
+  const height = finiteOr(flags.height, 1080);
+  return {
+    schema: "nextframe/v0.1",
+    duration: finiteOr(flags.duration, 10),
+    background: "#0b0b14",
+    project: {
+      width,
+      height,
+      aspectRatio: width / height,
+      fps: finiteOr(flags.fps, 30),
+    },
+    chapters: [],
+    markers: [],
+    tracks: [],
+    assets: [],
+  };
+}
+
+function makeLegacySeedTimeline() {
+  return {
+    schema: "nextframe/v0.1",
+    duration: 5,
+    background: "#0b0b14",
+    project: {
+      width: 1920,
+      height: 1080,
+      aspectRatio: 16 / 9,
+      fps: 30,
+    },
+    chapters: [],
+    markers: [],
+    tracks: [
+      {
+        id: "v1",
+        kind: "video",
+        clips: [
+          {
+            id: "clip-1",
+            start: 0,
+            dur: 5,
+            scene: "auroraGradient",
+            params: {},
+          },
+        ],
+      },
+    ],
+    assets: [],
+  };
+}
+
+function finiteOr(raw, fallback) {
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : fallback;
 }

@@ -1,106 +1,71 @@
-import { cloneTimeline } from "./timeline.js";
+// engine-v2/ops.js — layer CRUD operations for v0.3 flat layers[] format.
+// Each function reads/modifies timeline object, returns { ok, value/error }.
 
 export function addLayer(timeline, opts) {
-  const working = ensureTimeline(timeline);
-  if (!opts || typeof opts !== "object") {
-    return { ok: false, error: { code: "BAD_LAYER", message: "layer payload must be an object" } };
-  }
-  if (!opts.id || typeof opts.id !== "string") {
-    return { ok: false, error: { code: "MISSING_ID", message: "layer id is required" } };
-  }
-  if ((working.layers || []).some((layer) => layer.id === opts.id)) {
-    return { ok: false, error: { code: "DUPLICATE_ID", message: `layer "${opts.id}" already exists` } };
-  }
-  if (!opts.scene || typeof opts.scene !== "string") {
-    return { ok: false, error: { code: "MISSING_SCENE", message: "layer scene is required" } };
-  }
-  if (!Number.isFinite(Number(opts.start)) || Number(opts.start) < 0) {
-    return { ok: false, error: { code: "BAD_START", message: "layer start must be >= 0" } };
-  }
-  if (!Number.isFinite(Number(opts.dur)) || Number(opts.dur) <= 0) {
-    return { ok: false, error: { code: "BAD_DUR", message: "layer dur must be > 0" } };
-  }
-
+  if (!opts.scene) return { ok: false, error: { code: 'MISSING_SCENE', message: 'opts.scene is required' } };
+  const id = opts.id || `${opts.scene}-${timeline.layers.length + 1}`;
   const layer = {
-    ...cloneTimeline(opts),
-    start: Number(opts.start),
-    dur: Number(opts.dur),
+    id,
+    scene: opts.scene,
+    start: opts.start ?? 0,
+    dur: opts.dur ?? 5,
   };
-  working.layers.push(layer);
+  if (opts.params) layer.params = opts.params;
+  if (opts.enter) layer.enter = opts.enter;
+  if (opts.exit) layer.exit = opts.exit;
+  if (opts.blend) layer.blend = opts.blend;
+  if (opts.opacity != null) layer.opacity = opts.opacity;
+  timeline.layers.push(layer);
   return { ok: true, value: layer };
 }
 
 export function removeLayer(timeline, id) {
-  const working = ensureTimeline(timeline);
-  const index = working.layers.findIndex((layer) => layer.id === id);
-  if (index === -1) {
-    return { ok: false, error: { code: "NOT_FOUND", message: `layer "${id}" not found` } };
-  }
-  const [removed] = working.layers.splice(index, 1);
+  const idx = timeline.layers.findIndex(l => l.id === id);
+  if (idx === -1) return { ok: false, error: { code: 'NOT_FOUND', message: `layer "${id}" not found` } };
+  const removed = timeline.layers.splice(idx, 1)[0];
   return { ok: true, value: removed };
 }
 
-export function moveLayer(timeline, id, start) {
-  const layer = findMutableLayer(timeline, id);
-  if (!layer.ok) return layer;
-  if (!Number.isFinite(Number(start)) || Number(start) < 0) {
-    return { ok: false, error: { code: "BAD_START", message: "start must be >= 0" } };
+export function moveLayer(timeline, id, newStart) {
+  const layer = timeline.layers.find(l => l.id === id);
+  if (!layer) return { ok: false, error: { code: 'NOT_FOUND', message: `layer "${id}" not found` } };
+  if (typeof newStart !== 'number' || newStart < 0) {
+    return { ok: false, error: { code: 'BAD_TIME', message: 'newStart must be a non-negative number' } };
   }
-  layer.value.start = Number(start);
-  return { ok: true, value: layer.value };
+  layer.start = newStart;
+  return { ok: true, value: layer };
 }
 
-export function resizeLayer(timeline, id, dur) {
-  const layer = findMutableLayer(timeline, id);
-  if (!layer.ok) return layer;
-  if (!Number.isFinite(Number(dur)) || Number(dur) <= 0) {
-    return { ok: false, error: { code: "BAD_DUR", message: "dur must be > 0" } };
+export function resizeLayer(timeline, id, newDur) {
+  const layer = timeline.layers.find(l => l.id === id);
+  if (!layer) return { ok: false, error: { code: 'NOT_FOUND', message: `layer "${id}" not found` } };
+  if (typeof newDur !== 'number' || newDur <= 0) {
+    return { ok: false, error: { code: 'BAD_DUR', message: 'newDur must be positive' } };
   }
-  layer.value.dur = Number(dur);
-  return { ok: true, value: layer.value };
+  layer.dur = newDur;
+  return { ok: true, value: layer };
 }
 
-export function setLayerProps(timeline, id, props) {
-  const layer = findMutableLayer(timeline, id);
-  if (!layer.ok) return layer;
-  if (!props || typeof props !== "object" || Array.isArray(props)) {
-    return { ok: false, error: { code: "BAD_PROPS", message: "props must be an object" } };
+export function setLayerProp(timeline, id, key, value) {
+  const layer = timeline.layers.find(l => l.id === id);
+  if (!layer) return { ok: false, error: { code: 'NOT_FOUND', message: `layer "${id}" not found` } };
+  if (key === 'params' && typeof value === 'object' && value !== null) {
+    layer.params = { ...(layer.params || {}), ...value };
+  } else {
+    layer[key] = value;
   }
-  Object.assign(layer.value, cloneTimeline(props));
-  if (layer.value.start !== undefined) layer.value.start = Number(layer.value.start);
-  if (layer.value.dur !== undefined) layer.value.dur = Number(layer.value.dur);
-  return { ok: true, value: layer.value };
+  return { ok: true, value: layer };
 }
 
 export function listLayers(timeline) {
-  const working = ensureTimeline(timeline);
   return {
     ok: true,
-    value: working.layers.map((layer) => ({
-      id: layer.id,
-      scene: layer.scene,
-      start: layer.start,
-      dur: layer.dur,
-      end: layer.start + layer.dur,
+    value: (timeline.layers || []).map(l => ({
+      id: l.id,
+      scene: l.scene,
+      start: l.start,
+      dur: l.dur,
+      end: l.start + l.dur,
     })),
   };
-}
-
-function ensureTimeline(timeline) {
-  if (!timeline || typeof timeline !== "object") {
-    return { layers: [] };
-  }
-  if (!Array.isArray(timeline.layers)) {
-    timeline.layers = [];
-  }
-  return timeline;
-}
-
-function findMutableLayer(timeline, id) {
-  const working = ensureTimeline(timeline);
-  const layer = working.layers.find((entry) => entry.id === id);
-  if (!layer) {
-    return { ok: false, error: { code: "NOT_FOUND", message: `layer "${id}" not found` } };
-  }
-  return { ok: true, value: layer };
 }
