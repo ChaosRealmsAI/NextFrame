@@ -160,7 +160,21 @@
   font-size: 14px;
 }
 
-/* Script stage — article + margin annotations */
+/* Segment filter pills (shared across tabs) */
+.pl-seg-pill {
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+.pl-seg-pill:hover { background: rgba(255,255,255,0.04); color: var(--ink); }
+.pl-seg-pill.active { background: var(--accent-15); color: var(--accent); border-color: rgba(124,106,239,0.2); }
+
+/* Script stage — table layout */
 .pl-script {
   display: flex;
   gap: 0;

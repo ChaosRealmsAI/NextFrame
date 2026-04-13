@@ -2028,40 +2028,35 @@ function renderPipelineScript(data) {
   if (segs.length === 0) return '<div class="pipeline-empty">暂无脚本 — nextframe script-set</div>';
 
   var principles = s.principles || {};
-  var arc = s.arc || [];
 
-  var tagsHtml = "";
+  // Toolbar: chips + segment filter
+  var chips = "";
   for (var key in principles) {
-    if (principles[key]) tagsHtml += '<span class="pl-principle-tag">' + escHtml(key) + " " + escHtml(principles[key]) + "</span>";
+    if (principles[key]) chips += '<div style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 12px;border-radius:5px;background:var(--bg-surface);border:var(--border-a1)"><span style="color:var(--ink-ghost)">' + escHtml(key) + '</span><span style="color:var(--ink-mid);font-weight:500">' + escHtml(principles[key]) + '</span></div>';
+  }
+  var pills = '<span class="pl-seg-pill active" onclick="plFilterSeg(-1)">全部</span>';
+  for (var p = 0; p < segs.length; p++) {
+    pills += '<span class="pl-seg-pill" onclick="plFilterSeg(' + p + ')">段 ' + (segs[p].segment || p + 1) + '</span>';
   }
 
-  var arcHtml = arc.map(function(node, i) {
-    return (i > 0 ? '<span class="pl-arc-arrow">→</span>' : "") + '<span class="pl-arc-node">' + escHtml(node) + "</span>";
-  }).join("");
+  // Table rows
+  var rows = segs.map(function(seg, idx) {
+    var meta = '';
+    if (seg.visual) meta += '<div style="margin-bottom:8px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-ghost);margin-bottom:2px">画面</div><div style="font-size:13px;color:var(--ink-mid);line-height:1.5">' + escHtml(seg.visual) + '</div></div>';
+    if (seg.role) meta += '<div style="margin-bottom:8px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-ghost);margin-bottom:2px">意图</div><div style="font-size:13px;color:var(--ink-mid);line-height:1.5">' + escHtml(seg.role) + '</div></div>';
+    if (seg.logic) meta += '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-ghost);margin-bottom:2px">逻辑</div><div style="font-size:13px;color:var(--ink-dim);line-height:1.5;font-style:italic">' + escHtml(seg.logic) + '</div></div>';
+    return '<tr data-seg="' + idx + '">' +
+      '<td style="padding:28px;border-bottom:var(--border-a1);vertical-align:top;font-family:var(--font-display);font-size:17px;line-height:1.9;color:var(--ink);width:55%">' + escHtml(seg.narration || '') + '</td>' +
+      '<td style="padding:28px;border-bottom:var(--border-a1);vertical-align:top;background:var(--bg-surface);width:45%">' + meta + '</td>' +
+    '</tr>';
+  }).join('');
 
-  var articleHtml = "";
-  var commentsHtml = "";
-
-  for (var i = 0; i < segs.length; i++) {
-    var seg = segs[i];
-    articleHtml += '<div class="pl-segment-marker">' + (seg.segment || seg.id || (i + 1)) + "</div>";
-    articleHtml += '<div class="pl-narration">' + escHtml(seg.narration || "") + "</div>";
-
-    commentsHtml += '<div class="pl-annotation-group">';
-    if (seg.role) commentsHtml += '<div class="pl-annotation role"><div class="pl-annotation-label">角色</div>' + escHtml(seg.role) + "</div>";
-    if (seg.visual) commentsHtml += '<div class="pl-annotation visual"><div class="pl-annotation-label">画面</div>' + escHtml(seg.visual) + "</div>";
-    if (seg.logic) commentsHtml += '<div class="pl-annotation logic"><div class="pl-annotation-label">逻辑</div>' + escHtml(seg.logic) + "</div>";
-    commentsHtml += "</div>";
-  }
-
-  return '<div class="pl-script">' +
-    '<div class="pl-script-article">' +
-      (tagsHtml ? '<div class="pl-principles">' + tagsHtml + "</div>" : "") +
-      (arcHtml ? '<div class="pl-arc">' + arcHtml + "</div>" : "") +
-      articleHtml +
-    "</div>" +
-    '<div class="pl-script-comments">' + commentsHtml + "</div>" +
-  "</div>";
+  return '<div style="padding:10px 20px;border-bottom:var(--border-a1);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' + chips +
+    '<div style="width:1px;height:18px;background:rgba(255,255,255,0.08);margin:0 4px"></div>' + pills + '</div>' +
+    '<div style="flex:1;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>' +
+    '<th style="padding:10px 28px;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-ghost);text-align:left;font-weight:400;border-bottom:var(--border-a1);background:var(--bg-surface);position:sticky;top:0;z-index:2;width:55%">文案</th>' +
+    '<th style="padding:10px 28px;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-ghost);text-align:left;font-weight:400;border-bottom:var(--border-a1);background:var(--bg-surface);position:sticky;top:0;z-index:2;width:45%">说明</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 function renderPipelineAudio(data) {
@@ -2209,6 +2204,15 @@ function renderPipelineOutput(data) {
   }).join("");
 
   return '<div class="pl-outputs">' + cardsHtml + "</div>";
+}
+
+function plFilterSeg(idx) {
+  document.querySelectorAll(".pl-seg-pill").forEach(function(p, i) {
+    p.classList.toggle("active", idx === -1 ? i === 0 : i === idx + 1);
+  });
+  document.querySelectorAll("tbody tr[data-seg]").forEach(function(row) {
+    row.style.display = (idx === -1 || row.dataset.seg == idx) ? "" : "none";
+  });
 }
 
 function escHtml(str) {
@@ -2368,6 +2372,7 @@ Object.assign(window, {
   goHome,
   goPipeline,
   goProject,
+  plFilterSeg,
   openPlayer,
   pickOpt,
   seekPlayer,
