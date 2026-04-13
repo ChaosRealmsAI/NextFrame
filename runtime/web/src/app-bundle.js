@@ -1081,10 +1081,6 @@ function initDOMPreview(timeline) {
   var placeholder = document.getElementById("preview-placeholder");
   if (placeholder) placeholder.style.display = "none";
 
-  // Hide iframe if present
-  var iframe = document.getElementById("preview-iframe");
-  if (iframe) iframe.style.display = "none";
-
   // Create wrapper (clips to scaled size) + stage (stays at 1920x1080)
   var wrapper = document.createElement("div");
   wrapper.id = "preview-scale-wrapper";
@@ -1154,6 +1150,10 @@ function requestPreviewFrame(t) {
   if (!previewEngine && !initDOMPreview(currentTimeline)) {
     return;
   }
+  // Guard: previewEngine may have been destroyed between init check and here
+  if (!previewEngine) {
+    return;
+  }
   try {
     previewEngine.renderFrame(Math.max(0, finiteNumber(t, 0)));
     ensurePreviewInteractivity();
@@ -1192,14 +1192,8 @@ function setPlayheadTime(time) {
     fill.style.width = (TOTAL_DURATION > 0 ? (currentTime / TOTAL_DURATION) * 100 : 0) + "%";
   }
 
-  // Sync playhead with direct-render engine
-  if (previewEngine && typeof previewEngine.renderFrame === "function") {
-    try {
-      previewEngine.renderFrame(currentTime);
-    } catch(e) {
-      console.warn("[preview] renderFrame error", e);
-    }
-  }
+  // Render frame via unified entry point (avoids double-render during playback)
+  requestPreviewFrame(currentTime);
 }
 
 function playLoop(timestamp) {
@@ -1225,7 +1219,6 @@ function playLoop(timestamp) {
   }
 
   setPlayheadTime(currentTime);
-  // previewEngine.renderFrame already called inside setPlayheadTime
   if (isPlaying) {
     playRAF = requestAnimationFrame(playLoop);
   }
@@ -2258,6 +2251,11 @@ function reloadCurrentTimeline() {
 
 function initPreviewSurface() {
   window.addEventListener("resize", fitStageToContainer);
+  // ResizeObserver catches panel toggles / layout shifts within the same window size
+  var canvasInnerForObserver = document.getElementById("canvas-inner");
+  if (canvasInnerForObserver && typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(fitStageToContainer).observe(canvasInnerForObserver);
+  }
 }
 
 async function previewComposed() {
