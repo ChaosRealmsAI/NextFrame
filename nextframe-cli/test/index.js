@@ -4,3 +4,4 @@ import "./v3-cli.test.js";
 import "./v3-render.test.js";
 import "./v3-preview-engine.test.js";
 import "./v4-pipeline.test.js";
+import "./v5-source.test.js";

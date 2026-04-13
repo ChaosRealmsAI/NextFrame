@@ -27,6 +27,12 @@ const SUBCOMMANDS = {
   "output-publish": () => import("../src/cli/output-publish.js"),
   "segment-new": () => import("../src/cli/segment-new.js"),
   "segment-list": () => import("../src/cli/segment-list.js"),
+  "source-download": () => import("../src/cli/source-download.js"),
+  "source-transcribe": () => import("../src/cli/source-transcribe.js"),
+  "source-align": () => import("../src/cli/source-align.js"),
+  "source-cut": () => import("../src/cli/source-cut.js"),
+  "source-list": () => import("../src/cli/source-list.js"),
+  "source-link": () => import("../src/cli/source-link.js"),
   "layer-add": () => import("../src/cli/layers.js"),
   "layer-move": () => import("../src/cli/layers.js"),
   "layer-resize": () => import("../src/cli/layers.js"),
@@ -98,6 +104,10 @@ Pipeline (v0.4)
   audio-set / audio-get
   atom-add / atom-list / atom-remove
   output-add / output-list / output-publish
+
+Source Library
+  source-download / source-transcribe / source-align
+  source-cut / source-list / source-link
 
 Layer CRUD
   layer-list / layer-add / layer-move / layer-resize / layer-set / layer-remove

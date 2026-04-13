@@ -22,6 +22,7 @@ import { resolveTimeline } from "../src/engine/time.js";
 import { validateTimeline } from "../src/engine/validate.js";
 import { listScenes, REGISTRY, META_TABLE } from "../src/scenes/index.js"; // REGISTRY+META used in scene-preview route
 import { exportMP4 } from "../src/targets/ffmpeg-mp4.js";
+import { listSources, readSourceJson } from "../src/cli/_source.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePath(HERE, "..");
@@ -91,6 +92,11 @@ function assertSafePath(res, abs) {
   if (!abs) { err(res, 400, "missing path"); return false; }
   if (abs === "__BLOCKED__") { err(res, 403, "path outside workspace", `allowed root: ${WORKSPACE_ROOT}`); return false; }
   return true;
+}
+
+function resolveAbsoluteInput(raw) {
+  if (!raw) return null;
+  return isAbsolute(raw) ? raw : resolvePath(WORKSPACE_ROOT, raw);
 }
 
 const server = createServer(async (req, res) => {
@@ -178,6 +184,20 @@ const server = createServer(async (req, res) => {
       const timeline = JSON.parse(text);
       const validation = validateTimeline(timeline, { projectDir: dirname(abs) });
       return ok(res, { path: abs, timeline, validation });
+    }
+
+    if (method === "GET" && path === "/api/source") {
+      const abs = resolveAbsoluteInput(q.path);
+      if (!abs) return err(res, 400, "missing path");
+      const source = await readSourceJson(abs);
+      return ok(res, source);
+    }
+
+    if (method === "GET" && path === "/api/source-list") {
+      const library = resolveAbsoluteInput(q.library);
+      if (!library) return err(res, 400, "missing library");
+      const rows = await listSources(library);
+      return ok(res, rows);
     }
 
     if (method === "POST" && path === "/api/timeline") {
