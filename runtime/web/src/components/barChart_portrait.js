@@ -1,7 +1,7 @@
 import {
   createRoot, createNode, smoothstep, easeOutCubic,
   toNumber, normalizeArray, SANS_FONT_STACK,
-} from '../scenes-v2-shared.js';
+} from '../core/scenes-v2-shared.js';
 
 const DEFAULT_COLORS = ["#a0c4ff", "#ffc6ff", "#bdb2ff", "#caffbf", "#fdffb6"];
 

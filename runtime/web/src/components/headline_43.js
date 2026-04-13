@@ -1,20 +1,20 @@
 import {
-  createRoot, createNode, smoothstep, easeOutCubic,
+  createRoot, createNode, smoothstep,
   toNumber, SANS_FONT_STACK, makeLinearGradient,
-} from '../scenes-v2-shared.js';
+} from '../core/scenes-v2-shared.js';
 
 export default {
-  id: "headline",
+  id: "headline_43",
   type: "dom",
-  name: "Headline (16:9)",
+  name: "Headline (4:3)",
   category: "Typography",
-  ratio: "16:9",
-  tags: ["text", "title", "heading"],
-  description: "居中大标题，渐变色，逐字 stagger。1920x1080 专用",
+  ratio: "4:3",
+  tags: ["text", "title", "heading", "ppt"],
+  description: "4:3 PPT 大标题，渐变色，逐字 stagger。PPT 横屏专用",
   params: {
     text:     { type: "string", default: "HEADLINE", desc: "标题文字" },
     subtitle: { type: "string", default: "",         desc: "副标题" },
-    fontSize: { type: "number", default: 96,         desc: "标题字号(px)" },
+    fontSize: { type: "number", default: 80,         desc: "标题字号(px)" },
     gradient: { type: "array",  default: ["#ffffff", "#a0c4ff"], desc: "渐变色数组" },
     stagger:  { type: "number", default: 0.08,       desc: "逐字延迟(秒)" },
   },
@@ -27,12 +27,15 @@ export default {
 
   create(container, params) {
     const p = { ...this.defaultParams, ...params };
-    const root = createRoot(container, "display:flex;flex-direction:column;align-items:center;justify-content:center;width:1920px;height:1080px");
+    const W = container.clientWidth;
+    const H = container.clientHeight;
+    const root = createRoot(container, `display:flex;flex-direction:column;align-items:center;justify-content:center;width:${W}px;height:${H}px`);
 
     const titleRow = createNode("div", `
       display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
       font-family:${SANS_FONT_STACK};font-weight:800;
-      font-size:${toNumber(p.fontSize, 96)}px;line-height:1.2;
+      font-size:${toNumber(p.fontSize, 80)}px;line-height:1.2;
+      max-width:90%;word-break:break-word;
     `);
 
     const text = String(p.text || "HEADLINE");
@@ -52,9 +55,9 @@ export default {
     let subtitleEl = null;
     if (p.subtitle) {
       subtitleEl = createNode("div", `
-        font-family:${SANS_FONT_STACK};font-size:28px;font-weight:400;
+        font-family:${SANS_FONT_STACK};font-size:24px;font-weight:400;
         color:rgba(255,255,255,0.7);margin-top:24px;opacity:0;
-        text-align:center;max-width:1200px;
+        text-align:center;max-width:80%;
       `, p.subtitle);
       root.appendChild(subtitleEl);
     }
@@ -62,7 +65,7 @@ export default {
     return { root, chars, subtitleEl, stagger: toNumber(p.stagger, 0.08) };
   },
 
-  update(els, localT, params) {
+  update(els, localT) {
     const { chars, subtitleEl, stagger } = els;
     for (let i = 0; i < chars.length; i++) {
       const t = smoothstep(i * stagger, i * stagger + 0.4, localT);

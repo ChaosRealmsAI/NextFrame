@@ -1,7 +1,7 @@
 import {
   createRoot, createNode, smoothstep, escapeHtml,
   toNumber, MONO_FONT_STACK, SANS_FONT_STACK,
-} from '../scenes-v2-shared.js';
+} from '../core/scenes-v2-shared.js';
 
 export default {
   id: "codeBlock_portrait",
