@@ -210,6 +210,11 @@
 tr.seg-pending td.col-text { color: rgba(228,228,232,0.5); }
 tr.seg-pending .s-text { color: rgba(228,228,232,0.25); }
 
+/* Play button */
+.pl-play-btn { width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer; background: #7c6aef; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1); flex-shrink: 0; }
+.pl-play-btn:hover { opacity: 0.8; }
+.pl-play-btn.playing { background: rgba(228,228,232,0.25); }
+
 /* Output count bar */
 .count-bar { padding: 12px 0; font-size: 12px; color: rgba(228,228,232,0.5); }
 

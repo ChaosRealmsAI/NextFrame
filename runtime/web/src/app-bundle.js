@@ -2140,6 +2140,46 @@ function plFilterSeg(idx) {
   }
 }
 
+// Pipeline audio/video playback
+var _plAudio = null;
+function playPipelineAudio(btn, filePath) {
+  // Stop current
+  if (_plAudio) { _plAudio.pause(); _plAudio = null; }
+  // Toggle off if same button
+  if (btn.classList.contains("playing")) {
+    btn.classList.remove("playing");
+    btn.innerHTML = "&#9654;";
+    return;
+  }
+  // Reset all play buttons
+  document.querySelectorAll(".pl-play-btn.playing").forEach(function(b) { b.classList.remove("playing"); b.innerHTML = "&#9654;"; });
+
+  // Build URL — use bridge to resolve path then play
+  bridgeCall("fs.read", { path: filePath }, 3000).then(function() {
+    // fs.read succeeded means file exists. Build nfdata URL for audio playback.
+    var parts = filePath.replace("~/NextFrame/projects/", "").split("/");
+    var url = buildNfdataUrl(parts);
+    _plAudio = new Audio(url);
+    _plAudio.play();
+    btn.classList.add("playing");
+    btn.innerHTML = "&#9646;&#9646;";
+    _plAudio.onended = function() {
+      btn.classList.remove("playing");
+      btn.innerHTML = "&#9654;";
+      _plAudio = null;
+    };
+  }).catch(function(e) {
+    console.error("[pipeline] audio play failed:", e);
+  });
+}
+
+function playPipelineVideo(filePath) {
+  // Use existing player modal
+  var parts = filePath.replace("~/NextFrame/projects/", "").split("/");
+  var url = buildNfdataUrl(parts);
+  openPlayer(url, filePath.split("/").pop());
+}
+
 function populateEditorClipSidebar() {
   var list = document.getElementById("editor-clip-list");
   var count = document.getElementById("editor-clip-count");
@@ -2225,6 +2265,11 @@ function renderPipelineAudio(data) {
     html += '<div class="audio-head">';
 
     if (isGenerated) {
+      // Play button
+      var audioPath = seg.file ? ("~/NextFrame/projects/" + currentProject + "/" + currentEpisode + "/" + seg.file) : null;
+      if (audioPath) {
+        html += '<button class="pl-play-btn" onclick="playPipelineAudio(this,\'' + escHtml(audioPath) + '\')">&#9654;</button>';
+      }
       html += '<span class="pl-tag-generated">\u5DF2\u751F\u6210</span>';
       html += '<span class="audio-duration">' + seg.duration.toFixed(1) + 's</span>';
     } else {
@@ -2314,11 +2359,13 @@ function renderPipelineClips(data) {
         escHtml('段' + a.segment) + '</span>';
     }
 
-    // --- thumbnail placeholder ---
+    // --- thumbnail with play button ---
+    var videoPath = a.file ? ("~/NextFrame/projects/" + currentProject + "/" + currentEpisode + "/" + a.file) : null;
+    var playBtn = videoPath ? '<button class="pl-play-btn" style="width:24px;height:24px;font-size:9px" onclick="event.stopPropagation();playPipelineVideo(\'' + escHtml(videoPath) + '\')">&#9654;</button>' : '<span style="font-size:11px;color:rgba(228,228,232,0.25)">16:9</span>';
     var thumb =
       '<div style="width:100px;height:56px;background:#111114;border-radius:4px;flex-shrink:0;' +
-      'display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(228,228,232,0.25)">' +
-      '16:9</div>';
+      'display:flex;align-items:center;justify-content:center">' +
+      playBtn + '</div>';
 
     // --- row ---
     rows +=
@@ -2665,6 +2712,8 @@ Object.assign(window, {
   goHome,
   goPipeline,
   goProject,
+  playPipelineAudio,
+  playPipelineVideo,
   plFilterSeg,
   selectEditorClip,
   openPlayer,
