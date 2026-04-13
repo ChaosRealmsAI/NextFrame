@@ -55,8 +55,9 @@ export default {
 
     const barW = chartW / (data.length * 1.6);  // wider bars
     const gap = barW * 0.3;
-    const labelFs = resolveSize(params.labelSize, S, 0.035);
-    const valueFs = resolveSize(params.valueSize, S, 0.03);
+    const maxLabelFs = Math.floor(chartW / (data.length * 3.5)); // prevent labels overlapping
+    const labelFs = Math.min(resolveSize(params.labelSize, S, 0.035), maxLabelFs);
+    const valueFs = Math.min(resolveSize(params.valueSize, S, 0.03), maxLabelFs);
 
     const bars = [];
 

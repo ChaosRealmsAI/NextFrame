@@ -93,13 +93,16 @@ for (const file of fs.readdirSync(sceneDirV2).filter(f => f.endsWith('.js') && f
   sceneCodesV2.push({ id, code });
 }
 
+// Legacy scenes/ dir removed in v0.3.1 — skip if missing
 const sceneDirCanvas = path.join(srcDir, 'scenes');
 const sceneCodesCanvas = [];
-for (const file of fs.readdirSync(sceneDirCanvas).filter(f => f.endsWith('.js') && f !== 'index.js' && !f.startsWith('_'))) {
-  const id = file.replace('.js', '');
-  if (!neededScenes.has(id)) continue;
-  const code = readAndStrip(path.join(sceneDirCanvas, file));
-  sceneCodesCanvas.push({ id, fnName: id, code });
+if (fs.existsSync(sceneDirCanvas)) {
+  for (const file of fs.readdirSync(sceneDirCanvas).filter(f => f.endsWith('.js') && f !== 'index.js' && !f.startsWith('_'))) {
+    const id = file.replace('.js', '');
+    if (!neededScenes.has(id)) continue;
+    const code = readAndStrip(path.join(sceneDirCanvas, file));
+    sceneCodesCanvas.push({ id, fnName: id, code });
+  }
 }
 
 // Build the HTML
