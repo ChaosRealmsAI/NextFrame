@@ -1702,6 +1702,10 @@ button { cursor: pointer; }
 .s-timecode { font-family: 'SF Mono', Menlo, monospace; font-size: 11px; color: rgba(228,228,232,0.5); white-space: nowrap; }
 .s-arrow { color: rgba(228,228,232,0.25); margin: 0 2px; }
 .s-text { font-size: 13px; color: rgba(228,228,232,0.75); line-height: 1.5; }
+.karaoke-char { color: rgba(228,228,232,0.25); text-shadow: none; transition: color 0.05s, text-shadow 0.05s; white-space: pre; }
+.karaoke-char.unspoken { color: rgba(228,228,232,0.25); }
+.karaoke-char.spoken { color: #e4e4e8; }
+.karaoke-char.current { color: #7c6aef; text-shadow: 0 0 8px rgba(124,106,239,0.5); }
 .s-dur { font-family: 'SF Mono', Menlo, monospace; font-size: 11px; color: rgba(228,228,232,0.25); text-align: right; white-space: nowrap; }
 tr.seg-pending td.col-text { color: rgba(228,228,232,0.5); }
 tr.seg-pending .s-text { color: rgba(228,228,232,0.25); }
