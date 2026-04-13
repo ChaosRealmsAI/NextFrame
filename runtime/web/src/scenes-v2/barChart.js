@@ -1,4 +1,4 @@
-import { smoothstep, easeOutBack, clamp, toNumber, normalizeArray, SANS_FONT_STACK, MONO_FONT_STACK, getStageSize } from "../scenes-v2-shared.js";
+import { smoothstep, easeOutBack, clamp, toNumber, normalizeArray, resolveSize, SANS_FONT_STACK, MONO_FONT_STACK, getStageSize } from "../scenes-v2-shared.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -21,7 +21,9 @@ export default {
     data:    { type: "array",  default: [40, 70, 55, 90],         desc: "Bar values" },
     labels:  { type: "array",  default: ["A", "B", "C", "D"],    desc: "Bar labels" },
     colors:  { type: "array",  default: ["#6ee7ff", "#a78bfa", "#f472b6", "#ffd93d"], desc: "Bar colors" },
-    stagger: { type: "number", default: 0.12, min: 0, max: 1,    desc: "Stagger delay between bars (s)" },
+    stagger:   { type: "number", default: 0.12, min: 0, max: 1,    desc: "Stagger delay between bars (s)" },
+    labelSize: { type: "number", default: 0.022, desc: "Label font size (ratio or px or keyword)" },
+    valueSize: { type: "number", default: 0.025, desc: "Value font size (ratio or px or keyword)" },
   },
   get defaultParams() {
     const p = {};
@@ -53,8 +55,8 @@ export default {
 
     const barW = chartW / (data.length * 2);
     const gap = barW;
-    const labelFs = S * 0.018;
-    const valueFs = S * 0.02;
+    const labelFs = resolveSize(params.labelSize, S, 0.022);
+    const valueFs = resolveSize(params.valueSize, S, 0.025);
 
     const bars = [];
 

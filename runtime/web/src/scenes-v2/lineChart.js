@@ -1,4 +1,4 @@
-import { smoothstep, clamp, toNumber, toBoolean, normalizeArray, SANS_FONT_STACK, MONO_FONT_STACK, getStageSize } from "../scenes-v2-shared.js";
+import { smoothstep, resolveSize, clamp, toNumber, toBoolean, normalizeArray, SANS_FONT_STACK, MONO_FONT_STACK, getStageSize } from "../scenes-v2-shared.js";
 
 const NS = "http://www.w3.org/2000/svg";
 
@@ -16,6 +16,7 @@ export default {
     color:    { type: "color",   default: "#6ee7ff",                          desc: "Line color" },
     showDots: { type: "boolean", default: true,                               desc: "Show data point dots" },
     showArea: { type: "boolean", default: true,                               desc: "Show filled area under line" },
+    labelSize: { type: "number", default: 0.022, desc: "Label font size" },
   },
   get defaultParams() {
     const p = {};
@@ -37,7 +38,7 @@ export default {
 
     const lineW  = S * 0.003;
     const dotR   = S * 0.006;
-    const labelFs = S * 0.018;
+    const labelFs = resolveSize(params.labelSize, S, 0.022);
 
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);

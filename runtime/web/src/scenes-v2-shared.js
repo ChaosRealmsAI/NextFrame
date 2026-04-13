@@ -213,6 +213,23 @@ function timelineBaseHref() {
   return toFileHref(directory);
 }
 
+/**
+ * Resolve a size value to pixels.
+ * Accepts: number 0~1 (ratio of S), number >=1 (px), "48px", "large", etc.
+ * S = Math.min(containerWidth, containerHeight)
+ */
+export function resolveSize(value, S, fallback = 0.03) {
+  if (value == null) return Math.round(S * fallback);
+  if (typeof value === 'number') {
+    return value < 1 ? Math.round(S * value) : Math.round(value);
+  }
+  const str = String(value).trim().toLowerCase();
+  const keywords = { xxsmall: 0.012, xsmall: 0.016, small: 0.02, medium: 0.035, large: 0.05, xlarge: 0.07, xxlarge: 0.1 };
+  if (keywords[str]) return Math.round(S * keywords[str]);
+  const parsed = parseFloat(str);
+  return Number.isFinite(parsed) ? Math.round(parsed < 1 ? S * parsed : parsed) : Math.round(S * fallback);
+}
+
 export function resolveAssetUrl(src) {
   const value = String(src ?? "").trim();
   if (!value) {

@@ -1,4 +1,4 @@
-import { smoothstep, clamp, toNumber, toBoolean, easeOutCubic, SANS_FONT_STACK, MONO_FONT_STACK, getStageSize } from "../scenes-v2-shared.js";
+import { smoothstep, resolveSize, clamp, toNumber, toBoolean, easeOutCubic, SANS_FONT_STACK, MONO_FONT_STACK, getStageSize } from "../scenes-v2-shared.js";
 
 const NS = "http://www.w3.org/2000/svg";
 const TAU = Math.PI * 2;
@@ -16,6 +16,8 @@ export default {
     color:       { type: "color",   default: "#4ade80",              desc: "Ring color" },
     label:       { type: "string",  default: "Quality",             desc: "Label below the number" },
     showPercent: { type: "boolean", default: true,                   desc: "Show percent symbol" },
+    numberSize: { type: "number", default: 0.08, desc: "Number font size" },
+    labelSize:  { type: "number", default: 0.025, desc: "Label font size" },
   },
   get defaultParams() {
     const p = {};
@@ -36,8 +38,8 @@ export default {
 
     const radius   = S * 0.2;
     const lineW    = S * 0.015;
-    const numberFs = S * 0.08;
-    const labelFs  = S * 0.02;
+    const numberFs = resolveSize(params.numberSize, S, 0.08);
+    const labelFs  = resolveSize(params.labelSize, S, 0.025);
     const cx = W / 2;
     const cy = H / 2;
 
