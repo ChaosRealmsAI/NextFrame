@@ -2154,22 +2154,36 @@ function playPipelineAudio(btn, filePath) {
   // Reset all play buttons
   document.querySelectorAll(".pl-play-btn.playing").forEach(function(b) { b.classList.remove("playing"); b.innerHTML = "&#9654;"; });
 
-  // Build nfdata URL directly and play
+  // Build nfdata URL — encode each path part for Chinese chars
   var parts = filePath.replace("~/NextFrame/projects/", "").split("/");
-  var url = buildNfdataUrl(parts);
+  var url = "nfdata://localhost/" + parts.map(function(p) { return encodeURIComponent(p); }).join("/");
   console.log("[pipeline] playing audio:", url);
-  _plAudio = new Audio(url);
-  _plAudio.play().then(function() {
-    btn.classList.add("playing");
-    btn.innerHTML = "&#9646;&#9646;";
-  }).catch(function(e) {
-    console.error("[pipeline] audio play failed:", e, url);
-  });
-  _plAudio.onended = function() {
-    btn.classList.remove("playing");
-    btn.innerHTML = "&#9654;";
-    _plAudio = null;
-  };
+  try {
+    _plAudio = new Audio(url);
+    _plAudio.oncanplaythrough = function() {
+      console.log("[pipeline] audio ready, playing");
+    };
+    _plAudio.onerror = function(e) {
+      console.error("[pipeline] audio error:", _plAudio.error);
+    };
+    var playPromise = _plAudio.play();
+    if (playPromise) {
+      playPromise.then(function() {
+        console.log("[pipeline] audio playing!");
+        btn.classList.add("playing");
+        btn.innerHTML = "&#9646;&#9646;";
+      }).catch(function(e) {
+        console.error("[pipeline] audio play promise rejected:", e.message);
+      });
+    }
+    _plAudio.onended = function() {
+      btn.classList.remove("playing");
+      btn.innerHTML = "&#9654;";
+      _plAudio = null;
+    };
+  } catch(e) {
+    console.error("[pipeline] audio exception:", e.message);
+  }
 }
 
 function playPipelineVideo(filePath) {
