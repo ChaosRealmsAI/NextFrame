@@ -89,6 +89,10 @@ struct CommonArgs {
     #[arg(long, value_name = "N", default_missing_value = "4", num_args = 0..=1)]
     pub parallel: Option<usize>,
 
+    /// Frame range for intra-segment parallel: only record frames START..END
+    #[arg(long, value_name = "START END", num_args = 2)]
+    pub frame_range: Option<Vec<usize>>,
+
     /// Render at a fraction of output resolution, then upscale (0.25-1.0, default: 1.0)
     #[arg(long, value_name = "N", default_value_t = 1.0)]
     pub render_scale: f64,
@@ -127,6 +131,9 @@ impl From<CommonArgs> for RecordArgs {
             width: args.width,
             height: args.height,
             parallel: args.parallel,
+            frame_range: args.frame_range.and_then(|v| {
+                if v.len() == 2 { Some((v[0], v[1])) } else { None }
+            }),
             render_scale: args.render_scale,
         }
     }

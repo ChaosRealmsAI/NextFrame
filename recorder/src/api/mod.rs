@@ -32,6 +32,8 @@ pub struct RecordArgs {
     pub width: f64,
     pub height: f64,
     pub parallel: Option<usize>,
+    #[serde(default)]
+    pub frame_range: Option<(usize, usize)>,
     #[serde(default = "default_render_scale")]
     pub render_scale: f64,
 }
@@ -64,6 +66,7 @@ impl From<RecordArgs> for CommonArgs {
             width: args.width,
             height: args.height,
             parallel: args.parallel,
+            frame_range: args.frame_range,
             render_scale: args.render_scale,
         }
     }
@@ -77,6 +80,10 @@ pub fn record_segments(args: RecordArgs) -> Result<RecordOutput, String> {
     let out = absolute_path(&cli.out)?;
 
     match cli.parallel {
+        Some(requested) if frame_files.len() == 1 => {
+            // Single HTML file: use intra-segment frame-slice parallelism
+            parallel::record_parallel_single(&args, &frame_files[0], &out, requested)
+        }
         Some(requested) => parallel::record_parallel(&args, &frame_files, &out, requested),
         None => record_single(&cli, &frame_files, &out),
     }

@@ -26,6 +26,8 @@ pub struct CommonArgs {
     pub width: f64,
     pub height: f64,
     pub parallel: Option<usize>,
+    /// Only record frames in this range (start, end). Used by parallel subprocess.
+    pub frame_range: Option<(usize, usize)>,
     /// Render at a fraction of output resolution, then upscale.
     /// 0.5 = render at half size, 1.0 = native (default).
     pub render_scale: f64,

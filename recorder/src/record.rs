@@ -142,10 +142,15 @@ pub fn record_segment(
 
     let mut last_image: Option<Retained<CGImage>> = None;
     let total_frames = clock.total_frames();
+    // Frame range for intra-segment parallelism
+    let (range_start, range_end) = match cli.frame_range {
+        Some((s, e)) => (s.min(total_frames), e.min(total_frames)),
+        None => (0, total_frames),
+    };
     let batch_size = if cli.no_skip { 1usize } else { 5usize };
-    let mut frame_index = 0usize;
-    while frame_index < total_frames {
-        let batch_end = (frame_index + batch_size).min(total_frames);
+    let mut frame_index = range_start;
+    while frame_index < range_end {
+        let batch_end = (frame_index + batch_size).min(range_end);
         let mut decisions = Vec::with_capacity(batch_end - frame_index);
         for fi in frame_index..batch_end {
             let mut decision = clock.next(fi);
@@ -251,12 +256,12 @@ pub fn record_segment(
         })?;
 
         let last_in_batch = batch_end - 1;
-        if frame_index.is_multiple_of(100) || last_in_batch + 1 == total_frames {
+        if frame_index.is_multiple_of(100) || last_in_batch + 1 == range_end {
             println!(
                 "    seg {}: frame {}/{} (skip {})",
                 index + 1,
-                last_in_batch + 1,
-                total_frames,
+                last_in_batch + 1 - range_start,
+                range_end - range_start,
                 clock.skipped_frames()
             );
         }
@@ -265,21 +270,23 @@ pub fn record_segment(
     }
     encoder.finish()?;
 
+    let frames_recorded = range_end - range_start;
     println!(
-        "  ✓ {} ({:.1}s audio, {} skipped, {})",
+        "  ✓ {} ({:.1}s, {} frames, {} skipped, {})",
         plan.metadata
             .html_path
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or("segment"),
         plan.audio_duration_sec.max(effective_duration),
+        frames_recorded,
         clock.skipped_frames(),
         backend.label()
     );
 
     Ok(SegmentSummary {
         path: segment_path,
-        total_frames,
+        total_frames: frames_recorded,
         skipped_frames: clock.skipped_frames(),
     })
 }
