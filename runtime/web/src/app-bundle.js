@@ -1980,6 +1980,19 @@ async function goPipeline(project, episode) {
 
 function switchPipelineStage(stage) {
   pipelineStage = stage;
+  if (stage === "assembly") {
+    // Switch to editor view — it has matching tabs with 剪辑 active
+    if (currentProject && currentEpisode) {
+      goEditor(currentProject, currentEpisode);
+    }
+    return;
+  }
+  // For non-assembly stages, ensure we're in pipeline view
+  var activeView = document.querySelector(".view.active");
+  if (activeView && activeView.id === "view-editor") {
+    switchView("view-pipeline");
+  }
+  // Update tab highlights across BOTH pipeline and editor tabs
   document.querySelectorAll(".pl-tab").forEach(function(tab) {
     tab.classList.toggle("active", tab.dataset.stage === stage);
   });

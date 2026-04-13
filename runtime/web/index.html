@@ -135,12 +135,11 @@ window.__ipc = window.__ipc || {};
       <div class="pl-tab" data-stage="audio" onclick="switchPipelineStage('audio')">音频</div>
       <div class="pl-tab" data-stage="clips" onclick="switchPipelineStage('clips')">素材</div>
       <div class="pl-tab" data-stage="atoms" onclick="switchPipelineStage('atoms')">原子</div>
-      <div class="pl-tab" data-stage="assembly" onclick="switchPipelineStage('assembly')">拼装</div>
+      <div class="pl-tab" data-stage="assembly" onclick="switchPipelineStage('assembly')">剪辑</div>
       <div class="pl-tab" data-stage="output" onclick="switchPipelineStage('output')">产出</div>
     </div>
     <div style="flex:1"></div>
     <div class="topbar-right">
-      <button class="btn-ghost-sm" onclick="if(currentProject&&currentEpisode)goEditor(currentProject,currentEpisode)">EDITOR</button>
       <div class="avatar">Z</div>
     </div>
   </div>
@@ -181,7 +180,19 @@ window.__ipc = window.__ipc || {};
           <div class="bc-dropdown-new">+ New Episode</div>
         </div>
       </div>
-      <span class="bc-sep">/</span>
+    </div>
+    <div style="flex:1"></div>
+    <div class="pipeline-tabs" id="editor-pipeline-tabs">
+      <div class="pl-tab" onclick="switchPipelineStage('script')">脚本</div>
+      <div class="pl-tab" onclick="switchPipelineStage('audio')">音频</div>
+      <div class="pl-tab" onclick="switchPipelineStage('clips')">素材</div>
+      <div class="pl-tab" onclick="switchPipelineStage('atoms')">原子</div>
+      <div class="pl-tab active" data-stage="assembly">剪辑</div>
+      <div class="pl-tab" onclick="switchPipelineStage('output')">产出</div>
+    </div>
+    <div style="flex:1"></div>
+    <!-- Keep original segment dropdown for editor internals -->
+    <div class="breadcrumb" style="margin-right:8px">
       <div class="bc-item" id="bc-scene" onclick="toggleBcDrop('bc-drop-scene',event)">
         <span id="bc-scene-label">content</span><span class="bc-caret">&#x25BE;</span>
         <div class="bc-dropdown" id="bc-drop-scene">
