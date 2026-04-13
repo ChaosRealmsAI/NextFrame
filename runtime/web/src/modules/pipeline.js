@@ -52,6 +52,7 @@ function switchPipelineStage(stage) {
 function renderPipelineStage() {
   var container = document.getElementById("pipeline-content");
   if (!container) return;
+  resetPipelineAudioPlayback();
 
   if (!pipelineData) {
     container.innerHTML = '<div class="pipeline-empty">Loading...</div>';
@@ -221,6 +222,8 @@ function plFilterSeg(idx) {
 // Pipeline audio/video playback
 var _plAudio = null;
 var _plAudioBtn = null;
+var _plAudioChars = [];
+var _plAudioRaf = 0;
 var PIPELINE_PROJECTS_ROOT = "~/NextFrame/projects/";
 
 function buildPipelineMediaUrl(filePath) {
@@ -245,7 +248,70 @@ function setPipelineAudioButtonState(btn, isPlaying) {
   btn.innerHTML = isPlaying ? "&#10074;&#10074;" : "&#9654;";
 }
 
-function resetPipelineAudioPlayback() {
+function setPipelineKaraokeCharState(span, state) {
+  if (!span) return;
+  var className = "karaoke-char " + state;
+  if (span.className !== className) span.className = className;
+}
+
+function resetPipelineKaraokeChars() {
+  for (var i = 0; i < _plAudioChars.length; i++) {
+    setPipelineKaraokeCharState(_plAudioChars[i], "unspoken");
+  }
+  _plAudioChars = [];
+}
+
+function stopPipelineKaraokeLoop() {
+  if (_plAudioRaf) {
+    cancelAnimationFrame(_plAudioRaf);
+    _plAudioRaf = 0;
+  }
+}
+
+function updatePipelineKaraokeChars(currentTime) {
+  for (var i = 0; i < _plAudioChars.length; i++) {
+    var span = _plAudioChars[i];
+    var start = parseFloat(span.dataset.start);
+    var end = parseFloat(span.dataset.end);
+    if (currentTime >= end) {
+      setPipelineKaraokeCharState(span, "spoken");
+    } else if (currentTime >= start) {
+      setPipelineKaraokeCharState(span, "current");
+    } else {
+      setPipelineKaraokeCharState(span, "unspoken");
+    }
+  }
+}
+
+function startPipelineKaraokeLoop(btn) {
+  stopPipelineKaraokeLoop();
+  resetPipelineKaraokeChars();
+  if (!_plAudio || !btn) return;
+
+  var row = btn.closest ? btn.closest("tr[data-seg]") : null;
+  if (!row) return;
+
+  _plAudioChars = Array.prototype.slice.call(row.querySelectorAll(".karaoke-char"));
+  if (_plAudioChars.length === 0) return;
+
+  function karaokeLoop() {
+    if (!_plAudio || _plAudio.paused) {
+      _plAudioRaf = 0;
+      return;
+    }
+    updatePipelineKaraokeChars(_plAudio.currentTime || 0);
+    _plAudioRaf = requestAnimationFrame(karaokeLoop);
+  }
+
+  updatePipelineKaraokeChars(_plAudio.currentTime || 0);
+  _plAudioRaf = requestAnimationFrame(karaokeLoop);
+}
+
+function resetPipelineAudioPlayback(options) {
+  stopPipelineKaraokeLoop();
+  if (!options || !options.keepKaraokeState) {
+    resetPipelineKaraokeChars();
+  }
   if (_plAudio) {
     _plAudio.pause();
     _plAudio.onended = null;
@@ -279,13 +345,16 @@ function playPipelineAudio(btn, filePath) {
     if (playPromise && typeof playPromise.then === "function") {
       playPromise.then(function() {
         console.log("[pipeline] audio playing!");
+        startPipelineKaraokeLoop(btn);
       }).catch(function(e) {
         console.error("[pipeline] audio play promise rejected:", e.message);
         resetPipelineAudioPlayback();
       });
+    } else {
+      startPipelineKaraokeLoop(btn);
     }
     _plAudio.onended = function() {
-      resetPipelineAudioPlayback();
+      resetPipelineAudioPlayback({ keepKaraokeState: true });
     };
   } catch (e) {
     console.error("[pipeline] audio exception:", e.message);
@@ -409,7 +478,7 @@ function renderPipelineAudio(data) {
 
         html += '<div class="sentence-row">';
         html += '<span class="s-timecode">' + startFmt + ' <span class="s-arrow">&rarr;</span> ' + endFmt + '</span>';
-        html += '<span class="s-text">' + escHtml(sent.text) + '</span>';
+        html += '<span class="s-text">' + renderPipelineKaraokeSentence(sent) + '</span>';
         html += '<span class="s-dur">' + durVal + 's</span>';
         html += '</div>';
       }
@@ -432,6 +501,22 @@ function fmtTime(sec) {
   var frac = Math.round((s - whole) * 10);
   var ss = (whole < 10 ? '0' : '') + whole;
   return mm + ':' + ss + '.' + frac;
+}
+
+function renderPipelineKaraokeSentence(sentence) {
+  if (!sentence || !sentence.words || sentence.words.length === 0) {
+    return escHtml(sentence && sentence.text || "");
+  }
+
+  var html = "";
+  for (var i = 0; i < sentence.words.length; i++) {
+    var word = sentence.words[i] || {};
+    var charText = word.char == null ? "" : String(word.char);
+    if (!charText) continue;
+    html += '<span class="karaoke-char unspoken" data-start="' + escHtml(String(word.start == null ? 0 : word.start)) + '" data-end="' + escHtml(String(word.end == null ? 0 : word.end)) + '">' + escHtml(charText) + '</span>';
+  }
+
+  return html || escHtml(sentence.text || "");
 }
 
 function renderPipelineClips(data) {
