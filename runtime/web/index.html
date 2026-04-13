@@ -156,6 +156,7 @@ window.__ipc = window.__ipc || {};
     <div style="flex:1"></div>
     <div class="topbar-right">
       <button class="btn-ghost-sm" onclick="toggleExports()">EXPORTS</button>
+      <button class="btn-ghost-sm" onclick="previewComposed()">PREVIEW</button>
       <button class="btn-ghost-sm" onclick="toggleSettings()">SETTINGS</button>
       <button class="btn-ghost-sm" onclick="navigator.clipboard.writeText('nextframe scene list --json')">COPY SKILLS</button>
     </div>
@@ -340,7 +341,7 @@ window.__ipc = window.__ipc || {};
         </div>
         <div class="playback-right">
           <button class="btn-icon" id="btn-fullscreen" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
-          <button class="btn-export" onclick="alert('Export coming soon')">EXPORT</button>
+          <button class="btn-export" onclick="previewComposed()">PREVIEW</button>
         </div>
       </div>
     </div>

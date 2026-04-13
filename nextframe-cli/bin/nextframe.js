@@ -12,6 +12,7 @@ const SUBCOMMANDS = {
   describe: () => import("../src/cli/describe.js"),
   ascii: () => import("../src/cli/ascii.js"),
   "bake-browser": () => import("../src/cli/bakeBrowser.js"),
+  compose: () => import("../src/cli/compose.js"),
   new: () => import("../src/cli/new.js"),
   "project-new": () => import("../src/cli/project-new.js"),
   "project-list": () => import("../src/cli/project-list.js"),
@@ -21,6 +22,7 @@ const SUBCOMMANDS = {
   "segment-list": () => import("../src/cli/segment-list.js"),
   exports: () => import("../src/cli/exports.js"),
   "bake-video": () => import("../src/cli/bakeVideo.js"),
+  compose: () => import("../src/cli/compose.js"),
   "add-clip": () => import("../src/cli/ops.js"),
   "move-clip": () => import("../src/cli/ops.js"),
   "resize-clip": () => import("../src/cli/ops.js"),
@@ -59,8 +61,10 @@ SUBCOMMANDS
   ascii <project> <episode> <segment> <t>     ASCII art preview of a frame
   gantt <project> <episode> <segment>         ASCII gantt
   bake-video <project> <episode> <segment>    pre-extract videoClip frames with ffmpeg
+  compose <project> <episode> <segment>       compose a self-contained HTML preview
   scenes                                      list all scenes with META
   bake-browser <project> <episode> <segment>  bake html/svg/markdown/lottie browser scenes
+  compose <project> <episode> <segment>       compose a self-contained HTML preview
   add-clip <project> <episode> <segment> ...  add a clip to a track
   move-clip <project> <episode> <segment> ... move a clip's start time
   resize-clip <project> <episode> <segment>   resize clip duration

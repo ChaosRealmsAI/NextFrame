@@ -127,10 +127,43 @@ function applyLayerStyle(el, layer) {
   if (layer.clipPath && layer.clipPath !== 'none') s.clipPath = layer.clipPath;
 }
 
+function timelineMetrics(timeline) {
+  const project = timeline && typeof timeline.project === 'object' ? timeline.project : {};
+  return {
+    width: project.width || timeline.width || 1920,
+    height: project.height || timeline.height || 1080,
+    fps: project.fps || timeline.fps || 30,
+    duration: timeline.duration || 10,
+    background: timeline.background || '#05050c',
+  };
+}
+
+function normalizeLayers(timeline) {
+  if (Array.isArray(timeline.layers)) {
+    return timeline.layers;
+  }
+  const tracks = Array.isArray(timeline && timeline.tracks) ? timeline.tracks : [];
+  const layers = [];
+  for (let trackIndex = 0; trackIndex < tracks.length; trackIndex++) {
+    const track = tracks[trackIndex];
+    const clips = Array.isArray(track && track.clips) ? track.clips : [];
+    for (let clipIndex = 0; clipIndex < clips.length; clipIndex++) {
+      const clip = clips[clipIndex];
+      layers.push({
+        ...clip,
+        id: clip && clip.id ? clip.id : `track-${trackIndex + 1}-clip-${clipIndex + 1}`,
+        kind: clip && clip.kind ? clip.kind : (track && track.kind ? track.kind : 'video'),
+        trackId: track && track.id ? track.id : `track-${trackIndex + 1}`,
+      });
+    }
+  }
+  return layers;
+}
+
 // ─── Engine ────────────────────────────────────────────────────
 export function createEngine(stageEl, timeline, sceneRegistry) {
-  const { width = 1920, height = 1080, fps = 30, duration = 10, background = '#05050c' } = timeline;
-  const layers = timeline.layers || [];
+  const { width, height, fps, duration, background } = timelineMetrics(timeline);
+  const layers = normalizeLayers(timeline);
 
   // Setup stage
   stageEl.style.cssText = `position:relative;width:${width}px;height:${height}px;overflow:hidden;background:${background}`;
@@ -183,12 +216,7 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
       if (active) {
         // Lazy create scene on first activation
         if (!state.created && scene) {
-          try {
-            state.sceneEls = scene.create(sceneContainer, layer.params || {});
-          } catch (_) {
-            // WebGL may fail in headless — skip gracefully
-            state.sceneEls = null;
-          }
+          state.sceneEls = scene.create(sceneContainer, layer.params || {});
           state.created = true;
         }
 
@@ -197,7 +225,7 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
         // Update scene content
         // DOM scenes use normalized time (0~1), Canvas/SVG scenes use seconds
         if (scene && state.sceneEls != null) {
-          const sceneT = scene.type === 'dom' ? (localT / dur) : localT;
+          const sceneT = scene.type === 'dom' ? (dur > 0 ? (localT / dur) : 0) : localT;
           scene.update(state.sceneEls, sceneT, layer.params || {});
         }
 
@@ -296,9 +324,33 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
 export function createPlayer(engine, stageEl) {
   const { duration, fps, width, height } = engine;
   let playing = false;
-  let startWall = 0;
-  let startTime = 0;
   let currentTime = 0;
+  let playbackRate = 1;
+  let tickRaf = 0;
+  let lastTickWall = 0;
+  let scaleMode = 'fit';
+
+  document.documentElement.style.background = '#111';
+  document.body.style.margin = '0';
+  document.body.style.minHeight = '100vh';
+  document.body.style.overflow = 'hidden';
+  document.body.style.background = '#111';
+
+  const viewport = document.createElement('div');
+  viewport.style.cssText = 'position:fixed;inset:0 0 64px 0;padding:24px;overflow:hidden;background:#111;display:flex;align-items:center;justify-content:center';
+
+  const stageShell = document.createElement('div');
+  stageShell.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:center;min-width:100%;min-height:100%;box-sizing:border-box';
+
+  const originalParent = stageEl.parentNode;
+  if (originalParent) {
+    originalParent.insertBefore(viewport, stageEl);
+  } else {
+    document.body.appendChild(viewport);
+  }
+  viewport.appendChild(stageShell);
+  stageShell.appendChild(stageEl);
+  stageEl.style.boxShadow = '0 0 80px rgba(100,80,200,0.15)';
 
   const bar = document.createElement('div');
   bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;padding:10px 20px;background:rgba(0,0,0,0.92);display:flex;align-items:center;gap:12px;font:13px -apple-system,sans-serif;color:#aaa;z-index:9999';
@@ -315,26 +367,113 @@ export function createPlayer(engine, stageEl) {
   slider.style.cssText = 'flex:1;accent-color:#a78bfa';
 
   const timeLabel = document.createElement('span');
-  timeLabel.style.cssText = 'min-width:90px;text-align:right;font-family:"SF Mono",monospace;font-size:12px';
+  timeLabel.style.cssText = 'min-width:120px;text-align:right;font-family:"SF Mono",monospace;font-size:12px;color:#ddd';
 
   const info = document.createElement('span');
   info.style.cssText = 'font-size:11px;color:#666';
   info.textContent = `| ${duration}s @ ${fps}fps | ${width}\u00d7${height} | layers:${engine.layerCount}`;
 
-  bar.append(playBtn, slider, timeLabel, info);
+  const speedWrap = document.createElement('div');
+  speedWrap.style.cssText = 'display:flex;align-items:center;gap:6px';
+  const speedButtons = [0.5, 1, 2].map((rate) => {
+    const button = document.createElement('button');
+    button.textContent = `${rate}x`;
+    button.style.cssText = 'background:#141414;border:1px solid #333;color:#bbb;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px';
+    button.addEventListener('click', () => {
+      playbackRate = rate;
+      if (playing) {
+        lastTickWall = performance.now();
+      }
+      syncButtons();
+    });
+    speedWrap.appendChild(button);
+    return button;
+  });
+
+  const scaleBtn = document.createElement('button');
+  scaleBtn.style.cssText = 'background:#141414;border:1px solid #333;color:#fff;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px';
+  scaleBtn.addEventListener('click', () => {
+    scaleMode = scaleMode === 'fit' ? 'native' : 'fit';
+    applyScaleMode();
+    syncButtons();
+  });
+
+  const fullscreenBtn = document.createElement('button');
+  fullscreenBtn.style.cssText = 'background:#141414;border:1px solid #333;color:#fff;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:12px';
+  fullscreenBtn.addEventListener('click', async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+    if (document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen();
+    }
+  });
+
+  bar.append(playBtn, slider, timeLabel, speedWrap, scaleBtn, fullscreenBtn, info);
   document.body.appendChild(bar);
+
+  function formatTime(seconds) {
+    const safe = Math.max(0, Number(seconds) || 0);
+    const minutes = Math.floor(safe / 60);
+    const remainder = safe - minutes * 60;
+    return `${String(minutes).padStart(2, '0')}:${remainder.toFixed(2).padStart(5, '0')}`;
+  }
+
+  function stopPlayback() {
+    playing = false;
+    lastTickWall = 0;
+    if (tickRaf) {
+      cancelAnimationFrame(tickRaf);
+      tickRaf = 0;
+    }
+    syncButtons();
+  }
+
+  function syncButtons() {
+    playBtn.textContent = playing ? '\u23F8' : '\u25B6';
+    scaleBtn.textContent = scaleMode === 'fit' ? 'Fit' : '1:1';
+    fullscreenBtn.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
+    for (const button of speedButtons) {
+      const active = button.textContent === `${playbackRate}x`;
+      button.style.borderColor = active ? '#7c5cff' : '#333';
+      button.style.color = active ? '#fff' : '#bbb';
+      button.style.background = active ? '#2b1f5f' : '#141414';
+    }
+  }
+
+  function applyScaleMode() {
+    if (scaleMode === 'fit') {
+      const availableWidth = Math.max(1, viewport.clientWidth - 48);
+      const availableHeight = Math.max(1, viewport.clientHeight - 48);
+      const scale = Math.min(availableWidth / width, availableHeight / height);
+      const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+      stageEl.style.width = `${Math.round(width * safeScale)}px`;
+      stageEl.style.height = `${Math.round(height * safeScale)}px`;
+      viewport.style.overflow = 'hidden';
+      stageShell.style.padding = '0';
+      stageShell.style.minWidth = '100%';
+      stageShell.style.minHeight = '100%';
+    } else {
+      stageEl.style.width = `${width}px`;
+      stageEl.style.height = `${height}px`;
+      viewport.style.overflow = 'auto';
+      stageShell.style.padding = '24px';
+      stageShell.style.minWidth = 'max-content';
+      stageShell.style.minHeight = 'max-content';
+    }
+  }
 
   function seek(t) {
     t = Math.max(0, Math.min(duration, t));
     currentTime = t;
     slider.value = String(t * 1000);
-    timeLabel.textContent = t.toFixed(3) + 's';
+    timeLabel.textContent = `${formatTime(t)} / ${formatTime(duration)}`;
     engine.renderFrame(t);
   }
 
   slider.addEventListener('input', () => {
-    playing = false;
-    playBtn.textContent = '\u25B6';
+    stopPlayback();
     seek(Number(slider.value) / 1000);
   });
 
@@ -342,45 +481,75 @@ export function createPlayer(engine, stageEl) {
 
   function togglePlay() {
     if (playing) {
-      playing = false;
-      playBtn.textContent = '\u25B6';
+      stopPlayback();
       return;
+    }
+    if (currentTime >= duration) {
+      currentTime = 0;
     }
     playing = true;
-    playBtn.textContent = '\u23F8';
-    startWall = performance.now();
-    startTime = currentTime >= duration ? 0 : currentTime;
-    tick();
+    lastTickWall = 0;
+    syncButtons();
+    tickRaf = requestAnimationFrame(tick);
   }
 
-  function tick() {
+  function tick(now) {
     if (!playing) return;
-    const t = startTime + (performance.now() - startWall) / 1000;
-    if (t >= duration) {
+    if (!lastTickWall) {
+      lastTickWall = now;
+    }
+    const delta = (now - lastTickWall) / 1000;
+    lastTickWall = now;
+    const nextTime = currentTime + delta * playbackRate;
+    if (nextTime >= duration) {
       seek(duration);
-      playing = false;
-      playBtn.textContent = '\u25B6';
+      stopPlayback();
       return;
     }
-    seek(t);
-    requestAnimationFrame(tick);
+    seek(nextTime);
+    tickRaf = requestAnimationFrame(tick);
+  }
+
+  function handleResize() {
+    applyScaleMode();
+  }
+
+  function handleFullscreenChange() {
+    applyScaleMode();
+    syncButtons();
   }
 
   // Keyboard shortcuts
-  document.addEventListener('keydown', (e) => {
+  const handleKeydown = (e) => {
+    const tagName = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+    if (tagName === 'input' || tagName === 'textarea' || (e.target && e.target.isContentEditable)) {
+      return;
+    }
     if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
     if (e.code === 'ArrowLeft') { e.preventDefault(); seek(currentTime - 1); }
     if (e.code === 'ArrowRight') { e.preventDefault(); seek(currentTime + 1); }
     if (e.code === 'Home') { e.preventDefault(); seek(0); }
     if (e.code === 'End') { e.preventDefault(); seek(duration); }
-  });
+  };
+  document.addEventListener('keydown', handleKeydown);
+  window.addEventListener('resize', handleResize);
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
 
+  applyScaleMode();
+  syncButtons();
   seek(0);
 
   return {
     seek,
     play: togglePlay,
     get currentTime() { return currentTime; },
-    destroy() { bar.remove(); },
+    destroy() {
+      stopPlayback();
+      document.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      bar.remove();
+      viewport.remove();
+    },
   };
 }
