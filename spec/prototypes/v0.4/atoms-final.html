@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame — Content Atoms</title>
+<style>
+:root {
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --accent: #8a6fae;
+  --accent-15: rgba(138,111,174,0.15);
+  --accent-06: rgba(138,111,174,0.06);
+  --ink: #f0ece4;
+  --ink-mid: rgba(240,236,228,0.85);
+  --ink-dim: rgba(240,236,228,0.65);
+  --ink-ghost: rgba(240,236,228,0.15);
+  --ink-faint: rgba(138,111,174,0.08);
+  --bg: #0a0a0f;
+  --bg-up: #111118;
+  --bg-surface: #17171f;
+  --bg-hover: #1d1d28;
+  --warm: #da7756;
+  --warm-20: rgba(218,119,86,0.2);
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Helvetica Neue', system-ui, sans-serif;
+  --font-mono: 'SF Mono', Menlo, monospace;
+  --border-a1: 1px solid rgba(138,111,174,0.1);
+  --border-a2: 1px solid rgba(138,111,174,0.25);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Film grain overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* ── Top Bar ─────────────────────────────────────────────── */
+.topbar {
+  height: 48px;
+  background: rgba(10,10,15,0.92);
+  border-bottom: var(--border-a1);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 16px;
+}
+
+.logo-mark {
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, var(--accent), var(--warm));
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.topbar-logo span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.2px;
+}
+
+.topbar-show {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+  margin-right: 4px;
+}
+.topbar-show:hover { background: var(--bg-hover); }
+.topbar-show .chevron { font-size: 9px; opacity: 0.6; }
+
+.topbar-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(138,111,174,0.15);
+  margin: 0 12px;
+}
+
+.topbar-stages {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.stage-item {
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+.stage-item:hover { color: var(--ink); background: var(--bg-hover); }
+.stage-item.active {
+  color: var(--accent);
+  background: var(--accent-06);
+}
+.stage-item.active::after {
+  content: '●';
+  font-size: 5px;
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--accent);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 20px;
+}
+
+.topbar-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  background: var(--bg-up);
+  border: var(--border-a1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.topbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Header Bar ───────────────────────────────────────────── */
+.header-bar {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px 0;
+  gap: 16px;
+}
+
+.header-label {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.header-count {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.header-divider {
+  width: 1px;
+  height: 12px;
+  background: rgba(138,111,174,0.15);
+}
+
+.filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.filter-pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  color: var(--ink-dim);
+  border: var(--border-a1);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.filter-pill:hover { border-color: rgba(138,111,174,0.3); color: var(--ink); }
+.filter-pill.active {
+  background: var(--accent-06);
+  border-color: rgba(138,111,174,0.35);
+  color: var(--accent);
+}
+
+/* ── Atom Grid ────────────────────────────────────────────── */
+.atom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 20px 24px 32px;
+}
+
+/* ── Atom Card ────────────────────────────────────────────── */
+.atom-card {
+  background: var(--bg-surface);
+  border: var(--border-a1);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s var(--ease);
+}
+.atom-card:hover {
+  border-color: rgba(138,111,174,0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(138,111,174,0.08);
+}
+
+.atom-preview {
+  height: 200px;
+  background: var(--bg);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.atom-info {
+  padding: 14px;
+}
+
+.atom-info-row1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.segment-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.5px;
+}
+
+.scene-type-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--accent-06);
+  color: var(--accent);
+  border: 1px solid rgba(138,111,174,0.2);
+}
+
+.atom-description {
+  font-size: 12px;
+  color: var(--ink-dim);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.atom-info-row3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.param-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+}
+
+.preview-btn {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.preview-btn:hover { opacity: 0.7; }
+
+/* ── Atom Previews: CSS drawings ─────────────────────────── */
+
+/* 1. numberCounter */
+.preview-number {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.big-number {
+  font-family: var(--font-display);
+  font-size: 72px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  text-shadow: 0 0 40px rgba(138,111,174,0.5), 0 0 80px rgba(138,111,174,0.2);
+  animation: numPulse 3s ease-in-out infinite;
+}
+
+@keyframes numPulse {
+  0%, 100% { text-shadow: 0 0 40px rgba(138,111,174,0.5), 0 0 80px rgba(138,111,174,0.2); }
+  50% { text-shadow: 0 0 60px rgba(138,111,174,0.8), 0 0 120px rgba(138,111,174,0.4); }
+}
+
+.num-unit {
+  font-size: 14px;
+  color: var(--ink-dim);
+  margin-top: 6px;
+  letter-spacing: 2px;
+  font-family: var(--font-body);
+}
+
+.num-progress-track {
+  position: absolute;
+  bottom: 24px;
+  left: 32px;
+  right: 32px;
+  height: 2px;
+  background: rgba(138,111,174,0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.num-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), rgba(138,111,174,0.4));
+  border-radius: 2px;
+  animation: progressSweep 3s ease-in-out infinite;
+}
+
+@keyframes progressSweep {
+  0% { width: 0%; }
+  70% { width: 100%; }
+  100% { width: 100%; }
+}
+
+/* 2. logoReveal */
+.preview-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 12px;
+}
+
+.logo-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--warm));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  color: white;
+  animation: logoPulse 2.5s ease-in-out infinite;
+  position: relative;
+}
+
+.logo-circle::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(138,111,174,0.3) 0%, transparent 70%);
+  animation: logoGlow 2.5s ease-in-out infinite;
+}
+
+@keyframes logoPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(138,111,174,0.4), 0 0 40px rgba(218,119,86,0.2); transform: scale(1); }
+  50% { box-shadow: 0 0 40px rgba(138,111,174,0.6), 0 0 80px rgba(218,119,86,0.3); transform: scale(1.04); }
+}
+
+@keyframes logoGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+.logo-text {
+  font-size: 12px;
+  color: var(--ink-dim);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  animation: fadeInOut 2.5s ease-in-out infinite;
+}
+
+@keyframes fadeInOut {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* 3. flowChart */
+.preview-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 0;
+  padding: 24px;
+}
+
+.flow-node {
+  width: 72px;
+  height: 44px;
+  background: var(--bg-up);
+  border: var(--border-a1);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--ink-dim);
+  gap: 2px;
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.flow-node .node-icon { font-size: 14px; }
+
+.flow-node.hl {
+  border-color: rgba(138,111,174,0.5);
+  background: var(--accent-06);
+  color: var(--ink);
+  box-shadow: 0 0 12px rgba(138,111,174,0.2);
+}
+
+.flow-arrow {
+  width: 28px;
+  height: 2px;
+  background: var(--ink-ghost);
+  position: relative;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.flow-arrow::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: -3px;
+  border-left: 6px solid var(--ink-ghost);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+.flow-arrow .flow-arrow-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s;
+}
+
+/* 4. barChart */
+.preview-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 20px 32px 40px;
+  gap: 32px;
+  position: relative;
+}
+
+.bar-grid-lines {
+  position: absolute;
+  top: 20px;
+  left: 32px;
+  right: 32px;
+  bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.bar-grid-line {
+  width: 100%;
+  height: 1px;
+  background: rgba(240,236,228,0.05);
+}
+
+.bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  position: relative;
+}
+
+.bar-track {
+  width: 100%;
+  height: 120px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 3px 3px 0 0;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(240,236,228,0.08);
+}
+
+.bar-fill {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  transform-origin: bottom;
+  animation: barGrow 1.5s var(--ease) forwards;
+}
+
+.bar-fill.warm {
+  background: linear-gradient(0deg, var(--warm-20), rgba(218,119,86,0.35));
+  animation-delay: 0.1s;
+}
+.bar-fill.accent {
+  background: linear-gradient(0deg, var(--accent-15), rgba(138,111,174,0.3));
+  animation-delay: 0.3s;
+}
+
+.bar-label {
+  font-size: 10px;
+  color: var(--ink-dim);
+  text-align: center;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+
+@keyframes barGrow {
+  from { height: 0%; }
+}
+
+/* 5. slideFrame */
+.preview-slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 10px;
+}
+
+.cta-button {
+  background: linear-gradient(135deg, var(--accent), var(--warm));
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px 32px;
+  border-radius: 24px;
+  letter-spacing: -0.2px;
+  animation: ctaGlow 2.5s ease-in-out infinite;
+  cursor: default;
+}
+
+@keyframes ctaGlow {
+  0%, 100% { box-shadow: 0 4px 20px rgba(138,111,174,0.3), 0 0 0 0 rgba(138,111,174,0); }
+  50% { box-shadow: 0 8px 40px rgba(138,111,174,0.5), 0 0 0 8px rgba(138,111,174,0.05); }
+}
+
+.cta-sub {
+  font-size: 11px;
+  color: var(--ink-dim);
+  letter-spacing: 0.5px;
+}
+
+/* ── Preview Overlay ─────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(8px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.overlay-card {
+  background: var(--bg-surface);
+  border: var(--border-a2);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 680px;
+  overflow: hidden;
+  transform: scale(0.96) translateY(8px);
+  transition: transform 0.3s var(--ease);
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+}
+
+.overlay.open .overlay-card {
+  transform: scale(1) translateY(0);
+}
+
+.overlay-preview {
+  height: 340px;
+  background: var(--bg);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.overlay-params {
+  padding: 20px;
+}
+
+.params-title {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--ink-ghost);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  margin-bottom: 12px;
+}
+
+.param-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.param-row {
+  border-bottom: 1px solid rgba(138,111,174,0.07);
+}
+.param-row:last-child { border-bottom: none; }
+
+.param-row td {
+  padding: 8px 0;
+  font-size: 12px;
+}
+
+.param-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  width: 35%;
+  padding-right: 12px;
+}
+
+.param-value {
+  font-size: 13px;
+  color: var(--ink);
+  width: 45%;
+}
+
+.param-type {
+  text-align: right;
+}
+
+.type-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(138,111,174,0.08);
+  color: var(--accent);
+}
+
+.overlay-footer {
+  padding: 14px 20px;
+  background: var(--bg-up);
+  border-top: var(--border-a1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.overlay-segment-info {
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+}
+
+.overlay-close {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  padding: 6px 16px;
+  border-radius: 5px;
+  border: var(--border-a2);
+  transition: all 0.15s;
+}
+.overlay-close:hover {
+  background: var(--accent-15);
+}
+
+/* ── Large preview variants for overlay ─────────────────── */
+.overlay-preview .big-number { font-size: 96px; }
+.overlay-preview .logo-circle { width: 96px; height: 96px; font-size: 42px; }
+.overlay-preview .logo-text { font-size: 14px; }
+.overlay-preview .flow-node { width: 88px; height: 54px; font-size: 11px; }
+.overlay-preview .flow-node .node-icon { font-size: 18px; }
+.overlay-preview .flow-arrow { width: 36px; }
+.overlay-preview .bar-track { height: 180px; }
+.overlay-preview .cta-button { font-size: 18px; padding: 14px 40px; }
+.overlay-preview .cta-sub { font-size: 13px; }
+.overlay-preview .preview-bar { padding: 24px 48px 48px; }
+.overlay-preview .bar-grid-lines { top: 24px; left: 48px; right: 48px; bottom: 48px; }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="topbar-logo">
+    <div class="logo-mark">N</div>
+    <span>NextFrame</span>
+  </div>
+  <div class="topbar-show">Show <span class="chevron">▾</span></div>
+  <span style="font-size:12px;color:var(--ink-ghost);margin:0 2px">/</span>
+  <div class="topbar-show">EP01 <span class="chevron">▾</span></div>
+
+  <div class="topbar-stages">
+    <div class="stage-item">脚本</div>
+    <div class="stage-item">音频</div>
+    <div class="stage-item active">原子</div>
+    <div class="stage-item">拼装</div>
+    <div class="stage-item">产出</div>
+  </div>
+
+  <div class="topbar-actions">
+    <div class="topbar-btn">⚙</div>
+    <div class="topbar-btn" style="font-weight:700;font-family:var(--font-display)">Z</div>
+  </div>
+</div>
+
+<!-- Header Bar -->
+<div class="header-bar">
+  <div class="header-label">Content Atoms</div>
+  <div class="header-divider"></div>
+  <div class="header-count">5 个原子 · 4 种场景类型</div>
+  <div class="filter-pills">
+    <div class="filter-pill active" data-filter="all">全部</div>
+    <div class="filter-pill" data-filter="文字">文字</div>
+    <div class="filter-pill" data-filter="图表">图表</div>
+    <div class="filter-pill" data-filter="媒体">媒体</div>
+    <div class="filter-pill" data-filter="动效">动效</div>
+  </div>
+</div>
+
+<!-- Atom Grid -->
+<div class="atom-grid">
+
+  <!-- Card 1: numberCounter -->
+  <div class="atom-card" data-idx="0" data-filter-type="动效">
+    <div class="atom-preview">
+      <div class="preview-number">
+        <div class="big-number" id="card-counter">3</div>
+        <div class="num-unit">小时 / 天</div>
+        <div class="num-progress-track">
+          <div class="num-progress-fill"></div>
+        </div>
+      </div>
+    </div>
+    <div class="atom-info">
+      <div class="atom-info-row1">
+        <span class="segment-badge">段 1</span>
+        <span class="scene-type-pill">numberCounter</span>
+      </div>
+      <div class="atom-description">大数字 "3" + 配文 "小时/天"</div>
+      <div class="atom-info-row3">
+        <span class="param-count">4 params</span>
+        <span class="preview-btn">PREVIEW</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 2: logoReveal -->
+  <div class="atom-card" data-idx="1" data-filter-type="动效">
+    <div class="atom-preview">
+      <div class="preview-logo">
+        <div class="logo-circle">N</div>
+        <div class="logo-text">NextFrame</div>
+      </div>
+    </div>
+    <div class="atom-info">
+      <div class="atom-info-row1">
+        <span class="segment-badge">段 2</span>
+        <span class="scene-type-pill">logoReveal</span>
+      </div>
+      <div class="atom-description">Logo 从模糊到清晰，渐入动效</div>
+      <div class="atom-info-row3">
+        <span class="param-count">3 params</span>
+        <span class="preview-btn">PREVIEW</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 3: flowChart -->
+  <div class="atom-card" data-idx="2" data-filter-type="图表">
+    <div class="atom-preview">
+      <div class="preview-flow" id="flow-preview">
+        <div class="flow-node" id="fn0">
+          <span class="node-icon">📝</span>
+          <span>脚本</span>
+        </div>
+        <div class="flow-arrow">
+          <div class="flow-arrow-fill" style="width:0%"></div>
+        </div>
+        <div class="flow-node" id="fn1">
+          <span class="node-icon">🔊</span>
+          <span>音频</span>
+        </div>
+        <div class="flow-arrow">
+          <div class="flow-arrow-fill" style="width:0%"></div>
+        </div>
+        <div class="flow-node" id="fn2">
+          <span class="node-icon">🎬</span>
+          <span>成片</span>
+        </div>
+      </div>
+    </div>
+    <div class="atom-info">
+      <div class="atom-info-row1">
+        <span class="segment-badge">段 3</span>
+        <span class="scene-type-pill">flowChart</span>
+      </div>
+      <div class="atom-description">三步流程 脚本→音频→成片</div>
+      <div class="atom-info-row3">
+        <span class="param-count">3 params</span>
+        <span class="preview-btn">PREVIEW</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4: barChart -->
+  <div class="atom-card" data-idx="3" data-filter-type="图表">
+    <div class="atom-preview">
+      <div class="preview-bar">
+        <div class="bar-grid-lines">
+          <div class="bar-grid-line"></div>
+          <div class="bar-grid-line"></div>
+          <div class="bar-grid-line"></div>
+          <div class="bar-grid-line"></div>
+        </div>
+        <div class="bar-col">
+          <div class="bar-track">
+            <div class="bar-fill warm" style="--bar-h:28%"></div>
+          </div>
+          <div class="bar-label">传统 3天</div>
+        </div>
+        <div class="bar-col">
+          <div class="bar-track">
+            <div class="bar-fill accent" style="--bar-h:85%"></div>
+          </div>
+          <div class="bar-label">NF 5分钟</div>
+        </div>
+      </div>
+    </div>
+    <div class="atom-info">
+      <div class="atom-info-row1">
+        <span class="segment-badge">段 4</span>
+        <span class="scene-type-pill">barChart</span>
+      </div>
+      <div class="atom-description">对比 3天 vs 5分钟效率差异</div>
+      <div class="atom-info-row3">
+        <span class="param-count">4 params</span>
+        <span class="preview-btn">PREVIEW</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 5: slideFrame -->
+  <div class="atom-card" data-idx="4" data-filter-type="文字">
+    <div class="atom-preview">
+      <div class="preview-slide">
+        <div class="cta-button">开始试用</div>
+        <div class="cta-sub">免费 · 无需信用卡</div>
+      </div>
+    </div>
+    <div class="atom-info">
+      <div class="atom-info-row1">
+        <span class="segment-badge">段 5</span>
+        <span class="scene-type-pill">slideFrame</span>
+      </div>
+      <div class="atom-description">CTA 按钮 "开始试用" + 副文本</div>
+      <div class="atom-info-row3">
+        <span class="param-count">3 params</span>
+        <span class="preview-btn">PREVIEW</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Preview Overlay -->
+<div class="overlay" id="overlay">
+  <div class="overlay-card" id="overlay-card">
+    <div class="overlay-preview" id="overlay-preview"></div>
+    <div class="overlay-params">
+      <div class="params-title">Parameters</div>
+      <table class="param-table" id="param-table"></table>
+    </div>
+    <div class="overlay-footer">
+      <div class="overlay-segment-info" id="overlay-seg"></div>
+      <div class="overlay-close" id="overlay-close">CLOSE</div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Bar fill heights via custom properties */
+.bar-fill.warm { animation: barGrowWarm 1.6s var(--ease) forwards; }
+.bar-fill.accent { animation: barGrowAccent 1.6s var(--ease) 0.25s both; }
+@keyframes barGrowWarm {
+  from { height: 0%; }
+  to { height: 28%; }
+}
+@keyframes barGrowAccent {
+  from { height: 0%; }
+  to { height: 85%; }
+}
+/* Same for overlay */
+.overlay-preview .bar-fill.warm { animation: barGrowWarmLg 1.6s var(--ease) forwards; }
+.overlay-preview .bar-fill.accent { animation: barGrowAccentLg 1.6s var(--ease) 0.25s both; }
+@keyframes barGrowWarmLg {
+  from { height: 0%; }
+  to { height: 28%; }
+}
+@keyframes barGrowAccentLg {
+  from { height: 0%; }
+  to { height: 85%; }
+}
+</style>
+
+<script>
+const atoms = [
+  {
+    idx: 0,
+    sceneType: 'numberCounter',
+    segment: '段 1 · 痛点',
+    description: '大数字 "3" + 配文 "小时/天"',
+    params: [
+      { name: 'value', value: '3', type: 'number' },
+      { name: 'unit', value: '"小时/天"', type: 'string' },
+      { name: 'fontSize', value: '64', type: 'px' },
+      { name: 'color', value: '#8a6fae', type: 'color' },
+    ],
+    previewHTML: `<div class="preview-number">
+      <div class="big-number">3</div>
+      <div class="num-unit">小时 / 天</div>
+      <div class="num-progress-track"><div class="num-progress-fill"></div></div>
+    </div>`,
+  },
+  {
+    idx: 1,
+    sceneType: 'logoReveal',
+    segment: '段 2 · 方案',
+    description: 'Logo 从模糊到清晰，渐入动效',
+    params: [
+      { name: 'text', value: '"NextFrame"', type: 'string' },
+      { name: 'size', value: '72', type: 'px' },
+      { name: 'gradient', value: 'accent → warm', type: 'gradient' },
+    ],
+    previewHTML: `<div class="preview-logo">
+      <div class="logo-circle">N</div>
+      <div class="logo-text">NextFrame</div>
+    </div>`,
+  },
+  {
+    idx: 2,
+    sceneType: 'flowChart',
+    segment: '段 3 · 原理',
+    description: '三步流程 脚本→音频→成片',
+    params: [
+      { name: 'nodes', value: '3', type: 'number' },
+      { name: 'labels', value: '["脚本","音频","成片"]', type: 'array' },
+      { name: 'direction', value: '"horizontal"', type: 'string' },
+    ],
+    previewHTML: `<div class="preview-flow">
+      <div class="flow-node hl"><span class="node-icon">📝</span><span>脚本</span></div>
+      <div class="flow-arrow"><div class="flow-arrow-fill" style="width:100%"></div></div>
+      <div class="flow-node hl"><span class="node-icon">🔊</span><span>音频</span></div>
+      <div class="flow-arrow"><div class="flow-arrow-fill" style="width:100%"></div></div>
+      <div class="flow-node hl"><span class="node-icon">🎬</span><span>成片</span></div>
+    </div>`,
+  },
+  {
+    idx: 3,
+    sceneType: 'barChart',
+    segment: '段 4 · 证据',
+    description: '对比 3天 vs 5分钟效率差异',
+    params: [
+      { name: 'bar[0].label', value: '"传统"', type: 'string' },
+      { name: 'bar[0].value', value: '72 (hr)', type: 'number' },
+      { name: 'bar[1].label', value: '"NF"', type: 'string' },
+      { name: 'bar[1].value', value: '0.083 (hr)', type: 'number' },
+    ],
+    previewHTML: `<div class="preview-bar">
+      <div class="bar-grid-lines">
+        <div class="bar-grid-line"></div>
+        <div class="bar-grid-line"></div>
+        <div class="bar-grid-line"></div>
+        <div class="bar-grid-line"></div>
+      </div>
+      <div class="bar-col">
+        <div class="bar-track"><div class="bar-fill warm"></div></div>
+        <div class="bar-label">传统 3天</div>
+      </div>
+      <div class="bar-col">
+        <div class="bar-track"><div class="bar-fill accent"></div></div>
+        <div class="bar-label">NF 5分钟</div>
+      </div>
+    </div>`,
+  },
+  {
+    idx: 4,
+    sceneType: 'slideFrame',
+    segment: '段 5 · 行动',
+    description: 'CTA 按钮 "开始试用" + 副文本',
+    params: [
+      { name: 'text', value: '"开始试用"', type: 'string' },
+      { name: 'style', value: '"cta"', type: 'string' },
+      { name: 'subtext', value: '"免费 · 无需信用卡"', type: 'string' },
+    ],
+    previewHTML: `<div class="preview-slide">
+      <div class="cta-button">开始试用</div>
+      <div class="cta-sub">免费 · 无需信用卡</div>
+    </div>`,
+  },
+];
+
+const overlay = document.getElementById('overlay');
+const overlayPreview = document.getElementById('overlay-preview');
+const paramTable = document.getElementById('param-table');
+const overlaySeg = document.getElementById('overlay-seg');
+const overlayClose = document.getElementById('overlay-close');
+
+function openOverlay(idx) {
+  const atom = atoms[idx];
+  overlayPreview.innerHTML = atom.previewHTML;
+  overlaySeg.textContent = atom.segment + ' · ' + atom.sceneType;
+  paramTable.innerHTML = atom.params.map(p => `
+    <tr class="param-row">
+      <td class="param-name">${p.name}</td>
+      <td class="param-value">${p.value}</td>
+      <td class="param-type"><span class="type-badge">${p.type}</span></td>
+    </tr>
+  `).join('');
+  overlay.classList.add('open');
+}
+
+function closeOverlay() {
+  overlay.classList.remove('open');
+}
+
+document.querySelectorAll('.atom-card').forEach(card => {
+  card.addEventListener('click', (e) => {
+    openOverlay(parseInt(card.dataset.idx));
+  });
+});
+
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay) closeOverlay();
+});
+overlayClose.addEventListener('click', closeOverlay);
+
+// Filter pills
+document.querySelectorAll('.filter-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    const filter = pill.dataset.filter;
+    document.querySelectorAll('.atom-card').forEach(card => {
+      if (filter === 'all' || card.dataset.filterType === filter) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
+});
+
+// Flow chart sequential highlight animation
+function animateFlow() {
+  const nodes = document.querySelectorAll('#flow-preview .flow-node');
+  const arrows = document.querySelectorAll('#flow-preview .flow-arrow-fill');
+  let step = 0;
+  nodes.forEach(n => n.classList.remove('hl'));
+  arrows.forEach(a => { a.style.width = '0%'; });
+
+  function next() {
+    if (step < nodes.length) {
+      nodes[step].classList.add('hl');
+      if (step > 0) {
+        arrows[step - 1].style.transition = 'width 0.4s ease';
+        arrows[step - 1].style.width = '100%';
+      }
+      step++;
+      setTimeout(next, 600);
+    } else {
+      setTimeout(() => {
+        nodes.forEach(n => n.classList.remove('hl'));
+        arrows.forEach(a => { a.style.transition = 'none'; a.style.width = '0%'; });
+        step = 0;
+        setTimeout(next, 400);
+      }, 1200);
+    }
+  }
+  next();
+}
+
+animateFlow();
+</script>
+
+</body>
+</html>
