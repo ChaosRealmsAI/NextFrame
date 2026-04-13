@@ -1,0 +1,59 @@
+{
+  "schema": "nextframe/v0.1",
+  "duration": 18,
+  "background": "#1a1510",
+  "project": {"width": 1920, "height": 1080, "aspectRatio": 1.778, "fps": 30},
+  "chapters": [
+    {"id": "canvas", "start": 0, "end": 3},
+    {"id": "html", "start": 3, "end": 6},
+    {"id": "svg", "start": 6, "end": 9},
+    {"id": "markdown", "start": 9, "end": 12},
+    {"id": "video", "start": 12, "end": 15},
+    {"id": "multitrack", "start": 15, "end": 18}
+  ],
+  "tracks": [
+    {
+      "id": "v1-bg",
+      "kind": "video",
+      "clips": [
+        {"id": "bg", "start": 0, "dur": 18, "scene": "auroraGradient", "params": {"hueA": 25, "hueB": 15, "hueC": 340, "intensity": 0.7, "grain": 0.04}}
+      ]
+    },
+    {
+      "id": "v2-content",
+      "kind": "video",
+      "clips": [
+        {"id": "c-canvas", "start": 0, "dur": 3, "blend": "source-over", "scene": "kineticHeadline", "params": {"text": "CANVAS", "subtitle": "napi-canvas frame-pure scenes", "hueStart": 25, "hueEnd": 345}},
+        {"id": "c-html", "start": 3, "dur": 3, "blend": "source-over", "scene": "htmlSlide", "params": {"html": "<div style='width:1920px;height:1080px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px'><div style='font:900 140px Georgia,serif;color:#da7756'>HTML</div><div style='font:400 32px system-ui;color:#f5ece0'>Flexbox · CSS · Fonts · Any Layout</div><div style='display:flex;gap:16px;margin-top:20px'><div style='padding:14px 24px;background:#211c15;border:1px solid rgba(245,236,224,0.12);border-radius:8px;color:#d4b483;font:500 18px monospace'>Auto Wrap</div><div style='padding:14px 24px;background:rgba(218,119,86,0.1);border:1.5px solid rgba(218,119,86,0.25);border-radius:8px;color:#da7756;font:500 18px monospace'>Font Fallback</div><div style='padding:14px 24px;background:#211c15;border:1px solid rgba(245,236,224,0.12);border-radius:8px;color:#d4b483;font:500 18px monospace'>Flexbox</div></div></div>"}},
+        {"id": "c-svg", "start": 6, "dur": 3, "blend": "source-over", "scene": "svgOverlay", "params": {"svg": "<svg width='1920' height='1080' viewBox='0 0 1920 1080'><rect width='1920' height='1080' fill='#1a1510'/><text x='960' y='400' text-anchor='middle' fill='#da7756' font-size='140' font-family='Georgia,serif' font-weight='900'>SVG</text><text x='960' y='480' text-anchor='middle' fill='rgba(245,236,224,0.6)' font-size='32' font-family='monospace'>Vector · Flowchart · Diagram · Icon</text><circle cx='600' cy='700' r='80' fill='none' stroke='#da7756' stroke-width='3' stroke-dasharray='15,8'/><rect x='860' y='640' width='200' height='120' rx='12' fill='none' stroke='#d4b483' stroke-width='2'/><circle cx='1320' cy='700' r='60' fill='none' stroke='rgba(245,236,224,0.3)' stroke-width='2'/><line x1='680' y1='700' x2='860' y2='700' stroke='#da7756' stroke-width='2'/><line x1='1060' y1='700' x2='1260' y2='700' stroke='#d4b483' stroke-width='2'/></svg>"}},
+        {"id": "c-md", "start": 9, "dur": 3, "blend": "source-over", "scene": "markdownSlide", "params": {"md": "# Markdown Scene\n\n**Code docs** and **README** rendered as video frames.\n\n- Auto typography\n- Code blocks with syntax colors\n- Anthropic-warm theme\n\n```js\nexport function render(t, params) {\n  return markdownToHTML(params.md);\n}\n```\n\n> One line of markdown, one frame of video."}},
+        {"id": "c-video", "start": 12, "dur": 3, "blend": "source-over", "scene": "videoClip", "params": {"src": "../cc-e01-slide01/slide01-placeholder.mp4", "offset": 5}},
+        {"id": "c-multi", "start": 15, "dur": 3, "blend": "source-over", "scene": "kineticHeadline", "params": {"text": "MULTI-TRACK", "subtitle": "All types composited together", "hueStart": 30, "hueEnd": 350}}
+      ]
+    },
+    {
+      "id": "v3-label",
+      "kind": "video",
+      "clips": [
+        {"id": "lbl-1", "start": 0, "dur": 3, "scene": "cornerBadge", "params": {"label": "CANVAS", "subtitle": "napi-canvas", "hue": 25, "accentHue": 345}},
+        {"id": "lbl-2", "start": 3, "dur": 3, "scene": "cornerBadge", "params": {"label": "HTML", "subtitle": "puppeteer", "hue": 200, "accentHue": 30}},
+        {"id": "lbl-3", "start": 6, "dur": 3, "scene": "cornerBadge", "params": {"label": "SVG", "subtitle": "vector graphics", "hue": 140, "accentHue": 280}},
+        {"id": "lbl-4", "start": 9, "dur": 3, "scene": "cornerBadge", "params": {"label": "MARKDOWN", "subtitle": "docs as video", "hue": 280, "accentHue": 40}},
+        {"id": "lbl-5", "start": 12, "dur": 3, "scene": "cornerBadge", "params": {"label": "VIDEO", "subtitle": "ffmpeg extract", "hue": 345, "accentHue": 180}},
+        {"id": "lbl-6", "start": 15, "dur": 3, "scene": "cornerBadge", "params": {"label": "6 TYPES", "subtitle": "one timeline", "hue": 25, "accentHue": 345}}
+      ]
+    },
+    {
+      "id": "v4-accent",
+      "kind": "video",
+      "clips": [
+        {"id": "ripple-1", "start": 0, "dur": 3, "scene": "circleRipple", "params": {"hueStart": 25, "hueSpan": 120}},
+        {"id": "ripple-2", "start": 3, "dur": 3, "scene": "circleRipple", "params": {"hueStart": 200, "hueSpan": 80}},
+        {"id": "ripple-3", "start": 6, "dur": 3, "scene": "circleRipple", "params": {"hueStart": 140, "hueSpan": 100}},
+        {"id": "ripple-4", "start": 9, "dur": 3, "scene": "circleRipple", "params": {"hueStart": 280, "hueSpan": 90}},
+        {"id": "ripple-5", "start": 12, "dur": 3, "scene": "circleRipple", "params": {"hueStart": 345, "hueSpan": 60}},
+        {"id": "orbit-6", "start": 15, "dur": 3, "scene": "orbitRings", "params": {"ringCount": 6, "hueA": 25, "hueB": 345, "baseSpeed": 0.5}}
+      ]
+    }
+  ]
+}

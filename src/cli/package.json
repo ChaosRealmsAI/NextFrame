@@ -1,0 +1,22 @@
+{
+  "name": "nextframe-cli",
+  "version": "0.1.0",
+  "description": "NextFrame v0.1 — frame-pure CLI video editor for AI",
+  "type": "module",
+  "bin": {
+    "nextframe": "bin/nextframe.js"
+  },
+  "scripts": {
+    "test": "node --test test/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "pngjs": "^7.0.0"
+  },
+  "optionalDependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

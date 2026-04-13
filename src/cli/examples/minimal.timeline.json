@@ -1,0 +1,15 @@
+{
+  "schema": "nextframe/v0.1",
+  "duration": 3,
+  "background": "#0b0b14",
+  "project": { "width": 1920, "height": 1080, "aspectRatio": 1.7777, "fps": 30 },
+  "tracks": [
+    {
+      "id": "v1",
+      "kind": "video",
+      "clips": [
+        { "id": "clip-aurora", "start": 0, "dur": 3, "scene": "auroraGradient", "params": {} }
+      ]
+    }
+  ]
+}

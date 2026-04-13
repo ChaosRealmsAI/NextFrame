@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NextFrame Scene Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0b14;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top, rgba(99, 102, 241, 0.12), transparent 30%),
+          radial-gradient(circle at bottom, rgba(244, 114, 182, 0.08), transparent 34%),
+          var(--bg);
+      }
+
+      body {
+        display: grid;
+        place-items: stretch;
+      }
+
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+        background: var(--bg);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="demo"></canvas>
+    <script type="module">
+      import * as engine from "./src/engine/index.js";
+      import { registerAllScenes } from "./src/scenes/index.js";
+
+      const FALLBACK_TIMELINE = {
+        version: "1",
+        duration: 30,
+        background: "#0b0b14",
+        tracks: [
+          {
+            id: "v1",
+            kind: "video",
+            clips: [
+              {
+                id: "clip-aurora",
+                start: 0,
+                dur: 6,
+                scene: "auroraGradient",
+                params: { hueA: 270, hueB: 200, hueC: 320, intensity: 1, grain: 0.05 },
+              },
+              {
+                id: "clip-headline",
+                start: 2,
+                dur: 6,
+                scene: "kineticHeadline",
+                params: {
+                  text: "NextFrame",
+                  subtitle: "Port 5 scene registry demo",
+                  hueStart: 32,
+                  hueEnd: 320,
+                  stagger: 0.14,
+                  size: 0.13,
+                },
+              },
+              {
+                id: "clip-grid",
+                start: 8,
+                dur: 8,
+                scene: "neonGrid",
+                params: {
+                  hueHorizon: 320,
+                  hueGrid: 280,
+                  scrollSpeed: 0.45,
+                  lineCount: 16,
+                  colCount: 22,
+                },
+              },
+              {
+                id: "clip-chart",
+                start: 16,
+                dur: 6,
+                scene: "barChartReveal",
+                params: {
+                  title: "SCENE COVERAGE",
+                  unit: "%",
+                  hueStart: 198,
+                  hueEnd: 318,
+                  stagger: 0.11,
+                  barDur: 0.9,
+                  data: [
+                    { label: "AUR", value: 64 },
+                    { label: "KIN", value: 82 },
+                    { label: "NEO", value: 91 },
+                    { label: "BAR", value: 76 },
+                    { label: "LOW", value: 88 },
+                  ],
+                },
+              },
+              {
+                id: "clip-lower-third",
+                start: 22,
+                dur: 8,
+                scene: "lowerThirdVelvet",
+                params: {
+                  title: "NEXTFRAME",
+                  subtitle: "Five scene loop · renderAt demo",
+                  hueA: 24,
+                  hueB: 320,
+                  holdEnd: 7,
+                  fadeOut: 0.8,
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      async function loadTimeline() {
+        const timelineUrl = new URL("./src/demo-timeline.json", import.meta.url);
+        try {
+          const response = await fetch(timelineUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch ${timelineUrl}: ${response.status}`);
+          }
+          return await response.json();
+        } catch (error) {
+          console.warn("[NextFrame] Falling back to inline timeline:", error);
+          return FALLBACK_TIMELINE;
+        }
+      }
+
+      const canvas = document.getElementById("demo");
+      registerAllScenes(engine);
+      const timeline = await loadTimeline();
+
+      function frame(now) {
+        const ctx = engine.setupDPR(canvas);
+        const t = (now / 1000) % timeline.duration;
+        engine.renderAt(ctx, timeline, t);
+        requestAnimationFrame(frame);
+      }
+
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>

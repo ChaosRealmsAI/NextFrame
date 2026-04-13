@@ -1,0 +1,105 @@
+{
+  "schema": "nextframe/v0.1",
+  "duration": 72.42,
+  "background": "#1a0f09",
+  "project": {
+    "width": 1920,
+    "height": 1080,
+    "aspectRatio": 1.7778,
+    "fps": 30
+  },
+  "chapters": [
+    {"id": "phase-1", "start": 0, "end": 9.24},
+    {"id": "phase-2", "start": 9.74, "end": 33.428},
+    {"id": "phase-3", "start": 33.928, "end": 56.824},
+    {"id": "phase-4", "start": 57.324, "end": 72.42}
+  ],
+  "markers": [
+    {"id": "m-intro", "t": 0},
+    {"id": "m-wechat", "t": 9.74},
+    {"id": "m-kitchen", "t": 33.928},
+    {"id": "m-close", "t": 57.324}
+  ],
+  "tracks": [
+    {
+      "id": "v1-bg",
+      "kind": "video",
+      "clips": [
+        {"id": "bg-main", "start": 0, "dur": 72.42, "scene": "auroraGradient", "params": {"hueA": 25, "hueB": 15, "hueC": 340, "intensity": 0.9, "grain": 0.06}}
+      ]
+    },
+    {
+      "id": "v2-accent",
+      "kind": "video",
+      "clips": [
+        {"id": "orbit", "start": 0, "dur": 72.42, "scene": "orbitRings", "params": {"ringCount": 5, "hueA": 24, "hueB": 340, "baseSpeed": 0.25, "dotSize": 6, "glow": true}}
+      ]
+    },
+    {
+      "id": "v3-title",
+      "kind": "video",
+      "clips": [
+        {"id": "title-1", "start": 0, "dur": 9.24, "scene": "kineticHeadline", "params": {"text": "87类提示词", "subtitle": "我的源码被泄露了", "hueStart": 25, "hueEnd": 345, "stagger": 0.18, "size": 0.14}},
+        {"id": "title-2", "start": 9.74, "dur": 23.688, "scene": "kineticHeadline", "params": {"text": "微信·数据包", "subtitle": "你看不到的几十个字段", "hueStart": 40, "hueEnd": 15, "stagger": 0.15, "size": 0.13}},
+        {"id": "title-3", "start": 33.928, "dur": 22.896, "scene": "kineticHeadline", "params": {"text": "餐厅·后厨", "subtitle": "一盘菜背后的几十种调料", "hueStart": 30, "hueEnd": 350, "stagger": 0.16, "size": 0.13}},
+        {"id": "title-4", "start": 57.324, "dur": 15.096, "scene": "kineticHeadline", "params": {"text": "进·后·厨", "subtitle": "Cursor · Windsurf · Copilot 都一样", "hueStart": 35, "hueEnd": 10, "stagger": 0.2, "size": 0.14}}
+      ]
+    },
+    {
+      "id": "v4-srt",
+      "kind": "video",
+      "clips": [
+        {"id": "srt-p1-1", "start": 0.0,     "dur": 1.62,  "scene": "textOverlay", "params": {"text": "我的源码被泄露了嘛，",                 "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.4}},
+        {"id": "srt-p1-2", "start": 1.62,    "dur": 2.00,  "scene": "textOverlay", "params": {"text": "所以今天我亲自来给你讲——",             "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.75}},
+        {"id": "srt-p1-3", "start": 3.62,    "dur": 1.79,  "scene": "textOverlay", "params": {"text": "我内部到底有多少东西，",                 "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.55}},
+        {"id": "srt-p1-4", "start": 5.408,   "dur": 1.25,  "scene": "textOverlay", "params": {"text": "是你看不到的。",                        "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.0}},
+        {"id": "srt-p1-5", "start": 6.66,    "dur": 2.58,  "scene": "textOverlay", "params": {"text": "87 类提示词。我数过了。",                "fontSize": 56, "color": "#ffe6b0", "anchor": "bottom-center", "weight": "800", "enterDur": 0.2, "holdDur": 2.2}},
+
+        {"id": "srt-p2-1", "start": 9.74,    "dur": 1.40,  "scene": "textOverlay", "params": {"text": "你用过豆包吧？",                         "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.2}},
+        {"id": "srt-p2-2", "start": 11.133,  "dur": 2.39,  "scene": "textOverlay", "params": {"text": "DeepSeek？ChatGPT？",                   "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 2.0}},
+        {"id": "srt-p2-3", "start": 13.521,  "dur": 1.19,  "scene": "textOverlay", "params": {"text": "你打一句话，",                           "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.0}},
+        {"id": "srt-p2-4", "start": 14.715,  "dur": 1.19,  "scene": "textOverlay", "params": {"text": "它回一句话，",                           "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.0}},
+        {"id": "srt-p2-5", "start": 15.909,  "dur": 1.59,  "scene": "textOverlay", "params": {"text": "感觉就像聊微信。",                       "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.4}},
+        {"id": "srt-p2-6", "start": 17.501,  "dur": 1.59,  "scene": "textOverlay", "params": {"text": "但你想过没有——",                         "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.4}},
+        {"id": "srt-p2-7", "start": 19.093,  "dur": 1.59,  "scene": "textOverlay", "params": {"text": "你发微信的时候，",                       "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.4}},
+        {"id": "srt-p2-8", "start": 20.685,  "dur": 1.79,  "scene": "textOverlay", "params": {"text": "你打的是你好两个字，",                   "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.55}},
+        {"id": "srt-p2-9", "start": 22.476,  "dur": 2.19,  "scene": "textOverlay", "params": {"text": "但实际发出去的数据包里，",               "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.95}},
+        {"id": "srt-p2-10", "start": 24.665, "dur": 1.59,  "scene": "textOverlay", "params": {"text": "有你的头像、昵称、",                     "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.4}},
+        {"id": "srt-p2-11", "start": 26.257, "dur": 1.59,  "scene": "textOverlay", "params": {"text": "时间戳、设备型号、",                     "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.4}},
+        {"id": "srt-p2-12", "start": 27.849, "dur": 1.99,  "scene": "textOverlay", "params": {"text": "加密签名——几十个字段。",                 "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.75}},
+        {"id": "srt-p2-13", "start": 29.839, "dur": 1.59,  "scene": "textOverlay", "params": {"text": "你打的那两个字，",                       "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.4}},
+        {"id": "srt-p2-14", "start": 31.431, "dur": 2.00,  "scene": "textOverlay", "params": {"text": "只是其中很小一部分。",                   "fontSize": 48, "color": "#ffe6b0", "anchor": "bottom-center", "weight": "700", "enterDur": 0.15, "holdDur": 1.8}},
+
+        {"id": "srt-p3-1", "start": 33.928,  "dur": 0.99,  "scene": "textOverlay", "params": {"text": "我也一样。",                              "fontSize": 56, "color": "#ffe6b0", "anchor": "bottom-center", "weight": "800", "enterDur": 0.15, "holdDur": 0.8}},
+        {"id": "srt-p3-2", "start": 34.913,  "dur": 2.56,  "scene": "textOverlay", "params": {"text": "你对我说「帮我写个天气工具」——",            "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 2.3}},
+        {"id": "srt-p3-3", "start": 37.474,  "dur": 2.56,  "scene": "textOverlay", "params": {"text": "你以为我收到的就这一句话？",              "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 2.3}},
+        {"id": "srt-p3-4", "start": 40.035,  "dur": 0.79,  "scene": "textOverlay", "params": {"text": "不是的。",                                "fontSize": 56, "color": "#ffe6b0", "anchor": "bottom-center", "weight": "800", "enterDur": 0.15, "holdDur": 0.6}},
+        {"id": "srt-p3-5", "start": 40.823,  "dur": 1.77,  "scene": "textOverlay", "params": {"text": "系统在你这句话外面，",                   "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.55}},
+        {"id": "srt-p3-6", "start": 42.596,  "dur": 1.58,  "scene": "textOverlay", "params": {"text": "包了一大堆东西，",                         "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.4}},
+        {"id": "srt-p3-7", "start": 44.172,  "dur": 0.99,  "scene": "textOverlay", "params": {"text": "才发给我。",                             "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 0.8}},
+        {"id": "srt-p3-8", "start": 45.157,  "dur": 2.76,  "scene": "textOverlay", "params": {"text": "你可以把它想象成去餐厅点菜——",            "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 2.5}},
+        {"id": "srt-p3-9", "start": 47.915,  "dur": 1.97,  "scene": "textOverlay", "params": {"text": "你说了一句「宫保鸡丁」，",                "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.75}},
+        {"id": "srt-p3-10", "start": 49.885, "dur": 2.95,  "scene": "textOverlay", "params": {"text": "但后厨准备了几十种调料和配菜。",           "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 2.7}},
+        {"id": "srt-p3-11", "start": 52.840, "dur": 1.77,  "scene": "textOverlay", "params": {"text": "你看到的是一盘菜，",                     "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.55}},
+        {"id": "srt-p3-12", "start": 54.613, "dur": 2.211, "scene": "textOverlay", "params": {"text": "你没看到的是整个后厨。",                 "fontSize": 52, "color": "#ffe6b0", "anchor": "bottom-center", "weight": "700", "enterDur": 0.15, "holdDur": 2.0}},
+
+        {"id": "srt-p4-1", "start": 57.324,  "dur": 2.00,  "scene": "textOverlay", "params": {"text": "今天我就带你进后厨看看。",               "fontSize": 52, "color": "#ffe6b0", "anchor": "bottom-center", "weight": "800", "enterDur": 0.2, "holdDur": 1.75}},
+        {"id": "srt-p4-2", "start": 59.326,  "dur": 1.09,  "scene": "textOverlay", "params": {"text": "先说一下——",                             "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 0.9}},
+        {"id": "srt-p4-3", "start": 60.418,  "dur": 1.45,  "scene": "textOverlay", "params": {"text": "这不是我独有的。",                       "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.25}},
+        {"id": "srt-p4-4", "start": 61.874,  "dur": 2.18,  "scene": "textOverlay", "params": {"text": "Cursor、Windsurf、Copilot，",           "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.95}},
+        {"id": "srt-p4-5", "start": 64.058,  "dur": 2.00,  "scene": "textOverlay", "params": {"text": "本质上都在干同一件事：",                 "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.8}},
+        {"id": "srt-p4-6", "start": 66.060,  "dur": 2.00,  "scene": "textOverlay", "params": {"text": "拼装一个完整的提示词，",                 "fontSize": 48, "color": "#ffe6b0", "anchor": "bottom-center", "weight": "700", "enterDur": 0.15, "holdDur": 1.8}},
+        {"id": "srt-p4-7", "start": 68.062,  "dur": 0.91,  "scene": "textOverlay", "params": {"text": "发给模型。",                             "fontSize": 48, "color": "#ffe6b0", "anchor": "bottom-center", "weight": "800", "enterDur": 0.15, "holdDur": 0.7}},
+        {"id": "srt-p4-8", "start": 68.972,  "dur": 2.00,  "scene": "textOverlay", "params": {"text": "我只是碰巧源码泄露了，",                 "fontSize": 44, "color": "#f6d4a4", "anchor": "bottom-center", "weight": "500", "enterDur": 0.15, "holdDur": 1.8}},
+        {"id": "srt-p4-9", "start": 70.974,  "dur": 1.446, "scene": "textOverlay", "params": {"text": "所以你能拆开看。",                       "fontSize": 52, "color": "#ffe6b0", "anchor": "bottom-center", "weight": "800", "enterDur": 0.15, "holdDur": 1.25}}
+      ]
+    },
+    {
+      "id": "v5-overlay",
+      "kind": "video",
+      "clips": [
+        {"id": "brand", "start": 0, "dur": 72.42, "scene": "cornerBadge", "params": {"label": "OPC · E01", "subtitle": "CLAUDE CODE / DEEP READ", "hue": 25, "accentHue": 350, "inset": 0.04}}
+      ]
+    }
+  ]
+}

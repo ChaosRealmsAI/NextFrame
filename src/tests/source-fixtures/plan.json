@@ -1,0 +1,10 @@
+{
+  "episode": "TINY",
+  "total_sentences": 4,
+  "clips": [
+    { "id": 1, "from": 1, "to": 2, "title": "Intro" },
+    { "id": 2, "from": 3, "to": 4, "title": "Outro" }
+  ],
+  "bridges": [],
+  "skipped": []
+}

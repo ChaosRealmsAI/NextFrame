@@ -1,0 +1,168 @@
+{
+  "schema": "nextframe/v0.1",
+  "duration": 12,
+  "background": "#06060c",
+  "project": { "width": 1920, "height": 1080, "aspectRatio": 1.7777, "fps": 30 },
+  "chapters": [
+    { "id": "intro", "start": 0, "end": 4 },
+    { "id": "reveal", "start": 4, "end": 9 },
+    { "id": "outro", "start": 9, "end": 12 }
+  ],
+  "markers": [
+    { "id": "drop", "t": 4 },
+    { "id": "beat", "t": 6 }
+  ],
+  "tracks": [
+    {
+      "id": "v1-bg",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "clip-fluid",
+          "start": 0,
+          "dur": 9,
+          "scene": "fluidBackground",
+          "params": {
+            "blobCount": 6,
+            "hueA": 268,
+            "hueB": 200,
+            "hueC": 330,
+            "intensity": 0.75,
+            "drift": 0.45,
+            "blur": 90
+          }
+        },
+        {
+          "id": "clip-aurora-outro",
+          "start": 9,
+          "dur": 3,
+          "scene": "auroraGradient",
+          "params": { "hueA": 280, "hueB": 210, "hueC": 330, "intensity": 1.05, "grain": 0.03 }
+        }
+      ]
+    },
+    {
+      "id": "v2-mid",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "clip-mesh",
+          "start": 0,
+          "dur": 9,
+          "scene": "meshGrid",
+          "params": {
+            "cols": 22,
+            "rows": 14,
+            "hueA": 205,
+            "hueB": 320,
+            "waveSpeed": 0.55,
+            "waveAmp": 0.18,
+            "perspective": 0.5,
+            "lineWidth": 1.4
+          }
+        },
+        {
+          "id": "clip-orbit",
+          "start": 9,
+          "dur": 3,
+          "scene": "orbitRings",
+          "params": {
+            "ringCount": 6,
+            "hueA": 200,
+            "hueB": 320,
+            "baseSpeed": 0.35,
+            "dotSize": 10,
+            "glow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "v3-headline",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "clip-welcome",
+          "start": 1,
+          "dur": 2,
+          "scene": "textOverlay",
+          "params": {
+            "text": "HELLO YUXUAN",
+            "fontSize": 140,
+            "color": "#ffe99c",
+            "align": "center",
+            "anchor": "center",
+            "weight": "800",
+            "letterSpacing": 0.02,
+            "enterDur": 0.5,
+            "holdDur": 1.1
+          }
+        },
+        {
+          "id": "clip-intro",
+          "start": 3,
+          "dur": 1.0,
+          "scene": "glitchText",
+          "params": {
+            "text": "WELCOME",
+            "fontSize": 120,
+            "weight": "900",
+            "baseHue": 300,
+            "glitchAmount": 0.5,
+            "scanlines": true,
+            "burstFreq": 3
+          }
+        },
+        {
+          "id": "clip-kinetic",
+          "start": { "at": "chapter-reveal" },
+          "dur": 4,
+          "scene": "kineticHeadline",
+          "params": {
+            "text": "NEXTFRAME",
+            "subtitle": "AI-NATIVE VIDEO",
+            "hueStart": 30,
+            "hueEnd": 320,
+            "stagger": 0.14,
+            "size": 0.14
+          }
+        }
+      ]
+    },
+    {
+      "id": "v4-accent",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "clip-burst",
+          "start": { "at": "marker-drop" },
+          "dur": 2,
+          "scene": "shapeBurst",
+          "params": {
+            "count": 120,
+            "shape": "mixed",
+            "hueStart": 200,
+            "hueEnd": 320,
+            "speed": 360,
+            "gravity": 90,
+            "fadeOut": true
+          }
+        },
+        {
+          "id": "clip-lower",
+          "start": 9,
+          "dur": 3,
+          "scene": "lowerThirdVelvet",
+          "params": {
+            "title": "NEXTFRAME",
+            "subtitle": "frame-pure · CLI-first",
+            "hueA": 25,
+            "hueB": 320,
+            "holdEnd": 2.2,
+            "fadeOut": 0.6
+          }
+        }
+      ]
+    }
+  ]
+}

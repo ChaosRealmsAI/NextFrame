@@ -1,0 +1,22 @@
+[package]
+name = "videocut-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.86"
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+[dev-dependencies]
+tempfile = "3.15"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unreachable = "deny"
+todo = "deny"
+wildcard_imports = "deny"

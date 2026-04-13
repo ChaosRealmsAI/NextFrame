@@ -1,0 +1,9 @@
+import "./engine/audio.test.js";
+import "./engine/clip.test.js";
+import "./engine/manifest.test.js";
+import "./engine/render.test.js";
+import "./engine/scrub.test.js";
+import "./engine/store.test.js";
+import "./engine/timeline.test.js";
+import "./engine/ui.test.js";
+import "./engine/validation.test.js";
