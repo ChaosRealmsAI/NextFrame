@@ -16,7 +16,7 @@ export default {
     color:    { type: "color",   default: "#6ee7ff",                          desc: "Line color" },
     showDots: { type: "boolean", default: true,                               desc: "Show data point dots" },
     showArea: { type: "boolean", default: true,                               desc: "Show filled area under line" },
-    labelSize: { type: "number", default: 0.022, desc: "Label font size" },
+    labelSize: { type: "number", default: 0.022, desc: "Label font size as a ratio of the short edge (or px/keyword)" },
   },
   get defaultParams() {
     const p = {};

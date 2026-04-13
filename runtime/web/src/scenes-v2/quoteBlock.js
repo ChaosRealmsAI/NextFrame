@@ -7,6 +7,7 @@ import {
   clamp,
   getSafeZone,
   getStageSize,
+  resolveSize,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -20,7 +21,7 @@ export default {
   params: {
     text: { type: "string", default: "Design is not just what it looks like. Design is how it works.", desc: "Quote text" },
     author: { type: "string", default: "Steve Jobs", desc: "Quote attribution" },
-    fontSize: { type: "number", default: 0.03, desc: "Quote font size relative to short edge", min: 0.018, max: 0.06 },
+    fontSize: { type: "number", default: 0.03, desc: "Quote font size as a ratio of the short edge", min: 0.018, max: 0.06 },
     accentColor: { type: "string", default: "#a78bfa", desc: "Accent color for quotation mark and attribution" },
   },
 
@@ -37,13 +38,13 @@ export default {
     const W = Math.max(container.clientWidth || stage.width, 1);
     const H = Math.max(container.clientHeight || stage.height, 1);
     const S = Math.min(stage.width || W, stage.height || H); // stage-based for stable font size
-    const safeZone = getSafeZone(W, H);
+    const safeZone = getSafeZone(stage.width || W, stage.height || H);
 
     const text = String(params.text || "");
     const author = String(params.author || "");
-    const fontSize = S * (params.fontSize || 0.03);
-    const quoteMarkSize = S * 0.06;
-    const authorSize = S * 0.02;
+    const fontSize = resolveSize(params.fontSize, S, 0.03);
+    const quoteMarkSize = resolveSize(0.06, S, 0.06);
+    const authorSize = resolveSize(0.02, S, 0.02);
     const accentColor = params.accentColor || "#a78bfa";
     const root = createRoot(container, [
       "display:flex",
@@ -60,6 +61,7 @@ export default {
       "align-items:center",
       "max-width:70ch",
       "width:100%",
+      "overflow:hidden",
       "text-align:center",
     ].join(";"));
 
@@ -85,6 +87,8 @@ export default {
       "opacity:0",
       "will-change:opacity",
       "text-align:center",
+      "max-width:100%",
+      "overflow:hidden",
       "word-break:break-word",
       "overflow-wrap:break-word",
     ].join(";"), text);
@@ -102,6 +106,10 @@ export default {
         "will-change:opacity",
         "letter-spacing:0.05em",
         "text-transform:uppercase",
+        "max-width:100%",
+        "overflow:hidden",
+        "word-break:break-word",
+        "overflow-wrap:break-word",
       ].join(";"), "\u2014 " + author);
       quoteWrap.appendChild(authorEl);
     }

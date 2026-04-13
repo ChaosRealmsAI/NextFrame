@@ -1,7 +1,7 @@
 import {
   createRoot, createNode, smoothstep, easeOutCubic, clamp,
   toNumber, resolveSize, getStageSize, SANS_FONT_STACK, MONO_FONT_STACK,
-  normalizeArray,
+  normalizeArray, shrinkTextToFit,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -16,8 +16,8 @@ export default {
     values:    { type: "array",  default: ["12M", "98%", "4.9★"],     desc: "Stat values (3-5 items)" },
     labels:    { type: "array",  default: ["Users", "Uptime", "Rating"], desc: "Stat labels" },
     colors:    { type: "array",  default: ["#6ee7ff", "#a78bfa", "#ffd93d"], desc: "Value colors" },
-    valueSize: { type: "number", default: 0.09,  desc: "Value font size (ratio or px or keyword)", min: 0.04, max: 0.15 },
-    labelSize: { type: "number", default: 0.025, desc: "Label font size (ratio or px or keyword)", min: 0.01, max: 0.06 },
+    valueSize: { type: "number", default: 0.09,  desc: "Value font size as a ratio of the short edge (or px/keyword)", min: 0.04, max: 0.15 },
+    labelSize: { type: "number", default: 0.025, desc: "Label font size as a ratio of the short edge (or px/keyword)", min: 0.01, max: 0.06 },
     bgColor:   { type: "string", default: "rgba(255,255,255,0.04)", desc: "Card background color" },
     gap:       { type: "number", default: 0.03, desc: "Gap between cards (ratio of S)", min: 0, max: 0.1 },
   },
@@ -73,6 +73,8 @@ export default {
         `background:${bgColor}`,
         `border-radius:${S * 0.015}px`,
         `border:1px solid rgba(255,255,255,0.08)`,
+        "max-width:100%",
+        "overflow:hidden",
         "will-change:opacity,transform",
         "opacity:0",
         `transform:translateY(${S * 0.02}px)`,
@@ -87,6 +89,10 @@ export default {
         "line-height:1.1",
         "letter-spacing:-0.02em",
         "text-align:center",
+        "max-width:100%",
+        "overflow:hidden",
+        "word-break:break-word",
+        "overflow-wrap:break-word",
       ].join(";");
       valEl.textContent = String(values[i] ?? "");
 
@@ -100,12 +106,18 @@ export default {
         "letter-spacing:0.04em",
         "text-transform:uppercase",
         `margin-top:${S * 0.008}px`,
+        "max-width:100%",
+        "overflow:hidden",
+        "word-break:break-word",
+        "overflow-wrap:break-word",
       ].join(";");
       labelEl.textContent = String(labels[i] ?? "");
 
       card.appendChild(valEl);
       card.appendChild(labelEl);
       row.appendChild(card);
+      shrinkTextToFit(valEl, { container: card, minFontSize: Math.round(S * 0.02) });
+      shrinkTextToFit(labelEl, { container: card, minFontSize: Math.round(S * 0.02) });
       cards.push({ card, valEl, labelEl });
     }
 

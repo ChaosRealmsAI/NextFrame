@@ -9,7 +9,45 @@ import {
   makeLinearGradient,
   getSafeZone,
   getStageSize,
+  resolveSize,
 } from "../scenes-v2-shared.js";
+
+function fitHeadline(titleWrap, chars, baseFontSize, minFontSize) {
+  if (!titleWrap || !Array.isArray(chars) || chars.length === 0) {
+    return baseFontSize;
+  }
+
+  const wrapWidth = titleWrap.clientWidth || titleWrap.getBoundingClientRect().width || 0;
+  if (!(wrapWidth > 0)) {
+    return baseFontSize;
+  }
+
+  let titleSize = baseFontSize;
+  const wrapThreshold = Math.max(minFontSize, Math.round(baseFontSize * 0.6));
+  titleWrap.style.flexWrap = "nowrap";
+  for (const span of chars) {
+    span.style.fontSize = `${titleSize}px`;
+    if (span.textContent === "\u00A0") {
+      span.style.width = `${Math.round(titleSize * 0.3)}px`;
+    }
+  }
+
+  while (titleWrap.scrollWidth > wrapWidth * 0.9 && titleSize > wrapThreshold) {
+    titleSize -= 1;
+    for (const span of chars) {
+      span.style.fontSize = `${titleSize}px`;
+      if (span.textContent === "\u00A0") {
+        span.style.width = `${Math.round(titleSize * 0.3)}px`;
+      }
+    }
+  }
+
+  if (titleWrap.scrollWidth > wrapWidth * 0.9) {
+    titleWrap.style.flexWrap = "wrap";
+  }
+
+  return titleSize;
+}
 
 export default {
   id: "headline",
@@ -22,7 +60,7 @@ export default {
   params: {
     text: { type: "string", default: "TITLE", desc: "Main headline text" },
     subtitle: { type: "string", default: "", desc: "Optional subtitle below headline" },
-    fontSize: { type: "number", default: 0.07, desc: "Font size relative to short edge", min: 0.02, max: 0.15 },
+    fontSize: { type: "number", default: 0.07, desc: "Font size as a ratio of the short edge", min: 0.02, max: 0.15 },
     gradient: { type: "array", default: ["#6ee7ff", "#a78bfa", "#f472b6"], desc: "Gradient color stops" },
     stagger: { type: "number", default: 0.08, desc: "Stagger delay per character (in localT units)", min: 0.01, max: 0.3 },
   },
@@ -40,14 +78,15 @@ export default {
     const W = Math.max(container.clientWidth || stage.width, 1);
     const H = Math.max(container.clientHeight || stage.height, 1);
     const S = Math.min(stage.width || W, stage.height || H); // stage-based for stable font size
-    const safeZone = getSafeZone(W, H);
+    const safeZone = getSafeZone(stage.width || W, stage.height || H);
 
     const text = String(params.text || "TITLE");
     const subtitle = String(params.subtitle || "");
-    const fontSize = S * (params.fontSize || 0.07);
-    const subtitleSize = S * 0.025;
+    const fontSize = resolveSize(params.fontSize, S, 0.07);
+    const subtitleSize = resolveSize(0.025, S, 0.025);
     const colors = normalizeArray(params.gradient, ["#6ee7ff", "#a78bfa", "#f472b6"]);
     const gradientCSS = makeLinearGradient(colors);
+    const minTitleSize = Math.round(S * 0.02);
 
     const root = createRoot(container, [
       "display:flex",
@@ -60,7 +99,7 @@ export default {
 
     const titleWrap = createNode("div", [
       "display:flex",
-      "flex-wrap:wrap",
+      "flex-wrap:nowrap",
       "justify-content:center",
       "align-content:center",
       "align-items:baseline",
@@ -70,6 +109,7 @@ export default {
       "padding:0 5%",
       "box-sizing:border-box",
       "text-align:center",
+      "overflow:hidden",
       "word-break:break-word",
       "overflow-wrap:break-word",
       "will-change:transform,opacity",
@@ -87,6 +127,7 @@ export default {
         "background-clip:text",
         "-webkit-text-fill-color:transparent",
         "display:inline-block",
+        "max-width:100%",
         "opacity:0",
         "transform:translateY(20px)",
         "will-change:transform,opacity",
@@ -97,6 +138,7 @@ export default {
       chars.push(span);
     }
     root.appendChild(titleWrap);
+    const fittedTitleSize = fitHeadline(titleWrap, chars, fontSize, minTitleSize);
 
     let subtitleEl = null;
     if (subtitle) {
@@ -107,22 +149,32 @@ export default {
         "color:rgba(255,255,255,0.6)",
         `margin-top:${Math.round(S * 0.015)}px`,
         "max-width:90%",
+        "width:100%",
         "padding:0 5%",
         "box-sizing:border-box",
+        "overflow:hidden",
         "opacity:0",
         "will-change:opacity",
         "text-align:center",
+        "word-break:break-word",
+        "overflow-wrap:break-word",
       ].join(";"), subtitle);
       root.appendChild(subtitleEl);
     }
 
-    return { root, chars, subtitleEl, S };
+    return { root, titleWrap, chars, subtitleEl, S, baseTitleSize: fontSize, titleSize: fittedTitleSize, minTitleSize };
   },
 
   update(els, localT, params) {
     const t = clamp(localT);
     const staggerDelay = params.stagger || 0.08;
     const charCount = els.chars.length;
+    const wrapWidth = els.titleWrap?.clientWidth || 0;
+
+    if (wrapWidth > 0 && els.lastWrapWidth !== wrapWidth) {
+      els.titleSize = fitHeadline(els.titleWrap, els.chars, els.baseTitleSize, els.minTitleSize);
+      els.lastWrapWidth = wrapWidth;
+    }
 
     for (let i = 0; i < charCount; i += 1) {
       const charStart = i * staggerDelay * 0.3;

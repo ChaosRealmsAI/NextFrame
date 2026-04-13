@@ -9,6 +9,8 @@ import {
   normalizeLines,
   escapeHtml,
   getStageSize,
+  resolveSize,
+  shrinkTextToFit,
 } from "../scenes-v2-shared.js";
 
 const KEYWORDS = new Set([
@@ -82,7 +84,7 @@ export default {
   params: {
     code: { type: "string", default: "const greeting = \"Hello, world!\";\nconsole.log(greeting);", desc: "Code content" },
     language: { type: "string", default: "javascript", desc: "Language name for display" },
-    fontSize: { type: "number", default: 0.02, desc: "Font size relative to short edge", min: 0.01, max: 0.04 },
+    fontSize: { type: "number", default: 0.02, desc: "Font size as a ratio of the short edge", min: 0.01, max: 0.04 },
     title: { type: "string", default: "main.js", desc: "Window title bar text" },
   },
 
@@ -102,10 +104,11 @@ export default {
 
     const code = String(params.code || "");
     const title = String(params.title || "main.js");
-    const fontSize = S * (params.fontSize || 0.02);
+    const fontSize = resolveSize(params.fontSize, S, 0.02);
     const padding = S * 0.025;
     const borderRadius = S * 0.012;
     const dotSize = S * 0.008;
+    const minTextSize = Math.round(S * 0.02);
 
     const root = createRoot(container, [
       "display:flex",
@@ -120,6 +123,7 @@ export default {
       `border-radius:${Math.round(borderRadius)}px`,
       "box-shadow:0 8px 32px rgba(0,0,0,0.5),0 2px 8px rgba(0,0,0,0.3)",
       "overflow:hidden",
+      "width:min(90%, 1000px)",
       "max-width:90%",
       "min-width:40%",
       "opacity:0",
@@ -152,13 +156,18 @@ export default {
       "font-weight:500",
       "color:rgba(255,255,255,0.4)",
       `margin-left:${Math.round(S * 0.01)}px`,
+      "max-width:100%",
+      "overflow:hidden",
+      "white-space:nowrap",
+      "text-overflow:ellipsis",
     ].join(";"), title);
     titleBar.appendChild(titleText);
     window.appendChild(titleBar);
 
     const codeArea = createNode("div", [
       `padding:${Math.round(padding)}px`,
-      "overflow-x:auto",
+      "max-width:100%",
+      "overflow:hidden",
     ].join(";"));
 
     const lines = normalizeLines(code);
@@ -168,6 +177,8 @@ export default {
         "display:flex",
         `min-height:${Math.round(fontSize * 1.6)}px`,
         "align-items:center",
+        "max-width:100%",
+        "overflow:hidden",
         "opacity:0",
         "will-change:opacity",
       ].join(";"));
@@ -187,8 +198,12 @@ export default {
       const lineContent = createNode("span", [
         `font-size:${Math.round(fontSize)}px`,
         `font-family:${MONO_FONT_STACK}`,
-        "white-space:pre",
+        "white-space:pre-wrap",
         "line-height:1.6",
+        "max-width:100%",
+        "overflow:hidden",
+        "overflow-wrap:anywhere",
+        "word-break:break-word",
       ].join(";"));
 
       const tokens = highlightLine(lines[i]);
@@ -204,6 +219,7 @@ export default {
 
     window.appendChild(codeArea);
     root.appendChild(window);
+    shrinkTextToFit(titleText, { container: window, minFontSize: minTextSize, maxWidthRatio: 0.72 });
 
     return { root, window, lineEls, S };
   },

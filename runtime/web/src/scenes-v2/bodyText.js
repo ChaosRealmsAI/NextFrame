@@ -8,6 +8,7 @@ import {
   normalizeLines,
   getSafeZone,
   getStageSize,
+  resolveSize,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -20,7 +21,7 @@ export default {
 
   params: {
     text: { type: "string", default: "Your text here.\nSecond line of text.", desc: "Body text, newlines split into lines" },
-    fontSize: { type: "number", default: 0.028, desc: "Font size relative to short edge", min: 0.015, max: 0.06 },
+    fontSize: { type: "number", default: 0.028, desc: "Font size as a ratio of the short edge", min: 0.015, max: 0.06 },
     color: { type: "string", default: "#f0f0f0", desc: "Text color" },
     lineHeight: { type: "number", default: 1.6, desc: "Line height multiplier", min: 1, max: 3 },
     stagger: { type: "number", default: 0.06, desc: "Stagger delay per line (in localT units)", min: 0.01, max: 0.3 },
@@ -39,10 +40,10 @@ export default {
     const W = Math.max(container.clientWidth || stage.width, 1);
     const H = Math.max(container.clientHeight || stage.height, 1);
     const S = Math.min(stage.width || W, stage.height || H); // stage-based for stable font size
-    const safeZone = getSafeZone(W, H);
+    const safeZone = getSafeZone(stage.width || W, stage.height || H);
 
     const text = String(params.text || "");
-    const fontSize = S * (params.fontSize || 0.028);
+    const fontSize = resolveSize(params.fontSize, S, 0.028);
     const color = params.color || "#f0f0f0";
     const lineHeight = params.lineHeight || 1.6;
     const lines = normalizeLines(text).filter((line) => line.trim().length > 0);
@@ -65,7 +66,9 @@ export default {
         `line-height:${lineHeight}`,
         "opacity:0",
         "will-change:opacity",
-        "max-width:80ch",
+        "width:min(100%, 80ch)",
+        "max-width:100%",
+        "overflow:hidden",
         "word-break:break-word",
         "overflow-wrap:break-word",
       ].join(";"), lines[i]);

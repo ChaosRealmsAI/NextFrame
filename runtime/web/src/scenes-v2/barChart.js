@@ -22,8 +22,8 @@ export default {
     labels:  { type: "array",  default: ["A", "B", "C", "D"],    desc: "Bar labels" },
     colors:  { type: "array",  default: ["#6ee7ff", "#a78bfa", "#f472b6", "#ffd93d"], desc: "Bar colors" },
     stagger:   { type: "number", default: 0.12, min: 0, max: 1,    desc: "Stagger delay between bars (s)" },
-    labelSize: { type: "number", default: 0.022, desc: "Label font size (ratio or px or keyword)" },
-    valueSize: { type: "number", default: 0.025, desc: "Value font size (ratio or px or keyword)" },
+    labelSize: { type: "number", default: 0.022, desc: "Label font size as a ratio of the short edge (or px/keyword)" },
+    valueSize: { type: "number", default: 0.025, desc: "Value font size as a ratio of the short edge (or px/keyword)" },
   },
   get defaultParams() {
     const p = {};

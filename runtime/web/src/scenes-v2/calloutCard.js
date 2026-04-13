@@ -6,6 +6,7 @@ import {
   easeOutBack,
   smoothstep,
   getStageSize,
+  shrinkTextToFit,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -62,6 +63,8 @@ export default {
       "flex-direction:column",
       `gap:${gap}px`,
       `max-width:${Math.round(S * 0.4)}px`,
+      "width:100%",
+      "overflow:hidden",
       "transform:scale(0)",
       "opacity:0",
       "will-change:transform,opacity",
@@ -78,6 +81,10 @@ export default {
       "font-weight:700",
       "color:#ffffff",
       "line-height:1.3",
+      "max-width:100%",
+      "overflow:hidden",
+      "word-break:break-word",
+      "overflow-wrap:break-word",
     ].join(";"), title);
 
     const descEl = createNode("div", [
@@ -86,12 +93,17 @@ export default {
       "font-weight:400",
       "color:rgba(255,255,255,0.7)",
       "line-height:1.5",
+      "max-width:100%",
+      "overflow:hidden",
+      "word-break:break-word",
+      "overflow-wrap:break-word",
     ].join(";"), description);
 
     card.appendChild(iconEl);
     card.appendChild(titleEl);
     card.appendChild(descEl);
     root.appendChild(card);
+    shrinkTextToFit(titleEl, { container: card, minFontSize: Math.round(S * 0.02) });
 
     return { root, card };
   },

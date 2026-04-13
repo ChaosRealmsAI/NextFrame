@@ -2,6 +2,19 @@
 
 import { REGISTRY } from './registry.js';
 
+const BG_SCENES = new Set([
+  'auroraGradient','fluidBackground','neonGrid','vignette','starfield','particleFlow',
+  'circleRipple','meshGrid','radialBurst','confetti','waveform','pulseWave',
+  'matrixRain','gridPattern','svgRings',
+  'subtitleBar','marquee','lowerThird','cornerBadge',
+  'audioTrack','syncSubs','videoClip',
+  'slideChrome','slideFrame',
+]);
+
+function hasExplicitBounds(layer) {
+  return layer?.x != null || layer?.y != null || layer?.w != null || layer?.h != null;
+}
+
 export function validateTimeline(timeline) {
   const errors = [];
   const warnings = [];
@@ -63,19 +76,11 @@ export function validateTimeline(timeline) {
   // Gate 7: fullscreen content overlap detection
   // Background scenes (aurora, starfield, vignette, fluid, neon) are OK to overlap.
   // Content scenes (headline, bulletList, barChart, etc.) should NOT overlap fullscreen.
-  const BG_SCENES = new Set([
-    'auroraGradient','fluidBackground','neonGrid','vignette','starfield','particleFlow',
-    'circleRipple','meshGrid','radialBurst','confetti','waveform','pulseWave',
-    'matrixRain','gridPattern','svgRings',
-    'subtitleBar','marquee','lowerThird','cornerBadge',
-    'audioTrack','syncSubs','videoClip',
-    'slideChrome','slideFrame',
-  ]);
   const contentLayers = timeline.layers.filter(l => {
     if (BG_SCENES.has(l.scene)) return false;
     if (l.blend && l.blend !== 'normal') return false; // blend layers are overlays
     if (l.opacity != null && l.opacity < 0.5) return false; // faint overlays OK
-    if (l.x || l.y || l.w || l.h) return false; // positioned = not fullscreen
+    if (hasExplicitBounds(l)) return false; // positioned = not fullscreen
     return true;
   });
   for (let i = 0; i < contentLayers.length; i++) {
@@ -128,7 +133,7 @@ export function validateTimeline(timeline) {
     }
 
     // Check position overflow (% values)
-    if (layer.x && layer.w) {
+    if (layer.x != null && layer.w != null) {
       const x = parseFloat(layer.x);
       const w = parseFloat(layer.w);
       if (String(layer.x).includes('%') && String(layer.w).includes('%') && x + w > 102) {
@@ -138,7 +143,7 @@ export function validateTimeline(timeline) {
         });
       }
     }
-    if (layer.y && layer.h) {
+    if (layer.y != null && layer.h != null) {
       const y = parseFloat(layer.y);
       const h = parseFloat(layer.h);
       if (String(layer.y).includes('%') && String(layer.h).includes('%') && y + h > 102) {
@@ -147,6 +152,13 @@ export function validateTimeline(timeline) {
           message: `layer "${layer.id}" y=${layer.y} + h=${layer.h} exceeds stage height`,
         });
       }
+    }
+
+    if (isVertical && !BG_SCENES.has(layer.scene) && !hasExplicitBounds(layer)) {
+      hints.push({
+        code: 'SAFE_ZONE_HINT',
+        message: `layer "${layer.id}" is fullscreen in portrait mode without x/y/w/h. Consider safe-zone padding to reduce text clipping near the edges.`,
+      });
     }
   }
 

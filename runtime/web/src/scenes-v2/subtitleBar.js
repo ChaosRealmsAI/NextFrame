@@ -4,9 +4,10 @@ import {
   createNode,
   clamp,
   smoothstep,
-  toNumber,
   getSafeZone,
   getStageSize,
+  resolveSize,
+  shrinkTextToFit,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -19,7 +20,7 @@ export default {
 
   params: {
     text:     { type: "string", default: "Subtitle text", desc: "Subtitle content" },
-    fontSize: { type: "number", default: 0.025, desc: "Font size relative to short edge", min: 0.01, max: 0.06 },
+    fontSize: { type: "number", default: 0.025, desc: "Font size as a ratio of the short edge", min: 0.01, max: 0.06 },
     bgColor:  { type: "string", default: "rgba(0,0,0,0.6)", desc: "Background color of the subtitle bar" },
   },
 
@@ -36,11 +37,10 @@ export default {
     const W = Math.max(container.clientWidth || stage.width, 1);
     const H = Math.max(container.clientHeight || stage.height, 1);
     const S = Math.min(stage.width || W, stage.height || H); // stage-based for stable font size
-    const safeZone = getSafeZone(W, H);
+    const safeZone = getSafeZone(stage.width || W, stage.height || H);
 
     const text = String(params.text || "Subtitle text");
-    const fontRatio = toNumber(params.fontSize, 0.025);
-    const fontSize = Math.round(S * fontRatio);
+    const fontSize = resolveSize(params.fontSize, S, 0.025);
     const bgColor = String(params.bgColor || "rgba(0,0,0,0.6)");
     const radius = Math.round(S * 0.008);
     const padding = Math.round(S * 0.012);
@@ -63,17 +63,19 @@ export default {
       "line-height:1.5",
       "text-align:center",
       "max-width:100%",
+      "overflow:hidden",
       "word-break:break-word",
       "overflow-wrap:break-word",
       "opacity:0",
       "will-change:opacity",
     ].join(";"));
 
-    const textEl = createNode("span", "", "");
+    const textEl = createNode("span", "display:block;max-width:100%;overflow:hidden;word-break:break-word;overflow-wrap:break-word", "");
     bar.appendChild(textEl);
     root.appendChild(bar);
+    shrinkTextToFit(bar, { container: root, minFontSize: Math.round(S * 0.02) });
 
-    return { root, bar, textEl, fullText: text };
+    return { root, bar, textEl, fullText: text, fontSize, minTextSize: Math.round(S * 0.02) };
   },
 
   update(els, localT) {
@@ -90,7 +92,9 @@ export default {
     const typeProgress = clamp((t - typeStart) / (typeEnd - typeStart));
     const visibleChars = Math.round(len * typeProgress);
 
+    els.bar.style.fontSize = `${els.fontSize}px`;
     els.textEl.textContent = text.slice(0, visibleChars);
+    shrinkTextToFit(els.bar, { container: els.root, minFontSize: els.minTextSize });
   },
 
   destroy(els) {

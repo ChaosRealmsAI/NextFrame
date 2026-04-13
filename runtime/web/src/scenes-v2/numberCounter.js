@@ -8,6 +8,7 @@ import {
   toNumber,
   getSafeZone,
   getStageSize,
+  shrinkTextToFit,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -39,7 +40,7 @@ export default {
     const W = Math.max(container.clientWidth || stage.width, 1);
     const H = Math.max(container.clientHeight || stage.height, 1);
     const S = Math.min(stage.width || W, stage.height || H); // stage-based for stable font size
-    const safeZone = getSafeZone(W, H);
+    const safeZone = getSafeZone(stage.width || W, stage.height || H);
 
     const color = String(params.color || "#6ee7ff");
     const label = String(params.label || "Total");
@@ -59,6 +60,7 @@ export default {
       "flex-direction:column",
       "align-items:center",
       "max-width:100%",
+      "overflow:hidden",
       `gap:${Math.round(S * 0.012)}px`,
     ].join(";"));
 
@@ -72,6 +74,8 @@ export default {
       "opacity:0",
       "will-change:opacity",
       "text-align:center",
+      "max-width:100%",
+      "overflow:hidden",
       "word-break:break-word",
       "overflow-wrap:break-word",
     ].join(";"), "0");
@@ -86,6 +90,8 @@ export default {
       "opacity:0",
       "will-change:opacity",
       "text-align:center",
+      "max-width:100%",
+      "overflow:hidden",
       "word-break:break-word",
       "overflow-wrap:break-word",
     ].join(";"), label);
@@ -94,7 +100,7 @@ export default {
     wrap.appendChild(labelEl);
     root.appendChild(wrap);
 
-    return { root, numberEl, labelEl };
+    return { root, wrap, numberEl, labelEl, numberSize, labelSize, minTextSize: Math.round(S * 0.02) };
   },
 
   update(els, localT, params) {
@@ -113,9 +119,13 @@ export default {
     const formatted = currentValue.toLocaleString("en-US");
     els.numberEl.textContent = `${prefix}${formatted}${suffix}`;
     els.numberEl.style.opacity = String(opacity);
+    els.numberEl.style.fontSize = `${els.numberSize}px`;
+    shrinkTextToFit(els.numberEl, { container: els.wrap, minFontSize: els.minTextSize });
 
     const labelEnter = easeOutCubic(smoothstep(0.1, 0.3, t));
     els.labelEl.style.opacity = String(labelEnter * (1 - exitProgress));
+    els.labelEl.style.fontSize = `${els.labelSize}px`;
+    shrinkTextToFit(els.labelEl, { container: els.wrap, minFontSize: els.minTextSize });
   },
 
   destroy(els) {

@@ -8,6 +8,7 @@ import {
   normalizeArray,
   getSafeZone,
   getStageSize,
+  resolveSize,
 } from "../scenes-v2-shared.js";
 
 export default {
@@ -20,7 +21,7 @@ export default {
 
   params: {
     items: { type: "array", default: ["Item 1", "Item 2", "Item 3"], desc: "List of bullet point strings" },
-    fontSize: { type: "number", default: 0.028, desc: "Font size relative to short edge", min: 0.015, max: 0.06 },
+    fontSize: { type: "number", default: 0.028, desc: "Font size as a ratio of the short edge", min: 0.015, max: 0.06 },
     bulletColor: { type: "string", default: "#a78bfa", desc: "Bullet dot color" },
     stagger: { type: "number", default: 0.1, desc: "Stagger delay per item (in localT units)", min: 0.02, max: 0.4 },
   },
@@ -38,10 +39,10 @@ export default {
     const W = Math.max(container.clientWidth || stage.width, 1);
     const H = Math.max(container.clientHeight || stage.height, 1);
     const S = Math.min(stage.width || W, stage.height || H); // stage-based for stable font size
-    const safeZone = getSafeZone(W, H);
+    const safeZone = getSafeZone(stage.width || W, stage.height || H);
 
     const items = normalizeArray(params.items, ["Item 1", "Item 2", "Item 3"]);
-    const fontSize = S * (params.fontSize || 0.028);
+    const fontSize = resolveSize(params.fontSize, S, 0.028);
     const bulletColor = params.bulletColor || "#a78bfa";
     const bulletSize = S * 0.008;
     const gap = S * 0.018;
@@ -57,14 +58,20 @@ export default {
       "display:flex",
       "flex-direction:column",
       `gap:${Math.round(gap)}px`,
+      "width:100%",
+      "max-width:100%",
+      "overflow:hidden",
     ].join(";"));
 
     const itemEls = [];
     for (let i = 0; i < items.length; i += 1) {
       const row = createNode("div", [
         "display:flex",
-        "align-items:center",
+        "align-items:flex-start",
         `gap:${Math.round(S * 0.012)}px`,
+        "max-width:100%",
+        "min-width:0",
+        "overflow:hidden",
         "opacity:0",
         "transform:translateX(-30px)",
         "will-change:transform,opacity",
@@ -76,6 +83,7 @@ export default {
         "border-radius:50%",
         `background:${bulletColor}`,
         "flex-shrink:0",
+        `margin-top:${Math.round(fontSize * 0.35)}px`,
       ].join(";"));
 
       const textEl = createNode("span", [
@@ -84,6 +92,9 @@ export default {
         "font-weight:400",
         "color:#f0f0f0",
         "line-height:1.5",
+        "flex:1",
+        "max-width:100%",
+        "overflow:hidden",
         "word-break:break-word",
         "overflow-wrap:break-word",
       ].join(";"), String(items[i]));

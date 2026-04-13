@@ -16,8 +16,8 @@ export default {
     color:       { type: "color",   default: "#4ade80",              desc: "Ring color" },
     label:       { type: "string",  default: "Quality",             desc: "Label below the number" },
     showPercent: { type: "boolean", default: true,                   desc: "Show percent symbol" },
-    numberSize: { type: "number", default: 0.08, desc: "Number font size" },
-    labelSize:  { type: "number", default: 0.025, desc: "Label font size" },
+    numberSize: { type: "number", default: 0.08, desc: "Number font size as a ratio of the short edge (or px/keyword)" },
+    labelSize:  { type: "number", default: 0.025, desc: "Label font size as a ratio of the short edge (or px/keyword)" },
   },
   get defaultParams() {
     const p = {};

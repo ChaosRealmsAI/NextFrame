@@ -230,6 +230,51 @@ export function resolveSize(value, S, fallback = 0.03) {
   return Number.isFinite(parsed) ? Math.round(parsed < 1 ? S * parsed : parsed) : Math.round(S * fallback);
 }
 
+export function shrinkTextToFit(element, options = {}) {
+  if (!element) {
+    return 0;
+  }
+
+  const container = options.container || element.parentElement;
+  if (!container) {
+    return 0;
+  }
+
+  const computed = typeof window !== "undefined" ? window.getComputedStyle(element) : null;
+  let fontSize = parseFloat(options.fontSize ?? computed?.fontSize ?? "0");
+  if (!Number.isFinite(fontSize) || fontSize <= 0) {
+    return 0;
+  }
+
+  const ratio = Number.isFinite(options.maxWidthRatio) ? options.maxWidthRatio : 0.9;
+  const containerWidth = options.maxWidth
+    ?? container.clientWidth
+    ?? container.getBoundingClientRect?.().width
+    ?? 0;
+  const maxWidth = Math.max(0, containerWidth * ratio);
+  const minFontSize = Math.max(1, Number(options.minFontSize) || 1);
+  const maxIterations = Math.max(1, Number(options.maxIterations) || 64);
+
+  if (!(maxWidth > 0)) {
+    return Math.round(fontSize);
+  }
+
+  let iterations = 0;
+  while (fontSize > minFontSize && iterations < maxIterations) {
+    const tooWide = element.scrollWidth > maxWidth + 1;
+    const tooTall = options.maxHeight > 0 && element.scrollHeight > options.maxHeight + 1;
+    if (!tooWide && !tooTall) {
+      break;
+    }
+
+    fontSize -= 1;
+    element.style.fontSize = `${fontSize}px`;
+    iterations += 1;
+  }
+
+  return Math.round(fontSize);
+}
+
 export function resolveAssetUrl(src) {
   const value = String(src ?? "").trim();
   if (!value) {
