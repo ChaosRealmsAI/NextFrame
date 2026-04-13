@@ -83,13 +83,29 @@ TIMELINE FORMAT (v0.3 flat layers)
   }
 
 LAYOUT RULES (critical — read this!)
-  ★ Same time = only ONE fullscreen content layer. Use staggered times:
-      Layer A: start=0 dur=5, Layer B: start=5 dur=5  (sequential, no overlap)
-  ★ Background layers (aurora, starfield, shader*, vignette) CAN overlap — they're meant to stack
-  ★ If you need 2 content layers at same time, position them:
-      Layer A: x="10%", y="10%", w="45%", h="80%"
-      Layer B: x="55%", y="10%", w="40%", h="80%"
+  ★ Same time = only ONE fullscreen content layer, unless positioned with x/y/w/h
+  ★ Background layers (aurora, starfield, shader*, vignette) CAN overlap
+  ★ Think like CSS layout — each layer is a positioned div on a 1920x1080 stage:
+
+  Common layouts (use x/y/w/h on the LAYER, not the scene):
+    fullscreen    (default)     → no x/y/w/h needed
+    left-half     → x="0"    y="0"    w="50%"  h="100%"
+    right-half    → x="50%"  y="0"    w="50%"  h="100%"
+    top-half      → x="0"    y="0"    w="100%" h="50%"
+    bottom-half   → x="0"    y="50%"  w="100%" h="50%"
+    center-box    → x="15%"  y="15%"  w="70%"  h="70%"
+    top-bar       → x="0"    y="0"    w="100%" h="15%"
+    bottom-bar    → x="0"    y="85%"  w="100%" h="15%"
+    left-sidebar  → x="0"    y="0"    w="30%"  h="100%"
+    main-content  → x="30%"  y="0"    w="70%"  h="100%"
+    pip(画中画)   → x="65%"  y="5%"   w="30%"  h="30%"
+
+  2 layers side-by-side at same time:
+    { "scene": "barChart",  "x":"5%", "y":"10%", "w":"45%", "h":"80%" }
+    { "scene": "pieChart",  "x":"52%","y":"10%", "w":"45%", "h":"80%" }
+
   ★ validate will WARN on fullscreen content overlap — fix all warnings before build
+  ★ preview shows each layer's position — use it to verify layout
 
 LAYER PROPERTIES
   id, scene, start, dur, params       required
