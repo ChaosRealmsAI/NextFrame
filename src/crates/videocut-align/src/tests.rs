@@ -17,7 +17,7 @@ fn unit(text: &str, start_ms: u64, end_ms: u64) -> AlignUnit {
 #[test]
 fn align_script_resolves_from_source_tree() -> Result<()> {
     let path = align_script_path()?;
-    assert!(path.ends_with("python/align_ffa.py"));
+    assert!(path.ends_with("src/python/align_ffa.py"));
     Ok(())
 }
 

@@ -24,8 +24,7 @@ pub(crate) fn handle_preview_frame(params: &Value) -> Result<Value, String> {
     let out_path = tmp_dir.join(format!("frame-{}.png", t));
 
     // find nextframe CLI
-    let cli_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../nextframe-cli/bin/nextframe.js");
+    let cli_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../cli/bin/nextframe.js");
 
     let status = Command::new("node")
         .arg(&cli_path)

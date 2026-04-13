@@ -22,7 +22,7 @@ for (const c of candidates) {
 if (!chromePath) { console.error('Chrome not found'); process.exit(1); }
 console.log('Using:', chromePath);
 
-const { launch } = await import('/Users/Zhuanz/bigbang/NextFrame/nextframe-cli/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js');
+const { launch } = await import(resolve(HERE, '../node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js'));
 
 const browser = await launch({
   executablePath: chromePath,

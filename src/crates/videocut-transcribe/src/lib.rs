@@ -298,13 +298,13 @@ fn whisper_script_path() -> Result<PathBuf> {
 
     let exe = std::env::current_exe().context("resolve current executable")?;
     for parent in exe.ancestors() {
-        let candidate = parent.join("python/whisper_transcribe.py");
+        let candidate = parent.join("src/python/whisper_transcribe.py");
         if candidate.exists() {
             return Ok(candidate);
         }
     }
 
-    bail!("python/whisper_transcribe.py not found (set SPLICE_WHISPER_SCRIPT)")
+    bail!("src/python/whisper_transcribe.py not found (set SPLICE_WHISPER_SCRIPT)")
 }
 
 #[cfg(test)]
@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn whisper_script_resolves_from_source_tree() -> Result<()> {
         let path = whisper_script_path()?;
-        assert!(path.ends_with("python/whisper_transcribe.py"));
+        assert!(path.ends_with("src/python/whisper_transcribe.py"));
         Ok(())
     }
 }

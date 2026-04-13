@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic test double for python/whisper_transcribe.py."""
+"""Deterministic test double for src/python/whisper_transcribe.py."""
 
 from __future__ import annotations
 

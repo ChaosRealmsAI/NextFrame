@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT_DIR" || exit 1
+
 FAIL=0
 
 echo "=== 1. cargo check ==="
@@ -29,19 +32,19 @@ OVER_TEST=$(find . -type f \( -name '*test*' -o -name '*tests*' \) \
 if [ -n "$OVER_TEST" ]; then echo "FAIL: test files >800 lines:" && echo "$OVER_TEST"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 6. JS var usage ==="
-VAR_COUNT=$(grep -rn '\bvar ' runtime/web/src/ --include='*.js' 2>/dev/null | wc -l | tr -d ' ')
+VAR_COUNT=$(grep -rn '\bvar ' src/runtime/web/src/ --include='*.js' 2>/dev/null | wc -l | tr -d ' ')
 if [ "$VAR_COUNT" -gt 0 ]; then echo "FAIL: $VAR_COUNT var usages found"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 7. console.log ==="
-LOG_COUNT=$(grep -rn 'console\.log' runtime/web/src/ --include='*.js' 2>/dev/null | grep -v '\[bridge\]' | wc -l | tr -d ' ')
+LOG_COUNT=$(grep -rn 'console\.log' src/runtime/web/src/ --include='*.js' 2>/dev/null | grep -v '\[bridge\]' | wc -l | tr -d ' ')
 if [ "$LOG_COUNT" -gt 0 ]; then echo "FAIL: $LOG_COUNT console.log found"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 8. TODO/FIXME ==="
-TODO_COUNT=$(grep -rn 'TODO\|FIXME\|HACK\|XXX' bridge/src/ shell/src/ recorder/src/ runtime/web/src/ --include='*.rs' --include='*.js' 2>/dev/null | wc -l | tr -d ' ')
+TODO_COUNT=$(grep -rn 'TODO\|FIXME\|HACK\|XXX' src/bridge/src/ src/shell/src/ src/recorder/src/ src/runtime/web/src/ --include='*.rs' --include='*.js' 2>/dev/null | wc -l | tr -d ' ')
 if [ "$TODO_COUNT" -gt 0 ]; then echo "FAIL: $TODO_COUNT TODO/FIXME found"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 9. scene cross-import ==="
-CROSS=$(grep -rn "from.*modules/" runtime/web/src/components/ --include='*.js' 2>/dev/null || true)
+CROSS=$(grep -rn "from.*modules/" src/runtime/web/src/components/ --include='*.js' 2>/dev/null || true)
 if [ -n "$CROSS" ]; then echo "FAIL: scenes import modules:" && echo "$CROSS"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 10. Cargo.toml deny rules ==="

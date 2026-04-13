@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 cargo build --release -p shell >/tmp/nextframe-shell-smoke-build.log 2>&1
 cargo run --release -p shell >/tmp/nextframe-shell-smoke.log 2>&1 &

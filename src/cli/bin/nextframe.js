@@ -187,7 +187,7 @@ SCENE TYPES
   dom=文字/布局  canvas=特效/背景  svg=图表  media=视频/音频
 
 CREATING SCENES（必须遵守 SCENE_SPEC.md）
-  完整规范：runtime/web/src/components/SCENE_SPEC.md（含模板、规则、检查清单）
+  完整规范：src/runtime/web/src/components/SCENE_SPEC.md（含模板、规则、检查清单）
   核心规则：
     1. id = 文件名
     2. 字号用 resolveSize(params.fontSize, S, fallback) — S 基于 stage 短边

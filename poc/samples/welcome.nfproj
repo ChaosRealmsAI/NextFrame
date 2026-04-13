@@ -6,7 +6,7 @@
     {
       "id": "demo-tone",
       "name": "Demo Audio",
-      "path": "../runtime/web/assets/demo-audio.wav",
+      "path": "../../src/runtime/web/assets/demo-audio.wav",
       "kind": "audio",
       "duration": 2
     }
@@ -222,7 +222,7 @@
           "dur": 2,
           "assetId": "demo-tone",
           "params": {
-            "src": "../runtime/web/assets/demo-audio.wav",
+            "src": "../../src/runtime/web/assets/demo-audio.wav",
             "volume": 0.16,
             "gainAutomation": [
               {
@@ -258,7 +258,7 @@
           "dur": 2,
           "assetId": "demo-tone",
           "params": {
-            "src": "../runtime/web/assets/demo-audio.wav",
+            "src": "../../src/runtime/web/assets/demo-audio.wav",
             "volume": 0.12,
             "gainAutomation": [
               {

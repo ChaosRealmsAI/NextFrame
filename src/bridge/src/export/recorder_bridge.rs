@@ -3,12 +3,22 @@ use std::path::{Path, PathBuf};
 use crate::codec::encoding::{path_to_file_url, percent_decode_url_path};
 
 pub(crate) fn build_recording_url(current_dir: &Path) -> Result<String, String> {
-    let web_path = current_dir
-        .join("runtime/web/index.html")
-        .canonicalize()
-        .map_err(|error| format!("failed to resolve runtime/web/index.html: {error}"))?;
+    let web_path = resolve_runtime_index_path(current_dir)?;
 
     Ok(format!("{}?record=true", path_to_file_url(&web_path)))
+}
+
+fn resolve_runtime_index_path(current_dir: &Path) -> Result<PathBuf, String> {
+    for base in current_dir.ancestors() {
+        for relative in ["src/runtime/web/index.html", "runtime/web/index.html"] {
+            let candidate = base.join(relative);
+            if let Ok(canonical) = candidate.canonicalize() {
+                return Ok(canonical);
+            }
+        }
+    }
+
+    Err("failed to resolve runtime web index.html from current directory".to_string())
 }
 
 pub(crate) fn resolve_recorder_frame_path_from_url(

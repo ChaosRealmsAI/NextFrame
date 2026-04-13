@@ -77,11 +77,11 @@ pub(crate) fn align_script_path() -> Result<PathBuf> {
 
     let exe = std::env::current_exe().context("resolve current executable")?;
     for parent in exe.ancestors() {
-        let candidate = parent.join("python/align_ffa.py");
+        let candidate = parent.join("src/python/align_ffa.py");
         if candidate.exists() {
             return Ok(candidate);
         }
     }
 
-    bail!("python/align_ffa.py not found (set VIDEOCUT_ALIGN_SCRIPT)")
+    bail!("src/python/align_ffa.py not found (set VIDEOCUT_ALIGN_SCRIPT)")
 }

@@ -179,7 +179,7 @@ describe("BDD critical scenarios", () => {
 
   it("CLIP-05 splitClip produces two clips", () => {
     if (typeof commandsModule.splitClipCommand !== "function") {
-      skip("splitClipCommand() is not implemented in runtime/web/src/commands.js");
+      skip("splitClipCommand() is not implemented in src/runtime/web/src/commands.js");
     }
 
     const timeline = createDefaultTimeline();
