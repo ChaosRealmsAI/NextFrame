@@ -46,61 +46,119 @@ const SUBCOMMANDS = {
   help: null,
 };
 
-const HELP = `nextframe — frame-pure CLI video editor for AI
+const HELP = `nextframe — AI-native video editor CLI (v0.3)
 
-USAGE
-  nextframe <command> <project> <episode> <segment> [args]
-  nextframe <command> <timeline.json> [args]     (legacy)
+  Timeline JSON → multi-layer HTML → browser playback
 
-SUBCOMMANDS
-  new <out.json>                              create empty timeline
-  validate <project> <episode> <segment>      run safety gates
-  frame <project> <episode> <segment> <t>     render single frame
-  render <project> <episode> <segment>        export full timeline to mp4
-  probe <out.mp4>                             inspect export metadata with ffprobe
-  bake-html <project> <episode> <segment>     pre-render htmlSlide clips into PNG cache
-  describe <project> <episode> <segment> <t>  JSON of what is visible at t
-  ascii <project> <episode> <segment> <t>     ASCII art preview of a frame
-  gantt <project> <episode> <segment>         ASCII gantt
-  bake-video <project> <episode> <segment>    pre-extract videoClip frames with ffmpeg
-  compose <project> <episode> <segment>       compose a self-contained HTML preview
-  scenes                                      list all scenes with META
-  bake-browser <project> <episode> <segment>  bake html/svg/markdown/lottie browser scenes
-  compose <project> <episode> <segment>       compose a self-contained HTML preview
-  add-clip <project> <episode> <segment> ...  add a clip to a track
-  move-clip <project> <episode> <segment> ... move a clip's start time
-  resize-clip <project> <episode> <segment>   resize clip duration
-  remove-clip <project> <episode> <segment>   remove a clip
-  set-param <project> <episode> <segment> ... update clip params
-  add-marker <project> <episode> <segment>    append a timeline marker
-  list-clips <project> <episode> <segment>    list clips grouped by track
-  dup-clip <project> <episode> <segment> ...  duplicate a clip at a new time
-  import-image <project> <episode> <segment>  add an image asset to timeline.assets[]
-  import-audio <project> <episode> <segment>  add an audio asset to timeline.assets[]
-  list-assets <project> <episode> <segment>   list assets grouped by kind
-  remove-asset <project> <episode> <segment>  remove an asset by id
-  guide                                       AI onboarding: conventions, workflow, naming
+WORKFLOW
+  1. nextframe scenes                         see 48 components
+  2. nextframe scenes <id>                    see component params
+  3. Write timeline.json                      (see FORMAT below)
+  4. nextframe validate <timeline.json>       check errors + overlap
+  5. nextframe build <timeline.json> -o X     generate playable HTML
+  6. nextframe preview <timeline.json>        screenshot key frames + layout check
+  7. Fix issues, repeat from step 4
 
-PROJECT MANAGEMENT
-  project-new <name>                          create a project folder under ~/NextFrame/projects
-  project-list [--root=PATH] [--json]        list projects with episode counts
-  episode-new <project> <name>               create an episode inside a project
-  episode-list <project> [--json]            list episodes for a project
-  segment-new <project> <episode> <name>     create an empty segment timeline JSON
-  segment-list <project> <episode> [--json]  list segment JSON files in an episode
-  exports <project> <episode> [--json]       list recorded render exports for an episode
+  No matching scene? Write one:
+    runtime/web/src/scenes-v2/myScene.js      create/update/destroy format
+    Add to scenes-v2/index.js                 register it
+
+COMMANDS
+  scenes                         list all 48 scene components
+  scenes <id>                    show params + defaults for one scene
+  validate <timeline.json>       6 safety gates + fullscreen overlap detection
+  build <timeline.json> -o X     bundle timeline + scenes into single HTML
+  preview <timeline.json>        headless screenshot + layout map per frame
+  preview <tl> --times=2,8,15   screenshot specific times
+  project-new <name>             create project in ~/NextFrame/projects/
+  episode-new <proj> <name>      create episode
+  segment-new <proj> <ep> <name> create segment (v0.3 layers format)
+
+TIMELINE FORMAT
+  {
+    "width": 1920, "height": 1080, "fps": 30, "duration": 20,
+    "background": "#05050c",
+    "layers": [
+      { "id": "bg", "scene": "auroraGradient", "start": 0, "dur": 20,
+        "params": { "hueA": 265 } },
+      { "id": "title", "scene": "headline", "start": 1, "dur": 5,
+        "params": { "text": "Hello", "fontSize": 96 },
+        "enter": "fadeIn 0.8s", "exit": "fadeOut 0.5s" }
+    ]
+  }
+
+LAYER PROPERTIES (every property = CSS, AI writes like CSS)
+  id, scene, start, dur, params   required
+  x, y, w, h                     position + size (% or px)
+  opacity                         0-1
+  rotation                        degrees
+  scale                           multiplier (1 = normal)
+  blend                           normal/screen/multiply/overlay/lighten
+  filter                          CSS filter (blur/grayscale/sepia)
+  borderRadius                    CSS border-radius
+  shadow                          CSS box-shadow
+  clipPath                        CSS clip-path
+  border                          CSS border
+  padding                         CSS padding
+  backdropFilter                  CSS backdrop-filter (e.g. blur(20px))
+  transformOrigin                 CSS transform-origin
+  zIndex                          explicit z-order (default = array order)
+  enter                           fadeIn/slideUp/slideDown/slideLeft/slideRight/scaleIn + dur
+  exit                            fadeOut/slideDown/scaleOut + dur
+  transition                      dissolve/wipeLeft/wipeRight/wipeUp/wipeDown/zoomIn + dur
+
+KEYFRAME ANIMATION (any property can animate over time)
+  Static:   "opacity": 0.8
+  Animated: "opacity": { "keys": [[0, 0], [1, 1], [4, 1], [5, 0]], "ease": "easeOut" }
+
+  keys = [[time_in_seconds, value], ...]  sorted by time
+  ease = "linear" | "easeIn" | "easeOut" (default)
+  Works on: opacity, x, y, w, h, rotation, scale, filter, clipPath
+
+  Examples:
+    Fly in from right:  "x": { "keys": [[0, "100%"], [1.5, "10%"]] }
+    Rotate 360:         "rotation": { "keys": [[0, 0], [5, 360]], "ease": "linear" }
+    Scale bounce:       "scale": { "keys": [[0, 0.5], [1, 1.2], [1.5, 1]] }
+    Fade in+out:        "opacity": { "keys": [[0, 0], [0.5, 1], [4, 1], [5, 0]] }
+
+LAYOUT (same time = position with x/y/w/h, think CSS)
+  fullscreen   (default)    no x/y/w/h needed
+  left-half    x="0"    y="0"    w="50%"  h="100%"
+  right-half   x="50%"  y="0"    w="50%"  h="100%"
+  top-half     x="0"    y="0"    w="100%" h="50%"
+  bottom-half  x="0"    y="50%"  w="100%" h="50%"
+  center-box   x="15%"  y="15%"  w="70%"  h="70%"
+  pip          x="65%"  y="5%"   w="30%"  h="30%"
+
+  Same time, side by side:
+    { "scene": "barChart",  "x":"5%", "y":"10%", "w":"45%", "h":"80%" }
+    { "scene": "pieChart",  "x":"52%","y":"10%", "w":"45%", "h":"80%" }
+
+  Background layers (aurora, shader, vignette, starfield) can overlap freely.
+  Content layers at same time MUST use x/y/w/h or validate will warn.
+
+SCENE TYPES
+  dom      text, layout, cards      (localT normalized 0~1)
+  canvas   2D effects, backgrounds  (localT in seconds)
+  svg      charts, diagrams         (localT in seconds)
+  webgl    GPU shader effects       (localT in seconds)
+  media    video, image             (localT in seconds)
+
+CREATING NEW SCENES
+  export default {
+    id: "myScene", type: "dom", name: "My Scene",
+    category: "Typography", defaultParams: { text: "Hi" },
+    create(container, params) { /* return DOM refs */ },
+    update(els, localT, params) { /* animate per frame */ },
+    destroy(els) { els.root.remove(); }
+  };
 
 FLAGS
-  --json     output structured JSON (for AI / scripts)
-  --width    override render width
-  --height   override render height
-  --fps      override fps for export
+  --json     structured JSON output
+  -o FILE    output file path (build)
+  --times=   comma-separated times (preview)
 
-EXIT CODES
-  0  success
-  1  warning (operation completed)
-  2  error
-  3  usage error
+EXIT CODES  0=ok  1=warning  2=error  3=usage
 `;
 
 async function main() {
