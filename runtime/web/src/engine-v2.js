@@ -367,8 +367,23 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
     }
   }
 
+  // ─── Media stall detector ───
+  // If renderFrame stops being called for >150ms, pause all media elements.
+  // This catches the case where the caller (recorder, external driver) simply
+  // stops calling __onFrame — without this, <audio> keeps playing forever.
+  let mediaStallTimer = 0;
+  function resetMediaStallTimer() {
+    if (mediaStallTimer) clearTimeout(mediaStallTimer);
+    mediaStallTimer = setTimeout(() => {
+      stageEl.querySelectorAll('audio, video').forEach(m => {
+        if (!m.paused) m.pause();
+      });
+    }, 150);
+  }
+
   // ─── Destroy ───
   function destroy() {
+    if (mediaStallTimer) clearTimeout(mediaStallTimer);
     for (const state of layerStates) {
       if (state.created && state.scene) {
         try { state.scene.destroy(state.sceneEls); } catch (_) {}
@@ -495,6 +510,13 @@ export function createPlayer(engine, stageEl) {
     return `${String(minutes).padStart(2, '0')}:${remainder.toFixed(2).padStart(5, '0')}`;
   }
 
+  function pauseAllMedia() {
+    const stage = stageEl;
+    stage.querySelectorAll('audio, video').forEach(m => {
+      if (!m.paused) m.pause();
+    });
+  }
+
   function stopPlayback() {
     playing = false;
     lastTickWall = 0;
@@ -502,6 +524,7 @@ export function createPlayer(engine, stageEl) {
       cancelAnimationFrame(tickRaf);
       tickRaf = 0;
     }
+    pauseAllMedia();
     syncButtons();
   }
 
