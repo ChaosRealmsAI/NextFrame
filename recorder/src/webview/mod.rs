@@ -73,7 +73,8 @@ impl WebViewHost {
             offscreen_origin(0)
         };
         let initial_rect = NSRect::new(initial_origin, NSSize::new(view_width, view_height));
-        let window: Retained<NSWindow> = unsafe {
+        // SAFETY: `mtm` proves main-thread access, and these arguments form a valid window initializer.
+        let window: Retained<NSWindow> = unsafe { // SAFETY: see above.
             msg_send![
                 NSWindow::alloc(mtm),
                 initWithContentRect: initial_rect,
@@ -84,7 +85,8 @@ impl WebViewHost {
         };
         window.setTitle(&NSString::from_str("recorder"));
         window.setFrame_display(initial_rect, true);
-        unsafe {
+        // SAFETY: `window` is live, and `setIgnoresMouseEvents:` is valid for an initialized window.
+        unsafe { // SAFETY: see above.
             let _: () = msg_send![&window, setIgnoresMouseEvents: true];
         }
         if headed {
@@ -92,7 +94,8 @@ impl WebViewHost {
             window.orderFrontRegardless();
             pump_main_run_loop(Duration::from_millis(150));
         } else {
-            unsafe {
+            // SAFETY: `window` is live, and these setters only adjust presentation attributes.
+            unsafe { // SAFETY: see above.
                 let _: () = msg_send![&window, setAlphaValue: 0.0f64];
                 let _: () = msg_send![&window, setOpaque: false];
                 let _: () = msg_send![&window, setHasShadow: false];
@@ -168,7 +171,8 @@ impl WebViewHost {
         let url = NSURL::URLWithString(&NSString::from_str(url))
             .ok_or_else(|| format!("failed to construct NSURL from {url:?}"))?;
         let request = NSURLRequest::requestWithURL(&url);
-        let navigation = unsafe { self.web_view.loadRequest(&request) };
+        // SAFETY: `self.web_view` and `request` are live Objective-C objects for this load call.
+        let navigation = unsafe { self.web_view.loadRequest(&request) }; // SAFETY: see above.
         if navigation.is_none() {
             return Err(format!(
                 "WKWebView refused loadRequest for {}",
@@ -186,7 +190,8 @@ impl WebViewHost {
         let file_url = NSURL::fileURLWithPath(&NSString::from_str(&file_path.to_string_lossy()));
         let read_access_url =
             NSURL::fileURLWithPath(&NSString::from_str(&read_access_root.to_string_lossy()));
-        let navigation = unsafe {
+        // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
+        let navigation = unsafe { // SAFETY: see above.
             self.web_view
                 .loadFileURL_allowingReadAccessToURL(&file_url, &read_access_url)
         };
@@ -211,8 +216,10 @@ impl WebViewHost {
         let mut saw_navigation = false;
         while started.elapsed() < timeout {
             self.sync_view_hierarchy();
-            last_loading = unsafe { self.web_view.isLoading() };
-            last_progress = unsafe { self.web_view.estimatedProgress() };
+            // SAFETY: `self.web_view` is live, and `isLoading` is a side-effect-free query.
+            last_loading = unsafe { self.web_view.isLoading() }; // SAFETY: see above.
+            // SAFETY: `self.web_view` is live, and `estimatedProgress` is a side-effect-free query.
+            last_progress = unsafe { self.web_view.estimatedProgress() }; // SAFETY: see above.
             last_url = self.current_url();
             saw_navigation |= last_loading
                 || last_progress > 0.0
@@ -324,13 +331,17 @@ impl WebViewHost {
 
     fn create_web_view(target_size: NSSize) -> Result<Retained<WKWebView>, String> {
         let mtm = MainThreadMarker::new().ok_or("snapshot capture must run on the main thread")?;
-        let config = unsafe { WKWebViewConfiguration::new(mtm) };
-        let store = unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) };
-        unsafe {
+        // SAFETY: `mtm` proves main-thread access, which `WKWebViewConfiguration::new` requires.
+        let config = unsafe { WKWebViewConfiguration::new(mtm) }; // SAFETY: see above.
+        // SAFETY: `mtm` proves main-thread access, which `nonPersistentDataStore` requires.
+        let store = unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) }; // SAFETY: see above.
+        // SAFETY: `config` and `store` are live WebKit objects being configured before initialization.
+        unsafe { // SAFETY: see above.
             config.setWebsiteDataStore(&store);
             config.setMediaTypesRequiringUserActionForPlayback(WKAudiovisualMediaTypes::All);
         }
-        let web_view = unsafe {
+        // SAFETY: `mtm`, the frame, and `config` satisfy `WKWebView`'s designated initializer contract.
+        let web_view = unsafe { // SAFETY: see above.
             WKWebView::initWithFrame_configuration(
                 WKWebView::alloc(mtm),
                 NSRect::new(NSPoint::new(0.0, 0.0), target_size),
@@ -338,7 +349,8 @@ impl WebViewHost {
             )
         };
         web_view.setWantsLayer(true);
-        unsafe {
+        // SAFETY: `web_view` responds to `_setPageMuted:` on macOS, and this only toggles mute state.
+        unsafe { // SAFETY: see above.
             let _: () = msg_send![&web_view, _setPageMuted: 0x3u64];
         }
         Ok(web_view)
@@ -372,7 +384,8 @@ impl WebViewHost {
     }
 
     fn current_url(&self) -> Option<String> {
-        unsafe { self.web_view.URL() }
+        // SAFETY: `self.web_view` is live, and `URL` returns either null or a live borrowed `NSURL`.
+        unsafe { self.web_view.URL() } // SAFETY: see above.
             .and_then(|url| url.absoluteString().map(|value| value.to_string()))
     }
 }
@@ -419,5 +432,7 @@ fn encode_path_component(output: &mut String, text: &str) {
 fn pump_main_run_loop(duration: Duration) {
     let run_loop = NSRunLoop::currentRunLoop();
     let date = NSDate::dateWithTimeIntervalSinceNow(duration.as_secs_f64());
-    let _ = run_loop.runMode_beforeDate(unsafe { NSDefaultRunLoopMode }, &date);
+    // SAFETY: `NSDefaultRunLoopMode` is a valid process-global Foundation NSString constant.
+    let default_mode = unsafe { NSDefaultRunLoopMode }; // SAFETY: see above.
+    let _ = run_loop.runMode_beforeDate(default_mode, &date);
 }

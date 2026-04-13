@@ -188,7 +188,8 @@ impl WebViewHost {
 
     pub(super) fn take_snapshot_image(&self) -> Result<Retained<NSImage>, String> {
         let mtm = MainThreadMarker::new().ok_or("snapshot capture must run on the main thread")?;
-        let config = unsafe { WKSnapshotConfiguration::new(mtm) };
+        // SAFETY: `mtm` proves this runs on Cocoa's main thread, which `WKSnapshotConfiguration::new` requires.
+        let config = unsafe { WKSnapshotConfiguration::new(mtm) }; // SAFETY: see above.
         let backing = self.window.convertRectToBacking(self.web_view.bounds());
         let backing_scale = if self.view_width > 0.0 {
             backing.size.width / self.view_width
@@ -201,21 +202,24 @@ impl WebViewHost {
                 .round()
                 .max(1.0) as usize,
         );
-        unsafe {
+        // SAFETY: `config` is live, and WebKit accepts this width setter on the main thread.
+        unsafe { // SAFETY: see above.
             config.setSnapshotWidth(Some(&snapshot_width));
         }
         let slot: SnapshotResultSlot = Rc::new(RefCell::new(None));
         let slot_clone = slot.clone();
         let block = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
             autoreleasepool(|_| {
-                let result = if let Some(error) = unsafe { error.as_ref() } {
+                // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
+                let result = if let Some(error) = unsafe { error.as_ref() } { // SAFETY: see above.
                     Err(format!(
                         "{} (domain={}, code={})",
                         error.localizedDescription(),
                         error.domain(),
                         error.code()
                     ))
-                } else if let Some(image) = unsafe { Retained::retain(image) } {
+                // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes ownership.
+                } else if let Some(image) = unsafe { Retained::retain(image) } { // SAFETY: see above.
                     Ok(image)
                 } else {
                     Err("WKWebView.takeSnapshot returned nil without an error".into())
@@ -224,7 +228,8 @@ impl WebViewHost {
             });
         });
 
-        unsafe {
+        // SAFETY: `self.web_view`, `config`, and `block` are live main-thread Objective-C objects.
+        unsafe { // SAFETY: see above.
             self.web_view
                 .takeSnapshotWithConfiguration_completionHandler(Some(&config), &block);
         }
@@ -299,7 +304,8 @@ impl WebViewHost {
         let slot_clone = slot.clone();
         let block = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
             autoreleasepool(|_| {
-                let result = if let Some(error) = unsafe { error.as_ref() } {
+                // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
+                let result = if let Some(error) = unsafe { error.as_ref() } { // SAFETY: see above.
                     if is_unsupported_js_result(error) {
                         Ok(None)
                     } else {
@@ -313,14 +319,16 @@ impl WebViewHost {
                 } else if value.is_null() {
                     Ok(None)
                 } else {
-                    let description: Retained<NSString> = unsafe { msg_send![value, description] };
+                    // SAFETY: a non-null success value is a live Objective-C object that responds to `description`.
+                    let description: Retained<NSString> = unsafe { msg_send![value, description] }; // SAFETY: see above.
                     Ok(Some(description.to_string()))
                 };
                 *slot_clone.borrow_mut() = Some(result);
             });
         });
 
-        unsafe {
+        // SAFETY: `self.web_view` is live, and WebKit accepts this script and completion handler on the main thread.
+        unsafe { // SAFETY: see above.
             self.web_view
                 .evaluateJavaScript_completionHandler(&NSString::from_str(script), Some(&block));
         }

@@ -50,10 +50,13 @@ pub fn is_nsimage_black(image: &NSImage) -> Result<bool, String> {
     let threshold = 8u8;
 
     for y in (0..height).step_by(step_y) {
-        let row = unsafe { data.add(y * bytes_per_row) };
+        // SAFETY: `data` points to the bitmap allocation, and this row offset stays within it.
+        let row = unsafe { data.add(y * bytes_per_row) }; // SAFETY: see above.
         for x in (0..width).step_by(step_x) {
-            let pixel = unsafe { row.add(x * samples_per_pixel) };
-            let channels = unsafe { std::slice::from_raw_parts(pixel, samples_per_pixel) };
+            // SAFETY: this pixel offset stays within the current row for the sampled coordinates.
+            let pixel = unsafe { row.add(x * samples_per_pixel) }; // SAFETY: see above.
+            // SAFETY: `pixel` points to one pixel, and `samples_per_pixel` matches the bitmap metadata.
+            let channels = unsafe { std::slice::from_raw_parts(pixel, samples_per_pixel) }; // SAFETY: see above.
             let (r, g, b) = rgb_components(channels, format);
             if r > threshold || g > threshold || b > threshold {
                 return Ok(false);
@@ -65,7 +68,8 @@ pub fn is_nsimage_black(image: &NSImage) -> Result<bool, String> {
 
 /// Extracts a `CGImage` from an `NSImage`.
 pub fn cgimage_from_nsimage(image: &NSImage) -> Result<Retained<CGImage>, String> {
-    unsafe {
+    // SAFETY: `image` is live, and AppKit allows null rect/context/hints for this conversion call.
+    unsafe { // SAFETY: see above.
         image
             .CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None)
             .ok_or("NSImage did not yield a CGImage".into())
@@ -88,7 +92,8 @@ pub fn layer_render_cgimage(
         CGColorSpace::new_device_rgb().ok_or("CGColorSpace::new_device_rgb returned nil")?;
     let bitmap_info =
         CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
-    let context = unsafe {
+    // SAFETY: `buffer` owns the target bytes, and the dimensions and format match this bitmap context.
+    let context = unsafe { // SAFETY: see above.
         CGBitmapContextCreate(
             buffer.as_mut_ptr().cast::<c_void>(),
             width,
@@ -116,7 +121,8 @@ pub fn layer_render_cgimage(
     CGContext::translate_ctm(Some(context.as_ref()), 0.0, height as f64);
     CGContext::scale_ctm(Some(context.as_ref()), scale_x, -scale_y);
 
-    let _: () = unsafe { msg_send![layer, renderInContext: &*context] };
+    // SAFETY: `layer` and `context` are live, and `renderInContext:` accepts a valid bitmap context.
+    let _: () = unsafe { msg_send![layer, renderInContext: &*context] }; // SAFETY: see above.
 
     let image = CGBitmapContextCreateImage(Some(&context))
         .ok_or("CGBitmapContextCreateImage returned nil")?;
@@ -133,7 +139,8 @@ pub fn is_cgimage_mostly_black(image: &CGImage) -> Result<bool, String> {
         CGColorSpace::new_device_rgb().ok_or("CGColorSpace::new_device_rgb returned nil")?;
     let bitmap_info =
         CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
-    let context = unsafe {
+    // SAFETY: `buffer` owns the thumbnail bytes, and the dimensions and format match this context.
+    let context = unsafe { // SAFETY: see above.
         CGBitmapContextCreate(
             buffer.as_mut_ptr().cast::<c_void>(),
             thumbnail_width,
