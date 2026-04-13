@@ -173,3 +173,41 @@ function playPipelineVideo(filePath) {
   var name = filePath.split("/").pop() || "clip.mp4";
   openPlayer(name, url, filePath);
 }
+
+var _inlineVideo = null;
+function playPipelineVideoInline(btn) {
+  // Stop any existing inline video
+  if (_inlineVideo) {
+    _inlineVideo.pause();
+    _inlineVideo.parentElement.removeChild(_inlineVideo);
+    _inlineVideo = null;
+  }
+
+  var filePath = btn.dataset.videoPath;
+  if (!filePath) return;
+  var url = buildPipelineMediaUrl(filePath);
+
+  // Find the thumbnail container (parent of the button)
+  var container = btn.closest(".clips-src-thumb") || btn.closest(".cd-preview-area") || btn.parentElement;
+  if (!container) return;
+
+  // Create video element inside the thumbnail
+  var video = document.createElement("video");
+  video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:2;border-radius:inherit";
+  video.playsInline = true;
+  video.controls = true;
+  video.autoplay = true;
+  container.style.position = "relative";
+  container.appendChild(video);
+  _inlineVideo = video;
+
+  video.src = url;
+  video.play().catch(function(e) {
+    console.error("[pipeline] inline video play failed:", e.message);
+  });
+
+  video.onended = function() {
+    if (video.parentElement) video.parentElement.removeChild(video);
+    _inlineVideo = null;
+  };
+}

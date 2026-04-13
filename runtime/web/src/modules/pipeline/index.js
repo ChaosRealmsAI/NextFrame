@@ -1,6 +1,8 @@
 /* === pipeline/index.js === */
 var pipelineData = null;
 var pipelineStage = "script";
+var pipelineClipsSelectedIndex = 0;
+var pipelineClipsExpandedClip = -1;
 
 async function goPipeline(project, episode) {
   if (typeof project === "string") {
@@ -24,6 +26,8 @@ async function goPipeline(project, episode) {
   }
 
   pipelineData = null;
+  pipelineClipsSelectedIndex = 0;
+  pipelineClipsExpandedClip = -1;
   renderPipelineStage();
 
   try {
@@ -113,7 +117,13 @@ function bindPipelineEvents(container) {
   container.querySelectorAll("[data-video-path]").forEach(function(btn) {
     btn.addEventListener("click", function(event) {
       event.stopPropagation();
-      playPipelineVideo(btn.dataset.videoPath);
+      if (btn.dataset.fullscreen === "1") {
+        // ⛶ Fullscreen modal
+        playPipelineVideo(btn.dataset.videoPath);
+      } else {
+        // ▶ Inline small-window playback
+        playPipelineVideoInline(btn);
+      }
     });
   });
 
@@ -135,24 +145,36 @@ function bindPipelineEvents(container) {
     });
   });
 
-  // Clips source sidebar click
-  container.querySelectorAll("[data-clips-idx]").forEach(function(item) {
-    item.addEventListener("click", function() {
-      container.querySelectorAll("[data-clips-idx]").forEach(function(s) {
-        s.style.borderColor = "transparent";
-        s.style.background = "transparent";
-      });
-      item.style.borderColor = "rgba(124,106,239,0.25)";
-      item.style.background = "rgba(124,106,239,0.03)";
-      var idx = parseInt(item.dataset.clipsIdx, 10);
-      var videos = (pipelineData.atoms || []).filter(function(a) { return a.type === "video"; });
-      var detail = document.getElementById("clips-detail");
-      if (detail && videos[idx]) {
-        detail.innerHTML = renderClipDetail(videos[idx]);
-        detail.querySelectorAll("[data-video-path]").forEach(function(btn) {
-          btn.addEventListener("click", function(e) { e.stopPropagation(); playPipelineVideo(btn.dataset.videoPath); });
-        });
+  var clipsRoot = container.querySelector(".pipeline-clips");
+  if (clipsRoot) {
+    clipsRoot.addEventListener("click", function(event) {
+      // Skip if clicking a play/fullscreen button
+      if (event.target.closest("[data-video-path]")) return;
+
+      // Sidebar source click
+      var srcItem = event.target.closest ? event.target.closest(".clips-src-item[data-idx]") : null;
+      if (srcItem && clipsRoot.contains(srcItem)) {
+        var nextIndex = parseInt(srcItem.dataset.idx, 10);
+        if (isFinite(nextIndex) && nextIndex !== pipelineClipsSelectedIndex) {
+          pipelineClipsSelectedIndex = nextIndex;
+          pipelineClipsExpandedClip = -1;
+          container.innerHTML = renderPipelineClips(pipelineData);
+          bindPipelineEvents(container);
+        }
+        return;
+      }
+
+      // Clip row or timeline block click (expand/collapse detail)
+      var clipEl = event.target.closest ? event.target.closest("[data-clips-idx]") : null;
+      if (clipEl && clipsRoot.contains(clipEl)) {
+        var clipIdx = parseInt(clipEl.dataset.clipsIdx, 10);
+        if (isFinite(clipIdx)) {
+          pipelineClipsExpandedClip = (pipelineClipsExpandedClip === clipIdx) ? -1 : clipIdx;
+          container.innerHTML = renderPipelineClips(pipelineData);
+          bindPipelineEvents(container);
+        }
+        return;
       }
     });
-  });
+  }
 }
