@@ -84,6 +84,40 @@ WORKFLOW（必须走项目三级结构）
 
   也支持直接文件路径：nextframe build path/to/file.json -o out.html
 
+RECORDING (HTML → MP4)
+  录制用 nextframe-recorder（Rust binary），不是 CLI 的 render 命令。
+
+  基本用法：
+    nextframe-recorder slide <html> --out <mp4> --width W --height H --fps 30
+
+  推荐用法（默认开并行 8 进程）：
+    nextframe-recorder slide video.html --out video.mp4 --width 1920 --height 1080 --dpr 1 --fps 30 --parallel 8
+
+  三种比例录制：
+    # 16:9 横屏 1080p
+    nextframe-recorder slide wide.html -o wide.mp4 --width 1920 --height 1080 --dpr 1 --fps 30 --parallel 8
+
+    # 9:16 竖屏 1080p
+    nextframe-recorder slide tall.html -o tall.mp4 --width 1080 --height 1920 --dpr 1 --fps 30 --parallel 8
+
+    # 4:3 PPT
+    nextframe-recorder slide ppt.html -o ppt.mp4 --width 1440 --height 1080 --dpr 1 --fps 30 --parallel 8
+
+    # 4K（加 --dpr 2）
+    nextframe-recorder slide wide.html -o wide-4k.mp4 --width 1920 --height 1080 --dpr 2 --fps 30 --parallel 4
+
+  参数说明：
+    --parallel N    并行 WebView 数（推荐 8，4K 用 4）
+    --dpr N         设备像素比（1=1080p, 2=4K）
+    --fps N         帧率（30 或 60）
+    --crf N         质量（默认 14，越小越清晰，文件越大）
+
+  完整流程：build HTML → recorder 录制 → 得到 MP4
+    nextframe build myproject ep01 main
+    nextframe-recorder slide ~/NextFrame/projects/myproject/ep01/main.html \\
+      -o ~/NextFrame/projects/myproject/ep01/main.mp4 \\
+      --width 1920 --height 1080 --dpr 1 --fps 30 --parallel 8
+
 COMMANDS
   new <out.json>                         create v0.3 timeline
   validate <timeline>                    6 gates + overlap check
