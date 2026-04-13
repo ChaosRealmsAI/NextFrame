@@ -717,6 +717,91 @@ return {
 })();
 
 
+// --- card3d ---
+SCENE_REGISTRY["card3d"] = (function() {
+  
+return {
+  id: "card3d",
+  type: "dom",
+  name: "3D Card Flip",
+  category: "Motion Graphics",
+  defaultParams: {
+    frontTitle: "Front",
+    frontSubtitle: "",
+    backContent: "Back side",
+    bgColor: "rgba(30,30,50,0.9)",
+    rotateAxis: "Y",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center;perspective:1200px");
+    const bgColor = params.bgColor || "rgba(30,30,50,0.9)";
+    const axis = (params.rotateAxis || "Y").toUpperCase() === "X" ? "X" : "Y";
+
+    const card = createNode("div", [
+      "position:relative;width:360px;height:240px",
+      "transform-style:preserve-3d",
+      "will-change:transform;opacity:0",
+    ].join(";"));
+
+    const faceBase = [
+      "position:absolute;inset:0;display:flex;flex-direction:column",
+      "align-items:center;justify-content:center;backface-visibility:hidden",
+      `background:${bgColor};border-radius:16px`,
+      `border:1px solid rgba(255,255,255,0.1)`,
+      `box-shadow:0 8px 32px rgba(0,0,0,0.4)`,
+      `font-family:${SANS_FONT_STACK}`,
+    ].join(";");
+
+    const front = createNode("div", faceBase);
+    const title = createNode("div", [
+      "font-size:28px;font-weight:700;color:#fff",
+      "letter-spacing:-0.01em",
+    ].join(";"), params.frontTitle || "Front");
+    front.appendChild(title);
+    if (params.frontSubtitle) {
+      const sub = createNode("div", "font-size:14px;color:rgba(255,255,255,0.5);margin-top:8px", params.frontSubtitle);
+      front.appendChild(sub);
+    }
+
+    const back = createNode("div", [
+      faceBase,
+      `transform:rotate${axis}(180deg)`,
+    ].join(";"));
+    const backText = createNode("div", "font-size:18px;color:rgba(255,255,255,0.8);padding:24px;text-align:center;line-height:1.5", params.backContent || "Back side");
+    back.appendChild(backText);
+
+    card.appendChild(front);
+    card.appendChild(back);
+    root.appendChild(card);
+    return { root, card, axis };
+  },
+
+  update(els, localT) {
+    const fadeIn = smoothstep(0, 0.1, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    els.card.style.opacity = fadeIn * fadeOut;
+
+    // 0~0.15: flip from 180 to 0 (back→front), 0.15~0.85: show front (0), 0.85~1: flip to 180
+    let deg;
+    if (localT < 0.15) {
+      const t = easeOutCubic(smoothstep(0, 0.15, localT));
+      deg = 180 - t * 180;
+    } else if (localT > 0.85) {
+      const t = easeOutCubic(smoothstep(0.85, 1, localT));
+      deg = t * 180;
+    } else {
+      deg = 0;
+    }
+    els.card.style.transform = `rotate${els.axis}(${deg}deg)`;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
 // --- circleRipple ---
 SCENE_REGISTRY["circleRipple"] = (function() {
   
@@ -893,6 +978,305 @@ return {
   },
 
   destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- confetti ---
+SCENE_REGISTRY["confetti"] = (function() {
+  
+const DEFAULT_COLORS = ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80", "#fbbf24"];
+
+return {
+  id: "confetti",
+  type: "canvas",
+  name: "Confetti",
+  category: "Effects",
+  defaultParams: {
+    count: 100,
+    colors: DEFAULT_COLORS,
+    gravity: 0.5,
+    spread: 60,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+
+    const count = clamp(toNumber(params.count, 100), 10, 500) | 0;
+    const colors = normalizeArray(params.colors, DEFAULT_COLORS);
+    const spread = toNumber(params.spread, 60);
+
+    let seed = 42;
+    const rng = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+
+    const particles = [];
+    for (let i = 0; i < count; i++) {
+      const angle = ((rng() - 0.5) * spread * Math.PI) / 180 - Math.PI / 2;
+      const velocity = 300 + rng() * 400;
+      particles.push({
+        x: 0.5, y: 0.7,
+        vx: Math.cos(angle) * velocity * (rng() * 0.5 + 0.75),
+        vy: Math.sin(angle) * velocity * (rng() * 0.5 + 0.75),
+        w: 6 + rng() * 8, h: 4 + rng() * 6,
+        rot: rng() * Math.PI * 2,
+        rotSpeed: (rng() - 0.5) * 12,
+        color: colors[i % colors.length] || "#fff",
+        shape: rng() > 0.5 ? "rect" : "circle",
+      });
+    }
+    canvas._data = { particles };
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    const W = canvas.width;
+    const H = canvas.height;
+    const gravity = toNumber(params.gravity, 0.5) * 800;
+    const t = localT;
+
+    ctx.clearRect(0, 0, W, H);
+    const { particles } = canvas._data;
+
+    for (const p of particles) {
+      const px = (p.x + p.vx * t / W) * W;
+      const py = (p.y + p.vy * t / H + 0.5 * gravity * t * t / H) * H;
+      if (py > H + 20) continue;
+
+      const rot = p.rot + p.rotSpeed * t;
+      const alpha = clamp(1 - t * 0.3, 0.2, 1);
+
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(rot);
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+
+      if (p.shape === "circle") {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.w * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(-p.w * 0.5, -p.h * 0.5, p.w, p.h);
+      }
+      ctx.restore();
+    }
+  },
+
+  destroy(canvas) { canvas._data = null; canvas.remove(); },
+};
+
+})();
+
+
+// --- featureGrid ---
+SCENE_REGISTRY["featureGrid"] = (function() {
+  
+const DEFAULT_FEATURES = [
+  { icon: "\u26a1", title: "Fast", desc: "Lightning speed rendering" },
+  { icon: "\ud83c\udfa8", title: "Beautiful", desc: "Stunning visual quality" },
+  { icon: "\ud83e\udde0", title: "Smart", desc: "AI-powered editing" },
+  { icon: "\ud83d\udd12", title: "Secure", desc: "Your data stays yours" },
+];
+
+return {
+  id: "featureGrid",
+  type: "dom",
+  name: "Feature Grid",
+  category: "Layout",
+  defaultParams: {
+    features: DEFAULT_FEATURES,
+    columns: 2,
+    stagger: 0.05,
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center;padding:40px");
+    const features = normalizeArray(params.features, DEFAULT_FEATURES);
+    const cols = toNumber(params.columns, 2);
+
+    const grid = createNode("div", [
+      "display:grid",
+      `grid-template-columns:repeat(${cols}, 1fr)`,
+      "gap:20px;max-width:680px;width:100%",
+    ].join(";"));
+
+    const cards = features.map((f) => {
+      const card = createNode("div", [
+        "background:rgba(255,255,255,0.05)",
+        "border:1px solid rgba(255,255,255,0.1)",
+        "border-radius:14px;padding:24px",
+        "will-change:transform,opacity;opacity:0",
+        "transform:scale(0.7)",
+        "backdrop-filter:blur(4px)",
+      ].join(";"));
+
+      const icon = createNode("div", [
+        "font-size:32px;margin-bottom:10px",
+      ].join(";"), f.icon || "");
+      const title = createNode("div", [
+        `font-family:${SANS_FONT_STACK}`,
+        "font-size:18px;font-weight:700;color:#fff",
+        "margin-bottom:6px",
+      ].join(";"), f.title || "");
+      const desc = createNode("div", [
+        `font-family:${SANS_FONT_STACK}`,
+        "font-size:13px;color:rgba(255,255,255,0.55)",
+        "line-height:1.4",
+      ].join(";"), f.desc || "");
+
+      card.appendChild(icon);
+      card.appendChild(title);
+      card.appendChild(desc);
+      grid.appendChild(card);
+      return card;
+    });
+
+    root.appendChild(grid);
+    return { root, cards };
+  },
+
+  update(els, localT, params) {
+    const stagger = toNumber(params.stagger, 0.05);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+
+    els.cards.forEach((card, i) => {
+      const start = 0.03 + i * stagger;
+      const enterT = smoothstep(start, start + 0.12, localT);
+      const scale = 0.7 + easeOutBack(enterT) * 0.3;
+      const alpha = enterT * fadeOut;
+      card.style.opacity = alpha;
+      card.style.transform = `scale(${scale})`;
+    });
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- flowChart ---
+SCENE_REGISTRY["flowChart"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const DEFAULT_STEPS = [
+  { label: "Input" }, { label: "Process" }, { label: "Validate" }, { label: "Output" },
+];
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  if (attrs) { for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); }
+  return el;
+}
+
+return {
+  id: "flowChart",
+  type: "svg",
+  name: "Flow Chart",
+  category: "Data Viz",
+  defaultParams: {
+    steps: DEFAULT_STEPS,
+    color: "#6ee7ff",
+    arrowColor: "#a78bfa",
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const steps = normalizeArray(params.steps, DEFAULT_STEPS);
+    const color = params.color || "#6ee7ff";
+    const arrowColor = params.arrowColor || "#a78bfa";
+    const count = clamp(steps.length, 2, 6);
+    const boxW = 200, boxH = 80, cy = 540;
+    const totalW = count * boxW + (count - 1) * 100;
+    const startX = (1920 - totalW) / 2;
+
+    // Defs: arrow marker + glow
+    const defs = svgEl("defs");
+    const marker = svgEl("marker", {
+      id: "fcArrow", viewBox: "0 0 10 10", refX: "10", refY: "5",
+      markerWidth: "8", markerHeight: "8", orient: "auto-start-reverse",
+    });
+    const path = svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: arrowColor });
+    marker.appendChild(path);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    const boxes = [];
+    const arrows = [];
+
+    for (let i = 0; i < count; i++) {
+      const x = startX + i * (boxW + 100);
+      const g = svgEl("g", { opacity: "0" });
+
+      const rect = svgEl("rect", {
+        x: String(x), y: String(cy - boxH / 2),
+        width: String(boxW), height: String(boxH),
+        rx: "12", fill: "rgba(255,255,255,0.06)",
+        stroke: color, "stroke-width": "1.5",
+      });
+      g.appendChild(rect);
+
+      const text = svgEl("text", {
+        x: String(x + boxW / 2), y: String(cy + 6),
+        fill: "#fff", "font-size": "17", "text-anchor": "middle",
+        "font-family": "-apple-system, sans-serif", "font-weight": "600",
+      });
+      text.textContent = (steps[i] && steps[i].label) || `Step ${i + 1}`;
+      g.appendChild(text);
+
+      svg.appendChild(g);
+      boxes.push(g);
+
+      // Arrow between boxes
+      if (i < count - 1) {
+        const ax1 = x + boxW + 8;
+        const ax2 = x + boxW + 100 - 8;
+        const arrow = svgEl("line", {
+          x1: String(ax1), y1: String(cy),
+          x2: String(ax2), y2: String(cy),
+          stroke: arrowColor, "stroke-width": "2",
+          "marker-end": "url(#fcArrow)", opacity: "0",
+        });
+        svg.appendChild(arrow);
+        arrows.push(arrow);
+      }
+    }
+
+    return { svg, boxes, arrows };
+  },
+
+  update(els, localT) {
+    const total = els.boxes.length + els.arrows.length;
+    const progress = Math.min(1, localT / Math.max(total * 0.5, 2));
+
+    let idx = 0;
+    for (let i = 0; i < els.boxes.length; i++) {
+      const threshold = (idx + 1) / (total + 1);
+      els.boxes[i].setAttribute("opacity", progress >= threshold ? "1" : "0");
+      idx++;
+      if (i < els.arrows.length) {
+        const aThreshold = (idx + 1) / (total + 1);
+        els.arrows[i].setAttribute("opacity", progress >= aThreshold ? "1" : "0");
+        idx++;
+      }
+    }
+  },
+
+  destroy(els) { els.svg.remove(); },
 };
 
 })();
@@ -1202,6 +1586,60 @@ return {
 })();
 
 
+// --- imageHero ---
+SCENE_REGISTRY["imageHero"] = (function() {
+  
+return {
+  id: "imageHero",
+  type: "media",
+  name: "Image Hero",
+  category: "Media",
+  defaultParams: {
+    src: "",
+    alt: "",
+    objectFit: "cover",
+    zoomStart: 1,
+    zoomEnd: 1.15,
+    panX: 0,
+    panY: 0,
+  },
+
+  create(container, params) {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:absolute;inset:0;overflow:hidden";
+    const img = document.createElement("img");
+    img.style.cssText = [
+      "width:100%;height:100%",
+      `object-fit:${params.objectFit || "cover"}`,
+      "display:block;will-change:transform",
+    ].join(";");
+    img.alt = params.alt || "";
+    if (params.src) img.src = params.src;
+    wrap.appendChild(img);
+    container.appendChild(wrap);
+    return { wrap, img };
+  },
+
+  update(els, localT, params) {
+    const duration = toNumber(localT, 0);
+    // Normalize to 0-1 over a 10s assumed max, clamped
+    const progress = clamp(duration / 10, 0, 1);
+    const zoomStart = toNumber(params.zoomStart, 1);
+    const zoomEnd = toNumber(params.zoomEnd, 1.15);
+    const panX = toNumber(params.panX, 0);
+    const panY = toNumber(params.panY, 0);
+    const scale = lerp(zoomStart, zoomEnd, progress);
+    const tx = panX * progress;
+    const ty = panY * progress;
+    els.img.style.transform = `scale(${scale}) translate(${tx}px, ${ty}px)`;
+  },
+
+  destroy(els) { els.wrap.remove(); },
+};
+
+})();
+
+
 // --- lineChart ---
 SCENE_REGISTRY["lineChart"] = (function() {
   
@@ -1358,6 +1796,70 @@ return {
 })();
 
 
+// --- logoReveal ---
+SCENE_REGISTRY["logoReveal"] = (function() {
+  
+return {
+  id: "logoReveal",
+  type: "dom",
+  name: "Logo Reveal",
+  category: "Media",
+  defaultParams: {
+    src: "",
+    size: 200,
+    glowColor: "#6ee7ff",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center");
+    const size = toNumber(params.size, 200);
+    const glowColor = params.glowColor || "#6ee7ff";
+
+    const wrap = createNode("div", [
+      "position:relative",
+      `width:${size}px;height:${size}px`,
+      "will-change:opacity,transform",
+      "opacity:0",
+    ].join(";"));
+
+    const img = document.createElement("img");
+    img.style.cssText = "width:100%;height:100%;object-fit:contain;display:block;position:relative;z-index:1";
+    if (params.src) img.src = params.src;
+    wrap.appendChild(img);
+
+    const glow = createNode("div", [
+      "position:absolute;top:0;left:-40%;width:30%;height:100%",
+      `background:linear-gradient(90deg,transparent,${glowColor}88,transparent)`,
+      "will-change:transform;opacity:0;z-index:2",
+      "pointer-events:none;filter:blur(8px)",
+    ].join(";"));
+    wrap.appendChild(glow);
+
+    root.appendChild(wrap);
+    return { root, wrap, glow };
+  },
+
+  update(els, localT, params) {
+    const fadeIn = smoothstep(0, 0.12, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    const scale = 0.8 + easeOutCubic(fadeIn) * 0.2;
+
+    els.wrap.style.opacity = fadeIn * fadeOut;
+    els.wrap.style.transform = `scale(${scale})`;
+
+    // Glow sweep: active between 0.1 and 0.5
+    const sweepT = smoothstep(0.1, 0.5, localT);
+    const glowX = -40 + sweepT * 180; // percent
+    els.glow.style.opacity = sweepT < 1 ? 0.9 : 0;
+    els.glow.style.transform = `translateX(${glowX}%)`;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
 // --- lowerThird ---
 SCENE_REGISTRY["lowerThird"] = (function() {
   
@@ -1430,6 +1932,76 @@ return {
     els.bar.style.width = `${barT * 60}px`;
     const subT = smoothstep(0.1, 0.18, localT);
     els.subtitle.style.opacity = subT * exitAlpha;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- marquee ---
+SCENE_REGISTRY["marquee"] = (function() {
+  
+return {
+  id: "marquee",
+  type: "dom",
+  name: "Marquee",
+  category: "Typography",
+  defaultParams: {
+    text: "BREAKING NEWS — NEXTFRAME AI VIDEO EDITOR",
+    fontSize: 24,
+    speed: 100,
+    color: "#fff",
+    bgColor: "rgba(0,0,0,0.6)",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:flex-end;padding-bottom:60px");
+    const fontSize = toNumber(params.fontSize, 24);
+    const bgColor = params.bgColor || "rgba(0,0,0,0.6)";
+    const color = params.color || "#fff";
+
+    const bar = createNode("div", [
+      "width:100%;overflow:hidden;position:relative",
+      `background:${bgColor}`,
+      "padding:12px 0",
+      "backdrop-filter:blur(8px)",
+      "will-change:opacity;opacity:0",
+    ].join(";"));
+
+    // Duplicate text for seamless loop
+    const fullText = String(params.text || "MARQUEE");
+    const repeated = `${fullText}    \u2014    ${fullText}    \u2014    `;
+    const textEl = createNode("span", [
+      `font-family:${SANS_FONT_STACK}`,
+      `font-size:${fontSize}px`,
+      "font-weight:600",
+      `color:${color}`,
+      "white-space:nowrap",
+      "display:inline-block",
+      "will-change:transform",
+      "letter-spacing:0.02em",
+    ].join(";"), repeated);
+
+    bar.appendChild(textEl);
+    root.appendChild(bar);
+    return { root, bar, textEl };
+  },
+
+  update(els, localT, params) {
+    const fadeIn = smoothstep(0, 0.08, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    els.bar.style.opacity = fadeIn * fadeOut;
+
+    const speed = toNumber(params.speed, 100);
+    // localT is 0~1; map to pixel offset
+    const totalDuration = 1; // the full 0~1 range
+    const pixelOffset = localT * speed * 10; // scale up for visible movement
+    // Loop by using modulo of half the text width (since we duplicated)
+    const textWidth = els.textEl.offsetWidth * 0.5;
+    const offset = textWidth > 0 ? pixelOffset % textWidth : pixelOffset;
+    els.textEl.style.transform = `translateX(${-offset}px)`;
   },
 
   destroy(els) { els.root.remove(); },
@@ -1746,6 +2318,66 @@ return {
     els.digits.textContent = current.toLocaleString();
     const labelT = smoothstep(0.15, 0.25, localT);
     els.label.style.opacity = labelT * exitAlpha;
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- parallaxStack ---
+SCENE_REGISTRY["parallaxStack"] = (function() {
+  
+const DEFAULT_LAYERS = [
+  { text: "Background", speed: 0.3, color: "rgba(110,231,255,0.4)", size: 48 },
+  { text: "Middle", speed: 0.6, color: "rgba(167,139,250,0.6)", size: 64 },
+  { text: "Foreground", speed: 1, color: "#ffffff", size: 80 },
+];
+
+return {
+  id: "parallaxStack",
+  type: "dom",
+  name: "Parallax Stack",
+  category: "Motion Graphics",
+  defaultParams: {
+    layers: DEFAULT_LAYERS,
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center");
+    const layers = normalizeArray(params.layers, DEFAULT_LAYERS);
+    const divs = layers.map((layer) => {
+      const size = toNumber(layer.size, 48);
+      const color = layer.color || "#ffffff";
+      const div = createNode("div", [
+        "position:absolute;text-align:center;white-space:nowrap",
+        `font-family:${SANS_FONT_STACK}`,
+        `font-size:${size}px;font-weight:700`,
+        `color:${color}`,
+        "will-change:transform,opacity;opacity:0",
+        `text-shadow:0 0 20px ${color}44`,
+      ].join(";"), layer.text || "");
+      root.appendChild(div);
+      return { div, speed: toNumber(layer.speed, 0.5) };
+    });
+    return { root, divs };
+  },
+
+  update(els, localT) {
+    const fadeIn = smoothstep(0, 0.15, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    const alpha = fadeIn * fadeOut;
+
+    // Parallax offset: each layer moves at different speed
+    const baseOffset = (localT - 0.5) * 200; // px range
+
+    els.divs.forEach((item, i) => {
+      const enterT = easeOutCubic(smoothstep(0.02 + i * 0.04, 0.15 + i * 0.04, localT));
+      const y = baseOffset * item.speed + (1 - enterT) * 60;
+      item.div.style.opacity = enterT * alpha;
+      item.div.style.transform = `translateY(${y}px)`;
+    });
   },
 
   destroy(els) { els.root.remove(); },
@@ -2963,6 +3595,119 @@ return {
 })();
 
 
+// --- timelineViz ---
+SCENE_REGISTRY["timelineViz"] = (function() {
+  
+const SVG_NS = "http://www.w3.org/2000/svg";
+const DEFAULT_EVENTS = [
+  { label: "Start", date: "Q1" },
+  { label: "Develop", date: "Q2" },
+  { label: "Test", date: "Q3" },
+  { label: "Launch", date: "Q4" },
+];
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  if (attrs) { for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v); }
+  return el;
+}
+
+return {
+  id: "timelineViz",
+  type: "svg",
+  name: "Timeline",
+  category: "Data Viz",
+  defaultParams: {
+    events: DEFAULT_EVENTS,
+    color: "#a78bfa",
+    dotSize: 8,
+  },
+
+  create(container, params) {
+    const svg = svgEl("svg", {
+      viewBox: "0 0 1920 1080",
+      style: "position:absolute;inset:0;width:100%;height:100%",
+    });
+    container.appendChild(svg);
+
+    const events = normalizeArray(params.events, DEFAULT_EVENTS);
+    const color = params.color || "#a78bfa";
+    const dotR = toNumber(params.dotSize, 8);
+    const count = events.length;
+    const marginX = 240;
+    const cy = 540;
+    const lineY = cy;
+
+    // Glow filter
+    const defs = svgEl("defs");
+    const filter = svgEl("filter", { id: "tlGlow", x: "-50%", y: "-50%", width: "200%", height: "200%" });
+    filter.appendChild(svgEl("feGaussianBlur", { stdDeviation: "4", result: "blur" }));
+    const merge = svgEl("feMerge");
+    merge.appendChild(svgEl("feMergeNode", { in: "blur" }));
+    merge.appendChild(svgEl("feMergeNode", { in: "SourceGraphic" }));
+    filter.appendChild(merge);
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+
+    // Horizontal line
+    const line = svgEl("line", {
+      x1: String(marginX), y1: String(lineY),
+      x2: String(1920 - marginX), y2: String(lineY),
+      stroke: color, "stroke-width": "2", opacity: "0.3",
+    });
+    svg.appendChild(line);
+
+    const nodes = [];
+    for (let i = 0; i < count; i++) {
+      const x = marginX + ((1920 - 2 * marginX) / Math.max(count - 1, 1)) * i;
+      const g = svgEl("g", { opacity: "0" });
+
+      const dot = svgEl("circle", {
+        cx: String(x), cy: String(cy), r: String(dotR),
+        fill: color, filter: "url(#tlGlow)",
+      });
+      g.appendChild(dot);
+
+      const label = svgEl("text", {
+        x: String(x), y: String(cy - 28),
+        fill: "#fff", "font-size": "18", "text-anchor": "middle",
+        "font-family": "-apple-system, sans-serif", "font-weight": "600",
+      });
+      label.textContent = events[i].label || "";
+      g.appendChild(label);
+
+      const date = svgEl("text", {
+        x: String(x), y: String(cy + 36),
+        fill: "rgba(255,255,255,0.45)", "font-size": "13", "text-anchor": "middle",
+        "font-family": "-apple-system, sans-serif",
+      });
+      date.textContent = events[i].date || "";
+      g.appendChild(date);
+
+      svg.appendChild(g);
+      nodes.push(g);
+    }
+
+    return { svg, nodes };
+  },
+
+  update(els, localT) {
+    const count = els.nodes.length;
+    for (let i = 0; i < count; i++) {
+      const threshold = (i + 1) / (count + 1);
+      // localT is seconds; reveal over first few seconds
+      const progress = Math.min(1, localT / Math.max(count * 0.8, 2));
+      const opacity = progress >= threshold ? 1 : 0;
+      els.nodes[i].setAttribute("opacity", String(opacity));
+    }
+  },
+
+  destroy(els) { els.svg.remove(); },
+};
+
+})();
+
+
 // --- treeMap ---
 SCENE_REGISTRY["treeMap"] = (function() {
   
@@ -3130,6 +3875,132 @@ return {
 })();
 
 
+// --- typewriter ---
+SCENE_REGISTRY["typewriter"] = (function() {
+  
+return {
+  id: "typewriter",
+  type: "dom",
+  name: "Typewriter",
+  category: "Typography",
+  defaultParams: {
+    text: "Hello, World!",
+    fontSize: 32,
+    speed: 20,
+    cursor: true,
+    cursorColor: "#6ee7ff",
+  },
+
+  create(container, params) {
+    const root = createRoot(container, "display:flex;align-items:center;justify-content:center;padding:40px");
+    const fontSize = toNumber(params.fontSize, 32);
+    const cursorColor = params.cursorColor || "#6ee7ff";
+
+    const wrap = createNode("div", [
+      "display:inline-flex;align-items:baseline",
+      `font-family:${MONO_FONT_STACK}`,
+      `font-size:${fontSize}px`,
+      "color:#fff;line-height:1.5",
+      "will-change:opacity",
+    ].join(";"));
+
+    const textSpan = createNode("span", "white-space:pre-wrap;word-break:break-word");
+    const cursorSpan = createNode("span", [
+      `color:${cursorColor}`,
+      "font-weight:400;margin-left:1px",
+      "will-change:opacity",
+    ].join(";"), "\u2588");
+
+    wrap.appendChild(textSpan);
+    if (params.cursor !== false) wrap.appendChild(cursorSpan);
+    root.appendChild(wrap);
+
+    return { root, textSpan, cursorSpan, fullText: String(params.text || "Hello, World!") };
+  },
+
+  update(els, localT, params) {
+    const fadeIn = smoothstep(0, 0.05, localT);
+    const fadeOut = 1 - smoothstep(0.85, 1, localT);
+    els.root.style.opacity = fadeIn * fadeOut;
+
+    const speed = toNumber(params.speed, 20);
+    const totalChars = els.fullText.length;
+    // Map localT (0~1) to typing progress
+    const typeDuration = totalChars / speed; // seconds at this speed
+    const normalizedSpeed = typeDuration > 0 ? 1 / typeDuration : 10;
+    // Typing happens between 0.05 and 0.8
+    const typeT = smoothstep(0.05, 0.05 + 0.75 * (totalChars / (speed * 4 + totalChars)), localT);
+    const charCount = Math.min(totalChars, Math.floor(typeT * (totalChars + 1)));
+
+    els.textSpan.textContent = els.fullText.slice(0, charCount);
+
+    // Cursor blink (using localT as a proxy for time)
+    if (els.cursorSpan) {
+      const blink = Math.sin(localT * 80) > 0 ? 1 : 0.15;
+      const showCursor = charCount < totalChars ? 1 : blink;
+      els.cursorSpan.style.opacity = showCursor;
+    }
+  },
+
+  destroy(els) { els.root.remove(); },
+};
+
+})();
+
+
+// --- videoClip ---
+SCENE_REGISTRY["videoClip"] = (function() {
+  
+return {
+  id: "videoClip",
+  type: "media",
+  name: "Video Clip",
+  category: "Media",
+  defaultParams: {
+    src: "",
+    poster: "",
+    muted: true,
+    loop: false,
+    objectFit: "cover",
+  },
+
+  create(container, params) {
+    const video = document.createElement("video");
+    video.style.cssText = [
+      "position:absolute;inset:0;width:100%;height:100%",
+      `object-fit:${params.objectFit || "cover"}`,
+      "display:block;background:#000",
+    ].join(";");
+    video.playsInline = true;
+    video.muted = params.muted !== false;
+    video.loop = params.loop === true;
+    video.preload = "auto";
+    if (params.poster) video.poster = params.poster;
+    if (params.src) video.src = params.src;
+    container.appendChild(video);
+    return video;
+  },
+
+  update(video, localT) {
+    const t = toNumber(localT, 0);
+    if (!video.duration || !Number.isFinite(video.duration)) return;
+    const target = clamp(t, 0, video.duration);
+    if (Math.abs(video.currentTime - target) > 0.1) {
+      video.currentTime = target;
+    }
+  },
+
+  destroy(video) {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    video.remove();
+  },
+};
+
+})();
+
+
 // --- vignette ---
 SCENE_REGISTRY["vignette"] = (function() {
   
@@ -3196,6 +4067,110 @@ function alphaHex(alpha) {
   const val = Math.round(clamp(alpha, 0, 1) * 255);
   return val.toString(16).padStart(2, "0");
 }
+
+})();
+
+
+// --- waveform ---
+SCENE_REGISTRY["waveform"] = (function() {
+  
+return {
+  id: "waveform",
+  type: "canvas",
+  name: "Waveform",
+  category: "Effects",
+  defaultParams: {
+    bars: 64,
+    color: "#6ee7ff",
+    mirrorY: true,
+    beatSpeed: 2,
+  },
+
+  create(container, params) {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block";
+    canvas.width = container.clientWidth || 1920;
+    canvas.height = container.clientHeight || 1080;
+    container.appendChild(canvas);
+
+    const barCount = clamp(toNumber(params.bars, 64), 8, 256) | 0;
+    const offsets = new Float64Array(barCount);
+    let seed = 197;
+    for (let i = 0; i < barCount; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      offsets[i] = (seed / 0x7fffffff) * Math.PI * 2;
+    }
+    canvas._data = { offsets };
+    return canvas;
+  },
+
+  update(canvas, localT, params) {
+    const ctx = canvas.getContext("2d");
+    const cw = canvas.parentElement?.clientWidth || canvas.width;
+    const ch = canvas.parentElement?.clientHeight || canvas.height;
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    const W = canvas.width;
+    const H = canvas.height;
+
+    const barCount = clamp(toNumber(params.bars, 64), 8, 256) | 0;
+    const color = params.color || "#6ee7ff";
+    const mirror = params.mirrorY !== false;
+    const beatSpeed = toNumber(params.beatSpeed, 2);
+    const { offsets } = canvas._data;
+    const t = localT * beatSpeed;
+
+    ctx.clearRect(0, 0, W, H);
+
+    const gap = 2;
+    const totalGap = gap * (barCount - 1);
+    const barW = Math.max(1, (W * 0.7 - totalGap) / barCount);
+    const startX = W * 0.15;
+    const centerY = H / 2;
+    const maxBarH = H * 0.35;
+
+    for (let i = 0; i < barCount; i++) {
+      const off = i < offsets.length ? offsets[i] : i;
+      const w1 = Math.sin(t * 3.2 + off) * 0.35;
+      const w2 = Math.sin(t * 1.8 + off * 1.4) * 0.3;
+      const w3 = Math.sin(t * 5.5 + off * 0.6) * 0.2;
+      const beat = Math.pow(Math.abs(Math.sin(t * Math.PI * 0.5)), 4) * 0.15;
+      const raw = clamp(0.5 + w1 + w2 + w3 + beat, 0, 1);
+      const barH = lerp(maxBarH * 0.05, maxBarH, raw);
+      const x = startX + i * (barW + gap);
+
+      // Glow: draw a wider transparent version behind
+      const glowGrad = ctx.createLinearGradient(x, centerY - barH, x, centerY + (mirror ? barH : 0));
+      glowGrad.addColorStop(0, color + "44");
+      glowGrad.addColorStop(1, "transparent");
+      ctx.fillStyle = glowGrad;
+      const glowW = barW + 4;
+      ctx.fillRect(x - 2, centerY - barH, glowW, barH + (mirror ? barH : 0));
+
+      // Main bar
+      const grad = ctx.createLinearGradient(x, centerY - barH, x, centerY);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, color + "88");
+      ctx.fillStyle = grad;
+
+      const rx = Math.min(barW / 2, 3);
+      ctx.beginPath();
+      ctx.roundRect(x, centerY - barH, barW, barH, [rx, rx, 0, 0]);
+      ctx.fill();
+
+      if (mirror) {
+        const mGrad = ctx.createLinearGradient(x, centerY, x, centerY + barH);
+        mGrad.addColorStop(0, color + "66");
+        mGrad.addColorStop(1, color + "11");
+        ctx.fillStyle = mGrad;
+        ctx.beginPath();
+        ctx.roundRect(x, centerY, barW, barH, [0, 0, rx, rx]);
+        ctx.fill();
+      }
+    }
+  },
+
+  destroy(canvas) { canvas._data = null; canvas.remove(); },
+};
 
 })();
 
@@ -3268,6 +4243,45 @@ function calcExitEffect(effect, localT, dur) {
   }
 }
 
+// ─── Transition Calculator ─────────────────────────────────────
+// Format: "dissolve 0.5s" or "wipeLeft 0.8s" or "wipeUp 0.6s" or "none"
+function parseTransition(str) {
+  if (!str || str === 'none') return null;
+  const parts = str.trim().split(/\s+/);
+  const type = parts[0];
+  const dur = parseFloat(parts[1]) || 0.5;
+  return { type, dur };
+}
+
+function calcTransitionStyle(transition, progress) {
+  if (!transition) return {};
+  const p = easeOutCubic(clamp01(progress));
+  switch (transition.type) {
+    case 'dissolve':
+      return { opacity: p };
+    case 'wipeLeft':
+      return { clipPath: `inset(0 ${(1 - p) * 100}% 0 0)` };
+    case 'wipeRight':
+      return { clipPath: `inset(0 0 0 ${(1 - p) * 100}%)` };
+    case 'wipeUp':
+      return { clipPath: `inset(0 0 ${(1 - p) * 100}% 0)` };
+    case 'wipeDown':
+      return { clipPath: `inset(${(1 - p) * 100}% 0 0 0)` };
+    case 'slideLeft':
+      return { transform: `translateX(${(1 - p) * 100}%)` };
+    case 'slideRight':
+      return { transform: `translateX(${(p - 1) * 100}%)` };
+    case 'slideUp':
+      return { transform: `translateY(${(1 - p) * 100}%)` };
+    case 'slideDown':
+      return { transform: `translateY(${(p - 1) * 100}%)` };
+    case 'zoomIn':
+      return { opacity: p, transform: `scale(${0.5 + 0.5 * p})` };
+    default:
+      return { opacity: p };
+  }
+}
+
 // ─── Layer Style Resolver ──────────────────────────────────────
 // Converts layer properties to CSS on the container div
 function applyLayerStyle(el, layer) {
@@ -3330,6 +4344,7 @@ function createEngine(stageEl, timeline, sceneRegistry) {
       wasActive: false,
       enterEffect: parseEffect(layer.enter),
       exitEffect: parseEffect(layer.exit),
+      transition: parseTransition(layer.transition),
     };
     layerStates.push(state);
   }
@@ -3362,11 +4377,31 @@ function createEngine(stageEl, timeline, sceneRegistry) {
         // Calculate effects
         const enter = calcEnterEffect(state.enterEffect, localT);
         const exit = calcExitEffect(state.exitEffect, localT, dur);
-        const opacity = enter.opacity * exit.opacity * (layer.opacity != null ? layer.opacity : 1);
-        const transforms = [enter.transform, exit.transform].filter(Boolean).join(' ');
+
+        // Calculate transition (applied at layer start)
+        let transOpacity = 1;
+        let transTransform = '';
+        let transClipPath = '';
+        if (state.transition && localT < state.transition.dur) {
+          const tp = clamp01(localT / state.transition.dur);
+          const ts = calcTransitionStyle(state.transition, tp);
+          if (ts.opacity != null) transOpacity = ts.opacity;
+          if (ts.transform) transTransform = ts.transform;
+          if (ts.clipPath) transClipPath = ts.clipPath;
+        }
+
+        const opacity = enter.opacity * exit.opacity * transOpacity * (layer.opacity != null ? layer.opacity : 1);
+        const transforms = [enter.transform, exit.transform, transTransform].filter(Boolean).join(' ');
 
         // Apply visual properties
         container.style.opacity = opacity;
+        if (transClipPath) {
+          container.style.clipPath = transClipPath;
+        } else if (layer.clipPath && layer.clipPath !== 'none') {
+          container.style.clipPath = layer.clipPath;
+        } else {
+          container.style.clipPath = '';
+        }
         if (transforms) {
           container.style.transform = transforms;
         } else if (!layer.x && !layer.y) {
