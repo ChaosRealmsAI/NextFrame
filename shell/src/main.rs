@@ -7,7 +7,7 @@ macro_rules! trace_log {
     };
 }
 
-mod app;
+mod window;
 mod app_control;
 mod appctl_script;
 mod http;
@@ -16,7 +16,7 @@ mod protocol;
 mod screenshot;
 
 fn main() {
-    if let Err(error) = app::run() {
+    if let Err(error) = window::run() {
         trace_log!("failed to start shell: {error}");
         std::process::exit(1);
     }
