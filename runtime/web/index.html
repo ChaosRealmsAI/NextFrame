@@ -191,24 +191,8 @@ window.__ipc = window.__ipc || {};
       <div class="pl-tab" onclick="switchPipelineStage('output')">产出</div>
     </div>
     <div style="flex:1"></div>
-    <!-- Keep original segment dropdown for editor internals -->
-    <div class="breadcrumb" style="margin-right:8px">
-      <div class="bc-item" id="bc-scene" onclick="toggleBcDrop('bc-drop-scene',event)">
-        <span id="bc-scene-label">content</span><span class="bc-caret">&#x25BE;</span>
-        <div class="bc-dropdown" id="bc-drop-scene">
-          <div class="bc-dropdown-item"><span class="dot-active"></span>content</div>
-          <div class="bc-dropdown-item"><span class="dot-inactive"></span>transitions</div>
-          <div class="bc-dropdown-item"><span class="dot-inactive"></span>audio</div>
-        </div>
-      </div>
-    </div>
-
-    <div style="flex:1"></div>
     <div class="topbar-right">
-      <button class="btn-ghost-sm" onclick="toggleExports()">EXPORTS</button>
-      <button class="btn-ghost-sm" onclick="previewComposed()">PREVIEW</button>
-      <button class="btn-ghost-sm" onclick="toggleSettings()">SETTINGS</button>
-      <button class="btn-ghost-sm" onclick="navigator.clipboard.writeText('nextframe scene list --json')">COPY SKILLS</button>
+      <div class="avatar">Z</div>
     </div>
   </div>
 
