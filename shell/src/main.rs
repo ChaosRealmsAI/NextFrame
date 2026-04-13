@@ -519,6 +519,30 @@ fn handle_http_request(
                 "application/json; charset=utf-8",
             )
         }
+        ("GET", "/pipeline/status") => {
+            let script = r#"(function() {
+  return JSON.stringify({
+    project: currentProject,
+    episode: currentEpisode,
+    stage: pipelineStage,
+    view: document.querySelector(".view.active")?.id,
+    data: pipelineData ? {
+      scriptSegments: pipelineData.script?.segments?.length || 0,
+      audioSegments: pipelineData.audio?.segments?.length || 0,
+      atoms: pipelineData.atoms?.length || 0,
+      outputs: pipelineData.outputs?.length || 0
+    } : null
+  });
+})()"#;
+            queue_appctl_script(
+                webview,
+                script,
+                stream,
+                pending_appctl,
+                next_request_id,
+                "application/json; charset=utf-8",
+            )
+        }
         ("GET", "/screenshot") => {
             let requested_path = match query_value(query, "out") {
                 Some(raw_path) => {
@@ -650,6 +674,11 @@ fn build_navigate_script(payload: &Value) -> Result<String, String> {
   var hasSegment = payload && Object.prototype.hasOwnProperty.call(payload, "segment");
   if (view === "project") {{
     await goProject(payload.project || null);
+  }} else if (view === "pipeline") {{
+    await goPipeline(
+      payload && typeof payload.project === "string" ? payload.project : null,
+      payload && typeof payload.episode === "string" ? payload.episode : null
+    );
   }} else {{
     await goEditor(
       payload && typeof payload.project === "string" ? payload.project : null,

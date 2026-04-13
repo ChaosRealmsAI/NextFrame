@@ -34,6 +34,7 @@ const SUBCOMMANDS = {
   "layer-set": () => import("../src/cli/layers.js"),
   "layer-list": () => import("../src/cli/layers.js"),
   app: () => import("../src/cli/app.js"),
+  "app-pipeline": () => import("../src/cli/app-pipeline.js"),
   "app-eval": () => import("../src/cli/app-eval.js"),
   "app-screenshot": () => import("../src/cli/app-screenshot.js"),
   help: null,
