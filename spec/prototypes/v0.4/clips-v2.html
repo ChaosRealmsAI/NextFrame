@@ -142,7 +142,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 .main-head { padding: 12px 20px; border-bottom: var(--border); }
 .main-head-row { display: flex; align-items: baseline; gap: 10px; }
 .main-name { font-size: 16px; font-weight: 500; }
-.main-specs { font-family: var(--mono); font-size: 12px; color: var(--ink-55); }
+.main-specs { display: flex; gap: 6px; flex-wrap: wrap; }
+.spec-tag { font-family: var(--mono); font-size: 11px; padding: 3px 10px; border-radius: 4px; background: var(--ink-08); color: var(--ink-55); border: 1px solid rgba(255,255,255,0.04); }
 .main-path { font-family: var(--mono); font-size: 12px; color: var(--ink-55); margin-top: 3px; user-select: all; }
 
 /* ─── Full timeline ─── */
@@ -449,7 +450,7 @@ function renderMain() {
   var s = S[aS], clips = C.filter(function(c){return c.si===aS;});
   document.getElementById("mName").textContent = s.n;
   document.getElementById("mPath").textContent = s.path;
-  document.getElementById("mSpecs").innerHTML = s.w+"&times;"+s.h+" &middot; "+s.fps+"fps &middot; "+s.cod+" &middot; "+s.dur+" &middot; "+s.sz;
+  document.getElementById("mSpecs").innerHTML = [s.w+"&times;"+s.h, s.fps+"fps", s.cod, s.dur, s.sz].map(function(v){return '<span class="spec-tag">'+v+'</span>';}).join("");
 
   // Full timeline
   var bh = "";
