@@ -656,43 +656,77 @@ fn build_screenshot_script(out_path: &str) -> Result<String, String> {
     Ok(format!(
         r##"(async function() {{
   var outPath = {out_path_json};
-  function findCanvas() {{
-    var direct = document.getElementById("render-canvas");
-    if (direct && direct.width > 0 && direct.height > 0) {{
-      return direct;
-    }}
-    var host = document.getElementById("preview-stage-host") || document.getElementById("canvas-inner");
-    if (host) {{
-      var nested = host.querySelector("canvas");
-      if (nested && nested.width > 0 && nested.height > 0) {{
-        return nested;
-      }}
-    }}
-    var playerCanvas = document.querySelector("#player-canvas-inner canvas");
-    if (playerCanvas && playerCanvas.width > 0 && playerCanvas.height > 0) {{
-      return playerCanvas;
-    }}
-    return null;
-  }}
-  var canvas = findCanvas();
-  if (!canvas) {{
-    if (typeof window.__captureViewport === "function") {{
-      var viewportResult = window.__captureViewport(outPath);
-      return {{ path: outPath, mode: "viewport", detail: viewportResult }};
-    }}
-    throw new Error("no canvas found for screenshot");
-  }}
   if (typeof bridgeCall !== "function") {{
     throw new Error("bridgeCall is unavailable");
   }}
-  var dataUrl = canvas.toDataURL("image/png");
-  await bridgeCall("fs.writeBase64", {{ path: outPath, data: dataUrl }}, 10000);
-  return {{
-    path: outPath,
-    mode: "canvas",
-    width: canvas.width,
-    height: canvas.height
-  }};
+
+  // Try DOM screenshot via SVG foreignObject
+  var stageHost = document.getElementById("preview-stage-host");
+  if (stageHost && stageHost.childElementCount > 0) {{
+    try {{
+      var w = parseInt(stageHost.style.width) || 1920;
+      var h = parseInt(stageHost.style.height) || 1080;
+      var clone = stageHost.cloneNode(true);
+      // Reset transform for clean capture
+      clone.style.transform = "none";
+      clone.style.left = "0";
+      clone.style.top = "0";
+      clone.style.position = "absolute";
+
+      var svgData = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+        '<foreignObject width="100%" height="100%">' +
+        '<div xmlns="http://www.w3.org/1999/xhtml" style="width:' + w + 'px;height:' + h + 'px;overflow:hidden">' +
+        new XMLSerializer().serializeToString(clone) +
+        '</div></foreignObject></svg>';
+
+      var img = new Image();
+      var blob = new Blob([svgData], {{type: "image/svg+xml;charset=utf-8"}});
+      var url = URL.createObjectURL(blob);
+
+      await new Promise(function(resolve, reject) {{
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      }});
+
+      var canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      var ctx = canvas.getContext("2d");
+
+      // Draw all canvas layers first
+      stageHost.querySelectorAll("canvas").forEach(function(srcCanvas) {{
+        try {{
+          var rect = srcCanvas.getBoundingClientRect();
+          var hostRect = stageHost.getBoundingClientRect();
+          var scale = w / hostRect.width;
+          ctx.drawImage(srcCanvas, (rect.left - hostRect.left) * scale, (rect.top - hostRect.top) * scale, rect.width * scale, rect.height * scale);
+        }} catch(e) {{}}
+      }});
+
+      // Draw DOM layer on top
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+
+      var dataUrl = canvas.toDataURL("image/png");
+      await bridgeCall("fs.writeBase64", {{ path: outPath, data: dataUrl }}, 10000);
+      return {{ path: outPath, mode: "dom-composite", width: w, height: h }};
+    }} catch(domErr) {{
+      console.error("[screenshot] DOM capture failed:", domErr.message);
+    }}
+  }}
+
+  // Fallback: plain canvas capture
+  var renderCanvas = document.getElementById("render-canvas") ||
+    (stageHost && stageHost.querySelector("canvas")) ||
+    document.querySelector("#canvas-inner canvas");
+  if (renderCanvas && renderCanvas.width > 0) {{
+    var dataUrl = renderCanvas.toDataURL("image/png");
+    await bridgeCall("fs.writeBase64", {{ path: outPath, data: dataUrl }}, 10000);
+    return {{ path: outPath, mode: "canvas", width: renderCanvas.width, height: renderCanvas.height }};
+  }}
+
+  throw new Error("no capturable content found");
 }})()"##,
     ))
 }
