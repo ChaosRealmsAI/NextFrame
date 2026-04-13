@@ -3,7 +3,7 @@ import {
   MONO_FONT_STACK, SANS_FONT_STACK,
 } from "../scenes-v2-shared.js";
 
-// terminalCode — 终端风格代码窗口，带标题栏三圆点 + JSON 语法高亮
+// terminalCode — terminal-style code window with traffic lights and JSON syntax highlighting
 // type: "dom"
 // params: { title, lines: [{tokens:[{text,color}]}], lineHeight }
 
@@ -13,11 +13,11 @@ export default {
   name: "Terminal Code Window",
   category: "Code",
   tags: ["terminal", "code", "monospace", "codeblock", "window", "programming"],
-  description: "仿终端窗口样式的代码内容展示组件",
+  description: "Terminal-style code display component",
   params: {
-    title:      { type: "string", default: "schema.json", desc: "窗口标题栏文字" },
-    lines:      { type: "array",  default: [],             desc: "代码行数组（含 text/color）" },
-    lineHeight: { type: "number", default: 1.75,           desc: "行高倍数", min: 1, max: 3 },
+    title:      { type: "string", default: "schema.json", desc: "Window title text" },
+    lines:      { type: "array",  default: [],             desc: "Code line array with text/color tokens" },
+    lineHeight: { type: "number", default: 1.75,           desc: "Line-height multiplier", min: 1, max: 3 },
   },
   get defaultParams() {
     const p = {};

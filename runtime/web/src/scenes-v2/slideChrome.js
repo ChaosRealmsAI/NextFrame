@@ -3,11 +3,11 @@ import {
   SANS_FONT_STACK, SERIF_FONT_STACK,
 } from "../scenes-v2-shared.js";
 
-// slideChrome — 课件外框（顶栏 + 标题行 + 进度条 + 字幕）
+// slideChrome — presentation frame with top bar, title row, progress bar, and subtitles
 // type: "dom"
 // params:
 //   brand, series, ep
-//   tag (橙色药丸), title (衬线大标题), tagExtra (右侧说明)
+//   tag (orange pill), title (serif headline), tagExtra (right-side note)
 //   dimNum, totalDims
 //   bgColor, accentColor, textColor
 //   subtitles: [{start, end, text}]  — normalized 0~1
@@ -18,20 +18,20 @@ export default {
   name: "Slide Chrome",
   category: "Chrome",
   tags: ["slide", "brand", "title", "layout", "chrome", "show"],
-  description: "带品牌标识、集数、标题和字幕区的视频幻灯片外框",
+  description: "Slide frame with branding, episode label, title, and subtitle area",
   params: {
-    brand:       { type: "string", default: "OPC · 王宇轩",                       desc: "品牌名称" },
-    series:      { type: "string", default: "《深入浅出 Claude Code 源代码》",     desc: "系列名称" },
-    ep:          { type: "string", default: "E01",                                desc: "集数标签" },
-    tag:         { type: "string", default: "tools[]",                            desc: "标签文字" },
-    title:       { type: "string", default: "工具箱",                             desc: "主标题" },
-    tagExtra:    { type: "string", default: "20+ built-in",                       desc: "标签附加说明" },
-    dimNum:      { type: "number", default: 6,                                    desc: "当前维度序号" },
-    totalDims:   { type: "number", default: 15,                                   desc: "总维度数" },
-    bgColor:     { type: "string", default: "#1a1510",                            desc: "背景色" },
-    accentColor: { type: "string", default: "#da7756",                            desc: "强调色" },
-    textColor:   { type: "string", default: "#f5ece0",                            desc: "文字颜色" },
-    subtitles:   { type: "array",  default: [],                                   desc: "字幕段落数组" },
+    brand:       { type: "string", default: "OPC · Wang Yuxuan",                  desc: "Brand name" },
+    series:      { type: "string", default: "Claude Code Source Walkthrough",     desc: "Series name" },
+    ep:          { type: "string", default: "E01",                                desc: "Episode label" },
+    tag:         { type: "string", default: "tools[]",                            desc: "Tag text" },
+    title:       { type: "string", default: "Toolbox",                            desc: "Main title" },
+    tagExtra:    { type: "string", default: "20+ built-in",                       desc: "Extra tag note" },
+    dimNum:      { type: "number", default: 6,                                    desc: "Current dimension index" },
+    totalDims:   { type: "number", default: 15,                                   desc: "Total dimensions" },
+    bgColor:     { type: "string", default: "#1a1510",                            desc: "Background color" },
+    accentColor: { type: "string", default: "#da7756",                            desc: "Accent color" },
+    textColor:   { type: "string", default: "#f5ece0",                            desc: "Text color" },
+    subtitles:   { type: "array",  default: [],                                   desc: "Subtitle segment array" },
   },
   get defaultParams() {
     const p = {};
@@ -86,7 +86,7 @@ export default {
       "font-weight:700",
       `color:${text}`,
       "letter-spacing:0.04em",
-    ].join(";"), params.brand || "OPC · 王宇轩");
+    ].join(";"), params.brand || "OPC · Wang Yuxuan");
     leftWrap.appendChild(brandEl);
 
     const sep = createNode("span", [
@@ -132,7 +132,7 @@ export default {
       `border-bottom:1px solid ${accent}14`,
     ].join(";"));
 
-    // Tag pill (橙色)
+    // Tag pill (orange)
     const tagEl = createNode("div", [
       `font-family:${SANS_FONT_STACK}`,
       "font-size:13px",

@@ -15,12 +15,12 @@ export default {
   name: "Video Clip",
   category: "Media",
   tags: ["video", "media", "background-video", "clip", "playback", "footage"],
-  description: "全屏播放视频素材的媒体场景组件",
+  description: "Media scene component for full-screen video playback",
   params: {
-    src:       { type: "string", default: "",      desc: "视频文件路径或 URL" },
-    poster:    { type: "string", default: "",      desc: "封面图路径或 URL" },
-    objectFit: { type: "string", default: "cover", desc: "填充模式：cover / contain / fill" },
-    offset:    { type: "number", default: 0,       desc: "视频起始时间偏移（秒）", min: 0 },
+    src:       { type: "string", default: "",      desc: "Video file path or URL" },
+    poster:    { type: "string", default: "",      desc: "Poster image path or URL" },
+    objectFit: { type: "string", default: "cover", desc: "Fit mode: cover / contain / fill" },
+    offset:    { type: "number", default: 0,       desc: "Video start time offset in seconds", min: 0 },
   },
   get defaultParams() {
     const p = {};

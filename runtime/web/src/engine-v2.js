@@ -151,22 +151,20 @@ function resolveLayerProp(layer, prop, localT, fallback) {
 
 // ─── Layer Style Resolver ──────────────────────────────────────
 // Converts layer properties to CSS on the container div
-function applyLayerStyle(el, layer) {
+function applyLayerStyle(el, layer, state) {
   const s = el.style;
   // Position & size (defaults to full-screen)
   if (layer.x != null || layer.y != null || layer.w != null || layer.h != null) {
     s.position = 'absolute';
-    s.left = layer.x || '0';
-    s.top = layer.y || '0';
-    s.width = layer.w || '100%';
-    s.height = layer.h || '100%';
-    if (layer.anchor === 'center') {
-      s.transform = 'translate(-50%, -50%)';
-    }
+    s.left = layer.x != null ? layer.x : '0';
+    s.top = layer.y != null ? layer.y : '0';
+    s.width = layer.w != null ? layer.w : '100%';
+    s.height = layer.h != null ? layer.h : '100%';
   } else {
     s.position = 'absolute';
     s.inset = '0';
   }
+  state.anchorTransform = layer.anchor === 'center' ? 'translate(-50%, -50%)' : '';
   if (layer.borderRadius) s.borderRadius = layer.borderRadius;
   if (layer.shadow && layer.shadow !== 'none') s.boxShadow = layer.shadow;
   if (layer.clipPath && layer.clipPath !== 'none') s.clipPath = layer.clipPath;
@@ -219,6 +217,13 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
   const { width, height, fps, duration, background } = timelineMetrics(timeline);
   const layers = normalizeLayers(timeline);
 
+  function setIfChanged(el, prop, value) {
+    if (el._nfPrev?.[prop] !== value) {
+      el.style[prop] = value;
+      (el._nfPrev = el._nfPrev || {})[prop] = value;
+    }
+  }
+
   // Setup stage
   stageEl.style.cssText = `position:relative;width:${width}px;height:${height}px;overflow:hidden;background:${background}`;
 
@@ -235,26 +240,30 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
     container.className = 'nf-layer';
     container.dataset.layerId = layer.id;
     container.style.cssText = `position:absolute;inset:0;z-index:${i};pointer-events:none;display:none;overflow:hidden`;
-    applyLayerStyle(container, layer);
-    stageEl.appendChild(container);
-
-    // Scene content container
-    const sceneContainer = document.createElement('div');
-    sceneContainer.style.cssText = 'position:absolute;inset:0';
-    container.appendChild(sceneContainer);
 
     const state = {
       layer,
       scene,
       container,
-      sceneContainer,
+      sceneContainer: null,
       sceneEls: null,        // returned by scene.create()
       created: false,
       wasActive: false,
       enterEffect: parseEffect(layer.enter),
       exitEffect: parseEffect(layer.exit),
       transition: parseTransition(layer.transition),
+      anchorTransform: '',
+      _prevStyle: {},
     };
+    container._nfPrev = state._prevStyle;
+    applyLayerStyle(container, layer, state);
+    stageEl.appendChild(container);
+
+    // Scene content container
+    const sceneContainer = document.createElement('div');
+    sceneContainer.style.cssText = 'position:absolute;inset:0';
+    container.appendChild(sceneContainer);
+    state.sceneContainer = sceneContainer;
     layerStates.push(state);
   }
 
@@ -275,7 +284,7 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
           state.created = true;
         }
 
-        container.style.display = 'block';
+        setIfChanged(container, 'display', 'block');
 
         // Update scene content
         // DOM scenes use normalized time (0~1), Canvas/SVG scenes use seconds
@@ -315,53 +324,49 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
         const userTransforms = [];
         if (kRotation) userTransforms.push(`rotate(${kRotation}deg)`);
         if (kScale) userTransforms.push(`scale(${kScale})`);
-        const allTransforms = [enter.transform, exit.transform, transTransform, ...userTransforms].filter(Boolean).join(' ');
+        const allTransforms = [state.anchorTransform, enter.transform, exit.transform, transTransform, ...userTransforms].filter(Boolean).join(' ');
 
         // Apply visual properties
-        container.style.opacity = opacity;
+        setIfChanged(container, 'opacity', opacity);
 
         // Position (keyframe-animated)
-        if (kX != null) container.style.left = typeof kX === 'number' ? kX + 'px' : kX;
-        if (kY != null) container.style.top = typeof kY === 'number' ? kY + 'px' : kY;
-        if (kW != null) container.style.width = typeof kW === 'number' ? kW + 'px' : kW;
-        if (kH != null) container.style.height = typeof kH === 'number' ? kH + 'px' : kH;
+        if (kX != null) setIfChanged(container, 'left', typeof kX === 'number' ? kX + 'px' : kX);
+        if (kY != null) setIfChanged(container, 'top', typeof kY === 'number' ? kY + 'px' : kY);
+        if (kW != null) setIfChanged(container, 'width', typeof kW === 'number' ? kW + 'px' : kW);
+        if (kH != null) setIfChanged(container, 'height', typeof kH === 'number' ? kH + 'px' : kH);
 
         // ClipPath
         if (transClipPath) {
-          container.style.clipPath = transClipPath;
+          setIfChanged(container, 'clipPath', transClipPath);
         } else if (kClipPath && kClipPath !== 'none') {
-          container.style.clipPath = kClipPath;
+          setIfChanged(container, 'clipPath', kClipPath);
         } else {
-          container.style.clipPath = '';
+          setIfChanged(container, 'clipPath', '');
         }
 
         // Transform
-        if (allTransforms) {
-          container.style.transform = allTransforms;
-        } else if (layer.x == null && layer.y == null) {
-          container.style.transform = '';
-        }
+        setIfChanged(container, 'transform', allTransforms);
 
         // Blend mode
-        if (layer.blend && layer.blend !== 'normal') {
-          container.style.mixBlendMode = layer.blend;
-        }
+        setIfChanged(container, 'mixBlendMode', layer.blend && layer.blend !== 'normal' ? layer.blend : '');
 
         // CSS filter (keyframe-animated)
         if (kFilter && kFilter !== 'none') {
-          container.style.filter = kFilter;
+          setIfChanged(container, 'filter', kFilter);
         } else {
-          container.style.filter = '';
+          setIfChanged(container, 'filter', '');
         }
 
         state.wasActive = true;
       } else {
         // Hide inactive layers
         if (state.wasActive) {
-          container.style.display = 'none';
-          container.style.opacity = '';
-          container.style.transform = '';
-          container.style.filter = '';
+          setIfChanged(container, 'display', 'none');
+          setIfChanged(container, 'opacity', '');
+          setIfChanged(container, 'transform', '');
+          setIfChanged(container, 'filter', '');
+          setIfChanged(container, 'clipPath', '');
+          setIfChanged(container, 'mixBlendMode', '');
           state.wasActive = false;
         }
       }
@@ -374,6 +379,7 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
   // stops calling __onFrame — without this, <audio> keeps playing forever.
   let mediaStallTimer = 0;
   function resetMediaStallTimer() {
+    if (window.__recordingMode) return;
     if (mediaStallTimer) clearTimeout(mediaStallTimer);
     mediaStallTimer = setTimeout(() => {
       stageEl.querySelectorAll('audio, video').forEach(m => {
@@ -617,6 +623,15 @@ export function createPlayer(engine, stageEl) {
     applyScaleMode();
   }
 
+  let resizeRaf = 0;
+  const handleResizeRaf = () => {
+    if (resizeRaf) return;
+    resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = 0;
+      handleResize();
+    });
+  };
+
   function handleFullscreenChange() {
     applyScaleMode();
     syncButtons();
@@ -635,7 +650,7 @@ export function createPlayer(engine, stageEl) {
     if (e.code === 'End') { e.preventDefault(); seek(duration); }
   };
   document.addEventListener('keydown', handleKeydown);
-  window.addEventListener('resize', handleResize);
+  window.addEventListener('resize', handleResizeRaf);
   document.addEventListener('fullscreenchange', handleFullscreenChange);
 
   applyScaleMode();
@@ -648,8 +663,12 @@ export function createPlayer(engine, stageEl) {
     get currentTime() { return currentTime; },
     destroy() {
       stopPlayback();
+      if (resizeRaf) {
+        cancelAnimationFrame(resizeRaf);
+        resizeRaf = 0;
+      }
       document.removeEventListener('keydown', handleKeydown);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', handleResizeRaf);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       bar.remove();
       viewport.remove();
