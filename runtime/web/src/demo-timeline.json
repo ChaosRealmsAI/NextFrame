@@ -1,442 +1,114 @@
 {
-  "version": "1",
-  "duration": 60,
-  "background": "#0b0b14",
-  "assets": [
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 20,
+  "background": "#05050c",
+  "layers": [
     {
-      "id": "demo-tone",
-      "name": "Demo Tone",
-      "path": "assets/demo-audio.wav",
-      "kind": "audio",
-      "duration": 2
-    }
-  ],
-  "tracks": [
-    {
-      "id": "v1",
-      "name": "V1",
-      "kind": "video",
-      "clips": [
-        {
-          "id": "clip-fluid-background",
-          "start": 0,
-          "dur": 30,
-          "scene": "fluidBackground",
-          "params": {
-            "blobCount": 6,
-            "hueA": 198,
-            "hueB": 286,
-            "hueC": 336,
-            "intensity": 0.82,
-            "drift": 0.48,
-            "blur": 108
-          }
-        },
-        {
-          "id": "clip-particle-flow",
-          "start": 30,
-          "dur": 30,
-          "scene": "particleFlow",
-          "params": {
-            "count": 520,
-            "hueA": 186,
-            "hueB": 316,
-            "fieldScale": 0.0032,
-            "speed": 92,
-            "trailLength": 28,
-            "lineWidth": 1.3
-          }
-        }
-      ]
+      "id": "bg",
+      "scene": "auroraGradient",
+      "start": 0,
+      "dur": 20,
+      "params": { "hueA": 265, "hueB": 200, "hueC": 330, "intensity": 0.9, "grain": 0.04 }
     },
     {
-      "id": "v2",
-      "name": "V2",
-      "kind": "video",
-      "clips": [
-        {
-          "id": "clip-orbit-rings",
-          "start": 5,
-          "dur": 20,
-          "scene": "orbitRings",
-          "params": {
-            "ringCount": 7,
-            "hueA": 180,
-            "hueB": 312,
-            "baseSpeed": 0.55,
-            "dotSize": 9,
-            "ringWidth": 1.6,
-            "glow": true
-          }
-        },
-        {
-          "id": "clip-mesh-grid",
-          "start": 30,
-          "dur": 20,
-          "scene": "meshGrid",
-          "params": {
-            "cols": 20,
-            "rows": 14,
-            "hueA": 198,
-            "hueB": 314,
-            "waveSpeed": 0.82,
-            "waveAmp": 0.16,
-            "perspective": 0.5,
-            "lineWidth": 1.5
-          }
-        }
-      ]
+      "id": "dark-overlay",
+      "scene": "vignette",
+      "start": 0,
+      "dur": 20,
+      "params": { "intensity": 0.6, "color": "#000000", "radius": 0.7 }
     },
     {
-      "id": "v3",
-      "name": "V3",
-      "kind": "video",
-      "clips": [
-        {
-          "id": "clip-glitch-text",
-          "start": 8,
-          "dur": 6,
-          "scene": "glitchText",
-          "params": {
-            "text": "NEXTFRAME",
-            "fontSize": 176,
-            "weight": "900",
-            "baseHue": 320,
-            "glitchAmount": 0.48,
-            "scanlines": true,
-            "burstFreq": 3.4
-          }
-        },
-        {
-          "id": "clip-countdown",
-          "start": 14,
-          "dur": 4,
-          "scene": "countdown",
-          "params": {
-            "sequence": [
-              "3",
-              "2",
-              "1",
-              "GO"
-            ],
-            "subtitle": "SCENES ARMED",
-            "hueStart": 20,
-            "hueEnd": 160,
-            "accentHue": 318
-          }
-        },
-        {
-          "id": "clip-kinetic-headline",
-          "start": 18,
-          "dur": 8,
-          "scene": "kineticHeadline",
-          "params": {
-            "text": "SCENE PICKER",
-            "subtitle": "fluidBackground · orbitRings · meshGrid",
-            "hueStart": 24,
-            "hueEnd": 320,
-            "stagger": 0.14,
-            "size": 0.11
-          }
-        },
-        {
-          "id": "clip-text-overlay",
-          "start": 26,
-          "dur": 6,
-          "scene": "textOverlay",
-          "params": {
-            "text": "FRAME-PURE · AI-NATIVE",
-            "fontSize": 88,
-            "color": "#f6f7ff",
-            "align": "center",
-            "anchor": "center",
-            "weight": "800",
-            "letterSpacing": 0.08,
-            "enterDur": 0.5,
-            "holdDur": 5.1
-          }
-        },
-        {
-          "id": "clip-lower-third",
-          "start": 50,
-          "dur": 10,
-          "scene": "lowerThirdVelvet",
-          "params": {
-            "title": "NEXTFRAME SHOWCASE",
-            "subtitle": "Scene picker demo · 60 seconds",
-            "hueA": 24,
-            "hueB": 324,
-            "holdEnd": 8.8,
-            "fadeOut": 1.2
-          }
-        }
-      ]
+      "id": "rings",
+      "scene": "svgRings",
+      "start": 0,
+      "dur": 20,
+      "params": { "count": 4, "speed": 0.8, "strokeWidth": 1.2 },
+      "blend": "screen",
+      "opacity": 0.35
     },
     {
-      "id": "v4",
-      "name": "V4",
-      "kind": "video",
-      "clips": [
-        {
-          "id": "clip-shape-burst",
-          "start": 12,
-          "dur": 4,
-          "scene": "shapeBurst",
-          "params": {
-            "count": 96,
-            "shape": "mixed",
-            "hueStart": 188,
-            "hueEnd": 328,
-            "sizeMin": 10,
-            "sizeMax": 42,
-            "speed": 300,
-            "gravity": 90,
-            "fadeOut": true
-          }
-        },
-        {
-          "id": "clip-data-pulse",
-          "start": 32,
-          "dur": 12,
-          "scene": "dataPulse",
-          "params": {
-            "bars": 72,
-            "hueA": 182,
-            "hueB": 320,
-            "peak": 0.86,
-            "baseHeight": 0.16,
-            "smoothness": 0.34,
-            "glowAlpha": 0.46
-          }
-        },
-        {
-          "id": "clip-pixel-rain",
-          "start": 44,
-          "dur": 6,
-          "scene": "pixelRain",
-          "params": {
-            "columns": 52,
-            "hueStart": 152,
-            "hueEnd": 206,
-            "speed": 190,
-            "density": 1.25,
-            "charSize": 18,
-            "glyphPalette": "01NF*"
-          }
-        }
-      ]
+      "id": "title",
+      "scene": "headline",
+      "start": 0.5,
+      "dur": 6,
+      "params": {
+        "text": "NextFrame",
+        "subtitle": "AI-Native Video Editor",
+        "fontSize": 110,
+        "gradient": ["#6ee7ff", "#a78bfa", "#f472b6"],
+        "stagger": 0.15
+      },
+      "enter": "fadeIn 0.8s",
+      "exit": "fadeOut 0.5s"
     },
     {
-      "id": "v5",
-      "name": "V5",
-      "kind": "video",
-      "clips": [
-        {
-          "id": "clip-spotlight-sweep",
-          "start": 35,
-          "dur": 12,
-          "scene": "spotlightSweep",
-          "params": {
-            "beamCount": 4,
-            "hueA": 208,
-            "hueB": 330,
-            "sweepSpeed": 0.6,
-            "beamWidth": 0.34,
-            "intensity": 0.72,
-            "ambient": 0.08
-          }
-        }
-      ]
+      "id": "bullets",
+      "scene": "bulletList",
+      "start": 3,
+      "dur": 5,
+      "params": {
+        "items": ["28 Scene Components", "Canvas + DOM + SVG", "Frame-Pure Rendering", "4K GPU Accelerated"],
+        "fontSize": 28,
+        "bulletColor": "#a78bfa",
+        "stagger": 0.2
+      },
+      "enter": "slideUp 0.6s",
+      "exit": "fadeOut 0.4s"
     },
     {
-      "id": "a1",
-      "name": "Pulse A",
-      "kind": "audio",
-      "clips": [
-        {
-          "id": "clip-tone-a-1",
-          "start": 1,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.18
-          }
-        },
-        {
-          "id": "clip-tone-a-2",
-          "start": 9,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.18
-          }
-        },
-        {
-          "id": "clip-tone-a-3",
-          "start": 17,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.18
-          }
-        },
-        {
-          "id": "clip-tone-a-4",
-          "start": 25,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.18
-          }
-        },
-        {
-          "id": "clip-tone-a-5",
-          "start": 33,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.18
-          }
-        },
-        {
-          "id": "clip-tone-a-6",
-          "start": 41,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.18
-          }
-        },
-        {
-          "id": "clip-tone-a-7",
-          "start": 49,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.18
-          }
-        },
-        {
-          "id": "clip-tone-a-8",
-          "start": 57,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.18
-          }
-        }
-      ]
+      "id": "chart",
+      "scene": "barChart",
+      "start": 7,
+      "dur": 6,
+      "params": {
+        "data": [28, 45, 72, 90, 65],
+        "labels": ["v0.1", "v0.2", "v0.3", "v0.4", "v0.5"],
+        "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#fb923c", "#4ade80"]
+      },
+      "enter": "slideUp 0.8s",
+      "exit": "fadeOut 0.5s"
     },
     {
-      "id": "a2",
-      "name": "Pulse B",
-      "kind": "audio",
-      "clips": [
-        {
-          "id": "clip-tone-b-1",
-          "start": 2,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.1
-          }
-        },
-        {
-          "id": "clip-tone-b-2",
-          "start": 10,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.1
-          }
-        },
-        {
-          "id": "clip-tone-b-3",
-          "start": 18,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.1
-          }
-        },
-        {
-          "id": "clip-tone-b-4",
-          "start": 26,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.1
-          }
-        },
-        {
-          "id": "clip-tone-b-5",
-          "start": 34,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.1
-          }
-        },
-        {
-          "id": "clip-tone-b-6",
-          "start": 42,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.1
-          }
-        },
-        {
-          "id": "clip-tone-b-7",
-          "start": 50,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.1
-          }
-        },
-        {
-          "id": "clip-tone-b-8",
-          "start": 58,
-          "dur": 2,
-          "scene": "audio",
-          "params": {
-            "assetId": "demo-tone",
-            "src": "assets/demo-audio.wav",
-            "volume": 0.1
-          }
-        }
-      ]
+      "id": "counter",
+      "scene": "numberCounter",
+      "start": 8,
+      "dur": 5,
+      "params": {
+        "value": 28,
+        "suffix": "",
+        "label": "Scene Components",
+        "color": "#6ee7ff"
+      },
+      "enter": "scaleIn 0.5s",
+      "exit": "fadeOut 0.3s"
+    },
+    {
+      "id": "quote",
+      "scene": "quoteBlock",
+      "start": 13,
+      "dur": 5,
+      "params": {
+        "text": "Every frame is a pure function of time.",
+        "author": "NextFrame Architecture",
+        "fontSize": 36,
+        "accentColor": "#a78bfa"
+      },
+      "enter": "fadeIn 1s",
+      "exit": "fadeOut 0.5s"
+    },
+    {
+      "id": "subtitle",
+      "scene": "subtitleBar",
+      "start": 1,
+      "dur": 18,
+      "params": {
+        "text": "Timeline JSON → HTML → Browser Playback",
+        "fontSize": 16
+      },
+      "enter": "fadeIn 0.6s",
+      "exit": "fadeOut 0.4s"
     }
   ]
 }

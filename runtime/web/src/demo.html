@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NextFrame v0.3 — Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: #111; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding-top: 20px; }
+  #stage { box-shadow: 0 0 80px rgba(100,80,200,0.15); }
+  .nf-layer { will-change: opacity, transform; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { createEngine, createPlayer } from './engine-v2.js';
+import SCENE_REGISTRY from './scenes-v2/index.js';
+
+const timeline = await fetch('./demo-timeline.json').then(r => r.json());
+const stage = document.getElementById('stage');
+const engine = createEngine(stage, timeline, SCENE_REGISTRY);
+const player = createPlayer(engine, stage);
+</script>
+</body>
+</html>

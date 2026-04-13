@@ -1,0 +1,142 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 25,
+  "background": "#0a0a14",
+  "layers": [
+    {
+      "id": "bg",
+      "scene": "fluidBackground",
+      "start": 0,
+      "dur": 25,
+      "params": { "colors": ["#1a0a2e", "#0a1a2e", "#0a0a1e"], "speed": 0.3, "blur": 80 }
+    },
+    {
+      "id": "stars",
+      "scene": "starfield",
+      "start": 0,
+      "dur": 25,
+      "params": { "count": 150, "speed": 15, "depth": 3, "color": "#ffffff" },
+      "blend": "screen",
+      "opacity": 0.4
+    },
+    {
+      "id": "cover-title",
+      "scene": "headline",
+      "start": 0,
+      "dur": 5,
+      "params": {
+        "text": "Product Launch",
+        "subtitle": "2026 Roadmap",
+        "fontSize": 120,
+        "gradient": ["#ff6b6b", "#ffd93d", "#6bcb77"]
+      },
+      "enter": "fadeIn 1s",
+      "exit": "fadeOut 0.5s"
+    },
+    {
+      "id": "agenda",
+      "scene": "bulletList",
+      "start": 5,
+      "dur": 5,
+      "params": {
+        "items": ["Market Analysis", "Product Strategy", "Engineering Timeline", "Budget Allocation", "Q&A"],
+        "fontSize": 32,
+        "bulletColor": "#ffd93d",
+        "stagger": 0.25
+      },
+      "enter": "slideUp 0.6s",
+      "exit": "fadeOut 0.4s"
+    },
+    {
+      "id": "code-demo",
+      "scene": "codeBlock",
+      "start": 10,
+      "dur": 5,
+      "params": {
+        "code": "const timeline = loadJSON('project.json');\nconst html = engine.render(timeline);\nawait browser.open(html);\n// → Video plays in browser!",
+        "language": "javascript",
+        "fontSize": 20,
+        "theme": "dark"
+      },
+      "enter": "fadeIn 0.8s",
+      "exit": "fadeOut 0.4s"
+    },
+    {
+      "id": "radar",
+      "scene": "radarChart",
+      "start": 12,
+      "dur": 5,
+      "params": {
+        "data": [85, 72, 90, 65, 78],
+        "labels": ["Speed", "Quality", "Scale", "Cost", "UX"],
+        "color": "#6ee7ff",
+        "fillOpacity": 0.3,
+        "maxValue": 100
+      },
+      "enter": "scaleIn 0.6s",
+      "exit": "fadeOut 0.4s"
+    },
+    {
+      "id": "callout",
+      "scene": "calloutCard",
+      "start": 15,
+      "dur": 4,
+      "params": {
+        "icon": "🚀",
+        "title": "Launch Date",
+        "description": "June 15, 2026 — Public Beta",
+        "bgColor": "rgba(106,139,250,0.1)",
+        "borderColor": "#a78bfa"
+      },
+      "enter": "scaleIn 0.5s",
+      "exit": "fadeOut 0.3s"
+    },
+    {
+      "id": "h-bars",
+      "scene": "horizontalBars",
+      "start": 17,
+      "dur": 5,
+      "params": {
+        "data": [95, 82, 68, 45],
+        "labels": ["Backend", "Frontend", "Mobile", "DevOps"],
+        "colors": ["#4ade80", "#6ee7ff", "#a78bfa", "#f472b6"],
+        "height": 40,
+        "gap": 20
+      },
+      "enter": "slideLeft 0.8s",
+      "exit": "fadeOut 0.4s"
+    },
+    {
+      "id": "end-quote",
+      "scene": "quoteBlock",
+      "start": 20,
+      "dur": 5,
+      "params": {
+        "text": "The best way to predict the future is to create it.",
+        "author": "Alan Kay",
+        "fontSize": 40,
+        "accentColor": "#ffd93d"
+      },
+      "enter": "fadeIn 1s",
+      "exit": "fadeOut 0.5s"
+    },
+    {
+      "id": "ripple",
+      "scene": "circleRipple",
+      "start": 0,
+      "dur": 25,
+      "params": { "count": 4, "speed": 0.5, "color": "#a78bfa", "strokeWidth": 1, "maxRadius": 500 },
+      "blend": "screen",
+      "opacity": 0.15
+    },
+    {
+      "id": "vignette",
+      "scene": "vignette",
+      "start": 0,
+      "dur": 25,
+      "params": { "intensity": 0.5, "color": "#000000", "radius": 0.7 }
+    }
+  ]
+}
