@@ -32,6 +32,7 @@ import pulseWave from './pulseWave.js';
 import quoteBlock from './quoteBlock.js';
 import radarChart from './radarChart.js';
 import radialBurst from './radialBurst.js';
+import slideFrame from './slideFrame.js';
 import splitText from './splitText.js';
 import starfield from './starfield.js';
 import subtitleBar from './subtitleBar.js';
@@ -65,6 +66,7 @@ const ALL_SCENES = [
   lowerThird, numberCounter, splitText, subtitleBar,
   progressBar, calloutCard, typewriter, marquee,
   featureGrid, card3d, parallaxStack, logoReveal,
+  slideFrame,
   // SVG — data viz & decoration
   barChart, lineChart, pieChart, progressRing,
   svgRings, radarChart, horizontalBars, treeMap,

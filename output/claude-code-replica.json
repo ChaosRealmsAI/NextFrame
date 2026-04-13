@@ -1,0 +1,189 @@
+{
+  "schema": "nextframe/v0.3",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 30,
+  "background": "#1a1510",
+  "assets": [],
+  "chapters": [],
+  "markers": [],
+  "layers": [
+    {
+      "id": "slide-bg-1",
+      "scene": "slideFrame",
+      "start": 0,
+      "dur": 10.5,
+      "enter": "fadeIn 0.5s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "brand": "OPC · 王宇轩",
+        "series": "《深入浅出 Claude Code 源代码》",
+        "ep": "E01",
+        "slideTitle": "出厂设置 System Prompt",
+        "dimNum": 4,
+        "totalDims": 15,
+        "bgColor": "#1a1510",
+        "accentColor": "#da7756",
+        "textColor": "#f5ece0"
+      }
+    },
+    {
+      "id": "code-dim4",
+      "scene": "codeBlock",
+      "start": 0,
+      "dur": 10,
+      "x": "8%",
+      "y": "22%",
+      "w": "84%",
+      "h": "55%",
+      "enter": "fadeIn 0.6s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "language": "typescript",
+        "fontSize": 16,
+        "theme": "dark",
+        "code": "// System Prompt — 出厂设置，每轮强制注入\nconst SYSTEM_PROMPT = [\n  // 1. 身份声明\n  `You are Claude Code, Anthropic's official CLI for Claude.`,\n\n  // 2. 工具定义（动态注册）\n  ...injectToolDefinitions(enabledTools),\n\n  // 3. 规则 & CLAUDE.md\n  ...injectProjectRules(cwd),\n\n  // 4. 环境上下文\n  `cwd: ${cwd}`,\n  `platform: ${process.platform}`,\n  `date: ${new Date().toISOString()}`,\n].join('\\n');\n\n// 你每轮都看不到它，但 Claude 每轮都收到它。"
+      }
+    },
+    {
+      "id": "sub-0-10",
+      "scene": "subtitleBar",
+      "start": 0,
+      "dur": 10,
+      "params": {
+        "text": "维度4：出厂设置 System Prompt — Claude 每轮必收的隐藏指令",
+        "fontSize": 22,
+        "bgColor": "rgba(0,0,0,0.75)",
+        "textColor": "#ffffff"
+      }
+    },
+    {
+      "id": "slide-bg-2",
+      "scene": "slideFrame",
+      "start": 9.5,
+      "dur": 11,
+      "enter": "fadeIn 0.5s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "brand": "OPC · 王宇轩",
+        "series": "《深入浅出 Claude Code 源代码》",
+        "ep": "E01",
+        "slideTitle": "CLAUDE.md 九层",
+        "dimNum": 5,
+        "totalDims": 15,
+        "bgColor": "#1a1510",
+        "accentColor": "#da7756",
+        "textColor": "#f5ece0"
+      }
+    },
+    {
+      "id": "bullets-dim5",
+      "scene": "bulletList",
+      "start": 10,
+      "dur": 10,
+      "x": "8%",
+      "y": "22%",
+      "w": "84%",
+      "h": "55%",
+      "enter": "fadeIn 0.5s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "items": [
+          "~/.claude/CLAUDE.md — 全局规则，所有项目生效",
+          "~/.claude/rules/*.md — 专项规则（BDD / Worktree / Commit 格式）",
+          "{project}/CLAUDE.md — 项目根规则，覆盖全局",
+          "{project}/**/.claude/CLAUDE.md — 子目录规则，最高优先级",
+          "spec/cockpit-app/ — 指挥部，所有产出注册到 JSON",
+          "adrs.json — 架构决策，从 walking 起每行代码必须符合",
+          "bdd/{module}/bdd.json — 场景即代码，BDD 是唯一开发驱动源",
+          "issues.json — 跨模块 bug 管理，不混在 bdd.json 里",
+          "roadmap.json — 全局进度，每版本完成后更新"
+        ],
+        "fontSize": 22,
+        "bulletColor": "#da7756",
+        "stagger": 0.06
+      }
+    },
+    {
+      "id": "sub-10-20",
+      "scene": "subtitleBar",
+      "start": 10,
+      "dur": 10,
+      "params": {
+        "text": "维度5：CLAUDE.md 九层继承 — 全局 → 项目 → 子目录，优先级递增",
+        "fontSize": 22,
+        "bgColor": "rgba(0,0,0,0.75)",
+        "textColor": "#ffffff"
+      }
+    },
+    {
+      "id": "slide-bg-3",
+      "scene": "slideFrame",
+      "start": 19.5,
+      "dur": 10.5,
+      "enter": "fadeIn 0.5s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "brand": "OPC · 王宇轩",
+        "series": "《深入浅出 Claude Code 源代码》",
+        "ep": "E01",
+        "slideTitle": "工具箱 Tools",
+        "dimNum": 6,
+        "totalDims": 15,
+        "bgColor": "#1a1510",
+        "accentColor": "#da7756",
+        "textColor": "#f5ece0"
+      }
+    },
+    {
+      "id": "code-dim6",
+      "scene": "codeBlock",
+      "start": 20,
+      "dur": 10,
+      "x": "8%",
+      "y": "22%",
+      "w": "51%",
+      "h": "55%",
+      "enter": "fadeIn 0.6s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "language": "typescript",
+        "fontSize": 15,
+        "theme": "dark",
+        "code": "// Tools — AI 的双手，按需注入\ninterface Tool {\n  name: string;\n  description: string;\n  input_schema: JSONSchema;\n  execute(input: unknown): Promise<ToolResult>;\n}\n\n// 内置工具（部分）\nconst BUILT_IN_TOOLS: Tool[] = [\n  new BashTool(),        // 运行 shell 命令\n  new ReadFileTool(),    // 读取文件\n  new WriteFileTool(),   // 写入文件\n  new GrepTool(),        // 搜索内容\n  new GlobTool(),        // 文件查找\n];\n\n// Claude 调用工具 → 等待结果 → 继续推理\n// 每个工具 = 一个原子能力"
+      }
+    },
+    {
+      "id": "callout-dim6",
+      "scene": "calloutCard",
+      "start": 20,
+      "dur": 10,
+      "x": "61%",
+      "y": "22%",
+      "w": "31%",
+      "h": "55%",
+      "enter": "fadeIn 0.7s",
+      "exit": "fadeOut 0.4s",
+      "params": {
+        "icon": "🔧",
+        "title": "工具即双手",
+        "description": "Claude 本身只会推理。工具让它能执行、读写、搜索。每次对话按需注入启用的工具列表。",
+        "bgColor": "rgba(26,21,16,0.92)",
+        "borderColor": "#da7756"
+      }
+    },
+    {
+      "id": "sub-20-30",
+      "scene": "subtitleBar",
+      "start": 20,
+      "dur": 10,
+      "params": {
+        "text": "维度6：工具箱 Tools — Claude 的双手，每次对话按需注入",
+        "fontSize": 22,
+        "bgColor": "rgba(0,0,0,0.75)",
+        "textColor": "#ffffff"
+      }
+    }
+  ]
+}
