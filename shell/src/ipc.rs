@@ -1,7 +1,7 @@
 use bridge::{Request, Response};
 use serde_json::Value;
 
-use crate::app_control::PendingAppCtlMap;
+use crate::ai_ops::PendingAppCtlMap;
 use crate::http::write_http_response;
 
 pub(crate) fn parse_request(payload: &str) -> Result<Request, serde_json::Error> {

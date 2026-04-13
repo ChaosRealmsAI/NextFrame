@@ -8,12 +8,10 @@ macro_rules! trace_log {
 }
 
 mod window;
-mod app_control;
-mod appctl_script;
+mod ai_ops;
 mod http;
 mod ipc;
 mod protocol;
-mod screenshot;
 
 fn main() {
     if let Err(error) = window::run() {

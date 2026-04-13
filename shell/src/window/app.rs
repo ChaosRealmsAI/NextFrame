@@ -9,7 +9,7 @@ use tao::window::WindowBuilder;
 use wry::BackgroundThrottlingPolicy;
 use wry::{PageLoadEvent, WebViewBuilder};
 
-use crate::app_control::{
+use crate::ai_ops::{
     new_pending_appctl, poll_app_control_server, prune_expired_appctl_requests,
 };
 use crate::ipc::{handle_appctl_ipc_result, invalid_request_response, parse_request};

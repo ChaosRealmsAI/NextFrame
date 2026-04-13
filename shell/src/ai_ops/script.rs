@@ -3,7 +3,7 @@ use std::time::Instant;
 use serde_json::Value;
 use wry::WebView;
 
-use crate::app_control::{PendingAppCtlMap, PendingAppCtlRequest};
+use super::{PendingAppCtlMap, PendingAppCtlRequest};
 
 pub(crate) fn queue_appctl_script(
     webview: &WebView,
@@ -47,7 +47,7 @@ pub(crate) fn queue_appctl_script(
 
 fn next_appctl_request_id(counter: &mut u64) -> String {
     *counter += 1;
-    format!("nf-appctl-{}-{counter}", crate::screenshot::now_unix_millis())
+    format!("nf-appctl-{}-{counter}", super::now_unix_millis())
 }
 
 fn appctl_eval_script(req_id: &str, source: &str) -> Result<String, String> {

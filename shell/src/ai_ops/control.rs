@@ -7,12 +7,11 @@ use std::time::{Duration, Instant};
 use serde_json::Value;
 use wry::WebView;
 
-use crate::appctl_script::{build_navigate_script, queue_appctl_script};
-use crate::http::{read_http_request, write_http_response, HttpConnection, HttpRequest};
-use crate::screenshot::{
-    decode_query_component, default_screenshot_path, native_screenshot, query_value,
-    split_path_and_query,
+use super::{
+    build_navigate_script, decode_query_component, default_screenshot_path, native_screenshot,
+    query_value, queue_appctl_script, split_path_and_query,
 };
+use crate::http::{read_http_request, write_http_response, HttpConnection, HttpRequest};
 
 pub(crate) type PendingAppCtlMap = Arc<Mutex<HashMap<String, PendingAppCtlRequest>>>;
 
