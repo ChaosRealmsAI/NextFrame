@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 
-use crate::validation::require_object;
+use crate::util::validation::require_object;
 
 pub(crate) fn handle_scene_list(params: &Value) -> Result<Value, String> {
     require_object(params)?;

@@ -1,28 +1,21 @@
 #![deny(unused)]
 
 #[macro_use]
-mod trace;
+mod util;
 
 mod autosave;
-mod compose;
-mod dialog;
 mod encoding;
 mod episode;
 mod export;
 mod export_runner;
 mod ffmpeg;
 mod fs;
-mod log;
-pub mod path;
-mod preview;
 mod project;
 mod recent;
 mod recorder_bridge;
 mod scene;
 mod segment;
-mod time;
 mod timeline;
-mod validation;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -30,21 +23,24 @@ use serde_json::Value;
 use autosave::{
     handle_autosave_clear, handle_autosave_list, handle_autosave_recover, handle_autosave_write,
 };
-use compose::handle_compose_generate;
-use dialog::{handle_fs_dialog_open, handle_fs_dialog_save, handle_fs_reveal};
 use episode::{handle_episode_create, handle_episode_list};
 use export::{handle_export_cancel, handle_export_start, handle_export_status, process_registry};
 use ffmpeg::{ffmpeg_command_path, handle_export_mux_audio};
 use fs::{
     handle_fs_list_dir, handle_fs_mtime, handle_fs_read, handle_fs_write, handle_fs_write_base64,
 };
-use log::handle_log;
-use preview::handle_preview_frame;
 use project::{handle_project_create, handle_project_list};
 use recent::{handle_recent_add, handle_recent_clear, handle_recent_list};
 use scene::handle_scene_list;
 use segment::{handle_segment_list, handle_segment_video_url};
 use timeline::{handle_timeline_load, handle_timeline_save};
+use util::dialog::{handle_fs_dialog_open, handle_fs_dialog_save, handle_fs_reveal};
+use util::{handle_compose_generate, handle_log, handle_preview_frame};
+
+pub use util::path;
+
+#[cfg(test)]
+use util::{dialog, time, validation};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Request {

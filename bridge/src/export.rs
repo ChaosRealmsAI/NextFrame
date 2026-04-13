@@ -12,7 +12,7 @@ use tokio::task::JoinHandle;
 use crate::export_runner::{create_export_log_path, run_embedded_recorder};
 use crate::fs::resolve_write_path;
 use crate::recorder_bridge::{build_recording_url, RecorderRequest};
-use crate::validation::{
+use crate::util::validation::{
     read_optional_u8_in_range, require_positive_f64, require_positive_u32, require_string_alias,
     require_u32,
 };

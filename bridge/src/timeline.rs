@@ -2,7 +2,7 @@ use serde_json::{json, Value};
 use std::fs;
 
 use crate::fs::{resolve_existing_path, resolve_write_path};
-use crate::validation::{require_string, require_value_alias};
+use crate::util::validation::{require_string, require_value_alias};
 
 pub(crate) fn handle_timeline_load(params: &Value) -> Result<Value, String> {
     let path = require_string(params, "path")?;

@@ -6,8 +6,8 @@ use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 
 use crate::fs::resolve_existing_path;
-use crate::time::trim_float;
-use crate::validation::{require_array, require_string_alias};
+use crate::util::time::trim_float;
+use crate::util::validation::{require_array, require_string_alias};
 use serde_json::{json, Value};
 
 pub(crate) static FFMPEG_PATH_CACHE: OnceLock<Mutex<Option<Option<PathBuf>>>> = OnceLock::new();
