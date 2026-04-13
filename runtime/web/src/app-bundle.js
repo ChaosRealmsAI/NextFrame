@@ -1158,6 +1158,11 @@ function setPlayheadTime(time) {
   if (fill) {
     fill.style.width = (TOTAL_DURATION > 0 ? (currentTime / TOTAL_DURATION) * 100 : 0) + "%";
   }
+
+  // Update DOM preview engine
+  if (previewEngine && previewEngine.renderFrame) {
+    previewEngine.renderFrame(currentTime);
+  }
 }
 
 function playLoop(timestamp) {
