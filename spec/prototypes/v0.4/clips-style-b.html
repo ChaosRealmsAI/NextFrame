@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clips - NextFrame</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0c0c0e;
+    --surface: #141416;
+    --card: #1a1a1e;
+    --border: rgba(255,255,255,0.06);
+    --text: #e4e4e8;
+    --secondary: #8888a0;
+    --muted: #48485a;
+    --accent: #7c6aef;
+    --accent-bg: rgba(124,106,239,0.08);
+    --accent-bg-hover: rgba(124,106,239,0.12);
+    --success: #3eb370;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --font-mono: "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace;
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 13px; line-height: 1.5; overflow: hidden; }
+
+  /* Top bar */
+  .topbar {
+    height: 44px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--bg);
+    flex-shrink: 0;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+  .topbar-back {
+    color: var(--secondary); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px;
+    padding: 4px 8px; border-radius: 4px; transition: background 0.15s;
+  }
+  .topbar-back:hover { background: rgba(255,255,255,0.04); }
+  .topbar-breadcrumb { color: var(--muted); font-size: 12px; letter-spacing: 0.02em; }
+  .topbar-breadcrumb span { color: var(--secondary); }
+  .topbar-title { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--secondary); text-transform: uppercase; }
+  .topbar-meta { font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+
+  /* Main layout */
+  .main { display: flex; height: calc(100% - 44px); }
+
+  /* Left panel */
+  .panel-left {
+    width: 50%; min-width: 360px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .panel-header {
+    padding: 16px 20px 12px; font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;
+    flex-shrink: 0;
+  }
+  .tree { flex: 1; overflow-y: auto; padding: 0 0 24px; }
+  .tree::-webkit-scrollbar { width: 4px; }
+  .tree::-webkit-scrollbar-track { background: transparent; }
+  .tree::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+  /* Source node */
+  .source-node { margin-bottom: 2px; }
+  .source-header {
+    display: flex; align-items: center; padding: 6px 20px; cursor: pointer;
+    transition: background 0.12s; gap: 8px; user-select: none;
+  }
+  .source-header:hover { background: rgba(255,255,255,0.03); }
+  .source-toggle {
+    width: 12px; font-size: 10px; color: var(--muted); flex-shrink: 0;
+    transition: color 0.15s;
+  }
+  .source-header:hover .source-toggle { color: var(--secondary); }
+  .source-name {
+    flex: 1; font-size: 13px; color: var(--secondary); font-weight: 400;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: color 0.15s;
+  }
+  .source-node.expanded .source-name { color: var(--text); font-weight: 500; }
+  .source-meta {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    display: flex; gap: 12px; flex-shrink: 0;
+  }
+
+  /* Clip list */
+  .clip-list { display: none; padding-bottom: 4px; }
+  .source-node.expanded .clip-list { display: block; }
+
+  .clip-row {
+    display: flex; align-items: center; padding: 4px 20px 4px 32px;
+    cursor: pointer; transition: background 0.12s; gap: 0;
+  }
+  .clip-row:hover { background: rgba(255,255,255,0.025); }
+  .clip-row.selected { background: var(--accent-bg); }
+  .clip-row.selected:hover { background: var(--accent-bg-hover); }
+
+  .clip-tree-line {
+    width: 24px; flex-shrink: 0; font-family: var(--font-mono); font-size: 12px;
+    color: var(--muted); opacity: 0.4; line-height: 1;
+  }
+  .clip-label {
+    flex: 1; font-size: 12px; color: var(--secondary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: color 0.15s;
+  }
+  .clip-row.selected .clip-label { color: var(--text); }
+  .clip-row:hover .clip-label { color: var(--text); }
+
+  .clip-range {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    margin-left: 12px; flex-shrink: 0; white-space: nowrap;
+  }
+  .clip-dur {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    margin-left: 16px; flex-shrink: 0; width: 48px; text-align: right;
+  }
+  .clip-row.selected .clip-range,
+  .clip-row.selected .clip-dur { color: var(--secondary); }
+
+  /* Right panel */
+  .panel-right {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--bg);
+  }
+
+  .detail-empty {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 13px; letter-spacing: 0.01em;
+  }
+
+  .detail { flex: 1; display: none; flex-direction: column; overflow-y: auto; }
+  .detail.visible { display: flex; }
+  .detail::-webkit-scrollbar { width: 4px; }
+  .detail::-webkit-scrollbar-track { background: transparent; }
+  .detail::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+  /* Timeline preview */
+  .timeline-preview {
+    height: 120px; margin: 20px 20px 0; background: var(--surface);
+    border-radius: 8px; border: 1px solid var(--border); position: relative;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .waveform {
+    position: absolute; bottom: 32px; left: 0; right: 0; height: 48px;
+    display: flex; align-items: flex-end; gap: 1px; padding: 0 40px;
+  }
+  .waveform-bar {
+    flex: 1; background: rgba(255,255,255,0.06); border-radius: 1px 1px 0 0;
+    min-width: 2px;
+  }
+  .waveform-bar.in-range { background: rgba(124,106,239,0.2); }
+
+  .marker-in, .marker-out {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent);
+    opacity: 0.7;
+  }
+  .marker-in::after, .marker-out::after {
+    content: attr(data-time); position: absolute; top: 6px;
+    font-family: var(--font-mono); font-size: 10px; color: var(--accent);
+    white-space: nowrap;
+  }
+  .marker-in::after { left: 6px; }
+  .marker-out::after { right: 6px; }
+
+  .time-ruler {
+    position: absolute; bottom: 0; left: 40px; right: 40px; height: 24px;
+    border-top: 1px solid var(--border); display: flex; align-items: center;
+    justify-content: space-between;
+  }
+  .time-ruler span {
+    font-family: var(--font-mono); font-size: 9px; color: var(--muted);
+  }
+
+  /* Properties */
+  .props {
+    padding: 24px 20px; flex: 1;
+  }
+  .props-section-title {
+    font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.06em; font-weight: 500; margin-bottom: 16px;
+  }
+  .prop-grid {
+    display: grid; grid-template-columns: 100px 1fr; gap: 0;
+  }
+  .prop-key {
+    font-size: 12px; color: var(--muted); padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .prop-val {
+    font-size: 12px; color: var(--text); padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .prop-val.mono { font-family: var(--font-mono); }
+  .prop-val .tag {
+    display: inline-block; padding: 1px 8px; font-size: 11px; color: var(--secondary);
+    background: rgba(255,255,255,0.04); border-radius: 3px; margin-right: 4px;
+  }
+  .prop-val .link {
+    color: var(--accent); cursor: pointer; text-decoration: none;
+  }
+  .prop-val .link:hover { text-decoration: underline; }
+
+  /* Source context */
+  .source-context {
+    padding: 16px 20px 24px; border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--muted); flex-shrink: 0;
+  }
+
+  /* Divider resize handle */
+  .divider {
+    width: 1px; cursor: col-resize; position: relative; z-index: 10;
+    flex-shrink: 0;
+  }
+  .divider::after {
+    content: ''; position: absolute; top: 0; bottom: 0; left: -3px; width: 7px;
+  }
+  .divider:hover::after { background: rgba(124,106,239,0.15); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-back">&#9664; back</div>
+    <div class="topbar-breadcrumb">NextFrame <span>/</span> Show <span>/</span> EP01</div>
+  </div>
+  <div class="topbar-title">Clips</div>
+  <div class="topbar-meta">4 sources &middot; 8 clips</div>
+</div>
+
+<div class="main">
+  <div class="panel-left">
+    <div class="panel-header">Sources</div>
+    <div class="tree" id="tree"></div>
+  </div>
+  <div class="divider" id="divider"></div>
+  <div class="panel-right">
+    <div class="detail-empty" id="empty-state">Select a clip to view details</div>
+    <div class="detail" id="detail">
+      <div class="timeline-preview" id="timeline-preview"></div>
+      <div class="props">
+        <div class="props-section-title">Properties</div>
+        <div class="prop-grid" id="prop-grid"></div>
+      </div>
+      <div class="source-context" id="source-context"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const sources = [
+  {
+    name: 'interview-raw.mp4', duration: '03:24', durSec: 204, res: '1080p',
+    clips: [
+      { id: 'c1', label: '\u7247\u6bb5 1 \u2014 \u7528\u6237\u4ecb\u7ecd', inT: '00:12', outT: '00:28', inSec: 12.4, outSec: 28.8, dur: '16.4s', tags: ['intro', 'talking-head'], usedIn: '\u6bb5 2' },
+      { id: 'c2', label: '\u7247\u6bb5 2 \u2014 \u75db\u70b9\u63cf\u8ff0', inT: '00:45', outT: '01:15', inSec: 45.0, outSec: 75.2, dur: '30.2s', tags: ['pain-point', 'talking-head'], usedIn: '\u6bb5 3' },
+      { id: 'c3', label: '\u7247\u6bb5 3 \u2014 \u4f7f\u7528\u611f\u53d7', inT: '02:10', outT: '02:38', inSec: 130.0, outSec: 158.5, dur: '28.5s', tags: ['review'], usedIn: '\u6bb5 5' },
+    ]
+  },
+  {
+    name: 'screen-recording.mp4', duration: '05:12', durSec: 312, res: '1080p',
+    clips: [
+      { id: 'c4', label: '\u7247\u6bb5 1 \u2014 \u767b\u5f55\u6d41\u7a0b', inT: '00:05', outT: '00:32', inSec: 5.0, outSec: 32.0, dur: '27.0s', tags: ['screen', 'login'], usedIn: '\u6bb5 1' },
+      { id: 'c5', label: '\u7247\u6bb5 2 \u2014 \u4e3b\u529f\u80fd\u6f14\u793a', inT: '01:20', outT: '02:45', inSec: 80.0, outSec: 165.0, dur: '85.0s', tags: ['screen', 'demo'], usedIn: '\u6bb5 4' },
+    ]
+  },
+  {
+    name: 'office-broll.mp4', duration: '01:48', durSec: 108, res: '4K',
+    clips: [
+      { id: 'c6', label: '\u7247\u6bb5 1 \u2014 \u529e\u516c\u73af\u5883', inT: '00:08', outT: '00:22', inSec: 8.0, outSec: 22.0, dur: '14.0s', tags: ['b-roll', 'office'], usedIn: '\u6bb5 1' },
+    ]
+  },
+  {
+    name: 'founder-talk.mp4', duration: '08:30', durSec: 510, res: '1080p',
+    clips: [
+      { id: 'c7', label: '\u7247\u6bb5 1 \u2014 \u613f\u666f\u9610\u8ff0', inT: '00:30', outT: '01:12', inSec: 30.0, outSec: 72.0, dur: '42.0s', tags: ['vision', 'talking-head'], usedIn: '\u6bb5 6' },
+      { id: 'c8', label: '\u7247\u6bb5 2 \u2014 \u672a\u6765\u89c4\u5212', inT: '06:00', outT: '07:15', inSec: 360.0, outSec: 435.0, dur: '75.0s', tags: ['roadmap'], usedIn: '\u6bb5 7' },
+    ]
+  }
+];
+
+let selectedClipId = null;
+
+function render() {
+  const tree = document.getElementById('tree');
+  tree.innerHTML = '';
+  sources.forEach((src, si) => {
+    const node = document.createElement('div');
+    node.className = 'source-node' + (si === 0 ? ' expanded' : '');
+    const clipCount = src.clips.length;
+
+    node.innerHTML = `
+      <div class="source-header" data-src="${si}">
+        <span class="source-toggle">${si === 0 ? '\u25be' : '\u25b8'}</span>
+        <span class="source-name">${src.name}</span>
+        <span class="source-meta">
+          <span>${src.duration}</span>
+          <span>${src.res}</span>
+        </span>
+      </div>
+      <div class="clip-list">
+        ${src.clips.map((c, ci) => {
+          const treeLine = ci === clipCount - 1 ? '\u2514\u2500\u2500' : '\u251c\u2500\u2500';
+          const sel = c.id === selectedClipId ? ' selected' : '';
+          return `<div class="clip-row${sel}" data-clip="${c.id}" data-src="${si}" data-ci="${ci}">
+            <span class="clip-tree-line">${treeLine}</span>
+            <span class="clip-label">${c.label}</span>
+            <span class="clip-range">${c.inT} \u2192 ${c.outT}</span>
+            <span class="clip-dur">${c.dur}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    `;
+    tree.appendChild(node);
+  });
+
+  // Bind toggles
+  tree.querySelectorAll('.source-header').forEach(h => {
+    h.addEventListener('click', () => {
+      const node = h.parentElement;
+      const toggle = h.querySelector('.source-toggle');
+      node.classList.toggle('expanded');
+      toggle.textContent = node.classList.contains('expanded') ? '\u25be' : '\u25b8';
+    });
+  });
+
+  // Bind clip selection
+  tree.querySelectorAll('.clip-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedClipId = row.dataset.clip;
+      showDetail(parseInt(row.dataset.src), parseInt(row.dataset.ci));
+      tree.querySelectorAll('.clip-row').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+    });
+  });
+}
+
+function showDetail(srcIdx, clipIdx) {
+  const src = sources[srcIdx];
+  const clip = src.clips[clipIdx];
+
+  document.getElementById('empty-state').style.display = 'none';
+  const detail = document.getElementById('detail');
+  detail.classList.add('visible');
+
+  // Timeline
+  const tp = document.getElementById('timeline-preview');
+  const totalBars = 80;
+  const inPct = clip.inSec / src.durSec;
+  const outPct = clip.outSec / src.durSec;
+
+  let barsHtml = '';
+  for (let i = 0; i < totalBars; i++) {
+    const p = i / totalBars;
+    const inRange = p >= inPct && p <= outPct;
+    const h = 8 + Math.random() * 36;
+    barsHtml += `<div class="waveform-bar${inRange ? ' in-range' : ''}" style="height:${h}px"></div>`;
+  }
+
+  const inLeft = 40 + inPct * (tp.offsetWidth - 80);
+  const outLeft = 40 + outPct * (tp.offsetWidth - 80);
+
+  tp.innerHTML = `
+    <div class="waveform">${barsHtml}</div>
+    <div class="marker-in" style="left:${inPct * 100}%" data-time="${clip.inT}"></div>
+    <div class="marker-out" style="left:${outPct * 100}%" data-time="${clip.outT}"></div>
+    <div class="time-ruler">
+      <span>00:00</span>
+      <span>${formatTime(src.durSec * 0.25)}</span>
+      <span>${formatTime(src.durSec * 0.5)}</span>
+      <span>${formatTime(src.durSec * 0.75)}</span>
+      <span>${src.duration}</span>
+    </div>
+  `;
+
+  // Properties
+  const grid = document.getElementById('prop-grid');
+  const tagsHtml = clip.tags.map(t => `<span class="tag">${t}</span>`).join('');
+  grid.innerHTML = `
+    <div class="prop-key">Name</div><div class="prop-val">${clip.label}</div>
+    <div class="prop-key">Source</div><div class="prop-val"><span class="link">${src.name}</span></div>
+    <div class="prop-key">Range</div><div class="prop-val mono">${clip.inSec.toFixed(1)}s \u2192 ${clip.outSec.toFixed(1)}s</div>
+    <div class="prop-key">Duration</div><div class="prop-val mono">${clip.dur}</div>
+    <div class="prop-key">Used in</div><div class="prop-val">${clip.usedIn}</div>
+    <div class="prop-key">Tags</div><div class="prop-val">${tagsHtml}</div>
+  `;
+
+  // Source context
+  document.getElementById('source-context').textContent =
+    `This clip is from ${src.name} (${src.clips.length} clip${src.clips.length > 1 ? 's' : ''} total)`;
+}
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+// Resizable divider
+const divider = document.getElementById('divider');
+const panelLeft = document.querySelector('.panel-left');
+let dragging = false;
+divider.addEventListener('mousedown', () => { dragging = true; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; });
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const w = Math.max(280, Math.min(e.clientX, window.innerWidth - 320));
+  panelLeft.style.width = w + 'px';
+});
+window.addEventListener('mouseup', () => { dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; });
+
+render();
+</script>
+</body>
+</html>
