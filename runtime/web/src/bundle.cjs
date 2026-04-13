@@ -110,10 +110,12 @@ const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=${width}">
 <title>NextFrame — Generated Video</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { background: #111; min-height: 100vh; }
+  html, body { background: #111; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  #stage { aspect-ratio: ${width} / ${height}; max-width: 100vw; max-height: 100vh; }
   .nf-layer { will-change: opacity, transform; }
 </style>
 </head>
