@@ -188,6 +188,30 @@
 .pl-atom-info { padding: 12px; }
 .pl-atom-name { font-size: 13px; color: #e4e4e8; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .pl-atom-desc { font-size: 11px; color: rgba(228,228,232,0.5); margin-top: 2px; }
+.pl-atom-type-tag { font-size: 11px; padding: 2px 8px; border-radius: 3px; font-weight: 500; }
+.pl-atom-type-tag.component { background: rgba(124,106,239,0.1); color: #7c6aef; }
+.pl-atom-type-tag.video { background: rgba(62,179,112,0.1); color: #3eb370; }
+.pl-atom-type-tag.image { background: rgba(224,160,64,0.1); color: #e0a040; }
+.pl-atom-seg { font-size: 11px; padding: 1px 8px; border-radius: 3px; background: rgba(124,106,239,0.15); color: #7c6aef; font-family: var(--font-mono); }
+.pl-atom-path { font-family: var(--font-mono); font-size: 11px; color: rgba(228,228,232,0.5); margin-top: 2px; word-break: break-all; }
+
+/* Audio table */
+.col-text { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; line-height: 1.9; color: #e4e4e8; }
+.col-audio { background: #111114; }
+.audio-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.audio-duration { font-family: var(--font-mono); font-size: 13px; color: #e4e4e8; font-weight: 500; }
+.sentence-list { display: flex; flex-direction: column; gap: 2px; }
+.sentence-row { display: grid; grid-template-columns: 150px 1fr auto; align-items: baseline; padding: 8px 10px; border-radius: 4px; gap: 12px; }
+.sentence-row:hover { background: rgba(228,228,232,0.03); }
+.s-timecode { font-family: var(--font-mono); font-size: 11px; color: rgba(228,228,232,0.5); white-space: nowrap; }
+.s-arrow { color: rgba(228,228,232,0.25); margin: 0 2px; }
+.s-text { font-size: 13px; color: rgba(228,228,232,0.75); line-height: 1.5; }
+.s-dur { font-family: var(--font-mono); font-size: 11px; color: rgba(228,228,232,0.25); text-align: right; white-space: nowrap; }
+tr.seg-pending td.col-text { color: rgba(228,228,232,0.5); }
+tr.seg-pending .s-text { color: rgba(228,228,232,0.25); }
+
+/* Output count bar */
+.count-bar { padding: 12px 0; font-size: 12px; color: rgba(228,228,232,0.5); }
 
 /* ─── Output cards ─── */
 .pl-outputs { padding: 24px; max-width: 900px; margin: 0 auto; }

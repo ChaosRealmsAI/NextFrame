@@ -2023,274 +2023,452 @@ function renderPipelineStage() {
   }
 }
 
+
+/**
+ * Render pipeline script view: toolbar (principles + segment filter) + two-column table.
+ * @param {Object} data
+ * @param {Object} data.script.principles  - { audience, tone, style, pace, ... }
+ * @param {Array}  data.script.segments    - [{ segment, narration, visual, role, logic }, ...]
+ * @returns {string} HTML string
+ */
 function renderPipelineScript(data) {
-  var s = data.script || {};
-  var segs = s.segments || [];
-  if (segs.length === 0) return '<div class="pipeline-empty">暂无脚本 — nextframe script-set</div>';
-
-  var principles = s.principles || {};
-
-  // Toolbar: chips + segment filter
-  var chips = "";
-  for (var key in principles) {
-    if (principles[key]) chips += '<div style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 12px;border-radius:5px;background:var(--bg-surface);border:var(--border-a1)"><span style="color:var(--ink-ghost)">' + escHtml(key) + '</span><span style="color:var(--ink-mid);font-weight:500">' + escHtml(principles[key]) + '</span></div>';
-  }
-  var pills = '<span class="pl-seg-pill active" onclick="plFilterSeg(-1)">全部</span>';
-  for (var p = 0; p < segs.length; p++) {
-    pills += '<span class="pl-seg-pill" onclick="plFilterSeg(' + p + ')">段 ' + (segs[p].segment || p + 1) + '</span>';
+  var script = data && data.script;
+  if (!script || !script.segments || script.segments.length === 0) {
+    return '<div class="pipeline-empty" style="padding:40px;text-align:center;color:rgba(228,228,232,0.5);font-size:13px;">No script data</div>';
   }
 
-  // Table rows
-  var rows = segs.map(function(seg, idx) {
-    var meta = '';
-    if (seg.visual) meta += '<div style="margin-bottom:8px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-ghost);margin-bottom:2px">画面</div><div style="font-size:13px;color:var(--ink-mid);line-height:1.5">' + escHtml(seg.visual) + '</div></div>';
-    if (seg.role) meta += '<div style="margin-bottom:8px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-ghost);margin-bottom:2px">意图</div><div style="font-size:13px;color:var(--ink-mid);line-height:1.5">' + escHtml(seg.role) + '</div></div>';
-    if (seg.logic) meta += '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-ghost);margin-bottom:2px">逻辑</div><div style="font-size:13px;color:var(--ink-dim);line-height:1.5;font-style:italic">' + escHtml(seg.logic) + '</div></div>';
-    return '<tr data-seg="' + idx + '">' +
-      '<td style="padding:28px;border-bottom:var(--border-a1);vertical-align:top;font-family:var(--font-display);font-size:17px;line-height:1.9;color:var(--ink);width:55%">' + escHtml(seg.narration || '') + '</td>' +
-      '<td style="padding:28px;border-bottom:var(--border-a1);vertical-align:top;background:var(--bg-surface);width:45%">' + meta + '</td>' +
-    '</tr>';
-  }).join('');
+  var principles = script.principles || {};
+  var segments = script.segments;
+  var html = '';
 
-  return '<div style="padding:10px 20px;border-bottom:var(--border-a1);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' + chips +
-    '<div style="width:1px;height:18px;background:rgba(255,255,255,0.08);margin:0 4px"></div>' + pills + '</div>' +
-    '<div style="flex:1;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>' +
-    '<th style="padding:10px 28px;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-ghost);text-align:left;font-weight:400;border-bottom:var(--border-a1);background:var(--bg-surface);position:sticky;top:0;z-index:2;width:55%">文案</th>' +
-    '<th style="padding:10px 28px;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-ghost);text-align:left;font-weight:400;border-bottom:var(--border-a1);background:var(--bg-surface);position:sticky;top:0;z-index:2;width:45%">说明</th>' +
-    '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  // ── Toolbar: principle chips ──
+  html += '<div class="pl-toolbar" style="padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;flex-wrap:wrap;gap:20px;align-items:center;">';
+  var pKeys = Object.keys(principles);
+  for (var p = 0; p < pKeys.length; p++) {
+    var k = pKeys[p];
+    html += '<div class="pl-chip" style="display:flex;align-items:center;gap:6px;">';
+    html += '<span class="pl-chip-label" style="font-size:11px;color:rgba(228,228,232,0.5);">' + escHtml(k) + '</span>';
+    html += '<span class="pl-chip-val" style="font-size:12px;color:rgba(228,228,232,0.5);font-weight:500;">' + escHtml(principles[k]) + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // ── Toolbar: divider ──
+  html += '<div class="pl-divider" style="height:0;border-bottom:1px solid rgba(255,255,255,0.06);"></div>';
+
+  // ── Toolbar: segment filter pills ──
+  html += '<div class="pl-toolbar" style="padding:8px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;gap:6px;align-items:center;">';
+  html += '<span style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(228,228,232,0.5);margin-right:8px;">Segments</span>';
+  html += '<span class="pl-seg-pill" data-seg="-1" onclick="plFilterSeg(-1)" style="font-size:12px;padding:4px 14px;border-radius:5px;border:1px solid rgba(124,106,239,0.2);background:rgba(124,106,239,0.15);color:#7c6aef;cursor:pointer;">All</span>';
+  for (var s = 0; s < segments.length; s++) {
+    html += '<span class="pl-seg-pill" data-seg="' + s + '" onclick="plFilterSeg(' + s + ')" style="font-size:12px;padding:4px 14px;border-radius:5px;border:1px solid transparent;background:transparent;color:rgba(228,228,232,0.5);cursor:pointer;">' + escHtml(String(segments[s].segment)) + '</span>';
+  }
+  html += '</div>';
+
+  // ── Two-column table ──
+  html += '<div class="pl-table" style="width:100%;overflow-y:auto;">';
+  html += '<table style="width:100%;border-collapse:collapse;">';
+  html += '<thead><tr>';
+  html += '<th style="width:55%;padding:10px 24px;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(228,228,232,0.5);text-align:left;font-weight:400;border-bottom:1px solid rgba(255,255,255,0.06);background:#111114;position:sticky;top:0;z-index:2;">Narration</th>';
+  html += '<th style="width:45%;padding:10px 24px;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(228,228,232,0.5);text-align:left;font-weight:400;border-bottom:1px solid rgba(255,255,255,0.06);background:#111114;position:sticky;top:0;z-index:2;">Details</th>';
+  html += '</tr></thead>';
+  html += '<tbody>';
+
+  for (var i = 0; i < segments.length; i++) {
+    var seg = segments[i];
+    html += '<tr data-seg="' + i + '">';
+
+    // Left column: narration (Georgia 17px)
+    html += '<td style="font-family:Georgia,\'Times New Roman\',serif;font-size:17px;line-height:1.9;color:#e4e4e8;width:55%;padding:28px 24px;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top;">';
+    html += escHtml(seg.narration || '');
+    html += '</td>';
+
+    // Right column: visual + role/intent + logic
+    html += '<td style="background:#111114;width:45%;padding:28px 24px;border-bottom:1px solid rgba(255,255,255,0.06);vertical-align:top;">';
+
+    if (seg.visual) {
+      html += '<div class="pl-meta-item" style="margin-bottom:10px;">';
+      html += '<div class="pl-meta-label" style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(228,228,232,0.5);margin-bottom:3px;">Visual</div>';
+      html += '<div class="pl-meta-value" style="font-size:13px;color:rgba(228,228,232,0.5);line-height:1.5;">' + escHtml(seg.visual) + '</div>';
+      html += '</div>';
+    }
+
+    if (seg.role) {
+      html += '<div class="pl-meta-item" style="margin-bottom:10px;">';
+      html += '<div class="pl-meta-label" style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(228,228,232,0.5);margin-bottom:3px;">Intent</div>';
+      html += '<div class="pl-meta-value" style="font-size:13px;color:rgba(228,228,232,0.5);line-height:1.5;">' + escHtml(seg.role) + '</div>';
+      html += '</div>';
+    }
+
+    if (seg.logic) {
+      html += '<div class="pl-meta-item" style="margin-bottom:0;">';
+      html += '<div class="pl-meta-label" style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(228,228,232,0.5);margin-bottom:3px;">Logic</div>';
+      html += '<div class="pl-meta-value" style="font-size:13px;color:rgba(228,228,232,0.5);line-height:1.5;font-style:italic;">' + escHtml(seg.logic) + '</div>';
+      html += '</div>';
+    }
+
+    html += '</td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div>';
+
+  return html;
+}
+
+/**
+ * Segment filter: show/hide table rows + toggle active pill styling.
+ * @param {number} idx  -1 = show all, 0..N = show only that segment index
+ */
+function plFilterSeg(idx) {
+  var pills = document.querySelectorAll('.pl-seg-pill');
+  for (var i = 0; i < pills.length; i++) {
+    var isActive = (idx === -1) ? (i === 0) : (parseInt(pills[i].getAttribute('data-seg'), 10) === idx);
+    if (isActive) {
+      pills[i].style.background = 'rgba(124,106,239,0.15)';
+      pills[i].style.color = '#7c6aef';
+      pills[i].style.borderColor = 'rgba(124,106,239,0.2)';
+    } else {
+      pills[i].style.background = 'transparent';
+      pills[i].style.color = 'rgba(228,228,232,0.5)';
+      pills[i].style.borderColor = 'transparent';
+    }
+  }
+  var rows = document.querySelectorAll('.pl-table tbody tr[data-seg]');
+  for (var r = 0; r < rows.length; r++) {
+    rows[r].style.display = (idx === -1 || parseInt(rows[r].getAttribute('data-seg'), 10) === idx) ? '' : 'none';
+  }
 }
 
 function renderPipelineAudio(data) {
-  var a = data.audio || {};
-  var segs = a.segments || [];
-  if (segs.length === 0) return '<div class="pipeline-empty">暂无音频 — nextframe audio-set</div>';
+  var voice = escHtml(data.audio.voice);
+  var speed = data.audio.speed;
+  var segments = data.audio.segments;
+  var scriptSegs = data.script.segments;
 
-  var scriptSegs = (data.script || {}).segments || [];
-  var genCount = segs.filter(function(s) { return s.status === "generated"; }).length;
-  var totalDur = segs.reduce(function(sum, s) { return sum + (s.duration || 0); }, 0);
+  var generated = segments.filter(function(s) { return s.status === 'generated'; });
+  var totalDur = generated.reduce(function(sum, s) { return sum + (s.duration || 0); }, 0);
 
-  // Toolbar chips
-  var toolbar = '<div style="padding:10px 20px;border-bottom:var(--border-a1);display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-    '<div style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 12px;border-radius:5px;background:var(--bg-surface);border:var(--border-a1)"><span style="color:var(--ink-ghost)">声线</span><span style="color:var(--accent);font-weight:500">' + escHtml(a.voice || '未设置') + '</span></div>' +
-    '<div style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 12px;border-radius:5px;background:var(--bg-surface);border:var(--border-a1)"><span style="color:var(--ink-ghost)">语速</span><span style="color:var(--ink-mid);font-weight:500">' + (a.speed || 1.0) + 'x</span></div>' +
-    '<div style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 12px;border-radius:5px;background:rgba(62,179,112,0.08);border:1px solid rgba(62,179,112,0.12)"><span style="color:var(--ink-ghost)">已生成</span><span style="color:#3eb370;font-weight:500">' + genCount + '/' + segs.length + '</span></div>' +
-    '<div style="display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 12px;border-radius:5px;background:var(--bg-surface);border:var(--border-a1)"><span style="color:var(--ink-ghost)">总时长</span><span style="color:var(--ink-mid);font-weight:500">' + totalDur.toFixed(1) + 's</span></div>' +
-    '<div style="width:1px;height:18px;background:rgba(255,255,255,0.08);margin:0 4px"></div>';
-  var pills = '<span class="pl-seg-pill active" onclick="plFilterSeg(-1)">全部</span>';
-  for (var p = 0; p < segs.length; p++) pills += '<span class="pl-seg-pill" onclick="plFilterSeg(' + p + ')">段 ' + segs[p].segment + '</span>';
-  toolbar += pills + '</div>';
+  // --- Toolbar ---
+  var html = '<div class="pl-toolbar">';
+  html += '<div class="pl-chip pl-chip-accent"><span class="pl-chip-label">\u58F0\u7EBF</span><span class="pl-chip-val">' + voice + '</span></div>';
+  html += '<div class="pl-chip"><span class="pl-chip-label">\u8BED\u901F</span><span class="pl-chip-val">' + speed.toFixed(1) + 'x</span></div>';
+  html += '<div class="pl-chip pl-chip-green"><span class="pl-chip-label">\u5DF2\u751F\u6210</span><span class="pl-chip-val">' + generated.length + '/' + segments.length + '</span></div>';
+  html += '<div class="pl-chip"><span class="pl-chip-label">\u603B\u65F6\u957F</span><span class="pl-chip-val">' + totalDur.toFixed(1) + 's</span></div>';
+  html += '<div class="pl-divider"></div>';
+  html += '<span class="pl-seg-pill active" onclick="plFilterSeg(-1)">\u5168\u90E8</span>';
+  for (var i = 0; i < segments.length; i++) {
+    html += '<span class="pl-seg-pill" onclick="plFilterSeg(' + i + ')">\u6BB5 ' + (i + 1) + '</span>';
+  }
+  html += '</div>';
 
-  // Table rows
-  var rows = segs.map(function(seg, idx) {
-    var matchScript = scriptSegs.find(function(ss) { return (ss.segment || ss.id) === seg.segment; });
-    var text = matchScript ? matchScript.narration : ("Segment " + seg.segment);
-    var isGen = seg.status === "generated";
+  // --- Table ---
+  html += '<div class="pl-table"><table><thead><tr>';
+  html += '<th style="width:45%">\u6587\u6848</th>';
+  html += '<th style="width:55%">\u97F3\u9891</th>';
+  html += '</tr></thead><tbody>';
 
-    var audioMeta = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">' +
-      (isGen ? '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:rgba(62,179,112,0.12);color:#3eb370;font-weight:500">已生成</span>' : '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:var(--ink-08);color:var(--ink-ghost)">待生成</span>') +
-      (isGen ? '<span style="font-family:var(--font-mono);font-size:13px;color:var(--ink);font-weight:500">' + seg.duration + 's</span>' : '') +
-    '</div>';
+  for (var si = 0; si < segments.length; si++) {
+    var seg = segments[si];
+    var script = scriptSegs[si];
+    var isGenerated = seg.status === 'generated';
+    var trClass = isGenerated ? '' : ' class="seg-pending"';
 
-    // Karaoke sentences
-    var sentencesHtml = '';
-    if (seg.sentences && seg.sentences.length > 0) {
-      sentencesHtml = '<div style="display:flex;flex-direction:column;gap:2px">';
-      seg.sentences.forEach(function(sent) {
-        sentencesHtml += '<div style="display:grid;grid-template-columns:150px 1fr auto;align-items:baseline;padding:8px 10px;border-radius:4px;gap:12px;transition:background 0.15s">' +
-          '<span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-dim);white-space:nowrap">' + sent.start.toFixed(1) + ' → ' + sent.end.toFixed(1) + '</span>' +
-          '<span style="font-size:13px;color:var(--ink-mid)">' + escHtml(sent.text) + '</span>' +
-          '<span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-ghost);white-space:nowrap">' + (sent.end - sent.start).toFixed(1) + 's</span>' +
-        '</div>';
-      });
-      sentencesHtml += '</div>';
+    html += '<tr data-seg="' + si + '"' + trClass + '>';
+
+    // Left column: narration
+    html += '<td class="col-text">' + escHtml(script.narration) + '</td>';
+
+    // Right column: audio metadata
+    html += '<td class="col-audio">';
+    html += '<div class="audio-head">';
+
+    if (isGenerated) {
+      html += '<span class="pl-tag-generated">\u5DF2\u751F\u6210</span>';
+      html += '<span class="audio-duration">' + seg.duration.toFixed(1) + 's</span>';
+    } else {
+      html += '<span class="pl-tag-pending">\u5F85\u751F\u6210</span>';
     }
 
-    return '<tr data-seg="' + idx + '">' +
-      '<td style="padding:28px;border-bottom:var(--border-a1);vertical-align:top;font-family:var(--font-display);font-size:17px;line-height:1.9;color:' + (isGen ? 'var(--ink)' : 'var(--ink-dim)') + ';width:45%">' + escHtml(text) + '</td>' +
-      '<td style="padding:28px;border-bottom:var(--border-a1);vertical-align:top;background:var(--bg-surface);width:55%">' + audioMeta + sentencesHtml + '</td>' +
-    '</tr>';
-  }).join('');
+    html += '</div>';
 
-  return toolbar +
-    '<div style="flex:1;overflow-y:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>' +
-    '<th style="padding:10px 28px;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-ghost);text-align:left;font-weight:400;border-bottom:var(--border-a1);background:var(--bg-surface);position:sticky;top:0;z-index:2;width:45%">文案</th>' +
-    '<th style="padding:10px 28px;font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-ghost);text-align:left;font-weight:400;border-bottom:var(--border-a1);background:var(--bg-surface);position:sticky;top:0;z-index:2;width:55%">音频</th>' +
-    '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    // Sentence rows (karaoke) - only for generated segments
+    if (isGenerated && seg.sentences && seg.sentences.length > 0) {
+      html += '<div class="sentence-list">';
+      for (var j = 0; j < seg.sentences.length; j++) {
+        var sent = seg.sentences[j];
+        var startFmt = fmtTime(sent.start);
+        var endFmt = fmtTime(sent.end);
+        var durVal = (sent.end - sent.start).toFixed(1);
+
+        html += '<div class="sentence-row">';
+        html += '<span class="s-timecode">' + startFmt + ' <span class="s-arrow">&rarr;</span> ' + endFmt + '</span>';
+        html += '<span class="s-text">' + escHtml(sent.text) + '</span>';
+        html += '<span class="s-dur">' + durVal + 's</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+
+    html += '</td></tr>';
+  }
+
+  html += '</tbody></table></div>';
+
+  return html;
+}
+
+function fmtTime(sec) {
+  var m = Math.floor(sec / 60);
+  var s = sec % 60;
+  var mm = (m < 10 ? '0' : '') + m;
+  var whole = Math.floor(s);
+  var frac = Math.round((s - whole) * 10);
+  var ss = (whole < 10 ? '0' : '') + whole;
+  return mm + ':' + ss + '.' + frac;
 }
 
 function renderPipelineClips(data) {
-  var atoms = data.atoms || [];
-  var videos = atoms.filter(function(a) { return a.type === "video"; });
-  if (videos.length === 0) return '<div class="pipeline-empty">暂无素材 — nextframe atom-add --type=video</div>';
+  var atoms = (data.atoms || []).filter(function (a) { return a.type === 'video'; });
 
-  var rowsHtml = videos.map(function(v) {
-    var hasSub = v.subtitles && v.subtitles.length > 0;
-    var hasTl = v.hasTl;
-    var tags = '';
-    tags += hasSub ? '<span class="pl-tag-generated">字幕 ✓</span> ' : '<span class="pl-tag-pending">无字幕</span> ';
-    tags += hasTl ? '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:rgba(124,106,239,0.1);color:#7c6aef;font-weight:500">时间轴 ✓</span> ' : '<span class="pl-tag-pending">无时间轴</span> ';
-    if (v.segment) tags += '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:rgba(124,106,239,0.15);color:#7c6aef;font-family:var(--font-mono)">段 ' + v.segment + '</span>';
-
-    return '<div style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.06)">' +
-      '<div style="width:100px;aspect-ratio:16/9;background:#111114;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:rgba(228,228,232,0.25);font-size:11px">▶</div>' +
-      '<div style="flex:1;min-width:0">' +
-        '<div style="font-size:14px;font-weight:500;margin-bottom:2px">' + escHtml(v.name) + '</div>' +
-        '<div style="font-family:var(--font-mono);font-size:11px;color:rgba(228,228,232,0.5)">' + escHtml(v.file || "") + (v.duration ? " · " + v.duration + "s" : "") + '</div>' +
-      '</div>' +
-      '<div style="display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0">' + tags + '</div>' +
+  var header =
+    '<div class="clip-list-header" style="padding:10px 20px;border-bottom:1px solid rgba(255,255,255,0.06);' +
+    'font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:rgba(228,228,232,0.5)">' +
+    'VIDEO CLIPS &middot; ' + atoms.length +
     '</div>';
-  }).join("");
 
-  return '<div style="padding:10px 20px;border-bottom:var(--border-a1);display:flex;align-items:center;gap:8px">' +
-    '<span style="font-size:12px;color:var(--ink-dim)">' + videos.length + ' 个素材</span>' +
-  '</div>' + rowsHtml;
+  var rows = '';
+  atoms.forEach(function (a) {
+    var dur = (typeof a.duration === 'number') ? a.duration.toFixed(1) : '0.0';
+
+    // --- status tags ---
+    var tags = '';
+
+    // subtitle tag
+    if (a.subtitles && a.subtitles.length > 0) {
+      tags += '<span class="pl-tag-generated" style="font-size:11px;padding:2px 10px;border-radius:3px;' +
+        'font-weight:500;background:rgba(224,160,64,0.12);color:#e0a040">' +
+        escHtml('字幕✓') + '</span>';
+    } else {
+      tags += '<span class="pl-tag-pending" style="font-size:11px;padding:2px 10px;border-radius:3px;' +
+        'font-weight:500;background:rgba(228,228,232,0.05);color:rgba(228,228,232,0.25)">' +
+        escHtml('无字幕') + '</span>';
+    }
+
+    // timeline tag
+    if (a.hasTl) {
+      tags += '<span class="pl-tag-generated" style="font-size:11px;padding:2px 10px;border-radius:3px;' +
+        'font-weight:500;background:rgba(124,106,239,0.06);color:#7c6aef">' +
+        escHtml('时间轴✓') + '</span>';
+    } else {
+      tags += '<span class="pl-tag-pending" style="font-size:11px;padding:2px 10px;border-radius:3px;' +
+        'font-weight:500;background:rgba(228,228,232,0.05);color:rgba(228,228,232,0.25)">' +
+        escHtml('无时间轴') + '</span>';
+    }
+
+    // segment tag
+    if (a.segment != null) {
+      tags += '<span class="pl-tag-generated" style="font-size:11px;padding:2px 10px;border-radius:3px;' +
+        'font-weight:500;font-family:\'SF Mono\',Menlo,monospace;background:rgba(124,106,239,0.15);color:#7c6aef">' +
+        escHtml('段' + a.segment) + '</span>';
+    }
+
+    // --- thumbnail placeholder ---
+    var thumb =
+      '<div style="width:100px;height:56px;background:#111114;border-radius:4px;flex-shrink:0;' +
+      'display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(228,228,232,0.25)">' +
+      '16:9</div>';
+
+    // --- row ---
+    rows +=
+      '<div class="clip-row" style="display:flex;align-items:center;gap:12px;padding:7px 10px;' +
+      'border-radius:6px;border:1px solid transparent">' +
+        thumb +
+        '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">' +
+          '<span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+            escHtml(a.name) +
+          '</span>' +
+          '<span style="font-family:\'SF Mono\',Menlo,monospace;font-size:11px;color:rgba(228,228,232,0.5);' +
+          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' +
+            escHtml(a.file || '') +
+          '</span>' +
+        '</div>' +
+        '<span style="font-family:\'SF Mono\',Menlo,monospace;font-size:11px;color:#7c6aef;white-space:nowrap;flex-shrink:0">' +
+          escHtml(dur + 's') +
+        '</span>' +
+        '<div style="display:flex;gap:4px;flex-shrink:0;align-items:center">' +
+          tags +
+        '</div>' +
+      '</div>';
+  });
+
+  return header + '<div class="clip-list" style="padding:6px 20px">' + rows + '</div>';
 }
 
 function renderPipelineAtoms(data) {
   var atoms = data.atoms || [];
-  if (atoms.length === 0) return '<div class="pipeline-empty">暂无原子 — nextframe atom-add</div>';
 
-  var cardsHtml = atoms.map(function(atom) {
-    var typeColors = { component: "rgba(124,106,239,0.1);color:#7c6aef", video: "rgba(62,179,112,0.1);color:#3eb370", image: "rgba(224,160,64,0.1);color:#e0a040" };
-    var typeLabels = { component: "组件", video: "视频", image: "图片" };
-    var tc = typeColors[atom.type] || typeColors.component;
-    var desc = atom.scene ? atom.scene : (atom.file || "");
-    var segTag = atom.segment ? ' <span style="font-size:11px;padding:1px 8px;border-radius:3px;background:var(--accent-15);color:var(--accent);font-family:var(--font-mono)">段 ' + atom.segment + '</span>' : '';
-    return '<div class="pl-atom-card" data-type="' + (atom.type || 'component') + '">' +
-      '<div class="pl-atom-preview">' + escHtml(atom.scene || atom.file || atom.name) + "</div>" +
-      '<div class="pl-atom-info">' +
-        '<div class="pl-atom-name">' + escHtml(atom.name) + ' <span style="font-size:11px;padding:2px 8px;border-radius:3px;background:' + tc + '">' + (typeLabels[atom.type] || '组件') + '</span>' + segTag + '</div>' +
-        '<div class="pl-atom-desc">' + escHtml(desc) + (atom.duration ? " · " + atom.duration + "s" : "") + (atom.dimensions ? " · " + atom.dimensions : "") + (atom.size ? " · " + atom.size : "") + "</div>" +
-        (atom.file ? '<div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-dim);margin-top:2px">' + escHtml(atom.file) + '</div>' : '') +
-      "</div>" +
-    "</div>";
-  }).join("");
+  var counts = { all: atoms.length, component: 0, video: 0, image: 0 };
+  atoms.forEach(function(a) { if (counts[a.type] !== undefined) counts[a.type]++; });
 
-  var counts = { component: 0, video: 0, image: 0 };
-  atoms.forEach(function(a) { counts[a.type] = (counts[a.type] || 0) + 1; });
+  var typeLabels = { component: '组件', video: '视频', image: '图片' };
 
-  return '<div class="pl-atoms">' +
-    '<div class="pl-atoms-header">' +
-      '<span style="font-size:11px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:0.06em">' + atoms.length + ' 个原子</span>' +
-      '<div class="pl-atoms-filters">' +
-        '<span class="pl-filter active">全部</span>' +
-        (counts.component ? '<span class="pl-filter">组件 ' + counts.component + "</span>" : "") +
-        (counts.video ? '<span class="pl-filter">视频 ' + counts.video + "</span>" : "") +
-        (counts.image ? '<span class="pl-filter">图片 ' + counts.image + "</span>" : "") +
-      "</div>" +
-    "</div>" +
-    '<div class="pl-atoms-grid">' + cardsHtml + "</div>" +
-  "</div>";
-}
+  // --- Toolbar ---
+  var html = '<div class="pl-toolbar">';
+  html += '<span class="pl-seg-pill active" data-filter="all">全部 ' + counts.all + '</span>';
+  html += '<span class="pl-seg-pill" data-filter="component">' + typeLabels.component + ' ' + counts.component + '</span>';
+  html += '<span class="pl-seg-pill" data-filter="video">' + typeLabels.video + ' ' + counts.video + '</span>';
+  html += '<span class="pl-seg-pill" data-filter="image">' + typeLabels.image + ' ' + counts.image + '</span>';
+  html += '</div>';
 
-function renderPipelineAssembly() {
-  return '<div class="pl-assembly">' +
-    '<div style="font-size:14px;color:var(--ink-dim)">拼装视图在编辑器中查看</div>' +
-    '<div class="pl-assembly-link" onclick="if(currentProject&&currentEpisode)goEditor(currentProject,currentEpisode)">打开编辑器</div>' +
-  "</div>";
+  // --- Grid ---
+  html += '<div class="pl-atoms-grid">';
+  atoms.forEach(function(a) {
+    var typeClass = a.type; // component | video | image
+    var typeLabel = typeLabels[a.type] || a.type;
+
+    // Build info / description line
+    var desc = '';
+    if (a.type === 'component') {
+      desc = 'scene &middot; ' + escHtml(a.scene || a.name) + '.js';
+    } else if (a.type === 'video') {
+      var parts = [];
+      if (a.duration != null) parts.push(a.duration + 's');
+      if (a.dimensions) parts.push(a.dimensions);
+      desc = parts.join(' &middot; ');
+    } else if (a.type === 'image') {
+      var parts = [];
+      if (a.dimensions) parts.push(a.dimensions);
+      if (a.size) parts.push(a.size);
+      desc = parts.join(' &middot; ');
+    }
+
+    html += '<div class="pl-atom-card" data-type="' + escHtml(a.type) + '">';
+
+    // Preview area
+    html += '<div class="pl-atom-preview">';
+    if (a.type === 'component') {
+      html += '<span>' + escHtml(a.scene || a.name) + '</span>';
+    } else {
+      html += '<span>' + escHtml(a.file || a.name) + '</span>';
+    }
+    html += '</div>';
+
+    // Info area
+    html += '<div class="pl-atom-info">';
+
+    // Name + type tag row
+    html += '<div class="pl-atom-name">';
+    html += '<span>' + escHtml(a.name) + '</span>';
+    html += '<span class="pl-atom-type-tag ' + typeClass + '">' + escHtml(typeLabel) + '</span>';
+    if (a.segment != null) {
+      html += '<span class="pl-atom-seg">段 ' + escHtml(String(a.segment)) + '</span>';
+    }
+    html += '</div>';
+
+    // Description
+    if (desc) {
+      html += '<div class="pl-atom-desc">' + desc + '</div>';
+    }
+
+    // File path for video/image
+    if (a.file && (a.type === 'video' || a.type === 'image')) {
+      html += '<div class="pl-atom-path">' + escHtml(a.file) + '</div>';
+    }
+
+    html += '</div>'; // .pl-atom-info
+    html += '</div>'; // .pl-atom-card
+  });
+  html += '</div>';
+
+  return html;
 }
 
 function renderPipelineOutput(data) {
-  var outputs = data.outputs || [];
-  if (outputs.length === 0) return '<div class="pipeline-empty">暂无导出 — nextframe output-add</div>';
+  var outputs = (data.outputs || []).slice().sort(function(a, b) { return b.id - a.id; });
+  var count = outputs.length;
 
-  var sorted = outputs.slice().sort(function(a, b) { return (b.id || 0) - (a.id || 0); });
-  var cardsHtml = sorted.map(function(out) {
-    var specs = out.specs || {};
-    var specItems = [];
-    if (specs.width) specItems.push({ v: specs.width + "×" + specs.height, c: "res" });
-    if (specs.fps) specItems.push({ v: specs.fps + "fps", c: "fps" });
-    if (specs.codec) specItems.push({ v: specs.codec, c: "codec" });
-    if (out.duration) specItems.push({ v: out.duration + "s", c: "dur" });
-    if (out.size || specs.size) specItems.push({ v: out.size || specs.size, c: "size" });
-    var specColors = { res: "rgba(124,106,239,0.1);color:#7c6aef", fps: "rgba(62,179,112,0.1);color:#3eb370", codec: "rgba(224,160,64,0.1);color:#e0a040", dur: "var(--ink-08);color:var(--ink)", size: "var(--ink-08);color:var(--ink-dim)" };
-    var specPills = specItems.map(function(s) { return '<span style="font-family:var(--font-mono);font-size:11px;padding:3px 10px;border-radius:4px;background:' + specColors[s.c] + '">' + escHtml(s.v) + '</span>'; }).join("");
+  var html = '<div class="pl-outputs">';
 
-    var pubPills = (out.published || []).map(function(p) {
-      var name = typeof p === "string" ? p : p.platform;
-      return '<span class="pl-publish-pill published">' + escHtml(name) + " ✓</span>";
-    }).join("");
-    if (!pubPills) pubPills = '<span class="pl-publish-pill unpublished">未发布</span>';
+  // Header
+  html += '<div class="count-bar"><span>' + escHtml(String(count)) + ' 个版本</span></div>';
 
-    var dateStr = out.date ? new Date(out.date).toLocaleString("zh-CN") : "";
-
-    return '<div class="pl-output-card">' +
-      '<div class="pl-output-thumb">▶</div>' +
-      '<div class="pl-output-info">' +
-        '<div class="pl-output-name">' + escHtml(out.name) + "</div>" +
-        '<div class="pl-output-date">' + escHtml(dateStr) + "</div>" +
-        '<div class="pl-output-specs">' + specPills + "</div>" +
-        (out.changes ? '<div class="pl-output-changes">' + escHtml(out.changes) + "</div>" : "") +
-        (out.file ? '<div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-dim);margin-top:4px;user-select:all">' + escHtml(out.file) + '</div>' : '') +
-      "</div>" +
-      '<div class="pl-output-status">' + pubPills + "</div>" +
-    "</div>";
-  }).join("");
-
-  return '<div class="pl-outputs">' + cardsHtml + "</div>";
-}
-
-function populateEditorClipSidebar() {
-  var list = document.getElementById("editor-clip-list");
-  var count = document.getElementById("editor-clip-count");
-  if (!list) return;
-  if (!pipelineData || !pipelineData.script || !pipelineData.script.segments || pipelineData.script.segments.length === 0) {
-    // Try to load pipeline data
-    if (currentProject && currentEpisode) {
-      bridgeCall("fs.read", { path: "~/NextFrame/projects/" + currentProject + "/" + currentEpisode + "/pipeline.json" }, 3000).then(function(result) {
-        try {
-          pipelineData = JSON.parse(result.contents);
-          renderEditorClips();
-        } catch (_e) {}
-      }).catch(function() {});
+  // Version cards
+  for (var i = 0; i < outputs.length; i++) {
+    var o = outputs[i];
+    var specs = o.specs || {};
+    var published = o.published || [];
+    var dateStr = '';
+    if (o.date) {
+      var d = new Date(o.date);
+      var mm = String(d.getMonth() + 1).padStart(2, '0');
+      var dd = String(d.getDate()).padStart(2, '0');
+      var hh = String(d.getHours()).padStart(2, '0');
+      var mi = String(d.getMinutes()).padStart(2, '0');
+      dateStr = d.getFullYear() + '-' + mm + '-' + dd + ' ' + hh + ':' + mi;
     }
-    list.innerHTML = '<div style="padding:20px;color:rgba(228,228,232,0.25);font-size:12px;text-align:center">暂无片段</div>';
-    if (count) count.textContent = "0";
-    return;
+
+    html += '<div class="pl-output-card">';
+
+    // Thumbnail
+    html += '<div class="pl-output-thumb"><span class="v-thumb-play">&#x25B6;</span></div>';
+
+    // Info
+    html += '<div class="pl-output-info">';
+    html += '<div class="pl-output-name">' + escHtml(o.name || '') + '</div>';
+    html += '<div class="pl-output-date">' + escHtml(dateStr) + '</div>';
+
+    // Spec tags
+    html += '<div class="pl-output-specs">';
+    if (specs.width && specs.height) {
+      html += '<span class="spec-tag pl-spec-res">' + escHtml(specs.width + '\u00d7' + specs.height) + '</span>';
+    }
+    if (specs.fps) {
+      html += '<span class="spec-tag pl-spec-fps">' + escHtml(specs.fps + 'fps') + '</span>';
+    }
+    if (specs.codec) {
+      html += '<span class="spec-tag pl-spec-codec">' + escHtml(specs.codec) + '</span>';
+    }
+    if (o.duration != null) {
+      html += '<span class="spec-tag pl-spec-dur">' + escHtml(o.duration + 's') + '</span>';
+    }
+    if (o.size) {
+      html += '<span class="spec-tag pl-spec-size">' + escHtml(o.size) + '</span>';
+    }
+    html += '</div>';
+
+    // Changes
+    if (o.changes) {
+      html += '<div class="pl-output-changes">' + escHtml(o.changes) + '</div>';
+    }
+
+    // File path
+    if (o.file) {
+      html += '<div class="pl-meta-path">' + escHtml(o.file) + '</div>';
+    }
+
+    html += '</div>'; // pl-output-info
+
+    // Publish status
+    html += '<div class="pl-output-status">';
+    if (published.length > 0) {
+      for (var j = 0; j < published.length; j++) {
+        html += '<span class="pl-tag-published">' + escHtml(published[j].platform) + ' \u2713</span>';
+      }
+    } else {
+      html += '<span class="pl-tag-unpublished">未发布</span>';
+    }
+    html += '</div>';
+
+    html += '</div>'; // pl-output-card
   }
-  renderEditorClips();
-}
 
-function renderEditorClips() {
-  var list = document.getElementById("editor-clip-list");
-  var countEl = document.getElementById("editor-clip-count");
-  if (!list || !pipelineData) return;
-  var segs = pipelineData.script.segments || [];
-  var audioSegs = (pipelineData.audio || {}).segments || [];
-  if (countEl) countEl.textContent = segs.length + " 个片段";
-
-  var html = segs.map(function(seg, i) {
-    var audio = audioSegs.find(function(a) { return a.segment === seg.segment; });
-    var dur = audio && audio.duration ? audio.duration + "s" : "—";
-    var role = seg.role ? seg.role + " — " : "";
-    return '<div class="editor-clip-item' + (i === 0 ? ' active' : '') + '" onclick="selectEditorClip(this,' + i + ')">' +
-      '<div class="editor-clip-name">' + escHtml(role + (seg.narration || '').substring(0, 12)) + '</div>' +
-      '<div class="editor-clip-meta">00:00 → ' + dur + '</div>' +
-      '<div class="editor-clip-tags">' +
-        '<span class="editor-clip-tag seg">段 ' + (seg.segment || i + 1) + '</span>' +
-        '<span class="editor-clip-tag dur">' + dur + '</span>' +
-      '</div>' +
-    '</div>';
-  }).join("");
-  list.innerHTML = html;
-}
-
-function selectEditorClip(el, idx) {
-  document.querySelectorAll(".editor-clip-item").forEach(function(item) { item.classList.remove("active"); });
-  el.classList.add("active");
-}
-
-function plFilterSeg(idx) {
-  document.querySelectorAll(".pl-seg-pill").forEach(function(p, i) {
-    p.classList.toggle("active", idx === -1 ? i === 0 : i === idx + 1);
-  });
-  document.querySelectorAll("tbody tr[data-seg]").forEach(function(row) {
-    row.style.display = (idx === -1 || row.dataset.seg == idx) ? "" : "none";
-  });
+  html += '</div>'; // pl-outputs
+  return html;
 }
 
 function escHtml(str) {
-  return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(str || "").replace(/&/g, "&amp;").replace(/</g, "\&lt;").replace(/>/g, "\&gt;").replace(/"/g, "\&quot;");
 }
 
 function initBreadcrumbNavigation() {
