@@ -1188,7 +1188,7 @@ function playLoop(timestamp) {
   }
 
   setPlayheadTime(currentTime);
-  requestPreviewFrame(currentTime);
+  // previewEngine.renderFrame already called inside setPlayheadTime
   if (isPlaying) {
     playRAF = requestAnimationFrame(playLoop);
   }
