@@ -105,9 +105,17 @@ Pipeline (v0.4)
   atom-add / atom-list / atom-remove
   output-add / output-list / output-publish
 
-Source Library
-  source-download / source-transcribe / source-align
-  source-cut / source-list / source-link
+Source Library (视频素材全链路)
+  source-download <url> --library <path>     download YouTube video via yt-dlp
+  source-transcribe <source-dir>             Whisper ASR → sentences.json (no subtitles)
+  source-align <source-dir> --srt <file>     whisperX align → sentences.json (have subtitles, better)
+  source-cut <source-dir> --plan <file>      cut clips by sentence-id ranges
+  source-list --library <path>               list all sources with status
+  source-link <source-dir> --project X --episode Y   link clips to pipeline atoms
+
+  DECISION: have SRT → source-align (~20ms). No SRT → source-transcribe (~200ms).
+  FLOW: source-download → source-transcribe/align → source-cut → source-link → 素材tab可见
+  source.json per source dir is the single truth. pipeline.json atoms reference it.
 
 Layer CRUD
   layer-list / layer-add / layer-move / layer-resize / layer-set / layer-remove

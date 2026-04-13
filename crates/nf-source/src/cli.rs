@@ -3,8 +3,25 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[command(name = "nf-source")]
-#[command(about = "Source pipeline tools for NextFrame")]
+#[command(
+    name = "nf-source",
+    about = "Video source pipeline for NextFrame",
+    long_about = "Video source pipeline for NextFrame.\n\n\
+        Full pipeline: download → transcribe/align → cut → preview.\n\
+        All cut operations address content by sentence ids, not timestamps.",
+    after_long_help = "\
+        DECISION: TRANSCRIBE vs ALIGN\n\n  \
+        Have an SRT subtitle file? → nf-source align (whisperX, ~20ms precision)\n  \
+        No subtitles?              → nf-source transcribe (Whisper ASR, ~200ms precision)\n  \
+        Both produce identical sentences.json.\n\n\
+        FULL PIPELINE:\n\n  \
+        nf-source download --url <URL> --out-dir project/\n  \
+        nf-source transcribe --video project/source.mp4 --out-dir project/\n  \
+        nf-source cut --video project/source.mp4 --sentences-path project/ \\\n    \
+          --plan-path plan.json --out-dir project/clips/\n  \
+        nf-source preview --sentences-path project/ \\\n    \
+          --cut-report-path project/clips/cut_report.json --out-path project/preview/"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -12,10 +29,15 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Download a video with yt-dlp. Outputs: source.mp4, meta.json.
     Download(DownloadArgs),
+    /// Transcribe video to word-level sentences.json via Whisper.
     Transcribe(TranscribeArgs),
+    /// Force-align SRT subtitles against audio via whisperX.
     Align(AlignArgs),
+    /// Cut clips by sentence-id plan. Outputs: clip_XX.mp4, cut_report.json.
     Cut(CutArgs),
+    /// Generate HTML preview page with karaoke highlighting.
     Preview(PreviewArgs),
 }
 
