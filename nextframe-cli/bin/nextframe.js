@@ -98,6 +98,21 @@ Pipeline (v0.4)
 Layer CRUD
   layer-list / layer-add / layer-move / layer-resize / layer-set / layer-remove
 
+VIDEO SIZE PRESETS (写在 timeline JSON 顶层)
+  横屏 16:9    width: 1920, height: 1080   — 默认，YouTube/演示
+  竖屏 9:16    width: 1080, height: 1920   — 抖音/Reels/短视频
+  方形 1:1     width: 1080, height: 1080   — Instagram/朋友圈
+  超宽 21:9    width: 2560, height: 1080   — 电影感
+  4K 16:9      width: 3840, height: 2160   — 高清
+
+CONTENT SAFETY RULES (validate 会检查)
+  ★ 文字最小 18px — 小于 18px 在手机上看不清
+  ★ 竖屏文字最小 24px — 9:16 画面窄，字要更大
+  ★ 内容不超出 stage — x+w ≤ 100%, y+h ≤ 100%
+  ★ 重要内容避开安全区 — 各平台上下左右有 UI 遮挡
+    横屏安全区：上下各留 5%, 左右各留 3%
+    竖屏安全区：上留 15%（状态栏）, 下留 10%（操作区）, 左右各留 5%
+
 LAYER PROPERTIES (= CSS)
   必填：id, scene, start, dur, params
   位置：x, y, w, h (% 或 px)

@@ -94,6 +94,44 @@ export function validateTimeline(timeline) {
     }
   }
 
+  // Gate 8: content safety — size, overflow, safe zone
+  const isVertical = timeline.height > timeline.width;
+  for (const layer of timeline.layers) {
+    // Check fontSize in params
+    const fontSize = layer.params?.fontSize;
+    if (typeof fontSize === 'number') {
+      const minFont = isVertical ? 24 : 18;
+      if (fontSize < minFont) {
+        warnings.push({
+          code: 'FONT_TOO_SMALL',
+          message: `layer "${layer.id}" fontSize ${fontSize}px — minimum ${minFont}px for ${isVertical ? '竖屏' : '横屏'}`,
+        });
+      }
+    }
+
+    // Check position overflow (% values)
+    if (layer.x && layer.w) {
+      const x = parseFloat(layer.x);
+      const w = parseFloat(layer.w);
+      if (String(layer.x).includes('%') && String(layer.w).includes('%') && x + w > 102) {
+        warnings.push({
+          code: 'CONTENT_OVERFLOW',
+          message: `layer "${layer.id}" x=${layer.x} + w=${layer.w} exceeds stage width`,
+        });
+      }
+    }
+    if (layer.y && layer.h) {
+      const y = parseFloat(layer.y);
+      const h = parseFloat(layer.h);
+      if (String(layer.y).includes('%') && String(layer.h).includes('%') && y + h > 102) {
+        warnings.push({
+          code: 'CONTENT_OVERFLOW',
+          message: `layer "${layer.id}" y=${layer.y} + h=${layer.h} exceeds stage height`,
+        });
+      }
+    }
+  }
+
   return { ok: errors.length === 0, errors, warnings, hints };
 }
 
