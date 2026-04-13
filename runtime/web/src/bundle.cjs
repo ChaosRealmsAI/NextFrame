@@ -316,6 +316,3 @@ window.addEventListener('resize', fitPreview);
 `;
 
 fs.writeFileSync(outputPath, html, 'utf-8');
-console.log(`Generated: ${outputPath} (${Math.round(html.length / 1024)}KB)`);
-console.log(`Timeline: ${width}x${height} @ ${fps}fps, ${duration}s, ${layers.length} layers`);
-console.log(`Scenes bundled: ${sceneCodesV2.length + sceneCodesCanvas.length + customSceneIds.length}`);

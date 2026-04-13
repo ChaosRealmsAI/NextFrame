@@ -136,7 +136,6 @@ function initDOMPreview(timeline) {
     previewEngine.renderFrame(Math.max(0, finiteNumber(currentTime, 0)));
     ensurePreviewInteractivity();
     fitStageToContainer();
-    console.log("[preview] direct render ready, " + (timeline.layers ? timeline.layers.length : 0) + " layers");
   } catch (error) {
     console.error("[preview] createEngine failed", error);
     setPreviewPlaceholder("PREVIEW", "Engine error: " + (error.message || error));
@@ -193,7 +192,6 @@ function requestPreviewFrame(t) {
 }
 
 window.__onEngineV2Ready = function() {
-  console.log("[app] engine-v2 ready, " + Object.keys(window.__engineV2?.SCENE_REGISTRY || {}).length + " scenes");
   if (currentTimeline) {
     initDOMPreview(currentTimeline);
   }

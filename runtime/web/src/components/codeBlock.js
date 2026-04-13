@@ -12,7 +12,7 @@ export default {
   tags: ["code", "terminal", "dev"],
   description: "暗色终端代码窗口，逐行淡入。1920x1080 专用",
   params: {
-    code:     { type: "string", default: 'console.log("hello");', desc: "代码内容" },
+    code:     { type: "string", default: 'const greeting = "hello";', desc: "代码内容" },
     language: { type: "string", default: "",     desc: "语言标识" },
     fontSize: { type: "number", default: 22,     desc: "字号(px)" },
     title:    { type: "string", default: "",     desc: "窗口标题" },

@@ -135,7 +135,6 @@ function playPipelineAudio(btn, filePath) {
   if (!url) {
     return;
   }
-  console.log("[pipeline] playing audio:", url);
   try {
     _plAudio = new Audio(url);
     _plAudioBtn = btn;
@@ -147,7 +146,6 @@ function playPipelineAudio(btn, filePath) {
     var playPromise = _plAudio.play();
     if (playPromise && typeof playPromise.then === "function") {
       playPromise.then(function() {
-        console.log("[pipeline] audio playing!");
         startPipelineKaraokeLoop(btn);
       }).catch(function(error) {
         console.error("[pipeline] audio play promise rejected:", error.message);

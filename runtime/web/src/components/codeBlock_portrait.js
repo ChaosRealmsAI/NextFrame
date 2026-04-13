@@ -12,7 +12,7 @@ export default {
   tags: ["code", "programming", "portrait"],
   description: "竖屏代码块，全宽，圆角。1080x1920 专用",
   params: {
-    code:     { type: "string", default: "console.log('hello');", desc: "代码内容" },
+    code:     { type: "string", default: "const greeting = 'hello';", desc: "代码内容" },
     language: { type: "string", default: "",                      desc: "语言标签" },
     fontSize: { type: "number", default: 18,                      desc: "代码字号(px)" },
     title:    { type: "string", default: "",                      desc: "顶部标题" },
