@@ -1,0 +1,217 @@
+{
+  "feature": "Clips 素材管理",
+  "version": "v0.4",
+  "invariants": {
+    "behavior": [
+      "源视频和 clip 都有绝对路径，可复制",
+      "所有视频支持两种播放：▶ 小窗播放 + ⛶ 全屏弹窗",
+      "clip 必须标记字幕状态和时间轴对齐状态",
+      "左侧源列表切换不影响 clip 数据隔离",
+      "展开 detail 面板不影响其他 clip 行状态"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "clips-source-1",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户查看所有原始视频列表",
+      "given": "项目有 4 个原始视频文件",
+      "when": "打开素材页",
+      "then": [
+        "左侧显示 4 个源视频卡片",
+        "每个卡片显示：缩略图 + 文件名 + 时长/分辨率/大小 + clips 数量",
+        "第一个源默认选中（紫色边框）"
+      ],
+      "critical": "缩略图必须 16:9 比例，信息不能溢出"
+    },
+    {
+      "id": "clips-source-2",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户切换查看不同源视频的 clips",
+      "given": "左侧有 4 个源视频",
+      "when": "点击第二个源视频",
+      "then": [
+        "第二个源高亮，第一个取消高亮",
+        "右侧 header 显示新源的文件名 + 绝对路径",
+        "spec 标签更新（分辨率紫、帧率绿、编码黄、时长白、大小灰）",
+        "时间轴条更新为新源的 clip 分布",
+        "clip 列表更新为新源的 clips"
+      ]
+    },
+    {
+      "id": "clips-header-3",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户查看源视频详细规格",
+      "given": "选中一个源视频",
+      "when": "查看右侧 header",
+      "then": [
+        "显示文件名（16px 粗体）",
+        "显示绝对路径（mono 12px）",
+        "显示 5 个彩色标签：分辨率(紫) 帧率(绿) 编码(黄) 时长(白) 大小(灰)"
+      ],
+      "correct_visual": "标签是独立的彩色 pill，不是纯文本逗号分隔"
+    },
+    {
+      "id": "clips-timeline-4",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户在时间轴上看到 clip 分布位置",
+      "given": "源视频有 3 个 clips",
+      "when": "查看时间轴条",
+      "then": [
+        "灰色条表示源视频全长",
+        "紫色块表示每个 clip 的 in/out 区间",
+        "块内显示 clip ID（C1, C2, C3）",
+        "下方显示时间刻度"
+      ],
+      "critical": "clip 块的位置和宽度必须按时间比例精确计算"
+    },
+    {
+      "id": "clips-list-5",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户查看 clip 列表概览",
+      "given": "源视频有多个 clips",
+      "when": "查看 clip 列表",
+      "then": [
+        "每个 clip 行显示：缩略图 + 名称 + 时码范围 + 时长 + tags",
+        "右侧显示状态标签：字幕 ✓/无字幕（黄/灰）+ 时间轴 ✓/无时间轴（紫/灰）",
+        "关联段落显示紫色标签（如 段2）"
+      ]
+    },
+    {
+      "id": "clips-detail-6",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户点击 clip 查看详情",
+      "given": "clip 列表中有多个 clips",
+      "when": "点击一个 clip 行",
+      "then": [
+        "该行高亮（紫色边框）",
+        "时间轴条上对应的块高亮",
+        "展开 detail 面板",
+        "面板包含：预览播放器 + 精准时间轴 + 字幕轨 + 元数据 + 绝对路径"
+      ],
+      "interaction_flow": [
+        "点击 clip 行",
+        "detail 面板滑入（fade-in 动画）",
+        "再次点击同一行 → 收起 detail"
+      ]
+    },
+    {
+      "id": "clips-precision-7",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户查看 clip 的精准时间轴",
+      "given": "展开了一个 clip 的 detail",
+      "when": "查看精准时间轴",
+      "then": [
+        "显示 clip 的 in→out 范围（放大视图）",
+        "显示帧数（如 492 frames）",
+        "左右两端 in/out 标记线",
+        "红色播放头",
+        "鼠标悬停显示帧号浮窗（Frame N + 时码）",
+        "下方时间刻度精确到秒"
+      ]
+    },
+    {
+      "id": "clips-subtitle-8",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户查看 clip 的卡拉 OK 级别字幕",
+      "given": "clip 有字幕数据",
+      "when": "查看字幕轨道",
+      "then": [
+        "标题显示 '卡拉OK对齐 ✓' 绿色标签 + 句数",
+        "每句字幕一行：时码范围 + 逐字文本 + 时长",
+        "每个字可 hover 查看该字的精确时间戳",
+        "无字幕的 clip 显示 '无字幕' 灰色标签"
+      ],
+      "critical": "卡拉OK = 逐字级别时间对齐，不是逐句"
+    },
+    {
+      "id": "clips-play-mini-9",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户小窗播放视频",
+      "given": "任意视频缩略图可见（源或 clip）",
+      "when": "点击缩略图上的 ▶",
+      "then": [
+        "在缩略图原位开始播放",
+        "底部出现进度条（紫色填充）",
+        "再次点击停止播放",
+        "播放结束自动归零"
+      ]
+    },
+    {
+      "id": "clips-play-fullscreen-10",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户全屏预览视频",
+      "given": "任意视频缩略图可见",
+      "when": "点击缩略图角落的 ⛶ 放大按钮",
+      "then": [
+        "弹出全屏 modal（深色遮罩 + backdrop-blur）",
+        "16:9 视频画面 + 播放控件 + 进度条",
+        "底部显示文件名 + 规格",
+        "ESC 或点击遮罩关闭"
+      ]
+    },
+    {
+      "id": "clips-topbar-11",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户通过顶栏导航切换项目/集/阶段",
+      "given": "页面已加载",
+      "when": "查看顶栏",
+      "then": [
+        "显示 Vercel 风格面包屑：NextFrame / Project ▾ / Episode ▾",
+        "点击 ▾ 展开下拉列表",
+        "竖线分隔后显示 6 个 Tab（脚本/音频/素材/原子/拼装/产出）",
+        "当前 Tab 紫色下划线",
+        "右侧：语言切换 + 设置 + 头像"
+      ]
+    },
+    {
+      "id": "clips-path-12",
+      "version": "v0.4",
+      "type": "feature",
+      "status": "todo",
+      "verify": "pending",
+      "story": "用户查看文件绝对路径",
+      "given": "选中源视频或展开 clip detail",
+      "when": "查看路径",
+      "then": [
+        "源视频路径在右侧 header 第二行（mono 字体）",
+        "clip 路径在 detail 面板最底部（mono 字体）",
+        "路径可选中复制",
+        "左侧源列表不显示路径（保持简洁）"
+      ]
+    }
+  ]
+}
