@@ -100,7 +100,7 @@ function renderExportsList(entries, emptyMessage) {
   }).join("");
 }
 
-var _pendingVideoUrl = null;
+let _pendingVideoUrl = null;
 
 function openPlayer(name, url, detail) {
   document.getElementById("exports-overlay").classList.remove("show");
@@ -115,7 +115,7 @@ function openPlayer(name, url, detail) {
 
   // Store URL — don't load video yet (nfdata:// blocks main thread)
   _pendingVideoUrl = url;
-  var video = getPlayerVideo();
+  const video = getPlayerVideo();
   if (video) { video.pause(); video.removeAttribute("src"); }
 
   // Show modal INSTANTLY — zero blocking

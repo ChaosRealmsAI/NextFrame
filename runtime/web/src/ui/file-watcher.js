@@ -1,7 +1,7 @@
 /* === File watcher (polling) === */
-var _watchPath = null;
-var _watchMtime = 0;
-var _watchInterval = null;
+let _watchPath = null;
+let _watchMtime = 0;
+let _watchInterval = null;
 
 function startWatching(path) {
   stopWatching();
@@ -15,7 +15,7 @@ function startWatching(path) {
   _watchInterval = setInterval(function() {
     if (!_watchPath) return;
     bridgeCall("fs.mtime", { path: _watchPath }, IPC_POLL_TIMEOUT_MS).then(function(r) {
-      var newMtime = (r && r.mtime) || 0;
+      const newMtime = (r && r.mtime) || 0;
       if (newMtime > 0 && _watchMtime > 0 && newMtime !== _watchMtime) {
         _watchMtime = newMtime;
         // file changed — reload timeline

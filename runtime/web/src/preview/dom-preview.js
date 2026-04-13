@@ -28,7 +28,7 @@ function destroyDOMPreview() {
   if (previewStageHost) {
     previewStageHost = null;
   }
-  var wrapper = document.getElementById("preview-scale-wrapper");
+  const wrapper = document.getElementById("preview-scale-wrapper");
   if (wrapper) {
     wrapper.remove();
   }
@@ -58,23 +58,23 @@ function ensurePreviewInteractivity() {
 }
 
 function fitStageToContainer() {
-  var wrapper = document.getElementById("preview-scale-wrapper");
-  var container = document.getElementById("canvas-inner");
+  const wrapper = document.getElementById("preview-scale-wrapper");
+  const container = document.getElementById("canvas-inner");
   if (!container || !wrapper || !previewStageHost || !previewTimeline) {
     return;
   }
-  var bounds = container.getBoundingClientRect();
+  const bounds = container.getBoundingClientRect();
   if (!(bounds.width > 0) || !(bounds.height > 0)) {
     return;
   }
-  var stageW = previewTimeline.width;
-  var stageH = previewTimeline.height;
-  var scale = Math.min(bounds.width / stageW, bounds.height / stageH);
+  const stageW = previewTimeline.width;
+  const stageH = previewTimeline.height;
+  let scale = Math.min(bounds.width / stageW, bounds.height / stageH);
   if (!Number.isFinite(scale) || scale <= 0) {
     scale = 1;
   }
-  var scaledW = Math.round(stageW * scale);
-  var scaledH = Math.round(stageH * scale);
+  const scaledW = Math.round(stageW * scale);
+  const scaledH = Math.round(stageH * scale);
   wrapper.style.width = scaledW + "px";
   wrapper.style.height = scaledH + "px";
   wrapper.style.left = Math.round((bounds.width - scaledW) / 2) + "px";
@@ -91,7 +91,7 @@ function initDOMPreview(timeline) {
     return false;
   }
 
-  var ev2 = window.__engineV2;
+  const ev2 = window.__engineV2;
   if (!ev2 || !ev2.createEngine || !ev2.SCENE_REGISTRY) {
     console.warn("[preview] engine-v2 not loaded yet");
     return false;
@@ -99,22 +99,22 @@ function initDOMPreview(timeline) {
 
   destroyDOMPreview();
 
-  var canvasInner = document.getElementById("canvas-inner");
+  const canvasInner = document.getElementById("canvas-inner");
   if (!canvasInner) {
     return false;
   }
 
-  var placeholder = document.getElementById("preview-placeholder");
+  const placeholder = document.getElementById("preview-placeholder");
   if (placeholder) {
     placeholder.style.display = "none";
   }
 
-  var iframe = document.getElementById("preview-iframe");
+  const iframe = document.getElementById("preview-iframe");
   if (iframe) {
     iframe.style.display = "none";
   }
 
-  var wrapper = document.createElement("div");
+  const wrapper = document.createElement("div");
   wrapper.id = "preview-scale-wrapper";
   wrapper.style.cssText = "position:absolute;overflow:hidden;";
   previewStageHost = document.createElement("div");
@@ -123,8 +123,8 @@ function initDOMPreview(timeline) {
   wrapper.appendChild(previewStageHost);
   canvasInner.appendChild(wrapper);
 
-  var previewWidth = finiteNumber((timeline.project && timeline.project.width) || timeline.width, 1920);
-  var previewHeight = finiteNumber((timeline.project && timeline.project.height) || timeline.height, 1080);
+  const previewWidth = finiteNumber((timeline.project && timeline.project.width) || timeline.width, 1920);
+  const previewHeight = finiteNumber((timeline.project && timeline.project.height) || timeline.height, 1080);
   previewTimeline = {
     width: previewWidth > 0 ? previewWidth : 1920,
     height: previewHeight > 0 ? previewHeight : 1080,
@@ -143,10 +143,10 @@ function initDOMPreview(timeline) {
   }
 
   previewStageClickHandler = function(event) {
-    var target = event.target.closest(".nf-layer > *") || event.target.closest(".nf-layer");
+    const target = event.target.closest(".nf-layer > *") || event.target.closest(".nf-layer");
     if (target) {
-      var layerId = target.dataset?.layerId || target.closest(".nf-layer")?.dataset?.layerId || "";
-      var scene = target.dataset?.scene || "";
+      const layerId = target.dataset?.layerId || target.closest(".nf-layer")?.dataset?.layerId || "";
+      const scene = target.dataset?.scene || "";
       updateInspectorFromIframe(layerId, scene, target);
     }
   };
@@ -158,7 +158,7 @@ function initDOMPreview(timeline) {
 function updateInspectorFromIframe(layerId, scene, element) {
   setText("insp-scene-name", scene || layerId || "Element");
   setText("insp-clip-id", layerId || "--");
-  var paramsEl = document.getElementById("insp-params");
+  const paramsEl = document.getElementById("insp-params");
   if (paramsEl) {
     paramsEl.textContent = JSON.stringify({
       tag: element.tagName,

@@ -2,17 +2,17 @@
 
 /* ─── Utility: safe number ─── */
 function pipelineClipNumber(value, fallback) {
-  var next = Number(value);
+  const next = Number(value);
   return isFinite(next) ? next : fallback;
 }
 
 /* ─── Utility: format timecode MM:SS.t ─── */
 function formatPipelineClipTime(seconds) {
-  var safe = Math.max(0, pipelineClipNumber(seconds, 0));
-  var minutes = Math.floor(safe / 60);
-  var remainder = safe - minutes * 60;
-  var wholeSeconds = Math.floor(remainder);
-  var tenths = Math.round((remainder - wholeSeconds) * 10);
+  const safe = Math.max(0, pipelineClipNumber(seconds, 0));
+  let minutes = Math.floor(safe / 60);
+  const remainder = safe - minutes * 60;
+  let wholeSeconds = Math.floor(remainder);
+  let tenths = Math.round((remainder - wholeSeconds) * 10);
   if (tenths === 10) { tenths = 0; wholeSeconds += 1; }
   if (wholeSeconds === 60) { wholeSeconds = 0; minutes += 1; }
   return String(minutes).padStart(2, "0") + ":" + String(wholeSeconds).padStart(2, "0") + "." + tenths;
@@ -26,12 +26,12 @@ function getPipelineClipResolution(atom) {
   return "--";
 }
 function getPipelineClipFps(atom) {
-  var fps = atom.fps != null ? atom.fps : (atom.frameRate != null ? atom.frameRate : atom.frame_rate);
+  const fps = atom.fps != null ? atom.fps : (atom.frameRate != null ? atom.frameRate : atom.frame_rate);
   if (fps == null || fps === "") return "--fps";
   return String(fps).replace(/fps$/i, "") + "fps";
 }
 function getPipelineClipFpsNumber(atom) {
-  var fps = atom.fps != null ? atom.fps : (atom.frameRate != null ? atom.frameRate : atom.frame_rate);
+  const fps = atom.fps != null ? atom.fps : (atom.frameRate != null ? atom.frameRate : atom.frame_rate);
   return pipelineClipNumber(fps, 30);
 }
 function getPipelineClipCodec(atom) {
@@ -43,14 +43,14 @@ function getPipelineClipSize(atom) {
 
 function getPipelineClipSourceId(atom) {
   if (!atom) return null;
-  var sourceId = atom.sourceId;
+  let sourceId = atom.sourceId;
   if (sourceId == null) sourceId = atom.source_id;
   if (sourceId == null) sourceId = atom.parentSourceId;
   if (sourceId == null) sourceId = atom.parent_source_id;
   if (sourceId == null && atom.source != null && typeof atom.source !== "object") {
     sourceId = atom.source;
   }
-  var numeric = Number(sourceId);
+  const numeric = Number(sourceId);
   return isFinite(numeric) ? numeric : null;
 }
 
@@ -68,10 +68,10 @@ function pipelineClipMatchesSource(video, sourceVideo) {
 
 /* ─── Build absolute path ─── */
 function buildPipelineClipAbsolutePath(filePath) {
-  var relativePath = String(filePath || "");
+  const relativePath = String(filePath || "");
   if (!relativePath) return "";
   if (relativePath.indexOf(PIPELINE_PROJECTS_ROOT) === 0) return relativePath;
-  var base = PIPELINE_PROJECTS_ROOT;
+  let base = PIPELINE_PROJECTS_ROOT;
   if (currentProject) base += currentProject + "/";
   if (currentEpisode) base += currentEpisode + "/";
   return base + relativePath.replace(/^\/+/, "");
@@ -82,14 +82,14 @@ function getPipelineClipVideos(data) {
   return (data.atoms || []).filter(function(atom) {
     return atom && atom.type === "video";
   }).map(function(atom, index) {
-    var filePath = String(atom.file || "");
-    var durationSeconds = Math.max(0, pipelineClipNumber(atom.duration, 0));
-    var isSource = atom.isSource === true || /^sources\//.test(filePath);
-    var inPoint = pipelineClipNumber(
+    const filePath = String(atom.file || "");
+    const durationSeconds = Math.max(0, pipelineClipNumber(atom.duration, 0));
+    const isSource = atom.isSource === true || /^sources\//.test(filePath);
+    const inPoint = pipelineClipNumber(
       atom.inSec != null ? atom.inSec : (atom.in_point != null ? atom.in_point : atom.inPoint),
       0
     );
-    var outPoint = pipelineClipNumber(
+    let outPoint = pipelineClipNumber(
       atom.outSec != null ? atom.outSec : (atom.out_point != null ? atom.out_point : atom.outPoint),
       durationSeconds
     );
@@ -123,8 +123,8 @@ function getPipelineClipVideos(data) {
 
 /* ─── Group clips by source ─── */
 function getPipelineClipsBySource(videos) {
-  var sources = [];
-  var clipsBySource = {};
+  const sources = [];
+  const clipsBySource = {};
   videos.forEach(function(v) {
     if (v.isSource) {
       sources.push(v);
@@ -134,7 +134,7 @@ function getPipelineClipsBySource(videos) {
   // Derive parent source for non-source clips by matching file path prefix or atom.source
   videos.forEach(function(v) {
     if (!v.isSource) {
-      var parentIdx = -1;
+      let parentIdx = -1;
       if (v.atom.source != null) {
         parentIdx = pipelineClipNumber(v.atom.source, -1);
       }
@@ -152,31 +152,31 @@ function getPipelineClipsBySource(videos) {
 
 /* ─── Expanded clip state (global, managed by index.js event binding) ─── */
 if (typeof pipelineClipsExpandedClip === "undefined") {
-  var pipelineClipsExpandedClip = -1;
+  globalThis.pipelineClipsExpandedClip = -1;
 }
 
 /* ─── Render clip detail panel (expanded view for a single clip) ─── */
 function renderClipDetail(video, sourceVideo) {
-  var atom = video.atom;
-  var src = sourceVideo || video;
-  var inPt = video.inPoint;
-  var outPt = video.outPoint;
-  var dur = outPt - inPt;
+  const atom = video.atom;
+  const src = sourceVideo || video;
+  const inPt = video.inPoint;
+  const outPt = video.outPoint;
+  let dur = outPt - inPt;
   if (dur <= 0) dur = video.durationSeconds;
-  var fpsNum = video.fpsNum || src.fpsNum || 30;
-  var frames = Math.round(dur * fpsNum);
-  var srcDur = src.durationSeconds || dur;
+  const fpsNum = video.fpsNum || src.fpsNum || 30;
+  const frames = Math.round(dur * fpsNum);
+  const srcDur = src.durationSeconds || dur;
 
   // IN/OUT as pct of source for precision bar
-  var inPct = srcDur > 0 ? (inPt / srcDur * 100) : 0;
-  var outPct = srcDur > 0 ? (outPt / srcDur * 100) : 100;
-  var fillWidth = outPct - inPct;
-  var playheadPct = inPct + fillWidth * 0.35; // static 35% into clip
+  const inPct = srcDur > 0 ? (inPt / srcDur * 100) : 0;
+  const outPct = srcDur > 0 ? (outPt / srcDur * 100) : 100;
+  const fillWidth = outPct - inPct;
+  const playheadPct = inPct + fillWidth * 0.35; // static 35% into clip
 
   // Zoom ticks
-  var zoomTicks = [];
-  var zStep = dur <= 20 ? 2 : (dur <= 60 ? 5 : 10);
-  for (var zt = inPt; zt <= outPt; zt += zStep) {
+  const zoomTicks = [];
+  const zStep = dur <= 20 ? 2 : (dur <= 60 ? 5 : 10);
+  for (let zt = inPt; zt <= outPt; zt += zStep) {
     zoomTicks.push('<span>' + escHtml(formatPipelineClipTime(zt)) + '</span>');
   }
   if (Math.abs(outPt - (inPt + Math.floor((outPt - inPt) / zStep) * zStep)) > 0.5) {
@@ -184,20 +184,20 @@ function renderClipDetail(video, sourceVideo) {
   }
 
   // Subtitle track
-  var subs = atom.subtitles || [];
-  var subHtml = "";
+  const subs = atom.subtitles || [];
+  let subHtml = "";
   if (subs.length > 0) {
     subHtml = '<div class="cd-subs">' +
       '<div class="cd-subs-label">SUBTITLES <span class="cd-subs-tag on">\u5361\u62C9OK \u2713</span>' +
       '<span style="margin-left:auto;font-family:var(--mono,\'SF Mono\',Menlo,monospace);font-size:11px;color:rgba(228,228,232,0.5)">' + subs.length + ' \u53E5</span></div>' +
       '<div class="cd-sub-lines">';
     subs.forEach(function(sub) {
-      var subStart = pipelineClipNumber(sub.start != null ? sub.start : sub.s, 0);
-      var subEnd = pipelineClipNumber(sub.end != null ? sub.end : sub.e, subStart);
-      var subText = sub.text || sub.t || "";
-      var charDur = subText.length > 0 ? ((subEnd - subStart) / subText.length) : 0;
-      var charsHtml = subText.split("").map(function(ch, ci) {
-        var ct = (subStart + ci * charDur).toFixed(2);
+      const subStart = pipelineClipNumber(sub.start != null ? sub.start : sub.s, 0);
+      const subEnd = pipelineClipNumber(sub.end != null ? sub.end : sub.e, subStart);
+      const subText = sub.text || sub.t || "";
+      const charDur = subText.length > 0 ? ((subEnd - subStart) / subText.length) : 0;
+      const charsHtml = subText.split("").map(function(ch, ci) {
+        const ct = (subStart + ci * charDur).toFixed(2);
         return '<span class="char" title="' + ct + 's">' + escHtml(ch) + '</span>';
       }).join("");
       subHtml += '<div class="cd-sub-line">' +
@@ -215,12 +215,12 @@ function renderClipDetail(video, sourceVideo) {
   }
 
   // Play button for large preview
-  var previewPlayBtn = video.absolutePath
+  const previewPlayBtn = video.absolutePath
     ? '<div class="cd-play-center" data-video-path="' + escHtml(video.absolutePath) + '">&#9654;</div>'
     : '<div class="cd-play-center">&#9654;</div>';
 
   // Expand (fullscreen modal) button
-  var expandBtn = video.absolutePath
+  const expandBtn = video.absolutePath
     ? '<div class="cd-expand-btn" data-video-path="' + escHtml(video.absolutePath) + '" data-fullscreen="1">&#x26F6;</div>'
     : '';
 
@@ -269,12 +269,12 @@ function renderClipDetail(video, sourceVideo) {
 
 /* ─── Main render: sidebar sources + clip list with expandable detail ─── */
 function renderPipelineClips(data) {
-  var videos = getPipelineClipVideos(data);
+  const videos = getPipelineClipVideos(data);
   if (videos.length === 0) {
     return '<div class="pipeline-empty">\u6682\u65E0\u7D20\u6750 \u2014 nextframe atom-add --type=video</div>';
   }
 
-  var sources = videos.filter(function(v) { return v.isSource; });
+  const sources = videos.filter(function(v) { return v.isSource; });
   if (sources.length === 0) {
     return (
       '<div class="pipeline-clips">' +
@@ -293,24 +293,24 @@ function renderPipelineClips(data) {
     pipelineClipsSelectedIndex = sources[0].index;
   }
 
-  var selected = videos[pipelineClipsSelectedIndex];
+  let selected = videos[pipelineClipsSelectedIndex];
   if (!selected || !selected.isSource) {
     selected = sources[0];
     pipelineClipsSelectedIndex = selected.index;
   }
 
-  var selectedClips = videos.filter(function(video) {
+  const selectedClips = videos.filter(function(video) {
     return pipelineClipMatchesSource(video, selected);
   });
 
-  var sourceItemsHtml = sources.map(function(video) {
-    var clipCount = videos.filter(function(clip) {
+  const sourceItemsHtml = sources.map(function(video) {
+    const clipCount = videos.filter(function(clip) {
       return pipelineClipMatchesSource(clip, video);
     }).length;
-    var inlinePlayBtn = video.absolutePath
+    const inlinePlayBtn = video.absolutePath
       ? '<button class="pl-play-btn clips-inline-play" data-video-path="' + escHtml(video.absolutePath) + '" title="Inline preview">&#9654;</button>'
       : '';
-    var fullscreenBtn = video.absolutePath
+    const fullscreenBtn = video.absolutePath
       ? '<button class="clips-fs-btn" data-video-path="' + escHtml(video.absolutePath) + '" data-fullscreen="1" title="Fullscreen">&#x26F6;</button>'
       : '';
     return (
@@ -330,7 +330,7 @@ function renderPipelineClips(data) {
   }).join("");
 
   // ─── Main panel: source header with colored spec tags ───
-  var headerHtml =
+  const headerHtml =
     '<div class="clips-head">' +
       '<div class="clips-head-row">' +
         '<span class="clips-head-name">' + escHtml(selected.name) + '</span>' +
@@ -346,13 +346,13 @@ function renderPipelineClips(data) {
     '</div>';
 
   // ─── Full timeline bar (all clips on source) ───
-  var relatedClips = selectedClips;
-  var timelineSpan = Math.max(selected.durationSeconds, 1);
+  const relatedClips = selectedClips;
+  const timelineSpan = Math.max(selected.durationSeconds, 1);
 
-  var timelineBlocksHtml = relatedClips.map(function(video) {
-    var srcDur = timelineSpan;
-    var left = srcDur > 0 ? (video.inPoint / srcDur * 100) : 0;
-    var width = srcDur > 0 ? ((video.outPoint - video.inPoint) / srcDur * 100) : 10;
+  const timelineBlocksHtml = relatedClips.map(function(video) {
+    const srcDur = timelineSpan;
+    const left = srcDur > 0 ? (video.inPoint / srcDur * 100) : 0;
+    let width = srcDur > 0 ? ((video.outPoint - video.inPoint) / srcDur * 100) : 10;
     if (width < 1) width = 1;
     return (
       '<div class="clips-timeline-block' + (pipelineClipsExpandedClip === video.index ? ' selected' : '') + '" data-clips-idx="' + video.index + '" style="left:' + left.toFixed(2) + '%;width:' + width.toFixed(2) + '%">' +
@@ -361,12 +361,12 @@ function renderPipelineClips(data) {
     );
   }).join("");
 
-  var timelineTicks = [];
-  for (var tickIndex = 0; tickIndex <= 4; tickIndex++) {
+  const timelineTicks = [];
+  for (let tickIndex = 0; tickIndex <= 4; tickIndex++) {
     timelineTicks.push('<span>' + escHtml(formatPipelineClipTime((timelineSpan * tickIndex) / 4)) + '</span>');
   }
 
-  var timelineHtml =
+  const timelineHtml =
     '<div class="clips-timeline">' +
       '<div class="clips-section-label"><span>TIMELINE</span><span>' + escHtml("Source: " + selected.name) + '</span></div>' +
       '<div class="clips-timeline-bar">' + timelineBlocksHtml + '</div>' +
@@ -374,24 +374,24 @@ function renderPipelineClips(data) {
     '</div>';
 
   // ─── Clip rows: only clips from selected source ───
-  var allClips = selectedClips;
+  const allClips = selectedClips;
 
-  var clipRowsHtml = allClips.map(function(video) {
-    var isExpanded = pipelineClipsExpandedClip === video.index;
-    var dur = video.outPoint > video.inPoint ? (video.outPoint - video.inPoint) : video.durationSeconds;
+  const clipRowsHtml = allClips.map(function(video) {
+    const isExpanded = pipelineClipsExpandedClip === video.index;
+    const dur = video.outPoint > video.inPoint ? (video.outPoint - video.inPoint) : video.durationSeconds;
 
     // Status tags
-    var subTag = video.hasSubs
+    const subTag = video.hasSubs
       ? '<span class="cr-status-tag sub-yes">\u5B57\u5E55 \u2713</span>'
       : '<span class="cr-status-tag sub-no">\u65E0\u5B57\u5E55</span>';
-    var tlTag = video.hasTimeline
+    const tlTag = video.hasTimeline
       ? '<span class="cr-status-tag tl-yes">\u65F6\u95F4\u8F74 \u2713</span>'
       : '<span class="cr-status-tag tl-no">\u65E0\u65F6\u95F4\u8F74</span>';
-    var segTag = video.segment != null
+    const segTag = video.segment != null
       ? '<span class="cr-status-tag seg">' + escHtml(String(video.segment)) + '</span>'
       : '';
 
-    var rowHtml =
+    let rowHtml =
       '<div class="clip-row' + (isExpanded ? ' selected' : '') + '" data-clips-idx="' + video.index + '">' +
         '<div class="clips-row-thumb-mini">' +
           (video.absolutePath
@@ -414,7 +414,7 @@ function renderPipelineClips(data) {
     return rowHtml;
   }).join("");
 
-  var clipsSectionLabel = allClips.length + ' CLIPS';
+  const clipsSectionLabel = allClips.length + ' CLIPS';
 
   return (
     '<div class="pipeline-clips">' +

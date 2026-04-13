@@ -1,18 +1,18 @@
 /* === preview/index.js === */
-var _timelineScrubTarget = null;
+let _timelineScrubTarget = null;
 
 function initPreviewSurface() {
   window.addEventListener("resize", fitStageToContainer);
 }
 
 async function previewComposed() {
-  var segPath = getCurrentSegmentPath();
+  const segPath = getCurrentSegmentPath();
   if (!segPath) {
     setPreviewPlaceholder("PREVIEW", "Open a segment before composing");
     return;
   }
 
-  var htmlPath = segPath.replace(/\.json$/i, ".html");
+  const htmlPath = segPath.replace(/\.json$/i, ".html");
   setPlaybackState(false);
 
   try {

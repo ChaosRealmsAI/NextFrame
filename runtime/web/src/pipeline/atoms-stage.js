@@ -1,15 +1,15 @@
 /* === pipeline/atoms-stage.js === */
 function renderPipelineAtoms(data) {
-  var atoms = data.atoms || [];
-  var counts = { all: atoms.length, component: 0, video: 0, image: 0 };
+  const atoms = data.atoms || [];
+  const counts = { all: atoms.length, component: 0, video: 0, image: 0 };
   atoms.forEach(function(atom) {
     if (counts[atom.type] !== undefined) {
       counts[atom.type] += 1;
     }
   });
 
-  var typeLabels = { component: "组件", video: "视频", image: "图片" };
-  var html = '<div class="pl-toolbar pl-toolbar-stats">';
+  const typeLabels = { component: "组件", video: "视频", image: "图片" };
+  let html = '<div class="pl-toolbar pl-toolbar-stats">';
   html += '<div class="pl-chip"><span class="pl-chip-label">总计</span><span class="pl-chip-val">' + counts.all + " 个原子</span></div>";
   html += '<div class="pl-chip"><span class="pl-chip-label">组件</span><span class="pl-chip-val">' + counts.component + "</span></div>";
   html += '<div class="pl-chip"><span class="pl-chip-label">视频</span><span class="pl-chip-val">' + counts.video + "</span></div>";
@@ -25,14 +25,14 @@ function renderPipelineAtoms(data) {
 
   html += '<div class="pl-atoms-grid">';
   atoms.forEach(function(atom) {
-    var typeClass = atom.type;
-    var typeLabel = typeLabels[atom.type] || atom.type;
-    var desc = "";
+    const typeClass = atom.type;
+    const typeLabel = typeLabels[atom.type] || atom.type;
+    let desc = "";
 
     if (atom.type === "component") {
       desc = "scene &middot; " + escHtml(atom.scene || atom.name) + ".js";
     } else if (atom.type === "video") {
-      var videoParts = [];
+      const videoParts = [];
       if (atom.duration != null) {
         videoParts.push(atom.duration + "s");
       }
@@ -41,7 +41,7 @@ function renderPipelineAtoms(data) {
       }
       desc = videoParts.join(" &middot; ");
     } else if (atom.type === "image") {
-      var imageParts = [];
+      const imageParts = [];
       if (atom.dimensions) {
         imageParts.push(atom.dimensions);
       }

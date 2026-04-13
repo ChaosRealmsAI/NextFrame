@@ -1,12 +1,12 @@
 /* === export-log.js — Recording report tab on home page === */
 
-var exportLogCache = [];
+let exportLogCache = [];
 
 function switchHomeTab(tab) {
-  var projTab = document.getElementById("home-tab-projects");
-  var expTab = document.getElementById("home-tab-exports");
-  var projContent = document.getElementById("home-projects-content");
-  var expContent = document.getElementById("home-exports-content");
+  const projTab = document.getElementById("home-tab-projects");
+  const expTab = document.getElementById("home-tab-exports");
+  const projContent = document.getElementById("home-projects-content");
+  const expContent = document.getElementById("home-exports-content");
   if (!projTab || !expTab || !projContent || !expContent) return;
 
   if (tab === "exports") {
@@ -24,16 +24,16 @@ function switchHomeTab(tab) {
 }
 
 async function loadExportLog() {
-  var root = document.getElementById("export-log-root");
+  const root = document.getElementById("export-log-root");
   if (!root) return;
   root.innerHTML = '<div class="el-empty"><div class="el-empty-title">Loading...</div></div>';
 
   // Try multiple perf.jsonl locations
-  var paths = ["/tmp/recorder-perf.jsonl"];
+  const paths = ["/tmp/recorder-perf.jsonl"];
 
   // Try the user home NextFrame exports
   try {
-    var homeResult = await bridgeCall("fs.read", { path: "~/NextFrame/perf.jsonl" }, 2000);
+    const homeResult = await bridgeCall("fs.read", { path: "~/NextFrame/perf.jsonl" }, 2000);
     if (homeResult && homeResult.contents) {
       exportLogCache = parseJsonl(homeResult.contents);
       renderExportLog(root);
@@ -41,9 +41,9 @@ async function loadExportLog() {
     }
   } catch (_e) { /* try next */ }
 
-  for (var i = 0; i < paths.length; i++) {
+  for (let i = 0; i < paths.length; i++) {
     try {
-      var result = await bridgeCall("fs.read", { path: paths[i] }, 2000);
+      const result = await bridgeCall("fs.read", { path: paths[i] }, 2000);
       if (result && result.contents) {
         exportLogCache = parseJsonl(result.contents);
         renderExportLog(root);
@@ -54,7 +54,7 @@ async function loadExportLog() {
 
   // Also try via export.log bridge method
   try {
-    var logResult = await bridgeCall("export.log", { path: "/tmp/recorder-perf.jsonl" }, 3000);
+    const logResult = await bridgeCall("export.log", { path: "/tmp/recorder-perf.jsonl" }, 3000);
     if (logResult && Array.isArray(logResult.entries)) {
       exportLogCache = logResult.entries.reverse();
       renderExportLog(root);
@@ -76,18 +76,18 @@ function parseJsonl(text) {
 function elFmtDuration(secs) {
   if (typeof secs !== "number" || !isFinite(secs) || secs <= 0) return "-";
   if (secs < 60) return secs.toFixed(1) + "s";
-  var m = Math.floor(secs / 60);
-  var s = Math.round(secs % 60);
+  const m = Math.floor(secs / 60);
+  const s = Math.round(secs % 60);
   return m + "m" + (s > 0 ? s + "s" : "");
 }
 
 function elFmtDate(ts) {
   if (!ts) return "-";
-  var d = new Date(ts * 1000);
-  var mon = d.getMonth() + 1;
-  var day = d.getDate();
-  var h = String(d.getHours()).padStart(2, "0");
-  var min = String(d.getMinutes()).padStart(2, "0");
+  const d = new Date(ts * 1000);
+  const mon = d.getMonth() + 1;
+  const day = d.getDate();
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
   return mon + "/" + day + " " + h + ":" + min;
 }
 
@@ -106,33 +106,33 @@ function elSpeedClass(x) {
 
 function elShortenPath(p) {
   if (typeof p !== "string") return "-";
-  var home = "/Users/" + (p.split("/Users/")[1] || "").split("/")[0];
+  const home = "/Users/" + (p.split("/Users/")[1] || "").split("/")[0];
   if (home.length > 7) p = p.replace(home, "~");
-  var parts = p.split("/");
+  const parts = p.split("/");
   if (parts.length > 3) return ".../" + parts.slice(-2).join("/");
   return p;
 }
 
 function renderExportLog(root) {
-  var entries = exportLogCache;
+  const entries = exportLogCache;
   if (!entries.length) {
     root.innerHTML = '<div class="el-empty"><div class="el-empty-title">No recordings yet</div><div>Record a video to see timing data here.</div></div>';
     return;
   }
 
-  var totalContentS = 0, totalWallS = 0, totalSizeMb = 0, totalFrames = 0;
-  var count = entries.length;
-  for (var i = 0; i < entries.length; i++) {
-    var e = entries[i];
+  let totalContentS = 0, totalWallS = 0, totalSizeMb = 0, totalFrames = 0;
+  const count = entries.length;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
     totalContentS += (typeof e.content_s === "number" ? e.content_s : 0);
     totalWallS += (typeof e.total_s === "number" ? e.total_s : 0);
     totalSizeMb += (typeof e.size_mb === "number" ? e.size_mb : 0);
     totalFrames += (typeof e.frames === "number" ? e.frames : 0);
   }
-  var avgSpeed = totalWallS > 0 ? (totalContentS / totalWallS) : 0;
-  var savedS = totalContentS - totalWallS;
+  const avgSpeed = totalWallS > 0 ? (totalContentS / totalWallS) : 0;
+  const savedS = totalContentS - totalWallS;
 
-  var html = '';
+  let html = '';
 
   // Summary
   html += '<div class="el-summary">';
@@ -166,17 +166,17 @@ function renderExportLog(root) {
   html += '</tr></thead>';
   html += '<tbody>';
 
-  for (var j = 0; j < entries.length; j++) {
-    var entry = entries[j];
-    var status = entry.status || "done";
-    var contentS = typeof entry.content_s === "number" ? entry.content_s : 0;
-    var recordS = typeof entry.record_s === "number" ? entry.record_s : 0;
-    var overlayS = typeof entry.overlay_s === "number" ? entry.overlay_s : 0;
-    var totalS = typeof entry.total_s === "number" ? entry.total_s : 0;
-    var realtimeX = typeof entry.realtime_x === "number" ? entry.realtime_x : 0;
-    var capturePct = totalS > 0 ? (recordS / totalS * 100) : 0;
-    var encodePct = totalS > 0 ? (overlayS / totalS * 100) : 0;
-    var muxPct = 100 - capturePct - encodePct;
+  for (let j = 0; j < entries.length; j++) {
+    const entry = entries[j];
+    const status = entry.status || "done";
+    const contentS = typeof entry.content_s === "number" ? entry.content_s : 0;
+    const recordS = typeof entry.record_s === "number" ? entry.record_s : 0;
+    const overlayS = typeof entry.overlay_s === "number" ? entry.overlay_s : 0;
+    const totalS = typeof entry.total_s === "number" ? entry.total_s : 0;
+    const realtimeX = typeof entry.realtime_x === "number" ? entry.realtime_x : 0;
+    const capturePct = totalS > 0 ? (recordS / totalS * 100) : 0;
+    const encodePct = totalS > 0 ? (overlayS / totalS * 100) : 0;
+    let muxPct = 100 - capturePct - encodePct;
     if (muxPct < 0) muxPct = 0;
 
     html += '<tr class="' + (status === "failed" ? "failed" : "") + '">';

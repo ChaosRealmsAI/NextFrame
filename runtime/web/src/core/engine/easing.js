@@ -2,19 +2,19 @@
  * NextFrame Engine v2 — easing, effects, transitions, keyframes
  */
 
-var clamp = typeof globalThis.clamp === 'function'
+const clamp = typeof globalThis.clamp === 'function'
   ? globalThis.clamp
   : function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
   };
 
-var easeOutCubic = typeof globalThis.easeOutCubic === 'function'
+const easeOutCubic = typeof globalThis.easeOutCubic === 'function'
   ? globalThis.easeOutCubic
   : function easeOutCubic(value) {
     return 1 - ((1 - value) ** 3);
   };
 
-var easeInCubic = typeof globalThis.easeInCubic === 'function'
+const easeInCubic = typeof globalThis.easeInCubic === 'function'
   ? globalThis.easeInCubic
   : function easeInCubic(value) {
     return value ** 3;

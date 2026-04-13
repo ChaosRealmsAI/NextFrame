@@ -33,7 +33,7 @@
   };
 
   window.bridgeCall = function bridgeCall(method, params, timeoutMs) {
-    var postFn = null;
+    let postFn = null;
     if (typeof window.ipc?.postMessage === "function") {
       postFn = function(message) { window.ipc.postMessage(message); };
     } else if (typeof window.webkit?.messageHandlers?.ipc?.postMessage === "function") {
@@ -94,8 +94,8 @@ function initApp() {
   window.__nfAppInitialized = true;
 
   // Move player modal to body root (it's inside view-editor which gets display:none)
-  var playerOverlay = document.getElementById("player-overlay");
-  var playerModal = document.getElementById("player-modal");
+  const playerOverlay = document.getElementById("player-overlay");
+  const playerModal = document.getElementById("player-modal");
   if (playerOverlay && playerOverlay.parentElement !== document.body) document.body.appendChild(playerOverlay);
   if (playerModal && playerModal.parentElement !== document.body) document.body.appendChild(playerModal);
 

@@ -1,23 +1,23 @@
 /* === pipeline/output-stage.js === */
 function renderPipelineOutput(data) {
-  var outputs = (data.outputs || []).slice().sort(function(left, right) {
+  const outputs = (data.outputs || []).slice().sort(function(left, right) {
     return right.id - left.id;
   });
-  var html = '<div class="pl-outputs">';
+  let html = '<div class="pl-outputs">';
 
   html += '<div class="count-bar"><span>' + escHtml(String(outputs.length)) + " 个版本</span></div>";
 
-  for (var i = 0; i < outputs.length; i++) {
-    var output = outputs[i];
-    var specs = output.specs || {};
-    var published = output.published || [];
-    var dateStr = "";
+  for (let i = 0; i < outputs.length; i++) {
+    const output = outputs[i];
+    const specs = output.specs || {};
+    const published = output.published || [];
+    let dateStr = "";
     if (output.date) {
-      var date = new Date(output.date);
-      var mm = String(date.getMonth() + 1).padStart(2, "0");
-      var dd = String(date.getDate()).padStart(2, "0");
-      var hh = String(date.getHours()).padStart(2, "0");
-      var mi = String(date.getMinutes()).padStart(2, "0");
+      const date = new Date(output.date);
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const hh = String(date.getHours()).padStart(2, "0");
+      const mi = String(date.getMinutes()).padStart(2, "0");
       dateStr = date.getFullYear() + "-" + mm + "-" + dd + " " + hh + ":" + mi;
     }
 
@@ -55,7 +55,7 @@ function renderPipelineOutput(data) {
 
     html += '<div class="pl-output-status">';
     if (published.length > 0) {
-      for (var j = 0; j < published.length; j++) {
+      for (let j = 0; j < published.length; j++) {
         html += '<span class="pl-tag-published">' + escHtml(published[j].platform) + " ✓</span>";
       }
     } else {

@@ -1,19 +1,19 @@
 /* === pipeline/media.js === */
-var _plAudio = null;
-var _plAudioBtn = null;
-var _plAudioChars = [];
-var _plAudioRaf = 0;
-var PIPELINE_PROJECTS_ROOT = "~/NextFrame/projects/";
+let _plAudio = null;
+let _plAudioBtn = null;
+let _plAudioChars = [];
+let _plAudioRaf = 0;
+const PIPELINE_PROJECTS_ROOT = "~/NextFrame/projects/";
 
 function buildPipelineMediaUrl(filePath) {
-  var relativePath = String(filePath || "");
+  let relativePath = String(filePath || "");
   if (!relativePath) {
     return "";
   }
   if (relativePath.indexOf(PIPELINE_PROJECTS_ROOT) === 0) {
     relativePath = relativePath.slice(PIPELINE_PROJECTS_ROOT.length);
   }
-  var parts = relativePath.split("/").filter(function(part) {
+  const parts = relativePath.split("/").filter(function(part) {
     return part.length > 0;
   });
   if (parts.length === 0) {
@@ -39,14 +39,14 @@ function setPipelineKaraokeCharState(span, state) {
   if (!span) {
     return;
   }
-  var className = "karaoke-char " + state;
+  const className = "karaoke-char " + state;
   if (span.className !== className) {
     span.className = className;
   }
 }
 
 function resetPipelineKaraokeChars() {
-  for (var i = 0; i < _plAudioChars.length; i++) {
+  for (let i = 0; i < _plAudioChars.length; i++) {
     setPipelineKaraokeCharState(_plAudioChars[i], "unspoken");
   }
   _plAudioChars = [];
@@ -60,10 +60,10 @@ function stopPipelineKaraokeLoop() {
 }
 
 function updatePipelineKaraokeChars(currentAudioTime) {
-  for (var i = 0; i < _plAudioChars.length; i++) {
-    var span = _plAudioChars[i];
-    var start = parseFloat(span.dataset.start);
-    var end = parseFloat(span.dataset.end);
+  for (let i = 0; i < _plAudioChars.length; i++) {
+    const span = _plAudioChars[i];
+    const start = parseFloat(span.dataset.start);
+    const end = parseFloat(span.dataset.end);
     if (currentAudioTime >= end) {
       setPipelineKaraokeCharState(span, "spoken");
     } else if (currentAudioTime >= start) {
@@ -81,7 +81,7 @@ function startPipelineKaraokeLoop(btn) {
     return;
   }
 
-  var row = btn.closest ? btn.closest("tr[data-seg]") : null;
+  const row = btn.closest ? btn.closest("tr[data-seg]") : null;
   if (!row) {
     return;
   }
@@ -125,13 +125,13 @@ function playPipelineAudio(btn, filePath) {
   if (!btn || !filePath) {
     return;
   }
-  var isSameButton = _plAudioBtn === btn && btn.classList.contains("playing");
+  const isSameButton = _plAudioBtn === btn && btn.classList.contains("playing");
   resetPipelineAudioPlayback();
   if (isSameButton) {
     return;
   }
 
-  var url = buildPipelineMediaUrl(filePath);
+  const url = buildPipelineMediaUrl(filePath);
   if (!url) {
     return;
   }
@@ -143,7 +143,7 @@ function playPipelineAudio(btn, filePath) {
       console.error("[pipeline] audio error:", _plAudio && _plAudio.error);
       resetPipelineAudioPlayback();
     };
-    var playPromise = _plAudio.play();
+    const playPromise = _plAudio.play();
     if (playPromise && typeof playPromise.then === "function") {
       playPromise.then(function() {
         startPipelineKaraokeLoop(btn);
@@ -168,13 +168,13 @@ function playPipelineVideo(filePath) {
     return;
   }
   removePipelineInlineVideo();
-  var url = buildPipelineMediaUrl(filePath);
-  var name = filePath.split("/").pop() || "clip.mp4";
+  const url = buildPipelineMediaUrl(filePath);
+  const name = filePath.split("/").pop() || "clip.mp4";
   openPlayer(name, url, filePath);
 }
 
-var _inlineVideo = null;
-var _inlineVideoBtn = null;
+let _inlineVideo = null;
+let _inlineVideoBtn = null;
 
 function removePipelineInlineVideo() {
   if (!_inlineVideo) {
@@ -192,9 +192,9 @@ function removePipelineInlineVideo() {
 
 function playPipelineVideoInline(btn) {
   if (!btn) return;
-  var filePath = btn.dataset.videoPath;
+  const filePath = btn.dataset.videoPath;
   if (!filePath) return;
-  var url = buildPipelineMediaUrl(filePath);
+  const url = buildPipelineMediaUrl(filePath);
   if (!url) return;
 
   if (_inlineVideo && _inlineVideoBtn === btn) {
@@ -205,10 +205,10 @@ function playPipelineVideoInline(btn) {
   removePipelineInlineVideo();
 
   // Find the thumbnail container (parent of the button)
-  var container = btn.closest(".clips-src-thumb") || btn.closest(".clips-row-thumb-mini") || btn.closest(".cd-preview") || btn.parentElement;
+  const container = btn.closest(".clips-src-thumb") || btn.closest(".clips-row-thumb-mini") || btn.closest(".cd-preview") || btn.parentElement;
   if (!container) return;
 
-  var video = document.createElement("video");
+  const video = document.createElement("video");
   video.className = "pipeline-inline-video";
   video.style.cssText = "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;z-index:2;border-radius:inherit";
   video.preload = "metadata";

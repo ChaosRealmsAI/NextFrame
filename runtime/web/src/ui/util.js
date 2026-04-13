@@ -234,7 +234,7 @@ function getTimelineTracks(timeline) {
 }
 
 // v0.1 → v0.3 scene ID mapping
-var SCENE_ALIASES = {
+const SCENE_ALIASES = {
   kineticHeadline: "headline",
   htmlSlide: "headline",
   svgOverlay: "headline",

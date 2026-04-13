@@ -1,7 +1,7 @@
 /* === pipeline/editor-sidebar.js === */
 function populateEditorClipSidebar() {
-  var list = document.getElementById("editor-clip-list");
-  var count = document.getElementById("editor-clip-count");
+  const list = document.getElementById("editor-clip-list");
+  const count = document.getElementById("editor-clip-count");
   if (!list) {
     return;
   }
@@ -24,22 +24,22 @@ function populateEditorClipSidebar() {
 }
 
 function renderEditorClips() {
-  var list = document.getElementById("editor-clip-list");
-  var countEl = document.getElementById("editor-clip-count");
+  const list = document.getElementById("editor-clip-list");
+  const countEl = document.getElementById("editor-clip-count");
   if (!list || !pipelineData) {
     return;
   }
-  var segments = pipelineData.script.segments || [];
-  var audioSegments = (pipelineData.audio || {}).segments || [];
+  const segments = pipelineData.script.segments || [];
+  const audioSegments = (pipelineData.audio || {}).segments || [];
   if (countEl) {
     countEl.textContent = segments.length + " 个片段";
   }
-  var html = segments.map(function(seg, index) {
-    var audio = audioSegments.find(function(entry) {
+  const html = segments.map(function(seg, index) {
+    const audio = audioSegments.find(function(entry) {
       return entry.segment === seg.segment;
     });
-    var duration = audio && audio.duration ? audio.duration + "s" : "—";
-    var role = seg.role ? seg.role + " — " : "";
+    const duration = audio && audio.duration ? audio.duration + "s" : "—";
+    const role = seg.role ? seg.role + " — " : "";
     return '<div class="editor-clip-item' + (index === 0 ? " active" : "") + '" onclick="selectEditorClip(this)">' +
       '<div class="editor-clip-name">' + escHtml(role + (seg.narration || "").substring(0, 12)) + "</div>" +
       '<div class="editor-clip-meta">段 ' + (seg.segment || index + 1) + " · " + duration + "</div>" +
