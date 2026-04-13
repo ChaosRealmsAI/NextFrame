@@ -110,7 +110,8 @@ export default {
     to:    { type: "string",  default: "star",    desc: "目标形状" },
     color: { type: "string",  default: "#a78bfa",  desc: "颜色" },
     fill:  { type: "boolean", default: true,       desc: "是否填充" },
-    size:  { type: "number",  default: 300,        desc: "形状大小", min: 50, max: 800 },
+    size:     { type: "number",  default: 300,        desc: "形状大小", min: 50, max: 800 },
+    duration: { type: "number",  default: 2,          desc: "变形动画时长(秒)", min: 0.1, max: 30 },
   },
   get defaultParams() {
     const p = {};
@@ -145,8 +146,8 @@ export default {
     return { svg, path, fromPts, toPts };
   },
 
-  update(els, localT) {
-    const duration = 2;
+  update(els, localT, params) {
+    const duration = params.duration || 2;
     const raw = clamp(localT / duration, 0, 1);
     // ease in-out
     const t = raw < 0.5

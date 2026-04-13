@@ -70,7 +70,7 @@ export default {
       if (audio.paused) {
         audio.currentTime = target;
         audio.play().catch(() => {});
-      } else if (Math.abs(audio.currentTime - target) > 0.3) {
+      } else if (Math.abs(audio.currentTime - target) > 0.1) {
         // Drifted too far, re-sync
         audio.currentTime = target;
       }

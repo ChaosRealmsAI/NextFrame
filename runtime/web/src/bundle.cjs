@@ -267,7 +267,7 @@ SCENE_REGISTRY["markdownSlide"] = __nfCreateStaticScene((params) => {
 ${engineCode}
 
 // ===== Timeline Data =====
-const TIMELINE = ${JSON.stringify(timeline, null, 2)};
+const TIMELINE = ${JSON.stringify(timeline, null, 2).replace(/<\//g, '<\\/')};
 
 // ===== Boot =====
 const stage = document.getElementById('stage');

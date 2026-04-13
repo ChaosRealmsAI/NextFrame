@@ -14,7 +14,7 @@ export default {
   type: "media",
   name: "Video Clip",
   category: "Media",
-  tags: ["视频", "媒体", "背景视频", "剪辑", "播放", "素材"],
+  tags: ["video", "media", "background-video", "clip", "playback", "footage"],
   description: "全屏播放视频素材的媒体场景组件",
   params: {
     src:       { type: "string", default: "",      desc: "视频文件路径或 URL" },

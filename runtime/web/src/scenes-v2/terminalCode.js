@@ -12,7 +12,7 @@ export default {
   type: "dom",
   name: "Terminal Code Window",
   category: "Code",
-  tags: ["终端", "代码", "等宽字体", "代码块", "窗口", "编程"],
+  tags: ["terminal", "code", "monospace", "codeblock", "window", "programming"],
   description: "仿终端窗口样式的代码内容展示组件",
   params: {
     title:      { type: "string", default: "schema.json", desc: "窗口标题栏文字" },
@@ -152,7 +152,7 @@ export default {
     return { root, win, lineEls };
   },
 
-  update(els, localT) {
+  update(els, localT, params) {
     const enterT = smoothstep(0, 0.06, localT);
     const exitT = 1 - smoothstep(0.88, 1, localT);
     const alpha = enterT * exitT;

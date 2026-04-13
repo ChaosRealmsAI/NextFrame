@@ -154,7 +154,7 @@ function resolveLayerProp(layer, prop, localT, fallback) {
 function applyLayerStyle(el, layer) {
   const s = el.style;
   // Position & size (defaults to full-screen)
-  if (layer.x || layer.y || layer.w || layer.h) {
+  if (layer.x != null || layer.y != null || layer.w != null || layer.h != null) {
     s.position = 'absolute';
     s.left = layer.x || '0';
     s.top = layer.y || '0';
@@ -338,7 +338,7 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
         // Transform
         if (allTransforms) {
           container.style.transform = allTransforms;
-        } else if (!layer.x && !layer.y) {
+        } else if (layer.x == null && layer.y == null) {
           container.style.transform = '';
         }
 
@@ -387,7 +387,7 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
     if (mediaStallTimer) clearTimeout(mediaStallTimer);
     for (const state of layerStates) {
       if (state.created && state.scene) {
-        try { state.scene.destroy(state.sceneEls); } catch (_) {}
+        try { state.scene.destroy(state.sceneEls); } catch (e) { console.warn('[engine] scene destroy error:', e); }
       }
       state.container.remove();
     }
@@ -397,7 +397,11 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
   // ─── Recorder protocol ───
   window.__onFrame = function (frame) {
     renderFrame(Number(frame.time) || 0);
-    return true;
+    return new Promise(function (resolve) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { resolve(true); });
+      });
+    });
   };
 
   return {
@@ -453,7 +457,7 @@ export function createPlayer(engine, stageEl) {
   const slider = document.createElement('input');
   slider.type = 'range';
   slider.min = '0';
-  slider.max = String(duration * 1000);
+  slider.max = String(Math.round(duration * 1000));
   slider.value = '0';
   slider.style.cssText = 'flex:1;accent-color:#a78bfa';
 

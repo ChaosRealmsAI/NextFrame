@@ -64,11 +64,11 @@ export default {
       });
     }
 
-    canvas._data = { particles };
-    return canvas;
+    return { canvas, particles };
   },
 
-  update(canvas, localT, params) {
+  update(state, localT, params) {
+    const { canvas, particles } = state;
     const ctx = canvas.getContext("2d");
     const cw = canvas.parentElement?.clientWidth || canvas.width;
     const ch = canvas.parentElement?.clientHeight || canvas.height;
@@ -83,7 +83,6 @@ export default {
     const t = localT;
 
     ctx.clearRect(0, 0, W, H);
-    const { particles } = canvas._data;
 
     for (const p of particles) {
       const px = (p.x * W) + p.vx * t + 0.5 * wind * t * t;
@@ -97,7 +96,7 @@ export default {
 
       const s = p.size;
       ctx.save();
-      ctx.translate(px % (W + 40) - 20, py % (H + 40) - 20);
+      ctx.translate(((px % (W + 40)) + (W + 40)) % (W + 40) - 20, ((py % (H + 40)) + (H + 40)) % (H + 40) - 20);
       ctx.rotate(p.rotation + t * 0.5);
       ctx.globalAlpha = clamp(alpha, 0, 1);
       ctx.fillStyle = color;
@@ -130,5 +129,5 @@ export default {
     }
   },
 
-  destroy(canvas) { canvas._data = null; canvas.remove(); },
+  destroy(state) { state.canvas.remove(); },
 };

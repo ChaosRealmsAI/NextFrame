@@ -12,7 +12,6 @@ export default {
     hueB:      { type: "number", default: 280, desc: "第二色光色相 (0-360)", min: 0, max: 360 },
     hueC:      { type: "number", default: 180, desc: "第三色光色相 (0-360)", min: 0, max: 360 },
     intensity: { type: "number", default: 0.7, desc: "光晕强度 (0-1)", min: 0, max: 1 },
-    grain:     { type: "number", default: 0.03, desc: "胶片颗粒强度 (0-0.2)", min: 0, max: 0.2 },
   },
   get defaultParams() {
     const p = {};
@@ -44,7 +43,6 @@ export default {
     const hueB = toNumber(params.hueB, 280);
     const hueC = toNumber(params.hueC, 180);
     const intensity = clamp(toNumber(params.intensity, 0.7), 0, 1);
-    const grain = clamp(toNumber(params.grain, 0.03), 0, 0.2);
 
     // Dark background
     ctx.fillStyle = "#0a0a14";
@@ -74,23 +72,6 @@ export default {
     }
 
     ctx.globalCompositeOperation = "source-over";
-
-    // Film grain
-    if (grain > 0) {
-      const imageData = ctx.getImageData(0, 0, W, H);
-      const data = imageData.data;
-      const strength = grain * 40;
-      // Simple pseudo-random grain based on position + time
-      let seed = (localT * 1000) | 0;
-      for (let i = 0; i < data.length; i += 4) {
-        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-        const noise = ((seed >> 16) / 32767 - 0.5) * strength;
-        data[i] = clamp(data[i] + noise, 0, 255);
-        data[i + 1] = clamp(data[i + 1] + noise, 0, 255);
-        data[i + 2] = clamp(data[i + 2] + noise, 0, 255);
-      }
-      ctx.putImageData(imageData, 0, 0);
-    }
   },
 
   destroy(canvas) {

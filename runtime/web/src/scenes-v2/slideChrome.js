@@ -16,8 +16,8 @@ export default {
   id: "slideChrome",
   type: "dom",
   name: "Slide Chrome",
-  category: "Layout",
-  tags: ["幻灯片", "品牌", "标题", "布局", "Chrome", "节目"],
+  category: "Chrome",
+  tags: ["slide", "brand", "title", "layout", "chrome", "show"],
   description: "带品牌标识、集数、标题和字幕区的视频幻灯片外框",
   params: {
     brand:       { type: "string", default: "OPC · 王宇轩",                       desc: "品牌名称" },
