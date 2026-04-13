@@ -150,8 +150,10 @@ export function createEngine(stageEl, timeline, sceneRegistry) {
         container.style.display = 'block';
 
         // Update scene content
+        // DOM scenes use normalized time (0~1), Canvas/SVG scenes use seconds
         if (scene && state.sceneEls != null) {
-          scene.update(state.sceneEls, localT, layer.params || {});
+          const sceneT = scene.type === 'dom' ? (localT / dur) : localT;
+          scene.update(state.sceneEls, sceneT, layer.params || {});
         }
 
         // Calculate effects
