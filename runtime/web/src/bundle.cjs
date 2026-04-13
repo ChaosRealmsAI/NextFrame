@@ -117,14 +117,14 @@ const html = `<!DOCTYPE html>
 <title>NextFrame — Generated Video</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { background: #111; height: 100vh; display: flex; flex-direction: column; align-items: center; overflow: hidden; }
-  #preview-wrap { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; overflow: hidden; }
+  html, body { background: #111; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #nf-player { display: flex; flex-direction: column; max-width: 100vw; max-height: 100vh; }
   #stage { box-shadow: 0 0 40px rgba(0,0,0,0.5); }
   .nf-layer { will-change: opacity, transform; }
 </style>
 </head>
 <body>
-<div id="preview-wrap"><div id="stage"></div></div>
+<div id="nf-player"><div id="stage"></div></div>
 <script>
 // ===== Shared Utilities =====
 ${sharedCode}
@@ -281,15 +281,16 @@ const engine = createEngine(stage, TIMELINE, SCENE_REGISTRY);
 const player = createPlayer(engine, stage);
 window.__nfEngine = engine;
 
-// ===== Preview zoom: scale stage to fit window =====
+// ===== Preview zoom: scale #nf-player to fit window =====
 function fitPreview() {
-  const wrap = document.getElementById('preview-wrap');
-  if (!wrap || !stage) return;
-  const pw = wrap.clientWidth || window.innerWidth;
-  const ph = wrap.clientHeight || window.innerHeight;
-  const sw = ${width}, sh = ${height};
+  const player = document.getElementById('nf-player');
+  if (!player) return;
+  const pw = window.innerWidth;
+  const ph = window.innerHeight;
+  const sw = ${width};
+  const sh = ${height} + 50; // 50px for controls bar
   const zoom = Math.min(pw / sw, ph / sh, 1);
-  stage.style.zoom = zoom;
+  player.style.zoom = zoom;
 }
 fitPreview();
 window.addEventListener('resize', fitPreview);

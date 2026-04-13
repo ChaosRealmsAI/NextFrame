@@ -437,31 +437,8 @@ export function createPlayer(engine, stageEl) {
   document.documentElement.style.background = '#111';
   document.body.style.margin = '0';
   document.body.style.minHeight = '100vh';
-  document.body.style.display = 'flex';
-  document.body.style.flexDirection = 'column';
-  document.body.style.alignItems = 'stretch';
-  document.body.style.overflow = 'hidden';
-  document.body.style.background = '#111';
-
-  const playerRoot = document.createElement('div');
-  playerRoot.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:stretch;gap:12px;box-sizing:border-box;width:100%;min-height:100vh;padding:16px;background:#111;overflow:hidden';
-
-  const viewport = document.createElement('div');
-  viewport.style.cssText = 'flex:1 1 auto;width:100%;min-height:0;padding:16px;overflow:hidden;background:#111;display:flex;align-items:center;justify-content:center;box-sizing:border-box';
-
-  const stageShell = document.createElement('div');
-  stageShell.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-width:0;min-height:0;box-sizing:border-box';
-
-  const originalParent = stageEl.parentNode;
-  if (originalParent) {
-    originalParent.insertBefore(playerRoot, stageEl);
-  } else {
-    document.body.appendChild(playerRoot);
-  }
-  playerRoot.appendChild(viewport);
-  viewport.appendChild(stageShell);
-  stageShell.appendChild(stageEl);
-  stageEl.style.boxShadow = '0 0 80px rgba(100,80,200,0.15)';
+  // Don't move stage — just append controls bar to stage's parent (#nf-player)
+  const playerContainer = stageEl.parentElement || document.body;
 
   const bar = document.createElement('div');
   bar.style.cssText = 'position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;padding:10px 14px;background:rgba(0,0,0,0.92);border:1px solid rgba(255,255,255,0.08);border-radius:12px;box-sizing:border-box;font:13px -apple-system,sans-serif;color:#aaa';
@@ -522,7 +499,7 @@ export function createPlayer(engine, stageEl) {
   });
 
   bar.append(playBtn, slider, timeLabel, speedWrap, scaleBtn, fullscreenBtn, info);
-  playerRoot.appendChild(bar);
+  playerContainer.appendChild(bar);
 
   function formatTime(seconds) {
     const safe = Math.max(0, Number(seconds) || 0);
@@ -562,31 +539,9 @@ export function createPlayer(engine, stageEl) {
   }
 
   function applyScaleMode() {
-    if (scaleMode === 'fit') {
-      const availableWidth = Math.max(1, viewport.clientWidth - 32);
-      const availableHeight = Math.max(1, viewport.clientHeight - 32);
-      const scale = Math.min(availableWidth / width, availableHeight / height);
-      const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
-      const scaledWidth = Math.round(width * safeScale);
-      const scaledHeight = Math.round(height * safeScale);
-      stageEl.style.width = `${scaledWidth}px`;
-      stageEl.style.height = `${scaledHeight}px`;
-      bar.style.width = `${scaledWidth}px`;
-      bar.style.maxWidth = '100%';
-      viewport.style.overflow = 'hidden';
-      stageShell.style.padding = '0';
-      stageShell.style.width = '100%';
-      stageShell.style.height = '100%';
-    } else {
-      stageEl.style.width = `${width}px`;
-      stageEl.style.height = `${height}px`;
-      bar.style.width = `${width}px`;
-      bar.style.maxWidth = '100%';
-      viewport.style.overflow = 'auto';
-      stageShell.style.padding = '24px';
-      stageShell.style.width = 'max-content';
-      stageShell.style.height = 'max-content';
-    }
+    // Scaling handled by bundle's CSS zoom — don't override stage dimensions
+    stageEl.style.width = `${width}px`;
+    stageEl.style.height = `${height}px`;
   }
 
   function seek(t) {
@@ -686,7 +641,7 @@ export function createPlayer(engine, stageEl) {
       document.removeEventListener('keydown', handleKeydown);
       window.removeEventListener('resize', handleResizeRaf);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      playerRoot.remove();
+      playerContainer.remove();
     },
   };
 }
