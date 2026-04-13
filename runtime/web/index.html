@@ -480,9 +480,24 @@ window.__ipc = window.__ipc || {};
 </div>
 
 
+<script src="src/modules/util.js"></script>
+<script src="src/modules/custom-select.js"></script>
+<script src="src/modules/settings-panel.js"></script>
+<script src="src/modules/breadcrumbs.js"></script>
+<script src="src/modules/exports-panel.js"></script>
+<script src="src/modules/timeline-utils.js"></script>
+<script src="src/modules/preview.js"></script>
+<script src="src/modules/canvas-drag.js"></script>
+<script src="src/modules/fullscreen.js"></script>
+<script src="src/modules/home.js"></script>
+<script src="src/modules/project.js"></script>
+<script src="src/modules/editor.js"></script>
+<script src="src/modules/app-init.js"></script>
+<script src="src/modules/pipeline.js"></script>
+<script src="src/modules/file-watcher.js"></script>
 <script src="src/app-bundle.js"></script>
 
-<!-- DOM preview engine — ES module, loaded after IIFE bundle -->
+<!-- DOM preview engine — ES module, loaded after the split app scripts -->
 <script type="module">
 import { createEngine } from "./src/engine-v2.js";
 import { SCENE_REGISTRY } from "./src/scenes-v2/index.js";
