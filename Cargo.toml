@@ -8,8 +8,11 @@ rust-version = "1.75"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"
-expect_used = "warn"
+expect_used = "deny"
 panic = "deny"
+unreachable = "deny"
+todo = "deny"
+wildcard_imports = "deny"
 
 [profile.release]
 lto = "thin"

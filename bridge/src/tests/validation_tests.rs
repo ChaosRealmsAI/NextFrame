@@ -21,14 +21,11 @@ fn require_object_accepts_object() {
 
 #[test]
 fn require_object_rejects_null_and_array() {
-    let null_error = require_object(&Value::Null)
-        .err()
-        .expect("null params should return an error");
+    let null_error = require_object(&Value::Null).expect_err("null params should return an error");
     assert_eq!(null_error, "params must be a JSON object");
 
-    let array_error = require_object(&json!([1, 2, 3]))
-        .err()
-        .expect("array params should return an error");
+    let array_error =
+        require_object(&json!([1, 2, 3])).expect_err("array params should return an error");
     assert_eq!(array_error, "params must be a JSON object");
 }
 
@@ -42,14 +39,12 @@ fn require_string_handles_present_missing_and_non_string() {
     let name = require_string(&params, "name").expect("string value should be accepted");
     assert_eq!(name, "demo");
 
-    let missing_error = require_string(&params, "title")
-        .err()
-        .expect("missing string should return an error");
+    let missing_error =
+        require_string(&params, "title").expect_err("missing string should return an error");
     assert_eq!(missing_error, "missing params.title");
 
-    let non_string_error = require_string(&params, "count")
-        .err()
-        .expect("non-string value should return an error");
+    let non_string_error =
+        require_string(&params, "count").expect_err("non-string value should return an error");
     assert_eq!(non_string_error, "params.count must be a string");
 }
 
@@ -64,22 +59,18 @@ fn require_u32_handles_valid_negative_float_and_missing() {
     let count = require_u32(&params, "count").expect("unsigned integer should be accepted");
     assert_eq!(count, 42);
 
-    let negative_error = require_u32(&params, "negative")
-        .err()
-        .expect("negative number should return an error");
+    let negative_error =
+        require_u32(&params, "negative").expect_err("negative number should return an error");
     assert_eq!(
         negative_error,
         "params.negative must be an unsigned integer"
     );
 
-    let float_error = require_u32(&params, "ratio")
-        .err()
-        .expect("float should return an error");
+    let float_error = require_u32(&params, "ratio").expect_err("float should return an error");
     assert_eq!(float_error, "params.ratio must be an unsigned integer");
 
-    let missing_error = require_u32(&params, "missing")
-        .err()
-        .expect("missing integer should return an error");
+    let missing_error =
+        require_u32(&params, "missing").expect_err("missing integer should return an error");
     assert_eq!(missing_error, "missing params.missing");
 }
 
@@ -92,9 +83,8 @@ fn require_positive_u32_rejects_zero() {
         require_positive_u32(&valid_params, "count").expect("positive integer should be accepted");
     assert_eq!(count, 7);
 
-    let zero_error = require_positive_u32(&zero_params, "count")
-        .err()
-        .expect("zero should return an error");
+    let zero_error =
+        require_positive_u32(&zero_params, "count").expect_err("zero should return an error");
     assert_eq!(zero_error, "params.count must be greater than 0");
 }
 
@@ -109,19 +99,16 @@ fn require_positive_f64_rejects_zero_negative_and_non_number() {
         require_positive_f64(&valid_params, "volume").expect("positive number should be accepted");
     assert_eq!(volume, 0.75);
 
-    let zero_error = require_positive_f64(&zero_params, "volume")
-        .err()
-        .expect("zero should return an error");
+    let zero_error =
+        require_positive_f64(&zero_params, "volume").expect_err("zero should return an error");
     assert_eq!(zero_error, "params.volume must be greater than 0");
 
     let negative_error = require_positive_f64(&negative_params, "volume")
-        .err()
-        .expect("negative number should return an error");
+        .expect_err("negative number should return an error");
     assert_eq!(negative_error, "params.volume must be greater than 0");
 
     let string_error = require_positive_f64(&string_params, "volume")
-        .err()
-        .expect("non-number should return an error");
+        .expect_err("non-number should return an error");
     assert_eq!(string_error, "params.volume must be a number");
 }
 
@@ -135,9 +122,8 @@ fn require_array_accepts_arrays_and_rejects_non_arrays() {
     let items = require_array(&params, "items").expect("array value should be accepted");
     assert_eq!(items, &vec![json!("a"), json!("b")]);
 
-    let non_array_error = require_array(&params, "name")
-        .err()
-        .expect("non-array should return an error");
+    let non_array_error =
+        require_array(&params, "name").expect_err("non-array should return an error");
     assert_eq!(non_array_error, "params.name must be an array");
 }
 
@@ -163,8 +149,7 @@ fn require_value_alias_returns_first_second_or_missing_error() {
     assert_eq!(second, &json!("second"));
 
     let missing_error = require_value_alias(&missing_params, &["primary", "secondary"])
-        .err()
-        .expect("missing aliases should return an error");
+        .expect_err("missing aliases should return an error");
     assert_eq!(
         missing_error,
         "missing one of params.primary, params.secondary"
@@ -184,13 +169,11 @@ fn read_optional_u8_in_range_handles_in_range_bounds_missing_and_non_number() {
     assert_eq!(in_range, Some(3));
 
     let below_error = read_optional_u8_in_range(&below_params, "level", 2, 4)
-        .err()
-        .expect("below-range integer should return an error");
+        .expect_err("below-range integer should return an error");
     assert_eq!(below_error, "params.level must be between 2 and 4");
 
     let above_error = read_optional_u8_in_range(&above_params, "level", 2, 4)
-        .err()
-        .expect("above-range integer should return an error");
+        .expect_err("above-range integer should return an error");
     assert_eq!(above_error, "params.level must be between 2 and 4");
 
     let missing = read_optional_u8_in_range(&missing_params, "level", 2, 4)
@@ -198,8 +181,7 @@ fn read_optional_u8_in_range_handles_in_range_bounds_missing_and_non_number() {
     assert_eq!(missing, None);
 
     let non_number_error = read_optional_u8_in_range(&string_params, "level", 2, 4)
-        .err()
-        .expect("non-number should return an error");
+        .expect_err("non-number should return an error");
     assert_eq!(non_number_error, "params.level must be an unsigned integer");
 }
 
@@ -214,8 +196,7 @@ fn validate_project_component_allows_valid_names_and_dots() {
 #[test]
 fn validate_project_component_rejects_slashes() {
     let error = validate_project_component("folder/name", "projectId")
-        .err()
-        .expect("slash-containing component should return an error");
+        .expect_err("slash-containing component should return an error");
 
     assert_eq!(error, "invalid params.projectId: folder/name");
 }

@@ -158,7 +158,6 @@ pub(crate) fn handle_export_start(params: &Value) -> Result<Value, String> {
     }))
 }
 
-#[allow(clippy::expect_used)]
 pub(crate) fn handle_export_status(params: &Value) -> Result<Value, String> {
     let pid = require_u32(params, "pid")?;
     let mut registry = lock_process_registry()?;
@@ -179,7 +178,9 @@ pub(crate) fn handle_export_status(params: &Value) -> Result<Value, String> {
     }
 
     // Now borrow immutably for json formatting
-    let handle = registry.handles.get(&pid).expect("checked above");
+    let Some(handle) = registry.handles.get(&pid) else {
+        return Err(format!("missing export handle after refresh for pid {pid}"));
+    };
     Ok(export_status_json(handle, &registry.queue, pid))
 }
 

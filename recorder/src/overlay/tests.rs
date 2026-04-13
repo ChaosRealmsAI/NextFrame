@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 use std::env;
 use std::ffi::OsString;
 use std::fs;
