@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame - Recording Log Prototype</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface-raised: #17171f;
+    --surface-hover: #1d1d28;
+    --border: rgba(240,236,228,0.06);
+    --accent: #8a6fae;
+    --accent-15: rgba(138,111,174,0.15);
+    --accent-06: rgba(138,111,174,0.06);
+    --warm: #da7756;
+    --warm-15: rgba(218,119,86,0.15);
+    --green: #7cb37a;
+    --green-15: rgba(124,179,122,0.15);
+    --red: #c75a5a;
+    --red-15: rgba(199,90,90,0.15);
+    --yellow: #c9a94e;
+    --yellow-15: rgba(201,169,78,0.15);
+    --blue: #6e9ecf;
+    --blue-15: rgba(110,158,207,0.15);
+    --text: #f0ece4;
+    --text-mid: rgba(240,236,228,0.85);
+    --text-dim: rgba(240,236,228,0.65);
+    --text-ghost: rgba(240,236,228,0.35);
+    --text-faint: rgba(240,236,228,0.15);
+    --mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+    --sans: -apple-system, 'Helvetica Neue', sans-serif;
+    --serif: Georgia, 'Times New Roman', serif;
+    --radius: 8px;
+    --radius-sm: 4px;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--text-mid);
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    font-size: 12px;
+    color: var(--text-ghost);
+    margin-bottom: 32px;
+  }
+
+  /* ---- Layout: simulates the editor right panel ---- */
+  .app-frame {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* ---- Panel Header ---- */
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .panel-badge {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--accent);
+    background: var(--accent-06);
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  /* ---- Filter Tabs ---- */
+  .filter-bar {
+    display: flex;
+    gap: 2px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .filter-tab {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    color: var(--text-ghost);
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    background: none;
+  }
+  .filter-tab:hover { color: var(--text-dim); background: var(--accent-06); }
+  .filter-tab.active { color: var(--accent); background: var(--accent-15); }
+
+  /* ---- Stats Row ---- */
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px;
+    padding: 0;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-cell {
+    background: var(--surface);
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .stat-label {
+    font-size: 10px;
+    color: var(--text-ghost);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ---- Log Entry List ---- */
+  .log-list {
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  .log-list::-webkit-scrollbar { width: 4px; }
+  .log-list::-webkit-scrollbar-thumb { background: var(--text-faint); border-radius: 2px; }
+
+  /* ---- Date Separator ---- */
+  .date-sep {
+    font-size: 10px;
+    color: var(--text-ghost);
+    padding: 10px 16px 4px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  /* ---- Single Log Entry ---- */
+  .log-entry {
+    display: flex;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .log-entry:hover { background: var(--surface-hover); }
+
+  /* Status indicator */
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .status-dot.done { background: var(--green); box-shadow: 0 0 6px var(--green-15); }
+  .status-dot.failed { background: var(--red); box-shadow: 0 0 6px var(--red-15); }
+  .status-dot.running { background: var(--yellow); box-shadow: 0 0 6px var(--yellow-15); animation: pulse 1.5s infinite; }
+  .status-dot.queued { background: var(--text-ghost); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .log-body { flex: 1; min-width: 0; }
+
+  .log-row-1 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .log-name {
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .log-time {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-ghost);
+    flex-shrink: 0;
+  }
+
+  .log-row-2 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+  }
+  .tag-res { color: var(--blue); background: var(--blue-15); }
+  .tag-fps { color: var(--accent); background: var(--accent-15); }
+  .tag-dur { color: var(--warm); background: var(--warm-15); }
+  .tag-size { color: var(--green); background: var(--green-15); }
+  .tag-speed { color: var(--yellow); background: var(--yellow-15); }
+  .tag-err { color: var(--red); background: var(--red-15); }
+  .tag-queued { color: var(--text-ghost); background: rgba(240,236,228,0.06); }
+
+  .log-row-3 {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--text-ghost);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .log-row-3 .path {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* ---- Caller Badge ---- */
+  .caller {
+    font-size: 9px;
+    font-family: var(--mono);
+    padding: 1px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .caller-ai { color: var(--accent); background: var(--accent-06); border: 1px solid var(--accent-15); }
+  .caller-ui { color: var(--warm); background: rgba(218,119,86,0.06); border: 1px solid var(--warm-15); }
+  .caller-cli { color: var(--blue); background: rgba(110,158,207,0.06); border: 1px solid var(--blue-15); }
+
+  /* ---- Expanded Detail ---- */
+  .log-detail {
+    display: none;
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  .log-entry.expanded .log-detail { display: block; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    font-size: 11px;
+  }
+  .detail-label {
+    color: var(--text-ghost);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .detail-value {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .detail-cmd {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+
+  .detail-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .detail-btn {
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .detail-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+    border-color: var(--accent-15);
+  }
+
+  /* ---- Bottom Bar ---- */
+  .panel-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-hint {
+    font-size: 10px;
+    color: var(--text-ghost);
+  }
+  .footer-btn {
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--accent-15);
+    background: var(--accent-06);
+    color: var(--accent);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .footer-btn:hover {
+    background: var(--accent-15);
+  }
+
+  /* ---- Annotation ---- */
+  .annotation {
+    margin-top: 24px;
+    max-width: 420px;
+    width: 100%;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--accent-15);
+    border-radius: var(--radius);
+  }
+  .annotation h3 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .annotation ul {
+    list-style: none;
+    padding: 0;
+  }
+  .annotation li {
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 3px 0;
+    line-height: 1.5;
+  }
+  .annotation li::before {
+    content: ">";
+    color: var(--accent);
+    margin-right: 8px;
+    font-family: var(--mono);
+  }
+</style>
+</head>
+<body>
+
+<h1>Recording Log</h1>
+<p class="subtitle">NextFrame Desktop - Right Panel Prototype</p>
+
+<!-- ============ PANEL ============ -->
+<div class="app-frame">
+
+  <!-- Header -->
+  <div class="panel-header">
+    <span class="panel-title">Recording Log</span>
+    <span class="panel-badge">12 total</span>
+  </div>
+
+  <!-- Filter -->
+  <div class="filter-bar">
+    <button class="filter-tab active">All</button>
+    <button class="filter-tab">Done</button>
+    <button class="filter-tab">Failed</button>
+    <button class="filter-tab">Running</button>
+    <button class="filter-tab">Queued</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-cell">
+      <div class="stat-value">47m</div>
+      <div class="stat-label">Total Time</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-value">2.3 GB</div>
+      <div class="stat-label">Total Size</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-value">1.8x</div>
+      <div class="stat-label">Avg Speed</div>
+    </div>
+  </div>
+
+  <!-- Log List -->
+  <div class="log-list">
+
+    <!-- Today -->
+    <div class="date-sep">Today - Apr 13</div>
+
+    <!-- Running -->
+    <div class="log-entry">
+      <div class="status-dot running"></div>
+      <div class="log-body">
+        <div class="log-row-1">
+          <span class="log-name">ep03-segment-07.mp4</span>
+          <span class="log-time">14:23</span>
+        </div>
+        <div class="log-row-2">
+          <span class="caller caller-ai">AI</span>
+          <span class="tag tag-res">1080x1920</span>
+          <span class="tag tag-fps">60fps</span>
+          <span class="tag tag-dur">32s</span>
+          <span class="tag tag-speed">62%</span>
+        </div>
+        <div class="log-row-3">
+          <span class="path">~/Projects/AI-Tools/exports/ep03-segment-07.mp4</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queued -->
+    <div class="log-entry">
+      <div class="status-dot queued"></div>
+      <div class="log-body">
+        <div class="log-row-1">
+          <span class="log-name">ep03-segment-08.mp4</span>
+          <span class="log-time">14:23</span>
+        </div>
+        <div class="log-row-2">
+          <span class="caller caller-ai">AI</span>
+          <span class="tag tag-res">1080x1920</span>
+          <span class="tag tag-fps">60fps</span>
+          <span class="tag tag-dur">28s</span>
+          <span class="tag tag-queued">#2 in queue</span>
+        </div>
+        <div class="log-row-3">
+          <span class="path">~/Projects/AI-Tools/exports/ep03-segment-08.mp4</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Done (expanded) -->
+    <div class="log-entry expanded" onclick="this.classList.toggle('expanded')">
+      <div class="status-dot done"></div>
+      <div class="log-body">
+        <div class="log-row-1">
+          <span class="log-name">ep03-segment-06.mp4</span>
+          <span class="log-time">14:18</span>
+        </div>
+        <div class="log-row-2">
+          <span class="caller caller-cli">CLI</span>
+          <span class="tag tag-res">1080x1920</span>
+          <span class="tag tag-fps">60fps</span>
+          <span class="tag tag-dur">45s</span>
+          <span class="tag tag-size">38.2 MB</span>
+          <span class="tag tag-speed">1.9x</span>
+        </div>
+        <div class="log-row-3">
+          <span class="path">~/Projects/AI-Tools/exports/ep03-segment-06.mp4</span>
+        </div>
+
+        <!-- Expanded Detail -->
+        <div class="log-detail">
+          <div class="detail-grid">
+            <span class="detail-label">PID</span>
+            <span class="detail-value">7</span>
+            <span class="detail-label">Started</span>
+            <span class="detail-value">2026-04-13 14:18:02</span>
+            <span class="detail-label">Finished</span>
+            <span class="detail-value">2026-04-13 14:18:25</span>
+            <span class="detail-label">Wall Time</span>
+            <span class="detail-value">23.4s</span>
+            <span class="detail-label">Frames</span>
+            <span class="detail-value">2700 total, 814 skipped (30%)</span>
+            <span class="detail-label">Encoder</span>
+            <span class="detail-value">h264_videotoolbox</span>
+            <span class="detail-label">CRF</span>
+            <span class="detail-value">20</span>
+            <span class="detail-label">DPR</span>
+            <span class="detail-value">2.0 (Retina)</span>
+            <span class="detail-label">Audio</span>
+            <span class="detail-value">segment-06.m4a (muxed)</span>
+            <span class="detail-label">Source</span>
+            <span class="detail-value">runtime/web/index.html?record=true</span>
+            <span class="detail-label">Log</span>
+            <span class="detail-value">/tmp/nextframe-export-1744527482.log</span>
+          </div>
+          <div class="detail-cmd">recorder slide runtime/web/index.html \
+  --out exports/ep03-segment-06.mp4 \
+  --width 540 --height 960 --dpr 2 \
+  --fps 60 --crf 20</div>
+          <div class="detail-actions">
+            <button class="detail-btn">Open Video</button>
+            <button class="detail-btn">Show in Finder</button>
+            <button class="detail-btn">View Log</button>
+            <button class="detail-btn">Copy Command</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Done -->
+    <div class="log-entry" onclick="this.classList.toggle('expanded')">
+      <div class="status-dot done"></div>
+      <div class="log-body">
+        <div class="log-row-1">
+          <span class="log-name">ep03-segment-05.mp4</span>
+          <span class="log-time">14:12</span>
+        </div>
+        <div class="log-row-2">
+          <span class="caller caller-ui">UI</span>
+          <span class="tag tag-res">1080x1920</span>
+          <span class="tag tag-fps">60fps</span>
+          <span class="tag tag-dur">52s</span>
+          <span class="tag tag-size">44.7 MB</span>
+          <span class="tag tag-speed">2.1x</span>
+        </div>
+        <div class="log-row-3">
+          <span class="path">~/Projects/AI-Tools/exports/ep03-segment-05.mp4</span>
+        </div>
+        <div class="log-detail">
+          <div class="detail-grid">
+            <span class="detail-label">PID</span>
+            <span class="detail-value">6</span>
+            <span class="detail-label">Started</span>
+            <span class="detail-value">2026-04-13 14:12:10</span>
+            <span class="detail-label">Finished</span>
+            <span class="detail-value">2026-04-13 14:12:35</span>
+            <span class="detail-label">Wall Time</span>
+            <span class="detail-value">24.8s</span>
+            <span class="detail-label">Frames</span>
+            <span class="detail-value">3120 total, 1022 skipped (33%)</span>
+            <span class="detail-label">Encoder</span>
+            <span class="detail-value">h264_videotoolbox</span>
+            <span class="detail-label">CRF</span>
+            <span class="detail-value">20</span>
+            <span class="detail-label">Audio</span>
+            <span class="detail-value">segment-05.m4a (muxed)</span>
+          </div>
+          <div class="detail-cmd">recorder slide runtime/web/index.html \
+  --out exports/ep03-segment-05.mp4 \
+  --width 540 --height 960 --dpr 2 \
+  --fps 60 --crf 20</div>
+          <div class="detail-actions">
+            <button class="detail-btn">Open Video</button>
+            <button class="detail-btn">Show in Finder</button>
+            <button class="detail-btn">View Log</button>
+            <button class="detail-btn">Copy Command</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Failed -->
+    <div class="log-entry" onclick="this.classList.toggle('expanded')">
+      <div class="status-dot failed"></div>
+      <div class="log-body">
+        <div class="log-row-1">
+          <span class="log-name">ep03-segment-04.mp4</span>
+          <span class="log-time">13:58</span>
+        </div>
+        <div class="log-row-2">
+          <span class="caller caller-ai">AI</span>
+          <span class="tag tag-res">1080x1920</span>
+          <span class="tag tag-fps">60fps</span>
+          <span class="tag tag-dur">38s</span>
+          <span class="tag tag-err">encoder timeout</span>
+        </div>
+        <div class="log-row-3">
+          <span class="path">~/Projects/AI-Tools/exports/ep03-segment-04.mp4</span>
+        </div>
+        <div class="log-detail">
+          <div class="detail-grid">
+            <span class="detail-label">PID</span>
+            <span class="detail-value">5</span>
+            <span class="detail-label">Started</span>
+            <span class="detail-value">2026-04-13 13:58:44</span>
+            <span class="detail-label">Failed at</span>
+            <span class="detail-value" style="color:var(--red)">2026-04-13 13:59:14 (30s timeout)</span>
+            <span class="detail-label">Error</span>
+            <span class="detail-value" style="color:var(--red)">AVAssetWriter finishWriting timed out after 30s</span>
+            <span class="detail-label">Log</span>
+            <span class="detail-value">/tmp/nextframe-export-1744526324.log</span>
+          </div>
+          <div class="detail-actions">
+            <button class="detail-btn">View Log</button>
+            <button class="detail-btn">Retry</button>
+            <button class="detail-btn">Copy Command</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Yesterday -->
+    <div class="date-sep">Yesterday - Apr 12</div>
+
+    <div class="log-entry">
+      <div class="status-dot done"></div>
+      <div class="log-body">
+        <div class="log-row-1">
+          <span class="log-name">ep02-final.mp4</span>
+          <span class="log-time">22:41</span>
+        </div>
+        <div class="log-row-2">
+          <span class="caller caller-cli">CLI</span>
+          <span class="tag tag-res">1080x1920</span>
+          <span class="tag tag-fps">60fps</span>
+          <span class="tag tag-dur">4m12s</span>
+          <span class="tag tag-size">312 MB</span>
+          <span class="tag tag-speed">1.6x</span>
+        </div>
+        <div class="log-row-3">
+          <span class="path">~/Projects/AI-Tools/exports/ep02-final.mp4</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-entry">
+      <div class="status-dot done"></div>
+      <div class="log-body">
+        <div class="log-row-1">
+          <span class="log-name">ep02-segment-12.mp4</span>
+          <span class="log-time">22:35</span>
+        </div>
+        <div class="log-row-2">
+          <span class="caller caller-ai">AI</span>
+          <span class="tag tag-res">1080x1920</span>
+          <span class="tag tag-fps">60fps</span>
+          <span class="tag tag-dur">28s</span>
+          <span class="tag tag-size">22.1 MB</span>
+          <span class="tag tag-speed">2.0x</span>
+        </div>
+        <div class="log-row-3">
+          <span class="path">~/Projects/AI-Tools/exports/ep02-segment-12.mp4</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-entry">
+      <div class="status-dot done"></div>
+      <div class="log-body">
+        <div class="log-row-1">
+          <span class="log-name">ep02-segment-11.mp4</span>
+          <span class="log-time">22:30</span>
+        </div>
+        <div class="log-row-2">
+          <span class="caller caller-ai">AI</span>
+          <span class="tag tag-res">1080x1920</span>
+          <span class="tag tag-fps">60fps</span>
+          <span class="tag tag-dur">35s</span>
+          <span class="tag tag-size">27.8 MB</span>
+          <span class="tag tag-speed">1.7x</span>
+        </div>
+        <div class="log-row-3">
+          <span class="path">~/Projects/AI-Tools/exports/ep02-segment-11.mp4</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="panel-footer">
+    <span class="footer-hint">Click entry to expand details</span>
+    <button class="footer-btn">Export CSV</button>
+  </div>
+
+</div>
+
+<!-- ============ ANNOTATION ============ -->
+<div class="annotation">
+  <h3>Design Notes</h3>
+  <ul>
+    <li>Panel 位置：编辑器右侧，替换现有 Exports Panel（360-420px 宽）</li>
+    <li>数据源：perf.jsonl（已有）+ ProcessHandle 内存状态</li>
+    <li>Caller 标签：AI / UI / CLI 三种来源，颜色区分</li>
+    <li>每条记录：文件名 + 时间 + 分辨率 + FPS + 时长 + 大小 + 速度</li>
+    <li>展开详情：PID、起止时间、帧统计、编码器、CRF、音频、完整命令</li>
+    <li>操作按钮：Open Video / Show in Finder / View Log / Copy Command / Retry</li>
+    <li>顶部统计：累计时间、累计大小、平均速度</li>
+    <li>队列状态：running(脉冲黄点) / queued(灰点+位置) / done(绿) / failed(红)</li>
+    <li>按日期分组，sticky header</li>
+  </ul>
+</div>
+
+<script>
+  // Toggle expand on click
+  document.querySelectorAll('.log-entry').forEach(entry => {
+    entry.addEventListener('click', () => {
+      entry.classList.toggle('expanded');
+    });
+  });
+
+  // Filter tabs
+  document.querySelectorAll('.filter-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
