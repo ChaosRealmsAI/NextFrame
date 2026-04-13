@@ -78,6 +78,15 @@ TIMELINE FORMAT (v0.3 flat layers)
     ]
   }
 
+LAYOUT RULES (critical — read this!)
+  ★ Same time = only ONE fullscreen content layer. Use staggered times:
+      Layer A: start=0 dur=5, Layer B: start=5 dur=5  (sequential, no overlap)
+  ★ Background layers (aurora, starfield, shader*, vignette) CAN overlap — they're meant to stack
+  ★ If you need 2 content layers at same time, position them:
+      Layer A: x="10%", y="10%", w="45%", h="80%"
+      Layer B: x="55%", y="10%", w="40%", h="80%"
+  ★ validate will WARN on fullscreen content overlap — fix all warnings before build
+
 LAYER PROPERTIES
   id, scene, start, dur, params       required
   enter       fadeIn/slideUp/slideDown/slideLeft/slideRight/scaleIn + duration
@@ -86,7 +95,7 @@ LAYER PROPERTIES
   blend       normal/screen/lighten/multiply/overlay
   filter      CSS filter string (blur/grayscale/sepia)
   opacity     0-1
-  x/y/w/h     position and size
+  x/y/w/h     position and size (use to avoid fullscreen overlap)
 
 SCENE TYPES
   dom         text, layout, cards (localT normalized 0~1)

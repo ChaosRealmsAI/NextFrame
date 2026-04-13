@@ -60,6 +60,38 @@ export function validateTimeline(timeline) {
     }
   }
 
+  // Gate 7: fullscreen content overlap detection
+  // Background scenes (aurora, starfield, vignette, shader*, fluid, neon) are OK to overlap.
+  // Content scenes (headline, bulletList, barChart, etc.) should NOT overlap fullscreen.
+  const BG_SCENES = new Set([
+    'auroraGradient','fluidBackground','neonGrid','vignette','starfield','particleFlow',
+    'circleRipple','meshGrid','radialBurst','confetti','waveform','pulseWave',
+    'shaderGradient','shaderNoise','shaderGlitch','shaderChromatic','shaderPlasma',
+    'shaderTunnel','shaderRipple','shaderFirefly','svgRings',
+  ]);
+  const contentLayers = timeline.layers.filter(l => {
+    if (BG_SCENES.has(l.scene)) return false;
+    if (l.blend && l.blend !== 'normal') return false; // blend layers are overlays
+    if (l.opacity != null && l.opacity < 0.5) return false; // faint overlays OK
+    if (l.x || l.y || l.w || l.h) return false; // positioned = not fullscreen
+    return true;
+  });
+  for (let i = 0; i < contentLayers.length; i++) {
+    const a = contentLayers[i];
+    const aEnd = a.start + a.dur;
+    for (let j = i + 1; j < contentLayers.length; j++) {
+      const b = contentLayers[j];
+      const bEnd = b.start + b.dur;
+      const overlap = Math.min(aEnd, bEnd) - Math.max(a.start, b.start);
+      if (overlap > 0.5) { // more than 0.5s overlap
+        warnings.push({
+          code: 'FULLSCREEN_OVERLAP',
+          message: `"${a.id}" (${a.start}-${aEnd.toFixed(1)}s) and "${b.id}" (${b.start}-${bEnd.toFixed(1)}s) overlap ${overlap.toFixed(1)}s — both fullscreen content. Use x/y/w/h to position, or stagger times.`,
+        });
+      }
+    }
+  }
+
   return { ok: errors.length === 0, errors, warnings, hints };
 }
 
