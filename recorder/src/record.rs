@@ -36,9 +36,7 @@ fn urlencoding_decode(input: &str) -> String {
 }
 
 fn strip_query_and_fragment(input: &str) -> &str {
-    let end = input
-        .find(|ch| ch == '?' || ch == '#')
-        .unwrap_or(input.len());
+    let end = input.find(['?', '#']).unwrap_or(input.len());
     &input[..end]
 }
 

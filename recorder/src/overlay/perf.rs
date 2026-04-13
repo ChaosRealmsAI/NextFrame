@@ -1,0 +1,177 @@
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde_json::json;
+
+pub struct PerfLogContext<'a> {
+    pub output_path: Option<&'a Path>,
+    pub frame_files: &'a [PathBuf],
+    pub video_overlay: Option<&'a Path>,
+    pub html_duration_sec: Option<f64>,
+    pub plan_duration_sec: f64,
+    pub width: f64,
+    pub height: f64,
+    pub dpr: f64,
+    pub target_fps: usize,
+    pub parallel: Option<usize>,
+    pub render_scale: f64,
+    pub has_audio: bool,
+    pub video_layers_count: usize,
+    pub audio_src: Option<&'a Path>,
+}
+
+fn round_tenths(value: f64) -> f64 {
+    (value * 10.0).round() / 10.0
+}
+
+fn path_display_string(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn format_perf_log_line(
+    ts: u64,
+    total_frames: usize,
+    skipped_frames: usize,
+    content_duration: f64,
+    record_secs: f64,
+    overlay_secs: f64,
+    fps: f64,
+    size_mb: f64,
+    pixel_size: (usize, usize),
+    encoder: &str,
+    context: &PerfLogContext<'_>,
+    command_args: &[String],
+) -> String {
+    let mode = if context.video_overlay.is_some() {
+        "clip"
+    } else {
+        "slide"
+    };
+    let skip_pct = if total_frames > 0 {
+        skipped_frames as f64 / total_frames as f64 * 100.0
+    } else {
+        0.0
+    };
+    let total_secs = record_secs + overlay_secs;
+    let realtime_x = if total_secs > 0.0 {
+        content_duration / total_secs
+    } else {
+        0.0
+    };
+    let html_files = context
+        .frame_files
+        .iter()
+        .map(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("unknown")
+                .to_owned()
+        })
+        .collect::<Vec<_>>();
+    let first_file = context
+        .frame_files
+        .first()
+        .and_then(|path| path.file_name())
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown");
+
+    json!({
+        "ts": ts,
+        "mode": mode,
+        "file": first_file,
+        "html_files": html_files,
+        "content_s": round_tenths(content_duration),
+        "html_duration_sec": context.html_duration_sec.map(round_tenths),
+        "plan_duration_sec": round_tenths(context.plan_duration_sec),
+        "record_s": round_tenths(record_secs),
+        "overlay_s": round_tenths(overlay_secs),
+        "total_s": round_tenths(total_secs),
+        "realtime_x": round_tenths(realtime_x),
+        "fps": round_tenths(fps),
+        "frames": total_frames,
+        "skipped": skipped_frames,
+        "skip_pct": round_tenths(skip_pct),
+        "size_mb": round_tenths(size_mb),
+        "resolution": format!("{}x{}", pixel_size.0, pixel_size.1),
+        "width": context.width,
+        "height": context.height,
+        "dpr": context.dpr,
+        "target_fps": context.target_fps,
+        "parallel": context.parallel,
+        "render_scale": context.render_scale,
+        "has_audio": context.has_audio,
+        "has_video_overlay": context.video_layers_count > 0,
+        "video_layers_count": context.video_layers_count,
+        "audio_src": context.audio_src.map(path_display_string),
+        "command_args": command_args,
+        "encoder": encoder,
+    })
+    .to_string()
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn write_perf_log(
+    _out: &Path,
+    total_frames: usize,
+    skipped_frames: usize,
+    content_duration: f64,
+    record_secs: f64,
+    overlay_secs: f64,
+    fps: f64,
+    size_mb: f64,
+    pixel_size: (usize, usize),
+    encoder: &str,
+    context: PerfLogContext<'_>,
+) {
+    use std::io::Write;
+
+    if env::var_os(crate::api::OUTPUT_JSON_ENV).is_some() {
+        return;
+    }
+
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let command_args = env::args_os()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+
+    let line = format_perf_log_line(
+        ts,
+        total_frames,
+        skipped_frames,
+        content_duration,
+        record_secs,
+        overlay_secs,
+        fps,
+        size_mb,
+        pixel_size,
+        encoder,
+        &context,
+        &command_args,
+    );
+
+    let log_path = context
+        .output_path
+        .as_ref()
+        .and_then(|path| path.parent().map(|dir| dir.join("perf.jsonl")))
+        .or_else(|| {
+            env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(|path| path.join("perf.jsonl")))
+        })
+        .unwrap_or_else(|| PathBuf::from("/tmp/recorder-perf.jsonl"));
+
+    if let Ok(mut file) = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        let _ = writeln!(file, "{line}");
+        println!("  perf → {}", log_path.display());
+    }
+}
