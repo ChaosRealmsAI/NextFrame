@@ -137,9 +137,9 @@ function renderPipelineScript(data) {
   // ── Toolbar: segment filter pills ──
   html += '<div class="pl-toolbar" style="padding:8px 20px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;gap:6px;align-items:center;">';
   html += '<span style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:rgba(228,228,232,0.5);margin-right:8px;">Segments</span>';
-  html += '<span class="pl-seg-pill" data-seg="-1" onclick="plFilterSeg(-1)" style="font-size:12px;padding:4px 14px;border-radius:5px;border:1px solid rgba(124,106,239,0.2);background:rgba(124,106,239,0.15);color:#7c6aef;cursor:pointer;">All</span>';
+  html += '<span class="pl-seg-pill" data-seg="-1" data-filter-seg="-1" style="font-size:12px;padding:4px 14px;border-radius:5px;border:1px solid rgba(124,106,239,0.2);background:rgba(124,106,239,0.15);color:#7c6aef;cursor:pointer;">All</span>';
   for (var s = 0; s < segments.length; s++) {
-    html += '<span class="pl-seg-pill" data-seg="' + s + '" onclick="plFilterSeg(' + s + ')" style="font-size:12px;padding:4px 14px;border-radius:5px;border:1px solid transparent;background:transparent;color:rgba(228,228,232,0.5);cursor:pointer;">' + escHtml(String(segments[s].segment)) + '</span>';
+    html += '<span class="pl-seg-pill" data-seg="' + s + '" data-filter-seg="' + s + '" style="font-size:12px;padding:4px 14px;border-radius:5px;border:1px solid transparent;background:transparent;color:rgba(228,228,232,0.5);cursor:pointer;">' + escHtml(String(segments[s].segment)) + '</span>';
   }
   html += '</div>';
 
@@ -220,55 +220,84 @@ function plFilterSeg(idx) {
 
 // Pipeline audio/video playback
 var _plAudio = null;
-function playPipelineAudio(btn, filePath) {
-  // Stop current
-  if (_plAudio) { _plAudio.pause(); _plAudio = null; }
-  // Toggle off if same button
-  if (btn.classList.contains("playing")) {
-    btn.classList.remove("playing");
-    btn.innerHTML = "&#9654;";
-    return;
-  }
-  // Reset all play buttons
-  document.querySelectorAll(".pl-play-btn.playing").forEach(function(b) { b.classList.remove("playing"); b.innerHTML = "&#9654;"; });
+var _plAudioBtn = null;
+var PIPELINE_PROJECTS_ROOT = "~/NextFrame/projects/";
 
-  // Build nfdata URL — encode each path part for Chinese chars
-  var parts = filePath.replace("~/NextFrame/projects/", "").split("/");
-  var url = "nfdata://localhost/" + parts.map(function(p) { return encodeURIComponent(p); }).join("/");
+function buildPipelineMediaUrl(filePath) {
+  var relativePath = String(filePath || "");
+  if (!relativePath) return "";
+  if (relativePath.indexOf(PIPELINE_PROJECTS_ROOT) === 0) {
+    relativePath = relativePath.slice(PIPELINE_PROJECTS_ROOT.length);
+  }
+  var parts = relativePath.split("/").filter(function(part) { return part.length > 0; });
+  if (parts.length === 0) return "";
+  if (typeof buildNfdataUrl === "function") {
+    return buildNfdataUrl(parts);
+  }
+  return "nfdata://localhost/" + parts.map(function(part) {
+    return encodeURIComponent(String(part));
+  }).join("/");
+}
+
+function setPipelineAudioButtonState(btn, isPlaying) {
+  if (!btn) return;
+  btn.classList.toggle("playing", Boolean(isPlaying));
+  btn.innerHTML = isPlaying ? "&#10074;&#10074;" : "&#9654;";
+}
+
+function resetPipelineAudioPlayback() {
+  if (_plAudio) {
+    _plAudio.pause();
+    _plAudio.onended = null;
+    _plAudio.onerror = null;
+    _plAudio = null;
+  }
+  if (_plAudioBtn) {
+    setPipelineAudioButtonState(_plAudioBtn, false);
+    _plAudioBtn = null;
+  }
+}
+
+function playPipelineAudio(btn, filePath) {
+  if (!btn || !filePath) return;
+  var isSameButton = _plAudioBtn === btn && btn.classList.contains("playing");
+  resetPipelineAudioPlayback();
+  if (isSameButton) return;
+
+  var url = buildPipelineMediaUrl(filePath);
+  if (!url) return;
   console.log("[pipeline] playing audio:", url);
   try {
     _plAudio = new Audio(url);
-    _plAudio.oncanplaythrough = function() {
-      console.log("[pipeline] audio ready, playing");
-    };
-    _plAudio.onerror = function(e) {
-      console.error("[pipeline] audio error:", _plAudio.error);
+    _plAudioBtn = btn;
+    setPipelineAudioButtonState(btn, true);
+    _plAudio.onerror = function() {
+      console.error("[pipeline] audio error:", _plAudio && _plAudio.error);
+      resetPipelineAudioPlayback();
     };
     var playPromise = _plAudio.play();
-    if (playPromise) {
+    if (playPromise && typeof playPromise.then === "function") {
       playPromise.then(function() {
         console.log("[pipeline] audio playing!");
-        btn.classList.add("playing");
-        btn.innerHTML = "&#9646;&#9646;";
       }).catch(function(e) {
         console.error("[pipeline] audio play promise rejected:", e.message);
+        resetPipelineAudioPlayback();
       });
     }
     _plAudio.onended = function() {
-      btn.classList.remove("playing");
-      btn.innerHTML = "&#9654;";
-      _plAudio = null;
+      resetPipelineAudioPlayback();
     };
-  } catch(e) {
+  } catch (e) {
     console.error("[pipeline] audio exception:", e.message);
+    resetPipelineAudioPlayback();
   }
 }
 
 function playPipelineVideo(filePath) {
-  // Use existing player modal
-  var parts = filePath.replace("~/NextFrame/projects/", "").split("/");
-  var url = buildNfdataUrl(parts);
-  openPlayer(url, filePath.split("/").pop());
+  if (!filePath) return;
+  var url = buildPipelineMediaUrl(filePath);
+  var name = filePath.split("/").pop() || "clip.mp4";
+  openPlayer(name, url, filePath);
 }
 
 function populateEditorClipSidebar() {
@@ -328,9 +357,9 @@ function renderPipelineAudio(data) {
   html += '<div class="pl-chip pl-chip-green"><span class="pl-chip-label">\u5DF2\u751F\u6210</span><span class="pl-chip-val">' + generated.length + '/' + segments.length + '</span></div>';
   html += '<div class="pl-chip"><span class="pl-chip-label">\u603B\u65F6\u957F</span><span class="pl-chip-val">' + totalDur.toFixed(1) + 's</span></div>';
   html += '<div class="pl-divider"></div>';
-  html += '<span class="pl-seg-pill active" onclick="plFilterSeg(-1)">\u5168\u90E8</span>';
+  html += '<span class="pl-seg-pill active" data-seg="-1" data-filter-seg="-1">\u5168\u90E8</span>';
   for (var i = 0; i < segments.length; i++) {
-    html += '<span class="pl-seg-pill" onclick="plFilterSeg(' + i + ')">\u6BB5 ' + (i + 1) + '</span>';
+    html += '<span class="pl-seg-pill" data-seg="' + i + '" data-filter-seg="' + i + '">\u6BB5 ' + (i + 1) + '</span>';
   }
   html += '</div>';
 
@@ -494,10 +523,10 @@ function renderPipelineAtoms(data) {
 
   // --- Toolbar ---
   var html = '<div class="pl-toolbar">';
-  html += '<span class="pl-seg-pill active" data-filter="all">全部 ' + counts.all + '</span>';
-  html += '<span class="pl-seg-pill" data-filter="component">' + typeLabels.component + ' ' + counts.component + '</span>';
-  html += '<span class="pl-seg-pill" data-filter="video">' + typeLabels.video + ' ' + counts.video + '</span>';
-  html += '<span class="pl-seg-pill" data-filter="image">' + typeLabels.image + ' ' + counts.image + '</span>';
+  html += '<span class="pl-seg-pill active" data-filter-type="all">全部 ' + counts.all + '</span>';
+  html += '<span class="pl-seg-pill" data-filter-type="component">' + typeLabels.component + ' ' + counts.component + '</span>';
+  html += '<span class="pl-seg-pill" data-filter-type="video">' + typeLabels.video + ' ' + counts.video + '</span>';
+  html += '<span class="pl-seg-pill" data-filter-type="image">' + typeLabels.image + ' ' + counts.image + '</span>';
   html += '</div>';
 
   // --- Grid ---
