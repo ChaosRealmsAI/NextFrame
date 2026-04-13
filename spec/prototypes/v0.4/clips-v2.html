@@ -108,6 +108,31 @@ html, body {
   cursor: pointer;
 }
 .source-play:hover { background: rgba(124,106,239,0.3); }
+.source-expand, .clip-expand {
+  position: absolute; top: 6px; right: 6px;
+  width: 22px; height: 22px; border-radius: 4px;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: rgba(255,255,255,0.5);
+  cursor: pointer; opacity: 0;
+  transition: opacity 0.2s var(--ease);
+  z-index: 3;
+}
+.source-thumb:hover .source-expand, .clip-thumb:hover .clip-expand { opacity: 1; }
+.source-expand:hover, .clip-expand:hover { background: rgba(124,106,239,0.4); color: #fff; }
+.clip-expand { top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 3px; font-size: 9px; }
+.mini-player {
+  position: absolute; inset: 0; background: #050508;
+  display: none; flex-direction: column; z-index: 2;
+}
+.mini-player.active { display: flex; }
+.mini-player-area { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--ink-25); font-family: var(--mono); font-size: 11px; }
+.mini-player-bar { height: 20px; display: flex; align-items: center; gap: 6px; padding: 0 6px; background: rgba(0,0,0,0.6); }
+.mini-btn { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.5); font-size: 9px; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; transition: color 0.2s var(--ease); }
+.mini-btn:hover { color: #fff; }
+.mini-progress { flex: 1; height: 2px; background: rgba(255,255,255,0.1); border-radius: 1px; overflow: hidden; }
+.mini-progress-fill { height: 100%; width: 0; background: var(--accent); border-radius: 1px; transition: width 0.3s linear; }
+.mini-tc { font-family: var(--mono); font-size: 8px; color: rgba(255,255,255,0.4); }
 .source-pill {
   position: absolute; bottom: 6px;
   font-family: var(--mono); font-size: 9px;
@@ -409,7 +434,9 @@ function renderSources() {
     html += '<div class="source-item stagger' + (i === activeSource ? " active" : "") + '" onclick="selectSource(' + i + ')">' +
       '<div class="source-thumb">' +
         '<div class="source-thumb-gradient" style="background:linear-gradient(135deg,hsla(' + src.hue + ',0.3),transparent)"></div>' +
-        '<div class="source-play" onclick="event.stopPropagation();openModal(\'' + src.name + '\',\'00:00 / ' + src.dur + '\',\'' + src.res + ' &middot; ' + src.fps + 'fps\')">&#9654;</div>' +
+        '<div class="source-play" onclick="event.stopPropagation();playMini(\'mini-src-' + i + '\')">&#9654;</div>' +
+        '<div class="source-expand" onclick="event.stopPropagation();openModal(\'' + src.name + '\',\'00:00 / ' + src.dur + '\',\'' + src.res + ' &middot; ' + src.fps + 'fps\')">&#x26F6;</div>' +
+        '<div class="mini-player" id="mini-src-' + i + '"><div class="mini-player-area">&#9654; Playing</div><div class="mini-player-bar"><button class="mini-btn" onclick="event.stopPropagation();stopMini(\'mini-src-' + i + '\')">&#x25A0;</button><div class="mini-progress"><div class="mini-progress-fill"></div></div><span class="mini-tc">00:00 / ' + src.dur + '</span></div></div>' +
         '<span class="source-pill left">' + src.res + '</span>' +
         '<span class="source-pill right">' + src.dur + '</span>' +
       '</div>' +
@@ -461,7 +488,9 @@ function renderMain() {
     var tagsHtml = clip.tags.map(function(t) { return '<span class="clip-tag">' + t + '</span>'; }).join("");
     listHtml += '<div class="clip-card stagger">' +
       '<div class="clip-thumb" style="background:linear-gradient(135deg,hsla(' + src.hue + ',0.2),var(--surface))">' +
-        '<div class="clip-thumb-play" onclick="openModal(\'' + clip.id + ' ' + clip.name + '\',\'' + tc(clip.inSec) + ' / ' + tc(clip.outSec) + '\',\'' + src.res + ' &middot; ' + src.fps + 'fps\')">&#9654;</div>' +
+        '<div class="clip-thumb-play" onclick="playMini(\'mini-clip-' + i + '\')">&#9654;</div>' +
+        '<div class="clip-expand" onclick="openModal(\'' + clip.id + ' ' + clip.name + '\',\'' + tc(clip.inSec) + ' / ' + tc(clip.outSec) + '\',\'' + src.res + ' &middot; ' + src.fps + 'fps\')">&#x26F6;</div>' +
+        '<div class="mini-player" id="mini-clip-' + i + '"><div class="mini-player-area">&#9654; Playing</div><div class="mini-player-bar"><button class="mini-btn" onclick="event.stopPropagation();stopMini(\'mini-clip-' + i + '\')">&#x25A0;</button><div class="mini-progress"><div class="mini-progress-fill"></div></div><span class="mini-tc">' + tc(clip.inSec) + ' / ' + tc(clip.outSec) + '</span></div></div>' +
         '<span class="clip-tc in">' + tc(clip.inSec) + '</span>' +
         '<span class="clip-tc out">' + tc(clip.outSec) + '</span>' +
         '<span class="clip-tc dur">' + dur + 's</span>' +
@@ -470,15 +499,35 @@ function renderMain() {
         '<div class="clip-name">' + clip.name + '</div>' +
         '<div class="clip-source-ref"><span class="clip-source-dot"></span>' + src.name + '</div>' +
         '<div class="clip-tags">' + tagsHtml + '</div>' +
-        '<div class="clip-segment' + (clip.seg ? '' : ' unused') + '">' + (clip.seg ? '&rarr; ' + clip.seg : '未使用') + '</div>' +
+        (clip.seg ? '<div class="clip-segment">&rarr; ' + clip.seg + '</div>' : '') +
       '</div>' +
     '</div>';
   });
   document.getElementById("clipList").innerHTML = listHtml;
 
   var totalDur = clips.reduce(function(s, c) { return s + (c.outSec - c.inSec); }, 0);
-  var unused = clips.filter(function(c) { return !c.seg; }).length;
-  document.getElementById("footerLeft").textContent = clips.length + " clips \u00b7 " + totalDur.toFixed(1) + "s" + (unused ? " \u00b7 " + unused + " unused" : "");
+  document.getElementById("footerLeft").textContent = clips.length + " clips \u00b7 " + totalDur.toFixed(1) + "s";
+}
+
+var miniTimers = {};
+function playMini(id) {
+  document.querySelectorAll(".mini-player.active").forEach(function(el) { el.classList.remove("active"); });
+  Object.keys(miniTimers).forEach(function(k) { clearInterval(miniTimers[k]); delete miniTimers[k]; });
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add("active");
+  var fill = el.querySelector(".mini-progress-fill");
+  var p = 0;
+  miniTimers[id] = setInterval(function() {
+    p += 2;
+    if (p > 100) { stopMini(id); return; }
+    fill.style.width = p + "%";
+  }, 100);
+}
+function stopMini(id) {
+  var el = document.getElementById(id);
+  if (el) { el.classList.remove("active"); var f = el.querySelector(".mini-progress-fill"); if (f) f.style.width = "0"; }
+  if (miniTimers[id]) { clearInterval(miniTimers[id]); delete miniTimers[id]; }
 }
 
 function openModal(label, timecode, specs) {
