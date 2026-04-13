@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame — Script</title>
+<style>
+  :root {
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --accent: #8a6fae;
+    --accent-15: rgba(138,111,174,0.15);
+    --accent-06: rgba(138,111,174,0.06);
+    --ink: #f0ece4;
+    --ink-mid: rgba(240,236,228,0.85);
+    --ink-dim: rgba(240,236,228,0.65);
+    --ink-ghost: rgba(240,236,228,0.15);
+    --ink-faint: rgba(138,111,174,0.08);
+    --bg: #0a0a0f;
+    --bg-up: #111118;
+    --bg-surface: #17171f;
+    --bg-hover: #1d1d28;
+    --warm: #da7756;
+    --warm-20: rgba(218,119,86,0.2);
+    --font-display: Georgia, 'Times New Roman', serif;
+    --font-body: -apple-system, 'Helvetica Neue', system-ui, sans-serif;
+    --font-mono: 'SF Mono', Menlo, monospace;
+    --border-a1: 1px solid rgba(138,111,174,0.1);
+    --border-a2: 1px solid rgba(138,111,174,0.25);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { font-size: 16px; scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 48px;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: var(--border-a1);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 0;
+    z-index: 1000;
+  }
+
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 20px;
+    flex-shrink: 0;
+  }
+
+  .logo-mark {
+    width: 18px; height: 18px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .logo-mark svg { width: 18px; height: 18px; }
+
+  .brand-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.2px;
+    font-family: var(--font-body);
+  }
+
+  .topbar-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: auto;
+  }
+
+  .nav-select {
+    background: transparent;
+    border: none;
+    color: var(--ink-dim);
+    font-size: 13px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  .nav-select:hover { background: var(--bg-hover); color: var(--ink); }
+
+  .nav-divider {
+    width: 1px; height: 16px;
+    background: var(--ink-ghost);
+    margin: 0 4px;
+  }
+
+  .topbar-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .tab-item {
+    font-size: 13px;
+    color: var(--ink-dim);
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    user-select: none;
+    position: relative;
+  }
+
+  .tab-item:hover { background: var(--bg-hover); color: var(--ink); }
+
+  .tab-item.active {
+    color: var(--ink);
+    background: var(--accent-15);
+  }
+
+  .tab-item.active .tab-dot {
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-left: 4px;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+  }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 16px;
+  }
+
+  .action-btn {
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+    color: var(--ink-dim);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    font-size: 13px;
+  }
+
+  .action-btn:hover { background: var(--bg-hover); color: var(--ink); }
+
+  .action-btn.user {
+    width: 28px; height: 28px;
+    background: var(--accent-15);
+    border-radius: 50%;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  .page-wrapper {
+    margin-top: 48px;
+    min-height: calc(100vh - 48px);
+    display: flex;
+    justify-content: center;
+  }
+
+  .content-area {
+    width: 100%;
+    max-width: 1100px;
+    display: flex;
+    align-items: flex-start;
+    padding: 64px 40px 120px;
+    gap: 48px;
+  }
+
+  /* ── ARTICLE COLUMN ── */
+  .article-col {
+    flex: 0 0 580px;
+    max-width: 580px;
+  }
+
+  .article-title-area {
+    margin-bottom: 32px;
+  }
+
+  .article-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: normal;
+    color: var(--ink);
+    letter-spacing: -0.5px;
+    line-height: 1.3;
+    margin-bottom: 6px;
+  }
+
+  .article-subtitle {
+    font-size: 13px;
+    color: var(--ink-dim);
+    font-family: var(--font-body);
+    margin-bottom: 16px;
+  }
+
+  .title-accent-line {
+    width: 40px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+  }
+
+  /* Principles bar */
+  .principles-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 44px;
+  }
+
+  .principle-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-surface);
+    border: var(--border-a1);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: var(--ink-dim);
+    font-family: var(--font-body);
+  }
+
+  .principle-label {
+    color: var(--ink-ghost);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  /* Script prose */
+  .script-body {
+    position: relative;
+  }
+
+  .segment {
+    position: relative;
+    margin-bottom: 40px;
+    padding-left: 28px;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+  }
+
+  .segment:hover .segment-text-highlight {
+    opacity: 1;
+  }
+
+  .segment.hovered-from-annotation {
+    border-left: 2px solid var(--accent);
+    padding-left: 26px;
+    margin-left: 0;
+  }
+
+  .segment-num {
+    position: absolute;
+    left: 0;
+    top: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-ghost);
+    user-select: none;
+    line-height: 1;
+    width: 16px;
+    text-align: right;
+  }
+
+  .segment-text {
+    font-family: var(--font-display);
+    font-size: 18px;
+    line-height: 2.0;
+    color: var(--ink);
+    position: relative;
+    transition: color 0.2s;
+  }
+
+  .segment:hover .segment-text {
+    color: var(--ink);
+  }
+
+  .segment-text-highlight {
+    position: absolute;
+    left: -28px;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    opacity: 0;
+    border-radius: 1px;
+    transition: opacity 0.2s var(--ease);
+  }
+
+  /* ── COMMENTS COLUMN ── */
+  .comments-col {
+    flex: 1;
+    position: relative;
+    padding-top: 0;
+  }
+
+  .annotation-group {
+    margin-bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0.7;
+    transition: opacity 0.2s var(--ease);
+  }
+
+  .annotation-group.active {
+    opacity: 1;
+  }
+
+  .annotation-card {
+    background: var(--bg-surface);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 12px;
+    max-width: 260px;
+    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+    position: relative;
+  }
+
+  .annotation-card.type-role {
+    border-left: 2px solid var(--warm);
+  }
+
+  .annotation-card.type-visual {
+    border-left: 2px solid var(--accent);
+  }
+
+  .annotation-card.type-logic {
+    border-left: 2px solid rgba(240,236,228,0.25);
+  }
+
+  .annotation-card.type-role:hover,
+  .annotation-card.type-role.glowing {
+    box-shadow: -2px 0 8px rgba(218,119,86,0.25);
+  }
+
+  .annotation-card.type-visual:hover,
+  .annotation-card.type-visual.glowing {
+    box-shadow: -2px 0 8px rgba(138,111,174,0.3);
+  }
+
+  .annotation-card.type-logic:hover,
+  .annotation-card.type-logic.glowing {
+    box-shadow: -2px 0 8px rgba(240,236,228,0.08);
+  }
+
+  .annotation-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--ink-dim);
+    font-family: var(--font-body);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .annotation-content {
+    font-size: 12px;
+    color: var(--ink-mid);
+    line-height: 1.6;
+    font-family: var(--font-body);
+  }
+
+  .annotation-content.italic {
+    font-style: italic;
+    color: var(--ink-dim);
+  }
+
+  /* Connector dot */
+  .annotation-connector {
+    position: absolute;
+    left: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    opacity: 0.4;
+  }
+
+  .type-role .annotation-connector { background: var(--warm); }
+  .type-visual .annotation-connector { background: var(--accent); }
+  .type-logic .annotation-connector { background: rgba(240,236,228,0.25); }
+
+  /* ── NARRATIVE ARC ── */
+  .narrative-arc {
+    position: fixed;
+    bottom: 0;
+    left: 0; right: 0;
+    height: 52px;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(12px);
+    border-top: var(--border-a1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    z-index: 1000;
+  }
+
+  .arc-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .arc-node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+
+  .arc-node:hover { background: var(--bg-hover); }
+
+  .arc-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink-ghost);
+    border: 1px solid rgba(240,236,228,0.3);
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+  }
+
+  .arc-node.arc-active .arc-dot {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 6px rgba(138,111,174,0.5);
+  }
+
+  .arc-label {
+    font-size: 11px;
+    color: var(--ink-dim);
+    font-family: var(--font-mono);
+    transition: color 0.2s;
+    white-space: nowrap;
+  }
+
+  .arc-node.arc-active .arc-label {
+    color: var(--ink);
+  }
+
+  .arc-connector {
+    width: 28px;
+    height: 1px;
+    background: var(--ink-ghost);
+    flex-shrink: 0;
+  }
+
+  .arc-stats {
+    position: absolute;
+    right: 24px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    opacity: 0.6;
+  }
+
+  /* ── FILM GRAIN ── */
+  .film-grain {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.035;
+    z-index: 9999;
+    mix-blend-mode: overlay;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(138,111,174,0.2); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(138,111,174,0.4); }
+
+  /* Subtle separator between segments */
+  .segment-sep {
+    text-align: center;
+    color: var(--ink-ghost);
+    font-size: 16px;
+    margin: 0 0 40px 28px;
+    user-select: none;
+    letter-spacing: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Film grain -->
+<svg class="film-grain">
+  <filter id="grain">
+    <feTurbulence baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/>
+  </filter>
+  <rect width="100%" height="100%" filter="url(#grain)"/>
+</svg>
+
+<!-- TOP BAR -->
+<header class="topbar">
+  <div class="topbar-brand">
+    <div class="logo-mark">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="16" height="16" rx="3" fill="rgba(138,111,174,0.15)" stroke="rgba(138,111,174,0.4)" stroke-width="1"/>
+        <path d="M6 5.5L13 9L6 12.5V5.5Z" fill="#8a6fae"/>
+        <rect x="1" y="3.5" width="2" height="2" rx="0.5" fill="rgba(138,111,174,0.5)"/>
+        <rect x="1" y="8" width="2" height="2" rx="0.5" fill="rgba(138,111,174,0.5)"/>
+        <rect x="1" y="12.5" width="2" height="2" rx="0.5" fill="rgba(138,111,174,0.5)"/>
+        <rect x="15" y="3.5" width="2" height="2" rx="0.5" fill="rgba(138,111,174,0.5)"/>
+        <rect x="15" y="8" width="2" height="2" rx="0.5" fill="rgba(138,111,174,0.5)"/>
+        <rect x="15" y="12.5" width="2" height="2" rx="0.5" fill="rgba(138,111,174,0.5)"/>
+      </svg>
+    </div>
+    <span class="brand-name">NextFrame</span>
+  </div>
+
+  <div class="topbar-nav">
+    <select class="nav-select" style="padding-right:18px;">
+      <option>产品介绍视频 ▾</option>
+    </select>
+    <div class="nav-divider"></div>
+    <select class="nav-select" style="padding-right:18px;">
+      <option>EP01 ▾</option>
+    </select>
+  </div>
+
+  <div class="topbar-tabs">
+    <div class="tab-item active">脚本<span class="tab-dot"></span></div>
+    <div class="tab-item">音频</div>
+    <div class="tab-item">原子</div>
+    <div class="tab-item">拼装</div>
+    <div class="tab-item">产出</div>
+  </div>
+
+  <div class="topbar-actions">
+    <div class="action-btn" title="设置">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+        <path d="M7.5 9.5a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M2.929 2.929l1.06 1.06M10.01 10.01l1.06 1.06M2.929 12.071l1.06-1.06M10.01 4.99l1.06-1.06" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="action-btn user">Z</div>
+  </div>
+</header>
+
+<!-- MAIN PAGE -->
+<main class="page-wrapper">
+  <div class="content-area">
+
+    <!-- ARTICLE COLUMN -->
+    <article class="article-col">
+      <div class="article-title-area">
+        <h1 class="article-title">产品介绍视频</h1>
+        <p class="article-subtitle">EP01 · 第一集</p>
+        <div class="title-accent-line"></div>
+      </div>
+
+      <!-- Principles bar -->
+      <div class="principles-bar">
+        <div class="principle-pill">
+          <span class="principle-label">受众</span>
+          <span>创作者 25–35</span>
+        </div>
+        <div class="principle-pill">
+          <span class="principle-label">语气</span>
+          <span>专业友好</span>
+        </div>
+        <div class="principle-pill">
+          <span class="principle-label">节奏</span>
+          <span>快 → 慢 → 快</span>
+        </div>
+        <div class="principle-pill">
+          <span class="principle-label">时长</span>
+          <span>90秒</span>
+        </div>
+      </div>
+
+      <!-- Script prose -->
+      <div class="script-body">
+
+        <div class="segment" data-segment="1" id="seg-1">
+          <div class="segment-text-highlight"></div>
+          <span class="segment-num">1</span>
+          <p class="segment-text">
+            每天，我们花 3 小时在重复性工作上。这些时间，<br>
+            本可以用来做更有价值的事。
+          </p>
+        </div>
+
+        <div class="segment" data-segment="2" id="seg-2">
+          <div class="segment-text-highlight"></div>
+          <span class="segment-num">2</span>
+          <p class="segment-text">
+            如果有一个工具，能把这些时间还给你？NextFrame，<br>
+            让视频制作像写文档一样简单。
+          </p>
+        </div>
+
+        <div class="segment" data-segment="3" id="seg-3">
+          <div class="segment-text-highlight"></div>
+          <span class="segment-num">3</span>
+          <p class="segment-text">
+            从脚本到音频，从画面到成片——AI 全自动编排，<br>
+            你只需要审核。
+          </p>
+        </div>
+
+        <div class="segment" data-segment="4" id="seg-4">
+          <div class="segment-text-highlight"></div>
+          <span class="segment-num">4</span>
+          <p class="segment-text">
+            过去一部视频需要 3 天，现在 5 分钟出稿。<br>
+            已有 12,000 位创作者正在用它工作。
+          </p>
+        </div>
+
+        <div class="segment" data-segment="5" id="seg-5">
+          <div class="segment-text-highlight"></div>
+          <span class="segment-num">5</span>
+          <p class="segment-text">
+            免费开始，第一个项目在今天。<br>
+            你的时间，值得更好的安排。
+          </p>
+        </div>
+
+        <!-- Stats -->
+        <div style="margin-top:8px;padding-left:28px;">
+          <span style="font-family:var(--font-mono);font-size:11px;color:var(--ink-ghost);">5 段 · 148 字</span>
+        </div>
+
+      </div>
+    </article>
+
+    <!-- COMMENTS COLUMN -->
+    <aside class="comments-col" id="comments-col">
+
+      <!-- Segment 1 annotations -->
+      <div class="annotation-group" data-for="1" id="ann-1">
+        <div class="annotation-card type-role" data-segment="1">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">角色</div>
+          <div class="annotation-content">引出痛点 — 用共鸣开场</div>
+        </div>
+        <div class="annotation-card type-visual" data-segment="1">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">画面</div>
+          <div class="annotation-content">大数字 "3" + 配文 "小时/天"</div>
+        </div>
+        <div class="annotation-card type-logic" data-segment="1">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">逻辑</div>
+          <div class="annotation-content italic">用具体数字制造共鸣，不讲道理，讲感受</div>
+        </div>
+      </div>
+
+      <!-- Segment 2 annotations -->
+      <div class="annotation-group" data-for="2" id="ann-2">
+        <div class="annotation-card type-role" data-segment="2">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">角色</div>
+          <div class="annotation-content">提出方案 — 给出答案</div>
+        </div>
+        <div class="annotation-card type-visual" data-segment="2">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">画面</div>
+          <div class="annotation-content">产品 Logo 从模糊到清晰</div>
+        </div>
+        <div class="annotation-card type-logic" data-segment="2">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">逻辑</div>
+          <div class="annotation-content italic">先问问题再给答案，制造期待感</div>
+        </div>
+      </div>
+
+      <!-- Segment 3 annotations -->
+      <div class="annotation-group" data-for="3" id="ann-3">
+        <div class="annotation-card type-role" data-segment="3">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">角色</div>
+          <div class="annotation-content">讲解原理 — 建立信任</div>
+        </div>
+        <div class="annotation-card type-visual" data-segment="3">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">画面</div>
+          <div class="annotation-content">三步流程图 📝 → 🔊 → 🎬</div>
+        </div>
+        <div class="annotation-card type-logic" data-segment="3">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">逻辑</div>
+          <div class="annotation-content italic">三步降低认知负担，"你只需要"是关键词</div>
+        </div>
+      </div>
+
+      <!-- Segment 4 annotations -->
+      <div class="annotation-group" data-for="4" id="ann-4">
+        <div class="annotation-card type-role" data-segment="4">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">角色</div>
+          <div class="annotation-content">数据证明 — 消除疑虑</div>
+        </div>
+        <div class="annotation-card type-visual" data-segment="4">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">画面</div>
+          <div class="annotation-content">对比柱状图 3天 vs 5分钟</div>
+        </div>
+        <div class="annotation-card type-logic" data-segment="4">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">逻辑</div>
+          <div class="annotation-content italic">对比 + 社会证明，两个说服力叠加</div>
+        </div>
+      </div>
+
+      <!-- Segment 5 annotations -->
+      <div class="annotation-group" data-for="5" id="ann-5">
+        <div class="annotation-card type-role" data-segment="5">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">角色</div>
+          <div class="annotation-content">行动号召 — 推动转化</div>
+        </div>
+        <div class="annotation-card type-visual" data-segment="5">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">画面</div>
+          <div class="annotation-content">大按钮 "开始试用" + 发光效果</div>
+        </div>
+        <div class="annotation-card type-logic" data-segment="5">
+          <div class="annotation-connector"></div>
+          <div class="annotation-label">逻辑</div>
+          <div class="annotation-content italic">"免费"降低门槛，"第一个"暗示简单</div>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+</main>
+
+<!-- NARRATIVE ARC (fixed bottom) -->
+<footer class="narrative-arc">
+  <div class="arc-wrapper">
+    <div class="arc-node arc-active" data-arc="1" onclick="scrollToSegment(1)">
+      <div class="arc-dot"></div>
+      <span class="arc-label">痛点</span>
+    </div>
+    <div class="arc-connector"></div>
+    <div class="arc-node" data-arc="2" onclick="scrollToSegment(2)">
+      <div class="arc-dot"></div>
+      <span class="arc-label">方案</span>
+    </div>
+    <div class="arc-connector"></div>
+    <div class="arc-node" data-arc="3" onclick="scrollToSegment(3)">
+      <div class="arc-dot"></div>
+      <span class="arc-label">原理</span>
+    </div>
+    <div class="arc-connector"></div>
+    <div class="arc-node" data-arc="4" onclick="scrollToSegment(4)">
+      <div class="arc-dot"></div>
+      <span class="arc-label">证据</span>
+    </div>
+    <div class="arc-connector"></div>
+    <div class="arc-node" data-arc="5" onclick="scrollToSegment(5)">
+      <div class="arc-dot"></div>
+      <span class="arc-label">行动</span>
+    </div>
+  </div>
+  <div class="arc-stats">5 段 · 148 字</div>
+</footer>
+
+<script>
+  // ── Vertical alignment of annotations ──
+  function alignAnnotations() {
+    const segments = document.querySelectorAll('.segment');
+    const annGroups = document.querySelectorAll('.annotation-group');
+    const contentArea = document.querySelector('.content-area');
+    const contentTop = contentArea.getBoundingClientRect().top + window.scrollY;
+
+    segments.forEach((seg, i) => {
+      const ann = annGroups[i];
+      if (!ann) return;
+      const segTop = seg.getBoundingClientRect().top + window.scrollY;
+      const offset = segTop - contentTop - 48; // 48px topbar
+      // We'll use a relative-within-col approach: marginTop stacking
+    });
+
+    // Absolute approach: position each group based on corresponding segment
+    const commentsCol = document.getElementById('comments-col');
+    const colRect = commentsCol.getBoundingClientRect();
+
+    annGroups.forEach((ann, i) => {
+      const seg = segments[i];
+      if (!seg) return;
+      const segRect = seg.getBoundingClientRect();
+      const colTop = commentsCol.getBoundingClientRect().top;
+    });
+  }
+
+  // Better approach: use margin-top to push annotations to align with segments
+  function reflow() {
+    const segments = document.querySelectorAll('.segment');
+    const annGroups = document.querySelectorAll('.annotation-group');
+
+    if (!segments.length || !annGroups.length) return;
+
+    // Get article col top reference
+    const articleCol = document.querySelector('.article-col');
+    const articleColTop = articleCol.getBoundingClientRect().top + window.scrollY;
+
+    // Get comments col
+    const commentsCol = document.getElementById('comments-col');
+    const commentsColTop = commentsCol.getBoundingClientRect().top + window.scrollY;
+
+    let prevAnnBottom = commentsColTop; // track bottom of previous annotation group
+
+    segments.forEach((seg, i) => {
+      const ann = annGroups[i];
+      if (!ann) return;
+
+      const segTop = seg.getBoundingClientRect().top + window.scrollY;
+      const desiredTop = segTop;
+
+      // Calculate how much top margin we need
+      const currentAnnTop = ann.getBoundingClientRect().top + window.scrollY;
+      const needed = desiredTop - currentAnnTop;
+
+      // Only push down, never overlap previous
+      const safeTop = Math.max(desiredTop, prevAnnBottom + 8);
+      const margin = safeTop - (ann.getBoundingClientRect().top + window.scrollY);
+
+      if (Math.abs(margin) > 1) {
+        const current = parseInt(ann.style.marginTop || '0');
+        ann.style.marginTop = Math.max(0, current + margin) + 'px';
+      }
+
+      prevAnnBottom = ann.getBoundingClientRect().bottom + window.scrollY;
+    });
+  }
+
+  // Initialize alignment
+  window.addEventListener('load', () => {
+    // Reset all margins first
+    document.querySelectorAll('.annotation-group').forEach(g => g.style.marginTop = '0');
+
+    setTimeout(() => {
+      const segments = document.querySelectorAll('.segment');
+      const annGroups = document.querySelectorAll('.annotation-group');
+
+      const commentsCol = document.getElementById('comments-col');
+      const commentsColTop = commentsCol.getBoundingClientRect().top + window.scrollY;
+
+      let cursor = 0; // cursor tracks where we are in the comments col
+
+      segments.forEach((seg, i) => {
+        const ann = annGroups[i];
+        if (!ann) return;
+
+        const segTop = seg.getBoundingClientRect().top + window.scrollY;
+        const desiredOffset = segTop - commentsColTop;
+        const marginNeeded = Math.max(desiredOffset - cursor, 0);
+
+        ann.style.marginTop = marginNeeded + 'px';
+
+        // Update cursor to below this annotation group
+        cursor = desiredOffset + ann.getBoundingClientRect().height + 8;
+      });
+    }, 50);
+  });
+
+  // ── Hover interactions ──
+  const segments = document.querySelectorAll('.segment');
+  const annGroups = document.querySelectorAll('.annotation-group');
+
+  segments.forEach((seg, i) => {
+    seg.addEventListener('mouseenter', () => {
+      const ann = annGroups[i];
+      if (ann) {
+        ann.classList.add('active');
+        ann.querySelectorAll('.annotation-card').forEach(c => c.classList.add('glowing'));
+      }
+      // Update arc
+      updateArc(i + 1);
+    });
+
+    seg.addEventListener('mouseleave', () => {
+      const ann = annGroups[i];
+      if (ann) {
+        ann.classList.remove('active');
+        ann.querySelectorAll('.annotation-card').forEach(c => c.classList.remove('glowing'));
+      }
+    });
+  });
+
+  annGroups.forEach((ann, i) => {
+    ann.addEventListener('mouseenter', () => {
+      const seg = segments[i];
+      if (seg) {
+        seg.classList.add('hovered-from-annotation');
+        const hl = seg.querySelector('.segment-text-highlight');
+        if (hl) hl.style.opacity = '1';
+      }
+      ann.classList.add('active');
+    });
+
+    ann.addEventListener('mouseleave', () => {
+      const seg = segments[i];
+      if (seg) {
+        seg.classList.remove('hovered-from-annotation');
+        const hl = seg.querySelector('.segment-text-highlight');
+        if (hl) hl.style.opacity = '';
+      }
+      ann.classList.remove('active');
+    });
+  });
+
+  // ── Scroll-based arc update ──
+  function updateArc(n) {
+    document.querySelectorAll('.arc-node').forEach(node => {
+      node.classList.toggle('arc-active', parseInt(node.dataset.arc) === n);
+    });
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const n = parseInt(entry.target.dataset.segment);
+        updateArc(n);
+
+        // Also highlight the corresponding annotation group
+        annGroups.forEach(g => {
+          if (parseInt(g.dataset.for) === n) {
+            g.classList.add('active');
+          }
+        });
+      }
+    });
+  }, { rootMargin: '-40% 0px -40% 0px', threshold: 0 });
+
+  segments.forEach(seg => observer.observe(seg));
+
+  // ── Arc click scroll ──
+  function scrollToSegment(n) {
+    const seg = document.getElementById('seg-' + n);
+    if (seg) {
+      const top = seg.getBoundingClientRect().top + window.scrollY - 80;
+      window.scrollTo({ top, behavior: 'smooth' });
+    }
+  }
+
+  // Tab switching (visual only)
+  document.querySelectorAll('.tab-item').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>
