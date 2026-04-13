@@ -11,17 +11,15 @@
       "start": 0,
       "dur": 30,
       "params": { "speed": 0.4, "rings": 10, "color": "#a78bfa", "twist": 3 },
-      "opacity": 0.35,
+      "opacity": 0.3,
       "blend": "screen"
     },
     {
-      "id": "bg-plasma",
-      "scene": "shaderPlasma",
-      "start": 14,
-      "dur": 8,
-      "params": { "speed": 0.8, "scale": 5, "colors": 3 },
-      "opacity": 0.25,
-      "blend": "screen"
+      "id": "bg-starfield",
+      "scene": "starfield",
+      "start": 0,
+      "dur": 30,
+      "params": { "count": 300, "speed": 0.6, "depth": 1.5, "color": "#6ee7ff" }
     },
     {
       "id": "vignette-global",
@@ -32,30 +30,10 @@
     },
 
     {
-      "id": "stars-open",
-      "scene": "starfield",
-      "start": 0,
-      "dur": 6,
-      "params": { "count": 350, "speed": 0.8, "depth": 1.5, "color": "#a78bfa" },
-      "enter": "fadeIn 1.2s",
-      "exit": "fadeOut 0.8s"
-    },
-    {
-      "id": "shader-gradient-open",
-      "scene": "shaderGradient",
+      "id": "intro-headline",
+      "scene": "headline",
       "start": 0,
       "dur": 5,
-      "params": { "color1": "#0d0020", "color2": "#0a0535", "color3": "#1a0040", "speed": 0.2 },
-      "opacity": 0.7,
-      "enter": "fadeIn 1.0s",
-      "exit": "fadeOut 0.6s",
-      "transition": "dissolve 0.8s"
-    },
-    {
-      "id": "headline-intro",
-      "scene": "headline",
-      "start": 0.5,
-      "dur": 4,
       "params": {
         "text": "Introducing Nova",
         "fontSize": 112,
@@ -66,25 +44,24 @@
       },
       "enter": "scaleIn 1.0s",
       "exit": "fadeOut 0.5s",
-      "transition": "zoomIn"
+      "transition": "dissolve 0.5s"
     },
 
     {
-      "id": "counter-bg",
-      "scene": "shaderGradient",
-      "start": 3,
-      "dur": 6,
-      "params": { "color1": "#050020", "color2": "#0a0040", "color3": "#150060", "speed": 0.4 },
-      "opacity": 0.85,
-      "enter": "fadeIn 0.5s",
-      "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.6s"
+      "id": "confetti-burst",
+      "scene": "confetti",
+      "start": 5,
+      "dur": 4,
+      "params": { "count": 120, "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#fbbf24"] },
+      "blend": "screen",
+      "enter": "fadeIn 0.3s",
+      "exit": "fadeOut 0.8s"
     },
     {
       "id": "counter-main",
       "scene": "numberCounter",
-      "start": 3.5,
-      "dur": 5,
+      "start": 5,
+      "dur": 4,
       "params": {
         "value": 10,
         "prefix": "",
@@ -96,32 +73,12 @@
       "exit": "fadeOut 0.5s",
       "transition": "dissolve 0.5s"
     },
-    {
-      "id": "confetti-counter",
-      "scene": "confetti",
-      "start": 4.5,
-      "dur": 4,
-      "params": { "count": 120, "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#fbbf24"] },
-      "enter": "fadeIn 0.3s",
-      "exit": "fadeOut 0.8s"
-    },
 
-    {
-      "id": "feature-bg",
-      "scene": "shaderGradient",
-      "start": 6,
-      "dur": 7,
-      "params": { "color1": "#020015", "color2": "#080030", "color3": "#100025", "speed": 0.3 },
-      "opacity": 0.9,
-      "enter": "fadeIn 0.6s",
-      "exit": "fadeOut 0.5s",
-      "transition": "wipeLeft 0.6s"
-    },
     {
       "id": "feature-grid-main",
       "scene": "featureGrid",
-      "start": 6.5,
-      "dur": 6,
+      "start": 9,
+      "dur": 5,
       "params": {
         "columns": 2,
         "items": [
@@ -139,21 +96,10 @@
     },
 
     {
-      "id": "chart-bg",
-      "scene": "shaderGradient",
-      "start": 10,
-      "dur": 7,
-      "params": { "color1": "#010018", "color2": "#030030", "color3": "#060020", "speed": 0.25 },
-      "opacity": 0.9,
-      "enter": "fadeIn 0.6s",
-      "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.5s"
-    },
-    {
       "id": "line-chart-perf",
       "scene": "lineChart",
-      "start": 10.5,
-      "dur": 5.5,
+      "start": 14,
+      "dur": 5,
       "params": {
         "data": [12, 28, 45, 62, 74, 88, 96],
         "labels": ["Q1'23", "Q2'23", "Q3'23", "Q4'23", "Q1'24", "Q2'24", "Now"],
@@ -164,45 +110,14 @@
       },
       "enter": "slideUp 0.7s",
       "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.5s",
-      "w": 900,
-      "x": 80
-    },
-    {
-      "id": "progress-ring-uptime",
-      "scene": "progressRing",
-      "start": 11,
-      "dur": 5,
-      "params": {
-        "progress": 99.9,
-        "color": "#f472b6",
-        "bgColor": "rgba(244,114,182,0.1)",
-        "strokeWidth": 24,
-        "label": "Uptime",
-        "showPercent": true
-      },
-      "enter": "scaleIn 0.8s",
-      "exit": "fadeOut 0.5s",
-      "x": 1100,
-      "w": 600
+      "transition": "dissolve 0.5s"
     },
 
     {
-      "id": "code-bg",
-      "scene": "shaderGradient",
-      "start": 14,
-      "dur": 7,
-      "params": { "color1": "#000818", "color2": "#001230", "color3": "#000a20", "speed": 0.2 },
-      "opacity": 0.9,
-      "enter": "fadeIn 0.6s",
-      "exit": "fadeOut 0.5s",
-      "transition": "wipeRight 0.6s"
-    },
-    {
       "id": "code-block-main",
       "scene": "codeBlock",
-      "start": 14.5,
-      "dur": 5.5,
+      "start": 19,
+      "dur": 4,
       "params": {
         "language": "rust",
         "code": "use nova::prelude::*;\n\n#[nova::model]\nasync fn infer(input: Tensor) -> Result<Output> {\n    let engine = NovaEngine::new()\n        .with_precision(Precision::BF16)\n        .with_batch_size(32)\n        .build()?;\n\n    engine.run(input).await\n}",
@@ -217,8 +132,8 @@
     {
       "id": "glitch-overlay",
       "scene": "shaderGlitch",
-      "start": 15,
-      "dur": 5,
+      "start": 19,
+      "dur": 4,
       "params": { "intensity": 0.3, "blockSize": 12, "colorSplit": 0.015, "scanlines": true },
       "opacity": 0.4,
       "blend": "screen",
@@ -227,21 +142,10 @@
     },
 
     {
-      "id": "timeline-bg",
-      "scene": "shaderGradient",
-      "start": 18,
-      "dur": 7,
-      "params": { "color1": "#080010", "color2": "#120020", "color3": "#0a0018", "speed": 0.35 },
-      "opacity": 0.9,
-      "enter": "fadeIn 0.6s",
-      "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.6s"
-    },
-    {
       "id": "timeline-roadmap",
       "scene": "timelineViz",
-      "start": 18.5,
-      "dur": 5.5,
+      "start": 23,
+      "dur": 4,
       "params": {
         "items": [
           { "label": "Beta", "date": "Mar 2024", "desc": "Early access — 2,000 users" },
@@ -257,64 +161,19 @@
     },
 
     {
-      "id": "card3d-bg",
-      "scene": "shaderGradient",
-      "start": 22,
-      "dur": 7,
-      "params": { "color1": "#0a0020", "color2": "#050028", "color3": "#0f0030", "speed": 0.4 },
-      "opacity": 0.9,
-      "enter": "fadeIn 0.6s",
-      "exit": "fadeOut 0.5s",
-      "transition": "zoomIn"
-    },
-    {
-      "id": "card3d-main",
-      "scene": "card3d",
-      "start": 22.5,
-      "dur": 5.5,
-      "params": {
-        "frontTitle": "Nova AI Engine",
-        "frontSubtitle": "Built for the next generation",
-        "backContent": "10x faster · 99.9% uptime · Open source\n\nApache 2.0 — github.com/nova-ai/nova",
-        "bgColor": "linear-gradient(135deg, rgba(110,231,255,0.15), rgba(167,139,250,0.15))",
-        "rotateAxis": "Y"
-      },
-      "enter": "scaleIn 0.9s",
-      "exit": "fadeOut 0.5s",
-      "transition": "zoomIn"
-    },
-
-    {
-      "id": "outro-stars",
-      "scene": "starfield",
-      "start": 25.5,
-      "dur": 4.5,
-      "params": { "count": 400, "speed": 1.2, "depth": 2, "color": "#6ee7ff" },
-      "enter": "fadeIn 0.8s"
-    },
-    {
-      "id": "outro-waveform",
-      "scene": "waveform",
-      "start": 26,
-      "dur": 4,
-      "params": { "bars": 80, "color": "#a78bfa", "mirrorY": true, "beatSpeed": 2.5 },
-      "opacity": 0.5,
-      "blend": "screen",
-      "enter": "fadeIn 0.6s"
-    },
-    {
       "id": "confetti-outro",
       "scene": "confetti",
-      "start": 26.5,
-      "dur": 3.5,
+      "start": 27,
+      "dur": 3,
       "params": { "count": 200, "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#34d399", "#fbbf24"] },
+      "blend": "screen",
       "enter": "fadeIn 0.3s"
     },
     {
-      "id": "headline-outro",
+      "id": "outro-headline",
       "scene": "headline",
-      "start": 26.5,
-      "dur": 3.5,
+      "start": 27,
+      "dur": 3,
       "params": {
         "text": "Available Now",
         "fontSize": 120,

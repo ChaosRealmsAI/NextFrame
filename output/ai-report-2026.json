@@ -3,407 +3,175 @@
   "height": 1080,
   "fps": 30,
   "duration": 35,
-  "background": "#04030d",
+  "background": "#05050c",
   "layers": [
     {
-      "id": "bg-grid-global",
+      "id": "bg-grid",
       "scene": "neonGrid",
       "start": 0,
       "dur": 35,
-      "params": { "hueHorizon": 270, "hueGrid": 240, "scrollSpeed": 0.3, "lineCount": 14, "colCount": 20 },
-      "opacity": 0.18,
-      "blend": "screen"
+      "params": { "gridColor": "#1a0a4a", "skyColor": "#05050c", "speed": 0.4, "perspective": 0.5 },
+      "opacity": 0.5
     },
     {
-      "id": "bg-noise-global",
+      "id": "bg-noise",
       "scene": "shaderNoise",
       "start": 0,
       "dur": 35,
-      "params": { "scale": 4, "speed": 0.2, "color1": "#0a1520", "color2": "#0d0824", "octaves": 3 },
-      "opacity": 0.55,
-      "blend": "multiply"
+      "params": { "scale": 4, "speed": 0.3, "color1": "#0d0020", "color2": "#001a30", "octaves": 3 },
+      "blend": "screen",
+      "opacity": 0.3
     },
     {
-      "id": "vignette-global",
+      "id": "bg-vignette",
       "scene": "vignette",
       "start": 0,
       "dur": 35,
-      "params": { "intensity": 0.85, "color": "#000000", "radius": 0.55 }
+      "params": { "intensity": 0.8, "color": "#000000", "radius": 0.45 }
     },
 
     {
-      "id": "cover-bg-gradient",
-      "scene": "shaderGradient",
-      "start": 0,
-      "dur": 6,
-      "params": { "color1": "#0a0020", "color2": "#060418", "color3": "#120030", "speed": 0.15 },
-      "opacity": 0.8,
-      "enter": "fadeIn 1.0s",
-      "exit": "fadeOut 0.8s"
-    },
-    {
-      "id": "cover-rings",
-      "scene": "svgRings",
-      "start": 0,
-      "dur": 5.5,
-      "params": {},
-      "opacity": 0.25,
-      "enter": "scaleIn 1.5s",
-      "exit": "fadeOut 0.5s"
-    },
-    {
-      "id": "cover-headline",
+      "id": "cover-title",
       "scene": "headline",
-      "start": 0.5,
+      "start": 0,
       "dur": 5,
-      "params": {
-        "text": "AI Industry Report 2026",
-        "subtitle": "The Year Everything Changed",
-        "fontSize": 88,
-        "gradient": ["#6ee7ff", "#a78bfa", "#f472b6"],
-        "stagger": 0.04
-      },
-      "enter": "fadeIn 1.0s",
-      "exit": "fadeOut 0.6s"
-    },
-    {
-      "id": "cover-lowerThird",
-      "scene": "lowerThird",
-      "start": 2.0,
-      "dur": 3.5,
-      "params": { "text": "ANNUAL TECHNOLOGY INTELLIGENCE BRIEF", "accent": "#6ee7ff" },
-      "enter": "slideUp 0.6s",
-      "exit": "fadeOut 0.4s"
-    },
-
-    {
-      "id": "market-bg",
-      "scene": "shaderPlasma",
-      "start": 4,
-      "dur": 8,
-      "params": { "speed": 0.4, "scale": 6, "colors": 2 },
-      "opacity": 0.12,
-      "blend": "screen",
+      "params": { "text": "AI Industry Report 2026", "fontSize": 88 },
       "enter": "fadeIn 0.8s",
-      "exit": "fadeOut 0.6s"
-    },
-    {
-      "id": "market-counter",
-      "scene": "numberCounter",
-      "start": 4.5,
-      "dur": 5.5,
-      "params": {
-        "value": 4200,
-        "prefix": "$",
-        "suffix": "B",
-        "label": "Global AI Market Size 2026",
-        "color": "#6ee7ff"
-      },
-      "enter": "scaleIn 0.8s",
-      "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.6s"
-    },
-    {
-      "id": "market-bar-chart",
-      "scene": "barChart",
-      "start": 6,
-      "dur": 4.5,
-      "params": {
-        "data": [920, 810, 540, 670, 380],
-        "labels": ["Healthcare", "Finance", "Education", "Manufacturing", "Entertainment"],
-        "colors": ["#6ee7ff", "#a78bfa", "#4ade80", "#fb923c", "#f472b6"],
-        "barWidth": 90,
-        "gap": 40,
-        "showLabels": true,
-        "showValues": true
-      },
-      "enter": "fadeIn 0.6s",
       "exit": "fadeOut 0.5s",
       "transition": "dissolve 0.5s"
     },
 
     {
-      "id": "growth-bg-particles",
-      "scene": "particleFlow",
-      "start": 8,
-      "dur": 7,
-      "params": { "count": 120, "speed": 0.6, "hueA": 200, "hueB": 280 },
-      "opacity": 0.3,
-      "blend": "screen",
-      "enter": "fadeIn 0.8s",
-      "exit": "fadeOut 0.6s"
-    },
-    {
-      "id": "growth-line-chart",
-      "scene": "lineChart",
-      "start": 8.5,
-      "dur": 6,
+      "id": "bar-market",
+      "scene": "barChart",
+      "start": 5,
+      "dur": 5,
       "params": {
-        "data": [12, 28, 55, 110, 220, 480, 1050],
-        "labels": ["2020", "2021", "2022", "2023", "2024", "2025", "2026"],
+        "data": [820, 1200, 1750, 2400, 3100, 4200],
+        "labels": ["2021", "2022", "2023", "2024", "2025", "2026"],
         "color": "#6ee7ff",
-        "strokeWidth": 4,
+        "title": "Global AI Market Size ($B)"
+      },
+      "enter": "slideUp 0.6s",
+      "exit": "fadeOut 0.4s",
+      "transition": "wipeLeft 0.5s"
+    },
+
+    {
+      "id": "line-growth",
+      "scene": "lineChart",
+      "start": 10,
+      "dur": 5,
+      "params": {
+        "data": [12, 18, 28, 38, 52, 71, 95],
+        "labels": ["Q1'25", "Q2'25", "Q3'25", "Q4'25", "Q1'26", "Q2'26", "Q3'26"],
+        "color": "#a78bfa",
+        "strokeWidth": 3,
         "showDots": true,
         "showArea": true,
-        "title": "AI MARKET GROWTH",
-        "unit": "B USD"
+        "title": "AI Adoption Growth Rate (%)"
       },
-      "enter": "fadeIn 0.7s",
-      "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.6s"
-    },
-    {
-      "id": "growth-annotation",
-      "scene": "calloutCard",
-      "start": 11,
-      "dur": 3.5,
-      "params": {
-        "title": "Inflection Point",
-        "body": "2024: AGI threshold crossed — adoption curve goes vertical",
-        "accent": "#f472b6"
-      },
-      "x": 0.6,
-      "y": 0.2,
-      "w": 0.35,
-      "h": 0.2,
-      "enter": "slideLeft 0.5s",
-      "exit": "fadeOut 0.4s"
+      "enter": "slideUp 0.6s",
+      "exit": "fadeOut 0.4s",
+      "transition": "slideUp 0.5s"
     },
 
     {
-      "id": "share-bg-gradient",
-      "scene": "shaderGradient",
-      "start": 12,
-      "dur": 8,
-      "params": { "color1": "#050018", "color2": "#0a0030", "color3": "#08001a", "speed": 0.1 },
-      "opacity": 0.7,
-      "enter": "fadeIn 0.6s",
-      "exit": "fadeOut 0.6s"
-    },
-    {
-      "id": "share-pie-chart",
+      "id": "pie-share",
       "scene": "pieChart",
-      "start": 12.5,
-      "dur": 6,
+      "start": 15,
+      "dur": 5,
       "params": {
-        "data": [28, 25, 20, 15, 12],
-        "labels": ["Anthropic", "OpenAI", "Google", "Meta", "Other"],
-        "colors": ["#6ee7ff", "#a78bfa", "#4ade80", "#fb923c", "#f472b6"],
+        "data": [32, 24, 18, 14, 12],
+        "labels": ["USA", "China", "EU", "Asia-Pac", "Others"],
+        "colors": ["#6ee7ff", "#a78bfa", "#f0abfc", "#34d399", "#fbbf24"],
         "innerRadius": 0.35,
-        "showLabels": true
+        "showLabels": true,
+        "title": "AI Market Share by Region"
       },
-      "enter": "scaleIn 0.9s",
-      "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.6s"
-    },
-    {
-      "id": "share-title",
-      "scene": "subtitleBar",
-      "start": 13,
-      "dur": 5.5,
-      "params": { "text": "AI MODEL MARKET SHARE · 2026", "accent": "#a78bfa" },
-      "enter": "slideUp 0.5s",
-      "exit": "fadeOut 0.4s"
+      "enter": "scaleIn 0.6s",
+      "exit": "fadeOut 0.4s",
+      "transition": "zoomIn 0.5s"
     },
 
     {
-      "id": "radar-bg-ripple",
-      "scene": "circleRipple",
-      "start": 16,
-      "dur": 7,
-      "params": { "count": 5, "speed": 0.7, "hue": 260 },
-      "opacity": 0.2,
-      "blend": "screen",
-      "enter": "fadeIn 0.8s",
-      "exit": "fadeOut 0.6s"
-    },
-    {
-      "id": "radar-chart",
+      "id": "radar-capability",
       "scene": "radarChart",
-      "start": 16.5,
-      "dur": 6,
+      "start": 20,
+      "dur": 5,
       "params": {
-        "data": [92, 88, 79, 95, 72, 85],
-        "labels": ["Reasoning", "Code", "Vision", "Language", "Speed", "Safety"],
-        "color": "#a78bfa",
-        "fillOpacity": 0.28,
+        "data": [92, 78, 85, 70, 88, 76],
+        "labels": ["Language", "Vision", "Reasoning", "Autonomy", "Coding", "Multimodal"],
+        "color": "#34d399",
+        "fillOpacity": 0.25,
         "maxValue": 100
       },
-      "enter": "scaleIn 0.9s",
-      "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.6s"
-    },
-    {
-      "id": "radar-label",
-      "scene": "marquee",
-      "start": 17,
-      "dur": 5,
-      "params": { "text": "  CLAUDE 4 · CAPABILITY BENCHMARK · 2026  ·  ", "speed": 60, "color": "#a78bfa" },
-      "y": 0.88,
-      "h": 0.06,
-      "enter": "fadeIn 0.4s",
-      "exit": "fadeOut 0.4s"
+      "enter": "scaleIn 0.7s",
+      "exit": "fadeOut 0.4s",
+      "transition": "dissolve 0.5s"
     },
 
     {
-      "id": "tech-bg-firefly",
-      "scene": "shaderFirefly",
-      "start": 20,
-      "dur": 7,
-      "params": { "count": 80, "speed": 0.5, "hue": 200 },
-      "opacity": 0.4,
-      "blend": "screen",
-      "enter": "fadeIn 0.8s",
-      "exit": "fadeOut 0.6s"
-    },
-    {
-      "id": "tech-timeline",
-      "scene": "timelineViz",
-      "start": 20.5,
-      "dur": 6,
-      "params": {
-        "events": [
-          { "label": "GPT-4", "date": "Mar 2023" },
-          { "label": "Claude 3", "date": "Mar 2024" },
-          { "label": "Gemini 2.0", "date": "Jan 2025" },
-          { "label": "GPT-5", "date": "Jun 2025" },
-          { "label": "Claude 4", "date": "Apr 2026" }
-        ],
-        "color": "#6ee7ff",
-        "dotSize": 10
-      },
-      "enter": "fadeIn 0.7s",
-      "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.6s"
-    },
-    {
-      "id": "tech-flowchart",
-      "scene": "flowChart",
-      "start": 22,
-      "dur": 4,
-      "params": {
-        "steps": [
-          { "label": "Pre-training" },
-          { "label": "RLHF" },
-          { "label": "Constitutional AI" },
-          { "label": "Deployment" }
-        ],
-        "color": "#4ade80",
-        "arrowColor": "#6ee7ff"
-      },
-      "x": 0.55,
-      "y": 0.1,
-      "w": 0.42,
-      "h": 0.8,
-      "enter": "slideLeft 0.6s",
-      "exit": "fadeOut 0.5s"
-    },
-
-    {
-      "id": "trends-bg-waveform",
-      "scene": "waveform",
-      "start": 24,
-      "dur": 7,
-      "params": { "bands": 48, "hueA": 220, "hueB": 300, "amplitude": 0.6 },
-      "opacity": 0.25,
-      "blend": "screen",
-      "enter": "fadeIn 0.8s",
-      "exit": "fadeOut 0.6s"
-    },
-    {
-      "id": "trends-bullet-list",
+      "id": "bullets-trends",
       "scene": "bulletList",
-      "start": 24.5,
-      "dur": 5.5,
+      "start": 25,
+      "dur": 5,
       "params": {
         "items": [
-          "Multimodal reasoning surpasses human expert benchmarks",
-          "Agentic workflows replace 35% of knowledge work tasks",
-          "On-device AI reaches parity with cloud-only models",
-          "AI safety frameworks adopted by 90% of tier-1 labs",
-          "Open-source models close gap to frontier within 6 months"
+          "Agentic AI surpasses 40% enterprise adoption",
+          "Multimodal models dominate top-10 rankings",
+          "Edge inference grows 3x year-over-year",
+          "Open-source narrows gap with proprietary models",
+          "Regulatory frameworks accelerate in G20 nations"
         ],
-        "fontSize": 32,
-        "bulletColor": "#6ee7ff",
-        "stagger": 0.12
+        "fontSize": 30,
+        "bulletColor": "#fbbf24",
+        "stagger": 0.1
       },
-      "enter": "slideRight 0.7s",
-      "exit": "fadeOut 0.5s",
-      "transition": "dissolve 0.6s"
-    },
-    {
-      "id": "trends-horizontal-bars",
-      "scene": "horizontalBars",
-      "start": 25.5,
-      "dur": 4,
-      "params": {
-        "data": [94, 78, 65, 82, 71],
-        "labels": ["Model Capability", "Developer Adoption", "Enterprise Trust", "Regulatory Clarity", "Cost Efficiency"],
-        "colors": ["#6ee7ff", "#a78bfa", "#4ade80", "#fb923c", "#f472b6"],
-        "height": 48,
-        "gap": 22,
-        "showValues": true
-      },
-      "x": 0.52,
-      "y": 0.05,
-      "w": 0.45,
-      "h": 0.9,
-      "enter": "slideLeft 0.6s",
-      "exit": "fadeOut 0.5s"
+      "enter": "slideUp 0.6s",
+      "exit": "fadeOut 0.4s",
+      "transition": "wipeLeft 0.5s"
     },
 
     {
-      "id": "outro-bg-radial",
-      "scene": "radialBurst",
-      "start": 28,
-      "dur": 7,
-      "params": { "rays": 20, "hue": 270, "speed": 0.4 },
-      "opacity": 0.2,
-      "blend": "screen",
-      "enter": "fadeIn 1.0s"
-    },
-    {
-      "id": "outro-quote",
+      "id": "quote-closing",
       "scene": "quoteBlock",
-      "start": 28.5,
-      "dur": 5,
+      "start": 30,
+      "dur": 3,
       "params": {
-        "text": "The models we build today will be the infrastructure of civilization tomorrow. We are not building products — we are building the future.",
-        "author": "— AI Industry Consensus, 2026",
+        "text": "AI is not replacing human creativity — it is amplifying it at civilizational scale.",
+        "author": "NextFrame Research, 2026",
         "fontSize": 30,
         "accentColor": "#a78bfa"
       },
-      "enter": "fadeIn 1.0s",
-      "exit": "fadeOut 0.6s",
-      "transition": "dissolve 0.8s"
+      "enter": "fadeIn 0.8s",
+      "exit": "fadeOut 0.4s",
+      "transition": "dissolve 0.5s"
     },
+
     {
-      "id": "outro-headline",
+      "id": "end-title",
       "scene": "headline",
-      "start": 31,
-      "dur": 4,
-      "params": {
-        "text": "The Future is Multimodal",
-        "subtitle": "AI Industry Report 2026 · NextFrame Intelligence",
-        "fontSize": 72,
-        "gradient": ["#6ee7ff", "#a78bfa", "#f472b6"],
-        "stagger": 0.05
-      },
-      "enter": "scaleIn 0.9s",
-      "exit": "fadeOut 0.5s"
+      "start": 33,
+      "dur": 2,
+      "params": { "text": "NextFrame AI — 2026", "fontSize": 56 },
+      "enter": "scaleIn 0.5s",
+      "exit": "fadeOut 0.3s",
+      "transition": "zoomIn 0.5s"
     },
+
     {
-      "id": "outro-confetti",
-      "scene": "confetti",
-      "start": 31.5,
-      "dur": 3.5,
+      "id": "marquee-ticker",
+      "scene": "marquee",
+      "start": 0,
+      "dur": 35,
       "params": {
-        "count": 150,
-        "colors": ["#6ee7ff", "#a78bfa", "#f472b6", "#4ade80", "#fbbf24"],
-        "gravity": 0.4,
-        "spread": 70
-      },
-      "enter": "fadeIn 0.3s"
+        "text": "AI Market $4.2T by 2026  •  40% Enterprise Adoption  •  Multimodal Models Lead Rankings  •  Edge AI Grows 3x  •  Open Source Closing the Gap  •  G20 AI Regulation Advancing  •  ",
+        "fontSize": 22,
+        "speed": 120,
+        "color": "#6ee7ff",
+        "bgColor": "rgba(0,0,0,0.75)"
+      }
     }
   ]
 }
