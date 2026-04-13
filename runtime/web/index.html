@@ -342,6 +342,17 @@ window.__ipc = window.__ipc || {};
     </div>
   </div>
 
+  <!-- Clip sidebar (v0.4) -->
+  <div class="editor-clip-sidebar" id="editor-clip-sidebar">
+    <div class="editor-clip-header">
+      <span>CLIPS</span>
+      <span id="editor-clip-count" style="font-family:var(--font-mono);font-size:11px;color:rgba(228,228,232,0.5);text-transform:none;letter-spacing:0">0</span>
+    </div>
+    <div class="editor-clip-list" id="editor-clip-list">
+      <!-- Populated by JS from pipeline.json -->
+    </div>
+  </div>
+
   <div class="editor-main">
     <!-- Preview -->
     <div class="preview-area">

@@ -1842,6 +1842,7 @@ async function goEditor(project, episode, segment) {
   updateInspectorContext();
   renderProjectDropdown();
   renderEpisodeDropdown();
+  populateEditorClipSidebar();
   renderSegmentDropdown();
   renderExportsList([], currentEpisode ? "Loading exports..." : "Open an episode to view exports");
 
@@ -2126,15 +2127,15 @@ function renderPipelineClips(data) {
     var hasSub = v.subtitles && v.subtitles.length > 0;
     var hasTl = v.hasTl;
     var tags = '';
-    tags += hasSub ? '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:rgba(224,160,64,0.12);color:#e0a040;font-weight:500">字幕 ✓</span> ' : '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:var(--ink-08);color:var(--ink-25)">无字幕</span> ';
-    tags += hasTl ? '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:rgba(124,106,239,0.1);color:#7c6aef;font-weight:500">时间轴 ✓</span> ' : '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:var(--ink-08);color:var(--ink-25)">无时间轴</span> ';
+    tags += hasSub ? '<span class="pl-tag-generated">字幕 ✓</span> ' : '<span class="pl-tag-pending">无字幕</span> ';
+    tags += hasTl ? '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:rgba(124,106,239,0.1);color:#7c6aef;font-weight:500">时间轴 ✓</span> ' : '<span class="pl-tag-pending">无时间轴</span> ';
     if (v.segment) tags += '<span style="font-size:11px;padding:2px 10px;border-radius:3px;background:rgba(124,106,239,0.15);color:#7c6aef;font-family:var(--font-mono)">段 ' + v.segment + '</span>';
 
-    return '<div style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:var(--border-a1)">' +
-      '<div style="width:100px;aspect-ratio:16/9;background:var(--bg-surface);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--ink-ghost);font-size:11px">▶</div>' +
+    return '<div style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.06)">' +
+      '<div style="width:100px;aspect-ratio:16/9;background:#111114;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:rgba(228,228,232,0.25);font-size:11px">▶</div>' +
       '<div style="flex:1;min-width:0">' +
         '<div style="font-size:14px;font-weight:500;margin-bottom:2px">' + escHtml(v.name) + '</div>' +
-        '<div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-dim)">' + escHtml(v.file || "") + (v.duration ? " · " + v.duration + "s" : "") + '</div>' +
+        '<div style="font-family:var(--font-mono);font-size:11px;color:rgba(228,228,232,0.5)">' + escHtml(v.file || "") + (v.duration ? " · " + v.duration + "s" : "") + '</div>' +
       '</div>' +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0">' + tags + '</div>' +
     '</div>';
@@ -2227,6 +2228,56 @@ function renderPipelineOutput(data) {
   }).join("");
 
   return '<div class="pl-outputs">' + cardsHtml + "</div>";
+}
+
+function populateEditorClipSidebar() {
+  var list = document.getElementById("editor-clip-list");
+  var count = document.getElementById("editor-clip-count");
+  if (!list) return;
+  if (!pipelineData || !pipelineData.script || !pipelineData.script.segments || pipelineData.script.segments.length === 0) {
+    // Try to load pipeline data
+    if (currentProject && currentEpisode) {
+      bridgeCall("fs.read", { path: "~/NextFrame/projects/" + currentProject + "/" + currentEpisode + "/pipeline.json" }, 3000).then(function(result) {
+        try {
+          pipelineData = JSON.parse(result.contents);
+          renderEditorClips();
+        } catch (_e) {}
+      }).catch(function() {});
+    }
+    list.innerHTML = '<div style="padding:20px;color:rgba(228,228,232,0.25);font-size:12px;text-align:center">暂无片段</div>';
+    if (count) count.textContent = "0";
+    return;
+  }
+  renderEditorClips();
+}
+
+function renderEditorClips() {
+  var list = document.getElementById("editor-clip-list");
+  var countEl = document.getElementById("editor-clip-count");
+  if (!list || !pipelineData) return;
+  var segs = pipelineData.script.segments || [];
+  var audioSegs = (pipelineData.audio || {}).segments || [];
+  if (countEl) countEl.textContent = segs.length + " 个片段";
+
+  var html = segs.map(function(seg, i) {
+    var audio = audioSegs.find(function(a) { return a.segment === seg.segment; });
+    var dur = audio && audio.duration ? audio.duration + "s" : "—";
+    var role = seg.role ? seg.role + " — " : "";
+    return '<div class="editor-clip-item' + (i === 0 ? ' active' : '') + '" onclick="selectEditorClip(this,' + i + ')">' +
+      '<div class="editor-clip-name">' + escHtml(role + (seg.narration || '').substring(0, 12)) + '</div>' +
+      '<div class="editor-clip-meta">00:00 → ' + dur + '</div>' +
+      '<div class="editor-clip-tags">' +
+        '<span class="editor-clip-tag seg">段 ' + (seg.segment || i + 1) + '</span>' +
+        '<span class="editor-clip-tag dur">' + dur + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join("");
+  list.innerHTML = html;
+}
+
+function selectEditorClip(el, idx) {
+  document.querySelectorAll(".editor-clip-item").forEach(function(item) { item.classList.remove("active"); });
+  el.classList.add("active");
 }
 
 function plFilterSeg(idx) {
@@ -2396,6 +2447,7 @@ Object.assign(window, {
   goPipeline,
   goProject,
   plFilterSeg,
+  selectEditorClip,
   openPlayer,
   pickOpt,
   seekPlayer,
