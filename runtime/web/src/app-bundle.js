@@ -1036,7 +1036,7 @@ function ensurePreviewInteractivity() {
 }
 
 function fitStageToContainer() {
-  const stageRoot = document.getElementById("render-stage");
+  const stageRoot = document.getElementById("canvas-inner");
   if (!stageRoot || !previewStageHost || !previewTimeline) {
     return;
   }

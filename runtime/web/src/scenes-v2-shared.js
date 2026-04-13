@@ -122,6 +122,72 @@ export function makeLinearGradient(colors, fallback = ["#ffffff"]) {
   return `linear-gradient(135deg, ${(palette.length > 0 ? palette : fallback).join(", ")})`;
 }
 
+function toFileHref(path) {
+  const value = String(path ?? "").trim();
+  if (!value) {
+    return "";
+  }
+
+  if (/^(data:|blob:|https?:|file:|nfdata:)/i.test(value)) {
+    return value;
+  }
+
+  const normalized = value.replace(/\\/g, "/");
+  if (/^[a-zA-Z]:\//.test(normalized)) {
+    return `file:///${encodeURI(normalized)}`;
+  }
+  if (normalized.startsWith("/")) {
+    return `file://${encodeURI(normalized)}`;
+  }
+  return "";
+}
+
+function timelineBaseHref() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const explicitBase = String(window.__NEXTFRAME_TIMELINE_BASE_HREF ?? "").trim();
+  if (explicitBase) {
+    return explicitBase;
+  }
+
+  const timelinePath = String(window.__NEXTFRAME_TIMELINE_PATH ?? "").trim();
+  if (!timelinePath) {
+    return "";
+  }
+
+  const slashIndex = Math.max(timelinePath.lastIndexOf("/"), timelinePath.lastIndexOf("\\"));
+  const directory = slashIndex >= 0 ? timelinePath.slice(0, slashIndex + 1) : timelinePath;
+  return toFileHref(directory);
+}
+
+export function resolveAssetUrl(src) {
+  const value = String(src ?? "").trim();
+  if (!value) {
+    return "";
+  }
+
+  const directHref = toFileHref(value);
+  if (directHref) {
+    return directHref;
+  }
+
+  const baseHref = timelineBaseHref()
+    || (typeof document !== "undefined" ? document.baseURI : "")
+    || (typeof window !== "undefined" ? window.location?.href || "" : "");
+
+  if (!baseHref) {
+    return value;
+  }
+
+  try {
+    return new URL(value, baseHref).href;
+  } catch (_) {
+    return value;
+  }
+}
+
 export function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
