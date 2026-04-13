@@ -117,9 +117,10 @@ const html = `<!DOCTYPE html>
 <title>NextFrame — Generated Video</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { background: #111; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  #nf-player { display: flex; flex-direction: column; max-width: 100vw; max-height: 100vh; }
-  #stage { box-shadow: 0 0 40px rgba(0,0,0,0.5); }
+  html, body { background: #111; height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #nf-player { display: flex; flex-direction: column; align-items: center; }
+  #stage { box-shadow: 0 0 40px rgba(0,0,0,0.5); transform-origin: top center; }
+  #nf-controls { background: rgba(0,0,0,0.92); padding: 8px 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; font: 12px -apple-system,sans-serif; color: #aaa; border-radius: 0 0 8px 8px; }
   .nf-layer { will-change: opacity, transform; }
 </style>
 </head>
@@ -281,16 +282,21 @@ const engine = createEngine(stage, TIMELINE, SCENE_REGISTRY);
 const player = createPlayer(engine, stage);
 window.__nfEngine = engine;
 
-// ===== Preview zoom: scale #nf-player to fit window =====
+// ===== Fit stage to window via transform scale =====
 function fitPreview() {
-  const player = document.getElementById('nf-player');
-  if (!player) return;
-  const pw = window.innerWidth;
-  const ph = window.innerHeight;
-  const sw = ${width};
-  const sh = ${height} + 50; // 50px for controls bar
-  const zoom = Math.min(pw / sw, ph / sh, 1);
-  player.style.zoom = zoom;
+  const stageW = ${width}, stageH = ${height};
+  const controlsH = 50;
+  const pw = window.innerWidth - 32; // 16px padding each side
+  const ph = window.innerHeight - controlsH - 32;
+  const scale = Math.min(pw / stageW, ph / stageH, 1);
+  stage.style.transform = 'scale(' + scale + ')';
+  stage.style.width = stageW + 'px';
+  stage.style.height = stageH + 'px';
+  // Set player width to match scaled stage
+  const scaledW = Math.round(stageW * scale);
+  stage.parentElement.style.width = scaledW + 'px';
+  // Offset for transform scale (it scales from top-center but keeps original space)
+  stage.style.marginBottom = '-' + Math.round(stageH * (1 - scale)) + 'px';
 }
 fitPreview();
 window.addEventListener('resize', fitPreview);
