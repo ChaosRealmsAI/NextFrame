@@ -60,7 +60,9 @@ export function validateTimeline(timeline) {
       if (sceneRatio && sceneRatio !== 'any') {
         const isPortrait = timeline.height > timeline.width;
         const isSquare = Math.abs(timeline.width - timeline.height) < 50;
-        const timelineRatio = isSquare ? '1:1' : isPortrait ? '9:16' : '16:9';
+        const aspectRatio = timeline.width / timeline.height;
+        const is43 = !isPortrait && !isSquare && aspectRatio >= 1.2 && aspectRatio <= 1.5;
+        const timelineRatio = isSquare ? '1:1' : isPortrait ? '9:16' : is43 ? '4:3' : '16:9';
         if (sceneRatio !== timelineRatio) {
           errors.push({
             code: 'RATIO_MISMATCH',
