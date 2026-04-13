@@ -20,6 +20,7 @@ if (!timelinePath || !outputPath) {
 
 const timeline = JSON.parse(fs.readFileSync(timelinePath, 'utf-8'));
 const srcDir = __dirname;
+const coreDir = path.join(srcDir, 'core');
 
 function getTimelineMetrics(input) {
   const project = input && typeof input.project === 'object' ? input.project : {};
@@ -78,13 +79,20 @@ function readAndStrip(filePath) {
 }
 
 // Read shared utils
-const sharedCode = readAndStrip(path.join(srcDir, 'scenes-v2-shared.js'));
+const sharedCode = readAndStrip(path.join(coreDir, 'scenes-v2-shared.js'));
 
 // Read engine
-const engineCode = readAndStrip(path.join(srcDir, 'engine-v2.js'));
+const engineCode = [
+  'easing.js',
+  'layout.js',
+  'render.js',
+  'index.js',
+].map((file) => readAndStrip(path.join(coreDir, 'engine', file))).join('\n\n');
 
 // Read each scene file
-const sceneDirV2 = path.join(srcDir, 'scenes-v2');
+const sceneDirV2 = fs.existsSync(path.join(srcDir, 'scenes-v2'))
+  ? path.join(srcDir, 'scenes-v2')
+  : path.join(srcDir, 'components');
 const sceneCodesV2 = [];
 for (const file of fs.readdirSync(sceneDirV2).filter(f => f.endsWith('.js') && f !== 'index.js')) {
   const id = file.replace('.js', '');

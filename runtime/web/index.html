@@ -521,14 +521,18 @@ window.__ipc = window.__ipc || {};
 <script src="src/ui/file-watcher.js"></script>
 <script src="src/editor/export-log.js"></script>
 <script src="src/core/app-bundle.js"></script>
+<script src="src/core/engine/easing.js"></script>
+<script src="src/core/engine/layout.js"></script>
+<script src="src/core/engine/render.js"></script>
+<script src="src/core/engine/index.js"></script>
 
-<!-- DOM preview engine — ES module, loaded after the split app scripts -->
+<!-- DOM preview engine bootstrap -->
 <script type="module">
-import { createEngine } from "./src/core/engine-v2.js";
-import { SCENE_REGISTRY } from "./src/components/index.js";
+import * as SCENE_REGISTRY from "./src/components/index.js";
 
 window.__engineV2 = {
-  createEngine,
+  createEngine: window.createEngine,
+  createPlayer: window.createPlayer,
   SCENE_REGISTRY,
   ready: true,
 };
