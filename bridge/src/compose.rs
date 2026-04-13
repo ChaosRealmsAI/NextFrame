@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use crate::fs::{resolve_existing_path, resolve_write_path};
 use crate::validation::require_string;
 
 fn replace_json_extension(path: &Path) -> PathBuf {
@@ -14,11 +15,20 @@ fn replace_json_extension(path: &Path) -> PathBuf {
 }
 
 pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
-    let timeline_path = PathBuf::from(require_string(params, "timelinePath")?);
+    let timeline_path = resolve_existing_path(require_string(params, "timelinePath")?)?;
     let output_path = match params.get("outputPath").and_then(Value::as_str) {
-        Some(raw) if !raw.trim().is_empty() => PathBuf::from(raw),
+        Some(raw) if !raw.trim().is_empty() => resolve_write_path(raw)?,
         _ => replace_json_extension(&timeline_path),
     };
+
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "failed to create output directory '{}': {error}",
+                parent.display()
+            )
+        })?;
+    }
 
     let bundle_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../runtime/web/src/bundle.cjs");
 
@@ -47,9 +57,54 @@ pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
     let meta = fs::metadata(&output_path)
         .map_err(|error| format!("failed to stat composed html {}: {error}", output_path.display()))?;
 
+    if params.get("open").and_then(Value::as_bool).unwrap_or(false) {
+        open_in_browser(&output_path)?;
+    }
+
     Ok(json!({
-        "ok": true,
-        "path": output_path,
+        "path": output_path.display().to_string(),
         "size": meta.len(),
     }))
+}
+
+#[cfg(not(test))]
+fn open_in_browser(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut next = Command::new("open");
+        next.arg(path);
+        next
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut next = Command::new("cmd");
+        next.args(["/C", "start", "", &path.display().to_string()]);
+        next
+    };
+
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let mut command = {
+        let mut next = Command::new("xdg-open");
+        next.arg(path);
+        next
+    };
+
+    let status = command
+        .status()
+        .map_err(|error| format!("failed to open '{}': {error}", path.display()))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "failed to open '{}': command exited with {}",
+            path.display(),
+            status.code().unwrap_or(-1)
+        ))
+    }
+}
+
+#[cfg(test)]
+fn open_in_browser(_path: &Path) -> Result<(), String> {
+    Ok(())
 }

@@ -103,7 +103,9 @@ let currentSegment = null;
 let currentSegmentPath = null;
 let currentTimeline = null;
 let currentSelectedClipId = null;
-let currentPreviewVideoUrl = null;
+let previewEngine = null;
+let previewStageHost = null;
+let previewTimeline = null;
 
 let projectsCache = [];
 let episodesCache = [];
@@ -306,6 +308,7 @@ function deriveTimelineDuration(timeline) {
   const direct = finiteNumber(timeline?.duration, 0);
   const meta = finiteNumber(timeline?.meta?.duration, 0);
   const tracks = Array.isArray(timeline?.tracks) ? timeline.tracks : [];
+  const layers = Array.isArray(timeline?.layers) ? timeline.layers : [];
   const derived = tracks.reduce((maxEnd, track) => {
     const clips = Array.isArray(track?.clips) ? track.clips : [];
     return clips.reduce((clipMax, clip) => {
@@ -315,7 +318,11 @@ function deriveTimelineDuration(timeline) {
       return Math.max(clipMax, start + duration);
     }, maxEnd);
   }, 0);
-  return Math.max(direct, meta, derived);
+  const derivedLayers = layers.reduce((maxEnd, layer) => {
+    const timing = deriveClipTiming(layer);
+    return Math.max(maxEnd, timing.start + timing.duration);
+  }, 0);
+  return Math.max(direct, meta, derived, derivedLayers);
 }
 
 function deriveClipTiming(clip) {
@@ -326,6 +333,73 @@ function deriveClipTiming(clip) {
     ? Math.max(0, explicitDuration)
     : Math.max(0, end - start);
   return { start, duration };
+}
+
+function getTimelineTracks(timeline) {
+  if (Array.isArray(timeline?.tracks) && timeline.tracks.length) {
+    return timeline.tracks;
+  }
+  if (!Array.isArray(timeline?.layers)) {
+    return [];
+  }
+  return timeline.layers.map(function(layer, index) {
+    return {
+      id: layer?.id || ("layer-" + (index + 1)),
+      label: layer?.id || layer?.scene || ("Layer " + (index + 1)),
+      kind: "layer",
+      clips: [layer],
+    };
+  });
+}
+
+function buildPreviewTimeline(timeline) {
+  const source = timeline && typeof timeline === "object" ? timeline : {};
+  const project = source.project && typeof source.project === "object" ? source.project : {};
+  const width = Math.max(1, finiteNumber(source.width ?? project.width, 1920));
+  const height = Math.max(1, finiteNumber(source.height ?? project.height, 1080));
+  const fps = Math.max(1, finiteNumber(source.fps ?? project.fps, 30));
+  const duration = Math.max(0, deriveTimelineDuration(source));
+
+  if (Array.isArray(source.layers) && source.layers.length) {
+    return {
+      width: width,
+      height: height,
+      fps: fps,
+      duration: duration,
+      background: source.background || "#05050c",
+      layers: source.layers.map(function(layer, index) {
+        const timing = deriveClipTiming(layer);
+        return Object.assign({}, layer, {
+          id: layer?.id || ("layer-" + (index + 1)),
+          start: timing.start,
+          dur: timing.duration,
+        });
+      }),
+    };
+  }
+
+  const layers = [];
+  getTimelineTracks(source).forEach(function(track, trackIndex) {
+    const clips = Array.isArray(track?.clips) ? track.clips : [];
+    clips.forEach(function(clip, clipIndex) {
+      const timing = deriveClipTiming(clip);
+      layers.push(Object.assign({}, clip, {
+        id: clip?.id || ((track?.id || ("track-" + (trackIndex + 1))) + "-" + (clipIndex + 1)),
+        scene: clip?.scene || clip?.type || "",
+        start: timing.start,
+        dur: timing.duration,
+      }));
+    });
+  });
+
+  return {
+    width: width,
+    height: height,
+    fps: fps,
+    duration: duration,
+    background: source.background || "#05050c",
+    layers: layers,
+  };
 }
 
 function deriveTrackLabel(track, index) {
@@ -868,22 +942,6 @@ function setPlaybackState(nextPlaying) {
   }
   lastTS = null;
 
-  const previewVideo = document.getElementById("preview-video");
-  if (previewVideo && currentPreviewVideoUrl) {
-    if (isPlaying) {
-      syncPreviewVideoTime(true);
-      const playResult = previewVideo.play();
-      if (playResult && typeof playResult.catch === "function") {
-        playResult.catch(function() {
-          isPlaying = false;
-          setPlayButtonIcons();
-        });
-      }
-    } else {
-      previewVideo.pause();
-    }
-  }
-
   if (isPlaying) {
     playRAF = requestAnimationFrame(playLoop);
   }
@@ -897,50 +955,8 @@ function setTotalDuration(duration) {
 }
 
 /* === Preview frame rendering === */
-let _previewTimer = null;
-let _previewSeq = 0;
-let _previewRendering = false;
-let _previewPendingTime = null;
-
 function getCurrentSegmentPath() {
   return currentSegmentPath || findSegmentEntry(currentSegment)?.path || null;
-}
-
-function resolveProjectRelativeParts(filePath) {
-  const normalized = String(filePath || "").replace(/\\/g, "/");
-  const marker = "/NextFrame/projects/";
-  const markerIndex = normalized.lastIndexOf(marker);
-  if (markerIndex >= 0) {
-    return normalized.slice(markerIndex + marker.length).split("/").filter(Boolean);
-  }
-  return [];
-}
-
-function hideComposedPreview(unload) {
-  const frame = document.getElementById("preview-iframe");
-  if (!frame) {
-    return;
-  }
-  frame.style.display = "none";
-  if (unload && frame.getAttribute("src")) {
-    frame.src = "about:blank";
-  }
-}
-
-function ensurePreviewIframe() {
-  var frame = document.getElementById("preview-iframe");
-  if (frame) {
-    return frame;
-  }
-  frame = document.createElement("iframe");
-  frame.id = "preview-iframe";
-  frame.setAttribute("allow", "autoplay; fullscreen");
-  frame.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:none;background:#000;display:none;z-index:4";
-  var canvasInner = document.getElementById("canvas-inner");
-  if (canvasInner) {
-    canvasInner.appendChild(frame);
-  }
-  return frame;
 }
 
 function stringifyClipParams(params) {
@@ -951,108 +967,113 @@ function stringifyClipParams(params) {
   return keys.length ? JSON.stringify(params, null, 2) : "No params";
 }
 
-function setPreviewPlaceholder(title, subtitle, preserveFrame) {
-  const img = document.getElementById("preview-frame-img");
-  const video = document.getElementById("preview-video");
-  const placeholder = document.getElementById("preview-placeholder");
-  hideComposedPreview(true);
-  if (img && !preserveFrame) {
-    img.style.display = "none";
-    img.removeAttribute("src");
-  }
-  if (video) {
-    video.pause();
-    video.style.display = "none";
-    if (!preserveFrame) {
-      video.removeAttribute("src");
-      video.load();
+function destroyDOMPreview() {
+  if (previewEngine && typeof previewEngine.destroy === "function") {
+    try {
+      previewEngine.destroy();
+    } catch (error) {
+      console.warn("[preview] destroy failed", error);
     }
   }
+  previewEngine = null;
+  previewTimeline = null;
+  if (previewStageHost) {
+    previewStageHost.remove();
+    previewStageHost = null;
+  }
+  const stageRoot = document.getElementById("render-stage");
+  if (stageRoot) {
+    stageRoot.innerHTML = "";
+  }
+}
+
+function setPreviewPlaceholder(title, subtitle) {
+  destroyDOMPreview();
+  const placeholder = document.getElementById("preview-placeholder");
   if (placeholder) {
     placeholder.style.display = "flex";
   }
   setText("canvas-title", title || "TIMELINE");
-  setText("canvas-sub", subtitle || "Load a segment to preview video");
+  setText("canvas-sub", subtitle || "Load a timeline to preview");
 }
 
-function syncPreviewVideoTime(force) {
-  const video = document.getElementById("preview-video");
-  if (!video || !currentPreviewVideoUrl) {
+function ensurePreviewInteractivity() {
+  const stageRoot = document.getElementById("render-stage");
+  if (!stageRoot) {
     return;
   }
-
-  const duration = finiteNumber(video.duration, TOTAL_DURATION);
-  const targetTime = duration > 0 ? Math.min(currentTime, duration) : currentTime;
-  if (force || Math.abs(finiteNumber(video.currentTime, 0) - targetTime) > 0.08) {
-    try {
-      video.currentTime = targetTime;
-    } catch (error) {
-      console.warn("[preview] failed to seek video", error);
-    }
-  }
+  stageRoot.style.pointerEvents = "auto";
+  stageRoot.querySelectorAll(".nf-layer").forEach(function(layer) {
+    layer.style.pointerEvents = "auto";
+  });
 }
 
-function setPreviewVideoSource(videoUrl) {
-  const video = document.getElementById("preview-video");
-  const img = document.getElementById("preview-frame-img");
+function fitStageToContainer() {
+  const stageRoot = document.getElementById("render-stage");
+  if (!stageRoot || !previewStageHost || !previewTimeline) {
+    return;
+  }
+  const bounds = stageRoot.getBoundingClientRect();
+  if (!(bounds.width > 0) || !(bounds.height > 0)) {
+    return;
+  }
+  const scale = Math.min(
+    bounds.width / previewTimeline.width,
+    bounds.height / previewTimeline.height
+  );
+  previewStageHost.style.width = previewTimeline.width + "px";
+  previewStageHost.style.height = previewTimeline.height + "px";
+  previewStageHost.style.left = "50%";
+  previewStageHost.style.top = "50%";
+  previewStageHost.style.transformOrigin = "0 0";
+  previewStageHost.style.transform =
+    "translate(-50%, -50%) scale(" + Math.max(scale, 0.001) + ")";
+}
+
+function initDOMPreview(timeline) {
+  if (!timeline) {
+    destroyDOMPreview();
+    return false;
+  }
+  if (!window.__engineV2?.ready) {
+    setPreviewPlaceholder("PREVIEW", "Loading DOM preview engine...");
+    return false;
+  }
+  const stageRoot = document.getElementById("render-stage");
+  if (!stageRoot) {
+    return false;
+  }
+  const nextTimeline = buildPreviewTimeline(timeline);
+  if (!nextTimeline.layers.length) {
+    setPreviewPlaceholder("TIMELINE", "No previewable layers in timeline");
+    return false;
+  }
+
+  destroyDOMPreview();
+  stageRoot.style.display = "block";
+  stageRoot.style.overflow = "hidden";
+  stageRoot.style.pointerEvents = "auto";
+
+  previewStageHost = document.createElement("div");
+  previewStageHost.id = "preview-stage-host";
+  previewStageHost.style.cssText = "position:absolute;left:50%;top:50%;transform-origin:0 0;pointer-events:auto";
+  stageRoot.appendChild(previewStageHost);
+
+  previewTimeline = nextTimeline;
+  previewEngine = window.__engineV2.createEngine(
+    previewStageHost,
+    previewTimeline,
+    window.__engineV2.SCENE_REGISTRY
+  );
+  ensurePreviewInteractivity();
+  fitStageToContainer();
+
   const placeholder = document.getElementById("preview-placeholder");
-  hideComposedPreview(true);
-  if (!video) {
-    return;
-  }
-
-  currentPreviewVideoUrl = videoUrl || null;
-  if (img) {
-    img.style.display = "none";
-    img.removeAttribute("src");
-  }
   if (placeholder) {
     placeholder.style.display = "none";
   }
-
-  if (video.getAttribute("src") !== currentPreviewVideoUrl) {
-    video.pause();
-    if (currentPreviewVideoUrl) {
-      video.src = currentPreviewVideoUrl;
-    } else {
-      video.removeAttribute("src");
-    }
-    video.load();
-  }
-
-  video.style.display = currentPreviewVideoUrl ? "block" : "none";
-  syncPreviewVideoTime(true);
-}
-
-async function refreshSegmentPreviewVideo(requestId) {
-  if (!currentProject || !currentEpisode || !currentSegment) {
-    currentPreviewVideoUrl = null;
-    setPreviewPlaceholder("TIMELINE", "Select a segment");
-    return;
-  }
-
-  try {
-    const result = await bridgeCall("segment.videoUrl", {
-      project: currentProject,
-      episode: currentEpisode,
-      segment: currentSegment,
-    }, IPC_LOAD_TIMEOUT_MS);
-    if (requestId !== editorLoadSeq) {
-      return;
-    }
-
-    if (result?.exists) {
-      setPreviewVideoSource(buildNfdataUrl([currentProject, currentEpisode, currentSegment + ".mp4"]));
-      return;
-    }
-  } catch (error) {
-    if (requestId !== editorLoadSeq) {
-      return;
-    }
-  }
-
-  currentPreviewVideoUrl = null;
-  setPreviewPlaceholder("NO VIDEO YET", "No video yet - run `nextframe render` to export");
+  requestPreviewFrame(currentTime);
+  return true;
 }
 
 function updateInspectorContext() {
@@ -1062,95 +1083,25 @@ function updateInspectorContext() {
 }
 
 function requestPreviewFrame(t) {
-  if (!currentTimeline) return;
-  // Use render engine if available (instant, <16ms)
-  if (window.__renderEngine && window.__renderEngine.ready) {
-    renderPreviewCanvas(t);
+  if (!currentTimeline) {
     return;
   }
-  // Fallback: CLI subprocess (slow, ~1s per frame)
-  var timelinePath = getCurrentSegmentPath();
-  if (!timelinePath) return;
-  clearTimeout(_previewTimer);
-  _previewPendingTime = Math.max(0, finiteNumber(t, 0));
-  _previewTimer = setTimeout(function() {
-    renderPreviewFrameCLI(_previewPendingTime);
-  }, 200);
-}
-
-function renderPreviewCanvas(t) {
-  var canvas = document.getElementById("render-canvas");
-  if (!canvas || !currentTimeline) return;
-  var ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  hideComposedPreview(true);
-
-  // Hide fallbacks, show canvas
-  var placeholder = document.getElementById("preview-placeholder");
-  var img = document.getElementById("preview-frame-img");
-  var video = document.getElementById("preview-video");
-  if (placeholder) placeholder.style.display = "none";
-  if (img) img.style.display = "none";
-  if (video) video.style.display = "none";
-  canvas.style.display = "block";
-
+  if (!previewEngine && !initDOMPreview(currentTimeline)) {
+    return;
+  }
   try {
-    window.__renderEngine.renderAt(ctx, currentTimeline, Math.max(0, t));
-  } catch (e) {
-    console.error("[render] frame error at t=" + t + ":", e.message);
+    previewEngine.renderFrame(Math.max(0, finiteNumber(t, 0)));
+    ensurePreviewInteractivity();
+  } catch (error) {
+    console.error("[preview] render failed", error);
+    setPreviewPlaceholder("PREVIEW", error?.message || "Failed to render DOM preview");
   }
 }
 
-function renderPreviewFrameCLI(t) {
-  var timelinePath = getCurrentSegmentPath();
-  if (!timelinePath || !currentTimeline) return;
-  if (_previewRendering) {
-    _previewPendingTime = t;
-    return;
-  }
-  _previewRendering = true;
-  _previewPendingTime = null;
-  var seq = ++_previewSeq;
-
-  bridgeCall("preview.frame", {
-    timelinePath: timelinePath,
-    t: Math.round(t * 100) / 100,
-    width: 960,
-    height: 540,
-  }).then(function(result) {
-    if (seq !== _previewSeq) return;
-    var imgEl = document.getElementById("preview-frame-img");
-    var placeholder = document.getElementById("preview-placeholder");
-    var canvas = document.getElementById("render-canvas");
-    var video = document.getElementById("preview-video");
-    if (imgEl && result && result.dataUrl) {
-      hideComposedPreview(true);
-      if (canvas) canvas.style.display = "none";
-      if (video) video.style.display = "none";
-      imgEl.src = result.dataUrl;
-      imgEl.style.display = "block";
-      if (placeholder) placeholder.style.display = "none";
-    }
-  }).catch(function(error) {
-    if (seq !== _previewSeq) return;
-    var hasFrame = Boolean(document.getElementById("preview-frame-img")?.getAttribute("src"));
-    setPreviewPlaceholder("PREVIEW", getBridgeMessage(error), hasFrame);
-  }).finally(function() {
-    _previewRendering = false;
-    if (_previewPendingTime != null) {
-      var nextTime = _previewPendingTime;
-      _previewPendingTime = null;
-      renderPreviewFrameCLI(nextTime);
-    }
-  });
-}
-
-// Called by engine module when it finishes loading
-window.__onEngineReady = function() {
-  console.log("[app] render engine ready, " + (window.__renderEngine?.scenes?.size || 0) + " scenes");
-  // Re-render current frame with engine
+window.__onEngineV2Ready = function() {
+  console.log("[app] engine-v2 ready, " + Object.keys(window.__engineV2?.SCENE_REGISTRY || {}).length + " scenes");
   if (currentTimeline) {
-    renderPreviewCanvas(currentTime);
+    initDOMPreview(currentTimeline);
   }
 };
 
@@ -1175,10 +1126,6 @@ function setPlayheadTime(time) {
   if (fill) {
     fill.style.width = (TOTAL_DURATION > 0 ? (currentTime / TOTAL_DURATION) * 100 : 0) + "%";
   }
-
-  if (currentPreviewVideoUrl && options.syncVideo !== false) {
-    syncPreviewVideoTime(false);
-  }
 }
 
 function playLoop(timestamp) {
@@ -1193,20 +1140,6 @@ function playLoop(timestamp) {
 
   if (!lastTS) {
     lastTS = timestamp;
-  }
-
-  const previewVideo = document.getElementById("preview-video");
-  if (previewVideo && currentPreviewVideoUrl) {
-    setPlayheadTime(previewVideo.currentTime, { syncVideo: false });
-    if (previewVideo.ended) {
-      setPlaybackState(false);
-      setPlayheadTime(0, { syncVideo: false });
-      return;
-    }
-    if (isPlaying) {
-      playRAF = requestAnimationFrame(playLoop);
-    }
-    return;
   }
 
   const delta = (timestamp - lastTS) / 1000;
@@ -1255,11 +1188,7 @@ function selectClip(element) {
   setText("badge-id", id || "--");
 
   setPlayheadTime(start, { syncVideo: true });
-  if (window.__renderEngine?.ready) {
-    renderPreviewCanvas(start);
-  } else {
-    requestPreviewFrame(start);
-  }
+  requestPreviewFrame(start);
 
   document
     .querySelectorAll(".scene-chip")
@@ -1289,7 +1218,7 @@ function resetSelection(message) {
   setReadout("insp-duration", "0.000s");
   setReadout("insp-params", currentTimeline ? "Select a clip to inspect its params." : "Select a clip to inspect its params.");
   setText("canvas-title", "TIMELINE");
-  setText("canvas-sub", currentSegment ? "segment:" + slugify(currentSegment) : "Load a segment to preview video");
+  setText("canvas-sub", currentSegment ? "segment:" + slugify(currentSegment) : "Load a timeline to preview");
   setText("badge-type", "TIMELINE");
   setText("badge-id", currentSegment || "--");
   updateInspectorContext();
@@ -1446,9 +1375,8 @@ function renderEditorNotice(message) {
 
   setPlaybackState(false);
   setTotalDuration(0);
-  currentPreviewVideoUrl = null;
   resetSelection(message);
-  setPreviewPlaceholder("TIMELINE", message || "Load a segment to preview video");
+  setPreviewPlaceholder("TIMELINE", message || "Load a timeline to preview");
 }
 
 let _timelineScrubTarget = null;
@@ -1465,9 +1393,7 @@ function updatePlayheadFromPointer(event, lanes) {
   const offset = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
   const time = rect.width > 0 ? (offset / rect.width) * TOTAL_DURATION : 0;
   setPlayheadTime(time, { syncVideo: true });
-  if (!currentPreviewVideoUrl) {
-    requestPreviewFrame(time);
-  }
+  requestPreviewFrame(time);
 }
 
 function beginTimelineScrub(event) {
@@ -1496,7 +1422,7 @@ function renderTimeline(timeline, preferredClipId) {
   }
   prepareTimelineContainer(container);
 
-  const tracks = Array.isArray(timeline?.tracks) ? timeline.tracks : [];
+  const tracks = getTimelineTracks(timeline);
   const duration = deriveTimelineDuration(timeline);
   TOTAL_DURATION = duration;
 
@@ -1544,7 +1470,7 @@ function initTimeline() {
   setText("tc-total", formatPreciseTime(TOTAL_DURATION));
   setText("tc-fs-total", formatPreciseTime(TOTAL_DURATION));
   updateInspectorContext();
-  setPreviewPlaceholder("TIMELINE", "Load a segment to preview video");
+  setPreviewPlaceholder("TIMELINE", "Load a timeline to preview");
   renderExportsList([], "Open an episode to view exports");
   renderEditorNotice("Select a segment");
 }
@@ -1591,6 +1517,7 @@ function initCanvasDrag() {
 /* === fullscreen.js === */
 function toggleFullscreen() {
   document.getElementById("view-editor").classList.toggle("fullscreen");
+  requestAnimationFrame(fitStageToContainer);
 }
 
 /* === home.js === */
@@ -1761,6 +1688,7 @@ async function goProject(projectName) {
   segmentsCache = [];
   currentTimeline = null;
   currentSelectedClipId = null;
+  destroyDOMPreview();
 
   switchView("view-project");
   updateInspectorContext();
@@ -1818,7 +1746,7 @@ async function goEditor(project, episode, segment) {
   currentSegmentPath = null;
   currentTimeline = null;
   currentSelectedClipId = null;
-  currentPreviewVideoUrl = null;
+  destroyDOMPreview();
   segmentsCache = [];
   exportsCache = [];
 
@@ -1880,7 +1808,7 @@ async function goEditor(project, episode, segment) {
 
     currentTimeline = timeline || {};
     renderTimeline(currentTimeline);
-    await refreshSegmentPreviewVideo(requestId);
+    initDOMPreview(currentTimeline);
     updateInspectorContext();
     renderProjectDropdown();
     renderEpisodeDropdown();
@@ -1895,7 +1823,7 @@ async function goEditor(project, episode, segment) {
     currentSegmentPath = null;
     currentTimeline = null;
     currentSelectedClipId = null;
-    currentPreviewVideoUrl = null;
+    destroyDOMPreview();
     exportsCache = [];
     updateInspectorContext();
     renderProjectDropdown();
@@ -1916,6 +1844,7 @@ function switchView(id) {
   if (id !== "view-editor") {
     stopWatching();
     setPlaybackState(false);
+    destroyDOMPreview();
   }
   target.classList.add("active");
   target.classList.add("view-transition-enter");
@@ -2027,20 +1956,12 @@ function reloadCurrentTimeline() {
     if (!result) return;
     currentTimeline = result;
     renderTimeline(result, selectedClipId);
-    syncPreviewVideoTime(true);
+    initDOMPreview(result);
   }).catch(function() {});
 }
 
-function initPreviewVideo() {
-  const video = document.getElementById("preview-video");
-  if (!video) {
-    return;
-  }
-
-  video.preload = "metadata";
-  video.addEventListener("loadedmetadata", function() {
-    syncPreviewVideoTime(true);
-  });
+function initPreviewSurface() {
+  window.addEventListener("resize", fitStageToContainer);
 }
 
 async function previewComposed() {
@@ -2052,38 +1973,18 @@ async function previewComposed() {
 
   var htmlPath = segPath.replace(/\.json$/i, ".html");
   setPlaybackState(false);
-  setText("canvas-title", "PREVIEW");
-  setText("canvas-sub", "Composing HTML preview...");
 
   try {
-    var result = await bridgeCall("compose.generate", {
+    await bridgeCall("compose.generate", {
       timelinePath: segPath,
       outputPath: htmlPath,
+      open: true,
     }, IPC_COMPOSE_TIMEOUT_MS);
-    var parts = resolveProjectRelativeParts(result && result.path ? result.path : htmlPath);
-    if (!parts.length) {
-      throw new Error("unable to resolve preview URL");
-    }
-
-    var frame = ensurePreviewIframe();
-    var placeholder = document.getElementById("preview-placeholder");
-    var renderCanvas = document.getElementById("render-canvas");
-    var previewImage = document.getElementById("preview-frame-img");
-    var previewVideo = document.getElementById("preview-video");
-    if (placeholder) placeholder.style.display = "none";
-    if (renderCanvas) renderCanvas.style.display = "none";
-    if (previewImage) previewImage.style.display = "none";
-    if (previewVideo) {
-      previewVideo.pause();
-      previewVideo.style.display = "none";
-    }
-
-    frame.src = buildNfdataUrl(parts) + "?v=" + Date.now();
-    frame.style.display = "block";
-    setText("canvas-title", "PREVIEW");
-    setText("canvas-sub", currentSegment ? ("segment:" + slugify(currentSegment) + " · bundled HTML") : "Bundled HTML preview");
+    requestPreviewFrame(currentTime);
   } catch (error) {
-    setPreviewPlaceholder("PREVIEW", getBridgeMessage(error));
+    console.error("[preview] compose failed", error);
+    setText("canvas-title", "PREVIEW");
+    setText("canvas-sub", getBridgeMessage(error));
   }
 }
 
@@ -2093,7 +1994,7 @@ function initApp() {
   initCustomSelect();
   initCanvasDrag();
   initTimeline();
-  initPreviewVideo();
+  initPreviewSurface();
   document.addEventListener("mousemove", moveTimelineScrub);
   document.addEventListener("mouseup", endTimelineScrub);
   renderProjectDropdown();
