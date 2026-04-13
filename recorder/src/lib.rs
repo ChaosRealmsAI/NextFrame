@@ -26,6 +26,9 @@ pub struct CommonArgs {
     pub width: f64,
     pub height: f64,
     pub parallel: Option<usize>,
+    /// Render at a fraction of output resolution, then upscale.
+    /// 0.5 = render at half size, 1.0 = native (default).
+    pub render_scale: f64,
 }
 
 pub mod api;

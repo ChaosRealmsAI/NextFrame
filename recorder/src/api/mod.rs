@@ -32,6 +32,12 @@ pub struct RecordArgs {
     pub width: f64,
     pub height: f64,
     pub parallel: Option<usize>,
+    #[serde(default = "default_render_scale")]
+    pub render_scale: f64,
+}
+
+fn default_render_scale() -> f64 {
+    1.0
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +64,7 @@ impl From<RecordArgs> for CommonArgs {
             width: args.width,
             height: args.height,
             parallel: args.parallel,
+            render_scale: args.render_scale,
         }
     }
 }

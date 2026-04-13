@@ -73,6 +73,21 @@ impl WebViewHost {
         capture::layer_render_cgimage(&layer, width, height)
     }
 
+    /// Captures at a scaled-down resolution for faster rendering.
+    /// The returned CGImage is smaller than the output — caller must upscale.
+    pub fn snapshot_via_layer_scaled(&self, render_scale: f64) -> Result<Retained<CGImage>, String> {
+        if render_scale >= 1.0 {
+            return self.snapshot_via_layer();
+        }
+        self.sync_view_hierarchy();
+        let layer = self.web_view.layer().ok_or("WKWebView has no layer")?;
+        let (full_w, full_h) = self.target_pixel_size();
+        // Round to even numbers (H.264 requirement)
+        let scaled_w = ((full_w as f64 * render_scale).round() as usize).max(2) & !1;
+        let scaled_h = ((full_h as f64 * render_scale).round() as usize).max(2) & !1;
+        capture::layer_render_cgimage(&layer, scaled_w, scaled_h)
+    }
+
     /// Queries the page-declared video duration from the v0.3 engine.
     ///
     /// Checks `window.__duration`, `engine.duration`, and the timeline JSON's

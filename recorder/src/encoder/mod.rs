@@ -155,6 +155,32 @@ impl SegmentEncoder {
         self.append_pixel_buffer(pixel_buffer)
     }
 
+    /// Appends a CGImage upscaled to the given output size.
+    /// Used when render_scale < 1.0 — the CGImage is smaller than the output.
+    pub fn write_cgimage_scaled(
+        &mut self,
+        image: &CGImage,
+        output_width: usize,
+        output_height: usize,
+        overlay: Option<ProgressOverlay<'_>>,
+    ) -> Result<(), String> {
+        // Initialize encoder at output size, not CGImage size
+        if self.writer.is_none() {
+            let output_size = FrameSize {
+                width: output_width,
+                height: output_height,
+            };
+            self.init_writer(output_size)?;
+        }
+        let output_size = FrameSize {
+            width: output_width,
+            height: output_height,
+        };
+        let pixel_buffer =
+            pixel_buffer::create_pixel_buffer_from_cgimage_scaled(image, output_size, overlay)?;
+        self.append_pixel_buffer(pixel_buffer)
+    }
+
     /// Finalizes the writer and muxes the optional audio track into the output segment.
     pub fn finish(self) -> Result<(), String> {
         if self.frame_count == 0 {
@@ -253,6 +279,13 @@ impl SegmentEncoder {
                 "snapshot size must be even for H.264, got {}x{}",
                 frame_size.width, frame_size.height
             ));
+        }
+        self.init_writer(frame_size)
+    }
+
+    fn init_writer(&mut self, frame_size: FrameSize) -> Result<(), String> {
+        if self.writer.is_some() {
+            return Ok(());
         }
 
         let writer_class = lookup_class(c"AVAssetWriter")?;

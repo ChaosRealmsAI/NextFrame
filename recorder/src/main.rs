@@ -88,6 +88,10 @@ struct CommonArgs {
     /// Record slides in parallel using N processes (default: 4)
     #[arg(long, value_name = "N", default_missing_value = "4", num_args = 0..=1)]
     pub parallel: Option<usize>,
+
+    /// Render at a fraction of output resolution, then upscale (0.25-1.0, default: 1.0)
+    #[arg(long, value_name = "N", default_value_t = 1.0)]
+    pub render_scale: f64,
 }
 
 #[derive(Parser, Debug)]
@@ -123,6 +127,7 @@ impl From<CommonArgs> for RecordArgs {
             width: args.width,
             height: args.height,
             parallel: args.parallel,
+            render_scale: args.render_scale,
         }
     }
 }

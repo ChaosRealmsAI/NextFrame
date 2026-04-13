@@ -118,11 +118,27 @@ pub fn record_segment(
     );
 
     let mut capture_method = CaptureMethod::LayerRender;
-    println!(
-        "  segment {} capture: {}",
-        index + 1,
-        capture_method.label()
-    );
+    let is_upscaling = cli.render_scale < 1.0;
+    let (output_pw, output_ph) = host.target_pixel_size();
+    if is_upscaling {
+        let render_w = ((output_pw as f64 * cli.render_scale).round() as usize).max(2) & !1;
+        let render_h = ((output_ph as f64 * cli.render_scale).round() as usize).max(2) & !1;
+        println!(
+            "  segment {} capture: {} (render {}x{} → upscale {}x{})",
+            index + 1,
+            capture_method.label(),
+            render_w,
+            render_h,
+            output_pw,
+            output_ph,
+        );
+    } else {
+        println!(
+            "  segment {} capture: {}",
+            index + 1,
+            capture_method.label()
+        );
+    }
 
     let mut last_image: Option<Retained<CGImage>> = None;
     let total_frames = clock.total_frames();
@@ -158,7 +174,11 @@ pub fn record_segment(
                     let prog = progress_rect
                         .as_ref()
                         .map(|pb| pb.overlay(decision.progress_pct));
-                    encoder.write_cgimage_with_progress(image, prog)?;
+                    if is_upscaling {
+                        encoder.write_cgimage_scaled(image, output_pw, output_ph, prog)?;
+                    } else {
+                        encoder.write_cgimage_with_progress(image, prog)?;
+                    }
                     i += 1;
                     continue;
                 }
@@ -184,11 +204,15 @@ pub fn record_segment(
                         segment_durations,
                         decision.timestamp_sec,
                     )?;
-                    let image = capture_frame(host, index, fi, &mut capture_method)?;
+                    let image = capture_frame(host, index, fi, &mut capture_method, cli.render_scale)?;
                     let prog = progress_rect
                         .as_ref()
                         .map(|pb| pb.overlay(decision.progress_pct));
-                    encoder.write_cgimage_with_progress(&image, prog)?;
+                    if is_upscaling {
+                        encoder.write_cgimage_scaled(&image, output_pw, output_ph, prog)?;
+                    } else {
+                        encoder.write_cgimage_with_progress(&image, prog)?;
+                    }
                     last_image = Some(image);
                 } else {
                     let batch_frames: Vec<_> = (run_start..run_end)
@@ -209,10 +233,14 @@ pub fn record_segment(
                     host.inject_states_batch(&batch_frames)?;
 
                     let last_fi = decisions[run_end - 1].0;
-                    let image = capture_frame(host, index, last_fi, &mut capture_method)?;
+                    let image = capture_frame(host, index, last_fi, &mut capture_method, cli.render_scale)?;
                     for (_, d) in &decisions[run_start..run_end] {
                         let prog = progress_rect.as_ref().map(|pb| pb.overlay(d.progress_pct));
-                        encoder.write_cgimage_with_progress(&image, prog)?;
+                        if is_upscaling {
+                            encoder.write_cgimage_scaled(&image, output_pw, output_ph, prog)?;
+                        } else {
+                            encoder.write_cgimage_with_progress(&image, prog)?;
+                        }
                     }
                     last_image = Some(image);
                 }
@@ -261,9 +289,10 @@ pub fn capture_frame(
     segment_index: usize,
     frame_index: usize,
     capture_method: &mut CaptureMethod,
+    render_scale: f64,
 ) -> Result<Retained<CGImage>, String> {
     if *capture_method == CaptureMethod::LayerRender {
-        match host.snapshot_via_layer() {
+        match host.snapshot_via_layer_scaled(render_scale) {
             Ok(image) => {
                 if frame_index == 0 && is_cgimage_mostly_black(&image)? {
                     eprintln!(

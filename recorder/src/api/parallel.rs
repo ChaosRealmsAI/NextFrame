@@ -71,6 +71,7 @@ pub(super) fn record_parallel(
             width: args.width,
             height: args.height,
             parallel: None,
+            render_scale: args.render_scale,
         };
 
         let mut cmd = Command::new(&exe);
@@ -233,6 +234,10 @@ fn build_cli_args(args: &RecordArgs) -> Vec<OsString> {
     }
     if args.headed {
         cli_args.push(OsString::from("--headed"));
+    }
+    if args.render_scale < 1.0 {
+        cli_args.push(OsString::from("--render-scale"));
+        cli_args.push(OsString::from(args.render_scale.to_string()));
     }
 
     cli_args
