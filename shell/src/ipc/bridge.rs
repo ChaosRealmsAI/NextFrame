@@ -1,8 +1,8 @@
 use bridge::{Request, Response};
 use serde_json::Value;
 
-use crate::ai_ops::PendingAppCtlMap;
 use super::write_http_response;
+use crate::ai_ops::PendingAppCtlMap;
 
 pub(crate) fn parse_request(payload: &str) -> Result<Request, serde_json::Error> {
     serde_json::from_str(payload)

@@ -11,7 +11,7 @@ use super::{
     build_navigate_script, decode_query_component, default_screenshot_path, native_screenshot,
     query_value, queue_appctl_script, split_path_and_query,
 };
-use crate::ipc::{HttpConnection, HttpRequest, read_http_request, write_http_response};
+use crate::ipc::{read_http_request, write_http_response, HttpConnection, HttpRequest};
 
 pub(crate) type PendingAppCtlMap = Arc<Mutex<HashMap<String, PendingAppCtlRequest>>>;
 
@@ -173,25 +173,23 @@ fn handle_http_request(
         }
         ("GET", "/screenshot") => {
             let requested_path = match query_value(query, "out") {
-                Some(raw_path) => {
-                    Some(match decode_query_component(raw_path) {
-                        Ok(path) => path,
-                        Err(error) => {
-                            return write_http_response(
-                                stream,
-                                400,
-                                "Bad Request",
-                                "text/plain; charset=utf-8",
-                                error.as_bytes(),
+                Some(raw_path) => Some(match decode_query_component(raw_path) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        return write_http_response(
+                            stream,
+                            400,
+                            "Bad Request",
+                            "text/plain; charset=utf-8",
+                            error.as_bytes(),
+                        )
+                        .map_err(|write_error| {
+                            format!(
+                                "failed to write screenshot query error response: {write_error}"
                             )
-                            .map_err(|write_error| {
-                                format!(
-                                    "failed to write screenshot query error response: {write_error}"
-                                )
-                            });
-                        }
-                    })
-                }
+                        });
+                    }
+                }),
                 None => None,
             };
             let out_path = requested_path.unwrap_or_else(default_screenshot_path);

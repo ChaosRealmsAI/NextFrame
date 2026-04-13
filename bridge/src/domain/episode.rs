@@ -1,9 +1,9 @@
 use serde_json::{json, Value};
 use std::fs;
 
+use super::project::projects_root;
 use crate::util::time::iso_now;
 use crate::util::validation::require_string;
-use super::project::projects_root;
 
 pub(crate) fn handle_episode_list(params: &Value) -> Result<Value, String> {
     let project = require_string(params, "project")?;

@@ -7,10 +7,10 @@ macro_rules! trace_log {
     };
 }
 
-mod window;
 mod ai_ops;
 mod ipc;
 mod protocol;
+mod window;
 
 fn main() {
     if let Err(error) = window::run() {

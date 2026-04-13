@@ -14,7 +14,9 @@ pub(crate) struct HttpRequest {
     pub(crate) body: Vec<u8>,
 }
 
-pub(crate) fn read_http_request(connection: &mut HttpConnection) -> Result<Option<HttpRequest>, String> {
+pub(crate) fn read_http_request(
+    connection: &mut HttpConnection,
+) -> Result<Option<HttpRequest>, String> {
     let mut chunk = [0_u8; 8192];
     loop {
         match connection.stream.read(&mut chunk) {

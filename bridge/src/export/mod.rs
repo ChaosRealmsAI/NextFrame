@@ -2,14 +2,14 @@ pub mod lifecycle;
 pub mod recorder_bridge;
 pub mod runner;
 
-pub(crate) use lifecycle::{
-    handle_export_cancel, handle_export_log, handle_export_start, handle_export_status,
-    process_registry, EXPORT_ERROR_CANCELED,
-};
 #[cfg(test)]
 pub(crate) use lifecycle::{
     build_export_request, export_runtime, export_status_json, next_export_pid, percent_complete,
     remaining_secs, ExportTask, ProcessHandle, ProcessTerminal,
+};
+pub(crate) use lifecycle::{
+    handle_export_cancel, handle_export_log, handle_export_start, handle_export_status,
+    process_registry, EXPORT_ERROR_CANCELED,
 };
 #[cfg(test)]
 pub(crate) use recorder_bridge::{
@@ -17,6 +17,4 @@ pub(crate) use recorder_bridge::{
     RecorderRequest,
 };
 #[cfg(test)]
-pub(crate) use runner::{
-    cleanup_intermediate_video, copy_video_output, create_export_log_path,
-};
+pub(crate) use runner::{cleanup_intermediate_video, copy_video_output, create_export_log_path};

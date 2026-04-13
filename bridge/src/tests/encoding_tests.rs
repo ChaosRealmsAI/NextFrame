@@ -111,7 +111,8 @@ fn encoding_percent_decode_url_path_decodes_consecutive_percent_sequences() {
 
 #[test]
 fn encoding_percent_encode_path_handles_spaces_and_unicode_segments() {
-    let encoded = encoding::percent_encode_path("folder name/\u{4f60}\u{597d} \u{4e16}\u{754c}.txt");
+    let encoded =
+        encoding::percent_encode_path("folder name/\u{4f60}\u{597d} \u{4e16}\u{754c}.txt");
 
     assert_eq!(
         encoded,

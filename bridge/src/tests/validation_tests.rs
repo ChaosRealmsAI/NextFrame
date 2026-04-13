@@ -265,17 +265,15 @@ fn path_canonical_or_raw_canonicalizes_existing_and_preserves_missing() {
 #[test]
 fn validate_path_rejects_empty_string() {
     let error =
-        super::super::storage::fs::validate_path("   ")
-            .expect_err("empty path should be rejected");
+        super::super::storage::fs::validate_path("   ").expect_err("empty path should be rejected");
 
     assert_eq!(error, "path must not be empty");
 }
 
 #[test]
 fn validate_path_rejects_null_bytes() {
-    let error =
-        super::super::storage::fs::validate_path("bad\0path")
-            .expect_err("null bytes should be rejected");
+    let error = super::super::storage::fs::validate_path("bad\0path")
+        .expect_err("null bytes should be rejected");
 
     assert_eq!(error, "path must not contain null bytes");
 }
@@ -285,8 +283,9 @@ fn resolve_existing_path_errors_for_missing_file() {
     let temp = TestDir::new("fs-resolve-missing");
     let missing_path = temp.join("missing.txt");
 
-    let error = super::super::storage::fs::resolve_existing_path(&missing_path.display().to_string())
-        .expect_err("missing path should fail to resolve");
+    let error =
+        super::super::storage::fs::resolve_existing_path(&missing_path.display().to_string())
+            .expect_err("missing path should fail to resolve");
 
     assert!(error.contains("failed to resolve"));
 }
