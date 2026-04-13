@@ -63,7 +63,7 @@ impl WebViewHost {
                 Err(err) => return Err(err),
             }
         }
-        unreachable!()
+        Err("snapshot_nsimage: exhausted all retry attempts without result".into())
     }
 
     /// Captures a `CGImage` by rendering the `WKWebView` layer tree into a bitmap context.
@@ -76,7 +76,10 @@ impl WebViewHost {
 
     /// Captures at a scaled-down resolution for faster rendering.
     /// The returned CGImage is smaller than the output — caller must upscale.
-    pub fn snapshot_via_layer_scaled(&self, render_scale: f64) -> Result<Retained<CGImage>, String> {
+    pub fn snapshot_via_layer_scaled(
+        &self,
+        render_scale: f64,
+    ) -> Result<Retained<CGImage>, String> {
         if render_scale >= 1.0 {
             return self.snapshot_via_layer();
         }
@@ -103,7 +106,10 @@ impl WebViewHost {
         })()
         "#;
         let result = self.eval_string(script).ok()??;
-        result.parse::<f64>().ok().filter(|d| *d > 0.0 && d.is_finite())
+        result
+            .parse::<f64>()
+            .ok()
+            .filter(|d| *d > 0.0 && d.is_finite())
     }
 
     /// Queries the page for an audio source URL set by the audioTrack component.

@@ -8,7 +8,9 @@ use objc2::MainThreadMarker;
 use serde::{Deserialize, Serialize};
 
 use crate::CommonArgs;
-use crate::overlay::{build_video_overlay_specs, overlay_video, overlay_video_layers, write_perf_log};
+use crate::overlay::{
+    build_video_overlay_specs, overlay_video, overlay_video_layers, write_perf_log,
+};
 use crate::parser::SlideType;
 use crate::plan::{build_segment_plans, collect_frame_files, detect_root};
 use crate::record::record_segment;
@@ -36,6 +38,8 @@ pub struct RecordArgs {
     pub frame_range: Option<(usize, usize)>,
     #[serde(default = "default_render_scale")]
     pub render_scale: f64,
+    #[serde(default)]
+    pub disable_audio: bool,
 }
 
 fn default_render_scale() -> f64 {
@@ -68,6 +72,7 @@ impl From<RecordArgs> for CommonArgs {
             parallel: args.parallel,
             frame_range: args.frame_range,
             render_scale: args.render_scale,
+            disable_audio: args.disable_audio,
         }
     }
 }

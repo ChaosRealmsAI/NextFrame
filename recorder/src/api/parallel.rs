@@ -12,6 +12,12 @@ use crate::util::create_temp_dir;
 
 const RECORDER_PATH_ENV: &str = "NEXTFRAME_RECORDER_PATH";
 
+#[derive(Default)]
+struct PageProbe {
+    duration_sec: Option<f64>,
+    audio_path: Option<PathBuf>,
+}
+
 pub(super) fn record_parallel(
     args: &RecordArgs,
     frame_files: &[PathBuf],
@@ -73,6 +79,7 @@ pub(super) fn record_parallel(
             parallel: None,
             frame_range: None,
             render_scale: args.render_scale,
+            disable_audio: args.disable_audio,
         };
 
         let mut cmd = Command::new(&exe);
@@ -219,10 +226,20 @@ pub(super) fn record_parallel_single(
         .first()
         .map(|p| p.effective_duration_sec)
         .unwrap_or(10.0);
+    let planned_audio = plans
+        .first()
+        .and_then(|plan| plan.metadata.audio_path.clone());
 
-    // Quick WebView probe for page-declared duration
-    let page_duration = probe_page_duration(html_file, &cli);
-    let duration = page_duration.unwrap_or(plan_duration);
+    // Quick WebView probe for page-declared duration and runtime audio source.
+    let page_probe = probe_page(html_file, &cli);
+    let duration = page_probe.duration_sec.unwrap_or(plan_duration);
+    let final_audio = if cli.disable_audio {
+        None
+    } else {
+        planned_audio
+            .or(page_probe.audio_path)
+            .filter(|path| path.exists())
+    };
     let total_frames = ((duration + 0.5) * args.fps as f64).ceil() as usize;
 
     let cpus = std::thread::available_parallelism()
@@ -282,6 +299,7 @@ pub(super) fn record_parallel_single(
             parallel: None,
             frame_range: Some((range_start, range_end)),
             render_scale: args.render_scale,
+            disable_audio: true,
         };
 
         let mut cmd = Command::new(&exe);
@@ -349,6 +367,18 @@ pub(super) fn record_parallel_single(
 
     println!("\n  concat {} slices...", actual_procs);
     super::concat_output(&group_outputs, out, duration)?;
+    if let Some(audio_path) = final_audio.as_deref() {
+        let muxed_out = out.with_extension("muxed.mp4");
+        let _ = fs::remove_file(&muxed_out);
+        println!("  mux original audio once...");
+        crate::encoder::mux_audio(out, Some(audio_path), duration, &muxed_out)?;
+        fs::rename(&muxed_out, out).map_err(|err| {
+            format!(
+                "failed to replace concat output with remuxed file {}: {err}",
+                muxed_out.display()
+            )
+        })?;
+    }
     let _ = fs::remove_dir_all(&temp_root);
 
     let elapsed = started_at.elapsed();
@@ -373,28 +403,63 @@ pub(super) fn record_parallel_single(
     })
 }
 
-/// Quick probe: load HTML in a temporary WebView and query engine.duration.
-fn probe_page_duration(html_path: &Path, cli: &crate::CommonArgs) -> Option<f64> {
+/// Quick probe: load HTML in a temporary WebView and query runtime metadata.
+fn probe_page(html_path: &Path, cli: &crate::CommonArgs) -> PageProbe {
     use objc2::MainThreadMarker;
 
-    let mtm = MainThreadMarker::new()?;
-    let host =
-        crate::webview::WebViewHost::new(mtm, false, cli.dpr, cli.width, cli.height).ok()?;
+    let Some(mtm) = MainThreadMarker::new() else {
+        return PageProbe::default();
+    };
+    let Ok(host) = crate::webview::WebViewHost::new(mtm, false, cli.dpr, cli.width, cli.height)
+    else {
+        return PageProbe::default();
+    };
 
-    let root = html_path.parent().unwrap_or_else(|| std::path::Path::new("."));
-    let root = root.canonicalize().ok()?;
+    let root = html_path
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let Ok(root) = root.canonicalize() else {
+        return PageProbe::default();
+    };
     let server = crate::server::HttpFileServer::start(root.clone()).ok();
     if let Some(ref server) = server {
-        let url = crate::webview::relative_http_url(&server.base_url(), &root, html_path).ok()?;
-        host.load_url(&url).ok()?;
+        let Ok(url) = crate::webview::relative_http_url(&server.base_url(), &root, html_path)
+        else {
+            return PageProbe::default();
+        };
+        if host.load_url(&url).is_err() {
+            return PageProbe::default();
+        }
     } else {
-        host.load_file_url(html_path, &root).ok()?;
+        if host.load_file_url(html_path, &root).is_err() {
+            return PageProbe::default();
+        }
     }
-    host.wait_until_ready(std::time::Duration::from_secs(15)).ok()?;
-    host.prepare_page().ok()?;
+    if host
+        .wait_until_ready(std::time::Duration::from_secs(15))
+        .is_err()
+    {
+        return PageProbe::default();
+    }
+    if host.prepare_page().is_err() {
+        return PageProbe::default();
+    }
     std::thread::sleep(std::time::Duration::from_millis(200));
 
-    host.query_page_duration()
+    let duration_sec = host.query_page_duration();
+    let segment_titles = [String::from("segment")];
+    let segment_durations = [duration_sec.unwrap_or(0.0)];
+    let _ = host.inject_state(0, "", 0.0, 0, 1, &segment_titles, &segment_durations, 0.0);
+    let _ = host.flush_render(std::time::Duration::from_millis(200));
+    let server_base_url = server.as_ref().map(|server| server.base_url());
+    let audio_path = host.query_page_audio_src().and_then(|src| {
+        crate::record::resolve_media_src(&src, server_base_url.as_deref(), &root, html_path)
+    });
+
+    PageProbe {
+        duration_sec,
+        audio_path,
+    }
 }
 
 fn build_cli_args(args: &RecordArgs) -> Vec<OsString> {
@@ -432,6 +497,9 @@ fn build_cli_args(args: &RecordArgs) -> Vec<OsString> {
     if args.render_scale < 1.0 {
         cli_args.push(OsString::from("--render-scale"));
         cli_args.push(OsString::from(args.render_scale.to_string()));
+    }
+    if args.disable_audio {
+        cli_args.push(OsString::from("--disable-audio"));
     }
 
     cli_args

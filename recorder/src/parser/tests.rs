@@ -169,6 +169,7 @@ fn collect_frame_files_sorts_by_stem_number() {
         parallel: None,
         frame_range: None,
         render_scale: 1.0,
+        disable_audio: false,
     };
 
     let files = collect_frame_files(&cli).expect("frame files should collect");

@@ -192,6 +192,7 @@ mod tests {
             parallel: None,
             frame_range: None,
             render_scale: 1.0,
+            disable_audio: false,
         }
     }
 

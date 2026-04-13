@@ -429,6 +429,15 @@ impl SegmentEncoder {
     }
 }
 
+pub fn mux_audio(
+    video_path: &Path,
+    audio_path: Option<&Path>,
+    duration_sec: f64,
+    output_path: &Path,
+) -> Result<(), String> {
+    mux_audio_track(video_path, audio_path, duration_sec, output_path)
+}
+
 /// Returns the only supported encoder backend.
 pub fn detect_backend() -> EncoderBackend {
     EncoderBackend::VideoToolbox

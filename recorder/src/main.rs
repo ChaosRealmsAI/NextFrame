@@ -141,6 +141,10 @@ struct CommonArgs {
     /// [experimental] Render at lower resolution then upscale (not recommended)
     #[arg(long, value_name = "N", default_value_t = 1.0, hide = true)]
     pub render_scale: f64,
+
+    /// [internal] Disable per-segment audio muxing. Used by frame-slice subprocesses.
+    #[arg(long, hide = true)]
+    pub disable_audio: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -177,9 +181,14 @@ impl From<CommonArgs> for RecordArgs {
             height: args.height,
             parallel: args.parallel,
             frame_range: args.frame_range.and_then(|v| {
-                if v.len() == 2 { Some((v[0], v[1])) } else { None }
+                if v.len() == 2 {
+                    Some((v[0], v[1]))
+                } else {
+                    None
+                }
             }),
             render_scale: args.render_scale,
+            disable_audio: args.disable_audio,
         }
     }
 }

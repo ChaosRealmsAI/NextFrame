@@ -31,6 +31,8 @@ pub struct CommonArgs {
     /// Render at a fraction of output resolution, then upscale.
     /// 0.5 = render at half size, 1.0 = native (default).
     pub render_scale: f64,
+    /// Internal flag for frame-slice subprocesses; skips per-segment audio muxing.
+    pub disable_audio: bool,
 }
 
 pub mod api;
