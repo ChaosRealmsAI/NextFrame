@@ -117,13 +117,15 @@ const html = `<!DOCTYPE html>
 <title>NextFrame — Generated Video</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { background: #111; margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
-  #nf-player { display: inline-flex; flex-direction: column; align-items: stretch; margin: auto; }
+  html, body { background: #111; margin: 0; height: 100vh; display: flex; flex-direction: column; align-items: center; overflow: hidden; }
+  #nf-stage-wrap { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; width: 100%; }
+  #nf-player { display: inline-block; }
+  #nf-controls { width: 100%; max-width: 900px; margin: 0 auto; padding: 8px 16px; background: rgba(0,0,0,0.92); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; font: 13px -apple-system,sans-serif; color: #aaa; flex-shrink: 0; }
   .nf-layer { will-change: opacity, transform; }
 </style>
 </head>
 <body>
-<div id="nf-player"><div id="stage"></div></div>
+<div id="nf-stage-wrap"><div id="nf-player"><div id="stage"></div></div></div>
 <script>
 // ===== Shared Utilities =====
 ${sharedCode}
@@ -280,14 +282,14 @@ const engine = createEngine(stage, TIMELINE, SCENE_REGISTRY);
 const player = createPlayer(engine, stage);
 window.__nfEngine = engine;
 
-// ===== Fit player to window =====
+// ===== Fit stage to window (controls stay full size) =====
 function fitPreview() {
   const sw = ${width}, sh = ${height};
   const player = document.getElementById('nf-player');
   if (!player) return;
-  const controlsH = 60;
+  const controlsH = 52;
   const maxW = window.innerWidth * 0.95;
-  const maxH = window.innerHeight * 0.95 - controlsH;
+  const maxH = (window.innerHeight - controlsH - 16) * 0.98;
   const scale = Math.min(maxW / sw, maxH / sh, 1);
   player.style.zoom = scale;
 }

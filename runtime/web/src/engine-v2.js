@@ -441,7 +441,8 @@ export function createPlayer(engine, stageEl) {
   const playerContainer = stageEl.parentElement || document.body;
 
   const bar = document.createElement('div');
-  bar.style.cssText = 'position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;padding:10px 14px;background:rgba(0,0,0,0.92);border:1px solid rgba(255,255,255,0.08);border-radius:12px;box-sizing:border-box;font:13px -apple-system,sans-serif;color:#aaa';
+  bar.id = 'nf-controls';
+  bar.style.cssText = 'width:100%;max-width:900px;margin:0 auto;padding:8px 16px;background:rgba(0,0,0,0.92);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;font:13px -apple-system,sans-serif;color:#aaa;flex-shrink:0';
 
   const playBtn = document.createElement('button');
   playBtn.textContent = '\u25B6';
@@ -499,7 +500,8 @@ export function createPlayer(engine, stageEl) {
   });
 
   bar.append(playBtn, slider, timeLabel, speedWrap, scaleBtn, fullscreenBtn, info);
-  playerContainer.appendChild(bar);
+  // Append controls to body (outside zoom container) so they stay full size
+  document.body.appendChild(bar);
 
   function formatTime(seconds) {
     const safe = Math.max(0, Number(seconds) || 0);
