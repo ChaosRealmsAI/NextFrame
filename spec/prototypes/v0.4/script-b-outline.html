@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame v0.4 — Script</title>
+<style>
+:root {
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --accent: #8a6fae;
+  --accent-15: rgba(138,111,174,0.15);
+  --accent-06: rgba(138,111,174,0.06);
+  --ink: #f0ece4;
+  --ink-mid: rgba(240,236,228,0.85);
+  --ink-dim: rgba(240,236,228,0.65);
+  --ink-ghost: rgba(240,236,228,0.15);
+  --ink-faint: rgba(138,111,174,0.08);
+  --bg: #0a0a0f;
+  --bg-up: #111118;
+  --bg-surface: #17171f;
+  --bg-hover: #1d1d28;
+  --warm: #da7756;
+  --warm-20: rgba(218,119,86,0.2);
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Helvetica Neue', system-ui, sans-serif;
+  --font-mono: 'SF Mono', Menlo, monospace;
+  --border-a1: 1px solid rgba(138,111,174,0.1);
+  --border-a2: 1px solid rgba(138,111,174,0.25);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+
+/* ── Film grain overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ── Top Bar ── */
+.topbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 0;
+  border-bottom: var(--border-a1);
+  background: var(--bg);
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+  margin-right: 16px;
+  white-space: nowrap;
+}
+.logo span { color: var(--accent); }
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  margin-right: 24px;
+}
+.breadcrumb .sep { color: var(--ink-ghost); }
+.breadcrumb .current {
+  color: var(--accent);
+  background: var(--accent-06);
+  border: var(--border-a1);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.pipe-tab {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.18s var(--ease);
+  white-space: nowrap;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pipe-tab:hover { color: var(--ink-mid); background: var(--bg-up); }
+.pipe-tab.active {
+  color: var(--accent);
+  background: var(--accent-15);
+  border-color: rgba(138,111,174,0.25);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 16px;
+}
+.icon-btn {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: var(--bg-up);
+  border: var(--border-a1);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--ink-dim);
+  font-size: 13px;
+  transition: all 0.15s;
+}
+.icon-btn:hover { background: var(--bg-hover); color: var(--ink); }
+
+.avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent) 0%, #5a4580 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+}
+
+/* ── Main Layout ── */
+.main {
+  display: flex;
+  position: fixed;
+  top: 48px; left: 0; right: 0; bottom: 0;
+}
+
+/* ── Left Panel ── */
+.left-panel {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--bg-up);
+  border-right: var(--border-a1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Principles section */
+.principles {
+  border-bottom: var(--border-a1);
+  flex-shrink: 0;
+}
+.principles-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.principles-header:hover { background: var(--bg-hover); }
+.principles-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+}
+.principles-toggle {
+  font-size: 10px;
+  color: var(--ink-ghost);
+  transition: transform 0.2s var(--ease);
+}
+.principles-toggle.open { transform: rotate(180deg); }
+
+.principles-body {
+  padding: 4px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  transition: max-height 0.3s var(--ease), opacity 0.2s;
+  max-height: 120px;
+}
+.principles-body.collapsed { max-height: 0; opacity: 0; padding-bottom: 0; }
+
+.kv-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.kv-key {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  min-width: 36px;
+}
+.kv-val {
+  font-size: 12px;
+  color: var(--ink-mid);
+}
+
+/* Narrative arc */
+.arc-section {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 0 8px;
+}
+.arc-section::-webkit-scrollbar { width: 4px; }
+.arc-section::-webkit-scrollbar-track { background: transparent; }
+.arc-section::-webkit-scrollbar-thumb { background: var(--ink-ghost); border-radius: 2px; }
+
+.arc-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  padding: 0 16px 12px;
+}
+
+.arc-nodes {
+  position: relative;
+  padding: 0 16px;
+}
+
+/* Vertical connector line */
+.arc-nodes::before {
+  content: '';
+  position: absolute;
+  left: 27px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(138,111,174,0.15) 10%, rgba(138,111,174,0.15) 90%, transparent);
+}
+
+.arc-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 6px 0;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.arc-dot-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 12px;
+  padding-top: 4px;
+}
+
+.arc-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--ink-ghost);
+  transition: all 0.22s var(--ease);
+  flex-shrink: 0;
+}
+
+.arc-node.active .arc-dot {
+  width: 10px; height: 10px;
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(138,111,174,0.2), 0 0 8px rgba(138,111,174,0.35);
+}
+
+.arc-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.arc-role {
+  font-size: 13px;
+  color: var(--ink-dim);
+  font-weight: 400;
+  transition: color 0.18s;
+  white-space: nowrap;
+}
+.arc-node.active .arc-role {
+  color: var(--ink);
+  font-weight: 600;
+}
+.arc-node:hover:not(.active) .arc-role { color: var(--ink-mid); }
+
+.arc-seg {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  margin-top: 1px;
+  transition: color 0.18s;
+}
+.arc-node.active .arc-seg { color: rgba(138,111,174,0.6); }
+
+/* Stats */
+.stats-bar {
+  border-top: var(--border-a1);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.05em;
+}
+.stat-val {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+.stat-val.accent { color: var(--accent); }
+
+/* ── Right Panel ── */
+.right-panel {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding: 40px 56px 80px;
+  background: var(--bg);
+}
+.right-panel::-webkit-scrollbar { width: 6px; }
+.right-panel::-webkit-scrollbar-track { background: transparent; }
+.right-panel::-webkit-scrollbar-thumb { background: var(--ink-ghost); border-radius: 3px; }
+
+/* Segment block */
+.segment {
+  margin-bottom: 0;
+  padding-bottom: 48px;
+  border-left: 3px solid transparent;
+  padding-left: 20px;
+  margin-left: -20px;
+  transition: border-color 0.25s var(--ease);
+  scroll-margin-top: 24px;
+}
+.segment.highlighted {
+  border-left-color: var(--accent);
+}
+
+.segment-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  background: var(--warm-20);
+  color: var(--warm);
+  border: 1px solid rgba(218,119,86,0.25);
+}
+
+.seg-counter {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: 0.1em;
+}
+
+/* Narration — center of attention */
+.narration {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 2.0;
+  color: var(--ink);
+  margin-bottom: 28px;
+  max-width: 640px;
+}
+
+/* Sub-cards */
+.sub-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-width: 640px;
+  margin-bottom: 0;
+}
+
+.sub-card {
+  background: var(--bg-up);
+  border: var(--border-a1);
+  border-radius: 8px;
+  padding: 14px 16px;
+  transition: border-color 0.18s;
+}
+.sub-card:hover { border-color: rgba(138,111,174,0.2); }
+
+.sub-card-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.sub-card-text {
+  font-size: 12px;
+  color: var(--ink-mid);
+  line-height: 1.65;
+}
+.sub-card.logic .sub-card-text {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+
+/* Segment divider */
+.seg-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 40px;
+  margin-left: -20px;
+  padding-left: 20px;
+  max-width: 640px;
+}
+.seg-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-a1);
+  background: linear-gradient(to right, rgba(138,111,174,0.08), rgba(138,111,174,0.04));
+}
+.seg-divider-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+/* Full text section */
+.full-text-section {
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: var(--border-a1);
+  max-width: 640px;
+}
+.full-text-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.full-text-body {
+  background: var(--bg-up);
+  border: var(--border-a1);
+  border-radius: 8px;
+  padding: 28px 32px;
+}
+.full-text-body p {
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ink-dim);
+}
+</style>
+</head>
+<body>
+
+<!-- Film grain SVG filter (hidden, referenced by CSS bg) -->
+
+<!-- ── Top Bar ── -->
+<header class="topbar">
+  <div class="logo">Next<span>Frame</span></div>
+
+  <div class="breadcrumb">
+    <span>我的短片</span>
+    <span class="sep">/</span>
+    <span>创作者工具介绍</span>
+    <span class="sep">/</span>
+    <span class="current">Script</span>
+  </div>
+
+  <nav class="pipeline">
+    <div class="pipe-tab">CONCEPT</div>
+    <div class="pipe-tab active">SCRIPT</div>
+    <div class="pipe-tab">STORYBOARD</div>
+    <div class="pipe-tab">VOICE</div>
+    <div class="pipe-tab">VISUAL</div>
+    <div class="pipe-tab">COMPOSE</div>
+    <div class="pipe-tab">EXPORT</div>
+  </nav>
+
+  <div class="topbar-right">
+    <div class="icon-btn" title="搜索">⌕</div>
+    <div class="icon-btn" title="设置">⚙</div>
+    <div class="avatar">Z</div>
+  </div>
+</header>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- ── Left Panel ── -->
+  <aside class="left-panel">
+
+    <!-- Principles -->
+    <div class="principles">
+      <div class="principles-header" id="principlesToggle">
+        <span class="principles-label">原则</span>
+        <span class="principles-toggle open" id="principlesArrow">▾</span>
+      </div>
+      <div class="principles-body" id="principlesBody">
+        <div class="kv-row">
+          <span class="kv-key">受众</span>
+          <span class="kv-val">25–35岁创作者</span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-key">语气</span>
+          <span class="kv-val">专业友好</span>
+        </div>
+        <div class="kv-row">
+          <span class="kv-key">节奏</span>
+          <span class="kv-val">快 → 慢 → 快</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Narrative Arc -->
+    <div class="arc-section">
+      <div class="arc-title">叙事线</div>
+      <div class="arc-nodes" id="arcNodes">
+        <div class="arc-node active" data-seg="0">
+          <div class="arc-dot-wrap"><div class="arc-dot"></div></div>
+          <div class="arc-info">
+            <div class="arc-role">痛点</div>
+            <div class="arc-seg">段 1</div>
+          </div>
+        </div>
+        <div class="arc-node" data-seg="1">
+          <div class="arc-dot-wrap"><div class="arc-dot"></div></div>
+          <div class="arc-info">
+            <div class="arc-role">方案</div>
+            <div class="arc-seg">段 2</div>
+          </div>
+        </div>
+        <div class="arc-node" data-seg="2">
+          <div class="arc-dot-wrap"><div class="arc-dot"></div></div>
+          <div class="arc-info">
+            <div class="arc-role">原理</div>
+            <div class="arc-seg">段 3</div>
+          </div>
+        </div>
+        <div class="arc-node" data-seg="3">
+          <div class="arc-dot-wrap"><div class="arc-dot"></div></div>
+          <div class="arc-info">
+            <div class="arc-role">证据</div>
+            <div class="arc-seg">段 4</div>
+          </div>
+        </div>
+        <div class="arc-node" data-seg="4">
+          <div class="arc-dot-wrap"><div class="arc-dot"></div></div>
+          <div class="arc-info">
+            <div class="arc-role">行动</div>
+            <div class="arc-seg">段 5</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-row">
+        <span class="stat-label">段落</span>
+        <span class="stat-val accent">5</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">字数</span>
+        <span class="stat-val">148 字</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">叙事结构</span>
+        <span class="stat-val">经典五段</span>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── Right Panel ── -->
+  <main class="right-panel" id="rightPanel">
+
+    <!-- Segment 1 -->
+    <section class="segment highlighted" id="seg-0">
+      <div class="segment-header">
+        <span class="role-badge">痛点</span>
+        <span class="seg-counter">SEGMENT 1 OF 5</span>
+      </div>
+      <p class="narration">
+        每次剪视频，光整理素材就要花几个小时。找 BGM、配字幕、调色调——每一步都在消耗你的创作热情，到最后真正想表达的东西反而没时间打磨了。
+      </p>
+      <div class="sub-cards">
+        <div class="sub-card">
+          <div class="sub-card-label">Visual</div>
+          <div class="sub-card-text">创作者面对满屏时间轴，桌面凌乱，时钟走到深夜。疲惫感。</div>
+        </div>
+        <div class="sub-card logic">
+          <div class="sub-card-label">Logic</div>
+          <div class="sub-card-text">用具体时间数字（几小时）建立共鸣，而非抽象抱怨。</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="seg-divider">
+      <div class="seg-divider-line"></div>
+      <div class="seg-divider-badge">方案 · SEGMENT 2</div>
+      <div class="seg-divider-line"></div>
+    </div>
+
+    <!-- Segment 2 -->
+    <section class="segment" id="seg-1">
+      <div class="segment-header">
+        <span class="role-badge">方案</span>
+        <span class="seg-counter">SEGMENT 2 OF 5</span>
+      </div>
+      <p class="narration">
+        NextFrame 不一样。你只需要写下你想说的话，AI 会帮你把它变成一支完整的视频——脚本、画面、配音、剪辑，全都在一个地方完成。
+      </p>
+      <div class="sub-cards">
+        <div class="sub-card">
+          <div class="sub-card-label">Visual</div>
+          <div class="sub-card-text">界面从混乱切换到简洁清晰的 NextFrame 工作区，光线变亮。</div>
+        </div>
+        <div class="sub-card logic">
+          <div class="sub-card-label">Logic</div>
+          <div class="sub-card-text">"写下你想说的话"对比上段的"几个小时"，解法要比痛点简单 10 倍。</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="seg-divider">
+      <div class="seg-divider-line"></div>
+      <div class="seg-divider-badge">原理 · SEGMENT 3</div>
+      <div class="seg-divider-line"></div>
+    </div>
+
+    <!-- Segment 3 -->
+    <section class="segment" id="seg-2">
+      <div class="segment-header">
+        <span class="role-badge">原理</span>
+        <span class="seg-counter">SEGMENT 3 OF 5</span>
+      </div>
+      <p class="narration">
+        背后是一套「叙事优先」的工作流。系统理解你的意图，把语言直接映射到时间轴上——不是模板套壳，而是真正读懂了你想讲的故事结构。
+      </p>
+      <div class="sub-cards">
+        <div class="sub-card">
+          <div class="sub-card-label">Visual</div>
+          <div class="sub-card-text">文字段落与时间轴关键帧之间的连线动画，展示映射关系。</div>
+        </div>
+        <div class="sub-card logic">
+          <div class="sub-card-label">Logic</div>
+          <div class="sub-card-text">用"读懂故事结构"区分 NextFrame 与普通模板工具，建立技术可信度。</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="seg-divider">
+      <div class="seg-divider-line"></div>
+      <div class="seg-divider-badge">证据 · SEGMENT 4</div>
+      <div class="seg-divider-line"></div>
+    </div>
+
+    <!-- Segment 4 -->
+    <section class="segment" id="seg-3">
+      <div class="segment-header">
+        <span class="role-badge">证据</span>
+        <span class="seg-counter">SEGMENT 4 OF 5</span>
+      </div>
+      <p class="narration">
+        测试用户用 NextFrame 完成了同一个视频项目：平均用时从 4.5 小时降到了 38 分钟。发布频率提升了 3 倍。他们说，终于有时间想「说什么」了，而不是想「怎么剪」。
+      </p>
+      <div class="sub-cards">
+        <div class="sub-card">
+          <div class="sub-card-label">Visual</div>
+          <div class="sub-card-text">前后对比数据卡片：4.5h → 38min，发布频率 ×3，引用用户原话。</div>
+        </div>
+        <div class="sub-card logic">
+          <div class="sub-card-label">Logic</div>
+          <div class="sub-card-text">具体数字 + 用户引语，两种证据类型叠加，可信度最大化。</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="seg-divider">
+      <div class="seg-divider-line"></div>
+      <div class="seg-divider-badge">行动 · SEGMENT 5</div>
+      <div class="seg-divider-line"></div>
+    </div>
+
+    <!-- Segment 5 -->
+    <section class="segment" id="seg-4">
+      <div class="segment-header">
+        <span class="role-badge">行动</span>
+        <span class="seg-counter">SEGMENT 5 OF 5</span>
+      </div>
+      <p class="narration">
+        现在开始免费试用。写下你的第一个想法，看看 NextFrame 会把它变成什么。你只需要有话想说。
+      </p>
+      <div class="sub-cards">
+        <div class="sub-card">
+          <div class="sub-card-label">Visual</div>
+          <div class="sub-card-text">输入框光标闪烁，等待输入。按钮「开始创作」高亮，简洁有力。</div>
+        </div>
+        <div class="sub-card logic">
+          <div class="sub-card-label">Logic</div>
+          <div class="sub-card-text">最低门槛行动号召——"免费"+"只需要有话想说"，消除最后一个顾虑。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Full Text -->
+    <div class="full-text-section">
+      <div class="full-text-title">完整文稿</div>
+      <div class="full-text-body">
+        <p>
+          每次剪视频，光整理素材就要花几个小时。找 BGM、配字幕、调色调——每一步都在消耗你的创作热情，到最后真正想表达的东西反而没时间打磨了。
+          NextFrame 不一样。你只需要写下你想说的话，AI 会帮你把它变成一支完整的视频——脚本、画面、配音、剪辑，全都在一个地方完成。
+          背后是一套「叙事优先」的工作流。系统理解你的意图，把语言直接映射到时间轴上——不是模板套壳，而是真正读懂了你想讲的故事结构。
+          测试用户用 NextFrame 完成了同一个视频项目：平均用时从 4.5 小时降到了 38 分钟。发布频率提升了 3 倍。他们说，终于有时间想「说什么」了，而不是想「怎么剪」。
+          现在开始免费试用。写下你的第一个想法，看看 NextFrame 会把它变成什么。你只需要有话想说。
+        </p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Principles toggle ──
+const toggle = document.getElementById('principlesToggle');
+const body = document.getElementById('principlesBody');
+const arrow = document.getElementById('principlesArrow');
+
+toggle.addEventListener('click', () => {
+  const collapsed = body.classList.toggle('collapsed');
+  arrow.classList.toggle('open', !collapsed);
+});
+
+// ── Scroll spy ──
+const rightPanel = document.getElementById('rightPanel');
+const segments = document.querySelectorAll('.segment');
+const arcNodes = document.querySelectorAll('.arc-node');
+
+function getActiveIndex() {
+  const panelRect = rightPanel.getBoundingClientRect();
+  const threshold = panelRect.top + panelRect.height * 0.38;
+
+  let best = 0;
+  let bestDist = Infinity;
+
+  segments.forEach((seg, i) => {
+    const rect = seg.getBoundingClientRect();
+    const dist = Math.abs(rect.top - threshold);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = i;
+    }
+  });
+  return best;
+}
+
+function updateActive(idx) {
+  arcNodes.forEach((node, i) => {
+    node.classList.toggle('active', i === idx);
+  });
+  segments.forEach((seg, i) => {
+    // Only highlight on click, not scroll
+  });
+}
+
+rightPanel.addEventListener('scroll', () => {
+  updateActive(getActiveIndex());
+});
+
+// ── Click arc node → scroll to segment ──
+arcNodes.forEach((node, i) => {
+  node.addEventListener('click', () => {
+    segments[i].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    updateActive(i);
+
+    // Highlight segment briefly
+    segments.forEach(s => s.classList.remove('highlighted'));
+    segments[i].classList.add('highlighted');
+  });
+});
+
+// ── Click segment → highlight ──
+segments.forEach((seg, i) => {
+  seg.addEventListener('click', () => {
+    segments.forEach(s => s.classList.remove('highlighted'));
+    seg.classList.add('highlighted');
+    updateActive(i);
+  });
+});
+</script>
+</body>
+</html>
