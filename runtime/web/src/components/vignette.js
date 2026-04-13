@@ -1,6 +1,6 @@
 import {
   createRoot, toNumber, clamp,
-} from '../core/scenes-v2-shared.js';
+} from '../core/shared/index.js';
 
 export default {
   id: "vignette",

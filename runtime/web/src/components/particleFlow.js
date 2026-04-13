@@ -1,6 +1,6 @@
 import {
   createRoot, toNumber, clamp, hashFloat,
-} from '../core/scenes-v2-shared.js';
+} from '../core/shared/index.js';
 
 export default {
   id: "particleFlow",

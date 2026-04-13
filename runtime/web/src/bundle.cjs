@@ -71,6 +71,8 @@ function readAndStrip(filePath) {
   code = code.replace(/^import\s*\{[^}]*\}\s*from\s+['"].*?['"];?\s*$/gm, '');
   // Remove export default
   code = code.replace(/^export\s+default\s+/gm, 'return ');
+  // Remove export * from ...
+  code = code.replace(/^export\s+\*\s+from\s+['"].*?['"];?\s*$/gm, '');
   // Remove export { ... }
   code = code.replace(/^export\s*\{[^}]*\};?\s*$/gm, '');
   // Remove export from functions/const
@@ -79,7 +81,12 @@ function readAndStrip(filePath) {
 }
 
 // Read shared utils
-const sharedCode = readAndStrip(path.join(coreDir, 'scenes-v2-shared.js'));
+const sharedCode = [
+  'easing.js',
+  'color.js',
+  'font.js',
+  'index.js',
+].map((file) => readAndStrip(path.join(coreDir, 'shared', file))).join('\n\n');
 
 // Read engine
 const engineCode = [
