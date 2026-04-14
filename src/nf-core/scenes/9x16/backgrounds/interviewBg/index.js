@@ -1,51 +1,53 @@
+import { TOKENS } from "../../../shared/design.js";
+
 export const meta = {
   id: "interviewBg",
-  version: 1,
+  version: 2,
   ratio: "9:16",
   category: "backgrounds",
   label: "Interview Background",
-  description: "深黑访谈背景，纯黑底色带微弱橙色光晕，营造访谈氛围",
+  description: "Deep black interview background with a restrained warm glow.",
   tech: "dom",
   duration_hint: 20,
   loopable: true,
   z_hint: "bottom",
   tags: ["backgrounds", "interview", "dark", "9x16"],
-  mood: ["professional", "focused"],
+  mood: ["focused", "editorial"],
   theme: ["interview", "tech"],
   default_theme: "dark-interview",
   themes: {
-    "dark-interview": { bg: "#0a0a0a", glowColor: "rgba(218,119,86,0.10)", glowX: 50, glowY: 45, glowSize: 60 },
+    "dark-interview": {
+      bg: TOKENS.interview.bg,
+      glowColor: "rgba(218,119,86,0.08)",
+      glowX: 50,
+      glowY: 38,
+      glowSize: 46,
+    },
   },
   params: {
-    bg: { type: "color", default: "#0a0a0a", label: "背景色", group: "color" },
-    glowColor: { type: "color", default: "rgba(218,119,86,0.10)", label: "光晕色", group: "color" },
+    bg: { type: "color", default: TOKENS.interview.bg, label: "背景色", group: "color" },
+    glowColor: { type: "color", default: "rgba(218,119,86,0.08)", label: "光晕色", group: "color" },
     glowX: { type: "number", default: 50, label: "光晕 X(%)", group: "layout", range: [0, 100], step: 1 },
-    glowY: { type: "number", default: 45, label: "光晕 Y(%)", group: "layout", range: [0, 100], step: 1 },
-    glowSize: { type: "number", default: 60, label: "光晕尺寸(%)", group: "style", range: [10, 120], step: 1 },
-  },
-  ai: {
-    when: "访谈切片竖屏视频的背景层，9:16比例",
-    how: "放在最底层作为全屏背景。{ scene: \"interviewBg\", start: 0, dur: 20, params: {} }",
-    example: { bg: "#0a0a0a", glowColor: "rgba(218,119,86,0.10)", glowX: 50, glowY: 45, glowSize: 60 },
-    avoid: "不要叠加其他背景；glowColor太亮会影响字幕可读性",
-    pairs_with: ["interviewTopBar", "interviewBiSub", "progressBar9x16"],
+    glowY: { type: "number", default: 38, label: "光晕 Y(%)", group: "layout", range: [0, 100], step: 1 },
+    glowSize: { type: "number", default: 46, label: "光晕尺寸(%)", group: "style", range: [10, 120], step: 1 },
   },
 };
 
-function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); }
-
 export function render(t, params, vp) {
-  const bg = params.bg || "#0a0a0a";
-  const glowColor = params.glowColor || "rgba(218,119,86,0.10)";
+  const bg = params.bg || TOKENS.interview.bg;
+  const glowColor = params.glowColor || "rgba(218,119,86,0.08)";
   const glowX = Number.isFinite(params.glowX) ? params.glowX : 50;
-  const glowY = Number.isFinite(params.glowY) ? params.glowY : 45;
-  const glowSize = Number.isFinite(params.glowSize) ? params.glowSize : 60;
-  const glow = `radial-gradient(circle at ${glowX}% ${glowY}%, ${glowColor} 0%, transparent ${glowSize}%)`;
-  const vignette = "linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.0) 30%, rgba(0,0,0,0.0) 70%, rgba(0,0,0,0.5) 100%)";
-  return `<div style="position:absolute;left:0;top:0;width:${vp.width}px;height:${vp.height}px;overflow:hidden;background:${bg}">
-  <div style="position:absolute;inset:0;background:${glow}"></div>
+  const glowY = Number.isFinite(params.glowY) ? params.glowY : 38;
+  const glowSize = Number.isFinite(params.glowSize) ? params.glowSize : 46;
+  const warmGlow = `radial-gradient(circle at ${glowX}% ${glowY}%, ${glowColor} 0%, transparent ${glowSize}%)`;
+  const lowerLift = "radial-gradient(circle at 50% 78%, rgba(212,180,131,0.05) 0%, transparent 34%)";
+  const vignette = "linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.08) 18%, rgba(0,0,0,0.06) 42%, rgba(0,0,0,0.22) 100%)";
+  const sideShade = "linear-gradient(90deg, rgba(0,0,0,0.2) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.2) 100%)";
+  return `<div style="position:absolute;inset:0;overflow:hidden;background:${bg}">
+  <div style="position:absolute;inset:0;background:${warmGlow}"></div>
+  <div style="position:absolute;inset:0;background:${lowerLift}"></div>
   <div style="position:absolute;inset:0;background:${vignette}"></div>
+  <div style="position:absolute;inset:0;background:${sideShade}"></div>
 </div>`;
 }
 

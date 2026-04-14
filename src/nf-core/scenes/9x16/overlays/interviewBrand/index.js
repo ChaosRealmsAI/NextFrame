@@ -1,56 +1,57 @@
+import { TOKENS, esc, fadeIn, scaleH, scaleW } from "../../../shared/design.js";
+
 export const meta = {
   id: "interviewBrand",
-  version: 1,
+  version: 2,
   ratio: "9:16",
   category: "overlays",
   label: "Interview Brand",
-  description: "品牌底栏：金色大字 OPC·名字 + 极弱小字副标，访谈切片品牌标识",
+  description: "Bottom brand lockup with small attribution line.",
   tech: "dom",
   duration_hint: 20,
   loopable: true,
   z_hint: "top",
   tags: ["overlays", "interview", "brand", "9x16"],
-  mood: ["professional"],
+  mood: ["editorial"],
   theme: ["interview", "tech"],
   default_theme: "dark-interview",
   themes: {
-    "dark-interview": { brandColor: "#d4b483", subColor: "rgba(245,236,224,0.25)" },
+    "dark-interview": { brandColor: TOKENS.interview.gold, subColor: "rgba(245,236,224,0.22)" },
   },
   params: {
-    brandName: { type: "string", default: "OPC · 王宇轩", label: "品牌名", group: "content" },
-    subText: { type: "string", default: "速通硅谷访谈", label: "副标文字", group: "content" },
-    brandColor: { type: "color", default: "#d4b483", label: "品牌名颜色（金色）", group: "color" },
-    subColor: { type: "color", default: "rgba(245,236,224,0.25)", label: "副标颜色（极弱）", group: "color" },
-  },
-  ai: {
-    when: "访谈切片底部品牌标识，y=1700",
-    how: '{ scene: "interviewBrand", start: 0, dur: 20, params: { brandName: "OPC · 王宇轩", subText: "速通硅谷访谈" } }',
-    example: { brandName: "OPC · 王宇轩", subText: "速通硅谷访谈" },
-    avoid: "不要放太靠下，会被进度条遮住",
-    pairs_with: ["interviewBg", "progressBar9x16"],
+    brand: { type: "string", default: "OPC · 王宇轩", label: "品牌名", group: "content" },
+    brandName: { type: "string", default: "OPC · 王宇轩", label: "品牌名兼容参数", group: "content" },
+    subText: {
+      type: "string",
+      default: "该视频由数字员工 Alysa 全自动负责剪辑 · 翻译 · 字幕 · 讲解 · 封面 · 发布",
+      label: "副标文字",
+      group: "content",
+    },
+    brandColor: { type: "color", default: TOKENS.interview.gold, label: "品牌名颜色", group: "color" },
+    subColor: { type: "color", default: "rgba(245,236,224,0.22)", label: "副标颜色", group: "color" },
   },
 };
 
-function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); }
-
 export function render(t, params, vp) {
-  const brandName = esc(params.brandName || "OPC · 王宇轩");
-  const subText = esc(params.subText || "速通硅谷访谈");
-  const brandColor = params.brandColor || "#d4b483";
-  const subColor = params.subColor || "rgba(245,236,224,0.25)";
-
-  const fadeAlpha = Math.min(1, ease3(Math.min(1, t * 3)));
-
-  // Spec: y=1700
-  const brandY = Math.round(vp.height * 1700 / 1920);
-  const brandFontSize = Math.round(vp.width * 18 / 1080);
-  const subFontSize = Math.round(vp.width * 12 / 1080);
-  const lineGap = Math.round(vp.height * 10 / 1920);
-
-  return `<div style="position:absolute;left:0;top:${brandY}px;width:${vp.width}px;opacity:${fadeAlpha};pointer-events:none;text-align:center">
-  <div style="font-family:system-ui,'PingFang SC','Helvetica Neue',sans-serif;font-size:${brandFontSize}px;font-weight:600;color:${brandColor};letter-spacing:0.03em">${brandName}</div>
-  <div style="font-family:system-ui,'PingFang SC',sans-serif;font-size:${subFontSize}px;font-weight:400;color:${subColor};margin-top:${lineGap}px;letter-spacing:0.02em">${subText}</div>
+  const brandName = esc(params.brand || params.brandName || "OPC · 王宇轩");
+  const subText = esc(
+    params.subText ||
+      "该视频由数字员工 Alysa 全自动负责剪辑 · 翻译 · 字幕 · 讲解 · 封面 · 发布",
+  );
+  const brandColor = params.brandColor || TOKENS.interview.gold;
+  const subColor = params.subColor || "rgba(245,236,224,0.22)";
+  const alpha = fadeIn(t, 0.12, 0.55);
+  const dividerY = scaleH(vp, 1670, 1920);
+  const top = scaleH(vp, 1718, 1920);
+  const side = scaleW(vp, 80, 1080);
+  const brandSize = scaleW(vp, 20, 1080);
+  const subSize = scaleW(vp, 11, 1080);
+  return `<div style="position:absolute;inset:0;pointer-events:none;opacity:${alpha}">
+  <div style="position:absolute;left:${side}px;right:${side}px;top:${dividerY}px;height:1px;background:linear-gradient(90deg, transparent 0%, rgba(245,236,224,0.05) 10%, rgba(245,236,224,0.08) 50%, rgba(245,236,224,0.05) 90%, transparent 100%)"></div>
+  <div style="position:absolute;left:0;right:0;top:${top}px;text-align:center">
+    <div style="font-family:'Iowan Old Style','Songti SC','Noto Serif SC',serif;font-size:${brandSize}px;font-weight:700;color:${brandColor};letter-spacing:0.06em">${brandName}</div>
+    <div style="margin-top:${scaleH(vp, 36, 1920)}px;padding:0 ${scaleW(vp, 110, 1080)}px;font-family:'SF Pro Text','PingFang SC',sans-serif;font-size:${subSize}px;font-weight:500;color:${subColor};letter-spacing:0.06em">${subText}</div>
+  </div>
 </div>`;
 }
 
@@ -63,6 +64,6 @@ export function screenshots() {
 
 export function lint(params) {
   const errors = [];
-  if (!params.brandName) errors.push("brandName 品牌名不能为空。Fix: 传入品牌名");
+  if (!params.brand && !params.brandName) errors.push("brand 品牌名不能为空。Fix: 传入品牌名");
   return { ok: errors.length === 0, errors };
 }
