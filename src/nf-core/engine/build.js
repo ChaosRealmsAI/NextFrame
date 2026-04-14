@@ -1,3 +1,4 @@
+// Build HTML from src/nf-core/scenes discovery instead of legacy runtime scenes-v2.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -168,6 +169,24 @@ function buildRuntime() {
       message + " (" + String(layer.scene || "unknown") + ")</div>";
   }
 
+  function resolveSceneParams(scene, rawParams) {
+    const input = rawParams && typeof rawParams === "object" ? rawParams : {};
+    const meta = scene && scene.meta && typeof scene.meta === "object" ? scene.meta : {};
+    const paramsMeta = meta.params && typeof meta.params === "object" ? meta.params : {};
+    const defaults = {};
+    for (const [key, spec] of Object.entries(paramsMeta)) {
+      if (spec && Object.prototype.hasOwnProperty.call(spec, "default")) {
+        defaults[key] = spec.default;
+      }
+    }
+    const themes = meta.themes && typeof meta.themes === "object" ? meta.themes : {};
+    const themeKey = input.theme || meta.default_theme;
+    const themeValues = themeKey && themes[themeKey] && typeof themes[themeKey] === "object"
+      ? themes[themeKey]
+      : {};
+    return { ...defaults, ...themeValues, ...input };
+  }
+
   function getPhaseLabel(visible) {
     const active = visible[visible.length - 1];
     if (!active) return "idle";
@@ -205,7 +224,7 @@ function buildRuntime() {
         inner = renderSceneError(layer, "Missing scene renderer");
       } else {
         try {
-          inner = scene.render(t - start, layer.params || {}, viewport);
+          inner = scene.render(t - start, resolveSceneParams(scene, layer.params), viewport);
         } catch (err) {
           inner = renderSceneError(layer, String(err && err.message ? err.message : err));
         }
