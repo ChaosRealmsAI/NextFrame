@@ -413,24 +413,6 @@ html, body {
   color: var(--accent);
 }
 
-/* Status dot on thumbnail */
-.card-status {
-  position: absolute;
-  top: var(--sp-8);
-  right: var(--sp-8);
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  z-index: 2;
-}
-.card-status--published {
-  background: var(--green);
-  box-shadow: 0 0 6px rgba(52,211,153,0.40);
-}
-.card-status--progress {
-  background: var(--yellow);
-  box-shadow: 0 0 6px rgba(251,191,36,0.40);
-}
 
 /* Card body */
 .card-body {
@@ -743,6 +725,198 @@ html, body {
 }
 
 /* ══════════════════════════════════════
+   MODAL (shared base for settings + new project)
+   ══════════════════════════════════════ */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.50);
+  z-index: 500;
+}
+.modal-overlay.open { display: block; }
+
+.modal-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  width: 480px;
+  background: #141416;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--r);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.60), 0 4px 16px rgba(0,0,0,0.40);
+  z-index: 501;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-panel.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.modal-header {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--t100);
+}
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: 460px;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ── Form elements ── */
+.form-group {
+  margin-bottom: 20px;
+}
+.form-group:last-child { margin-bottom: 0; }
+.form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t65);
+  margin-bottom: 8px;
+}
+.form-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--t80);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-xs);
+  outline: none;
+  transition: border-color 0.2s var(--ease);
+}
+.form-input::placeholder { color: var(--t50); }
+.form-input:focus { border-color: rgba(167,139,250,0.35); }
+
+.form-path-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form-path {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--t65);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--r-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.form-path-btn {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t80);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s var(--ease);
+}
+.form-path-btn:hover { background: rgba(255,255,255,0.10); }
+
+/* ── Ratio Picker ── */
+.ratio-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.ratio-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.ratio-card:hover {
+  border-color: rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.03);
+}
+.ratio-card.active {
+  border-color: var(--accent);
+  background: var(--accent-06);
+}
+.ratio-preview {
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+}
+.r-16-9 { width: 48px; height: 27px; }
+.r-9-16 { width: 27px; height: 48px; }
+.r-1-1  { width: 36px; height: 36px; }
+.r-4-3  { width: 44px; height: 33px; }
+.ratio-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t80);
+}
+.ratio-card.active .ratio-label { color: var(--accent); }
+.ratio-desc {
+  font-size: 12px;
+  color: var(--t50);
+}
+
+/* ── Ghost button ── */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 16px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t65);
+  background: none;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+.btn-ghost:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--t80);
+}
+
+/* ══════════════════════════════════════
    RESPONSIVE
    ══════════════════════════════════════ */
 @media (max-width: 800px) {
@@ -884,6 +1058,61 @@ html, body {
     </div>
   </div>
 
+  <!-- ── New Project Modal ── -->
+  <div class="modal-overlay" id="new-project-overlay" onclick="toggleNewProject()"></div>
+  <div class="modal-panel" id="new-project-modal">
+    <div class="modal-header">
+      <span class="modal-title">新建项目</span>
+      <button class="settings-close" onclick="toggleNewProject()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">项目名称</label>
+        <input class="form-input" type="text" placeholder="My Video Project" id="np-name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">保存位置</label>
+        <div class="form-path-row">
+          <span class="form-path" id="np-path">~/NextFrame/projects</span>
+          <button class="form-path-btn" onclick="alert('选择文件夹')">选择</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">画面比例</label>
+        <div class="ratio-grid">
+          <div class="ratio-card active" onclick="pickRatio(this, '16:9')">
+            <div class="ratio-preview r-16-9"></div>
+            <span class="ratio-label">16:9</span>
+            <span class="ratio-desc">横屏</span>
+          </div>
+          <div class="ratio-card" onclick="pickRatio(this, '9:16')">
+            <div class="ratio-preview r-9-16"></div>
+            <span class="ratio-label">9:16</span>
+            <span class="ratio-desc">竖屏</span>
+          </div>
+          <div class="ratio-card" onclick="pickRatio(this, '1:1')">
+            <div class="ratio-preview r-1-1"></div>
+            <span class="ratio-label">1:1</span>
+            <span class="ratio-desc">方形</span>
+          </div>
+          <div class="ratio-card" onclick="pickRatio(this, '4:3')">
+            <div class="ratio-preview r-4-3"></div>
+            <span class="ratio-label">4:3</span>
+            <span class="ratio-desc">PPT</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">标签</label>
+        <input class="form-input" type="text" placeholder="教程, AI, 产品介绍..." id="np-tags">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="toggleNewProject()">取消</button>
+      <button class="btn-primary" onclick="createProject()">创建</button>
+    </div>
+  </div>
+
   <!-- ── Main Content ── -->
   <main class="main">
     <div class="content">
@@ -897,7 +1126,7 @@ html, body {
           </svg>
           <input class="tb-search-input" type="text" placeholder="搜索项目...">
         </div>
-        <button class="btn-primary">
+        <button class="btn-primary" onclick="toggleNewProject()">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -917,7 +1146,7 @@ html, body {
           <!-- Card 1: AI短视频课 -->
           <div class="project-card glass">
             <div class="card-thumb">
-              <div class="card-status card-status--progress"></div>
+
               <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <polygon points="12,8 24,16 12,24" fill="currentColor"/>
               </svg>
@@ -940,7 +1169,7 @@ html, body {
           <!-- Card 2: 产品介绍 -->
           <div class="project-card glass">
             <div class="card-thumb">
-              <div class="card-status card-status--published"></div>
+
               <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <polygon points="12,8 24,16 12,24" fill="currentColor"/>
               </svg>
@@ -963,7 +1192,7 @@ html, body {
           <!-- Card 3: Demo Reel -->
           <div class="project-card glass">
             <div class="card-thumb">
-              <div class="card-status card-status--progress"></div>
+
               <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <polygon points="12,8 24,16 12,24" fill="currentColor"/>
               </svg>
@@ -996,7 +1225,7 @@ html, body {
           <!-- Card 1: AI短视频课 -->
           <div class="project-card glass">
             <div class="card-thumb">
-              <div class="card-status card-status--progress"></div>
+
               <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <polygon points="12,8 24,16 12,24" fill="currentColor"/>
               </svg>
@@ -1019,7 +1248,7 @@ html, body {
           <!-- Card 2: 产品介绍 -->
           <div class="project-card glass">
             <div class="card-thumb">
-              <div class="card-status card-status--published"></div>
+
               <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <polygon points="12,8 24,16 12,24" fill="currentColor"/>
               </svg>
@@ -1042,7 +1271,7 @@ html, body {
           <!-- Card 3: Demo Reel -->
           <div class="project-card glass">
             <div class="card-thumb">
-              <div class="card-status card-status--progress"></div>
+
               <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <polygon points="12,8 24,16 12,24" fill="currentColor"/>
               </svg>
@@ -1065,7 +1294,7 @@ html, body {
           <!-- Card 4: 用户案例 -->
           <div class="project-card glass">
             <div class="card-thumb">
-              <div class="card-status card-status--published"></div>
+
               <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <polygon points="12,8 24,16 12,24" fill="currentColor"/>
               </svg>
@@ -1088,7 +1317,7 @@ html, body {
           <!-- Card 5: Onboarding -->
           <div class="project-card glass">
             <div class="card-thumb">
-              <div class="card-status card-status--progress"></div>
+
               <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <polygon points="12,8 24,16 12,24" fill="currentColor"/>
               </svg>
@@ -1142,6 +1371,24 @@ document.addEventListener('click', (e) => {
     document.querySelectorAll('.nf-select.open').forEach(s => s.classList.remove('open'));
   }
 });
+
+function toggleNewProject() {
+  document.getElementById('new-project-overlay').classList.toggle('open');
+  document.getElementById('new-project-modal').classList.toggle('open');
+}
+
+function pickRatio(card, ratio) {
+  card.closest('.ratio-grid').querySelectorAll('.ratio-card').forEach(c => c.classList.remove('active'));
+  card.classList.add('active');
+}
+
+function createProject() {
+  const name = document.getElementById('np-name').value || 'Untitled';
+  const path = document.getElementById('np-path').textContent;
+  const tags = document.getElementById('np-tags').value;
+  const ratio = document.querySelector('.ratio-card.active .ratio-label').textContent;
+  toggleNewProject();
+}
 
 </script>
 
