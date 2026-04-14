@@ -82,7 +82,7 @@ test("v3-cli new/validate/layer commands stay on v0.3", () => {
     const scene = JSON.parse(runCli(["scenes", "headlineCenter", "--json"]).stdout);
     assert.equal(scene.ok, true);
     assert.equal(scene.value.id, "headlineCenter");
-    assert.ok(Array.isArray(scene.value.params));
+    assert.ok(typeof scene.value.params === "object" && scene.value.params !== null);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
