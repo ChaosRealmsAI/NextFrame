@@ -24,9 +24,10 @@ export function render(t, params, vp) {
   const title = esc(params.title || "");
   const alpha = fadeIn(t, 0, 0.55);
   const pad = scaleW(vp, GRID.sidePad);
-  // Series line: centered in header zone, ~75% from top of header
-  const seriesY = scaleH(vp, 160);
-  const titleY = scaleH(vp, 190);
+  // Old system: header 0-260px, flex justify-end with 24px bottom padding
+  // Series(44px) + 12px gap + Title(60px×1.2) = ~128px block, starts at ~108px
+  const seriesY = scaleH(vp, 108);
+  const titleY = scaleH(vp, 164);
   const sSize = scaleW(vp, TYPE.seriesName.size);
   const tSize = scaleW(vp, TYPE.title.size);
   const seriesLine = guest ? `${series} · ${episode} · ${guest}` : `${series} · ${episode}`;
@@ -35,7 +36,7 @@ export function render(t, params, vp) {
     `<span style="font:${TYPE.seriesName.weight} ${sSize}px ${TYPE.seriesName.font};color:${TOKENS.interview.gold};letter-spacing:${TYPE.seriesName.spacing};white-space:nowrap">${seriesLine}</span>` +
     `</div>` +
     `<div style="position:absolute;left:${pad}px;right:${pad}px;top:${titleY}px;text-align:center">` +
-    `<div style="font:${TYPE.title.weight} ${tSize}px/${TYPE.title.lineHeight} ${TYPE.title.font};color:${TOKENS.interview.text};letter-spacing:${TYPE.title.spacing};display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${title}</div>` +
+    `<div style="font:${TYPE.title.weight} ${tSize}px/${TYPE.title.lineHeight} ${TYPE.title.font};color:${TOKENS.interview.text};letter-spacing:${TYPE.title.spacing};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div>` +
     `</div>` +
     decoLine(vp, GRID.decoLine1) +
     `</div>`;
