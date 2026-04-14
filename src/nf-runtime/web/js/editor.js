@@ -128,16 +128,95 @@ function selectTimelineClip(index) {
   let html = '<div style="padding:16px">';
   html += '<div style="font-size:14px;font-weight:600;color:var(--t100);margin-bottom:12px">' + (layer.scene || layer.name || 'Clip') + '</div>';
   html += '<div style="font-size:12px;color:var(--t50);margin-bottom:16px">Layer ' + (index + 1) + '</div>';
+  const editableKeys = ['name', 'start', 'duration'];
   Object.keys(layer).forEach(function(key) {
     const val = layer[key];
-    const display = typeof val === 'object' ? JSON.stringify(val).substring(0, 60) : String(val);
-    html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">' +
-      '<span style="font-size:12px;color:var(--t65)">' + key + '</span>' +
-      '<span style="font-size:12px;font-family:var(--mono);color:var(--t80)">' + display + '</span>' +
-    '</div>';
+    const isEditable = editableKeys.indexOf(key) >= 0;
+    if (typeof val === 'object') {
+      const display = JSON.stringify(val).substring(0, 60);
+      html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:12px;color:var(--t65)">' + key + '</span>' +
+        '<span style="font-size:12px;font-family:var(--mono);color:var(--t80)">' + display + '</span></div>';
+    } else if (isEditable) {
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:12px;color:var(--t65)">' + key + '</span>' +
+        '<input class="ed-insp-input" data-nf-action="edit-clip-param" data-key="' + key + '" data-index="' + index + '" value="' + String(val) + '" onchange="edSaveParam(this)" style="width:80px;text-align:right">' +
+      '</div>';
+    } else {
+      html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:12px;color:var(--t65)">' + key + '</span>' +
+        '<span style="font-size:12px;font-family:var(--mono);color:var(--t80)">' + String(val) + '</span></div>';
+    }
   });
+  html += '<div style="margin-top:12px"><button class="btn-sm" data-nf-action="compose-preview" onclick="composePreview()" style="font-size:12px;padding:4px 12px;background:var(--accent);color:#000;border:none;border-radius:6px;cursor:pointer">合成预览</button></div>';
   html += '</div>';
   insp.innerHTML = html;
+}
+
+function edSaveParam(input) {
+  const idx = parseInt(input.dataset.index);
+  const key = input.dataset.key;
+  if (!edTimelineData) return;
+  const layers = edTimelineData.layers || [];
+  if (!layers[idx]) return;
+  const newVal = isNaN(Number(input.value)) ? input.value : Number(input.value);
+  layers[idx][key] = newVal;
+  saveTimeline();
+}
+
+function saveTimeline() {
+  if (typeof bridgeCall !== 'function' || !window.currentEpisodePath || !edTimelineData) return;
+  const path = window.currentEpisodePath + '/timeline.json';
+  bridgeCall('timeline.save', { path: path, timeline: edTimelineData }).then(function() {
+    const insp = document.getElementById('ed-insp-inner2');
+    if (!insp) return;
+    let badge = document.getElementById('ed-save-badge');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.id = 'ed-save-badge';
+      badge.style.cssText = 'position:absolute;top:8px;right:8px;font-size:11px;color:var(--green);opacity:1;transition:opacity 0.5s';
+      insp.style.position = 'relative';
+      insp.appendChild(badge);
+    }
+    badge.textContent = '已保存';
+    badge.style.opacity = '1';
+    setTimeout(function() { badge.style.opacity = '0'; }, 2000);
+  }).catch(function(e) {
+    console.error('[editor] save timeline:', e);
+  });
+}
+
+function composePreview() {
+  if (typeof bridgeCall !== 'function' || !window.currentEpisodePath || !edTimelineData) return;
+  const path = window.currentEpisodePath + '/timeline.json';
+  const preview = document.querySelector('.ed-preview');
+  if (preview) {
+    preview.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t50)">合成中...</div>';
+  }
+  bridgeCall('timeline.save', { path: path, timeline: edTimelineData }).then(function() {
+    return bridgeCall('compose.generate', { timelinePath: path });
+  }).then(function(data) {
+    if (!preview || !data.path) return;
+    const htmlPath = data.path.replace(/^.*\/projects\//, '');
+    preview.innerHTML = '<iframe src="nfdata://localhost/' + htmlPath + '" style="width:100%;height:100%;border:none;background:#000"></iframe>';
+  }).catch(function(e) {
+    console.error('[editor] compose:', e);
+    if (preview) preview.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--warm)">合成失败: ' + (e.message || e) + '</div>';
+  });
+}
+
+function previewFrame(t) {
+  if (typeof bridgeCall !== 'function' || !window.currentEpisodePath) return;
+  const path = window.currentEpisodePath + '/timeline.json';
+  bridgeCall('preview.frame', { timelinePath: path, t: t }).then(function(data) {
+    if (!data.dataUrl) return;
+    const preview = document.querySelector('.ed-preview');
+    if (preview) {
+      preview.innerHTML = '<img src="' + data.dataUrl + '" style="width:100%;height:100%;object-fit:contain">';
+    }
+  }).catch(function(e) {
+    console.error('[editor] preview frame:', e);
+  });
 }
 
 function renderEditorClipList() {
@@ -242,6 +321,18 @@ function edSelectClip(idOrIndex) {
 
 tagEditorControls();
 
+// Timeline click → preview frame at that time position
+document.addEventListener('click', function(e) {
+  const track = e.target.closest('.ed-tl-track-clips');
+  if (!track || !edTimelineData) return;
+  const rect = track.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  const totalDur = edTimelineData.duration || 0;
+  if (totalDur > 0) {
+    previewFrame(pct * totalDur);
+  }
+});
+
 window.loadEditorTimeline = loadEditorTimeline;
 window.showEditorEmpty = showEditorEmpty;
 window.renderEditorFromTimeline = renderEditorFromTimeline;
@@ -249,3 +340,7 @@ window.renderEditorClipList = renderEditorClipList;
 window.renderEditorTimeline = renderEditorTimeline;
 window.renderEditorInspector = renderEditorInspector;
 window.edSelectClip = edSelectClip;
+window.edSaveParam = edSaveParam;
+window.saveTimeline = saveTimeline;
+window.composePreview = composePreview;
+window.previewFrame = previewFrame;

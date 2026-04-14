@@ -4,11 +4,11 @@ function loadEpisodes() {
     const episodes = data.episodes || [];
     const grid = document.getElementById('vp-episode-grid');
     if (!grid) return;
+    let html = '<div class="vp-ep-new glass" data-nf-action="create-episode" onclick="createEpisode()" style="cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:180px"><div style="text-align:center;color:var(--accent)"><div style="font-size:28px;line-height:1">+</div><div style="font-size:13px;margin-top:8px">新建剧集</div></div></div>';
     if (episodes.length === 0) {
-      grid.innerHTML = '<div style="text-align:center;padding:60px;color:var(--t50)">暂无剧集，点击上方 + 新建</div>';
+      grid.innerHTML = html;
       return;
     }
-    let html = '';
     episodes.forEach(function(ep, i) {
       const num = 'EP' + String(i + 1).padStart(2, '0');
       const segCount = ep.segments || 0;
@@ -41,6 +41,18 @@ function openEpisode(path, name) {
   showView('pipeline', { projectName: window.currentProjectName, episodeName: name, episodePath: path });
 }
 
+function createEpisode() {
+  const name = prompt('输入剧集名称:');
+  if (!name || !name.trim()) return;
+  if (typeof bridgeCall !== 'function' || !window.currentProjectPath) return;
+  bridgeCall('episode.create', { project: window.currentProjectPath, name: name.trim() }).then(function() {
+    loadEpisodes();
+  }).catch(function(e) {
+    console.error('[project] create episode:', e);
+  });
+}
+
 window.loadEpisodes = loadEpisodes;
 window.renderProjectEpisodes = renderProjectEpisodes;
 window.openEpisode = openEpisode;
+window.createEpisode = createEpisode;
