@@ -5,6 +5,15 @@ const scClipSpecs={
   'clip_02-天才之国.mp4':{startSec:510,endSec:595,linkedSegment:'段2·方案',reason:'观点切换明确，适合承接第二段论据。',tags:['talent','genius'],quality:'A',confidence:0.88},
   'clip_03-端到端写代码.mp4':{startSec:920,endSec:1025,linkedSegment:'段3·原理',reason:'端到端叙述完整，适合作为技术观点切片。',tags:['AI','coding'],quality:'B+',confidence:0.85},
 };
+const scSubtitleFallbacks={
+  22:'我写那篇文章时，GPT-1 才刚刚发布，对吧？',
+  23:'所以那只是众多方向中的一个，对吧？',
+  84:'然后我认为，我们会越来越多地获得泛化能力。',
+  85:'这样一来，RL 和预训练之间的那种对立就没那么重要了。',
+  142:'我几乎可以确定，我们有一条可靠的路径能走到那里，但如果说还存在一点点不确定性，那也确实还在。',
+  143:'所以对十年这个时间尺度，我大概有 90% 把握，这已经接近你能有的最高确定性了。',
+};
+const scCardPreviewLimit=2;
 const scTimelineColors=['var(--accent)','#60a5fa','#34d399','#f97316'];
 let scSources=[]; let scActiveSource=0; let scClips=[]; let scTranscript=[]; let scRenderedClips=[]; let scPlayerCleanup=null;
 
@@ -27,9 +36,11 @@ function scPickSentencesFile(videoName,sentenceEntries){
 
 function scExtractLanguageRows(sentence){
   const rows=[]; const translations=sentence.translations&&typeof sentence.translations==='object'?sentence.translations:{};
+  const zhText=translations.zh||sentence.zh||scSubtitleFallbacks[sentence.id]||'';
   if(sentence.text)rows.push({label:'EN',text:sentence.text,primary:true});
-  Object.keys(translations).forEach((key)=>{if(translations[key])rows.push({label:scLangLabel(key),text:translations[key],primary:false});});
-  ['zh','ja','ko','fr','es','de'].forEach((key)=>{if(sentence[key]&&!translations[key])rows.push({label:scLangLabel(key),text:sentence[key],primary:false});});
+  if(zhText)rows.push({label:'中',text:zhText,primary:false});
+  Object.keys(translations).forEach((key)=>{if(key!=='zh'&&translations[key])rows.push({label:scLangLabel(key),text:translations[key],primary:false});});
+  ['ja','ko','fr','es','de'].forEach((key)=>{if(sentence[key]&&!translations[key])rows.push({label:scLangLabel(key),text:sentence[key],primary:false});});
   return rows;
 }
 
@@ -41,14 +52,14 @@ function scBuildClipModels(){
   const sourceDuration=scGetSourceDuration(source);
   return scClips.map((clip,index)=>{
     const spec=scGetClipSpec(clip); if(!spec)return null;
-    const sentences=scTranscript.filter((sentence)=>sentence.start>=spec.startSec&&sentence.end<=spec.endSec).map((sentence)=>({
+    const sentences=scTranscript.filter((sentence)=>sentence.end>spec.startSec&&sentence.start<spec.endSec).map((sentence)=>({
       id:sentence.id,startSec:sentence.start-spec.startSec,endSec:sentence.end-spec.startSec,durationSec:Math.max(0,sentence.end-sentence.start),languageRows:scExtractLanguageRows(sentence),
     }));
     const firstSentence=sentences[0]; const lastSentence=sentences[sentences.length-1];
     return {
       clip,index,startSec:spec.startSec,endSec:spec.endSec,durationSec:spec.endSec-spec.startSec,sourceDurationSec:sourceDuration,nfUrl:scNfUrl(clip.path),sizeLabel:scFormatBytes(clip.size),
       timecodeLabel:scFormatClock(spec.startSec,false)+' → '+scFormatClock(spec.endSec,false),sentences,linkedSegment:spec.linkedSegment,tags:spec.tags,reason:spec.reason,quality:spec.quality,confidence:spec.confidence,
-      sentenceRange:firstSentence&&lastSentence?firstSentence.id+'-'+lastSentence.id:'—',
+      previewSentences:sentences.slice(0,scCardPreviewLimit),sentenceRange:firstSentence&&lastSentence?firstSentence.id+'-'+lastSentence.id:'—',
     };
   }).filter(Boolean);
 }
@@ -69,6 +80,7 @@ function scRenderSidebar(){
 
 function scRenderTimeline(clips,source){
   const durationSec=scGetSourceDuration(source);
+  if(!durationSec)return'';
   const ticks=Array.from({length:6},(_,index)=>scFormatClock(durationSec*(index/5),false));
   const regions=clips.map((clipModel)=>{
     const left=(clipModel.startSec/durationSec)*100; const width=((clipModel.endSec-clipModel.startSec)/durationSec)*100; const color=scTimelineColors[clipModel.index%scTimelineColors.length];
@@ -77,9 +89,9 @@ function scRenderTimeline(clips,source){
   return '<div class="glass sc-timeline"><div class="sc-tl-label">时间轴 · 切片分布</div><div class="sc-tl-bar">'+regions+'</div><div class="sc-tl-ticks">'+ticks.map((tick)=>'<span class="sc-tl-tick">'+tick+'</span>').join('')+'</div></div>';
 }
 
-function scRenderClipSentence(sentence){
+function scRenderClipSentence(sentence,index){
   const rows=sentence.languageRows.length?sentence.languageRows.map((row)=>'<div class="sc-sent-lang-row"><span class="sc-sent-lang-label">'+row.label+'</span><span class="'+(row.primary?'sc-sent-text':'sc-sent-trans')+'">'+scEscape(row.text)+'</span></div>').join(''):'<div class="sc-sent-lang-row"><span class="sc-sent-lang-label">EN</span><span class="sc-sent-text">字幕缺失</span></div>';
-  return '<div class="sc-sent-row"><span class="sc-sent-tc">'+scFormatClock(sentence.startSec,true)+'</span><div class="sc-sent-content">'+rows+'</div><span class="sc-sent-dur">'+sentence.durationSec.toFixed(1)+'s</span></div>';
+  return '<div class="sc-sent-row'+(index===0?' active':'')+'"><span class="sc-sent-tc">'+scFormatClock(sentence.startSec,true)+'</span><div class="sc-sent-content">'+rows+'</div><span class="sc-sent-dur">'+sentence.durationSec.toFixed(1)+'s</span></div>';
 }
 
 function scRenderMain(){
@@ -97,11 +109,11 @@ function scRenderMain(){
     '<span class="sc-tag sc-tag-accent">'+scRenderedClips.length+' clips</span>',
   ].join('');
   const timelineHtml=scRenderedClips.length?scRenderTimeline(scRenderedClips,source):'';
-  const cardsHtml=scRenderedClips.length?scRenderedClips.map((clipModel)=>'<div class="glass sc-clip-card" id="sc-clip-'+clipModel.index+'">'+
+  const cardsHtml=scRenderedClips.length?scRenderedClips.map((clipModel)=>'<div class="sc-clip-card'+(clipModel.index===0?' active':'')+'" id="sc-clip-'+clipModel.index+'">'+
       '<div class="sc-clip-top"><span class="sc-clip-num">'+(clipModel.index+1)+'</span><span class="sc-clip-name">'+scEscape(clipModel.clip.name)+'</span><span class="sc-clip-dur">'+Math.round(clipModel.durationSec)+'s</span><span class="sc-clip-tc">'+clipModel.timecodeLabel+'</span></div>'+
-      '<div class="sc-clip-body"><button class="sc-clip-video" type="button" data-nf-action="preview-smart-clip" onclick="scOpenPlayer('+clipModel.index+')"><video src="'+scEscape(clipModel.nfUrl)+'" preload="metadata" muted playsinline></video><span class="sc-play-overlay"><span class="sc-play-circle">&#9654;</span></span></button><div class="sc-sentences">'+clipModel.sentences.map(scRenderClipSentence).join('')+'</div></div>'+
-      '<div class="sc-meta-bar"><span class="sc-meta-tag">关联: '+scEscape(clipModel.linkedSegment)+'</span><span class="sc-meta-tag">标签: '+scEscape(clipModel.tags.join(', '))+'</span><button class="sc-more-btn" type="button" data-nf-action="open-smart-clip-meta" onclick="scOpenMeta('+clipModel.index+')">更多 ↗</button></div></div>').join(''):'<div class="sc-empty">暂无切片数据</div>';
-  root.innerHTML='<div class="glass sc-detail-header"><div class="sc-detail-top"><div class="sc-detail-name">'+scEscape(source.name)+'</div><button class="sc-preview-btn" type="button" data-nf-action="preview-smart-source" onclick="scOpenSourcePlayer()">&#9654; 预览原视频</button></div><div class="sc-detail-path">'+scEscape(source.path)+'</div><div class="sc-detail-tags">'+tagHtml+'</div></div>'+timelineHtml+'<div class="sc-clip-scroll">'+cardsHtml+'</div>';
+      '<div class="sc-clip-body"><button class="sc-clip-video" type="button" data-nf-action="preview-smart-clip" onclick="scOpenPlayer('+clipModel.index+')"><video src="'+scEscape(clipModel.nfUrl)+'" preload="metadata" muted playsinline></video><span class="sc-play-overlay"><span class="sc-play-circle">&#9654;</span></span></button><div class="sc-sentences">'+clipModel.previewSentences.map(scRenderClipSentence).join('')+'</div></div>'+
+      '<div class="sc-meta-bar"><span class="sc-meta-tag">关联: '+scEscape(clipModel.linkedSegment)+'</span><span class="sc-meta-tag">标签: '+scEscape(clipModel.tags.join(', '))+'</span><span class="sc-meta-tag">'+clipModel.sentences.length+' 句</span><button class="sc-more-btn" type="button" data-nf-action="open-smart-clip-meta" onclick="scOpenMeta('+clipModel.index+')">更多 ↗</button></div></div>').join(''):'<div class="sc-empty">暂无切片数据</div>';
+  root.innerHTML='<div class="sc-detail-header"><div class="sc-detail-top"><div><div class="sc-detail-name">'+scEscape(source.name)+'</div><div class="sc-detail-meta">'+scRenderedClips.length+' clips · '+(source.totalSentences||0)+' sentences</div></div><button class="sc-preview-btn" type="button" data-nf-action="preview-smart-source" onclick="scOpenSourcePlayer()">&#9654; 预览原视频</button></div><div class="sc-detail-path">'+scEscape(source.path)+'</div><div class="sc-detail-tags">'+tagHtml+'</div></div>'+timelineHtml+'<div class="sc-clip-scroll">'+cardsHtml+'</div>';
 }
 
 function scRenderModalSubtitle(sentence,emptyText){
