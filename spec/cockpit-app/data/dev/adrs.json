@@ -1,0 +1,77 @@
+{
+  "version": "v0.4",
+  "decisions": [
+    {
+      "id": "ADR-001",
+      "title": "引擎层 3 个原子模块：Easing + Animation + Transition",
+      "status": "accepted",
+      "date": "2026-04-14",
+      "context": "NextFrame 现有 40+ scene 组件，但动画能力只有简单的 enter/exit 预设。对比 Remotion（spring+interpolate）和 GSAP（3256 行核心），缺少通用动画系统导致画面像 PPT 而不像视频。",
+      "decision": "引擎层自己写 3 个模块，不引用外部库。写一次，所有 scene 自动受益。",
+      "modules": [
+        {
+          "name": "Easing",
+          "what": "缓动函数库 — 输入进度 0→1，输出变换后的 0→1",
+          "covers": "spring、ease-in、ease-out、ease-in-out、bounce、elastic、expo、cubic-bezier 自定义",
+          "estimate": "~150 行 JS",
+          "reference": "学 GSAP 缓动设计 + Anime.js 实现，不引用"
+        },
+        {
+          "name": "Animation",
+          "what": "属性动画系统 — 给定 (t, from, to, easing) → 当前值",
+          "covers": "enter 入场动画、exit 退场动画、keyframe 关键帧、stagger 依次出现、loop 循环",
+          "estimate": "~100 行 JS",
+          "reference": "学 GSAP Tween 设计，不引用"
+        },
+        {
+          "name": "Transition",
+          "what": "场景间过渡 — 两个 layer 的属性同时做动画",
+          "covers": "dissolve 溶解、fadeBlack 黑场、wipe 擦除、slide 推移、zoom 缩放、iris 光圈",
+          "estimate": "~100 行 JS",
+          "reference": "CSS clip-path + opacity + transform 组合，自己写"
+        }
+      ],
+      "why_not_library": "1. GSAP 商业协议有授权风险。2. 所有实时动画库都是 Ticker 驱动，NextFrame 是 frame-pure（给 t 算一帧），架构不兼容。3. 核心只需 300 行，引库反而更重。",
+      "impact": "40+ 现有 scene 零改动，自动获得 spring 入场、缓动退场、关键帧动画、场景转场能力。"
+    },
+    {
+      "id": "ADR-002",
+      "title": "Scene 组件内部可引用渲染库，引擎层零依赖",
+      "status": "accepted",
+      "date": "2026-04-14",
+      "context": "3D 背景需要 Three.js、数据可视化需要 D3、矢量动画需要 Lottie。自己写这些渲染引擎不现实（Three.js 10 万+ 行）。但引擎层（Timeline/Easing/Animation/Transition/Recorder）必须自己控制。",
+      "decision": "两层策略 — 引擎层自己写零依赖，Scene 组件内部按需引用 MIT/Apache 库。",
+      "rules": [
+        "引用的库只出现在单个 scene 文件内部",
+        "引擎层（timeline/easing/animation/transition/recorder）零外部依赖",
+        "用户/AI 只看到 scene 名字和 params，不知道内部用了什么",
+        "换掉一个库只影响一个 scene 文件",
+        "只引用 MIT/Apache/BSD 协议的库"
+      ],
+      "allowed_imports": {
+        "Three.js": "3D 背景/粒子/特效 scene",
+        "D3.js": "数据可视化 scene",
+        "Lottie": "矢量动画 scene（已有 lottieAnim）",
+        "GLSL shader 代码片段": "特效 scene（lygia、Shadertoy）"
+      },
+      "forbidden_imports": {
+        "GSAP": "商业协议",
+        "Framer Motion": "绑 React",
+        "任何库在引擎层": "引擎必须零依赖"
+      }
+    },
+    {
+      "id": "ADR-003",
+      "title": "产品定位：AI 视频引擎，不是自媒体工具",
+      "status": "accepted",
+      "date": "2026-04-14",
+      "context": "视频的本质 = 让信息更容易被人理解。NextFrame 不应只服务自媒体人，任何需要'把信息变成视频'的场景都是用武之地：教育、产品演示、数据报告、内部培训、开源项目介绍。",
+      "decision": "NextFrame 是通用 AI 视频引擎（引擎层），自媒体全链路是上层应用之一。",
+      "layers": {
+        "engine": "JSON Timeline → Scene 组件 → 动画系统 → TTS → Recorder → CLI",
+        "applications": ["自媒体全链路", "教育课件生成", "数据报告视频化", "产品 Demo 生成", "演示/Slide"]
+      },
+      "implication": "先把引擎做到极致，上层应用自然生长。Scene 组件不只为短视频设计，教育/数据/代码场景同样重要。"
+    }
+  ]
+}
