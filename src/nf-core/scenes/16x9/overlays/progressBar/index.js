@@ -11,12 +11,13 @@ export const meta = {
     "signal-green": { color:"#7ec699", trackColor:"rgba(126,198,153,.18)" }
   },
   params: {
-    progress:     { type:"number", required:true, default:0.35, label:"进度 0-1", semantic:"current progress fraction, 0=empty 1=full", group:"content", range:[0,1], step:0.01 },
-    color:        { type:"color",  default:"#da7756",          label:"进度条颜色",  group:"color" },
-    trackColor:   { type:"color",  default:"rgba(245,236,224,.08)", label:"轨道颜色", group:"color" },
-    height:       { type:"number", default:4,                  label:"高度(px)",    group:"style", range:[1,20], step:1 },
-    y:            { type:"number", default:50,                 label:"距底部(px)",  group:"style", range:[0,200], step:5 },
-    borderRadius: { type:"number", default:2,                  label:"圆角(px)",    group:"style", range:[0,10], step:1 }
+    progress:      { type:"number", required:false, default:0.35, label:"进度 0-1（静态）", semantic:"current progress fraction, 0=empty 1=full. Ignored if totalDuration>0.", group:"content", range:[0,1], step:0.01 },
+    totalDuration: { type:"number", default:0, label:"总时长(s)，用于自动计算进度", semantic:"when >0, progress = t/totalDuration (auto from time). Overrides static progress.", group:"content", range:[0,3600], step:1 },
+    color:         { type:"color",  default:"#da7756",          label:"进度条颜色",  group:"color" },
+    trackColor:    { type:"color",  default:"rgba(245,236,224,.08)", label:"轨道颜色", group:"color" },
+    height:        { type:"number", default:4,                  label:"高度(px)",    group:"style", range:[1,20], step:1 },
+    y:             { type:"number", default:50,                 label:"距底部(px)",  group:"style", range:[0,200], step:5 },
+    borderRadius:  { type:"number", default:2,                  label:"圆角(px)",    group:"style", range:[0,10], step:1 }
   },
   ai: {
     when: "显示视频整体播放进度或章节进度。调用方计算 progress = currentTime / totalDuration 传入。",
@@ -31,7 +32,9 @@ export const meta = {
 export function render(t, params, vp) {
   const p = {};
   for (const k in meta.params) p[k] = params[k] !== undefined ? params[k] : meta.params[k].default;
-  const progress = Math.max(0, Math.min(1, p.progress || 0));
+  const progress = p.totalDuration > 0
+    ? Math.max(0, Math.min(1, t / p.totalDuration))
+    : Math.max(0, Math.min(1, p.progress || 0));
   const h = p.height;
   const r = p.borderRadius;
   const y = p.y;

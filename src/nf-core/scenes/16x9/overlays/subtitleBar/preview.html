@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>subtitleBar Preview</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-direction:column;align-items:center;padding:20px;min-height:100vh}
+.info{font-size:13px;color:#888;margin-bottom:12px}.info span{color:#da7756;font-weight:700}
+.canvas-wrap{position:relative;width:960px;height:540px;background:#1a1510;border:1px solid #333;border-radius:8px;overflow:hidden}
+.canvas-inner{width:1920px;height:1080px;transform-origin:0 0;transform:scale(0.5);position:absolute;top:0;left:0}
+.controls{margin-top:16px;display:flex;gap:16px;align-items:center}
+.controls input[type=range]{width:400px}
+.controls button{background:#da7756;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:14px}
+.time-display{font-family:monospace;font-size:14px;color:#da7756;min-width:80px}
+</style>
+</head>
+<body>
+<div class="info"><span>subtitleBar</span> · 16:9 · overlays</div>
+<div class="canvas-wrap"><div class="canvas-inner" id="canvas"></div></div>
+<div class="controls">
+  <button id="playBtn">▶ Play</button>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <div class="time-display" id="timeDisplay">0.00s</div>
+</div>
+<script>
+(function(){
+  var DEMO_SRT = [
+    { s: 0.5, e: 4, t: "Hook：AI 的安检员" },
+    { s: 4.5, e: 9, t: "每次 AI 动手前先检查一遍" },
+    { s: 10, e: 14, t: "发现危险行为就阻断" },
+    { s: 15, e: 20, t: "只需要一个 JSON 配置就能启动" },
+  ];
+
+  function render(t, params, vp) {
+    var srt = Array.isArray(params.srt) ? params.srt : [];
+    var entry = null;
+    for (var i = 0; i < srt.length; i++) {
+      if (t >= Number(srt[i].s || 0) && t < Number(srt[i].e || 0)) { entry = srt[i]; break; }
+    }
+    var text = entry ? String(entry.t || "") : "";
+    if (!text) return "";
+    var fs = params.fontSize || 32;
+    var y = params.y || 60;
+    var maxW = vp.width - 160;
+    var bgColor = params.bgColor || "rgba(26,21,16,0.82)";
+    var textColor = params.textColor || "#f5ece0";
+    var accentColor = params.accentColor || "#da7756";
+    return '<div style="position:absolute;left:0;right:0;bottom:'+y+'px;display:flex;justify-content:center;align-items:flex-end;padding:0 80px">' +
+      '<div style="background:'+bgColor+';color:'+textColor+';font:500 '+fs+'px system-ui,sans-serif;' +
+      'padding:10px 28px;border-radius:6px;max-width:'+maxW+'px;text-align:center;line-height:1.5;' +
+      'border-bottom:2px solid '+accentColor+'">' + text + '</div>' +
+    '</div>';
+  }
+
+  var duration = 22;
+  var canvas = document.getElementById('canvas');
+  var scrubber = document.getElementById('scrubber');
+  var timeDisplay = document.getElementById('timeDisplay');
+  var playBtn = document.getElementById('playBtn');
+
+  function renderFrame(t) {
+    canvas.innerHTML =
+      '<div style="position:absolute;inset:0;background:linear-gradient(135deg,#1a1510 0%,#2a1f18 100%)"></div>' +
+      '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">' +
+        '<div style="font:600 36px Georgia,serif;color:rgba(245,236,224,0.25)">t = ' + t.toFixed(2) + 's</div>' +
+      '</div>' +
+      render(t, { srt: DEMO_SRT, fontSize: 32, y: 60 }, { width: 1920, height: 1080 });
+  }
+
+  scrubber.addEventListener('input', function(){
+    var t = (scrubber.value / 1000) * duration;
+    timeDisplay.textContent = t.toFixed(2) + 's';
+    renderFrame(t);
+  });
+
+  var playing = false, startTime = 0, startOffset = 0;
+  function tick() {
+    if (!playing) return;
+    var t = ((Date.now() - startTime) / 1000 + startOffset) % duration;
+    scrubber.value = (t / duration) * 1000;
+    timeDisplay.textContent = t.toFixed(2) + 's';
+    renderFrame(t);
+    requestAnimationFrame(tick);
+  }
+  playBtn.addEventListener('click', function(){
+    playing = !playing;
+    if (playing) { startTime = Date.now(); startOffset = (scrubber.value / 1000) * duration; playBtn.textContent = '⏸ Pause'; tick(); }
+    else { playBtn.textContent = '▶ Play'; }
+  });
+  renderFrame(0);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>flowDiagram Preview</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-direction:column;align-items:center;padding:20px;min-height:100vh}
+.info{font-size:13px;color:#888;margin-bottom:12px}.info span{color:#da7756;font-weight:700}
+.canvas-wrap{position:relative;width:960px;height:540px;background:#1a1510;border:1px solid #333;border-radius:8px;overflow:hidden}
+.canvas-inner{width:1920px;height:1080px;transform-origin:0 0;transform:scale(0.5);position:absolute;top:0;left:0}
+.controls{margin-top:16px;display:flex;gap:16px;align-items:center}
+.controls input[type=range]{width:400px}
+.controls button{background:#da7756;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:14px}
+.time-display{font-family:monospace;font-size:14px;color:#da7756;min-width:80px}
+</style>
+</head>
+<body>
+<div class="info"><span>flowDiagram</span> · 16:9 · data — Hook 流程图演示</div>
+<div class="canvas-wrap"><div class="canvas-inner" id="canvas"></div></div>
+<div class="controls">
+  <button id="playBtn">▶ Play</button>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <div class="time-display" id="timeDisplay">0.00s</div>
+</div>
+<script>
+(function(){
+  function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); }
+
+  function render(t, params, vp) {
+    var p = {
+      nodes: params.nodes || [],
+      title: params.title || "",
+      enterDur: params.enterDur !== undefined ? params.enterDur : 0.4,
+      enterStagger: params.enterStagger !== undefined ? params.enterStagger : 0.5,
+      nodeBg: params.nodeBg || "#2a1f18",
+      nodeBorder: params.nodeBorder || "#da7756",
+      nodeText: params.nodeText || "#f5ece0",
+      arrowColor: params.arrowColor || "#d4b483",
+      passColor: params.passColor || "#7ec699",
+      blockColor: params.blockColor || "#e06c75",
+      y: params.y || 0,
+      nodeWidth: params.nodeWidth || 220,
+      nodeHeight: params.nodeHeight || 90,
+    };
+
+    var nodes = p.nodes;
+    if (nodes.length === 0) return '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(245,236,224,.3);font:400 24px system-ui">No nodes</div>';
+
+    var nw = p.nodeWidth, nh = p.nodeHeight, arrowW = 60;
+
+    var mainNodes = nodes.filter(function(n){ return n.type !== "pass" && n.type !== "block"; });
+    var branchNodes = nodes.filter(function(n){ return n.type === "pass" || n.type === "block"; });
+    var decisionIdx = mainNodes.findIndex(function(n){ return n.type === "decision"; });
+
+    var mainFlowCount = mainNodes.length;
+    var totalMainW = mainFlowCount * nw + (mainFlowCount - 1) * arrowW;
+    var branchCount = branchNodes.length;
+    var totalBranchW = branchCount > 1 ? branchCount * nw + (branchCount - 1) * 40 : nw;
+
+    var startX = (vp.width - totalMainW) / 2;
+    var mainY = p.y > 0 ? p.y : (branchCount > 0 ? vp.height * 0.35 : vp.height / 2 - nh / 2);
+    var branchY = mainY + nh + 70;
+
+    var shapes = [];
+    var nodeIdx = 0;
+
+    for (var i = 0; i < mainNodes.length; i++) {
+      var n = mainNodes[i];
+      var nx = startX + i * (nw + arrowW);
+      var ny = mainY;
+      var appearAt = nodeIdx * p.enterStagger;
+      var op = ease3((t - appearAt) / p.enterDur);
+      nodeIdx++;
+      if (i < mainNodes.length - 1) {
+        var arrowOp = ease3((t - (nodeIdx - 0.5) * p.enterStagger) / p.enterDur);
+        shapes.push({ kind: "arrow", x: nx + nw, y: ny + nh / 2, w: arrowW, op: arrowOp, color: p.arrowColor });
+      }
+      shapes.push({ kind: "node", x: nx, y: ny, w: nw, h: nh, op: op, node: n });
+    }
+
+    if (branchCount > 0 && decisionIdx >= 0) {
+      var decisionX = startX + decisionIdx * (nw + arrowW);
+      var decisionCX = decisionX + nw / 2;
+      var branchStartX = decisionCX - totalBranchW / 2;
+
+      for (var j = 0; j < branchNodes.length; j++) {
+        var bn = branchNodes[j];
+        var bx = branchStartX + j * (nw + 40);
+        var by = branchY;
+        var bAppearAt = nodeIdx * p.enterStagger;
+        var bOp = ease3((t - bAppearAt) / p.enterDur);
+        nodeIdx++;
+        shapes.push({ kind: "varrow", x: bx + nw / 2, y1: mainY + nh, y2: by, op: bOp, color: p.arrowColor });
+        shapes.push({ kind: "node", x: bx, y: by, w: nw, h: nh, op: bOp, node: bn });
+      }
+    }
+
+    var html = '<div style="position:absolute;inset:0;overflow:hidden">';
+    if (p.title) {
+      var titleOp = ease3(t / p.enterDur);
+      html += '<div style="position:absolute;top:60px;left:0;right:0;text-align:center;font:600 36px Georgia,serif;color:'+p.nodeText+';opacity:'+titleOp+'">'+p.title+'</div>';
+    }
+
+    for (var s = 0; s < shapes.length; s++) {
+      var shape = shapes[s];
+      var opC = Math.max(0, Math.min(1, shape.op));
+      if (opC <= 0) continue;
+
+      if (shape.kind === "arrow") {
+        html += '<div style="position:absolute;left:'+shape.x+'px;top:'+(shape.y-1)+'px;width:'+shape.w+'px;height:2px;background:'+shape.color+';opacity:'+opC+'">' +
+          '<div style="position:absolute;right:0;top:50%;transform:translateY(-50%);width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid '+shape.color+'"></div>' +
+          '</div>';
+      } else if (shape.kind === "varrow") {
+        var lineH = shape.y2 - shape.y1;
+        html += '<div style="position:absolute;left:'+(shape.x-1)+'px;top:'+shape.y1+'px;width:2px;height:'+lineH+'px;background:'+shape.color+';opacity:'+opC+'">' +
+          '<div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:12px solid '+shape.color+'"></div>' +
+          '</div>';
+      } else if (shape.kind === "node") {
+        var nd = shape.node;
+        var bgColor = p.nodeBg, borderColor = p.nodeBorder, textColor = p.nodeText;
+        if (nd.type === "pass")  { bgColor = "rgba(126,198,153,0.15)"; borderColor = p.passColor; textColor = p.passColor; }
+        if (nd.type === "block") { bgColor = "rgba(224,108,117,0.15)"; borderColor = p.blockColor; textColor = p.blockColor; }
+        var isDecision = nd.type === "decision";
+        var nodeStyle;
+        if (isDecision) {
+          nodeStyle = 'position:absolute;left:'+shape.x+'px;top:'+shape.y+'px;width:'+shape.w+'px;height:'+shape.h+'px;display:flex;align-items:center;justify-content:center;clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);background:'+bgColor+';outline:2px solid '+borderColor+';opacity:'+opC;
+        } else {
+          nodeStyle = 'position:absolute;left:'+shape.x+'px;top:'+shape.y+'px;width:'+shape.w+'px;height:'+shape.h+'px;display:flex;align-items:center;justify-content:center;border:2px solid '+borderColor+';border-radius:8px;background:'+bgColor+';opacity:'+opC;
+        }
+        html += '<div style="'+nodeStyle+'"><div style="font:600 28px system-ui,sans-serif;color:'+textColor+';text-align:center;padding:0 12px">'+(nd.label||nd.id)+'</div></div>';
+      }
+    }
+    html += '</div>';
+    return html;
+  }
+
+  var DEMO_PARAMS = {
+    nodes: [
+      { id: "ai",    label: "AI 请求", type: "main" },
+      { id: "hook",  label: "Hook 检查", type: "decision" },
+      { id: "pass",  label: "PASS ✓", type: "pass" },
+      { id: "block", label: "BLOCK ✗", type: "block" },
+    ],
+    title: "Claude Code Hook 流程",
+    enterStagger: 0.8,
+    enterDur: 0.4,
+  };
+
+  var duration = 8;
+  var canvas = document.getElementById('canvas');
+  var scrubber = document.getElementById('scrubber');
+  var timeDisplay = document.getElementById('timeDisplay');
+  var playBtn = document.getElementById('playBtn');
+
+  function renderFrame(t) {
+    canvas.innerHTML =
+      '<div style="position:absolute;inset:0;background:#1a1510"></div>' +
+      render(t, DEMO_PARAMS, { width: 1920, height: 1080 });
+  }
+
+  scrubber.addEventListener('input', function(){
+    var t = (scrubber.value / 1000) * duration;
+    timeDisplay.textContent = t.toFixed(2) + 's';
+    renderFrame(t);
+  });
+
+  var playing = false, startTime = 0, startOffset = 0;
+  function tick() {
+    if (!playing) return;
+    var t = ((Date.now() - startTime) / 1000 + startOffset) % duration;
+    scrubber.value = (t / duration) * 1000;
+    timeDisplay.textContent = t.toFixed(2) + 's';
+    renderFrame(t);
+    requestAnimationFrame(tick);
+  }
+  playBtn.addEventListener('click', function(){
+    playing = !playing;
+    if (playing) { startTime = Date.now(); startOffset = (scrubber.value / 1000) * duration; playBtn.textContent = '⏸ Pause'; tick(); }
+    else { playBtn.textContent = '▶ Play'; }
+  });
+  renderFrame(0);
+})();
+</script>
+</body>
+</html>
