@@ -38,7 +38,8 @@ pub fn run() {
     let style = NSWindowStyleMask::Titled
         | NSWindowStyleMask::Closable
         | NSWindowStyleMask::Resizable
-        | NSWindowStyleMask::Miniaturizable;
+        | NSWindowStyleMask::Miniaturizable
+        | NSWindowStyleMask::FullSizeContentView;
 
     let rect = NSRect::new(
         NSPoint::new(100.0, 100.0),
@@ -58,6 +59,13 @@ pub fn run() {
 
     window.setTitle(&NSString::from_str("NextFrame"));
     window.center();
+
+    // Transparent titlebar — content extends behind it, traffic lights inline
+    // SAFETY: these are valid NSWindow property setters.
+    unsafe {
+        let _: () = msg_send![&window, setTitlebarAppearsTransparent: true];
+        let _: () = msg_send![&window, setTitleVisibility: 1i64]; // NSWindowTitleHidden = 1
+    }
 
     // Create WKWebView and set as content
     match webview::create(mtm, NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT)) {
