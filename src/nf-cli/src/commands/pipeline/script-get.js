@@ -1,3 +1,4 @@
+// Reads pipeline script metadata or a single script segment from an episode.
 import { parseFlags, emit } from "../_helpers/_io.js";
 import { loadPipeline } from "../_helpers/_pipeline.js";
 import { parseIntegerFlag } from "../_helpers/_pipeline-utils.js";

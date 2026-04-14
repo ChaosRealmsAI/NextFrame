@@ -1,3 +1,4 @@
+// Controls the desktop pipeline view over the local app HTTP API.
 import http from "node:http";
 import { emit, parseFlags } from "../_helpers/_io.js";
 import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help/index.js";

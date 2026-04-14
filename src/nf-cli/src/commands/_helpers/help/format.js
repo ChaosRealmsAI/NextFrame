@@ -1,3 +1,4 @@
+// Formats CLI help text for individual commands and the root command listing.
 const renderList = (items) => {
   if (!items || items.length === 0) return "";
   return items.map((item) => `  - ${item}`).join("\n");

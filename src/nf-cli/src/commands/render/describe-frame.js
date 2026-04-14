@@ -1,3 +1,4 @@
+// Describes the active scenes at a specific timeline time by calling scene describe() hooks.
 import { emit, loadTimeline, parseFlags, parseTime } from "../_helpers/_io.js";
 import { resolveTimeline as resolveTimelineArgs, timelineUsage } from "../_helpers/_resolve.js";
 import { resolveTimeline as resolveLegacyTimeline } from "../../engine/legacy/time.js";

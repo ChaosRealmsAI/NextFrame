@@ -1,3 +1,4 @@
+// Lints runtime scene modules for metadata, lifecycle hooks, and stage-sizing conventions.
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { readdir, readFile } from "node:fs/promises";

@@ -1,3 +1,4 @@
+// Adds a component, video, or image atom to an episode pipeline.
 import { parseFlags, emit } from "../_helpers/_io.js";
 import { loadPipeline, savePipeline } from "../_helpers/_pipeline.js";
 import { objectOr, parseIntegerFlag, parseJsonFlag, parseNumberFlag } from "../_helpers/_pipeline-utils.js";

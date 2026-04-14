@@ -1,3 +1,4 @@
+// Downloads a source video into the library and initializes its source.json metadata.
 import { finalizeDownloadDirectory, createSourceDocument, ensureDirectory, fail, normalizeFormat, parseSourceFlags, pickMetaDuration, pickMetaTitle, prepareDownloadDirectory, readMetaJson, resolveSourceBin, runSourceBinary, success, writeSourceJson, assertSourceBinAvailable } from "../_helpers/_source.js";
 
 const HELP = "usage: nextframe source-download <url> --library <path> [--format 720]";

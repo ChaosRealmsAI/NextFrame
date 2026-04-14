@@ -1,3 +1,4 @@
+// Provides immutable helpers for adding, moving, resizing, and querying legacy timeline clips.
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }

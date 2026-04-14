@@ -1,3 +1,4 @@
+// Loads project metadata, resolves project roots, and updates project timestamps.
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";

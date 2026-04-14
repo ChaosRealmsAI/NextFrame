@@ -1,3 +1,4 @@
+// Implements CLI subcommands that inspect and control the desktop app over HTTP.
 import http from "node:http";
 import { existsSync } from "node:fs";
 import { emit, parseFlags } from "../_helpers/_io.js";

@@ -1,3 +1,4 @@
+// Exports timelines to MP4 with the Rust recorder and falls back to ffmpeg when needed.
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";

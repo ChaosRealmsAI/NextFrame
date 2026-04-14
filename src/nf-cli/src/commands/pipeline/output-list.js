@@ -1,3 +1,4 @@
+// Lists pipeline outputs for an episode as JSON or a formatted table.
 import { parseFlags, emit } from "../_helpers/_io.js";
 import { loadPipeline } from "../_helpers/_pipeline.js";
 import { formatTable } from "../_helpers/_pipeline-utils.js";

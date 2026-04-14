@@ -1,3 +1,4 @@
+// Creates a new legacy timeline JSON file with optional seed content.
 import { parseFlags, saveTimeline, emit } from "../_helpers/_io.js";
 
 export async function run(argv) {

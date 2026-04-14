@@ -1,3 +1,4 @@
+// Creates a new empty segment timeline JSON file inside an episode.
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";

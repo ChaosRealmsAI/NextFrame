@@ -1,3 +1,4 @@
+// Provides example invocations for CLI help output.
 const lines = (text) => text.trim().split("\n").map((line) => line.trim()).filter(Boolean);
 const examples = (name, text) => [name, lines(text)];
 

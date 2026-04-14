@@ -1,3 +1,4 @@
+// Builds scene metadata indexes from the runtime scene registry for CLI consumers.
 import SCENE_REGISTRY from "../../../../nf-runtime/web/src/components/index.js";
 
 const SCENE_ENTRIES = Object.values(SCENE_REGISTRY)

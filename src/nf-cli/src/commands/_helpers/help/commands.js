@@ -1,3 +1,4 @@
+// Defines grouped CLI command metadata, usage text, and help constraints.
 import { COMMAND_EXAMPLES } from "./examples.js";
 
 export const DEFAULT_FIX = "run the same command with --help to see required params, examples, and constraints";

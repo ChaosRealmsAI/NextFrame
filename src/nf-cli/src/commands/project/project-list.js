@@ -1,3 +1,4 @@
+// Lists projects under the configured root with episode counts and update times.
 import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";

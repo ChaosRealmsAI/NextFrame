@@ -1,3 +1,4 @@
+// Creates a new project directory and writes its initial project.json file.
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";

@@ -1,3 +1,4 @@
+// Validates guarded result shapes for legacy engine functions when guard mode is enabled.
 function isStructuredError(error) {
   return !!error && typeof error === "object" && typeof error.code === "string" && typeof error.message === "string";
 }

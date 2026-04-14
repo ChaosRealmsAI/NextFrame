@@ -1,3 +1,4 @@
+// Applies a cool-tone color filter and exposes its matching CSS filter string.
 function clamp01(value, fallback) {
   const normalized = value ?? fallback;
   return Math.max(0, Math.min(1, normalized));

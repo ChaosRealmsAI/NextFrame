@@ -1,3 +1,4 @@
+// Marks a pipeline output as published to a platform with a publish timestamp.
 import { parseFlags, emit } from "../_helpers/_io.js";
 import { loadPipeline, savePipeline } from "../_helpers/_pipeline.js";
 import { parseIntegerFlag } from "../_helpers/_pipeline-utils.js";

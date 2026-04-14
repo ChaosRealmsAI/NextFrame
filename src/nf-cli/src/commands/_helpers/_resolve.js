@@ -1,3 +1,4 @@
+// Resolves project, segment, timeline, and cache paths for timeline-oriented CLI commands.
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";

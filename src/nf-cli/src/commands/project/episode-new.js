@@ -1,3 +1,4 @@
+// Creates a new episode directory with pipeline scaffolding inside an existing project.
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";

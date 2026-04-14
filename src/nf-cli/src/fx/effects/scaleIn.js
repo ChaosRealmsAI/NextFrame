@@ -1,3 +1,4 @@
+// Applies a scale-in transition by growing and fading the canvas content into place.
 export function scaleIn(ctx, progress, w, h) {
   const s = progress;
   ctx.globalAlpha = progress;

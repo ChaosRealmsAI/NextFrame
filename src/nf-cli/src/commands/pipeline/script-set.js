@@ -1,3 +1,4 @@
+// Updates pipeline script metadata or per-segment script content for an episode.
 import { parseFlags, emit } from "../_helpers/_io.js";
 import { loadPipeline, savePipeline } from "../_helpers/_pipeline.js";
 import { parseIntegerFlag, parseJsonFlag } from "../_helpers/_pipeline-utils.js";

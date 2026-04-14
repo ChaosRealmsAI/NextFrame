@@ -1,3 +1,4 @@
+// Renders timelines in headless Chrome and captures frames or MP4 output from them.
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";

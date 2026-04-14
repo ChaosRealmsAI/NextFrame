@@ -1,3 +1,4 @@
+// Lists a project's episodes with their order, segment count, and total duration.
 import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";

@@ -1,3 +1,4 @@
+// Aligns an SRT file to a source video and writes transcript metadata back to source.json.
 import { assertSourceBinAvailable, fail, parseSourceFlags, readJson, readSourceJson, resolveSourceBin, runSourceBinary, success, summarizeTranscript, writeSourceJson } from "../_helpers/_source.js";
 import { join, resolve } from "node:path";
 

@@ -1,3 +1,4 @@
+// Transcribes a source video and stores the summarized transcript in source.json.
 import { assertSourceBinAvailable, fail, parseSourceFlags, readJson, readSourceJson, resolveSourceBin, runSourceBinary, success, summarizeTranscript, writeSourceJson } from "../_helpers/_source.js";
 import { join, resolve } from "node:path";
 

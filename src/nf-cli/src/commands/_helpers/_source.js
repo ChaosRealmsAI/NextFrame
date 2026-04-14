@@ -1,3 +1,4 @@
+// Provides shared helpers for source-library commands, source.json files, and nf-source integration.
 import { access, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { spawnSync } from "node:child_process";

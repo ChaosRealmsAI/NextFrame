@@ -1,3 +1,4 @@
+// Normalizes source transcript data and derives transcript summaries, clips, and subtitles.
 import { readFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 

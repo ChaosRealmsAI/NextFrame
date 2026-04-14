@@ -1,3 +1,4 @@
+// Parses pipeline command flags and formats tabular pipeline command output.
 export function parseIntegerFlag(name, raw, options = {}) {
   const value = Number(raw);
   if (!Number.isInteger(value)) {

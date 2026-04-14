@@ -1,3 +1,4 @@
+// Applies a scale-out transition by shrinking and fading the canvas content.
 export function scaleOut(ctx, progress, w, h) {
   const s = 1 - progress;
   ctx.globalAlpha = 1 - progress;

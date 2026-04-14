@@ -1,3 +1,4 @@
+// Lists segment timeline files for an episode with their durations.
 import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";

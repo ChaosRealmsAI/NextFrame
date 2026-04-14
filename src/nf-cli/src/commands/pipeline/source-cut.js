@@ -1,3 +1,4 @@
+// Cuts clips from a source video using a plan and saves the resulting clip metadata.
 import { assertSourceBinAvailable, buildClipsFromCut, fail, parseSourceFlags, readJson, readSourceJson, resolveSourceBin, runSourceBinary, success, writeSourceJson } from "../_helpers/_source.js";
 import { join, resolve } from "node:path";
 

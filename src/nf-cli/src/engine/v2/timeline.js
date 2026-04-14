@@ -1,3 +1,4 @@
+// Defines v0.3 timeline helpers for templates, metrics, and active-layer queries.
 export const V3_SCHEMA = "nextframe/v0.3";
 
 export function createTimelineTemplate(opts = {}) {

@@ -1,3 +1,4 @@
+// Reads and updates shared project configuration values in project.json.
 import { parseFlags, emit } from "../_helpers/_io.js";
 import { objectOr } from "../_helpers/_pipeline-utils.js";
 import { resolveRoot, loadProjectContext, touchProject } from "../_helpers/_project.js";

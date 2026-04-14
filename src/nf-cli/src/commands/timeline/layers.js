@@ -1,3 +1,4 @@
+// Handles layer list and CRUD CLI subcommands for v0.3 timeline files.
 import { parseFlags, loadTimeline, saveTimeline, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineUsage } from "../_helpers/_resolve.js";
 import { addLayer, listLayers, moveLayer, removeLayer, resizeLayer, setLayerProps } from "../../engine/v2/ops.js";

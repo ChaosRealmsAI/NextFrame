@@ -1,3 +1,4 @@
+// Links source clips into an episode pipeline by appending video atoms from source.json.
 import { join, resolve } from "node:path";
 
 import { loadPipeline, savePipeline } from "../_helpers/_pipeline.js";

@@ -1,3 +1,4 @@
+// Lists source library entries from a source library directory.
 import { fail, listSources, parseSourceFlags, success } from "../_helpers/_source.js";
 
 const HELP = "usage: nextframe source-list --library <path>";

@@ -1,3 +1,4 @@
+// Adds deterministic film grain noise to pixel buffers or canvas overlays.
 function clamp01(value, fallback) {
   const normalized = value ?? fallback;
   return Math.max(0, Math.min(1, normalized));

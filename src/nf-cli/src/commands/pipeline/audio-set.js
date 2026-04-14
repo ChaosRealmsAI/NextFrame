@@ -1,3 +1,4 @@
+// Updates pipeline audio settings or per-segment audio metadata for an episode.
 import { parseFlags, emit } from "../_helpers/_io.js";
 import { loadPipeline, savePipeline } from "../_helpers/_pipeline.js";
 import { parseIntegerFlag, parseJsonFlag, parseNumberFlag } from "../_helpers/_pipeline-utils.js";
