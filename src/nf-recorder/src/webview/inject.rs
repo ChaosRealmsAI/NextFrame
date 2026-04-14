@@ -5,34 +5,41 @@ use std::time::Duration;
 use super::WebViewHost;
 use crate::error_with_fix;
 
+/// Data passed to the page's `window.__onFrame` callback each frame.
+pub struct FrameState<'a> {
+    pub cue_index: i32,
+    pub subtitle_text: &'a str,
+    pub progress_pct: f64,
+    pub segment_index: usize,
+    pub total_segments: usize,
+    pub segment_titles: &'a [String],
+    pub segment_durations: &'a [f64],
+    pub video_time_sec: f64,
+}
+
 impl WebViewHost {
     /// Sends frame data to the page via `window.__onFrame(data)`.
     ///
     /// The recorder only passes data — all rendering (subtitles, cue animations,
     /// progress bars) is the HTML template's responsibility via its `__onFrame`
     /// implementation.
-    #[allow(clippy::too_many_arguments)]
-    pub fn inject_state(
-        &self,
-        cue_index: i32,
-        subtitle_text: &str,
-        progress_pct: f64,
-        segment_index: usize,
-        total_segments: usize,
-        segment_titles: &[String],
-        segment_durations: &[f64],
-        video_time_sec: f64,
-    ) -> Result<(), String> {
-        let subtitle_json = serde_json::to_string(subtitle_text).map_err(|err| {
+    pub fn inject_state(&self, state: &FrameState<'_>) -> Result<(), String> {
+        let subtitle_json = serde_json::to_string(state.subtitle_text).map_err(|err| {
             error_with_fix(
                 "encode subtitle text for page injection",
                 err,
                 "Retry after removing unsupported subtitle data or control characters from the page input.",
             )
         })?;
-        let titles_json = serde_json::to_string(segment_titles).unwrap_or_else(|_| "[]".to_owned());
+        let titles_json =
+            serde_json::to_string(state.segment_titles).unwrap_or_else(|_| "[]".to_owned());
         let durations_json =
-            serde_json::to_string(segment_durations).unwrap_or_else(|_| "[]".to_owned());
+            serde_json::to_string(state.segment_durations).unwrap_or_else(|_| "[]".to_owned());
+        let video_time_sec = state.video_time_sec;
+        let progress_pct = state.progress_pct;
+        let cue_index = state.cue_index;
+        let segment_index = state.segment_index;
+        let total_segments = state.total_segments;
         let script = format!(
             r#"
             (() => {{

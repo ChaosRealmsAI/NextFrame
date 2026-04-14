@@ -14,7 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::Value;
 
 use super::ffmpeg::{build_overlay_filter, build_video_layer_filter};
-use super::perf::format_perf_log_line;
+use super::perf::{PerfMetrics, format_perf_log_line};
 use super::spec::VideoOverlaySpec;
 use super::{PerfLogContext, build_video_overlay_specs, overlay_video};
 use crate::plan::VideoLayerInfo;
@@ -201,15 +201,17 @@ fn format_perf_log_line_formats_clip_mode_metrics() {
     };
     let line = format_perf_log_line(
         123,
-        12,
-        3,
-        30.0,
-        10.0,
-        5.0,
-        60.0,
-        42.4,
-        (1080, 1920),
-        "h264_videotoolbox",
+        &PerfMetrics {
+            total_frames: 12,
+            skipped_frames: 3,
+            content_duration: 30.0,
+            record_secs: 10.0,
+            overlay_secs: 5.0,
+            fps: 60.0,
+            size_mb: 42.4,
+            pixel_size: (1080, 1920),
+            encoder: "h264_videotoolbox",
+        },
         &context,
         &[
             "nextframe-recorder".into(),
@@ -266,15 +268,17 @@ fn format_perf_log_line_handles_slide_mode_with_zero_totals() {
     };
     let line = format_perf_log_line(
         456,
-        0,
-        0,
-        0.0,
-        0.0,
-        0.0,
-        24.0,
-        0.0,
-        (920, 538),
-        "libx264",
+        &PerfMetrics {
+            total_frames: 0,
+            skipped_frames: 0,
+            content_duration: 0.0,
+            record_secs: 0.0,
+            overlay_secs: 0.0,
+            fps: 24.0,
+            size_mb: 0.0,
+            pixel_size: (920, 538),
+            encoder: "libx264",
+        },
         &context,
         &["nextframe-recorder".into(), "slide".into()],
     );

@@ -8,7 +8,7 @@ use super::cli::{RECORDER_PATH_ENV, build_cli_args, resolve_parallel_executable}
 use super::probe::probe_page;
 use crate::api::{OUTPUT_JSON_ENV, RecordArgs, RecordOutput};
 use crate::error_with_fix;
-use crate::overlay::{PerfLogContext, write_perf_log};
+use crate::overlay::{PerfLogContext, PerfMetrics, write_perf_log};
 use crate::util::create_temp_dir;
 
 pub(super) fn record_parallel(
@@ -220,18 +220,20 @@ pub(super) fn record_parallel(
 
     write_perf_log(
         out,
-        total_frames,
-        skipped_frames,
-        duration_sec,
-        elapsed.as_secs_f64(),
-        0.0,
-        measured_fps,
-        output_size_mb,
-        (
-            (args.width * args.dpr).round() as usize,
-            (args.height * args.dpr).round() as usize,
-        ),
-        "parallel",
+        &PerfMetrics {
+            total_frames,
+            skipped_frames,
+            content_duration: duration_sec,
+            record_secs: elapsed.as_secs_f64(),
+            overlay_secs: 0.0,
+            fps: measured_fps,
+            size_mb: output_size_mb,
+            pixel_size: (
+                (args.width * args.dpr).round() as usize,
+                (args.height * args.dpr).round() as usize,
+            ),
+            encoder: "parallel",
+        },
         PerfLogContext {
             output_path: Some(out),
             frame_files,

@@ -9,7 +9,7 @@ use super::cli::{build_cli_args, resolve_parallel_executable};
 use super::probe::probe_page;
 use crate::api::{OUTPUT_JSON_ENV, RecordArgs, RecordOutput};
 use crate::error_with_fix;
-use crate::overlay::{PerfLogContext, write_perf_log};
+use crate::overlay::{PerfLogContext, PerfMetrics, write_perf_log};
 use crate::util::create_temp_dir;
 
 /// Parallel recording for a single HTML file by splitting the frame range.
@@ -208,18 +208,20 @@ pub(super) fn record_parallel_single(
 
     write_perf_log(
         out,
-        total_frames_recorded,
-        skipped_frames,
-        duration,
-        elapsed.as_secs_f64(),
-        0.0,
-        total_frames_recorded as f64 / elapsed.as_secs_f64().max(0.001),
-        output_size_mb,
-        (
-            (args.width * args.dpr).round() as usize,
-            (args.height * args.dpr).round() as usize,
-        ),
-        "parallel",
+        &PerfMetrics {
+            total_frames: total_frames_recorded,
+            skipped_frames,
+            content_duration: duration,
+            record_secs: elapsed.as_secs_f64(),
+            overlay_secs: 0.0,
+            fps: total_frames_recorded as f64 / elapsed.as_secs_f64().max(0.001),
+            size_mb: output_size_mb,
+            pixel_size: (
+                (args.width * args.dpr).round() as usize,
+                (args.height * args.dpr).round() as usize,
+            ),
+            encoder: "parallel",
+        },
         PerfLogContext {
             output_path: Some(out),
             frame_files: &frame_files,

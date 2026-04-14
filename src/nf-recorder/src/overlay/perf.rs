@@ -34,21 +34,34 @@ fn path_display_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Measured performance metrics collected during recording.
+pub struct PerfMetrics<'a> {
+    pub total_frames: usize,
+    pub skipped_frames: usize,
+    pub content_duration: f64,
+    pub record_secs: f64,
+    pub overlay_secs: f64,
+    pub fps: f64,
+    pub size_mb: f64,
+    pub pixel_size: (usize, usize),
+    pub encoder: &'a str,
+}
+
 pub(super) fn format_perf_log_line(
     ts: u64,
-    total_frames: usize,
-    skipped_frames: usize,
-    content_duration: f64,
-    record_secs: f64,
-    overlay_secs: f64,
-    fps: f64,
-    size_mb: f64,
-    pixel_size: (usize, usize),
-    encoder: &str,
+    metrics: &PerfMetrics<'_>,
     context: &PerfLogContext<'_>,
     command_args: &[String],
 ) -> String {
+    let total_frames = metrics.total_frames;
+    let skipped_frames = metrics.skipped_frames;
+    let content_duration = metrics.content_duration;
+    let record_secs = metrics.record_secs;
+    let overlay_secs = metrics.overlay_secs;
+    let fps = metrics.fps;
+    let size_mb = metrics.size_mb;
+    let pixel_size = metrics.pixel_size;
+    let encoder = metrics.encoder;
     let mode = if context.video_overlay.is_some() {
         "clip"
     } else {
@@ -121,18 +134,9 @@ pub(super) fn format_perf_log_line(
     .to_string()
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn write_perf_log(
     _out: &Path,
-    total_frames: usize,
-    skipped_frames: usize,
-    content_duration: f64,
-    record_secs: f64,
-    overlay_secs: f64,
-    fps: f64,
-    size_mb: f64,
-    pixel_size: (usize, usize),
-    encoder: &str,
+    metrics: &PerfMetrics<'_>,
     context: PerfLogContext<'_>,
 ) {
     use std::io::Write;
@@ -151,15 +155,7 @@ pub fn write_perf_log(
 
     let line = format_perf_log_line(
         ts,
-        total_frames,
-        skipped_frames,
-        content_duration,
-        record_secs,
-        overlay_secs,
-        fps,
-        size_mb,
-        pixel_size,
-        encoder,
+        metrics,
         &context,
         &command_args,
     );

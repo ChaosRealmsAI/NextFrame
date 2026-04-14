@@ -2,7 +2,7 @@
 
 mod capture;
 mod frame;
-mod inject;
+pub(crate) mod inject;
 mod navigation;
 mod parallel;
 

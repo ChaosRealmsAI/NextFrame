@@ -2,14 +2,14 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::CommonArgs;
 use crate::clock::SegmentClock;
-use crate::encoder::{EncoderBackend, SegmentEncoder};
+use crate::encoder::SegmentEncoder;
 use crate::plan::{SegmentPlan, VideoLayerInfo};
 use crate::progress::ProgressBar;
-use crate::server::HttpFileServer;
 use crate::webview::{WebViewHost, relative_http_url};
+use crate::webview::inject::FrameState;
 
+use super::config::SegmentRecordingConfig;
 use super::resolve_media_src;
 
 pub(super) struct SegmentContext {
@@ -23,25 +23,17 @@ pub(super) struct SegmentContext {
     pub(super) clock: SegmentClock,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn prepare_segment(
     host: &mut WebViewHost,
-    server: Option<&HttpFileServer>,
-    root: &Path,
     plan: &SegmentPlan,
-    index: usize,
-    temp_root: &Path,
-    offset_sec: f64,
-    total_duration_sec: f64,
-    cli: &CommonArgs,
-    backend: EncoderBackend,
-    total_segments: usize,
-    segment_titles: &[String],
-    segment_durations: &[f64],
-    progress_color: Option<(f64, f64, f64)>,
+    cfg: &SegmentRecordingConfig<'_>,
 ) -> Result<SegmentContext, String> {
+    let index = cfg.index;
+    let cli = cfg.cli;
+    let root = cfg.root;
+
     host.reset_webview()?;
-    if let Some(server) = server {
+    if let Some(server) = cfg.server {
         let url = relative_http_url(&server.base_url(), root, &plan.metadata.html_path)?;
         host.load_url(&url)?;
     } else {
@@ -72,20 +64,20 @@ pub(super) fn prepare_segment(
     } else {
         plan.effective_duration_sec
     };
-    let server_base_url = server.map(|server| server.base_url());
+    let server_base_url = cfg.server.map(|server| server.base_url());
 
     // Trigger one __onFrame at t=0 so all scene components get created
     // (audioTrack sets window.__audioSrc during create, videoClip initializes, etc.)
-    host.inject_state(
-        0,
-        "",
-        0.0,
-        index,
-        total_segments,
-        segment_titles,
-        segment_durations,
-        0.0,
-    )?;
+    host.inject_state(&FrameState {
+        cue_index: 0,
+        subtitle_text: "",
+        progress_pct: 0.0,
+        segment_index: index,
+        total_segments: cfg.total_segments,
+        segment_titles: cfg.segment_titles,
+        segment_durations: cfg.segment_durations,
+        video_time_sec: 0.0,
+    })?;
     host.flush_render(Duration::from_millis(200))?;
     let video_layers = host.query_video_layers();
     if !video_layers.is_empty() {
@@ -125,7 +117,7 @@ pub(super) fn prepare_segment(
     };
 
     // Query #sk-progress slot position for pixel-level progress bar overlay
-    let progress_bar = if total_segments > 1 {
+    let progress_bar = if cfg.total_segments > 1 {
         let rect = host.query_progress_rect(cli.dpr);
         match &rect {
             Some(r) => trace_log!(
@@ -138,8 +130,8 @@ pub(super) fn prepare_segment(
             None => trace_log!("progress bar: not found in DOM"),
         }
         rect.map(|rect| {
-            let bar = ProgressBar::new(rect, segment_durations);
-            match progress_color {
+            let bar = ProgressBar::new(rect, cfg.segment_durations);
+            match cfg.progress_color {
                 Some((r, g, b)) => bar.with_color(r, g, b),
                 None => bar,
             }
@@ -148,7 +140,7 @@ pub(super) fn prepare_segment(
         None
     };
 
-    let segment_path = temp_root.join(format!("seg{:03}.mp4", index));
+    let segment_path = cfg.temp_root.join(format!("seg{:03}.mp4", index));
     let effective_audio = if cli.disable_audio {
         None
     } else {
@@ -163,13 +155,13 @@ pub(super) fn prepare_segment(
         effective_duration.max(0.1),
         cli.fps,
         cli.crf,
-        backend,
+        cfg.backend,
     )?;
     let clock = SegmentClock::new(
         &plan.metadata,
         cli.fps,
-        offset_sec,
-        total_duration_sec,
+        cfg.offset_sec,
+        cfg.total_duration_sec,
         effective_duration,
         cli.no_skip,
         cli.skip_aggressive,

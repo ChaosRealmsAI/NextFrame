@@ -48,7 +48,16 @@ pub(super) fn probe_page(html_path: &Path, cli: &crate::CommonArgs) -> PageProbe
     let duration_sec = host.query_page_duration();
     let segment_titles = [String::from("segment")];
     let segment_durations = [duration_sec.unwrap_or(0.0)];
-    let _ = host.inject_state(0, "", 0.0, 0, 1, &segment_titles, &segment_durations, 0.0);
+    let _ = host.inject_state(&crate::webview::inject::FrameState {
+        cue_index: 0,
+        subtitle_text: "",
+        progress_pct: 0.0,
+        segment_index: 0,
+        total_segments: 1,
+        segment_titles: &segment_titles,
+        segment_durations: &segment_durations,
+        video_time_sec: 0.0,
+    });
     let _ = host.flush_render(Duration::from_millis(200));
     let video_layers_count = host.query_video_layers().len();
     let server_base_url = server.as_ref().map(|server| server.base_url());

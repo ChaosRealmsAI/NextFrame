@@ -8,11 +8,12 @@ use objc2::MainThreadMarker;
 use crate::CommonArgs;
 use crate::api::RecordOutput;
 use crate::overlay::{
-    PerfLogContext, build_video_overlay_specs, overlay_video, overlay_video_layers, write_perf_log,
+    PerfLogContext, PerfMetrics, build_video_overlay_specs, overlay_video, overlay_video_layers, write_perf_log,
 };
 use crate::parser::SlideType;
 use crate::plan::{build_segment_plans, detect_root};
 use crate::record::record_segment;
+use crate::record::config::SegmentRecordingConfig;
 use crate::util::{auto_jobs, create_temp_dir};
 use crate::{encoder, error_with_fix, internal_error_with_fix, server, webview};
 
@@ -104,21 +105,24 @@ pub(super) fn record_single(
 
     let recording_result = (|| -> Result<(), String> {
         for (index, plan) in plans.iter().enumerate() {
-            let summary = record_segment(
-                &mut host,
-                server.as_ref(),
-                &root,
-                plan,
+            let cfg = SegmentRecordingConfig {
+                server: server.as_ref(),
+                root: &root,
                 index,
-                &temp_root,
+                temp_root: &temp_root,
                 offset_sec,
                 total_duration_sec,
                 cli,
                 backend,
                 total_segments,
-                &segment_titles,
-                &segment_durations,
-                None,
+                segment_titles: &segment_titles,
+                segment_durations: &segment_durations,
+                progress_color: None,
+            };
+            let summary = record_segment(
+                &mut host,
+                plan,
+                &cfg,
             )?;
             offset_sec += plan.effective_duration_sec;
             total_frames += summary.total_frames;
@@ -203,15 +207,17 @@ pub(super) fn record_single(
 
     write_perf_log(
         out,
-        total_frames,
-        skipped_frames,
-        total_duration_sec,
-        elapsed.as_secs_f64(),
-        0.0,
-        measured_fps,
-        output_size_mb,
-        pixel_size,
-        backend.label(),
+        &PerfMetrics {
+            total_frames,
+            skipped_frames,
+            content_duration: total_duration_sec,
+            record_secs: elapsed.as_secs_f64(),
+            overlay_secs: 0.0,
+            fps: measured_fps,
+            size_mb: output_size_mb,
+            pixel_size,
+            encoder: backend.label(),
+        },
         PerfLogContext {
             output_path: Some(out),
             frame_files,

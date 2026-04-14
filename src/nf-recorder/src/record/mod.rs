@@ -1,17 +1,16 @@
 //! recording module exports
+pub(crate) mod config;
 mod cleanup;
 mod frame_loop;
 mod setup;
 
 use std::path::{Path, PathBuf};
 
-use crate::CommonArgs;
-use crate::encoder::EncoderBackend;
 use crate::plan::{SegmentPlan, SegmentSummary};
-use crate::server::HttpFileServer;
 use crate::webview::WebViewHost;
 
 use cleanup::finish_segment;
+use config::SegmentRecordingConfig;
 use frame_loop::record_frames;
 use setup::prepare_segment;
 
@@ -97,50 +96,14 @@ pub(crate) fn resolve_media_src(
     relative.exists().then_some(relative)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn record_segment(
     host: &mut WebViewHost,
-    server: Option<&HttpFileServer>,
-    root: &Path,
     plan: &SegmentPlan,
-    index: usize,
-    temp_root: &Path,
-    offset_sec: f64,
-    total_duration_sec: f64,
-    cli: &CommonArgs,
-    backend: EncoderBackend,
-    total_segments: usize,
-    segment_titles: &[String],
-    segment_durations: &[f64],
-    progress_color: Option<(f64, f64, f64)>,
+    cfg: &SegmentRecordingConfig<'_>,
 ) -> Result<SegmentSummary, String> {
-    let mut context = prepare_segment(
-        host,
-        server,
-        root,
-        plan,
-        index,
-        temp_root,
-        offset_sec,
-        total_duration_sec,
-        cli,
-        backend,
-        total_segments,
-        segment_titles,
-        segment_durations,
-        progress_color,
-    )?;
-    let frames_recorded = record_frames(
-        host,
-        plan,
-        index,
-        cli,
-        total_segments,
-        segment_titles,
-        segment_durations,
-        &mut context,
-    )?;
-    finish_segment(plan, backend, context, frames_recorded)
+    let mut context = prepare_segment(host, plan, cfg)?;
+    let frames_recorded = record_frames(host, plan, cfg, &mut context)?;
+    finish_segment(plan, cfg.backend, context, frames_recorded)
 }
 
 #[cfg(test)]

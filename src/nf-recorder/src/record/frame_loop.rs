@@ -4,14 +4,15 @@ use std::time::Duration;
 use objc2::rc::{Retained, autoreleasepool};
 use objc2_core_graphics::CGImage;
 
-use crate::CommonArgs;
 use crate::capture::{
     BLACK_FRAME_MAX_RETRIES, cgimage_from_nsimage, is_cgimage_mostly_black, is_nsimage_black,
 };
 use crate::plan::SegmentPlan;
 use crate::webview::WebViewHost;
+use crate::webview::inject::FrameState;
 use crate::{error_with_fix, internal_error_with_fix};
 
+use super::config::SegmentRecordingConfig;
 use super::setup::SegmentContext;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -29,17 +30,14 @@ impl CaptureMethod {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn record_frames(
     host: &WebViewHost,
     plan: &SegmentPlan,
-    index: usize,
-    cli: &CommonArgs,
-    total_segments: usize,
-    segment_titles: &[String],
-    segment_durations: &[f64],
+    cfg: &SegmentRecordingConfig<'_>,
     context: &mut SegmentContext,
 ) -> Result<usize, String> {
+    let index = cfg.index;
+    let cli = cfg.cli;
     let progress_bar = context.progress_bar.as_ref();
     let encoder = &mut context.encoder;
     let clock = &mut context.clock;
@@ -116,16 +114,16 @@ pub(super) fn record_frames(
                     continue;
                 }
 
-                host.inject_state(
-                    decision.cue_index,
-                    &decision.subtitle_text,
-                    decision.progress_pct,
-                    index,
-                    total_segments,
-                    segment_titles,
-                    segment_durations,
-                    decision.timestamp_sec,
-                )?;
+                host.inject_state(&FrameState {
+                    cue_index: decision.cue_index,
+                    subtitle_text: &decision.subtitle_text,
+                    progress_pct: decision.progress_pct,
+                    segment_index: index,
+                    total_segments: cfg.total_segments,
+                    segment_titles: cfg.segment_titles,
+                    segment_durations: cfg.segment_durations,
+                    video_time_sec: decision.timestamp_sec,
+                })?;
                 let image = capture_frame(host, index, *fi, &mut capture_method, cli.render_scale)?;
                 let prog = progress_bar.map(|pb| pb.overlay(decision.progress_pct));
                 if is_upscaling {
