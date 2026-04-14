@@ -2,7 +2,7 @@
 import { REGISTRY, listScenes, getScene } from '../lib/scene-registry.js';
 import { validateTimelineV3 } from '../lib/timeline-validate.js';
 import { describeAt } from '../lib/v3-describe.js';
-import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from '../../../nf-core/engine/ops.js';
+import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from 'nf-core/engine/ops.js';
 
 export const TOOLS = {
   list_scenes: {

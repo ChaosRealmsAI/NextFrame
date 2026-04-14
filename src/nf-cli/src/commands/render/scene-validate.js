@@ -3,8 +3,8 @@
 
 import { parseFlags } from "../_helpers/_io.js";
 import { existsSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve, dirname } from "node:path";
+import { createRequire } from "node:module";
 
 const RATIO_DIRS = { "16:9": "16x9", "9:16": "9x16", "4:3": "4x3" };
 const CATEGORIES = ["backgrounds", "typography", "data", "shapes", "overlays", "media", "browser"];
@@ -46,7 +46,7 @@ export async function run(argv) {
     return 2;
   }
 
-  const scenesRoot = resolve(fileURLToPath(import.meta.url), "../../../../../nf-core/scenes");
+  const scenesRoot = resolve(dirname(createRequire(import.meta.url).resolve("nf-core/package.json")), "scenes");
 
   // Find scene directory
   let sceneDir = null;

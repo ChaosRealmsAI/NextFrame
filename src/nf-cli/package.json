@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.65",
+    "nf-core": "file:../nf-core",
     "pngjs": "^7.0.0"
   },
   "optionalDependencies": {

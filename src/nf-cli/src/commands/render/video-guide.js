@@ -6,7 +6,7 @@ import { parseFlags } from "../_helpers/_io.js";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { listScenes } from "../../../../nf-core/scenes/index.js";
+import { listScenes } from "nf-core/scenes/index.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STATES_DIR = resolve(HERE, "states");

@@ -1,5 +1,5 @@
 // Scene registry adapter — delegates to nf-core/scenes/ auto-discovery
-import { listScenes as _listScenes, getScene as _getScene, getRegistry, listScenesForRatio as _listForRatio } from "../../../nf-core/scenes/index.js";
+import { listScenes as _listScenes, getScene as _getScene, getRegistry, listScenesForRatio as _listForRatio } from "nf-core/scenes/index.js";
 
 export async function listScenes() { return _listScenes(); }
 export async function getScene(id) { return _getScene(id); }

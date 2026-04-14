@@ -1,0 +1,12 @@
+{
+  "name": "nf-core",
+  "version": "0.1.0",
+  "description": "NextFrame engine core — timeline, animation, scenes, filters",
+  "type": "module",
+  "exports": {
+    "./engine/*": "./engine/*",
+    "./animation/*": "./animation/*",
+    "./filters/*": "./filters/*",
+    "./scenes/*": "./scenes/*"
+  }
+}

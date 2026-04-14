@@ -2,7 +2,7 @@
 import { parseFlags, loadTimeline, emit } from '../_helpers/_io.js';
 import { resolveTimeline, timelineUsage } from '../_helpers/_resolve.js';
 import { detectFormat, validateTimelineV3 } from '../_helpers/_timeline-validate.js';
-import { buildHTML } from '../../../../nf-core/engine/build.js';
+import { buildHTML } from 'nf-core/engine/build.js';
 
 function extractOutput(argv) {
   // Handle -o <path> (short flag not supported by parseFlags)
