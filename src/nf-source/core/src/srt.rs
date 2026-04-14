@@ -102,4 +102,55 @@ mod tests {
         assert_eq!(parsed.len(), 2);
         Ok(())
     }
+
+    #[test]
+    fn parse_srt_handles_crlf_line_endings() -> Result<()> {
+        let input = "1\r\n00:00:00,000 --> 00:00:01,000\r\nHi.\r\n\r\n";
+        let parsed = parse_srt(input)?;
+        assert_eq!(parsed, vec!["Hi.".to_string()]);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_srt_skips_empty_text_blocks() -> Result<()> {
+        let input =
+            "1\n00:00:00,000 --> 00:00:01,000\n\n\n2\n00:00:01,000 --> 00:00:02,000\nGood.\n";
+        let parsed = parse_srt(input)?;
+        assert_eq!(parsed, vec!["Good.".to_string()]);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_srt_rejects_missing_timestamp_line() {
+        let input = "1\nNot a timestamp\nSome text.\n";
+        assert!(parse_srt(input).is_err());
+    }
+
+    #[test]
+    fn render_srt_produces_valid_srt() {
+        let sentences = vec![
+            Sentence {
+                id: 1,
+                start: 0.0,
+                end: 1.5,
+                text: "Hello world.".to_string(),
+                words: vec![],
+            },
+            Sentence {
+                id: 2,
+                start: 2.0,
+                end: 3.0,
+                text: "Again.".to_string(),
+                words: vec![],
+            },
+        ];
+        let srt = render_srt(&sentences);
+        assert!(srt.contains("1\n00:00:00,000 --> 00:00:01,500\nHello world.\n"));
+        assert!(srt.contains("2\n00:00:02,000 --> 00:00:03,000\nAgain.\n"));
+    }
+
+    #[test]
+    fn render_srt_empty_input() {
+        assert_eq!(render_srt(&[]), "");
+    }
 }

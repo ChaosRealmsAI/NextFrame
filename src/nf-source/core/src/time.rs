@@ -80,4 +80,36 @@ mod tests {
         assert_eq!(clamp_range(-0.2, 11.4, 10.0), (0.0, 10.0));
         assert_eq!(clamp_range(5.0, 4.0, 10.0), (5.0, 5.0));
     }
+
+    #[test]
+    fn round2_handles_typical_values() {
+        assert_eq!(round2(1.005), 1.0);
+        assert_eq!(round2(1.006), 1.01);
+        assert_eq!(round2(0.0), 0.0);
+        assert_eq!(round2(99.999), 100.0);
+    }
+
+    #[test]
+    fn seconds_to_millis_handles_large_and_infinity() {
+        assert_eq!(seconds_to_millis(f64::INFINITY), 0);
+        assert_eq!(seconds_to_millis(f64::NEG_INFINITY), 0);
+        assert_eq!(seconds_to_millis(0.0), 0);
+        assert_eq!(seconds_to_millis(1.5), 1500);
+    }
+
+    #[test]
+    fn format_srt_timestamp_handles_zero_and_hours() {
+        assert_eq!(format_srt_timestamp(0.0), "00:00:00,000");
+        assert_eq!(format_srt_timestamp(3661.5), "01:01:01,500");
+    }
+
+    #[test]
+    fn format_hms_handles_zero() {
+        assert_eq!(format_hms(0.0), "0:00:00.00");
+    }
+
+    #[test]
+    fn clamp_range_identity_when_within_bounds() {
+        assert_eq!(clamp_range(1.0, 5.0, 10.0), (1.0, 5.0));
+    }
 }

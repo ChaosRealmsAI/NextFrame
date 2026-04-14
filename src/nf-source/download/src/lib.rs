@@ -250,4 +250,51 @@ mod tests {
         assert_eq!(civil_from_days(0)?, (1970, 1, 1));
         Ok(())
     }
+
+    #[test]
+    fn civil_from_days_known_dates() -> Result<()> {
+        assert_eq!(civil_from_days(10_957)?, (2000, 1, 1));
+        assert_eq!(civil_from_days(19_782)?, (2024, 2, 29));
+        Ok(())
+    }
+
+    #[test]
+    fn format_selector_various_heights() {
+        assert_eq!(
+            format_selector(1080),
+            "bestvideo*[height<=1080]+bestaudio/best[height<=1080]"
+        );
+        assert_eq!(
+            format_selector(480),
+            "bestvideo*[height<=480]+bestaudio/best[height<=480]"
+        );
+    }
+
+    #[test]
+    fn now_utc_rfc3339_returns_valid_format() -> Result<()> {
+        let ts = now_utc_rfc3339()?;
+        assert_eq!(ts.len(), 20);
+        assert!(ts.ends_with('Z'));
+        assert_eq!(&ts[4..5], "-");
+        assert_eq!(&ts[7..8], "-");
+        assert_eq!(&ts[10..11], "T");
+        Ok(())
+    }
+
+    #[test]
+    fn download_metadata_serializes_all_fields() -> Result<()> {
+        let meta = DownloadMetadata {
+            url: "https://example.com/video".to_string(),
+            title: "Test Video".to_string(),
+            duration_sec: 120.5,
+            format: "720p".to_string(),
+            downloaded_at: "2024-01-01T00:00:00Z".to_string(),
+        };
+        let json = serde_json::to_string(&meta)?;
+        assert!(json.contains("\"url\":\"https://example.com/video\""));
+        assert!(json.contains("\"title\":\"Test Video\""));
+        assert!(json.contains("\"duration_sec\":120.5"));
+        assert!(json.contains("\"format\":\"720p\""));
+        Ok(())
+    }
 }

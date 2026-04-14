@@ -244,6 +244,73 @@ mod tests {
     }
 
     #[test]
+    fn split_handles_empty_input() {
+        let sentences = split_into_sentences(&[]);
+        assert!(sentences.is_empty());
+    }
+
+    #[test]
+    fn split_handles_no_sentence_ending_punctuation() {
+        let words = vec![word("Hello", 0.0, 0.5), word("world", 0.5, 1.0)];
+        let sentences = split_into_sentences(&words);
+        assert_eq!(sentences.len(), 1);
+        assert_eq!(sentences[0].text, "Hello world");
+        assert_eq!(sentences[0].id, 1);
+    }
+
+    #[test]
+    fn split_recognizes_chinese_punctuation() {
+        let words = vec![word("你好。", 0.0, 0.5), word("世界！", 0.5, 1.0)];
+        let sentences = split_into_sentences(&words);
+        assert_eq!(sentences.len(), 2);
+    }
+
+    #[test]
+    fn split_recognizes_question_mark() {
+        let words = vec![word("Really?", 0.0, 0.3), word("Yes.", 0.3, 0.6)];
+        let sentences = split_into_sentences(&words);
+        assert_eq!(sentences.len(), 2);
+        assert_eq!(sentences[0].text, "Really?");
+        assert_eq!(sentences[1].text, "Yes.");
+    }
+
+    #[test]
+    fn to_txt_formats_all_sentences() {
+        let sentences = Sentences {
+            version: "1".to_string(),
+            source: SentenceSource::WhisperTimestamped,
+            model: "base.en".to_string(),
+            language: "en".to_string(),
+            audio_duration_sec: 5.0,
+            total_sentences: 1,
+            sentences: vec![Sentence {
+                id: 1,
+                start: 0.0,
+                end: 1.0,
+                text: "Hello.".to_string(),
+                words: vec![word("Hello.", 0.0, 1.0)],
+            }],
+        };
+        let txt = sentences.to_txt();
+        assert!(txt.contains("[1]"));
+        assert!(txt.contains("Hello."));
+    }
+
+    #[test]
+    fn sentence_by_id_returns_none_for_missing() {
+        let sentences = Sentences {
+            version: "1".to_string(),
+            source: SentenceSource::WhisperTimestamped,
+            model: "base.en".to_string(),
+            language: "en".to_string(),
+            audio_duration_sec: 5.0,
+            total_sentences: 0,
+            sentences: vec![],
+        };
+        assert!(sentences.sentence_by_id(99).is_none());
+    }
+
+    #[test]
     fn sentence_lookup_by_id() {
         let sentences = Sentences {
             version: "1".to_string(),

@@ -261,4 +261,42 @@ mod tests {
             "Only one."
         );
     }
+
+    #[test]
+    fn preview_short_texts_no_truncation() {
+        let preview = build_text_preview("Hi.", "Bye.", false);
+        assert_eq!(preview, "Hi.  ...  Bye.");
+    }
+
+    #[test]
+    fn progress_event_serializes_with_optional_fields() {
+        let event = ProgressEvent {
+            clip_num: 1,
+            status: "ok",
+            file: Some("clip_01.mp4".to_string()),
+            start: Some(0.0),
+            end: Some(5.0),
+            duration: Some(5.0),
+            error: None,
+        };
+        let json = serde_json::to_string(&event).expect("serialize ok event");
+        assert!(!json.contains("\"error\""));
+        assert!(json.contains("\"clip_num\":1"));
+    }
+
+    #[test]
+    fn progress_event_failed_includes_error() {
+        let event = ProgressEvent {
+            clip_num: 2,
+            status: "failed",
+            file: None,
+            start: None,
+            end: None,
+            duration: None,
+            error: Some("ffmpeg crashed".to_string()),
+        };
+        let json = serde_json::to_string(&event).expect("serialize failed event");
+        assert!(json.contains("ffmpeg crashed"));
+        assert!(!json.contains("\"file\""));
+    }
 }
