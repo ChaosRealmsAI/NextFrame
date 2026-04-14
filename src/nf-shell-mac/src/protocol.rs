@@ -88,8 +88,7 @@ struct HttpReply {
 }
 
 fn serve_task(task: &ProtocolObject<dyn WKURLSchemeTask>, root: &Path) {
-    // SAFETY: WebKit provides a live task with a valid request object.
-    let request = unsafe { task.request() };
+    let request = unsafe { task.request() }; // SAFETY: WebKit provides a live task with a valid request object.
     let Some(url) = request.URL() else {
         fail_task(task, "missing request URL");
         return;
@@ -188,8 +187,7 @@ fn send_reply(task: &ProtocolObject<dyn WKURLSchemeTask>, url: &NSURL, reply: &H
     ) else {
         return Err("failed to create HTTP response".to_string());
     };
-    // SAFETY: Task protocol requires didReceiveResponse, then didReceiveData, then didFinish in order.
-    unsafe {
+    unsafe { // SAFETY: Task protocol requires didReceiveResponse, then didReceiveData, then didFinish in order.
         task.didReceiveResponse(&response);
         if !reply.body.is_empty() {
             let data = NSData::with_bytes(&reply.body);
@@ -202,18 +200,15 @@ fn send_reply(task: &ProtocolObject<dyn WKURLSchemeTask>, url: &NSURL, reply: &H
 
 fn fail_task(task: &ProtocolObject<dyn WKURLSchemeTask>, reason: &str) {
     tracing::error!("scheme handler failed: {reason}");
-    // SAFETY: NSError factory method with a valid Cocoa error domain constant.
-    let error = unsafe { NSError::errorWithDomain_code_userInfo(NSCocoaErrorDomain, 0, None) };
-    // SAFETY: didFailWithError terminates the live scheme task exactly once.
-    unsafe { task.didFailWithError(&error) };
+    let error = unsafe { NSError::errorWithDomain_code_userInfo(NSCocoaErrorDomain, 0, None) }; // SAFETY: NSError factory method with a valid Cocoa error domain constant.
+    unsafe { task.didFailWithError(&error) }; // SAFETY: didFailWithError terminates the live scheme task exactly once.
 }
 
 fn insert_header(headers: &NSMutableDictionary<NSString, NSString>, key: &str, value: &str) {
     let key = NSString::from_str(key);
     let value = NSString::from_str(value);
     let key = ProtocolObject::from_ref(&*key);
-    // SAFETY: NSString key and value are valid Objective-C objects for NSMutableDictionary insertion.
-    unsafe { headers.setObject_forKey(&value, key) };
+    unsafe { headers.setObject_forKey(&value, key) }; // SAFETY: NSString key and value are valid Objective-C objects for NSMutableDictionary insertion.
 }
 
 fn resolve_file_path(root: &Path, raw_path: &str) -> Result<PathBuf, i64> {
