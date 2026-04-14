@@ -6,8 +6,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-direction:column;align-items:center;padding:20px;min-height:100vh}
-.info{font-size:13px;color:#888;margin-bottom:12px}
-.info span{color:#da7756;font-weight:700}
+.info{font-size:13px;color:#888;margin-bottom:12px}.info span{color:#da7756;font-weight:700}
 .canvas-wrap{position:relative;width:960px;height:540px;background:#1a1510;border:1px solid #333;border-radius:8px;overflow:hidden}
 .canvas-inner{width:1920px;height:1080px;transform-origin:0 0;transform:scale(0.5);position:absolute;top:0;left:0}
 .controls{margin-top:16px;display:flex;gap:16px;align-items:center}
@@ -17,7 +16,7 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
 </style>
 </head>
 <body>
-<div class="info"><span>flowDiagram</span> · 16:9 · DOM · 流程图（v2 药丸分叉）</div>
+<div class="info"><span>flowDiagram</span> · 16:9 · DOM · 纯流程图（无标题/无引语）</div>
 <div class="canvas-wrap"><div class="canvas-inner" id="canvas"></div></div>
 <div class="controls">
   <button id="playBtn">▶ Play</button>
@@ -27,73 +26,62 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
 <script>
 (function(){
   function ease3(p){return 1-Math.pow(1-Math.max(0,Math.min(1,p)),3)}
-  function fadeIn(t,start,dur){return ease3((t-start)/dur)}
+  function fadeIn(t,s,d){return ease3((t-s)/d)}
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-  var COLOR_MAP={blue:"#8ab4cc",orange:"#da7756",green:"#7ec699",red:"#e06c75"};
-  function rc(c){return COLOR_MAP[c]||c||"#8ab4cc"}
-
+  var CM={blue:"#8ab4cc",orange:"#da7756",green:"#7ec699",red:"#e06c75"};
+  function rc(c){return CM[c]||c||"#8ab4cc"}
   function nodeCircle(icon,label,sub,color){
-    var c=rc(color);var iconLen=(icon||'').length;var fs=iconLen<=2?20:iconLen<=4?14:11;
+    var c=rc(color);var il=(icon||'').length;var fs=il<=2?20:il<=4?14:11;
     return '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;min-width:90px">'+
-      '<div style="width:72px;height:72px;border-radius:50%;border:2px solid '+c+';background:'+c+'15;display:flex;align-items:center;justify-content:center;font:800 '+fs+'px \'SF Mono\',monospace;color:'+c+';flex-shrink:0;letter-spacing:.02em">'+esc(icon||'')+'</div>'+
-      (label?'<div style="font:600 14px system-ui,sans-serif;color:#f5ece0;text-align:center">'+esc(label)+'</div>':'')+
+      '<div style="width:72px;height:72px;border-radius:50%;border:2px solid '+c+';background:'+c+'15;display:flex;align-items:center;justify-content:center;font:800 '+fs+'px \'SF Mono\',monospace;color:'+c+'">'+esc(icon||'')+'</div>'+
+      (label?'<div style="font:600 14px system-ui;color:#f5ece0;text-align:center">'+esc(label)+'</div>':'')+
       (sub?'<div style="font:400 12px \'SF Mono\',monospace;color:rgba(245,236,224,.45);text-align:center">'+esc(sub)+'</div>':'')+
     '</div>';
   }
   function arrow(){
     return '<svg viewBox="0 0 60 24" style="width:60px;flex-shrink:0;margin:0 4px;align-self:center;margin-bottom:30px">'+
       '<line x1="4" y1="12" x2="48" y2="12" stroke="rgba(245,236,224,.25)" stroke-width="2"/>'+
-      '<polygon points="46,6 58,12 46,18" fill="rgba(245,236,224,.25)"/>'+
-    '</svg>';
+      '<polygon points="46,6 58,12 46,18" fill="rgba(245,236,224,.25)"/></svg>';
   }
   function forkPill(label,sub,color){
     var c=rc(color);
     return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0">'+
-      '<div style="padding:6px 18px;border-radius:20px;border:2px solid '+c+';background:'+c+'12;font:700 14px \'SF Mono\',monospace;color:'+c+';letter-spacing:.05em;white-space:nowrap">'+esc(label||'')+'</div>'+
-      (sub?'<div style="font:400 13px system-ui,sans-serif;color:rgba(245,236,224,.6)">'+esc(sub)+'</div>':'')+
+      '<div style="padding:6px 18px;border-radius:20px;border:2px solid '+c+';background:'+c+'12;font:700 14px \'SF Mono\',monospace;color:'+c+';white-space:nowrap">'+esc(label||'')+'</div>'+
+      (sub?'<div style="font:400 13px system-ui;color:rgba(245,236,224,.6)">'+esc(sub)+'</div>':'')+
     '</div>';
   }
-
-  function render(t,params){
-    var p=params;var nodes=p.nodes||[];var forkNodes=p.forkNodes||[];
-    var hlOp=fadeIn(t,0.3,0.7);var flowOp=fadeIn(t,2.5,0.8);var qOp=fadeIn(t,6.0,0.7);
+  function render(t,p,vp){
+    var nodes=p.nodes||[];var forkNodes=p.forkNodes||[];
+    var op=fadeIn(t,p.enterDelay||0,0.8);
     var mainRow=nodes.map(function(n,i){return(i>0?arrow():'')+nodeCircle(n.icon,n.label,n.sub,n.color)}).join('');
     var forkHtml='';
     if(forkNodes.length>0){
       var pills=forkNodes.map(function(fn){return forkPill(fn.label||'',fn.sub,fn.color)}).join('');
       forkHtml='<div style="display:flex;align-items:center">'+arrow()+'<div style="display:flex;flex-direction:column;gap:4px">'+pills+'</div></div>';
     }
-    return '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;padding:80px 60px">'+
-      (p.headline?'<div style="font:700 42px Georgia,\'Noto Serif SC\',serif;color:#f5ece0;text-align:center;line-height:1.3;opacity:'+hlOp+'">'+(p.headline)+'</div>':'')+
-      '<div style="display:flex;align-items:center;opacity:'+flowOp+'">'+mainRow+forkHtml+'</div>'+
-      (p.quote?'<div style="font:italic 20px Georgia,\'Noto Serif SC\',serif;color:#d4b483;text-align:center;max-width:700px;line-height:1.5;opacity:'+qOp+'">"'+(p.quote)+'"</div>':'')+
-    '</div>';
+    var pos=p.y>0?'position:absolute;left:0;right:0;top:'+p.y+'px;display:flex;justify-content:center':'position:absolute;inset:0;display:flex;align-items:center;justify-content:center';
+    return '<div style="'+pos+'"><div style="display:flex;align-items:center;opacity:'+op+'">'+mainRow+forkHtml+'</div></div>';
   }
 
   var DEMO={
-    headline:'给 AI 安了一个<span style="color:#da7756">安检员</span>',
     nodes:[
-      {icon:"AI",label:"AI 请求",sub:"要执行操作",color:"blue"},
-      {icon:"H",label:"Hook 安检",sub:"脚本检查",color:"orange"}
+      {icon:'AI',label:'AI 请求',sub:'要执行操作',color:'blue'},
+      {icon:'H',label:'Hook 安检',sub:'脚本检查',color:'orange'}
     ],
     forkNodes:[
-      {label:"PASS",sub:"放行执行",color:"green"},
-      {label:"BLOCK",sub:"拦截拒绝",color:"red"}
+      {label:'PASS',sub:'放行执行',color:'green'},
+      {label:'BLOCK',sub:'拦截拒绝',color:'red'}
     ],
-    quote:"每次动手之前，安检员先过一遍——该拦的拦，该放行的放行"
+    enterDelay:0.3
   };
 
-  var duration=10;var canvas=document.getElementById('canvas');
-  var scrubber=document.getElementById('scrubber');var timeDisplay=document.getElementById('timeDisplay');var playBtn=document.getElementById('playBtn');
-  function renderFrame(t){
-    canvas.innerHTML='<div style="position:absolute;inset:0;background:#1a1510;background-image:radial-gradient(ellipse at 40% 40%,rgba(212,180,131,.04) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(218,119,86,.03) 0%,transparent 50%)"></div>'+
-      '<div style="position:absolute;inset:0">'+render(t,DEMO)+'</div>';
-  }
-  scrubber.addEventListener('input',function(){var t=(scrubber.value/1000)*duration;timeDisplay.textContent=t.toFixed(2)+'s';renderFrame(t);});
-  var playing=false,startTime=0,startOffset=0;
-  function tick(){if(!playing)return;var t=((Date.now()-startTime)/1000+startOffset)%duration;scrubber.value=(t/duration)*1000;timeDisplay.textContent=t.toFixed(2)+'s';renderFrame(t);requestAnimationFrame(tick);}
-  playBtn.addEventListener('click',function(){playing=!playing;if(playing){startTime=Date.now();startOffset=(scrubber.value/1000)*duration;playBtn.textContent='⏸ Pause';tick();}else{playBtn.textContent='▶ Play';}});
-  renderFrame(0);
+  var duration=5;var canvas=document.getElementById('canvas');var scrubber=document.getElementById('scrubber');var td=document.getElementById('timeDisplay');var pb=document.getElementById('playBtn');
+  function rf(t){canvas.innerHTML='<div style="position:absolute;inset:0;background:#1a1510;background-image:radial-gradient(ellipse at 40% 40%,rgba(212,180,131,.04) 0%,transparent 50%)"></div><div style="position:absolute;inset:0">'+render(t,DEMO,{width:1920,height:1080})+'</div>';}
+  scrubber.addEventListener('input',function(){var t=(scrubber.value/1000)*duration;td.textContent=t.toFixed(2)+'s';rf(t);});
+  var playing=false,st=0,so=0;
+  function tick(){if(!playing)return;var t=((Date.now()-st)/1000+so)%duration;scrubber.value=(t/duration)*1000;td.textContent=t.toFixed(2)+'s';rf(t);requestAnimationFrame(tick);}
+  pb.addEventListener('click',function(){playing=!playing;if(playing){st=Date.now();so=(scrubber.value/1000)*duration;pb.textContent='⏸ Pause';tick();}else{pb.textContent='▶ Play';}});
+  rf(0);
 })();
 </script>
 </body>
