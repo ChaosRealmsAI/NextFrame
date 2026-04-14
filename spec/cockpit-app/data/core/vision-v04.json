@@ -1,10 +1,10 @@
 {
   "version": "v0.4",
-  "title": "NextFrame — 自媒体人的 AI 全链路工具",
-  "tagline": "从选题到迭代，人只做选择，AI 做剩下所有",
+  "title": "NextFrame — AI 视频引擎",
+  "tagline": "结构化信息 → 视频，像写 JSON 一样简单",
   "updated": "2026-04-14",
 
-  "first_principle": "自媒体人的本质工作 = 把信息差变成注意力。人是最慢的环节，AI 要把人从执行者变成决策者。",
+  "first_principle": "视频的本质 = 让信息更容易被人理解。把信息变成视频的门槛太高，NextFrame 让这件事像写 JSON 一样简单。不限于自媒体，任何需要视觉化表达的场景都是它的用武之地。",
 
   "chain": [
     {

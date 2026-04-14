@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is NextFrame
 
-AI-native video editor: JSON timeline → multi-layer HTML → browser playback → MP4 recording → multi-platform publishing. Core principle: one visual element = one layer (track). Frame-pure rendering: any frame at time t is computed independently via f(t) → frame.
+AI 视频引擎 — 把结构化信息变成视频。输入是 JSON，输出是可播放的 HTML 或 MP4。不限于自媒体，任何需要"让信息更容易理解"的场景都是它的用武之地：教育、产品演示、数据报告、内部培训、开源项目介绍。
+
+技术栈：JSON timeline → 多层 HTML（scene 组件渲染）→ 浏览器播放 → WKWebView 并行录制 → MP4。核心原则：一个视觉元素 = 一个 layer。Frame-pure 渲染：任意时刻 t 可独立计算 f(t) → frame。
 
 ## Build & Test
 
