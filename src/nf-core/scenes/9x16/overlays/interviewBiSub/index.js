@@ -14,13 +14,13 @@ export const meta = {
   theme: ["interview", "tech"],
   default_theme: "dark-interview",
   themes: {
-    "dark-interview": { zhColor: "#f5ece0", enColor: "#f5ece0", accentColor: "#da7756", bgColor: "rgba(10,10,10,0.6)" },
+    "dark-interview": { zhColor: "#d4b483", enColor: "rgba(245,236,224,0.6)", accentColor: "#da7756", bgColor: "rgba(10,10,10,0.6)" },
   },
   params: {
     zh: { type: "string", default: "指数增长快要到头了", label: "中文字幕", group: "content" },
     en: { type: "string", default: "Exponential growth is about to plateau", label: "英文字幕", group: "content" },
-    zhColor: { type: "color", default: "#f5ece0", label: "中文颜色", group: "color" },
-    enColor: { type: "color", default: "#f5ece0", label: "英文颜色", group: "color" },
+    zhColor: { type: "color", default: "#d4b483", label: "中文颜色（金色）", group: "color" },
+    enColor: { type: "color", default: "rgba(245,236,224,0.6)", label: "英文颜色（灰）", group: "color" },
     accentColor: { type: "color", default: "#da7756", label: "强调色（左边竖线）", group: "color" },
     bgColor: { type: "color", default: "rgba(10,10,10,0.6)", label: "背景色", group: "color" },
     yPct: { type: "number", default: 72, label: "垂直位置(%)", group: "layout", range: [50, 95], step: 1 },

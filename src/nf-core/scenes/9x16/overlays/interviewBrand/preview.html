@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>interviewBrand 9:16 Preview</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-direction:column;align-items:center;padding:20px;min-height:100vh}
+.info{font-size:13px;color:#888;margin-bottom:12px}.info span{color:#da7756;font-weight:700}
+.canvas-wrap{position:relative;width:378px;height:672px;background:#1a1510;border:1px solid #333;border-radius:8px;overflow:hidden}
+.canvas-inner{width:1080px;height:1920px;transform-origin:0 0;transform:scale(0.35);position:absolute;top:0;left:0}
+.controls{margin-top:16px;display:flex;gap:16px;align-items:center}
+.controls input[type=range]{width:400px}
+.controls button{background:#da7756;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:14px}
+.time-display{font-family:monospace;font-size:14px;color:#da7756;min-width:80px}
+</style>
+</head>
+<body>
+<div class="info"><span>interviewBrand</span> · 9:16 · dom</div>
+<div class="canvas-wrap"><div class="canvas-inner" id="canvas"></div></div>
+<div class="controls">
+  <button id="playBtn">▶ Play</button>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <div class="time-display" id="timeDisplay">0.00s</div>
+</div>
+<script>
+(function(){
+  function render(t, params, vp) {
+  var color = params.color || "#da7756";
+  var height = params.height || 3;
+  var progress = typeof params.progress === "number" ? params.progress : (params.duration ? t / params.duration : 0);
+  progress = Math.max(0, Math.min(1, progress));
+  return '<div style="position:absolute;left:0;bottom:0;width:' + vp.width + 'px;height:' + height + 'px;background:rgba(245,236,224,0.08)">' +
+    '<div style="height:100%;width:' + (progress * 100) + '%;background:' + color + ';transition:none"></div>' +
+  '</div>';
+}
+
+  var DEMO = {};
+  var duration = 10;
+  var canvas = document.getElementById('canvas');
+  var scrubber = document.getElementById('scrubber');
+  var td = document.getElementById('timeDisplay');
+  var pb = document.getElementById('playBtn');
+  function rf(t){canvas.innerHTML='<div style="position:absolute;inset:0;background:#1a1510"></div><div style="position:absolute;inset:0">'+render(t,DEMO,{width:1080,height:1920})+'</div>';}
+  scrubber.addEventListener('input',function(){var t=(scrubber.value/1000)*duration;td.textContent=t.toFixed(2)+'s';rf(t);});
+  var playing=false,st=0,so=0;
+  function tick(){if(!playing)return;var t=((Date.now()-st)/1000+so)%duration;scrubber.value=(t/duration)*1000;td.textContent=t.toFixed(2)+'s';rf(t);requestAnimationFrame(tick);}
+  pb.addEventListener('click',function(){playing=!playing;if(playing){st=Date.now();so=(scrubber.value/1000)*duration;pb.textContent='⏸ Pause';tick();}else{pb.textContent='▶ Play';}});
+  rf(0);
+})();
+</script>
+</body>
+</html>
