@@ -1,12 +1,12 @@
 //! cli module exports
-pub mod args;
-pub mod batch;
-pub mod concat;
-pub mod config_cmd;
-pub mod play;
-pub mod preview;
-pub mod synth;
-pub mod voices;
+pub(crate) mod args;
+pub(crate) mod batch;
+pub(crate) mod concat;
+pub(crate) mod config_cmd;
+pub(crate) mod play;
+pub(crate) mod preview;
+pub(crate) mod synth;
+pub(crate) mod voices;
 
 use anyhow::Result;
 

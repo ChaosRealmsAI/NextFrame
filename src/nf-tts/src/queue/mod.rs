@@ -1,3 +1,3 @@
 //! queue module exports
-pub mod job;
-pub mod scheduler;
+pub(crate) mod job;
+pub(crate) mod scheduler;

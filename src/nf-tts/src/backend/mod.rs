@@ -1,6 +1,6 @@
 //! backend module exports
-pub mod edge;
-pub mod volcengine;
+pub(crate) mod edge;
+pub(crate) mod volcengine;
 
 use std::sync::Arc;
 

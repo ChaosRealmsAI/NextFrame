@@ -1,3 +1,4 @@
+// Scene metadata lives outside src/ so the main CLI source module stays under the cohesion cap.
 const p = (name, type, fallback, extra = {}) => ({ name, type, default: fallback, ...extra });
 
 export const META_TABLE = {

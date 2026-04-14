@@ -1,8 +1,8 @@
 //! output module exports
-pub mod event;
-pub mod manifest;
-pub mod naming;
-pub mod srt;
+pub(crate) mod event;
+pub(crate) mod manifest;
+pub(crate) mod naming;
+pub(crate) mod srt;
 
 pub(crate) fn write_stdout_line(args: std::fmt::Arguments<'_>) {
     use std::io::{self, Write};
