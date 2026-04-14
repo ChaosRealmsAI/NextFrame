@@ -99,7 +99,43 @@ return { meta: typeof meta !== "undefined" ? meta : null, render: typeof render 
 function escapeInlineScript(value) {
   return String(value)
     .replace(/<\/script/gi, "<\\/script")
-    .replace(/<!--/g, "<\\!--");
+    .replace(/<!--/g, "<\\!--")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+function normalizeSrtEntry(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const start = Number(entry.s ?? entry.start ?? 0);
+  const end = Number(entry.e ?? entry.end ?? start);
+  const text = String(entry.t ?? entry.text ?? "");
+  if (!text) return null;
+  return { s: start, e: end, t: text };
+}
+
+function extractTimelineSrt(timeline) {
+  const layers = Array.isArray(timeline?.layers) ? timeline.layers : [];
+  for (const layer of layers) {
+    const srt = Array.isArray(layer?.params?.srt) ? layer.params.srt : null;
+    if (!srt || srt.length === 0) continue;
+    return srt.map(normalizeSrtEntry).filter(Boolean);
+  }
+
+  const audio = timeline?.audio;
+  if (!audio || typeof audio === "string") return [];
+  const sentences = Array.isArray(audio.sentences)
+    ? audio.sentences
+    : Array.isArray(audio.segments)
+      ? audio.segments.flatMap((segment) => segment?.sentences || [])
+      : [];
+  return sentences.map(normalizeSrtEntry).filter(Boolean);
+}
+
+function serializeSrtLiteral(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return "[]";
+  return `[
+${entries.map((entry) => `  { s: ${JSON.stringify(entry.s)}, e: ${JSON.stringify(entry.e)}, t: ${JSON.stringify(entry.t)} }`).join(",\n")}
+]`;
 }
 
 function buildRuntime() {
@@ -457,7 +493,9 @@ function buildDocument(timeline, sceneModules) {
   const background = String(timeline.background || "#05050c");
   const width = Number(timeline.width || 1920);
   const height = Number(timeline.height || 1080);
-  const scriptBody = escapeInlineScript(`const TIMELINE = ${JSON.stringify(timeline, null, 2)};
+  const inlineSrt = extractTimelineSrt(timeline);
+  const scriptBody = escapeInlineScript(`const SRT = ${serializeSrtLiteral(inlineSrt)};
+const TIMELINE = ${JSON.stringify(timeline, null, 2)};
 ${sceneBundles}
 const SCENES = {
 ${sceneMap}
