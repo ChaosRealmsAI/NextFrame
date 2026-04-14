@@ -348,6 +348,33 @@ fn verify_app(wv: &objc2_web_kit::WKWebView) {
     webview::pump_run_loop_pub(std::time::Duration::from_millis(500));
     let _ = webview::screenshot(wv, "/tmp/nf-verify-output.png");
 
+    // ── RICH DATA PROJECT (爆款公式课) ──
+    check!("nav to 爆款公式课", webview::eval_js(wv, "showView('project',{name:'爆款公式课',path:'/Users/Zhuanz/NextFrame/projects/爆款公式课'});'ok'"));
+    webview::pump_run_loop_pub(std::time::Duration::from_secs(2));
+    check!("爆款 episodes", webview::eval_js(wv, "document.querySelectorAll('.vp-ep-card').length + ' episodes'"));
+    let _ = webview::screenshot(wv, "/tmp/nf-verify-rich-project.png");
+
+    check!("open 第一课", webview::eval_js(wv, "var eps=document.querySelectorAll('.vp-ep-card');if(eps.length>0){eps[0].click();'clicked'}else{'no eps'}"));
+    webview::pump_run_loop_pub(std::time::Duration::from_secs(3));
+    check!("rich pipeline segments", webview::eval_js(wv, "document.querySelectorAll('#pl-tab-script .glass').length + ' segments'"));
+    let _ = webview::screenshot(wv, "/tmp/nf-verify-rich-script.png");
+
+    // Switch to audio tab to see TTS status
+    check!("rich audio tab", webview::eval_js(wv, "document.querySelector('[data-stage=\"audio\"]')?.click();'clicked'"));
+    webview::pump_run_loop_pub(std::time::Duration::from_secs(2));
+    let _ = webview::screenshot(wv, "/tmp/nf-verify-rich-audio.png");
+
+    // Switch to clips tab to see real clips
+    check!("rich clips tab", webview::eval_js(wv, "document.querySelector('[data-stage=\"clips\"]')?.click();'clicked'"));
+    webview::pump_run_loop_pub(std::time::Duration::from_secs(2));
+    let _ = webview::screenshot(wv, "/tmp/nf-verify-rich-clips.png");
+
+    // Switch to editor to see atoms
+    check!("rich editor tab", webview::eval_js(wv, "document.querySelector('[data-stage=\"assembly\"]')?.click();'clicked'"));
+    webview::pump_run_loop_pub(std::time::Duration::from_secs(2));
+    check!("rich editor layers", webview::eval_js(wv, "edTimelineData ? (edTimelineData.layers||[]).length + ' layers' : 'null'"));
+    let _ = webview::screenshot(wv, "/tmp/nf-verify-rich-editor.png");
+
     // ── BACK TO HOME ──
     check!("back to home", webview::eval_js(wv, "showView('home');'ok'"));
     webview::pump_run_loop_pub(std::time::Duration::from_secs(1));
