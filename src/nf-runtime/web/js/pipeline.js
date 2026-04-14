@@ -22,6 +22,7 @@ function escapeJsString(value) {
 }
 
 function resetPipelineEpisodeState() {
+  pipelineSegments = [];
   pipelinePreviewState = {};
   pipelineExportState = null;
   stopExportPolling();
@@ -189,7 +190,7 @@ function renderScriptTab(segments) {
     const segmentName = seg.name || seg.path || '';
     const preview = pipelinePreviewState[segmentName];
     html += '' +
-      '<div class="glass" style="padding:16px;margin-bottom:8px;border-radius:10px">' +
+      '<div class="glass" data-nf-action="generate-script" style="padding:16px;margin-bottom:8px;border-radius:10px">' +
         '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
           '<div>' +
             '<div style="font-size:13px;font-weight:600;color:var(--t100)">段落 ' + (index + 1) + '</div>' +
