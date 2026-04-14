@@ -44,7 +44,9 @@ async function discoverDir(baseDir, source) {
             path: join(ratioDir, cat.name, sc.name),
             source,
           };
-          _registry.set(mod.meta.id, entry);
+          // Key = ratio:id — different ratios of same scene coexist
+          const key = `${mod.meta.ratio}:${mod.meta.id}`;
+          _registry.set(key, entry);
         } catch (e) {
           // skip broken scenes silently
         }
@@ -63,9 +65,20 @@ async function discover() {
   _loaded = true;
 }
 
+/**
+ * Get scene by key. Accepts:
+ *   "9:16:auroraGradient" — exact ratio:id
+ *   "auroraGradient" — returns first match (useful when only one ratio exists)
+ */
 export async function getScene(id) {
   await discover();
-  return _registry.get(id) || null;
+  // Try exact key first (ratio:id)
+  if (_registry.has(id)) return _registry.get(id);
+  // Fallback: search by scene id across all ratios
+  for (const entry of _registry.values()) {
+    if (entry.id === id) return entry;
+  }
+  return null;
 }
 
 export async function listScenes() {
@@ -93,8 +106,7 @@ export async function getRegistry() {
  * @returns {object} merged params
  */
 export async function resolveParams(sceneId, theme, userParams = {}) {
-  await discover();
-  const entry = _registry.get(sceneId);
+  const entry = await getScene(sceneId);
   if (!entry) return { ...userParams };
 
   const meta = entry.META;
