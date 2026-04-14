@@ -260,6 +260,10 @@ async function loadEditorTimeline() {
     });
     edTimelineData = normalizeEditorTimeline(timelineData);
     renderEditorFromTimeline(edTimelineData);
+    // Auto-compose preview if timeline has layers with scenes
+    if (edTimelineData.layers && edTimelineData.layers.some(function(l) { return l.scene; })) {
+      composePreview();
+    }
   } catch (error) {
     console.error('[editor] load timeline:', error);
     showEditorEmpty('暂无时间线数据');
@@ -445,6 +449,9 @@ async function composePreview() {
     });
     window.edPreviewIframe = frame;
     ensurePlayhead();
+    if (typeof startStatePolling === 'function') {
+      startStatePolling();
+    }
     updateEditorPreviewState(0, getEditorTimelineDuration());
   }
   return result;
