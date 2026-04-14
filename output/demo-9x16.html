@@ -28,10 +28,12 @@ body { background: #000; display: flex; flex-direction: column; align-items: cen
 
 <script>
 // ─── Config ───
-const W = 1080, H = 1920, DURATION = 12;
+const DURATION = 12;
 const MAX_H = Math.min(window.innerHeight - 80, 750);
-const SCALE = MAX_H / H;
-const PW = Math.round(W * SCALE), PH = Math.round(H * SCALE);
+// 所有 scene 统一用显示尺寸渲染（9:16 比例）
+const PH = MAX_H;
+const PW = Math.round(PH * 9 / 16);
+const W = PW, H = PH; // scene 拿到的就是显示尺寸
 
 const vp = document.getElementById('viewport');
 vp.style.width = PW + 'px';

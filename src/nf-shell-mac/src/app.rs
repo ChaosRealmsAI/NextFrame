@@ -203,10 +203,12 @@ pub fn run() {
         NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
     );
 
-    // Create WKWebView
+    // Create WKWebView with IPC + drag bridges
     let mut drag_handler: Option<Retained<WindowDragHandler>> = None;
+    let mut ipc_handler: Option<Retained<crate::ipc::BridgeHandler>> = None;
     let wv = match webview::create(mtm, NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT), |config| {
         drag_handler = Some(install_window_drag_bridge(mtm, config, &window));
+        ipc_handler = Some(crate::ipc::install(mtm, config, std::ptr::null()));
     }) {
         Ok(wv) => wv,
         Err(e) => {
@@ -222,6 +224,12 @@ pub fn run() {
     window.makeKeyAndOrderFront(None);
 
     let _drag_handler = drag_handler;
+
+    // Set webview pointer for IPC (must happen after WKWebView is created)
+    if let Some(ref handler) = ipc_handler {
+        crate::ipc::set_webview(handler, &wv);
+    }
+    let _ipc_handler = ipc_handler;
 
     // Position traffic lights to align with HTML topbar center
     position_traffic_lights(&window);
