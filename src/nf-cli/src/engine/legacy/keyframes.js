@@ -3,12 +3,120 @@
 //   { keys: [[0, 24], [1, 48], [4, 48], [5, 24]], ease: "easeOut" }
 // resolveKeyframes(params, t) returns a new object with all keys resolved.
 
+function bounce(t) {
+  const n = 7.5625;
+  const d = 2.75;
+  if (t < 1 / d) return n * t * t;
+  if (t < 2 / d) {
+    t -= 1.5 / d;
+    return n * t * t + 0.75;
+  }
+  if (t < 2.5 / d) {
+    t -= 2.25 / d;
+    return n * t * t + 0.9375;
+  }
+  t -= 2.625 / d;
+  return n * t * t + 0.984375;
+}
+
+function elastic(t) {
+  return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t - 0.1) * 5 * Math.PI) + 1;
+}
+
+function expo(t) {
+  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
+
+function back(t) {
+  const c = 1.70158;
+  const c3 = c + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
+}
+
+function circ(t) {
+  return Math.sqrt(1 - Math.pow(t - 1, 2));
+}
+
+function springConfigurable(t, config = {}) {
+  const damping = config.damping ?? 12;
+  const stiffness = config.stiffness ?? 180;
+  const mass = config.mass ?? 1;
+  const safeMass = Math.max(mass, 0.0001);
+  const omega0 = Math.sqrt(stiffness / safeMass);
+  const zeta = damping / (2 * Math.sqrt(stiffness * safeMass));
+
+  if (zeta < 1) {
+    const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
+    const envelope = Math.exp(-zeta * omega0 * t);
+    return 1 - envelope * (
+      Math.cos(omegaD * t) +
+      (zeta / Math.sqrt(1 - zeta * zeta)) * Math.sin(omegaD * t)
+    );
+  }
+
+  return 1 - Math.exp(-omega0 * t) * (1 + omega0 * t);
+}
+
+function cubicBezier(x1, y1, x2, y2) {
+  const cx = 3 * x1;
+  const bx = 3 * (x2 - x1) - cx;
+  const ax = 1 - cx - bx;
+  const cy = 3 * y1;
+  const by = 3 * (y2 - y1) - cy;
+  const ay = 1 - cy - by;
+
+  function sampleCurveX(t) {
+    return ((ax * t + bx) * t + cx) * t;
+  }
+
+  function sampleCurveY(t) {
+    return ((ay * t + by) * t + cy) * t;
+  }
+
+  function sampleDerivativeX(t) {
+    return (3 * ax * t + 2 * bx) * t + cx;
+  }
+
+  return (t) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+
+    let param = t;
+    for (let i = 0; i < 8; i++) {
+      const x = sampleCurveX(param) - t;
+      const dx = sampleDerivativeX(param);
+      if (Math.abs(x) < 1e-6) return sampleCurveY(param);
+      if (Math.abs(dx) < 1e-6) break;
+      param -= x / dx;
+    }
+
+    let low = 0;
+    let high = 1;
+    param = t;
+    for (let i = 0; i < 10; i++) {
+      const x = sampleCurveX(param);
+      if (Math.abs(x - t) < 1e-6) break;
+      if (x < t) low = param;
+      else high = param;
+      param = (low + high) * 0.5;
+    }
+    return sampleCurveY(param);
+  };
+}
+
 const EASINGS = {
   linear: (t) => t,
   easeIn: (t) => t * t,
   easeOut: (t) => t * (2 - t),
   easeInOut: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
   spring: (t) => 1 - Math.cos(t * Math.PI * 0.5) * Math.exp(-6 * t),
+  bounce,
+  elastic,
+  expo,
+  back,
+  circ,
+  springConfigurable,
+  cubicBezier,
 };
 
 /**
@@ -41,7 +149,7 @@ export function isKeyframed(val) {
  */
 export function interpolate(kf, t) {
   const keys = kf.keys;
-  const ease = EASINGS[kf.ease] || EASINGS.linear;
+  const ease = resolveEasing(kf.ease);
 
   if (keys.length === 1) return keys[0][1];
 
@@ -100,4 +208,10 @@ function hexToRgb(hex) {
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
 }
 
-export { EASINGS };
+function resolveEasing(ease) {
+  if (typeof ease === "function") return ease;
+  if (typeof ease === "string" && EASINGS[ease]) return EASINGS[ease];
+  return EASINGS.linear;
+}
+
+export { EASINGS, back, bounce, circ, cubicBezier, elastic, expo, springConfigurable };
