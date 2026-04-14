@@ -1,3 +1,5 @@
+import { TOKENS, esc, escAttr, easeOutCubic, fadeIn, sw16, sh16 } from "../../../shared/design.js";
+
 export const meta = {
   id: "flowDiagram", version: 1, ratio: "16:9", category: "data",
   label: "Flow Diagram",
@@ -7,8 +9,8 @@ export const meta = {
   mood: ["analytical", "focused"], theme: ["education", "tech", "presentation"],
   default_theme: "anthropic-warm",
   themes: {
-    "anthropic-warm": { nodeBg: "#2a1f18", nodeBorder: "#da7756", nodeText: "#f5ece0", arrowColor: "#d4b483", passColor: "#7ec699", blockColor: "#e06c75" },
-    "cool-blue":      { nodeBg: "#121820", nodeBorder: "#8ab4cc", nodeText: "#e8f0f5", arrowColor: "#8ab4cc", passColor: "#7ec699", blockColor: "#e06c75" },
+    "anthropic-warm": { nodeBg: "#2a1f18", nodeBorder: TOKENS.lecture.accent, nodeText: TOKENS.lecture.text, arrowColor: TOKENS.lecture.gold, passColor: TOKENS.lecture.green, blockColor: TOKENS.lecture.red },
+    "cool-blue":      { nodeBg: "#121820", nodeBorder: "#8ab4cc", nodeText: "#e8f0f5", arrowColor: "#8ab4cc", passColor: TOKENS.lecture.green, blockColor: TOKENS.lecture.red },
   },
   params: {
     nodes:       { type: "array",  required: true, default: [], label: "节点列表", semantic: "array of {id, label, type} objects. type: 'main'|'pass'|'block'|'decision'", group: "content" },
@@ -16,11 +18,11 @@ export const meta = {
     enterDur:    { type: "number", default: 0.4, label: "每节点淡入时长(s)", group: "animation", range: [0.1, 2], step: 0.1 },
     enterStagger:{ type: "number", default: 0.5, label: "节点间隔(s)", group: "animation", range: [0.1, 3], step: 0.1 },
     nodeBg:      { type: "color",  default: "#2a1f18", label: "节点背景", group: "color" },
-    nodeBorder:  { type: "color",  default: "#da7756", label: "节点边框", group: "color" },
-    nodeText:    { type: "color",  default: "#f5ece0", label: "节点文字", group: "color" },
-    arrowColor:  { type: "color",  default: "#d4b483", label: "箭头颜色", group: "color" },
-    passColor:   { type: "color",  default: "#7ec699", label: "PASS 节点颜色", group: "color" },
-    blockColor:  { type: "color",  default: "#e06c75", label: "BLOCK 节点颜色", group: "color" },
+    nodeBorder:  { type: "color",  default: TOKENS.lecture.accent, label: "节点边框", group: "color" },
+    nodeText:    { type: "color",  default: TOKENS.lecture.text, label: "节点文字", group: "color" },
+    arrowColor:  { type: "color",  default: TOKENS.lecture.gold, label: "箭头颜色", group: "color" },
+    passColor:   { type: "color",  default: TOKENS.lecture.green, label: "PASS 节点颜色", group: "color" },
+    blockColor:  { type: "color",  default: TOKENS.lecture.red, label: "BLOCK 节点颜色", group: "color" },
     y:           { type: "number", default: 0, label: "Y 偏移(px, 0=居中)", group: "style", range: [0, 1080], step: 10 },
     nodeWidth:   { type: "number", default: 220, label: "节点宽(px)", group: "style", range: [120, 400], step: 10 },
     nodeHeight:  { type: "number", default: 90, label: "节点高(px)", group: "style", range: [50, 200], step: 10 },
@@ -41,8 +43,6 @@ export const meta = {
     pairs_with: ["headlineCenter", "subtitleBar", "progressBar16x9"],
   },
 };
-
-function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); }
 
 export function render(t, params, vp) {
   const p = {};
@@ -90,12 +90,12 @@ export function render(t, params, vp) {
     const nx = startX + i * (nw + arrowW);
     const ny = mainY;
     const appearAt = nodeIdx * p.enterStagger;
-    const op = ease3((t - appearAt) / p.enterDur);
+    const op = easeOutCubic((t - appearAt) / p.enterDur);
     nodeIdx++;
 
     // Arrow after this node (except last)
     if (i < mainNodes.length - 1) {
-      const arrowOp = ease3((t - (nodeIdx - 0.5) * p.enterStagger) / p.enterDur);
+      const arrowOp = easeOutCubic((t - (nodeIdx - 0.5) * p.enterStagger) / p.enterDur);
       shapes.push({ kind: "arrow", x: nx + nw, y: ny + nh / 2, w: arrowW, op: arrowOp, color: p.arrowColor, dir: "right" });
     }
     shapes.push({ kind: "node", x: nx, y: ny, w: nw, h: nh, op, node: n });
@@ -114,7 +114,7 @@ export function render(t, params, vp) {
       const bx = branchStartX + i * (nw + 40);
       const by = branchY;
       const appearAt = nodeIdx * p.enterStagger;
-      const op = ease3((t - appearAt) / p.enterDur);
+      const op = easeOutCubic((t - appearAt) / p.enterDur);
       nodeIdx++;
 
       // Vertical arrow from decision to branch
@@ -134,8 +134,8 @@ export function render(t, params, vp) {
 
   // Title
   if (p.title) {
-    const titleOp = Math.max(0, Math.min(1, ease3(t / p.enterDur)));
-    svg += '<text x="' + svgW / 2 + '" y="80" text-anchor="middle" font-family="Georgia,serif" font-size="36" font-weight="600" fill="' + p.nodeText + '" opacity="' + titleOp + '">' + p.title + '</text>';
+    const titleOp = Math.max(0, Math.min(1, easeOutCubic(t / p.enterDur)));
+    svg += '<text x="' + svgW / 2 + '" y="80" text-anchor="middle" font-family="Georgia,serif" font-size="36" font-weight="600" fill="' + p.nodeText + '" opacity="' + titleOp + '">' + esc(p.title) + '</text>';
   }
 
   for (const shape of shapes) {
@@ -167,12 +167,12 @@ export function render(t, params, vp) {
       if (n.type === "decision") {
         svg += '<g opacity="' + opClamped + '">' +
           '<polygon points="' + cx + ',' + shape.y + ' ' + (shape.x + shape.w) + ',' + cy + ' ' + cx + ',' + (shape.y + shape.h) + ' ' + shape.x + ',' + cy + '" fill="' + bgColor + '" stroke="' + borderColor + '" stroke-width="2"/>' +
-          '<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="600" fill="' + textColor + '">' + (n.label || n.id) + '</text>' +
+          '<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="600" fill="' + textColor + '">' + esc(n.label || n.id) + '</text>' +
           '</g>';
       } else {
         svg += '<g opacity="' + opClamped + '">' +
           '<rect x="' + shape.x + '" y="' + shape.y + '" width="' + shape.w + '" height="' + shape.h + '" rx="8" fill="' + bgColor + '" stroke="' + borderColor + '" stroke-width="2"/>' +
-          '<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="600" fill="' + textColor + '">' + (n.label || n.id) + '</text>' +
+          '<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="600" fill="' + textColor + '">' + esc(n.label || n.id) + '</text>' +
           '</g>';
       }
     }

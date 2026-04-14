@@ -1,3 +1,5 @@
+import { TOKENS, esc, escAttr, easeOutCubic, fadeIn, sw16, sh16 } from "../../../shared/design.js";
+
 export const meta = {
   id: "progressBar16x9", version: 1, ratio: "16:9", category: "overlays",
   label: "Progress Bar", description: "底部细进度条。调用方每帧传入 progress(0-1)，无动画逻辑，视觉即时更新。",
@@ -6,14 +8,14 @@ export const meta = {
   mood: ["neutral"], theme: ["tech", "education", "vlog"],
   default_theme: "anthropic-warm",
   themes: {
-    "anthropic-warm": { color:"#da7756", trackColor:"rgba(245,236,224,.08)" },
+    "anthropic-warm": { color: TOKENS.lecture.accent, trackColor:"rgba(245,236,224,.08)" },
     "dark-minimal": { color:"#8ab4cc", trackColor:"rgba(255,255,255,.08)" },
     "signal-green": { color:"#7ec699", trackColor:"rgba(126,198,153,.18)" }
   },
   params: {
     progress:      { type:"number", required:false, default:0.35, label:"进度 0-1（静态）", semantic:"current progress fraction, 0=empty 1=full. Ignored if totalDuration>0.", group:"content", range:[0,1], step:0.01 },
     totalDuration: { type:"number", default:0, label:"总时长(s)，用于自动计算进度", semantic:"when >0, progress = t/totalDuration (auto from time). Overrides static progress.", group:"content", range:[0,3600], step:1 },
-    color:         { type:"color",  default:"#da7756",          label:"进度条颜色",  group:"color" },
+    color:         { type:"color",  default: TOKENS.lecture.accent, label:"进度条颜色",  group:"color" },
     trackColor:    { type:"color",  default:"rgba(245,236,224,.08)", label:"轨道颜色", group:"color" },
     height:        { type:"number", default:4,                  label:"高度(px)",    group:"style", range:[1,20], step:1 },
     y:             { type:"number", default:50,                 label:"距底部(px)",  group:"style", range:[0,200], step:5 },
@@ -22,7 +24,7 @@ export const meta = {
   ai: {
     when: "显示视频整体播放进度或章节进度。调用方计算 progress = currentTime / totalDuration 传入。",
     how: "progress 是 0-1 的小数。0 = 空，1 = 满。每帧由调用方更新，组件本身无时间逻辑。",
-    example: { progress:0.35, color:"#da7756", height:4, y:50 },
+    example: { progress:0.35, color: TOKENS.lecture.accent, height:4, y:50 },
     theme_guide: { "anthropic-warm":"橙色进度条 + 极淡轨道", "dark-minimal":"蓝色极简", "signal-green":"绿色强调" },
     avoid: "height > 8 会显得突兀，建议 3-6px。不要用于倒计时（那是调用方的逻辑）。",
     pairs_with: ["subtitleBar","slideChrome","auroraGradient"]

@@ -1,3 +1,5 @@
+import { TOKENS, esc, escAttr, easeOutCubic, fadeIn, sw16, sh16 } from "../../../shared/design.js";
+
 export const meta = {
   id: "codeTerminal", version: 1, ratio: "16:9", category: "browser",
   label: "Code Terminal",
@@ -7,21 +9,21 @@ export const meta = {
   mood: ["technical", "focused"], theme: ["tech", "education"],
   default_theme: "anthropic-warm",
   themes: {
-    "anthropic-warm": { bg: "#1e1810", border: "rgba(218,119,86,0.25)", lineNumColor: "#6b5d52", codeColor: "#f5ece0", commentColor: "#7ec699", keywordColor: "#da7756", stringColor: "#d4b483", numberColor: "#8ab4cc" },
-    "dark-pro":       { bg: "#0d1117", border: "rgba(138,180,204,0.20)", lineNumColor: "#4a5568", codeColor: "#e2e8f0", commentColor: "#7ec699", keywordColor: "#8ab4cc", stringColor: "#d4b483", numberColor: "#da7756" },
+    "anthropic-warm": { bg: TOKENS.lecture.codeBg, border: "rgba(218,119,86,0.25)", lineNumColor: "#6b5d52", codeColor: TOKENS.lecture.text, commentColor: TOKENS.lecture.green, keywordColor: TOKENS.lecture.accent, stringColor: TOKENS.lecture.gold, numberColor: "#8ab4cc" },
+    "dark-pro":       { bg: "#0d1117", border: "rgba(138,180,204,0.20)", lineNumColor: "#4a5568", codeColor: "#e2e8f0", commentColor: TOKENS.lecture.green, keywordColor: "#8ab4cc", stringColor: TOKENS.lecture.gold, numberColor: TOKENS.lecture.accent },
   },
   params: {
     lines:       { type: "array",  required: true, default: [], label: "代码行", semantic: "array of strings, each is one line. Use special prefixes: '//' for comment style, 'k:' for keyword", group: "content" },
     title:       { type: "string", default: "", label: "标题（可选）", group: "content" },
     enterStagger:{ type: "number", default: 0.15, label: "逐行延迟(s)", group: "animation", range: [0, 1], step: 0.05 },
     enterDur:    { type: "number", default: 0.3,  label: "每行淡入时长(s)", group: "animation", range: [0.1, 1], step: 0.05 },
-    bg:          { type: "color",  default: "#1e1810", label: "背景色", group: "color" },
+    bg:          { type: "color",  default: TOKENS.lecture.codeBg, label: "背景色", group: "color" },
     border:      { type: "color",  default: "rgba(218,119,86,0.25)", label: "边框色", group: "color" },
     lineNumColor:{ type: "color",  default: "#6b5d52", label: "行号颜色", group: "color" },
-    codeColor:   { type: "color",  default: "#f5ece0", label: "代码颜色", group: "color" },
-    commentColor:{ type: "color",  default: "#7ec699", label: "注释颜色", group: "color" },
-    keywordColor:{ type: "color",  default: "#da7756", label: "关键字颜色", group: "color" },
-    stringColor: { type: "color",  default: "#d4b483", label: "字符串颜色", group: "color" },
+    codeColor:   { type: "color",  default: TOKENS.lecture.text, label: "代码颜色", group: "color" },
+    commentColor:{ type: "color",  default: TOKENS.lecture.green, label: "注释颜色", group: "color" },
+    keywordColor:{ type: "color",  default: TOKENS.lecture.accent, label: "关键字颜色", group: "color" },
+    stringColor: { type: "color",  default: TOKENS.lecture.gold, label: "字符串颜色", group: "color" },
     numberColor: { type: "color",  default: "#8ab4cc", label: "数字颜色", group: "color" },
     fontSize:    { type: "number", default: 28, label: "字号(px)", group: "style", range: [14, 48], step: 2 },
     x:           { type: "number", default: 0, label: "X 偏移(px, 0=居中)", group: "style", range: [0, 1920], step: 10 },
@@ -49,15 +51,13 @@ export const meta = {
   },
 };
 
-function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); }
-
 function colorize(line, p) {
   if (!line) return "<br>";
 
   // Comment
   const trimmed = line.trimStart();
   if (trimmed.startsWith("//") || trimmed.startsWith("#")) {
-    return '<span style="color:' + p.commentColor + '">' + escHtml(line) + '</span>';
+    return '<span style="color:' + p.commentColor + '">' + esc(line) + '</span>';
   }
 
   // Simple tokenizer: strings, numbers, keywords, rest
@@ -90,10 +90,10 @@ function colorize(line, p) {
 
   for (const seg of segments) {
     if (seg.type === "string") {
-      result += '<span style="color:' + p.stringColor + '">' + escHtml(seg.text) + '</span>';
+      result += '<span style="color:' + p.stringColor + '">' + esc(seg.text) + '</span>';
     } else {
       // Numbers
-      let codeHtml = escHtml(seg.text);
+      let codeHtml = esc(seg.text);
       codeHtml = codeHtml.replace(/\b(\d+\.?\d*)\b/g, '<span style="color:' + p.numberColor + '">$1</span>');
       // Keywords
       codeHtml = codeHtml.replace(new RegExp("\\b(" + KEYWORDS.join("|") + ")\\b", "g"),
@@ -105,14 +105,6 @@ function colorize(line, p) {
     }
   }
   return result;
-}
-
-function escHtml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 export function render(t, params, vp) {
@@ -135,7 +127,7 @@ export function render(t, params, vp) {
     'background:' + p.bg + ';border:1px solid ' + p.border + ';border-radius:10px;overflow:hidden">';
 
   // Title bar with window control dots
-  const titleOp = ease3(t / (p.enterDur || 0.3));
+  const titleOp = easeOutCubic(t / (p.enterDur || 0.3));
   const titleOpClamped = Math.max(0, Math.min(1, titleOp));
   const dotSize = Math.round(fs * 0.4);
   const dotGap = Math.round(fs * 0.28);
@@ -143,11 +135,11 @@ export function render(t, params, vp) {
     '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#ff5f57;margin-right:' + dotGap + 'px"></span>' +
     '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#febc2e;margin-right:' + dotGap + 'px"></span>' +
     '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#28c840;margin-right:' + Math.round(padH * 0.5) + 'px"></span>' +
-    (p.title ? '<span style="font:500 ' + (fs - 6) + 'px system-ui,sans-serif;color:' + p.lineNumColor + '">' + escHtml(p.title) + '</span>' : '') +
+    (p.title ? '<span style="font:500 ' + (fs - 6) + 'px system-ui,sans-serif;color:' + p.lineNumColor + '">' + esc(p.title) + '</span>' : '') +
     '</div>';
 
   // Code lines — single pre block for maximum WKWebView compatibility
-  const globalOp = Math.max(0, Math.min(1, ease3(t / Math.max(p.enterDur || 0.3, 0.01))));
+  const globalOp = Math.max(0, Math.min(1, easeOutCubic(t / Math.max(p.enterDur || 0.3, 0.01))));
   const codeLines = [];
   for (let idx = 0; idx < lines.length; idx++) {
     const num = String(idx + 1).padStart(3, ' ');

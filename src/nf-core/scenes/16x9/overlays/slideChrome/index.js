@@ -1,3 +1,5 @@
+import { TOKENS, esc, escAttr, easeOutCubic, fadeIn, sw16, sh16 } from "../../../shared/design.js";
+
 export const meta = {
   id: "slideChrome", version: 1, ratio: "16:9", category: "overlays",
   label: "Slide Chrome",
@@ -9,9 +11,9 @@ export const meta = {
   default_theme: "anthropic-warm",
   themes: {
     "anthropic-warm": {
-      brandColor: "#d4b483",
+      brandColor: TOKENS.lecture.gold,
       seriesBg: "rgba(218,119,86,0.15)",
-      seriesColor: "#da7756",
+      seriesColor: TOKENS.lecture.accent,
       epTitleColor: "rgba(245,236,224,0.6)",
       watermarkColor: "rgba(218,119,86,0.12)",
     },
@@ -23,9 +25,9 @@ export const meta = {
       watermarkColor: "rgba(138,180,204,0.10)",
     },
     "gold-accent": {
-      brandColor: "#d4b483",
+      brandColor: TOKENS.lecture.gold,
       seriesBg: "rgba(212,180,131,0.18)",
-      seriesColor: "#d4b483",
+      seriesColor: TOKENS.lecture.gold,
       epTitleColor: "rgba(245,236,224,0.55)",
       watermarkColor: "rgba(212,180,131,0.10)",
     },
@@ -37,9 +39,9 @@ export const meta = {
     watermark:     { type: "string", default: "E01", label: "水印文字（右上角）", semantic: "large faint watermark at top-right, typically episode number like E01, E02", group: "content" },
     barHeight:     { type: "number", default: 50, label: "顶栏高度(px)", semantic: "height of the top bar area in pixels", group: "style", range: [36, 80], step: 2 },
     fontSize:      { type: "number", default: 14, label: "文字字号(px)", semantic: "font size for brand, series, and episode title text", group: "style", range: [10, 20], step: 1 },
-    brandColor:    { type: "color", default: "#d4b483", label: "品牌色", group: "color" },
+    brandColor:    { type: "color", default: TOKENS.lecture.gold, label: "品牌色", group: "color" },
     seriesBg:      { type: "color", default: "rgba(218,119,86,0.15)", label: "系列横幅背景", group: "color" },
-    seriesColor:   { type: "color", default: "#da7756", label: "系列文字色", group: "color" },
+    seriesColor:   { type: "color", default: TOKENS.lecture.accent, label: "系列文字色", group: "color" },
     epTitleColor:  { type: "color", default: "rgba(245,236,224,0.6)", label: "章节副标题色", group: "color" },
     watermarkColor:{ type: "color", default: "rgba(218,119,86,0.12)", label: "水印颜色", group: "color" },
     watermarkSize: { type: "number", default: 120, label: "水印字号(px)", semantic: "font size of the large faint watermark at top-right", group: "style", range: [60, 200], step: 10 },
@@ -104,14 +106,6 @@ export function render(t, params, vp) {
     // Watermark
     wmHtml +
   '</div>';
-}
-
-function esc(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 export function screenshots() {

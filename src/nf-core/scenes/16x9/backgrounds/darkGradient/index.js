@@ -1,3 +1,5 @@
+import { TOKENS, esc, escAttr, easeOutCubic, fadeIn, sw16, sh16 } from "../../../shared/design.js";
+
 export const meta = {
   id: "darkGradient",
   version: 1,
@@ -14,12 +16,12 @@ export const meta = {
   theme: ["education", "lecture", "interview"],
   default_theme: "warm-lecture",
   themes: {
-    "warm-lecture": { bg: "#1a1510", glowColor: "rgba(218,119,86,0.16)", glowX: 52, glowY: 34, glowSize: 54 },
+    "warm-lecture": { bg: TOKENS.lecture.bg, glowColor: "rgba(218,119,86,0.16)", glowX: 52, glowY: 34, glowSize: 54 },
     "charcoal-focus": { bg: "#121214", glowColor: "rgba(138,180,204,0.12)", glowX: 50, glowY: 30, glowSize: 48 },
     "espresso-soft": { bg: "#18110d", glowColor: "rgba(212,180,131,0.12)", glowX: 48, glowY: 28, glowSize: 44 },
   },
   params: {
-    bg: { type: "color", default: "#1a1510", label: "背景色", semantic: "base background color covering the full viewport", group: "color" },
+    bg: { type: "color", default: TOKENS.lecture.bg, label: "背景色", semantic: "base background color covering the full viewport", group: "color" },
     glowColor: { type: "color", default: "rgba(218,119,86,0.16)", label: "光晕色", semantic: "color used in the subtle radial glow overlay", group: "color" },
     glowX: { type: "number", default: 52, label: "光晕 X(%)", semantic: "horizontal glow anchor in percent of viewport width", group: "layout", range: [0, 100], step: 1 },
     glowY: { type: "number", default: 34, label: "光晕 Y(%)", semantic: "vertical glow anchor in percent of viewport height", group: "layout", range: [0, 100], step: 1 },
@@ -28,7 +30,7 @@ export const meta = {
   ai: {
     when: "做课程讲解、lecture video、访谈说明等需要克制背景的时候使用。",
     how: "放在最底层作为全屏背景。只调 bg 和 glowColor 就能快速换气质；glowX/glowY 控制光斑落点。",
-    example: { bg: "#1a1510", glowColor: "rgba(218,119,86,0.16)", glowX: 52, glowY: 34, glowSize: 54 },
+    example: { bg: TOKENS.lecture.bg, glowColor: "rgba(218,119,86,0.16)", glowX: 52, glowY: 34, glowSize: 54 },
     theme_guide: { "warm-lecture": "默认暖棕 lecture 背景", "charcoal-focus": "偏冷深灰，适合科技内容", "espresso-soft": "更柔和的棕黑" },
     avoid: "不要再叠加其他背景 scene；glowSize 太大或 glowColor 太亮会让文字对比变差。",
     pairs_with: ["videoClip", "slideChrome", "subtitleBar"],
@@ -36,7 +38,7 @@ export const meta = {
 };
 
 export function render(t, params, vp) {
-  const bg = params.bg || "#1a1510";
+  const bg = params.bg || TOKENS.lecture.bg;
   const glowColor = params.glowColor || "rgba(218,119,86,0.16)";
   const glowX = Number.isFinite(params.glowX) ? params.glowX : 52;
   const glowY = Number.isFinite(params.glowY) ? params.glowY : 34;

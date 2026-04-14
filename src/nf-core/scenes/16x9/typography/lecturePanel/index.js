@@ -1,3 +1,5 @@
+import { TOKENS, esc, escAttr, easeOutCubic, fadeIn, sw16, sh16 } from '../../../shared/design.js';
+
 // lecturePanel — Right-side explanation panel for dual-pane lecture layout.
 // Shows: category label + large title + accent subtitle + description text.
 // Pairs with codeTerminal on the left side.
@@ -19,8 +21,8 @@ export const meta = {
   themes: {
     "anthropic-warm": {
       categoryColor: "rgba(245,236,224,0.4)",
-      titleColor: "#f5ece0",
-      subtitleColor: "#da7756",
+      titleColor: TOKENS.lecture.text,
+      subtitleColor: TOKENS.lecture.accent,
       descColor: "rgba(245,236,224,0.65)",
     },
   },
@@ -33,8 +35,8 @@ export const meta = {
     width: { type: "number", default: 40, label: "Width (% of viewport)", group: "layout", range: [10, 100], step: 1 },
     y: { type: "number", default: 30, label: "Y position (% of viewport)", group: "layout", range: [0, 100], step: 1 },
     categoryColor: { type: "color", default: "rgba(245,236,224,0.4)", label: "Category color", group: "color" },
-    titleColor: { type: "color", default: "#f5ece0", label: "Title color", group: "color" },
-    subtitleColor: { type: "color", default: "#da7756", label: "Subtitle color", group: "color" },
+    titleColor: { type: "color", default: TOKENS.lecture.text, label: "Title color", group: "color" },
+    subtitleColor: { type: "color", default: TOKENS.lecture.accent, label: "Subtitle color", group: "color" },
     descColor: { type: "color", default: "rgba(245,236,224,0.65)", label: "Description color", group: "color" },
     enterDelay: { type: "number", default: 0, label: "Enter delay (s)", group: "animation", range: [0, 10], step: 0.1 },
   },
@@ -47,17 +49,14 @@ export const meta = {
   },
 };
 
-function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); }
-
 export function render(t, params, vp) {
   const category = esc(params.category || "");
   const title = esc(params.title || "");
   const subtitle = esc(params.subtitle || "");
   const desc = esc(params.desc || "");
   const categoryColor = params.categoryColor || "rgba(245,236,224,0.4)";
-  const titleColor = params.titleColor || "#f5ece0";
-  const subtitleColor = params.subtitleColor || "#da7756";
+  const titleColor = params.titleColor || TOKENS.lecture.text;
+  const subtitleColor = params.subtitleColor || TOKENS.lecture.accent;
   const descColor = params.descColor || "rgba(245,236,224,0.65)";
   const enterDelay = Number(params.enterDelay) || 0;
 
@@ -68,17 +67,17 @@ export function render(t, params, vp) {
   const left = Math.round(vp.width * xPct / 100);
   const areaWidth = Math.round(vp.width * widthPct / 100);
   const top = Math.round(vp.height * yPct / 100);
-  const pad = Math.round(vp.width * 30 / 1920);
+  const pad = sw16(vp, 30);
 
   const localT = Math.max(0, t - enterDelay);
-  const fadeAlpha = Math.min(1, ease3(Math.min(1, localT * 2)));
-  const slideX = (1 - ease3(Math.min(1, localT * 1.5))) * 30;
+  const fadeAlpha = fadeIn(t, enterDelay, 0.5);
+  const slideX = (1 - easeOutCubic(Math.min(1, localT * 1.5))) * 30;
 
-  const catSize = Math.round(vp.width * 12 / 1920);
-  const titleSize = Math.round(vp.width * 48 / 1920);
-  const subSize = Math.round(vp.width * 28 / 1920);
-  const descSize = Math.round(vp.width * 16 / 1920);
-  const gap = Math.round(vp.height * 12 / 1080);
+  const catSize = sw16(vp, 12);
+  const titleSize = sw16(vp, 48);
+  const subSize = sw16(vp, 28);
+  const descSize = sw16(vp, 16);
+  const gap = sh16(vp, 12);
 
   let html = `<div style="position:absolute;left:${left}px;top:${top}px;width:${areaWidth}px;padding:0 ${pad}px;opacity:${fadeAlpha};transform:translateX(${slideX}px);pointer-events:none">`;
 

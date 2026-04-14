@@ -1,3 +1,5 @@
+import { TOKENS, esc, escAttr, easeOutCubic, fadeIn, sw16, sh16 } from '../../../shared/design.js';
+
 export const meta = {
   id: "subtitleBar", version: 1, ratio: "16:9", category: "overlays",
   label: "Subtitle Bar",
@@ -7,15 +9,15 @@ export const meta = {
   mood: ["neutral"], theme: ["education", "lecture", "vlog"],
   default_theme: "anthropic-warm",
   themes: {
-    "anthropic-warm": { bgColor: "rgba(26,21,16,0.82)", textColor: "#f5ece0", accentColor: "#da7756" },
+    "anthropic-warm": { bgColor: "rgba(26,21,16,0.82)", textColor: TOKENS.lecture.text, accentColor: TOKENS.lecture.accent },
     "dark-minimal":   { bgColor: "rgba(0,0,0,0.72)",   textColor: "#ffffff", accentColor: "#8ab4cc" },
-    "warm-gold":      { bgColor: "rgba(26,21,16,0.85)", textColor: "#d4b483", accentColor: "#da7756" },
+    "warm-gold":      { bgColor: "rgba(26,21,16,0.85)", textColor: TOKENS.lecture.gold, accentColor: TOKENS.lecture.accent },
   },
   params: {
     srt:         { type: "array",  required: true, default: [], label: "字幕数组", semantic: "array of {s,e,t} objects: s=start(s), e=end(s), t=text", group: "content" },
     bgColor:     { type: "color",  default: "rgba(26,21,16,0.82)", label: "背景色", group: "color" },
-    textColor:   { type: "color",  default: "#f5ece0", label: "文字色", group: "color" },
-    accentColor: { type: "color",  default: "#da7756", label: "强调色", group: "color" },
+    textColor:   { type: "color",  default: TOKENS.lecture.text, label: "文字色", group: "color" },
+    accentColor: { type: "color",  default: TOKENS.lecture.accent, label: "强调色", group: "color" },
     fontSize:    { type: "number", default: 32, label: "字号(px)", group: "style", range: [18, 54], step: 2 },
     y:           { type: "number", default: 60, label: "距底部(px)", group: "style", range: [0, 300], step: 4 },
   },
