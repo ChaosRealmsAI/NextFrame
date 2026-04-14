@@ -433,10 +433,10 @@ async function composePreview() {
     timeline: edTimelineData
   });
   const result = await bridgeCall('compose.generate', {
-    timelinePath: buildEditorTimelinePath()
+    timelinePath: buildEditorTimelinePath(),
+    open: true
   });
   if (result && result.path) {
-    showEditorComposePreview(result.path);
     updateEditorPreviewState(0, getEditorTimelineDuration());
   }
   return result;
