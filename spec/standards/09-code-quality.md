@@ -162,3 +162,11 @@ grep -rn "from.*modules/" src/nf-runtime/web/src/components/ --include='*.js'
 ```
 
 **全部 exit 0 才能合并到 main。**
+
+## 技术选型原则（来自 Agent Experience 研究）
+
+- **用无聊的技术** — AI 对成熟技术（Rust std、vanilla JS、ffmpeg）的理解远好于新潮框架
+- **不混技术栈** — 一个职责用一种技术。不在 JS 里写 Rust 的活
+- **设计模式优先** — 用 AI 熟悉的模式（Builder、Adapter、Registry）。AI 不用读代码就懂意图
+- **不重名** — 项目内不允许两个文件叫同一个名字（除 mod.rs/index.js）。AI 搜到多个同名文件浪费 context
+- **每次 AI 犯错后改环境** — AI 犯错 = 环境的 bug。加注释、改名、加 lint 规则防止再犯

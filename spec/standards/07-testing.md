@@ -64,3 +64,10 @@ bash scripts/lint-all.sh       # 4. 全量检查
 ```
 
 全部 exit 0 才能合并。
+
+## AI 友好测试实践
+
+- **支持单模块测试** — `cargo test -p nf-bridge` 而不是只能跑全量。AI 改一个文件不用等 30s
+- **测试名 = 行为描述** — `fn timeline_save_rejects_symlink_escape()` AI 读名字就知道测什么
+- **失败信息可操作** — assert 消息带期望值 vs 实际值，AI 不用猜
+- **每次 AI 引入 bug → 加回归测试** — 防止同一个 bug 出现两次
