@@ -65,22 +65,20 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --stagger: 60ms;
 
-  /* Glass — 3D panel with depth */
-  --glass-bg: rgba(255,255,255,0.04);
-  --glass-blur: blur(20px) saturate(1.6);
+  /* Glass — subtle depth, not heavy 3D */
+  --glass-bg: rgba(0,0,0,0.50);
+  --glass-blur: blur(16px) saturate(1.4);
   --glass-shadow:
-    inset 0 1px 0 0 rgba(255,255,255,0.12),
-    inset 0 -1px 0 0 rgba(0,0,0,0.25),
-    0 4px 16px rgba(0,0,0,0.30),
-    0 1px 3px rgba(0,0,0,0.20);
+    inset 0 1px 0 0 rgba(255,255,255,0.09),
+    inset 0 -1px 0 0 rgba(0,0,0,0.15),
+    0 2px 8px rgba(0,0,0,0.20);
   --glass-shadow-hover:
-    inset 0 1px 0 0 rgba(255,255,255,0.15),
-    inset 0 -1px 0 0 rgba(0,0,0,0.25),
-    0 8px 32px rgba(0,0,0,0.45),
-    0 2px 6px rgba(0,0,0,0.25);
+    inset 0 1px 0 0 rgba(255,255,255,0.09),
+    inset 0 -1px 0 0 rgba(0,0,0,0.15),
+    0 6px 20px rgba(0,0,0,0.35);
   --glass-highlight:
-    linear-gradient(178deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 4%, transparent 15%),
-    linear-gradient(92deg, rgba(255,255,255,0.04) 0%, transparent 4%, transparent 96%, rgba(255,255,255,0.02) 100%);
+    linear-gradient(178deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 3%, transparent 12%),
+    linear-gradient(92deg, rgba(255,255,255,0.025) 0%, transparent 3%, transparent 97%, rgba(255,255,255,0.015) 100%);
 }
 
 html, body {
@@ -2074,7 +2072,7 @@ html, body {
       <div class="tb-pl-tab" data-stage="audio" onclick="switchTab(this)">音频</div>
       <div class="tb-pl-tab" data-stage="clips" onclick="switchTab(this)">素材</div>
       <div class="tb-pl-tab" data-stage="atoms" onclick="switchTab(this)">原子</div>
-      <div class="tb-pl-tab" data-stage="assembly" onclick="switchTab(this)">剪辑</div>
+      <div class="tb-pl-tab" data-stage="assembly" onclick="showView('editor')">剪辑</div>
       <div class="tb-pl-tab" data-stage="output" onclick="switchTab(this)">产出</div>
     </div>
 
