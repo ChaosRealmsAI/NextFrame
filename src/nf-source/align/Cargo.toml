@@ -10,7 +10,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tempfile = "3.15"
 thiserror = "2.0"
-nf-cut-core = { path = "../nf-cut-core" }
+nf-cut-core = { path = "../core" }
 
 [lints.clippy]
 unwrap_used = "deny"

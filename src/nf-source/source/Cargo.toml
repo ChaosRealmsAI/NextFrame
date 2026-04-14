@@ -12,11 +12,11 @@ path = "src/main.rs"
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 serde_json = "1.0"
-nf-cut-core = { path = "../nf-cut-core" }
-nf-download = { path = "../nf-download" }
-nf-transcribe = { path = "../nf-transcribe" }
-nf-align = { path = "../nf-align" }
-nf-cut = { path = "../nf-cut" }
+nf-cut-core = { path = "../core" }
+nf-download = { path = "../download" }
+nf-transcribe = { path = "../transcribe" }
+nf-align = { path = "../align" }
+nf-cut = { path = "../cut" }
 
 [lints.clippy]
 unwrap_used = "deny"

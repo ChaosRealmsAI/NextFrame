@@ -8,7 +8,7 @@ license = "UNLICENSED"
 repository = "https://github.com/Zhuanz/vox"
 keywords = ["tts", "cli", "speech", "audio", "edge"]
 categories = ["command-line-utilities", "multimedia::audio"]
-rust-version = "1.88"
+rust-version = "1.75"
 
 [lints]
 workspace = true

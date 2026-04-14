@@ -83,20 +83,29 @@ pub fn run() {
     reposition_traffic_lights(&window);
 
     // Create WKWebView and set as content
-    match webview::create(mtm, NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT)) {
-        Ok(wv) => {
-            window.setContentView(Some(&wv));
-        }
+    let wv = match webview::create(mtm, NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT)) {
+        Ok(wv) => wv,
         Err(e) => {
             tracing::error!("failed to create webview: {e}");
             return;
         }
-    }
+    };
+    window.setContentView(Some(&wv));
 
     window.makeKeyAndOrderFront(None);
 
     // Reapply after content is set (system may reset)
     reposition_traffic_lights(&window);
+
+    // Auto-screenshot if --screenshot flag passed
+    if std::env::args().any(|a| a == "--screenshot") {
+        let out = "/tmp/nf-screenshot.png";
+        match webview::screenshot(&wv, out) {
+            Ok(()) => tracing::info!("screenshot: {out}"),
+            Err(e) => tracing::error!("screenshot failed: {e}"),
+        }
+        std::process::exit(0);
+    }
 
     // SAFETY: activateIgnoringOtherApps: is valid for NSApplication.
     unsafe {
