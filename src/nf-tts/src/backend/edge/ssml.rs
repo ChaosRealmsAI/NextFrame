@@ -109,7 +109,8 @@ pub fn split_text(text: &str, max_bytes: usize) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{build_ssml, escaped_len, split_text};
+    use crate::backend::SynthParams;
 
     fn params() -> SynthParams {
         SynthParams {

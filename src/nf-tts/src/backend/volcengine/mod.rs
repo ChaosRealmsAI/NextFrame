@@ -18,6 +18,10 @@ const DEFAULT_ACCESS_TOKEN: &str = "RXQjJw1vScxdoZUH9eVK3wKvGXArk-j0";
 const DEFAULT_RESOURCE_ID: &str = "seed-tts-2.0";
 pub(crate) const DEFAULT_VOICE: &str = "zh_female_vv_uranus_bigtts";
 
+<<<<<<< HEAD
+=======
+/// 可用的豆包音色（与火山引擎控制台实际开通的声音同步）
+>>>>>>> wt-fix-tts-bb31c753
 const VOICES: &[(&str, &str, &str)] = &[
     ("zh_female_vv_uranus_bigtts", "zh-CN", "Female"),
     ("zh_female_xiaohe_uranus_bigtts", "zh-CN", "Female"),
@@ -69,11 +73,11 @@ impl Backend for VolcengineBackend {
         let voices: Vec<Voice> = VOICES
             .iter()
             .map(|(name, locale, gender)| Voice {
-                name: name.to_string(),
-                short_name: name.to_string(),
-                locale: locale.to_string(),
+                name: (*name).to_string(),
+                short_name: (*name).to_string(),
+                locale: (*locale).to_string(),
                 language: locale.split('-').next().unwrap_or("zh").to_string(),
-                gender: gender.to_string(),
+                gender: (*gender).to_string(),
             })
             .collect();
 
@@ -97,8 +101,12 @@ impl Backend for VolcengineBackend {
             bail!("输入文本为空");
         }
 
+<<<<<<< HEAD
         let char_count = text.chars().count();
         let timeout_secs = (60 + char_count as u64 / 10).min(180);
+=======
+        let timeout_secs = (60 + text.chars().count() as u64 / 10).min(180);
+>>>>>>> wt-fix-tts-bb31c753
         let audio = timeout(
             Duration::from_secs(timeout_secs),
             self.synthesize_inner(text, params),
@@ -114,7 +122,7 @@ impl Backend for VolcengineBackend {
         let boundaries = if sentences.len() > 1 {
             detect_sentence_boundaries(&audio, &sentences).unwrap_or_default()
         } else {
-            vec![]
+            Vec::new()
         };
 
         Ok(SynthResult {

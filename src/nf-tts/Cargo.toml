@@ -10,6 +10,9 @@ keywords = ["tts", "cli", "speech", "audio", "edge"]
 categories = ["command-line-utilities", "multimedia::audio"]
 rust-version = "1.88"
 
+[lints]
+workspace = true
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }

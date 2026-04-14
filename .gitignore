@@ -10,3 +10,5 @@ projects/
 node_modules/
 test-results/
 output/
+!src/nf-tts/src/output/
+!src/nf-tts/src/output/*.rs
