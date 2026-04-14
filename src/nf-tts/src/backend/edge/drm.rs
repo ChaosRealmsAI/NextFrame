@@ -14,8 +14,7 @@ static CLOCK_SKEW_MS: AtomicI64 = AtomicI64::new(0);
 pub(super) fn adjust_clock_skew(server_timestamp_s: f64) {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs_f64();
+        .map_or(0.0, |duration| duration.as_secs_f64());
     let skew_ms = ((server_timestamp_s - now) * 1000.0) as i64;
     CLOCK_SKEW_MS.store(skew_ms, Ordering::Relaxed);
 }
@@ -24,8 +23,7 @@ pub(super) fn adjust_clock_skew(server_timestamp_s: f64) {
 fn corrected_unix_secs() -> f64 {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs_f64();
+        .map_or(0.0, |duration| duration.as_secs_f64());
     now + (CLOCK_SKEW_MS.load(Ordering::Relaxed) as f64 / 1000.0)
 }
 
@@ -51,11 +49,10 @@ pub(super) fn generate_sec_ms_gec() -> String {
 
 /// Generate a random MUID cookie value.
 pub(super) fn generate_muid() -> String {
-    use std::fmt::Write;
     let bytes: [u8; 16] = rand_bytes();
     let mut s = String::with_capacity(32);
     for b in bytes {
-        write!(s, "{b:02X}").unwrap();
+        s.push_str(&format!("{b:02X}"));
     }
     s
 }
@@ -83,7 +80,7 @@ pub(super) fn sec_ms_gec_version() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{generate_muid, generate_sec_ms_gec};
 
     #[test]
     fn test_gec_token_format() {

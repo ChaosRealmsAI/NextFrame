@@ -89,7 +89,7 @@ pub async fn run_batch(
 
         Event::queued(job.id).emit();
         let handle = tokio::spawn(async move {
-            let _permit = sem.acquire().await.expect("semaphore closed");
+            let _permit = sem.acquire().await.ok();
             Event::started(job.id).emit();
 
             match backend.synthesize(&job.text, &params).await {
@@ -102,7 +102,12 @@ pub async fn run_batch(
                     (
                         job,
                         params,
-                        Ok((out_path, result.audio, result.duration_ms, result.boundaries)),
+                        Ok((
+                            out_path,
+                            result.audio,
+                            result.duration_ms,
+                            result.boundaries,
+                        )),
                     )
                 }
                 Err(e) => (job, params, Err(e)),
@@ -178,13 +183,17 @@ pub async fn run_batch(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::run_batch;
     use anyhow::{anyhow, Result};
     use async_trait::async_trait;
+    use std::collections::HashMap;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use uuid::Uuid;
 
-    use crate::backend::{SynthParams, SynthResult, Voice};
+    use crate::backend::{Backend, SynthParams, SynthResult, Voice};
+    use crate::cache::Cache;
+    use crate::queue::job::Job;
 
     struct MockBackend {
         name: &'static str,
@@ -214,10 +223,10 @@ mod tests {
         }
     }
 
-    fn temp_output_dir() -> PathBuf {
+    fn temp_output_dir() -> Result<PathBuf> {
         let dir = std::env::temp_dir().join(format!("vox-scheduler-test-{}", Uuid::new_v4()));
-        std::fs::create_dir_all(&dir).unwrap();
-        dir
+        std::fs::create_dir_all(&dir)?;
+        Ok(dir)
     }
 
     fn sample_job(id: usize, text: &str, backend: Option<&str>, filename: &str) -> Job {
@@ -241,9 +250,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn run_batch_uses_each_jobs_backend() {
-        let output_dir = temp_output_dir();
-        let cache = Cache::new(&output_dir).unwrap();
+    async fn run_batch_uses_each_jobs_backend() -> Result<()> {
+        let output_dir = temp_output_dir()?;
+        let cache = Cache::new(&output_dir)?;
         let mut backends: HashMap<String, Arc<dyn Backend>> = HashMap::new();
         backends.insert(
             "alpha".to_string(),
@@ -272,29 +281,29 @@ mod tests {
             "alpha",
             false,
         )
-        .await
-        .unwrap();
+        .await?;
 
         assert_eq!(manifest.errors, 0);
         assert_eq!(manifest.entries.len(), 2);
         assert_eq!(manifest.entries[0].backend, "alpha");
         assert_eq!(manifest.entries[1].backend, "beta");
         assert_eq!(
-            std::fs::read(output_dir.join("first.mp3")).unwrap(),
+            std::fs::read(output_dir.join("first.mp3"))?,
             b"alpha:first job"
         );
         assert_eq!(
-            std::fs::read(output_dir.join("second.mp3")).unwrap(),
+            std::fs::read(output_dir.join("second.mp3"))?,
             b"beta:second job"
         );
 
         let _ = std::fs::remove_dir_all(output_dir);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn run_batch_records_failures_with_details() {
-        let output_dir = temp_output_dir();
-        let cache = Cache::new(&output_dir).unwrap();
+    async fn run_batch_records_failures_with_details() -> Result<()> {
+        let output_dir = temp_output_dir()?;
+        let cache = Cache::new(&output_dir)?;
         let mut backends: HashMap<String, Arc<dyn Backend>> = HashMap::new();
         backends.insert(
             "alpha".to_string(),
@@ -316,8 +325,7 @@ mod tests {
             "alpha",
             false,
         )
-        .await
-        .unwrap();
+        .await?;
 
         assert_eq!(manifest.total, 2);
         assert_eq!(manifest.entries.len(), 1);
@@ -328,5 +336,6 @@ mod tests {
         assert!(manifest.failures[0].error.contains("alpha failed for boom"));
 
         let _ = std::fs::remove_dir_all(output_dir);
+        Ok(())
     }
 }

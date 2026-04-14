@@ -4,4 +4,6 @@
 /manifest.json
 /*.mp3
 /*.srt
+*.log
+.vox-cache/
 .DS_Store

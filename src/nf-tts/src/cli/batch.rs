@@ -157,7 +157,7 @@ pub async fn run(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{ensure_batch_success, prepare_jobs, resolve_batch_options, BatchOptions};
     use crate::output::manifest::{ManifestEntry, ManifestFailure};
     use std::collections::HashMap;
 

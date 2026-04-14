@@ -33,8 +33,9 @@ pub fn run_get(key: Option<String>) -> Result<()> {
         Some("dir") => println!("{}", config.default_dir.unwrap_or_default()),
         Some("backend") => println!("{}", config.default_backend.unwrap_or_default()),
         Some(k) if k.starts_with("alias.") => {
-            let name = k.strip_prefix("alias.").unwrap();
-            println!("{}", config.aliases.get(name).cloned().unwrap_or_default());
+            if let Some(name) = k.strip_prefix("alias.") {
+                println!("{}", config.aliases.get(name).cloned().unwrap_or_default());
+            }
         }
         Some(k) => anyhow::bail!("Unknown key: {k}"),
         None => {
