@@ -23,6 +23,17 @@ impl VolcengineBackend {
         params: &SynthParams,
     ) -> Result<Vec<u8>> {
         let mut request = WS_URL.into_client_request()?;
+
+        let headers = request.headers_mut();
+        headers.insert("X-Api-App-Key", self.app_id.parse()?);
+        headers.insert("X-Api-Access-Key", self.access_token.parse()?);
+        headers.insert("X-Api-Resource-Id", self.resource_id.parse()?);
+        headers.insert("X-Api-Connect-Id", Uuid::new_v4().to_string().parse()?);
+        headers.insert("User-Agent", "vox/0.1.0".parse()?);
+
+        let (ws, _) = connect_async(request).await?;
+        let (mut sink, mut stream) = ws.split();
+
         sink.send(Message::Binary(build_send_frame(text, params)?.into()))
             .await?;
 
@@ -142,6 +153,30 @@ fn parse_response_frame(data: &[u8]) -> FrameResult {
     let msg_type = (data[1] >> 4) & 0x0F;
     let flags = data[1] & 0x0F;
 
+    if msg_type == 0x0F {
+        let code = if data.len() >= 8 {
+            u32::from_be_bytes([data[4], data[5], data[6], data[7]])
+        } else {
+            0
+        };
+        let raw = if data.len() > 8 {
+            String::from_utf8_lossy(&data[8..]).to_string()
+        } else {
+            String::new()
+        };
+        let message = extract_json_error(&raw).unwrap_or(raw);
+        return FrameResult::Error { code, message };
+    }
+
+    if flags & 0x04 == 0 {
+        return FrameResult::Other;
+    }
+
+    let mut offset = 4usize;
+    if data.len() < offset + 4 {
+        return FrameResult::Other;
+    }
+
     let event_code = u32::from_be_bytes([
         data[offset],
         data[offset + 1],
@@ -173,6 +208,24 @@ fn parse_response_frame(data: &[u8]) -> FrameResult {
     offset += 4;
 
     let end = (offset + payload_len).min(data.len());
+
+    if event_code == EVENT_TTS_RESPONSE && msg_type == 0x0B {
+        return FrameResult::Audio(data[offset..end].to_vec());
+    }
+    if event_code == EVENT_SESSION_FINISHED {
+        return FrameResult::SessionFinished;
+    }
+
+    FrameResult::Other
+}
+
+fn extract_json_error(raw: &str) -> Option<String> {
+    let start = raw.find('{')?;
+    let end = raw.rfind('}')? + 1;
+    let json_str = &raw[start..end];
+    let value: serde_json::Value = serde_json::from_str(json_str).ok()?;
+    value
+        .get("error")
         .and_then(serde_json::Value::as_str)
         .map(str::to_string)
         .or_else(|| Some(json_str.to_string()))

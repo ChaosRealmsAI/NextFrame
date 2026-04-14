@@ -1,3 +1,10 @@
+use std::io::Write;
+use std::process::Command;
+
+use anyhow::Result;
+
+use crate::backend::WordBoundary;
+
 /// 分句策略：有换行按换行分（用户手动控制），否则按标点分
 pub(super) fn split_sentences(text: &str) -> Vec<String> {
     let lines: Vec<String> = text
@@ -11,6 +18,25 @@ pub(super) fn split_sentences(text: &str) -> Vec<String> {
 
     let mut sentences = Vec::new();
     let mut current = String::new();
+
+    for ch in text.chars() {
+        current.push(ch);
+        if matches!(ch, '。' | '！' | '？' | '；' | '.' | '!' | '?' | ';') {
+            let trimmed = current.trim().to_string();
+            if !trimmed.is_empty() {
+                sentences.push(trimmed);
+            }
+            current.clear();
+        }
+    }
+
+    let trimmed = current.trim().to_string();
+    if !trimmed.is_empty() {
+        sentences.push(trimmed);
+    }
+    sentences
+}
+
 /// 用 ffmpeg 获取精确的 MP3 时长（毫秒）
 pub(super) fn get_audio_duration_ms(audio: &[u8]) -> u64 {
     let tmp = std::env::temp_dir().join(format!("vox-dur-{}.mp3", std::process::id()));
@@ -40,7 +66,11 @@ pub(super) fn get_audio_duration_ms(audio: &[u8]) -> u64 {
         .unwrap_or_else(|| (audio.len() as u64) * 1000 / 16000)
 }
 
->>>>>>> wt-fix-tts-bb31c753
+/// 用 ffmpeg silencedetect 找静音点，与分句对齐
+pub(super) fn detect_sentence_boundaries(
+    audio: &[u8],
+    sentences: &[String],
+) -> Result<Vec<WordBoundary>> {
     let tmp = std::env::temp_dir().join(format!("vox-sil-{}.mp3", std::process::id()));
     {
         let mut file = std::fs::File::create(&tmp)?;
@@ -63,21 +93,6 @@ pub(super) fn get_audio_duration_ms(audio: &[u8]) -> u64 {
 
     let output = output?;
     let stderr = String::from_utf8_lossy(&output.stderr);
-<<<<<<< HEAD
-    let mut starts = Vec::new();
-    let mut ends = Vec::new();
-    for line in stderr.lines() {
-        if let Some(pos) = line.find("silence_start: ") {
-            if let Ok(value) = line[pos + "silence_start: ".len()..].trim().parse::<f64>() {
-                starts.push(value);
-            }
-        }
-        if let Some(pos) = line.find("silence_end: ") {
-            if let Some(value) = line[pos + "silence_end: ".len()..]
-                .split_whitespace()
-                .next()
-            {
-=======
 
     let mut starts = Vec::new();
     let mut ends = Vec::new();
