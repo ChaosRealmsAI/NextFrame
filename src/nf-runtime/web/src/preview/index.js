@@ -6,9 +6,11 @@ function initPreviewSurface() {
 }
 
 async function previewComposed() {
+  setElementState("btn-preview-compose", "composing");
   const segPath = getCurrentSegmentPath();
   if (!segPath) {
     setPreviewPlaceholder("PREVIEW", "Open a segment before composing");
+    setElementState("btn-preview-compose", "idle");
     return;
   }
 
@@ -26,5 +28,7 @@ async function previewComposed() {
     console.error("[preview] compose failed", error);
     setText("canvas-title", "PREVIEW");
     setText("canvas-sub", getBridgeMessage(error));
+  } finally {
+    setElementState("btn-preview-compose", "idle");
   }
 }

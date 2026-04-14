@@ -424,6 +424,29 @@ function deriveClipInlineStyle(clip, track, totalDuration) {
   );
 }
 
+function formatNfTimeValue(seconds) {
+  const safeSeconds = Math.max(0, finiteNumber(seconds, 0));
+  return String(Math.round(safeSeconds * 1000) / 1000);
+}
+
+function setNfTime(id, seconds, text) {
+  const element = document.getElementById(id);
+  if (!element) {
+    return;
+  }
+  if (typeof text === "string") {
+    element.textContent = text;
+  }
+  element.setAttribute("data-nf-time", formatNfTimeValue(seconds));
+}
+
+function setElementState(id, state) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.setAttribute("data-nf-state", state);
+  }
+}
+
 function setText(id, text) {
   const element = document.getElementById(id);
   if (element) {

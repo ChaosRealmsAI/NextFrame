@@ -3,13 +3,24 @@ function setPlayButtonIcons() {
   const icon = isPlaying ? "\u23F8" : "\u25B6";
   const primary = document.getElementById("btn-play");
   const fullscreen = document.getElementById("btn-play-fs");
-  if (primary) primary.innerHTML = icon;
-  if (fullscreen) fullscreen.innerHTML = icon;
+  const nextAction = isPlaying ? "pause" : "play";
+  const nextState = isPlaying ? "playing" : "paused";
+  if (primary) {
+    primary.innerHTML = icon;
+    primary.setAttribute("data-nf-action", nextAction);
+    primary.setAttribute("data-nf-state", nextState);
+  }
+  if (fullscreen) {
+    fullscreen.innerHTML = icon;
+    fullscreen.setAttribute("data-nf-action", nextAction);
+    fullscreen.setAttribute("data-nf-state", nextState);
+  }
 }
 
 function setPlaybackState(nextPlaying) {
   isPlaying = Boolean(nextPlaying);
   setPlayButtonIcons();
+  setElementState("timeline", isPlaying ? "playing" : "paused");
   if (playRAF) {
     cancelAnimationFrame(playRAF);
     playRAF = null;
@@ -23,7 +34,7 @@ function setPlaybackState(nextPlaying) {
 
 function setTotalDuration(duration) {
   TOTAL_DURATION = Math.max(0, finiteNumber(duration, 0));
-  setText("tc-total", formatPreciseTime(TOTAL_DURATION));
-  setText("tc-fs-total", formatPreciseTime(TOTAL_DURATION));
+  setNfTime("tc-total", TOTAL_DURATION, formatPreciseTime(TOTAL_DURATION));
+  setNfTime("tc-fs-total", TOTAL_DURATION, formatPreciseTime(TOTAL_DURATION));
   setPlayheadTime(TOTAL_DURATION > 0 ? Math.min(currentTime, TOTAL_DURATION) : 0);
 }

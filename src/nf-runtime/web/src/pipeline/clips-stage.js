@@ -216,12 +216,12 @@ function renderClipDetail(video, sourceVideo) {
 
   // Play button for large preview
   const previewPlayBtn = video.absolutePath
-    ? '<div class="cd-play-center" data-video-path="' + escHtml(video.absolutePath) + '">&#9654;</div>'
+    ? '<div class="cd-play-center" data-video-path="' + escHtml(video.absolutePath) + '" data-nf-action="open-video-player">&#9654;</div>'
     : '<div class="cd-play-center">&#9654;</div>';
 
   // Expand (fullscreen modal) button
   const expandBtn = video.absolutePath
-    ? '<div class="cd-expand-btn" data-video-path="' + escHtml(video.absolutePath) + '" data-fullscreen="1">&#x26F6;</div>'
+    ? '<div class="cd-expand-btn" data-video-path="' + escHtml(video.absolutePath) + '" data-fullscreen="1" data-nf-action="fullscreen-video">&#x26F6;</div>'
     : '';
 
   return (
@@ -230,7 +230,7 @@ function renderClipDetail(video, sourceVideo) {
       '<div class="cd-preview-wrap">' +
         '<div class="cd-preview">' +
           previewPlayBtn +
-          '<div class="cd-tc-overlay">' + escHtml(formatPipelineClipTime(inPt)) + ' \u2192 ' + escHtml(formatPipelineClipTime(outPt)) + '</div>' +
+        '<div class="cd-tc-overlay" data-nf-time="' + escHtml(String(inPt.toFixed(3))) + '">' + escHtml(formatPipelineClipTime(inPt)) + ' \u2192 ' + escHtml(formatPipelineClipTime(outPt)) + '</div>' +
         '</div>' +
         expandBtn +
         '<div class="cd-progress-bar"><div class="cd-progress-fill" style="width:0"></div></div>' +
@@ -253,8 +253,8 @@ function renderClipDetail(video, sourceVideo) {
 
       /* Metadata */
       '<div class="cd-meta">' +
-        '<div class="cd-meta-item"><div class="cd-meta-label">IN</div><div class="cd-meta-value">' + escHtml(formatPipelineClipTime(inPt)) + '</div></div>' +
-        '<div class="cd-meta-item"><div class="cd-meta-label">OUT</div><div class="cd-meta-value">' + escHtml(formatPipelineClipTime(outPt)) + '</div></div>' +
+        '<div class="cd-meta-item"><div class="cd-meta-label">IN</div><div class="cd-meta-value" data-nf-time="' + escHtml(String(inPt.toFixed(3))) + '">' + escHtml(formatPipelineClipTime(inPt)) + '</div></div>' +
+        '<div class="cd-meta-item"><div class="cd-meta-label">OUT</div><div class="cd-meta-value" data-nf-time="' + escHtml(String(outPt.toFixed(3))) + '">' + escHtml(formatPipelineClipTime(outPt)) + '</div></div>' +
         '<div class="cd-meta-item"><div class="cd-meta-label">FRAMES</div><div class="cd-meta-value">' + escHtml(String(frames)) + '</div></div>' +
         '<div class="cd-meta-item"><div class="cd-meta-label">\u65F6\u95F4\u8F74</div><div class="cd-meta-value" style="color:' + (video.hasTimeline ? '#7c6aef' : 'rgba(228,228,232,0.25)') + '">' +
           (video.hasTimeline ? '\u2713 \u5DF2\u5BF9\u9F50' : '\u672A\u5BF9\u9F50') + '</div></div>' +
@@ -308,17 +308,17 @@ function renderPipelineClips(data) {
       return pipelineClipMatchesSource(clip, video);
     }).length;
     const inlinePlayBtn = video.absolutePath
-      ? '<button class="pl-play-btn clips-inline-play" data-video-path="' + escHtml(video.absolutePath) + '" title="Inline preview">&#9654;</button>'
+      ? '<button class="pl-play-btn clips-inline-play" data-video-path="' + escHtml(video.absolutePath) + '" title="Inline preview" data-nf-action="preview-video-inline">&#9654;</button>'
       : '';
     const fullscreenBtn = video.absolutePath
-      ? '<button class="clips-fs-btn" data-video-path="' + escHtml(video.absolutePath) + '" data-fullscreen="1" title="Fullscreen">&#x26F6;</button>'
+      ? '<button class="clips-fs-btn" data-video-path="' + escHtml(video.absolutePath) + '" data-fullscreen="1" title="Fullscreen" data-nf-action="fullscreen-video">&#x26F6;</button>'
       : '';
     return (
       '<div class="clips-src-item' + (video.index === selected.index ? ' active' : '') + '" data-idx="' + video.index + '">' +
         '<div class="clips-src-thumb">' +
           inlinePlayBtn +
           fullscreenBtn +
-          '<span class="clips-src-dur">' + escHtml(video.durationLabel) + '</span>' +
+          '<span class="clips-src-dur" data-nf-time="' + escHtml(String(video.durationSeconds.toFixed(3))) + '">' + escHtml(video.durationLabel) + '</span>' +
         '</div>' +
         '<div class="clips-src-info">' +
           '<div class="clips-src-name">' + escHtml(video.name) + '</div>' +
@@ -355,7 +355,7 @@ function renderPipelineClips(data) {
     let width = srcDur > 0 ? ((video.outPoint - video.inPoint) / srcDur * 100) : 10;
     if (width < 1) width = 1;
     return (
-      '<div class="clips-timeline-block' + (pipelineClipsExpandedClip === video.index ? ' selected' : '') + '" data-clips-idx="' + video.index + '" style="left:' + left.toFixed(2) + '%;width:' + width.toFixed(2) + '%">' +
+      '<div class="clips-timeline-block' + (pipelineClipsExpandedClip === video.index ? ' selected' : '') + '" data-clips-idx="' + video.index + '" data-nf-role="clip" data-nf-clip-id="' + escHtml(String(video.id)) + '" style="left:' + left.toFixed(2) + '%;width:' + width.toFixed(2) + '%">' +
         escHtml(video.segment != null ? "SEG " + video.segment : video.name) +
       '</div>'
     );
@@ -363,7 +363,7 @@ function renderPipelineClips(data) {
 
   const timelineTicks = [];
   for (let tickIndex = 0; tickIndex <= 4; tickIndex++) {
-    timelineTicks.push('<span>' + escHtml(formatPipelineClipTime((timelineSpan * tickIndex) / 4)) + '</span>');
+    timelineTicks.push('<span data-nf-time="' + escHtml(String((((timelineSpan * tickIndex) / 4)).toFixed(3))) + '">' + escHtml(formatPipelineClipTime((timelineSpan * tickIndex) / 4)) + '</span>');
   }
 
   const timelineHtml =
@@ -392,16 +392,16 @@ function renderPipelineClips(data) {
       : '';
 
     let rowHtml =
-      '<div class="clip-row' + (isExpanded ? ' selected' : '') + '" data-clips-idx="' + video.index + '">' +
+      '<div class="clip-row' + (isExpanded ? ' selected' : '') + '" data-clips-idx="' + video.index + '" data-nf-role="clip" data-nf-clip-id="' + escHtml(String(video.id)) + '">' +
         '<div class="clips-row-thumb-mini">' +
           (video.absolutePath
-            ? '<button class="pl-play-btn clips-mini-play" data-video-path="' + escHtml(video.absolutePath) + '">&#9654;</button>'
+            ? '<button class="pl-play-btn clips-mini-play" data-video-path="' + escHtml(video.absolutePath) + '" data-nf-action="preview-video-inline">&#9654;</button>'
             : '<span class="clips-dim-label">16:9</span>') +
         '</div>' +
         '<div class="cr-info">' +
           '<span class="cr-name">' + escHtml(video.name) + '</span>' +
-          '<span class="cr-range">' + escHtml(formatPipelineClipTime(video.inPoint) + ' \u2192 ' + formatPipelineClipTime(video.outPoint)) + '</span>' +
-          '<span class="cr-dur">' + escHtml(dur.toFixed(1) + 's') + '</span>' +
+          '<span class="cr-range" data-nf-time="' + escHtml(String(video.inPoint.toFixed(3))) + '">' + escHtml(formatPipelineClipTime(video.inPoint) + ' \u2192 ' + formatPipelineClipTime(video.outPoint)) + '</span>' +
+          '<span class="cr-dur" data-nf-time="' + escHtml(String(dur.toFixed(3))) + '">' + escHtml(dur.toFixed(1) + 's') + '</span>' +
         '</div>' +
         '<div class="cr-status-tags">' + subTag + tlTag + segTag + '</div>' +
       '</div>';
@@ -418,7 +418,7 @@ function renderPipelineClips(data) {
 
   return (
     '<div class="pipeline-clips">' +
-      '<div class="clips-sources">' +
+      '<div class="clips-sources" data-nf-role="sidebar">' +
         '<div class="clips-sources-header">SOURCES \u00b7 ' + escHtml(String(sources.length)) + '</div>' +
         '<div class="clips-sources-list">' + sourceItemsHtml + '</div>' +
       '</div>' +

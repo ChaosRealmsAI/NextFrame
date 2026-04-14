@@ -20,6 +20,7 @@ function getPlayerVideo() {
   video.style.height = "100%";
   video.style.objectFit = "contain";
   video.style.background = "#000";
+  video.setAttribute("data-nf-state", "idle");
   container.insertBefore(video, container.firstChild);
   return video;
 }
@@ -34,24 +35,34 @@ function animatePlayer() {
   const current = finiteNumber(video.currentTime, 0);
   const pct = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
   document.getElementById("player-progress-fill").style.width = pct + "%";
-  document.getElementById("player-tc").textContent =
-    formatTC(current) + " / " + formatTC(duration);
+  setNfTime("player-tc", current, formatTC(current) + " / " + formatTC(duration));
 
   if (video.paused || video.ended) {
     playerPlaying = false;
     document.getElementById("player-big-play").classList.remove("playing");
     document.getElementById("player-play-btn").innerHTML = "&#9654;";
+    document.getElementById("player-big-play").setAttribute("data-nf-action", "play");
+    document.getElementById("player-big-play").setAttribute("data-nf-state", "paused");
+    document.getElementById("player-play-btn").setAttribute("data-nf-action", "play");
+    document.getElementById("player-play-btn").setAttribute("data-nf-state", "paused");
+    video.setAttribute("data-nf-state", video.ended ? "ended" : "paused");
     return;
   }
 
+  video.setAttribute("data-nf-state", "playing");
   playerAnim = requestAnimationFrame(animatePlayer);
 }
 
 function toggleExports() {
   document.getElementById("settings-overlay").classList.remove("show");
   document.getElementById("settings-panel").classList.remove("show");
-  document.getElementById("exports-overlay").classList.toggle("show");
-  document.getElementById("exports-panel").classList.toggle("show");
+  setElementState("settings-panel", "closed");
+
+  const exportsOverlay = document.getElementById("exports-overlay");
+  const exportsPanel = document.getElementById("exports-panel");
+  exportsOverlay.classList.toggle("show");
+  exportsPanel.classList.toggle("show");
+  exportsPanel.setAttribute("data-nf-state", exportsPanel.classList.contains("show") ? "open" : "closed");
 }
 
 function renderExportsList(entries, emptyMessage) {
@@ -65,7 +76,7 @@ function renderExportsList(entries, emptyMessage) {
 
   if (!safeEntries.length) {
     container.innerHTML =
-      `<div class="export-item" style="cursor:default">` +
+      `<div class="export-item" style="cursor:default" data-nf-state="empty">` +
       `<div class="export-thumb"><span class="export-play-icon">&#9675;</span></div>` +
       `<div class="export-info">` +
       `<div class="export-name">${escapeHtml(emptyMessage || "No exports yet")}</div>` +
@@ -88,7 +99,7 @@ function renderExportsList(entries, emptyMessage) {
     const url = buildNfdataUrl([currentProject, currentEpisode, entry.name]);
 
     return (
-      `<div class="export-item" onclick='openPlayer(${jsLiteral(entry.name)}, ${jsLiteral(url)}, ${jsLiteral(detail)})'>` +
+      `<div class="export-item" onclick='openPlayer(${jsLiteral(entry.name)}, ${jsLiteral(url)}, ${jsLiteral(detail)})' data-nf-action="open-export">` +
       `<div class="export-thumb"><span class="export-play-icon">&#9654;</span></div>` +
       `<div class="export-info">` +
       `<div class="export-name">${escapeHtml(entry.name || "export.mp4")}</div>` +
@@ -105,11 +116,17 @@ let _pendingVideoUrl = null;
 function openPlayer(name, url, detail) {
   document.getElementById("exports-overlay").classList.remove("show");
   document.getElementById("exports-panel").classList.remove("show");
+  setElementState("exports-panel", "closed");
   document.getElementById("player-title").textContent = name;
   document.getElementById("player-detail").textContent = detail || "";
-  document.getElementById("player-tc").textContent = "点击 ▶ 播放";
+  setNfTime("player-tc", 0, "点击 ▶ 播放");
   document.getElementById("player-progress-fill").style.width = "0%";
   document.getElementById("player-big-play").classList.remove("playing");
+  document.getElementById("player-big-play").setAttribute("data-nf-action", "play");
+  document.getElementById("player-big-play").setAttribute("data-nf-state", "paused");
+  document.getElementById("player-play-btn").innerHTML = "&#9654;";
+  document.getElementById("player-play-btn").setAttribute("data-nf-action", "play");
+  document.getElementById("player-play-btn").setAttribute("data-nf-state", "paused");
   playerPlaying = false;
   playerDur = 0;
 
@@ -117,10 +134,14 @@ function openPlayer(name, url, detail) {
   _pendingVideoUrl = url;
   const video = getPlayerVideo();
   if (video) { video.pause(); video.removeAttribute("src"); }
+  if (video) {
+    video.setAttribute("data-nf-state", "idle");
+  }
 
   // Show modal INSTANTLY — zero blocking
   document.getElementById("player-overlay").classList.add("show");
   document.getElementById("player-modal").classList.add("show");
+  setElementState("player-modal", "open");
 }
 
 function closePlayer() {
@@ -132,9 +153,17 @@ function closePlayer() {
   }
   if (video) {
     video.pause();
+    video.setAttribute("data-nf-state", "idle");
   }
+  document.getElementById("player-big-play").classList.remove("playing");
+  document.getElementById("player-big-play").setAttribute("data-nf-action", "play");
+  document.getElementById("player-big-play").setAttribute("data-nf-state", "paused");
+  document.getElementById("player-play-btn").innerHTML = "&#9654;";
+  document.getElementById("player-play-btn").setAttribute("data-nf-action", "play");
+  document.getElementById("player-play-btn").setAttribute("data-nf-state", "paused");
   document.getElementById("player-overlay").classList.remove("show");
   document.getElementById("player-modal").classList.remove("show");
+  setElementState("player-modal", "closed");
 }
 
 function togglePlayerPlay() {
@@ -147,12 +176,12 @@ function togglePlayerPlay() {
 
   // Lazy load: first play triggers video.src load
   if (_pendingVideoUrl && (!video.src || video.src === "")) {
-    document.getElementById("player-tc").textContent = "加载中...";
+    setNfTime("player-tc", 0, "加载中...");
     video.src = _pendingVideoUrl;
     _pendingVideoUrl = null;
     video.onloadedmetadata = function() {
       playerDur = finiteNumber(video.duration, playerDur);
-      document.getElementById("player-tc").textContent = "00:00 / " + formatTC(playerDur);
+      setNfTime("player-tc", 0, "00:00 / " + formatTC(playerDur));
     };
     video.oncanplay = function() {
       video.oncanplay = null;
@@ -160,6 +189,11 @@ function togglePlayerPlay() {
       playerPlaying = true;
       bigPlay.classList.add("playing");
       button.innerHTML = "&#10074;&#10074;";
+      bigPlay.setAttribute("data-nf-action", "pause");
+      bigPlay.setAttribute("data-nf-state", "playing");
+      button.setAttribute("data-nf-action", "pause");
+      button.setAttribute("data-nf-state", "playing");
+      video.setAttribute("data-nf-state", "playing");
       animatePlayer();
     };
     video.load();
@@ -170,12 +204,22 @@ function togglePlayerPlay() {
     playerPlaying = true;
     bigPlay.classList.add("playing");
     button.innerHTML = "&#10074;&#10074;";
+    bigPlay.setAttribute("data-nf-action", "pause");
+    bigPlay.setAttribute("data-nf-state", "playing");
+    button.setAttribute("data-nf-action", "pause");
+    button.setAttribute("data-nf-state", "playing");
+    video.setAttribute("data-nf-state", "playing");
     const playResult = video.play();
     if (playResult && typeof playResult.catch === "function") {
       playResult.catch(function() {
         playerPlaying = false;
         bigPlay.classList.remove("playing");
         button.innerHTML = "&#9654;";
+        bigPlay.setAttribute("data-nf-action", "play");
+        bigPlay.setAttribute("data-nf-state", "paused");
+        button.setAttribute("data-nf-action", "play");
+        button.setAttribute("data-nf-state", "paused");
+        video.setAttribute("data-nf-state", "paused");
       });
     }
     if (playerAnim) {
@@ -187,6 +231,11 @@ function togglePlayerPlay() {
     video.pause();
     bigPlay.classList.remove("playing");
     button.innerHTML = "&#9654;";
+    bigPlay.setAttribute("data-nf-action", "play");
+    bigPlay.setAttribute("data-nf-state", "paused");
+    button.setAttribute("data-nf-action", "play");
+    button.setAttribute("data-nf-state", "paused");
+    video.setAttribute("data-nf-state", "paused");
     if (playerAnim) {
       cancelAnimationFrame(playerAnim);
       playerAnim = null;
@@ -207,8 +256,7 @@ function seekPlayer(event) {
     video.currentTime = pct * duration;
   }
   document.getElementById("player-progress-fill").style.width = pct * 100 + "%";
-  document.getElementById("player-tc").textContent =
-    formatTC(duration > 0 ? video.currentTime : 0) + " / " + formatTC(duration);
+  setNfTime("player-tc", duration > 0 ? video.currentTime : 0, formatTC(duration > 0 ? video.currentTime : 0) + " / " + formatTC(duration));
 }
 
 async function refreshExportsPanel(requestId) {

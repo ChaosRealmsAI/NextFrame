@@ -9,7 +9,7 @@ function renderTimelineRuler(duration) {
     ticks.push(
       `<div class="tl-ruler-tick${major ? " major" : ""}" style="left:${percentOfTotal(second, safeDuration)}%">` +
       `<div class="tick-line"></div>` +
-      (major ? `<span class="tick-label">${second}s</span>` : "") +
+      (major ? `<span class="tick-label" data-nf-time="${escapeAttr(formatNfTimeValue(second))}">${second}s</span>` : "") +
       `</div>`
     );
   }
@@ -19,7 +19,7 @@ function renderTimelineRuler(duration) {
     ticks.push(
       `<div class="tl-ruler-tick major" style="left:100%">` +
       `<div class="tick-line"></div>` +
-      `<span class="tick-label">${endLabel}</span>` +
+      `<span class="tick-label" data-nf-time="${escapeAttr(formatNfTimeValue(safeDuration))}">${endLabel}</span>` +
       `</div>`
     );
   }
@@ -28,7 +28,7 @@ function renderTimelineRuler(duration) {
     ticks.push(
       `<div class="tl-ruler-tick major" style="left:0px">` +
       `<div class="tick-line"></div>` +
-      `<span class="tick-label">0s</span>` +
+      `<span class="tick-label" data-nf-time="0">0s</span>` +
       `</div>`
     );
   }
@@ -73,7 +73,7 @@ function renderTrackRow(track, trackIndex, totalDuration) {
   const clipHtml = clips.length
     ? clips.map((clip, clipIndex) => renderClipHtml(clip, track, trackIndex, clipIndex, totalDuration)).join("")
     : `<div style="padding:12px;color:var(--ink-dim);font-size:11px">No clips</div>`;
-  return `<div class="tl-track" id="track-${escapeAttr(trackId)}">${clipHtml}</div>`;
+  return `<div class="tl-track" id="track-${escapeAttr(trackId)}" data-nf-role="track" data-nf-track="${escapeAttr(String(trackIndex))}">${clipHtml}</div>`;
 }
 
 function renderClipHtml(clip, track, trackIndex, clipIndex, totalDuration) {
@@ -88,6 +88,8 @@ function renderClipHtml(clip, track, trackIndex, clipIndex, totalDuration) {
   const domId = "tl-clip-" + slugify((track?.id || "track") + "-" + id + "-" + (clipIndex + 1));
   return (
     `<div class="tl-clip ${deriveClipClass(clip, track)}" id="${escapeAttr(domId)}"` +
+    ` data-nf-role="clip"` +
+    ` data-nf-clip-id="${escapeAttr(id)}"` +
     ` data-name="${escapeAttr(label)}"` +
     ` data-scene="${escapeAttr(scene)}"` +
     ` data-type="${escapeAttr(type)}"` +
@@ -118,10 +120,10 @@ function renderEditorNotice(message) {
     `<div class="tl-lanes">` +
     `<div class="tl-lanes-inner" style="width:${Math.max(100, Math.round(noticeDuration * 80))}px">` +
     `<div class="tl-ruler">` +
-    `<div class="tl-ruler-tick major" style="left:0px"><div class="tick-line"></div><span class="tick-label">0s</span></div>` +
+    `<div class="tl-ruler-tick major" style="left:0px"><div class="tick-line"></div><span class="tick-label" data-nf-time="0">0s</span></div>` +
     `</div>` +
     `<div class="tl-track"><div style="padding:12px;color:var(--ink-dim);font-size:11px">${escapeHtml(message)}</div></div>` +
-    `<div class="tl-playhead" id="tl-playhead"><div class="tl-playhead-handle"></div></div>` +
+    `<div class="tl-playhead" id="tl-playhead" data-nf-role="playhead" data-nf-time="0"><div class="tl-playhead-handle"></div></div>` +
     `</div>` +
     `</div>`;
 
@@ -190,7 +192,7 @@ function renderTimeline(timeline, preferredClipId) {
     `<div class="tl-lanes-inner" style="width:${Math.max(100, Math.round(duration * 80))}px">` +
     `<div class="tl-ruler">${renderTimelineRuler(duration)}</div>` +
     trackRows +
-    `<div class="tl-playhead" id="tl-playhead"><div class="tl-playhead-handle"></div></div>` +
+    `<div class="tl-playhead" id="tl-playhead" data-nf-role="playhead" data-nf-time="${escapeAttr(formatNfTimeValue(currentTime))}"><div class="tl-playhead-handle"></div></div>` +
     `</div>` +
     `</div>`;
 
@@ -217,8 +219,8 @@ function renderTimeline(timeline, preferredClipId) {
 
 function initTimeline() {
   setPlayButtonIcons();
-  setText("tc-total", formatPreciseTime(TOTAL_DURATION));
-  setText("tc-fs-total", formatPreciseTime(TOTAL_DURATION));
+  setNfTime("tc-total", TOTAL_DURATION, formatPreciseTime(TOTAL_DURATION));
+  setNfTime("tc-fs-total", TOTAL_DURATION, formatPreciseTime(TOTAL_DURATION));
   updateInspectorContext();
   setPreviewPlaceholder("TIMELINE", "Load a timeline to preview");
   renderExportsList([], "Open an episode to view exports");

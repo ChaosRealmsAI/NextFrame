@@ -2,6 +2,11 @@
 function toggleSettings() {
   document.getElementById("exports-overlay").classList.remove("show");
   document.getElementById("exports-panel").classList.remove("show");
-  document.getElementById("settings-overlay").classList.toggle("show");
-  document.getElementById("settings-panel").classList.toggle("show");
+  setElementState("exports-panel", "closed");
+
+  const settingsOverlay = document.getElementById("settings-overlay");
+  const settingsPanel = document.getElementById("settings-panel");
+  settingsOverlay.classList.toggle("show");
+  settingsPanel.classList.toggle("show");
+  settingsPanel.setAttribute("data-nf-state", settingsPanel.classList.contains("show") ? "open" : "closed");
 }

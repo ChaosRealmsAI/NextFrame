@@ -43,10 +43,10 @@ function renderPipelineAudio(data) {
     if (isGenerated) {
       const audioPath = seg.file ? ("~/NextFrame/projects/" + currentProject + "/" + currentEpisode + "/" + seg.file) : null;
       if (audioPath) {
-        html += '<button class="pl-play-btn" data-audio-path="' + escHtml(audioPath) + '">&#9654;</button>';
+        html += '<button class="pl-play-btn" data-audio-path="' + escHtml(audioPath) + '" data-nf-action="play" data-nf-state="paused">&#9654;</button>';
       }
       html += '<span class="pl-tag-generated">已生成</span>';
-      html += '<span class="audio-duration">' + seg.duration.toFixed(1) + "s</span>";
+      html += '<span class="audio-duration" data-nf-time="' + escHtml(String(seg.duration.toFixed(3))) + '">' + seg.duration.toFixed(1) + "s</span>";
     } else {
       html += '<span class="pl-tag-pending">待生成</span>';
     }
@@ -62,7 +62,7 @@ function renderPipelineAudio(data) {
         const duration = (sentence.end - sentence.start).toFixed(1);
 
         html += '<div class="sentence-row">';
-        html += '<span class="s-timecode">' + startFmt + ' <span class="s-arrow">&rarr;</span> ' + endFmt + "</span>";
+        html += '<span class="s-timecode" data-nf-time="' + escHtml(String(sentence.start.toFixed(3))) + '">' + startFmt + ' <span class="s-arrow">&rarr;</span> ' + endFmt + "</span>";
         html += '<span class="s-text">' + renderPipelineKaraokeSentence(sentence) + "</span>";
         html += '<span class="s-dur">' + duration + "s</span>";
         html += "</div>";

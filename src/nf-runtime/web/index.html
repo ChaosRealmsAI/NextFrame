@@ -35,7 +35,7 @@ window.__ipc = window.__ipc || {};
 <!-- ============================================================
      VIEW 1: HOME
      ============================================================ -->
-<div class="view active" id="view-home">
+<div class="view active" id="view-home" data-nf-page="home">
   <div class="topbar">
     <div class="logo" onclick="goHome()">
       <div class="logo-mark"></div>
@@ -43,14 +43,14 @@ window.__ipc = window.__ipc || {};
     </div>
     <div style="flex:1"></div>
     <div class="topbar-right">
-      <button class="btn-ghost-sm" onclick="toggleSettings()">SETTINGS</button>
+      <button class="btn-ghost-sm" onclick="toggleSettings()" data-nf-action="open-settings">SETTINGS</button>
       <div class="avatar">Z</div>
     </div>
   </div>
 
   <div class="home-tabs">
-    <button class="home-tab active" onclick="switchHomeTab('projects')" id="home-tab-projects">Projects</button>
-    <button class="home-tab" onclick="switchHomeTab('exports')" id="home-tab-exports">Export Log</button>
+    <button class="home-tab active" onclick="switchHomeTab('projects')" id="home-tab-projects" data-nf-action="show-projects">Projects</button>
+    <button class="home-tab" onclick="switchHomeTab('exports')" id="home-tab-exports" data-nf-action="show-exports">Export Log</button>
   </div>
 
   <div class="home-content" id="home-projects-content">
@@ -59,7 +59,7 @@ window.__ipc = window.__ipc || {};
 
       <div class="section-header stagger-in">
         <span class="section-label">Recent</span>
-        <button class="btn-new" onclick="goProject()">+ New Project</button>
+        <button class="btn-new" onclick="goProject()" data-nf-action="new-project">+ New Project</button>
       </div>
 
       <div class="project-grid" id="project-grid"></div>
@@ -69,8 +69,8 @@ window.__ipc = window.__ipc || {};
       <div class="all-projects-header stagger-in">
         <span class="all-projects-title">All Projects</span>
         <div class="view-toggle">
-          <button class="view-toggle-btn" id="toggle-grid">Grid</button>
-          <button class="view-toggle-btn active" id="toggle-list">List</button>
+          <button class="view-toggle-btn" id="toggle-grid" data-nf-action="show-grid">Grid</button>
+          <button class="view-toggle-btn active" id="toggle-list" data-nf-action="show-list">List</button>
         </div>
       </div>
 
@@ -88,7 +88,7 @@ window.__ipc = window.__ipc || {};
 <!-- ============================================================
      VIEW 2: PROJECT
      ============================================================ -->
-<div class="view" id="view-project">
+<div class="view" id="view-project" data-nf-page="project">
   <div class="topbar">
     <div class="back-link" onclick="goHome()">&#x2190;</div>
     <div class="logo" onclick="goHome()">
@@ -99,7 +99,7 @@ window.__ipc = window.__ipc || {};
     <span style="font-size:13px;font-weight:500;color:var(--ink)" id="project-topbar-title">Show</span>
     <div style="flex:1"></div>
     <div class="topbar-right">
-      <button class="btn-ghost-sm" onclick="toggleSettings()">SETTINGS</button>
+      <button class="btn-ghost-sm" onclick="toggleSettings()" data-nf-action="open-settings">SETTINGS</button>
       <div class="avatar">Z</div>
     </div>
   </div>
@@ -118,7 +118,7 @@ window.__ipc = window.__ipc || {};
 
       <div class="episode-list" id="episode-list"></div>
 
-      <button class="btn-new-outline stagger-in">+ New Episode</button>
+      <button class="btn-new-outline stagger-in" data-nf-action="new-episode">+ New Episode</button>
     </div>
   </div>
 </div>
@@ -126,7 +126,7 @@ window.__ipc = window.__ipc || {};
 <!-- ============================================================
      VIEW 4: PIPELINE (v0.4 — Video Production Workflow)
      ============================================================ -->
-<div class="view" id="view-pipeline">
+<div class="view" id="view-pipeline" data-nf-page="pipeline">
   <div class="topbar topbar-editor">
     <div class="logo" onclick="goHome()" style="margin-right:12px">
       <div class="logo-mark" style="width:18px;height:18px;border-radius:5px"></div>
@@ -164,7 +164,7 @@ window.__ipc = window.__ipc || {};
 <!-- ============================================================
      VIEW 3: EDITOR
      ============================================================ -->
-<div class="view" id="view-editor">
+<div class="view" id="view-editor" data-nf-page="editor" data-nf-state="windowed">
   <div class="topbar topbar-editor">
     <div class="logo" onclick="goHome()" style="margin-right:12px">
       <div class="logo-mark" style="width:18px;height:18px;border-radius:5px"></div>
@@ -209,20 +209,20 @@ window.__ipc = window.__ipc || {};
 
   <!-- Export History Panel -->
   <div class="exports-overlay" id="exports-overlay" onclick="if(event.target===this)toggleExports()"></div>
-  <div class="exports-panel" id="exports-panel">
+  <div class="exports-panel" id="exports-panel" data-nf-role="sidebar" data-nf-state="closed">
     <div class="exports-header">
       <span class="exports-title">EXPORT HISTORY</span>
-      <button class="exports-close" onclick="toggleExports()">&times;</button>
+      <button class="exports-close" onclick="toggleExports()" data-nf-action="close-exports">&times;</button>
     </div>
     <div class="exports-list" id="exports-list"></div>
   </div>
 
   <!-- Settings Panel -->
   <div class="settings-overlay" id="settings-overlay" onclick="if(event.target===this)toggleSettings()"></div>
-  <div class="settings-panel" id="settings-panel">
+  <div class="settings-panel" id="settings-panel" data-nf-role="sidebar" data-nf-state="closed">
     <div class="exports-header">
       <span class="exports-title">SETTINGS</span>
-      <button class="exports-close" onclick="toggleSettings()">&times;</button>
+      <button class="exports-close" onclick="toggleSettings()" data-nf-action="close-settings">&times;</button>
     </div>
     <div class="settings-body">
       <!-- General -->
@@ -239,7 +239,7 @@ window.__ipc = window.__ipc || {};
           <span class="settings-label">Project Path</span>
           <div class="settings-path">
             <span class="settings-path-text">~/NextFrame/projects</span>
-            <button class="settings-path-btn" onclick="alert('Choose folder')">Browse</button>
+            <button class="settings-path-btn" onclick="alert('Choose folder')" data-nf-action="browse-project-path">Browse</button>
           </div>
         </div>
         <div class="settings-row">
@@ -294,17 +294,17 @@ window.__ipc = window.__ipc || {};
         <div class="settings-row">
           <span class="settings-label">HTML Cache</span>
           <span class="settings-val">12.4 MB</span>
-          <button class="btn-ghost-sm" onclick="alert('Cleared')">CLEAR</button>
+          <button class="btn-ghost-sm" onclick="alert('Cleared')" data-nf-action="clear-html-cache">CLEAR</button>
         </div>
         <div class="settings-row">
           <span class="settings-label">Video Cache</span>
           <span class="settings-val">45.2 MB</span>
-          <button class="btn-ghost-sm" onclick="alert('Cleared')">CLEAR</button>
+          <button class="btn-ghost-sm" onclick="alert('Cleared')" data-nf-action="clear-video-cache">CLEAR</button>
         </div>
         <div class="settings-row">
           <span class="settings-label">Browser Cache</span>
           <span class="settings-val">8.1 MB</span>
-          <button class="btn-ghost-sm" onclick="alert('Cleared')">CLEAR</button>
+          <button class="btn-ghost-sm" onclick="alert('Cleared')" data-nf-action="clear-browser-cache">CLEAR</button>
         </div>
       </div>
 
@@ -329,33 +329,33 @@ window.__ipc = window.__ipc || {};
 
   <!-- Video Player Modal moved to global scope (outside view-editor) via JS on load -->
   <div class="player-overlay" id="player-overlay" onclick="closePlayer()" style="position:fixed;z-index:10000"></div>
-  <div class="player-modal" id="player-modal" style="position:fixed;z-index:10001">
+  <div class="player-modal" id="player-modal" style="position:fixed;z-index:10001" data-nf-state="closed">
     <div class="player-header">
       <span class="player-title" id="player-title">content.mp4</span>
-      <button class="player-close" onclick="closePlayer()">&times;</button>
+      <button class="player-close" onclick="closePlayer()" data-nf-action="close-player">&times;</button>
     </div>
     <div class="player-canvas">
       <div class="player-canvas-inner" id="player-canvas-inner">
-        <div class="player-big-play" id="player-big-play" onclick="togglePlayerPlay()">&#9654;</div>
+        <div class="player-big-play" id="player-big-play" onclick="togglePlayerPlay()" data-nf-action="play" data-nf-state="paused">&#9654;</div>
       </div>
     </div>
     <div class="player-controls">
-      <button class="play-btn" onclick="togglePlayerPlay()" id="player-play-btn">&#9654;</button>
+      <button class="play-btn" onclick="togglePlayerPlay()" id="player-play-btn" data-nf-action="play" data-nf-state="paused">&#9654;</button>
       <div class="player-progress" id="player-progress" onclick="seekPlayer(event)">
         <div class="player-progress-fill" id="player-progress-fill" style="width:0%"></div>
       </div>
-      <span class="player-tc" id="player-tc">00:00 / 00:26</span>
+      <span class="player-tc" id="player-tc" data-nf-time="0">00:00 / 00:26</span>
     </div>
     <div class="player-actions">
-      <button class="btn-ghost-sm" onclick="alert('Reveal in Finder')">REVEAL IN FINDER</button>
+      <button class="btn-ghost-sm" onclick="alert('Reveal in Finder')" data-nf-action="reveal-export">REVEAL IN FINDER</button>
       <span class="player-detail" id="player-detail">1920×1080 · 30fps · h264 · crf 23</span>
-      <button class="btn-ghost-sm" style="color:var(--red);border-color:rgba(201,88,88,0.3)" onclick="alert('Delete')">DELETE</button>
+      <button class="btn-ghost-sm" style="color:var(--red);border-color:rgba(201,88,88,0.3)" onclick="alert('Delete')" data-nf-action="delete-export">DELETE</button>
     </div>
   </div>
 
   <div class="editor-body">
   <!-- Clip sidebar (v0.4) -->
-  <div class="editor-clip-sidebar" id="editor-clip-sidebar">
+  <div class="editor-clip-sidebar" id="editor-clip-sidebar" data-nf-role="sidebar">
     <div class="editor-clip-header">
       <span>CLIPS</span>
       <span id="editor-clip-count" style="font-family:var(--font-mono);font-size:11px;color:rgba(228,228,232,0.5);text-transform:none;letter-spacing:0">0</span>
@@ -367,7 +367,7 @@ window.__ipc = window.__ipc || {};
 
   <div class="editor-main">
     <!-- Preview -->
-    <div class="preview-area">
+    <div class="preview-area" data-nf-role="preview">
       <div class="preview-canvas-wrap">
         <div class="canvas-frame">
           <div class="canvas-inner" id="canvas-inner">
@@ -387,22 +387,22 @@ window.__ipc = window.__ipc || {};
       <!-- Playback bar -->
       <div class="playback-bar">
         <div class="playback-left">
-          <div class="timecode"><span class="tc-current" id="tc-current">00:02.400</span> / <span id="tc-total">00:26.000</span></div>
+          <div class="timecode"><span class="tc-current" id="tc-current" data-nf-time="2.4">00:02.400</span> / <span id="tc-total" data-nf-time="26">00:26.000</span></div>
         </div>
         <div class="play-controls">
-          <button class="play-btn" title="Previous">&#x23EE;</button>
-          <button class="play-btn primary" id="btn-play" onclick="togglePlay()" title="Play/Pause">&#x25B6;</button>
-          <button class="play-btn" title="Next">&#x23ED;</button>
+          <button class="play-btn" title="Previous" data-nf-action="previous">&#x23EE;</button>
+          <button class="play-btn primary" id="btn-play" onclick="togglePlay()" title="Play/Pause" data-nf-action="play" data-nf-state="paused">&#x25B6;</button>
+          <button class="play-btn" title="Next" data-nf-action="next">&#x23ED;</button>
         </div>
         <div class="playback-right">
-          <button class="btn-icon" id="btn-fullscreen" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
-          <button class="btn-export" onclick="previewComposed()">PREVIEW</button>
+          <button class="btn-icon" id="btn-fullscreen" onclick="toggleFullscreen()" title="Fullscreen" data-nf-action="toggle-fullscreen">&#x26F6;</button>
+          <button class="btn-export" id="btn-preview-compose" onclick="previewComposed()" data-nf-action="preview-compose" data-nf-state="idle">PREVIEW</button>
         </div>
       </div>
     </div>
 
     <!-- Inspector -->
-    <div class="inspector" id="inspector">
+    <div class="inspector" id="inspector" data-nf-role="sidebar">
       <div class="insp-header">
         <span class="insp-name" id="insp-scene-name">No clip selected</span>
         <span class="insp-tag" id="insp-clip-id">--</span>
@@ -420,18 +420,18 @@ window.__ipc = window.__ipc || {};
           </div>
           <div class="insp-row">
             <span class="insp-label">Start</span>
-            <div class="insp-input" id="insp-start" style="display:flex;align-items:center">00:00.000</div>
+            <div class="insp-input" id="insp-start" style="display:flex;align-items:center" data-nf-time="0">00:00.000</div>
           </div>
           <div class="insp-row">
             <span class="insp-label">Duration</span>
-            <div class="insp-input" id="insp-duration" style="display:flex;align-items:center">0.000s</div>
+            <div class="insp-input" id="insp-duration" style="display:flex;align-items:center" data-nf-time="0">0.000s</div>
           </div>
           <div class="scene-chips">
-            <button class="scene-chip">canvas</button>
-            <button class="scene-chip">html</button>
-            <button class="scene-chip">svg</button>
-            <button class="scene-chip">md</button>
-            <button class="scene-chip">video</button>
+            <button class="scene-chip" data-nf-action="filter-canvas">canvas</button>
+            <button class="scene-chip" data-nf-action="filter-html">html</button>
+            <button class="scene-chip" data-nf-action="filter-svg">svg</button>
+            <button class="scene-chip" data-nf-action="filter-md">md</button>
+            <button class="scene-chip" data-nf-action="filter-video">video</button>
           </div>
         </div>
 
@@ -462,11 +462,11 @@ window.__ipc = window.__ipc || {};
   </div><!-- /editor-body -->
 
   <!-- Timeline -->
-  <div class="timeline" id="timeline">
+  <div class="timeline" id="timeline" data-nf-role="timeline" data-nf-state="paused">
     <div class="tl-header">
       <span class="tl-header-label">Timeline</span>
-      <button class="tl-header-btn">Snap</button>
-      <button class="tl-header-btn">Zoom</button>
+      <button class="tl-header-btn" data-nf-action="toggle-snap">Snap</button>
+      <button class="tl-header-btn" data-nf-action="toggle-zoom">Zoom</button>
     </div>
     <div class="tl-body">
       <div class="tl-tracks" id="tl-tracks"></div>
@@ -480,14 +480,14 @@ window.__ipc = window.__ipc || {};
 
   <!-- Fullscreen controls -->
   <div class="fullscreen-controls">
-    <div class="timecode"><span class="tc-current" id="tc-fs-current">00:02.400</span> / <span id="tc-fs-total">00:26.000</span></div>
+    <div class="timecode"><span class="tc-current" id="tc-fs-current" data-nf-time="2.4">00:02.400</span> / <span id="tc-fs-total" data-nf-time="26">00:26.000</span></div>
     <div class="play-controls">
-      <button class="play-btn" title="Previous">&#x23EE;</button>
-      <button class="play-btn primary" id="btn-play-fs" onclick="togglePlay()" title="Play/Pause">&#x25B6;</button>
-      <button class="play-btn" title="Next">&#x23ED;</button>
+      <button class="play-btn" title="Previous" data-nf-action="previous">&#x23EE;</button>
+      <button class="play-btn primary" id="btn-play-fs" onclick="togglePlay()" title="Play/Pause" data-nf-action="play" data-nf-state="paused">&#x25B6;</button>
+      <button class="play-btn" title="Next" data-nf-action="next">&#x23ED;</button>
     </div>
   </div>
-  <button class="fullscreen-exit" onclick="toggleFullscreen()">&#x2715;</button>
+  <button class="fullscreen-exit" onclick="toggleFullscreen()" data-nf-action="exit-fullscreen">&#x2715;</button>
 </div>
 
 

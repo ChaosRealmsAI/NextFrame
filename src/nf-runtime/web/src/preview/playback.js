@@ -10,10 +10,11 @@ function setPlayheadTime(time) {
   const playhead = document.getElementById("tl-playhead");
   if (playhead) {
     playhead.style.left = px;
+    playhead.setAttribute("data-nf-time", formatNfTimeValue(currentTime));
   }
 
-  setText("tc-current", formatPreciseTime(currentTime));
-  setText("tc-fs-current", formatPreciseTime(currentTime));
+  setNfTime("tc-current", currentTime, formatPreciseTime(currentTime));
+  setNfTime("tc-fs-current", currentTime, formatPreciseTime(currentTime));
 
   const fill = document.getElementById("progress-fill");
   if (fill) {
@@ -80,8 +81,8 @@ function selectClip(element) {
   setText("insp-clip-id", id || "--");
   setReadout("insp-scene-readout", scene || name || "Clip");
   setReadout("insp-clip-readout", id || "--");
-  setReadout("insp-start", formatPreciseTime(start));
-  setReadout("insp-duration", duration.toFixed(3) + "s");
+  setNfTime("insp-start", start, formatPreciseTime(start));
+  setNfTime("insp-duration", duration, duration.toFixed(3) + "s");
   setReadout("insp-params", paramsText);
   setText("canvas-title", prettifyLabel(scene || name || type || "Clip").toUpperCase());
   setText("canvas-sub", "scene:" + slugify(scene || name || type || "clip") + " · " + formatPreciseTime(start));
@@ -115,8 +116,8 @@ function resetSelection(message) {
   setText("insp-clip-id", "--");
   setReadout("insp-scene-readout", message || "No clip selected");
   setReadout("insp-clip-readout", "--");
-  setReadout("insp-start", "00:00.000");
-  setReadout("insp-duration", "0.000s");
+  setNfTime("insp-start", 0, "00:00.000");
+  setNfTime("insp-duration", 0, "0.000s");
   setReadout("insp-params", "Select a clip to inspect its params.");
   setText("canvas-title", "TIMELINE");
   setText("canvas-sub", currentSegment ? "segment:" + slugify(currentSegment) : "Load a timeline to preview");

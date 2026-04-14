@@ -33,6 +33,8 @@ function setPipelineAudioButtonState(btn, isPlayingNow) {
   }
   btn.classList.toggle("playing", Boolean(isPlayingNow));
   btn.innerHTML = isPlayingNow ? "&#10074;&#10074;" : "&#9654;";
+  btn.setAttribute("data-nf-action", isPlayingNow ? "pause" : "play");
+  btn.setAttribute("data-nf-state", isPlayingNow ? "playing" : "paused");
 }
 
 function setPipelineKaraokeCharState(span, state) {
@@ -216,6 +218,7 @@ function playPipelineVideoInline(btn) {
   video.setAttribute("playsinline", "playsinline");
   video.controls = true;
   video.autoplay = true;
+  video.setAttribute("data-nf-state", "loading");
   container.style.position = "relative";
   container.appendChild(video);
   _inlineVideo = video;
@@ -227,6 +230,14 @@ function playPipelineVideoInline(btn) {
     removePipelineInlineVideo();
   });
 
+  video.onplay = function() {
+    video.setAttribute("data-nf-state", "playing");
+  };
+  video.onpause = function() {
+    if (_inlineVideo === video) {
+      video.setAttribute("data-nf-state", "paused");
+    }
+  };
   video.onerror = function() {
     console.error("[pipeline] inline video error:", video.error);
     removePipelineInlineVideo();
