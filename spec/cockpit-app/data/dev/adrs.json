@@ -111,6 +111,48 @@
         "scenes 按类别分目录，不再 50 文件平铺",
         "动画系统在 animation/ 下，引擎在 engine/ 下，职责清晰"
       ]
+    },
+    {
+      "id": "ADR-005",
+      "title": "原生 macOS 桌面端：objc2 直调 AppKit/WebKit，替代 Tao/Wry",
+      "status": "accepted",
+      "date": "2026-04-14",
+      "version": "v0.5",
+      "context": "v0.4 桌面端用 Tao(窗口)+Wry(WebView) 跨平台抽象层。问题：1) backdrop-filter 需要 -webkit- 前缀但 Wry 不暴露 WKWebView 配置；2) 无法用原生 NSToolbar/NSVisualEffectView；3) 跨平台抽象限制了 macOS 特有能力（Traffic lights、原生毛玻璃、Split View）；4) Tao/Wry 是框架，违反'禁止框架'原则。",
+      "decision": "删除 Tao/Wry，用 objc2 直调 macOS 原生 API。每个平台独立 crate，共享逻辑抽到 nf-shell-core。",
+      "architecture": {
+        "nf-shell-core": {
+          "what": "共享 traits + IPC 分发 + 协议解析（纯 Rust，零平台依赖）",
+          "traits": ["ShellWindow", "ShellWebView", "ShellProtocol"]
+        },
+        "nf-shell-mac": {
+          "what": "macOS 原生实现（当前唯一平台）",
+          "tech": "objc2 + objc2-app-kit + objc2-web-kit",
+          "apis": {
+            "窗口": "NSApplication + NSWindow + NSWindowDelegate",
+            "WebView": "WKWebView + WKWebViewConfiguration",
+            "自定义协议": "WKURLSchemeHandler (nf:// + nfdata://)",
+            "IPC": "WKUserContentController + WKScriptMessageHandler",
+            "原生UI": "NSToolbar + NSVisualEffectView + NSMenu"
+          }
+        },
+        "future": ["nf-shell-win (WebView2 + windows-rs)", "nf-shell-linux (WebKitGTK + gtk-rs)"]
+      },
+      "web_ui": {
+        "location": "src/nf-runtime/web-v2/",
+        "principle": "模块化 CSS/JS，每个 view 独立文件，< 300 行/文件",
+        "design": "3D Glass Aurora 主题（DESIGN.md）"
+      },
+      "why_not_tao_wry": [
+        "Tao/Wry 是跨平台框架，违反'每个平台用原生 API'原则",
+        "抽象层限制了原生能力的上限",
+        "AI 时代自己造轮子成本低，上限高",
+        "objc2 已在 nf-recorder 中验证可行"
+      ],
+      "migration": {
+        "deleted": ["src/nf-shell/ (Tao/Wry)", "src/nf-runtime/web/ (旧 UI)"],
+        "created": ["src/nf-shell-mac/ (objc2)", "src/nf-runtime/web-v2/ (新 UI)"]
+      }
     }
   ]
 }
