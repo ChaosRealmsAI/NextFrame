@@ -357,31 +357,67 @@ function renderAudioTab(segments) {
   renderAudioTabInner(audioSegments);
 }
 
+function formatTimecode(ms) {
+  const s = (ms || 0) / 1000;
+  const m = Math.floor(s / 60);
+  const sec = (s % 60).toFixed(1).padStart(4, '0');
+  return String(m).padStart(2, '0') + ':' + sec;
+}
+
 function renderAudioTabInner(segments) {
   const el = document.querySelector('#pl-tab-audio .pl-main');
   if (!el) return;
-  let html = '';
+  let html = '<div style="padding:16px;overflow-y:auto;height:100%">';
   segments.forEach(function(seg, index) {
     const segmentNumber = Number(seg.segment) || (index + 1);
-    const narration = getAudioSegmentNarration(seg, index) || ('seg-' + segmentNumber);
-    const segId = 'seg-' + segmentNumber;
+    const narration = getAudioSegmentNarration(seg, index) || '';
     const state = pipelineAudioState[segmentNumber] || {};
     const hasAudio = state.exists && state.mp3;
-    html += '<div class="glass" style="padding:16px;margin-bottom:8px;border-radius:10px">' +
-      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
-        '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--t100)">音频 ' + segmentNumber + ' <span style="font-size:11px;color:var(--t50);font-weight:400">' + escapeHtml(segId) + '</span></div>' +
-        '<div style="font-size:12px;color:var(--t65);margin-top:4px;line-height:1.5">' + escapeHtml(narration.length > 80 ? narration.substring(0, 80) + '...' : narration) + '</div></div>' +
-        '<div style="display:flex;gap:6px;flex-shrink:0">' +
-          (hasAudio
-            ? '<button data-nf-action="play-audio" onclick="playSegmentAudio(\'' + escapeJsString(state.mp3) + '\')" style="border:0;border-radius:999px;padding:6px 12px;background:rgba(52,211,153,0.15);color:var(--green);cursor:pointer;font-size:12px">播放</button>'
-            : '') +
-          '<button data-nf-action="generate-tts" onclick="generateTTS(' + segmentNumber + ')" style="border:0;border-radius:999px;padding:6px 12px;background:rgba(167,139,250,0.15);color:var(--accent);cursor:pointer;font-size:12px">' + (hasAudio ? '重新生成' : '生成配音') + '</button>' +
-        '</div>' +
-      '</div>' +
-      (state.generating ? '<div style="font-size:11px;color:var(--t50);margin-top:8px">正在生成配音...</div>' : '') +
-      (state.error ? '<div style="font-size:11px;color:var(--warm);margin-top:8px">' + escapeHtml(state.error) + '</div>' : '') +
-      (hasAudio ? '<audio controls preload="metadata" style="width:100%;margin-top:8px;height:32px" src="' + escapeHtml(state.mp3) + '"></audio>' : '') +
-    '</div>';
+    const tl = state.timelineData;
+    const sentences = (tl && tl.segments) || [];
+    const duration = seg.duration || (sentences.length > 0 ? sentences[sentences.length - 1].end_ms / 1000 : 0);
+    const statusLabel = hasAudio ? '已生成' : '待生成';
+    const statusColor = hasAudio ? 'var(--green)' : 'var(--t50)';
+
+    html += '<div class="glass audio-card" id="audio-card-' + segmentNumber + '" style="padding:20px;margin-bottom:12px;border-radius:12px">';
+
+    // Card body: narration text
+    html += '<div style="margin-bottom:12px"><span style="font-size:13px;font-weight:600;color:var(--accent)">段 ' + segmentNumber + '</span></div>';
+    html += '<div style="font-size:14px;color:var(--t80);line-height:1.7;margin-bottom:16px">' + escapeHtml(narration) + '</div>';
+
+    // Audio head: play + status + duration
+    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">';
+    if (hasAudio) {
+      html += '<button data-nf-action="play-audio" onclick="playKaraokeAudio(' + segmentNumber + ')" style="width:32px;height:32px;border-radius:50%;border:none;background:var(--accent);color:#000;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">&#9654;</button>';
+    }
+    html += '<span style="font-size:12px;font-weight:600;color:' + statusColor + ';padding:2px 8px;border-radius:4px;background:' + (hasAudio ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.06)') + '">' + statusLabel + '</span>';
+    if (duration > 0) html += '<span style="font-family:var(--mono);font-size:13px;color:var(--t80);margin-left:auto">' + duration.toFixed(1) + 's</span>';
+    html += '</div>';
+
+    // Sentence breakdown with karaoke
+    if (hasAudio && sentences.length > 0) {
+      html += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--t50);margin-bottom:8px">逐句分解</div>';
+      sentences.forEach(function(sent) {
+        const startMs = sent.start_ms || 0;
+        const endMs = sent.end_ms || 0;
+        const dur = ((endMs - startMs) / 1000).toFixed(1);
+        const words = sent.words || [];
+        const wordSpans = words.length > 0
+          ? words.map(function(w) { return '<span class="ch" data-start="' + (w.start_ms || 0) + '" data-end="' + (w.end_ms || 0) + '">' + escapeHtml(w.word || w.char || '') + '</span>'; }).join('')
+          : escapeHtml(sent.text || '');
+        html += '<div class="sentence-row" data-seg="' + segmentNumber + '" style="display:grid;grid-template-columns:auto 1fr auto;align-items:start;padding:8px 10px;border-radius:6px;gap:10px;border-left:2px solid transparent">' +
+          '<span style="font-family:var(--mono);font-size:12px;color:var(--t50);white-space:nowrap">' + formatTimecode(startMs) + '</span>' +
+          '<div><span class="s-text" style="font-size:13px;color:var(--t80);line-height:1.5">' + wordSpans + '</span>' +
+            '<div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:4px;overflow:hidden"><div class="s-progress-fill" style="height:100%;width:0;background:var(--accent);transition:width 0.15s linear"></div></div>' +
+          '</div>' +
+          '<span style="font-family:var(--mono);font-size:12px;color:var(--t50);text-align:right;white-space:nowrap">' + dur + 's</span>' +
+        '</div>';
+      });
+    } else if (!hasAudio) {
+      html += '<div style="display:flex;align-items:center;justify-content:center;padding:20px 0;font-size:13px;color:var(--t50)">等待生成</div>';
+    }
+
+    html += '</div>';
   });
   el.innerHTML = html;
 }
@@ -413,9 +449,75 @@ function generateTTS(segmentNumber) {
   });
 }
 
+let activeKaraokeAudio = null;
+let activeKaraokeRaf = null;
+
+function playKaraokeAudio(segmentNumber) {
+  // Stop any playing audio
+  if (activeKaraokeAudio) {
+    activeKaraokeAudio.pause();
+    activeKaraokeAudio = null;
+  }
+  if (activeKaraokeRaf) {
+    cancelAnimationFrame(activeKaraokeRaf);
+    activeKaraokeRaf = null;
+  }
+
+  const state = pipelineAudioState[segmentNumber];
+  if (!state || !state.mp3) return;
+  const card = document.getElementById('audio-card-' + segmentNumber);
+  if (!card) return;
+
+  const audio = new Audio(state.mp3);
+  activeKaraokeAudio = audio;
+  const chars = card.querySelectorAll('.ch');
+  const progressFills = card.querySelectorAll('.s-progress-fill');
+  const sentenceRows = card.querySelectorAll('.sentence-row');
+
+  function tick() {
+    const ms = audio.currentTime * 1000;
+    // Highlight words
+    chars.forEach(function(ch) {
+      const start = Number(ch.dataset.start) || 0;
+      const end = Number(ch.dataset.end) || 0;
+      if (ms >= start && ms < end) {
+        ch.style.color = 'var(--accent)';
+        ch.style.textShadow = '0 0 8px rgba(167,139,250,0.5)';
+      } else if (ms >= end) {
+        ch.style.color = 'var(--t100)';
+        ch.style.textShadow = 'none';
+      } else {
+        ch.style.color = 'var(--t50)';
+        ch.style.textShadow = 'none';
+      }
+    });
+    // Update sentence progress bars
+    sentenceRows.forEach(function(row, i) {
+      const fill = progressFills[i];
+      if (!fill) return;
+      const rowChars = row.querySelectorAll('.ch');
+      if (rowChars.length === 0) return;
+      const rowStart = Number(rowChars[0].dataset.start) || 0;
+      const rowEnd = Number(rowChars[rowChars.length - 1].dataset.end) || 1;
+      const pct = Math.max(0, Math.min(100, (ms - rowStart) / (rowEnd - rowStart) * 100));
+      fill.style.width = (ms >= rowStart ? pct : 0) + '%';
+      // Active row highlight
+      row.style.borderLeftColor = (ms >= rowStart && ms < rowEnd) ? 'var(--accent)' : 'transparent';
+      row.style.background = (ms >= rowStart && ms < rowEnd) ? 'var(--accent-06)' : 'transparent';
+    });
+    if (!audio.paused && !audio.ended) activeKaraokeRaf = requestAnimationFrame(tick);
+  }
+
+  audio.play().then(function() { activeKaraokeRaf = requestAnimationFrame(tick); }).catch(function() {});
+  audio.onended = function() { activeKaraokeAudio = null; };
+}
+
 function playSegmentAudio(mp3Path) {
+  if (activeKaraokeAudio) { activeKaraokeAudio.pause(); activeKaraokeAudio = null; }
   const audio = new Audio(mp3Path);
+  activeKaraokeAudio = audio;
   audio.play().catch(function() {});
+  audio.onended = function() { activeKaraokeAudio = null; };
 }
 
 function renderAtomsTab(scenes) {
@@ -638,6 +740,7 @@ window.renderOutputTab = renderOutputTab;
 window.startPipelineExport = startPipelineExport;
 window.cancelPipelineExport = cancelPipelineExport;
 window.previewSegmentVideo = previewSegmentVideo;
+window.playKaraokeAudio = playKaraokeAudio;
 window.scrollToSegment = scrollToSegment;
 window.saveNarration = saveNarration;
 window.generateTTS = generateTTS;
