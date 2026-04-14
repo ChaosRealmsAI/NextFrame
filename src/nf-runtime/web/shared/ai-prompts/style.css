@@ -1,0 +1,96 @@
+/* AI Prompts — shared component
+   Uses design tokens from the host page's :root */
+
+.ai-prompts {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.ai-prompts-search {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px 0 36px;
+  font-family: var(--sans, -apple-system, system-ui, sans-serif);
+  font-size: 13px;
+  color: rgba(255,255,255,0.80);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  outline: none;
+  margin-bottom: 24px;
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ai-prompts-search::placeholder { color: rgba(255,255,255,0.50); }
+.ai-prompts-search:focus { border-color: rgba(167,139,250,0.35); }
+
+.ai-prompts-search-wrap {
+  position: relative;
+  margin-bottom: 24px;
+}
+.ai-prompts-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255,255,255,0.50);
+  pointer-events: none;
+}
+
+.prompt-section {
+  margin-bottom: 24px;
+}
+.prompt-section:last-child { margin-bottom: 0; }
+
+.prompt-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.80);
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.prompt-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: 12px;
+}
+.prompt-item:hover {
+  background: rgba(255,255,255,0.04);
+}
+.prompt-item:active {
+  background: rgba(255,255,255,0.06);
+}
+
+.prompt-text {
+  font-size: 13px;
+  color: rgba(255,255,255,0.65);
+  flex: 1;
+  line-height: 1.5;
+  transition: color 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.prompt-item:hover .prompt-text {
+  color: rgba(255,255,255,0.80);
+}
+
+.prompt-copy {
+  font-size: 12px;
+  font-weight: 500;
+  color: #a78bfa;
+  opacity: 0;
+  transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.prompt-item:hover .prompt-copy {
+  opacity: 1;
+}
+.prompt-copy.copied {
+  color: #34d399;
+  opacity: 1;
+}

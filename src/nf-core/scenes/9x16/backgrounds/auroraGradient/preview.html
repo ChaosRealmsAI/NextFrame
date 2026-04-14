@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Preview: Aurora Gradient (9:16)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: -apple-system, sans-serif; color: #fff; }
+  #wrapper { display: flex; gap: 24px; align-items: flex-start; padding: 20px; }
+  #stage { border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+  #controls { width: 260px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; }
+  #controls h2 { font-size: 14px; margin-bottom: 4px; color: rgba(255,255,255,0.9); }
+  #controls .desc { font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 16px; }
+  .param-group { margin-bottom: 12px; }
+  .param-group-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); margin-bottom: 8px; }
+  .param { margin-bottom: 10px; }
+  .param label { display: flex; justify-content: space-between; font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+  .param label span { color: rgba(255,255,255,0.9); font-variant-numeric: tabular-nums; }
+  .param input[type=range] { width: 100%; height: 4px; -webkit-appearance: none; background: rgba(255,255,255,0.1); border-radius: 2px; outline: none; }
+  .param input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #6366f1; cursor: pointer; }
+  #info { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+  #info p { font-size: 11px; color: rgba(255,255,255,0.3); line-height: 1.5; }
+  #info code { color: #6366f1; }
+  #timer { font-size: 12px; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; margin-top: 8px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <div>
+    <div id="stage"></div>
+    <div id="timer">t = 0.00s</div>
+  </div>
+  <div id="controls">
+    <h2>Aurora Gradient</h2>
+    <div class="desc">9:16 竖屏 · 极光渐变背景</div>
+    <div id="param-container"></div>
+    <div id="info">
+      <p>比例: <code>9:16</code> (1080×1920)</p>
+      <p>技术: <code>canvas2d</code></p>
+      <p>可循环: <code>true</code></p>
+    </div>
+  </div>
+</div>
+<script type="module">
+import { meta, render } from './index.js';
+
+// 预览尺寸（等比缩小）
+const SCALE = 0.35;
+const W = 1080, H = 1920;
+const PW = Math.round(W * SCALE), PH = Math.round(H * SCALE);
+
+const stage = document.getElementById('stage');
+stage.style.width = PW + 'px';
+stage.style.height = PH + 'px';
+
+// 从 meta 生成参数控件
+const params = {};
+const container = document.getElementById('param-container');
+const groups = {};
+
+for (const [key, spec] of Object.entries(meta.params)) {
+  params[key] = spec.default;
+  const g = spec.group || 'other';
+  if (!groups[g]) {
+    groups[g] = document.createElement('div');
+    groups[g].className = 'param-group';
+    groups[g].innerHTML = '<div class="param-group-title">' + g + '</div>';
+    container.appendChild(groups[g]);
+  }
+  if (spec.type === 'number' && spec.range) {
+    const div = document.createElement('div');
+    div.className = 'param';
+    div.innerHTML = '<label>' + (spec.label || key) + ' <span id="v_' + key + '">' + spec.default + '</span></label>';
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = spec.range[0];
+    input.max = spec.range[1];
+    input.step = spec.step || (spec.range[1] - spec.range[0]) / 100;
+    input.value = spec.default;
+    input.addEventListener('input', () => {
+      params[key] = +input.value;
+      document.getElementById('v_' + key).textContent = (+input.value).toFixed(spec.step < 1 ? 2 : 0);
+    });
+    div.appendChild(input);
+    groups[g].appendChild(div);
+  }
+}
+
+// 动画循环
+const timerEl = document.getElementById('timer');
+const startTime = performance.now();
+
+function loop() {
+  const t = (performance.now() - startTime) / 1000;
+  timerEl.textContent = 't = ' + t.toFixed(2) + 's';
+
+  const html = render(t, params, { width: W, height: H });
+
+  // 用 iframe 隔离 scene 的 script 执行
+  let iframe = stage.querySelector('iframe');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+    iframe.sandbox = 'allow-scripts';
+    stage.innerHTML = '';
+    stage.appendChild(iframe);
+  }
+  const doc = iframe.contentDocument;
+  doc.open();
+  doc.write('<!DOCTYPE html><html><head><style>*{margin:0;padding:0}body{overflow:hidden}</style></head><body>' + html + '</body></html>');
+  doc.close();
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

@@ -16,17 +16,17 @@ use objc2_web_kit::{
     WKSnapshotConfiguration, WKWebView, WKWebViewConfiguration, WKWebsiteDataStore,
 };
 
-/// Resolve the web-v2 directory relative to the executable.
+/// Resolve the web directory relative to the executable.
 fn web_dir() -> PathBuf {
     // In dev: executable is at target/debug/nextframe
-    // web-v2 is at src/nf-runtime/web-v2/
+    // web is at src/nf-runtime/web/
     let exe = std::env::current_exe().unwrap_or_default();
     let project_root = exe
         .ancestors()
         .find(|p| p.join("Cargo.toml").exists())
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-    project_root.join("src/nf-runtime/web-v2")
+    project_root.join("src/nf-runtime/web")
 }
 
 /// Create a WKWebView that loads the home page from disk.

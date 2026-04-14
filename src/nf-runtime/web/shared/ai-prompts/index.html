@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>NextFrame · AI 指令库</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --sans: 'Inter', -apple-system, system-ui, sans-serif;
+}
+html, body {
+  height: 100%;
+  background: #050507;
+  color: rgba(255,255,255,0.80);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  padding: 48px 24px;
+  overflow-y: auto;
+}
+body::-webkit-scrollbar { width: 5px; }
+body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+.page-title {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.95);
+  margin-bottom: 32px;
+  letter-spacing: -0.2px;
+}
+
+.aurora {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 20% at 50% 0%, rgba(139,92,246,0.14), transparent),
+    radial-gradient(ellipse 60% 15% at 50% 100%, rgba(124,58,237,0.08), transparent);
+}
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+<div style="position:relative;z-index:1">
+  <div class="page-title">✨ AI 指令库</div>
+  <div id="ai-prompts-root"></div>
+</div>
+<script src="ai-prompts.js"></script>
+</body>
+</html>
