@@ -430,7 +430,7 @@ function renderAudioTabInner(segments) {
     html += '</div>';
     // File path
     if (hasAudio && state.mp3) {
-      const rawPath = state.mp3.replace('nfdata://localhost/', '~/NextFrame/projects/');
+      const rawPath = decodeURI(state.mp3).replace('nfdata://localhost/', '~/NextFrame/projects/');
       html += '<div style="font-family:var(--mono);font-size:11px;color:var(--t50);margin-bottom:12px;word-break:break-all">' + escapeHtml(rawPath) + '</div>';
     }
 
