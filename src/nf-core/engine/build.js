@@ -144,12 +144,16 @@ function buildRuntime() {
   }
 
   function applyScale() {
-    const scale = Math.min(
-      window.innerWidth / viewport.width,
-      window.innerHeight / viewport.height
-    );
+    const controlsH = 56;
+    const availW = window.innerWidth;
+    const availH = window.innerHeight - controlsH;
+    const scale = Math.min(availW / viewport.width, availH / viewport.height);
     const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
-    stageShell.style.transform = "translate(-50%, -50%) scale(" + safeScale + ")";
+    const scaledW = viewport.width * safeScale;
+    const scaledH = viewport.height * safeScale;
+    stageShell.style.transform = "scale(" + safeScale + ")";
+    stageShell.style.left = Math.round((availW - scaledW) / 2) + "px";
+    stageShell.style.top = Math.round((availH - scaledH) / 2) + "px";
   }
 
   function replayInlineScripts(root) {
@@ -394,7 +398,7 @@ ${buildRuntime()}`);
   * { box-sizing: border-box; }
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: ${background}; color: #f4efe8; font-family: system-ui, -apple-system, sans-serif; }
   body { position: relative; }
-  #stage-shell { position: fixed; left: 50%; top: 50%; width: ${width}px; height: ${height}px; transform-origin: top left; }
+  #stage-shell { position: fixed; width: ${width}px; height: ${height}px; transform-origin: 0 0; }
   #stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: ${background}; box-shadow: 0 24px 100px rgba(0, 0, 0, 0.35); }
   #controls {
     position: fixed; left: 0; right: 0; bottom: 0; height: 56px; z-index: 9999;
