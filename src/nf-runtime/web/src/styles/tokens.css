@@ -150,6 +150,7 @@
   position: relative;
   border-radius: var(--r);
   overflow: hidden;
+  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   background: var(--glass-bg);
   border: 1px solid rgba(255,255,255,0.08);
