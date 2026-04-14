@@ -43,9 +43,21 @@ function usage() {
 export async function run(argv) {
   const step = (argv[0] || "").toLowerCase().replace(/^--/, "");
 
-  if (!step || step === "help") {
+  if (step === "help") {
     process.stdout.write(usage() + "\n");
     return 0;
+  }
+
+  // 无参数 → 输出状态机指南
+  if (!step) {
+    const guidePath = resolve(RECIPE_DIR, "guide.md");
+    try {
+      process.stdout.write(readFileSync(guidePath, "utf8"));
+      return 0;
+    } catch {
+      process.stdout.write(usage() + "\n");
+      return 0;
+    }
   }
 
   const info = STEPS[step];
