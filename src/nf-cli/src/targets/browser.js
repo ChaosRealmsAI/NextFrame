@@ -1,12 +1,12 @@
 // Renders timelines in headless Chrome and captures frames or MP4 output from them.
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { once } from "node:events";
 
-import { buildHTMLDocument, timelineBaseHref } from "../engine/v2/build.js";
+import { buildHTML } from "../../../nf-core/engine/build.js";
 import { timelineMetrics } from "../engine/v2/timeline.js";
 
 const CHROME_CANDIDATES = [
@@ -100,11 +100,10 @@ export async function openRenderedTimeline(timeline, opts = {}) {
   const { width, height } = timelineMetrics(timeline);
   const htmlDir = await mkdtemp(join(tmpdir(), "nextframe-v3-"));
   const htmlPath = join(htmlDir, "render.html");
-  const html = buildHTMLDocument(timeline, {
-    mode: "headless",
-    baseHref: timelineBaseHref(opts.baseDir || process.cwd()),
-  });
-  await writeFile(htmlPath, html, "utf8");
+  const buildResult = buildHTML(timeline, htmlPath);
+  if (!buildResult.ok) {
+    throw new Error(buildResult.error?.message || "failed to build timeline HTML");
+  }
 
   const { default: puppeteer } = await import("puppeteer-core");
   const browser = await puppeteer.launch({
