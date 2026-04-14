@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use super::WebViewHost;
+use crate::error_with_fix;
 
 impl WebViewHost {
     /// Sends frame data to the page via `window.__onFrame(data)`.
@@ -22,8 +23,13 @@ impl WebViewHost {
         segment_durations: &[f64],
         video_time_sec: f64,
     ) -> Result<(), String> {
-        let subtitle_json = serde_json::to_string(subtitle_text)
-            .map_err(|err| format!("failed to encode subtitle text for JS: {err}"))?;
+        let subtitle_json = serde_json::to_string(subtitle_text).map_err(|err| {
+            error_with_fix(
+                "encode subtitle text for page injection",
+                err,
+                "Retry after removing unsupported subtitle data or control characters from the page input.",
+            )
+        })?;
         let titles_json = serde_json::to_string(segment_titles).unwrap_or_else(|_| "[]".to_owned());
         let durations_json =
             serde_json::to_string(segment_durations).unwrap_or_else(|_| "[]".to_owned());
@@ -49,10 +55,11 @@ impl WebViewHost {
         );
         let result = self.eval_string(&script)?;
         if result.as_deref() == Some("no __onFrame") {
-            return Err(
-                "page does not implement window.__onFrame — see recorder README for the template protocol"
-                    .into(),
-            );
+            return Err(error_with_fix(
+                "inject frame state into the page",
+                "the page does not implement `window.__onFrame`",
+                "Implement the recorder template protocol in `window.__onFrame` and retry.",
+            ));
         }
         // 8ms flush: enough for video.currentTime seek to decode a frame.
         // For pages without video, this is a ~7ms overhead vs the old 1ms flush,

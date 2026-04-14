@@ -14,6 +14,8 @@ mod tests;
 use std::fs;
 use std::path::Path;
 
+use crate::error_with_fix;
+
 use js_extract::{extract_assignment_array, extract_assignment_string, extract_number};
 use manifest::{
     extract_slide_segments_audio, extract_slide_segments_srt, load_manifest_fallback, max_data_cue,
@@ -43,9 +45,21 @@ pub fn detect_slide_type(html_content: &str) -> SlideType {
 pub fn parse_frame_file(path: &Path) -> Result<FrameMetadata, String> {
     let html_path = path
         .canonicalize()
-        .map_err(|err| format!("failed to canonicalize {}: {err}", path.display()))?;
+        .map_err(|err| {
+            error_with_fix(
+                "open the HTML frame file",
+                format!("failed to canonicalize {}: {err}", path.display()),
+                "Pass an existing HTML frame file path and retry.",
+            )
+        })?;
     let html = fs::read_to_string(&html_path)
-        .map_err(|err| format!("failed to read {}: {err}", html_path.display()))?;
+        .map_err(|err| {
+            error_with_fix(
+                "read the HTML frame file",
+                format!("failed to read {}: {err}", html_path.display()),
+                "Ensure the HTML frame file is readable and retry.",
+            )
+        })?;
     let slide_type = detect_slide_type(&html);
 
     let mut warnings = Vec::new();
@@ -132,7 +146,13 @@ pub fn parse_frame_file(path: &Path) -> Result<FrameMetadata, String> {
 fn resolve_relative(html_path: &Path, rel: String) -> Result<std::path::PathBuf, String> {
     let parent = html_path
         .parent()
-        .ok_or_else(|| format!("{} has no parent directory", html_path.display()))?;
+        .ok_or_else(|| {
+            error_with_fix(
+                "resolve a frame-relative asset path",
+                format!("{} has no parent directory", html_path.display()),
+                "Place the HTML frame on disk under a real directory and retry.",
+            )
+        })?;
     Ok(parent.join(rel))
 }
 
@@ -147,7 +167,13 @@ fn extract_cuemap(source: &str) -> Result<Vec<usize>, String> {
         .map(|chunk| {
             chunk
                 .parse::<usize>()
-                .map_err(|err| format!("invalid CUEMAP entry {chunk:?}: {err}"))
+                .map_err(|err| {
+                    error_with_fix(
+                        "parse the CUEMAP array",
+                        format!("invalid CUEMAP entry {chunk:?}: {err}"),
+                        "Use integer cue indexes in the inline CUEMAP array and retry.",
+                    )
+                })
         })
         .collect()
 }

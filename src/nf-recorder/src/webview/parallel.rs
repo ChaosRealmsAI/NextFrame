@@ -5,6 +5,7 @@ use objc2_foundation::NSPoint;
 
 use super::frame::offscreen_origin;
 use super::{VIEW_HEIGHT, VIEW_WIDTH, WebViewHost};
+use crate::{error_with_fix, internal_error_with_fix};
 
 /// Owns multiple `WebViewHost` instances for parallel experiments and benchmarks.
 #[allow(dead_code)]
@@ -28,10 +29,20 @@ impl ParallelHost {
         view_height: f64,
     ) -> Result<Self, String> {
         if count == 0 {
-            return Err("parallel host count must be greater than 0".into());
+            return Err(error_with_fix(
+                "create the parallel recorder hosts",
+                "parallel host count must be greater than 0",
+                "Pass a host count of at least `1`.",
+            ));
         }
 
-        let mtm = MainThreadMarker::new().ok_or("recorder must start on the main thread")?;
+        let mtm = MainThreadMarker::new().ok_or_else(|| {
+            internal_error_with_fix(
+                "create the parallel recorder hosts",
+                "recorder must start on the main thread",
+                "Retry from the normal macOS recorder entry point so hosts initialize on the main thread.",
+            )
+        })?;
         let mut hosts = Vec::with_capacity(count);
         for index in 0..count {
             let host = WebViewHost::new(mtm, headed, dpr, view_width, view_height)?;

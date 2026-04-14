@@ -4,6 +4,7 @@ use super::frame::{EvalResultSlot, SnapshotResultSlot, pump_main_run_loop};
 use crate::capture;
 use crate::plan::VideoLayerInfo;
 use crate::progress::{PROGRESS_CANDIDATE_SELECTORS, ProgressRect};
+use crate::{error_with_fix, internal_error_with_fix};
 use block2::RcBlock;
 use objc2::MainThreadMarker;
 use objc2::msg_send;
@@ -40,8 +41,10 @@ impl WebViewHost {
             Some("true") => Ok(Some(true)),
             Some("false") => Ok(Some(false)),
             Some("missing") | None => Ok(None),
-            Some(other) => Err(format!(
-                "unexpected __hasFrameChanged result from page: {other}"
+            Some(other) => Err(error_with_fix(
+                "query frame change state from the page",
+                format!("page returned unexpected `__hasFrameChanged` result `{other}`"),
+                "Update the page helper to return only `true`, `false`, or `missing`, then retry.",
             )),
         }
     }
@@ -60,13 +63,23 @@ impl WebViewHost {
                 Err(err) => return Err(err),
             }
         }
-        Err("snapshot_nsimage: exhausted all retry attempts without result".into())
+        Err(error_with_fix(
+            "capture a WKWebView snapshot",
+            "all snapshot attempts completed without a usable image",
+            "Retry after the page finishes rendering, or rerun with `--headed` to inspect the page state.",
+        ))
     }
 
     /// Captures a `CGImage` by rendering the `WKWebView` layer tree into a bitmap context.
     pub fn snapshot_via_layer(&self) -> Result<Retained<CGImage>, String> {
         self.sync_view_hierarchy();
-        let layer = self.web_view.layer().ok_or("WKWebView has no layer")?;
+        let layer = self.web_view.layer().ok_or_else(|| {
+            internal_error_with_fix(
+                "capture the webview layer",
+                "WKWebView had no backing CALayer",
+                "Retry after the webview finishes initializing.",
+            )
+        })?;
         let (width, height) = self.target_pixel_size();
         capture::layer_render_cgimage(&layer, width, height)
     }
@@ -81,7 +94,13 @@ impl WebViewHost {
             return self.snapshot_via_layer();
         }
         self.sync_view_hierarchy();
-        let layer = self.web_view.layer().ok_or("WKWebView has no layer")?;
+        let layer = self.web_view.layer().ok_or_else(|| {
+            internal_error_with_fix(
+                "capture the scaled webview layer",
+                "WKWebView had no backing CALayer",
+                "Retry after the webview finishes initializing.",
+            )
+        })?;
         let (full_w, full_h) = self.target_pixel_size();
         // Round to even numbers (H.264 requirement)
         let scaled_w = ((full_w as f64 * render_scale).round() as usize).max(2) & !1;
@@ -182,7 +201,13 @@ impl WebViewHost {
     }
 
     pub(super) fn take_snapshot_image(&self) -> Result<Retained<NSImage>, String> {
-        let mtm = MainThreadMarker::new().ok_or("snapshot capture must run on the main thread")?;
+        let mtm = MainThreadMarker::new().ok_or_else(|| {
+            internal_error_with_fix(
+                "capture a WKWebView snapshot",
+                "snapshot capture must run on the main thread",
+                "Retry from the normal macOS recorder entry point so snapshot code runs on the main thread.",
+            )
+        })?;
         // SAFETY: `mtm` proves this runs on Cocoa's main thread, which `WKSnapshotConfiguration::new` requires.
         let config = unsafe { WKSnapshotConfiguration::new(mtm) }; // SAFETY: see above.
         let backing = self.window.convertRectToBacking(self.web_view.bounds());
@@ -198,7 +223,8 @@ impl WebViewHost {
                 .max(1.0) as usize,
         );
         // SAFETY: `config` is live, and WebKit accepts this width setter on the main thread.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             config.setSnapshotWidth(Some(&snapshot_width));
         }
         let slot: SnapshotResultSlot = Rc::new(RefCell::new(None));
@@ -206,25 +232,36 @@ impl WebViewHost {
         let block = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
             autoreleasepool(|_| {
                 // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
-                let result = if let Some(error) = unsafe { error.as_ref() } { // SAFETY: see above.
-                    Err(format!(
-                        "{} (domain={}, code={})",
-                        error.localizedDescription(),
-                        error.domain(),
-                        error.code()
+                let result = if let Some(error) = unsafe { error.as_ref() } {
+                    // SAFETY: see above.
+                    Err(error_with_fix(
+                        "capture a WKWebView snapshot",
+                        format!(
+                            "{} (domain={}, code={})",
+                            error.localizedDescription(),
+                            error.domain(),
+                            error.code()
+                        ),
+                        "Retry after the page finishes rendering, or rerun with `--headed` to inspect the page state.",
                     ))
                 // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes ownership.
-                } else if let Some(image) = unsafe { Retained::retain(image) } { // SAFETY: see above.
+                } else if let Some(image) = unsafe { Retained::retain(image) } {
+                    // SAFETY: see above.
                     Ok(image)
                 } else {
-                    Err("WKWebView.takeSnapshot returned nil without an error".into())
+                    Err(internal_error_with_fix(
+                        "capture a WKWebView snapshot",
+                        "WKWebView.takeSnapshot returned nil without an error",
+                        "Retry after the page finishes rendering, or rerun with `--headed` to inspect the page state.",
+                    ))
                 };
                 *slot_clone.borrow_mut() = Some(result);
             });
         });
 
         // SAFETY: `self.web_view`, `config`, and `block` are live main-thread Objective-C objects.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             self.web_view
                 .takeSnapshotWithConfiguration_completionHandler(Some(&config), &block);
         }
@@ -232,13 +269,23 @@ impl WebViewHost {
         let started = Instant::now();
         while slot.borrow().is_none() {
             if started.elapsed() > Duration::from_secs(10) {
-                return Err("timed out waiting for WKWebView.takeSnapshot".into());
+                return Err(error_with_fix(
+                    "capture a WKWebView snapshot",
+                    "WKWebView.takeSnapshot did not finish within 10 seconds",
+                    "Retry after the page finishes rendering, or rerun with `--headed` to inspect the page state.",
+                ));
             }
             pump_main_run_loop(Duration::from_millis(10));
         }
         slot.borrow_mut()
             .take()
-            .ok_or_else(|| "snapshot completion did not return an image".to_string())?
+            .ok_or_else(|| {
+                internal_error_with_fix(
+                    "capture a WKWebView snapshot",
+                    "snapshot completion did not return an image",
+                    "Retry the recording job after the page finishes rendering.",
+                )
+            })?
     }
 
     fn query_element_rect(&self, selectors: &[&str], dpr: f64, hide: bool) -> Option<ProgressRect> {
@@ -300,15 +347,20 @@ impl WebViewHost {
         let block = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
             autoreleasepool(|_| {
                 // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
-                let result = if let Some(error) = unsafe { error.as_ref() } { // SAFETY: see above.
+                let result = if let Some(error) = unsafe { error.as_ref() } {
+                    // SAFETY: see above.
                     if is_unsupported_js_result(error) {
                         Ok(None)
                     } else {
-                        Err(format!(
-                            "{} (domain={}, code={})",
-                            error.localizedDescription(),
-                            error.domain(),
-                            error.code()
+                        Err(error_with_fix(
+                            "evaluate JavaScript in the page",
+                            format!(
+                                "{} (domain={}, code={})",
+                                error.localizedDescription(),
+                                error.domain(),
+                                error.code()
+                            ),
+                            "Check the page script and retry after the page finishes loading.",
                         ))
                     }
                 } else if value.is_null() {
@@ -323,7 +375,8 @@ impl WebViewHost {
         });
 
         // SAFETY: `self.web_view` is live, and WebKit accepts this script and completion handler on the main thread.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             self.web_view
                 .evaluateJavaScript_completionHandler(&NSString::from_str(script), Some(&block));
         }
@@ -331,13 +384,23 @@ impl WebViewHost {
         let started = Instant::now();
         while slot.borrow().is_none() {
             if started.elapsed() > Duration::from_secs(10) {
-                return Err("timed out waiting for evaluateJavaScript".into());
+                return Err(error_with_fix(
+                    "evaluate JavaScript in the page",
+                    "WebKit did not finish evaluateJavaScript within 10 seconds",
+                    "Retry after the page finishes loading or simplify the injected script.",
+                ));
             }
             pump_main_run_loop(Duration::from_millis(10));
         }
         slot.borrow_mut()
             .take()
-            .ok_or_else(|| "evaluateJavaScript completed without result".to_string())?
+            .ok_or_else(|| {
+                internal_error_with_fix(
+                    "evaluate JavaScript in the page",
+                    "evaluateJavaScript completed without a result",
+                    "Retry the recording job after the page finishes loading.",
+                )
+            })?
     }
 }
 

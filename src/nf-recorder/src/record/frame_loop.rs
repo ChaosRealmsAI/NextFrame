@@ -10,6 +10,7 @@ use crate::capture::{
 };
 use crate::plan::SegmentPlan;
 use crate::webview::WebViewHost;
+use crate::{error_with_fix, internal_error_with_fix};
 
 use super::setup::SegmentContext;
 
@@ -99,7 +100,13 @@ pub(super) fn record_frames(
                 if !decision.needs_capture && last_image.is_some() {
                     let image = last_image
                         .as_ref()
-                        .ok_or_else(|| "missing cached frame for skipped render".to_string())?;
+                        .ok_or_else(|| {
+                            internal_error_with_fix(
+                                "reuse the cached frame for a skipped render",
+                                "the cached frame image was missing",
+                                "Retry the recording job after disabling aggressive frame skipping if the issue persists.",
+                            )
+                        })?;
                     let prog = progress_bar.map(|pb| pb.overlay(decision.progress_pct));
                     if is_upscaling {
                         encoder.write_cgimage_scaled(image, output_pw, output_ph, prog)?;
@@ -204,10 +211,14 @@ pub(super) fn capture_frame(
             std::thread::sleep(Duration::from_millis(100));
         }
     }
-    Err(format!(
-        "segment {} frame {} remained black after {} snapshot attempts",
-        segment_index + 1,
-        frame_index + 1,
-        BLACK_FRAME_MAX_RETRIES + 1
+    Err(error_with_fix(
+        "capture a non-black frame",
+        format!(
+            "segment {} frame {} remained black after {} snapshot attempts",
+            segment_index + 1,
+            frame_index + 1,
+            BLACK_FRAME_MAX_RETRIES + 1
+        ),
+        "Retry after ensuring the page is rendering visible content, or rerun with `--headed` to inspect the frame.",
     ))
 }

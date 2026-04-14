@@ -7,6 +7,8 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde::Deserialize;
 
+use crate::error_with_fix;
+
 use super::js_extract::{
     extract_assignment_object, extract_inner_array, extract_object_literals, extract_object_number,
     extract_object_string,
@@ -74,7 +76,13 @@ pub(super) fn max_data_cue(html: &str) -> Option<usize> {
 
 pub(super) fn parse_segments_manifest(source: &str) -> Result<SegmentsManifest, String> {
     let mut manifest: SegmentsManifest = serde_json::from_str(source)
-        .map_err(|err| format!("failed to parse segments manifest: {err}"))?;
+        .map_err(|err| {
+            error_with_fix(
+                "parse the segments manifest",
+                err,
+                "Fix the `segments.json` syntax and retry.",
+            )
+        })?;
     manifest.segments.sort_by_key(|entry| entry.id);
     Ok(manifest)
 }
@@ -92,12 +100,30 @@ pub(super) fn load_manifest_fallback(html_path: &Path) -> Result<Option<Manifest
     };
 
     let manifest_source = fs::read_to_string(&manifest_path)
-        .map_err(|err| format!("failed to read {}: {err}", manifest_path.display()))?;
+        .map_err(|err| {
+            error_with_fix(
+                "read the segments manifest",
+                format!("failed to read {}: {err}", manifest_path.display()),
+                "Ensure `segments.json` exists and is readable, then retry.",
+            )
+        })?;
     let manifest = parse_segments_manifest(&manifest_source)
-        .map_err(|err| format!("failed to parse {}: {err}", manifest_path.display()))?;
+        .map_err(|err| {
+            error_with_fix(
+                "parse the segments manifest",
+                format!("failed to parse {}: {err}", manifest_path.display()),
+                "Fix `segments.json` and retry.",
+            )
+        })?;
     let manifest_dir = manifest_path
         .parent()
-        .ok_or_else(|| format!("{} has no parent directory", manifest_path.display()))?;
+        .ok_or_else(|| {
+            error_with_fix(
+                "resolve segments manifest assets",
+                format!("{} has no parent directory", manifest_path.display()),
+                "Place `segments.json` under a real project directory and retry.",
+            )
+        })?;
 
     let stem = html_path
         .file_stem()

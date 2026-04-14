@@ -7,12 +7,21 @@ use std::path::{Component, Path, PathBuf};
 pub(crate) fn web_root() -> Result<PathBuf, Box<dyn Error>> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../nf-runtime/web")
-        .canonicalize()?;
+        .canonicalize()
+        .map_err(|error| {
+            std::io::Error::other(format!(
+                "failed to locate the shell web runtime: {error}. Fix: Build or restore `src/nf-runtime/web`, then retry."
+            ))
+        })?;
     Ok(path)
 }
 
 pub(crate) fn projects_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home = nf_bridge::path::home_dir().ok_or("home directory is unavailable")?;
+    let home = nf_bridge::path::home_dir().ok_or_else(|| {
+        std::io::Error::other(
+            "failed to resolve the NextFrame projects root: home directory is unavailable. Fix: Run nf-shell in a user session with a valid home directory.",
+        )
+    })?;
     Ok(home.join("NextFrame").join("projects"))
 }
 

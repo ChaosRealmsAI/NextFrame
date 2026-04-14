@@ -15,6 +15,7 @@ use super::{
     CVPixelBufferLockBaseAddress, CVPixelBufferRef, CVPixelBufferUnlockBaseAddress, FrameSize,
     K_CV_PIXEL_FORMAT_TYPE_32_BGRA,
 };
+use crate::{error_with_fix, internal_error_with_fix};
 use crate::progress::ProgressOverlay;
 
 // CGInterpolationQuality values
@@ -22,7 +23,8 @@ use crate::progress::ProgressOverlay;
 const kCGInterpolationHigh: i32 = 3;
 
 // SAFETY: This imports CoreGraphics with the declared system signature for valid CGContext pointers.
-unsafe extern "C" { // SAFETY: see above.
+unsafe extern "C" {
+    // SAFETY: see above.
     fn CGContextSetInterpolationQuality(context: *const std::ffi::c_void, quality: i32);
 }
 
@@ -41,7 +43,8 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
     let attributes = pixel_buffer_attributes(frame_size);
     let mut pixel_buffer: CVPixelBufferRef = ptr::null_mut();
     // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
-    let create_result = unsafe { // SAFETY: see above.
+    let create_result = unsafe {
+        // SAFETY: see above.
         CVPixelBufferCreate(
             ptr::null(),
             frame_size.width,
@@ -52,9 +55,10 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
         )
     };
     if create_result != 0 || pixel_buffer.is_null() {
-        return Err(format!(
-            "CVPixelBufferCreate failed with status {}",
-            create_result
+        return Err(internal_error_with_fix(
+            "create the scaled pixel buffer",
+            format!("CVPixelBufferCreate failed with status {create_result}"),
+            "Retry the recording job after reducing output size or system load.",
         ));
     }
 
@@ -63,9 +67,10 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
     if lock_result != 0 {
         // SAFETY: this function still owns the created `pixel_buffer` on the error path.
         unsafe { CVBufferRelease(pixel_buffer) }; // SAFETY: see above.
-        return Err(format!(
-            "CVPixelBufferLockBaseAddress failed with status {}",
-            lock_result
+        return Err(internal_error_with_fix(
+            "lock the scaled pixel buffer base address",
+            format!("CVPixelBufferLockBaseAddress failed with status {lock_result}"),
+            "Retry the recording job after reducing output size or system load.",
         ));
     }
 
@@ -73,16 +78,26 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
         // SAFETY: the locked pixel buffer exposes a valid base address for direct access.
         let base_address = unsafe { CVPixelBufferGetBaseAddress(pixel_buffer) }; // SAFETY: see above.
         if base_address.is_null() {
-            return Err("CVPixelBuffer base address was null".to_string());
+            return Err(internal_error_with_fix(
+                "draw into the scaled pixel buffer",
+                "CVPixelBuffer base address was null",
+                "Retry the recording job after reducing output size or system load.",
+            ));
         }
         // SAFETY: the locked pixel buffer permits querying its row stride.
         let bytes_per_row = unsafe { CVPixelBufferGetBytesPerRow(pixel_buffer) }; // SAFETY: see above.
-        let color_space =
-            CGColorSpace::new_device_rgb().ok_or("CGColorSpace::new_device_rgb returned nil")?;
+        let color_space = CGColorSpace::new_device_rgb().ok_or_else(|| {
+            internal_error_with_fix(
+                "create the scaled pixel buffer color space",
+                "CGColorSpace::new_device_rgb returned nil",
+                "Retry the recording job after ensuring CoreGraphics is available.",
+            )
+        })?;
         let bitmap_info =
             CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
         // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
-        let context = unsafe { // SAFETY: see above.
+        let context = unsafe {
+            // SAFETY: see above.
             CGBitmapContextCreate(
                 base_address,
                 frame_size.width,
@@ -93,12 +108,19 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
                 bitmap_info,
             )
         }
-        .ok_or("CGBitmapContextCreate returned nil")?;
+        .ok_or_else(|| {
+            internal_error_with_fix(
+                "create the scaled bitmap drawing context",
+                "CGBitmapContextCreate returned nil",
+                "Retry the recording job after reducing output size or system load.",
+            )
+        })?;
 
         // Set high-quality interpolation when upscaling
         if is_upscaling {
             // SAFETY: `context` is live, and CoreGraphics accepts its pointer for interpolation changes.
-            unsafe { // SAFETY: see above.
+            unsafe {
+                // SAFETY: see above.
                 let ctx_ptr: *const CGContext = &*context;
                 CGContextSetInterpolationQuality(ctx_ptr.cast(), kCGInterpolationHigh);
             }
@@ -125,9 +147,10 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
     if unlock_result != 0 {
         // SAFETY: this function still owns the created `pixel_buffer` on the error path.
         unsafe { CVBufferRelease(pixel_buffer) }; // SAFETY: see above.
-        return Err(format!(
-            "CVPixelBufferUnlockBaseAddress failed with status {}",
-            unlock_result
+        return Err(internal_error_with_fix(
+            "unlock the scaled pixel buffer base address",
+            format!("CVPixelBufferUnlockBaseAddress failed with status {unlock_result}"),
+            "Retry the recording job after reducing output size or system load.",
         ));
     }
 
@@ -151,7 +174,8 @@ pub(super) fn create_pixel_buffer_from_cgimage(
     let attributes = pixel_buffer_attributes(frame_size);
     let mut pixel_buffer: CVPixelBufferRef = ptr::null_mut();
     // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
-    let create_result = unsafe { // SAFETY: see above.
+    let create_result = unsafe {
+        // SAFETY: see above.
         CVPixelBufferCreate(
             ptr::null(),
             frame_size.width,
@@ -162,9 +186,10 @@ pub(super) fn create_pixel_buffer_from_cgimage(
         )
     };
     if create_result != 0 || pixel_buffer.is_null() {
-        return Err(format!(
-            "CVPixelBufferCreate failed with status {}",
-            create_result
+        return Err(internal_error_with_fix(
+            "create the pixel buffer",
+            format!("CVPixelBufferCreate failed with status {create_result}"),
+            "Retry the recording job after reducing output size or system load.",
         ));
     }
 
@@ -173,9 +198,10 @@ pub(super) fn create_pixel_buffer_from_cgimage(
     if lock_result != 0 {
         // SAFETY: this function still owns the created `pixel_buffer` on the error path.
         unsafe { CVBufferRelease(pixel_buffer) }; // SAFETY: see above.
-        return Err(format!(
-            "CVPixelBufferLockBaseAddress failed with status {}",
-            lock_result
+        return Err(internal_error_with_fix(
+            "lock the pixel buffer base address",
+            format!("CVPixelBufferLockBaseAddress failed with status {lock_result}"),
+            "Retry the recording job after reducing output size or system load.",
         ));
     }
 
@@ -183,16 +209,26 @@ pub(super) fn create_pixel_buffer_from_cgimage(
         // SAFETY: the locked pixel buffer exposes a valid base address for direct access.
         let base_address = unsafe { CVPixelBufferGetBaseAddress(pixel_buffer) }; // SAFETY: see above.
         if base_address.is_null() {
-            return Err("CVPixelBuffer base address was null".to_string());
+            return Err(internal_error_with_fix(
+                "draw into the pixel buffer",
+                "CVPixelBuffer base address was null",
+                "Retry the recording job after reducing output size or system load.",
+            ));
         }
         // SAFETY: the locked pixel buffer permits querying its row stride.
         let bytes_per_row = unsafe { CVPixelBufferGetBytesPerRow(pixel_buffer) }; // SAFETY: see above.
-        let color_space =
-            CGColorSpace::new_device_rgb().ok_or("CGColorSpace::new_device_rgb returned nil")?;
+        let color_space = CGColorSpace::new_device_rgb().ok_or_else(|| {
+            internal_error_with_fix(
+                "create the pixel buffer color space",
+                "CGColorSpace::new_device_rgb returned nil",
+                "Retry the recording job after ensuring CoreGraphics is available.",
+            )
+        })?;
         let bitmap_info =
             CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
         // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
-        let context = unsafe { // SAFETY: see above.
+        let context = unsafe {
+            // SAFETY: see above.
             CGBitmapContextCreate(
                 base_address,
                 frame_size.width,
@@ -203,7 +239,13 @@ pub(super) fn create_pixel_buffer_from_cgimage(
                 bitmap_info,
             )
         }
-        .ok_or("CGBitmapContextCreate returned nil")?;
+        .ok_or_else(|| {
+            internal_error_with_fix(
+                "create the bitmap drawing context",
+                "CGBitmapContextCreate returned nil",
+                "Retry the recording job after reducing output size or system load.",
+            )
+        })?;
         CGContext::draw_image(
             Some(context.as_ref()),
             CGRect::new(
@@ -248,9 +290,10 @@ pub(super) fn create_pixel_buffer_from_cgimage(
     if unlock_result != 0 {
         // SAFETY: this function still owns the created `pixel_buffer` on the error path.
         unsafe { CVBufferRelease(pixel_buffer) }; // SAFETY: see above.
-        return Err(format!(
-            "CVPixelBufferUnlockBaseAddress failed with status {}",
-            unlock_result
+        return Err(internal_error_with_fix(
+            "unlock the pixel buffer base address",
+            format!("CVPixelBufferUnlockBaseAddress failed with status {unlock_result}"),
+            "Retry the recording job after reducing output size or system load.",
         ));
     }
 
@@ -290,7 +333,13 @@ fn draw_progress_overlay(context: &CGContext, frame_height: usize, ov: &Progress
 }
 
 pub(super) fn frame_time(frame_index: usize, fps: usize) -> Result<CMTime, String> {
-    let timescale = i32::try_from(fps).map_err(|_| format!("fps {fps} does not fit in i32"))?;
+    let timescale = i32::try_from(fps).map_err(|_| {
+        error_with_fix(
+            "compute the frame presentation time",
+            format!("fps {fps} does not fit in i32"),
+            "Use a smaller `--fps` value that fits within a 32-bit integer.",
+        )
+    })?;
     // SAFETY: `timescale` is checked and positive, and `frame_index` is only used as a value input.
     Ok(unsafe { CMTime::new(frame_index as i64, timescale) }) // SAFETY: see above.
 }

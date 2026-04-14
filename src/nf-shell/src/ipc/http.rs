@@ -1,4 +1,5 @@
 //! ipc http transport helpers
+use std::fmt::Display;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::time::Instant;
@@ -15,6 +16,10 @@ pub(crate) struct HttpRequest {
     pub(crate) body: Vec<u8>,
 }
 
+fn error_with_fix(action: &str, reason: impl Display, fix: &str) -> String {
+    format!("failed to {action}: {reason}. Fix: {fix}")
+}
+
 pub(crate) fn read_http_request(
     connection: &mut HttpConnection,
 ) -> Result<Option<HttpRequest>, String> {
@@ -24,7 +29,13 @@ pub(crate) fn read_http_request(
             Ok(0) => break,
             Ok(read_len) => connection.buffer.extend_from_slice(&chunk[..read_len]),
             Err(error) if error.kind() == ErrorKind::WouldBlock => break,
-            Err(error) => return Err(format!("failed to read request: {error}")),
+            Err(error) => {
+                return Err(error_with_fix(
+                    "read the HTTP request",
+                    error,
+                    "Retry after reconnecting the HTTP client and resending the request.",
+                ));
+            }
         }
     }
 
@@ -37,20 +48,43 @@ pub(crate) fn read_http_request(
     };
 
     let header_bytes = &connection.buffer[..header_end];
-    let header_text = std::str::from_utf8(header_bytes)
-        .map_err(|error| format!("invalid header utf-8: {error}"))?;
+    let header_text = std::str::from_utf8(header_bytes).map_err(|error| {
+        error_with_fix(
+            "decode the HTTP request headers",
+            format!("header bytes were not valid UTF-8: {error}"),
+            "Send ASCII or UTF-8 HTTP headers and retry the request.",
+        )
+    })?;
     let mut lines = header_text.split("\r\n");
     let request_line = lines
         .next()
-        .ok_or_else(|| "missing HTTP request line".to_string())?;
+        .ok_or_else(|| {
+            error_with_fix(
+                "parse the HTTP request line",
+                "the request line was missing",
+                "Send a complete HTTP request starting with `METHOD /path HTTP/1.1`.",
+            )
+        })?;
     let mut request_parts = request_line.split_whitespace();
     let method = request_parts
         .next()
-        .ok_or_else(|| "missing HTTP method".to_string())?
+        .ok_or_else(|| {
+            error_with_fix(
+                "parse the HTTP request method",
+                "the request line did not include an HTTP method",
+                "Start the request line with a method such as `GET` or `POST`.",
+            )
+        })?
         .to_string();
     let path = request_parts
         .next()
-        .ok_or_else(|| "missing HTTP path".to_string())?
+        .ok_or_else(|| {
+            error_with_fix(
+                "parse the HTTP request path",
+                "the request line did not include a path",
+                "Include a request path such as `/status` or `/navigate` in the request line.",
+            )
+        })?
         .to_string();
 
     let mut content_length = 0_usize;
@@ -59,10 +93,13 @@ pub(crate) fn read_http_request(
             continue;
         };
         if name.trim().eq_ignore_ascii_case("content-length") {
-            content_length = value
-                .trim()
-                .parse::<usize>()
-                .map_err(|error| format!("invalid Content-Length: {error}"))?;
+            content_length = value.trim().parse::<usize>().map_err(|error| {
+                error_with_fix(
+                    "parse the HTTP Content-Length header",
+                    format!("invalid Content-Length value `{}`: {error}", value.trim()),
+                    "Send a non-negative integer Content-Length header that matches the request body size.",
+                )
+            })?;
         }
     }
 

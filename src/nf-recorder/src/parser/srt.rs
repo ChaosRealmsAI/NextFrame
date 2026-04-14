@@ -7,6 +7,8 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::Value;
 
+use crate::error_with_fix;
+
 use super::js_extract::{
     extract_assignment_array, extract_object_literals, extract_object_number, extract_object_string,
 };
@@ -23,7 +25,13 @@ pub(super) static SRT_TIME_RE: LazyLock<Regex> = LazyLock::new(|| {
 
 pub(super) fn parse_srt_file(path: &Path) -> Result<Vec<SubtitleCue>, String> {
     let source = fs::read_to_string(path)
-        .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+        .map_err(|err| {
+            error_with_fix(
+                "read the SRT subtitle file",
+                format!("failed to read {}: {err}", path.display()),
+                "Ensure the SRT file exists and is readable, then retry.",
+            )
+        })?;
     parse_srt_text(&source)
 }
 
@@ -43,10 +51,22 @@ pub(super) fn parse_srt_text(source: &str) -> Result<Vec<SubtitleCue>, String> {
             .iter()
             .find(|line| SRT_TIME_RE.is_match(line))
             .copied()
-            .ok_or_else(|| format!("invalid SRT block: {block:?}"))?;
+            .ok_or_else(|| {
+                error_with_fix(
+                    "parse the SRT subtitle block",
+                    format!("invalid SRT block: {block:?}"),
+                    "Ensure each subtitle block contains a valid `HH:MM:SS,mmm --> HH:MM:SS,mmm` timing line.",
+                )
+            })?;
         let captures = SRT_TIME_RE
             .captures(timing_line)
-            .ok_or_else(|| format!("invalid SRT timing line: {timing_line:?}"))?;
+            .ok_or_else(|| {
+                error_with_fix(
+                    "parse the SRT timing line",
+                    format!("invalid SRT timing line: {timing_line:?}"),
+                    "Use the `HH:MM:SS,mmm --> HH:MM:SS,mmm` SRT timing format and retry.",
+                )
+            })?;
         let start = parse_srt_timestamp(&captures, 1)?;
         let end = parse_srt_timestamp(&captures, 5)?;
         let text = lines
@@ -64,28 +84,76 @@ pub(super) fn parse_srt_text(source: &str) -> Result<Vec<SubtitleCue>, String> {
 fn parse_srt_timestamp(captures: &regex::Captures<'_>, start: usize) -> Result<f64, String> {
     let hours: f64 = captures
         .get(start)
-        .ok_or("missing hours capture")?
+        .ok_or_else(|| {
+            error_with_fix(
+                "parse the SRT timestamp",
+                "missing hours capture",
+                "Use full `HH:MM:SS,mmm` timestamps in the SRT file.",
+            )
+        })?
         .as_str()
         .parse()
-        .map_err(|err| format!("invalid SRT hour field: {err}"))?;
+        .map_err(|err| {
+            error_with_fix(
+                "parse the SRT hour field",
+                err,
+                "Use a numeric two-digit hour field in the SRT timestamp.",
+            )
+        })?;
     let minutes: f64 = captures
         .get(start + 1)
-        .ok_or("missing minutes capture")?
+        .ok_or_else(|| {
+            error_with_fix(
+                "parse the SRT timestamp",
+                "missing minutes capture",
+                "Use full `HH:MM:SS,mmm` timestamps in the SRT file.",
+            )
+        })?
         .as_str()
         .parse()
-        .map_err(|err| format!("invalid SRT minute field: {err}"))?;
+        .map_err(|err| {
+            error_with_fix(
+                "parse the SRT minute field",
+                err,
+                "Use a numeric two-digit minute field in the SRT timestamp.",
+            )
+        })?;
     let seconds: f64 = captures
         .get(start + 2)
-        .ok_or("missing seconds capture")?
+        .ok_or_else(|| {
+            error_with_fix(
+                "parse the SRT timestamp",
+                "missing seconds capture",
+                "Use full `HH:MM:SS,mmm` timestamps in the SRT file.",
+            )
+        })?
         .as_str()
         .parse()
-        .map_err(|err| format!("invalid SRT second field: {err}"))?;
+        .map_err(|err| {
+            error_with_fix(
+                "parse the SRT second field",
+                err,
+                "Use a numeric two-digit second field in the SRT timestamp.",
+            )
+        })?;
     let millis: f64 = captures
         .get(start + 3)
-        .ok_or("missing millis capture")?
+        .ok_or_else(|| {
+            error_with_fix(
+                "parse the SRT timestamp",
+                "missing milliseconds capture",
+                "Use full `HH:MM:SS,mmm` timestamps in the SRT file.",
+            )
+        })?
         .as_str()
         .parse()
-        .map_err(|err| format!("invalid SRT millis field: {err}"))?;
+        .map_err(|err| {
+            error_with_fix(
+                "parse the SRT millisecond field",
+                err,
+                "Use a numeric three-digit millisecond field in the SRT timestamp.",
+            )
+        })?;
     Ok(hours * 3600.0 + minutes * 60.0 + seconds + millis / 1000.0)
 }
 
@@ -96,11 +164,29 @@ pub(super) fn extract_srt_array(source: &str) -> Result<Vec<SubtitleCue>, String
     let mut result = Vec::new();
     for object_source in extract_object_literals(&array_source)? {
         let start = extract_object_number(&object_source, "s")
-            .ok_or_else(|| format!("SRT entry missing s: {object_source}"))?;
+            .ok_or_else(|| {
+                error_with_fix(
+                    "parse the inline SRT entry",
+                    format!("SRT entry is missing `s`: {object_source}"),
+                    "Add an `s` start time field to each inline SRT entry and retry.",
+                )
+            })?;
         let end = extract_object_number(&object_source, "e")
-            .ok_or_else(|| format!("SRT entry missing e: {object_source}"))?;
+            .ok_or_else(|| {
+                error_with_fix(
+                    "parse the inline SRT entry",
+                    format!("SRT entry is missing `e`: {object_source}"),
+                    "Add an `e` end time field to each inline SRT entry and retry.",
+                )
+            })?;
         let text = extract_object_string(&object_source, "t")
-            .ok_or_else(|| format!("SRT entry missing t: {object_source}"))?;
+            .ok_or_else(|| {
+                error_with_fix(
+                    "parse the inline SRT entry",
+                    format!("SRT entry is missing `t`: {object_source}"),
+                    "Add a `t` text field to each inline SRT entry and retry.",
+                )
+            })?;
         result.push(SubtitleCue { start, end, text });
     }
     Ok(result)

@@ -3,10 +3,10 @@ use std::cmp::Ordering;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::CommonArgs;
 use crate::encoder::probe_audio_duration;
 use crate::parser::{FrameMetadata, parse_frame_file};
 use crate::util::absolute_path;
+use crate::{CommonArgs, error_with_fix};
 
 pub struct SegmentPlan {
     pub metadata: FrameMetadata,
@@ -38,7 +38,13 @@ pub fn collect_frame_files(cli: &CommonArgs) -> Result<Vec<PathBuf>, String> {
     let mut files = if let Some(dir) = &cli.dir {
         let dir = absolute_path(dir)?;
         let mut files = fs::read_dir(&dir)
-            .map_err(|err| format!("failed to read {}: {err}", dir.display()))?
+            .map_err(|err| {
+                error_with_fix(
+                    "list HTML frames from the input directory",
+                    format!("could not read {}: {err}", dir.display()),
+                    "Pass an existing readable directory to `--dir` and retry.",
+                )
+            })?
             .filter_map(|entry| entry.ok())
             .map(|entry| entry.path())
             .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("html"))
@@ -55,7 +61,11 @@ pub fn collect_frame_files(cli: &CommonArgs) -> Result<Vec<PathBuf>, String> {
         return if cli.dir.is_some() {
             Ok(Vec::new())
         } else {
-            Err("no frame files were provided".into())
+            Err(error_with_fix(
+                "collect frame files",
+                "no frame files were provided",
+                "Pass one or more HTML frame files or use `--dir <frames-dir>`.",
+            ))
         };
     }
     if cli.dir.is_some() {
@@ -63,7 +73,11 @@ pub fn collect_frame_files(cli: &CommonArgs) -> Result<Vec<PathBuf>, String> {
     } else {
         for path in &files {
             if !path.exists() {
-                return Err(format!("frame file not found: {}", path.display()));
+                return Err(error_with_fix(
+                    "collect frame files",
+                    format!("frame file was not found: {}", path.display()),
+                    "Pass an existing HTML frame file path and retry.",
+                ));
             }
         }
     }
@@ -71,7 +85,11 @@ pub fn collect_frame_files(cli: &CommonArgs) -> Result<Vec<PathBuf>, String> {
         return if cli.dir.is_some() {
             Ok(Vec::new())
         } else {
-            Err("none of the requested frame files exist".into())
+            Err(error_with_fix(
+                "collect frame files",
+                "none of the requested frame files exist",
+                "Verify the HTML frame file paths and retry the command.",
+            ))
         };
     }
     let files = files
@@ -101,17 +119,22 @@ fn frame_stem_number(path: &Path) -> Option<usize> {
 }
 
 pub fn detect_root(frame_files: &[PathBuf]) -> Result<PathBuf, String> {
-    let first = frame_files
-        .first()
-        .ok_or("cannot determine root without frame files")?;
+    let first = frame_files.first().ok_or_else(|| {
+        error_with_fix(
+            "detect the frame root directory",
+            "no frame files were provided",
+            "Pass at least one HTML frame file before starting the recorder.",
+        )
+    })?;
     let mut root = first
         .parent()
         .unwrap_or_else(|| Path::new("."))
         .canonicalize()
         .map_err(|err| {
-            format!(
-                "failed to canonicalize frame parent {}: {err}",
-                first.display()
+            error_with_fix(
+                "detect the frame root directory",
+                format!("failed to canonicalize the parent of {}: {err}", first.display()),
+                "Ensure the frame file path exists on disk and retry.",
             )
         })?;
     let parent_dirs = frame_files
@@ -121,9 +144,10 @@ pub fn detect_root(frame_files: &[PathBuf]) -> Result<PathBuf, String> {
                 .unwrap_or_else(|| Path::new("."))
                 .canonicalize()
                 .map_err(|err| {
-                    format!(
-                        "failed to canonicalize frame parent {}: {err}",
-                        path.display()
+                    error_with_fix(
+                        "detect the frame root directory",
+                        format!("failed to canonicalize the parent of {}: {err}", path.display()),
+                        "Ensure each frame file path exists on disk and retry.",
                     )
                 })
         })
@@ -131,7 +155,13 @@ pub fn detect_root(frame_files: &[PathBuf]) -> Result<PathBuf, String> {
     while !parent_dirs.iter().all(|dir| dir.starts_with(&root)) {
         root = root
             .parent()
-            .ok_or_else(|| "failed to determine common parent for frame files".to_string())?
+            .ok_or_else(|| {
+                error_with_fix(
+                    "detect the frame root directory",
+                    "failed to determine a common parent directory for the frame files",
+                    "Place the frame files under a shared parent directory or retry with a single segment.",
+                )
+            })?
             .to_path_buf();
     }
     Ok(root)

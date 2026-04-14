@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::error_with_fix;
+
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub fn absolute_path(path: &Path) -> Result<PathBuf, String> {
@@ -12,7 +14,13 @@ pub fn absolute_path(path: &Path) -> Result<PathBuf, String> {
         Ok(path.to_path_buf())
     } else {
         env::current_dir()
-            .map_err(|err| format!("failed to inspect current directory: {err}"))
+            .map_err(|err| {
+                error_with_fix(
+                    "resolve the relative input path",
+                    format!("failed to inspect the current directory: {err}"),
+                    "Run the recorder from a readable working directory or pass an absolute path.",
+                )
+            })
             .map(|cwd| cwd.join(path))
     }
 }
@@ -28,8 +36,13 @@ pub fn create_temp_dir() -> Result<PathBuf, String> {
         TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed)
     );
     let dir = env::temp_dir().join(unique);
-    fs::create_dir_all(&dir)
-        .map_err(|err| format!("failed to create temp dir {}: {err}", dir.display()))?;
+    fs::create_dir_all(&dir).map_err(|err| {
+        error_with_fix(
+            "create the recorder temp directory",
+            format!("failed to create {}: {err}", dir.display()),
+            "Ensure the system temp directory is writable, then retry.",
+        )
+    })?;
     Ok(dir)
 }
 

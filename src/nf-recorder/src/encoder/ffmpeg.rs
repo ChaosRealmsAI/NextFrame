@@ -5,13 +5,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use crate::error_with_fix;
+
 /// Uses `ffprobe` to inspect the duration of an optional audio track.
 pub fn probe_audio_duration(audio_path: Option<&Path>) -> Result<f64, String> {
     let Some(path) = audio_path else {
         return Ok(0.0);
     };
     if !path.exists() {
-        return Err(format!("audio file does not exist: {}", path.display()));
+        return Err(error_with_fix(
+            "inspect the audio track duration",
+            format!("audio file does not exist: {}", path.display()),
+            "Point the timeline audio source at an existing local file and retry.",
+        ));
     }
     let output = Command::new("ffprobe")
         .args([
@@ -24,12 +30,18 @@ pub fn probe_audio_duration(audio_path: Option<&Path>) -> Result<f64, String> {
             path.as_os_str(),
         ])
         .output()
-        .map_err(|err| format!("failed to launch ffprobe for {}: {err}", path.display()))?;
+        .map_err(|err| {
+            error_with_fix(
+                "launch ffprobe for the audio track",
+                format!("failed to start ffprobe for {}: {err}", path.display()),
+                "Install `ffprobe` and ensure it is available on PATH before retrying.",
+            )
+        })?;
     if !output.status.success() {
-        return Err(format!(
-            "ffprobe failed for {}: exit {}",
-            path.display(),
-            output.status
+        return Err(error_with_fix(
+            "inspect the audio track duration",
+            format!("ffprobe failed for {} with exit {}", path.display(), output.status),
+            "Verify the audio file is readable by ffprobe, then retry.",
         ));
     }
     parse_probe_audio_duration_output(path, &output.stdout)
@@ -41,7 +53,13 @@ pub fn concat_segments(segment_paths: &[PathBuf], output_path: &Path) -> Result<
         // Single segment: just rename, no ffmpeg needed
         fs::rename(&segment_paths[0], output_path)
             .or_else(|_| fs::copy(&segment_paths[0], output_path).map(|_| ()))
-            .map_err(|err| format!("failed to move single segment to output: {err}"))?;
+            .map_err(|err| {
+                error_with_fix(
+                    "move the recorded segment to the final output path",
+                    err,
+                    "Ensure the output path is writable and retry.",
+                )
+            })?;
         return Ok(());
     }
 
@@ -50,13 +68,20 @@ pub fn concat_segments(segment_paths: &[PathBuf], output_path: &Path) -> Result<
     let output = Command::new("ffmpeg")
         .args(&args)
         .output()
-        .map_err(|err| format!("failed to launch concat ffmpeg: {err}"))?;
+        .map_err(|err| {
+            error_with_fix(
+                "launch ffmpeg to concatenate segments",
+                err,
+                "Install `ffmpeg` and ensure it is available on PATH before retrying.",
+            )
+        })?;
     if output.status.success() {
         return Ok(());
     }
-    Err(format!(
-        "ffmpeg concat failed: {}",
-        String::from_utf8_lossy(&output.stderr)
+    Err(error_with_fix(
+        "concatenate the recorded segments",
+        String::from_utf8_lossy(&output.stderr),
+        "Inspect the ffmpeg error output, then retry after fixing the segment inputs.",
     ))
 }
 
@@ -65,9 +90,10 @@ fn parse_probe_audio_duration_output(path: &Path, stdout: &[u8]) -> Result<f64, 
         .trim()
         .parse::<f64>()
         .map_err(|err| {
-            format!(
-                "failed to parse ffprobe duration for {}: {err}",
-                path.display()
+            error_with_fix(
+                "parse the ffprobe duration output",
+                format!("failed to parse ffprobe duration for {}: {err}", path.display()),
+                "Verify the audio file reports a numeric duration in ffprobe and retry.",
             )
         })
 }
@@ -169,18 +195,23 @@ pub(super) fn mux_audio_track(
         .stderr(Stdio::piped())
         .output()
         .map_err(|err| {
-            format!(
-                "failed to start ffmpeg audio mux for {}: {err}",
-                output_path.display()
+            error_with_fix(
+                "launch ffmpeg to mux audio",
+                format!("failed to start ffmpeg for {}: {err}", output_path.display()),
+                "Install `ffmpeg` and ensure it is available on PATH before retrying.",
             )
         })?;
     if output.status.success() {
         return Ok(());
     }
-    Err(format!(
-        "ffmpeg audio mux failed for {}: {}",
-        output_path.display(),
-        String::from_utf8_lossy(&output.stderr)
+    Err(error_with_fix(
+        "mux audio into the recorded output",
+        format!(
+            "ffmpeg failed for {}: {}",
+            output_path.display(),
+            String::from_utf8_lossy(&output.stderr)
+        ),
+        "Inspect the ffmpeg error output, then retry after fixing the audio or video input.",
     ))
 }
 

@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::error_with_fix;
+
 use super::types::{FrameMetadata, SlideType};
 use layers::{
     extract_audio_src, extract_clip_audio_src, extract_clip_cuemap, extract_clip_timing,
@@ -108,13 +110,27 @@ pub(super) struct NextframeClip {
 /// Parses a NextFrame `timeline.json` file into recorder segment metadata.
 #[allow(dead_code)]
 pub(crate) fn parse_nextframe_timeline(path: &Path) -> Result<Vec<FrameMetadata>, String> {
-    let timeline_path = path
-        .canonicalize()
-        .map_err(|err| format!("failed to canonicalize {}: {err}", path.display()))?;
-    let source = fs::read_to_string(&timeline_path)
-        .map_err(|err| format!("failed to read {}: {err}", timeline_path.display()))?;
-    let timeline: NextframeTimeline = serde_json::from_str(&source)
-        .map_err(|err| format!("failed to parse {}: {err}", timeline_path.display()))?;
+    let timeline_path = path.canonicalize().map_err(|err| {
+        error_with_fix(
+            "open the NextFrame timeline",
+            format!("failed to canonicalize {}: {err}", path.display()),
+            "Pass an existing timeline JSON path and retry.",
+        )
+    })?;
+    let source = fs::read_to_string(&timeline_path).map_err(|err| {
+        error_with_fix(
+            "read the NextFrame timeline",
+            format!("failed to read {}: {err}", timeline_path.display()),
+            "Ensure the timeline JSON file is readable and retry.",
+        )
+    })?;
+    let timeline: NextframeTimeline = serde_json::from_str(&source).map_err(|err| {
+        error_with_fix(
+            "parse the NextFrame timeline",
+            format!("failed to parse {}: {err}", timeline_path.display()),
+            "Fix the timeline JSON syntax and retry.",
+        )
+    })?;
 
     let fps = timeline
         .fps
@@ -122,9 +138,13 @@ pub(crate) fn parse_nextframe_timeline(path: &Path) -> Result<Vec<FrameMetadata>
         .or_else(|| timeline.meta.as_ref().and_then(|meta| meta.fps))
         .unwrap_or(30.0);
     if !fps.is_finite() || fps <= 0.0 {
-        return Err(format!(
-            "invalid fps in {}: expected a finite number > 0, got {fps}",
-            timeline_path.display()
+        return Err(error_with_fix(
+            "parse the NextFrame timeline fps",
+            format!(
+                "invalid fps in {}: expected a finite number greater than 0, got {fps}",
+                timeline_path.display()
+            ),
+            "Set `fps` to a positive finite number in the timeline JSON and retry.",
         ));
     }
 
@@ -215,6 +235,12 @@ fn resolve_path_from(base_path: &Path, rel: &str) -> Result<PathBuf, String> {
     }
     let parent = base_path
         .parent()
-        .ok_or_else(|| format!("{} has no parent directory", base_path.display()))?;
+        .ok_or_else(|| {
+            error_with_fix(
+                "resolve a timeline-relative asset path",
+                format!("{} has no parent directory", base_path.display()),
+                "Place the timeline on disk under a real directory and retry.",
+            )
+        })?;
     Ok(parent.join(path))
 }

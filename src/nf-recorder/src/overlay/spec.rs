@@ -2,6 +2,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::plan::VideoLayerInfo;
+use crate::error_with_fix;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VideoOverlaySpec {
@@ -85,18 +86,36 @@ fn parse_layer_axis(raw: &str, axis_pixels: f64, dpr: f64, label: &str) -> Resul
         percent
             .trim()
             .parse::<f64>()
-            .map_err(|err| format!("invalid {label} percentage {raw:?}: {err}"))?
+            .map_err(|err| {
+                error_with_fix(
+                    "parse the video overlay percentage value",
+                    format!("invalid {label} percentage {raw:?}: {err}"),
+                    "Use numeric percentage values such as `50%` for overlay positioning and sizing.",
+                )
+            })?
             / 100.0
             * axis_pixels
     } else if let Some(px) = trimmed.strip_suffix("px") {
         px.trim()
             .parse::<f64>()
-            .map_err(|err| format!("invalid {label} pixel value {raw:?}: {err}"))?
+            .map_err(|err| {
+                error_with_fix(
+                    "parse the video overlay pixel value",
+                    format!("invalid {label} pixel value {raw:?}: {err}"),
+                    "Use numeric pixel values such as `320px` for overlay positioning and sizing.",
+                )
+            })?
             * dpr
     } else {
         trimmed
             .parse::<f64>()
-            .map_err(|err| format!("invalid {label} value {raw:?}: {err}"))?
+            .map_err(|err| {
+                error_with_fix(
+                    "parse the video overlay value",
+                    format!("invalid {label} value {raw:?}: {err}"),
+                    "Use numeric values or CSS-like percentages for overlay positioning and sizing.",
+                )
+            })?
             * dpr
     };
     Ok(value.round().max(0.0) as usize)
@@ -116,7 +135,13 @@ pub fn build_video_overlay_specs(
 
     for layer in layers {
         let source_path = resolve_overlay_source(&layer.src, root, html_path)
-            .ok_or_else(|| format!("failed to resolve video layer src {}", layer.src))?;
+            .ok_or_else(|| {
+                error_with_fix(
+                    "resolve the video overlay source",
+                    format!("failed to resolve video layer src {}", layer.src),
+                    "Use a reachable file path or project-relative URL for the video layer source.",
+                )
+            })?;
         let width = parse_layer_axis(&layer.w, output_width_px, dpr, "w")?;
         let height = parse_layer_axis(&layer.h, output_height_px, dpr, "h")?;
         if width == 0 || height == 0 || layer.dur <= 0.0 {

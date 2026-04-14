@@ -3,6 +3,8 @@ use std::collections::HashMap;
 
 use serde_json::Value;
 
+use crate::error_with_fix;
+
 use super::super::types::ClipTiming;
 use super::NextframeClip;
 
@@ -18,7 +20,11 @@ pub(super) fn extract_clip_timing(
             (start_frame / fps, (end_frame - start_frame) / fps)
         } else if let Some(start_frame) = clip.start_frame {
             let duration_frames = clip.dur_frames.or(clip.duration_frames).ok_or_else(|| {
-                format!("timeline clip {clip_label} is missing endFrame/durationFrames")
+                error_with_fix(
+                    "parse the timeline clip timing",
+                    format!("timeline clip {clip_label} is missing `endFrame` and `durationFrames`"),
+                    "Set either `endFrame` or `durationFrames` on the clip and retry.",
+                )
             })?;
             (start_frame / fps, duration_frames / fps)
         } else {
@@ -26,18 +32,28 @@ pub(super) fn extract_clip_timing(
             let duration_sec = clip
                 .dur
                 .or_else(|| clip.end.map(|end| end - start_sec))
-                .ok_or_else(|| format!("timeline clip {clip_label} is missing duration"))?;
+                .ok_or_else(|| {
+                    error_with_fix(
+                        "parse the timeline clip timing",
+                        format!("timeline clip {clip_label} is missing duration"),
+                        "Set `dur` or `end` on the clip and retry.",
+                    )
+                })?;
             (start_sec, duration_sec)
         };
 
     if !start_sec.is_finite() || start_sec < 0.0 {
-        return Err(format!(
-            "timeline clip {clip_label} has invalid start time: {start_sec}"
+        return Err(error_with_fix(
+            "parse the timeline clip timing",
+            format!("timeline clip {clip_label} has invalid start time: {start_sec}"),
+            "Use a finite non-negative start time for the clip and retry.",
         ));
     }
     if !duration_sec.is_finite() || duration_sec <= 0.0 {
-        return Err(format!(
-            "timeline clip {clip_label} has invalid duration: {duration_sec}"
+        return Err(error_with_fix(
+            "parse the timeline clip timing",
+            format!("timeline clip {clip_label} has invalid duration: {duration_sec}"),
+            "Use a finite positive duration for the clip and retry.",
         ));
     }
 

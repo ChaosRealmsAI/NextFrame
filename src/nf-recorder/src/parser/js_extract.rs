@@ -2,6 +2,8 @@
 
 use regex::Regex;
 
+use crate::error_with_fix;
+
 /// Extracts the string value from a JS assignment like `NAME = 'value'`.
 pub(super) fn extract_assignment_string(source: &str, name: &str) -> Option<String> {
     let start = source.find(name)?;
@@ -66,7 +68,13 @@ pub(super) fn extract_object_literals(source: &str) -> Result<Vec<String>, Strin
         match bytes[idx] as char {
             '{' => {
                 let (block, consumed) = parse_balanced_block(&source[idx..], '{', '}')
-                    .ok_or_else(|| "unterminated SRT object literal".to_string())?;
+                    .ok_or_else(|| {
+                        error_with_fix(
+                            "parse the inline SRT object literal",
+                            "unterminated SRT object literal",
+                            "Close each `{ ... }` subtitle object in the inline SRT array and retry.",
+                        )
+                    })?;
                 result.push(block);
                 idx += consumed;
             }
