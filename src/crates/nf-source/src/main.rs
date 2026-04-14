@@ -1,3 +1,4 @@
+//! CLI entrypoint for the nf-source pipeline tool.
 mod cli;
 mod cmd_align;
 mod cmd_cut;

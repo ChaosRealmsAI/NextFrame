@@ -1,3 +1,4 @@
+//! Download command for fetching a source video and metadata.
 use anyhow::Result;
 use nf_download::{DownloadOptions, download};
 use serde_json::json;

@@ -1,3 +1,4 @@
+//! Preview command for building the nf-source timeline manifest.
 use anyhow::Result;
 use nf_cut_core::{CutReport, PreviewClip, PreviewTimelines, Sentences, remap_words_to_clip_ms};
 use serde_json::json;

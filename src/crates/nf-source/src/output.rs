@@ -1,3 +1,4 @@
+//! Stdout writers shared by nf-source subcommands.
 use std::io::{self, Write};
 
 use anyhow::Result;

@@ -1,3 +1,4 @@
+//! Command-line argument definitions for the nf-source tool.
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};

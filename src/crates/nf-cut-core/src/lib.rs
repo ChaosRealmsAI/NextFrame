@@ -1,14 +1,14 @@
 //! Shared schemas and filesystem helpers for the `nf` pipeline.
 
-pub mod cut_report;
-pub mod fs;
-pub mod media;
-pub mod plan;
-pub mod preview;
-pub mod python;
-pub mod sentence;
-pub mod srt;
-pub mod time;
+pub(crate) mod cut_report;
+pub(crate) mod fs;
+pub(crate) mod media;
+pub(crate) mod plan;
+pub(crate) mod preview;
+pub(crate) mod python;
+pub(crate) mod sentence;
+pub(crate) mod srt;
+pub(crate) mod time;
 
 pub use cut_report::{ClipFailure, ClipResult, CutReport};
 pub use fs::remove_existing_path;

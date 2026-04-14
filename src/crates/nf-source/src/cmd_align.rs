@@ -1,3 +1,4 @@
+//! Align command for forcing subtitle text onto source audio.
 use anyhow::Result;
 use nf_align::{AlignOptions, align};
 use serde_json::json;

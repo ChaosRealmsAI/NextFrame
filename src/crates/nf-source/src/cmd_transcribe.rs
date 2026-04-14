@@ -1,3 +1,4 @@
+//! Transcribe command for generating the canonical sentence bundle.
 use anyhow::Result;
 use nf_transcribe::{TranscribeOptions, transcribe};
 use serde_json::json;

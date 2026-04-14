@@ -1,3 +1,4 @@
+//! Cut command for producing clips and a cut report.
 use anyhow::Result;
 use nf_cut::{CutOptions, cut_plan};
 use nf_cut_core::CutReport;
