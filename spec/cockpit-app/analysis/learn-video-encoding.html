@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Encoding Basics — NextFrame</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface-2: #1a1a26;
+  --surface-3: #22222e;
+  --accent: #6366f1;
+  --accent-50: rgba(99,102,241,0.5);
+  --accent-15: rgba(99,102,241,0.15);
+  --accent-08: rgba(99,102,241,0.08);
+  --accent-04: rgba(99,102,241,0.04);
+  --text-1: rgba(255,255,255,0.92);
+  --text-2: rgba(255,255,255,0.55);
+  --text-3: rgba(255,255,255,0.25);
+  --text-4: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.06);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --serif: 'Noto Serif SC', serif;
+  --sans: 'Inter', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --green: #22c55e;
+  --yellow: #f59e0b;
+  --red: #ef4444;
+  --orange: #f97316;
+  --cyan: #06b6d4;
+  --pink: #ec4899;
+  --purple: #a855f7;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--sans);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Film grain */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+/* Layout */
+.container { max-width: 900px; margin: 0 auto; padding: 0 2rem; }
+section { padding: 5rem 0; border-bottom: 1px solid var(--border); }
+section:last-of-type { border-bottom: none; }
+
+/* Typography */
+h1 { font-family: var(--serif); font-size: clamp(2.2rem, 5vw, 3.5rem); font-weight: 700; line-height: 1.15; margin-bottom: 1rem; }
+h2 { font-family: var(--serif); font-size: clamp(1.6rem, 3.5vw, 2.2rem); font-weight: 600; line-height: 1.2; margin-bottom: 0.5rem; }
+h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-1); }
+p { color: var(--text-2); line-height: 1.7; margin-bottom: 1rem; }
+.section-num { font-family: var(--mono); font-size: 0.75rem; font-weight: 500; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.75rem; display: block; }
+.takeaway { background: var(--accent-08); border: 1px solid var(--accent-15); border-radius: 8px; padding: 1rem 1.25rem; margin: 1.5rem 0; color: var(--accent); font-weight: 500; font-size: 0.95rem; }
+code { font-family: var(--mono); font-size: 0.85em; background: var(--surface-2); padding: 0.15em 0.4em; border-radius: 4px; }
+
+/* Hero */
+.hero {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 6rem 2rem 4rem;
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, var(--accent-08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-15);
+  padding: 0.4em 1.2em;
+  border-radius: 100px;
+  margin-bottom: 2rem;
+  display: inline-block;
+}
+.hero p { max-width: 550px; font-size: 1.1rem; }
+
+/* TOC */
+.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.5rem; margin-top: 2rem; }
+.toc a {
+  display: block;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 0.85rem;
+  transition: all 0.3s var(--ease);
+}
+.toc a:hover { border-color: var(--accent-50); color: var(--text-1); background: var(--surface-2); }
+.toc a span { color: var(--accent); font-family: var(--mono); font-size: 0.75rem; margin-right: 0.5rem; }
+
+/* Pixel grid */
+.pixel-grid-wrap { display: flex; gap: 2rem; align-items: center; margin: 2rem 0; flex-wrap: wrap; }
+.pixel-grid {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 2px;
+  width: 240px;
+  flex-shrink: 0;
+}
+.pixel-grid .px {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  animation: pixelFade 2s ease-in-out infinite alternate;
+}
+@keyframes pixelFade { 0% { opacity: 0.7; } 100% { opacity: 1; } }
+.pixel-info { flex: 1; min-width: 200px; }
+.pixel-info .calc { font-family: var(--mono); font-size: 0.9rem; color: var(--text-2); margin-bottom: 0.4rem; }
+.pixel-info .calc strong { color: var(--text-1); }
+
+/* Bar chart */
+.bar-chart { margin: 2rem 0; }
+.bar-row { display: flex; align-items: center; margin-bottom: 0.75rem; gap: 1rem; }
+.bar-label { font-size: 0.8rem; color: var(--text-2); width: 100px; text-align: right; flex-shrink: 0; }
+.bar-track { flex: 1; height: 28px; background: var(--surface); border-radius: 6px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 0.75rem; font-size: 0.75rem; font-family: var(--mono); font-weight: 500; color: var(--bg); transition: width 1.5s var(--ease); }
+.bar-value { font-size: 0.8rem; color: var(--text-2); width: 70px; flex-shrink: 0; font-family: var(--mono); }
+
+/* Frame types */
+.frame-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin: 2rem 0; }
+@media (max-width: 700px) { .frame-types { grid-template-columns: 1fr; } }
+.frame-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  text-align: center;
+}
+.frame-card h3 { font-size: 1rem; margin-bottom: 0.75rem; }
+.frame-card .frame-visual {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  position: relative;
+  overflow: hidden;
+}
+.frame-card p { font-size: 0.82rem; color: var(--text-2); }
+
+/* GOP timeline */
+.gop-timeline { margin: 2rem 0; overflow-x: auto; padding-bottom: 0.5rem; }
+.gop-frames { display: flex; gap: 4px; min-width: 600px; position: relative; padding-bottom: 3rem; }
+.gop-frame {
+  width: 52px;
+  height: 36px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  position: relative;
+  color: var(--bg);
+}
+.gop-frame.i-frame { background: var(--accent); }
+.gop-frame.p-frame { background: var(--green); }
+.gop-frame.b-frame { background: var(--yellow); }
+.gop-legend { display: flex; gap: 1.5rem; margin-top: 0.75rem; }
+.gop-legend span { font-size: 0.8rem; color: var(--text-2); display: flex; align-items: center; gap: 0.4rem; }
+.gop-legend .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+/* Arrow connectors */
+.gop-arrows { position: relative; height: 24px; min-width: 600px; margin-top: -2.5rem; margin-bottom: 1rem; }
+
+/* Codec table */
+.codec-table { width: 100%; border-collapse: collapse; margin: 2rem 0; font-size: 0.85rem; }
+.codec-table th { text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-2); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.codec-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+.codec-table tr:last-child td { border-bottom: none; }
+.codec-table tr.highlight { background: var(--accent-04); }
+.codec-table tr.highlight td:first-child { color: var(--accent); font-weight: 600; }
+.tag { display: inline-block; padding: 0.15em 0.5em; border-radius: 4px; font-size: 0.75rem; font-weight: 500; }
+.tag-green { background: rgba(34,197,94,0.15); color: var(--green); }
+.tag-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+.tag-red { background: rgba(239,68,68,0.15); color: var(--red); }
+.tag-accent { background: var(--accent-15); color: var(--accent); }
+
+/* CRF slider */
+.crf-interactive { margin: 2rem 0; }
+.crf-slider-wrap { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+.crf-slider-wrap input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: linear-gradient(90deg, var(--green) 0%, var(--accent) 30%, var(--yellow) 60%, var(--red) 100%);
+  border-radius: 3px;
+  outline: none;
+}
+.crf-slider-wrap input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.crf-value { font-family: var(--mono); font-size: 2rem; font-weight: 700; width: 70px; text-align: center; color: var(--accent); }
+.crf-label { font-size: 0.9rem; color: var(--text-2); min-height: 1.5rem; }
+.crf-preview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 2rem 0; }
+@media (max-width: 600px) { .crf-preview { grid-template-columns: repeat(2, 1fr); } }
+.crf-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+}
+.crf-card .quality-viz {
+  width: 100%;
+  aspect-ratio: 4/3;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.crf-card .crf-num { font-family: var(--mono); font-size: 0.8rem; font-weight: 600; margin-bottom: 0.25rem; }
+.crf-card .crf-desc { font-size: 0.75rem; color: var(--text-2); }
+.crf-card .crf-size { font-family: var(--mono); font-size: 0.7rem; color: var(--text-3); margin-top: 0.25rem; }
+
+/* Bitrate graph */
+.bitrate-graph { margin: 2rem 0; }
+.bitrate-svg { width: 100%; max-width: 700px; }
+
+/* Comparison grid */
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin: 2rem 0; }
+@media (max-width: 600px) { .compare-grid { grid-template-columns: 1fr; } }
+.compare-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+}
+.compare-card h3 { display: flex; align-items: center; gap: 0.5rem; }
+.compare-card .metric { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+.compare-card .metric:last-child { border-bottom: none; }
+.compare-card .metric-label { color: var(--text-2); }
+.compare-card .metric-value { font-family: var(--mono); font-weight: 500; }
+
+/* Speed bar */
+.speed-compare { margin: 2rem 0; }
+.speed-bar { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.speed-bar .label { width: 120px; font-size: 0.85rem; color: var(--text-2); flex-shrink: 0; }
+.speed-bar .track { flex: 1; height: 32px; background: var(--surface); border-radius: 6px; overflow: hidden; position: relative; }
+.speed-bar .fill { height: 100%; border-radius: 6px; display: flex; align-items: center; justify-content: flex-end; padding-right: 0.75rem; font-family: var(--mono); font-size: 0.8rem; font-weight: 600; }
+
+/* DPR visual */
+.dpr-visual { display: flex; gap: 2rem; margin: 2rem 0; align-items: flex-start; flex-wrap: wrap; }
+.dpr-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.25rem;
+  flex: 1;
+  min-width: 200px;
+  text-align: center;
+}
+.dpr-box .dpr-grid {
+  display: inline-grid;
+  gap: 1px;
+  margin: 1rem auto;
+}
+.dpr-box .dpr-grid .cell {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+/* Parallel visual */
+.parallel-visual { margin: 2rem 0; }
+.chunk-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 1rem 0; }
+.chunk {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--text-2);
+  position: relative;
+}
+.chunk .chunk-label { font-family: var(--mono); font-size: 0.65rem; color: var(--accent); margin-bottom: 0.25rem; }
+.chunk .chunk-icon { font-size: 1.2rem; margin-bottom: 0.25rem; display: block; }
+
+/* Timeline sync */
+.sync-visual { margin: 2rem 0; position: relative; }
+.sync-track {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 0.25rem;
+  height: 36px;
+}
+.sync-track .track-label { width: 80px; font-size: 0.8rem; color: var(--text-2); flex-shrink: 0; }
+.sync-track .track-bar { flex: 1; height: 24px; border-radius: 4px; position: relative; }
+.sync-markers { display: flex; margin-left: 80px; margin-top: 0.5rem; }
+.sync-marker { font-family: var(--mono); font-size: 0.65rem; color: var(--text-3); }
+
+/* Scroll animations */
+.reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s var(--ease); }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* Nav dots */
+.nav-dots {
+  position: fixed;
+  right: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 100;
+}
+@media (max-width: 900px) { .nav-dots { display: none; } }
+.nav-dots a {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: all 0.3s var(--ease);
+  display: block;
+}
+.nav-dots a.active { background: var(--accent); transform: scale(1.4); }
+.nav-dots a:hover { background: var(--text-2); }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .container { padding: 0 1.25rem; }
+  section { padding: 3rem 0; }
+  .pixel-grid-wrap { flex-direction: column; }
+  .chunk-grid { grid-template-columns: repeat(4, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- Navigation dots -->
+<nav class="nav-dots" id="navDots"></nav>
+
+<!-- Hero -->
+<header class="hero">
+  <div class="hero-badge">NextFrame / nf-recorder</div>
+  <h1>Video Encoding<br>Basics</h1>
+  <p>A visual guide for developers building video tools. Understand why your recorder works the way it does.</p>
+  <div class="toc container" style="margin-top: 3rem;">
+    <a href="#s1"><span>01</span> What is a Frame</a>
+    <a href="#s2"><span>02</span> I / P / B Frames</a>
+    <a href="#s3"><span>03</span> Codec vs Container</a>
+    <a href="#s4"><span>04</span> CRF Quality Control</a>
+    <a href="#s5"><span>05</span> Bitrate Control</a>
+    <a href="#s6"><span>06</span> HW vs SW Encoding</a>
+    <a href="#s7"><span>07</span> Resolution &amp; DPR</a>
+    <a href="#s8"><span>08</span> Parallel Recording</a>
+    <a href="#s9"><span>09</span> Audio-Video Sync</a>
+  </div>
+</header>
+
+<!-- Section 1: What is a Frame -->
+<section id="s1">
+  <div class="container">
+    <span class="section-num reveal">Section 01</span>
+    <h2 class="reveal">一帧是什么 — What is a Frame?</h2>
+    <p class="reveal">A video is a rapid sequence of still images. Each image is a <strong>frame</strong> — a grid of colored pixels.</p>
+
+    <div class="pixel-grid-wrap reveal">
+      <div class="pixel-grid" id="pixelGrid"></div>
+      <div class="pixel-info">
+        <div class="calc"><strong>1920 x 1080</strong> = 2,073,600 pixels</div>
+        <div class="calc">x <strong>3 bytes</strong> (R, G, B) = <strong>~6 MB</strong> per frame</div>
+        <div class="calc">x <strong>30 fps</strong> = <strong>180 MB/s</strong></div>
+        <div class="calc">x <strong>60 sec</strong> = <strong>10.8 GB</strong> per minute</div>
+      </div>
+    </div>
+
+    <h3 class="reveal" style="margin-top: 2rem;">Raw vs Compressed</h3>
+    <div class="bar-chart reveal">
+      <div class="bar-row">
+        <div class="bar-label">Raw</div>
+        <div class="bar-track"><div class="bar-fill animated-bar" data-width="100" style="background: var(--red);">10.8 GB</div></div>
+        <div class="bar-value">10.8 GB</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">H.264 CRF 14</div>
+        <div class="bar-track"><div class="bar-fill animated-bar" data-width="4.6" style="background: var(--accent);">500 MB</div></div>
+        <div class="bar-value">~500 MB</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">H.264 CRF 23</div>
+        <div class="bar-track"><div class="bar-fill animated-bar" data-width="1.4" style="background: var(--green);">150 MB</div></div>
+        <div class="bar-value">~150 MB</div>
+      </div>
+    </div>
+
+    <div class="takeaway reveal">This is why we need encoding — raw video is impossibly large. A good encoder shrinks 10 GB to 150 MB with barely visible quality loss.</div>
+  </div>
+</section>
+
+<!-- Section 2: Frame Types -->
+<section id="s2">
+  <div class="container">
+    <span class="section-num reveal">Section 02</span>
+    <h2 class="reveal">I 帧、P 帧、B 帧 — Frame Types</h2>
+    <p class="reveal">Not every frame needs to store a complete image. Encoders exploit temporal redundancy — most of the image stays the same between frames.</p>
+
+    <div class="frame-types reveal">
+      <div class="frame-card">
+        <div class="frame-visual" id="iFrameViz" style="background: var(--surface-2);"></div>
+        <h3 style="color: var(--accent);">I-Frame (关键帧)</h3>
+        <p>Complete image. Can be decoded independently. Like a JPEG snapshot.</p>
+      </div>
+      <div class="frame-card">
+        <div class="frame-visual" id="pFrameViz" style="background: #050508;"></div>
+        <h3 style="color: var(--green);">P-Frame (预测帧)</h3>
+        <p>Stores only differences from previous frame. ~70% smaller than I-frame.</p>
+      </div>
+      <div class="frame-card">
+        <div class="frame-visual" id="bFrameViz" style="background: #030305;"></div>
+        <h3 style="color: var(--yellow);">B-Frame (双向预测)</h3>
+        <p>References past AND future. Smallest. ~85% smaller than I-frame.</p>
+      </div>
+    </div>
+
+    <h3 class="reveal" style="margin-top: 2rem;">GOP — Group of Pictures</h3>
+    <p class="reveal">Frames are organized in repeating patterns called GOPs. A typical pattern:</p>
+
+    <div class="gop-timeline reveal">
+      <div class="gop-frames" id="gopTimeline"></div>
+      <div class="gop-legend">
+        <span><span class="dot" style="background: var(--accent);"></span> I-Frame (keyframe)</span>
+        <span><span class="dot" style="background: var(--green);"></span> P-Frame (predicted)</span>
+        <span><span class="dot" style="background: var(--yellow);"></span> B-Frame (bi-directional)</span>
+      </div>
+    </div>
+
+    <div class="takeaway reveal">NextFrame records HTML as screenshots — every captured frame is an I-frame. The encoder (VideoToolbox / x264) must analyze them and create P/B frames to compress.</div>
+  </div>
+</section>
+
+<!-- Section 3: Codec vs Container -->
+<section id="s3">
+  <div class="container">
+    <span class="section-num reveal">Section 03</span>
+    <h2 class="reveal">编解码器 vs 容器 — Codec vs Container</h2>
+
+    <div class="compare-grid reveal" style="margin-bottom: 2rem;">
+      <div class="compare-card" style="border-color: var(--accent-15);">
+        <h3 style="color: var(--accent); margin-bottom: 0.75rem;">Codec = Language</h3>
+        <p style="font-size: 0.85rem;">How to compress and decompress video data. The algorithm that turns raw pixels into a compact bitstream.</p>
+        <p style="font-size: 0.82rem; color: var(--text-3);">Examples: H.264, H.265, VP9, AV1</p>
+      </div>
+      <div class="compare-card" style="border-color: var(--green); --accent: var(--green);">
+        <h3 style="color: var(--green); margin-bottom: 0.75rem;">Container = Envelope</h3>
+        <p style="font-size: 0.85rem;">How to package video + audio + metadata into a single file. Just a wrapper format.</p>
+        <p style="font-size: 0.82rem; color: var(--text-3);">Examples: .mp4, .webm, .mov, .mkv</p>
+      </div>
+    </div>
+
+    <table class="codec-table reveal">
+      <thead>
+        <tr>
+          <th>Codec</th>
+          <th>Container</th>
+          <th>Quality</th>
+          <th>Speed</th>
+          <th>Compat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="highlight">
+          <td>H.264</td>
+          <td><code>.mp4</code></td>
+          <td><span class="tag tag-green">Good</span></td>
+          <td><span class="tag tag-green">Fast</span></td>
+          <td><span class="tag tag-green">Universal</span></td>
+        </tr>
+        <tr>
+          <td>H.265 / HEVC</td>
+          <td><code>.mp4</code></td>
+          <td><span class="tag tag-accent">Better</span></td>
+          <td><span class="tag tag-yellow">Slower</span></td>
+          <td><span class="tag tag-yellow">Most</span></td>
+        </tr>
+        <tr>
+          <td>VP9</td>
+          <td><code>.webm</code></td>
+          <td><span class="tag tag-green">Good</span></td>
+          <td><span class="tag tag-red">Slow</span></td>
+          <td><span class="tag tag-yellow">Web</span></td>
+        </tr>
+        <tr>
+          <td>AV1</td>
+          <td><code>.mp4 / .webm</code></td>
+          <td><span class="tag tag-accent">Best</span></td>
+          <td><span class="tag tag-red">Very slow</span></td>
+          <td><span class="tag tag-red">New only</span></td>
+        </tr>
+        <tr>
+          <td>ProRes</td>
+          <td><code>.mov</code></td>
+          <td><span class="tag tag-accent">Near-lossless</span></td>
+          <td><span class="tag tag-green">Fast</span></td>
+          <td><span class="tag tag-yellow">Apple/Pro</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="takeaway reveal">NextFrame uses <strong>H.264 in .mp4</strong> — best compatibility across all platforms and players.</div>
+  </div>
+</section>
+
+<!-- Section 4: CRF -->
+<section id="s4">
+  <div class="container">
+    <span class="section-num reveal">Section 04</span>
+    <h2 class="reveal">CRF 是什么 — Constant Rate Factor</h2>
+    <p class="reveal">CRF is a single number that controls the quality/size tradeoff. The encoder adjusts bitrate per-frame to maintain consistent visual quality.</p>
+
+    <div class="crf-interactive reveal">
+      <div class="crf-slider-wrap">
+        <span style="font-size: 0.8rem; color: var(--green);">0</span>
+        <input type="range" id="crfSlider" min="0" max="51" value="14">
+        <span style="font-size: 0.8rem; color: var(--red);">51</span>
+        <div class="crf-value" id="crfValue">14</div>
+      </div>
+      <div class="crf-label" id="crfLabel">Visually lossless — NextFrame default</div>
+    </div>
+
+    <h3 class="reveal">Quality Comparison (60s 1080p video)</h3>
+    <div class="crf-preview reveal">
+      <div class="crf-card">
+        <div class="quality-viz" id="crfViz14"></div>
+        <div class="crf-num" style="color: var(--green);">CRF 14</div>
+        <div class="crf-desc">Visually lossless</div>
+        <div class="crf-size">~500 MB</div>
+      </div>
+      <div class="crf-card">
+        <div class="quality-viz" id="crfViz23"></div>
+        <div class="crf-num" style="color: var(--accent);">CRF 23</div>
+        <div class="crf-desc">Good quality</div>
+        <div class="crf-size">~150 MB</div>
+      </div>
+      <div class="crf-card">
+        <div class="quality-viz" id="crfViz35"></div>
+        <div class="crf-num" style="color: var(--yellow);">CRF 35</div>
+        <div class="crf-desc">Visible artifacts</div>
+        <div class="crf-size">~40 MB</div>
+      </div>
+      <div class="crf-card">
+        <div class="quality-viz" id="crfViz51"></div>
+        <div class="crf-num" style="color: var(--red);">CRF 51</div>
+        <div class="crf-desc">Potato quality</div>
+        <div class="crf-size">~5 MB</div>
+      </div>
+    </div>
+
+    <div class="bar-chart reveal">
+      <div class="bar-row">
+        <div class="bar-label">CRF 14</div>
+        <div class="bar-track"><div class="bar-fill animated-bar" data-width="100" style="background: var(--green);">500 MB</div></div>
+        <div class="bar-value">500 MB</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">CRF 23</div>
+        <div class="bar-track"><div class="bar-fill animated-bar" data-width="30" style="background: var(--accent);">150 MB</div></div>
+        <div class="bar-value">150 MB</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">CRF 35</div>
+        <div class="bar-track"><div class="bar-fill animated-bar" data-width="8" style="background: var(--yellow);">40 MB</div></div>
+        <div class="bar-value">40 MB</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">CRF 51</div>
+        <div class="bar-track"><div class="bar-fill animated-bar" data-width="1" style="background: var(--red);"></div></div>
+        <div class="bar-value">5 MB</div>
+      </div>
+    </div>
+
+    <div class="takeaway reveal">Lower CRF = better quality = bigger file. NextFrame defaults to CRF 14 (visually lossless).</div>
+  </div>
+</section>
+
+<!-- Section 5: Bitrate Control -->
+<section id="s5">
+  <div class="container">
+    <span class="section-num reveal">Section 05</span>
+    <h2 class="reveal">码率控制 — Bitrate Control</h2>
+    <p class="reveal">Three ways to tell the encoder how many bits to spend:</p>
+
+    <div class="compare-grid reveal" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="compare-card">
+        <h3 style="color: var(--yellow);">CBR</h3>
+        <p style="font-size: 0.82rem;">固定码率 — Same bitrate throughout. Good for streaming, wastes bits on simple scenes.</p>
+      </div>
+      <div class="compare-card">
+        <h3 style="color: var(--green);">VBR</h3>
+        <p style="font-size: 0.82rem;">可变码率 — More bits for complex scenes, fewer for simple. Better quality per byte.</p>
+      </div>
+      <div class="compare-card" style="border-color: var(--accent-15);">
+        <h3 style="color: var(--accent);">CRF</h3>
+        <p style="font-size: 0.82rem;">质量目标 — Encoder decides bitrate. Best for offline rendering. What NextFrame uses.</p>
+      </div>
+    </div>
+
+    <h3 class="reveal" style="margin-top: 2rem;">Bitrate Over Time</h3>
+    <div class="bitrate-graph reveal">
+      <svg class="bitrate-svg" viewBox="0 0 700 220" fill="none">
+        <!-- Axes -->
+        <line x1="50" y1="180" x2="680" y2="180" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        <line x1="50" y1="20" x2="50" y2="180" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        <!-- Labels -->
+        <text x="365" y="210" fill="rgba(255,255,255,0.35)" font-size="11" font-family="Inter" text-anchor="middle">Time</text>
+        <text x="15" y="100" fill="rgba(255,255,255,0.35)" font-size="11" font-family="Inter" text-anchor="middle" transform="rotate(-90 15 100)">Bitrate</text>
+        <!-- Scene complexity (background) -->
+        <rect x="200" y="30" width="180" height="150" fill="rgba(255,255,255,0.02)" rx="4"/>
+        <text x="290" y="48" fill="rgba(255,255,255,0.15)" font-size="9" font-family="Inter" text-anchor="middle">Complex scene</text>
+        <!-- CBR line -->
+        <line x1="60" y1="100" x2="670" y2="100" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 4"/>
+        <!-- VBR line -->
+        <path d="M60,110 C120,108 180,105 220,60 C260,30 300,35 340,55 C380,75 420,110 460,115 C500,118 540,120 600,118 C640,116 660,114 670,112" stroke="#22c55e" stroke-width="2" fill="none"/>
+        <!-- CRF line (similar shape to VBR but smoother) -->
+        <path d="M60,108 C120,106 180,100 220,65 C260,38 300,42 340,60 C380,78 420,108 460,112 C500,115 540,116 600,114 C640,113 660,112 670,110" stroke="#6366f1" stroke-width="2.5" fill="none"/>
+        <!-- Legend -->
+        <line x1="480" y1="30" x2="510" y2="30" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 4"/>
+        <text x="515" y="34" fill="#f59e0b" font-size="11" font-family="Inter">CBR</text>
+        <line x1="480" y1="50" x2="510" y2="50" stroke="#22c55e" stroke-width="2"/>
+        <text x="515" y="54" fill="#22c55e" font-size="11" font-family="Inter">VBR</text>
+        <line x1="480" y1="70" x2="510" y2="70" stroke="#6366f1" stroke-width="2.5"/>
+        <text x="515" y="74" fill="#6366f1" font-size="11" font-family="Inter">CRF</text>
+      </svg>
+    </div>
+    <p class="reveal" style="font-size: 0.85rem;">CBR wastes bits on simple scenes (horizontal line stays high). VBR and CRF allocate more bits where complexity demands it — the spike in the middle is a complex scene.</p>
+
+    <div class="takeaway reveal">CRF lets the encoder be smart about bitrate allocation. For offline rendering (not streaming), it produces the best quality-per-byte.</div>
+  </div>
+</section>
+
+<!-- Section 6: HW vs SW Encoding -->
+<section id="s6">
+  <div class="container">
+    <span class="section-num reveal">Section 06</span>
+    <h2 class="reveal">硬件 vs 软件编码 — Hardware vs Software</h2>
+    <p class="reveal">You can encode video using your CPU (software) or a dedicated chip on your GPU/SoC (hardware).</p>
+
+    <div class="compare-grid reveal">
+      <div class="compare-card">
+        <h3>Software (x264)</h3>
+        <div class="metric"><span class="metric-label">Speed</span><span class="metric-value" style="color: var(--red);">0.3x realtime</span></div>
+        <div class="metric"><span class="metric-label">Quality</span><span class="metric-value" style="color: var(--green);">Slightly better</span></div>
+        <div class="metric"><span class="metric-label">CPU usage</span><span class="metric-value" style="color: var(--red);">100% all cores</span></div>
+        <div class="metric"><span class="metric-label">Best for</span><span class="metric-value">Final export</span></div>
+      </div>
+      <div class="compare-card" style="border-color: var(--accent-15);">
+        <h3 style="color: var(--accent);">Hardware (VideoToolbox)</h3>
+        <div class="metric"><span class="metric-label">Speed</span><span class="metric-value" style="color: var(--green);">5-10x realtime</span></div>
+        <div class="metric"><span class="metric-label">Quality</span><span class="metric-value" style="color: var(--yellow);">Slightly worse</span></div>
+        <div class="metric"><span class="metric-label">CPU usage</span><span class="metric-value" style="color: var(--green);">&lt;10%</span></div>
+        <div class="metric"><span class="metric-label">Best for</span><span class="metric-value">Preview / batch</span></div>
+      </div>
+    </div>
+
+    <h3 class="reveal" style="margin-top: 2rem;">Encoding 60s of 1080p video</h3>
+    <div class="speed-compare reveal">
+      <div class="speed-bar">
+        <div class="label">Software</div>
+        <div class="track"><div class="bar-fill animated-bar" data-width="100" style="background: var(--red); width: 0;">200s</div></div>
+      </div>
+      <div class="speed-bar">
+        <div class="label">Hardware</div>
+        <div class="track"><div class="bar-fill animated-bar" data-width="5" style="background: var(--green); width: 0;">10s</div></div>
+      </div>
+    </div>
+
+    <div class="takeaway reveal">NextFrame uses <strong>VideoToolbox</strong> (Apple hardware encoder) — 20x faster, good enough quality for most use cases. Software encoding available for maximum quality exports.</div>
+  </div>
+</section>
+
+<!-- Section 7: Resolution & DPR -->
+<section id="s7">
+  <div class="container">
+    <span class="section-num reveal">Section 07</span>
+    <h2 class="reveal">分辨率与 DPR — Resolution &amp; Device Pixel Ratio</h2>
+    <p class="reveal">HTML renders at <strong>CSS pixels</strong>. DPR multiplies CSS pixels to physical pixels.</p>
+
+    <div class="dpr-visual reveal">
+      <div class="dpr-box">
+        <h3>DPR 1 (1080p)</h3>
+        <p style="font-size: 0.8rem; color: var(--text-3);">1920 x 1080</p>
+        <div class="dpr-grid" style="grid-template-columns: repeat(4, 16px);">
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-3);">1 CSS px = 1 physical px</p>
+        <p style="font-size: 0.8rem; margin-top: 0.5rem;"><code>~150 MB</code></p>
+      </div>
+      <div class="dpr-box" style="border-color: var(--accent-15);">
+        <h3 style="color: var(--accent);">DPR 2 (4K)</h3>
+        <p style="font-size: 0.8rem; color: var(--text-3);">3840 x 2160</p>
+        <div class="dpr-grid" style="grid-template-columns: repeat(8, 8px);">
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+          <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-3);">1 CSS px = 2x2 physical px</p>
+        <p style="font-size: 0.8rem; margin-top: 0.5rem;"><code>~500 MB</code></p>
+      </div>
+    </div>
+
+    <div class="bar-chart reveal">
+      <div class="bar-row">
+        <div class="bar-label">4K (DPR 2)</div>
+        <div class="bar-track"><div class="bar-fill animated-bar" data-width="100" style="background: var(--accent);">4x pixels</div></div>
+        <div class="bar-value">~500 MB</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-label">1080p (DPR 1)</div>
+        <div class="bar-track"><div class="bar-fill animated-bar" data-width="25" style="background: var(--green);">1x pixels</div></div>
+        <div class="bar-value">~150 MB</div>
+      </div>
+    </div>
+
+    <div class="takeaway reveal">NextFrame uses <code>--dpr</code> instead of resolution because HTML renders at CSS pixels. DPR 2 means each CSS pixel becomes a 2x2 block of physical pixels — 4x the data, 4x the file size.</div>
+  </div>
+</section>
+
+<!-- Section 8: Parallel Recording -->
+<section id="s8">
+  <div class="container">
+    <span class="section-num reveal">Section 08</span>
+    <h2 class="reveal">并行录制为什么可行 — Parallel Recording</h2>
+    <p class="reveal">NextFrame can split a recording job across multiple WebView instances running simultaneously.</p>
+
+    <h3 class="reveal">The Approach</h3>
+    <div class="parallel-visual reveal">
+      <p style="font-size: 0.85rem; text-align: center; color: var(--text-2); margin-bottom: 0.5rem;">800 total frames, split into 8 chunks of 100</p>
+      <div class="chunk-grid">
+        <div class="chunk"><div class="chunk-label">WV 1</div><div>0-99</div></div>
+        <div class="chunk"><div class="chunk-label">WV 2</div><div>100-199</div></div>
+        <div class="chunk"><div class="chunk-label">WV 3</div><div>200-299</div></div>
+        <div class="chunk"><div class="chunk-label">WV 4</div><div>300-399</div></div>
+        <div class="chunk"><div class="chunk-label">WV 5</div><div>400-499</div></div>
+        <div class="chunk"><div class="chunk-label">WV 6</div><div>500-599</div></div>
+        <div class="chunk"><div class="chunk-label">WV 7</div><div>600-699</div></div>
+        <div class="chunk"><div class="chunk-label">WV 8</div><div>700-800</div></div>
+      </div>
+      <p style="font-size: 0.85rem; text-align: center; color: var(--text-3); margin-top: 0.75rem;">Each WebView renders independently, then chunks are concatenated</p>
+    </div>
+
+    <h3 class="reveal" style="margin-top: 2rem;">Serial vs Parallel</h3>
+    <div class="speed-compare reveal">
+      <div class="speed-bar">
+        <div class="label">Serial (1 WV)</div>
+        <div class="track"><div class="bar-fill animated-bar" data-width="100" style="background: var(--red); width: 0;">200s</div></div>
+      </div>
+      <div class="speed-bar">
+        <div class="label">Parallel (8 WV)</div>
+        <div class="track"><div class="bar-fill animated-bar" data-width="12.5" style="background: var(--green); width: 0;">25s</div></div>
+      </div>
+    </div>
+
+    <div class="compare-grid reveal" style="margin-top: 2rem;">
+      <div class="compare-card" style="border-color: rgba(239,68,68,0.2);">
+        <h3 style="color: var(--red);">The Gotcha</h3>
+        <p style="font-size: 0.85rem;">Audio must be handled separately. You cannot split a continuous audio stream into chunks the same way you split frame rendering.</p>
+      </div>
+      <div class="compare-card" style="border-color: rgba(34,197,94,0.2);">
+        <h3 style="color: var(--green);">Why Frame-Pure Matters</h3>
+        <p style="font-size: 0.85rem;">Each WebView can jump to any frame independently. React/state-based renderers CAN'T do this — they need sequential state updates.</p>
+      </div>
+    </div>
+
+    <div class="takeaway reveal">Parallel recording is only possible because NextFrame's timeline is <strong>frame-pure</strong> — any frame can be rendered without knowing any other frame's state.</div>
+  </div>
+</section>
+
+<!-- Section 9: Audio-Video Sync -->
+<section id="s9">
+  <div class="container">
+    <span class="section-num reveal">Section 09</span>
+    <h2 class="reveal">音视频同步 — Audio-Video Sync</h2>
+    <p class="reveal">Audio is a continuous waveform. Video is discrete frames. Keeping them in sync requires precise timestamps.</p>
+
+    <h3 class="reveal">The Problem</h3>
+    <div class="sync-visual reveal">
+      <div class="sync-track">
+        <div class="track-label">Video</div>
+        <div class="track-bar" style="background: var(--surface); display: flex; gap: 2px; padding: 4px;">
+          <div style="flex: 1; background: var(--accent); border-radius: 2px;" title="Frame 0"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px; opacity: 0.8;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px; opacity: 0.6;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px; opacity: 0.8;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px; opacity: 0.7;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px; opacity: 0.9;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px; opacity: 0.6;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px; opacity: 0.8;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px; opacity: 0.7;"></div>
+          <div style="flex: 1; background: var(--accent); border-radius: 2px;"></div>
+        </div>
+      </div>
+      <div class="sync-track">
+        <div class="track-label">Audio</div>
+        <div class="track-bar" style="background: var(--surface); overflow: hidden; border-radius: 4px;">
+          <svg viewBox="0 0 400 24" style="width: 100%; height: 100%;">
+            <path d="M0,12 Q10,4 20,12 Q30,18 40,12 Q50,6 60,12 Q70,20 80,12 Q90,2 100,12 Q110,19 120,12 Q130,5 140,12 Q150,22 160,12 Q170,3 180,12 Q190,18 200,12 Q210,6 220,12 Q230,20 240,12 Q250,4 260,12 Q270,19 280,12 Q290,5 300,12 Q310,21 320,12 Q330,3 340,12 Q350,18 360,12 Q370,6 380,12 Q390,16 400,12" stroke="#22c55e" stroke-width="1.5" fill="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="sync-track" style="margin-top: 0.5rem;">
+        <div class="track-label" style="font-size: 0.7rem; color: var(--text-3);">PTS</div>
+        <div style="flex: 1; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.65rem; color: var(--text-3);">
+          <span>0.0s</span><span>0.5s</span><span>1.0s</span><span>1.5s</span><span>2.0s</span><span>2.5s</span><span>3.0s</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="compare-grid reveal">
+      <div class="compare-card">
+        <h3>PTS (Presentation Timestamp)</h3>
+        <p style="font-size: 0.85rem;">Every frame and audio sample has a timestamp: "show me at exactly 3.000 seconds." If frame 90 at 30fps should appear at 3.0s but appears at 3.03s — you see lip-sync drift.</p>
+      </div>
+      <div class="compare-card" style="border-color: var(--accent-15);">
+        <h3 style="color: var(--accent);">NextFrame's Approach</h3>
+        <p style="font-size: 0.85rem;">TTS generates audio with <strong>word-level timestamps</strong>. Video frames are calculated from the same timestamps. Same source of truth = guaranteed sync.</p>
+      </div>
+    </div>
+
+    <div class="takeaway reveal">Audio and video sync through shared timestamps. NextFrame derives both audio timing and frame timing from the same TTS word timestamps — sync is <strong>structural</strong>, not corrective.</div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer style="text-align: center; padding: 4rem 2rem; color: var(--text-3); font-size: 0.8rem;">
+  <p>NextFrame Video Encoding Basics</p>
+  <p style="margin-top: 0.5rem; font-family: var(--mono); font-size: 0.7rem;">Generated for nf-recorder developers</p>
+</footer>
+
+<script>
+// === Pixel Grid ===
+(function() {
+  const grid = document.getElementById('pixelGrid');
+  const colors = ['#6366f1','#818cf8','#a5b4fc','#4f46e5','#7c3aed','#8b5cf6','#06b6d4','#22d3ee','#14b8a6','#10b981','#22c55e','#f59e0b','#f97316','#ef4444','#ec4899','#d946ef'];
+  for (let i = 0; i < 256; i++) {
+    const px = document.createElement('div');
+    px.className = 'px';
+    px.style.background = colors[Math.floor(Math.random() * colors.length)];
+    px.style.animationDelay = (Math.random() * 2) + 's';
+    grid.appendChild(px);
+  }
+})();
+
+// === I-Frame visualization ===
+(function() {
+  const canvas = document.getElementById('iFrameViz');
+  const colors = ['#6366f1','#4f46e5','#818cf8','#7c3aed','#06b6d4','#14b8a6','#22c55e','#f59e0b'];
+  let html = '';
+  for (let y = 0; y < 6; y++) {
+    for (let x = 0; x < 10; x++) {
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      html += `<div style="position:absolute;left:${x*10}%;top:${y*16.66}%;width:10%;height:16.66%;background:${c};opacity:${0.4+Math.random()*0.6};"></div>`;
+    }
+  }
+  canvas.innerHTML = html;
+})();
+
+// === P-Frame visualization ===
+(function() {
+  const canvas = document.getElementById('pFrameViz');
+  let html = '';
+  // Only a few changed blocks
+  const changed = [[3,2],[7,4],[5,1],[8,3]];
+  for (const [x,y] of changed) {
+    const c = ['#6366f1','#22c55e','#f59e0b','#06b6d4'][Math.floor(Math.random()*4)];
+    html += `<div style="position:absolute;left:${x*10}%;top:${y*16.66}%;width:10%;height:16.66%;background:${c};opacity:0.7;border-radius:2px;"></div>`;
+  }
+  canvas.innerHTML = html;
+})();
+
+// === B-Frame visualization ===
+(function() {
+  const canvas = document.getElementById('bFrameViz');
+  let html = '';
+  const changed = [[5,3],[2,1]];
+  for (const [x,y] of changed) {
+    const c = ['#f59e0b','#ec4899'][Math.floor(Math.random()*2)];
+    html += `<div style="position:absolute;left:${x*10}%;top:${y*16.66}%;width:10%;height:16.66%;background:${c};opacity:0.5;border-radius:2px;"></div>`;
+  }
+  canvas.innerHTML = html;
+})();
+
+// === GOP Timeline ===
+(function() {
+  const container = document.getElementById('gopTimeline');
+  const pattern = ['I','P','P','B','P','P','B','P','P','I','P','P','B','P','P','B','P','P'];
+  const classMap = { I: 'i-frame', P: 'p-frame', B: 'b-frame' };
+  pattern.forEach((type, i) => {
+    const el = document.createElement('div');
+    el.className = `gop-frame ${classMap[type]}`;
+    el.textContent = type;
+    el.title = `Frame ${i}: ${type}-frame`;
+    container.appendChild(el);
+  });
+})();
+
+// === CRF Quality Visualizations ===
+(function() {
+  function drawQuality(id, noise, blockSize) {
+    const el = document.getElementById(id);
+    const cols = ['#6366f1','#4f46e5','#818cf8','#7c3aed','#06b6d4','#14b8a6'];
+    let html = '';
+    const gridSize = Math.max(3, Math.ceil(10 / blockSize));
+    for (let y = 0; y < 6; y++) {
+      for (let x = 0; x < 8; x++) {
+        const bx = Math.floor(x / blockSize) * blockSize;
+        const by = Math.floor(y / blockSize) * blockSize;
+        const baseColor = cols[(bx + by) % cols.length];
+        const opacity = Math.max(0.2, 1 - noise * Math.random());
+        html += `<div style="position:absolute;left:${x*12.5}%;top:${y*16.66}%;width:12.5%;height:16.66%;background:${baseColor};opacity:${opacity};"></div>`;
+      }
+    }
+    el.style.background = '#0a0a0f';
+    el.innerHTML = html;
+  }
+  drawQuality('crfViz14', 0.05, 1);
+  drawQuality('crfViz23', 0.15, 1);
+  drawQuality('crfViz35', 0.4, 2);
+  drawQuality('crfViz51', 0.7, 3);
+})();
+
+// === CRF Slider ===
+(function() {
+  const slider = document.getElementById('crfSlider');
+  const valueEl = document.getElementById('crfValue');
+  const labelEl = document.getElementById('crfLabel');
+  const labels = {
+    0: 'Lossless (huge file)',
+    10: 'Near-lossless',
+    14: 'Visually lossless — NextFrame default',
+    18: 'High quality',
+    23: 'Good quality — ffmpeg default',
+    28: 'Acceptable quality',
+    35: 'Visible artifacts / compression noise',
+    40: 'Heavy artifacts',
+    45: 'Very low quality',
+    51: 'Minimum quality (potato)'
+  };
+  function getLabel(v) {
+    const keys = Object.keys(labels).map(Number).sort((a,b) => a - b);
+    let best = keys[0];
+    for (const k of keys) { if (v >= k) best = k; }
+    return labels[best];
+  }
+  function getColor(v) {
+    if (v <= 14) return 'var(--green)';
+    if (v <= 23) return 'var(--accent)';
+    if (v <= 35) return 'var(--yellow)';
+    return 'var(--red)';
+  }
+  slider.addEventListener('input', () => {
+    const v = parseInt(slider.value);
+    valueEl.textContent = v;
+    valueEl.style.color = getColor(v);
+    labelEl.textContent = getLabel(v);
+  });
+})();
+
+// === Scroll reveal ===
+(function() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        // Animate bars
+        entry.target.querySelectorAll('.animated-bar').forEach(bar => {
+          const w = bar.getAttribute('data-width');
+          setTimeout(() => { bar.style.width = w + '%'; }, 200);
+        });
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // Init bars at 0
+  document.querySelectorAll('.animated-bar').forEach(bar => { bar.style.width = '0%'; });
+})();
+
+// === Nav dots ===
+(function() {
+  const nav = document.getElementById('navDots');
+  const sections = document.querySelectorAll('section[id]');
+  sections.forEach(s => {
+    const a = document.createElement('a');
+    a.href = '#' + s.id;
+    a.title = s.querySelector('h2')?.textContent || '';
+    nav.appendChild(a);
+  });
+
+  const dots = nav.querySelectorAll('a');
+  const sectionObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const idx = Array.from(sections).indexOf(entry.target);
+        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      }
+    });
+  }, { threshold: 0.3 });
+
+  sections.forEach(s => sectionObserver.observe(s));
+})();
+</script>
+</body>
+</html>
