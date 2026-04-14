@@ -1,6 +1,7 @@
 // Shared CLI I/O helpers.
 
 import { readFile, writeFile } from "node:fs/promises";
+import { defaultFixSuggestion } from "./help.js";
 
 export function parseFlags(argv) {
   const positional = [];
@@ -39,23 +40,36 @@ export async function saveTimeline(path, timeline) {
 }
 
 export function emit(result, flags) {
+  const normalized = normalizeResult(result);
   if (flags.json) {
-    process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+    process.stdout.write(JSON.stringify(normalized, null, 2) + "\n");
     return;
   }
-  if (result.ok) {
-    if (typeof result.value === "string") {
-      process.stdout.write(result.value);
-      if (!result.value.endsWith("\n")) process.stdout.write("\n");
-    } else if (result.value !== undefined) {
-      process.stdout.write(JSON.stringify(result.value, null, 2) + "\n");
-    } else if (result.message) {
-      process.stdout.write(result.message + "\n");
+  if (normalized.ok) {
+    if (typeof normalized.value === "string") {
+      process.stdout.write(normalized.value);
+      if (!normalized.value.endsWith("\n")) process.stdout.write("\n");
+    } else if (normalized.value !== undefined) {
+      process.stdout.write(JSON.stringify(normalized.value, null, 2) + "\n");
+    } else if (normalized.message) {
+      process.stdout.write(normalized.message + "\n");
     }
   } else {
-    process.stderr.write(`error: ${result.error?.message || "unknown error"}\n`);
-    if (result.error?.hint) process.stderr.write(`  hint: ${result.error.hint}\n`);
+    process.stderr.write(`error: ${normalized.error?.message || "unknown error"}\n`);
+    process.stderr.write(`Fix: ${normalized.error?.fix}\n`);
   }
+}
+
+function normalizeResult(result) {
+  if (!result || result.ok || !result.error) return result;
+  const fix = result.error.fix || result.error.hint || defaultFixSuggestion();
+  return {
+    ...result,
+    error: {
+      ...result.error,
+      fix,
+    },
+  };
 }
 
 export function parseTime(spec) {

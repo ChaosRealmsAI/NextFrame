@@ -28,10 +28,10 @@ export async function run(argv, context = {}) {
       result = addLayer(timeline, parseLayerAddPayload(resolved.rest, flags));
       break;
     case "layer-move":
-      result = moveLayer(timeline, resolved.rest[0], flags.start);
+      result = moveLayer(timeline, resolved.rest[0], toNumber(flags.start));
       break;
     case "layer-resize":
-      result = resizeLayer(timeline, resolved.rest[0], flags.dur);
+      result = resizeLayer(timeline, resolved.rest[0], toNumber(flags.dur));
       break;
     case "layer-remove":
       result = removeLayer(timeline, resolved.rest[0]);
@@ -72,8 +72,8 @@ function parseLayerAddPayload(rest, flags) {
   return {
     id: flags.id || `${scene}-${Date.now()}`,
     scene,
-    start: flags.start,
-    dur: flags.dur,
+    start: toNumber(flags.start),
+    dur: toNumber(flags.dur),
     params: parseJsonFlag(flags.params),
     x: flags.x,
     y: flags.y,

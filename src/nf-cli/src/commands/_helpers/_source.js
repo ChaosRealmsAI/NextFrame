@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseFlags } from "./_io.js";
+import { defaultFixSuggestion } from "./help.js";
 export {
   buildClipsFromCut,
   loadSentencesSummary,
@@ -282,7 +283,7 @@ export function success(value) {
 }
 
 export function fail(code, message, extra = {}) {
-  const error = { code, message, ...extra };
+  const error = { code, message, fix: extra.fix || extra.hint || defaultFixSuggestion(), ...extra };
   process.stdout.write(JSON.stringify({ ok: false, error }, null, 2) + "\n");
   process.exit(1);
 }

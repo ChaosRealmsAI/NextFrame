@@ -1,26 +1,24 @@
 import http from "node:http";
 import { existsSync } from "node:fs";
 import { emit, parseFlags } from "../_helpers/_io.js";
+import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help.js";
 
 const APP_HOST = "127.0.0.1";
 const APP_PORT = 19820;
 const DEFAULT_TIMEOUT_MS = 10000;
 
-const HELP = `usage: nextframe app <subcommand>
-
-Subcommands:
-  nextframe app eval <js>
-  nextframe app screenshot [--out=path.png]
-  nextframe app diagnose
-  nextframe app navigate <project> <episode> <segment>
-  nextframe app click <x> <y>
-  nextframe app status`;
-
 export async function run(argv) {
   const subcommand = argv[0];
   if (!subcommand || subcommand === "help" || subcommand === "--help" || subcommand === "-h") {
-    process.stdout.write(HELP + "\n");
+    process.stdout.write(renderCommandHelp("app"));
     return 0;
+  }
+  if (argv[1] === "--help" || argv[1] === "-h") {
+    const help = renderCommandHelp(`app ${subcommand}`);
+    if (help) {
+      process.stdout.write(help);
+      return 0;
+    }
   }
 
   try {
@@ -31,10 +29,12 @@ export async function run(argv) {
     if (subcommand === "click") return await runClick(argv.slice(1));
     if (subcommand === "status") return await runStatus(argv.slice(1));
 
-    process.stderr.write(`unknown app subcommand: ${subcommand}\n\n${HELP}\n`);
+    process.stderr.write(`error: unknown app subcommand "${subcommand}"\n`);
+    process.stderr.write('Fix: run "nextframe app --help" to see supported app subcommands\n');
     return 3;
   } catch (error) {
     process.stderr.write(`error: ${error.message}\n`);
+    process.stderr.write(`Fix: ${defaultFixSuggestion()}\n`);
     return 2;
   }
 }

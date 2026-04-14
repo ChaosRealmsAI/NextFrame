@@ -57,6 +57,18 @@ export function setLayerProp(timeline, id, key, value) {
   return { ok: true, value: layer };
 }
 
+export function setLayerProps(timeline, id, props) {
+  if (!props || typeof props !== "object" || Array.isArray(props)) {
+    return { ok: false, error: { code: "BAD_PROPS", message: "props must be an object" } };
+  }
+  let result = null;
+  for (const [key, value] of Object.entries(props)) {
+    result = setLayerProp(timeline, id, key, value);
+    if (!result.ok) return result;
+  }
+  return result || setLayerProp(timeline, id, "params", {});
+}
+
 export function listLayers(timeline) {
   return {
     ok: true,

@@ -1,23 +1,24 @@
 import http from "node:http";
 import { emit, parseFlags } from "../_helpers/_io.js";
+import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help.js";
 
 const HOST = "127.0.0.1";
 const PORT = 19820;
-const HELP = `usage: nextframe app-pipeline <subcommand>
-
-Subcommands:
-  nextframe app-pipeline navigate --project=<name> --episode=<name>
-  nextframe app-pipeline tab --tab=<script|audio|clips|atoms|assembly|output>
-  nextframe app-pipeline status
-  nextframe app-pipeline play --segment=<n>
-  nextframe app-pipeline stop`;
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
   const [sub] = positional;
 
   if (!sub || sub === "help" || sub === "--help" || sub === "-h") {
-    process.stdout.write(HELP + "\n");
+    process.stdout.write(renderCommandHelp("app-pipeline"));
+    return 0;
+  }
+  if (argv[1] === "--help" || argv[1] === "-h") {
+    const help = renderCommandHelp(`app-pipeline ${sub}`);
+    if (help) {
+      process.stdout.write(help);
+      return 0;
+    }
     return 0;
   }
 
@@ -87,11 +88,13 @@ export async function run(argv) {
         return 0;
       }
       default:
-        process.stderr.write(`unknown app-pipeline subcommand: ${sub}\n\n${HELP}\n`);
+        process.stderr.write(`error: unknown app-pipeline subcommand "${sub}"\n`);
+        process.stderr.write('Fix: run "nextframe app-pipeline --help" to see supported app-pipeline subcommands\n');
         return 3;
     }
   } catch (error) {
     process.stderr.write(`error: ${error.message}\n`);
+    process.stderr.write(`Fix: ${defaultFixSuggestion()}\n`);
     return 2;
   }
 }
