@@ -1,20 +1,103 @@
 //! NSApplication + NSWindow setup for NextFrame desktop.
 
-use objc2::msg_send;
-use objc2::rc::Retained;
-use objc2::runtime::AnyObject;
-use objc2::{MainThreadMarker, MainThreadOnly};
-use objc2_app_kit::{
-    NSApplication, NSApplicationActivationPolicy, NSAutoresizingMaskOptions,
-    NSBackingStoreType, NSView, NSWindow, NSWindowButton, NSWindowStyleMask,
+use std::ptr;
+
+use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
+use objc2::{
+    define_class, msg_send, rc::Retained, DeclaredClass, MainThreadMarker, MainThreadOnly,
 };
-use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
+use objc2_app_kit::{
+    NSApplication, NSApplicationActivationPolicy, NSAutoresizingMaskOptions, NSBackingStoreType,
+    NSEvent, NSEventType, NSView, NSWindow, NSWindowButton, NSWindowStyleMask,
+};
+use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
+use objc2_web_kit::{
+    WKScriptMessage, WKScriptMessageHandler, WKUserContentController, WKUserScript,
+    WKUserScriptInjectionTime, WKWebViewConfiguration,
+};
 
 use crate::webview;
 
 const WINDOW_WIDTH: f64 = 1440.0;
 const WINDOW_HEIGHT: f64 = 900.0;
 const TOPBAR_H: f64 = 48.0;
+const TRAFFIC_LIGHT_X: f64 = 14.0;
+const WINDOW_DRAG_HANDLER_NAME: &str = "nfWindowDrag";
+const WINDOW_DRAG_MESSAGE: &str = "start_dragging";
+const WINDOW_DRAG_SCRIPT: &str = r#"
+(() => {
+  const handlerName = 'nfWindowDrag';
+  const clickableTags = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL', 'SUMMARY']);
+  const interactiveRoles = new Set(['button', 'link', 'menuitem', 'tab', 'checkbox', 'radio', 'switch', 'option']);
+
+  function isClickableElement(el) {
+    return clickableTags.has(el.tagName)
+      || (el.hasAttribute('contenteditable') && el.getAttribute('contenteditable') !== 'false')
+      || (el.hasAttribute('tabindex') && el.getAttribute('tabindex') !== '-1')
+      || interactiveRoles.has(el.getAttribute('role'));
+  }
+
+  function shouldStartDrag(path) {
+    for (const node of path) {
+      if (!(node instanceof HTMLElement)) continue;
+      if (isClickableElement(node)) return false;
+      if (node.classList.contains('topbar')) return true;
+    }
+    return false;
+  }
+
+  document.addEventListener('mousedown', (event) => {
+    if (event.button !== 0 || event.detail !== 1) return;
+    if (!shouldStartDrag(event.composedPath())) return;
+
+    const handler = window.webkit?.messageHandlers?.[handlerName];
+    if (!handler) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    handler.postMessage('start_dragging');
+  }, true);
+})();
+"#;
+
+struct WindowDragHandlerIvars {
+    controller: Retained<WKUserContentController>,
+    window: *const NSWindow,
+}
+
+define_class!(
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[ivars = WindowDragHandlerIvars]
+    struct WindowDragHandler;
+
+    unsafe impl NSObjectProtocol for WindowDragHandler {}
+
+    unsafe impl WKScriptMessageHandler for WindowDragHandler {
+        #[unsafe(method(userContentController:didReceiveScriptMessage:))]
+        fn did_receive(
+            this: &WindowDragHandler,
+            _controller: &WKUserContentController,
+            message: &WKScriptMessage,
+        ) {
+            // SAFETY: WebKit invokes the script-message callback with a live `WKScriptMessage`.
+            let body = unsafe { message.body() };
+            let Ok(body) = body.downcast::<NSString>() else {
+                return;
+            };
+
+            if body.to_string() != WINDOW_DRAG_MESSAGE {
+                return;
+            }
+
+            let Some(window) = (unsafe { this.ivars().window.as_ref() }) else {
+                return;
+            };
+
+            start_window_drag(window);
+        }
+    }
+);
 
 /// Boot the macOS app: create window, embed WKWebView, run event loop.
 pub fn run() {
@@ -28,6 +111,7 @@ pub fn run() {
 
     // Dark appearance
     unsafe {
+        // SAFETY: `app` is a live NSApplication on the main thread, and these selectors are valid AppKit APIs.
         let dark_name = NSString::from_str("NSAppearanceNameDarkAqua");
         let appearance: Option<Retained<objc2_app_kit::NSAppearance>> =
             objc2_app_kit::NSAppearance::appearanceNamed(&dark_name);
@@ -63,22 +147,28 @@ pub fn run() {
 
     // Transparent titlebar
     unsafe {
+        // SAFETY: `window` is a live NSWindow and both setters are standard NSWindow configuration.
         let _: () = msg_send![&window, setTitlebarAppearsTransparent: true];
         let _: () = msg_send![&window, setTitleVisibility: 1i64]; // NSWindowTitleHidden
     }
 
-    // Create container view to hold both WKWebView + drag overlay
+    // Create a container view to hold the full-window WKWebView.
     let container = NSView::initWithFrame(
         mtm.alloc::<NSView>(),
-        NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT)),
+        NSRect::new(
+            NSPoint::new(0.0, 0.0),
+            NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT),
+        ),
     );
     container.setAutoresizingMask(
-        NSAutoresizingMaskOptions::ViewWidthSizable
-            | NSAutoresizingMaskOptions::ViewHeightSizable,
+        NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
     );
 
     // Create WKWebView
-    let wv = match webview::create(mtm, NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT)) {
+    let mut drag_handler: Option<Retained<WindowDragHandler>> = None;
+    let wv = match webview::create(mtm, NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT), |config| {
+        drag_handler = Some(install_window_drag_bridge(mtm, config, &window));
+    }) {
         Ok(wv) => wv,
         Err(e) => {
             tracing::error!("failed to create webview: {e}");
@@ -86,38 +176,13 @@ pub fn run() {
         }
     };
     wv.setAutoresizingMask(
-        NSAutoresizingMaskOptions::ViewWidthSizable
-            | NSAutoresizingMaskOptions::ViewHeightSizable,
+        NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
     );
-
-    // Create transparent drag overlay for the topbar area
-    // This sits ON TOP of WKWebView so the titlebar region is draggable
-    let drag_overlay = NSView::initWithFrame(
-        mtm.alloc::<NSView>(),
-        NSRect::new(
-                NSPoint::new(0.0, WINDOW_HEIGHT - TOPBAR_H),
-                NSSize::new(WINDOW_WIDTH, TOPBAR_H),
-            ),
-        );
-    // Pin to top, stretch width
-    drag_overlay.setAutoresizingMask(
-        NSAutoresizingMaskOptions::ViewWidthSizable
-            | NSAutoresizingMaskOptions::ViewMinYMargin,
-    );
-    // Make it transparent — no background, just catches mouse for dragging
-    // SAFETY: mouseDownCanMoveWindow is checked by NSWindow on the view hierarchy.
-    // A transparent view that returns YES for mouseDownCanMoveWindow enables dragging.
-    // We use a class that overrides this. For now, use movableByWindowBackground on window.
-    unsafe {
-        let _: () = msg_send![&window, setMovableByWindowBackground: true];
-    }
-
-    // Add views: WKWebView first (bottom), drag overlay on top
     container.addSubview(&wv);
-    container.addSubview(&drag_overlay);
-
     window.setContentView(Some(&container));
     window.makeKeyAndOrderFront(None);
+
+    let _drag_handler = drag_handler;
 
     // Position traffic lights to align with HTML topbar center
     position_traffic_lights(&window);
@@ -141,68 +206,144 @@ pub fn run() {
     app.run();
 }
 
-/// Reposition traffic lights to vertically center in our 48px HTML topbar.
-/// The buttons live in the system titlebar area (top of window).
-/// With FullSizeContentView, content starts at y=0 and titlebar overlaps.
-fn position_traffic_lights(window: &NSWindow) {
-    let padding_x = 13.0f64;
+fn install_window_drag_bridge(
+    mtm: MainThreadMarker,
+    config: &WKWebViewConfiguration,
+    window: &NSWindow,
+) -> Retained<WindowDragHandler> {
+    // SAFETY: `config` is a live configuration object created on the main thread.
+    let controller = unsafe { config.userContentController() };
+
+    let source = NSString::from_str(WINDOW_DRAG_SCRIPT);
+    let script = unsafe {
+        // SAFETY: The script is injected into the main frame before page scripts run.
+        WKUserScript::initWithSource_injectionTime_forMainFrameOnly(
+            WKUserScript::alloc(mtm),
+            &source,
+            WKUserScriptInjectionTime::AtDocumentStart,
+            true,
+        )
+    };
+    unsafe {
+        // SAFETY: `controller` is retained and accepts user scripts during web view setup.
+        controller.addUserScript(&script);
+    }
+
+    let handler = mtm
+        .alloc::<WindowDragHandler>()
+        .set_ivars(WindowDragHandlerIvars {
+            controller,
+            window: window as *const NSWindow,
+        });
+    let handler: Retained<WindowDragHandler> = unsafe { msg_send![super(handler), init] };
+
+    let handler_name = NSString::from_str(WINDOW_DRAG_HANDLER_NAME);
+    let protocol_handler = ProtocolObject::from_ref(&*handler);
+    unsafe {
+        // SAFETY: `handler` implements `WKScriptMessageHandler`, and the controller retains the bridge.
+        handler
+            .ivars()
+            .controller
+            .addScriptMessageHandler_name(protocol_handler, &handler_name);
+    }
+
+    handler
+}
+
+fn start_window_drag(window: &NSWindow) {
+    let Some(mtm) = MainThreadMarker::new() else {
+        tracing::error!("window drag must run on main thread");
+        return;
+    };
+
+    let app = NSApplication::sharedApplication(mtm);
+    let Some(current_event) = app.currentEvent() else {
+        return;
+    };
 
     unsafe {
-        let close = window.standardWindowButton(NSWindowButton::CloseButton);
-        let mini = window.standardWindowButton(NSWindowButton::MiniaturizeButton);
-        let zoom = window.standardWindowButton(NSWindowButton::ZoomButton);
+        // SAFETY: We mirror Tao's macOS drag path: use the current AppKit event when possible,
+        // or synthesize a left-mouse-down event before calling `performWindowDragWithEvent:`.
+        let event = if current_event.r#type().0 as usize == 0x15 {
+            let event: Retained<NSEvent> = msg_send![
+                objc2::class!(NSEvent),
+                mouseEventWithType: NSEventType::LeftMouseDown,
+                location: NSEvent::mouseLocation(),
+                modifierFlags: current_event.modifierFlags(),
+                timestamp: current_event.timestamp(),
+                windowNumber: current_event.windowNumber(),
+                context: ptr::null::<NSObject>(),
+                eventNumber: 0isize,
+                clickCount: 1isize,
+                pressure: 1.0f32
+            ];
+            event
+        } else {
+            current_event
+        };
 
-        let (Some(close), Some(mini), Some(zoom)) = (close, mini, zoom) else {
+        let _: () = msg_send![window, performWindowDragWithEvent: &*event];
+    }
+}
+
+/// Reposition traffic lights to vertically center in our 48px HTML topbar.
+fn position_traffic_lights(window: &NSWindow) {
+    unsafe {
+        // SAFETY: Standard titlebar buttons are queried from a live NSWindow on the main thread.
+        let close = window.standardWindowButton(NSWindowButton::CloseButton);
+        let Some(close) = close else {
             return;
         };
 
         let close_frame = close.frame();
-        let mini_frame = mini.frame();
-        let btn_h = close_frame.size.height;
-        let spacing = mini_frame.origin.x - close_frame.origin.x;
+        let y = ((TOPBAR_H - close_frame.size.height) / 2.0).max(0.0);
+        inset_traffic_lights(window, TRAFFIC_LIGHT_X, y);
+    }
+}
 
-        // We want buttons centered in a 48px topbar.
-        // System titlebar is at the very top of the window.
-        // Real titlebar height:
-        let win_frame = window.frame();
-        let content_rect: NSRect = msg_send![window, contentLayoutRect];
-        let titlebar_h = win_frame.size.height - content_rect.size.height;
+unsafe fn inset_traffic_lights(window: &NSWindow, x: f64, y: f64) {
+    // SAFETY: This follows Wry's macOS inset strategy: resize the titlebar container view,
+    // then move the standard buttons horizontally so AppKit keeps them aligned on relayout.
+    let Some(close) = window.standardWindowButton(NSWindowButton::CloseButton) else {
+        return;
+    };
+    let Some(miniaturize) = window.standardWindowButton(NSWindowButton::MiniaturizeButton) else {
+        return;
+    };
+    let zoom = window.standardWindowButton(NSWindowButton::ZoomButton);
 
-        // Our HTML topbar is 48px from the top of the content area.
-        // But with FullSizeContentView, content area includes the titlebar.
-        // So the "visual topbar" spans from (window top) to (window top - 48px).
-        // The buttons are in the titlebar coordinate space (origin at bottom-left of titlebar).
-        // Center button in 48px: y = (48 - btn_h) / 2, but measured from bottom of titlebar.
-        // Since titlebar_h < 48, we need to shift buttons DOWN into content area.
-        // Button y in titlebar coords: negative means below titlebar into content.
-        let visual_center_from_top = (TOPBAR_H - btn_h) / 2.0;
-        // From top of titlebar to center = visual_center_from_top
-        // In titlebar coords (bottom-up): y = titlebar_h - visual_center_from_top - btn_h
-        let y = titlebar_h - visual_center_from_top - btn_h;
+    let Some(title_bar_container_view) = close.superview().and_then(|view| view.superview()) else {
+        return;
+    };
 
-        let mut x = padding_x;
+    let close_rect = close.frame();
+    let title_bar_frame_height = close_rect.size.height + y;
 
-        let mut cf = close_frame;
-        cf.origin = NSPoint::new(x, y);
-        let _: () = msg_send![&*close, setFrame: cf];
-        x += spacing;
+    let mut title_bar_rect = title_bar_container_view.frame();
+    title_bar_rect.size.height = title_bar_frame_height;
+    title_bar_rect.origin.y = window.frame().size.height - title_bar_frame_height;
+    let _: () = msg_send![&title_bar_container_view, setFrame: title_bar_rect];
 
-        let mut mf = mini_frame;
-        mf.origin = NSPoint::new(x, y);
-        let _: () = msg_send![&*mini, setFrame: mf];
-        x += spacing;
+    let space_between = miniaturize.frame().origin.x - close_rect.origin.x;
 
-        let mut zf = zoom.frame();
-        zf.origin = NSPoint::new(x, y);
-        let _: () = msg_send![&*zoom, setFrame: zf];
+    close.setFrameOrigin(NSPoint::new(x, close_rect.origin.y));
+    miniaturize.setFrameOrigin(NSPoint::new(
+        x + space_between,
+        miniaturize.frame().origin.y,
+    ));
+    if let Some(zoom) = zoom {
+        zoom.setFrameOrigin(NSPoint::new(
+            x + (space_between * 2.0),
+            zoom.frame().origin.y,
+        ));
     }
 }
 
 /// Register resize/layout notifications to reapply traffic light positions.
 fn register_resize_observer(window: &NSWindow) {
     unsafe {
-        let center: *mut AnyObject =
-            msg_send![objc2::class!(NSNotificationCenter), defaultCenter];
+        // SAFETY: The default notification center is process-global and the observed window outlives the app run loop.
+        let center: *mut AnyObject = msg_send![objc2::class!(NSNotificationCenter), defaultCenter];
 
         let names = [
             "NSWindowDidResizeNotification",

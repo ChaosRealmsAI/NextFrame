@@ -33,9 +33,11 @@ fn web_dir() -> PathBuf {
 pub fn create(
     mtm: MainThreadMarker,
     size: NSSize,
+    configure: impl FnOnce(&WKWebViewConfiguration),
 ) -> Result<Retained<WKWebView>, String> {
     // SAFETY: mtm proves main-thread, required by WKWebViewConfiguration::new.
     let config = unsafe { WKWebViewConfiguration::new(mtm) };
+    configure(&config);
 
     // SAFETY: mtm proves main-thread, required by nonPersistentDataStore.
     let store = unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) };
@@ -55,9 +57,8 @@ pub fn create(
     }
 
     // SAFETY: mtm, frame, and config satisfy WKWebView designated initializer.
-    let web_view = unsafe {
-        WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), rect, &config)
-    };
+    let web_view =
+        unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), rect, &config) };
 
     // Allow non-opaque background so window dragging works with -webkit-app-region
     // SAFETY: _setDrawsBackground: is a private but widely-used WKWebView method.
@@ -70,12 +71,12 @@ pub fn create(
     let index_path = dir.join("index.html");
 
     if index_path.exists() {
-        let file_url = NSURL::URLWithString(&NSString::from_str(
-            &format!("file://{}", index_path.display()),
-        ));
-        let dir_url = NSURL::URLWithString(&NSString::from_str(
-            &format!("file://{}/", dir.display()),
-        ));
+        let file_url = NSURL::URLWithString(&NSString::from_str(&format!(
+            "file://{}",
+            index_path.display()
+        )));
+        let dir_url =
+            NSURL::URLWithString(&NSString::from_str(&format!("file://{}/", dir.display())));
 
         if let (Some(file), Some(dir)) = (file_url, dir_url) {
             // SAFETY: loadFileURL:allowingReadAccessToURL: is a standard WKWebView method.
@@ -88,7 +89,10 @@ pub fn create(
             load_fallback(&web_view);
         }
     } else {
-        tracing::warn!("index.html not found at {}, using fallback", index_path.display());
+        tracing::warn!(
+            "index.html not found at {}, using fallback",
+            index_path.display()
+        );
         load_fallback(&web_view);
     }
 
@@ -127,8 +131,8 @@ type SnapshotSlot = Rc<RefCell<Option<Result<Retained<NSImage>, String>>>>;
 
 /// Take a screenshot of the WKWebView and save as PNG to the given path.
 pub fn screenshot(web_view: &WKWebView, out_path: &str) -> Result<(), String> {
-    let mtm = MainThreadMarker::new()
-        .ok_or_else(|| "screenshot must run on main thread".to_string())?;
+    let mtm =
+        MainThreadMarker::new().ok_or_else(|| "screenshot must run on main thread".to_string())?;
 
     // Wait for page to render (fonts + animations need time)
     pump_run_loop(Duration::from_secs(4));
@@ -175,23 +179,22 @@ pub fn screenshot(web_view: &WKWebView, out_path: &str) -> Result<(), String> {
     // Convert NSImage → PNG data → write to disk
     // SAFETY: TIFFRepresentation and initWithData are standard AppKit methods.
     unsafe {
-        let tiff = image.TIFFRepresentation()
+        let tiff = image
+            .TIFFRepresentation()
             .ok_or_else(|| "failed to get TIFF data".to_string())?;
         let bitmap = NSBitmapImageRep::initWithData(NSBitmapImageRep::alloc(), &tiff)
             .ok_or_else(|| "failed to create bitmap rep".to_string())?;
 
         let png_type: objc2_app_kit::NSBitmapImageFileType =
             objc2_app_kit::NSBitmapImageFileType::PNG;
-        let png_data: Option<Retained<objc2_foundation::NSData>> =
-            objc2::msg_send![&bitmap, representationUsingType: png_type, properties: std::ptr::null::<AnyObject>()];
+        let png_data: Option<Retained<objc2_foundation::NSData>> = objc2::msg_send![&bitmap, representationUsingType: png_type, properties: std::ptr::null::<AnyObject>()];
 
         let data = png_data.ok_or_else(|| "failed to create PNG data".to_string())?;
         // Use NSData's bytes/length via CoreFoundation-compatible approach
         let len: usize = objc2::msg_send![&data, length];
         let ptr: *const std::ffi::c_void = objc2::msg_send![&data, bytes];
         let bytes = std::slice::from_raw_parts(ptr as *const u8, len);
-        std::fs::write(out_path, bytes)
-            .map_err(|e| format!("failed to write {out_path}: {e}"))?;
+        std::fs::write(out_path, bytes).map_err(|e| format!("failed to write {out_path}: {e}"))?;
     }
 
     tracing::info!("screenshot saved to {out_path}");

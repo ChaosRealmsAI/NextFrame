@@ -2,9 +2,9 @@
 //! No Tao, no Wry. Direct AppKit + WKWebView.
 
 mod app;
-mod webview;
-mod protocol;
 mod ipc;
+mod protocol;
+mod webview;
 
 fn main() {
     // Tracing
