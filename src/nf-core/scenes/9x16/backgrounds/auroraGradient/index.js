@@ -56,16 +56,16 @@ export function render(t, params, vp) {
   const W = vp.width, H = vp.height, T = t * speed;
   return `<canvas width="${W}" height="${H}" style="width:100%;height:100%;display:block" id="__sc"></canvas>
 <script>(function(){
-  var c=document.getElementById("__sc"),x=c.getContext("2d"),W=${W},H=${H},T=${T};
-  var hA=${hueA},hB=${hueB},hC=${hueC},I=${intensity},G=${grain};
-  function blob(cx,cy,r,h,a){var g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,"hsla("+h+","+Math.round(70*I)+"%,55%,"+a+")");g.addColorStop(1,"hsla("+h+","+Math.round(70*I)+"%,55%,0)");x.fillStyle=g;x.fillRect(0,0,W,H)}
+  const c=document.getElementById("__sc"),x=c.getContext("2d"),W=${W},H=${H},T=${T};
+  const hA=${hueA},hB=${hueB},hC=${hueC},I=${intensity},G=${grain};
+  function blob(cx,cy,r,h,a){const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,"hsla("+h+","+Math.round(70*I)+"%,55%,"+a+")");g.addColorStop(1,"hsla("+h+","+Math.round(70*I)+"%,55%,0)");x.fillStyle=g;x.fillRect(0,0,W,H)}
   x.fillStyle="#0a0a12";x.fillRect(0,0,W,H);x.globalCompositeOperation="lighter";
   blob(W*(0.3+0.2*Math.sin(T*0.7)),H*(0.2+0.12*Math.cos(T*0.5)),W*0.8,hA,0.6);
   blob(W*(0.7+0.15*Math.cos(T*0.6)),H*(0.45+0.15*Math.sin(T*0.4)),W*0.7,hB,0.5);
   blob(W*(0.5+0.2*Math.sin(T*0.8)),H*(0.7+0.1*Math.cos(T*0.9)),W*0.75,hC,0.45);
   blob(W*(0.4+0.1*Math.cos(T*1.1)),H*(0.9+0.05*Math.sin(T*0.6)),W*0.5,hA+40,0.3);
   x.globalCompositeOperation="source-over";
-  if(G>0.001){var d=x.getImageData(0,0,W,H),p=d.data,g2=255*G;for(var i=0;i<p.length;i+=16){var n=(Math.random()-0.5)*g2;p[i]+=n;p[i+1]+=n;p[i+2]+=n}x.putImageData(d,0,0)}
+  if(G>0.001){const d=x.getImageData(0,0,W,H),p=d.data,g2=255*G;for(let i=0;i<p.length;i+=16){const n=(Math.random()-0.5)*g2;p[i]+=n;p[i+1]+=n;p[i+2]+=n}x.putImageData(d,0,0)}
 })()<\/script>`;
 }
 

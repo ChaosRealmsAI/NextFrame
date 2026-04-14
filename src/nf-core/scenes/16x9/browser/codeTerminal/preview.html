@@ -73,12 +73,17 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
     return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
 
-  function render(t, p) {
+  function render(t, p, vp) {
     var lines = p.lines || [];
     var w = p.width || 560;
+    var h = p.height || 0;
+    var x = p.x || 60;
+    var yCenter = !p.y;
+    var yVal = p.y || 0;
     var fs = p.fontSize || 15;
     var delay = p.lineDelay || 0.4;
-    var br = 12;
+    var br = p.borderRadius || 12;
+    var showDots = p.showDots !== false;
     var bg = p.bg || "#0d1117";
     var barBg = p.barBg || "#21262d";
     var textC = p.text || "#e6edf3";
@@ -125,16 +130,25 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
         displayText = esc(text);
       }
 
-      linesHtml += '<div style="opacity:'+opacity+';color:'+color+';font-weight:'+fw+';font-style:'+fi+';line-height:1.75;min-height:'+(fs*1.75)+'px;white-space:pre-wrap">'+displayText+'</div>';
+        linesHtml += '<div style="opacity:'+opacity+';color:'+color+';font-weight:'+fw+';font-style:'+fi+';line-height:1.75;min-height:'+(fs*1.75)+'px;white-space:pre-wrap">'+displayText+'</div>';
     }
 
-    return '<div style="position:absolute;left:60px;top:50%;transform:translateY(-50%);width:'+w+'px;background:'+bg+';border-radius:'+br+'px;overflow:hidden;box-shadow:0 8px 48px rgba(0,0,0,.65);display:flex;flex-direction:column;font-family:\'SF Mono\',\'JetBrains Mono\',\'Fira Code\',Consolas,monospace">' +
-      '<div style="background:'+barBg+';padding:11px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">' +
-        '<div style="display:flex;gap:8px;align-items:center">' +
+    var dotsHtml = showDots
+      ? '<div style="display:flex;gap:8px;align-items:center">' +
           '<div style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></div>' +
           '<div style="width:12px;height:12px;border-radius:50%;background:#febc2e"></div>' +
           '<div style="width:12px;height:12px;border-radius:50%;background:#28c840"></div>' +
-        '</div>' +
+        '</div>'
+      : '';
+    var safeMaxWidth = Math.max(320, vp.width - x - 60);
+    var posStyle = yCenter
+      ? 'position:absolute;left:'+x+'px;top:50%;transform:translateY(-50%);width:'+w+'px;max-width:'+safeMaxWidth+'px'
+      : 'position:absolute;left:'+x+'px;top:'+yVal+'px;width:'+w+'px;max-width:'+safeMaxWidth+'px';
+    var heightStyle = h > 0 ? 'height:'+h+'px;' : '';
+
+    return '<div style="'+posStyle+';'+heightStyle+'background:'+bg+';border-radius:'+br+'px;overflow:hidden;box-shadow:0 8px 48px rgba(0,0,0,.65);display:flex;flex-direction:column;font-family:\'SF Mono\',\'JetBrains Mono\',\'Fira Code\',Consolas,monospace">' +
+      '<div style="background:'+barBg+';padding:11px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0">' +
+        dotsHtml +
         '<div style="flex:1;text-align:center;font-size:14px;color:rgba(255,255,255,.3)">' + esc(p.title||"Terminal") + '</div>' +
       '</div>' +
       '<div style="padding:20px 24px;font-size:'+fs+'px;flex:1;overflow:hidden">' +
@@ -172,13 +186,18 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
       lines: demoLines,
       lineDelay: parseFloat(document.getElementById('lineDelay').value),
       fontSize: parseInt(document.getElementById('fontSize').value),
-      width: parseInt(document.getElementById('termWidth').value)
+      width: parseInt(document.getElementById('termWidth').value),
+      height: 0,
+      x: 60,
+      y: 0,
+      showDots: true,
+      borderRadius: 12
     }, tc);
   }
 
   function renderFrame(t) {
     var bgHtml = '<div style="position:absolute;inset:0;background:#1a1510;background-image:radial-gradient(ellipse at 40% 40%,rgba(212,180,131,.04) 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,rgba(218,119,86,.03) 0%,transparent 50%)"></div>';
-    canvas.innerHTML = bgHtml + '<div style="position:absolute;inset:0">' + render(t, getParams()) + '</div>';
+    canvas.innerHTML = bgHtml + '<div style="position:absolute;inset:0">' + render(t, getParams(), {width:1920,height:1080}) + '</div>';
   }
 
   scrubber.addEventListener('input', function() {

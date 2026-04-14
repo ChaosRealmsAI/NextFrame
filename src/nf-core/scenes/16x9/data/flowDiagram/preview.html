@@ -33,8 +33,8 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
   function nodeCircle(icon,label,sub,color){
     var c=rc(color);var il=(icon||'').length;var fs=il<=2?20:il<=4?14:11;
     return '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;min-width:90px">'+
-      '<div style="width:72px;height:72px;border-radius:50%;border:2px solid '+c+';background:'+c+'15;display:flex;align-items:center;justify-content:center;font:800 '+fs+'px \'SF Mono\',monospace;color:'+c+'">'+esc(icon||'')+'</div>'+
-      (label?'<div style="font:600 14px system-ui;color:#f5ece0;text-align:center">'+esc(label)+'</div>':'')+
+      '<div style="width:72px;height:72px;border-radius:50%;border:2px solid '+c+';background:'+c+'15;display:flex;align-items:center;justify-content:center;font:800 '+fs+'px \'SF Mono\',monospace;color:'+c+';flex-shrink:0;letter-spacing:.02em">'+esc(icon||'')+'</div>'+
+      (label?'<div style="font:600 14px system-ui,sans-serif;color:#f5ece0;text-align:center">'+esc(label)+'</div>':'')+
       (sub?'<div style="font:400 12px \'SF Mono\',monospace;color:rgba(245,236,224,.45);text-align:center">'+esc(sub)+'</div>':'')+
     '</div>';
   }
@@ -46,8 +46,8 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
   function forkPill(label,sub,color){
     var c=rc(color);
     return '<div style="display:flex;align-items:center;gap:12px;padding:8px 0">'+
-      '<div style="padding:6px 18px;border-radius:20px;border:2px solid '+c+';background:'+c+'12;font:700 14px \'SF Mono\',monospace;color:'+c+';white-space:nowrap">'+esc(label||'')+'</div>'+
-      (sub?'<div style="font:400 13px system-ui;color:rgba(245,236,224,.6)">'+esc(sub)+'</div>':'')+
+      '<div style="padding:6px 18px;border-radius:20px;border:2px solid '+c+';background:'+c+'12;font:700 14px \'SF Mono\',monospace;color:'+c+';letter-spacing:.05em;white-space:nowrap">'+esc(label||'')+'</div>'+
+      (sub?'<div style="font:400 13px system-ui,sans-serif;color:rgba(245,236,224,.6)">'+esc(sub)+'</div>':'')+
     '</div>';
   }
   function render(t,p,vp){
@@ -56,11 +56,12 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
     var mainRow=nodes.map(function(n,i){return(i>0?arrow():'')+nodeCircle(n.icon,n.label,n.sub,n.color)}).join('');
     var forkHtml='';
     if(forkNodes.length>0){
-      var pills=forkNodes.map(function(fn){return forkPill(fn.label||'',fn.sub,fn.color)}).join('');
+      var pills=forkNodes.map(function(fn){return forkPill(fn.label||fn.icon||'',fn.sub,fn.color)}).join('');
       forkHtml='<div style="display:flex;align-items:center">'+arrow()+'<div style="display:flex;flex-direction:column;gap:4px">'+pills+'</div></div>';
     }
     var pos=p.y>0?'position:absolute;left:0;right:0;top:'+p.y+'px;display:flex;justify-content:center':'position:absolute;inset:0;display:flex;align-items:center;justify-content:center';
-    return '<div style="'+pos+'"><div style="display:flex;align-items:center;opacity:'+op+'">'+mainRow+forkHtml+'</div></div>';
+    var safeWidth=Math.max(360,vp.width-120);
+    return '<div style="'+pos+'"><div style="display:flex;align-items:center;opacity:'+op+';max-width:'+safeWidth+'px">'+mainRow+forkHtml+'</div></div>';
   }
 
   var DEMO={

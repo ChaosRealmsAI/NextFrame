@@ -1,0 +1,17 @@
+{
+  "complete": true,
+  "score": "10/10",
+  "summary": "Implemented videoClip for 16:9 and 9:16, added darkGradient for 16:9, synchronized outdated preview renderers, fixed scene-validate to resolve exported scene ids like progressBar16x9, and removed remaining var usage from scene index.js files covered by task verification.",
+  "verification": {
+    "task_commands": "passed",
+    "scene_preview_opened": [
+      "src/nf-core/scenes/16x9/media/videoClip/preview.html",
+      "src/nf-core/scenes/16x9/backgrounds/darkGradient/preview.html",
+      "src/nf-core/scenes/16x9/browser/codeTerminal/preview.html"
+    ]
+  },
+  "notes": [
+    "spec/standards/00-index.md was not present in this worktree, so no project standard could be read from the documented path.",
+    "node src/nf-cli/bin/nextframe.js --help still crashes in the existing help formatter code; task verification commands ran successfully regardless."
+  ]
+}

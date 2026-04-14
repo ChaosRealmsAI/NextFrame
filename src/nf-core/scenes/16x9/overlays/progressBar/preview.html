@@ -44,7 +44,7 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
     var r = p.borderRadius;
     var y = p.y;
     var fillW = (progress * 100).toFixed(3) + '%';
-    return '<div style="position:absolute;bottom:'+y+'px;left:0;right:0;height:'+h+'px;border-radius:'+r+'px;background:'+p.trackColor+';overflow:hidden">' +
+    return '<div style="position:absolute;bottom:'+y+'px;left:0;right:0;width:'+vp.width+'px;height:'+h+'px;border-radius:'+r+'px;background:'+p.trackColor+';overflow:hidden">' +
       '<div style="height:100%;width:'+fillW+';background:'+p.color+';border-radius:'+r+'px"></div>' +
     '</div>';
   }

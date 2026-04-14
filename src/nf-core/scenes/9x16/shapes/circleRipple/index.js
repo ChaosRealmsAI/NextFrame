@@ -48,19 +48,19 @@ export function render(t, params, vp) {
 
   return `<canvas width="${W}" height="${H}" style="width:100%;height:100%;display:block" id="__sc"></canvas>
 <script>(function(){
-  var c=document.getElementById("__sc"),x=c.getContext("2d"),W=${W},H=${H},t=${t};
-  var hS=${hueStart},hSpan=${hueSpan},rc=${ringCount},iv=${interval},ls=${lifespan},lw=${lineW},mR=${maxR};
+  const c=document.getElementById("__sc"),x=c.getContext("2d"),W=${W},H=${H},t=${t};
+  const hS=${hueStart},hSpan=${hueSpan},rc=${ringCount},iv=${interval},ls=${lifespan},lw=${lineW},mR=${maxR};
   x.fillStyle="#0a0a12";x.fillRect(0,0,W,H);
-  var cx=W/2,cy=H/2;
-  for(var i=0;i<rc;i++){
-    var age=(t-i*iv)%((rc)*iv);
+  const cx=W/2,cy=H/2;
+  for(let i=0;i<rc;i++){
+    let age=(t-i*iv)%((rc)*iv);
     if(age<0) age+=rc*iv;
-    var p=age/ls;
+    const p=age/ls;
     if(p>1||p<0) continue;
-    var ease=p*(2-p);
-    var r=ease*mR;
-    var alpha=1-p;
-    var hue=hS+(hSpan*i/rc)%360;
+    const ease=p*(2-p);
+    const r=ease*mR;
+    const alpha=1-p;
+    const hue=hS+(hSpan*i/rc)%360;
     x.beginPath();
     x.arc(cx,cy,Math.max(1,r),0,Math.PI*2);
     x.strokeStyle="hsla("+hue+",70%,60%,"+alpha+")";

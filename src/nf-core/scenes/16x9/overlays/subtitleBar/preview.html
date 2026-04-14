@@ -57,11 +57,12 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
     else               fs = 16;
     var y = p.y || 70;
     var shadow = '0 2px 8px '+p.shadowColor+',0 1px 3px '+p.shadowColor;
+    var maxWidth = Math.max(320, vp.width - 160);
     return '<div style="position:absolute;bottom:'+y+'px;left:0;right:0;text-align:center;' +
       'font:500 '+fs+'px \'PingFang SC\',\'Noto Sans SC\',system-ui,sans-serif;' +
       'color:'+p.textColor+';' +
       'text-shadow:'+shadow+';' +
-      'padding:0 80px;line-height:1.5">' +
+      'padding:0 80px;line-height:1.5;max-width:'+maxWidth+'px;margin:0 auto">' +
       esc(text) +
     '</div>';
   }

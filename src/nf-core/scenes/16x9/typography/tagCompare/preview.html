@@ -49,16 +49,16 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
     var p = {};
     for(var k in meta_params) p[k] = params[k]!==undefined ? params[k] : meta_params[k].default;
     var op = fadeIn(t, p.enterDelay, 0.5);
-    if(op <= 0) return '';
     var x = p.x;
     var y = p.y;
+    var maxWidth = Math.max(320, vp.width - x - 60);
     var tagStyle = function(bg, border, color) {
       return 'display:inline-flex;align-items:center;padding:8px 20px;border-radius:999px;' +
         'background:'+bg+';border:1.5px solid '+border+';' +
         'font:700 15px \'SF Mono\',\'JetBrains Mono\',monospace;color:'+color+';' +
         'white-space:nowrap;letter-spacing:.04em';
     };
-    return '<div style="position:absolute;left:'+x+'px;top:'+y+'px;display:flex;align-items:center;gap:16px;opacity:'+op+'">' +
+    return '<div style="position:absolute;left:'+x+'px;top:'+y+'px;display:flex;align-items:center;gap:16px;opacity:'+op+';max-width:'+maxWidth+'px">' +
       '<span style="'+tagStyle(p.leftBg, p.leftBorder, p.leftColor)+'">'+esc(p.left)+'</span>' +
       '<span style="font:italic 700 18px Georgia,serif;color:rgba(245,236,224,.45);flex-shrink:0">vs</span>' +
       '<span style="'+tagStyle(p.rightBg, p.rightBorder, p.rightColor)+'">'+esc(p.right)+'</span>' +

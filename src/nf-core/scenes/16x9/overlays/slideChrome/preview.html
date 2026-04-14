@@ -54,7 +54,8 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
       (p.dim ? '<div style="font:500 16px \'SF Mono\',monospace;color:'+p.dimColor+'">'+esc(p.dim)+'</div>' : '') +
     '</div>';
     var wm = p.watermark ? '<div style="position:absolute;top:40px;right:40px;font:900 120px system-ui;color:'+p.watermarkColor+';text-shadow:0 0 80px rgba(218,119,86,.06);z-index:1;letter-spacing:-.02em">'+esc(p.watermark)+'</div>' : '';
-    return topBar + wm;
+    var frameStyle = 'position:absolute;inset:0;width:'+vp.width+'px;height:'+vp.height+'px';
+    return '<div style="'+frameStyle+'">' + topBar + wm + '</div>';
   }
 
   var DEMO_PARAMS = {

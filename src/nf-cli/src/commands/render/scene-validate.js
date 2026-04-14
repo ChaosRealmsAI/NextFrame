@@ -2,7 +2,7 @@
 // Runs validate-scene.js on a scene and reports pass/fail.
 
 import { parseFlags } from "../_helpers/_io.js";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -55,6 +55,30 @@ export async function run(argv) {
     if (existsSync(resolve(candidate, "index.js"))) {
       sceneDir = candidate;
       break;
+    }
+  }
+
+  if (!sceneDir) {
+    for (const cat of CATEGORIES) {
+      const catDir = resolve(scenesRoot, ratioDir, cat);
+      if (!existsSync(catDir)) continue;
+      const entries = readdirSync(catDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const candidate = resolve(catDir, entry.name);
+        const indexPath = resolve(candidate, "index.js");
+        if (!existsSync(indexPath)) continue;
+        try {
+          const mod = await import(`file://${indexPath}`);
+          if (mod?.meta?.id === name) {
+            sceneDir = candidate;
+            break;
+          }
+        } catch {
+          // Skip broken scenes while searching for an ID match.
+        }
+      }
+      if (sceneDir) break;
     }
   }
 

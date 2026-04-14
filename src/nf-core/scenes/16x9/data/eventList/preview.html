@@ -53,6 +53,7 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
     var y = p.y;
     var titleOp = fadeIn(t, 0, 0.5);
     var DOT_SIZE = 16;
+    var maxWidth = Math.max(380, vp.width - x - 60);
     var rows = items.map(function(item, i) {
       var isHl = p.highlight && String(item) === String(p.highlight);
       var itemOp = fadeIn(t, i * p.stagger, 0.5);
@@ -69,7 +70,7 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
         '<div style="margin-left:16px;font:'+fontWeight+' '+fontSize+' \'SF Mono\',\'JetBrains Mono\',monospace;color:'+color+';line-height:1.5">'+esc(item)+'</div>' +
       '</div>';
     }).join('');
-    return '<div style="position:absolute;left:'+x+'px;top:'+y+'px;min-width:380px">' +
+    return '<div style="position:absolute;left:'+x+'px;top:'+y+'px;min-width:380px;max-width:'+maxWidth+'px">' +
       (p.title ? '<div style="font:700 13px \'SF Mono\',monospace;letter-spacing:.12em;text-transform:uppercase;color:'+p.titleColor+';opacity:'+titleOp+';margin-bottom:24px">'+esc(p.title)+'</div>' : '') +
       '<div style="position:relative">' +
         '<div style="position:absolute;left:'+(DOT_SIZE/2)+'px;top:0;bottom:0;width:2px;background:'+p.lineColor+'"></div>' +

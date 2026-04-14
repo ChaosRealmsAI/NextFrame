@@ -30,8 +30,9 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
   function render(t,p,vp){
     var op=fadeIn(t,p.enterDelay||0,0.7);
     var fs=p.fontSize||42;var c=p.color||'#f5ece0';
-    var pos=p.y>0?'position:absolute;left:60px;right:60px;top:'+p.y+'px;text-align:center':'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 60px';
-    return '<div style="'+pos+'"><div style="font:700 '+fs+'px Georgia,\'Noto Serif SC\',serif;color:'+c+';text-align:center;line-height:1.3;opacity:'+op+'">'+(p.text||'')+'</div></div>';
+    var maxWidth=Math.max(320,vp.width-120);
+    var pos=p.y>0?'position:absolute;left:60px;right:60px;top:'+p.y+'px;text-align:center;max-width:'+maxWidth+'px;margin:0 auto':'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 60px';
+    return '<div style="'+pos+'"><div style="font:700 '+fs+'px Georgia,\'Noto Serif SC\',serif;color:'+c+';text-align:center;line-height:1.3;opacity:'+op+';max-width:'+maxWidth+'px">'+(p.text||'')+'</div></div>';
   }
   var DEMO={text:'给 AI 安了一个<span style="color:#da7756">安检员</span>',fontSize:42,enterDelay:0.3};
   var duration=5;var canvas=document.getElementById('canvas');var scrubber=document.getElementById('scrubber');var td=document.getElementById('timeDisplay');var pb=document.getElementById('playBtn');
