@@ -1,10 +1,10 @@
 /**
- * toolboxSlide — 一比一复刻 09-dim-tools-v2.html
- * P1 (0-12s): 工具箱标题 + 6 个工具卡片 + JSON Schema 代码块
- * P2 (12-32s): 增长条形图 + 瑞士军刀 + 100+ 大数字
+ * toolboxSlide — 1:1 recreation of 09-dim-tools-v2.html
+ * P1 (0-12s): toolbox title + 6 tool cards + JSON Schema code block
+ * P2 (12-32s): growth bar chart + Swiss Army knife + 100+ hero number
  */
 
-// ─── 字体（napi-canvas 需要显式指定 CJK 字体） ───
+// ─── Fonts (napi-canvas requires explicit CJK font families) ───
 const CJK = '"Hiragino Sans GB", "Heiti TC"';
 function font(weight, size, family) {
   if (family === "mono") return `${weight} ${size}px Menlo, ${CJK}, monospace`;
@@ -12,7 +12,7 @@ function font(weight, size, family) {
   return `${weight} ${size}px ${CJK}, sans-serif`;
 }
 
-// ─── 色板（匹配 theme.css） ───
+// ─── Palette (matches theme.css) ───
 const INK = "#f5ece0";
 const INK50 = "rgba(245,236,224,0.5)";
 const INK75 = "rgba(245,236,224,0.75)";
@@ -38,7 +38,7 @@ function tween(t, startAt, dur, easeFn) {
   return easeFn ? easeFn(raw) : raw;
 }
 
-// ─── 绘制工具 ───
+// ─── Drawing helpers ───
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -92,7 +92,7 @@ function drawCard(ctx, x, y, w, h, { name, desc, color, iconFn, progress }) {
   ctx.restore();
 }
 
-// ─── 图标绘制函数 ───
+// ─── Icon drawing functions ───
 function iconBash(ctx, cx, cy, color) {
   ctx.strokeStyle = color; ctx.lineWidth = 2;
   roundRect(ctx, cx - 18, cy - 14, 36, 28, 4); ctx.stroke();
@@ -137,7 +137,7 @@ function iconSkill(ctx, cx, cy, color) {
   ctx.lineCap = "butt"; ctx.lineJoin = "miter";
 }
 
-// ─── JSON Schema 代码块 ───
+// ─── JSON Schema code block ───
 function drawSchemaBlock(ctx, x, y, w, h, progress) {
   ctx.save();
   ctx.globalAlpha = progress;
@@ -207,7 +207,7 @@ function drawSchemaBlock(ctx, x, y, w, h, progress) {
   ctx.restore();
 }
 
-// ─── P2: 条形图 ───
+// ─── P2: Bar chart ───
 function drawBarChart(ctx, x, y, w, progress, barProgress) {
   const bars = [
     { label: "Built-in", color: AC, fillColor: AC25, width: 0.3, value: "20+", chips: [] },
@@ -266,21 +266,21 @@ function drawBarChart(ctx, x, y, w, progress, barProgress) {
   ctx.restore();
 }
 
-// ─── P2: 瑞士军刀 ───
+// ─── P2: Swiss Army knife ───
 function drawKnife(ctx, cx, cy, progress) {
   ctx.save();
   ctx.globalAlpha = progress;
   const yOff = (1 - progress) * 15;
   ctx.translate(0, yOff);
 
-  // 刀柄
+  // Handle
   roundRect(ctx, cx - 60, cy - 30, 120, 60, 10);
   ctx.fillStyle = "rgba(224,108,117,0.15)"; ctx.fill();
   ctx.strokeStyle = RED; ctx.lineWidth = 2; ctx.stroke();
   ctx.fillStyle = RED; ctx.font = font("bold", 16, "mono"); ctx.textAlign = "center";
   ctx.fillText("tools[]", cx, cy + 6);
 
-  // 展开的刀片
+  // Extended blades
   const blades = [
     { dx: 60, dy: -20, w: 70, h: 16, color: GREEN, fill: "rgba(126,198,153,0.2)", angle: -0.35 },
     { dx: 60, dy: 10, w: 60, h: 16, color: BLUE, fill: "rgba(138,180,204,0.2)", angle: 0.09 },
@@ -295,7 +295,7 @@ function drawKnife(ctx, cx, cy, progress) {
     ctx.restore();
   }
 
-  // 虚线刀片（Deferred）
+  // Dashed blades (Deferred)
   ctx.setLineDash([4, 3]);
   const dashed = [
     { dy: 30, w: 50, angle: 0.26 },
@@ -312,7 +312,7 @@ function drawKnife(ctx, cx, cy, progress) {
   }
   ctx.setLineDash([]);
 
-  // 左侧刀片
+  // Left-side blade
   ctx.save();
   ctx.translate(cx - 60, cy + 10);
   ctx.rotate(-0.17);
@@ -324,7 +324,7 @@ function drawKnife(ctx, cx, cy, progress) {
   ctx.restore();
 }
 
-// ─── 主渲染函数 ───
+// ─── Main render function ───
 export function toolboxSlide(t, params = {}, ctx) {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
@@ -336,10 +336,10 @@ export function toolboxSlide(t, params = {}, ctx) {
   const pad = { x: W * 0.06, y: H * 0.06 };
 
   if (t < p1End) {
-    // ═══ P1: 工具箱 ═══
+    // ═══ P1: Toolbox ═══
     const pt = t;
 
-    // 标题
+    // Title
     const titleP = tween(pt, 0.2, 0.5, easeOutCubic);
     ctx.save();
     ctx.globalAlpha = titleP;
@@ -358,7 +358,7 @@ export function toolboxSlide(t, params = {}, ctx) {
     ctx.fillText("· 20+ built-in", pad.x + 246, pad.y + 26);
     ctx.restore();
 
-    // 6 个工具卡片
+    // Six tool cards
     const tools = [
       { name: "Bash", desc: "执行命令", color: GREEN, iconFn: iconBash },
       { name: "Read", desc: "读文件", color: BLUE, iconFn: iconRead },
@@ -378,13 +378,13 @@ export function toolboxSlide(t, params = {}, ctx) {
       drawCard(ctx, cardX, cardY, cardW, cardH, { ...tools[i], progress: p });
     }
 
-    // JSON Schema 代码块
+    // JSON Schema code block
     const schemaP = tween(pt, 8.4, 0.7, easeOutCubic);
     const schemaY = cardY + cardH + 20;
     const schemaH = H - schemaY - pad.y - 50;
     drawSchemaBlock(ctx, pad.x, schemaY, W - pad.x * 2, schemaH, schemaP);
 
-    // 底部注释
+    // Bottom note
     const noteP = tween(pt, 10.0, 0.5, easeOutCubic);
     ctx.save();
     ctx.globalAlpha = noteP;
@@ -396,10 +396,10 @@ export function toolboxSlide(t, params = {}, ctx) {
     ctx.restore();
 
   } else {
-    // ═══ P2: 增长条 + 瑞士军刀 + 100+ ═══
+    // ═══ P2: Growth bars + Swiss Army knife + 100+ ═══
     const pt = t - p1End;
 
-    // 条形图
+    // Bar chart
     const chartP = tween(pt, 0.2, 0.6, easeOutCubic);
     const barP = [
       1,
@@ -408,12 +408,12 @@ export function toolboxSlide(t, params = {}, ctx) {
     ];
     drawBarChart(ctx, pad.x, pad.y, W - pad.x * 2, chartP, barP);
 
-    // 瑞士军刀
+    // Swiss Army knife
     const knifeP = tween(pt, 10.5, 0.7, easeOutCubic);
     const knifeY = pad.y + 180;
     drawKnife(ctx, W * 0.25, knifeY + 80, knifeP);
 
-    // 刀旁边的文字
+    // Text beside the knife
     ctx.save();
     ctx.globalAlpha = knifeP;
     const textX = W * 0.45;
@@ -425,7 +425,7 @@ export function toolboxSlide(t, params = {}, ctx) {
     ctx.fillText("用到了才临时查 Schema — 省 token，不占上下文。", textX, knifeY + 146);
     ctx.restore();
 
-    // 100+ 大数字
+    // 100+ hero number
     const numP = tween(pt, 16.2, 0.5, easeOutBack);
     ctx.save();
     ctx.globalAlpha = numP;

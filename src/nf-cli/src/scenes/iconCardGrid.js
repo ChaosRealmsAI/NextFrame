@@ -1,6 +1,6 @@
 /**
- * iconCardGrid — N 个图标卡片的水平网格
- * 可复用于：工具展示、功能列表、特性对比
+ * iconCardGrid — horizontal grid of N icon cards
+ * Reusable for: tool showcases, feature lists, and feature comparisons
  */
 const CJK = '"Hiragino Sans GB", "Heiti TC"';
 function f(w, s, fam) {

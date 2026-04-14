@@ -1,4 +1,4 @@
-// 16:9 横屏
+// 16:9 landscape
 export { default as headline } from './headline.js';
 export { default as bulletList } from './bulletList.js';
 export { default as codeBlock } from './codeBlock.js';
@@ -10,7 +10,7 @@ export { default as vignette } from './vignette.js';
 export { default as auroraGradient } from './auroraGradient.js';
 export { default as particleFlow } from './particleFlow.js';
 
-// 9:16 竖屏
+// 9:16 portrait
 export { default as headline_portrait } from './headline_portrait.js';
 export { default as bulletList_portrait } from './bulletList_portrait.js';
 export { default as codeBlock_portrait } from './codeBlock_portrait.js';

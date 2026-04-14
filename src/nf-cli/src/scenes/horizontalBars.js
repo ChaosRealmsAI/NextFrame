@@ -1,6 +1,6 @@
 /**
- * horizontalBars — 水平条形图，支持逐条 stagger 动画
- * 可复用于：对比、增长、统计展示
+ * horizontalBars — horizontal bar chart with per-bar stagger animation
+ * Reusable for: comparison, growth, and stats presentation
  */
 const CJK = '"Hiragino Sans GB", "Heiti TC"';
 

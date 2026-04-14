@@ -1,6 +1,6 @@
 /**
- * codeBlock — JSON/代码块带语法高亮 + macOS 窗口 chrome
- * 可复用于：任何代码展示
+ * codeBlock — JSON/code block with syntax highlighting and macOS window chrome
+ * Reusable for: any code presentation
  */
 const CJK = '"Hiragino Sans GB", "Heiti TC"';
 

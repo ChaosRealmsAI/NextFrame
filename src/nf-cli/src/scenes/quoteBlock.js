@@ -1,5 +1,5 @@
 /**
- * quoteBlock — 引用文字块 + 解释文字
+ * quoteBlock — quote text block + explanatory text
  */
 const CJK = '"Hiragino Sans GB", "Heiti TC"';
 
