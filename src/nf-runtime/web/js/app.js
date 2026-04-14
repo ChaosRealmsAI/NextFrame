@@ -66,6 +66,7 @@ function showView(viewName, data) {
     bc2.textContent = window.currentEpisodeName || '剧集';
     loadPipelineData();
     loadEditorTimeline();
+    if (typeof loadSmartClips === 'function') loadSmartClips();
   }
 }
 
