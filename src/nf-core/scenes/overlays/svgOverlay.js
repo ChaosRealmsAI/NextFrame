@@ -1,4 +1,4 @@
-import { drawBrowserScene } from "./_browser-scenes.js";
+import { drawBrowserScene } from "../_browser-scenes.js";
 
 export function svgOverlay(t, params = {}, ctx) {
   drawBrowserScene(ctx, "svgOverlay", params, {

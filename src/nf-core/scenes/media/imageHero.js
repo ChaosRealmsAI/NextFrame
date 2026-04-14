@@ -1,4 +1,4 @@
-import { loadImage } from "./_image-cache.js";
+import { loadImage } from "../_image-cache.js";
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);

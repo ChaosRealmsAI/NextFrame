@@ -1,4 +1,4 @@
-import { loadCachedFrame, normalizeSourceFps, quantizeVideoTime } from "./_video-cache.js";
+import { loadCachedFrame, normalizeSourceFps, quantizeVideoTime } from "../_video-cache.js";
 
 const FALLBACK_BG = "#1a1510";
 const FALLBACK_FG = "#da7756";

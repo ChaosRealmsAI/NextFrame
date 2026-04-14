@@ -143,19 +143,36 @@ html, body {
 /* ══════════════════════════════════════
    TOPBAR — 48px fixed
    ══════════════════════════════════════ */
+/* Traffic light dots (browser preview only) */
+.tb-traffic-lights {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.tb-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+.tb-dot--close { background: #ff5f57; }
+.tb-dot--minimize { background: #febc2e; }
+.tb-dot--zoom { background: #28c840; }
+
 .topbar {
   height: 48px;
   display: flex;
   align-items: center;
-  padding: 0 var(--sp-20) 0 80px;
+  padding: 0 var(--sp-20) 0 var(--sp-16);
   -webkit-backdrop-filter: blur(24px) saturate(1.6);
   backdrop-filter: blur(24px) saturate(1.6);
   background: rgba(10,10,14,0.65);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
   box-shadow:
-    inset 0 -1px 0 rgba(0,0,0,0.30),
-    inset 0 1px 0 rgba(255,255,255,0.04),
-    0 1px 4px rgba(0,0,0,0.20);
+    inset 0 -1px 0 rgba(0,0,0,0.40),
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 2px 8px rgba(0,0,0,0.30);
   flex-shrink: 0;
   position: relative;
   z-index: 10;
@@ -302,6 +319,14 @@ html, body {
 .content {
   max-width: 1000px;
   margin: 0 auto;
+}
+
+/* ── Action Bar (search + new project) ── */
+.action-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  margin-bottom: var(--sp-32);
 }
 
 /* ── Section ── */
@@ -522,6 +547,13 @@ html, body {
 <div class="app">
   <!-- ── Topbar ── -->
   <header class="topbar">
+    <!-- Fake traffic lights (for browser preview, native app has real ones) -->
+    <div class="tb-traffic-lights">
+      <div class="tb-dot tb-dot--close"></div>
+      <div class="tb-dot tb-dot--minimize"></div>
+      <div class="tb-dot tb-dot--zoom"></div>
+    </div>
+
     <!-- Brand -->
     <div class="tb-brand">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -533,32 +565,6 @@ html, body {
 
     <div class="tb-spacer"></div>
 
-    <!-- Search -->
-    <div class="tb-search">
-      <svg class="tb-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-        <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/>
-        <line x1="11" y1="11" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      <input class="tb-search-input" type="text" placeholder="搜索项目...">
-    </div>
-
-    <!-- New Project -->
-    <button class="btn-primary">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-        <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      新建项目
-    </button>
-
-    <!-- Settings -->
-    <button class="tb-icon-btn" title="Settings">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/>
-        <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.05 3.05l1.06 1.06M11.89 11.89l1.06 1.06M3.05 12.95l1.06-1.06M11.89 4.11l1.06-1.06" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-      </svg>
-    </button>
-
     <!-- Avatar -->
     <div class="tb-avatar">Z</div>
   </header>
@@ -566,6 +572,24 @@ html, body {
   <!-- ── Main Content ── -->
   <main class="main">
     <div class="content">
+
+      <!-- Search + New Project bar -->
+      <div class="action-bar stagger-in">
+        <div class="tb-search">
+          <svg class="tb-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="11" y1="11" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <input class="tb-search-input" type="text" placeholder="搜索项目...">
+        </div>
+        <button class="btn-primary">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          新建项目
+        </button>
+      </div>
 
       <!-- Recent Projects -->
       <section class="section">

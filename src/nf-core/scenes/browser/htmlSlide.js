@@ -1,4 +1,4 @@
-import { drawCachedHtmlSlide } from "./_html-cache.js";
+import { drawCachedHtmlSlide } from "../_html-cache.js";
 
 function resolveSize(ctx) {
   return {

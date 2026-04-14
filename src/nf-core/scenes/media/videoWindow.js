@@ -2,8 +2,8 @@
 // Imports only from @napi-rs/canvas and ./_* helpers (arch-2 compliant).
 
 import { createCanvas } from "@napi-rs/canvas";
-import { CACHE_DIR, frameKey, quantizeVideoTime } from "./_video-cache.js";
-import { decodePNGFile } from "./_png-decode.js";
+import { CACHE_DIR, frameKey, quantizeVideoTime } from "../_video-cache.js";
+import { decodePNGFile } from "../_png-decode.js";
 
 export function videoWindow(t, params = {}, ctx) {
   const cw = ctx.canvas.width;

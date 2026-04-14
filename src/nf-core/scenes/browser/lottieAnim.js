@@ -1,4 +1,4 @@
-import { drawBrowserScene } from "./_browser-scenes.js";
+import { drawBrowserScene } from "../_browser-scenes.js";
 
 export function lottieAnim(t, params = {}, ctx) {
   drawBrowserScene(ctx, "lottieAnim", params, {
