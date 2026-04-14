@@ -50,9 +50,9 @@ export async function run(argv, context = {}) {
   }
 
   if (subcommand !== "layer-list") {
-    const validation = validateTimelineV3(timeline);
+    const validation = await validateTimelineV3(timeline);
     if (!validation.ok) {
-      emit({ ok: false, error: { code: "VALIDATION_FAILED", message: validation.errors[0]?.message || "validation failed" }, ...validation }, flags);
+      emit({ ok: false, error: { code: "VALIDATION_FAILED", message: validation.errors?.[0]?.message || "validation failed" }, ...validation }, flags);
       return 2;
     }
     const saved = await saveTimeline(resolved.jsonPath, timeline);
