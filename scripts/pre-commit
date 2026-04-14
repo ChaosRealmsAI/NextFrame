@@ -33,6 +33,26 @@ echo "[pre-commit] TODO/FIXME..."
 TODO=$(grep -rn 'TODO\|FIXME\|HACK\|XXX' src/ --include='*.rs' --include='*.js' 2>/dev/null | grep -v node_modules | head -3)
 if [ -n "$TODO" ]; then echo "BLOCKED: TODO found:" && echo "$TODO"; FAIL=1; fi
 
+echo "[pre-commit] HTML script paths..."
+if [ -f src/nf-runtime/web/index.html ]; then
+  MISSING=$(cd src/nf-runtime/web && grep -oP 'src="src/[^"]*\.js"' index.html | sed 's/src="//;s/"//' | while read f; do
+    [ -f "$f" ] || echo "MISSING: $f"
+  done)
+  if [ -n "$MISSING" ]; then echo "BLOCKED: broken script paths in index.html:" && echo "$MISSING"; FAIL=1; fi
+fi
+
+echo "[pre-commit] IPC method sync..."
+if [ -f src/nf-bridge/src/lib.rs ]; then
+  RUST_METHODS=$(grep -oP '"[a-z]+\.[a-zA-Z]+"' src/nf-bridge/src/lib.rs | sort -u)
+  JS_CALLS=$(grep -roh "bridgeCall(['\"][a-z]\+\.[a-zA-Z]\+['\"]" src/nf-runtime/web/src/ --include='*.js' 2>/dev/null | grep -oP "[a-z]+\.[a-zA-Z]+" | sort -u)
+  UNREGISTERED=$(comm -23 <(echo "$JS_CALLS") <(echo "$RUST_METHODS"))
+  if [ -n "$UNREGISTERED" ]; then echo "BLOCKED: JS calls unregistered IPC methods:" && echo "$UNREGISTERED"; FAIL=1; fi
+fi
+
+echo "[pre-commit] cross-module import..."
+CROSS=$(grep -rn "from.*modules/\|from.*editor/\|from.*pipeline/" src/nf-runtime/web/src/components/ --include='*.js' 2>/dev/null || true)
+if [ -n "$CROSS" ]; then echo "BLOCKED: components import from other modules:" && echo "$CROSS"; FAIL=1; fi
+
 if [ $FAIL -eq 0 ]; then
   echo "[pre-commit] ALL PASSED"
 else
