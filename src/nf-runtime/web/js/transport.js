@@ -1,18 +1,18 @@
 // Transport controls — bridge between editor UI and preview iframe playback.
 // Sends nf-cmd messages to iframe, receives nf-state updates, syncs UI.
 
-var edPreviewIframe = null;
 var edPlaybackState = { currentTime: 0, duration: 0, isPlaying: false };
 
 function sendPreviewCmd(action, time) {
-  if (!edPreviewIframe || !edPreviewIframe.contentWindow) {
+  var iframe = window.edPreviewIframe;
+  if (!iframe || !iframe.contentWindow) {
     return;
   }
   var msg = { type: 'nf-cmd', action: action };
   if (typeof time === 'number') {
     msg.time = time;
   }
-  edPreviewIframe.contentWindow.postMessage(msg, '*');
+  iframe.contentWindow.postMessage(msg, '*');
 }
 
 function updatePlayButton(playing) {

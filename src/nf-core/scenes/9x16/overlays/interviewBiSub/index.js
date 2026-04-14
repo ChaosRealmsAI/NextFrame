@@ -40,30 +40,23 @@ function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); }
 export function render(t, params, vp) {
   const zh = esc(params.zh || "");
   const en = esc(params.en || "");
-  const zhColor = params.zhColor || "#f5ece0";
-  const enColor = params.enColor || "#f5ece0";
-  const accentColor = params.accentColor || "#da7756";
-  const bgColor = params.bgColor || "rgba(10,10,10,0.6)";
+  const zhColor = params.zhColor || "#d4b483";
+  const enColor = params.enColor || "rgba(245,236,224,0.6)";
   const yPct = Number.isFinite(params.yPct) ? params.yPct : 72;
 
   const fadeIn = Math.min(1, t * 4);
-  const translateY = (1 - ease3(Math.min(1, t * 3))) * 12;
+  const translateY = (1 - ease3(Math.min(1, t * 3))) * 10;
 
-  const pad = Math.round(vp.width * 0.06);
-  const zhSize = Math.round(vp.width * 0.056);
-  const enSize = Math.round(vp.width * 0.036);
-  const lineH = Math.round(vp.width * 0.008);
+  const pad = Math.round(vp.width * 0.08);
+  const zhSize = Math.round(vp.width * 28 / 1080);
+  const enSize = Math.round(vp.width * 14 / 1080);
   const top = Math.round(vp.height * yPct / 100);
+  const gap = Math.round(vp.width * 8 / 1080);
 
-  return `<div style="position:absolute;left:0;top:${top}px;width:${vp.width}px;opacity:${fadeIn};transform:translateY(${translateY}px);pointer-events:none">
-  <div style="padding:${Math.round(vp.height*0.015)}px ${pad}px ${Math.round(vp.height*0.02)}px;background:${bgColor}">
-    <div style="display:flex;align-items:stretch;gap:${Math.round(vp.width*0.03)}px">
-      <div style="width:${lineH}px;background:${accentColor};border-radius:${lineH}px;flex-shrink:0;min-height:${zhSize*1.3}px"></div>
-      <div style="flex:1">
-        <div style="font-family:'PingFang SC','Noto Sans SC','Helvetica Neue',sans-serif;font-size:${zhSize}px;font-weight:700;color:${zhColor};line-height:1.35;letter-spacing:0.01em">${zh}</div>
-        <div style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:${enSize}px;font-weight:400;color:${enColor};opacity:0.7;line-height:1.5;margin-top:${Math.round(enSize*0.3)}px;letter-spacing:0.01em">${en}</div>
-      </div>
-    </div>
+  return `<div style="position:absolute;left:0;top:${top}px;width:${vp.width}px;opacity:${fadeIn};transform:translateY(${translateY}px);pointer-events:none;text-align:center">
+  <div style="padding:0 ${pad}px">
+    <div style="font-family:'PingFang SC','Noto Sans SC','Helvetica Neue',sans-serif;font-size:${zhSize}px;font-weight:700;color:${zhColor};line-height:1.4;letter-spacing:0.02em">${zh}</div>
+    <div style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:${enSize}px;font-weight:400;color:${enColor};line-height:1.6;margin-top:${gap}px;letter-spacing:0.01em">${en}</div>
   </div>
 </div>`;
 }
