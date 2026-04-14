@@ -65,20 +65,22 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --stagger: 60ms;
 
-  /* Glass */
-  --glass-bg: rgba(0,0,0,0.50);
-  --glass-blur: blur(16px) saturate(1.4);
+  /* Glass — 3D panel with depth */
+  --glass-bg: rgba(255,255,255,0.04);
+  --glass-blur: blur(20px) saturate(1.6);
   --glass-shadow:
-    inset 0 1px 0 0 rgba(255,255,255,0.09),
-    inset 0 -1px 0 0 rgba(0,0,0,0.15),
-    0 2px 8px rgba(0,0,0,0.20);
+    inset 0 1px 0 0 rgba(255,255,255,0.12),
+    inset 0 -1px 0 0 rgba(0,0,0,0.25),
+    0 4px 16px rgba(0,0,0,0.30),
+    0 1px 3px rgba(0,0,0,0.20);
   --glass-shadow-hover:
-    inset 0 1px 0 0 rgba(255,255,255,0.09),
-    inset 0 -1px 0 0 rgba(0,0,0,0.15),
-    0 6px 20px rgba(0,0,0,0.30);
+    inset 0 1px 0 0 rgba(255,255,255,0.15),
+    inset 0 -1px 0 0 rgba(0,0,0,0.25),
+    0 8px 32px rgba(0,0,0,0.45),
+    0 2px 6px rgba(0,0,0,0.25);
   --glass-highlight:
-    linear-gradient(178deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 3%, transparent 12%),
-    linear-gradient(92deg, rgba(255,255,255,0.025) 0%, transparent 3%, transparent 97%, rgba(255,255,255,0.015) 100%);
+    linear-gradient(178deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 4%, transparent 15%),
+    linear-gradient(92deg, rgba(255,255,255,0.04) 0%, transparent 4%, transparent 96%, rgba(255,255,255,0.02) 100%);
 }
 
 html, body {
@@ -93,15 +95,17 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Aurora Background ── */
+/* ── Aurora Background — subtle purple glow top + bottom ── */
 .aurora {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 60% 12% at 50% 2%, rgba(139,92,246,0.10) 0%, transparent 100%),
-    radial-gradient(ellipse 60% 12% at 50% 98%, rgba(124,58,237,0.06) 0%, transparent 100%);
+    radial-gradient(ellipse 80% 20% at 50% 0%, rgba(139,92,246,0.14) 0%, transparent 100%),
+    radial-gradient(ellipse 50% 15% at 80% 0%, rgba(167,139,250,0.08) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 15% at 50% 100%, rgba(124,58,237,0.08) 0%, transparent 100%),
+    radial-gradient(ellipse 40% 12% at 20% 100%, rgba(249,115,22,0.04) 0%, transparent 100%);
 }
 
 /* ── 3D Glass Panel ── */
@@ -143,17 +147,15 @@ html, body {
   height: 48px;
   display: flex;
   align-items: center;
-  padding: 0 var(--sp-16) 0 80px; /* 80px left for macOS traffic lights */
-  -webkit-app-region: drag; /* allow window dragging from topbar */
-}
-/* Interactive elements in topbar must not be draggable */
-.topbar button, .topbar input, .topbar .tb-avatar {
-  -webkit-app-region: no-drag;
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  background: rgba(0,0,0,0.55);
+  padding: 0 var(--sp-20) 0 80px;
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  background: rgba(10,10,14,0.65);
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.20), 0 1px 4px rgba(0,0,0,0.15);
+  box-shadow:
+    inset 0 -1px 0 rgba(0,0,0,0.30),
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    0 1px 4px rgba(0,0,0,0.20);
   flex-shrink: 0;
   position: relative;
   z-index: 10;
@@ -343,8 +345,9 @@ html, body {
   transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
 }
 .project-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: var(--glass-shadow-hover);
+  border-color: rgba(167,139,250,0.15);
 }
 
 /* Thumbnail */
@@ -352,8 +355,8 @@ html, body {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: rgba(255,255,255,0.03);
-  border-bottom: 1px solid var(--border-light);
+  background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(139,92,246,0.03) 100%);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
   display: flex;
   align-items: center;
   justify-content: center;
