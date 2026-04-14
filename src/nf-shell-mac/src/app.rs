@@ -55,7 +55,7 @@ const WINDOW_DRAG_SCRIPT: &str = r#"
   }
 
   document.addEventListener('mousedown', (event) => {
-    if (event.button !== 0 || event.detail !== 1) return;
+    if (event.button !== 0) return;
     if (!shouldStartDrag(event.composedPath())) return;
 
     const handler = window.webkit?.messageHandlers?.[handlerName];
@@ -63,6 +63,11 @@ const WINDOW_DRAG_SCRIPT: &str = r#"
 
     event.preventDefault();
     event.stopImmediatePropagation();
+
+    if (event.detail >= 2) {
+      handler.postMessage('zoom_window');
+      return;
+    }
     handler.postMessage('start_dragging');
   }, true);
 })();
@@ -94,15 +99,17 @@ define_class!(
                 return;
             };
 
-            if body.to_string() != WINDOW_DRAG_MESSAGE {
-                return;
-            }
+            let msg = body.to_string();
 
             let Some(window) = (unsafe { this.ivars().window.as_ref() }) else {
                 return;
             };
 
-            start_window_drag(window);
+            if msg == WINDOW_DRAG_MESSAGE {
+                start_window_drag(window);
+            } else if msg == "zoom_window" {
+                window.zoom(None);
+            }
         }
     }
 );
