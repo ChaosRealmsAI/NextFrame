@@ -47,12 +47,11 @@ pub fn create(
 
     let rect = NSRect::new(NSPoint::new(0.0, 0.0), size);
 
-    // Enable web content to use -webkit-app-region: drag
-    // SAFETY: setValue:forKey: is valid for WKPreferences configuration.
+    // Enable developer extras for debugging
+    // SAFETY: _setDeveloperExtrasEnabled: is valid for WKPreferences.
     unsafe {
         let prefs = config.preferences();
-        // Enable developer extras for debugging
-        let _: () = objc2::msg_send![&prefs, setValue: objc2::runtime::Bool::YES, forKey: &*NSString::from_str("developerExtrasEnabled")];
+        let _: () = objc2::msg_send![&prefs, _setDeveloperExtrasEnabled: true];
     }
 
     // SAFETY: mtm, frame, and config satisfy WKWebView designated initializer.

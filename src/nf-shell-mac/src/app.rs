@@ -15,10 +15,6 @@ use crate::webview;
 const WINDOW_WIDTH: f64 = 1440.0;
 const WINDOW_HEIGHT: f64 = 900.0;
 
-// Traffic light positioning — matches our 48px topbar
-const TRAFFIC_LIGHT_X: f64 = 13.0;
-const TRAFFIC_LIGHT_Y: f64 = 16.0; // vertically center 16px buttons in 48px bar
-
 /// Boot the macOS app: create window, embed WKWebView, run event loop.
 pub fn run() {
     let Some(mtm) = MainThreadMarker::new() else {
@@ -115,24 +111,49 @@ pub fn run() {
     app.run();
 }
 
-/// Position traffic light buttons at fixed offset within our topbar.
-/// Must be called on every resize (system resets positions).
+/// Reposition traffic lights using proven automedia/Zed approach:
+/// read real titlebar height from contentLayoutRect, set full frame per button.
 fn position_traffic_lights(window: &NSWindow) {
-    let buttons = [
-        (NSWindowButton::CloseButton, 0.0),
-        (NSWindowButton::MiniaturizeButton, 20.0),
-        (NSWindowButton::ZoomButton, 40.0),
-    ];
+    let padding_x = 13.0f64;
+    let padding_y = 10.0f64;
 
-    for (btn_type, x_offset) in buttons {
-        if let Some(button) = window.standardWindowButton(btn_type) {
-            let x = TRAFFIC_LIGHT_X + x_offset;
-            // SAFETY: setFrameOrigin: is valid for NSView.
-            unsafe {
-                let _: () =
-                    msg_send![&button, setFrameOrigin: NSPoint::new(x, TRAFFIC_LIGHT_Y)];
-            }
-        }
+    // SAFETY: standardWindowButton, frame, contentLayoutRect, setFrame are valid NSWindow/NSView methods.
+    unsafe {
+        let close = window.standardWindowButton(NSWindowButton::CloseButton);
+        let mini = window.standardWindowButton(NSWindowButton::MiniaturizeButton);
+        let zoom = window.standardWindowButton(NSWindowButton::ZoomButton);
+
+        let (Some(close), Some(mini), Some(zoom)) = (close, mini, zoom) else {
+            return;
+        };
+
+        // Real titlebar height = window frame height - content layout rect height
+        let win_frame = window.frame();
+        let content_rect: NSRect = msg_send![window, contentLayoutRect];
+        let titlebar_h = win_frame.size.height - content_rect.size.height;
+
+        let close_frame = close.frame();
+        let mini_frame = mini.frame();
+        let btn_h = close_frame.size.height;
+        let spacing = mini_frame.origin.x - close_frame.origin.x;
+
+        // Y from bottom of titlebar area
+        let y = titlebar_h - padding_y - btn_h;
+        let mut x = padding_x;
+
+        let mut cf = close_frame;
+        cf.origin = NSPoint::new(x, y);
+        let _: () = msg_send![&*close, setFrame: cf];
+        x += spacing;
+
+        let mut mf = mini_frame;
+        mf.origin = NSPoint::new(x, y);
+        let _: () = msg_send![&*mini, setFrame: mf];
+        x += spacing;
+
+        let mut zf = zoom.frame();
+        zf.origin = NSPoint::new(x, y);
+        let _: () = msg_send![&*zoom, setFrame: zf];
     }
 }
 
@@ -164,7 +185,7 @@ fn register_resize_observer(window: &NSWindow) {
                 position_traffic_lights(win);
             });
 
-            let _: () = msg_send![
+            let _: *mut AnyObject = msg_send![
                 center,
                 addObserverForName: &*ns_name,
                 object: window_ptr as *const AnyObject,
