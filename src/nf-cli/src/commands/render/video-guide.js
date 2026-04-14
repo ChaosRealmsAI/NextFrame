@@ -66,25 +66,22 @@ Available scenes: ${matching.length}
     process.stdout.write(`═══ What to do next ═══
 
 1. Decide what video to make — what layers/scenes do you need?
-   Typical lecture video layers (bottom to top):
-     - backgrounds: auroraGradient (background gradient)
-     - overlays: slideChrome (top bar + watermark)
-     - browser: codeTerminal (code blocks)
-     - typography: titleCard / headlineCenter (titles)
-     - typography: tagCompare (comparison tags)
-     - data: eventList / flowDiagram (diagrams)
-     - typography: quoteBlock (closing quotes)
-     - overlays: subtitleBar (subtitles)
-     - overlays: progressBar (progress indicator)
 
-2. If a scene you need is missing:
+2. ⚠️  BEFORE using any scene, check its defaults:
+     nextframe scenes <id>
+   Look at: default_theme, themes{}, params defaults.
+   Example: auroraGradient default_theme="obsidian-violet" (purple!) — if you want warm brown,
+   pass params: { hueA:25, hueB:15, hueC:35, intensity:0.3 } or use theme "sunset-warm".
+   DO NOT blindly use a scene without checking what it looks like by default.
+
+3. If a scene you need is missing:
      nextframe scene-new <name> --ratio=${ratio} --category=<cat>
      [edit index.js — implement render(), fill meta]
      [edit preview.html — inline render + demo params]
-     nextframe scene-preview <name>          ← MUST verify visually
+     nextframe scene-preview <name>          ← MUST open and verify visually
      nextframe scene-validate <name>         ← MUST pass all checks
 
-3. When all scenes are ready:
+4. When all scenes are ready:
      nextframe video-guide --ratio=${ratio}  ← run again to confirm
      Then: nextframe new -o timeline.json --ratio=${ratio} --duration=<N>
 `);
@@ -168,17 +165,25 @@ Layer summary:
 2. Build HTML:
      nextframe build ${timelinePath} -o ${htmlPath}
 
-3. Preview:
+3. ⛔ MANDATORY SELF-VERIFICATION (do NOT skip):
      open ${htmlPath}
-     ← Verify: correct layout, animations, no overflow
-     ← Check each phase by dragging the scrubber
+   Then take a screenshot or visually check EVERY phase:
+     a. Background correct? (NOT bright purple/pink — should match video theme)
+     b. Text readable? No overlap between layers?
+     c. Each phase shows correct content? (drag scrubber to phase boundaries)
+     d. Subtitles appear at correct times?
+     e. Progress bar fills correctly?
+   If ANY issue → fix and rebuild. Do NOT deliver without checking.
 
 4. If issues found:
-     nextframe layer-set ${timelinePath} <N> key=value   ← fix layer params
-     nextframe build ${timelinePath} -o ${htmlPath}      ← rebuild
-     open ${htmlPath}                                     ← re-verify
+     - Wrong scene colors? Check: nextframe scenes <id> ← look at default_theme
+     - Content overlap? Check layer positions (x, y params)
+     - Missing content? Check layer timing (start, dur)
+     Fix: nextframe layer-set ${timelinePath} <N> key=value
+     Rebuild: nextframe build ${timelinePath} -o ${htmlPath}
+     Re-verify: open ${htmlPath} ← check again
 
-5. When satisfied:
+5. When ALL checks pass:
      nextframe video-guide ${timelinePath}               ← run again for record step
 `);
     return 0;
