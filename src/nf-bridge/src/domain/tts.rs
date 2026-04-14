@@ -90,11 +90,21 @@ pub(crate) fn handle_tts_status(params: &Value) -> Result<Value, String> {
 
     let audio_dir = PathBuf::from(episode).join("audio").join(segment_name);
     let mp3 = find_first_file(&audio_dir, "mp3");
+    let timeline = find_first_file(&audio_dir, "timeline.json");
+    let srt = find_first_file(&audio_dir, ".srt");
     let exists = mp3.is_some();
+
+    // If timeline exists, read and parse it for karaoke data
+    let timeline_data = timeline.as_ref().and_then(|p| {
+        fs::read_to_string(p).ok().and_then(|c| serde_json::from_str::<Value>(&c).ok())
+    });
 
     Ok(json!({
         "exists": exists,
         "mp3": mp3.map(|p| p.display().to_string()),
+        "timeline": timeline.map(|p| p.display().to_string()),
+        "srt": srt.map(|p| p.display().to_string()),
+        "timelineData": timeline_data,
         "audioDir": audio_dir.display().to_string(),
     }))
 }
