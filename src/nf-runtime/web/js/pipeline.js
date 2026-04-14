@@ -143,12 +143,24 @@ function loadPipelineData() {
   }
 
   if (getCurrentEpisodeRef()) {
-    bridgeCall('segment.list', { project: getCurrentProjectRef(), episode: getCurrentEpisodeRef() }).then(function(data) {
-      const segs = data.segments || [];
+    // Load script segments from pipeline.json (has narration text)
+    bridgeCall('fs.read', { path: getCurrentEpisodeRef() + '/pipeline.json' }).then(function(data) {
+      const raw = data.contents || data.content || '';
+      let parsed;
+      try { parsed = typeof raw === 'object' ? raw : JSON.parse(raw); } catch(_e) { parsed = {}; }
+      const segs = (parsed.script && parsed.script.segments) || [];
+      pipelineSegments = segs;
       renderScriptTab(segs);
       renderAudioTab(segs);
     }).catch(function(error) {
-      console.error('[pipeline] segments:', error);
+      console.error('[pipeline] pipeline.json:', error);
+      // Fallback to segment.list
+      bridgeCall('segment.list', { project: getCurrentProjectRef(), episode: getCurrentEpisodeRef() }).then(function(data) {
+        const segs = data.segments || [];
+        pipelineSegments = segs;
+        renderScriptTab(segs);
+        renderAudioTab(segs);
+      }).catch(function() {});
     });
   }
 
@@ -196,16 +208,23 @@ function renderScriptTab(segments) {
 
   let html = '';
   segments.forEach(function(seg, index) {
-    const segmentName = seg.name || seg.path || '';
+    const segmentName = seg.name || seg.narration || seg.path || ('seg-' + (index + 1));
+    const narration = seg.narration || seg.text || '';
+    const visual = seg.visual || '';
+    const role = seg.role || '';
     const preview = pipelinePreviewState[segmentName];
     html += '' +
       '<div class="glass" data-nf-action="generate-script" style="padding:16px;margin-bottom:8px;border-radius:10px">' +
-        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
-          '<div>' +
-            '<div style="font-size:13px;font-weight:600;color:var(--t100)">段落 ' + (index + 1) + '</div>' +
-            '<div style="font-size:12px;color:var(--t65);margin-top:4px">' + escapeHtml(segmentName) + '</div>' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
+          '<div style="flex:1">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+              '<span style="font-size:13px;font-weight:600;color:var(--t100)">段落 ' + (index + 1) + '</span>' +
+              (role ? '<span style="font-size:11px;padding:2px 6px;background:var(--accent-12);color:var(--accent);border-radius:4px">' + escapeHtml(role) + '</span>' : '') +
+            '</div>' +
+            (narration ? '<div style="font-size:13px;color:var(--t80);line-height:1.6;margin-bottom:4px">' + escapeHtml(narration) + '</div>' : '') +
+            (visual ? '<div style="font-size:11px;color:var(--t50)">视觉: ' + escapeHtml(visual) + '</div>' : '') +
           '</div>' +
-          '<button data-nf-action="preview-segment" onclick="previewSegmentVideo(\'' + escapeJsString(segmentName) + '\')" style="border:0;border-radius:999px;padding:8px 14px;background:rgba(255,255,255,0.08);color:var(--t100);cursor:pointer">预览视频</button>' +
+          '<button data-nf-action="preview-segment" onclick="previewSegmentVideo(\'' + escapeJsString(segmentName) + '\')" style="border:0;border-radius:999px;padding:8px 14px;background:rgba(255,255,255,0.08);color:var(--t100);cursor:pointer;flex-shrink:0">预览视频</button>' +
         '</div>' +
         renderScriptPreview(preview) +
       '</div>';
@@ -240,14 +259,16 @@ function renderAudioTabInner(segments) {
   if (!el) return;
   let html = '';
   segments.forEach(function(seg, index) {
-    const segName = seg.name || seg.path || '';
+    const segName = seg.name || seg.narration || seg.path || ('seg-' + (index + 1));
+    const narration = seg.narration || seg.text || segName;
+    const segId = 'seg-' + (index + 1);
     const state = pipelineAudioState[segName] || {};
     const hasAudio = state.exists && state.mp3;
     html += '<div class="glass" style="padding:16px;margin-bottom:8px;border-radius:10px">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">' +
-        '<div><div style="font-size:13px;font-weight:600;color:var(--t100)">音频 ' + (index + 1) + '</div>' +
-        '<div style="font-size:12px;color:var(--t65);margin-top:4px">' + escapeHtml(segName) + '</div></div>' +
-        '<div style="display:flex;gap:6px">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
+        '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--t100)">音频 ' + (index + 1) + ' <span style="font-size:11px;color:var(--t50);font-weight:400">' + escapeHtml(segId) + '</span></div>' +
+        '<div style="font-size:12px;color:var(--t65);margin-top:4px;line-height:1.5">' + escapeHtml(narration.length > 80 ? narration.substring(0, 80) + '...' : narration) + '</div></div>' +
+        '<div style="display:flex;gap:6px;flex-shrink:0">' +
           (hasAudio
             ? '<button data-nf-action="play-audio" onclick="playSegmentAudio(\'' + escapeJsString(state.mp3) + '\')" style="border:0;border-radius:999px;padding:6px 12px;background:rgba(52,211,153,0.15);color:var(--green);cursor:pointer;font-size:12px">播放</button>'
             : '') +
@@ -255,6 +276,7 @@ function renderAudioTabInner(segments) {
         '</div>' +
       '</div>' +
       (state.generating ? '<div style="font-size:11px;color:var(--t50);margin-top:8px">正在生成配音...</div>' : '') +
+      (state.error ? '<div style="font-size:11px;color:var(--warm);margin-top:8px">' + escapeHtml(state.error) + '</div>' : '') +
       (hasAudio ? '<audio controls preload="metadata" style="width:100%;margin-top:8px;height:32px" src="' + escapeHtml(state.mp3) + '"></audio>' : '') +
     '</div>';
   });
@@ -263,12 +285,17 @@ function renderAudioTabInner(segments) {
 
 function generateTTS(segName) {
   if (typeof bridgeCall !== 'function' || !getCurrentEpisodeRef()) return;
+  // Find narration text from segment data
+  const seg = pipelineSegments.find(function(s) {
+    return (s.name || s.narration || s.path || '') === segName;
+  });
+  const text = (seg && seg.narration) || segName;
   pipelineAudioState[segName] = { generating: true };
   renderAudioTabInner(pipelineSegments);
   bridgeCall('tts.synth', {
     episode: getCurrentEpisodeRef(),
-    segment: segName,
-    text: segName,
+    segment: 'seg-' + (pipelineSegments.indexOf(seg) + 1),
+    text: text,
   }).then(function(data) {
     pipelineAudioState[segName] = { exists: true, mp3: data.mp3 || '' };
     renderAudioTabInner(pipelineSegments);
