@@ -1,153 +1,96 @@
-/**
- * apply.js — Browser-friendly animation utilities.
- * Returns CSS strings (transform + opacity) rather than mutating a Canvas ctx.
- * Works standalone in <script> tags with no ES module imports.
- */
+import { EASINGS, cubicBezier, springConfigurable, steps } from "../engine/keyframes.js";
+import { EFFECT_FNS, EFFECT_IDS } from "./effects/index.js";
+import { TRANSITION_FNS, TRANSITION_IDS } from "./transitions/index.js";
+import { clamp01, serializeStyle } from "./shared.js";
 
-// ─── Easing functions (mirrored from engine/keyframes.js) ───
+const EASING_FACTORY_NAMES = new Set(["cubicBezier", "steps", "springConfigurable"]);
 
-function easingLinear(t) { return t; }
-function easingEaseIn(t) { return t * t; }
-function easingEaseOut(t) { return t * (2 - t); }
-function easingEaseInOut(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
-function easingSpring(t) { return 1 - Math.cos(t * Math.PI * 0.5) * Math.exp(-6 * t); }
-function easingBounce(t) {
-  if (t < 1 / 2.75) return 7.5625 * t * t;
-  if (t < 2 / 2.75) { t -= 1.5 / 2.75; return 7.5625 * t * t + 0.75; }
-  if (t < 2.5 / 2.75) { t -= 2.25 / 2.75; return 7.5625 * t * t + 0.9375; }
-  t -= 2.625 / 2.75; return 7.5625 * t * t + 0.984375;
-}
-function easingElastic(t) {
-  if (t === 0 || t === 1) return t;
-  return -Math.pow(2, 10 * (t - 1)) * Math.sin((t - 1.075) * (2 * Math.PI) / 0.3);
-}
-function easingExpo(t) { return t === 0 ? 0 : Math.pow(2, 10 * (t - 1)); }
-function easingBack(t) { const c = 1.70158; return t * t * ((c + 1) * t - c); }
-function easingCirc(t) { return 1 - Math.sqrt(1 - t * t); }
+function parseFactorySpec(spec) {
+  const trimmed = spec.trim();
 
-const EASING_MAP = {
-  linear: easingLinear,
-  easeIn: easingEaseIn,
-  easeOut: easingEaseOut,
-  easeInOut: easingEaseInOut,
-  spring: easingSpring,
-  bounce: easingBounce,
-  elastic: easingElastic,
-  expo: easingExpo,
-  back: easingBack,
-  circ: easingCirc,
-};
+  const bezierMatch = trimmed.match(/^cubicBezier\(([^)]+)\)$/);
+  if (bezierMatch) {
+    const values = bezierMatch[1].split(",").map((value) => Number.parseFloat(value.trim()));
+    if (values.length === 4 && values.every(Number.isFinite)) {
+      return cubicBezier(values[0], values[1], values[2], values[3]);
+    }
+  }
 
-/** All available easing names. */
-export const EASING_NAMES = Object.keys(EASING_MAP);
+  const stepsMatch = trimmed.match(/^steps\(([^)]+)\)$/);
+  if (stepsMatch) {
+    const count = Number.parseInt(stepsMatch[1].trim(), 10);
+    if (Number.isFinite(count)) {
+      return steps(count);
+    }
+  }
 
-/**
- * Apply easing to t ∈ [0,1].
- * @param {string} easingName
- * @param {number} t — raw progress 0-1
- * @returns {number} eased value 0-1
- */
-export function applyEasing(easingName, t) {
-  const fn = EASING_MAP[easingName] || easingLinear;
-  return Math.max(0, Math.min(1, fn(Math.max(0, Math.min(1, t)))));
+  const springMatch = trimmed.match(/^springConfigurable\(([^)]+)\)$/);
+  if (springMatch) {
+    const values = springMatch[1].split(",").map((value) => Number.parseFloat(value.trim()));
+    if (values.length >= 1 && values.every(Number.isFinite)) {
+      const [damping, stiffness, mass] = values;
+      return (t) => springConfigurable(t, { damping, stiffness, mass });
+    }
+  }
+
+  return null;
 }
 
-// ─── Effect → CSS string ───
+function resolveEasing(spec) {
+  if (typeof spec === "function") return spec;
 
-/**
- * Each effect function takes eased progress (0-1) and returns
- * { opacity: number, transform: string }.
- * No Canvas ctx involved — pure CSS values.
- */
+  if (spec && typeof spec === "object") {
+    const type = spec.type ?? spec.name;
+    if (type === "cubicBezier") {
+      return cubicBezier(spec.x1, spec.y1, spec.x2, spec.y2);
+    }
+    if (type === "steps") {
+      return steps(spec.count ?? spec.n ?? spec.steps);
+    }
+    if (type === "springConfigurable") {
+      return (t) => springConfigurable(t, spec);
+    }
+    if (typeof type === "string" && EASINGS[type] && !EASING_FACTORY_NAMES.has(type)) {
+      return EASINGS[type];
+    }
+  }
 
-function effectFadeIn(p)   { return { opacity: p, transform: 'none' }; }
-function effectFadeOut(p)  { return { opacity: 1 - p, transform: 'none' }; }
+  if (typeof spec === "string") {
+    if (EASINGS[spec] && !EASING_FACTORY_NAMES.has(spec)) {
+      return EASINGS[spec];
+    }
+    if (spec === "springConfigurable") {
+      return (t) => springConfigurable(t);
+    }
+    return parseFactorySpec(spec) ?? EASINGS.linear;
+  }
 
-function effectSlideUp(p, dist = 40) {
-  return { opacity: p, transform: `translateY(${dist * (1 - p)}px)` };
-}
-function effectSlideDown(p, dist = 40) {
-  return { opacity: p, transform: `translateY(${-dist * (1 - p)}px)` };
-}
-function effectSlideLeft(p, dist = 40) {
-  return { opacity: p, transform: `translateX(${-dist * (1 - p)}px)` };
-}
-function effectSlideRight(p, dist = 40) {
-  return { opacity: p, transform: `translateX(${dist * (1 - p)}px)` };
-}
-
-function effectScaleIn(p) {
-  return { opacity: p, transform: `scale(${p})` };
-}
-function effectScaleOut(p) {
-  return { opacity: 1 - p, transform: `scale(${1 - p})` };
-}
-
-function effectSpringIn(p) {
-  const spring = 1 - Math.cos(p * Math.PI * 4) * Math.exp(-6 * p);
-  const scale = 0.5 + spring * 0.5;
-  return { opacity: p, transform: `scale(${scale})` };
-}
-function effectSpringOut(p) {
-  const spring = 1 - Math.cos(p * Math.PI * 4) * Math.exp(-6 * p);
-  const scale = 0.5 + spring * 0.5;
-  return { opacity: 1 - p, transform: `scale(${scale})` };
+  return EASINGS.linear;
 }
 
-function effectBlurIn(p) {
-  const blur = 20 * (1 - p);
-  return { opacity: p, transform: 'none', filter: blur > 0.5 ? `blur(${blur}px)` : 'none' };
-}
-function effectBlurOut(p) {
-  const blur = 20 * p;
-  return { opacity: 1 - p, transform: 'none', filter: blur > 0.5 ? `blur(${blur}px)` : 'none' };
-}
+export const EASING_NAMES = Object.keys(EASINGS);
+export const EFFECT_NAMES = [...EFFECT_IDS];
+export const TRANSITION_NAMES = [...TRANSITION_IDS];
 
-function effectBounceIn(p) {
-  const b = easingBounce(p);
-  return { opacity: p, transform: `scale(${b})` };
+export function ease(easingName, t) {
+  const fn = resolveEasing(easingName);
+  return clamp01(fn(clamp01(t)));
 }
 
-function effectWipeReveal(p) {
-  // CSS clip-path wipe left-to-right
-  return { opacity: 1, transform: 'none', clipPath: `inset(0 ${Math.round((1 - p) * 100)}% 0 0)` };
+export function getEffectCSS(effectName, progress, opts = {}) {
+  const fn = EFFECT_FNS[effectName] || EFFECT_FNS.fadeIn;
+  return serializeStyle(fn(clamp01(progress), opts));
 }
 
-const EFFECT_MAP = {
-  fadeIn:     effectFadeIn,
-  fadeOut:    effectFadeOut,
-  slideUp:    effectSlideUp,
-  slideDown:  effectSlideDown,
-  slideLeft:  effectSlideLeft,
-  slideRight: effectSlideRight,
-  scaleIn:    effectScaleIn,
-  scaleOut:   effectScaleOut,
-  springIn:   effectSpringIn,
-  springOut:  effectSpringOut,
-  blurIn:     effectBlurIn,
-  blurOut:    effectBlurOut,
-  bounceIn:   effectBounceIn,
-  wipeReveal: effectWipeReveal,
-};
-
-/** All available effect names. */
-export const EFFECT_NAMES = Object.keys(EFFECT_MAP);
-
-/**
- * Apply a named effect at progress p ∈ [0,1].
- * Returns a CSS style string: "opacity:X; transform:Y; ...".
- * @param {string} effectName
- * @param {number} progress — 0-1 (already eased if desired)
- * @param {object} [opts] — optional params like { distance: 60 }
- * @returns {string} CSS style string
- */
-export function applyEffect(effectName, progress, opts = {}) {
-  const fn = EFFECT_MAP[effectName] || effectFadeIn;
-  const p = Math.max(0, Math.min(1, progress));
-  const dist = opts.distance;
-  const result = dist !== undefined ? fn(p, dist) : fn(p);
-  const parts = [`opacity:${result.opacity.toFixed(3)}`, `transform:${result.transform}`];
-  if (result.filter && result.filter !== 'none') parts.push(`filter:${result.filter}`);
-  if (result.clipPath) parts.push(`clip-path:${result.clipPath}`);
-  return parts.join(';');
+export function getTransitionCSS(transitionName, progress, opts = {}) {
+  const fn = TRANSITION_FNS[transitionName] || TRANSITION_FNS.dissolve;
+  const styles = fn(clamp01(progress), opts);
+  return {
+    layerA: serializeStyle(styles.layerA),
+    layerB: serializeStyle(styles.layerB),
+  };
 }
+
+export const applyEasing = ease;
+export const applyEffect = getEffectCSS;
+export const applyTransition = getTransitionCSS;

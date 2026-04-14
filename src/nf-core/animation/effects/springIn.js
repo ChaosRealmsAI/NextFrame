@@ -1,9 +1,13 @@
-// Applies a springy scale-in effect while fading the canvas content into view.
-export function springIn(ctx, progress, w, h) {
-  const spring = 1 - Math.cos(progress * Math.PI * 4) * Math.exp(-6 * progress);
+import { clamp01, joinTransforms, round } from "../shared.js";
+
+// Springy overshoot entrance tuned for DOM/SVG.
+export function springIn(progress) {
+  const p = clamp01(progress);
+  const spring = 1 - Math.exp(-6 * p) * Math.cos(p * Math.PI * 4) * (1 - p);
   const scale = 0.5 + spring * 0.5;
-  ctx.globalAlpha = progress;
-  ctx.translate(w / 2, h / 2);
-  ctx.scale(scale, scale);
-  ctx.translate(-w / 2, -h / 2);
+  return {
+    opacity: Math.min(1, p * 1.6),
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
 }

@@ -1,5 +1,10 @@
-// Pushes clip A out while clip B enters from the right.
-export function push(ctxOut, canvasA, canvasB, progress, w, h) {
-  ctxOut.drawImage(canvasA, -w * progress, 0);
-  ctxOut.drawImage(canvasB, w - w * progress, 0);
+import { clamp01, joinTransforms, round } from "../shared.js";
+
+// Pushes A out to the left while B enters from the right.
+export function push(progress) {
+  const p = clamp01(progress);
+  return {
+    layerA: { transform: joinTransforms(`translate3d(${round(-p * 100)}%, 0, 0)`) },
+    layerB: { transform: joinTransforms(`translate3d(${round((1 - p) * 100)}%, 0, 0)`) },
+  };
 }

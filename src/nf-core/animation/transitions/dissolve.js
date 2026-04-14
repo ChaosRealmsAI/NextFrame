@@ -1,8 +1,10 @@
-// Cross-fade: A fades out, B fades in.
-export function dissolve(ctxOut, canvasA, canvasB, progress, w, h) {
-  ctxOut.globalAlpha = 1 - progress;
-  ctxOut.drawImage(canvasA, 0, 0);
-  ctxOut.globalAlpha = progress;
-  ctxOut.drawImage(canvasB, 0, 0);
-  ctxOut.globalAlpha = 1;
+import { clamp01 } from "../shared.js";
+
+// Cross-fade between the outgoing and incoming layers.
+export function dissolve(progress) {
+  const p = clamp01(progress);
+  return {
+    layerA: { opacity: 1 - p },
+    layerB: { opacity: p },
+  };
 }

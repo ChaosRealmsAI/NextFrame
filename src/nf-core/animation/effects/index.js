@@ -1,5 +1,5 @@
-// Effect registry — enter/exit animations applied after scene renders.
-// Each effect: apply(ctx, canvas, progress, params) → ctx transform
+// Effect registry — pure CSS-object animations for DOM/SVG scenes.
+// Each effect: apply(progress, opts) → CSS style object
 
 import { fadeIn } from "./fadeIn.js";
 import { fadeOut } from "./fadeOut.js";
@@ -15,6 +15,7 @@ import { blurIn } from "./blurIn.js";
 import { blurOut } from "./blurOut.js";
 import { wipeReveal } from "./wipeReveal.js";
 import { bounceIn } from "./bounceIn.js";
+import { applyCanvasStyle } from "../canvasCompat.js";
 
 export const EFFECT_TABLE = {
   fadeIn:     { id: "fadeIn",     description: "Opacity 0→1",                   params: [{ name: "dur", type: "number", default: 0.5 }] },
@@ -35,6 +36,7 @@ export const EFFECT_TABLE = {
 
 export const EFFECT_FNS = { fadeIn, fadeOut, slideUp, slideDown, slideLeft, slideRight, scaleIn, scaleOut, springIn, springOut, blurIn, blurOut, wipeReveal, bounceIn };
 export const EFFECT_IDS = Object.keys(EFFECT_FNS);
+export const EFFECT_NAMES = [...EFFECT_IDS];
 
 export function getEffect(id) {
   if (!EFFECT_FNS[id]) return null;
@@ -60,7 +62,8 @@ export function applyEnterEffect(ctx, localT, effect, canvasWidth, canvasHeight)
   const dur = effect.dur || 0.5;
   if (localT >= dur) return; // effect done
   const progress = Math.min(1, localT / dur);
-  fn(ctx, progress, canvasWidth, canvasHeight, effect);
+  const style = fn(progress, effect);
+  applyCanvasStyle(ctx, canvasWidth, canvasHeight, style);
 }
 
 /**
@@ -80,5 +83,6 @@ export function applyExitEffect(ctx, localT, clipDur, effect, canvasWidth, canva
   const exitStart = clipDur - dur;
   if (localT < exitStart) return; // not yet
   const progress = Math.min(1, (localT - exitStart) / dur);
-  fn(ctx, progress, canvasWidth, canvasHeight, effect);
+  const style = fn(progress, effect);
+  applyCanvasStyle(ctx, canvasWidth, canvasHeight, style);
 }

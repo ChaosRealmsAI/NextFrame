@@ -1,4 +1,6 @@
-// Applies a fade-out transition by lowering canvas alpha with progress.
-export function fadeOut(ctx, progress) {
-  ctx.globalAlpha = 1 - progress;
+import { clamp01 } from "../shared.js";
+
+// Pure CSS fade-out.
+export function fadeOut(progress) {
+  return { opacity: 1 - clamp01(progress) };
 }

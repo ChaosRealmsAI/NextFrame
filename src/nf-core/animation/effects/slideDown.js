@@ -1,6 +1,11 @@
-// Applies a slide-down transition that moves content downward while fading it out.
-export function slideDown(ctx, progress, w, h, params) {
-  const dist = params.distance || 40;
-  ctx.globalAlpha = 1 - progress;
-  ctx.translate(0, dist * progress);
+import { clamp01, joinTransforms, px } from "../shared.js";
+
+// Slides content downward while fading it out.
+export function slideDown(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: 1 - p,
+    transform: joinTransforms(`translate3d(0, ${px(distance * p)}, 0)`),
+  };
 }

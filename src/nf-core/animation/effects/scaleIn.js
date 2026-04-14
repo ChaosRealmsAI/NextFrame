@@ -1,8 +1,12 @@
-// Applies a scale-in transition by growing and fading the canvas content into place.
-export function scaleIn(ctx, progress, w, h) {
-  const s = progress;
-  ctx.globalAlpha = progress;
-  ctx.translate(w / 2, h / 2);
-  ctx.scale(s, s);
-  ctx.translate(-w / 2, -h / 2);
+import { clamp01, joinTransforms, round } from "../shared.js";
+
+// Grows content from a smaller scale while fading in.
+export function scaleIn(progress) {
+  const p = clamp01(progress);
+  const scale = 0.6 + p * 0.4;
+  return {
+    opacity: p,
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
 }

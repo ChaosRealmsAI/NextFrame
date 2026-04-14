@@ -1,6 +1,11 @@
-// Applies a rightward slide effect while fading the canvas content into view.
-export function slideRight(ctx, progress, w, h, params) {
-  const dist = params.distance || 40;
-  ctx.globalAlpha = progress;
-  ctx.translate(dist * (1 - progress), 0);
+import { clamp01, joinTransforms, px } from "../shared.js";
+
+// Slides content in from the right while fading it up.
+export function slideRight(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: p,
+    transform: joinTransforms(`translate3d(${px(distance * (1 - p))}, 0, 0)`),
+  };
 }

@@ -1,8 +1,12 @@
-// Applies a scale-out transition by shrinking and fading the canvas content.
-export function scaleOut(ctx, progress, w, h) {
-  const s = 1 - progress;
-  ctx.globalAlpha = 1 - progress;
-  ctx.translate(w / 2, h / 2);
-  ctx.scale(s, s);
-  ctx.translate(-w / 2, -h / 2);
+import { clamp01, joinTransforms, round } from "../shared.js";
+
+// Shrinks content down while fading it out.
+export function scaleOut(progress) {
+  const p = clamp01(progress);
+  const scale = 1 - p * 0.4;
+  return {
+    opacity: 1 - p,
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
 }

@@ -1,6 +1,12 @@
-// Applies a decreasing blur while fading the canvas content into view.
-export function blurIn(ctx, progress) {
-  const blur = 20 * (1 - progress);
-  ctx.filter = blur > 0.5 ? `blur(${blur}px)` : "none";
-  ctx.globalAlpha = progress;
+import { clamp01, px } from "../shared.js";
+
+// Resolves from a soft blur to crisp content.
+export function blurIn(progress, opts = {}) {
+  const p = clamp01(progress);
+  const maxBlur = opts.blur ?? 20;
+  const blur = maxBlur * (1 - p);
+  return {
+    opacity: p,
+    filter: blur > 0.01 ? `blur(${px(blur)})` : "none",
+  };
 }

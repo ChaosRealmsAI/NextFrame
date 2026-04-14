@@ -1,5 +1,10 @@
+import { clamp01, joinTransforms, round } from "../shared.js";
+
 // Slides B in from the left over A.
-export function slideLeft(ctxOut, canvasA, canvasB, progress, w, h) {
-  ctxOut.drawImage(canvasA, 0, 0);
-  ctxOut.drawImage(canvasB, -w * (1 - progress), 0);
+export function slideLeft(progress) {
+  const p = clamp01(progress);
+  return {
+    layerA: { opacity: 1 },
+    layerB: { transform: joinTransforms(`translate3d(${round((p - 1) * 100)}%, 0, 0)`) },
+  };
 }

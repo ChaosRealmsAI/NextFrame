@@ -1,13 +1,18 @@
-// Zoom: A zooms in and fades, B appears behind.
-export function zoomIn(ctxOut, canvasA, canvasB, progress, w, h) {
-  ctxOut.drawImage(canvasB, 0, 0);
-  const scale = 1 + progress * 0.3;
-  const alpha = 1 - progress;
-  ctxOut.save();
-  ctxOut.globalAlpha = alpha;
-  ctxOut.translate(w / 2, h / 2);
-  ctxOut.scale(scale, scale);
-  ctxOut.translate(-w / 2, -h / 2);
-  ctxOut.drawImage(canvasA, 0, 0);
-  ctxOut.restore();
+import { clamp01, joinTransforms, round } from "../shared.js";
+
+// A punches forward and fades while B settles in behind it.
+export function zoomIn(progress) {
+  const p = clamp01(progress);
+  return {
+    layerA: {
+      opacity: 1 - p,
+      transform: joinTransforms(`scale(${round(1 + p * 0.28)})`),
+      transformOrigin: "50% 50%",
+    },
+    layerB: {
+      opacity: 0.4 + p * 0.6,
+      transform: joinTransforms(`scale(${round(0.92 + p * 0.08)})`),
+      transformOrigin: "50% 50%",
+    },
+  };
 }

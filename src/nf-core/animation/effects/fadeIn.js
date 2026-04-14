@@ -1,4 +1,6 @@
-// Applies a fade-in transition by ramping canvas alpha with progress.
-export function fadeIn(ctx, progress) {
-  ctx.globalAlpha = progress;
+import { clamp01 } from "../shared.js";
+
+// Pure CSS fade-in.
+export function fadeIn(progress) {
+  return { opacity: clamp01(progress) };
 }

@@ -1,5 +1,5 @@
-// Transition registry — cross-fade between overlapping clips.
-// Each transition: apply(ctxOut, canvasA, canvasB, progress, width, height, params)
+// Transition registry — pure CSS transitions between two overlapping layers.
+// Each transition: apply(progress, opts) → { layerA, layerB }
 
 import { dissolve } from "./dissolve.js";
 import { wipeLeft } from "./wipeLeft.js";
@@ -33,6 +33,7 @@ export const TRANSITION_TABLE = {
 
 export const TRANSITION_FNS = { dissolve, wipeLeft, wipeUp, wipeRight, wipeDown, zoomIn, fadeBlack, fadeWhite, irisOpen, irisClose, slideLeft, slideRight, push };
 export const TRANSITION_IDS = Object.keys(TRANSITION_FNS);
+export const TRANSITION_NAMES = [...TRANSITION_IDS];
 
 export function getTransition(id) {
   if (!TRANSITION_FNS[id]) return null;

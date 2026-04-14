@@ -1,16 +1,20 @@
-// Fades from clip A to black, then from black into clip B.
-export function fadeBlack(ctxOut, canvasA, canvasB, progress, w, h) {
-  if (progress < 0.5) {
-    const p = progress * 2;
-    ctxOut.drawImage(canvasA, 0, 0);
-    ctxOut.fillStyle = `rgba(0,0,0,${p})`;
-    ctxOut.fillRect(0, 0, w, h);
-  } else {
-    const p = (progress - 0.5) * 2;
-    ctxOut.fillStyle = "#000";
-    ctxOut.fillRect(0, 0, w, h);
-    ctxOut.globalAlpha = p;
-    ctxOut.drawImage(canvasB, 0, 0);
-    ctxOut.globalAlpha = 1;
+import { clamp01, round } from "../shared.js";
+
+// Fades through black by dimming A, then brightening B from black.
+export function fadeBlack(progress) {
+  const p = clamp01(progress);
+
+  if (p < 0.5) {
+    const phase = p * 2;
+    return {
+      layerA: { opacity: 1, filter: `brightness(${round(1 - phase)})` },
+      layerB: { opacity: 0, filter: "brightness(0)" },
+    };
   }
+
+  const phase = (p - 0.5) * 2;
+  return {
+    layerA: { opacity: 0, filter: "brightness(0)" },
+    layerB: { opacity: 1, filter: `brightness(${round(phase)})` },
+  };
 }

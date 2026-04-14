@@ -1,6 +1,12 @@
-// Applies an increasing blur while fading the canvas content out.
-export function blurOut(ctx, progress) {
-  const blur = 20 * progress;
-  ctx.filter = blur > 0.5 ? `blur(${blur}px)` : "none";
-  ctx.globalAlpha = 1 - progress;
+import { clamp01, px } from "../shared.js";
+
+// Blurs content away while fading it out.
+export function blurOut(progress, opts = {}) {
+  const p = clamp01(progress);
+  const maxBlur = opts.blur ?? 20;
+  const blur = maxBlur * p;
+  return {
+    opacity: 1 - p,
+    filter: blur > 0.01 ? `blur(${px(blur)})` : "none",
+  };
 }

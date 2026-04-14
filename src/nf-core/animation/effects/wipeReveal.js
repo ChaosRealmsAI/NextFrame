@@ -1,6 +1,10 @@
-// Applies a horizontal clip that reveals the canvas from left to right.
-export function wipeReveal(ctx, progress, w, h) {
-  ctx.beginPath();
-  ctx.rect(0, 0, w * progress, h);
-  ctx.clip();
+import { clamp01, inset } from "../shared.js";
+
+// Reveals content from left to right with a clip mask.
+export function wipeReveal(progress) {
+  const p = clamp01(progress);
+  return {
+    opacity: 1,
+    clipPath: inset(0, (1 - p) * 100, 0, 0),
+  };
 }

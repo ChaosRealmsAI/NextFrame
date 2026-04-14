@@ -3,61 +3,99 @@
 //   { keys: [[0, 24], [1, 48], [4, 48], [5, 24]], ease: "easeOut" }
 // resolveKeyframes(params, t) returns a new object with all keys resolved.
 
-function bounce(t) {
+function clamp01(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}
+
+function normalizeTime(value) {
+  return clamp01(value);
+}
+
+export function linear(t) {
+  return normalizeTime(t);
+}
+
+export function easeIn(t) {
+  const p = normalizeTime(t);
+  return p * p;
+}
+
+export function easeOut(t) {
+  const p = normalizeTime(t);
+  return p * (2 - p);
+}
+
+export function easeInOut(t) {
+  const p = normalizeTime(t);
+  return p < 0.5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
+}
+
+export function spring(t) {
+  const p = normalizeTime(t);
+  return 1 - Math.cos(p * Math.PI * 0.5) * Math.exp(-6 * p);
+}
+
+export function bounce(t) {
+  let p = normalizeTime(t);
   const n = 7.5625;
   const d = 2.75;
-  if (t < 1 / d) return n * t * t;
-  if (t < 2 / d) {
-    t -= 1.5 / d;
-    return n * t * t + 0.75;
+  if (p < 1 / d) return n * p * p;
+  if (p < 2 / d) {
+    p -= 1.5 / d;
+    return n * p * p + 0.75;
   }
-  if (t < 2.5 / d) {
-    t -= 2.25 / d;
-    return n * t * t + 0.9375;
+  if (p < 2.5 / d) {
+    p -= 2.25 / d;
+    return n * p * p + 0.9375;
   }
-  t -= 2.625 / d;
-  return n * t * t + 0.984375;
+  p -= 2.625 / d;
+  return n * p * p + 0.984375;
 }
 
-function elastic(t) {
-  return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t - 0.1) * 5 * Math.PI) + 1;
+export function elastic(t) {
+  const p = normalizeTime(t);
+  return p === 0 || p === 1 ? p : Math.pow(2, -10 * p) * Math.sin((p - 0.1) * 5 * Math.PI) + 1;
 }
 
-function expo(t) {
-  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+export function expo(t) {
+  const p = normalizeTime(t);
+  return p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
 }
 
-function back(t) {
+export function back(t) {
+  const p = normalizeTime(t);
   const c = 1.70158;
   const c3 = c + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2);
+  return 1 + c3 * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
 }
 
-function circ(t) {
-  return Math.sqrt(1 - Math.pow(t - 1, 2));
+export function circ(t) {
+  const p = normalizeTime(t);
+  return Math.sqrt(1 - Math.pow(p - 1, 2));
 }
 
-function springConfigurable(t, config = {}) {
-  const damping = config.damping ?? 12;
-  const stiffness = config.stiffness ?? 180;
-  const mass = config.mass ?? 1;
-  const safeMass = Math.max(mass, 0.0001);
-  const omega0 = Math.sqrt(stiffness / safeMass);
-  const zeta = damping / (2 * Math.sqrt(stiffness * safeMass));
+export function springConfigurable(t, config = {}) {
+  const p = normalizeTime(t);
+  const damping = Math.max(0.0001, config.damping ?? 12);
+  const stiffness = Math.max(0.0001, config.stiffness ?? 180);
+  const mass = Math.max(0.0001, config.mass ?? 1);
+  const omega0 = Math.sqrt(stiffness / mass);
+  const zeta = damping / (2 * Math.sqrt(stiffness * mass));
 
   if (zeta < 1) {
     const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
-    const envelope = Math.exp(-zeta * omega0 * t);
+    const envelope = Math.exp(-zeta * omega0 * p);
     return 1 - envelope * (
-      Math.cos(omegaD * t) +
-      (zeta / Math.sqrt(1 - zeta * zeta)) * Math.sin(omegaD * t)
+      Math.cos(omegaD * p) +
+      (zeta / Math.sqrt(1 - zeta * zeta)) * Math.sin(omegaD * p)
     );
   }
 
-  return 1 - Math.exp(-omega0 * t) * (1 + omega0 * t);
+  return 1 - Math.exp(-omega0 * p) * (1 + omega0 * p);
 }
 
-function cubicBezier(x1, y1, x2, y2) {
+export function cubicBezier(x1, y1, x2, y2) {
   const cx = 3 * x1;
   const bx = 3 * (x2 - x1) - cx;
   const ax = 1 - cx - bx;
@@ -78,38 +116,47 @@ function cubicBezier(x1, y1, x2, y2) {
   }
 
   return (t) => {
-    if (t <= 0) return 0;
-    if (t >= 1) return 1;
+    const p = normalizeTime(t);
+    if (p === 0 || p === 1) return p;
 
-    let param = t;
+    let parameter = p;
     for (let i = 0; i < 8; i++) {
-      const x = sampleCurveX(param) - t;
-      const dx = sampleDerivativeX(param);
-      if (Math.abs(x) < 1e-6) return sampleCurveY(param);
+      const x = sampleCurveX(parameter) - p;
+      const dx = sampleDerivativeX(parameter);
+      if (Math.abs(x) < 1e-6) return sampleCurveY(parameter);
       if (Math.abs(dx) < 1e-6) break;
-      param -= x / dx;
+      parameter -= x / dx;
     }
 
     let low = 0;
     let high = 1;
-    param = t;
-    for (let i = 0; i < 10; i++) {
-      const x = sampleCurveX(param);
-      if (Math.abs(x - t) < 1e-6) break;
-      if (x < t) low = param;
-      else high = param;
-      param = (low + high) * 0.5;
+    parameter = p;
+    for (let i = 0; i < 12; i++) {
+      const x = sampleCurveX(parameter);
+      if (Math.abs(x - p) < 1e-6) break;
+      if (x < p) low = parameter;
+      else high = parameter;
+      parameter = (low + high) * 0.5;
     }
-    return sampleCurveY(param);
+    return sampleCurveY(parameter);
+  };
+}
+
+export function steps(count) {
+  const safeCount = Math.max(1, Math.floor(count || 1));
+  return (t) => {
+    const p = normalizeTime(t);
+    if (p === 1) return 1;
+    return Math.floor(p * safeCount) / safeCount;
   };
 }
 
 const EASINGS = {
-  linear: (t) => t,
-  easeIn: (t) => t * t,
-  easeOut: (t) => t * (2 - t),
-  easeInOut: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
-  spring: (t) => 1 - Math.cos(t * Math.PI * 0.5) * Math.exp(-6 * t),
+  linear,
+  easeIn,
+  easeOut,
+  easeInOut,
+  spring,
   bounce,
   elastic,
   expo,
@@ -117,6 +164,7 @@ const EASINGS = {
   circ,
   springConfigurable,
   cubicBezier,
+  steps,
 };
 
 /**
@@ -210,8 +258,11 @@ function hexToRgb(hex) {
 
 function resolveEasing(ease) {
   if (typeof ease === "function") return ease;
-  if (typeof ease === "string" && EASINGS[ease]) return EASINGS[ease];
+  if (typeof ease === "string" && EASINGS[ease]) {
+    if (ease === "springConfigurable") return (t) => springConfigurable(t);
+    return EASINGS[ease];
+  }
   return EASINGS.linear;
 }
 
-export { EASINGS, back, bounce, circ, cubicBezier, elastic, expo, springConfigurable };
+export { EASINGS };

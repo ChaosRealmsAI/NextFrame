@@ -1,11 +1,10 @@
-// Wipe from bottom: B reveals from bottom edge.
-export function wipeUp(ctxOut, canvasA, canvasB, progress, w, h) {
-  const split = Math.round(h * (1 - progress));
-  ctxOut.drawImage(canvasA, 0, 0);
-  ctxOut.save();
-  ctxOut.beginPath();
-  ctxOut.rect(0, split, w, h - split);
-  ctxOut.clip();
-  ctxOut.drawImage(canvasB, 0, 0);
-  ctxOut.restore();
+import { clamp01, inset } from "../shared.js";
+
+// B reveals from the bottom while A is clipped away from the bottom.
+export function wipeUp(progress) {
+  const p = clamp01(progress);
+  return {
+    layerA: { clipPath: inset(0, 0, p * 100, 0) },
+    layerB: { clipPath: inset((1 - p) * 100, 0, 0, 0) },
+  };
 }
