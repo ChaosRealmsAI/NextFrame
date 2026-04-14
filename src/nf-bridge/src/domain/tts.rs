@@ -28,7 +28,7 @@ pub(crate) fn handle_tts_synth(params: &Value) -> Result<Value, String> {
 
     let vox = vox_path()?;
     let mut cmd = Command::new(&vox);
-    cmd.arg("synth").arg(&text).arg("-d").arg(&audio_dir);
+    cmd.arg("synth").arg(text).arg("-d").arg(&audio_dir);
 
     if let Some(voice) = params.get("voice").and_then(Value::as_str) {
         if !voice.is_empty() {
