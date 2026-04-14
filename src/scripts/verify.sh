@@ -14,8 +14,8 @@ mkdir -p spec
 
 generated_at="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 rounds_completed="$(find spec/rounds -maxdepth 1 -type f -name 'R*.md' ! -name '*-reviewer.md' | wc -l | tr -d ' ')"
-scene_files="$(ls src/runtime/web/src/scenes/*.js 2>/dev/null | wc -l | tr -d ' ')"
-bdd_test_files="$(ls src/runtime/web/test/bdd/*.test.js 2>/dev/null | wc -l | tr -d ' ')"
+scene_files="$(ls src/nf-runtime/web/src/scenes/*.js 2>/dev/null | wc -l | tr -d ' ')"
+bdd_test_files="$(ls src/nf-runtime/web/test/bdd/*.test.js 2>/dev/null | wc -l | tr -d ' ')"
 
 tmp_files=()
 
@@ -174,11 +174,11 @@ run_check cargo clippy --workspace --all-targets -- -D warnings
 clippy_status="$RUN_STATUS"
 clippy_summary="$RUN_SUMMARY"
 
-run_check node src/runtime/web/test/lint.mjs
+run_check node src/nf-runtime/web/test/lint.mjs
 web_lint_status="$RUN_STATUS"
 web_lint_summary="$RUN_SUMMARY"
 
-run_check cargo test -p bridge
+run_check cargo test -p nf-bridge
 bridge_test_status="$RUN_STATUS"
 bridge_test_summary="$RUN_SUMMARY"
 extract_cargo_test_counts "$RUN_OUTPUT_FILE"
@@ -187,7 +187,7 @@ run_check cargo build --workspace --release
 release_build_status="$RUN_STATUS"
 release_build_summary="$RUN_SUMMARY"
 
-run_check node src/runtime/web/test/bdd/run.mjs
+run_check node src/nf-runtime/web/test/bdd/run.mjs
 bdd_status="$RUN_STATUS"
 bdd_summary="$RUN_SUMMARY"
 extract_bdd_counts "$RUN_OUTPUT_FILE"
@@ -197,7 +197,7 @@ if [ -n "$bdd_result_line" ]; then
 fi
 
 manual_notes=()
-manual_notes+=("\`verify.sh\` does not launch \`cargo run -p shell\` or the recorder subprocess, so the walkthrough below is source-backed rather than automated UI proof.")
+manual_notes+=("\`verify.sh\` does not launch \`cargo run -p nf-shell\` or the recorder subprocess, so the walkthrough below is source-backed rather than automated UI proof.")
 
 known_issues=()
 
@@ -210,11 +210,11 @@ if [ "$clippy_status" != "PASS" ]; then
 fi
 
 if [ "$web_lint_status" != "PASS" ]; then
-  known_issues+=("\`node src/runtime/web/test/lint.mjs\` failed. stdout/stderr summary: $web_lint_summary")
+  known_issues+=("\`node src/nf-runtime/web/test/lint.mjs\` failed. stdout/stderr summary: $web_lint_summary")
 fi
 
 if [ "$bridge_test_status" != "PASS" ]; then
-  known_issues+=("\`cargo test -p bridge\` failed. stdout/stderr summary: $bridge_test_summary")
+  known_issues+=("\`cargo test -p nf-bridge\` failed. stdout/stderr summary: $bridge_test_summary")
 fi
 
 if [ "$release_build_status" != "PASS" ]; then
@@ -222,7 +222,7 @@ if [ "$release_build_status" != "PASS" ]; then
 fi
 
 if [ "$bdd_status" != "PASS" ]; then
-  known_issues+=("\`node src/runtime/web/test/bdd/run.mjs\` failed. stdout/stderr summary: $bdd_summary")
+  known_issues+=("\`node src/nf-runtime/web/test/bdd/run.mjs\` failed. stdout/stderr summary: $bdd_summary")
 fi
 
 if [ "${#bdd_failed_cases[@]}" -gt 0 ]; then
@@ -240,11 +240,11 @@ if [ "$bdd_skipped" -gt 0 ]; then
   known_issues+=("BDD suite skipped $bdd_skipped scenario(s); this run is not a clean all-green behavioral sweep.")
 fi
 
-if has_needle 'tracks: []' src/runtime/web/src/store.js; then
+if has_needle 'tracks: []' src/nf-runtime/web/src/store.js; then
   known_issues+=("A fresh \`createDefaultTimeline()\` still starts with zero tracks; the 5-scene editor state comes from \`bootstrapDemoTimeline()\` during app init.")
 fi
 
-if has_needle 'recorder_not_found' src/bridge/src/lib.rs; then
+if has_needle 'recorder_not_found' src/nf-bridge/src/lib.rs; then
   known_issues+=("MP4 export depends on an external recorder/ffmpeg toolchain. The bridge handles a missing recorder gracefully, but end-to-end export still depends on local setup.")
 fi
 
@@ -269,12 +269,12 @@ fi
 ## Quick Start
 ```bash
 cd NextFrame
-cargo run -p shell
+cargo run -p nf-shell
 ```
 
 ## Features Shipped
 ### Phase A: Architecture (R1-R5)
-- R1: Initialized the Cargo workspace, four-crate skeleton, and `src/runtime/web` scaffold.
+- R1: Initialized the Cargo workspace, four-crate skeleton, and `src/nf-runtime/web` scaffold.
 - R2: Brought up the native Wry/Tao shell window and loaded the local web runtime.
 - R3: Added the JSON-style JS↔Rust bridge for filesystem, scene, timeline, and logging calls.
 - R4: Built the frame-pure render core, easing helpers, and timeline validation pipeline.
@@ -348,7 +348,7 @@ cargo run -p shell
 
 ## Try It Now
 1. `cd NextFrame`
-2. `cargo run -p shell`
+2. `cargo run -p nf-shell`
 3. The window opens, scenes auto-play
 4. Press `Cmd+K` to open the command palette.
 5. Press `B` for blade tool, click a clip to split
@@ -359,7 +359,7 @@ EOF
 
   printf '## What works (manual walkthrough)\n'
   printf '%s\n\n' "${manual_notes[0]}"
-  printf '1. Launch `cargo run -p shell` and let the `1440x900` Wry window settle on the autoplaying demo timeline.\n'
+  printf '1. Launch `cargo run -p nf-shell` and let the `1440x900` Wry window settle on the autoplaying demo timeline.\n'
   printf '2. Call out the editor shell: top menu, scene library, preview canvas, inspector, and multi-track timeline.\n'
   printf '3. Show that scenes are live by dragging a library card onto `V1`, then move and resize the created clip.\n'
   printf '4. Press `B`, split a clip, then use `Shift`+click or a marquee drag to show multi-select editing.\n'
@@ -385,13 +385,13 @@ EOF
   printf '## Verification command summaries\n'
   printf -- '- `cargo fmt --check`: %s. stdout/stderr summary: %s\n' "$fmt_status" "$fmt_summary"
   printf -- '- `cargo clippy --workspace --all-targets -- -D warnings`: %s. stdout/stderr summary: %s\n' "$clippy_status" "$clippy_summary"
-  printf -- '- `node src/runtime/web/test/lint.mjs`: %s. stdout/stderr summary: %s\n' "$web_lint_status" "$web_lint_summary"
-  printf -- '- `cargo test -p bridge`: %s. stdout/stderr summary: %s\n' "$bridge_test_status" "$bridge_test_summary"
+  printf -- '- `node src/nf-runtime/web/test/lint.mjs`: %s. stdout/stderr summary: %s\n' "$web_lint_status" "$web_lint_summary"
+  printf -- '- `cargo test -p nf-bridge`: %s. stdout/stderr summary: %s\n' "$bridge_test_status" "$bridge_test_summary"
   printf -- '- `cargo build --workspace --release`: %s. stdout/stderr summary: %s\n' "$release_build_status" "$release_build_summary"
-  printf -- '- `node src/runtime/web/test/bdd/run.mjs`: %s. stdout/stderr summary: %s\n' "$bdd_status" "$bdd_summary"
+  printf -- '- `node src/nf-runtime/web/test/bdd/run.mjs`: %s. stdout/stderr summary: %s\n' "$bdd_status" "$bdd_summary"
   printf '\n## Inventory Counts\n'
-  printf -- '- Scene files (`src/runtime/web/src/scenes/*.js`): %s\n' "$scene_files"
-  printf -- '- BDD test files (`src/runtime/web/test/bdd/*.test.js`): %s\n' "$bdd_test_files"
+  printf -- '- Scene files (`src/nf-runtime/web/src/scenes/*.js`): %s\n' "$scene_files"
+  printf -- '- BDD test files (`src/nf-runtime/web/test/bdd/*.test.js`): %s\n' "$bdd_test_files"
 } > "$REPORT_PATH"
 
 printf 'Wrote %s and %s\n' "$REPORT_PATH" "$LOG_PATH"

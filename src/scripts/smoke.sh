@@ -4,13 +4,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
-cargo build --release -p shell >/tmp/nextframe-shell-smoke-build.log 2>&1
-cargo run --release -p shell >/tmp/nextframe-shell-smoke.log 2>&1 &
+cargo build --release -p nf-shell >/tmp/nextframe-shell-smoke-build.log 2>&1
+cargo run --release -p nf-shell >/tmp/nextframe-shell-smoke.log 2>&1 &
 cargo_pid=$!
 shell_alive=0
 
 cleanup() {
-  pkill shell >/dev/null 2>&1 || true
+  pkill nf-shell >/dev/null 2>&1 || true
 
   if kill -0 "$cargo_pid" >/dev/null 2>&1; then
     kill "$cargo_pid" >/dev/null 2>&1 || true
@@ -22,11 +22,11 @@ trap cleanup EXIT
 
 sleep 3
 
-if pgrep -x shell >/dev/null 2>&1; then
+if pgrep -x nf-shell >/dev/null 2>&1; then
   shell_alive=1
 fi
 
-pkill shell >/dev/null 2>&1 || true
+pkill nf-shell >/dev/null 2>&1 || true
 
 if kill -0 "$cargo_pid" >/dev/null 2>&1; then
   if [ "$shell_alive" -eq 0 ]; then

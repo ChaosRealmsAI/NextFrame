@@ -1,5 +1,5 @@
 [package]
-name = "nextframe-recorder"
+name = "nf-recorder"
 version = "0.1.0"
 edition = "2024"
 description = "HTML-to-video recorder using WKWebView layer rendering and AVAssetWriter"

@@ -1,6 +1,6 @@
 #![allow(clippy::expect_used)]
 
-use bridge::{dispatch, Request, Response};
+use nf_bridge::{dispatch, Request, Response};
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::env;

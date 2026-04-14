@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const [rootDir, generatedPath, samplePath] = process.argv.slice(2);
-const { validateTimeline } = await import(path.join(rootDir, "src/runtime/web/src/engine/index.js"));
+const { validateTimeline } = await import(path.join(rootDir, "src/nf-runtime/web/src/engine/index.js"));
 
 function assert(condition, message) {
   if (!condition) {
@@ -93,8 +93,8 @@ for (const track of audioTracks) {
   for (const clip of track.clips ?? []) {
     assert(clip.assetId === "demo-tone", "Audio clips must target the demo-tone asset");
     assert(
-      clip.params?.src === "../../src/runtime/web/assets/demo-audio.wav",
-      "Audio clip params.src must point at ../../src/runtime/web/assets/demo-audio.wav",
+      clip.params?.src === "../../src/nf-runtime/web/assets/demo-audio.wav",
+      "Audio clip params.src must point at ../../src/nf-runtime/web/assets/demo-audio.wav",
     );
   }
 }

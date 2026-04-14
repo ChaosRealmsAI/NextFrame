@@ -26,7 +26,7 @@ if (typeof vm.SourceTextModule !== "function") {
   process.exit(result.status ?? 1);
 }
 
-const ROOT_DIR = path.resolve(process.cwd(), "src/runtime/web/src");
+const ROOT_DIR = path.resolve(process.cwd(), "src/nf-runtime/web/src");
 const IGNORED_PARTS = ["/_archive-v01/", "/app-bundle.js", "/bundle.cjs"];
 const FAILURES = [];
 const TODO_WARNINGS = [];
@@ -53,7 +53,7 @@ if (FAILURES.length > 0) {
 }
 
 process.stdout.write(
-  `Checked ${files.length} JavaScript file(s) under src/runtime/web/src with ${todoCount} TODO warning(s).\n`,
+  `Checked ${files.length} JavaScript file(s) under src/nf-runtime/web/src with ${todoCount} TODO warning(s).\n`,
 );
 
 async function collectJsFiles(dirPath) {

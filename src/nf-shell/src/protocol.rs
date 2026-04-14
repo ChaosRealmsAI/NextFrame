@@ -5,13 +5,13 @@ use std::path::{Component, Path, PathBuf};
 
 pub(crate) fn web_root() -> Result<PathBuf, Box<dyn Error>> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../runtime/web")
+        .join("../nf-runtime/web")
         .canonicalize()?;
     Ok(path)
 }
 
 pub(crate) fn projects_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home = bridge::path::home_dir().ok_or("home directory is unavailable")?;
+    let home = nf_bridge::path::home_dir().ok_or("home directory is unavailable")?;
     Ok(home.join("NextFrame").join("projects"))
 }
 

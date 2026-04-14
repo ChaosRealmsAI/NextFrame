@@ -1,4 +1,4 @@
-use bridge::{Request, Response};
+use nf_bridge::{Request, Response};
 use serde_json::Value;
 
 use super::write_http_response;

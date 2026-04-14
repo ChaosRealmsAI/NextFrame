@@ -22,7 +22,8 @@ use crate::progress::ProgressOverlay;
 const kCGInterpolationHigh: i32 = 3;
 
 // SAFETY: This imports CoreGraphics with the declared system signature for valid CGContext pointers.
-unsafe extern "C" { // SAFETY: see above.
+unsafe extern "C" {
+    // SAFETY: see above.
     fn CGContextSetInterpolationQuality(context: *const std::ffi::c_void, quality: i32);
 }
 
@@ -41,7 +42,8 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
     let attributes = pixel_buffer_attributes(frame_size);
     let mut pixel_buffer: CVPixelBufferRef = ptr::null_mut();
     // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
-    let create_result = unsafe { // SAFETY: see above.
+    let create_result = unsafe {
+        // SAFETY: see above.
         CVPixelBufferCreate(
             ptr::null(),
             frame_size.width,
@@ -82,7 +84,8 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
         let bitmap_info =
             CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
         // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
-        let context = unsafe { // SAFETY: see above.
+        let context = unsafe {
+            // SAFETY: see above.
             CGBitmapContextCreate(
                 base_address,
                 frame_size.width,
@@ -98,7 +101,8 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
         // Set high-quality interpolation when upscaling
         if is_upscaling {
             // SAFETY: `context` is live, and CoreGraphics accepts its pointer for interpolation changes.
-            unsafe { // SAFETY: see above.
+            unsafe {
+                // SAFETY: see above.
                 let ctx_ptr: *const CGContext = &*context;
                 CGContextSetInterpolationQuality(ctx_ptr.cast(), kCGInterpolationHigh);
             }
@@ -151,7 +155,8 @@ pub(super) fn create_pixel_buffer_from_cgimage(
     let attributes = pixel_buffer_attributes(frame_size);
     let mut pixel_buffer: CVPixelBufferRef = ptr::null_mut();
     // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
-    let create_result = unsafe { // SAFETY: see above.
+    let create_result = unsafe {
+        // SAFETY: see above.
         CVPixelBufferCreate(
             ptr::null(),
             frame_size.width,
@@ -172,7 +177,8 @@ pub(super) fn create_pixel_buffer_from_cgimage(
     let lock_result = unsafe { CVPixelBufferLockBaseAddress(pixel_buffer, 0) }; // SAFETY: see above.
     if lock_result != 0 {
         // SAFETY: this function still owns the created `pixel_buffer` on the error path.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             CVBufferRelease(pixel_buffer);
         }
         return Err(format!(
@@ -194,7 +200,8 @@ pub(super) fn create_pixel_buffer_from_cgimage(
         let bitmap_info =
             CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
         // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
-        let context = unsafe { // SAFETY: see above.
+        let context = unsafe {
+            // SAFETY: see above.
             CGBitmapContextCreate(
                 base_address,
                 frame_size.width,
@@ -249,7 +256,8 @@ pub(super) fn create_pixel_buffer_from_cgimage(
     let unlock_result = unsafe { CVPixelBufferUnlockBaseAddress(pixel_buffer, 0) }; // SAFETY: see above.
     if unlock_result != 0 {
         // SAFETY: this function still owns the created `pixel_buffer` on the error path.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             CVBufferRelease(pixel_buffer);
         }
         return Err(format!(
@@ -260,7 +268,8 @@ pub(super) fn create_pixel_buffer_from_cgimage(
 
     if let Err(err) = draw_result {
         // SAFETY: the caller has not taken ownership yet, so this function must release the buffer.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             CVBufferRelease(pixel_buffer);
         }
         return Err(err);

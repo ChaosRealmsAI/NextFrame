@@ -18,8 +18,8 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const CLI = resolve(ROOT, "bin/nextframe.js");
 const FIXTURE = resolve(HERE, "fixtures", "minimal-v3.json");
-const APP_BUNDLE = resolve(ROOT, "..", "runtime", "web", "src", "app-bundle.js");
-const SHELL_MAIN = resolve(ROOT, "..", "shell", "src", "main.rs");
+const APP_BUNDLE = resolve(ROOT, "..", "nf-runtime", "web", "src", "app-bundle.js");
+const SHELL_MAIN = resolve(ROOT, "..", "nf-shell", "src", "main.rs");
 
 function runCli(args) {
   const r = spawnSync("node", [CLI, ...args], { cwd: ROOT, encoding: "utf8", timeout: 120_000 });

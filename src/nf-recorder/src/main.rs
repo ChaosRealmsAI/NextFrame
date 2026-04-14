@@ -11,10 +11,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
-use nextframe_recorder::api::{
+use nf_recorder::api::{
     OUTPUT_JSON_ENV, RecordArgs, RecordOutput, overlay_output, record_segments,
 };
-use nextframe_recorder::util::absolute_path;
+use nf_recorder::util::absolute_path;
 
 #[derive(Parser, Debug)]
 #[command(

@@ -21,7 +21,7 @@ enum UserEvent {
 }
 
 pub(crate) fn run() -> Result<(), Box<dyn Error>> {
-    if let Err(error) = bridge::initialize() {
+    if let Err(error) = nf_bridge::initialize() {
         trace_log!("bridge initialization warning: {error}");
     }
 
@@ -118,7 +118,7 @@ pub(crate) fn run() -> Result<(), Box<dyn Error>> {
                         return;
                     }
 
-                    let response = bridge::dispatch(parsed_request);
+                    let response = nf_bridge::dispatch(parsed_request);
                     if is_fire_and_forget {
                         return;
                     }

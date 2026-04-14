@@ -17,8 +17,8 @@ pub(crate) fn native_screenshot(
     use std::rc::Rc;
 
     use block2::RcBlock;
+    use objc2::rc::{autoreleasepool, Retained};
     use objc2::MainThreadMarker;
-    use objc2::rc::{Retained, autoreleasepool};
     use objc2_app_kit::{NSBitmapImageRep, NSImage};
     use objc2_foundation::{NSData, NSError};
     use objc2_web_kit::WKSnapshotConfiguration;
@@ -36,13 +36,15 @@ pub(crate) fn native_screenshot(
     let block = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
         autoreleasepool(|_| {
             // SAFETY: WebKit passes either null or a valid `NSError *` for the duration of this callback.
-            let result = if let Some(error) = unsafe { error.as_ref() } { // SAFETY: see above.
+            let result = if let Some(error) = unsafe { error.as_ref() } {
+                // SAFETY: see above.
                 Err(format!(
                     "WKWebView.takeSnapshot error: {}",
                     error.localizedDescription()
                 ))
             // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes our own ownership.
-            } else if let Some(image) = unsafe { Retained::retain(image) } { // SAFETY: see above.
+            } else if let Some(image) = unsafe { Retained::retain(image) } {
+                // SAFETY: see above.
                 Ok(image)
             } else {
                 Err("WKWebView.takeSnapshot returned nil".into())
@@ -52,7 +54,8 @@ pub(crate) fn native_screenshot(
     });
 
     // SAFETY: `wk_webview`, `config`, and `block` are live Objective-C objects on the main thread.
-    unsafe { // SAFETY: see above.
+    unsafe {
+        // SAFETY: see above.
         wk_webview.takeSnapshotWithConfiguration_completionHandler(Some(&config), &block);
     }
 
@@ -72,7 +75,8 @@ pub(crate) fn native_screenshot(
         // Pump the run loop so the completion handler fires
         #[allow(clippy::undocumented_unsafe_blocks)]
         // SAFETY: `currentRunLoop` and `runUntilDate:` use live Objective-C objects for this thread only.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             use objc2_foundation::NSDate;
             let run_loop: *mut objc2::runtime::AnyObject =
                 objc2::msg_send![objc2::class!(NSRunLoop), currentRunLoop];
@@ -96,14 +100,15 @@ pub(crate) fn native_screenshot(
 
     // NSBitmapImageFileType.PNG = 4
     // SAFETY: `bitmap_rep` is live, and Cocoa accepts a null properties dictionary for default PNG options.
-    let png_data: Option<objc2::rc::Retained<NSData>> = unsafe { // SAFETY: see above.
+    let png_data: Option<objc2::rc::Retained<NSData>> = unsafe {
+        // SAFETY: see above.
         objc2::msg_send![&bitmap_rep, representationUsingType: 4_usize, properties: std::ptr::null::<objc2::runtime::AnyObject>()]
     };
     let png_data = png_data.ok_or("failed to generate PNG data")?;
 
     // SAFETY: `png_data` is a live `NSData` for the duration of this scope.
     let png_len: usize = unsafe { objc2::msg_send![&*png_data, length] }; // SAFETY: see above.
-    // SAFETY: `png_data` is a live `NSData` for the duration of this scope.
+                                                                          // SAFETY: `png_data` is a live `NSData` for the duration of this scope.
     let png_ptr: *const u8 = unsafe { objc2::msg_send![&*png_data, bytes] }; // SAFETY: see above.
     let png_bytes = if png_ptr.is_null() || png_len == 0 {
         return Err("PNG data is empty".into());
@@ -168,7 +173,11 @@ pub(crate) fn query_value<'a>(query: Option<&'a str>, key: &str) -> Option<&'a s
     query.and_then(|query| {
         query.split('&').find_map(|part| {
             let (name, value) = part.split_once('=').unwrap_or((part, ""));
-            if name == key { Some(value) } else { None }
+            if name == key {
+                Some(value)
+            } else {
+                None
+            }
         })
     })
 }

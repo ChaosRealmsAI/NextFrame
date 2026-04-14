@@ -6,7 +6,7 @@
 ## Quick start
 
 ```bash
-cd src/cli
+cd src/nf-cli
 
 # Render the showcase — 6 scene types in 18s
 node bin/nextframe.js bake-html examples/showcase/timeline.json
