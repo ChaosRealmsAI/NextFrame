@@ -1,3 +1,4 @@
+//! cli play command
 use anyhow::{anyhow, Result};
 use tokio::process::Command;
 

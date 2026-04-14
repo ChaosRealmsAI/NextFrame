@@ -1,3 +1,4 @@
+//! backend volcengine audio segmentation helpers
 use std::io::Write;
 use std::process::Command;
 
@@ -5,7 +6,7 @@ use anyhow::Result;
 
 use crate::backend::WordBoundary;
 
-/// 分句策略：有换行按换行分（用户手动控制），否则按标点分
+/// Splits by explicit line breaks first, then by sentence-ending punctuation
 pub(super) fn split_sentences(text: &str) -> Vec<String> {
     let lines: Vec<String> = text
         .lines()
@@ -37,7 +38,7 @@ pub(super) fn split_sentences(text: &str) -> Vec<String> {
     sentences
 }
 
-/// 用 ffmpeg 获取精确的 MP3 时长（毫秒）
+/// Uses ffprobe to estimate MP3 duration in milliseconds
 pub(super) fn get_audio_duration_ms(audio: &[u8]) -> u64 {
     let tmp = std::env::temp_dir().join(format!("vox-dur-{}.mp3", std::process::id()));
     if let Ok(mut file) = std::fs::File::create(&tmp) {
@@ -66,7 +67,7 @@ pub(super) fn get_audio_duration_ms(audio: &[u8]) -> u64 {
         .unwrap_or_else(|| (audio.len() as u64) * 1000 / 16000)
 }
 
-/// 用 ffmpeg silencedetect 找静音点，与分句对齐
+/// Uses ffmpeg silencedetect output to align sentence boundaries
 pub(super) fn detect_sentence_boundaries(
     audio: &[u8],
     sentences: &[String],

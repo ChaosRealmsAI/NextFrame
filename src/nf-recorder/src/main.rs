@@ -1,3 +1,4 @@
+//! nf-recorder entry point
 #![cfg(feature = "cli")]
 
 macro_rules! trace_log {

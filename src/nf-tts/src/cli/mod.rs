@@ -1,3 +1,4 @@
+//! cli module exports
 pub mod args;
 pub mod batch;
 pub mod concat;

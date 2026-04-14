@@ -1,3 +1,4 @@
+//! encoder encoding pipeline
 use std::fs;
 use std::ptr;
 use std::sync::mpsc;

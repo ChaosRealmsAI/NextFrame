@@ -1,3 +1,4 @@
+//! api parallel cli helpers
 use std::env;
 use std::ffi::OsString;
 use std::path::PathBuf;

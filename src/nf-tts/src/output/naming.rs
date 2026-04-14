@@ -1,3 +1,4 @@
+//! output naming helpers
 pub fn sequential_name(id: usize) -> String {
     format!("{id:03}.mp3")
 }

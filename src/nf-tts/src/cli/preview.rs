@@ -1,3 +1,4 @@
+//! cli preview rendering
 use anyhow::{anyhow, Result};
 use tokio::process::Command;
 

@@ -1,3 +1,4 @@
+//! autosave tests
 use super::*;
 
 #[test]

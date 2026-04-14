@@ -1,3 +1,4 @@
+//! codec ffmpeg helpers
 #[cfg(test)]
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};

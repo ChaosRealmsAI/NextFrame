@@ -1,3 +1,4 @@
+//! cli config commands
 use crate::config::VoxConfig;
 use anyhow::Result;
 

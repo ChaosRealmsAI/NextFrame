@@ -1,3 +1,4 @@
+//! command polling
 use block2::RcBlock;
 use objc2::runtime::AnyObject;
 use objc2_foundation::{NSError, NSString};

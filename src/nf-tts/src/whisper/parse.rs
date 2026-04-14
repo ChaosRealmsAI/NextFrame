@@ -1,3 +1,4 @@
+//! whisper alignment parsing
 use std::path::Path;
 
 use anyhow::{Context, Result};

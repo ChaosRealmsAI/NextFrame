@@ -1,3 +1,4 @@
+//! nf-tts entry point
 mod backend;
 mod cache;
 mod cli;

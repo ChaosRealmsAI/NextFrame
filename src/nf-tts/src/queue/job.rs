@@ -1,3 +1,4 @@
+//! queue job definitions
 use serde::{Deserialize, Serialize};
 
 use crate::backend::SynthParams;

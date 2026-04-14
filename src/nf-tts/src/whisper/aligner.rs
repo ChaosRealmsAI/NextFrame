@@ -1,3 +1,4 @@
+//! whisper forced alignment process helpers
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};

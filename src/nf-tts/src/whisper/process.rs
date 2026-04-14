@@ -1,3 +1,4 @@
+//! whisper alignment process execution
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};

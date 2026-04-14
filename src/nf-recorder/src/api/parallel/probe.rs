@@ -1,3 +1,4 @@
+//! api parallel page probing
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 

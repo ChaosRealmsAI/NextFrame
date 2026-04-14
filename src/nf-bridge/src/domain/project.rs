@@ -1,3 +1,4 @@
+//! domain project management handlers
 use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;

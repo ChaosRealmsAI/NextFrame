@@ -1,3 +1,4 @@
+//! utility module exports
 #[macro_use]
 pub mod trace;
 

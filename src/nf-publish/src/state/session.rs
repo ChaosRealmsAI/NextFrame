@@ -1,3 +1,4 @@
+//! state session persistence helpers
 use super::{
     APP_STATE, SessionHistoryEntry, SessionState, TABS, current_url_for_webview, log_activity,
     persistence, tabs, timestamp_now, trim_history, url_host, webview_for_tab,

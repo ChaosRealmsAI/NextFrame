@@ -1,3 +1,4 @@
+//! backend edge websocket transport
 use anyhow::{anyhow, Result};
 use futures::{SinkExt, StreamExt};
 use tokio_tungstenite::connect_async;

@@ -1,3 +1,4 @@
+//! ai control control server helpers
 use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::net::{TcpListener, TcpStream};

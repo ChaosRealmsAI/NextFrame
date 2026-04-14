@@ -1,3 +1,4 @@
+//! storage autosave persistence
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::fs;

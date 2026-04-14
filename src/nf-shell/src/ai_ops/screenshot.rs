@@ -1,3 +1,4 @@
+//! ai control native screenshot helpers
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};

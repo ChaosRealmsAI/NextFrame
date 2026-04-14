@@ -1,3 +1,4 @@
+//! output event models
 use serde::Serialize;
 
 #[derive(Serialize)]

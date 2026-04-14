@@ -1,3 +1,4 @@
+//! command module exports
 use std::panic::AssertUnwindSafe;
 
 mod input;

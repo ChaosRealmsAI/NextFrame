@@ -1,3 +1,4 @@
+//! ipc module exports
 mod bridge;
 mod http;
 

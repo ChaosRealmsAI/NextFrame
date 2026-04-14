@@ -1,3 +1,4 @@
+//! utility logging helpers
 use serde_json::{json, Value};
 
 use crate::util::validation::require_string;

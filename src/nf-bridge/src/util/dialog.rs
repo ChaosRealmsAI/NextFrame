@@ -1,3 +1,4 @@
+//! utility dialog handlers
 #[cfg(not(test))]
 use rfd::FileDialog;
 use serde_json::{json, Value};

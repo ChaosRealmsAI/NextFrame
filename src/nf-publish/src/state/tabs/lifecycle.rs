@@ -1,3 +1,4 @@
+//! state tab lifecycle helpers
 use objc2::rc::Retained;
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use objc2_web_kit::WKWebView;

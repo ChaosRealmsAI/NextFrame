@@ -1,3 +1,4 @@
+//! webview frame capture helpers
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;

@@ -1,3 +1,4 @@
+//! export recorder bridge helpers
 use std::path::{Path, PathBuf};
 
 use crate::codec::encoding::{path_to_file_url, percent_decode_url_path};

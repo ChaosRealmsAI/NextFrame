@@ -1,3 +1,4 @@
+//! command tab helpers
 use objc2_web_kit::WKWebView;
 
 use crate::state::{all_tab_infos, close_tab, create_dynamic_tab, switch_tab};

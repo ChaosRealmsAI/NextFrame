@@ -1,3 +1,4 @@
+//! dialog tests
 use super::*;
 
 #[test]

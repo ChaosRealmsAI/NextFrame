@@ -1,3 +1,4 @@
+//! cli batch command
 use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;

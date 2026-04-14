@@ -1,3 +1,4 @@
+//! project tests
 use super::*;
 
 #[test]

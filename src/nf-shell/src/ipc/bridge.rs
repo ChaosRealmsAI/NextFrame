@@ -1,3 +1,4 @@
+//! ipc bridge ipc helpers
 use nf_bridge::{Request, Response};
 use serde_json::Value;
 

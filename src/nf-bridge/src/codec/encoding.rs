@@ -1,3 +1,4 @@
+//! codec encoding helpers
 use std::path::Path;
 
 pub(crate) fn base64_encode(data: &[u8]) -> String {

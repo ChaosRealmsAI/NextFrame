@@ -1,3 +1,4 @@
+//! cache module exports
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 

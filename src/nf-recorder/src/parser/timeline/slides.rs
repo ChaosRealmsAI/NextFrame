@@ -1,3 +1,4 @@
+//! parser timeline subtitle extraction
 use serde_json::Value;
 
 use super::super::srt::parse_subtitle_array;

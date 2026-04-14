@@ -1,3 +1,4 @@
+//! storage recent project persistence
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashSet;

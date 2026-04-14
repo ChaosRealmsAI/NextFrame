@@ -1,3 +1,4 @@
+//! webview evaluation helpers
 use block2::RcBlock;
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSImage};

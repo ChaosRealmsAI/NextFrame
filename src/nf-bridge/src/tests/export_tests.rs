@@ -1,3 +1,4 @@
+//! export tests
 use super::*;
 
 #[test]

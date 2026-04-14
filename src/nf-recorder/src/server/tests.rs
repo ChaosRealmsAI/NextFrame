@@ -1,3 +1,4 @@
+//! local server tests helpers
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 #![allow(clippy::panic)]

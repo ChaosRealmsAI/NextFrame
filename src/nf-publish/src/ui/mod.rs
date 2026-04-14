@@ -1,3 +1,4 @@
+//! ui module exports
 use std::panic::AssertUnwindSafe;
 
 mod menu;

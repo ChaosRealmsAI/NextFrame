@@ -1,3 +1,4 @@
+//! recorder tests
 use super::*;
 
 #[test]

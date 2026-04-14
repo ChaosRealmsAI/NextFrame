@@ -1,3 +1,4 @@
+//! backend edge drm token helpers
 use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};

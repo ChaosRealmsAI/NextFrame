@@ -1,3 +1,4 @@
+//! cli args helpers
 use clap::{Args, Parser, Subcommand};
 
 use super::{play::PlayCommand, synth::SynthCommand};
@@ -122,7 +123,7 @@ pub struct SynthArgs {
     #[arg(long)]
     pub volc_pitch: Option<i32>,
 
-    /// TTS 2.0 emotional/style context hint (e.g. "用特别开心的语气说话"). Volcengine only.
+    /// TTS 2.0 emotional or style context hint (for example "speak in an especially cheerful tone"). Volcengine only.
     #[arg(long)]
     pub context_text: Option<String>,
 

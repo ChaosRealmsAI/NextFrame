@@ -1,3 +1,4 @@
+//! recording frame capture loop
 use std::time::Duration;
 
 use objc2::rc::{Retained, autoreleasepool};

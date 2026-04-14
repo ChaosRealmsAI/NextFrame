@@ -1,3 +1,4 @@
+//! backend volcengine websocket client
 use anyhow::{bail, Context, Result};
 use futures::stream::SplitStream;
 use futures::{SinkExt, StreamExt};

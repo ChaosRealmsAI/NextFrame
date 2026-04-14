@@ -1,3 +1,4 @@
+//! utility composition helpers
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};

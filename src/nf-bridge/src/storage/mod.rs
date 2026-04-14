@@ -1,3 +1,4 @@
+//! storage module exports
 pub mod autosave;
 pub mod fs;
 pub mod recent;

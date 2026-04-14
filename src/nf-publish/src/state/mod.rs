@@ -1,3 +1,4 @@
+//! state module exports
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Mutex, OnceLock};
 

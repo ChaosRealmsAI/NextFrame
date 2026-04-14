@@ -1,3 +1,4 @@
+//! api parallel module exports
 mod cli;
 mod frame_slices;
 mod group_recording;

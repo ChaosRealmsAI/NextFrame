@@ -1,3 +1,4 @@
+//! keyboard input helpers
 use std::ffi::c_ushort;
 
 use block2::RcBlock;

@@ -1,3 +1,4 @@
+//! nf-tts library exports
 pub mod backend;
 pub mod cache;
 pub mod config;

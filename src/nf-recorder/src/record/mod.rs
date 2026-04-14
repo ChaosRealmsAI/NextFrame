@@ -1,3 +1,4 @@
+//! recording module exports
 mod cleanup;
 mod frame_loop;
 mod setup;

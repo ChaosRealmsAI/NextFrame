@@ -1,3 +1,4 @@
+//! utility time helpers
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(crate) fn iso_now() -> String {

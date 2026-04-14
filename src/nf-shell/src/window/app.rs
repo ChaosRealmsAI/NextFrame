@@ -1,3 +1,4 @@
+//! window application window bootstrapping
 use std::error::Error;
 use std::sync::Arc;
 

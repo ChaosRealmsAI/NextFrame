@@ -1,3 +1,4 @@
+//! utility preview rendering
 use serde_json::{json, Value};
 use std::env;
 use std::fs;

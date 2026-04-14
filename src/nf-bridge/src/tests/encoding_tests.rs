@@ -1,3 +1,4 @@
+//! encoding tests
 use super::*;
 
 #[test]

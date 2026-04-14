@@ -1,3 +1,4 @@
+//! configuration loading
 use crate::backend::DEFAULT_BACKEND;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

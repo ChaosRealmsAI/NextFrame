@@ -1,3 +1,4 @@
+//! output manifest models
 use std::path::Path;
 
 use anyhow::{Context, Result};

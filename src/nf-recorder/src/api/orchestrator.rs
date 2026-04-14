@@ -1,3 +1,4 @@
+//! api recording orchestration
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;

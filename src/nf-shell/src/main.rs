@@ -1,3 +1,4 @@
+//! nf-shell entry point
 #![deny(unused)]
 
 /// Logging macro that auto-prepends file:line for AI-readable logs.

@@ -1,9 +1,9 @@
-//! Forced alignment of TTS audio to its own source text.
+//! whisper module exports
 //!
 //! Previous versions of this file ran `mlx-whisper` over the synthesized
 //! audio, re-transcribed it, then fuzzy-matched the resulting text back to
 //! the original input. Whisper's transcription has its own error rate (it
-//! hears "不错" as "不措", hallucinates on long audio, drops characters), and
+//! mishears CJK text, hallucinates on long audio, drops characters), and
 //! we were carrying a brittle "count content chars, force the original back"
 //! hack to paper over it.
 //!

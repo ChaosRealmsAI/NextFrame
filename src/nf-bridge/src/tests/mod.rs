@@ -1,3 +1,4 @@
+//! tests module exports
 use super::{
     autosave_storage_test_lock, build_export_request, build_ffmpeg_command,
     build_ffmpeg_filter_complex, build_recording_url, cleanup_intermediate_video,

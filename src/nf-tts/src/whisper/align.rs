@@ -1,3 +1,4 @@
+//! whisper audio alignment entry points
 use std::path::Path;
 
 use anyhow::Result;

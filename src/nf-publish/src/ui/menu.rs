@@ -1,3 +1,4 @@
+//! ui menu ui construction
 use objc2::msg_send;
 use objc2::runtime::AnyObject;
 use objc2::sel;

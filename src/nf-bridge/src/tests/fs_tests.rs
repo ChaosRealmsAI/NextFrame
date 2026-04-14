@@ -1,3 +1,4 @@
+//! fs tests
 use super::*;
 
 #[test]

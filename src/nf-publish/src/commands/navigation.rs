@@ -1,3 +1,4 @@
+//! command navigation commands
 use crate::state::{
     all_tab_ids, go_back, go_forward, log_crash, navigate_active_input, navigate_tab_to_url,
     reload_tab,

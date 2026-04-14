@@ -1,3 +1,4 @@
+//! local server request path resolution
 use std::path::{Component, Path, PathBuf};
 
 pub(super) enum ResolvedRequestPath {

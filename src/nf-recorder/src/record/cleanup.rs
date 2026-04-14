@@ -1,3 +1,4 @@
+//! recording segment cleanup
 use crate::encoder::EncoderBackend;
 use crate::plan::{SegmentPlan, SegmentSummary};
 

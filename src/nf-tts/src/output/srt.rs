@@ -1,3 +1,4 @@
+//! output srt writing
 use std::path::Path;
 
 use anyhow::{Context, Result};

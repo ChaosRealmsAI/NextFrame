@@ -1,3 +1,4 @@
+//! utility validation helpers
 use serde_json::Value;
 
 pub(crate) fn require_object(params: &Value) -> Result<&serde_json::Map<String, Value>, String> {

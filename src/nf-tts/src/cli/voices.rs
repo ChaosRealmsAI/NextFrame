@@ -1,3 +1,4 @@
+//! cli voice listing command
 use anyhow::Result;
 
 use crate::backend;

@@ -1,3 +1,4 @@
+//! cli audio concatenation command
 use anyhow::{anyhow, Result};
 use std::path::Path;
 

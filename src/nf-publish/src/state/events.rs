@@ -1,3 +1,4 @@
+//! state event helpers
 use chrono::{Local, SecondsFormat};
 
 use super::SessionHistoryEntry;

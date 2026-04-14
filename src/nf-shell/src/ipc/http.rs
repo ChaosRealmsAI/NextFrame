@@ -1,3 +1,4 @@
+//! ipc http transport helpers
 use std::io::{ErrorKind, Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::time::Instant;

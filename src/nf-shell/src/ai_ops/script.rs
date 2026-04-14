@@ -1,3 +1,4 @@
+//! ai control script injection helpers
 use std::time::Instant;
 
 use serde_json::Value;

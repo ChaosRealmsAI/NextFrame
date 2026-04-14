@@ -1,7 +1,4 @@
-//! 火山引擎（豆包）TTS backend — seed-tts-2.0
-//!
-//! 官方 WebSocket API v3，音质远超 Edge TTS，但按量计费（约 ¥2/万字）。
-//! 需要环境变量 VOLC_TTS_APP_ID + VOLC_TTS_ACCESS_TOKEN，或使用内置默认值。
+//! backend volcengine module exports
 
 mod audio;
 mod client;
@@ -18,7 +15,7 @@ const DEFAULT_ACCESS_TOKEN: &str = "RXQjJw1vScxdoZUH9eVK3wKvGXArk-j0";
 const DEFAULT_RESOURCE_ID: &str = "seed-tts-2.0";
 pub(crate) const DEFAULT_VOICE: &str = "zh_female_vv_uranus_bigtts";
 
-/// 可用的豆包音色（与火山引擎控制台实际开通的声音同步）
+/// Voices available from the enabled Volcengine account
 const VOICES: &[(&str, &str, &str)] = &[
     ("zh_female_vv_uranus_bigtts", "zh-CN", "Female"),
     ("zh_female_xiaohe_uranus_bigtts", "zh-CN", "Female"),

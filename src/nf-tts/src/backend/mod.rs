@@ -1,3 +1,4 @@
+//! backend module exports
 pub mod edge;
 pub mod volcengine;
 
@@ -47,7 +48,7 @@ pub struct SynthParams {
     /// Pitch shift: -12 to 12 semitones
     #[serde(default)]
     pub volc_pitch: Option<i32>,
-    /// TTS 2.0 emotional/style context, e.g. "用特别开心的语气说话"
+    /// TTS 2.0 emotional or style context, for example "speak in an especially cheerful tone"
     #[serde(default)]
     pub context_text: Option<String>,
     /// Dialect for vivi voice: dongbei/shaanxi/sichuan

@@ -1,3 +1,4 @@
+//! parallel recording
 use std::env;
 use std::ffi::OsString;
 use std::fs;

@@ -1,3 +1,4 @@
+//! state tab module exports
 mod lifecycle;
 mod platform;
 

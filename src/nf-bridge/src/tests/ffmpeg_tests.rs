@@ -1,3 +1,4 @@
+//! ffmpeg tests
 use super::*;
 
 #[test]

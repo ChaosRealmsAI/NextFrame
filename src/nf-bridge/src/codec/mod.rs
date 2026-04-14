@@ -1,3 +1,4 @@
+//! codec module exports
 pub mod encoding;
 pub mod ffmpeg;
 

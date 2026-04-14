@@ -1,3 +1,4 @@
+//! export embedded recorder runner
 use std::env;
 use std::fs;
 use std::io::ErrorKind;

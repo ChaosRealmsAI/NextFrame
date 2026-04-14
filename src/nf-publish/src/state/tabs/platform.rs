@@ -1,3 +1,4 @@
+//! state tab platform helpers
 use super::super::persistence;
 use super::{create_dynamic_tab, set_tab_loading_state};
 use crate::state::{

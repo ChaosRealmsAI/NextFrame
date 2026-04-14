@@ -1,3 +1,4 @@
+//! keyboard shortcut handling
 use std::ffi::c_ushort;
 use std::ptr::{NonNull, null_mut};
 

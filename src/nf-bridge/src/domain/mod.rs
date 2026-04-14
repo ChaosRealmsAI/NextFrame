@@ -1,3 +1,4 @@
+//! domain module exports
 pub mod episode;
 pub mod project;
 pub mod scene;

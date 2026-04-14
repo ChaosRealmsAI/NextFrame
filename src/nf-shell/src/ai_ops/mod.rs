@@ -1,3 +1,4 @@
+//! ai control module exports
 mod control;
 mod screenshot;
 mod script;
