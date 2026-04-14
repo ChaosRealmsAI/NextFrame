@@ -318,8 +318,18 @@ fn overlay_video_returns_error_for_missing_input_file() {
 
     let err = overlay_video(&recorded, &missing_video).expect_err("missing input should fail");
 
-    assert!(err.contains("ffmpeg overlay failed:"));
-    assert!(err.contains("No such file or directory"));
+    assert!(
+        err.contains("failed to overlay the source video with ffmpeg:"),
+        "unexpected overlay error: {err}"
+    );
+    assert!(
+        err.contains("No such file or directory"),
+        "unexpected overlay error: {err}"
+    );
+    assert!(
+        err.contains("Fix: Inspect the ffmpeg stderr output, verify the input files, and retry."),
+        "unexpected overlay error: {err}"
+    );
     assert!(recorded.exists());
 
     let _ = fs::remove_dir_all(&temp_dir);

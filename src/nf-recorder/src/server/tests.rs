@@ -202,25 +202,9 @@ fn request(server: &HttpFileServer, method: &str, path: &str) -> HttpResponse {
         .to_string();
 
     let mut last_error = None;
-    for _ in 0..40 {
-        match TcpStream::connect(&address) {
-            Ok(mut stream) => {
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(2)))
-                    .expect("failed to set read timeout");
-                let request = format!(
-                    "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
-                );
-                stream
-                    .write_all(request.as_bytes())
-                    .expect("failed to write request");
-
-                let mut response = Vec::new();
-                stream
-                    .read_to_end(&mut response)
-                    .expect("failed to read response");
-                return parse_response(&response);
-            }
+    for _ in 0..80 {
+        match try_request(&address, method, path) {
+            Ok(response) => return response,
             Err(err) => {
                 last_error = Some(err);
                 std::thread::sleep(Duration::from_millis(25));
@@ -229,28 +213,50 @@ fn request(server: &HttpFileServer, method: &str, path: &str) -> HttpResponse {
     }
 
     panic!(
-        "failed to connect to HTTP test server: {}",
+        "failed to connect to HTTP test server after retries: {}",
         last_error.expect("connection errors should be recorded")
     );
 }
 
-fn parse_response(response: &[u8]) -> HttpResponse {
+fn try_request(address: &str, method: &str, path: &str) -> Result<HttpResponse, String> {
+    let mut stream = TcpStream::connect(address)
+        .map_err(|err| format!("connect to {address}: {err}"))?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .map_err(|err| format!("set read timeout for {address}: {err}"))?;
+    let request =
+        format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|err| format!("write {method} {path} request to {address}: {err}"))?;
+
+    let mut response = Vec::new();
+    stream
+        .read_to_end(&mut response)
+        .map_err(|err| format!("read {method} {path} response from {address}: {err}"))?;
+    parse_response(&response)
+}
+
+fn parse_response(response: &[u8]) -> Result<HttpResponse, String> {
     let header_end = response
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
-        .expect("HTTP response should contain a header terminator");
+        .ok_or_else(|| "HTTP response should contain a header terminator".to_string())?;
     let header_bytes = &response[..header_end];
     let body = response[header_end + 4..].to_vec();
     let header_text =
-        std::str::from_utf8(header_bytes).expect("response headers should be valid UTF-8");
+        std::str::from_utf8(header_bytes)
+            .map_err(|err| format!("response headers should be valid UTF-8: {err}"))?;
     let mut lines = header_text.lines();
-    let status_line = lines.next().expect("response should have a status line");
+    let status_line = lines
+        .next()
+        .ok_or_else(|| "response should have a status line".to_string())?;
     let status_code = status_line
         .split_whitespace()
         .nth(1)
-        .expect("status line should contain a status code")
+        .ok_or_else(|| "status line should contain a status code".to_string())?
         .parse::<u16>()
-        .expect("status code should parse");
+        .map_err(|err| format!("status code should parse: {err}"))?;
     let headers = lines
         .filter_map(|line| {
             line.split_once(':')
@@ -258,11 +264,11 @@ fn parse_response(response: &[u8]) -> HttpResponse {
         })
         .collect();
 
-    HttpResponse {
+    Ok(HttpResponse {
         status_code,
         headers,
         body,
-    }
+    })
 }
 
 fn write_file(root: &Path, relative_path: &str, contents: &[u8]) {
