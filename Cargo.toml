@@ -1,5 +1,5 @@
 [workspace]
-members = ["src/nf-shell", "src/nf-bridge", "src/nf-recorder", "src/nf-tts", "src/nf-publish", "src/crates/nf-cut-core", "src/crates/nf-download", "src/crates/nf-transcribe", "src/crates/nf-align", "src/crates/nf-cut", "src/crates/nf-source"]
+members = ["src/nf-desktop", "src/nf-bridge", "src/nf-recorder", "src/nf-tts", "src/nf-publish", "src/crates/nf-cut-core", "src/crates/nf-download", "src/crates/nf-transcribe", "src/crates/nf-align", "src/crates/nf-cut", "src/crates/nf-source"]
 resolver = "2"
 
 [workspace.package]

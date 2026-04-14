@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame · Home</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════
+   NEXTFRAME HOME — Project Dashboard (web-v2)
+   Spec: DESIGN.md · Min font 12px · Min opacity 0.50
+   Fonts: Inter (UI) · JetBrains Mono (data)
+   ══════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Background */
+  --bg: #050507;
+
+  /* Accent — single purple, 4 densities */
+  --accent: #a78bfa;
+  --accent-20: rgba(167,139,250,0.20);
+  --accent-12: rgba(167,139,250,0.12);
+  --accent-06: rgba(167,139,250,0.06);
+
+  /* Text — 4 levels, hard floor 0.50 */
+  --t100: rgba(255,255,255,0.95);
+  --t80: rgba(255,255,255,0.80);
+  --t65: rgba(255,255,255,0.65);
+  --t50: rgba(255,255,255,0.50);
+
+  /* Semantic */
+  --green: #34d399;
+  --green-bg: rgba(52,211,153,0.12);
+  --yellow: #fbbf24;
+  --yellow-bg: rgba(251,191,36,0.12);
+
+  /* Borders */
+  --border: rgba(255,255,255,0.08);
+  --border-hover: rgba(255,255,255,0.14);
+  --border-light: rgba(255,255,255,0.05);
+
+  /* Typography */
+  --sans: 'Inter', -apple-system, system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+  /* Spacing (8-point grid) */
+  --sp-4: 4px;
+  --sp-6: 6px;
+  --sp-8: 8px;
+  --sp-12: 12px;
+  --sp-16: 16px;
+  --sp-20: 20px;
+  --sp-24: 24px;
+  --sp-32: 32px;
+  --sp-48: 48px;
+
+  /* Radius */
+  --r: 14px;
+  --r-sm: 10px;
+  --r-xs: 6px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --stagger: 60ms;
+
+  /* Glass */
+  --glass-bg: rgba(0,0,0,0.50);
+  --glass-blur: blur(16px) saturate(1.4);
+  --glass-shadow:
+    inset 0 1px 0 0 rgba(255,255,255,0.09),
+    inset 0 -1px 0 0 rgba(0,0,0,0.15),
+    0 2px 8px rgba(0,0,0,0.20);
+  --glass-shadow-hover:
+    inset 0 1px 0 0 rgba(255,255,255,0.09),
+    inset 0 -1px 0 0 rgba(0,0,0,0.15),
+    0 6px 20px rgba(0,0,0,0.30);
+  --glass-highlight:
+    linear-gradient(178deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 3%, transparent 12%),
+    linear-gradient(92deg, rgba(255,255,255,0.025) 0%, transparent 3%, transparent 97%, rgba(255,255,255,0.015) 100%);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--t80);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Aurora Background ── */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 12% at 50% 2%, rgba(139,92,246,0.10) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 12% at 50% 98%, rgba(124,58,237,0.06) 0%, transparent 100%);
+}
+
+/* ── 3D Glass Panel ── */
+.glass {
+  position: relative;
+  border-radius: var(--r);
+  overflow: hidden;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  background: var(--glass-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--glass-shadow);
+}
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  background: var(--glass-highlight);
+}
+
+/* ══════════════════════════════════════
+   APP SHELL
+   ══════════════════════════════════════ */
+.app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ══════════════════════════════════════
+   TOPBAR — 48px fixed
+   ══════════════════════════════════════ */
+.topbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-16);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  background: rgba(0,0,0,0.55);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.20), 0 1px 4px rgba(0,0,0,0.15);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  gap: var(--sp-12);
+}
+
+.tb-brand {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--t100);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.tb-brand svg {
+  flex-shrink: 0;
+}
+
+.tb-spacer {
+  flex: 1;
+}
+
+/* Search */
+.tb-search {
+  position: relative;
+  width: 260px;
+  flex-shrink: 0;
+}
+.tb-search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--sp-12) 0 34px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--t80);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-light);
+  border-radius: var(--r-xs);
+  outline: none;
+  transition: border 0.2s var(--ease), background 0.2s var(--ease);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.tb-search-input::placeholder {
+  color: var(--t50);
+}
+.tb-search-input:focus {
+  border-color: rgba(167,139,250,0.35);
+  background: rgba(255,255,255,0.05);
+}
+.tb-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--t50);
+  pointer-events: none;
+}
+
+/* Primary button */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-6);
+  height: 32px;
+  padding: 0 var(--sp-16);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0,0,0,0.90);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+  transition: filter 0.2s var(--ease), transform 0.15s var(--ease);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-primary:hover {
+  filter: brightness(1.12);
+}
+.btn-primary:active {
+  transform: scale(0.97);
+}
+
+/* Icon buttons */
+.tb-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-xs);
+  color: var(--t65);
+  cursor: pointer;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+  flex-shrink: 0;
+  border: none;
+  background: none;
+}
+.tb-icon-btn:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--t80);
+}
+
+/* Avatar */
+.tb-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-12);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.2s var(--ease);
+}
+.tb-avatar:hover {
+  background: var(--accent-20);
+}
+
+/* ══════════════════════════════════════
+   MAIN CONTENT
+   ══════════════════════════════════════ */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--sp-48) var(--sp-16);
+}
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-track { background: transparent; }
+.main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+.main::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+.content {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* ── Section ── */
+.section {
+  margin-bottom: var(--sp-48);
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-20);
+}
+.section-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--t100);
+  letter-spacing: -0.2px;
+  line-height: 1.3;
+}
+.section-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+  transition: opacity 0.2s var(--ease);
+}
+.section-link:hover {
+  opacity: 0.8;
+}
+
+/* ── Project Grid ── */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-16);
+}
+
+/* ── Project Card ── */
+.project-card {
+  cursor: pointer;
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
+}
+.project-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow-hover);
+}
+
+/* Thumbnail */
+.card-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.card-thumb-icon {
+  color: var(--t50);
+  opacity: 0.6;
+  transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.project-card:hover .card-thumb-icon {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Status dot on thumbnail */
+.card-status {
+  position: absolute;
+  top: var(--sp-8);
+  right: var(--sp-8);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  z-index: 2;
+}
+.card-status--published {
+  background: var(--green);
+  box-shadow: 0 0 6px rgba(52,211,153,0.40);
+}
+.card-status--progress {
+  background: var(--yellow);
+  box-shadow: 0 0 6px rgba(251,191,36,0.40);
+}
+
+/* Card body */
+.card-body {
+  position: relative;
+  z-index: 2;
+  padding: var(--sp-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-8);
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--t100);
+  line-height: 1.3;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+}
+
+.card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-12);
+  padding: 2px 8px;
+  border-radius: 20px;
+  line-height: 1.4;
+}
+.card-badge svg {
+  flex-shrink: 0;
+}
+
+.card-time {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t50);
+}
+
+/* ══════════════════════════════════════
+   EMPTY STATE (hidden by default)
+   ══════════════════════════════════════ */
+.empty-state {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  text-align: center;
+  gap: var(--sp-16);
+}
+.empty-state-icon {
+  color: var(--t50);
+  opacity: 0.5;
+}
+.empty-state-text {
+  font-size: 14px;
+  color: var(--t65);
+}
+
+/* ══════════════════════════════════════
+   ANIMATIONS — fadeUp + stagger
+   ══════════════════════════════════════ */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section {
+  opacity: 0;
+  animation: fadeUp 0.5s var(--ease) forwards;
+}
+.section:nth-child(1) { animation-delay: 0ms; }
+.section:nth-child(2) { animation-delay: 120ms; }
+
+.project-card {
+  opacity: 0;
+  animation: fadeUp 0.45s var(--ease) forwards;
+}
+
+/* Stagger per card within each grid */
+.project-grid .project-card:nth-child(1) { animation-delay: 60ms; }
+.project-grid .project-card:nth-child(2) { animation-delay: 120ms; }
+.project-grid .project-card:nth-child(3) { animation-delay: 180ms; }
+.project-grid .project-card:nth-child(4) { animation-delay: 240ms; }
+.project-grid .project-card:nth-child(5) { animation-delay: 300ms; }
+
+/* Section 2 cards get extra base delay */
+.section:nth-child(2) .project-card:nth-child(1) { animation-delay: 180ms; }
+.section:nth-child(2) .project-card:nth-child(2) { animation-delay: 240ms; }
+.section:nth-child(2) .project-card:nth-child(3) { animation-delay: 300ms; }
+.section:nth-child(2) .project-card:nth-child(4) { animation-delay: 360ms; }
+.section:nth-child(2) .project-card:nth-child(5) { animation-delay: 420ms; }
+
+/* ══════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════ */
+@media (max-width: 800px) {
+  .project-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .tb-search { width: 200px; }
+}
+@media (max-width: 560px) {
+  .project-grid {
+    grid-template-columns: 1fr;
+  }
+  .tb-search { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="aurora"></div>
+
+<div class="app">
+  <!-- ── Topbar ── -->
+  <header class="topbar">
+    <!-- Brand -->
+    <div class="tb-brand">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="1" y="1" width="16" height="16" rx="4" stroke="#a78bfa" stroke-width="1.5" fill="none"/>
+        <polygon points="7,5 13,9 7,13" fill="#a78bfa"/>
+      </svg>
+      NextFrame
+    </div>
+
+    <div class="tb-spacer"></div>
+
+    <!-- Search -->
+    <div class="tb-search">
+      <svg class="tb-search-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="11" y1="11" x2="14.5" y2="14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <input class="tb-search-input" type="text" placeholder="搜索项目...">
+    </div>
+
+    <!-- New Project -->
+    <button class="btn-primary">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      新建项目
+    </button>
+
+    <!-- Settings -->
+    <button class="tb-icon-btn" title="Settings">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+        <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.05 3.05l1.06 1.06M11.89 11.89l1.06 1.06M3.05 12.95l1.06-1.06M11.89 4.11l1.06-1.06" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <!-- Avatar -->
+    <div class="tb-avatar">Z</div>
+  </header>
+
+  <!-- ── Main Content ── -->
+  <main class="main">
+    <div class="content">
+
+      <!-- Recent Projects -->
+      <section class="section">
+        <div class="section-header">
+          <h2 class="section-title">最近项目</h2>
+          <span class="section-link">查看全部</span>
+        </div>
+        <div class="project-grid">
+
+          <!-- Card 1: AI短视频课 -->
+          <div class="project-card glass">
+            <div class="card-thumb">
+              <div class="card-status card-status--progress"></div>
+              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title">AI短视频课</div>
+              <div class="card-meta">
+                <span class="card-badge">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
+                  </svg>
+                  5 集
+                </span>
+                <span class="card-time">2 小时前</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: 产品介绍 -->
+          <div class="project-card glass">
+            <div class="card-thumb">
+              <div class="card-status card-status--published"></div>
+              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title">产品介绍</div>
+              <div class="card-meta">
+                <span class="card-badge">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
+                  </svg>
+                  2 集
+                </span>
+                <span class="card-time">1 天前</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Demo Reel -->
+          <div class="project-card glass">
+            <div class="card-thumb">
+              <div class="card-status card-status--progress"></div>
+              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Demo Reel</div>
+              <div class="card-meta">
+                <span class="card-badge">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
+                  </svg>
+                  3 集
+                </span>
+                <span class="card-time">3 天前</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- All Projects -->
+      <section class="section">
+        <div class="section-header">
+          <h2 class="section-title">所有项目</h2>
+        </div>
+        <div class="project-grid">
+
+          <!-- Card 1: AI短视频课 -->
+          <div class="project-card glass">
+            <div class="card-thumb">
+              <div class="card-status card-status--progress"></div>
+              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title">AI短视频课</div>
+              <div class="card-meta">
+                <span class="card-badge">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
+                  </svg>
+                  5 集
+                </span>
+                <span class="card-time">2 小时前</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: 产品介绍 -->
+          <div class="project-card glass">
+            <div class="card-thumb">
+              <div class="card-status card-status--published"></div>
+              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title">产品介绍</div>
+              <div class="card-meta">
+                <span class="card-badge">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
+                  </svg>
+                  2 集
+                </span>
+                <span class="card-time">1 天前</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Demo Reel -->
+          <div class="project-card glass">
+            <div class="card-thumb">
+              <div class="card-status card-status--progress"></div>
+              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Demo Reel</div>
+              <div class="card-meta">
+                <span class="card-badge">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
+                  </svg>
+                  3 集
+                </span>
+                <span class="card-time">3 天前</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4: 用户案例 -->
+          <div class="project-card glass">
+            <div class="card-thumb">
+              <div class="card-status card-status--published"></div>
+              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title">用户案例</div>
+              <div class="card-meta">
+                <span class="card-badge">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
+                  </svg>
+                  1 集
+                </span>
+                <span class="card-time">1 周前</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 5: Onboarding -->
+          <div class="project-card glass">
+            <div class="card-thumb">
+              <div class="card-status card-status--progress"></div>
+              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
+              </svg>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Onboarding</div>
+              <div class="card-meta">
+                <span class="card-badge">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
+                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
+                  </svg>
+                  4 集
+                </span>
+                <span class="card-time">2 周前</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+</body>
+</html>
