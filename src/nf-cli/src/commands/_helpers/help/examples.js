@@ -133,20 +133,20 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
     nextframe output-publish series alpha --id=2 --platform=reels --json
   `),
   examples("source-download", `
-    nextframe source-download https://www.youtube.com/watch?v=abc --library ~/NextFrame/library
-    nextframe source-download https://example.com/video --library ./sources --format 1080
+    nextframe source-download series alpha --url https://www.youtube.com/watch?v=abc
+    nextframe source-download series alpha --url https://example.com/video --format 1080 --json
   `),
   examples("source-transcribe", `
-    nextframe source-transcribe ~/NextFrame/library/my-source
-    nextframe source-transcribe ./sources/my-source --model small.en --lang en
+    nextframe source-transcribe series alpha --source my-source
+    nextframe source-transcribe series alpha --source my-source --model small.en --lang en --json
   `),
   examples("source-align", `
     nextframe source-align ~/NextFrame/library/my-source --srt ./subs/my-source.srt
     nextframe source-align ./sources/my-source --srt ./subs/my-source.srt --lang en
   `),
   examples("source-cut", `
-    nextframe source-cut ~/NextFrame/library/my-source --plan ./cut-plan.json
-    nextframe source-cut ./sources/my-source --plan ./cut-plan.json --margin 0.1
+    nextframe source-cut series alpha --source my-source --plan ./cut-plan.json
+    nextframe source-cut series alpha --plan ./cut-plan.json --margin 0.1 --json
   `),
   examples("source-list", `
     nextframe source-list --library ~/NextFrame/library

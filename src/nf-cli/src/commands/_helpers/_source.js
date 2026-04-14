@@ -2,6 +2,7 @@
 import { access, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,6 +45,25 @@ export function parseSourceFlags(argv, valuedFlags = []) {
     normalized.push(arg);
   }
   return parseFlags(normalized);
+}
+
+export function looksLikeSourcePath(value) {
+  return typeof value === "string" && value.includes("/");
+}
+
+export function resolveLibraryRoot() {
+  return resolve(homedir(), "NextFrame", "library");
+}
+
+export async function resolveEpisodeSourceDir(episodePath, sourceName) {
+  const episodeSourcesDir = join(resolve(episodePath), "sources");
+  const baseDir = await directoryExists(episodeSourcesDir)
+    ? episodeSourcesDir
+    : resolveLibraryRoot();
+  if (sourceName) {
+    return requireSourceDir(join(baseDir, String(sourceName)));
+  }
+  return findFirstSourceDir(baseDir);
 }
 
 export function slugifyTitle(title) {
@@ -312,4 +332,44 @@ async function pathExists(path) {
     if (error.code === "ENOENT") return false;
     throw error;
   }
+}
+
+async function directoryExists(path) {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function requireSourceDir(path) {
+  if (await pathExists(join(path, SOURCE_JSON))) {
+    return resolve(path);
+  }
+  throw new Error(`source not found: ${resolve(path)}`);
+}
+
+async function findFirstSourceDir(baseDir) {
+  let entries = [];
+  try {
+    entries = await readdir(resolve(baseDir), { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      throw new Error(`no source directories found at ${resolve(baseDir)}`);
+    }
+    throw error;
+  }
+
+  const names = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right));
+  for (const name of names) {
+    const candidate = join(baseDir, name);
+    if (await pathExists(join(candidate, SOURCE_JSON))) {
+      return resolve(candidate);
+    }
+  }
+  throw new Error(`no source directories found at ${resolve(baseDir)}`);
 }

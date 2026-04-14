@@ -212,22 +212,36 @@ export const COMMAND_SPECS = Object.fromEntries([
     --platform=NAME required publish target label such as youtube or reels
     --root=PATH projects root, default ~/NextFrame/projects
     --json emit the updated output row`, `The output id must already exist.`),
-  command("source-download", "Download a source video into the source library and create source.json.", `nextframe source-download <url> --library <path> [--format 720]`, `<url> source video URL
-    --library <path> required source library root
-    --format 720 optional target height, normalized to 720p, 1080p, etc.`, `Requires the nf-source binary to be installed and executable.
-    This creates a new source directory containing source.json, media, and metadata.`),
-  command("source-transcribe", "Run ASR on a downloaded source and write transcript summary into source.json.", `nextframe source-transcribe <source-dir> [--model base.en] [--lang auto]`, `<source-dir> existing downloaded source directory
+  command("source-download", "Download a source video into an episode sources directory and create source.json.", `nextframe source-download <project> <episode> --url <url> [--format 720] [--root=PATH] [--json]
+    nextframe source-download <url> --library <path> [--format 720]`, `<project> <episode> target episode that owns the downloaded source
+    --url <url> required source video URL in episode mode
+    --format 720 optional target height, normalized to 720p, 1080p, etc.
+    --root=PATH projects root, default ~/NextFrame/projects
+    --json emit structured JSON
+    <url> + --library keeps the legacy direct-library mode`, `Requires the nf-source binary to be installed and executable.
+    Episode mode writes into <episode>/sources/<source-name>/ and preserves the legacy --library mode for direct path workflows.`),
+  command("source-transcribe", "Run ASR on an episode source and write transcript summary into source.json.", `nextframe source-transcribe <project> <episode> --source <name> [--model base.en] [--lang auto] [--root=PATH] [--json]
+    nextframe source-transcribe <source-dir> [--model base.en] [--lang auto]`, `<project> <episode> target episode that owns or references the source
+    --source <name> source directory name under <episode>/sources/, required in episode mode
     --model MODEL whisper model name, default base.en
-    --lang LANG language code or auto, default auto`, `Use this when you do not have an SRT file.
-    Requires a source directory that already contains source.mp4 and source.json.`),
+    --lang LANG language code or auto, default auto
+    --root=PATH projects root, default ~/NextFrame/projects
+    --json emit structured JSON
+    <source-dir> keeps the legacy direct-path mode`, `Use this when you do not have an SRT file.
+    Episode mode resolves <episode>/sources/<name>/ first and falls back to ~/NextFrame/library/ when the episode has no sources directory.`),
   command("source-align", "Align an existing SRT against a source video and write transcript summary into source.json.", `nextframe source-align <source-dir> --srt <file> [--lang auto]`, `<source-dir> existing downloaded source directory
     --srt <file> required subtitle file to align
     --lang LANG language code or auto, default auto`, `Use this when you already have an SRT file; it is usually faster and more accurate than transcribe.
     Requires a source directory that already contains source.mp4 and source.json.`),
-  command("source-cut", "Cut clips from a source using sentence-id ranges and update source.json clip metadata.", `nextframe source-cut <source-dir> --plan <plan.json> [--margin 0.2]`, `<source-dir> existing source directory with transcript data
+  command("source-cut", "Cut clips from an episode source, write them into the episode clips directory, and register video atoms.", `nextframe source-cut <project> <episode> [--source <name>] --plan <plan.json> [--margin 0.2] [--root=PATH] [--json]
+    nextframe source-cut <source-dir> --plan <plan.json> [--margin 0.2]`, `<project> <episode> target episode that owns the resulting clips
+    --source <name> source directory name under <episode>/sources/; omit to use the first source dir
     --plan <plan.json> required cut plan file
-    --margin N optional seconds of padding around each cut, default 0.2`, `Run source-transcribe or source-align first so sentences.json exists.
-    The cut plan must reference valid sentence id ranges.`),
+    --margin N optional seconds of padding around each cut, default 0.2
+    --root=PATH projects root, default ~/NextFrame/projects
+    --json emit structured JSON
+    <source-dir> keeps the legacy direct-path mode`, `Run source-transcribe or source-align first so sentences.json exists.
+    Episode mode writes clip media into <episode>/clips/, updates source.json, and appends matching video atoms into pipeline.json.`),
   command("source-list", "List all sources in a library with transcript and clip status.", `nextframe source-list --library <path>`, `--library <path> required source library root`, `Only directories containing valid source.json files are listed.`),
   command("source-link", "Link source clips into a project pipeline as video atoms.", `nextframe source-link <source-dir> --project <name> --episode <name> [--root <path>]`, `<source-dir> source directory whose clips should be linked
     --project <name> required target project
