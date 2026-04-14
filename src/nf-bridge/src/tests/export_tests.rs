@@ -259,7 +259,7 @@ fn build_export_request_creates_valid_recorder_request_with_expected_fields() {
     assert_eq!(
         resolved,
         workspace_root
-            .join("src/runtime/web/index.html")
+            .join("src/nf-runtime/web/index.html")
             .canonicalize()
             .expect("canonicalize workspace recorder frame")
     );
@@ -269,7 +269,7 @@ fn build_export_request_creates_valid_recorder_request_with_expected_fields() {
 fn build_export_request_with_scene_library_path_resolves_correctly() {
     let _lock = lock_export_test();
     let temp = TestDir::new("scene-library #1");
-    let web_dir = temp.join("src/runtime/web");
+    let web_dir = temp.join("src/nf-runtime/web");
     fs::create_dir_all(&web_dir).expect("create runtime web dir");
     let web_path = web_dir.join("index.html");
     fs::write(&web_path, "<!doctype html>").expect("write recorder frame");

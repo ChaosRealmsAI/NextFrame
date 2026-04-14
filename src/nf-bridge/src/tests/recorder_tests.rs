@@ -4,7 +4,7 @@ use super::*;
 fn recorder_request_construction_preserves_fields() {
     let output_path = PathBuf::from("exports/final.mp4");
     let request = RecorderRequest {
-        url: "file:///tmp/src/runtime/web/index.html?record=true".to_string(),
+        url: "file:///tmp/src/nf-runtime/web/index.html?record=true".to_string(),
         output_path: output_path.clone(),
         width: 1920,
         height: 1080,
@@ -15,7 +15,7 @@ fn recorder_request_construction_preserves_fields() {
 
     assert_eq!(
         request.url,
-        "file:///tmp/src/runtime/web/index.html?record=true"
+        "file:///tmp/src/nf-runtime/web/index.html?record=true"
     );
     assert_eq!(request.output_path, output_path);
     assert_eq!(request.width, 1920);
@@ -28,7 +28,7 @@ fn recorder_request_construction_preserves_fields() {
 #[test]
 fn build_recording_url_encodes_special_characters_in_path() {
     let temp = TestDir::new("recorder build #1");
-    let web_dir = temp.join("src/runtime/web");
+    let web_dir = temp.join("src/nf-runtime/web");
     fs::create_dir_all(&web_dir).expect("create runtime web dir");
     let web_path = web_dir.join("index.html");
     fs::write(&web_path, "<!doctype html>").expect("write recorder frame");
@@ -64,7 +64,7 @@ fn resolve_recorder_frame_path_from_file_url_returns_decoded_path() {
 #[test]
 fn resolve_recorder_frame_path_from_http_url_returns_relative_file() {
     let temp = TestDir::new("recorder-http");
-    let frame_path = temp.join("src/runtime/web/recorded frame.html");
+    let frame_path = temp.join("src/nf-runtime/web/recorded frame.html");
     let frame_parent = frame_path
         .parent()
         .expect("recorder frame path should have parent");
@@ -72,7 +72,7 @@ fn resolve_recorder_frame_path_from_http_url_returns_relative_file() {
     fs::write(&frame_path, "<html></html>").expect("write recorder frame");
 
     let resolved = resolve_recorder_frame_path_from_url(
-        "http://localhost/src/runtime/web/recorded%20frame.html?record=true#frame-1",
+        "http://localhost/src/nf-runtime/web/recorded%20frame.html?record=true#frame-1",
         &temp.path,
     )
     .expect("resolve http recorder url");

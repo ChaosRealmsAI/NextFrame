@@ -14,6 +14,21 @@ fn replace_json_extension(path: &Path) -> PathBuf {
     PathBuf::from(format!("{as_string}.html"))
 }
 
+fn resolve_bundle_path() -> Result<PathBuf, String> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for relative in [
+        "../nf-runtime/web/src/bundle.cjs",
+        "../runtime/web/src/bundle.cjs",
+    ] {
+        let candidate = manifest_dir.join(relative);
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+
+    Err("failed to resolve compose bundle from current directory".to_string())
+}
+
 pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
     let timeline_path = resolve_existing_path(require_string(params, "timelinePath")?)?;
     let output_path = match params.get("outputPath").and_then(Value::as_str) {
@@ -30,8 +45,7 @@ pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
         })?;
     }
 
-    let bundle_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../runtime/web/src/bundle.cjs");
+    let bundle_path = resolve_bundle_path()?;
 
     let output = Command::new("node")
         .arg(&bundle_path)
