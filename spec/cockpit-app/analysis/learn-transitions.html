@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Transition Types -- Learn by Doing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --border: #1e1e2e;
+  --text: #e4e4ef;
+  --text-dim: #8888a0;
+  --accent: #6366f1;
+  --accent-dim: #4f46e5;
+  --scene-a: #3b82f6;
+  --scene-a-bg: #1e3a5f;
+  --scene-b: #a855f7;
+  --scene-b-bg: #4a1d6e;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: var(--grain);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* --- Typography --- */
+h1 { font-family: 'Noto Serif SC', serif; font-size: 2.4rem; font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-family: 'Noto Serif SC', serif; font-size: 1.6rem; font-weight: 700; letter-spacing: -0.01em; color: var(--accent); }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p, li { color: var(--text-dim); font-size: 0.95rem; }
+code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; background: #1a1a2e; padding: 2px 6px; border-radius: 4px; color: #c4b5fd; }
+
+/* --- Layout --- */
+.container { max-width: 900px; margin: 0 auto; padding: 3rem 1.5rem; }
+
+.hero { text-align: center; padding: 4rem 0 3rem; border-bottom: 1px solid var(--border); margin-bottom: 3rem; }
+.hero p { max-width: 600px; margin: 1rem auto 0; }
+
+.category { margin-bottom: 4rem; opacity: 0; transform: translateY(30px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+.category.visible { opacity: 1; transform: translateY(0); }
+
+.category-header { margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+.category-header p { margin-top: 0.5rem; }
+
+.transition-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+.transition-card h3 { margin-bottom: 0.5rem; }
+.transition-card .desc { margin-bottom: 1rem; }
+.transition-card .use-case { font-size: 0.85rem; color: var(--accent); margin-bottom: 1rem; font-style: italic; }
+
+/* --- Demo Stage --- */
+.demo-stage {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+  perspective: 800px;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  font-weight: 600;
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+}
+
+.scene-a { background: var(--scene-a-bg); color: var(--scene-a); }
+.scene-b { background: var(--scene-b-bg); color: var(--scene-b); }
+.scene span { font-size: 0.8rem; font-weight: 400; opacity: 0.6; margin-top: 4px; }
+
+/* --- Controls --- */
+.controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+
+.play-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+.play-btn:hover { background: var(--accent-dim); }
+.play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.duration-control { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-dim); }
+.duration-control input[type="range"] {
+  -webkit-appearance: none;
+  width: 120px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+.duration-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+/* --- Code Block --- */
+.code-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+  margin-left: auto;
+}
+.code-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+.code-block {
+  display: none;
+  background: #0d0d15;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-top: 1rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #c4b5fd;
+  white-space: pre;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.code-block.open { display: block; }
+
+/* --- Decision Tree --- */
+.decision-tree { list-style: none; padding: 0; }
+.decision-tree li {
+  padding: 0.75rem 1rem;
+  border-left: 2px solid var(--border);
+  margin-bottom: 0.5rem;
+  transition: border-color 0.2s;
+}
+.decision-tree li:hover { border-color: var(--accent); }
+.decision-tree li strong { color: var(--text); }
+
+/* --- Priority Table --- */
+.priority-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+.priority-table th, .priority-table td { padding: 0.6rem 1rem; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.priority-table th { color: var(--accent); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.priority-table td { color: var(--text-dim); }
+.priority-table .tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.tag-p0 { background: #dc262620; color: #ef4444; }
+.tag-p1 { background: #f59e0b20; color: #f59e0b; }
+.tag-p2 { background: #6366f120; color: #818cf8; }
+.tag-p3 { background: #1e1e2e; color: #6b7280; }
+
+/* --- Special shapes for match cut --- */
+.match-shape {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.5s var(--ease);
+}
+
+/* --- Responsive --- */
+@media (max-width: 640px) {
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.3rem; }
+  .demo-stage { height: 160px; }
+  .controls { gap: 0.5rem; }
+  .duration-control input[type="range"] { width: 80px; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- Hero -->
+<div class="hero">
+  <h1>Video Transition Types</h1>
+  <p>8 categories, 25+ transitions, live CSS/JS demos. Click "Play" to see each one in action.</p>
+</div>
+
+<!-- ===================== Category 1: Cut ===================== -->
+<section class="category" id="cat-cut">
+  <div class="category-header">
+    <h2>1. Cut Transitions (硬切)</h2>
+    <p>90% of video editing is hard cuts. Other transitions are for emphasis. The cut is the default.</p>
+  </div>
+
+  <!-- Hard Cut -->
+  <div class="transition-card">
+    <h3>Hard Cut</h3>
+    <p class="desc">Scene A instantly becomes Scene B. No animation, no effect. Zero frames of transition.</p>
+    <p class="use-case">When to use: Conversation shot/reverse-shot, fast-paced editing, most of the time.</p>
+    <div class="demo-stage" id="demo-hardcut">
+      <div class="scene scene-a">Scene A<span>Interview shot</span></div>
+      <div class="scene scene-b" style="opacity:0">Scene B<span>Reverse angle</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playHardCut(this)">Play</button>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Hard Cut: instant swap, no transition
+sceneA.style.opacity = '0';
+sceneB.style.opacity = '1';
+// That's it. No animation. The cut IS the absence of transition.</div>
+  </div>
+
+  <!-- Jump Cut -->
+  <div class="transition-card">
+    <h3>Jump Cut</h3>
+    <p class="desc">Same scene, slight time skip. The subject shifts position abruptly. Used in vlogs, montages.</p>
+    <p class="use-case">When to use: Time compression, energetic pacing, removing pauses in talking-head videos.</p>
+    <div class="demo-stage" id="demo-jumpcut">
+      <div class="scene scene-a" style="position:relative">
+        <div id="jumpcut-subject" style="transition: none; font-size: 2rem;">&#x1f464;</div>
+        <span>Same scene, subject shifts</span>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playJumpCut(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="80" max="500" value="150" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>150ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Jump Cut: same scene, different position
+// Flash white briefly to sell the "skip"
+stage.style.background = '#fff';
+subject.style.transform = `translate(${randomX}px, ${randomY}px)`;
+setTimeout(() => stage.style.background = '', 50);</div>
+  </div>
+
+  <!-- Match Cut -->
+  <div class="transition-card">
+    <h3>Match Cut</h3>
+    <p class="desc">Similar shapes or colors bridge two scenes. A ball becomes a planet, a wheel becomes a clock.</p>
+    <p class="use-case">When to use: Thematic connection, storytelling, the "artistic" cut.</p>
+    <div class="demo-stage" id="demo-matchcut" style="display:flex; align-items:center; justify-content:center;">
+      <div class="match-shape" id="matchcut-shape" style="background: var(--scene-a); color: #fff;">Moon</div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playMatchCut(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Match Cut: morph shape A into shape B
+// Keep the circle, change color + label
+shape.style.transition = `all ${duration}ms cubic-bezier(0.16,1,0.3,1)`;
+shape.style.background = sceneB_color;
+shape.textContent = 'Planet';
+// The shape continuity tricks the eye into accepting the scene change.</div>
+  </div>
+</section>
+
+<!-- ===================== Category 2: Dissolve ===================== -->
+<section class="category" id="cat-dissolve">
+  <div class="category-header">
+    <h2>2. Dissolve Transitions (溶解)</h2>
+    <p>Just opacity animation on two layers. The workhorse of emotional transitions.</p>
+  </div>
+
+  <!-- Cross Dissolve -->
+  <div class="transition-card">
+    <h3>Cross Dissolve</h3>
+    <p class="desc">A fades out while B fades in, overlapping. Both visible simultaneously during the transition.</p>
+    <p class="use-case">When to use: Passage of time, emotional shift, dream sequences.</p>
+    <div class="demo-stage" id="demo-crossdissolve">
+      <div class="scene scene-a">Scene A<span>Present day</span></div>
+      <div class="scene scene-b" style="opacity:0">Scene B<span>Memory</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playCrossDissolve(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>1000ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Cross Dissolve: pure CSS opacity */
+.scene-a {
+  transition: opacity ${duration}ms ease;
+  opacity: 0;           /* fade out */
+}
+.scene-b {
+  transition: opacity ${duration}ms ease;
+  opacity: 1;           /* fade in simultaneously */
+}
+/* Key: both layers animate at the same time, creating overlap */</div>
+  </div>
+
+  <!-- Fade to Black -->
+  <div class="transition-card">
+    <h3>Fade to Black</h3>
+    <p class="desc">A fades to black, pause, then B fades in from black. Sequential, not simultaneous.</p>
+    <p class="use-case">When to use: End of a chapter, dramatic pause, "time passes" feeling.</p>
+    <div class="demo-stage" id="demo-fadeblack">
+      <div class="scene scene-a">Scene A<span>End of act</span></div>
+      <div class="scene scene-b" style="opacity:0">Scene B<span>New chapter</span></div>
+      <div class="scene" style="background:#000; opacity:0; z-index:5;" id="fadeblack-overlay"></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playFadeBlack(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Fade to Black: A → black → B (sequential)
+overlay.style.transition = `opacity ${half}ms ease`;
+overlay.style.opacity = '1';          // fade to black
+setTimeout(() => {
+  sceneA.style.opacity = '0';
+  sceneB.style.opacity = '1';          // swap underneath
+  overlay.style.opacity = '0';          // reveal B
+}, half);</div>
+  </div>
+
+  <!-- Fade to White -->
+  <div class="transition-card">
+    <h3>Fade to White</h3>
+    <p class="desc">Same as fade to black, but through white. Brighter, more hopeful feeling.</p>
+    <p class="use-case">When to use: Flashbacks, heavenly/dreamy scenes, positive emotional transitions.</p>
+    <div class="demo-stage" id="demo-fadewhite">
+      <div class="scene scene-a">Scene A<span>Before</span></div>
+      <div class="scene scene-b" style="opacity:0">Scene B<span>After</span></div>
+      <div class="scene" style="background:#fff; opacity:0; z-index:5;" id="fadewhite-overlay"></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playFadeWhite(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Fade to White: identical to fade-to-black, just change overlay color
+overlay.style.background = '#fff';
+// Same timing logic as fade-to-black.</div>
+  </div>
+
+  <!-- Dip to Color -->
+  <div class="transition-card">
+    <h3>Dip to Color</h3>
+    <p class="desc">Same pattern as fade-to-black/white, but uses a brand color as the intermediate.</p>
+    <p class="use-case">When to use: Branded content, social media intros, logo reveals.</p>
+    <div class="demo-stage" id="demo-dipcolor">
+      <div class="scene scene-a">Scene A<span>Your brand</span></div>
+      <div class="scene scene-b" style="opacity:0">Scene B<span>New segment</span></div>
+      <div class="scene" style="background:var(--accent); opacity:0; z-index:5;" id="dipcolor-overlay"></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playDipColor(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Dip to Color: overlay.background = brandColor
+// Same sequential fade pattern, any color works.</div>
+  </div>
+</section>
+
+<!-- ===================== Category 3: Wipe ===================== -->
+<section class="category" id="cat-wipe">
+  <div class="category-header">
+    <h2>3. Wipe Transitions (擦除)</h2>
+    <p><code>clip-path</code> is the key CSS property. Scene B is revealed by animating a clipping region.</p>
+  </div>
+
+  <!-- Horizontal Wipe -->
+  <div class="transition-card">
+    <h3>Horizontal Wipe</h3>
+    <p class="desc">Scene B is revealed left-to-right (or right-to-left) like a curtain being drawn.</p>
+    <p class="use-case">When to use: Scene changes in documentaries, news segments, before/after comparisons.</p>
+    <div class="demo-stage" id="demo-hwipe">
+      <div class="scene scene-a">Scene A<span>Before</span></div>
+      <div class="scene scene-b" style="clip-path: inset(0 100% 0 0);">Scene B<span>After</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playHWipe(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Horizontal Wipe: clip-path inset animation */
+.scene-b {
+  clip-path: inset(0 100% 0 0);   /* fully clipped = hidden */
+  transition: clip-path ${duration}ms cubic-bezier(0.16,1,0.3,1);
+}
+/* trigger: */
+sceneB.style.clipPath = 'inset(0 0% 0 0)';  /* fully revealed */
+
+/* Reverse: inset(0 0 0 100%) for right-to-left */</div>
+  </div>
+
+  <!-- Vertical Wipe -->
+  <div class="transition-card">
+    <h3>Vertical Wipe</h3>
+    <p class="desc">Top-to-bottom reveal. Same technique, different axis.</p>
+    <p class="use-case">When to use: Vertical scrolling content, social media transitions.</p>
+    <div class="demo-stage" id="demo-vwipe">
+      <div class="scene scene-a">Scene A<span>Top</span></div>
+      <div class="scene scene-b" style="clip-path: inset(0 0 100% 0);">Scene B<span>Bottom</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playVWipe(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Vertical Wipe */
+.scene-b { clip-path: inset(0 0 100% 0); }   /* hidden */
+sceneB.style.clipPath = 'inset(0 0 0% 0)';    /* revealed top-to-bottom */</div>
+  </div>
+
+  <!-- Iris Wipe -->
+  <div class="transition-card">
+    <h3>Iris Wipe</h3>
+    <p class="desc">Circle expanding from center to reveal Scene B. Classic film technique (Looney Tunes ending).</p>
+    <p class="use-case">When to use: Retro feel, comedy, ending/opening focus on a subject.</p>
+    <div class="demo-stage" id="demo-iris">
+      <div class="scene scene-a">Scene A<span>Focus point</span></div>
+      <div class="scene scene-b" style="clip-path: circle(0% at 50% 50%);">Scene B<span>Revealed</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playIris(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Iris Wipe: circle() clip-path */
+.scene-b { clip-path: circle(0% at 50% 50%); }
+sceneB.style.transition = `clip-path ${duration}ms cubic-bezier(0.16,1,0.3,1)`;
+sceneB.style.clipPath = 'circle(75% at 50% 50%)';
+/* 75% radius covers the full rectangle including corners */</div>
+  </div>
+
+  <!-- Clock Wipe -->
+  <div class="transition-card">
+    <h3>Clock Wipe</h3>
+    <p class="desc">A rotating hand sweeps around from 12 o'clock, revealing Scene B like a clock face.</p>
+    <p class="use-case">When to use: Time-related transitions, retro/classic film.</p>
+    <div class="demo-stage" id="demo-clock">
+      <div class="scene scene-a">Scene A<span>Before</span></div>
+      <div class="scene scene-b" style="clip-path: polygon(50% 50%, 50% 0%, 50% 0%);">Scene B<span>After</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playClock(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="1200" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>1200ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Clock Wipe: animated polygon via JS requestAnimationFrame
+// CSS clip-path polygon can't animate between different vertex counts,
+// so we compute polygon points per frame:
+function clockFrame(progress) {
+  // Build a polygon from center to 12 o'clock, sweeping clockwise
+  const angle = progress * 360;
+  const points = [{ x: 50, y: 50 }, { x: 50, y: 0 }];
+  // Add corner points as the sweep passes them
+  if (angle > 45)  points.push({ x: 100, y: 0 });
+  if (angle > 135) points.push({ x: 100, y: 100 });
+  if (angle > 225) points.push({ x: 0, y: 100 });
+  if (angle > 315) points.push({ x: 0, y: 0 });
+  // Add the current sweep point
+  const rad = (angle - 90) * Math.PI / 180;
+  points.push({ x: 50 + 70 * Math.cos(rad), y: 50 + 70 * Math.sin(rad) });
+  return `polygon(${points.map(p => p.x+'% '+p.y+'%').join(', ')})`;
+}</div>
+  </div>
+
+  <!-- Star Wipe -->
+  <div class="transition-card">
+    <h3>Star Wipe &#x2B50;</h3>
+    <p class="desc">A star shape expands from center. Famously cheesy. Only use ironically (or if you're SpongeBob).</p>
+    <p class="use-case">When to use: Comedy, ironic retro, children's content. Never in serious work.</p>
+    <div class="demo-stage" id="demo-star">
+      <div class="scene scene-a">Scene A<span>Serious</span></div>
+      <div class="scene scene-b" id="demo-star-b" style="clip-path: polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%);">Scene B<span>LOL</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playStar(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>1000ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Star Wipe: 5-pointed star polygon, scaled from 0 to full
+function starPoints(scale) {
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const angle = (i * 36 - 90) * Math.PI / 180;
+    const r = i % 2 === 0 ? 50 * scale : 20 * scale;
+    pts.push({ x: 50 + r * Math.cos(angle), y: 50 + r * Math.sin(angle) });
+  }
+  return `polygon(${pts.map(p=>p.x+'% '+p.y+'%').join(', ')})`;
+}</div>
+  </div>
+</section>
+
+<!-- ===================== Category 4: Slide/Push ===================== -->
+<section class="category" id="cat-slide">
+  <div class="category-header">
+    <h2>4. Slide / Push Transitions (推移)</h2>
+    <p><code>transform: translateX/Y</code> + positioning. The timing relationship between A and B defines the variant.</p>
+  </div>
+
+  <!-- Slide -->
+  <div class="transition-card">
+    <h3>Slide</h3>
+    <p class="desc">Scene B slides over A from a direction. A stays still underneath.</p>
+    <p class="use-case">When to use: App-like navigation, panel reveals, mobile UI transitions.</p>
+    <div class="demo-stage" id="demo-slide" style="overflow:hidden">
+      <div class="scene scene-a">Scene A<span>Current view</span></div>
+      <div class="scene scene-b" style="transform: translateX(100%);">Scene B<span>New view</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playSlide(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="600" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>600ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Slide: B slides over A (A stays put) */
+.scene-b {
+  transform: translateX(100%);    /* starts off-screen right */
+  transition: transform ${duration}ms cubic-bezier(0.16,1,0.3,1);
+}
+sceneB.style.transform = 'translateX(0%)';  /* slides into view */
+/* A doesn't move — B covers it */</div>
+  </div>
+
+  <!-- Push -->
+  <div class="transition-card">
+    <h3>Push</h3>
+    <p class="desc">A is pushed out while B pushes in. Both move simultaneously in the same direction.</p>
+    <p class="use-case">When to use: Carousel-like navigation, equal-weight scene changes.</p>
+    <div class="demo-stage" id="demo-push" style="overflow:hidden">
+      <div class="scene scene-a" id="push-a">Scene A<span>Leaving</span></div>
+      <div class="scene scene-b" id="push-b" style="transform: translateX(100%);">Scene B<span>Arriving</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playPush(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="600" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>600ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Push: both A and B move together */
+.scene-a { transition: transform ${duration}ms ease; }
+.scene-b { transform: translateX(100%); transition: transform ${duration}ms ease; }
+/* trigger: */
+sceneA.style.transform = 'translateX(-100%)';  /* A exits left */
+sceneB.style.transform = 'translateX(0%)';     /* B enters from right */</div>
+  </div>
+
+  <!-- Cover -->
+  <div class="transition-card">
+    <h3>Cover</h3>
+    <p class="desc">B slides over A from a direction. Same as Slide but emphasizes B covering A. A is static.</p>
+    <p class="use-case">When to use: Overlay panels, "new content arriving" feel.</p>
+    <div class="demo-stage" id="demo-cover" style="overflow:hidden">
+      <div class="scene scene-a">Scene A<span>Background</span></div>
+      <div class="scene scene-b" style="transform: translateY(100%);">Scene B<span>Covering</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playCover(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="600" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>600ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Cover: B slides from bottom over A */
+sceneB.style.transform = 'translateY(100%)';  /* starts below */
+sceneB.style.transition = `transform ${duration}ms ease`;
+sceneB.style.transform = 'translateY(0%)';    /* covers A */</div>
+  </div>
+
+  <!-- Reveal -->
+  <div class="transition-card">
+    <h3>Reveal</h3>
+    <p class="desc">A slides away to reveal B sitting underneath. B was there all along.</p>
+    <p class="use-case">When to use: "Unveiling" content, peeling back layers, dramatic reveals.</p>
+    <div class="demo-stage" id="demo-reveal" style="overflow:hidden">
+      <div class="scene scene-b">Scene B<span>Was here all along</span></div>
+      <div class="scene scene-a" id="reveal-a">Scene A<span>Sliding away</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playReveal(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="2000" value="600" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>600ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Reveal: A slides away, B is underneath */
+/* B is positioned behind A (lower z-index or painted first) */
+sceneA.style.transition = `transform ${duration}ms ease`;
+sceneA.style.transform = 'translateX(-100%)';  /* A exits, revealing B */</div>
+  </div>
+</section>
+
+<!-- ===================== Category 5: Zoom ===================== -->
+<section class="category" id="cat-zoom">
+  <div class="category-header">
+    <h2>5. Zoom Transitions (缩放)</h2>
+    <p><code>transform: scale()</code> + <code>opacity</code> combo. Creates depth and camera-like movement.</p>
+  </div>
+
+  <!-- Zoom In -->
+  <div class="transition-card">
+    <h3>Zoom In</h3>
+    <p class="desc">Scene A zooms in (scales up) until it fills/blurs, then Scene B appears at normal scale.</p>
+    <p class="use-case">When to use: Focusing on detail, dramatic emphasis, "entering" a scene.</p>
+    <div class="demo-stage" id="demo-zoomin">
+      <div class="scene scene-a" id="zoomin-a">Scene A<span>Zooming in...</span></div>
+      <div class="scene scene-b" style="opacity:0">Scene B<span>Arrived</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playZoomIn(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Zoom In: scale A up + fade, then show B */
+.scene-a {
+  transition: transform ${duration}ms ease, opacity ${half}ms ease ${half}ms;
+  transform: scale(3);
+  opacity: 0;
+}
+.scene-b {
+  transition: opacity ${half}ms ease ${half}ms;
+  opacity: 1;
+  transform: scale(1);  /* B appears at normal scale */
+}</div>
+  </div>
+
+  <!-- Zoom Out -->
+  <div class="transition-card">
+    <h3>Zoom Out</h3>
+    <p class="desc">Camera pulls back from A, revealing B as the wider context.</p>
+    <p class="use-case">When to use: "Big picture" reveal, pulling back to show context, endings.</p>
+    <div class="demo-stage" id="demo-zoomout">
+      <div class="scene scene-a" id="zoomout-a">Scene A<span>Close up</span></div>
+      <div class="scene scene-b" style="opacity:0">Scene B<span>Big picture</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playZoomOut(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Zoom Out: A shrinks, B appears behind */
+sceneA.style.transition = `transform ${d}ms ease, opacity ${d}ms ease`;
+sceneA.style.transform = 'scale(0.3)';
+sceneA.style.opacity = '0';
+sceneB.style.transition = `opacity ${d}ms ease`;
+sceneB.style.opacity = '1';</div>
+  </div>
+
+  <!-- Zoom Through -->
+  <div class="transition-card">
+    <h3>Zoom Through</h3>
+    <p class="desc">Zoom into a detail of A, keep zooming, emerge in B. Continuous motion through both scenes.</p>
+    <p class="use-case">When to use: Seamless scene connection, travel/journey montages.</p>
+    <div class="demo-stage" id="demo-zoomthrough">
+      <div class="scene scene-a" id="zoomthrough-a">Scene A<span>Zooming through...</span></div>
+      <div class="scene scene-b" id="zoomthrough-b" style="opacity:0; transform: scale(0.3);">Scene B<span>Emerged</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playZoomThrough(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="300" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>1000ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Zoom Through: A scales up past view, B scales up from small */
+// Phase 1: A zooms in
+sceneA.style.transform = 'scale(5)'; sceneA.style.opacity = '0';
+// Phase 2: B zooms from small to normal (starts before A finishes)
+setTimeout(() => {
+  sceneB.style.opacity = '1';
+  sceneB.style.transform = 'scale(1)';
+}, duration * 0.3);</div>
+  </div>
+</section>
+
+<!-- ===================== Category 6: 3D ===================== -->
+<section class="category" id="cat-3d">
+  <div class="category-header">
+    <h2>6. 3D Transitions (三维)</h2>
+    <p>CSS 3D transforms with <code>perspective</code>. Use sparingly -- flashy but distracting in most contexts.</p>
+  </div>
+
+  <!-- Cube Rotate -->
+  <div class="transition-card">
+    <h3>Cube Rotate</h3>
+    <p class="desc">Scenes on faces of a rotating cube. The stage rotates to show the next face.</p>
+    <p class="use-case">When to use: Tech demos, gaming content, "cool factor" transitions. Sparingly.</p>
+    <div class="demo-stage" id="demo-cube" style="perspective: 800px;">
+      <div id="cube-wrapper" style="position:absolute; inset:0; transform-style:preserve-3d; transition: transform 0.8s cubic-bezier(0.16,1,0.3,1);">
+        <div class="scene scene-a" style="transform: translateZ(100px);">Scene A<span>Front face</span></div>
+        <div class="scene scene-b" style="transform: rotateY(90deg) translateZ(100px);">Scene B<span>Right face</span></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playCube(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Cube Rotate: CSS 3D */
+.stage { perspective: 800px; }
+.cube {
+  transform-style: preserve-3d;
+  transition: transform ${duration}ms cubic-bezier(0.16,1,0.3,1);
+}
+.face-a { transform: translateZ(100px); }
+.face-b { transform: rotateY(90deg) translateZ(100px); }
+/* Rotate the whole cube: */
+cube.style.transform = 'translateZ(-100px) rotateY(-90deg)';</div>
+  </div>
+
+  <!-- Flip -->
+  <div class="transition-card">
+    <h3>Flip</h3>
+    <p class="desc">Page flip effect. A rotates on Y-axis, revealing B on the "back side".</p>
+    <p class="use-case">When to use: Card reveals, before/after, page-turn metaphors.</p>
+    <div class="demo-stage" id="demo-flip" style="perspective: 800px;">
+      <div id="flip-wrapper" style="position:absolute; inset:0; transform-style:preserve-3d; transition: transform 0.8s cubic-bezier(0.16,1,0.3,1);">
+        <div class="scene scene-a" style="backface-visibility:hidden;">Scene A<span>Front</span></div>
+        <div class="scene scene-b" style="backface-visibility:hidden; transform:rotateY(180deg);">Scene B<span>Back</span></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playFlip(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Flip: backface-visibility is the key */
+.wrapper { transform-style: preserve-3d; }
+.scene-a { backface-visibility: hidden; }
+.scene-b { backface-visibility: hidden; transform: rotateY(180deg); }
+/* Flip: */
+wrapper.style.transform = 'rotateY(180deg)';
+/* The backface-visibility: hidden hides each face when rotated past 90deg */</div>
+  </div>
+
+  <!-- Fold -->
+  <div class="transition-card">
+    <h3>Fold</h3>
+    <p class="desc">Scene A folds away like paper being folded, revealing B behind it.</p>
+    <p class="use-case">When to use: Origami/paper metaphors, creative reveals.</p>
+    <div class="demo-stage" id="demo-fold" style="perspective: 800px;">
+      <div class="scene scene-b">Scene B<span>Revealed</span></div>
+      <div class="scene scene-a" id="fold-a" style="transform-origin: left center;">Scene A<span>Folding...</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playFold(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>800ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Fold: rotateY with transform-origin on one edge */
+.scene-a {
+  transform-origin: left center;
+  transition: transform ${duration}ms ease;
+}
+sceneA.style.transform = 'rotateY(-90deg)';  /* folds away to the left */</div>
+  </div>
+</section>
+
+<!-- ===================== Category 7: Morphing ===================== -->
+<section class="category" id="cat-morph">
+  <div class="category-header">
+    <h2>7. Morphing Transitions (变形)</h2>
+    <p>The hardest to implement but most impressive. Shape and color interpolation between scenes.</p>
+  </div>
+
+  <!-- Shape Morph -->
+  <div class="transition-card">
+    <h3>Shape Morph</h3>
+    <p class="desc">An element in Scene A morphs into a different element in Scene B. Requires matching geometry.</p>
+    <p class="use-case">When to use: Brand identity transitions, logo animations, premium content.</p>
+    <div class="demo-stage" id="demo-shapemorph" style="display:flex; align-items:center; justify-content:center; background: var(--scene-a-bg);">
+      <div id="morph-el" style="width:80px; height:80px; background:var(--scene-a); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.8rem; color:#fff; transition: all 1s cubic-bezier(0.16,1,0.3,1);">Square</div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playShapeMorph(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>1000ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Shape Morph: animate border-radius, size, color */
+element.style.transition = `all ${duration}ms cubic-bezier(0.16,1,0.3,1)`;
+element.style.borderRadius = '50%';        // square → circle
+element.style.background = sceneB_color;
+element.style.width = '120px';
+element.style.height = '120px';
+/* For complex shapes: use clip-path or SVG path morphing (SMIL/GSAP) */</div>
+  </div>
+
+  <!-- Color Morph -->
+  <div class="transition-card">
+    <h3>Color Morph</h3>
+    <p class="desc">The entire color palette shifts from Scene A's palette to Scene B's. Background, accents, all change.</p>
+    <p class="use-case">When to use: Mood changes, day-to-night, seasonal transitions.</p>
+    <div class="demo-stage" id="demo-colormorph" style="transition: background 1s ease;">
+      <div class="scene" id="colormorph-scene" style="background: var(--scene-a-bg); transition: background 1s ease, color 1s ease; color: var(--scene-a);">
+        Day Scene
+        <span>Warm colors</span>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playColorMorph(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>1000ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Color Morph: CSS transition on color properties */
+.scene {
+  transition: background ${duration}ms ease, color ${duration}ms ease;
+}
+scene.style.background = nightBg;
+scene.style.color = nightText;
+scene.textContent = 'Night Scene';
+/* CSS handles the interpolation between color values automatically */</div>
+  </div>
+</section>
+
+<!-- ===================== Category 8: Motion Graphics ===================== -->
+<section class="category" id="cat-mograph">
+  <div class="category-header">
+    <h2>8. Motion Graphics Transitions (动态图形)</h2>
+    <p>What makes YouTube/TikTok intros feel "pro". More complex, often requires canvas or WebGL.</p>
+  </div>
+
+  <!-- Gradient Wipe -->
+  <div class="transition-card">
+    <h3>Luma / Gradient Wipe</h3>
+    <p class="desc">A black-to-white gradient is used as a mask. Dark areas reveal first, light areas last.</p>
+    <p class="use-case">When to use: Organic-feeling reveals, smoke/cloud wipes, premium content.</p>
+    <div class="demo-stage" id="demo-gradwipe">
+      <div class="scene scene-a">Scene A<span>Masked</span></div>
+      <div class="scene scene-b" id="gradwipe-b" style="opacity:0; mask-image: linear-gradient(to right, black 0%, transparent 50%, transparent 100%); -webkit-mask-image: linear-gradient(to right, black 0%, transparent 50%, transparent 100%);">Scene B<span>Revealed</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playGradWipe(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="200" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>1000ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">/* Gradient Wipe: animate mask-image position */
+.scene-b {
+  -webkit-mask-image: linear-gradient(to right,
+    black 0%, transparent 50%, transparent 100%);
+}
+// Animate by shifting the gradient stops:
+// At start: black 0%, transparent 0% (nothing visible)
+// At end: black 100%, transparent 150% (fully visible)
+// This creates a soft-edge wipe effect.</div>
+  </div>
+
+  <!-- Glitch -->
+  <div class="transition-card">
+    <h3>Glitch</h3>
+    <p class="desc">Digital glitch effect: RGB split, slice displacement, noise. Disrupts the image briefly.</p>
+    <p class="use-case">When to use: Tech content, cyberpunk aesthetic, error/disruption themes.</p>
+    <div class="demo-stage" id="demo-glitch">
+      <div class="scene scene-a" id="glitch-a" style="overflow:hidden">Scene A<span>Stable</span></div>
+      <div class="scene scene-b" style="opacity:0">Scene B<span>Glitched in</span></div>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playGlitch(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="100" max="1000" value="400" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>400ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Glitch: rapid clip-path slices + color shift
+function glitchFrame() {
+  const slices = 5;
+  for (let i = 0; i &lt; slices; i++) {
+    const y1 = (i / slices) * 100;
+    const y2 = ((i + 1) / slices) * 100;
+    const offsetX = (Math.random() - 0.5) * 20;
+    // Apply random horizontal offset per slice
+    // Use clip-path: inset(y1% 0 (100-y2)% 0) on duplicated layers
+  }
+  // Add CSS filter: hue-rotate() for color shift
+  element.style.filter = `hue-rotate(${Math.random()*90}deg)`;
+}
+// Run at 30fps for ~400ms, then hard-cut to scene B.</div>
+  </div>
+
+  <!-- Particle -->
+  <div class="transition-card">
+    <h3>Particle Dissolve</h3>
+    <p class="desc">Scene dissolves into particles (pixels scatter), then particles reform as the new scene.</p>
+    <p class="use-case">When to use: Magical/sci-fi content, Thanos snap, premium motion graphics.</p>
+    <div class="demo-stage" id="demo-particle">
+      <div class="scene scene-a" id="particle-a">Scene A<span>About to dissolve</span></div>
+      <div class="scene scene-b" id="particle-b" style="opacity:0">Scene B<span>Reformed</span></div>
+      <canvas id="particle-canvas" style="position:absolute; inset:0; z-index:10; pointer-events:none;"></canvas>
+    </div>
+    <div class="controls">
+      <button class="play-btn" onclick="playParticle(this)">Play</button>
+      <div class="duration-control">
+        <input type="range" min="500" max="2000" value="1200" oninput="this.nextElementSibling.textContent=this.value+'ms'">
+        <span>1200ms</span>
+      </div>
+      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+    </div>
+    <div class="code-block">// Particle: requires canvas or WebGL
+// 1. Read pixels from scene A (or use representative color grid)
+// 2. Create particle for each pixel/block
+// 3. Animate particles: scatter with velocity + gravity
+// 4. After scatter peak, attract particles to scene B positions
+// 5. Fade in scene B, remove canvas
+
+// Simplified: fake it with random dots
+for (let i = 0; i &lt; 200; i++) {
+  const p = { x: rand(w), y: rand(h), vx: rand(-3,3), vy: rand(-3,3) };
+  particles.push(p);
+}
+// Animate with requestAnimationFrame</div>
+  </div>
+</section>
+
+<!-- ===================== Decision Tree ===================== -->
+<section class="category" id="cat-decision">
+  <div class="category-header">
+    <h2>Which Transition When?</h2>
+    <p>A quick decision tree. When in doubt, just cut.</p>
+  </div>
+  <ul class="decision-tree">
+    <li><strong>Emotional shift?</strong> &rarr; Dissolve (cross dissolve or fade to black)</li>
+    <li><strong>Same scene, time skip?</strong> &rarr; Jump cut or quick dissolve</li>
+    <li><strong>New topic or section?</strong> &rarr; Wipe or push</li>
+    <li><strong>Dramatic reveal?</strong> &rarr; Zoom (in or out)</li>
+    <li><strong>Playful / energetic?</strong> &rarr; 3D or motion graphics</li>
+    <li><strong>Branded / professional?</strong> &rarr; Dip to brand color, gradient wipe</li>
+    <li><strong>Tech / cyberpunk?</strong> &rarr; Glitch</li>
+    <li><strong>Not sure?</strong> &rarr; <strong>Just cut.</strong> Seriously. Hard cut is almost always correct.</li>
+  </ul>
+</section>
+
+<!-- ===================== Priority Table ===================== -->
+<section class="category" id="cat-priority">
+  <div class="category-header">
+    <h2>NextFrame 需要实现哪些</h2>
+    <p>Priority list for the NextFrame video editor engine.</p>
+  </div>
+  <table class="priority-table">
+    <thead>
+      <tr><th>Priority</th><th>Transition</th><th>Technique</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="tag tag-p0">P0</span></td><td>crossDissolve</td><td>opacity crossfade</td></tr>
+      <tr><td><span class="tag tag-p0">P0</span></td><td>fadeBlack</td><td>opacity + black overlay</td></tr>
+      <tr><td><span class="tag tag-p0">P0</span></td><td>horizontalWipe</td><td>clip-path inset</td></tr>
+      <tr><td><span class="tag tag-p0">P0</span></td><td>slide</td><td>transform translateX</td></tr>
+      <tr><td><span class="tag tag-p1">P1</span></td><td>irisWipe</td><td>clip-path circle()</td></tr>
+      <tr><td><span class="tag tag-p1">P1</span></td><td>push</td><td>dual transform</td></tr>
+      <tr><td><span class="tag tag-p1">P1</span></td><td>zoomIn</td><td>scale + opacity</td></tr>
+      <tr><td><span class="tag tag-p1">P1</span></td><td>zoomOut</td><td>scale + opacity</td></tr>
+      <tr><td><span class="tag tag-p2">P2</span></td><td>cubeRotate</td><td>CSS 3D transform</td></tr>
+      <tr><td><span class="tag tag-p2">P2</span></td><td>flip</td><td>rotateY + backface-visibility</td></tr>
+      <tr><td><span class="tag tag-p2">P2</span></td><td>glitch</td><td>clip-path slices + hue-rotate</td></tr>
+      <tr><td><span class="tag tag-p2">P2</span></td><td>gradientWipe</td><td>mask-image gradient</td></tr>
+      <tr><td><span class="tag tag-p3">P3</span></td><td>shapeMorph</td><td>SVG path morphing</td></tr>
+      <tr><td><span class="tag tag-p3">P3</span></td><td>particleDissolve</td><td>canvas / WebGL</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</div><!-- /.container -->
+
+<script>
+// ===== Utility =====
+function getDuration(btn) {
+  const slider = btn.closest('.controls').querySelector('input[type="range"]');
+  return slider ? parseInt(slider.value) : 800;
+}
+
+function resetAfter(btn, duration, resetFn) {
+  btn.disabled = true;
+  setTimeout(() => { resetFn(); btn.disabled = false; }, duration + 400);
+}
+
+function toggleCode(btn) {
+  const block = btn.closest('.transition-card').querySelector('.code-block');
+  block.classList.toggle('open');
+  btn.textContent = block.classList.contains('open') ? 'Hide Code' : 'Show Code';
+}
+
+// ===== IntersectionObserver =====
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.category').forEach(c => observer.observe(c));
+
+// ===== Category 1: Cuts =====
+function playHardCut(btn) {
+  const stage = document.getElementById('demo-hardcut');
+  const a = stage.children[0], b = stage.children[1];
+  a.style.opacity = '0'; b.style.opacity = '1';
+  resetAfter(btn, 1000, () => { a.style.opacity = '1'; b.style.opacity = '0'; });
+}
+
+function playJumpCut(btn) {
+  const d = getDuration(btn);
+  const subject = document.getElementById('jumpcut-subject');
+  const stage = subject.closest('.demo-stage');
+  let count = 0;
+  const interval = setInterval(() => {
+    stage.style.background = '#ffffff30';
+    const x = (Math.random() - 0.5) * 60;
+    const y = (Math.random() - 0.5) * 30;
+    subject.style.transform = `translate(${x}px, ${y}px)`;
+    setTimeout(() => { stage.style.background = ''; }, 50);
+    count++;
+    if (count >= 4) {
+      clearInterval(interval);
+      setTimeout(() => { subject.style.transform = ''; btn.disabled = false; }, 300);
+    }
+  }, d);
+  btn.disabled = true;
+}
+
+function playMatchCut(btn) {
+  const d = getDuration(btn);
+  const shape = document.getElementById('matchcut-shape');
+  shape.style.transition = `all ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  const isA = shape.textContent === 'Moon';
+  if (isA) {
+    shape.style.background = 'var(--scene-b)';
+    shape.style.width = '100px';
+    shape.style.height = '100px';
+    shape.textContent = 'Planet';
+  } else {
+    shape.style.background = 'var(--scene-a)';
+    shape.style.width = '80px';
+    shape.style.height = '80px';
+    shape.textContent = 'Moon';
+  }
+  btn.disabled = true;
+  setTimeout(() => { btn.disabled = false; }, d + 100);
+}
+
+// ===== Category 2: Dissolves =====
+function playCrossDissolve(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-crossdissolve');
+  const a = stage.children[0], b = stage.children[1];
+  a.style.transition = `opacity ${d}ms ease`;
+  b.style.transition = `opacity ${d}ms ease`;
+  a.style.opacity = '0'; b.style.opacity = '1';
+  resetAfter(btn, d, () => { a.style.opacity = '1'; b.style.opacity = '0'; });
+}
+
+function playFadeBlack(btn) {
+  const d = getDuration(btn);
+  const half = d / 2;
+  const stage = document.getElementById('demo-fadeblack');
+  const a = stage.children[0], b = stage.children[1];
+  const overlay = document.getElementById('fadeblack-overlay');
+  overlay.style.transition = `opacity ${half}ms ease`;
+  overlay.style.opacity = '1';
+  setTimeout(() => {
+    a.style.opacity = '0'; b.style.opacity = '1';
+    overlay.style.opacity = '0';
+  }, half);
+  resetAfter(btn, d + 200, () => { a.style.opacity = '1'; b.style.opacity = '0'; overlay.style.opacity = '0'; });
+}
+
+function playFadeWhite(btn) {
+  const d = getDuration(btn);
+  const half = d / 2;
+  const stage = document.getElementById('demo-fadewhite');
+  const a = stage.children[0], b = stage.children[1];
+  const overlay = document.getElementById('fadewhite-overlay');
+  overlay.style.transition = `opacity ${half}ms ease`;
+  overlay.style.opacity = '1';
+  setTimeout(() => {
+    a.style.opacity = '0'; b.style.opacity = '1';
+    overlay.style.opacity = '0';
+  }, half);
+  resetAfter(btn, d + 200, () => { a.style.opacity = '1'; b.style.opacity = '0'; overlay.style.opacity = '0'; });
+}
+
+function playDipColor(btn) {
+  const d = getDuration(btn);
+  const half = d / 2;
+  const stage = document.getElementById('demo-dipcolor');
+  const a = stage.children[0], b = stage.children[1];
+  const overlay = document.getElementById('dipcolor-overlay');
+  overlay.style.transition = `opacity ${half}ms ease`;
+  overlay.style.opacity = '1';
+  setTimeout(() => {
+    a.style.opacity = '0'; b.style.opacity = '1';
+    overlay.style.opacity = '0';
+  }, half);
+  resetAfter(btn, d + 200, () => { a.style.opacity = '1'; b.style.opacity = '0'; overlay.style.opacity = '0'; });
+}
+
+// ===== Category 3: Wipes =====
+function playHWipe(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-hwipe');
+  const b = stage.children[1];
+  b.style.transition = `clip-path ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  b.style.clipPath = 'inset(0 0% 0 0)';
+  resetAfter(btn, d, () => { b.style.transition = 'none'; b.style.clipPath = 'inset(0 100% 0 0)'; });
+}
+
+function playVWipe(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-vwipe');
+  const b = stage.children[1];
+  b.style.transition = `clip-path ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  b.style.clipPath = 'inset(0 0 0% 0)';
+  resetAfter(btn, d, () => { b.style.transition = 'none'; b.style.clipPath = 'inset(0 0 100% 0)'; });
+}
+
+function playIris(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-iris');
+  const b = stage.children[1];
+  b.style.transition = `clip-path ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  b.style.clipPath = 'circle(75% at 50% 50%)';
+  resetAfter(btn, d, () => { b.style.transition = 'none'; b.style.clipPath = 'circle(0% at 50% 50%)'; });
+}
+
+function playClock(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-clock');
+  const b = stage.children[1];
+  const start = performance.now();
+  btn.disabled = true;
+
+  function frame(now) {
+    const progress = Math.min((now - start) / d, 1);
+    const angle = progress * 360;
+    const points = [{ x: 50, y: 50 }, { x: 50, y: 0 }];
+    if (angle > 45) points.push({ x: 100, y: 0 });
+    if (angle > 135) points.push({ x: 100, y: 100 });
+    if (angle > 225) points.push({ x: 0, y: 100 });
+    if (angle > 315) points.push({ x: 0, y: 0 });
+    const rad = (angle - 90) * Math.PI / 180;
+    points.push({ x: 50 + 70 * Math.cos(rad), y: 50 + 70 * Math.sin(rad) });
+    b.style.clipPath = `polygon(${points.map(p => p.x + '% ' + p.y + '%').join(', ')})`;
+    if (progress < 1) requestAnimationFrame(frame);
+    else setTimeout(() => {
+      b.style.clipPath = 'polygon(50% 50%, 50% 0%, 50% 0%)';
+      btn.disabled = false;
+    }, 400);
+  }
+  requestAnimationFrame(frame);
+}
+
+function playStar(btn) {
+  const d = getDuration(btn);
+  const b = document.getElementById('demo-star-b');
+  const start = performance.now();
+  btn.disabled = true;
+
+  function starPoints(scale) {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const angle = (i * 36 - 90) * Math.PI / 180;
+      const r = i % 2 === 0 ? 50 * scale : 20 * scale;
+      pts.push({ x: 50 + r * Math.cos(angle), y: 50 + r * Math.sin(angle) });
+    }
+    return `polygon(${pts.map(p => p.x + '% ' + p.y + '%').join(', ')})`;
+  }
+
+  function frame(now) {
+    const progress = Math.min((now - start) / d, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    b.style.clipPath = starPoints(eased * 1.5);
+    if (progress < 1) requestAnimationFrame(frame);
+    else setTimeout(() => {
+      b.style.clipPath = 'polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%)';
+      btn.disabled = false;
+    }, 400);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ===== Category 4: Slide/Push =====
+function playSlide(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-slide');
+  const b = stage.children[1];
+  b.style.transition = `transform ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  b.style.transform = 'translateX(0%)';
+  resetAfter(btn, d, () => { b.style.transition = 'none'; b.style.transform = 'translateX(100%)'; });
+}
+
+function playPush(btn) {
+  const d = getDuration(btn);
+  const a = document.getElementById('push-a');
+  const b = document.getElementById('push-b');
+  a.style.transition = `transform ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  b.style.transition = `transform ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  a.style.transform = 'translateX(-100%)';
+  b.style.transform = 'translateX(0%)';
+  resetAfter(btn, d, () => {
+    a.style.transition = 'none'; b.style.transition = 'none';
+    a.style.transform = ''; b.style.transform = 'translateX(100%)';
+  });
+}
+
+function playCover(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-cover');
+  const b = stage.children[1];
+  b.style.transition = `transform ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  b.style.transform = 'translateY(0%)';
+  resetAfter(btn, d, () => { b.style.transition = 'none'; b.style.transform = 'translateY(100%)'; });
+}
+
+function playReveal(btn) {
+  const d = getDuration(btn);
+  const a = document.getElementById('reveal-a');
+  a.style.transition = `transform ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  a.style.transform = 'translateX(-100%)';
+  resetAfter(btn, d, () => { a.style.transition = 'none'; a.style.transform = ''; });
+}
+
+// ===== Category 5: Zoom =====
+function playZoomIn(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-zoomin');
+  const a = document.getElementById('zoomin-a');
+  const b = stage.children[1];
+  a.style.transition = `transform ${d}ms ease, opacity ${d * 0.5}ms ease ${d * 0.3}ms`;
+  b.style.transition = `opacity ${d * 0.5}ms ease ${d * 0.5}ms`;
+  a.style.transform = 'scale(3)'; a.style.opacity = '0';
+  b.style.opacity = '1';
+  resetAfter(btn, d, () => {
+    a.style.transition = 'none'; b.style.transition = 'none';
+    a.style.transform = ''; a.style.opacity = '1'; b.style.opacity = '0';
+  });
+}
+
+function playZoomOut(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-zoomout');
+  const a = document.getElementById('zoomout-a');
+  const b = stage.children[1];
+  a.style.transition = `transform ${d}ms ease, opacity ${d}ms ease`;
+  b.style.transition = `opacity ${d}ms ease`;
+  a.style.transform = 'scale(0.3)'; a.style.opacity = '0';
+  b.style.opacity = '1';
+  resetAfter(btn, d, () => {
+    a.style.transition = 'none'; b.style.transition = 'none';
+    a.style.transform = ''; a.style.opacity = '1'; b.style.opacity = '0';
+  });
+}
+
+function playZoomThrough(btn) {
+  const d = getDuration(btn);
+  const a = document.getElementById('zoomthrough-a');
+  const b = document.getElementById('zoomthrough-b');
+  a.style.transition = `transform ${d}ms ease, opacity ${d * 0.5}ms ease`;
+  a.style.transform = 'scale(5)'; a.style.opacity = '0';
+  setTimeout(() => {
+    b.style.transition = `transform ${d * 0.6}ms cubic-bezier(0.16,1,0.3,1), opacity ${d * 0.3}ms ease`;
+    b.style.opacity = '1'; b.style.transform = 'scale(1)';
+  }, d * 0.3);
+  resetAfter(btn, d + 200, () => {
+    a.style.transition = 'none'; b.style.transition = 'none';
+    a.style.transform = ''; a.style.opacity = '1';
+    b.style.opacity = '0'; b.style.transform = 'scale(0.3)';
+  });
+}
+
+// ===== Category 6: 3D =====
+function playCube(btn) {
+  const d = getDuration(btn);
+  const wrapper = document.getElementById('cube-wrapper');
+  wrapper.style.transition = `transform ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  wrapper.style.transform = 'translateZ(-100px) rotateY(-90deg)';
+  resetAfter(btn, d, () => { wrapper.style.transition = 'none'; wrapper.style.transform = ''; });
+}
+
+function playFlip(btn) {
+  const d = getDuration(btn);
+  const wrapper = document.getElementById('flip-wrapper');
+  wrapper.style.transition = `transform ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  wrapper.style.transform = 'rotateY(180deg)';
+  resetAfter(btn, d, () => { wrapper.style.transition = 'none'; wrapper.style.transform = ''; });
+}
+
+function playFold(btn) {
+  const d = getDuration(btn);
+  const a = document.getElementById('fold-a');
+  a.style.transition = `transform ${d}ms ease`;
+  a.style.transform = 'rotateY(-90deg)';
+  resetAfter(btn, d, () => { a.style.transition = 'none'; a.style.transform = ''; });
+}
+
+// ===== Category 7: Morphing =====
+function playShapeMorph(btn) {
+  const d = getDuration(btn);
+  const el = document.getElementById('morph-el');
+  const stage = el.closest('.demo-stage');
+  el.style.transition = `all ${d}ms cubic-bezier(0.16,1,0.3,1)`;
+  const isSquare = el.style.borderRadius !== '50%';
+  if (isSquare) {
+    el.style.borderRadius = '50%';
+    el.style.background = 'var(--scene-b)';
+    el.style.width = '120px'; el.style.height = '120px';
+    el.textContent = 'Circle';
+    stage.style.transition = `background ${d}ms ease`;
+    stage.style.background = 'var(--scene-b-bg)';
+  } else {
+    el.style.borderRadius = '8px';
+    el.style.background = 'var(--scene-a)';
+    el.style.width = '80px'; el.style.height = '80px';
+    el.textContent = 'Square';
+    stage.style.transition = `background ${d}ms ease`;
+    stage.style.background = 'var(--scene-a-bg)';
+  }
+  btn.disabled = true;
+  setTimeout(() => { btn.disabled = false; }, d + 100);
+}
+
+function playColorMorph(btn) {
+  const d = getDuration(btn);
+  const scene = document.getElementById('colormorph-scene');
+  scene.style.transition = `background ${d}ms ease, color ${d}ms ease`;
+  const isDay = scene.textContent.includes('Day');
+  if (isDay) {
+    scene.style.background = 'var(--scene-b-bg)';
+    scene.style.color = 'var(--scene-b)';
+    scene.innerHTML = 'Night Scene<span>Cool colors</span>';
+  } else {
+    scene.style.background = 'var(--scene-a-bg)';
+    scene.style.color = 'var(--scene-a)';
+    scene.innerHTML = 'Day Scene<span>Warm colors</span>';
+  }
+  btn.disabled = true;
+  setTimeout(() => { btn.disabled = false; }, d + 100);
+}
+
+// ===== Category 8: Motion Graphics =====
+function playGradWipe(btn) {
+  const d = getDuration(btn);
+  const b = document.getElementById('gradwipe-b');
+  b.style.opacity = '1';
+  const start = performance.now();
+  btn.disabled = true;
+
+  function frame(now) {
+    const progress = Math.min((now - start) / d, 1);
+    const eased = 1 - Math.pow(1 - progress, 2);
+    const pos = eased * 150 - 50;
+    const mask = `linear-gradient(to right, black ${pos}%, transparent ${pos + 50}%)`;
+    b.style.maskImage = mask;
+    b.style.webkitMaskImage = mask;
+    if (progress < 1) requestAnimationFrame(frame);
+    else setTimeout(() => {
+      b.style.opacity = '0';
+      b.style.maskImage = '';
+      b.style.webkitMaskImage = '';
+      btn.disabled = false;
+    }, 400);
+  }
+  requestAnimationFrame(frame);
+}
+
+function playGlitch(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-glitch');
+  const a = stage.children[0];
+  const b = stage.children[1];
+  const start = performance.now();
+  btn.disabled = true;
+
+  function frame(now) {
+    const progress = (now - start) / d;
+    if (progress < 1) {
+      a.style.transform = `translateX(${(Math.random() - 0.5) * 20}px)`;
+      a.style.filter = `hue-rotate(${Math.random() * 180}deg) saturate(${1 + Math.random() * 3})`;
+      a.style.clipPath = Math.random() > 0.5
+        ? `inset(${Math.random()*40}% 0 ${Math.random()*40}% 0)`
+        : '';
+      requestAnimationFrame(frame);
+    } else {
+      a.style.transform = ''; a.style.filter = ''; a.style.clipPath = '';
+      a.style.opacity = '0'; b.style.opacity = '1';
+      setTimeout(() => { a.style.opacity = '1'; b.style.opacity = '0'; btn.disabled = false; }, 800);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function playParticle(btn) {
+  const d = getDuration(btn);
+  const stage = document.getElementById('demo-particle');
+  const a = document.getElementById('particle-a');
+  const b = document.getElementById('particle-b');
+  const canvas = document.getElementById('particle-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = stage.offsetWidth;
+  canvas.height = stage.offsetHeight;
+  btn.disabled = true;
+
+  const particles = [];
+  const count = 150;
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6,
+      size: 2 + Math.random() * 4,
+      color: `hsl(${220 + Math.random() * 30}, 70%, ${50 + Math.random() * 30}%)`,
+    });
+  }
+
+  const start = performance.now();
+  a.style.transition = `opacity ${d * 0.3}ms ease`;
+  a.style.opacity = '0';
+
+  function frame(now) {
+    const progress = (now - start) / d;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (progress < 0.6) {
+      const alpha = 1 - progress / 0.6;
+      particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = alpha;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+      });
+    }
+
+    if (progress > 0.5 && progress < 1) {
+      const fadeIn = (progress - 0.5) / 0.5;
+      b.style.opacity = String(fadeIn);
+    }
+
+    if (progress < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      b.style.opacity = '1';
+      setTimeout(() => {
+        a.style.transition = 'none'; a.style.opacity = '1';
+        b.style.opacity = '0';
+        btn.disabled = false;
+      }, 600);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+</script>
+
+</body>
+</html>
