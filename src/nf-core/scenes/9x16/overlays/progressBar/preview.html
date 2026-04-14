@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Preview: Progress Bar (9:16)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: -apple-system, sans-serif; color: #fff; }
+#wrapper { display: flex; gap: 24px; align-items: flex-start; padding: 20px; }
+#stage-box { flex-shrink: 0; }
+#stage { border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; overflow: hidden; display: block; position: relative; background: #12121a; }
+#progress-bar { width: 100%; height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; margin-top: 8px; cursor: pointer; position: relative; }
+#progress-fill { height: 100%; background: #6366f1; border-radius: 2px; width: 0%; }
+#time-row { display: flex; justify-content: space-between; margin-top: 4px; }
+#time-row span { font-size: 11px; color: rgba(255,255,255,0.3); font-variant-numeric: tabular-nums; }
+#play-btn { margin-top: 8px; width: 100%; height: 28px; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); color: #6366f1; border-radius: 6px; cursor: pointer; font-size: 12px; }
+#controls { width: 260px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; }
+#controls h2 { font-size: 14px; margin-bottom: 4px; }
+#controls .desc { font-size: 11px; color: rgba(255,255,255,0.35); margin-bottom: 16px; }
+.group-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.25); margin: 12px 0 8px; }
+.param { margin-bottom: 8px; }
+.param-head { display: flex; justify-content: space-between; font-size: 12px; color: rgba(255,255,255,0.5); margin-bottom: 3px; }
+.param-head .val { color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; height: 3px; -webkit-appearance: none; background: rgba(255,255,255,0.08); border-radius: 2px; outline: none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #6366f1; cursor: pointer; }
+select { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+#info { margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 11px; color: rgba(255,255,255,0.25); line-height: 1.8; }
+#info code { color: #6366f1; }
+</style>
+</head>
+<body>
+<div id="wrapper">
+  <div id="stage-box">
+    <div id="stage"></div>
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+    <div id="time-row"><span id="t-current">0.00</span><span id="t-total">8.00</span></div>
+    <button id="play-btn">⏸ 暂停</button>
+  </div>
+  <div id="controls">
+    <h2>进度条</h2>
+    <div class="desc">9:16 竖屏 · 进度条叠加层</div>
+    <div id="params"></div>
+    <div id="info">
+      <p>比例: <code>9:16</code> (1080x1920)</p>
+      <p>预览: <code id="preview-size"></code></p>
+      <p>技术: <code>dom</code></p>
+      <p>时长: <code>8s</code></p>
+    </div>
+  </div>
+</div>
+<script>
+const REAL_W = 1080, REAL_H = 1920;
+const DURATION = 8;
+const MAX_H = Math.min(window.innerHeight - 120, 700);
+const SCALE = MAX_H / REAL_H;
+const PW = Math.round(REAL_W * SCALE);
+const PH = Math.round(REAL_H * SCALE);
+
+const stage = document.getElementById('stage');
+stage.style.width = PW + 'px';
+stage.style.height = PH + 'px';
+document.getElementById('stage-box').style.width = PW + 'px';
+document.getElementById('preview-size').textContent = PW + 'x' + PH;
+document.getElementById('t-total').textContent = DURATION.toFixed(2);
+
+const params = { barHeight: 3, hue: 245, glowSize: 10, position: 'bottom' };
+
+const paramDefs = {
+  barHeight: { type: 'range', range: [1, 10], step: 1,    label: '条高度(px)', group: 'style' },
+  hue:       { type: 'range', range: [0, 360], step: 1,   label: '色相',       group: 'color' },
+  glowSize:  { type: 'range', range: [0, 30],  step: 1,   label: '发光半径',   group: 'style' },
+  position:  { type: 'enum',  options: ['top', 'bottom'],  label: '位置',       group: 'shape' },
+};
+
+function renderProgressBar(t, p, W, H) {
+  const progress = Math.min(1, t / DURATION);
+  const fillW = Math.round(W * progress);
+  const barTop = p.position === 'top'
+    ? Math.round(H * 0.05)
+    : Math.round(H * 0.95) - p.barHeight;
+  const dotX = fillW;
+  const dotY = barTop + Math.round(p.barHeight / 2);
+  const trackColor = `hsla(${p.hue},60%,60%,0.18)`;
+  const fillColor = `hsl(${p.hue},80%,65%)`;
+  const glowColor = `hsl(${p.hue},90%,70%)`;
+  const gs = p.glowSize;
+  const bh = p.barHeight;
+  return `<div style="position:absolute;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;overflow:hidden">
+    <div style="position:absolute;top:${barTop}px;left:0;width:${W}px;height:${bh}px;background:${trackColor};border-radius:${bh}px"></div>
+    <div style="position:absolute;top:${barTop}px;left:0;width:${fillW}px;height:${bh}px;background:${fillColor};border-radius:${bh}px"></div>
+    ${gs > 0 ? `<div style="position:absolute;top:${dotY - gs}px;left:${dotX - gs}px;width:${gs * 2}px;height:${gs * 2}px;border-radius:50%;background:radial-gradient(circle,${glowColor} 0%,transparent 70%);opacity:0.85"></div>` : ''}
+    <div style="position:absolute;top:${dotY - Math.ceil(bh * 1.5)}px;left:${dotX - Math.ceil(bh * 1.5)}px;width:${Math.ceil(bh * 3)}px;height:${Math.ceil(bh * 3)}px;border-radius:50%;background:${fillColor};box-shadow:0 0 ${Math.round(bh * 4)}px ${fillColor}"></div>
+  </div>`;
+}
+
+// Build param controls
+const paramsEl = document.getElementById('params');
+const groups = {};
+for (const [key, def] of Object.entries(paramDefs)) {
+  const g = def.group;
+  if (!groups[g]) {
+    const title = document.createElement('div');
+    title.className = 'group-title';
+    title.textContent = g;
+    paramsEl.appendChild(title);
+    groups[g] = true;
+  }
+  const div = document.createElement('div');
+  div.className = 'param';
+  if (def.type === 'range') {
+    const head = document.createElement('div');
+    head.className = 'param-head';
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = def.label;
+    const valSpan = document.createElement('span');
+    valSpan.className = 'val';
+    valSpan.id = 'v_' + key;
+    valSpan.textContent = params[key];
+    head.appendChild(labelSpan);
+    head.appendChild(valSpan);
+    div.appendChild(head);
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = def.range[0]; input.max = def.range[1]; input.step = def.step; input.value = params[key];
+    input.addEventListener('input', function() {
+      params[key] = +input.value;
+      valSpan.textContent = input.value;
+    });
+    div.appendChild(input);
+  } else if (def.type === 'enum') {
+    const head = document.createElement('div');
+    head.className = 'param-head';
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = def.label;
+    head.appendChild(labelSpan);
+    div.appendChild(head);
+    const sel = document.createElement('select');
+    for (const opt of def.options) {
+      const o = document.createElement('option');
+      o.value = opt; o.textContent = opt;
+      if (opt === params[key]) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener('change', function() { params[key] = sel.value; });
+    div.appendChild(sel);
+  }
+  paramsEl.appendChild(div);
+}
+
+// Playback
+let playing = true;
+let startTime = performance.now();
+let currentT = 0;
+const progressFill = document.getElementById('progress-fill');
+const tCurrent = document.getElementById('t-current');
+const playBtn = document.getElementById('play-btn');
+
+playBtn.addEventListener('click', function() {
+  playing = !playing;
+  if (playing) { startTime = performance.now() - currentT * 1000; playBtn.textContent = '⏸ 暂停'; }
+  else { playBtn.textContent = '▶ 播放'; }
+});
+
+document.getElementById('progress-bar').addEventListener('click', function(e) {
+  const rect = this.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  currentT = ratio * DURATION;
+  startTime = performance.now() - currentT * 1000;
+});
+
+function loop() {
+  if (playing) {
+    currentT = ((performance.now() - startTime) / 1000) % DURATION;
+  }
+  tCurrent.textContent = currentT.toFixed(2);
+  progressFill.style.width = (currentT / DURATION * 100) + '%';
+
+  // Render at display size (DOM scene)
+  stage.innerHTML = renderProgressBar(currentT, params, PW, PH);
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
