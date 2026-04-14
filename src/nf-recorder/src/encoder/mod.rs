@@ -41,7 +41,7 @@ unsafe extern "C" {} // SAFETY: see above.
 unsafe extern "C" {} // SAFETY: see above.
 
 // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
-unsafe extern "C" {
+unsafe extern "C" { // SAFETY: see above.
     // SAFETY: see above.
     static AVFileTypeMPEG4: &'static NSString;
     static AVMediaTypeVideo: &'static NSString;

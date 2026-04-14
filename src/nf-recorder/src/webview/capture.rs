@@ -198,8 +198,7 @@ impl WebViewHost {
                 .max(1.0) as usize,
         );
         // SAFETY: `config` is live, and WebKit accepts this width setter on the main thread.
-        unsafe {
-            // SAFETY: see above.
+        unsafe { // SAFETY: see above.
             config.setSnapshotWidth(Some(&snapshot_width));
         }
         let slot: SnapshotResultSlot = Rc::new(RefCell::new(None));
@@ -207,8 +206,7 @@ impl WebViewHost {
         let block = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
             autoreleasepool(|_| {
                 // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
-                let result = if let Some(error) = unsafe { error.as_ref() } {
-                    // SAFETY: see above.
+                let result = if let Some(error) = unsafe { error.as_ref() } { // SAFETY: see above.
                     Err(format!(
                         "{} (domain={}, code={})",
                         error.localizedDescription(),
@@ -216,8 +214,7 @@ impl WebViewHost {
                         error.code()
                     ))
                 // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes ownership.
-                } else if let Some(image) = unsafe { Retained::retain(image) } {
-                    // SAFETY: see above.
+                } else if let Some(image) = unsafe { Retained::retain(image) } { // SAFETY: see above.
                     Ok(image)
                 } else {
                     Err("WKWebView.takeSnapshot returned nil without an error".into())
@@ -227,8 +224,7 @@ impl WebViewHost {
         });
 
         // SAFETY: `self.web_view`, `config`, and `block` are live main-thread Objective-C objects.
-        unsafe {
-            // SAFETY: see above.
+        unsafe { // SAFETY: see above.
             self.web_view
                 .takeSnapshotWithConfiguration_completionHandler(Some(&config), &block);
         }
@@ -304,8 +300,7 @@ impl WebViewHost {
         let block = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
             autoreleasepool(|_| {
                 // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
-                let result = if let Some(error) = unsafe { error.as_ref() } {
-                    // SAFETY: see above.
+                let result = if let Some(error) = unsafe { error.as_ref() } { // SAFETY: see above.
                     if is_unsupported_js_result(error) {
                         Ok(None)
                     } else {
@@ -328,8 +323,7 @@ impl WebViewHost {
         });
 
         // SAFETY: `self.web_view` is live, and WebKit accepts this script and completion handler on the main thread.
-        unsafe {
-            // SAFETY: see above.
+        unsafe { // SAFETY: see above.
             self.web_view
                 .evaluateJavaScript_completionHandler(&NSString::from_str(script), Some(&block));
         }

@@ -46,7 +46,7 @@ impl SegmentEncoder {
         let input = input.ok_or_else(|| "writer input missing during finish".to_string())?;
 
         // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
-        unsafe {
+        unsafe { // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*input, markAsFinished];
         }
@@ -68,7 +68,7 @@ impl SegmentEncoder {
         });
 
         // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
-        unsafe {
+        unsafe { // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*writer, finishWritingWithCompletionHandler: &*finish];
         }
@@ -144,7 +144,7 @@ impl SegmentEncoder {
 
         let mut error: *mut NSError = ptr::null_mut();
         // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
-        let writer: Option<Retained<AnyObject>> = unsafe {
+        let writer: Option<Retained<AnyObject>> = unsafe { // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
                 writer_class,
@@ -157,13 +157,13 @@ impl SegmentEncoder {
             return Err(ns_error_ptr_to_string(error, "AVAssetWriter init failed"));
         };
         // SAFETY: `writer` is live, and this setter is valid before writing starts.
-        unsafe {
+        unsafe { // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*writer, setShouldOptimizeForNetworkUse: true];
         }
 
         // SAFETY: `writer` is live, and these settings are queried with the documented media type.
-        let can_apply: bool = unsafe {
+        let can_apply: bool = unsafe { // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
                 &*writer,
@@ -179,7 +179,7 @@ impl SegmentEncoder {
         }
 
         // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
-        let input: Option<Retained<AnyObject>> = unsafe {
+        let input: Option<Retained<AnyObject>> = unsafe { // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
                 input_class,
@@ -191,7 +191,7 @@ impl SegmentEncoder {
             return Err("AVAssetWriterInput factory returned nil".into());
         };
         // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
-        unsafe {
+        unsafe { // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*input, setExpectsMediaDataInRealTime: false];
         }
@@ -202,13 +202,13 @@ impl SegmentEncoder {
             return Err("AVAssetWriter refused the video input".into());
         }
         // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
-        unsafe {
+        unsafe { // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*writer, addInput: &*input];
         }
 
         // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
-        let adaptor: Option<Retained<AnyObject>> = unsafe {
+        let adaptor: Option<Retained<AnyObject>> = unsafe { // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
                 adaptor_class,
@@ -229,7 +229,7 @@ impl SegmentEncoder {
             ));
         }
         // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
-        unsafe {
+        unsafe { // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*writer, startSessionAtSourceTime: kCMTimeZero];
         }
@@ -277,7 +277,7 @@ impl SegmentEncoder {
             .ok_or_else(|| "pixel buffer adaptor was not initialized".to_string())?;
         let presentation_time = frame_time(self.frame_count, self.fps)?;
         // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
-        let appended: bool = unsafe {
+        let appended: bool = unsafe { // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
                 &**adaptor,
@@ -286,7 +286,7 @@ impl SegmentEncoder {
             ]
         };
         // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
-        unsafe {
+        unsafe { // SAFETY: see above.
             // SAFETY: see above.
             CVBufferRelease(pixel_buffer);
         }
