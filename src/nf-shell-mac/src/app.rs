@@ -258,12 +258,85 @@ pub fn run() {
         std::process::exit(0);
     }
 
+    // Eval-script mode: run JS from file, screenshot, exit
+    if let Some(script_path) = std::env::args()
+        .skip_while(|a| a != "--eval-script")
+        .nth(1)
+    {
+        eval_script_mode(&wv, &script_path);
+        std::process::exit(0);
+    }
+
     unsafe {
         let _: () = msg_send![&app, activateIgnoringOtherApps: true];
     }
 
     tracing::info!("NextFrame window ready");
     app.run();
+}
+
+/// Eval-script mode: load app, run JS from file, take screenshots, exit.
+/// Usage: nextframe --eval-script /path/to/script.js
+/// The script can call __screenshot(path) to take screenshots at any point.
+/// Results are printed as JSON lines to stdout.
+fn eval_script_mode(wv: &objc2_web_kit::WKWebView, script_path: &str) {
+    use crate::webview;
+
+    // Read the script file
+    let script = match std::fs::read_to_string(script_path) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!("failed to read script {script_path}: {e}");
+            return;
+        }
+    };
+
+    // Wait for page load
+    webview::pump_run_loop_pub(std::time::Duration::from_secs(4));
+
+    // Inject screenshot helper
+    let _ = webview::eval_js(
+        wv,
+        "window.__screenshotRequests = []; window.__screenshot = function(path) { window.__screenshotRequests.push(path); }",
+    );
+
+    // Execute the user script
+    match webview::eval_js(wv, &script) {
+        Ok(result) => {
+            println!("{{\"ok\":true,\"result\":{}}}", serde_json::json!(result));
+        }
+        Err(e) => {
+            println!("{{\"ok\":false,\"error\":{}}}", serde_json::json!(e));
+        }
+    }
+
+    // Wait for async callbacks (setTimeout chains) to complete
+    // Poll for up to 30 seconds, checking screenshot requests each second
+    for _ in 0..30 {
+        webview::pump_run_loop_pub(std::time::Duration::from_secs(1));
+        if let Ok(done) = webview::eval_js(wv, "window.__evalDone ? 'true' : 'false'") {
+            if done == "true" {
+                break;
+            }
+        }
+    }
+
+    // Process any screenshot requests
+    webview::pump_run_loop_pub(std::time::Duration::from_secs(1));
+    if let Ok(paths) = webview::eval_js(wv, "JSON.stringify(window.__screenshotRequests || [])") {
+        if let Ok(arr) = serde_json::from_str::<Vec<String>>(&paths) {
+            for path in arr {
+                match webview::screenshot(wv, &path) {
+                    Ok(()) => println!("{{\"screenshot\":{}}}", serde_json::json!(path)),
+                    Err(e) => println!("{{\"screenshot_error\":{}}}", serde_json::json!(e)),
+                }
+            }
+        }
+    }
+
+    // Always take a final screenshot
+    let _ = webview::screenshot(wv, "/tmp/nf-eval-final.png");
+    println!("{{\"screenshot\":\"/tmp/nf-eval-final.png\"}}");
 }
 
 /// Automated self-verification: check pages load, buttons work, navigation works.
