@@ -61,11 +61,10 @@ impl WebViewHost {
                 "Implement the recorder template protocol in `window.__onFrame` and retry.",
             ));
         }
-        // 50ms flush: WKWebView needs time to execute JS compose(), run layout,
-        // paint to render tree, and composite layers. 8ms was too short for pages
-        // with many DOM elements (e.g. 16-line code terminal + text panel).
-        // 50ms adds ~17ms overhead per frame vs 33ms budget at 30fps, but ensures
-        // all DOM updates are reflected in CALayer.render captures.
-        self.flush_render(Duration::from_millis(50))
+        // 200ms flush: WKWebView needs time to execute JS compose(), run layout,
+        // paint, and composite layers. Even 50ms was insufficient for complex SVG
+        // flow diagrams and multi-element scenes. 200ms ensures reliable capture.
+        // Recording speed drops to ~5fps but correctness > speed.
+        self.flush_render(Duration::from_millis(200))
     }
 }

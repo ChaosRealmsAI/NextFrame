@@ -127,13 +127,15 @@ export function render(t, params, vp) {
     }
   }
 
-  // Render
-  let html = '<div style="position:absolute;inset:0;overflow:hidden">';
+  // Render as single SVG for reliable WKWebView capture
+  const svgW = vp.width;
+  const svgH = vp.height;
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0" width="' + svgW + '" height="' + svgH + '" viewBox="0 0 ' + svgW + ' ' + svgH + '">';
 
   // Title
   if (p.title) {
-    const titleOp = ease3(t / p.enterDur);
-    html += '<div style="position:absolute;top:60px;left:0;right:0;text-align:center;font:600 36px Georgia,serif;color:' + p.nodeText + ';opacity:' + titleOp + '">' + p.title + '</div>';
+    const titleOp = Math.max(0, Math.min(1, ease3(t / p.enterDur)));
+    svg += '<text x="' + svgW / 2 + '" y="80" text-anchor="middle" font-family="Georgia,serif" font-size="36" font-weight="600" fill="' + p.nodeText + '" opacity="' + titleOp + '">' + p.title + '</text>';
   }
 
   for (const shape of shapes) {
@@ -141,18 +143,17 @@ export function render(t, params, vp) {
     if (opClamped <= 0) continue;
 
     if (shape.kind === "arrow") {
-      html += '<div style="position:absolute;left:' + shape.x + 'px;top:' + (shape.y - 1) + 'px;width:' + shape.w + 'px;height:2px;' +
-        'background:' + shape.color + ';opacity:' + opClamped + '">' +
-        '<div style="position:absolute;right:0;top:50%;transform:translateY(-50%);width:0;height:0;' +
-        'border-top:7px solid transparent;border-bottom:7px solid transparent;border-left:12px solid ' + shape.color + '"></div>' +
-        '</div>';
+      const y = shape.y;
+      svg += '<g opacity="' + opClamped + '">' +
+        '<line x1="' + shape.x + '" y1="' + y + '" x2="' + (shape.x + shape.w - 12) + '" y2="' + y + '" stroke="' + shape.color + '" stroke-width="2"/>' +
+        '<polygon points="' + (shape.x + shape.w) + ',' + y + ' ' + (shape.x + shape.w - 12) + ',' + (y - 7) + ' ' + (shape.x + shape.w - 12) + ',' + (y + 7) + '" fill="' + shape.color + '"/>' +
+        '</g>';
     } else if (shape.kind === "varrow") {
       const lineH = shape.y2 - shape.y1;
-      html += '<div style="position:absolute;left:' + (shape.x - 1) + 'px;top:' + shape.y1 + 'px;width:2px;height:' + lineH + 'px;' +
-        'background:' + shape.color + ';opacity:' + opClamped + '">' +
-        '<div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:0;height:0;' +
-        'border-left:7px solid transparent;border-right:7px solid transparent;border-top:12px solid ' + shape.color + '"></div>' +
-        '</div>';
+      svg += '<g opacity="' + opClamped + '">' +
+        '<line x1="' + shape.x + '" y1="' + shape.y1 + '" x2="' + shape.x + '" y2="' + (shape.y2 - 12) + '" stroke="' + shape.color + '" stroke-width="2"/>' +
+        '<polygon points="' + shape.x + ',' + shape.y2 + ' ' + (shape.x - 7) + ',' + (shape.y2 - 12) + ' ' + (shape.x + 7) + ',' + (shape.y2 - 12) + '" fill="' + shape.color + '"/>' +
+        '</g>';
     } else if (shape.kind === "node") {
       const n = shape.node;
       let bgColor = p.nodeBg;
@@ -160,31 +161,25 @@ export function render(t, params, vp) {
       let textColor = p.nodeText;
       if (n.type === "pass")  { bgColor = "rgba(126,198,153,0.15)"; borderColor = p.passColor; textColor = p.passColor; }
       if (n.type === "block") { bgColor = "rgba(224,108,117,0.15)"; borderColor = p.blockColor; textColor = p.blockColor; }
+      const cx = shape.x + shape.w / 2;
+      const cy = shape.y + shape.h / 2;
 
-      const isDecision = n.type === "decision";
-      let nodeStyle;
-      if (isDecision) {
-        // Diamond shape using clip-path
-        nodeStyle = 'position:absolute;left:' + shape.x + 'px;top:' + shape.y + 'px;width:' + shape.w + 'px;height:' + shape.h + 'px;' +
-          'display:flex;align-items:center;justify-content:center;' +
-          'clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);' +
-          'background:' + bgColor + ';outline:2px solid ' + borderColor + ';' +
-          'opacity:' + opClamped;
+      if (n.type === "decision") {
+        svg += '<g opacity="' + opClamped + '">' +
+          '<polygon points="' + cx + ',' + shape.y + ' ' + (shape.x + shape.w) + ',' + cy + ' ' + cx + ',' + (shape.y + shape.h) + ' ' + shape.x + ',' + cy + '" fill="' + bgColor + '" stroke="' + borderColor + '" stroke-width="2"/>' +
+          '<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="600" fill="' + textColor + '">' + (n.label || n.id) + '</text>' +
+          '</g>';
       } else {
-        nodeStyle = 'position:absolute;left:' + shape.x + 'px;top:' + shape.y + 'px;width:' + shape.w + 'px;height:' + shape.h + 'px;' +
-          'display:flex;align-items:center;justify-content:center;' +
-          'border:2px solid ' + borderColor + ';border-radius:8px;' +
-          'background:' + bgColor + ';' +
-          'opacity:' + opClamped;
+        svg += '<g opacity="' + opClamped + '">' +
+          '<rect x="' + shape.x + '" y="' + shape.y + '" width="' + shape.w + '" height="' + shape.h + '" rx="8" fill="' + bgColor + '" stroke="' + borderColor + '" stroke-width="2"/>' +
+          '<text x="' + cx + '" y="' + (cy + 10) + '" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="600" fill="' + textColor + '">' + (n.label || n.id) + '</text>' +
+          '</g>';
       }
-      html += '<div style="' + nodeStyle + '">' +
-        '<div style="font:600 28px system-ui,sans-serif;color:' + textColor + ';text-align:center;padding:0 12px">' + (n.label || n.id) + '</div>' +
-        '</div>';
     }
   }
 
-  html += '</div>';
-  return html;
+  svg += '</svg>';
+  return svg;
 }
 
 export function screenshots() {
