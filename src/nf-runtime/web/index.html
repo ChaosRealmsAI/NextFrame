@@ -2977,10 +2977,27 @@ function showView(viewName, data) {
 // Expose globally for onclick handlers
 window.showView = showView;
 
+// Map topbar data-stage to content panel ids
+const STAGE_TO_TAB = {
+  script: 'pl-tab-script',
+  audio: 'pl-tab-audio',
+  clips: 'pl-tab-asset',
+  atoms: 'pl-tab-atom',
+  assembly: 'pl-tab-edit',
+  output: 'pl-tab-output',
+};
+
 function switchTab(tabEl) {
+  // Update topbar tab active state
   document.querySelectorAll('.tb-pl-tab').forEach(t => t.classList.remove('active'));
   tabEl.classList.add('active');
-  // TODO: switch pipeline content pane based on data-stage
+
+  // Switch content panel
+  const stage = tabEl.dataset.stage;
+  const targetId = STAGE_TO_TAB[stage];
+  document.querySelectorAll('.pl-tab-content').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById(targetId);
+  if (target) target.classList.add('active');
 }
 
 // ══════════════════════════════════════
