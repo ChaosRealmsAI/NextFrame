@@ -11,7 +11,7 @@ Typography is built on Inter for all UI surfaces, Noto Serif SC for reading-weig
 **Key Characteristics:**
 - Near-black background (`#050507`) with subtle purple aurora at top and bottom screen edges
 - 3D glass panel system: `rgba(0,0,0,0.50)` + `blur(16px)` + inset shadow edges + specular highlight
-- Single accent: purple `#a78bfa` with four density levels — the only chromatic color in the UI
+- Two accents: purple `#a78bfa` (interactive/selection) + deep orange `#f97316` (data/emphasis/energy) — cold + warm creates visual temperature
 - Minimum font size 12px, minimum text opacity 0.50 — readability is a hard constraint, not a preference
 - Inter + Noto Serif SC + JetBrains Mono — three fonts, strict separation of roles
 - `cubic-bezier(0.16, 1, 0.3, 1)` as the universal easing — no `ease`, no `linear`
@@ -23,14 +23,23 @@ Typography is built on Inter for all UI surfaces, Noto Serif SC for reading-weig
 ### Background
 - **Void** (`#050507`): Page canvas. Near-black with an imperceptible cool undertone. Not pure black — pure black is lifeless.
 - **Aurora Top**: `radial-gradient(ellipse 60% 12% at 50% 2%, rgba(139,92,246,0.10), transparent)` — faint purple glow at the top screen edge.
-- **Aurora Bottom**: `radial-gradient(ellipse 60% 12% at 50% 98%, rgba(124,58,237,0.06), transparent)` — even fainter purple at the bottom.
-- **Glass Surface** (`rgba(0,0,0,0.50)`): Panel backgrounds. Black-tinted, never purple-tinted. Purple arrives only via aurora bleed through backdrop blur.
+- **Aurora Bottom**: `radial-gradient(ellipse 60% 12% at 50% 98%, rgba(124,58,237,0.05), transparent)` — fainter purple at the bottom.
+- **Warm Glow**: `radial-gradient(ellipse 40% 10% at 80% 98%, rgba(249,115,22,0.04), transparent)` — subtle deep orange warmth at bottom-right corner.
+- **Glass Surface** (`rgba(0,0,0,0.50)`): Panel backgrounds. Black-tinted, never color-tinted. Color arrives only via aurora bleed through backdrop blur.
 
 ### Accent — single purple, four densities
 - **Accent Solid** (`#a78bfa`): Primary buttons, active tab indicators, playhead, links. The one color that means "interactive" or "active."
 - **Accent 20** (`rgba(167,139,250,0.20)`): Hover states on accent elements, active backgrounds under pressure.
 - **Accent 12** (`rgba(167,139,250,0.12)`): Badges, soft buttons, selected list items, tag fills.
 - **Accent 06** (`rgba(167,139,250,0.06)`): Subtle list active backgrounds, barely-there emphasis.
+
+### Warm — deep orange, secondary emphasis
+- **Warm Solid** (`#f97316`): Data numbers, character counts, durations, logic/reasoning text. Adds warmth to the cold purple palette.
+- **Warm 20** (`rgba(249,115,22,0.20)`): Hover states on warm elements.
+- **Warm 12** (`rgba(249,115,22,0.12)`): Warm badges, progress indicators.
+- **Warm 06** (`rgba(249,115,22,0.06)`): Subtle warm backgrounds.
+
+**Two-color rule**: Purple = interactive/selection (buttons, tabs, active states). Orange = data/emphasis/energy (numbers, stats, durations, logic). Never swap them.
 
 ### Text — four levels, hard floor at 0.50
 - **Primary** (`rgba(255,255,255,0.95)`): Headings, active items, primary data values, card titles. Near-white, not pure white — prevents glare on dark surfaces.
@@ -90,7 +99,20 @@ Always. Every page, every component. No exceptions.
 
 ## 4. Component Stylings
 
-### 3D Glass Panel (core surface)
+### CRITICAL: Overlapping panels must be OPAQUE
+
+```
+ANY panel that floats over other content — dropdowns, modals, popovers,
+context menus, tooltips, command palette — MUST use opaque background #141416.
+
+NOT translucent glass. NOT backdrop-filter blur. OPAQUE.
+
+Reason: translucent panels let content bleed through, making text unreadable.
+Glass is ONLY for side-by-side panels (sidebars, toolbars, timelines) where
+nothing is behind them except the aurora background.
+```
+
+### 3D Glass Panel (core surface — side-by-side panels only)
 ```css
 .glass {
   border-radius: 14px;
@@ -300,8 +322,11 @@ NextFrame is a **desktop application**. Responsive behavior is minimal — the a
 - Secondary Text: `rgba(255,255,255,0.65)`
 - Minimum Text: `rgba(255,255,255,0.50)`
 - Border Default: `rgba(255,255,255,0.08)`
+- Warm: Deep Orange (`#f97316`)
+- Warm Badge: `rgba(249,115,22,0.12)`
 - Aurora Top: `rgba(139,92,246,0.10)` at 50% 2%
-- Aurora Bottom: `rgba(124,58,237,0.06)` at 50% 98%
+- Aurora Bottom: `rgba(124,58,237,0.05)` at 50% 98%
+- Warm Glow: `rgba(249,115,22,0.04)` at 80% 98%
 
 ### Design Identity Prompt
 When prompting AI to generate NextFrame UI pages, use this anchor:
