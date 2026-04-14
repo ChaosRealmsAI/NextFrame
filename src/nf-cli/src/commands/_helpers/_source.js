@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseFlags } from "./_io.js";
-import { defaultFixSuggestion } from "./help.js";
+import { defaultFixSuggestion } from "./help/index.js";
 export {
   buildClipsFromCut,
   loadSentencesSummary,

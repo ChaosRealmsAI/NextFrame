@@ -1,6 +1,6 @@
 import http from "node:http";
 import { emit, parseFlags } from "../_helpers/_io.js";
-import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help.js";
+import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help/index.js";
 
 const HOST = "127.0.0.1";
 const PORT = 19820;

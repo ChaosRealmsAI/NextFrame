@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { defaultFixSuggestion, renderCommandHelp, renderRootHelp } from "../src/commands/_helpers/help.js";
+import { defaultFixSuggestion, renderCommandHelp, renderRootHelp } from "../src/commands/_helpers/help/index.js";
 
 const SUBCOMMANDS = {
   new: () => import("../src/commands/timeline/new.js"),

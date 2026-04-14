@@ -1,7 +1,7 @@
 // Shared CLI I/O helpers.
 
 import { readFile, writeFile } from "node:fs/promises";
-import { defaultFixSuggestion } from "./help.js";
+import { defaultFixSuggestion } from "./help/index.js";
 
 export function parseFlags(argv) {
   const positional = [];

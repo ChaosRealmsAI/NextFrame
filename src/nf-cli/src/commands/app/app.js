@@ -1,7 +1,7 @@
 import http from "node:http";
 import { existsSync } from "node:fs";
 import { emit, parseFlags } from "../_helpers/_io.js";
-import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help.js";
+import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help/index.js";
 
 const APP_HOST = "127.0.0.1";
 const APP_PORT = 19820;
