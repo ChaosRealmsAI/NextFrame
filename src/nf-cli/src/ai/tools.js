@@ -1,7 +1,7 @@
 // AI tool definitions — v0.3 layers[] format.
-import { REGISTRY, listScenes, getScene } from '../core/scene-registry.js';
-import { validateTimelineV3 } from '../core/timeline-validate.js';
-import { describeAt } from '../core/v3-describe.js';
+import { REGISTRY, listScenes, getScene } from '../lib/scene-registry.js';
+import { validateTimelineV3 } from '../lib/timeline-validate.js';
+import { describeAt } from '../lib/v3-describe.js';
 import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from '../../../nf-core/engine/ops.js';
 
 export const TOOLS = {

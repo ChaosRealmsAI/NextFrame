@@ -2,7 +2,7 @@
 import { parseFlags, loadTimeline, saveTimeline, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineUsage } from "../_helpers/_resolve.js";
 import { addLayer, listLayers, moveLayer, removeLayer, resizeLayer, setLayerProps } from "../../../../nf-core/engine/ops.js";
-import { validateTimelineV3 } from "../../core/timeline-validate.js";
+import { validateTimelineV3 } from "../_helpers/_timeline-validate.js";
 
 export async function run(argv, context = {}) {
   const { positional, flags } = parseFlags(argv);

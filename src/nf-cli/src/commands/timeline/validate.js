@@ -2,7 +2,7 @@
 // Auto-detects v0.1 (tracks/clips) vs v0.3 (layers[]) format.
 import { parseFlags, loadTimeline, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineDir, timelineUsage } from "../_helpers/_resolve.js";
-import { detectFormat, validateTimelineLegacy, validateTimelineV3 } from "../../core/timeline-validate.js";
+import { detectFormat, validateTimelineLegacy, validateTimelineV3 } from "../_helpers/_timeline-validate.js";
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);

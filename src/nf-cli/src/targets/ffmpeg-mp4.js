@@ -3,9 +3,9 @@
 
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { guarded } from "../core/guard.js";
-import { CanvasPool, renderAt } from "../core/legacy-render.js";
-import { resolveTimeline } from "../core/legacy-timeline.js";
+import { guarded } from "../lib/guard.js";
+import { CanvasPool, renderAt } from "../lib/legacy-render.js";
+import { resolveTimeline } from "../lib/legacy-timeline.js";
 
 function normalizeCrf(value) {
   if (value === undefined || value === null) return 20;

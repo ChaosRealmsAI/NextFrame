@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { once } from "node:events";
 
 import { buildHTML } from "../../../nf-core/engine/build.js";
-import { timelineMetrics } from "../core/timeline-utils.js";
+import { timelineMetrics } from "../lib/timeline-utils.js";
 
 const CHROME_CANDIDATES = [
   process.env.PUPPETEER_EXECUTABLE_PATH,

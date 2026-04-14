@@ -7,7 +7,7 @@ import { parseFlags, loadTimeline, emit } from "../_helpers/_io.js";
 import { configureProjectCacheEnv, resolveTimeline, timelineDir, timelineUsage } from "../_helpers/_resolve.js";
 import { exportMP4, muxMP4Audio } from "../../targets/ffmpeg-mp4.js";
 import { exportRecorder } from "../../targets/recorder.js";
-import { validateTimelineLegacy } from "../../core/timeline-validate.js";
+import { validateTimelineLegacy } from "../_helpers/_timeline-validate.js";
 
 const USAGE = timelineUsage("render", "", " <out.mp4>");
 const DEFAULT_CRF = 20;
