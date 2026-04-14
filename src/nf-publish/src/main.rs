@@ -38,7 +38,7 @@ use crate::ui::{create_browser_layout, create_webview};
 
 fn main() {
     let Some(mtm) = MainThreadMarker::new() else {
-        eprintln!("must run on main thread");
+        state::write_stderr_line(format_args!("[publish] must run on main thread"));
         std::process::abort();
     };
     let app = NSApplication::sharedApplication(mtm);
@@ -454,20 +454,22 @@ fn main() {
 
     start_command_poll();
 
-    println!("automedia started (per-tab channels)");
+    state::write_stderr_line(format_args!(
+        "[publish] automedia started (per-tab channels)"
+    ));
     for (i, tab) in TABS.iter().enumerate() {
-        println!(
-            "  tab {i} ({}):\tcmd → {}  result → {}",
+        state::write_stderr_line(format_args!(
+            "[publish] tab {i} ({}): cmd -> {}  result -> {}",
             tab.label,
             cmd_file(i),
             result_file(i)
-        );
+        ));
     }
-    println!(
-        "  legacy:\tcmd → {}  result → {}",
+    state::write_stderr_line(format_args!(
+        "[publish] legacy: cmd -> {}  result -> {}",
         state::LEGACY_CMD,
         state::LEGACY_RESULT
-    );
+    ));
 
     let _keep = (
         ui_delegate,
