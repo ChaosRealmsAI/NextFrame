@@ -1,17 +1,4 @@
-<<<<<<< HEAD
-=======
-use std::io::Write;
-use std::process::Command;
-
->>>>>>> wt-fix-tts-bb31c753
-use anyhow::Result;
-
-use crate::backend::WordBoundary;
-
-<<<<<<< HEAD
-=======
 /// 分句策略：有换行按换行分（用户手动控制），否则按标点分
->>>>>>> wt-fix-tts-bb31c753
 pub(super) fn split_sentences(text: &str) -> Vec<String> {
     let lines: Vec<String> = text
         .lines()
@@ -24,37 +11,8 @@ pub(super) fn split_sentences(text: &str) -> Vec<String> {
 
     let mut sentences = Vec::new();
     let mut current = String::new();
-<<<<<<< HEAD
-=======
-
->>>>>>> wt-fix-tts-bb31c753
-    for ch in text.chars() {
-        current.push(ch);
-        if matches!(ch, '。' | '！' | '？' | '；' | '.' | '!' | '?' | ';') {
-            let trimmed = current.trim().to_string();
-            if !trimmed.is_empty() {
-                sentences.push(trimmed);
-            }
-            current.clear();
-        }
-    }
-
-    let trimmed = current.trim().to_string();
-    if !trimmed.is_empty() {
-        sentences.push(trimmed);
-    }
-    sentences
-}
-
-<<<<<<< HEAD
-pub(super) fn get_audio_duration_ms(audio: &[u8]) -> u64 {
-    use std::io::Write;
-    use std::process::Command;
-
-=======
 /// 用 ffmpeg 获取精确的 MP3 时长（毫秒）
 pub(super) fn get_audio_duration_ms(audio: &[u8]) -> u64 {
->>>>>>> wt-fix-tts-bb31c753
     let tmp = std::env::temp_dir().join(format!("vox-dur-{}.mp3", std::process::id()));
     if let Ok(mut file) = std::fs::File::create(&tmp) {
         let _ = file.write_all(audio);
@@ -76,29 +34,12 @@ pub(super) fn get_audio_duration_ms(audio: &[u8]) -> u64 {
 
     output
         .ok()
-<<<<<<< HEAD
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-=======
         .and_then(|command| String::from_utf8(command.stdout).ok())
->>>>>>> wt-fix-tts-bb31c753
         .and_then(|stdout| stdout.trim().parse::<f64>().ok())
         .map(|secs| (secs * 1000.0) as u64)
         .unwrap_or_else(|| (audio.len() as u64) * 1000 / 16000)
 }
 
-<<<<<<< HEAD
-=======
-/// 用 ffmpeg silencedetect 找静音点，与分句对齐
->>>>>>> wt-fix-tts-bb31c753
-pub(super) fn detect_sentence_boundaries(
-    audio: &[u8],
-    sentences: &[String],
-) -> Result<Vec<WordBoundary>> {
-<<<<<<< HEAD
-    use std::io::Write;
-    use std::process::Command;
-
-=======
 >>>>>>> wt-fix-tts-bb31c753
     let tmp = std::env::temp_dir().join(format!("vox-sil-{}.mp3", std::process::id()));
     {
@@ -150,7 +91,6 @@ pub(super) fn detect_sentence_boundaries(
         if let Some(position) = line.find("silence_end: ") {
             let value = &line[position + "silence_end: ".len()..];
             if let Some(value) = value.split_whitespace().next() {
->>>>>>> wt-fix-tts-bb31c753
                 if let Ok(value) = value.parse::<f64>() {
                     ends.push(value);
                 }
@@ -180,43 +120,17 @@ pub(super) fn detect_sentence_boundaries(
         .sum();
 
     let mut expected_ends = Vec::new();
-<<<<<<< HEAD
-    let mut cumulative = 0usize;
-    for (i, sentence) in sentences.iter().enumerate() {
-        cumulative += sentence.chars().count();
-        if i < sentences.len() - 1 {
-            let ratio = cumulative as f64 / total_chars as f64;
-=======
     let mut cumulative_chars = 0usize;
     for (index, sentence) in sentences.iter().enumerate() {
         cumulative_chars += sentence.chars().count();
         if index < sentences.len() - 1 {
             let ratio = cumulative_chars as f64 / total_chars as f64;
->>>>>>> wt-fix-tts-bb31c753
             expected_ends.push((ratio * total_ms as f64) as u64);
         }
     }
 
     let mut used = vec![false; all_silences.len()];
     let mut matched = Vec::new();
-<<<<<<< HEAD
-    for expected in &expected_ends {
-        let mut best_idx = None;
-        let mut best_dist = u64::MAX;
-        for (idx, &(start_ms, _)) in all_silences.iter().enumerate() {
-            if used[idx] {
-                continue;
-            }
-            let dist = start_ms.abs_diff(*expected);
-            if dist < best_dist {
-                best_dist = dist;
-                best_idx = Some(idx);
-            }
-        }
-        if let Some(idx) = best_idx {
-            used[idx] = true;
-            matched.push(all_silences[idx]);
-=======
 
     for expected in &expected_ends {
         let mut best_idx = None;
@@ -236,7 +150,6 @@ pub(super) fn detect_sentence_boundaries(
         if let Some(index) = best_idx {
             used[index] = true;
             matched.push(all_silences[index]);
->>>>>>> wt-fix-tts-bb31c753
         }
     }
 
@@ -244,16 +157,6 @@ pub(super) fn detect_sentence_boundaries(
     matched.truncate(needed);
 
     let mut boundaries = Vec::new();
-<<<<<<< HEAD
-    let mut cursor_ms = 0;
-    for (i, sentence) in sentences.iter().enumerate() {
-        let end_ms = if i < matched.len() {
-            matched[i].0
-        } else {
-            total_ms
-        };
-        let duration_ms = end_ms.saturating_sub(cursor_ms);
-=======
     let mut cursor_ms = 0u64;
     for (index, sentence) in sentences.iter().enumerate() {
         let end_ms = if index < matched.len() {
@@ -261,24 +164,15 @@ pub(super) fn detect_sentence_boundaries(
         } else {
             total_ms
         };
->>>>>>> wt-fix-tts-bb31c753
 
         boundaries.push(WordBoundary {
             text: sentence.clone(),
             offset_ms: cursor_ms,
-<<<<<<< HEAD
-            duration_ms,
-        });
-
-        if i < matched.len() {
-            cursor_ms = matched[i].1;
-=======
             duration_ms: end_ms.saturating_sub(cursor_ms),
         });
 
         if index < matched.len() {
             cursor_ms = matched[index].1;
->>>>>>> wt-fix-tts-bb31c753
         }
     }
 
