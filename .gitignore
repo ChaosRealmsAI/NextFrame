@@ -1,4 +1,5 @@
 target/
+spec/
 .DS_Store
 *.log
 data/**/*.log
