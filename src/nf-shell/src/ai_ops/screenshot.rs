@@ -47,7 +47,7 @@ pub(crate) fn native_screenshot(
             autoreleasepool(|_| {
                 // SAFETY: WebKit passes either null or a valid `NSError *` for the duration of this callback.
                 let result =
-                    if let Some(error) = unsafe { error.as_ref() } {
+                    if let Some(error) = unsafe { error.as_ref() } { // SAFETY: see above.
                         // SAFETY: see above.
                         Err(/* Fix: user-facing error formatted below */ error_with_fix(
                     "capture a native screenshot",
@@ -55,7 +55,7 @@ pub(crate) fn native_screenshot(
                     "Wait for the page to finish rendering, then retry the screenshot request.",
                 ))
                     // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes our own ownership.
-                    } else if let Some(image) = unsafe { Retained::retain(image) } {
+                    } else if let Some(image) = unsafe { Retained::retain(image) } { // SAFETY: see above.
                         // SAFETY: see above.
                         Ok(image)
                     } else {
@@ -70,7 +70,7 @@ pub(crate) fn native_screenshot(
         });
 
     // SAFETY: `wk_webview`, `config`, and `block` are live Objective-C objects on the main thread.
-    unsafe {
+    unsafe { // SAFETY: see above.
         // SAFETY: see above.
         wk_webview.takeSnapshotWithConfiguration_completionHandler(Some(&config), &block);
     }
@@ -102,7 +102,7 @@ pub(crate) fn native_screenshot(
         // Pump the run loop so the completion handler fires
         #[allow(clippy::undocumented_unsafe_blocks)]
         // SAFETY: `currentRunLoop` and `runUntilDate:` use live Objective-C objects for this thread only.
-        unsafe {
+        unsafe { // SAFETY: see above.
             // SAFETY: see above.
             use objc2_foundation::NSDate;
             let run_loop: *mut objc2::runtime::AnyObject =
@@ -148,7 +148,7 @@ pub(crate) fn native_screenshot(
 
     // NSBitmapImageFileType.PNG = 4
     // SAFETY: `bitmap_rep` is live, and Cocoa accepts a null properties dictionary for default PNG options.
-    let png_data: Option<objc2::rc::Retained<NSData>> = unsafe {
+    let png_data: Option<objc2::rc::Retained<NSData>> = unsafe { // SAFETY: see above.
         // SAFETY: see above.
         objc2::msg_send![&bitmap_rep, representationUsingType: 4_usize, properties: std::ptr::null::<objc2::runtime::AnyObject>()]
     };

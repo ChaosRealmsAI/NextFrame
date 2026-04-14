@@ -31,7 +31,9 @@ use storage::{
 use util::dialog::{handle_fs_dialog_open, handle_fs_dialog_save, handle_fs_reveal};
 use util::{handle_compose_generate, handle_log, handle_preview_frame};
 
-pub use util::path;
+pub mod path {
+    pub use crate::util::path::*;
+}
 
 #[cfg(test)]
 use util::{dialog, time, validation};

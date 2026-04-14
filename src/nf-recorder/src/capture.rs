@@ -79,7 +79,7 @@ pub fn is_nsimage_black(image: &NSImage) -> Result<bool, String> {
 /// Extracts a `CGImage` from an `NSImage`.
 pub fn cgimage_from_nsimage(image: &NSImage) -> Result<Retained<CGImage>, String> {
     // SAFETY: `image` is live, and AppKit allows null rect/context/hints for this conversion call.
-    unsafe {
+    unsafe { // SAFETY: see above.
         // SAFETY: see above.
         image
             .CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None)
@@ -119,7 +119,7 @@ pub fn layer_render_cgimage(
     let bitmap_info =
         CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
     // SAFETY: `buffer` owns the target bytes, and the dimensions and format match this bitmap context.
-    let context = unsafe {
+    let context = unsafe { // SAFETY: see above.
         // SAFETY: see above.
         CGBitmapContextCreate(
             buffer.as_mut_ptr().cast::<c_void>(),
@@ -183,7 +183,7 @@ pub fn is_cgimage_mostly_black(image: &CGImage) -> Result<bool, String> {
     let bitmap_info =
         CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
     // SAFETY: `buffer` owns the thumbnail bytes, and the dimensions and format match this context.
-    let context = unsafe {
+    let context = unsafe { // SAFETY: see above.
         // SAFETY: see above.
         CGBitmapContextCreate(
             buffer.as_mut_ptr().cast::<c_void>(),
