@@ -134,12 +134,17 @@ export function render(t, params, vp) {
   let html = '<div style="position:absolute;left:' + cx + 'px;top:' + cy + 'px;width:' + blockW + 'px;min-height:' + blockH + 'px;' +
     'background:' + p.bg + ';border:1px solid ' + p.border + ';border-radius:10px;overflow:hidden">';
 
-  // Title bar
-  if (p.title) {
-    const titleOp = ease3(t / (p.enterDur || 0.3));
-    html += '<div style="padding:12px ' + padH + 'px 0;font:600 ' + (fs - 4) + 'px system-ui,sans-serif;color:' + p.lineNumColor + ';opacity:' + Math.max(0, Math.min(1, titleOp)) + '">' +
-      escHtml(p.title) + '</div>';
-  }
+  // Title bar with window control dots
+  const titleOp = ease3(t / (p.enterDur || 0.3));
+  const titleOpClamped = Math.max(0, Math.min(1, titleOp));
+  const dotSize = Math.round(fs * 0.4);
+  const dotGap = Math.round(fs * 0.28);
+  html += '<div style="display:flex;align-items:center;padding:' + Math.round(padV * 0.4) + 'px ' + padH + 'px;opacity:' + titleOpClamped + '">' +
+    '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#ff5f57;margin-right:' + dotGap + 'px"></span>' +
+    '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#febc2e;margin-right:' + dotGap + 'px"></span>' +
+    '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#28c840;margin-right:' + Math.round(padH * 0.5) + 'px"></span>' +
+    (p.title ? '<span style="font:500 ' + (fs - 6) + 'px system-ui,sans-serif;color:' + p.lineNumColor + '">' + escHtml(p.title) + '</span>' : '') +
+    '</div>';
 
   // Code lines
   html += '<div style="padding:' + padV + 'px 0">';

@@ -1,266 +1,172 @@
-// 智能切片 Tab — matches clips-d-final.html prototype
-let scSources = [];
-let scActiveSource = 0;
-let scClips = [];
-let scSentences = {};
+// Smart clips tab runtime for source browsing, clip cards, and modal playback.
+const scSourceSpecs={'dario-interview-full.mp4':{durationSec:1404,durationLabel:'23:24',resolution:'1080p',sizeLabel:'85MB',codec:'h264',fps:'30fps'}};
+const scClipSpecs={
+  'clip_01-指数快到头.mp4':{startSec:135,endSec:197,linkedSegment:'段1·痛点',reason:'Dario 用数据论证指数增长拐点，适合做开场冲击。',tags:['exponential','growth'],quality:'A',confidence:0.92},
+  'clip_02-天才之国.mp4':{startSec:510,endSec:595,linkedSegment:'段2·方案',reason:'观点切换明确，适合承接第二段论据。',tags:['talent','genius'],quality:'A',confidence:0.88},
+  'clip_03-端到端写代码.mp4':{startSec:920,endSec:1025,linkedSegment:'段3·原理',reason:'端到端叙述完整，适合作为技术观点切片。',tags:['AI','coding'],quality:'B+',confidence:0.85},
+};
+const scTimelineColors=['var(--accent)','#60a5fa','#34d399','#f97316'];
+let scSources=[]; let scActiveSource=0; let scClips=[]; let scTranscript=[]; let scRenderedClips=[]; let scPlayerCleanup=null;
 
-function scEscape(v) { return String(v || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function scTc(s) { if (typeof s !== 'number') return '00:00.0'; const m = Math.floor(s / 60); return String(m).padStart(2,'0') + ':' + (s % 60).toFixed(1).padStart(4,'0'); }
-function scNfUrl(path) { if (!path) return ''; const i = path.indexOf('/projects/'); return i >= 0 ? 'nfdata://localhost/' + encodeURI(path.substring(i + '/projects/'.length)) : path; }
+function scEscape(value){return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function scNormalizeStem(name){return String(name||'').replace(/\.[^.]+$/,'').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g,'-');}
+function scNfUrl(path){if(!path)return'';const marker=path.indexOf('/projects/');return marker<0?path:'nfdata://localhost/'+encodeURI(path.slice(marker+'/projects/'.length));}
+function scFormatBytes(bytes){if(!Number.isFinite(bytes)||bytes<=0)return'—';const mb=bytes/(1024*1024);return mb>=100?Math.round(mb)+'MB':mb.toFixed(1)+'MB';}
+function scLangLabel(key){const labels={zh:'中',ja:'日',ko:'韩',fr:'FR',es:'ES',de:'DE'};return labels[key]||String(key||'').slice(0,2).toUpperCase();}
+function scFormatClock(totalSeconds,withTenths){if(!Number.isFinite(totalSeconds)||totalSeconds<0)return withTenths?'00:00.0':'00:00';const hours=Math.floor(totalSeconds/3600);const minutes=Math.floor((totalSeconds%3600)/60);const seconds=totalSeconds%60;if(withTenths){const base=String(minutes).padStart(2,'0')+':'+seconds.toFixed(1).padStart(4,'0');return hours>0?String(hours).padStart(2,'0')+':'+base:base;}const mm=hours>0?Math.floor((totalSeconds%3600)/60):Math.floor(totalSeconds/60);const ss=Math.floor(totalSeconds%60);const core=String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');return hours>0?String(hours).padStart(2,'0')+':'+core:core;}
 
-function loadSmartClips() {
-  if (typeof bridgeCall !== 'function' || !window.currentEpisodePath) return;
-  const ep = window.currentEpisodePath;
-  const srcDir = ep + '/sources';
+function scPickSentencesFile(videoName,sentenceEntries){
+  if(!sentenceEntries.length)return null;
+  const stem=scNormalizeStem(videoName);
+  const direct=sentenceEntries.find((entry)=>scNormalizeStem(entry.name).startsWith(stem));
+  if(direct)return direct;
+  const tokens=stem.split('-').filter((token)=>token.length>2);
+  const partial=sentenceEntries.find((entry)=>{const entryStem=scNormalizeStem(entry.name).replace(/-sentences$/,'');return tokens.some((token)=>entryStem.includes(token));});
+  return partial||(sentenceEntries.length===1?sentenceEntries[0]:null);
+}
 
-  Promise.all([
-    bridgeCall('fs.listDir', { path: srcDir }).catch(function() { return { entries: [] }; }),
-    bridgeCall('source.clips', { episode: ep }).catch(function() { return { clips: [] }; })
-  ]).then(function(r) {
-    const entries = r[0].entries || [];
-    scClips = r[1].clips || [];
+function scExtractLanguageRows(sentence){
+  const rows=[]; const translations=sentence.translations&&typeof sentence.translations==='object'?sentence.translations:{};
+  if(sentence.text)rows.push({label:'EN',text:sentence.text,primary:true});
+  Object.keys(translations).forEach((key)=>{if(translations[key])rows.push({label:scLangLabel(key),text:translations[key],primary:false});});
+  ['zh','ja','ko','fr','es','de'].forEach((key)=>{if(sentence[key]&&!translations[key])rows.push({label:scLangLabel(key),text:sentence[key],primary:false});});
+  return rows;
+}
 
-    const vExts = ['.mp4','.mov','.webm','.mkv'];
-    const videos = entries.filter(function(e) { return e.name && vExts.some(function(x) { return e.name.endsWith(x); }); });
-    const sents = entries.filter(function(e) { return e.name && e.name.endsWith('-sentences.json'); });
+function scGetSourceDuration(source){const spec=scSourceSpecs[source.name]||{};return spec.durationSec||0;}
+function scGetClipSpec(clip){return scClipSpecs[clip.name]||null;}
 
-    scSources = videos.map(function(v) {
-      const base = v.name.replace(/\.[^.]+$/, '');
-      const sf = sents.find(function(s) { return s.name.startsWith(base); });
-      return { name: v.name, path: srcDir + '/' + v.name, sentencesPath: sf ? srcDir + '/' + sf.name : null };
-    });
+function scBuildClipModels(){
+  const source=scSources[scActiveSource]; if(!source)return[];
+  const sourceDuration=scGetSourceDuration(source);
+  return scClips.map((clip,index)=>{
+    const spec=scGetClipSpec(clip); if(!spec)return null;
+    const sentences=scTranscript.filter((sentence)=>sentence.start>=spec.startSec&&sentence.end<=spec.endSec).map((sentence)=>({
+      id:sentence.id,startSec:sentence.start-spec.startSec,endSec:sentence.end-spec.startSec,durationSec:Math.max(0,sentence.end-sentence.start),languageRows:scExtractLanguageRows(sentence),
+    }));
+    const firstSentence=sentences[0]; const lastSentence=sentences[sentences.length-1];
+    return {
+      clip,index,startSec:spec.startSec,endSec:spec.endSec,durationSec:spec.endSec-spec.startSec,sourceDurationSec:sourceDuration,nfUrl:scNfUrl(clip.path),sizeLabel:scFormatBytes(clip.size),
+      timecodeLabel:scFormatClock(spec.startSec,false)+' → '+scFormatClock(spec.endSec,false),sentences,linkedSegment:spec.linkedSegment,tags:spec.tags,reason:spec.reason,quality:spec.quality,confidence:spec.confidence,
+      sentenceRange:firstSentence&&lastSentence?firstSentence.id+'-'+lastSentence.id:'—',
+    };
+  }).filter(Boolean);
+}
 
-    scRenderSidebar();
-    if (scSources.length > 0) scSelectSource(0);
-    else scRenderMain();
+function scRenderSidebar(){
+  const root=document.getElementById('sc-source-list'); if(!root)return;
+  let html='<div class="sc-sidebar-title">源视频</div>';
+  if(!scSources.length){root.innerHTML=html+'<div class="sc-empty">暂无源视频</div>';return;}
+  html+=scSources.map((source,index)=>{
+    const active=index===scActiveSource?' active':''; const spec=scSourceSpecs[source.name]||{}; const clipCount=index===scActiveSource?scRenderedClips.length:scClips.length;
+    return '<button class="sc-src-item'+active+'" type="button" data-nf-action="select-smart-source" onclick="scSelectSource('+index+')">'+
+      '<span class="sc-src-name">'+scEscape(source.name)+'</span>'+
+      '<span class="sc-src-meta"><span>'+scEscape(spec.durationLabel||'—')+'</span><span>'+scEscape(spec.resolution||'—')+'</span></span>'+
+      '<span class="sc-src-count">'+clipCount+' clips · '+(source.totalSentences||0)+' 句</span></button>';
+  }).join('');
+  root.innerHTML=html;
+}
+
+function scRenderTimeline(clips,source){
+  const durationSec=scGetSourceDuration(source);
+  const ticks=Array.from({length:6},(_,index)=>scFormatClock(durationSec*(index/5),false));
+  const regions=clips.map((clipModel)=>{
+    const left=(clipModel.startSec/durationSec)*100; const width=((clipModel.endSec-clipModel.startSec)/durationSec)*100; const color=scTimelineColors[clipModel.index%scTimelineColors.length];
+    return '<button class="sc-tl-region" type="button" data-nf-action="focus-smart-clip" onclick="document.getElementById(\'sc-clip-'+clipModel.index+'\')?.scrollIntoView({block:\'start\',behavior:\'smooth\'})" style="left:'+left.toFixed(2)+'%;width:'+width.toFixed(2)+'%;background:'+color+'"><span class="sc-tl-region-label">'+String(clipModel.index+1).padStart(2,'0')+'</span></button>';
+  }).join('');
+  return '<div class="glass sc-timeline"><div class="sc-tl-label">时间轴 · 切片分布</div><div class="sc-tl-bar">'+regions+'</div><div class="sc-tl-ticks">'+ticks.map((tick)=>'<span class="sc-tl-tick">'+tick+'</span>').join('')+'</div></div>';
+}
+
+function scRenderClipSentence(sentence){
+  const rows=sentence.languageRows.length?sentence.languageRows.map((row)=>'<div class="sc-sent-lang-row"><span class="sc-sent-lang-label">'+row.label+'</span><span class="'+(row.primary?'sc-sent-text':'sc-sent-trans')+'">'+scEscape(row.text)+'</span></div>').join(''):'<div class="sc-sent-lang-row"><span class="sc-sent-lang-label">EN</span><span class="sc-sent-text">字幕缺失</span></div>';
+  return '<div class="sc-sent-row"><span class="sc-sent-tc">'+scFormatClock(sentence.startSec,true)+'</span><div class="sc-sent-content">'+rows+'</div><span class="sc-sent-dur">'+sentence.durationSec.toFixed(1)+'s</span></div>';
+}
+
+function scRenderMain(){
+  const root=document.getElementById('sc-main'); if(!root)return;
+  const source=scSources[scActiveSource]; if(!source){root.innerHTML='<div class="sc-empty">暂无源视频</div>';return;}
+  scRenderedClips=scBuildClipModels(); scRenderSidebar();
+  const spec=scSourceSpecs[source.name]||{};
+  const tagHtml=[
+    '<span class="sc-tag sc-tag-warm">'+scEscape(spec.durationLabel||'—')+'</span>',
+    '<span class="sc-tag sc-tag-default">'+scEscape(spec.resolution||'—')+'</span>',
+    '<span class="sc-tag sc-tag-default">'+scEscape(spec.codec||'—')+'</span>',
+    '<span class="sc-tag sc-tag-default">'+scEscape(spec.fps||'—')+'</span>',
+    '<span class="sc-tag sc-tag-warm">'+scEscape(spec.sizeLabel||'—')+'</span>',
+    '<span class="sc-tag sc-tag-accent">'+(source.totalSentences||0)+' sentences</span>',
+    '<span class="sc-tag sc-tag-accent">'+scRenderedClips.length+' clips</span>',
+  ].join('');
+  const timelineHtml=scRenderedClips.length?scRenderTimeline(scRenderedClips,source):'';
+  const cardsHtml=scRenderedClips.length?scRenderedClips.map((clipModel)=>'<div class="glass sc-clip-card" id="sc-clip-'+clipModel.index+'">'+
+      '<div class="sc-clip-top"><span class="sc-clip-num">'+(clipModel.index+1)+'</span><span class="sc-clip-name">'+scEscape(clipModel.clip.name)+'</span><span class="sc-clip-dur">'+Math.round(clipModel.durationSec)+'s</span><span class="sc-clip-tc">'+clipModel.timecodeLabel+'</span></div>'+
+      '<div class="sc-clip-body"><button class="sc-clip-video" type="button" data-nf-action="preview-smart-clip" onclick="scOpenPlayer('+clipModel.index+')"><video src="'+scEscape(clipModel.nfUrl)+'" preload="metadata" muted playsinline></video><span class="sc-play-overlay"><span class="sc-play-circle">&#9654;</span></span></button><div class="sc-sentences">'+clipModel.sentences.map(scRenderClipSentence).join('')+'</div></div>'+
+      '<div class="sc-meta-bar"><span class="sc-meta-tag">关联: '+scEscape(clipModel.linkedSegment)+'</span><span class="sc-meta-tag">标签: '+scEscape(clipModel.tags.join(', '))+'</span><button class="sc-more-btn" type="button" data-nf-action="open-smart-clip-meta" onclick="scOpenMeta('+clipModel.index+')">更多 ↗</button></div></div>').join(''):'<div class="sc-empty">暂无切片数据</div>';
+  root.innerHTML='<div class="glass sc-detail-header"><div class="sc-detail-top"><div class="sc-detail-name">'+scEscape(source.name)+'</div><button class="sc-preview-btn" type="button" data-nf-action="preview-smart-source" onclick="scOpenSourcePlayer()">&#9654; 预览原视频</button></div><div class="sc-detail-path">'+scEscape(source.path)+'</div><div class="sc-detail-tags">'+tagHtml+'</div></div>'+timelineHtml+'<div class="sc-clip-scroll">'+cardsHtml+'</div>';
+}
+
+function scRenderModalSubtitle(sentence,emptyText){
+  if(!sentence)return'<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-original">'+scEscape(emptyText||'···')+'</span></div>';
+  return sentence.languageRows.map((row)=>'<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">'+row.label+'</span><span class="'+(row.primary?'sc-modal-sub-original':'sc-modal-sub-trans')+'">'+scEscape(row.text)+'</span></div>').join('');
+}
+
+function scBindPlayer(video,subtitles,title,explicitDuration,emptyText){
+  const subtitleEl=document.getElementById('sc-modal-subtitle'); const currentEl=document.getElementById('sc-modal-current'); const totalEl=document.getElementById('sc-modal-total'); const fillEl=document.getElementById('sc-modal-progress-fill');
+  const titleEl=document.getElementById('sc-modal-title'); const progressEl=document.getElementById('sc-modal-progress'); if(!video||!subtitleEl||!currentEl||!totalEl||!fillEl||!titleEl||!progressEl)return;
+  titleEl.textContent=title;
+  function sync(){
+    const duration=Number.isFinite(video.duration)&&video.duration>0?video.duration:explicitDuration; const current=Number.isFinite(video.currentTime)?video.currentTime:0;
+    currentEl.textContent=scFormatClock(current,true); totalEl.textContent=scFormatClock(duration||0,true); fillEl.style.width=duration?((current/duration)*100).toFixed(2)+'%':'0%';
+    const active=subtitles.find((sentence)=>current>=sentence.startSec&&current<sentence.endSec)||null; subtitleEl.innerHTML=scRenderModalSubtitle(active,emptyText);
+  }
+  const onTimeUpdate=()=>sync(); const onLoaded=()=>sync();
+  const onProgressClick=(event)=>{const rect=progressEl.getBoundingClientRect(); const ratio=Math.min(1,Math.max(0,(event.clientX-rect.left)/rect.width)); const duration=Number.isFinite(video.duration)&&video.duration>0?video.duration:explicitDuration; if(duration)video.currentTime=ratio*duration;};
+  video.addEventListener('timeupdate',onTimeUpdate); video.addEventListener('loadedmetadata',onLoaded); progressEl.addEventListener('click',onProgressClick); sync();
+  scPlayerCleanup=function(){video.pause(); video.removeEventListener('timeupdate',onTimeUpdate); video.removeEventListener('loadedmetadata',onLoaded); progressEl.removeEventListener('click',onProgressClick);};
+}
+
+function scOpenPlayer(index){
+  const clipModel=scRenderedClips[index]; const overlay=document.getElementById('sc-player-modal'); const panel=document.getElementById('sc-player-panel'); if(!clipModel||!overlay||!panel)return;
+  if(typeof scPlayerCleanup==='function')scPlayerCleanup();
+  panel.innerHTML='<button class="sc-modal-close" type="button" data-nf-action="close-smart-player" onclick="scClosePlayer()">&times;</button><div class="sc-modal-video-shell"><video id="sc-modal-video" src="'+scEscape(clipModel.nfUrl)+'" controls autoplay playsinline></video></div><div class="sc-modal-subtitle" id="sc-modal-subtitle"></div><div class="sc-modal-transport"><div class="sc-modal-progress" id="sc-modal-progress"><div class="sc-modal-progress-fill" id="sc-modal-progress-fill"></div></div><div class="sc-modal-meta"><span class="sc-modal-tc" id="sc-modal-current">00:00.0</span><span class="sc-modal-clip-name" id="sc-modal-title"></span><span class="sc-modal-tc" id="sc-modal-total">00:00.0</span></div></div>';
+  overlay.classList.add('open'); scBindPlayer(document.getElementById('sc-modal-video'),clipModel.sentences,clipModel.clip.name,clipModel.durationSec,'···');
+}
+
+function scOpenSourcePlayer(){
+  const source=scSources[scActiveSource]; const overlay=document.getElementById('sc-player-modal'); const panel=document.getElementById('sc-player-panel'); const spec=source?(scSourceSpecs[source.name]||{}):null;
+  if(!source||!overlay||!panel)return; if(typeof scPlayerCleanup==='function')scPlayerCleanup();
+  panel.innerHTML='<button class="sc-modal-close" type="button" data-nf-action="close-smart-player" onclick="scClosePlayer()">&times;</button><div class="sc-modal-video-shell"><video id="sc-modal-video" src="'+scEscape(scNfUrl(source.path))+'" controls autoplay playsinline></video></div><div class="sc-modal-subtitle" id="sc-modal-subtitle"></div><div class="sc-modal-transport"><div class="sc-modal-progress" id="sc-modal-progress"><div class="sc-modal-progress-fill" id="sc-modal-progress-fill"></div></div><div class="sc-modal-meta"><span class="sc-modal-tc" id="sc-modal-current">00:00.0</span><span class="sc-modal-clip-name" id="sc-modal-title"></span><span class="sc-modal-tc" id="sc-modal-total">00:00.0</span></div></div>';
+  overlay.classList.add('open'); scBindPlayer(document.getElementById('sc-modal-video'),[],source.name+' · '+(spec&&spec.resolution?spec.resolution:'源视频'),spec&&spec.durationSec?spec.durationSec:0,'原视频预览');
+}
+
+function scClosePlayer(){const overlay=document.getElementById('sc-player-modal'); if(typeof scPlayerCleanup==='function'){scPlayerCleanup(); scPlayerCleanup=null;} if(overlay)overlay.classList.remove('open');}
+
+function scOpenMeta(index){
+  const clipModel=scRenderedClips[index]; const overlay=document.getElementById('sc-meta-modal'); const panel=document.getElementById('sc-meta-panel'); if(!clipModel||!overlay||!panel)return;
+  const rows=[['切片原因',clipModel.reason],['linked_segment',clipModel.linkedSegment],['source_timecode',clipModel.timecodeLabel],['source_sentence_ids',clipModel.sentenceRange],['sentence_count',String(clipModel.sentences.length)],['quality',clipModel.quality],['confidence',clipModel.confidence.toFixed(2)],['tags',clipModel.tags.join(', ')],['file_size',clipModel.sizeLabel],['path',clipModel.clip.path]];
+  panel.innerHTML='<button class="sc-modal-close" type="button" data-nf-action="close-smart-clip-meta" onclick="scCloseMeta()">&times;</button><div class="sc-meta-title">'+scEscape(clipModel.clip.name)+' · 元信息</div>'+rows.map((row)=>'<div class="sc-meta-row"><span class="sc-meta-key">'+scEscape(row[0])+'</span><span class="sc-meta-val">'+scEscape(row[1])+'</span></div>').join('');
+  overlay.classList.add('open');
+}
+
+function scCloseMeta(){const overlay=document.getElementById('sc-meta-modal'); if(overlay)overlay.classList.remove('open');}
+function scHandlePlayerOverlay(event){if(event.target&&event.target.id==='sc-player-modal')scClosePlayer();}
+function scHandleMetaOverlay(event){if(event.target&&event.target.id==='sc-meta-modal')scCloseMeta();}
+
+function scSelectSource(index){
+  scActiveSource=index; const source=scSources[index]; scTranscript=[];
+  if(!source||!source.sentencesPath||typeof bridgeCall!=='function'){scRenderMain();return;}
+  bridgeCall('fs.read',{path:source.sentencesPath}).then((data)=>{const parsed=JSON.parse(data.contents||'{}'); scTranscript=Array.isArray(parsed.sentences)?parsed.sentences:[]; source.totalSentences=parsed.total_sentences||scTranscript.length; scRenderMain();}).catch(()=>{scTranscript=[]; scRenderMain();});
+}
+
+function loadSmartClips(){
+  const sidebar=document.getElementById('sc-source-list'); const main=document.getElementById('sc-main'); if(!sidebar||!main)return;
+  if(typeof bridgeCall!=='function'||!window.currentEpisodePath){sidebar.innerHTML='<div class="sc-sidebar-title">源视频</div><div class="sc-empty">桌面桥接未就绪</div>'; main.innerHTML='<div class="sc-empty">无法读取当前剧集数据</div>'; return;}
+  const sourcesDir=window.currentEpisodePath+'/sources';
+  Promise.all([bridgeCall('fs.listDir',{path:sourcesDir}).catch(()=>({entries:[]})),bridgeCall('source.clips',{episode:window.currentEpisodePath}).catch(()=>({clips:[]}))]).then((result)=>{
+    const entries=Array.isArray(result[0].entries)?result[0].entries:[]; const videos=entries.filter((entry)=>/\.(mp4|mov|mkv|webm)$/i.test(entry.name||'')); const transcriptFiles=entries.filter((entry)=>/sentences\.json$/i.test(entry.name||''));
+    scSources=videos.map((video)=>{const transcript=scPickSentencesFile(video.name,transcriptFiles); return {name:video.name,path:video.path,sentencesPath:transcript?transcript.path:'',totalSentences:0};});
+    scClips=Array.isArray(result[1].clips)?result[1].clips:[]; scActiveSource=0; scRenderedClips=[]; scRenderSidebar(); if(!scSources.length){scRenderMain(); return;} scSelectSource(0);
   });
 }
 
-function scSelectSource(i) {
-  scActiveSource = i;
-  scRenderSidebar();
-  const src = scSources[i];
-  if (src && src.sentencesPath) {
-    bridgeCall('fs.read', { path: src.sentencesPath }).then(function(d) {
-      const raw = d.contents || d.content || '';
-      try { scSentences = typeof raw === 'object' ? raw : JSON.parse(raw); } catch(e) { scSentences = {}; }
-      scRenderMain();
-    }).catch(function() { scSentences = {}; scRenderMain(); });
-  } else {
-    scSentences = {};
-    scRenderMain();
-  }
-}
-
-function scRenderSidebar() {
-  const el = document.querySelector('#pl-tab-asset .pl-sidebar');
-  if (!el) return;
-  let h = '<div style="padding:16px 16px 12px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--t50)">源视频</div>';
-  if (!scSources.length) { h += '<div style="padding:16px;font-size:13px;color:var(--t50)">暂无源视频</div>'; }
-  scSources.forEach(function(s, idx) {
-    h += '<div class="sc-src-item' + (idx === scActiveSource ? ' active' : '') + '" data-nf-action="select-source" onclick="scSelectSource(' + idx + ')">' +
-      '<div class="sc-src-name">' + scEscape(s.name) + '</div>' +
-      '<div class="sc-src-meta"><span>' + scEscape(s.duration || '—') + '</span><span>' + scEscape(s.resolution || '—') + '</span></div>' +
-      '<div class="sc-src-clips-count">' + (scSentences.total_sentences || 0) + ' 句 · ' + scClips.length + ' clips</div>' +
-    '</div>';
-  });
-  el.innerHTML = h;
-}
-
-function scRenderMain() {
-  const el = document.querySelector('#pl-tab-asset .pl-main');
-  if (!el) return;
-  const src = scSources[scActiveSource];
-  if (!src) { el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t50)">暂无源视频</div>'; return; }
-
-  const allSents = (scSentences && scSentences.sentences) || [];
-  let h = '';
-
-  // Detail header (glass)
-  h += '<div class="glass sc-detail-header"><div class="sc-detail-top">' +
-    '<div class="sc-detail-name">' + scEscape(src.name) + '</div>' +
-    '<button class="sc-preview-btn" data-nf-action="preview-source" onclick="scOpenPlayer(-1)">&#9654; 预览原视频</button>' +
-  '</div>' +
-  '<div class="sc-detail-path">' + scEscape(decodeURI(scNfUrl(src.path)).replace('nfdata://localhost/', '~/NextFrame/projects/')) + '</div>' +
-  '<div class="sc-detail-tags">' +
-    (allSents.length ? '<span class="sc-tag sc-tag-accent">' + allSents.length + ' sentences</span>' : '') +
-    '<span class="sc-tag sc-tag-accent">' + scClips.length + ' clips</span>' +
-  '</div></div>';
-
-  // Timeline (glass)
-  if (scClips.length > 0) {
-    const colors = ['var(--accent)','#60a5fa','var(--green)','#f472b6','var(--warm)'];
-    h += '<div class="glass sc-timeline"><div class="sc-tl-label">时间轴 · 切片分布</div><div class="sc-tl-bar">';
-    scClips.forEach(function(c, i) {
-      const left = (i / scClips.length * 80 + 5);
-      const width = Math.max(3, 70 / scClips.length);
-      h += '<div class="sc-tl-region" style="left:' + left + '%;width:' + width + '%;background:' + colors[i % colors.length] + '" title="' + scEscape(c.name) + '"><span class="sc-tl-region-label">' + (i+1) + '</span></div>';
-    });
-    h += '</div><div class="sc-tl-ticks"><span class="sc-tl-tick">0:00</span><span class="sc-tl-tick">end</span></div></div>';
-  }
-
-  // Clip cards
-  h += '<div class="sc-clip-scroll">';
-  if (!scClips.length) {
-    h += '<div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--t50)">暂无切片</div>';
-  }
-  scClips.forEach(function(clip, i) {
-    const url = scNfUrl(clip.path || '');
-    const sizeMB = clip.size ? (clip.size / 1024 / 1024).toFixed(1) + 'MB' : '';
-    // Get sentences for this clip (distribute evenly for now)
-    const perClip = Math.max(1, Math.floor(allSents.length / Math.max(1, scClips.length)));
-    const clipSents = allSents.slice(i * perClip, (i + 1) * perClip).slice(0, 4);
-
-    h += '<div class="sc-clip-card glass" id="sc-clip-' + i + '">';
-    // Top row
-    h += '<div class="sc-clip-top"><div class="sc-clip-num">' + (i+1) + '</div>' +
-      '<div class="sc-clip-name">' + scEscape(clip.name) + '</div>' +
-      (sizeMB ? '<div class="sc-clip-dur">' + scEscape(sizeMB) + '</div>' : '') +
-    '</div>';
-
-    // Body: video + sentences
-    h += '<div class="sc-clip-body">';
-
-    // Video thumbnail
-    h += '<div class="sc-clip-video" data-nf-action="preview-clip" onclick="scOpenPlayer(' + i + ')">' +
-      (url ? '<video src="' + scEscape(url) + '" preload="metadata"></video>' : '') +
-      '<div class="sc-play-overlay"><div class="sc-play-circle">&#9654;</div></div>' +
-    '</div>';
-
-    // Sentences with multi-lang
-    h += '<div class="sc-sentences">';
-    if (clipSents.length > 0) {
-      clipSents.forEach(function(s) {
-        const dur = ((s.end || 0) - (s.start || 0)).toFixed(1);
-        h += '<div class="sc-sent-row">' +
-          '<span class="sc-sent-tc">' + scTc(s.start) + '</span>' +
-          '<div class="sc-sent-content">' +
-            '<div class="sc-sent-lang-row"><span class="sc-sent-lang-label">EN</span><span class="sc-sent-text">' + scEscape(s.text) + '</span></div>' +
-            (s.zh ? '<div class="sc-sent-lang-row"><span class="sc-sent-lang-label">中</span><span class="sc-sent-trans">' + scEscape(s.zh) + '</span></div>' : '') +
-            (s.ja ? '<div class="sc-sent-lang-row"><span class="sc-sent-lang-label">日</span><span class="sc-sent-trans">' + scEscape(s.ja) + '</span></div>' : '') +
-          '</div>' +
-          '<span class="sc-sent-dur">' + dur + 's</span>' +
-        '</div>';
-      });
-    } else {
-      h += '<div style="padding:8px;font-size:12px;color:var(--t50)">无字幕数据</div>';
-    }
-    h += '</div></div>';
-
-    // Meta bar
-    h += '<div class="sc-meta-bar"><span class="sc-meta-tag">clip ' + (i+1) + '</span>' +
-      '<button class="sc-more-btn" data-nf-action="clip-meta" onclick="scOpenMeta(' + i + ')">更多 ↗</button></div>';
-    h += '</div>';
-  });
-  h += '</div>';
-
-  el.innerHTML = h;
-}
-
-// Player modal
-function scOpenPlayer(clipIdx) {
-  let modal = document.getElementById('sc-player-modal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'sc-player-modal';
-    modal.className = 'sc-modal-overlay';
-    modal.onclick = function(e) { if (e.target === modal) scClosePlayer(); };
-    document.body.appendChild(modal);
-  }
-
-  let videoUrl, title;
-  if (clipIdx < 0) {
-    const src = scSources[scActiveSource];
-    if (!src) return;
-    videoUrl = scNfUrl(src.path);
-    title = src.name;
-  } else {
-    const clip = scClips[clipIdx];
-    if (!clip) return;
-    videoUrl = scNfUrl(clip.path);
-    title = clip.name;
-  }
-
-  const allSents = (scSentences && scSentences.sentences) || [];
-  const perClip = Math.max(1, Math.floor(allSents.length / Math.max(1, scClips.length)));
-  const clipSents = clipIdx >= 0 ? allSents.slice(clipIdx * perClip, (clipIdx + 1) * perClip) : [];
-
-  modal.innerHTML = '<div class="sc-modal-player glass">' +
-    '<div style="width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0a0a0f">' +
-      '<video id="sc-modal-video" src="' + scEscape(videoUrl) + '" controls autoplay style="width:100%;height:100%;object-fit:contain"></video>' +
-    '</div>' +
-    '<div class="sc-modal-subtitle" id="sc-modal-subs"></div>' +
-    '<div class="sc-modal-transport"><div style="display:flex;align-items:center;justify-content:center;padding:8px 0"><span class="sc-modal-clip-name">' + scEscape(title) + '</span></div></div>' +
-    '<button class="sc-modal-close" onclick="scClosePlayer()">&times;</button>' +
-  '</div>';
-  modal.classList.add('open');
-
-  // Setup subtitle sync
-  const video = document.getElementById('sc-modal-video');
-  if (video && clipSents.length > 0) {
-    let raf = null;
-    function tick() {
-      const t = video.currentTime;
-      const subsEl = document.getElementById('sc-modal-subs');
-      if (!subsEl) return;
-      let active = null;
-      clipSents.forEach(function(s) { if (t >= (s.start || 0) && t < (s.end || 0)) active = s; });
-      if (active) {
-        let sh = '<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">EN</span><span class="sc-modal-sub-original">' + scEscape(active.text) + '</span></div>';
-        if (active.zh) sh += '<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">中</span><span class="sc-modal-sub-trans">' + scEscape(active.zh) + '</span></div>';
-        if (active.ja) sh += '<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">日</span><span class="sc-modal-sub-trans">' + scEscape(active.ja) + '</span></div>';
-        subsEl.innerHTML = sh;
-      } else {
-        subsEl.innerHTML = '<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-original" style="color:var(--t50)">···</span></div>';
-      }
-      if (!video.paused && !video.ended) raf = requestAnimationFrame(tick);
-    }
-    video.onplay = function() { raf = requestAnimationFrame(tick); };
-    video.onpause = function() { if (raf) cancelAnimationFrame(raf); };
-    video.onended = function() { if (raf) cancelAnimationFrame(raf); };
-  }
-}
-
-function scClosePlayer() {
-  const modal = document.getElementById('sc-player-modal');
-  if (!modal) return;
-  const v = document.getElementById('sc-modal-video');
-  if (v) v.pause();
-  modal.classList.remove('open');
-}
-
-// Meta modal
-function scOpenMeta(i) {
-  const clip = scClips[i];
-  if (!clip) return;
-  let modal = document.getElementById('sc-meta-modal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'sc-meta-modal';
-    modal.className = 'sc-meta-overlay';
-    modal.onclick = function(e) { if (e.target === modal) scCloseMeta(); };
-    document.body.appendChild(modal);
-  }
-  let h = '<div class="sc-meta-modal glass"><div class="sc-meta-title">' + scEscape(clip.name) + ' · 元信息</div>' +
-    '<button class="sc-modal-close" onclick="scCloseMeta()">&times;</button>';
-  Object.keys(clip).forEach(function(k) {
-    const v = clip[k];
-    const d = Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? JSON.stringify(v) : String(v));
-    h += '<div class="sc-meta-row"><span class="sc-meta-key">' + scEscape(k) + '</span><span class="sc-meta-val">' + scEscape(d) + '</span></div>';
-  });
-  h += '</div>';
-  modal.innerHTML = h;
-  modal.classList.add('open');
-}
-
-function scCloseMeta() {
-  const modal = document.getElementById('sc-meta-modal');
-  if (modal) modal.classList.remove('open');
-}
-
-window.loadSmartClips = loadSmartClips;
-window.scSelectSource = scSelectSource;
-window.scOpenPlayer = scOpenPlayer;
-window.scClosePlayer = scClosePlayer;
-window.scOpenMeta = scOpenMeta;
-window.scCloseMeta = scCloseMeta;
+window.loadSmartClips=loadSmartClips; window.scSelectSource=scSelectSource; window.scOpenPlayer=scOpenPlayer; window.scOpenSourcePlayer=scOpenSourcePlayer; window.scClosePlayer=scClosePlayer;
+window.scOpenMeta=scOpenMeta; window.scCloseMeta=scCloseMeta; window.scHandlePlayerOverlay=scHandlePlayerOverlay; window.scHandleMetaOverlay=scHandleMetaOverlay;
