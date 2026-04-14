@@ -47,10 +47,24 @@ pub fn create(
 
     let rect = NSRect::new(NSPoint::new(0.0, 0.0), size);
 
+    // Enable web content to use -webkit-app-region: drag
+    // SAFETY: setValue:forKey: is valid for WKPreferences configuration.
+    unsafe {
+        let prefs = config.preferences();
+        // Enable developer extras for debugging
+        let _: () = objc2::msg_send![&prefs, setValue: objc2::runtime::Bool::YES, forKey: &*NSString::from_str("developerExtrasEnabled")];
+    }
+
     // SAFETY: mtm, frame, and config satisfy WKWebView designated initializer.
     let web_view = unsafe {
         WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), rect, &config)
     };
+
+    // Allow non-opaque background so window dragging works with -webkit-app-region
+    // SAFETY: _setDrawsBackground: is a private but widely-used WKWebView method.
+    unsafe {
+        let _: () = objc2::msg_send![&web_view, _setDrawsBackground: false];
+    }
 
     // Load from local file
     let dir = web_dir();
