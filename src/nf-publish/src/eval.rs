@@ -74,10 +74,7 @@ pub(crate) fn take_screenshot_with_callback<F>(
             callback(result);
         }
     });
-    // SAFETY: `webview` is a live WKWebView and the completion block outlives the async snapshot operation.
-    unsafe {
-        // SAFETY: see comment above.
-        // SAFETY: see comment above.
+    unsafe { // SAFETY: `webview` is a live WKWebView and the completion block outlives the async snapshot operation.
         webview.takeSnapshotWithConfiguration_completionHandler(None, &handler);
     }
 }
@@ -131,10 +128,7 @@ pub(crate) fn eval_js(webview: &WKWebView, js: &str, result_path: String) {
             let _ = std::fs::write(&res_path, "ok: null");
         }
     });
-    // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and block.
-    unsafe {
-        // SAFETY: see comment above.
-        // SAFETY: see comment above.
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }
 }

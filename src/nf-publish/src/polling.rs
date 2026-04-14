@@ -103,10 +103,7 @@ fn evaluate_session_for_tab(tab: usize, webview: &WKWebView) {
                             _ => check_session(tab, "expired"),
                         }
                     });
-                    // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
-                    unsafe {
-                        // SAFETY: see comment above.
-                        // SAFETY: see comment above.
+                    unsafe { // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
                         wv.evaluateJavaScript_completionHandler(&read_js, Some(&handler2));
                     }
                 });
@@ -121,10 +118,7 @@ fn evaluate_session_for_tab(tab: usize, webview: &WKWebView) {
             }
         }
     });
-    // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
-    unsafe {
-        // SAFETY: see comment above.
-        // SAFETY: see comment above.
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js, Some(&handler));
     }
 }
@@ -196,10 +190,7 @@ fn keep_alive_all() {
                 );
             }
         });
-        // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
-        unsafe {
-            // SAFETY: see comment above.
-            // SAFETY: see comment above.
+        unsafe { // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             wv.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
         }
     }
@@ -224,10 +215,7 @@ pub(crate) fn start_command_poll() {
             std::thread::sleep(std::time::Duration::from_millis(POLL_MS));
             tick += 1;
             dispatch::Queue::main().exec_async(move || {
-                // SAFETY: `catch` is the intended Objective-C boundary around poll callbacks running on the main queue.
-                let objc_result = unsafe {
-                    // SAFETY: see comment above.
-                    // SAFETY: see comment above.
+                let objc_result = unsafe { // SAFETY: `catch` is the intended Objective-C boundary around poll callbacks running on the main queue.
                     objc2::exception::catch(std::panic::AssertUnwindSafe(|| {
                         let result =
                             std::panic::catch_unwind(std::panic::AssertUnwindSafe(poll_all));

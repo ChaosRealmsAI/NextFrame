@@ -39,8 +39,7 @@ pub(crate) fn current_webview() -> Option<&'static WKWebView> {
 
 pub(crate) fn webview_for_tab(tab_id: usize) -> Option<&'static WKWebView> {
     let ptr = webview_ptr_for_tab(tab_id)?;
-    // SAFETY: tab webview pointers are stored from retained WKWebView instances in app state and remain valid until tab teardown.
-    Some(unsafe { &*ptr }) // SAFETY: see comment above.
+    Some(unsafe { &*ptr }) // SAFETY: `ptr` comes from a retained WKWebView stored in app state and remains valid until that tab is torn down.
 }
 
 pub(crate) fn tab_index_for_webview(wv: &WKWebView) -> Option<usize> {
@@ -56,50 +55,42 @@ pub(crate) fn tab_index_for_webview(wv: &WKWebView) -> Option<usize> {
 
 pub(crate) fn bookmarks_bar_view() -> Option<&'static NSView> {
     let state = APP_STATE.get()?;
-    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
-    Some(unsafe { &*state.bookmarks_bar_ptr }) // SAFETY: see comment above.
+    Some(unsafe { &*state.bookmarks_bar_ptr }) // SAFETY: `bookmarks_bar_ptr` is initialized from a retained startup NSView and lives for the app lifetime.
 }
 
 pub(crate) fn tab_strip_view() -> Option<&'static NSView> {
     let state = APP_STATE.get()?;
-    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
-    Some(unsafe { &*state.tab_strip_ptr }) // SAFETY: see comment above.
+    Some(unsafe { &*state.tab_strip_ptr }) // SAFETY: `tab_strip_ptr` is initialized from a retained startup NSView and lives for the app lifetime.
 }
 
 pub(crate) fn webview_host_view() -> Option<&'static NSView> {
     let state = APP_STATE.get()?;
-    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
-    Some(unsafe { &*state.webview_host_ptr }) // SAFETY: see comment above.
+    Some(unsafe { &*state.webview_host_ptr }) // SAFETY: `webview_host_ptr` is initialized from a retained startup NSView and lives for the app lifetime.
 }
 
 pub(crate) fn address_field() -> Option<&'static NSTextField> {
     let state = APP_STATE.get()?;
-    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
-    Some(unsafe { &*state.address_field_ptr }) // SAFETY: see comment above.
+    Some(unsafe { &*state.address_field_ptr }) // SAFETY: `address_field_ptr` is initialized from a retained startup NSTextField and lives for the app lifetime.
 }
 
 pub(crate) fn back_button() -> Option<&'static NSButton> {
     let state = APP_STATE.get()?;
-    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
-    Some(unsafe { &*state.back_button_ptr }) // SAFETY: see comment above.
+    Some(unsafe { &*state.back_button_ptr }) // SAFETY: `back_button_ptr` is initialized from a retained startup NSButton and lives for the app lifetime.
 }
 
 pub(crate) fn forward_button() -> Option<&'static NSButton> {
     let state = APP_STATE.get()?;
-    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
-    Some(unsafe { &*state.forward_button_ptr }) // SAFETY: see comment above.
+    Some(unsafe { &*state.forward_button_ptr }) // SAFETY: `forward_button_ptr` is initialized from a retained startup NSButton and lives for the app lifetime.
 }
 
 pub(crate) fn reload_button() -> Option<&'static NSButton> {
     let state = APP_STATE.get()?;
-    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
-    Some(unsafe { &*state.reload_button_ptr }) // SAFETY: see comment above.
+    Some(unsafe { &*state.reload_button_ptr }) // SAFETY: `reload_button_ptr` is initialized from a retained startup NSButton and lives for the app lifetime.
 }
 
 pub(crate) fn browser_target() -> Option<&'static AnyObject> {
     let state = APP_STATE.get()?;
-    // SAFETY: `browser_target_ptr` points to the retained Objective-C action target created during startup and kept alive for the app lifetime.
-    Some(unsafe { &*state.browser_target_ptr }) // SAFETY: see comment above.
+    Some(unsafe { &*state.browser_target_ptr }) // SAFETY: `browser_target_ptr` points to the retained Objective-C action target created during startup and kept alive for the app lifetime.
 }
 
 pub(crate) fn short_title(title: &str) -> String {
@@ -210,10 +201,7 @@ pub(crate) fn make_request(
 }
 
 pub(crate) fn remove_view_from_superview(view: &AnyObject) {
-    // SAFETY: `view` is an Objective-C view object and both `catch` and `removeFromSuperview` are valid at this AppKit boundary.
-    let _ = unsafe {
-        // SAFETY: see comment above.
-        // SAFETY: see comment above.
+    let _ = unsafe { // SAFETY: `view` is an Objective-C view object and both `catch` and `removeFromSuperview` are valid at this AppKit boundary.
         objc2::exception::catch(std::panic::AssertUnwindSafe(|| {
             // SAFETY: `view` is a live NSView/NSResponder object and `removeFromSuperview` is a valid selector on it.
             let _: () = unsafe { msg_send![view, removeFromSuperview] }; // SAFETY: see comment above.

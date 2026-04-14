@@ -36,23 +36,14 @@ pub(crate) fn switch_tab(index: usize) {
         (prev_ptr, next_ptr)
     };
 
-    // SAFETY: `catch` is the intended Objective-C boundary here, and the stored webview pointers come from retained WKWebView instances in app state.
-    let result = unsafe {
-        // SAFETY: see comment above.
-        // SAFETY: see comment above.
+    let result = unsafe { // SAFETY: `catch` is the intended Objective-C boundary here, and the stored webview pointers come from retained WKWebView instances in app state.
         objc2::exception::catch(std::panic::AssertUnwindSafe(|| {
             if let Some(prev_ptr) = prev_ptr {
-                // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
-                unsafe {
-                    // SAFETY: see comment above.
-                    // SAFETY: see comment above.
+                unsafe { // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
                     (&*prev_ptr).setHidden(true);
                 }
             }
-            // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
-            unsafe {
-                // SAFETY: see comment above.
-                // SAFETY: see comment above.
+            unsafe { // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
                 (&*next_ptr).setHidden(false);
             }
         }))
@@ -92,8 +83,7 @@ pub(crate) fn sync_tab_state_from_webview(tab_id: usize) {
     let Some(tab) = tabs.iter_mut().find(|tab| tab.id == tab_id) else {
         return;
     };
-    // SAFETY: `tab.webview_ptr` comes from a retained WKWebView stored in app state and stays valid until tab teardown.
-    let webview = unsafe { &*tab.webview_ptr }; // SAFETY: see comment above.
+    let webview = unsafe { &*tab.webview_ptr }; // SAFETY: `tab.webview_ptr` comes from a retained WKWebView stored in app state and stays valid until tab teardown.
     sync_tab_state_locked(tab, webview);
     let active = state.current_tab.load(std::sync::atomic::Ordering::Relaxed);
     persistence::save_browser_session_snapshot(&tabs, active);
@@ -143,12 +133,9 @@ pub(crate) fn create_dynamic_tab(
             "Retry after the main window finishes initializing.",
         )
     })?;
-    // SAFETY: these pointers are initialized once from retained startup objects and remain valid for the app lifetime.
-    let config = unsafe { &*state.config_ptr }; // SAFETY: see comment above.
-    // SAFETY: these pointers are initialized once from retained startup objects and remain valid for the app lifetime.
-    let ui_delegate = unsafe { &*state.ui_delegate_ptr }; // SAFETY: see comment above.
-    // SAFETY: these pointers are initialized once from retained startup objects and remain valid for the app lifetime.
-    let nav_delegate = unsafe { &*state.nav_delegate_ptr }; // SAFETY: see comment above.
+    let config = unsafe { &*state.config_ptr }; // SAFETY: `config_ptr` is initialized from the retained startup WKWebViewConfiguration and lives for the app lifetime.
+    let ui_delegate = unsafe { &*state.ui_delegate_ptr }; // SAFETY: `ui_delegate_ptr` is initialized from the retained startup WKUIDelegate object and lives for the app lifetime.
+    let nav_delegate = unsafe { &*state.nav_delegate_ptr }; // SAFETY: `nav_delegate_ptr` is initialized from the retained startup WKNavigationDelegate object and lives for the app lifetime.
     let frame = host.frame();
     let Some(mtm) = objc2_foundation::MainThreadMarker::new() else {
         return Err(/* Fix: user-facing error formatted below */ error_with_fix(
@@ -168,18 +155,12 @@ pub(crate) fn create_dynamic_tab(
         ui_delegate,
         nav_delegate,
     );
-    // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
-    unsafe {
-        // SAFETY: see comment above.
-        // SAFETY: see comment above.
+    unsafe { // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
         webview.setCustomUserAgent(Some(&NSString::from_str(state.user_agent)));
     }
     if is_new_tab {
         let html = NSString::from_str(&new_tab_html());
-        // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
-        unsafe {
-            // SAFETY: see comment above.
-            // SAFETY: see comment above.
+        unsafe { // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
             webview.loadHTMLString_baseURL(&html, None);
         }
     }
@@ -311,8 +292,7 @@ pub(crate) fn close_tab(tab_id: usize) -> Result<(), String> {
         (removed.webview_ptr, next_active, snapshot)
     };
 
-    // SAFETY: `removed_ptr` was taken from a retained WKWebView removed from the tab list but still alive until we drop the retained owner.
-    let webview = unsafe { &*removed_ptr }; // SAFETY: see comment above.
+    let webview = unsafe { &*removed_ptr }; // SAFETY: `removed_ptr` was taken from a retained WKWebView removed from the tab list but still alive until we drop the retained owner.
     remove_view_from_superview(webview);
     let _ = std::fs::remove_file(cmd_file(tab_id));
     let _ = std::fs::remove_file(result_file(tab_id));

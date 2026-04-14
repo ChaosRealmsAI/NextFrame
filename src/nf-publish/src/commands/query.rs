@@ -124,10 +124,7 @@ fn write_dump(
             ),
         }
     });
-    // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
-    unsafe {
-        // SAFETY: see comment above.
-        // SAFETY: see comment above.
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }
 }
@@ -194,8 +191,7 @@ fn waitfor_element(webview: &WKWebView, selector: &str, timeout_ms: u64, result_
                     serde_json::to_string(js.as_str()).unwrap_or_else(|_| "\"\"".to_owned())
                 );
                 let wrapped_str = NSString::from_str(&wrapped);
-                // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
-                unsafe { // SAFETY: see comment above.
+                unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
                     webview.evaluateJavaScript_completionHandler(&wrapped_str, Some(&handler));
                 }
             },

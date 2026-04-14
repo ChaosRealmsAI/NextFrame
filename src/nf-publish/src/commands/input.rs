@@ -76,10 +76,7 @@ fn handle_selector_action(
             Err(err) /* Fix: propagate or serialize the formatted error below */ => write_error(&result_path, err),
         }
     });
-    // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
-    unsafe {
-        // SAFETY: see comment above.
-        // SAFETY: see comment above.
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }
 }
@@ -103,10 +100,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
         let msg = if let Some(window) = webview.window() {
             if let Some(responder) = window.firstResponder() {
                 match catch_objc(|| {
-                    // SAFETY: `responder` is the current NSResponder from this window and `moveToEndOfLine:` is a standard text-editing selector.
-                    let _: () = unsafe {
-                        // SAFETY: see comment above.
-                        // SAFETY: see comment above.
+                    let _: () = unsafe { // SAFETY: `responder` is the current NSResponder from this window and `moveToEndOfLine:` is a standard text-editing selector.
                         msg_send![&*responder, moveToEndOfLine: std::ptr::null::<AnyObject>()]
                     };
                 }) {
@@ -271,10 +265,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
                         ),
                     );
                 });
-                // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
-                unsafe {
-                    // SAFETY: see comment above.
-                    // SAFETY: see comment above.
+                unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
                     webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
                 }
             }
@@ -340,10 +331,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
                 ),
             );
         });
-        // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
-        unsafe {
-            // SAFETY: see comment above.
-            // SAFETY: see comment above.
+        unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
         }
         true
@@ -377,10 +365,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
             }
             write_result(&result_path, format!("ok: dismissed {count}"));
         });
-        // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
-        unsafe {
-            // SAFETY: see comment above.
-            // SAFETY: see comment above.
+        unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
         }
         true
