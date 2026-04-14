@@ -81,6 +81,6 @@ test("errors include Fix suggestions", () => {
   assert.match(usage.stderr, /Fix:/);
 
   const sourceUsage = runCli(["source-download"]);
-  assert.equal(sourceUsage.status, 1, sourceUsage.stderr || sourceUsage.stdout);
-  assert.match(sourceUsage.stdout, /"fix":/);
+  assert.equal(sourceUsage.status, 3, sourceUsage.stderr || sourceUsage.stdout);
+  assert.match(sourceUsage.stderr, /Fix:/);
 });

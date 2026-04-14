@@ -40,6 +40,8 @@ export const COMMAND_SPECS = Object.fromEntries([
     --output=PATH or -o PATH write HTML to a custom path
     --json emit structured result data`, `The timeline must validate before build succeeds.
     Legacy v0.1 tracks/clips timelines are rejected by build.`),
+  command("video-guide", "Strict state machine for video production — detects state and outputs next action.", `nextframe video-guide [--type=lecture|interview] [timeline.json]`, `--type video type (lecture or interview)
+    timeline.json optional existing timeline to resume from`, `Run repeatedly. Each call detects current state and outputs the next prompt with mandatory verification.`),
   command("scene-new", "Create a new scene component skeleton (directory + index.js + preview.html).", `nextframe scene-new <name> --ratio=<16:9|9:16|4:3> --category=<cat> [--tech=dom]`, `--ratio target aspect ratio
     --category backgrounds|typography|data|shapes|overlays|media|browser
     --tech dom|canvas2d|svg|webgl|video|lottie`, `Creates a ready-to-edit skeleton. Next: edit render(), then scene-preview, then scene-validate.`),

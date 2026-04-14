@@ -218,4 +218,24 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
     nextframe app-screenshot
     nextframe app-screenshot --out=/tmp/editor.png --json
   `),
+  examples("describe-frame", `
+    nextframe describe-frame timeline.json --time=3.5
+    nextframe describe-frame timeline.json --time=0 --json
+  `),
+  examples("scene-new", `
+    nextframe scene-new myBackground --ratio=16:9 --category=backgrounds
+    nextframe scene-new interviewTitle --ratio=9:16 --category=overlays --tech=dom
+  `),
+  examples("scene-preview", `
+    nextframe scene-preview darkGradient
+    nextframe scene-preview interviewBg --ratio=9:16
+  `),
+  examples("scene-validate", `
+    nextframe scene-validate darkGradient
+    nextframe scene-validate interviewBg --ratio=9:16 --json
+  `),
+  examples("video-guide", `
+    nextframe video-guide --type=lecture
+    nextframe video-guide --type=interview timeline.json
+  `),
 ]);
