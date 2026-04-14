@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Dispatches nextframe CLI subcommands and routes help and runtime errors.
 
 import { defaultFixSuggestion, renderCommandHelp, renderRootHelp } from "../src/commands/_helpers/help/index.js";
 
