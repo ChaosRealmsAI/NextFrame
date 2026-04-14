@@ -2,6 +2,7 @@
   "complete": true,
   "score": "10/10",
   "review_written": true,
+  "last_verified_at": "2026-04-14T20:22:00+08:00",
   "summary": "Build/player fixes verified in the current worktree. Browser player HTML includes the expected controls and stage scaling, recorder renders subtitle timelines without crashing, and auroraGradient now defaults to a dark warm theme.",
   "verification": {
     "build_with_subtitle_bar": "pass",
