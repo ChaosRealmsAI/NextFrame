@@ -26,7 +26,7 @@
 .sc-tag,.sc-clip-dur,.sc-meta-tag{border-radius:999px;font-size:11px;font-weight:600}
 .sc-tag{padding:4px 10px;border:1px solid rgba(255,255,255,0.08)}
 .sc-tag-accent{color:var(--accent);border-color:rgba(167,139,250,0.20)}
-.sc-tag-warm{color:var(--warm);border-color:rgba(249,115,22,0.20)}
+.sc-tag-warm{color:#f97316;border-color:rgba(249,115,22,0.20)}
 .sc-tag-default{color:var(--t65)}
 .sc-tl-label{margin-bottom:8px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--t50)}
 .sc-tl-bar{position:relative;height:24px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden}
@@ -42,7 +42,7 @@
 .sc-clip-top{margin-bottom:14px}
 .sc-clip-num{width:28px;height:28px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:var(--accent-12);color:var(--accent);font-size:12px;font-weight:700}
 .sc-clip-name{flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--t100);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sc-clip-dur{padding:4px 10px;background:var(--warm-12);color:var(--warm)}
+.sc-clip-dur{padding:4px 10px;background:rgba(249,115,22,0.12);color:#f97316}
 .sc-clip-tc{font-size:11px;color:var(--t50)}
 .sc-clip-body{display:flex;align-items:flex-start;gap:16px}
 .sc-clip-video{position:relative;width:200px;aspect-ratio:16/9;flex-shrink:0;padding:0;border-radius:10px;overflow:hidden;background:radial-gradient(circle at 20% 20%,rgba(167,139,250,0.18),transparent 40%),linear-gradient(135deg,rgba(255,255,255,0.05),rgba(255,255,255,0.01)),#0a0a0f;border:1px solid rgba(255,255,255,0.06);cursor:pointer}
