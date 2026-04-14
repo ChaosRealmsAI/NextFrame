@@ -64,6 +64,7 @@ pub fn create(
     let start_url = NSURL::URLWithString(&NSString::from_str("nf://localhost/index.html"));
     if let Some(start_url) = start_url {
         let request = NSURLRequest::requestWithURL(&start_url);
+        // SAFETY: web_view is a live WKWebView and request is a valid NSURLRequest.
         let navigation = unsafe { web_view.loadRequest(&request) };
         if navigation.is_none() {
             tracing::warn!("WKWebView refused nf:// load, using fallback");
@@ -84,6 +85,7 @@ fn register_scheme_handler(
     handler: &ProtocolObject<dyn WKURLSchemeHandler>,
 ) {
     let scheme = NSString::from_str(scheme);
+    // SAFETY: config is a live WKWebViewConfiguration and handler conforms to WKURLSchemeHandler.
     unsafe {
         config.setURLSchemeHandler_forURLScheme(Some(handler), &scheme);
     }

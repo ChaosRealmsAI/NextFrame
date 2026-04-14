@@ -49,6 +49,7 @@ pub fn run() {
         NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT),
     );
 
+    // SAFETY: NSWindow designated initializer called with valid rect, style, backing on the main thread.
     let window: Retained<NSWindow> = unsafe {
         msg_send![
             NSWindow::alloc(mtm),
@@ -63,6 +64,7 @@ pub fn run() {
     window.center();
 
     // Window background matches app background — prevents gray flash during resize
+    // SAFETY: NSColor factory method and setBackgroundColor are valid AppKit calls on the main thread.
     unsafe {
         let bg_color: *mut AnyObject = msg_send![
             objc2::class!(NSColor),
@@ -157,6 +159,7 @@ pub fn run() {
         std::process::exit(0);
     }
 
+    // SAFETY: activateIgnoringOtherApps is a standard NSApplication method on the main thread.
     unsafe {
         let _: () = msg_send![&app, activateIgnoringOtherApps: true];
     }

@@ -98,6 +98,7 @@ define_class!(
 
             let msg = body.to_string();
 
+            // SAFETY: window pointer was set during install and the NSWindow outlives this handler.
             let Some(window) = (unsafe { this.ivars().window.as_ref() }) else {
                 return;
             };
@@ -106,6 +107,7 @@ define_class!(
                 start_window_drag(window);
             } else if msg == "zoom_window" {
                 // Use zoom with animation context for smooth transition
+                // SAFETY: NSAnimationContext runAnimationGroup is called on the main thread with valid blocks.
                 unsafe {
                     let _: () = objc2::msg_send![
                         objc2::class!(NSAnimationContext),
@@ -154,6 +156,7 @@ pub(crate) fn install_window_drag_bridge(
             controller,
             window: window as *const NSWindow,
         });
+    // SAFETY: NSObject init on a freshly allocated WindowDragHandler instance.
     let handler: Retained<WindowDragHandler> = unsafe { msg_send![super(handler), init] };
 
     let handler_name = NSString::from_str(WINDOW_DRAG_HANDLER_NAME);
