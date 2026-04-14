@@ -1,8 +1,8 @@
 // AI tool definitions — v0.3 layers[] format.
-import { REGISTRY, listScenes, getScene } from '../engine/v2/registry.js';
-import { validateTimeline } from '../engine/v2/validate.js';
+import { REGISTRY, listScenes, getScene } from '../core/scene-registry.js';
+import { validateTimelineV3 } from '../core/timeline-validate.js';
 import { describeAt } from '../engine/v2/describe.js';
-import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from '../engine/v2/ops.js';
+import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from '../../../nf-core/engine/ops.js';
 
 export const TOOLS = {
   list_scenes: {
@@ -27,7 +27,7 @@ export const TOOLS = {
       description: "Validate v0.3 layers[] timeline",
       params: [{ name: "timeline", type: "object", required: true }],
     },
-    handler: ({ timeline }) => validateTimeline(timeline),
+    handler: ({ timeline }) => validateTimelineV3(timeline),
   },
   describe_frame: {
     schema: {
@@ -88,7 +88,7 @@ export const TOOLS = {
         if (!result.ok) return result;
         applied += 1;
       }
-      return { ok: true, value: { timeline: tl, validation: validateTimeline(tl), applied } };
+      return { ok: true, value: { timeline: tl, validation: validateTimelineV3(tl), applied } };
     },
   },
   assert_at: {

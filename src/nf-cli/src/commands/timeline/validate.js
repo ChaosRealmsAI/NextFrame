@@ -2,8 +2,7 @@
 // Auto-detects v0.1 (tracks/clips) vs v0.3 (layers[]) format.
 import { parseFlags, loadTimeline, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineDir, timelineUsage } from "../_helpers/_resolve.js";
-import { validateTimeline as validateV1 } from "../../engine/legacy/validate.js";
-import { validateTimeline as validateV3, detectFormat } from "../../engine/v2/validate.js";
+import { detectFormat, validateTimelineLegacy, validateTimelineV3 } from "../../core/timeline-validate.js";
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
@@ -22,9 +21,9 @@ export async function run(argv) {
   let result;
   if (fmt === "v0.1") {
     process.stderr.write("warn: v0.1 tracks/clips format detected — consider migrating to v0.3 layers[]\n");
-    result = validateV1(loaded.value, { projectDir: timelineDir(resolved.jsonPath) });
+    result = validateTimelineLegacy(loaded.value, { projectDir: timelineDir(resolved.jsonPath) });
   } else if (fmt === "v0.3") {
-    result = validateV3(loaded.value);
+    result = validateTimelineV3(loaded.value);
   } else {
     result = {
       ok: false,

@@ -1,8 +1,8 @@
 // Handles layer list and CRUD CLI subcommands for v0.3 timeline files.
 import { parseFlags, loadTimeline, saveTimeline, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineUsage } from "../_helpers/_resolve.js";
-import { addLayer, listLayers, moveLayer, removeLayer, resizeLayer, setLayerProps } from "../../engine/v2/ops.js";
-import { validateTimeline } from "../../engine/v2/validate.js";
+import { addLayer, listLayers, moveLayer, removeLayer, resizeLayer, setLayerProps } from "../../../../nf-core/engine/ops.js";
+import { validateTimelineV3 } from "../../core/timeline-validate.js";
 
 export async function run(argv, context = {}) {
   const { positional, flags } = parseFlags(argv);
@@ -50,7 +50,7 @@ export async function run(argv, context = {}) {
   }
 
   if (subcommand !== "layer-list") {
-    const validation = validateTimeline(timeline);
+    const validation = validateTimelineV3(timeline);
     if (!validation.ok) {
       emit({ ok: false, error: { code: "VALIDATION_FAILED", message: validation.errors[0]?.message || "validation failed" }, ...validation }, flags);
       return 2;

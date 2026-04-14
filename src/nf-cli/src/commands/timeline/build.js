@@ -1,8 +1,8 @@
 // nextframe build <timeline.json> [-o <output.html> | --output=<output.html>]
 import { parseFlags, loadTimeline, emit } from '../_helpers/_io.js';
 import { resolveTimeline, timelineUsage } from '../_helpers/_resolve.js';
-import { detectFormat, validateTimeline } from '../../engine/v2/validate.js';
-import { buildHTML } from '../../engine/v2/build.js';
+import { detectFormat, validateTimelineV3 } from '../../core/timeline-validate.js';
+import { buildHTML } from '../../../../nf-core/engine/build.js';
 
 function extractOutput(argv) {
   // Handle -o <path> (short flag not supported by parseFlags)
@@ -37,7 +37,7 @@ export async function run(argv) {
   }
 
   // Validate before building
-  const validation = validateTimeline(timeline);
+  const validation = validateTimelineV3(timeline);
   if (!validation.ok) {
     if (flags.json) {
       process.stdout.write(JSON.stringify({ ok: false, error: { code: 'VALIDATION_FAILED', errors: validation.errors } }, null, 2) + '\n');

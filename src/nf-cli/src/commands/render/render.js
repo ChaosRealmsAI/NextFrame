@@ -7,7 +7,7 @@ import { parseFlags, loadTimeline, emit } from "../_helpers/_io.js";
 import { configureProjectCacheEnv, resolveTimeline, timelineDir, timelineUsage } from "../_helpers/_resolve.js";
 import { exportMP4, muxMP4Audio } from "../../targets/ffmpeg-mp4.js";
 import { exportRecorder } from "../../targets/recorder.js";
-import { validateTimeline } from "../../engine/legacy/validate.js";
+import { validateTimelineLegacy } from "../../core/timeline-validate.js";
 
 const USAGE = timelineUsage("render", "", " <out.mp4>");
 const DEFAULT_CRF = 20;
@@ -111,7 +111,7 @@ export async function run(argv) {
 
     // BDD cli-render-8 invariant: render must validate before touching ffmpeg.
     const projectDir = timelineDir(resolved.jsonPath);
-    const v = validateTimeline(loaded.value, { projectDir });
+    const v = validateTimelineLegacy(loaded.value, { projectDir });
     if (v.errors && v.errors.length > 0) {
       emit({ ok: false, error: v.errors[0], errors: v.errors, hints: v.hints }, flags);
       return 2;

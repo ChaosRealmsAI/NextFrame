@@ -4,7 +4,7 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { guarded } from "../engine/legacy/_guard.js";
-import { CanvasPool, renderAt } from "../engine/legacy/render.js";
+import { CanvasPool, renderAt } from "../core/legacy-render.js";
 import { resolveTimeline } from "../engine/legacy/time.js";
 
 function normalizeCrf(value) {

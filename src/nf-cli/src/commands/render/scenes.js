@@ -1,7 +1,7 @@
 // nextframe scenes — list all available scenes (v0.3 engine-v2 registry).
 // nextframe scenes <id> — show single scene details.
 import { parseFlags } from "../_helpers/_io.js";
-import { listScenes, getScene } from "../../engine/v2/registry.js";
+import { listScenes, getScene } from "../../core/scene-registry.js";
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
