@@ -44,12 +44,40 @@ export async function run(argv) {
   }
 
   // List all scenes
-  const scenes = await listScenes();
+  let scenes = await listScenes();
+
+  // Filter by --ratio
+  if (flags.ratio) {
+    scenes = scenes.filter((s) => s.ratio === flags.ratio);
+  }
+
+  // Filter by --search (case-insensitive partial match across id/label/description/tags/mood/theme)
+  if (flags.search) {
+    const q = String(flags.search).toLowerCase();
+    scenes = scenes.filter((s) => {
+      const fields = [
+        s.id,
+        s.label,
+        s.description,
+        ...(Array.isArray(s.tags) ? s.tags : []),
+        ...(Array.isArray(s.mood) ? s.mood : []),
+        ...(s.themes ? Object.keys(s.themes) : []),
+      ];
+      return fields.some((f) => f && String(f).toLowerCase().includes(q));
+    });
+  }
+
   if (flags.json) {
     process.stdout.write(JSON.stringify({ ok: true, value: scenes }, null, 2) + "\n");
     return 0;
   }
-  process.stdout.write(`${scenes.length} scenes available\n\n`);
+
+  const filterDesc = [];
+  if (flags.search) filterDesc.push(`search="${flags.search}"`);
+  if (flags.ratio) filterDesc.push(`ratio=${flags.ratio}`);
+  const suffix = filterDesc.length ? ` (${filterDesc.join(", ")})` : "";
+  process.stdout.write(`${scenes.length} scenes available${suffix}\n\n`);
+
   const byCategory = {};
   for (const s of scenes) {
     (byCategory[s.category] || (byCategory[s.category] = [])).push(s);

@@ -201,6 +201,56 @@ html, body {
   flex: 1;
 }
 
+/* ── Breadcrumb in topbar ── */
+.tb-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+}
+.tb-bc-sep {
+  color: var(--t50);
+  font-size: 12px;
+}
+.tb-bc-item {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t65);
+  cursor: pointer;
+  transition: color 0.15s var(--ease);
+}
+.tb-bc-item:hover { color: var(--t80); }
+.tb-bc-current {
+  color: var(--t100);
+  cursor: default;
+}
+.tb-bc-current:hover { color: var(--t100); }
+
+/* ── Pipeline tabs in topbar ── */
+.tb-pipeline-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 12px;
+}
+.tb-pl-tab {
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t50);
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.tb-pl-tab:hover {
+  color: var(--t80);
+  background: rgba(255,255,255,0.04);
+}
+.tb-pl-tab.active {
+  color: var(--accent);
+  background: var(--accent-06);
+}
+
 /* ── Avatar in topbar ── */
 
 /* Search */
@@ -1993,7 +2043,7 @@ html, body {
 
 <div class="app">
   <!-- ── Topbar ── -->
-  <header class="topbar">
+  <header class="topbar" id="global-topbar">
     <!-- Fake traffic lights (for browser preview, native app has real ones) -->
     <div class="tb-traffic-lights">
       <div class="tb-dot tb-dot--close"></div>
@@ -2001,13 +2051,31 @@ html, body {
       <div class="tb-dot tb-dot--zoom"></div>
     </div>
 
-    <!-- Brand -->
-    <div class="tb-brand">
+    <!-- Brand (click to go home) -->
+    <div class="tb-brand" onclick="showView('home')" style="cursor:pointer">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
         <rect x="1" y="1" width="16" height="16" rx="4" stroke="#a78bfa" stroke-width="1.5" fill="none"/>
         <polygon points="7,5 13,9 7,13" fill="#a78bfa"/>
       </svg>
       NextFrame
+    </div>
+
+    <!-- Dynamic breadcrumb (hidden on home, shown on other views) -->
+    <nav class="tb-breadcrumb" id="global-breadcrumb" style="display:none">
+      <span class="tb-bc-sep">/</span>
+      <span class="tb-bc-item" id="bc-level1" onclick="if(this.dataset.view)showView(this.dataset.view)"></span>
+      <span class="tb-bc-sep" id="bc-sep2" style="display:none">/</span>
+      <span class="tb-bc-item tb-bc-current" id="bc-level2"></span>
+    </nav>
+
+    <!-- Pipeline tabs (shown only in pipeline view) -->
+    <div class="tb-pipeline-tabs" id="global-pl-tabs" style="display:none">
+      <div class="tb-pl-tab active" data-stage="script" onclick="switchTab(this)">脚本</div>
+      <div class="tb-pl-tab" data-stage="audio" onclick="switchTab(this)">音频</div>
+      <div class="tb-pl-tab" data-stage="clips" onclick="switchTab(this)">素材</div>
+      <div class="tb-pl-tab" data-stage="atoms" onclick="switchTab(this)">原子</div>
+      <div class="tb-pl-tab" data-stage="assembly" onclick="switchTab(this)">剪辑</div>
+      <div class="tb-pl-tab" data-stage="output" onclick="switchTab(this)">产出</div>
     </div>
 
     <div class="tb-spacer"></div>
@@ -2295,21 +2363,6 @@ html, body {
        VIEW: PROJECT — Episode Dashboard
        ══════════════════════════════════════ -->
   <div class="view" id="view-project">
-    <div class="view-topbar">
-      <nav class="tb-breadcrumb">
-        <a class="tb-breadcrumb-item" onclick="showView('home')">Home</a>
-        <span class="tb-breadcrumb-sep">/</span>
-        <span class="tb-breadcrumb-current" id="vp-breadcrumb-name">AI短视频课</span>
-      </nav>
-      <div class="tb-spacer"></div>
-      <button class="btn-accent-soft" onclick="alert('新建剧集')">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        新建剧集
-      </button>
-    </div>
     <div class="vp-body">
       <aside class="vp-sidebar">
         <div class="glass vp-sb-panel">
@@ -2370,25 +2423,6 @@ html, body {
        VIEW: PIPELINE — 6-tab episode workflow
        ══════════════════════════════════════ -->
   <div class="view" id="view-pipeline">
-    <div class="view-topbar">
-      <nav class="tb-breadcrumb">
-        <a class="tb-breadcrumb-item" onclick="showView('home')">Home</a>
-        <span class="tb-breadcrumb-sep">/</span>
-        <a class="tb-breadcrumb-item" onclick="showView('project')" id="pl-breadcrumb-project">AI短视频课</a>
-        <span class="tb-breadcrumb-sep">/</span>
-        <span class="tb-breadcrumb-current" id="pl-breadcrumb-ep">EP01</span>
-      </nav>
-      <div style="width:1px;height:20px;background:var(--border);margin:0 var(--sp-12);flex-shrink:0"></div>
-      <div class="pl-topbar-extra" id="pl-tabs">
-        <div class="pl-tab active" data-tab="script" onclick="switchPipelineTab('script',this)">脚本</div>
-        <div class="pl-tab" data-tab="audio" onclick="switchPipelineTab('audio',this)">音频</div>
-        <div class="pl-tab" data-tab="asset" onclick="switchPipelineTab('asset',this)">素材</div>
-        <div class="pl-tab" data-tab="atom" onclick="switchPipelineTab('atom',this)">原子</div>
-        <div class="pl-tab" data-tab="edit" onclick="switchPipelineTab('edit',this)">剪辑</div>
-        <div class="pl-tab" data-tab="output" onclick="switchPipelineTab('output',this)">产出</div>
-      </div>
-      <div class="tb-spacer"></div>
-    </div>
 
     <!-- Script tab -->
     <div class="pl-tab-content active" id="pl-tab-script">
@@ -2666,18 +2700,6 @@ html, body {
        VIEW: EDITOR — Three-panel timeline editor
        ══════════════════════════════════════ -->
   <div class="view" id="view-editor">
-    <div class="view-topbar">
-      <nav class="tb-breadcrumb">
-        <a class="tb-breadcrumb-item" onclick="showView('home')">Home</a>
-        <span class="tb-breadcrumb-sep">/</span>
-        <a class="tb-breadcrumb-item" onclick="showView('project')" id="ed-breadcrumb-project">AI短视频课</a>
-        <span class="tb-breadcrumb-sep">/</span>
-        <a class="tb-breadcrumb-item" onclick="showView('pipeline')" id="ed-breadcrumb-ep">EP01</a>
-        <span class="tb-breadcrumb-sep">/</span>
-        <span class="tb-breadcrumb-current">编辑器</span>
-      </nav>
-      <div class="tb-spacer"></div>
-    </div>
     <div class="ed-body">
       <!-- Left: Clip Sidebar -->
       <div class="ed-panel-left glass">
@@ -2911,9 +2933,55 @@ function showView(viewName, data) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const target = document.getElementById('view-' + viewName);
   if (target) target.classList.add('active');
+
+  // Update global topbar
+  const bc = document.getElementById('global-breadcrumb');
+  const plTabs = document.getElementById('global-pl-tabs');
+  const bc1 = document.getElementById('bc-level1');
+  const bc2 = document.getElementById('bc-level2');
+  const sep2 = document.getElementById('bc-sep2');
+
+  // Reset
+  bc.style.display = 'none';
+  plTabs.style.display = 'none';
+  sep2.style.display = 'none';
+  bc2.textContent = '';
+
+  if (viewName === 'home') {
+    // Home: just logo, no breadcrumb
+  } else if (viewName === 'project') {
+    bc.style.display = 'flex';
+    bc1.textContent = data?.name || '项目';
+    bc1.dataset.view = '';
+    bc1.style.cursor = 'default';
+    bc1.classList.add('tb-bc-current');
+  } else if (viewName === 'pipeline') {
+    bc.style.display = 'flex';
+    plTabs.style.display = 'flex';
+    bc1.textContent = data?.projectName || '项目';
+    bc1.dataset.view = 'project';
+    bc1.style.cursor = 'pointer';
+    bc1.classList.remove('tb-bc-current');
+    sep2.style.display = '';
+    bc2.textContent = data?.episodeName || '剧集';
+  } else if (viewName === 'editor') {
+    bc.style.display = 'flex';
+    bc1.textContent = data?.projectName || '项目';
+    bc1.dataset.view = 'project';
+    bc1.style.cursor = 'pointer';
+    bc1.classList.remove('tb-bc-current');
+    sep2.style.display = '';
+    bc2.textContent = '剪辑';
+  }
 }
 // Expose globally for onclick handlers
 window.showView = showView;
+
+function switchTab(tabEl) {
+  document.querySelectorAll('.tb-pl-tab').forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+  // TODO: switch pipeline content pane based on data-stage
+}
 
 // ══════════════════════════════════════
 // PROJECT VIEW — Episode grid rendering
