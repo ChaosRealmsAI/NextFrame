@@ -52,8 +52,12 @@ function timeAgo(dateStr) {
 function renderCard(p) {
   var safeName = (p.name || 'Untitled').replace(/'/g, "\\'");
   var safePath = (p.path || '').replace(/'/g, "\\'");
+  var thumbUrl = p.thumbnail ? 'nfdata://localhost/' + encodeURI(p.name || '') + '/' + p.thumbnail : '';
+  var thumbStyle = thumbUrl ? 'background-image:url(' + thumbUrl + ');background-size:cover;background-position:center' : '';
   return '<div class="project-card glass" data-nf-action="open-project" data-path="' + (p.path || '') + '" onclick="showView(\'project\',{name:\'' + safeName + '\',path:\'' + safePath + '\'})">' +
-    '<div class="card-thumb"><svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg></div>' +
+    '<div class="card-thumb"' + (thumbStyle ? ' style="' + thumbStyle + '"' : '') + '>' +
+      (thumbUrl ? '' : '<svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg>') +
+    '</div>' +
     '<div class="card-body">' +
       '<div class="card-title">' + (p.name || 'Untitled') + '</div>' +
       '<div class="card-meta"><span class="card-badge">' + (p.episodes || 0) + ' 集</span>' +

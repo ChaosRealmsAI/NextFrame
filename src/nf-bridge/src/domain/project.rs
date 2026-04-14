@@ -55,11 +55,15 @@ pub(crate) fn handle_project_list(_params: &Value) -> Result<Value, String> {
             .unwrap_or("")
             .to_string();
 
+        // Find a thumbnail: look for thumbnail.png, or first screenshot in any episode
+        let thumbnail = find_project_thumbnail(&path);
+
         projects.push(json!({
             "name": meta.get("name").and_then(Value::as_str).unwrap_or_default(),
             "path": path.display().to_string(),
             "episodes": episode_count,
             "updated": updated,
+            "thumbnail": thumbnail,
         }));
     }
 
@@ -70,6 +74,62 @@ pub(crate) fn handle_project_list(_params: &Value) -> Result<Value, String> {
     });
 
     Ok(json!({ "projects": projects }))
+}
+
+use std::path::Path;
+
+/// Find a thumbnail for a project: check thumbnail.png at project root,
+/// then look for screenshots or .mp4 in episode subdirectories.
+/// Returns a relative path from the project root (for nfdata:// URLs).
+fn find_project_thumbnail(project_dir: &Path) -> Option<String> {
+    // 1. Direct thumbnail at project root
+    for name in &["thumbnail.png", "thumbnail.jpg", "cover.png", "cover.jpg"] {
+        if project_dir.join(name).exists() {
+            return Some(name.to_string());
+        }
+    }
+
+    // 2. Look in episode subdirectories for screenshots or frames
+    let Ok(entries) = fs::read_dir(project_dir) else {
+        return None;
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let ep_path = entry.path();
+        if !ep_path.is_dir() || !ep_path.join("episode.json").exists() {
+            continue;
+        }
+        let ep_name = entry.file_name().to_string_lossy().to_string();
+
+        // Check screenshots/ dir
+        let screenshots = ep_path.join("screenshots");
+        if screenshots.is_dir() {
+            if let Some(img) = first_image_in(&screenshots) {
+                return Some(format!("{ep_name}/screenshots/{img}"));
+            }
+        }
+
+        // Check .frames/ dir
+        let frames = ep_path.join(".frames");
+        if frames.is_dir() {
+            if let Some(img) = first_image_in(&frames) {
+                return Some(format!("{ep_name}/.frames/{img}"));
+            }
+        }
+    }
+    None
+}
+
+fn first_image_in(dir: &Path) -> Option<String> {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return None;
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.ends_with(".png") || name.ends_with(".jpg") || name.ends_with(".jpeg") {
+            return Some(name);
+        }
+    }
+    None
 }
 
 pub(crate) fn handle_project_create(params: &Value) -> Result<Value, String> {
