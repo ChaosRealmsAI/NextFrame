@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Encoding Basics — NextFrame</title>
+<title>视频编码基础 — NextFrame</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -378,18 +378,18 @@ code { font-family: var(--mono); font-size: 0.85em; background: var(--surface-2)
 <!-- Hero -->
 <header class="hero">
   <div class="hero-badge">NextFrame / nf-recorder</div>
-  <h1>Video Encoding<br>Basics</h1>
-  <p>A visual guide for developers building video tools. Understand why your recorder works the way it does.</p>
+  <h1>视频编码<br>基础知识</h1>
+  <p>写给视频工具开发者的可视化指南。理解你的录制器为什么这样工作。</p>
   <div class="toc container" style="margin-top: 3rem;">
-    <a href="#s1"><span>01</span> What is a Frame</a>
-    <a href="#s2"><span>02</span> I / P / B Frames</a>
-    <a href="#s3"><span>03</span> Codec vs Container</a>
-    <a href="#s4"><span>04</span> CRF Quality Control</a>
-    <a href="#s5"><span>05</span> Bitrate Control</a>
-    <a href="#s6"><span>06</span> HW vs SW Encoding</a>
-    <a href="#s7"><span>07</span> Resolution &amp; DPR</a>
-    <a href="#s8"><span>08</span> Parallel Recording</a>
-    <a href="#s9"><span>09</span> Audio-Video Sync</a>
+    <a href="#s1"><span>01</span> 什么是帧（Frame）</a>
+    <a href="#s2"><span>02</span> I / P / B 帧类型</a>
+    <a href="#s3"><span>03</span> 编解码器 vs 容器（Codec vs Container）</a>
+    <a href="#s4"><span>04</span> CRF 质量控制</a>
+    <a href="#s5"><span>05</span> 码率控制（Bitrate Control）</a>
+    <a href="#s6"><span>06</span> 硬件 vs 软件编码</a>
+    <a href="#s7"><span>07</span> 分辨率与 DPR</a>
+    <a href="#s8"><span>08</span> 并行录制（Parallel Recording）</a>
+    <a href="#s9"><span>09</span> 音视频同步</a>
   </div>
 </header>
 
@@ -397,23 +397,23 @@ code { font-family: var(--mono); font-size: 0.85em; background: var(--surface-2)
 <section id="s1">
   <div class="container">
     <span class="section-num reveal">Section 01</span>
-    <h2 class="reveal">一帧是什么 — What is a Frame?</h2>
-    <p class="reveal">A video is a rapid sequence of still images. Each image is a <strong>frame</strong> — a grid of colored pixels.</p>
+    <h2 class="reveal">一帧是什么（What is a Frame）</h2>
+    <p class="reveal">视频就是快速播放的一连串静止图片。每张图片就是一<strong>帧</strong>——一个由彩色像素组成的网格。</p>
 
     <div class="pixel-grid-wrap reveal">
       <div class="pixel-grid" id="pixelGrid"></div>
       <div class="pixel-info">
-        <div class="calc"><strong>1920 x 1080</strong> = 2,073,600 pixels</div>
-        <div class="calc">x <strong>3 bytes</strong> (R, G, B) = <strong>~6 MB</strong> per frame</div>
+        <div class="calc"><strong>1920 x 1080</strong> = 2,073,600 像素</div>
+        <div class="calc">x <strong>3 字节</strong>（R, G, B）= <strong>~6 MB</strong> 每帧</div>
         <div class="calc">x <strong>30 fps</strong> = <strong>180 MB/s</strong></div>
-        <div class="calc">x <strong>60 sec</strong> = <strong>10.8 GB</strong> per minute</div>
+        <div class="calc">x <strong>60 秒</strong> = <strong>10.8 GB</strong> 每分钟</div>
       </div>
     </div>
 
-    <h3 class="reveal" style="margin-top: 2rem;">Raw vs Compressed</h3>
+    <h3 class="reveal" style="margin-top: 2rem;">原始数据 vs 压缩后（Raw vs Compressed）</h3>
     <div class="bar-chart reveal">
       <div class="bar-row">
-        <div class="bar-label">Raw</div>
+        <div class="bar-label">原始数据</div>
         <div class="bar-track"><div class="bar-fill animated-bar" data-width="100" style="background: var(--red);">10.8 GB</div></div>
         <div class="bar-value">10.8 GB</div>
       </div>
@@ -429,7 +429,7 @@ code { font-family: var(--mono); font-size: 0.85em; background: var(--surface-2)
       </div>
     </div>
 
-    <div class="takeaway reveal">This is why we need encoding — raw video is impossibly large. A good encoder shrinks 10 GB to 150 MB with barely visible quality loss.</div>
+    <div class="takeaway reveal">这就是为什么需要编码——原始视频大到不可能直接存储。好的编码器能把 10 GB 压缩到 150 MB，画质损失肉眼几乎看不出。</div>
   </div>
 </section>
 
@@ -437,40 +437,40 @@ code { font-family: var(--mono); font-size: 0.85em; background: var(--surface-2)
 <section id="s2">
   <div class="container">
     <span class="section-num reveal">Section 02</span>
-    <h2 class="reveal">I 帧、P 帧、B 帧 — Frame Types</h2>
-    <p class="reveal">Not every frame needs to store a complete image. Encoders exploit temporal redundancy — most of the image stays the same between frames.</p>
+    <h2 class="reveal">I 帧、P 帧、B 帧——帧类型（Frame Types）</h2>
+    <p class="reveal">不是每一帧都需要存完整画面。编码器利用时间冗余——帧与帧之间大部分画面是不变的。</p>
 
     <div class="frame-types reveal">
       <div class="frame-card">
         <div class="frame-visual" id="iFrameViz" style="background: var(--surface-2);"></div>
-        <h3 style="color: var(--accent);">I-Frame (关键帧)</h3>
-        <p>Complete image. Can be decoded independently. Like a JPEG snapshot.</p>
+        <h3 style="color: var(--accent);">I-Frame（关键帧）</h3>
+        <p>完整画面。可以独立解码。类似一张 JPEG 快照。</p>
       </div>
       <div class="frame-card">
         <div class="frame-visual" id="pFrameViz" style="background: #050508;"></div>
-        <h3 style="color: var(--green);">P-Frame (预测帧)</h3>
-        <p>Stores only differences from previous frame. ~70% smaller than I-frame.</p>
+        <h3 style="color: var(--green);">P-Frame（预测帧）</h3>
+        <p>只存储与前一帧的差异。比 I-frame 小约 70%。</p>
       </div>
       <div class="frame-card">
         <div class="frame-visual" id="bFrameViz" style="background: #030305;"></div>
-        <h3 style="color: var(--yellow);">B-Frame (双向预测)</h3>
-        <p>References past AND future. Smallest. ~85% smaller than I-frame.</p>
+        <h3 style="color: var(--yellow);">B-Frame（双向预测帧）</h3>
+        <p>同时参考前后帧。体积最小。比 I-frame 小约 85%。</p>
       </div>
     </div>
 
-    <h3 class="reveal" style="margin-top: 2rem;">GOP — Group of Pictures</h3>
-    <p class="reveal">Frames are organized in repeating patterns called GOPs. A typical pattern:</p>
+    <h3 class="reveal" style="margin-top: 2rem;">GOP——图片组（Group of Pictures）</h3>
+    <p class="reveal">帧按重复模式组织成 GOP。一个典型的模式：</p>
 
     <div class="gop-timeline reveal">
       <div class="gop-frames" id="gopTimeline"></div>
       <div class="gop-legend">
-        <span><span class="dot" style="background: var(--accent);"></span> I-Frame (keyframe)</span>
-        <span><span class="dot" style="background: var(--green);"></span> P-Frame (predicted)</span>
-        <span><span class="dot" style="background: var(--yellow);"></span> B-Frame (bi-directional)</span>
+        <span><span class="dot" style="background: var(--accent);"></span> I-Frame（关键帧）</span>
+        <span><span class="dot" style="background: var(--green);"></span> P-Frame（预测帧）</span>
+        <span><span class="dot" style="background: var(--yellow);"></span> B-Frame（双向预测帧）</span>
       </div>
     </div>
 
-    <div class="takeaway reveal">NextFrame records HTML as screenshots — every captured frame is an I-frame. The encoder (VideoToolbox / x264) must analyze them and create P/B frames to compress.</div>
+    <div class="takeaway reveal">NextFrame 把 HTML 录制为截图——每一帧都是 I-frame。编码器（VideoToolbox / x264）必须分析它们并创建 P/B 帧来压缩。</div>
   </div>
 </section>
 
@@ -478,18 +478,18 @@ code { font-family: var(--mono); font-size: 0.85em; background: var(--surface-2)
 <section id="s3">
   <div class="container">
     <span class="section-num reveal">Section 03</span>
-    <h2 class="reveal">编解码器 vs 容器 — Codec vs Container</h2>
+    <h2 class="reveal">编解码器 vs 容器（Codec vs Container）</h2>
 
     <div class="compare-grid reveal" style="margin-bottom: 2rem;">
       <div class="compare-card" style="border-color: var(--accent-15);">
-        <h3 style="color: var(--accent); margin-bottom: 0.75rem;">Codec = Language</h3>
-        <p style="font-size: 0.85rem;">How to compress and decompress video data. The algorithm that turns raw pixels into a compact bitstream.</p>
-        <p style="font-size: 0.82rem; color: var(--text-3);">Examples: H.264, H.265, VP9, AV1</p>
+        <h3 style="color: var(--accent); margin-bottom: 0.75rem;">Codec = 语言</h3>
+        <p style="font-size: 0.85rem;">如何压缩和解压视频数据。把原始像素转换成紧凑比特流的算法。</p>
+        <p style="font-size: 0.82rem; color: var(--text-3);">例：H.264, H.265, VP9, AV1</p>
       </div>
       <div class="compare-card" style="border-color: var(--green); --accent: var(--green);">
-        <h3 style="color: var(--green); margin-bottom: 0.75rem;">Container = Envelope</h3>
-        <p style="font-size: 0.85rem;">How to package video + audio + metadata into a single file. Just a wrapper format.</p>
-        <p style="font-size: 0.82rem; color: var(--text-3);">Examples: .mp4, .webm, .mov, .mkv</p>
+        <h3 style="color: var(--green); margin-bottom: 0.75rem;">Container = 信封</h3>
+        <p style="font-size: 0.85rem;">如何把视频 + 音频 + 元数据打包到一个文件里。只是一个封装格式。</p>
+        <p style="font-size: 0.82rem; color: var(--text-3);">例：.mp4, .webm, .mov, .mkv</p>
       </div>
     </div>
 

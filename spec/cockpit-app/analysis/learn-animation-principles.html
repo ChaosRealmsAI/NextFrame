@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>12 Disney Animation Principles - Interactive Guide</title>
+<title>迪士尼动画 12 原则 - 交互式学习指南</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
@@ -390,23 +390,23 @@ canvas.spring-canvas {
 
 <!-- Hero -->
 <section class="hero" id="sec-hero">
-  <h1>12 Principles of Animation</h1>
-  <p class="subtitle">Disney 动画 12 原则 -- 为 NextFrame 动画系统打造的交互式学习指南。每个原则都有可操作的 live demo。</p>
-  <div class="scroll-hint">Scroll to explore<span></span></div>
+  <h1>动画 12 原则</h1>
+  <p class="subtitle">迪士尼动画 12 原则 -- 为 NextFrame 动画系统打造的交互式学习指南。每个原则都有可操作的实时演示。</p>
+  <div class="scroll-hint">向下滚动探索<span></span></div>
 </section>
 
 <!-- 1. Squash and Stretch -->
 <section class="principle-section" id="sec-1">
   <div class="section-header">
-    <div class="section-number">Principle 01</div>
-    <h2>Squash & Stretch<span class="cn">挤压与拉伸</span></h2>
+    <div class="section-number">原则 01</div>
+    <h2>挤压与拉伸（Squash & Stretch）<span class="cn"></span></h2>
     <p class="why">物体运动时体积不变，但形状会变。球落地时被挤扁，弹起时被拉长。没有这个原则，一切运动看起来像刚体碰撞 -- 僵硬、不自然。在视频编辑中，文字弹入、logo 揭示、按钮反馈都依赖它。</p>
     <span class="code-insight">transform: scaleX() scaleY() -- 保持面积守恒</span>
   </div>
   <div class="demo-container" id="demo-1">
     <div class="demo-toolbar">
-      <span class="label">Bouncing Ball -- squash on impact, stretch in air</span>
-      <button class="btn-replay" onclick="replay1()">Replay</button>
+      <span class="label">弹跳球 -- 落地时挤扁，腾空时拉长</span>
+      <button class="btn-replay" onclick="replay1()">重播</button>
     </div>
     <div class="demo-stage" id="stage-1"></div>
   </div>
@@ -415,15 +415,15 @@ canvas.spring-canvas {
 <!-- 2. Anticipation -->
 <section class="principle-section" id="sec-2">
   <div class="section-header">
-    <div class="section-number">Principle 02</div>
-    <h2>Anticipation<span class="cn">预备动作</span></h2>
+    <div class="section-number">原则 02</div>
+    <h2>预备动作（Anticipation）<span class="cn"></span></h2>
     <p class="why">跳跃前先蹲下，出拳前先收手。预备动作告诉观众"接下来有事要发生"，引导视线。没有预备的运动看起来像瞬移 -- 突兀、机械。</p>
     <span class="code-insight">负向偏移 -> 停顿 -> 正向运动</span>
   </div>
   <div class="demo-container" id="demo-2">
     <div class="demo-toolbar">
-      <span class="label">Circle pulls back before jumping (compare with/without)</span>
-      <button class="btn-replay" onclick="replay2()">Replay</button>
+      <span class="label">圆球跳跃前先后撤（对比有/无预备动作）</span>
+      <button class="btn-replay" onclick="replay2()">重播</button>
     </div>
     <div class="demo-stage" id="stage-2"></div>
   </div>
@@ -432,14 +432,14 @@ canvas.spring-canvas {
 <!-- 3. Staging -->
 <section class="principle-section" id="sec-3">
   <div class="section-header">
-    <div class="section-number">Principle 03</div>
-    <h2>Staging<span class="cn">演出布局</span></h2>
+    <div class="section-number">原则 03</div>
+    <h2>演出布局（Staging）<span class="cn"></span></h2>
     <p class="why">同一个元素，放对位置观众一眼看到，放错位置观众找不到。Staging 是动画的"导演视角" -- 控制观众先看什么、后看什么。</p>
   </div>
   <div class="demo-container" id="demo-3">
     <div class="demo-toolbar">
-      <span class="label">Good staging vs. bad staging -- same elements, different layout</span>
-      <button class="btn-replay" onclick="replay3()">Replay</button>
+      <span class="label">好布局 vs. 差布局 -- 同样的元素，不同的排列</span>
+      <button class="btn-replay" onclick="replay3()">重播</button>
     </div>
     <div class="demo-stage tall" id="stage-3"></div>
   </div>
@@ -448,15 +448,15 @@ canvas.spring-canvas {
 <!-- 4. Straight Ahead vs Pose to Pose -->
 <section class="principle-section" id="sec-4">
   <div class="section-header">
-    <div class="section-number">Principle 04</div>
-    <h2>Straight Ahead vs Pose to Pose<span class="cn">逐帧 vs 关键帧</span></h2>
+    <div class="section-number">原则 04</div>
+    <h2>逐帧 vs 关键帧（Straight Ahead vs Pose to Pose）<span class="cn"></span></h2>
     <p class="why">逐帧：一帧一帧画，动作流畅但难控制。关键帧：先定关键姿势，中间自动补间。NextFrame 用关键帧方案 -- 定义起点和终点，引擎算中间帧。这就是为什么。</p>
     <span class="code-insight">keyframes: [{t:0, val:0}, {t:1, val:100}] + interpolation</span>
   </div>
   <div class="demo-container" id="demo-4">
     <div class="demo-toolbar">
-      <span class="label">Left: random frame-by-frame | Right: smooth keyframe interpolation</span>
-      <button class="btn-replay" onclick="replay4()">Replay</button>
+      <span class="label">左：随机逐帧 | 右：平滑关键帧插值</span>
+      <button class="btn-replay" onclick="replay4()">重播</button>
     </div>
     <div class="demo-stage" id="stage-4"></div>
   </div>
@@ -465,15 +465,15 @@ canvas.spring-canvas {
 <!-- 5. Follow Through & Overlapping -->
 <section class="principle-section" id="sec-5">
   <div class="section-header">
-    <div class="section-number">Principle 05</div>
-    <h2>Follow Through & Overlapping<span class="cn">跟随与重叠</span></h2>
+    <div class="section-number">原则 05</div>
+    <h2>跟随与重叠（Follow Through & Overlapping）<span class="cn"></span></h2>
     <p class="why">主体停了，附属部件还在动。头发、衣摆、尾巴 -- 它们有自己的惯性。在视频编辑中，卡片停下后阴影还在晃、文字块停下后下划线还在滑，这就是"物理感"的来源。</p>
     <span class="code-insight">子元素 transition-delay + overshoot + settle</span>
   </div>
   <div class="demo-container" id="demo-5">
     <div class="demo-toolbar">
-      <span class="label">Box stops, but its "tail" keeps swinging and settles</span>
-      <button class="btn-replay" onclick="replay5()">Replay</button>
+      <span class="label">方块停下了，但它的"尾巴"还在摆动并逐渐静止</span>
+      <button class="btn-replay" onclick="replay5()">重播</button>
     </div>
     <div class="demo-stage" id="stage-5"></div>
   </div>
@@ -482,20 +482,20 @@ canvas.spring-canvas {
 <!-- 6. Ease In, Ease Out -->
 <section class="principle-section" id="sec-6">
   <div class="section-header">
-    <div class="section-number">Principle 06</div>
-    <h2>Ease In, Ease Out<span class="cn">缓入缓出</span></h2>
+    <div class="section-number">原则 06</div>
+    <h2>缓入缓出（Ease In, Ease Out）<span class="cn"></span></h2>
     <p class="why">现实中没有东西是匀速运动的。汽车起步加速、刹车减速。缓入缓出是让动画"有重量感"的核心。<strong>这是 NextFrame 动画系统最重要的原则。</strong></p>
     <span class="code-insight">cubic-bezier(x1, y1, x2, y2) -- 控制速度曲线</span>
   </div>
   <div class="demo-container" id="demo-6">
     <div class="demo-toolbar">
-      <span class="label">Three balls: linear | ease-in-out | spring</span>
-      <button class="btn-replay" onclick="replay6()">Replay</button>
+      <span class="label">三个球：linear | ease-in-out | spring</span>
+      <button class="btn-replay" onclick="replay6()">重播</button>
     </div>
     <div class="demo-stage" id="stage-6"></div>
     <div class="demo-controls">
       <div class="control-group">
-        <label>Duration</label>
+        <label>时长</label>
         <input type="range" min="200" max="3000" value="1000" id="ease-duration" oninput="updateEase6()">
         <span class="val" id="ease-dur-val">1000ms</span>
       </div>
@@ -506,15 +506,15 @@ canvas.spring-canvas {
 <!-- 7. Arc -->
 <section class="principle-section" id="sec-7">
   <div class="section-header">
-    <div class="section-number">Principle 07</div>
-    <h2>Arc<span class="cn">弧线运动</span></h2>
+    <div class="section-number">原则 07</div>
+    <h2>弧线运动（Arc）<span class="cn"></span></h2>
     <p class="why">自然界几乎所有运动都沿弧线 -- 抛物线、摆锤、挥手。直线运动看起来机械。让元素沿弧线移动，即使是简单的位移也会更有生命力。</p>
     <span class="code-insight">同时动画 translateX + translateY (不同 easing)</span>
   </div>
   <div class="demo-container" id="demo-7">
     <div class="demo-toolbar">
-      <span class="label">Straight line path vs. arc path -- same start/end points</span>
-      <button class="btn-replay" onclick="replay7()">Replay</button>
+      <span class="label">直线路径 vs. 弧线路径 -- 相同起点和终点</span>
+      <button class="btn-replay" onclick="replay7()">重播</button>
     </div>
     <div class="demo-stage" id="stage-7"></div>
   </div>

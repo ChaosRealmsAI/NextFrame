@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Transition Types -- Learn by Doing</title>
+<title>视频转场类型 -- 动手学习</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
@@ -217,57 +217,57 @@ code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; backg
 
 <!-- Hero -->
 <div class="hero">
-  <h1>Video Transition Types</h1>
-  <p>8 categories, 25+ transitions, live CSS/JS demos. Click "Play" to see each one in action.</p>
+  <h1>视频转场类型</h1>
+  <p>8 大类、25+ 种转场，实时 CSS/JS 演示。点击「播放」即可预览效果。</p>
 </div>
 
 <!-- ===================== Category 1: Cut ===================== -->
 <section class="category" id="cat-cut">
   <div class="category-header">
-    <h2>1. Cut Transitions (硬切)</h2>
-    <p>90% of video editing is hard cuts. Other transitions are for emphasis. The cut is the default.</p>
+    <h2>1. 硬切转场（Cut Transitions）</h2>
+    <p>90% 的视频剪辑都是硬切。其他转场是为了强调。硬切才是默认选择。</p>
   </div>
 
   <!-- Hard Cut -->
   <div class="transition-card">
-    <h3>Hard Cut</h3>
-    <p class="desc">Scene A instantly becomes Scene B. No animation, no effect. Zero frames of transition.</p>
-    <p class="use-case">When to use: Conversation shot/reverse-shot, fast-paced editing, most of the time.</p>
+    <h3>硬切（Hard Cut）</h3>
+    <p class="desc">场景 A 瞬间变成场景 B。没有动画，没有特效。零帧转场。</p>
+    <p class="use-case">适用场景：对话正反打、快节奏剪辑、大多数情况。</p>
     <div class="demo-stage" id="demo-hardcut">
-      <div class="scene scene-a">Scene A<span>Interview shot</span></div>
-      <div class="scene scene-b" style="opacity:0">Scene B<span>Reverse angle</span></div>
+      <div class="scene scene-a">场景 A<span>采访镜头</span></div>
+      <div class="scene scene-b" style="opacity:0">场景 B<span>反打角度</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playHardCut(this)">Play</button>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="play-btn" onclick="playHardCut(this)">播放</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
-    <div class="code-block">// Hard Cut: instant swap, no transition
+    <div class="code-block">// 硬切（Hard Cut）：瞬间切换，无转场
 sceneA.style.opacity = '0';
 sceneB.style.opacity = '1';
-// That's it. No animation. The cut IS the absence of transition.</div>
+// 就这样。没有动画。硬切本身就是"没有转场"。</div>
   </div>
 
   <!-- Jump Cut -->
   <div class="transition-card">
-    <h3>Jump Cut</h3>
-    <p class="desc">Same scene, slight time skip. The subject shifts position abruptly. Used in vlogs, montages.</p>
-    <p class="use-case">When to use: Time compression, energetic pacing, removing pauses in talking-head videos.</p>
+    <h3>跳切（Jump Cut）</h3>
+    <p class="desc">同一场景，轻微的时间跳跃。主体突然移位。常用于 vlog 和蒙太奇。</p>
+    <p class="use-case">适用场景：时间压缩、高能节奏、去掉口播中的停顿。</p>
     <div class="demo-stage" id="demo-jumpcut">
       <div class="scene scene-a" style="position:relative">
         <div id="jumpcut-subject" style="transition: none; font-size: 2rem;">&#x1f464;</div>
-        <span>Same scene, subject shifts</span>
+        <span>同一场景，主体位移</span>
       </div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playJumpCut(this)">Play</button>
+      <button class="play-btn" onclick="playJumpCut(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="80" max="500" value="150" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>150ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
-    <div class="code-block">// Jump Cut: same scene, different position
-// Flash white briefly to sell the "skip"
+    <div class="code-block">// 跳切（Jump Cut）：同一场景，不同位置
+// 短暂闪白来强化"跳跃"感
 stage.style.background = '#fff';
 subject.style.transform = `translate(${randomX}px, ${randomY}px)`;
 setTimeout(() => stage.style.background = '', 50);</div>
@@ -275,114 +275,114 @@ setTimeout(() => stage.style.background = '', 50);</div>
 
   <!-- Match Cut -->
   <div class="transition-card">
-    <h3>Match Cut</h3>
-    <p class="desc">Similar shapes or colors bridge two scenes. A ball becomes a planet, a wheel becomes a clock.</p>
-    <p class="use-case">When to use: Thematic connection, storytelling, the "artistic" cut.</p>
+    <h3>匹配剪辑（Match Cut）</h3>
+    <p class="desc">相似的形状或颜色连接两个场景。球变成星球，车轮变成时钟。</p>
+    <p class="use-case">适用场景：主题关联、叙事、"艺术感"剪辑。</p>
     <div class="demo-stage" id="demo-matchcut" style="display:flex; align-items:center; justify-content:center;">
       <div class="match-shape" id="matchcut-shape" style="background: var(--scene-a); color: #fff;">Moon</div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playMatchCut(this)">Play</button>
+      <button class="play-btn" onclick="playMatchCut(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
-    <div class="code-block">// Match Cut: morph shape A into shape B
-// Keep the circle, change color + label
+    <div class="code-block">// 匹配剪辑（Match Cut）：形状 A 变形为形状 B
+// 保持圆形，改变颜色和标签
 shape.style.transition = `all ${duration}ms cubic-bezier(0.16,1,0.3,1)`;
 shape.style.background = sceneB_color;
 shape.textContent = 'Planet';
-// The shape continuity tricks the eye into accepting the scene change.</div>
+// 形状的连续性让眼睛接受了场景的切换。</div>
   </div>
 </section>
 
 <!-- ===================== Category 2: Dissolve ===================== -->
 <section class="category" id="cat-dissolve">
   <div class="category-header">
-    <h2>2. Dissolve Transitions (溶解)</h2>
-    <p>Just opacity animation on two layers. The workhorse of emotional transitions.</p>
+    <h2>2. 溶解转场（Dissolve Transitions）</h2>
+    <p>就是两层的透明度动画。情感转场的主力军。</p>
   </div>
 
   <!-- Cross Dissolve -->
   <div class="transition-card">
-    <h3>Cross Dissolve</h3>
-    <p class="desc">A fades out while B fades in, overlapping. Both visible simultaneously during the transition.</p>
-    <p class="use-case">When to use: Passage of time, emotional shift, dream sequences.</p>
+    <h3>交叉溶解（Cross Dissolve）</h3>
+    <p class="desc">A 淡出的同时 B 淡入，两者重叠。转场过程中两个场景同时可见。</p>
+    <p class="use-case">适用场景：时间流逝、情绪转换、梦境。</p>
     <div class="demo-stage" id="demo-crossdissolve">
-      <div class="scene scene-a">Scene A<span>Present day</span></div>
-      <div class="scene scene-b" style="opacity:0">Scene B<span>Memory</span></div>
+      <div class="scene scene-a">场景 A<span>现在</span></div>
+      <div class="scene scene-b" style="opacity:0">场景 B<span>回忆</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playCrossDissolve(this)">Play</button>
+      <button class="play-btn" onclick="playCrossDissolve(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>1000ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
-    <div class="code-block">/* Cross Dissolve: pure CSS opacity */
+    <div class="code-block">/* 交叉溶解（Cross Dissolve）：纯 CSS opacity */
 .scene-a {
   transition: opacity ${duration}ms ease;
-  opacity: 0;           /* fade out */
+  opacity: 0;           /* 淡出 */
 }
 .scene-b {
   transition: opacity ${duration}ms ease;
-  opacity: 1;           /* fade in simultaneously */
+  opacity: 1;           /* 同时淡入 */
 }
-/* Key: both layers animate at the same time, creating overlap */</div>
+/* 关键：两层同时做动画，产生重叠效果 */</div>
   </div>
 
   <!-- Fade to Black -->
   <div class="transition-card">
-    <h3>Fade to Black</h3>
-    <p class="desc">A fades to black, pause, then B fades in from black. Sequential, not simultaneous.</p>
-    <p class="use-case">When to use: End of a chapter, dramatic pause, "time passes" feeling.</p>
+    <h3>淡入黑场（Fade to Black）</h3>
+    <p class="desc">A 淡入黑色，停顿，然后 B 从黑色淡出。依次进行，不是同时。</p>
+    <p class="use-case">适用场景：章节结束、戏剧停顿、"时间流逝"的感觉。</p>
     <div class="demo-stage" id="demo-fadeblack">
-      <div class="scene scene-a">Scene A<span>End of act</span></div>
-      <div class="scene scene-b" style="opacity:0">Scene B<span>New chapter</span></div>
+      <div class="scene scene-a">场景 A<span>幕终</span></div>
+      <div class="scene scene-b" style="opacity:0">场景 B<span>新篇章</span></div>
       <div class="scene" style="background:#000; opacity:0; z-index:5;" id="fadeblack-overlay"></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playFadeBlack(this)">Play</button>
+      <button class="play-btn" onclick="playFadeBlack(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
-    <div class="code-block">// Fade to Black: A → black → B (sequential)
+    <div class="code-block">// 淡入黑场（Fade to Black）：A → 黑 → B（依次进行）
 overlay.style.transition = `opacity ${half}ms ease`;
-overlay.style.opacity = '1';          // fade to black
+overlay.style.opacity = '1';          // 淡入黑色
 setTimeout(() => {
   sceneA.style.opacity = '0';
-  sceneB.style.opacity = '1';          // swap underneath
-  overlay.style.opacity = '0';          // reveal B
+  sceneB.style.opacity = '1';          // 底层切换
+  overlay.style.opacity = '0';          // 显露 B
 }, half);</div>
   </div>
 
   <!-- Fade to White -->
   <div class="transition-card">
-    <h3>Fade to White</h3>
-    <p class="desc">Same as fade to black, but through white. Brighter, more hopeful feeling.</p>
-    <p class="use-case">When to use: Flashbacks, heavenly/dreamy scenes, positive emotional transitions.</p>
+    <h3>淡入白场（Fade to White）</h3>
+    <p class="desc">和淡入黑场一样，但经过白色。更明亮、更有希望感。</p>
+    <p class="use-case">适用场景：闪回、梦幻场景、正面情绪转换。</p>
     <div class="demo-stage" id="demo-fadewhite">
-      <div class="scene scene-a">Scene A<span>Before</span></div>
-      <div class="scene scene-b" style="opacity:0">Scene B<span>After</span></div>
+      <div class="scene scene-a">场景 A<span>之前</span></div>
+      <div class="scene scene-b" style="opacity:0">场景 B<span>之后</span></div>
       <div class="scene" style="background:#fff; opacity:0; z-index:5;" id="fadewhite-overlay"></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playFadeWhite(this)">Play</button>
+      <button class="play-btn" onclick="playFadeWhite(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
-    <div class="code-block">// Fade to White: identical to fade-to-black, just change overlay color
+    <div class="code-block">// 淡入白场（Fade to White）：和淡入黑场完全一样，只是换了遮罩颜色
 overlay.style.background = '#fff';
-// Same timing logic as fade-to-black.</div>
+// 时序逻辑与淡入黑场相同。</div>
   </div>
 
   <!-- Dip to Color -->
@@ -396,12 +396,12 @@ overlay.style.background = '#fff';
       <div class="scene" style="background:var(--accent); opacity:0; z-index:5;" id="dipcolor-overlay"></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playDipColor(this)">Play</button>
+      <button class="play-btn" onclick="playDipColor(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">// Dip to Color: overlay.background = brandColor
 // Same sequential fade pattern, any color works.</div>
@@ -425,12 +425,12 @@ overlay.style.background = '#fff';
       <div class="scene scene-b" style="clip-path: inset(0 100% 0 0);">Scene B<span>After</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playHWipe(this)">Play</button>
+      <button class="play-btn" onclick="playHWipe(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Horizontal Wipe: clip-path inset animation */
 .scene-b {
@@ -453,12 +453,12 @@ sceneB.style.clipPath = 'inset(0 0% 0 0)';  /* fully revealed */
       <div class="scene scene-b" style="clip-path: inset(0 0 100% 0);">Scene B<span>Bottom</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playVWipe(this)">Play</button>
+      <button class="play-btn" onclick="playVWipe(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Vertical Wipe */
 .scene-b { clip-path: inset(0 0 100% 0); }   /* hidden */
@@ -475,12 +475,12 @@ sceneB.style.clipPath = 'inset(0 0 0% 0)';    /* revealed top-to-bottom */</div>
       <div class="scene scene-b" style="clip-path: circle(0% at 50% 50%);">Scene B<span>Revealed</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playIris(this)">Play</button>
+      <button class="play-btn" onclick="playIris(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Iris Wipe: circle() clip-path */
 .scene-b { clip-path: circle(0% at 50% 50%); }
@@ -499,12 +499,12 @@ sceneB.style.clipPath = 'circle(75% at 50% 50%)';
       <div class="scene scene-b" style="clip-path: polygon(50% 50%, 50% 0%, 50% 0%);">Scene B<span>After</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playClock(this)">Play</button>
+      <button class="play-btn" onclick="playClock(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="1200" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>1200ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">// Clock Wipe: animated polygon via JS requestAnimationFrame
 // CSS clip-path polygon can't animate between different vertex counts,
@@ -535,12 +535,12 @@ function clockFrame(progress) {
       <div class="scene scene-b" id="demo-star-b" style="clip-path: polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%, 50% 50%);">Scene B<span>LOL</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playStar(this)">Play</button>
+      <button class="play-btn" onclick="playStar(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>1000ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">// Star Wipe: 5-pointed star polygon, scaled from 0 to full
 function starPoints(scale) {
@@ -572,12 +572,12 @@ function starPoints(scale) {
       <div class="scene scene-b" style="transform: translateX(100%);">Scene B<span>New view</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playSlide(this)">Play</button>
+      <button class="play-btn" onclick="playSlide(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="600" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>600ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Slide: B slides over A (A stays put) */
 .scene-b {
@@ -598,12 +598,12 @@ sceneB.style.transform = 'translateX(0%)';  /* slides into view */
       <div class="scene scene-b" id="push-b" style="transform: translateX(100%);">Scene B<span>Arriving</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playPush(this)">Play</button>
+      <button class="play-btn" onclick="playPush(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="600" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>600ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Push: both A and B move together */
 .scene-a { transition: transform ${duration}ms ease; }
@@ -623,12 +623,12 @@ sceneB.style.transform = 'translateX(0%)';     /* B enters from right */</div>
       <div class="scene scene-b" style="transform: translateY(100%);">Scene B<span>Covering</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playCover(this)">Play</button>
+      <button class="play-btn" onclick="playCover(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="600" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>600ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Cover: B slides from bottom over A */
 sceneB.style.transform = 'translateY(100%)';  /* starts below */
@@ -646,12 +646,12 @@ sceneB.style.transform = 'translateY(0%)';    /* covers A */</div>
       <div class="scene scene-a" id="reveal-a">Scene A<span>Sliding away</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playReveal(this)">Play</button>
+      <button class="play-btn" onclick="playReveal(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="2000" value="600" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>600ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Reveal: A slides away, B is underneath */
 /* B is positioned behind A (lower z-index or painted first) */
@@ -677,12 +677,12 @@ sceneA.style.transform = 'translateX(-100%)';  /* A exits, revealing B */</div>
       <div class="scene scene-b" style="opacity:0">Scene B<span>Arrived</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playZoomIn(this)">Play</button>
+      <button class="play-btn" onclick="playZoomIn(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Zoom In: scale A up + fade, then show B */
 .scene-a {
@@ -707,12 +707,12 @@ sceneA.style.transform = 'translateX(-100%)';  /* A exits, revealing B */</div>
       <div class="scene scene-b" style="opacity:0">Scene B<span>Big picture</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playZoomOut(this)">Play</button>
+      <button class="play-btn" onclick="playZoomOut(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Zoom Out: A shrinks, B appears behind */
 sceneA.style.transition = `transform ${d}ms ease, opacity ${d}ms ease`;
@@ -732,12 +732,12 @@ sceneB.style.opacity = '1';</div>
       <div class="scene scene-b" id="zoomthrough-b" style="opacity:0; transform: scale(0.3);">Scene B<span>Emerged</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playZoomThrough(this)">Play</button>
+      <button class="play-btn" onclick="playZoomThrough(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="300" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>1000ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Zoom Through: A scales up past view, B scales up from small */
 // Phase 1: A zooms in
@@ -769,12 +769,12 @@ setTimeout(() => {
       </div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playCube(this)">Play</button>
+      <button class="play-btn" onclick="playCube(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Cube Rotate: CSS 3D */
 .stage { perspective: 800px; }
@@ -800,12 +800,12 @@ cube.style.transform = 'translateZ(-100px) rotateY(-90deg)';</div>
       </div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playFlip(this)">Play</button>
+      <button class="play-btn" onclick="playFlip(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Flip: backface-visibility is the key */
 .wrapper { transform-style: preserve-3d; }
@@ -826,12 +826,12 @@ wrapper.style.transform = 'rotateY(180deg)';
       <div class="scene scene-a" id="fold-a" style="transform-origin: left center;">Scene A<span>Folding...</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playFold(this)">Play</button>
+      <button class="play-btn" onclick="playFold(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="800" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>800ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Fold: rotateY with transform-origin on one edge */
 .scene-a {
@@ -858,12 +858,12 @@ sceneA.style.transform = 'rotateY(-90deg)';  /* folds away to the left */</div>
       <div id="morph-el" style="width:80px; height:80px; background:var(--scene-a); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:0.8rem; color:#fff; transition: all 1s cubic-bezier(0.16,1,0.3,1);">Square</div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playShapeMorph(this)">Play</button>
+      <button class="play-btn" onclick="playShapeMorph(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>1000ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Shape Morph: animate border-radius, size, color */
 element.style.transition = `all ${duration}ms cubic-bezier(0.16,1,0.3,1)`;
@@ -886,12 +886,12 @@ element.style.height = '120px';
       </div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playColorMorph(this)">Play</button>
+      <button class="play-btn" onclick="playColorMorph(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>1000ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Color Morph: CSS transition on color properties */
 .scene {
@@ -921,12 +921,12 @@ scene.textContent = 'Night Scene';
       <div class="scene scene-b" id="gradwipe-b" style="opacity:0; mask-image: linear-gradient(to right, black 0%, transparent 50%, transparent 100%); -webkit-mask-image: linear-gradient(to right, black 0%, transparent 50%, transparent 100%);">Scene B<span>Revealed</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playGradWipe(this)">Play</button>
+      <button class="play-btn" onclick="playGradWipe(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="200" max="2000" value="1000" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>1000ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">/* Gradient Wipe: animate mask-image position */
 .scene-b {
@@ -949,12 +949,12 @@ scene.textContent = 'Night Scene';
       <div class="scene scene-b" style="opacity:0">Scene B<span>Glitched in</span></div>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playGlitch(this)">Play</button>
+      <button class="play-btn" onclick="playGlitch(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="100" max="1000" value="400" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>400ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">// Glitch: rapid clip-path slices + color shift
 function glitchFrame() {
@@ -983,12 +983,12 @@ function glitchFrame() {
       <canvas id="particle-canvas" style="position:absolute; inset:0; z-index:10; pointer-events:none;"></canvas>
     </div>
     <div class="controls">
-      <button class="play-btn" onclick="playParticle(this)">Play</button>
+      <button class="play-btn" onclick="playParticle(this)">播放</button>
       <div class="duration-control">
         <input type="range" min="500" max="2000" value="1200" oninput="this.nextElementSibling.textContent=this.value+'ms'">
         <span>1200ms</span>
       </div>
-      <button class="code-toggle" onclick="toggleCode(this)">Show Code</button>
+      <button class="code-toggle" onclick="toggleCode(this)">查看代码</button>
     </div>
     <div class="code-block">// Particle: requires canvas or WebGL
 // 1. Read pixels from scene A (or use representative color grid)
@@ -1070,7 +1070,7 @@ function resetAfter(btn, duration, resetFn) {
 function toggleCode(btn) {
   const block = btn.closest('.transition-card').querySelector('.code-block');
   block.classList.toggle('open');
-  btn.textContent = block.classList.contains('open') ? 'Hide Code' : 'Show Code';
+  btn.textContent = block.classList.contains('open') ? '隐藏代码' : '查看代码';
 }
 
 // ===== IntersectionObserver =====
