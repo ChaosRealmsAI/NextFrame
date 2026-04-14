@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { createSourceDocument, slugifyTitle, validateSourceDocument } from "../src/cli/_source.js";
+import { createSourceDocument, slugifyTitle, validateSourceDocument } from "../src/commands/_helpers/_source.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");

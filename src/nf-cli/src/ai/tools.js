@@ -1,8 +1,8 @@
 // AI tool definitions — v0.3 layers[] format.
-import { REGISTRY, listScenes, getScene } from '../engine-v2/registry.js';
-import { validateTimeline } from '../engine-v2/validate.js';
-import { describeAt } from '../engine-v2/describe.js';
-import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from '../engine-v2/ops.js';
+import { REGISTRY, listScenes, getScene } from '../engine/v2/registry.js';
+import { validateTimeline } from '../engine/v2/validate.js';
+import { describeAt } from '../engine/v2/describe.js';
+import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from '../engine/v2/ops.js';
 
 export const TOOLS = {
   list_scenes: {

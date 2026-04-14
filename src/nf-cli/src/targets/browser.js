@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { once } from "node:events";
 
-import { buildHTMLDocument, timelineBaseHref } from "../engine-v2/build.js";
-import { timelineMetrics } from "../engine-v2/timeline.js";
+import { buildHTMLDocument, timelineBaseHref } from "../engine/v2/build.js";
+import { timelineMetrics } from "../engine/v2/timeline.js";
 
 const CHROME_CANDIDATES = [
   process.env.PUPPETEER_EXECUTABLE_PATH,

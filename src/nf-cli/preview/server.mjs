@@ -17,12 +17,8 @@ import { resolve as resolvePath, dirname, isAbsolute, join, relative } from "nod
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
-import { renderAt } from "../src/engine/render.js";
-import { resolveTimeline } from "../src/engine/time.js";
-import { validateTimeline } from "../src/engine/validate.js";
-import { listScenes, REGISTRY, META_TABLE } from "../src/scenes/index.js"; // REGISTRY+META used in scene-preview route
-import { exportMP4 } from "../src/targets/ffmpeg-mp4.js";
-import { listSources, readSourceJson } from "../src/cli/_source.js";
+import { resolveTimeline } from "../src/engine/legacy/time.js";
+import { listSources, readSourceJson } from "../src/commands/_helpers/_source.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolvePath(HERE, "..");
@@ -38,6 +34,22 @@ const MIME = {
   json: "application/json; charset=utf-8",
   svg: "image/svg+xml",
 };
+
+async function loadLegacyRenderer() {
+  return import("../src/engine/legacy/render.js");
+}
+
+async function loadMp4Exporter() {
+  return import("../src/targets/ffmpeg-mp4.js");
+}
+
+async function loadSceneRegistry() {
+  return import("../src/scenes/index.js");
+}
+
+async function loadLegacyValidator() {
+  return import("../src/engine/legacy/validate.js");
+}
 
 function json(res, code, obj) {
   res.writeHead(code, { "content-type": MIME.json });
@@ -140,6 +152,7 @@ const server = createServer(async (req, res) => {
     if (method === "GET" && path === "/api/scene-preview") {
       const sceneId = q.id;
       if (!sceneId) return err(res, 400, "missing id");
+      const { REGISTRY, META_TABLE } = await loadSceneRegistry();
       const entry = REGISTRY.get(sceneId);
       if (!entry) return err(res, 404, `unknown scene: ${sceneId}`);
       const t = Number(q.t ?? (entry.META.duration_hint || 5) * 0.4);
@@ -164,6 +177,7 @@ const server = createServer(async (req, res) => {
         project: { width, height, fps: 30 },
         tracks: [{ id: "v1", kind: "video", clips: [{ id: "preview", start: 0, dur: (entry.META.duration_hint || 10), scene: sceneId, params }] }],
       };
+      const { renderAt } = await loadLegacyRenderer();
       const frame = renderAt(miniTimeline, t, { width, height });
       if (!frame.ok) return err(res, 500, frame.error.message);
       const buf = await frame.canvas.encode("png");
@@ -174,6 +188,7 @@ const server = createServer(async (req, res) => {
 
     // API
     if (method === "GET" && path === "/api/scenes") {
+      const { listScenes } = await loadSceneRegistry();
       return ok(res, { scenes: listScenes() });
     }
 
@@ -182,6 +197,7 @@ const server = createServer(async (req, res) => {
       if (!assertSafePath(res, abs)) return;
       const text = await readFile(abs, "utf8");
       const timeline = JSON.parse(text);
+      const { validateTimeline } = await loadLegacyValidator();
       const validation = validateTimeline(timeline, { projectDir: dirname(abs) });
       return ok(res, { path: abs, timeline, validation });
     }
@@ -205,6 +221,7 @@ const server = createServer(async (req, res) => {
       if (!assertSafePath(res, abs)) return;
       const body = await readBody(req);
       if (!body.timeline) return err(res, 400, "body.timeline required");
+      const { validateTimeline } = await loadLegacyValidator();
       const validation = validateTimeline(body.timeline, { projectDir: dirname(abs) });
       if (!validation.ok) return json(res, 200, { ok: false, validation });
       await writeFile(abs, JSON.stringify(body.timeline, null, 2) + "\n");
@@ -222,6 +239,7 @@ const server = createServer(async (req, res) => {
       if (!r.ok) return err(res, 400, r.error.message, r.error.hint);
       const width = Number(q.w) || 960;
       const height = Math.round(width / 1.7777);
+      const { renderAt } = await loadLegacyRenderer();
       const frame = renderAt(r.value, t, { width, height });
       if (!frame.ok) return err(res, 500, frame.error.message);
       const buf = await frame.canvas.encode("png");
@@ -256,6 +274,7 @@ const server = createServer(async (req, res) => {
       const text = await readFile(abs, "utf8");
       const timeline = JSON.parse(text);
       const start = Date.now();
+      const { exportMP4 } = await loadMp4Exporter();
       const r = await exportMP4(timeline, outPath);
       if (!r.ok) return err(res, 500, r.error.message, r.error.hint);
       const st = await stat(outPath);
