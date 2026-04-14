@@ -46,29 +46,52 @@ Layer 3: Verification assertions (auto-check after every change)
 
 ## 3. Project Documentation
 
-### CLAUDE.md (for Claude Code)
-- Root: `.claude/CLAUDE.md` ≤ 50 lines.
-- Per crate: `src/nf-xxx/CLAUDE.md` ≤ 30 lines.
-- Content: build command + core rules + module nav + "where to find info".
-- **Progressive disclosure**: tell AI where to look, don't dump everything.
+### CLAUDE.md / AGENTS.md
 
-### AGENTS.md (for Codex)
-- Root: `AGENTS.md` ≤ 30 lines.
-- Content: setup + standards pointer + test command + key conventions.
+**Purpose: make AI development frictionless.** Not user docs — development aids.
+
+**No hard line limit.** Progressive disclosure — concise but complete. If AI needs it, write it.
+
+#### Must contain:
+- Build/test/lint commands
+- Module structure with one-line descriptions
+- Core constraints AI would violate without knowing
+- Where to find detailed info (pointers, not dumps)
+
+#### Trigger conditions (most important section):
+
+**When AI doesn't know how to use something that already exists → add it here.**
+
+Example: recorder has a CLI but AI keeps trying to call it via bridge. Fix:
+```markdown
+## Tools AI should know about
+- Recording: `cargo run -p nf-recorder -- slide timeline.json -o out.mp4`
+- TTS: `cargo run -p nf-tts -- synth "text" -o out.mp3`
+```
+
+**Pattern: AI tried X but should have used Y → document Y in CLAUDE.md.**
+
+These accumulate over time as you discover gaps. They are the real value of CLAUDE.md.
+
+#### Per-crate CLAUDE.md:
+Document what AI would miss about THIS crate:
+- Internal tools/scripts AI doesn't know about
+- Non-obvious conventions specific to this crate
+- Common mistakes AI makes when editing this crate
 
 ### Gold Standard Files
 - Mark one exemplar per file type: `//! Gold standard: new X should follow this pattern.`
 - AI copies the pattern, doesn't invent from scratch.
 
 ### Rules for Both
-- Every line must pass: "Would AI make a mistake without this?" No → delete it.
+- Every line must pass: "Would AI trip without this?" No → delete it.
 - Update when AI repeatedly makes the same mistake.
 - Delete rules AI no longer violates — less noise = better compliance.
 
 ## 4. Iterative Improvement
 
 ```
-AI makes mistake → analyze why → fix environment → verify fix
+AI makes mistake → analyze why → fix CLAUDE.md → verify fix
 ```
 
-**Don't teach AI how to use your product. Make the product teach itself.**
+**Don't teach AI how to use your product. Record where AI tripped and prevent it.**
