@@ -31,6 +31,8 @@ pub(crate) use persistence::{
     load_sessions, load_tab_urls, load_window_frame, save_browser_session, save_tab_urls,
     save_window_frame,
 };
+#[cfg(test)]
+pub(crate) use persistence::save_browser_session_snapshot;
 #[allow(unused_imports)]
 pub(crate) use session::{check_session, session_statuses};
 #[allow(unused_imports)]

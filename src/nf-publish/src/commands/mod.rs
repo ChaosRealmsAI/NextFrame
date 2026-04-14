@@ -18,7 +18,7 @@ use crate::error::{ensure_fix, error_with_fix};
 use crate::eval::eval_js;
 use crate::keyboard::jitter;
 
-pub(super) use parser::{
+pub(crate) use parser::{
     parse_command_token, parse_coords, parse_rect, parse_selector_and_timeout,
     parse_selector_and_value, parse_selector_arg, parse_selector_pair, parse_xy_args,
 };

@@ -53,6 +53,8 @@ macro_rules! trace_log {
 mod ai_ops;
 mod ipc;
 mod protocol;
+#[cfg(test)]
+mod tests;
 mod window;
 
 fn main() {
