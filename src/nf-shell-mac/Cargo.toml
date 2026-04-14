@@ -17,10 +17,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = [
+objc2-foundation = { version = "0.3.2", features = [
     "NSData", "NSString", "NSError", "NSURL", "NSURLRequest",
-    "NSURLResponse", "NSHTTPURLResponse",
-    "NSDictionary", "NSThread", "NSRunLoop",
+    "NSURLResponse", "NSDictionary", "NSThread", "NSRunLoop",
+    "NSGeometry", "NSObject",
 ] }
 objc2-app-kit = { version = "0.3", features = [
     "NSApplication", "NSWindow", "NSView", "NSScreen",
