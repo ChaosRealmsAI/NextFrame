@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Video Tech Landscape — NextFrame</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface-2: #1a1a26;
+  --accent: #6366f1;
+  --accent-50: rgba(99,102,241,0.5);
+  --accent-15: rgba(99,102,241,0.15);
+  --accent-08: rgba(99,102,241,0.08);
+  --accent-04: rgba(99,102,241,0.04);
+  --text-1: rgba(255,255,255,0.92);
+  --text-2: rgba(255,255,255,0.55);
+  --text-3: rgba(255,255,255,0.25);
+  --text-4: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.06);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --serif: 'Noto Serif SC', serif;
+  --sans: 'Inter', -apple-system, sans-serif;
+  --free: #22c55e;
+  --freemium: #f59e0b;
+  --paid: #ef4444;
+  --enterprise: #a855f7;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--sans);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Film grain */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+/* ---- HERO ---- */
+.hero {
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 6rem 2rem 4rem;
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, var(--accent-08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-08);
+  border: 1px solid var(--accent-15);
+  padding: 0.4rem 1.2rem;
+  border-radius: 100px;
+  margin-bottom: 2.5rem;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.2s forwards;
+}
+.hero h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.15;
+  max-width: 700px;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.4s forwards;
+}
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero-sub {
+  font-size: clamp(0.95rem, 1.8vw, 1.15rem);
+  color: var(--text-2);
+  max-width: 520px;
+  margin-top: 1.5rem;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.6s forwards;
+}
+.hero-note {
+  font-size: 0.8rem;
+  color: var(--text-3);
+  max-width: 480px;
+  margin-top: 2.5rem;
+  padding: 1rem 1.5rem;
+  background: var(--accent-04);
+  border: 1px solid var(--accent-15);
+  border-radius: 12px;
+  line-height: 1.6;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.8s forwards;
+}
+
+/* ---- NAV DOTS ---- */
+.cat-nav {
+  position: fixed;
+  right: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  z-index: 100;
+}
+.cat-nav a {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-3);
+  display: block;
+  transition: all 0.3s var(--ease);
+  position: relative;
+}
+.cat-nav a:hover,
+.cat-nav a.active {
+  background: var(--accent);
+  transform: scale(1.4);
+}
+.cat-nav a::after {
+  content: attr(data-label);
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.65rem;
+  color: var(--text-2);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.cat-nav a:hover::after { opacity: 1; }
+
+/* ---- PRICING LEGEND ---- */
+.legend {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 1s forwards;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--text-2);
+}
+.legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+/* ---- SECTION ---- */
+.section {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 5rem 2rem 3rem;
+}
+.section-num {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  opacity: 0.5;
+  margin-bottom: 0.5rem;
+}
+.section-title {
+  font-family: var(--serif);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.section-title-en {
+  font-size: 0.8rem;
+  color: var(--text-3);
+  font-weight: 400;
+  margin-bottom: 3rem;
+}
+.section-divider {
+  width: 40px;
+  height: 1px;
+  background: var(--accent-50);
+  margin-bottom: 3rem;
+}
+
+/* ---- CARDS GRID ---- */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.75rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s var(--ease), transform 0.3s var(--ease);
+  opacity: 0;
+  transform: translateY(24px);
+}
+.card.visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease), border-color 0.3s var(--ease);
+}
+.card:hover {
+  border-color: rgba(255,255,255,0.1);
+  transform: translateY(-2px);
+}
+
+/* top accent line */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0.3;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.card-name {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.card-org {
+  font-size: 0.7rem;
+  color: var(--text-3);
+  margin-top: 0.15rem;
+}
+.card-tier {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 100px;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+.card-tier.free { color: var(--free); background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); }
+.card-tier.freemium { color: var(--freemium); background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); }
+.card-tier.paid { color: var(--paid); background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); }
+.card-tier.enterprise { color: var(--enterprise); background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.2); }
+
+.card-desc {
+  font-size: 0.82rem;
+  color: var(--text-2);
+  line-height: 1.55;
+  margin-bottom: 1rem;
+}
+.card-diff {
+  font-size: 0.75rem;
+  color: var(--text-1);
+  padding: 0.6rem 0.85rem;
+  background: var(--accent-04);
+  border: 1px solid var(--accent-15);
+  border-radius: 8px;
+  line-height: 1.5;
+}
+.card-diff::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+.card-price {
+  font-size: 0.68rem;
+  color: var(--text-3);
+  margin-top: 0.75rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+/* ---- FOOTER ---- */
+.footer {
+  text-align: center;
+  padding: 5rem 2rem 3rem;
+  color: var(--text-4);
+  font-size: 0.72rem;
+}
+
+/* ---- ANIMATIONS ---- */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 768px) {
+  .cards { grid-template-columns: 1fr; }
+  .cat-nav { display: none; }
+  .hero { min-height: 70vh; padding: 4rem 1.5rem 3rem; }
+  .section { padding: 3rem 1.5rem 2rem; }
+}
+@media (min-width: 769px) and (max-width: 1024px) {
+  .cards { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="cat-nav" id="catNav"></nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">AI Video Tech Landscape 2026</div>
+  <h1>内容创作者的<br><em>AI 技术</em>全景图</h1>
+  <p class="hero-sub">6 大类 26 个工具 -- 从文生视频到自动剪辑，AI 正在重塑每一个创作环节</p>
+  <div class="hero-note">
+    NextFrame 可以集成这些技术 -- 作为 AI-native 视频编辑器，NextFrame 的 pipeline 天然支持对接外部 AI 服务。每一类技术都可以成为 NextFrame 工作流中的一个节点。
+  </div>
+  <div class="legend" style="margin-top:2rem">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--free)"></div>Free / Open Source</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--freemium)"></div>Freemium</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--paid)"></div>Paid</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--enterprise)"></div>Enterprise</div>
+  </div>
+</section>
+
+<!-- CONTENT -->
+<main id="main"></main>
+
+<div class="footer">NextFrame AI Video Tech Landscape -- built for content creators who think in pipelines, not clicks.</div>
+
+<script>
+const categories = [
+  {
+    id: 'video-gen',
+    num: '01',
+    title: 'AI 视频生成',
+    titleEn: 'Text-to-Video Generation',
+    items: [
+      { name:'Sora 2', org:'OpenAI', desc:'Cinematic text-to-video, up to 60s, strong narrative coherence.', diff:'Best cinematic quality and scene consistency', tier:'paid', price:'API pricing, $15-20/min estimated' },
+      { name:'Runway Gen-4.5', org:'Runway', desc:'Professional-grade generation, 15-30s clips, fine motion control.', diff:'Most mature creator tooling and editing integration', tier:'paid', price:'$12/mo Standard, $28/mo Pro' },
+      { name:'Kling 2.6', org:'ByteDance', desc:'Up to 120s generation with simultaneous audio synthesis.', diff:'Longest single-generation duration (120s) + built-in audio', tier:'freemium', price:'Free tier available, Pro from ~$10/mo' },
+      { name:'Veo 3', org:'Google', desc:'Google Cloud API, strong technical accuracy and physics simulation.', diff:'Best physical accuracy -- objects behave realistically', tier:'paid', price:'Google Cloud API pricing' },
+      { name:'Pika 2.5', org:'Pika', desc:'Fast iteration, lowest barrier to entry, good for rapid prototyping.', diff:'Fastest iteration cycle -- results in seconds', tier:'paid', price:'$8/mo Basic, most affordable entry' },
+      { name:'Luma Dream Machine', org:'Luma AI', desc:'Image-to-video specialist, excels at bringing stills to life.', diff:'Best at generating natural motion from a single static image', tier:'freemium', price:'Free tier, Pro from $24/mo' }
+    ]
+  },
+  {
+    id: 'digital-human',
+    num: '02',
+    title: '数字人 / AI 分身',
+    titleEn: 'Digital Human & Avatar',
+    items: [
+      { name:'HeyGen', org:'HeyGen', desc:'100+ stock avatars with industry-leading lip-sync accuracy.', diff:'Best lip-sync quality -- indistinguishable from real footage', tier:'paid', price:'$29/mo Creator, $89/mo Business' },
+      { name:'Synthesia', org:'Synthesia', desc:'230+ avatars, enterprise compliance, SOC 2 certified.', diff:'Most avatars (230+) and enterprise-grade security', tier:'enterprise', price:'Enterprise pricing, starts ~$22/mo' },
+      { name:'D-ID', org:'D-ID', desc:'Animate any still face photo, works with AI-generated portraits.', diff:'Works with any face image -- including AI art and historical photos', tier:'freemium', price:'Free trial, Pro from $6/mo' },
+      { name:'Argil', org:'Argil', desc:'Create custom avatars from your own footage, personal brand focus.', diff:'Best custom avatar creation from minimal source footage', tier:'paid', price:'From $49/mo' }
+    ]
+  },
+  {
+    id: 'voice-tts',
+    num: '03',
+    title: '语音克隆 / TTS',
+    titleEn: 'Voice Clone & Text-to-Speech',
+    items: [
+      { name:'ElevenLabs', org:'ElevenLabs', desc:'Industry-leading voice clone with fine-grained emotional control.', diff:'Best emotional range -- whisper, excitement, sadness on demand', tier:'freemium', price:'Free 10k chars/mo, $5/mo Starter' },
+      { name:'Edge TTS', org:'Microsoft', desc:'Free, decent quality, integrated with Microsoft ecosystem.', diff:'Zero cost, no API key needed, good enough for drafts', tier:'free', price:'Free' },
+      { name:'Volcengine TTS', org:'ByteDance', desc:'Chinese market leader, best Mandarin naturalness.', diff:'Best Chinese language TTS -- tonal accuracy unmatched', tier:'paid', price:'Pay-per-use, competitive pricing' },
+      { name:'Bark', org:'Open Source', desc:'Multilingual with emotion tokens, fully local deployment.', diff:'Open source + emotion tokens -- [laughs], [sighs] in text', tier:'free', price:'Free, self-hosted' },
+      { name:'F5-TTS', org:'Open Source', desc:'Latest open-source TTS, approaching commercial quality.', diff:'Highest quality open-source option, active development', tier:'free', price:'Free, self-hosted' }
+    ]
+  },
+  {
+    id: 'dubbing',
+    num: '04',
+    title: 'AI 配音 / 翻译',
+    titleEn: 'AI Dubbing & Translation',
+    items: [
+      { name:'Perso AI', org:'Perso AI', desc:'33+ languages, preserves original speaker tone and emotion.', diff:'Best tone preservation across languages -- sounds like the same person', tier:'paid', price:'Pay-per-minute' },
+      { name:'CAMB.AI', org:'CAMB.AI', desc:'Real-time dubbing for cinema and live sports broadcasting.', diff:'Real-time dubbing -- works on live streams', tier:'enterprise', price:'Enterprise / broadcast licensing' },
+      { name:'Rask AI', org:'Rask AI', desc:'End-to-end video translation with automatic lip-sync adjustment.', diff:'Automatic lip-sync adjustment to match translated audio', tier:'paid', price:'From $60/mo, 25 min/mo' },
+      { name:'HeyGen Translate', org:'HeyGen', desc:'Same avatar, different language -- maintains visual identity.', diff:'Avatar speaks new language with matching mouth movements', tier:'paid', price:'Included in HeyGen plans' }
+    ]
+  },
+  {
+    id: 'auto-edit',
+    num: '05',
+    title: 'AI 自动剪辑',
+    titleEn: 'AI Auto-Edit & Smart Cut',
+    items: [
+      { name:'OpusClip', org:'OpusClip', desc:'Long-form to short-form clips, 97% caption accuracy.', diff:'Best long-to-short algorithm -- finds viral moments automatically', tier:'freemium', price:'Free 1h/mo, $19/mo Pro' },
+      { name:'Vizard.ai', org:'Vizard', desc:'Engagement pattern detection, knows what hooks viewers.', diff:'Engagement scoring -- predicts which clips will perform', tier:'paid', price:'From $16/mo' },
+      { name:'Descript', org:'Descript', desc:'Text-based video editing -- edit video like editing a document.', diff:'Edit video by editing text transcript -- delete words, delete footage', tier:'freemium', price:'Free tier, $24/mo Pro' },
+      { name:'FunClip', org:'Alibaba', desc:'Paraformer ASR + LLM-based intelligent clipping, open source.', diff:'Open source + state-of-art Chinese ASR (Paraformer)', tier:'free', price:'Free, self-hosted' }
+    ]
+  },
+  {
+    id: 'image-gen',
+    num: '06',
+    title: 'AI 图像生成',
+    titleEn: 'Thumbnails, Assets & Visual Generation',
+    items: [
+      { name:'Flux.1', org:'Black Forest Labs', desc:'Open-source, high quality, strong text rendering in images.', diff:'Best text-in-image rendering among open-source models', tier:'free', price:'Free, self-hosted / API available' },
+      { name:'Stable Diffusion 3', org:'Stability AI', desc:'Most flexible, local deployment, massive community ecosystem.', diff:'Most customizable -- LoRA, ControlNet, infinite extensions', tier:'free', price:'Free, self-hosted' },
+      { name:'DALL-E 3', org:'OpenAI', desc:'Best prompt following, understands complex spatial descriptions.', diff:'Most faithful to prompt -- what you describe is what you get', tier:'paid', price:'$0.04-0.12 per image via API' },
+      { name:'Midjourney', org:'Midjourney', desc:'Unmatched aesthetics, best for eye-catching thumbnails and covers.', diff:'Best default aesthetics -- images look stunning without effort', tier:'paid', price:'$10/mo Basic, $30/mo Standard' }
+    ]
+  }
+];
+
+// ---- RENDER ----
+const main = document.getElementById('main');
+const nav = document.getElementById('catNav');
+
+categories.forEach((cat, ci) => {
+  // nav dot
+  const a = document.createElement('a');
+  a.href = `#${cat.id}`;
+  a.dataset.label = cat.title;
+  nav.appendChild(a);
+
+  // section
+  const section = document.createElement('section');
+  section.className = 'section';
+  section.id = cat.id;
+
+  let cardsHTML = '';
+  cat.items.forEach((item, ii) => {
+    cardsHTML += `
+      <div class="card" data-delay="${ii * 0.08}">
+        <div class="card-head">
+          <div>
+            <div class="card-name">${item.name}</div>
+            <div class="card-org">${item.org}</div>
+          </div>
+          <span class="card-tier ${item.tier}">${item.tier}</span>
+        </div>
+        <div class="card-desc">${item.desc}</div>
+        <div class="card-diff">${item.diff}</div>
+        <div class="card-price">${item.price}</div>
+      </div>`;
+  });
+
+  section.innerHTML = `
+    <div class="section-num">${cat.num}</div>
+    <div class="section-title">${cat.title}</div>
+    <div class="section-title-en">${cat.titleEn}</div>
+    <div class="section-divider"></div>
+    <div class="cards">${cardsHTML}</div>`;
+
+  main.appendChild(section);
+});
+
+// ---- INTERSECTION OBSERVER for stagger ----
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const delay = parseFloat(entry.target.dataset.delay) || 0;
+      setTimeout(() => {
+        entry.target.classList.add('visible');
+      }, delay * 1000);
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.card').forEach(card => observer.observe(card));
+
+// ---- NAV HIGHLIGHT ----
+const sections = document.querySelectorAll('.section');
+const navLinks = document.querySelectorAll('.cat-nav a');
+const secObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'));
+      const idx = [...sections].indexOf(entry.target);
+      if (navLinks[idx]) navLinks[idx].classList.add('active');
+    }
+  });
+}, { threshold: 0.3 });
+sections.forEach(s => secObserver.observe(s));
+</script>
+</body>
+</html>

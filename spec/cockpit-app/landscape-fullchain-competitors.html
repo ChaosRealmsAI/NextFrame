@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame — 全链路竞品地图</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface-2: #1a1a26;
+  --accent: #6366f1;
+  --accent-15: rgba(99,102,241,0.15);
+  --accent-08: rgba(99,102,241,0.08);
+  --done: #22c55e;
+  --done-15: rgba(34,197,94,0.15);
+  --done-bg: rgba(34,197,94,0.06);
+  --partial: #f59e0b;
+  --partial-15: rgba(245,158,11,0.15);
+  --partial-bg: rgba(245,158,11,0.06);
+  --missing: #ef4444;
+  --missing-15: rgba(239,68,68,0.15);
+  --missing-bg: rgba(239,68,68,0.06);
+  --text-1: rgba(255,255,255,0.92);
+  --text-2: rgba(255,255,255,0.55);
+  --text-3: rgba(255,255,255,0.25);
+  --border: rgba(255,255,255,0.06);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --serif: 'Noto Serif SC', serif;
+  --sans: 'Inter', -apple-system, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--sans);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+/* ─── HEADER ─── */
+.header {
+  text-align: center;
+  padding: 4rem 2rem 2rem;
+  position: relative;
+}
+.header::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, var(--accent-08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.header-badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(99,102,241,0.3);
+  padding: 0.35rem 1rem;
+  border-radius: 100px;
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  opacity: 0;
+  animation: fadeUp 0.6s var(--ease) 0.1s forwards;
+}
+.header h1 {
+  font-family: var(--serif);
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 0.75rem;
+  opacity: 0;
+  animation: fadeUp 0.6s var(--ease) 0.2s forwards;
+}
+.header p {
+  color: var(--text-2);
+  font-size: 0.95rem;
+  max-width: 600px;
+  margin: 0 auto;
+  opacity: 0;
+  animation: fadeUp 0.6s var(--ease) 0.3s forwards;
+}
+
+/* ─── PIPELINE (horizontal flow) ─── */
+.pipeline-wrap {
+  padding: 2rem 2rem 1rem;
+  overflow-x: auto;
+  opacity: 0;
+  animation: fadeUp 0.6s var(--ease) 0.4s forwards;
+}
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 900px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.pipe-node {
+  flex: 1;
+  text-align: center;
+  position: relative;
+  padding: 0.6rem 0.3rem;
+  cursor: pointer;
+  transition: transform 0.2s var(--ease);
+}
+.pipe-node:hover { transform: translateY(-2px); }
+.pipe-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  margin: 0 auto 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  position: relative;
+  z-index: 2;
+}
+.pipe-dot.done { background: var(--done); box-shadow: 0 0 20px rgba(34,197,94,0.3); }
+.pipe-dot.partial { background: var(--partial); box-shadow: 0 0 20px rgba(245,158,11,0.3); }
+.pipe-dot.missing { background: var(--missing); box-shadow: 0 0 20px rgba(239,68,68,0.3); }
+.pipe-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.pipe-label-zh {
+  font-size: 0.65rem;
+  color: var(--text-3);
+  margin-top: 0.1rem;
+}
+/* connector lines */
+.pipe-connector {
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  position: relative;
+  flex-shrink: 0;
+  flex: 0.5;
+}
+.pipe-connector::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: -3px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid var(--text-3);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+/* ─── LEGEND ─── */
+.legend {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  padding: 0.5rem 2rem 2rem;
+  opacity: 0;
+  animation: fadeUp 0.6s var(--ease) 0.5s forwards;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* ─── CALLOUT ─── */
+.callout {
+  max-width: 900px;
+  margin: 0 auto 2rem;
+  padding: 1.2rem 1.5rem;
+  background: var(--accent-08);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-1);
+  line-height: 1.7;
+  opacity: 0;
+  animation: fadeUp 0.6s var(--ease) 0.6s forwards;
+}
+.callout strong { color: var(--accent); }
+
+/* ─── STAGES ─── */
+.stages {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 2rem 4rem;
+}
+.stage {
+  margin-bottom: 2rem;
+  opacity: 0;
+  animation: fadeUp 0.5s var(--ease) forwards;
+}
+.stage-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.stage-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.stage-num.done { background: var(--done); }
+.stage-num.partial { background: var(--partial); }
+.stage-num.missing { background: var(--missing); }
+.stage-title {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.stage-title-en {
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--text-3);
+  font-weight: 400;
+  margin-left: 0.5rem;
+}
+.stage-status {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.2rem 0.6rem;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.stage-status.done { color: var(--done); background: var(--done-15); }
+.stage-status.partial { color: var(--partial); background: var(--partial-15); }
+.stage-status.missing { color: var(--missing); background: var(--missing-15); }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: border-color 0.2s, transform 0.2s var(--ease);
+}
+.card:hover {
+  border-color: rgba(255,255,255,0.12);
+  transform: translateY(-1px);
+}
+.card.nf {
+  border-color: rgba(99,102,241,0.3);
+  background: linear-gradient(135deg, var(--accent-08), var(--surface));
+}
+.card-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.card-name .nf-mark {
+  font-size: 0.6rem;
+  color: var(--accent);
+  border: 1px solid rgba(99,102,241,0.4);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.card-type {
+  font-size: 0.65rem;
+  font-weight: 500;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 0.4rem;
+}
+.card-type.saas { color: #818cf8; background: rgba(129,140,248,0.12); }
+.card-type.opensource { color: var(--done); background: var(--done-15); }
+.card-type.free { color: #38bdf8; background: rgba(56,189,248,0.12); }
+.card-type.freemium { color: #c084fc; background: rgba(192,132,252,0.12); }
+.card-type.local { color: var(--accent); background: var(--accent-15); }
+.card-desc {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+/* ─── ANIMATIONS ─── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 768px) {
+  .pipeline-wrap { padding: 1.5rem 1rem 0.5rem; }
+  .stages { padding: 0 1rem 3rem; }
+  .cards { grid-template-columns: 1fr; }
+  .legend { gap: 1rem; flex-wrap: wrap; }
+  .callout { margin: 0 1rem 2rem; }
+  .stage-header { flex-wrap: wrap; }
+  .stage-status { margin-left: 0; margin-top: 0.3rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-badge">Competitive Landscape</span>
+  <h1>8-Stage Content Pipeline</h1>
+  <p>每个环节的竞品、开源工具、与 NextFrame 的定位</p>
+</div>
+
+<!-- Pipeline Flow -->
+<div class="pipeline-wrap">
+  <div class="pipeline">
+    <div class="pipe-node" onclick="scrollToStage(1)">
+      <div class="pipe-dot missing">1</div>
+      <div class="pipe-label">Topic</div>
+      <div class="pipe-label-zh">选题</div>
+    </div>
+    <div class="pipe-connector"></div>
+    <div class="pipe-node" onclick="scrollToStage(2)">
+      <div class="pipe-dot partial">2</div>
+      <div class="pipe-label">Script</div>
+      <div class="pipe-label-zh">脚本</div>
+    </div>
+    <div class="pipe-connector"></div>
+    <div class="pipe-node" onclick="scrollToStage(3)">
+      <div class="pipe-dot partial">3</div>
+      <div class="pipe-label">Assets</div>
+      <div class="pipe-label-zh">素材</div>
+    </div>
+    <div class="pipe-connector"></div>
+    <div class="pipe-node" onclick="scrollToStage(4)">
+      <div class="pipe-dot done">4</div>
+      <div class="pipe-label">Production</div>
+      <div class="pipe-label-zh">制作</div>
+    </div>
+    <div class="pipe-connector"></div>
+    <div class="pipe-node" onclick="scrollToStage(5)">
+      <div class="pipe-dot done">5</div>
+      <div class="pipe-label">Voice</div>
+      <div class="pipe-label-zh">配音</div>
+    </div>
+    <div class="pipe-connector"></div>
+    <div class="pipe-node" onclick="scrollToStage(6)">
+      <div class="pipe-dot done">6</div>
+      <div class="pipe-label">Publish</div>
+      <div class="pipe-label-zh">发布</div>
+    </div>
+    <div class="pipe-connector"></div>
+    <div class="pipe-node" onclick="scrollToStage(7)">
+      <div class="pipe-dot missing">7</div>
+      <div class="pipe-label">Analytics</div>
+      <div class="pipe-label-zh">数据</div>
+    </div>
+    <div class="pipe-connector"></div>
+    <div class="pipe-node" onclick="scrollToStage(8)">
+      <div class="pipe-dot missing">8</div>
+      <div class="pipe-label">Iteration</div>
+      <div class="pipe-label-zh">迭代</div>
+    </div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--done)"></div> Done</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--partial)"></div> Partial</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--missing)"></div> To Build</div>
+</div>
+
+<!-- Callout -->
+<div class="callout">
+  <strong>市场现状：</strong>每个环节都有产品，但没有人串成一条链。<br>
+  NextFrame 的机会 = <strong>全链路</strong> + <strong>本地</strong> + <strong>AI-native</strong>
+</div>
+
+<!-- Stage Sections -->
+<div class="stages">
+
+  <!-- Stage 1 -->
+  <div class="stage" id="stage-1" style="animation-delay:0.7s">
+    <div class="stage-header">
+      <div class="stage-num missing">1</div>
+      <div class="stage-title">选题<span class="stage-title-en">Topic Selection</span></div>
+      <div class="stage-status missing">To Build</div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-name">蝉妈妈 / 飞瓜 / 千瓜</div>
+        <span class="card-type saas">Paid SaaS</span>
+        <div class="card-desc">抖音/小红书数据分析，选题热度追踪，爆款预测</div>
+      </div>
+      <div class="card">
+        <div class="card-name">TubeLab / vidIQ</div>
+        <span class="card-type freemium">Freemium</span>
+        <div class="card-desc">YouTube SEO + 选题分析，关键词研究，竞品频道对比</div>
+      </div>
+      <div class="card">
+        <div class="card-name">TrendRadar</div>
+        <span class="card-type opensource">Open Source</span>
+        <div class="card-desc">35+ 平台趋势聚合，开源可自部署</div>
+      </div>
+      <div class="card nf">
+        <div class="card-name">NextFrame <span class="nf-mark">OURS</span></div>
+        <span class="card-type local">Local + AI</span>
+        <div class="card-desc">待建设 -- AI 浏览器巡视 + 本地分析，数据不出本地</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 2 -->
+  <div class="stage" id="stage-2" style="animation-delay:0.8s">
+    <div class="stage-header">
+      <div class="stage-num partial">2</div>
+      <div class="stage-title">脚本<span class="stage-title-en">Script</span></div>
+      <div class="stage-status partial">Partial</div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-name">Jasper</div>
+        <span class="card-type saas">Paid SaaS</span>
+        <div class="card-desc">AI Agents 写营销内容，企业级，团队协作</div>
+      </div>
+      <div class="card">
+        <div class="card-name">讯飞绘文</div>
+        <span class="card-type free">Free</span>
+        <div class="card-desc">中文平台脚本生成，免费，适配国内短视频格式</div>
+      </div>
+      <div class="card">
+        <div class="card-name">Copy.ai / Writesonic</div>
+        <span class="card-type freemium">Freemium</span>
+        <div class="card-desc">AI 文案工具，多模板，支持长短内容</div>
+      </div>
+      <div class="card nf">
+        <div class="card-name">NextFrame <span class="nf-mark">OURS</span></div>
+        <span class="card-type local">Local + AI</span>
+        <div class="card-desc">pipeline script-set 已有，需加 AI 写作能力</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 3 -->
+  <div class="stage" id="stage-3" style="animation-delay:0.9s">
+    <div class="stage-header">
+      <div class="stage-num partial">3</div>
+      <div class="stage-title">素材<span class="stage-title-en">Assets</span></div>
+      <div class="stage-status partial">Partial</div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-name">Sora / Runway / Kling</div>
+        <span class="card-type saas">Paid SaaS</span>
+        <div class="card-desc">AI 视频生成，文字/图片转视频，前沿模型</div>
+      </div>
+      <div class="card">
+        <div class="card-name">Flux / SD / DALL-E</div>
+        <span class="card-type freemium">Freemium</span>
+        <div class="card-desc">AI 图片生成，开源 + 商业混合，风格多样</div>
+      </div>
+      <div class="card">
+        <div class="card-name">yt-dlp</div>
+        <span class="card-type opensource">Open Source</span>
+        <div class="card-desc">视频下载瑞士军刀，支持 1000+ 网站</div>
+      </div>
+      <div class="card nf">
+        <div class="card-name">NextFrame <span class="nf-mark">OURS</span></div>
+        <span class="card-type local">Local + AI</span>
+        <div class="card-desc">source 链路已有，需接入生成 API</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 4 -->
+  <div class="stage" id="stage-4" style="animation-delay:1.0s">
+    <div class="stage-header">
+      <div class="stage-num done">4</div>
+      <div class="stage-title">制作<span class="stage-title-en">Production</span></div>
+      <div class="stage-status done">Done</div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-name">Remotion</div>
+        <span class="card-type opensource">Open Source</span>
+        <div class="card-desc">React code-first 视频，市场领导者，社区活跃</div>
+      </div>
+      <div class="card">
+        <div class="card-name">Shotstack</div>
+        <span class="card-type saas">Pay-per-use</span>
+        <div class="card-desc">JSON API 云渲染，按用量计费，无需本地算力</div>
+      </div>
+      <div class="card">
+        <div class="card-name">Creatomate</div>
+        <span class="card-type saas">Paid SaaS</span>
+        <div class="card-desc">JSON API 云端视频生成，模板驱动，批量化</div>
+      </div>
+      <div class="card">
+        <div class="card-name">剪映 / CapCut</div>
+        <span class="card-type free">Free</span>
+        <div class="card-desc">GUI 编辑器，免费，消费级，抖音生态绑定</div>
+      </div>
+      <div class="card nf">
+        <div class="card-name">NextFrame <span class="nf-mark">OURS</span></div>
+        <span class="card-type local">Local + AI</span>
+        <div class="card-desc">JSON + CLI + 23 scenes，本地渲染，AI 可操作</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 5 -->
+  <div class="stage" id="stage-5" style="animation-delay:1.1s">
+    <div class="stage-header">
+      <div class="stage-num done">5</div>
+      <div class="stage-title">配音<span class="stage-title-en">Voice</span></div>
+      <div class="stage-status done">Done</div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-name">ElevenLabs</div>
+        <span class="card-type saas">Paid SaaS</span>
+        <div class="card-desc">声音克隆领导者，超自然度，多语言</div>
+      </div>
+      <div class="card">
+        <div class="card-name">Edge TTS</div>
+        <span class="card-type free">Free</span>
+        <div class="card-desc">微软免费 TTS，质量不错，无需 API key</div>
+      </div>
+      <div class="card">
+        <div class="card-name">火山引擎 TTS</div>
+        <span class="card-type saas">Paid SaaS</span>
+        <div class="card-desc">中文 TTS 领导者，字节生态，音色丰富</div>
+      </div>
+      <div class="card nf">
+        <div class="card-name">NextFrame <span class="nf-mark">OURS</span></div>
+        <span class="card-type local">Local + AI</span>
+        <div class="card-desc">nf-tts: Edge + 火山双后端，本地管理，CLI 驱动</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 6 -->
+  <div class="stage" id="stage-6" style="animation-delay:1.2s">
+    <div class="stage-header">
+      <div class="stage-num done">6</div>
+      <div class="stage-title">发布<span class="stage-title-en">Publish</span></div>
+      <div class="stage-status done">Done</div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-name">social-auto-upload</div>
+        <span class="card-type opensource">Open Source</span>
+        <div class="card-desc">多平台自动上传，Python，社区维护</div>
+      </div>
+      <div class="card">
+        <div class="card-name">影刀 RPA</div>
+        <span class="card-type saas">Paid SaaS</span>
+        <div class="card-desc">桌面自动化，流程编排，企业级</div>
+      </div>
+      <div class="card">
+        <div class="card-name">Buffer / Hootsuite</div>
+        <span class="card-type saas">Paid SaaS</span>
+        <div class="card-desc">社媒管理，国际平台为主，定时发布</div>
+      </div>
+      <div class="card nf">
+        <div class="card-name">NextFrame <span class="nf-mark">OURS</span></div>
+        <span class="card-type local">Local + AI</span>
+        <div class="card-desc">nf-publish: 7 平台，WKWebView 浏览器自动化，本地</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 7 -->
+  <div class="stage" id="stage-7" style="animation-delay:1.3s">
+    <div class="stage-header">
+      <div class="stage-num missing">7</div>
+      <div class="stage-title">数据<span class="stage-title-en">Analytics</span></div>
+      <div class="stage-status missing">To Build</div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-name">蝉妈妈 / 新榜</div>
+        <span class="card-type saas">Paid SaaS</span>
+        <div class="card-desc">平台数据分析，粉丝画像，收益追踪</div>
+      </div>
+      <div class="card">
+        <div class="card-name">Google Analytics</div>
+        <span class="card-type free">Free</span>
+        <div class="card-desc">网页分析，仅限 Web，不覆盖短视频平台</div>
+      </div>
+      <div class="card" style="border-style:dashed">
+        <div class="card-name" style="color:var(--text-3)">No Open Source Solution</div>
+        <span class="card-type" style="color:var(--text-3);background:rgba(255,255,255,0.04)">Gap</span>
+        <div class="card-desc">短视频数据分析领域无开源方案</div>
+      </div>
+      <div class="card nf">
+        <div class="card-name">NextFrame <span class="nf-mark">OURS</span></div>
+        <span class="card-type local">Local + AI</span>
+        <div class="card-desc">待建设 -- AI 浏览器看后台 + 本地 dashboard</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 8 -->
+  <div class="stage" id="stage-8" style="animation-delay:1.4s">
+    <div class="stage-header">
+      <div class="stage-num missing">8</div>
+      <div class="stage-title">迭代<span class="stage-title-en">Iteration</span></div>
+      <div class="stage-status missing">To Build</div>
+    </div>
+    <div class="cards">
+      <div class="card" style="border-style:dashed">
+        <div class="card-name" style="color:var(--text-3)">No Product Does This Well</div>
+        <span class="card-type" style="color:var(--text-3);background:rgba(255,255,255,0.04)">Gap</span>
+        <div class="card-desc">市场空白，没有产品真正做好内容迭代闭环</div>
+      </div>
+      <div class="card">
+        <div class="card-name">Palo</div>
+        <span class="card-type saas">$250/mo</span>
+        <div class="card-desc">YouTube only，数据驱动优化建议，价格高昂</div>
+      </div>
+      <div class="card nf">
+        <div class="card-name">NextFrame <span class="nf-mark">OURS</span></div>
+        <span class="card-type local">Local + AI</span>
+        <div class="card-desc">待建设 -- 全链路数据闭环，选题到迭代自动反馈</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function scrollToStage(n) {
+  const el = document.getElementById('stage-' + n);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Intersection Observer for stagger animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.animationPlayState = 'running';
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.stage').forEach(el => {
+  el.style.animationPlayState = 'paused';
+  observer.observe(el);
+});
+</script>
+
+</body>
+</html>

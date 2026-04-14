@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>选题工具竞品图谱 — Topic Selection Tools Landscape</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface-2: #1a1a26;
+  --accent: #6366f1;
+  --accent-15: rgba(99,102,241,0.15);
+  --accent-08: rgba(99,102,241,0.08);
+  --accent-04: rgba(99,102,241,0.04);
+  --text-1: rgba(255,255,255,0.92);
+  --text-2: rgba(255,255,255,0.55);
+  --text-3: rgba(255,255,255,0.25);
+  --text-4: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.06);
+  --green: #22c55e;
+  --green-15: rgba(34,197,94,0.15);
+  --amber: #f59e0b;
+  --amber-15: rgba(245,158,11,0.15);
+  --red: #ef4444;
+  --red-15: rgba(239,68,68,0.15);
+  --cyan: #06b6d4;
+  --cyan-15: rgba(6,182,212,0.15);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --serif: 'Noto Serif SC', serif;
+  --sans: 'Inter', -apple-system, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--sans);
+  line-height: 1.7;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Film grain */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.03;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+/* ─── LAYOUT ─── */
+.container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+
+/* ─── HERO ─── */
+.hero {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 6rem 2rem 4rem;
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, var(--accent-08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent-15);
+  padding: 0.4rem 1.2rem;
+  border-radius: 100px;
+  margin-bottom: 2.5rem;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.2s forwards;
+}
+.hero h1 {
+  font-family: var(--serif);
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 1.5rem;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.4s forwards;
+}
+.hero h1 em {
+  font-style: normal;
+  color: var(--accent);
+}
+.hero-sub {
+  font-size: 1.05rem;
+  color: var(--text-2);
+  max-width: 600px;
+  opacity: 0;
+  animation: fadeUp 0.8s var(--ease) 0.6s forwards;
+}
+
+/* ─── SECTION ─── */
+.section {
+  padding: 5rem 0;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+}
+.section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.section-header {
+  margin-bottom: 3rem;
+}
+.section-number {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+.section-title {
+  font-family: var(--serif);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.section-desc {
+  color: var(--text-2);
+  font-size: 0.9rem;
+  max-width: 560px;
+}
+.section-sub-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-top: 2.5rem;
+  margin-bottom: 1.2rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ─── CARDS GRID ─── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1.8rem;
+  position: relative;
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+.card:hover {
+  border-color: rgba(255,255,255,0.12);
+  background: var(--surface-2);
+}
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+  gap: 0.8rem;
+}
+.card-name {
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+.card-name-cn {
+  font-family: var(--serif);
+}
+.badge {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.badge-free {
+  background: var(--green-15);
+  color: var(--green);
+  border: 1px solid rgba(34,197,94,0.2);
+}
+.badge-paid {
+  background: var(--amber-15);
+  color: var(--amber);
+  border: 1px solid rgba(245,158,11,0.2);
+}
+.badge-enterprise {
+  background: var(--red-15);
+  color: var(--red);
+  border: 1px solid rgba(239,68,68,0.2);
+}
+.badge-freemium {
+  background: var(--cyan-15);
+  color: var(--cyan);
+  border: 1px solid rgba(6,182,212,0.2);
+}
+.badge-opensource {
+  background: var(--accent-15);
+  color: var(--accent);
+  border: 1px solid rgba(99,102,241,0.2);
+}
+.card-platforms {
+  font-size: 0.75rem;
+  color: var(--accent);
+  margin-bottom: 0.6rem;
+  letter-spacing: 0.02em;
+}
+.card-desc {
+  font-size: 0.85rem;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+.card-price {
+  font-size: 0.75rem;
+  color: var(--text-3);
+  margin-top: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── INSIGHT BOX ─── */
+.insight {
+  margin: 5rem auto;
+  max-width: 800px;
+  padding: 2.5rem;
+  background: var(--accent-04);
+  border: 1px solid var(--accent-15);
+  position: relative;
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+}
+.insight.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.insight-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+.insight-text {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  line-height: 1.9;
+  color: var(--text-1);
+}
+.insight-text em {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ─── FOOTER ─── */
+.footer {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-3);
+  font-size: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── ANIMATIONS ─── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Stagger cards */
+.card {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease), border-color 0.3s ease, background 0.3s ease;
+}
+.section.visible .card:nth-child(1) { transition-delay: 0.05s; opacity: 1; transform: translateY(0); }
+.section.visible .card:nth-child(2) { transition-delay: 0.1s; opacity: 1; transform: translateY(0); }
+.section.visible .card:nth-child(3) { transition-delay: 0.15s; opacity: 1; transform: translateY(0); }
+.section.visible .card:nth-child(4) { transition-delay: 0.2s; opacity: 1; transform: translateY(0); }
+.section.visible .card:nth-child(5) { transition-delay: 0.25s; opacity: 1; transform: translateY(0); }
+.section.visible .card:nth-child(6) { transition-delay: 0.3s; opacity: 1; transform: translateY(0); }
+.section.visible .card:nth-child(7) { transition-delay: 0.35s; opacity: 1; transform: translateY(0); }
+.section.visible .card:nth-child(8) { transition-delay: 0.4s; opacity: 1; transform: translateY(0); }
+.section.visible .card:nth-child(9) { transition-delay: 0.45s; opacity: 1; transform: translateY(0); }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 640px) {
+  .container { padding: 0 1.2rem; }
+  .cards { grid-template-columns: 1fr; }
+  .hero { padding: 4rem 1.2rem 3rem; min-height: 60vh; }
+  .section { padding: 3rem 0; }
+  .insight { margin: 3rem 1.2rem; padding: 1.8rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <div class="hero-badge">Competitive Landscape</div>
+  <h1>选题工具<em>竞品图谱</em></h1>
+  <p class="hero-sub">帮创作者决定「下一条做什么」的工具，按思路分四大流派</p>
+</section>
+
+<!-- ─── APPROACH 1: 数据驱动 ─── -->
+<section class="section" id="data-driven">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-number">Approach 01</div>
+      <h2 class="section-title">数据驱动</h2>
+      <p class="section-desc">看什么数据好，跟着做。平台级数据分析，追爆款、看带货、跟排行。</p>
+    </div>
+
+    <div class="section-sub-label">Chinese Platforms</div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name card-name-cn">蝉妈妈</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">抖音 / 小红书 / 视频号</div>
+        <div class="card-desc">爆款追踪 + 带货分析，直播电商数据最全</div>
+        <div class="card-price">年费几千起</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name card-name-cn">飞瓜数据</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">抖音 / 小红书 / B站</div>
+        <div class="card-desc">内容分析 + 达人排行，横向对比竞品账号</div>
+        <div class="card-price">年费几千起</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name card-name-cn">千瓜数据</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">小红书为主</div>
+        <div class="card-desc">笔记分析 + 热搜词，小红书垂直数据最深</div>
+        <div class="card-price">年费几千起</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name card-name-cn">新榜</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">全平台</div>
+        <div class="card-desc">跨平台数据 + 排行榜，国内覆盖面最广</div>
+        <div class="card-price">年费</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name card-name-cn">灰豚数据</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">抖音 / 快手 / 小红书</div>
+        <div class="card-desc">短视频数据，直播 + 短视频双场景分析</div>
+        <div class="card-price">年费</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name card-name-cn">卡思数据</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">抖音 / 快手 / B站 / YouTube</div>
+        <div class="card-desc">视频内容分析，国内少见覆盖 YouTube 的工具</div>
+        <div class="card-price">年费</div>
+      </div>
+    </div>
+
+    <div class="section-sub-label">International</div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">BuzzSumo</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">Cross-platform</div>
+        <div class="card-desc">Content research across billions of articles and social posts, the gold standard</div>
+        <div class="card-price">Premium pricing</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">SEMrush</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">SEO / Web</div>
+        <div class="card-desc">SEO + topic research, keyword gap analysis, content audit tools</div>
+        <div class="card-price">$119/mo+</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">Ahrefs</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">SEO / Web</div>
+        <div class="card-desc">Content explorer with 1B+ keywords, backlink-driven topic discovery</div>
+        <div class="card-price">Paid plans</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── APPROACH 2: 热点追踪 ─── -->
+<section class="section" id="trending">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-number">Approach 02</div>
+      <h2 class="section-title">热点追踪</h2>
+      <p class="section-desc">追实时热搜和趋势，第一时间抓住流量窗口。</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name card-name-cn">今日热榜</span>
+          <span class="badge badge-free">Free</span>
+        </div>
+        <div class="card-platforms">全平台热搜聚合</div>
+        <div class="card-desc">一页看完所有平台热搜，简单直接</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">Google Trends</span>
+          <span class="badge badge-free">Free</span>
+        </div>
+        <div class="card-platforms">Google Search</div>
+        <div class="card-desc">Search volume trends over time, regional breakdown, related queries</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">Exploding Topics</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">Cross-platform</div>
+        <div class="card-desc">AI trend discovery, 770k+ topics tracked, spot trends before they peak</div>
+        <div class="card-price">Paid plans</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">Glimpse</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">TikTok / Reddit / YouTube</div>
+        <div class="card-desc">100M+ signals from social platforms, consumer trend intelligence</div>
+        <div class="card-price">Paid plans</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">TrendRadar</span>
+          <span class="badge badge-opensource">Open Source</span>
+        </div>
+        <div class="card-platforms">35+ platforms</div>
+        <div class="card-desc">Self-hosted, AI analysis of trends across 35+ sources, Docker deploy</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">DailyHotApi</span>
+          <span class="badge badge-opensource">Open Source</span>
+        </div>
+        <div class="card-platforms">Aggregated API</div>
+        <div class="card-desc">Trending data API, self-hosted aggregation of Chinese platform hot lists</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── APPROACH 3: 对标分析 ─── -->
+<section class="section" id="competitor">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-number">Approach 03</div>
+      <h2 class="section-title">对标分析</h2>
+      <p class="section-desc">看竞品和对标账号，找 outlier 视频，学已验证的选题。</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">Palo</span>
+          <span class="badge badge-enterprise">Enterprise</span>
+        </div>
+        <div class="card-platforms">YouTube</div>
+        <div class="card-desc">Ex-MrBeast strategist built, AI ideation + analytics, requires 100k+ followers</div>
+        <div class="card-price">$250/mo</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">TubeLab</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">YouTube</div>
+        <div class="card-desc">YouTube niche research, outlier video finder, deep channel analytics</div>
+        <div class="card-price">Paid plans</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">vidIQ</span>
+          <span class="badge badge-freemium">Freemium</span>
+        </div>
+        <div class="card-platforms">YouTube</div>
+        <div class="card-desc">YouTube optimization suite, AI video ideas, keyword scores, trend alerts</div>
+        <div class="card-price">Free tier + paid plans</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">OutlierKit</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">YouTube</div>
+        <div class="card-desc">Finds videos performing 5-10x above channel average, pure signal extraction</div>
+        <div class="card-price">Paid plans</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">TubeBuddy</span>
+          <span class="badge badge-freemium">Freemium</span>
+        </div>
+        <div class="card-platforms">YouTube</div>
+        <div class="card-desc">Keyword research, competitor analysis, A/B testing for thumbnails and titles</div>
+        <div class="card-price">Free tier + paid plans</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── APPROACH 4: AI 生成 ─── -->
+<section class="section" id="ai-gen">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-number">Approach 04</div>
+      <h2 class="section-title">AI 生成</h2>
+      <p class="section-desc">AI 直接出选题建议，从 gap 分析到标题生成一条龙。</p>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">Jasper</span>
+          <span class="badge badge-enterprise">Enterprise</span>
+        </div>
+        <div class="card-platforms">Cross-platform</div>
+        <div class="card-desc">100+ specialized AI agents for marketing, brand voice training, enterprise scale</div>
+        <div class="card-price">Enterprise pricing</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name card-name-cn">讯飞绘文</span>
+          <span class="badge badge-free">Free</span>
+        </div>
+        <div class="card-platforms">抖音 / 小红书 / 公众号</div>
+        <div class="card-desc">AI 选题推荐 + 内容生成，国内中文创作者友好</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">Copy.ai</span>
+          <span class="badge badge-freemium">Freemium</span>
+        </div>
+        <div class="card-platforms">Cross-platform</div>
+        <div class="card-desc">Content idea generator, blog outlines, social copy, brainstorming assistant</div>
+        <div class="card-price">Free tier + paid plans</div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-name">Writesonic</span>
+          <span class="badge badge-paid">Paid</span>
+        </div>
+        <div class="card-platforms">Cross-platform</div>
+        <div class="card-desc">Competitor gap analysis, AI content ideation with SEO integration</div>
+        <div class="card-price">Paid plans</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── INSIGHT BOX ─── -->
+<div class="container">
+  <div class="insight" id="insight">
+    <div class="insight-label">NextFrame Opportunity</div>
+    <p class="insight-text">
+      这些 SaaS 每年收几千块，核心壁垒是<em>数据</em>。<br><br>
+      NextFrame 用 AI 操作浏览器的模式可以绕过：<br>
+      用户登录自己的账号 &rarr; AI 帮看数据 &rarr; 本地分析 &rarr; <em>免费</em>。
+    </p>
+  </div>
+</div>
+
+<!-- ─── FOOTER ─── -->
+<footer class="footer">
+  NextFrame &mdash; Topic Selection Tools Landscape &mdash; 2026
+</footer>
+
+<script>
+// Intersection Observer for stagger animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12 });
+
+document.querySelectorAll('.section, .insight').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
