@@ -4,7 +4,7 @@ use objc2_app_kit::{NSButton, NSTextField, NSView};
 use objc2_foundation::NSString;
 use objc2_web_kit::WKWebView;
 
-use super::*;
+use super::{APP_STATE, BOOKMARK_COLORS, BrowserTab, BrowserTabKind, TABS};
 
 pub(crate) fn active_tab_id() -> Option<usize> {
     let state = APP_STATE.get()?;

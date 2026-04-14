@@ -96,9 +96,18 @@ impl PilotUIDelegate {
         if let Err(e) = catch_objc(|| {
             ret = Some(unsafe { msg_send![super(this), init] });
         }) {
-            panic!("PilotUIDelegate init failed: {e}");
+            crate::state::log_crash("ERROR", "PilotUIDelegate::new", &e);
+            std::process::abort();
         }
-        ret.expect("PilotUIDelegate init returned no object")
+        let Some(ret) = ret else {
+            crate::state::log_crash(
+                "ERROR",
+                "PilotUIDelegate::new",
+                "init returned no object",
+            );
+            std::process::abort();
+        };
+        ret
     }
 }
 
@@ -191,9 +200,18 @@ impl PilotNavDelegate {
         if let Err(e) = catch_objc(|| {
             ret = Some(unsafe { msg_send![super(this), init] });
         }) {
-            panic!("PilotNavDelegate init failed: {e}");
+            crate::state::log_crash("ERROR", "PilotNavDelegate::new", &e);
+            std::process::abort();
         }
-        ret.expect("PilotNavDelegate init returned no object")
+        let Some(ret) = ret else {
+            crate::state::log_crash(
+                "ERROR",
+                "PilotNavDelegate::new",
+                "init returned no object",
+            );
+            std::process::abort();
+        };
+        ret
     }
 }
 
@@ -289,8 +307,17 @@ impl BrowserActionTarget {
         if let Err(e) = catch_objc(|| {
             ret = Some(unsafe { msg_send![super(this), init] });
         }) {
-            panic!("BrowserActionTarget init failed: {e}");
+            crate::state::log_crash("ERROR", "BrowserActionTarget::new", &e);
+            std::process::abort();
         }
-        ret.expect("BrowserActionTarget init returned no object")
+        let Some(ret) = ret else {
+            crate::state::log_crash(
+                "ERROR",
+                "BrowserActionTarget::new",
+                "init returned no object",
+            );
+            std::process::abort();
+        };
+        ret
     }
 }

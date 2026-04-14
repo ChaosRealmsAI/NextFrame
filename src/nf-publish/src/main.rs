@@ -37,7 +37,10 @@ use crate::state::{
 use crate::ui::{create_browser_layout, create_webview};
 
 fn main() {
-    let mtm = MainThreadMarker::new().expect("must run on main thread");
+    let Some(mtm) = MainThreadMarker::new() else {
+        eprintln!("must run on main thread");
+        std::process::abort();
+    };
     let app = NSApplication::sharedApplication(mtm);
     app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
 
@@ -103,11 +106,13 @@ fn main() {
     let config = unsafe { WKWebViewConfiguration::new(mtm) };
 
     // Fixed UUID → same persistent cookie store regardless of app bundle location
-    let store_id = NSUUID::initWithUUIDString(
+    let Some(store_id) = NSUUID::initWithUUIDString(
         mtm.alloc(),
         &NSString::from_str("A1B2C3D4-E5F6-7890-ABCD-EF1234567890"),
-    )
-    .expect("invalid UUID");
+    ) else {
+        state::log_crash("ERROR", "main", "invalid UUID");
+        std::process::abort();
+    };
     let data_store = unsafe { WKWebsiteDataStore::dataStoreForIdentifier(&store_id, mtm) };
     unsafe {
         config.setWebsiteDataStore(&data_store);

@@ -159,8 +159,11 @@ pub(crate) fn send_key_command(webview: &WKWebView, key: &str) -> Result<(), Str
     let (chars, keycode, inferred_modifiers) =
         if let Some((chars, keycode)) = named_key_spec(key_part) {
             (chars, keycode, NSEventModifierFlags::empty())
-        } else if key_part.chars().count() == 1 {
-            key_spec_for_text(key_part.chars().next().unwrap())
+        } else if let Some(ch) = (key_part.chars().count() == 1)
+            .then(|| key_part.chars().next())
+            .flatten()
+        {
+            key_spec_for_text(ch)
         } else {
             return Err(format!("unsupported key: {key_part}"));
         };

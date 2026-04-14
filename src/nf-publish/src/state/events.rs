@@ -1,6 +1,7 @@
 use chrono::{Local, SecondsFormat};
 
-use super::*;
+use super::SessionHistoryEntry;
+use super::persistence;
 
 pub(crate) fn timestamp_now() -> String {
     Local::now().to_rfc3339_opts(SecondsFormat::Secs, false)

@@ -1,12 +1,9 @@
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Mutex, OnceLock};
 
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{NSButton, NSTextField, NSView};
 use objc2_web_kit::{WKWebView, WKWebViewConfiguration};
-use serde::{Deserialize, Serialize};
-
 use crate::delegates::{PilotNavDelegate, PilotUIDelegate};
 
 mod events;

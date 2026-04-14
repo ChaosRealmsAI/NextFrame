@@ -1,4 +1,7 @@
-use super::*;
+use super::{
+    APP_STATE, SessionHistoryEntry, SessionState, TABS, current_url_for_webview, log_activity,
+    persistence, tabs, timestamp_now, trim_history, url_host, webview_for_tab,
+};
 
 /// Converts persisted session status strings into bookmark-bar status dots.
 /// `"alive"` becomes `Some(true)`, `"expired"` becomes `Some(false)`, and unknown stays `None`.

@@ -1,4 +1,11 @@
-use super::*;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering;
+
+use serde::{Deserialize, Serialize};
+
+use super::{
+    APP_STATE, BrowserTab, BrowserTabKind, TABS, browser_tabs_snapshot, trim_history, url_host,
+};
 
 #[derive(Serialize, Deserialize, Default)]
 struct SessionsFile {

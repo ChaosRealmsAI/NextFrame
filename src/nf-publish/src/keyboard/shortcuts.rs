@@ -108,9 +108,9 @@ pub(crate) fn install_browser_shortcuts() {
     let monitor = unsafe {
         NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::KeyDown, &handler)
     };
-    if monitor.is_none() {
+    let Some(monitor) = monitor else {
         crate::state::log_crash("WARN", "keyboard", "failed to install local key monitor");
         return;
-    }
-    let _ = objc2::rc::Retained::into_raw(monitor.unwrap());
+    };
+    let _ = objc2::rc::Retained::into_raw(monitor);
 }

@@ -122,8 +122,11 @@ pub(crate) fn create_dynamic_tab(
     let ui_delegate = unsafe { &*state.ui_delegate_ptr };
     let nav_delegate = unsafe { &*state.nav_delegate_ptr };
     let frame = host.frame();
+    let Some(mtm) = objc2_foundation::MainThreadMarker::new() else {
+        return Err("main thread not available".to_owned());
+    };
     let webview = create_webview(
-        objc2_foundation::MainThreadMarker::new().expect("main thread"),
+        mtm,
         NSRect::new(
             NSPoint::new(0.0, 0.0),
             NSSize::new(frame.size.width, frame.size.height),

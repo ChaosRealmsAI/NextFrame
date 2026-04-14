@@ -22,7 +22,9 @@ fn bookmark_label_width(label: &str) -> f64 {
 }
 
 pub(crate) fn rebuild_bookmarks_bar(bar: &NSView, target: &AnyObject, statuses: &[Option<bool>]) {
-    let mtm = MainThreadMarker::new().expect("main thread");
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
     remove_all_subviews(bar);
 
     let width = bar.frame().size.width;
@@ -78,7 +80,9 @@ pub(crate) fn rebuild_bookmarks_bar(bar: &NSView, target: &AnyObject, statuses: 
 }
 
 pub(crate) fn rebuild_tab_strip(tab_strip: &NSView, target: &AnyObject, tabs: &[BrowserTabView]) {
-    let mtm = MainThreadMarker::new().expect("main thread");
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
     remove_all_subviews(tab_strip);
 
     let tab_font = unsafe { NSFont::systemFontOfSize(12.0) };
