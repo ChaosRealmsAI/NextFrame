@@ -53,6 +53,12 @@ Layer 3: Verification assertions (auto-check after every change)
 **No hard line limit.** Progressive disclosure — concise but complete. If AI needs it, write it.
 
 #### Must contain:
+- **"Before You Write Code" section (mandatory, first thing in the file)**:
+  1. Read relevant standard → `cat spec/standards/00-index.md`
+  2. Read ADR if changing architecture
+  3. Read BDD if working on a feature
+  4. Read crate/module CLAUDE.md
+  5. "No standard found? Say so. Don't guess."
 - Build/test/lint commands
 - Module structure with one-line descriptions
 - Core constraints AI would violate without knowing
