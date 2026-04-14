@@ -19,8 +19,9 @@ export const meta = {
   z_hint: "bottom",
 
   // ─── 主题预设 ───
-  default_theme: "obsidian-violet",
+  default_theme: "warm-dark",
   themes: {
+    "warm-dark":       { hueA: 25,  hueB: 15,  hueC: 35,  intensity: 0.2, grain: 0.03, speed: 0.08, baseColor: "#1a1510" },
     "obsidian-violet": { hueA: 270, hueB: 200, hueC: 320, intensity: 1, grain: 0.04, speed: 0.3 },
     "ocean-teal":      { hueA: 180, hueB: 210, hueC: 160, intensity: 1.2, grain: 0.03, speed: 0.25 },
     "sunset-warm":     { hueA: 20,  hueB: 40,  hueC: 350, intensity: 0.8, grain: 0.05, speed: 0.2 },
@@ -34,6 +35,7 @@ export const meta = {
     hueB:      { type: "number", default: 200, range: [0, 360], step: 1, label: "副色相", semantic: "secondary hue, contrasts with primary for depth", group: "color" },
     hueC:      { type: "number", default: 320, range: [0, 360], step: 1, label: "第三色相", semantic: "tertiary hue, adds richness to the palette", group: "color" },
     intensity: { type: "number", default: 1, range: [0, 1.5], step: 0.05, label: "色彩强度", semantic: "saturation intensity: 0=grayscale, 1=normal, 1.5=vivid neon", group: "color" },
+    baseColor: { type: "color", default: "#0a0a12", label: "底色", semantic: "base fill color behind the aurora blobs", group: "color" },
     grain:     { type: "number", default: 0.04, range: [0, 0.15], step: 0.005, label: "颗粒感", semantic: "film grain overlay: 0=clean digital, 0.04=subtle film, 0.1=heavy grain", group: "style" },
     speed:     { type: "number", default: 0.3, range: [0, 2], step: 0.05, label: "流动速度", semantic: "blob drift speed: 0=frozen, 0.3=slow ambient, 1=noticeable motion", group: "animation" },
   },
@@ -50,14 +52,16 @@ export const meta = {
 };
 
 export function render(t, params, vp) {
-  const { hueA, hueB, hueC, intensity, grain, speed } = params;
+  const { hueA, hueB, hueC, intensity, grain, speed, baseColor } = params;
   const W = vp.width, H = vp.height, T = t * speed;
   return `<canvas width="${W}" height="${H}" style="width:100%;height:100%;display:block" id="__sc"></canvas>
 <script>(function(){
   const c=document.getElementById("__sc"),x=c.getContext("2d"),W=${W},H=${H},T=${T};
   const hA=${hueA},hB=${hueB},hC=${hueC},I=${intensity},G=${grain};
-  function blob(cx,cy,r,h,a){const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,"hsla("+h+","+Math.round(70*I)+"%,55%,"+a+")");g.addColorStop(1,"hsla("+h+","+Math.round(70*I)+"%,55%,0)");x.fillStyle=g;x.fillRect(0,0,W,H)}
-  x.fillStyle="#0a0a12";x.fillRect(0,0,W,H);x.globalCompositeOperation="lighter";
+  const base=${JSON.stringify(baseColor)};
+  const A=Math.max(0,Math.min(1,I));
+  function blob(cx,cy,r,h,a){const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,"hsla("+h+","+Math.round(70*I)+"%,55%,"+(a*A)+")");g.addColorStop(1,"hsla("+h+","+Math.round(70*I)+"%,55%,0)");x.fillStyle=g;x.fillRect(0,0,W,H)}
+  x.fillStyle=base;x.fillRect(0,0,W,H);x.globalCompositeOperation="lighter";
   blob(W*(0.3+0.2*Math.sin(T*0.7)),H*(0.2+0.12*Math.cos(T*0.5)),W*0.8,hA,0.6);
   blob(W*(0.7+0.15*Math.cos(T*0.6)),H*(0.45+0.15*Math.sin(T*0.4)),W*0.7,hB,0.5);
   blob(W*(0.5+0.2*Math.sin(T*0.8)),H*(0.7+0.1*Math.cos(T*0.9)),W*0.75,hC,0.45);

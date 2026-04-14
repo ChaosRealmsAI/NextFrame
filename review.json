@@ -1,0 +1,17 @@
+{
+  "complete": true,
+  "score": "10/10",
+  "summary": "Build/player fixes verified in the current worktree. Browser player HTML includes the expected controls and stage scaling, recorder renders subtitle timelines without crashing, and auroraGradient now defaults to a dark warm theme.",
+  "verification": {
+    "build_with_subtitle_bar": "pass",
+    "html_controls_present": "pass",
+    "recorder_no_crash": "pass",
+    "aurora_default_theme_warm_dark": "pass",
+    "frame_background_dark_warm": "pass",
+    "stage_scaling_transform_origin": "pass"
+  },
+  "notes": [
+    "AGENTS.md referenced spec/standards and src/nf-core/CLAUDE.md paths were not present in this worktree.",
+    "The auroraGradient default-theme import check was run against the current worktree path rather than the parent checkout path shown in the task snippet."
+  ]
+}

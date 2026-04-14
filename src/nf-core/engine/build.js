@@ -8,6 +8,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SCENES_DIR = resolve(HERE, "../scenes");
 const SCENE_REGISTRY_URL = pathToFileURL(resolve(SCENES_DIR, "index.js")).href;
 const SCRUBBER_MAX = 10000;
+const CONTROLS_HEIGHT = 52;
 
 function stripESM(code) {
   return code
@@ -16,6 +17,10 @@ function stripESM(code) {
     .replace(/^export\s*\{[^}]*\};?\s*$/gm, "")
     .replace(/^export\s+async\s+function\s+/gm, "async function ")
     .replace(/^export\s+(function|const|let|var|class)\s+/gm, "$1 ");
+}
+
+function sanitizeBundleCode(code) {
+  return String(code).replace(/\bSRT\b/g, "srt");
 }
 
 function toIdentifier(value) {
@@ -83,7 +88,7 @@ function collectSceneModules(timeline) {
       label: entry.label,
       varName,
       filePath,
-      code: stripESM(readFileSync(filePath, "utf8")).trim(),
+      code: sanitizeBundleCode(stripESM(readFileSync(filePath, "utf8"))).trim(),
     };
   });
 }
@@ -102,9 +107,14 @@ function escapeInlineScript(value) {
     .replace(/<!--/g, "<\\!--");
 }
 
+function serializeTimeline(timeline) {
+  return JSON.stringify(JSON.stringify(timeline || {}, null, 2));
+}
+
 function buildRuntime() {
   return `(() => {
-  const stageShell = document.getElementById("stage-shell");
+  const playerShell = document.getElementById("player-shell");
+  const stageWrap = document.getElementById("stage-wrap");
   const stage = document.getElementById("stage");
   const controls = document.getElementById("controls");
   const playBtn = document.getElementById("playBtn");
@@ -128,6 +138,7 @@ function buildRuntime() {
   let isPlaying = false;
   let recorderMode = false;
   let dragActive = false;
+  let dragWasPlaying = false;
   let clockBaseTime = 0;
   let clockBaseNow = 0;
   let lastVisible = [];
@@ -144,12 +155,15 @@ function buildRuntime() {
   }
 
   function applyScale() {
+    const controlsHeight = recorderMode ? 0 : ${CONTROLS_HEIGHT};
     const scale = Math.min(
       window.innerWidth / viewport.width,
-      window.innerHeight / viewport.height
+      (window.innerHeight - controlsHeight) / viewport.height
     );
     const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
-    stageShell.style.transform = "translate(-50%, -50%) scale(" + safeScale + ")";
+    stageWrap.style.width = String(viewport.width * safeScale) + "px";
+    stageWrap.style.height = String(viewport.height * safeScale) + "px";
+    stage.style.transform = "scale(" + safeScale + ")";
   }
 
   function replayInlineScripts(root) {
@@ -332,7 +346,9 @@ function buildRuntime() {
     if (recorderMode) return;
     recorderMode = true;
     stopPlayback();
+    playerShell.style.inset = "0";
     controls.style.display = "none";
+    applyScale();
   }
 
   window.__onFrame = function(data) {
@@ -341,10 +357,18 @@ function buildRuntime() {
   };
 
   playBtn.addEventListener("click", () => togglePlayback());
-  scrubber.addEventListener("pointerdown", () => { dragActive = true; });
-  scrubber.addEventListener("pointerup", () => { dragActive = false; });
-  scrubber.addEventListener("input", () => {
+  scrubber.addEventListener("pointerdown", () => {
+    dragActive = true;
+    dragWasPlaying = isPlaying;
     if (isPlaying) pause();
+  });
+  scrubber.addEventListener("pointerup", () => {
+    dragActive = false;
+    seek(scrubberTime());
+    if (dragWasPlaying) play();
+    dragWasPlaying = false;
+  });
+  scrubber.addEventListener("input", () => {
     seek(scrubberTime());
   });
 
@@ -378,7 +402,7 @@ function buildDocument(timeline, sceneModules) {
   const background = String(timeline.background || "#05050c");
   const width = Number(timeline.width || 1920);
   const height = Number(timeline.height || 1080);
-  const scriptBody = escapeInlineScript(`const TIMELINE = ${JSON.stringify(timeline, null, 2)};
+  const scriptBody = escapeInlineScript(`const TIMELINE = JSON.parse(${serializeTimeline(timeline)});
 ${sceneBundles}
 const SCENES = {
 ${sceneMap}
@@ -394,10 +418,19 @@ ${buildRuntime()}`);
   * { box-sizing: border-box; }
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: ${background}; color: #f4efe8; font-family: system-ui, -apple-system, sans-serif; }
   body { position: relative; }
-  #stage-shell { position: fixed; left: 50%; top: 50%; width: ${width}px; height: ${height}px; transform-origin: top left; }
-  #stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: ${background}; box-shadow: 0 24px 100px rgba(0, 0, 0, 0.35); }
+  #player-shell {
+    position: fixed; inset: 0 0 ${CONTROLS_HEIGHT}px 0;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; padding: 16px;
+  }
+  #stage-wrap { position: relative; width: ${width}px; height: ${height}px; }
+  #stage {
+    position: relative; width: ${width}px; height: ${height}px;
+    transform-origin: 0 0; overflow: hidden; background: ${background};
+    box-shadow: 0 24px 100px rgba(0, 0, 0, 0.35);
+  }
   #controls {
-    position: fixed; left: 0; right: 0; bottom: 0; height: 56px; z-index: 9999;
+    position: fixed; left: 0; right: 0; bottom: 0; height: ${CONTROLS_HEIGHT}px; z-index: 9999;
     display: flex; align-items: center; gap: 14px; padding: 0 20px;
     background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
   }
@@ -411,7 +444,7 @@ ${buildRuntime()}`);
 </style>
 </head>
 <body>
-<div id="stage-shell"><div id="stage"></div></div>
+<div id="player-shell"><div id="stage-wrap"><div id="stage"></div></div></div>
 <div id="controls">
   <button id="playBtn" type="button">Play</button>
   <input type="range" id="scrubber" min="0" max="${SCRUBBER_MAX}" value="0">
