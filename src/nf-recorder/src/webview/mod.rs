@@ -1,28 +1,29 @@
 //! `WKWebView` hosting and frame-capture helpers for the recorder.
 
 mod capture;
+mod frame;
 mod inject;
+mod navigation;
 mod parallel;
 
-use std::cell::{Cell, RefCell};
-use std::path::Path;
-use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::cell::Cell;
+use std::time::Duration;
 
 use objc2::msg_send;
 use objc2::rc::Retained;
 use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSFloatingWindowLevel,
-    NSImage, NSWindow, NSWindowStyleMask,
+    NSWindow, NSWindowStyleMask,
 };
-use objc2_foundation::{
-    NSDate, NSDefaultRunLoopMode, NSPoint, NSRect, NSRunLoop, NSSize, NSString, NSURL, NSURLRequest,
-};
+use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use objc2_web_kit::{
     WKAudiovisualMediaTypes, WKWebView, WKWebViewConfiguration, WKWebsiteDataStore,
 };
 
+use self::frame::{offscreen_origin, pump_main_run_loop};
+
+pub(crate) use navigation::relative_http_url;
 #[allow(unused_imports)]
 pub(crate) use parallel::ParallelHost;
 
@@ -34,8 +35,6 @@ pub(crate) const VIEW_WIDTH: f64 = 1920.0;
 pub(crate) const VIEW_HEIGHT: f64 = 1080.0;
 const OFFSCREEN_ORIGIN_X: f64 = -10000.0;
 const OFFSCREEN_ORIGIN_Y: f64 = -10000.0;
-type SnapshotResultSlot = Rc<RefCell<Option<Result<Retained<NSImage>, String>>>>;
-type EvalResultSlot = Rc<RefCell<Option<Result<Option<String>, String>>>>;
 
 /// Hosts a single `WKWebView` inside an offscreen-capable `NSWindow`.
 pub struct WebViewHost {
@@ -74,8 +73,7 @@ impl WebViewHost {
         };
         let initial_rect = NSRect::new(initial_origin, NSSize::new(view_width, view_height));
         // SAFETY: `mtm` proves main-thread access, and these arguments form a valid window initializer.
-        let window: Retained<NSWindow> = unsafe {
-            // SAFETY: see above.
+        let window: Retained<NSWindow> = unsafe { // SAFETY: see above.
             msg_send![
                 NSWindow::alloc(mtm),
                 initWithContentRect: initial_rect,
@@ -87,8 +85,7 @@ impl WebViewHost {
         window.setTitle(&NSString::from_str("recorder"));
         window.setFrame_display(initial_rect, true);
         // SAFETY: `window` is live, and `setIgnoresMouseEvents:` is valid for an initialized window.
-        unsafe {
-            // SAFETY: see above.
+        unsafe { // SAFETY: see above.
             let _: () = msg_send![&window, setIgnoresMouseEvents: true];
         }
         if headed {
@@ -97,16 +94,13 @@ impl WebViewHost {
             pump_main_run_loop(Duration::from_millis(150));
         } else {
             // SAFETY: `window` is live, and these setters only adjust presentation attributes.
-            unsafe {
-                // SAFETY: see above.
+            unsafe { // SAFETY: see above.
                 let _: () = msg_send![&window, setAlphaValue: 0.0f64];
                 let _: () = msg_send![&window, setOpaque: false];
                 let _: () = msg_send![&window, setHasShadow: false];
             }
         }
 
-        // CSS viewport uses the configured size regardless of DPR/screen scale.
-        // DPR only affects output resolution via takeSnapshot configuration.
         let target_size = NSSize::new(view_width, view_height);
         window.setContentSize(target_size);
         window.setFrameOrigin(if headed {
@@ -131,14 +125,6 @@ impl WebViewHost {
         };
         host.sync_view_hierarchy();
         Ok(host)
-    }
-
-    /// Returns the current capture size in backing pixels.
-    pub fn target_pixel_size(&self) -> (usize, usize) {
-        (
-            (self.view_width * self.dpr).round().max(1.0) as usize,
-            (self.view_height * self.dpr).round().max(1.0) as usize,
-        )
     }
 
     /// Moves the host window to the requested screen position.
@@ -169,170 +155,6 @@ impl WebViewHost {
         Ok(())
     }
 
-    /// Loads an HTTP URL into the hosted `WKWebView`.
-    pub fn load_url(&self, url: &str) -> Result<(), String> {
-        let url = NSURL::URLWithString(&NSString::from_str(url))
-            .ok_or_else(|| format!("failed to construct NSURL from {url:?}"))?;
-        let request = NSURLRequest::requestWithURL(&url);
-        // SAFETY: `self.web_view` and `request` are live Objective-C objects for this load call.
-        let navigation = unsafe { self.web_view.loadRequest(&request) }; // SAFETY: see above.
-        if navigation.is_none() {
-            return Err(format!(
-                "WKWebView refused loadRequest for {}",
-                url.absoluteString()
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| "<invalid-url>".into())
-            ));
-        }
-        self.window.displayIfNeeded();
-        Ok(())
-    }
-
-    /// Loads a local file URL with the supplied read-access root.
-    pub fn load_file_url(&self, file_path: &Path, read_access_root: &Path) -> Result<(), String> {
-        let file_url = NSURL::fileURLWithPath(&NSString::from_str(&file_path.to_string_lossy()));
-        let read_access_url =
-            NSURL::fileURLWithPath(&NSString::from_str(&read_access_root.to_string_lossy()));
-        // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
-        let navigation = unsafe {
-            // SAFETY: see above.
-            self.web_view
-                .loadFileURL_allowingReadAccessToURL(&file_url, &read_access_url)
-        };
-        if navigation.is_none() {
-            return Err(format!(
-                "WKWebView refused loadFileURL for {} with read access {}",
-                file_path.display(),
-                read_access_root.display()
-            ));
-        }
-        self.window.displayIfNeeded();
-        Ok(())
-    }
-
-    /// Waits until the page has reached a stable ready state for capture.
-    pub fn wait_until_ready(&self, timeout: Duration) -> Result<(), String> {
-        let started = Instant::now();
-        let mut last_ready_state = None;
-        let mut last_progress = 0.0;
-        let mut last_loading = true;
-        let mut last_url = None;
-        let mut saw_navigation = false;
-        while started.elapsed() < timeout {
-            self.sync_view_hierarchy();
-            // SAFETY: `self.web_view` is live, and `isLoading` is a side-effect-free query.
-            last_loading = unsafe { self.web_view.isLoading() }; // SAFETY: see above.
-            // SAFETY: `self.web_view` is live, and `estimatedProgress` is a side-effect-free query.
-            last_progress = unsafe { self.web_view.estimatedProgress() }; // SAFETY: see above.
-            last_url = self.current_url();
-            saw_navigation |= last_loading
-                || last_progress > 0.0
-                || last_url
-                    .as_deref()
-                    .is_some_and(|url| !url.is_empty() && url != "about:blank");
-            last_ready_state = self
-                .eval_string("document.readyState ? String(document.readyState) : null")
-                .ok()
-                .flatten();
-
-            if !last_loading
-                && last_progress >= 1.0
-                && matches!(last_ready_state.as_deref(), Some("complete"))
-            {
-                self.wait_for_animation_frame(timeout.saturating_sub(started.elapsed()))?;
-                self.flush_render(Duration::from_millis(50))?;
-                self.park_offscreen();
-                return Ok(());
-            }
-            if saw_navigation
-                && !last_loading
-                && matches!(last_ready_state.as_deref(), Some("complete"))
-                && started.elapsed() >= Duration::from_secs(1)
-            {
-                self.wait_for_animation_frame(timeout.saturating_sub(started.elapsed()))?;
-                self.flush_render(Duration::from_millis(50))?;
-                self.park_offscreen();
-                return Ok(());
-            }
-            if !last_loading
-                && last_progress == 0.0
-                && last_url.is_none()
-                && last_ready_state.is_none()
-                && started.elapsed() >= Duration::from_millis(1500)
-            {
-                self.flush_render(Duration::from_millis(1500))?;
-                let _ = self.wait_for_animation_frame(Duration::from_millis(500));
-                self.park_offscreen();
-                return Ok(());
-            }
-            pump_main_run_loop(Duration::from_millis(25));
-        }
-        Err(format!(
-            "timed out waiting for page load (readyState={last_ready_state:?}, estimatedProgress={last_progress:.3}, isLoading={last_loading}, url={last_url:?})"
-        ))
-    }
-
-    /// Applies recorder-specific DOM adjustments before capture begins.
-    pub fn prepare_page(&self) -> Result<(), String> {
-        let script = r#"
-        (() => {
-          document.documentElement.style.overflow = 'hidden';
-          if (document.body) {
-            document.body.style.overflow = 'hidden';
-            document.body.style.margin = '0';
-          }
-          const help = document.querySelector('.help');
-          if (help) help.style.display = 'none';
-          document.querySelectorAll('audio, video').forEach(el => {
-            try {
-              el.muted = true;
-              // Don't pause video — videoClip scene seeks it per frame via __onFrame.
-              // Only pause audio elements (audio is muxed by ffmpeg separately).
-              if (el.tagName === 'AUDIO') { el.pause(); el.currentTime = 0; }
-            } catch (_) {}
-          });
-          return 'ok';
-        })()
-        "#;
-        let started = Instant::now();
-        let mut last_error = None;
-        while started.elapsed() < Duration::from_secs(5) {
-            match self.eval_ignoring_result(script) {
-                Ok(()) => {
-                    let on_frame_check = self.eval_string(
-                        r#"
-                        (() => {
-                          return typeof window.__onFrame === 'function' ? 'ok' : 'missing';
-                        })()
-                        "#,
-                    )?;
-                    if on_frame_check.as_deref() == Some("missing") {
-                        eprintln!(
-                            "warning: page is missing window.__onFrame after load; \
-                             recorder output may stay static until the page defines it"
-                        );
-                    }
-                    return self.flush_render(Duration::from_millis(120));
-                }
-                Err(error) => {
-                    last_error = Some(error);
-                    self.flush_render(Duration::from_millis(100))?;
-                }
-            }
-        }
-        Err(format!(
-            "failed to prepare page after load: {}",
-            last_error.unwrap_or_else(|| "unknown JS error".into())
-        ))
-    }
-
-    /// Pumps layout and the main run loop so WebKit can flush pending updates.
-    pub fn flush_render(&self, duration: Duration) -> Result<(), String> {
-        self.sync_view_hierarchy();
-        pump_main_run_loop(duration);
-        Ok(())
-    }
-
     fn create_web_view(target_size: NSSize) -> Result<Retained<WKWebView>, String> {
         let mtm = MainThreadMarker::new().ok_or("snapshot capture must run on the main thread")?;
         // SAFETY: `mtm` proves main-thread access, which `WKWebViewConfiguration::new` requires.
@@ -340,14 +162,12 @@ impl WebViewHost {
         // SAFETY: `mtm` proves main-thread access, which `nonPersistentDataStore` requires.
         let store = unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) }; // SAFETY: see above.
         // SAFETY: `config` and `store` are live WebKit objects being configured before initialization.
-        unsafe {
-            // SAFETY: see above.
+        unsafe { // SAFETY: see above.
             config.setWebsiteDataStore(&store);
             config.setMediaTypesRequiringUserActionForPlayback(WKAudiovisualMediaTypes::All);
         }
         // SAFETY: `mtm`, the frame, and `config` satisfy `WKWebView`'s designated initializer contract.
-        let web_view = unsafe {
-            // SAFETY: see above.
+        let web_view = unsafe { // SAFETY: see above.
             WKWebView::initWithFrame_configuration(
                 WKWebView::alloc(mtm),
                 NSRect::new(NSPoint::new(0.0, 0.0), target_size),
@@ -356,90 +176,9 @@ impl WebViewHost {
         };
         web_view.setWantsLayer(true);
         // SAFETY: `web_view` responds to `_setPageMuted:` on macOS, and this only toggles mute state.
-        unsafe {
-            // SAFETY: see above.
+        unsafe { // SAFETY: see above.
             let _: () = msg_send![&web_view, _setPageMuted: 0x3u64];
         }
         Ok(web_view)
     }
-
-    pub(super) fn sync_view_hierarchy(&self) {
-        // Keep the view sized and laid out before any capture attempt.
-        self.web_view
-            .setFrame(NSRect::new(NSPoint::new(0.0, 0.0), self.target_size));
-        self.web_view.layoutSubtreeIfNeeded();
-        self.web_view.displayIfNeeded();
-        self.window.displayIfNeeded();
-    }
-
-    fn park_offscreen(&self) {
-        if self.offscreen_parked.replace(true) {
-            return;
-        }
-        self.window
-            .setFrameOrigin(NSPoint::new(OFFSCREEN_ORIGIN_X, OFFSCREEN_ORIGIN_Y));
-        self.window.displayIfNeeded();
-        self.web_view.displayIfNeeded();
-    }
-
-    fn wait_for_animation_frame(&self, _timeout: Duration) -> Result<(), String> {
-        // A short compositor settle time is more reliable here than polling rAF.
-        std::thread::sleep(Duration::from_millis(200));
-        self.sync_view_hierarchy();
-        self.flush_render(Duration::from_millis(100))?;
-        Ok(())
-    }
-
-    fn current_url(&self) -> Option<String> {
-        // SAFETY: `self.web_view` is live, and `URL` returns either null or a live borrowed `NSURL`.
-        unsafe { self.web_view.URL() } // SAFETY: see above.
-            .and_then(|url| url.absoluteString().map(|value| value.to_string()))
-    }
-}
-
-fn offscreen_origin(index: usize) -> NSPoint {
-    NSPoint::new(
-        OFFSCREEN_ORIGIN_X - index as f64 * 64.0,
-        OFFSCREEN_ORIGIN_Y - index as f64 * 48.0,
-    )
-}
-
-/// Converts a file path under the server root into a percent-encoded HTTP URL.
-pub fn relative_http_url(base_url: &str, root: &Path, file_path: &Path) -> Result<String, String> {
-    let relative = file_path.strip_prefix(root).map_err(|_| {
-        format!(
-            "{} is not under server root {}",
-            file_path.display(),
-            root.display()
-        )
-    })?;
-    let mut encoded = String::new();
-    for (index, component) in relative.components().enumerate() {
-        if index > 0 {
-            encoded.push('/');
-        }
-        let text = component.as_os_str().to_string_lossy();
-        encode_path_component(&mut encoded, &text);
-    }
-    Ok(format!("{base_url}/{encoded}"))
-}
-
-fn encode_path_component(output: &mut String, text: &str) {
-    for byte in text.bytes() {
-        let allowed = byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~');
-        if allowed {
-            output.push(byte as char);
-        } else {
-            output.push('%');
-            output.push_str(&format!("{byte:02X}"));
-        }
-    }
-}
-
-fn pump_main_run_loop(duration: Duration) {
-    let run_loop = NSRunLoop::currentRunLoop();
-    let date = NSDate::dateWithTimeIntervalSinceNow(duration.as_secs_f64());
-    // SAFETY: `NSDefaultRunLoopMode` is a valid process-global Foundation NSString constant.
-    let default_mode = unsafe { NSDefaultRunLoopMode }; // SAFETY: see above.
-    let _ = run_loop.runMode_beforeDate(default_mode, &date);
 }

@@ -3,7 +3,8 @@
 use objc2::MainThreadMarker;
 use objc2_foundation::NSPoint;
 
-use super::{VIEW_HEIGHT, VIEW_WIDTH, WebViewHost, offscreen_origin};
+use super::frame::offscreen_origin;
+use super::{VIEW_HEIGHT, VIEW_WIDTH, WebViewHost};
 
 /// Owns multiple `WebViewHost` instances for parallel experiments and benchmarks.
 #[allow(dead_code)]

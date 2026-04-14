@@ -49,7 +49,7 @@ pub(super) fn record_parallel_single(
     };
 
     if num_procs <= 1 || total_frames < 2 {
-        return super::super::record_single(&cli, &[html_file.to_path_buf()], out);
+        return super::super::orchestrator::record_single(&cli, &[html_file.to_path_buf()], out);
     }
 
     let exe = resolve_parallel_executable()?;
@@ -159,7 +159,7 @@ pub(super) fn record_parallel_single(
     }
 
     println!("\n  concat {} slices...", actual_procs);
-    super::super::concat_output(&group_outputs, out, duration)?;
+    super::super::orchestrator::concat_output(&group_outputs, out, duration)?;
     if let Some(audio_path) = final_audio.as_deref() {
         let muxed_out = out.with_extension("muxed.mp4");
         let _ = fs::remove_file(&muxed_out);

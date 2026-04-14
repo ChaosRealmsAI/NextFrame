@@ -462,7 +462,10 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+<<<<<<< HEAD
  "serde",
+=======
+>>>>>>> wt-split-recorder-bb31c753
  "wasm-bindgen",
  "windows-link 0.2.1",
 ]
@@ -2072,6 +2075,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "nf-publish"
 version = "0.1.0"
 dependencies = [
@@ -2087,6 +2091,8 @@ dependencies = [
 ]
 
 [[package]]
+=======
+>>>>>>> wt-split-recorder-bb31c753
 name = "nf-recorder"
 version = "0.1.0"
 dependencies = [

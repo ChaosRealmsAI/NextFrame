@@ -181,7 +181,7 @@ pub(super) fn record_parallel(
     }
 
     println!("\n  concat {} groups...", actual_procs);
-    let concat_result = super::super::concat_output(&group_outputs, out, duration_sec);
+    let concat_result = super::super::orchestrator::concat_output(&group_outputs, out, duration_sec);
     let _ = fs::remove_dir_all(&temp_root);
     concat_result?;
 

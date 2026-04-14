@@ -9,7 +9,7 @@ use objc2_core_media::CMTime;
 use objc2_foundation::{NSDictionary, NSObject, NSString};
 use objc2_foundation::{NSPoint as CGPoint, NSRect as CGRect, NSSize as CGSize};
 
-use super::settings::pixel_buffer_attributes;
+use super::config::pixel_buffer_attributes;
 use super::{
     CVBufferRelease, CVPixelBufferCreate, CVPixelBufferGetBaseAddress, CVPixelBufferGetBytesPerRow,
     CVPixelBufferLockBaseAddress, CVPixelBufferRef, CVPixelBufferUnlockBaseAddress, FrameSize,

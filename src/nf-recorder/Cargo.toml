@@ -13,6 +13,7 @@ required-features = ["cli"]
 cli = ["clap"]
 
 [lib]
+name = "nextframe_recorder"
 path = "src/lib.rs"
 
 [dependencies]

@@ -1,9 +1,7 @@
 //! Snapshot, JavaScript evaluation, and progress rect query methods for `WebViewHost`.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-
 use block2::RcBlock;
 use objc2::MainThreadMarker;
 use objc2::msg_send;
@@ -13,12 +11,11 @@ use objc2_app_kit::NSImage;
 use objc2_core_graphics::CGImage;
 use objc2_foundation::{NSError, NSNumber, NSString};
 use objc2_web_kit::WKSnapshotConfiguration;
-
 use crate::capture;
 use crate::plan::VideoLayerInfo;
 use crate::progress::{PROGRESS_CANDIDATE_SELECTORS, ProgressRect};
-
-use super::{EvalResultSlot, SnapshotResultSlot, WebViewHost, pump_main_run_loop};
+use super::frame::{EvalResultSlot, SnapshotResultSlot, pump_main_run_loop};
+use super::WebViewHost;
 
 impl WebViewHost {
     /// Queries `window.__hasFrameChanged(prevT, curT)` when available.
@@ -113,7 +110,6 @@ impl WebViewHost {
     }
 
     /// Queries the page for an audio source URL set by the audioTrack component.
-    /// Returns the resolved URL if found.
     pub fn query_page_audio_src(&self) -> Option<String> {
         let script = r#"
         (() => {
@@ -180,8 +176,7 @@ impl WebViewHost {
             .unwrap_or_default()
     }
 
-    /// Queries the pixel-space rect of the slide progress slot and hides the DOM bar so the
-    /// recorder can paint it directly into the output frames.
+    /// Queries the pixel-space rect of the slide progress slot and hides the DOM bar.
     pub fn query_progress_rect(&self, dpr: f64) -> Option<ProgressRect> {
         self.query_element_rect(PROGRESS_CANDIDATE_SELECTORS, dpr, true)
     }
