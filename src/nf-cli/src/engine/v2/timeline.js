@@ -5,6 +5,7 @@ export function createTimelineTemplate(opts = {}) {
   const height = finiteNumber(opts.height, 1080);
 
   return {
+    version: "0.3",
     schema: V3_SCHEMA,
     width,
     height,

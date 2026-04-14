@@ -28,6 +28,7 @@ function makeEmptyTimeline(flags) {
   const width = finiteOr(flags.width, 1920);
   const height = finiteOr(flags.height, 1080);
   return {
+    version: "0.1",
     schema: "nextframe/v0.1",
     duration: finiteOr(flags.duration, 10),
     background: "#0b0b14",
@@ -46,6 +47,7 @@ function makeEmptyTimeline(flags) {
 
 function makeLegacySeedTimeline() {
   return {
+    version: "0.1",
     schema: "nextframe/v0.1",
     duration: 5,
     background: "#0b0b14",

@@ -14,6 +14,8 @@ import { FILTER_IDS } from "../../fx/filters/index.js";
 import { TRANSITION_IDS } from "../../fx/transitions/index.js";
 
 const SUPPORTED_SCHEMAS = new Set(["nextframe/v0.1"]);
+const SUPPORTED_FPS = new Set([24, 25, 30, 60]);
+const VERSION_RE = /^\d+\.\d+(?:\.\d+)?$/;
 
 /**
  * @param {Timeline} timeline
@@ -144,6 +146,19 @@ function gateSchema(t) {
     errs.push({ code: "BAD_TIMELINE", message: "timeline is not an object" });
     return errs;
   }
+  if (typeof t.version !== "string" || !t.version.trim()) {
+    errs.push({
+      code: "MISSING_VERSION",
+      message: "version is required",
+      hint: 'set version to "0.1" for nextframe/v0.1 timelines',
+    });
+  } else if (!VERSION_RE.test(t.version.trim())) {
+    errs.push({
+      code: "BAD_VERSION",
+      message: `version "${t.version}" must be a semver-like string`,
+      hint: 'expected values look like "0.1" or "0.3"',
+    });
+  }
   if (typeof t.schema !== "string" || !SUPPORTED_SCHEMAS.has(t.schema)) {
     errs.push({
       code: "BAD_SCHEMA",
@@ -157,10 +172,14 @@ function gateSchema(t) {
   if (!t.project || typeof t.project !== "object") {
     errs.push({ code: "BAD_PROJECT", message: "project is required" });
   } else {
-    for (const k of ["width", "height", "fps"]) {
-      if (typeof t.project[k] !== "number" || t.project[k] <= 0) {
-        errs.push({ code: "BAD_PROJECT", message: `project.${k} must be > 0` });
-      }
+    if (typeof t.project.width !== "number" || t.project.width < 360 || t.project.width > 7680) {
+      errs.push({ code: "BAD_PROJECT", message: "project.width must be between 360 and 7680" });
+    }
+    if (typeof t.project.height !== "number" || t.project.height < 360 || t.project.height > 7680) {
+      errs.push({ code: "BAD_PROJECT", message: "project.height must be between 360 and 7680" });
+    }
+    if (typeof t.project.fps !== "number" || !SUPPORTED_FPS.has(t.project.fps)) {
+      errs.push({ code: "BAD_PROJECT", message: `project.fps must be one of ${[...SUPPORTED_FPS].join(", ")}` });
     }
   }
   if (!Array.isArray(t.tracks) || t.tracks.length === 0) {
@@ -179,6 +198,10 @@ function gateSchema(t) {
       errs.push({ code: "DUP_TRACK_ID", message: `duplicate track id "${trk.id}"`, ref: trk.id });
     }
     trackIds.add(trk.id);
+    if (!Array.isArray(trk.clips)) {
+      errs.push({ code: "BAD_TRACK", message: `track "${trk.id}" clips must be an array`, ref: trk.id });
+      continue;
+    }
     for (const clip of trk.clips || []) {
       if (!clip.id) {
         errs.push({ code: "MISSING_CLIP_ID", message: "clip missing id" });
@@ -190,6 +213,15 @@ function gateSchema(t) {
       clipIds.add(clip.id);
       if (!clip.scene || typeof clip.scene !== "string") {
         errs.push({ code: "MISSING_SCENE", message: `clip "${clip.id}" missing scene`, ref: clip.id });
+      }
+      if (clip.start == null) {
+        errs.push({ code: "MISSING_START", message: `clip "${clip.id}" missing start`, ref: clip.id });
+      }
+      if (clip.dur == null) {
+        errs.push({ code: "MISSING_DUR", message: `clip "${clip.id}" missing dur`, ref: clip.id });
+      }
+      if (!clip.params || typeof clip.params !== "object" || Array.isArray(clip.params)) {
+        errs.push({ code: "MISSING_PARAMS", message: `clip "${clip.id}" missing params object`, ref: clip.id });
       }
     }
   }

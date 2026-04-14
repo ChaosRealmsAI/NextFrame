@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "0.3",
   "prompt": "Create a 12-second tech product launch video timeline with intro aurora background, big product name reveal, then a tagline lower-third.",
   "canvas": {
     "width": 1920,
@@ -10,9 +10,11 @@
   "clips": [
     {
       "id": "bg-aurora",
+      "scene": "auroraGradient",
       "sceneId": "auroraGradient",
       "layer": 0,
       "start": 0,
+      "dur": 12,
       "duration": 12,
       "params": {
         "hueA": 268,
@@ -24,9 +26,11 @@
     },
     {
       "id": "hero-headline",
+      "scene": "kineticHeadline",
       "sceneId": "kineticHeadline",
       "layer": 1,
       "start": 2.4,
+      "dur": 4.8,
       "duration": 4.8,
       "params": {
         "text": "NOVA ONE",
@@ -39,9 +43,11 @@
     },
     {
       "id": "tagline-lower-third",
+      "scene": "lowerThirdVelvet",
       "sceneId": "lowerThirdVelvet",
       "layer": 2,
       "start": 8,
+      "dur": 4,
       "duration": 4,
       "params": {
         "title": "NOW SHIPPING",

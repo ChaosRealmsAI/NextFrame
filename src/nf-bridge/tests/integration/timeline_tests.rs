@@ -5,7 +5,7 @@ fn dispatch_timeline_save_and_load_round_trips_json() {
     let temp = TestDir::new("integration-timeline");
     let path = temp.join("timeline.json");
     let timeline = json!({
-        "version": "1",
+        "version": "0.1",
         "duration": 42,
         "background": "#101820",
         "tracks": [
@@ -16,7 +16,11 @@ fn dispatch_timeline_save_and_load_round_trips_json() {
                     {
                         "id": "clip-1",
                         "start": 0,
-                        "duration": 42
+                        "dur": 42,
+                        "scene": "auroraGradient",
+                        "params": {
+                            "text": "integration"
+                        }
                     }
                 ]
             }
@@ -70,13 +74,9 @@ fn dispatch_timeline_save_and_load_round_trips_large_json_payload() {
     );
 
     let timeline = json!({
-        "version": "1",
-        "metadata": {
-            "name": "Large Timeline",
-            "fps": 30,
-            "width": 1920,
-            "height": 1080,
-        },
+        "version": "0.1",
+        "duration": 42,
+        "background": "#101820",
         "tracks": [
             {
                 "id": "track-large",
@@ -85,8 +85,11 @@ fn dispatch_timeline_save_and_load_round_trips_large_json_payload() {
                     {
                         "id": "clip-large",
                         "start": 0,
-                        "duration": 42,
-                        "text": large_payload,
+                        "dur": 42,
+                        "scene": "auroraGradient",
+                        "params": {
+                            "text": large_payload
+                        }
                     }
                 ]
             }

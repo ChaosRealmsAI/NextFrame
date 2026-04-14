@@ -7,7 +7,7 @@ fn timeline_load_dispatch_happy_path() {
     let timeline_path = temp.join("timeline.json");
     fs::write(
         &timeline_path,
-        r##"{"version":"1","duration":30,"background":"#0b0b14","tracks":[{"id":"track-1","kind":"video","clips":[]}]}"##,
+        r##"{"version":"0.1","duration":30,"background":"#0b0b14","tracks":[{"id":"track-1","kind":"video","clips":[]}]}"##,
     )
     .expect("write timeline");
 
@@ -19,7 +19,7 @@ fn timeline_load_dispatch_happy_path() {
     assert_eq!(
         response.result,
         json!({
-            "version": "1",
+            "version": "0.1",
             "duration": 30,
             "background": "#0b0b14",
             "tracks": [
@@ -40,6 +40,44 @@ fn timeline_load_dispatch_error_on_invalid_json() {
     ));
     assert!(!error_response.ok);
     assert_error_contains(&error_response.error, "failed to parse timeline");
+}
+
+#[test]
+fn timeline_load_infers_version_for_legacy_tracks() {
+    let temp = TestDir::new("timeline-load-infer-version");
+    let timeline_path = temp.join("timeline.json");
+    fs::write(
+        &timeline_path,
+        r##"{"duration":30,"background":"#0b0b14","tracks":[{"id":"track-1","kind":"video","clips":[]}]}"##,
+    )
+    .expect("write timeline");
+
+    let response = dispatch(request(
+        "timeline.load",
+        json!({ "path": timeline_path.display().to_string() }),
+    ));
+
+    assert!(response.ok);
+    assert_eq!(response.result.get("version"), Some(&json!("0.1")));
+}
+
+#[test]
+fn timeline_load_dispatch_error_on_contract_violation() {
+    let temp = TestDir::new("timeline-load-contract-violation");
+    let timeline_path = temp.join("timeline.json");
+    fs::write(
+        &timeline_path,
+        r##"{"version":"0.1","duration":30,"background":"#0b0b14","tracks":[{"id":"track-1","kind":"video","clips":[{"id":"clip-1","start":0,"dur":3}]}]}"##,
+    )
+    .expect("write invalid timeline");
+
+    let response = dispatch(request(
+        "timeline.load",
+        json!({ "path": timeline_path.display().to_string() }),
+    ));
+
+    assert!(!response.ok);
+    assert_error_contains(&response.error, "tracks[0].clips[0].scene");
 }
 
 #[test]

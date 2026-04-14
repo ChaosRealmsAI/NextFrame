@@ -23,8 +23,15 @@ export async function run(argv) {
   if (fmt === "v0.1") {
     process.stderr.write("warn: v0.1 tracks/clips format detected — consider migrating to v0.3 layers[]\n");
     result = validateV1(loaded.value, { projectDir: timelineDir(resolved.jsonPath) });
-  } else {
+  } else if (fmt === "v0.3") {
     result = validateV3(loaded.value);
+  } else {
+    result = {
+      ok: false,
+      errors: [{ code: "UNKNOWN_FORMAT", message: "timeline must contain either tracks[] or layers[]" }],
+      warnings: [],
+      hints: [],
+    };
   }
 
   if (flags.json) {

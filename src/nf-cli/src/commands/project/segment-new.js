@@ -54,6 +54,8 @@ export async function run(argv) {
 
 function makeEmptyTimeline(flags) {
   return {
+    version: "0.3",
+    schema: "nextframe/v0.3",
     width: finiteOr(flags.width, 1920),
     height: finiteOr(flags.height, 1080),
     fps: finiteOr(flags.fps, 30),

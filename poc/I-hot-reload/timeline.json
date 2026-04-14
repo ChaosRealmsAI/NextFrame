@@ -1,10 +1,12 @@
 {
+  "version": "0.3",
   "duration": 18,
   "clips": [
     {
       "id": "dawn-hush",
       "scene": "auroraGradient",
       "start": 0,
+      "dur": 6,
       "duration": 6,
       "params": {
         "hueA": 270,
@@ -18,6 +20,7 @@
       "id": "cyan-drift",
       "scene": "auroraGradient",
       "start": 6,
+      "dur": 6,
       "duration": 6,
       "params": {
         "hueA": 195,
@@ -31,6 +34,7 @@
       "id": "magenta-bloom",
       "scene": "auroraGradient",
       "start": 12,
+      "dur": 6,
       "duration": 6,
       "params": {
         "hueA": 320,

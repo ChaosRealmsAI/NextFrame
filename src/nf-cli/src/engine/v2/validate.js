@@ -10,6 +10,7 @@ const BG_SCENES = new Set([
   'audioTrack','syncSubs','videoClip',
   'slideChrome','slideFrame',
 ]);
+const VERSION_RE = /^\d+\.\d+(?:\.\d+)?$/;
 
 function hasExplicitBounds(layer) {
   return layer?.x != null || layer?.y != null || layer?.w != null || layer?.h != null;
@@ -20,7 +21,24 @@ export function validateTimeline(timeline) {
   const warnings = [];
   const hints = [];
 
+  if (Array.isArray(timeline?.tracks) && !Array.isArray(timeline?.layers)) {
+    return {
+      ok: false,
+      errors: [{
+        code: 'LEGACY_FORMAT',
+        message: 'tracks/clips format detected — use the legacy validator or migrate to layers[]',
+      }],
+      warnings,
+      hints,
+    };
+  }
+
   // Gate 1: required top-level fields
+  if (typeof timeline?.version !== 'string' || !timeline.version.trim()) {
+    errors.push({ code: 'MISSING_FIELD', message: 'version is required' });
+  } else if (!VERSION_RE.test(timeline.version.trim())) {
+    errors.push({ code: 'BAD_VERSION', message: `version "${timeline.version}" must be a semver-like string` });
+  }
   if (!timeline.width) errors.push({ code: 'MISSING_FIELD', message: 'width is required' });
   if (!timeline.height) errors.push({ code: 'MISSING_FIELD', message: 'height is required' });
   if (!timeline.fps) errors.push({ code: 'MISSING_FIELD', message: 'fps is required' });
@@ -35,7 +53,10 @@ export function validateTimeline(timeline) {
     if (!layer.id) errors.push({ code: 'MISSING_ID', message: 'layer missing id' });
     if (!layer.scene) errors.push({ code: 'MISSING_SCENE', message: `layer "${layer.id}" missing scene` });
     if (layer.start == null) errors.push({ code: 'MISSING_START', message: `layer "${layer.id}" missing start` });
-    if (!layer.dur) errors.push({ code: 'MISSING_DUR', message: `layer "${layer.id}" missing dur` });
+    if (layer.dur == null) errors.push({ code: 'MISSING_DUR', message: `layer "${layer.id}" missing dur` });
+    if (!layer.params || typeof layer.params !== 'object' || Array.isArray(layer.params)) {
+      errors.push({ code: 'MISSING_PARAMS', message: `layer "${layer.id}" missing params object` });
+    }
 
     // Duplicate id
     if (layer.id && ids.has(layer.id)) {
