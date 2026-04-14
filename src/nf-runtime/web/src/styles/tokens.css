@@ -118,6 +118,7 @@
      BACKWARD COMPAT ALIASES
      Old Obsidian Velvet names → new tokens.
      Prevents breakage while we migrate.
+     TODO: remove after full migration verified
      ══════════════════════════════════════════════════════════ */
   --ink:       var(--t100);
   --ink-mid:   var(--t80);
