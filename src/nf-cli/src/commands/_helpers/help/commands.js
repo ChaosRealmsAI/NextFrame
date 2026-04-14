@@ -10,7 +10,7 @@ const command = (name, summary, usage, params, constraints, fix = DEFAULT_FIX) =
 ];
 
 export const TOP_LEVEL_COMMANDS = [
-  group("Timeline", "new validate build lint-scenes scenes preview frame render"),
+  group("Timeline", "new validate build lint-scenes scenes preview frame describe-frame render"),
   group("Layer CRUD", "layer-list layer-add layer-move layer-resize layer-set layer-remove"),
   group("Project Hierarchy", "project-new project-list project-config episode-new episode-list segment-new segment-list"),
   group("Pipeline", "pipeline-get script-set script-get audio-set audio-get atom-add atom-list atom-remove output-add output-list output-publish"),
@@ -57,6 +57,9 @@ export const COMMAND_SPECS = Object.fromEntries([
     --height=N override render height
     --json emit the output path and byte count`, `Project hierarchy mode writes to the segment .frames directory automatically.
     Time must parse to a non-negative finite number.`),
+  command("describe-frame", "Describe the active clips at one time using each scene's describe() contract.", `nextframe describe-frame <project> <episode> <segment> <t>
+    nextframe describe-frame <timeline.json> <t>`, `<t> frame time in seconds or mm:ss(.f)`, `Outputs JSON shaped like {time, active_clips:[{id, scene, describe_result}]}.
+    Every active clip scene must exist in src/nf-runtime/web/src/components/index.js.`),
   command("render", "Render an MP4 via the ffmpeg or recorder backend.", `nextframe render <project> <episode> <segment> [--target=ffmpeg|recorder] [--fps=N] [--crf=N] [--width=N] [--height=N] [--audio=PATH] [--quiet] [--json]
     nextframe render <timeline.json> <out.mp4> [--target=ffmpeg|recorder] [--fps=N] [--crf=N] [--width=N] [--height=N] [--audio=PATH] [--quiet] [--json]`, `--target=ffmpeg|recorder select the export backend, default ffmpeg
     --fps=N override render fps

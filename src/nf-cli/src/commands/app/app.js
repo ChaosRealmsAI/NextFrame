@@ -184,15 +184,7 @@ async function runClick(argv) {
 async function runStatus(argv) {
   const { flags } = parseFlags(argv);
   const result = await appJsonRequest("/status");
-  const value = {
-    running: true,
-    view: result.viewActive || "unknown",
-    title: result.title || null,
-    project: result.currentProject ?? null,
-    episode: result.currentEpisode ?? null,
-    segment: result.currentSegment ?? null,
-  };
-  emit({ ok: true, value }, flags);
+  emit({ ok: true, value: { running: true, ...result } }, flags);
   return 0;
 }
 

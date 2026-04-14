@@ -10,6 +10,7 @@ const SUBCOMMANDS = {
   scenes: () => import("../src/commands/render/scenes.js"),
   preview: () => import("../src/commands/render/preview.js"),
   frame: () => import("../src/commands/render/frame.js"),
+  "describe-frame": () => import("../src/commands/render/describe-frame.js"),
   render: () => import("../src/commands/render/render.js"),
   "project-new": () => import("../src/commands/project/project-new.js"),
   "project-list": () => import("../src/commands/project/project-list.js"),

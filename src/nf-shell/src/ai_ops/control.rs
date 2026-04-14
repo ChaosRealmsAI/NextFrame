@@ -9,8 +9,8 @@ use serde_json::Value;
 use wry::WebView;
 
 use super::{
-    build_navigate_script, decode_query_component, default_screenshot_path, native_screenshot,
-    query_value, queue_appctl_script, split_path_and_query,
+    build_navigate_script, decode_query_component, default_screenshot_path, error_with_fix,
+    native_screenshot, query_value, queue_appctl_script, split_path_and_query,
 };
 use crate::ipc::{read_http_request, write_http_response, HttpConnection, HttpRequest};
 
@@ -89,7 +89,12 @@ pub(crate) fn poll_app_control_server(
                         408,
                         "Request Timeout",
                         "text/plain; charset=utf-8",
-                        b"request timed out",
+                        error_with_fix(
+                            "read the app-control request",
+                            "the request body was not received before the 10 second timeout",
+                            "Send the full HTTP request promptly and retry.",
+                        )
+                        .as_bytes(),
                     );
                 } else {
                     index += 1;
@@ -119,24 +124,20 @@ fn handle_http_request(
 ) -> Result<(), String> {
     let (path, query) = split_path_and_query(&request.path);
     match (request.method.as_str(), path) {
-        ("GET", "/status") | ("GET", "/diagnose") => {
-            let script = r#"(function() {
-  if (typeof window.__diagnose === "function") {
-    try {
-      return JSON.parse(window.__diagnose());
-    } catch (_) {
-      return window.__diagnose();
-    }
-  }
-  return {
-    title: document.title || "NextFrame",
-    location: String(window.location),
-    viewActive: document.querySelector(".view.active")?.id || "none"
-  };
-})()"#;
+        ("GET", "/status") => {
             queue_appctl_script(
                 webview,
-                script,
+                status_probe_script(),
+                stream,
+                pending_appctl,
+                next_request_id,
+                "application/json; charset=utf-8",
+            )
+        }
+        ("GET", "/diagnose") => {
+            queue_appctl_script(
+                webview,
+                diagnose_probe_script(),
                 stream,
                 pending_appctl,
                 next_request_id,
@@ -145,7 +146,13 @@ fn handle_http_request(
         }
         ("POST", "/eval") => {
             let script = String::from_utf8(request.body)
-                .map_err(|error| format!("invalid UTF-8 body: {error}"))?;
+                .map_err(|error| {
+                    error_with_fix(
+                        "read the /eval request body",
+                        format!("the body was not valid UTF-8: {error}"),
+                        "Send UTF-8 JavaScript source in the request body and retry.",
+                    )
+                })?;
             queue_appctl_script(
                 webview,
                 &script,
@@ -160,7 +167,13 @@ fn handle_http_request(
                 Value::Null
             } else {
                 serde_json::from_slice::<Value>(&request.body)
-                    .map_err(|error| format!("invalid JSON body: {error}"))?
+                    .map_err(|error| {
+                        error_with_fix(
+                            "parse the /navigate request body",
+                            error,
+                            "Send valid JSON with the expected navigation fields and retry.",
+                        )
+                    })?
             };
             let navigation_script = build_navigate_script(&payload)?;
             queue_appctl_script(
@@ -185,8 +198,10 @@ fn handle_http_request(
                             error.as_bytes(),
                         )
                         .map_err(|write_error| {
-                            format!(
-                                "failed to write screenshot query error response: {write_error}"
+                            error_with_fix(
+                                "write the screenshot query error response",
+                                write_error,
+                                "Check the local HTTP connection and retry the screenshot request.",
                             )
                         });
                     }
@@ -203,7 +218,11 @@ fn handle_http_request(
                     b"missing screenshot output path",
                 )
                 .map_err(|error| {
-                    format!("failed to write screenshot output path error response: {error}")
+                    error_with_fix(
+                        "write the screenshot output-path error response",
+                        error,
+                        "Check the local HTTP connection and retry the screenshot request.",
+                    )
                 });
             }
             native_screenshot(webview, &out_path, stream)
@@ -213,10 +232,124 @@ fn handle_http_request(
             404,
             "Not Found",
             "text/plain; charset=utf-8",
-            b"unknown app-control endpoint",
+            error_with_fix(
+                "route the app-control request",
+                format!("no handler exists for {} {}", request.method, request.path),
+                "Use one of the supported endpoints: /status, /diagnose, /eval, /navigate, or /screenshot.",
+            )
+            .as_bytes(),
         )
-        .map_err(|error| format!("failed to write HTTP 404 response: {error}")),
+        .map_err(|error| {
+            error_with_fix(
+                "write the HTTP 404 response",
+                error,
+                "Check the local HTTP connection and retry the request.",
+            )
+        }),
     }
+}
+
+fn status_probe_script() -> &'static str {
+    r#"(function() {
+  function finiteNumber(value, fallback) {
+    var numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
+  function deriveClipTiming(clip) {
+    var start = Math.max(0, finiteNumber(clip && clip.start, 0));
+    var explicitDuration = finiteNumber(clip && (clip.dur != null ? clip.dur : clip.duration), NaN);
+    var end = finiteNumber(clip && clip.end, NaN);
+    var duration = Number.isFinite(explicitDuration)
+      ? Math.max(0, explicitDuration)
+      : Math.max(0, end - start);
+    return { start: start, duration: duration };
+  }
+
+  function clipCount(timeline) {
+    if (!timeline || typeof timeline !== "object") {
+      return 0;
+    }
+    if (Array.isArray(timeline.layers)) {
+      return timeline.layers.length;
+    }
+    if (!Array.isArray(timeline.tracks)) {
+      return 0;
+    }
+    return timeline.tracks.reduce(function(total, track) {
+      return total + (Array.isArray(track && track.clips) ? track.clips.length : 0);
+    }, 0);
+  }
+
+  function timelineDuration(timeline) {
+    if (!timeline || typeof timeline !== "object") {
+      return 0;
+    }
+    var direct = finiteNumber(timeline.duration, 0);
+    var meta = finiteNumber(timeline.meta && timeline.meta.duration, 0);
+    var tracks = Array.isArray(timeline.tracks) ? timeline.tracks : [];
+    var layers = Array.isArray(timeline.layers) ? timeline.layers : [];
+    var derivedTracks = tracks.reduce(function(maxEnd, track) {
+      var clips = Array.isArray(track && track.clips) ? track.clips : [];
+      return clips.reduce(function(clipMax, clip) {
+        var timing = deriveClipTiming(clip);
+        return Math.max(clipMax, timing.start + timing.duration);
+      }, maxEnd);
+    }, 0);
+    var derivedLayers = layers.reduce(function(maxEnd, layer) {
+      var timing = deriveClipTiming(layer);
+      return Math.max(maxEnd, timing.start + timing.duration);
+    }, 0);
+    return Math.max(direct, meta, derivedTracks, derivedLayers);
+  }
+
+  function pageFromView(activeViewId) {
+    if (activeViewId === "view-editor") {
+      return "editor";
+    }
+    if (activeViewId === "view-pipeline") {
+      return "pipeline";
+    }
+    if (activeViewId === "view-project") {
+      return "project";
+    }
+    if (typeof activeViewId === "string" && activeViewId.indexOf("view-") === 0) {
+      return activeViewId.slice("view-".length) || "unknown";
+    }
+    return "unknown";
+  }
+
+  var activeViewId = document.querySelector(".view.active")?.id || "none";
+  var timeline = typeof currentTimeline !== "undefined" ? currentTimeline : null;
+
+  return {
+    page: pageFromView(activeViewId),
+    project: typeof currentProject !== "undefined" ? currentProject : null,
+    episode: typeof currentEpisode !== "undefined" ? currentEpisode : null,
+    segment: typeof currentSegment !== "undefined" ? currentSegment : null,
+    timeline_loaded: !!timeline,
+    clip_count: clipCount(timeline),
+    duration: timelineDuration(timeline),
+    pipeline_stage: typeof pipelineStage !== "undefined" ? pipelineStage : null
+  };
+})()"#
+}
+
+fn diagnose_probe_script() -> &'static str {
+    r#"(function() {
+  if (typeof window.__diagnose === "function") {
+    try {
+      return JSON.parse(window.__diagnose());
+    } catch (_) {
+      return window.__diagnose();
+    }
+  }
+  return {
+    title: document.title || "NextFrame",
+    location: String(window.location),
+    viewActive: document.querySelector(".view.active")?.id || "none"
+  };
+})()"#
 }
 
 pub(crate) fn prune_expired_appctl_requests(pending_appctl: &PendingAppCtlMap) {
@@ -257,7 +390,12 @@ pub(crate) fn prune_expired_appctl_requests(pending_appctl: &PendingAppCtlMap) {
             504,
             "Gateway Timeout",
             "text/plain; charset=utf-8",
-            b"desktop app evaluation timed out",
+            error_with_fix(
+                "evaluate the app-control request",
+                format!("request {req_id} timed out after 10 seconds"),
+                "Reduce the work in the evaluated script or retry after the UI becomes responsive.",
+            )
+            .as_bytes(),
         );
     }
 }
