@@ -3,11 +3,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::CommonArgs;
-use crate::plan::collect_frame_files;
 use super::manifest::parse_segments_manifest;
 use super::srt::parse_srt_text;
 use super::{SlideType, SubtitleCue, detect_slide_type, parse_frame_file};
+use crate::CommonArgs;
+use crate::plan::collect_frame_files;
 
 struct TestDir {
     path: PathBuf,

@@ -40,7 +40,10 @@ pub(super) fn build_timeline_clip_subtitles(
     slice_global_cues(global_audio_cues, timing.start_sec, timing.duration_sec)
 }
 
-pub(super) fn extract_subtitles_from_value(value: &Value, default_duration: f64) -> Vec<SubtitleCue> {
+pub(super) fn extract_subtitles_from_value(
+    value: &Value,
+    default_duration: f64,
+) -> Vec<SubtitleCue> {
     find_array_field(value, &["subtitles", "subtitleCues", "captions"])
         .or_else(|| find_array_field(value, &["timestamps", "audioTimestamps", "wordTimestamps"]))
         .map(|entries| parse_subtitle_array(entries, default_duration))

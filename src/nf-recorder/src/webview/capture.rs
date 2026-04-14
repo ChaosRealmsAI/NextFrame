@@ -1,7 +1,9 @@
 //! Snapshot, JavaScript evaluation, and progress rect query methods for `WebViewHost`.
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::time::{Duration, Instant};
+use super::WebViewHost;
+use super::frame::{EvalResultSlot, SnapshotResultSlot, pump_main_run_loop};
+use crate::capture;
+use crate::plan::VideoLayerInfo;
+use crate::progress::{PROGRESS_CANDIDATE_SELECTORS, ProgressRect};
 use block2::RcBlock;
 use objc2::MainThreadMarker;
 use objc2::msg_send;
@@ -11,11 +13,9 @@ use objc2_app_kit::NSImage;
 use objc2_core_graphics::CGImage;
 use objc2_foundation::{NSError, NSNumber, NSString};
 use objc2_web_kit::WKSnapshotConfiguration;
-use crate::capture;
-use crate::plan::VideoLayerInfo;
-use crate::progress::{PROGRESS_CANDIDATE_SELECTORS, ProgressRect};
-use super::frame::{EvalResultSlot, SnapshotResultSlot, pump_main_run_loop};
-use super::WebViewHost;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 impl WebViewHost {
     /// Queries `window.__hasFrameChanged(prevT, curT)` when available.
