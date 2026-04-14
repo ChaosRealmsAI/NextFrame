@@ -26,6 +26,14 @@ const WINDOW_DRAG_HANDLER_NAME: &str = "nfWindowDrag";
 const WINDOW_DRAG_MESSAGE: &str = "start_dragging";
 const WINDOW_DRAG_SCRIPT: &str = r#"
 (() => {
+  // Hide HTML fake traffic lights + add padding for native ones
+  document.addEventListener('DOMContentLoaded', () => {
+    const dots = document.querySelector('.tb-traffic-lights');
+    if (dots) dots.style.display = 'none';
+    const topbar = document.querySelector('.topbar');
+    if (topbar) topbar.style.paddingLeft = '80px';
+  });
+
   const handlerName = 'nfWindowDrag';
   const clickableTags = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL', 'SUMMARY']);
   const interactiveRoles = new Set(['button', 'link', 'menuitem', 'tab', 'checkbox', 'radio', 'switch', 'option']);
@@ -301,7 +309,7 @@ fn position_traffic_lights(window: &NSWindow) {
     }
 }
 
-unsafe fn inset_traffic_lights(window: &NSWindow, x: f64, y: f64) {
+unsafe fn inset_traffic_lights(window: &NSWindow, x: f64, _y: f64) {
     // SAFETY: This follows Wry's macOS inset strategy: resize the titlebar container view,
     // then move the standard buttons horizontally so AppKit keeps them aligned on relayout.
     let Some(close) = window.standardWindowButton(NSWindowButton::CloseButton) else {
@@ -317,25 +325,23 @@ unsafe fn inset_traffic_lights(window: &NSWindow, x: f64, y: f64) {
     };
 
     let close_rect = close.frame();
-    let title_bar_frame_height = close_rect.size.height + y;
+    let btn_h = close_rect.size.height;
 
+    // Resize container to match our full 48px topbar
     let mut title_bar_rect = title_bar_container_view.frame();
-    title_bar_rect.size.height = title_bar_frame_height;
-    title_bar_rect.origin.y = window.frame().size.height - title_bar_frame_height;
+    title_bar_rect.size.height = TOPBAR_H;
+    title_bar_rect.origin.y = window.frame().size.height - TOPBAR_H;
     let _: () = msg_send![&title_bar_container_view, setFrame: title_bar_rect];
 
     let space_between = miniaturize.frame().origin.x - close_rect.origin.x;
 
-    close.setFrameOrigin(NSPoint::new(x, close_rect.origin.y));
-    miniaturize.setFrameOrigin(NSPoint::new(
-        x + space_between,
-        miniaturize.frame().origin.y,
-    ));
+    // Center buttons vertically in 48px container
+    let btn_y = (TOPBAR_H - btn_h) / 2.0;
+
+    close.setFrameOrigin(NSPoint::new(x, btn_y));
+    miniaturize.setFrameOrigin(NSPoint::new(x + space_between, btn_y));
     if let Some(zoom) = zoom {
-        zoom.setFrameOrigin(NSPoint::new(
-            x + (space_between * 2.0),
-            zoom.frame().origin.y,
-        ));
+        zoom.setFrameOrigin(NSPoint::new(x + (space_between * 2.0), btn_y));
     }
 }
 
