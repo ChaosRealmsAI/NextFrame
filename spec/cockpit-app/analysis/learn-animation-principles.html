@@ -523,15 +523,15 @@ canvas.spring-canvas {
 <!-- 8. Secondary Action -->
 <section class="principle-section" id="sec-8">
   <div class="section-header">
-    <div class="section-number">Principle 08</div>
-    <h2>Secondary Action<span class="cn">次要动作</span></h2>
+    <div class="section-number">原则 08</div>
+    <h2>次要动作（Secondary Action）<span class="cn"></span></h2>
     <p class="why">主动作是卡片滑入。次要动作是阴影扩大、背景微微变暗、边框闪光。次要动作不抢戏，但让画面更丰富、更有层次。</p>
     <span class="code-insight">主动画 + 伴随动画 (opacity, shadow, scale) 同步但弱化</span>
   </div>
   <div class="demo-container" id="demo-8">
     <div class="demo-toolbar">
-      <span class="label">Card slides in with growing shadow + background dim</span>
-      <button class="btn-replay" onclick="replay8()">Replay</button>
+      <span class="label">卡片滑入，伴随阴影扩大 + 背景变暗</span>
+      <button class="btn-replay" onclick="replay8()">重播</button>
     </div>
     <div class="demo-stage" id="stage-8"></div>
   </div>
@@ -540,20 +540,20 @@ canvas.spring-canvas {
 <!-- 9. Timing -->
 <section class="principle-section" id="sec-9">
   <div class="section-header">
-    <div class="section-number">Principle 09</div>
-    <h2>Timing<span class="cn">节奏</span></h2>
+    <div class="section-number">原则 09</div>
+    <h2>节奏（Timing）<span class="cn"></span></h2>
     <p class="why">同样的动作，200ms 感觉干脆利落，2000ms 感觉庄重优雅。Timing 不是"快好还是慢好"，而是"这个场景需要什么情绪"。</p>
     <span class="code-insight">duration 决定情绪：200ms=snappy, 500ms=smooth, 1000ms+=dramatic</span>
   </div>
   <div class="demo-container" id="demo-9">
     <div class="demo-toolbar">
-      <span class="label">Same motion at different durations -- feel the mood shift</span>
-      <button class="btn-replay" onclick="replay9()">Replay</button>
+      <span class="label">同样的运动，不同的时长 -- 感受情绪变化</span>
+      <button class="btn-replay" onclick="replay9()">重播</button>
     </div>
     <div class="demo-stage" id="stage-9"></div>
     <div class="demo-controls">
       <div class="control-group">
-        <label>Duration</label>
+        <label>时长</label>
         <input type="range" min="100" max="3000" value="500" id="timing-slider" oninput="updateTiming()">
         <span class="val" id="timing-val">500ms</span>
       </div>
@@ -564,14 +564,14 @@ canvas.spring-canvas {
 <!-- 10. Exaggeration -->
 <section class="principle-section" id="sec-10">
   <div class="section-header">
-    <div class="section-number">Principle 10</div>
-    <h2>Exaggeration<span class="cn">夸张</span></h2>
+    <div class="section-number">原则 10</div>
+    <h2>夸张（Exaggeration）<span class="cn"></span></h2>
     <p class="why">视频比 UI 需要更多夸张 -- 观众在远处看，细微变化会被吞没。Overshoot、更大的位移、更强的缩放，让动画在视频中"读得到"。</p>
   </div>
   <div class="demo-container" id="demo-10">
     <div class="demo-toolbar">
-      <span class="label">Normal slide-in vs. exaggerated with overshoot</span>
-      <button class="btn-replay" onclick="replay10()">Replay</button>
+      <span class="label">普通滑入 vs. 带 overshoot 的夸张效果</span>
+      <button class="btn-replay" onclick="replay10()">重播</button>
     </div>
     <div class="demo-stage" id="stage-10"></div>
   </div>
@@ -580,15 +580,15 @@ canvas.spring-canvas {
 <!-- 11. Solid Drawing -->
 <section class="principle-section" id="sec-11">
   <div class="section-header">
-    <div class="section-number">Principle 11</div>
-    <h2>Solid Drawing<span class="cn">立体感</span></h2>
+    <div class="section-number">原则 11</div>
+    <h2>立体感（Solid Drawing）<span class="cn"></span></h2>
     <p class="why">即使是 2D 元素，加上透视变换和阴影就能产生空间感。3D transforms 让视频场景感觉像一个真实的空间，而不是平面贴纸。</p>
     <span class="code-insight">perspective + rotateX/Y + box-shadow depth layers</span>
   </div>
   <div class="demo-container" id="demo-11">
     <div class="demo-toolbar">
-      <span class="label">Flat card vs. card with perspective + depth shadow</span>
-      <button class="btn-replay" onclick="replay11()">Replay</button>
+      <span class="label">平面卡片 vs. 带透视 + 深度阴影的卡片</span>
+      <button class="btn-replay" onclick="replay11()">重播</button>
     </div>
     <div class="demo-stage" id="stage-11"></div>
   </div>
@@ -597,14 +597,14 @@ canvas.spring-canvas {
 <!-- 12. Appeal -->
 <section class="principle-section" id="sec-12">
   <div class="section-header">
-    <div class="section-number">Principle 12</div>
-    <h2>Appeal<span class="cn">吸引力</span></h2>
+    <div class="section-number">原则 12</div>
+    <h2>吸引力（Appeal）<span class="cn"></span></h2>
     <p class="why">同样的内容，字体、颜色、间距不同，观感天差地别。Appeal 是最后的抛光层 -- 把"能用"变成"想看"。</p>
   </div>
   <div class="demo-container" id="demo-12">
     <div class="demo-toolbar">
-      <span class="label">Generic design vs. polished design -- same content</span>
-      <button class="btn-replay" onclick="replay12()">Replay</button>
+      <span class="label">普通设计 vs. 精致设计 -- 同样的内容</span>
+      <button class="btn-replay" onclick="replay12()">重播</button>
     </div>
     <div class="demo-stage tall" id="stage-12"></div>
   </div>
@@ -613,15 +613,15 @@ canvas.spring-canvas {
 <!-- Special: Spring Deep Dive -->
 <section class="special-section" id="sec-spring">
   <div class="section-header">
-    <div class="section-number">Deep Dive</div>
-    <h2>Spring Animation<span class="cn">弹簧动画</span></h2>
+    <div class="section-number">深入探讨</div>
+    <h2>弹簧动画（Spring Animation）<span class="cn"></span></h2>
     <p class="why">CSS 的 ease-in-out 是贝塞尔曲线 -- 预设的、机械的。Spring 是物理模拟 -- 有质量、有弹性、会过冲然后稳定。这就是 Remotion 的 spring() 和 Apple 动画"就是感觉对"的秘密。</p>
     <span class="code-insight">x(t) = A * e^(-gamma*t) * cos(omega*t + phi)</span>
   </div>
   <div class="demo-container" id="demo-spring">
     <div class="demo-toolbar">
-      <span class="label">Adjust damping, stiffness, mass -- see the curve change live</span>
-      <button class="btn-replay" onclick="replaySpring()">Replay</button>
+      <span class="label">调节 damping、stiffness、mass -- 实时查看曲线变化</span>
+      <button class="btn-replay" onclick="replaySpring()">重播</button>
     </div>
     <div class="demo-stage tall" id="stage-spring">
       <canvas id="spring-curve-canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
@@ -629,17 +629,17 @@ canvas.spring-canvas {
     </div>
     <div class="demo-controls">
       <div class="control-group">
-        <label>Damping</label>
+        <label>阻尼（Damping）</label>
         <input type="range" min="1" max="40" value="10" id="spring-damping" oninput="updateSpringParams()">
         <span class="val" id="spring-d-val">10</span>
       </div>
       <div class="control-group">
-        <label>Stiffness</label>
+        <label>刚度（Stiffness）</label>
         <input type="range" min="20" max="500" value="170" id="spring-stiffness" oninput="updateSpringParams()">
         <span class="val" id="spring-s-val">170</span>
       </div>
       <div class="control-group">
-        <label>Mass</label>
+        <label>质量（Mass）</label>
         <input type="range" min="1" max="20" value="5" id="spring-mass" oninput="updateSpringParams()">
         <span class="val" id="spring-m-val">5</span>
       </div>
@@ -647,8 +647,8 @@ canvas.spring-canvas {
   </div>
   <div style="margin-top:2rem;max-width:700px;text-align:center;">
     <p style="color:var(--text-dim);font-size:0.9rem;line-height:1.7;">
-      <strong style="color:var(--text-bright);">Why spring feels better:</strong>
-      CSS easing stops exactly at the target -- no overshoot, no settling. Spring overshoots, bounces back, and gradually settles. This mirrors real physics: a door swinging shut, a rubber band snapping, a pendulum finding rest. The overshoot creates anticipation; the settling creates satisfaction.
+      <strong style="color:var(--text-bright);">为什么 spring 感觉更好：</strong>
+      CSS 缓动精确地停在目标位置 -- 没有过冲，没有稳定过程。Spring 会过冲、反弹，然后逐渐稳定。这模拟了真实物理：门摆动关闭、橡皮筋弹回、钟摆最终静止。过冲制造期待感；稳定过程带来满足感。
     </p>
   </div>
 </section>
@@ -656,15 +656,15 @@ canvas.spring-canvas {
 <!-- Special: Easing Gallery -->
 <section class="special-section" id="sec-easing">
   <div class="section-header">
-    <div class="section-number">Reference</div>
-    <h2>Easing Curves Gallery<span class="cn">缓动曲线图鉴</span></h2>
+    <div class="section-number">参考手册</div>
+    <h2>缓动曲线图鉴（Easing Curves Gallery）<span class="cn"></span></h2>
     <p class="why">8 条常用曲线，每条配有曲线图 + 移动点 + 实际效果。点击任意一张卡片播放动画。</p>
   </div>
   <div class="easing-grid" id="easing-grid"></div>
 </section>
 
 <footer style="text-align:center;padding:4rem 2rem;border-top:1px solid var(--border);color:var(--text-dim);font-size:0.8rem;">
-  Built for NextFrame Animation System -- 12 Disney Principles, Interactive Edition
+  为 NextFrame 动画系统打造 -- 迪士尼 12 原则，交互式版本
 </footer>
 
 <script>
@@ -792,7 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dot = document.createElement('button');
     dot.className = 'nav-dot';
     dot.dataset.section = 'sec-' + s;
-    dot.title = s === 'hero' ? 'Top' : s === 'spring' ? 'Spring' : s === 'easing' ? 'Easing' : `#${s}`;
+    dot.title = s === 'hero' ? '顶部' : s === 'spring' ? '弹簧动画' : s === 'easing' ? '缓动曲线' : `#${s}`;
     dot.onclick = () => document.getElementById('sec-' + s)?.scrollIntoView({ behavior: 'smooth' });
     nav.appendChild(dot);
   });
@@ -881,8 +881,8 @@ function initDemo2() {
   stage.innerHTML = '';
 
   // Labels
-  stage.appendChild(el('div', { style: { position:'absolute', top:'20px', left:'15%', fontSize:'0.7rem', color:'var(--text-dim)' }}, 'Without anticipation'));
-  stage.appendChild(el('div', { style: { position:'absolute', top:'20px', right:'15%', fontSize:'0.7rem', color:'var(--accent)' }}, 'With anticipation'));
+  stage.appendChild(el('div', { style: { position:'absolute', top:'20px', left:'15%', fontSize:'0.7rem', color:'var(--text-dim)' }}, '无预备动作'));
+  stage.appendChild(el('div', { style: { position:'absolute', top:'20px', right:'15%', fontSize:'0.7rem', color:'var(--accent)' }}, '有预备动作'));
 
   // Two circles
   const c1 = el('div', { style: { position:'absolute', width:'40px', height:'40px', borderRadius:'50%', background:'var(--text-dim)', top:'50%', left:'15%', transform:'translate(-50%,-50%)' }});
@@ -956,10 +956,10 @@ function initDemo3() {
   // Bad staging side
   const bad = el('div', { style: { position:'absolute', left:'0', top:'0', width:'50%', height:'100%', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', padding:'20px', overflow:'hidden' }});
 
-  bad.appendChild(el('div', { style: { fontSize:'0.65rem', color:'#ef4444', marginBottom:'12px', textAlign:'center', letterSpacing:'0.1em' }}, 'BAD STAGING'));
+  bad.appendChild(el('div', { style: { fontSize:'0.65rem', color:'#ef4444', marginBottom:'12px', textAlign:'center', letterSpacing:'0.1em' }}, '差布局'));
 
   // Cluttered layout
-  const badItems = ['Welcome!', 'Click here', 'New!', 'Important', 'Sale', 'Menu', 'Hello', 'Info'];
+  const badItems = ['欢迎!', '点这里', '新品!', '重要', '促销', '菜单', '你好', '信息'];
   badItems.forEach((text, i) => {
     bad.appendChild(el('div', { style: {
       position:'absolute',
@@ -975,12 +975,12 @@ function initDemo3() {
   // Good staging side
   const good = el('div', { style: { position:'absolute', right:'0', top:'0', width:'50%', height:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'30px' }});
 
-  good.appendChild(el('div', { style: { fontSize:'0.65rem', color:'var(--success)', marginBottom:'24px', letterSpacing:'0.1em' }}, 'GOOD STAGING'));
+  good.appendChild(el('div', { style: { fontSize:'0.65rem', color:'var(--success)', marginBottom:'24px', letterSpacing:'0.1em' }}, '好布局'));
 
   const hero = el('div', { style: { textAlign:'center' }});
-  hero.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1.6rem', color:'var(--text-bright)', fontWeight:'700', marginBottom:'8px' }}, 'Welcome'));
-  hero.appendChild(el('div', { style: { fontSize:'0.85rem', color:'var(--text-dim)', marginBottom:'20px', lineHeight:'1.6' }}, 'Clear hierarchy guides the eye'));
-  hero.appendChild(el('div', { style: { display:'inline-block', padding:'8px 20px', background:'var(--accent)', color:'#fff', borderRadius:'6px', fontSize:'0.8rem', fontWeight:'500' }}, 'Get Started'));
+  hero.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1.6rem', color:'var(--text-bright)', fontWeight:'700', marginBottom:'8px' }}, '欢迎'));
+  hero.appendChild(el('div', { style: { fontSize:'0.85rem', color:'var(--text-dim)', marginBottom:'20px', lineHeight:'1.6' }}, '清晰的层级引导视线'));
+  hero.appendChild(el('div', { style: { display:'inline-block', padding:'8px 20px', background:'var(--accent)', color:'#fff', borderRadius:'6px', fontSize:'0.8rem', fontWeight:'500' }}, '开始使用'));
   good.appendChild(hero);
 
   stage.appendChild(bad);
@@ -1001,8 +1001,8 @@ function initDemo4() {
   stage.appendChild(el('div', { style: { position:'absolute', left:'50%', top:'10%', bottom:'10%', width:'1px', background:'var(--border)' }}));
 
   // Labels
-  stage.appendChild(el('div', { style: { position:'absolute', top:'15px', left:'25%', transform:'translateX(-50%)', fontSize:'0.7rem', color:'var(--text-dim)' }}, 'Straight Ahead (random)'));
-  stage.appendChild(el('div', { style: { position:'absolute', top:'15px', left:'75%', transform:'translateX(-50%)', fontSize:'0.7rem', color:'var(--accent)' }}, 'Pose to Pose (keyframes)'));
+  stage.appendChild(el('div', { style: { position:'absolute', top:'15px', left:'25%', transform:'translateX(-50%)', fontSize:'0.7rem', color:'var(--text-dim)' }}, '逐帧（随机）'));
+  stage.appendChild(el('div', { style: { position:'absolute', top:'15px', left:'75%', transform:'translateX(-50%)', fontSize:'0.7rem', color:'var(--accent)' }}, '关键帧（插值）'));
 
   // Track lines
   const trackY = 55;
@@ -1056,7 +1056,7 @@ function initDemo5() {
 
   // Box with tail segments
   const box = el('div', { style: { position:'absolute', width:'50px', height:'50px', background:'var(--accent)', borderRadius:'6px', left:'10%', top:'50%', transform:'translateY(-50%)', display:'flex', alignItems:'center', justifyContent:'center' }});
-  box.appendChild(el('div', { style: { fontSize:'0.6rem', color:'#fff', fontWeight:'600' }}, 'BOX'));
+  box.appendChild(el('div', { style: { fontSize:'0.6rem', color:'#fff', fontWeight:'600' }}, '方块'));
 
   const tailCount = 5;
   const tails = [];
@@ -1120,7 +1120,7 @@ function initDemo6() {
   const stage = document.getElementById('stage-6');
   stage.innerHTML = '';
 
-  const labels = ['Linear', 'Ease-in-out', 'Spring'];
+  const labels = ['匀速（Linear）', '缓入缓出（Ease-in-out）', '弹簧（Spring）'];
   const colors = ['var(--text-dim)', 'var(--warning)', 'var(--accent)'];
   const easings = [easeLinear, easeInOut, (t) => springValue(t * 2.5, 10, 170, 5)];
 
@@ -1186,8 +1186,8 @@ function initDemo7() {
   stage.innerHTML = '';
 
   // Labels
-  stage.appendChild(el('div', { style: { position:'absolute', top:'15px', left:'25%', transform:'translateX(-50%)', fontSize:'0.7rem', color:'var(--text-dim)' }}, 'Straight line'));
-  stage.appendChild(el('div', { style: { position:'absolute', top:'15px', left:'75%', transform:'translateX(-50%)', fontSize:'0.7rem', color:'var(--accent)' }}, 'Arc path'));
+  stage.appendChild(el('div', { style: { position:'absolute', top:'15px', left:'25%', transform:'translateX(-50%)', fontSize:'0.7rem', color:'var(--text-dim)' }}, '直线路径'));
+  stage.appendChild(el('div', { style: { position:'absolute', top:'15px', left:'75%', transform:'translateX(-50%)', fontSize:'0.7rem', color:'var(--accent)' }}, '弧线路径'));
 
   // Start and end markers
   const sx = 10, sy = 75, ex = 40, ey = 30;
@@ -1268,8 +1268,8 @@ function initDemo8() {
     left:'50%', top:'50%', transform:'translate(-50%, -50%) translateX(-400px)',
     boxShadow:'0 0 0 rgba(99,102,241,0)', opacity:'0'
   }});
-  card.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1.1rem', fontWeight:'600', color:'var(--text-bright)', marginBottom:'8px' }}, 'New Feature'));
-  card.appendChild(el('div', { style: { fontSize:'0.8rem', color:'var(--text-dim)', lineHeight:'1.5' }}, 'Spring animation now available with adjustable damping.'));
+  card.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1.1rem', fontWeight:'600', color:'var(--text-bright)', marginBottom:'8px' }}, '新功能'));
+  card.appendChild(el('div', { style: { fontSize:'0.8rem', color:'var(--text-dim)', lineHeight:'1.5' }}, 'Spring 动画现已支持可调节的 damping 参数。'));
 
   // Border glow element
   const glow = el('div', { style: {
@@ -1317,7 +1317,7 @@ function initDemo9() {
   stage.innerHTML = '';
 
   const presets = [200, 500, 1000, 2000];
-  const labels = ['200ms Snappy', '500ms Smooth', '1000ms Elegant', '2000ms Dramatic'];
+  const labels = ['200ms 干脆利落', '500ms 平滑流畅', '1000ms 优雅从容', '2000ms 戏剧张力'];
   const balls = [];
 
   presets.forEach((dur, i) => {
@@ -1367,7 +1367,7 @@ function initDemo10() {
     border:'1px solid var(--border)', borderRadius:'6px', display:'flex', alignItems:'center',
     justifyContent:'center', top:'35%', left:'-130px', transform:'translateY(-50%)'
   }});
-  normal.appendChild(el('div', { style: { fontSize:'0.75rem', color:'var(--text-dim)' }}, 'Normal'));
+  normal.appendChild(el('div', { style: { fontSize:'0.75rem', color:'var(--text-dim)' }}, '普通'));
 
   // Exaggerated
   const exag = el('div', { style: {
@@ -1375,11 +1375,11 @@ function initDemo10() {
     border:'1px solid var(--accent)', borderRadius:'6px', display:'flex', alignItems:'center',
     justifyContent:'center', top:'65%', left:'-130px', transform:'translateY(-50%)'
   }});
-  exag.appendChild(el('div', { style: { fontSize:'0.75rem', color:'var(--accent)' }}, 'Exaggerated'));
+  exag.appendChild(el('div', { style: { fontSize:'0.75rem', color:'var(--accent)' }}, '夸张'));
 
   // Labels
-  stage.appendChild(el('div', { style: { position:'absolute', right:'8%', top:'28%', fontSize:'0.65rem', color:'var(--text-dim)' }}, 'Normal: slides to position'));
-  stage.appendChild(el('div', { style: { position:'absolute', right:'8%', top:'58%', fontSize:'0.65rem', color:'var(--accent)' }}, 'Exaggerated: overshoots + settles'));
+  stage.appendChild(el('div', { style: { position:'absolute', right:'8%', top:'28%', fontSize:'0.65rem', color:'var(--text-dim)' }}, '普通：滑到目标位置'));
+  stage.appendChild(el('div', { style: { position:'absolute', right:'8%', top:'58%', fontSize:'0.65rem', color:'var(--accent)' }}, '夸张：过冲 + 稳定'));
 
   stage.appendChild(normal);
   stage.appendChild(exag);
@@ -1416,9 +1416,9 @@ function initDemo11() {
     border:'1px solid var(--border)', borderRadius:'6px',
     display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center'
   }});
-  flat.appendChild(el('div', { style: { fontSize:'0.65rem', color:'#ef4444', marginBottom:'4px', letterSpacing:'0.1em' }}, 'FLAT'));
-  flat.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1rem', color:'var(--text-bright)' }}, 'Card Title'));
-  flat.appendChild(el('div', { style: { fontSize:'0.7rem', color:'var(--text-dim)', marginTop:'4px' }}, 'No depth'));
+  flat.appendChild(el('div', { style: { fontSize:'0.65rem', color:'#ef4444', marginBottom:'4px', letterSpacing:'0.1em' }}, '平面'));
+  flat.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1rem', color:'var(--text-bright)' }}, '卡片标题'));
+  flat.appendChild(el('div', { style: { fontSize:'0.7rem', color:'var(--text-dim)', marginTop:'4px' }}, '无深度'));
 
   // 3D card
   const d3container = el('div', { style: {
@@ -1434,9 +1434,9 @@ function initDemo11() {
     boxShadow:'10px 15px 30px rgba(0,0,0,0.5), 0 0 15px rgba(99,102,241,0.1)',
     transition:'transform 0.3s ease'
   }});
-  d3card.appendChild(el('div', { style: { fontSize:'0.65rem', color:'var(--success)', marginBottom:'4px', letterSpacing:'0.1em' }}, '3D DEPTH'));
-  d3card.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1rem', color:'var(--text-bright)' }}, 'Card Title'));
-  d3card.appendChild(el('div', { style: { fontSize:'0.7rem', color:'var(--text-dim)', marginTop:'4px' }}, 'With perspective'));
+  d3card.appendChild(el('div', { style: { fontSize:'0.65rem', color:'var(--success)', marginBottom:'4px', letterSpacing:'0.1em' }}, '3D 深度'));
+  d3card.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1rem', color:'var(--text-bright)' }}, '卡片标题'));
+  d3card.appendChild(el('div', { style: { fontSize:'0.7rem', color:'var(--text-dim)', marginTop:'4px' }}, '带透视效果'));
 
   d3container.appendChild(d3card);
 
@@ -1468,25 +1468,25 @@ function initDemo12() {
     borderRight:'1px solid var(--border)', padding:'40px 30px',
     display:'flex', flexDirection:'column', justifyContent:'center'
   }});
-  generic.appendChild(el('div', { style: { fontSize:'0.65rem', color:'#ef4444', marginBottom:'16px', letterSpacing:'0.1em' }}, 'GENERIC'));
-  generic.appendChild(el('div', { style: { fontSize:'18px', fontWeight:'bold', color:'#aaa', fontFamily:'Arial, sans-serif', marginBottom:'8px' }}, 'Animation Principles'));
-  generic.appendChild(el('div', { style: { fontSize:'14px', color:'#888', fontFamily:'Arial, sans-serif', lineHeight:'1.4' }}, 'Learn the 12 principles of animation used by Disney animators.'));
-  generic.appendChild(el('div', { style: { marginTop:'16px', padding:'8px 16px', background:'#555', color:'#fff', display:'inline-block', fontSize:'13px', fontFamily:'Arial, sans-serif' }}, 'Learn More'));
+  generic.appendChild(el('div', { style: { fontSize:'0.65rem', color:'#ef4444', marginBottom:'16px', letterSpacing:'0.1em' }}, '普通'));
+  generic.appendChild(el('div', { style: { fontSize:'18px', fontWeight:'bold', color:'#aaa', fontFamily:'Arial, sans-serif', marginBottom:'8px' }}, '动画原则'));
+  generic.appendChild(el('div', { style: { fontSize:'14px', color:'#888', fontFamily:'Arial, sans-serif', lineHeight:'1.4' }}, '学习迪士尼动画师使用的 12 条动画原则。'));
+  generic.appendChild(el('div', { style: { marginTop:'16px', padding:'8px 16px', background:'#555', color:'#fff', display:'inline-block', fontSize:'13px', fontFamily:'Arial, sans-serif' }}, '了解更多'));
 
   // Polished side
   const polished = el('div', { style: {
     position:'absolute', right:'0', top:'0', width:'50%', height:'100%',
     padding:'40px 30px', display:'flex', flexDirection:'column', justifyContent:'center'
   }});
-  polished.appendChild(el('div', { style: { fontSize:'0.65rem', color:'var(--success)', marginBottom:'16px', letterSpacing:'0.1em' }}, 'WITH APPEAL'));
-  polished.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1.5rem', fontWeight:'700', color:'var(--text-bright)', marginBottom:'10px', letterSpacing:'-0.02em' }}, 'Animation Principles'));
-  polished.appendChild(el('div', { style: { fontSize:'0.9rem', color:'var(--text-dim)', lineHeight:'1.7', maxWidth:'280px' }}, 'Learn the 12 principles of animation used by Disney animators.'));
+  polished.appendChild(el('div', { style: { fontSize:'0.65rem', color:'var(--success)', marginBottom:'16px', letterSpacing:'0.1em' }}, '有吸引力'));
+  polished.appendChild(el('div', { style: { fontFamily:'var(--font-serif)', fontSize:'1.5rem', fontWeight:'700', color:'var(--text-bright)', marginBottom:'10px', letterSpacing:'-0.02em' }}, '动画原则'));
+  polished.appendChild(el('div', { style: { fontSize:'0.9rem', color:'var(--text-dim)', lineHeight:'1.7', maxWidth:'280px' }}, '学习迪士尼动画师使用的 12 条动画原则。'));
   const btn = el('div', { style: {
     marginTop:'20px', padding:'10px 24px', background:'var(--accent)',
     color:'#fff', display:'inline-block', fontSize:'0.85rem', borderRadius:'6px',
     fontWeight:'500', letterSpacing:'0.02em', cursor:'pointer',
     transition:'transform 0.3s var(--ease-expo), box-shadow 0.3s ease'
-  }}, 'Learn More');
+  }}, '了解更多');
   btn.addEventListener('mouseenter', () => { btn.style.transform = 'translateY(-2px)'; btn.style.boxShadow = '0 8px 20px rgba(99,102,241,0.3)'; });
   btn.addEventListener('mouseleave', () => { btn.style.transform = ''; btn.style.boxShadow = ''; });
   polished.appendChild(btn);
@@ -1608,8 +1608,8 @@ const easingDefs = [
   { name: 'ease-out', css: 'cubic-bezier(0, 0, 0.58, 1)', fn: easeOut },
   { name: 'ease-in-out', css: 'cubic-bezier(0.42, 0, 0.58, 1)', fn: easeInOut },
   { name: 'expo-out', css: 'cubic-bezier(0.16, 1, 0.3, 1)', fn: easeExpoOut },
-  { name: 'spring', css: 'physics simulation', fn: easeSpring },
-  { name: 'bounce', css: 'custom JS', fn: easeBounce },
+  { name: 'spring', css: '物理模拟', fn: easeSpring },
+  { name: 'bounce', css: '自定义 JS', fn: easeBounce },
 ];
 
 function initEasingGallery() {
