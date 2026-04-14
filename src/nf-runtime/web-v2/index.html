@@ -437,20 +437,44 @@ html, body {
   gap: var(--sp-12);
 }
 
+/* Card tags */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.card-tag {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  line-height: 1.5;
+}
+.tag-accent {
+  color: var(--accent);
+  background: var(--accent-06);
+}
+.tag-warm {
+  color: #f97316;
+  background: rgba(249,115,22,0.08);
+}
+
 .card-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-4);
   font-size: 12px;
   font-weight: 600;
   color: var(--accent);
   background: var(--accent-12);
   padding: 2px 8px;
   border-radius: 20px;
-  line-height: 1.4;
 }
-.card-badge svg {
-  flex-shrink: 0;
+
+.card-tag {
+  color: #f97316;
+  background: rgba(249,115,22,0.08);
+}
+.tag-accent, .tag-warm {
+  color: #f97316;
+  background: rgba(249,115,22,0.08);
 }
 
 .card-time {
@@ -851,6 +875,51 @@ html, body {
 }
 .form-path-btn:hover { background: rgba(255,255,255,0.10); }
 
+/* ── Tag Input ── */
+.tag-input-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  min-height: 36px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-xs);
+  align-items: center;
+  transition: border-color 0.2s var(--ease);
+}
+.tag-input-wrap:focus-within { border-color: rgba(167,139,250,0.35); }
+.tag-input {
+  border: none;
+  background: none;
+  outline: none;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--t80);
+  flex: 1;
+  min-width: 100px;
+}
+.tag-input::placeholder { color: var(--t50); }
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: default;
+}
+.tag-pill:nth-child(odd) { color: var(--accent); background: var(--accent-06); }
+.tag-pill:nth-child(even) { color: #f97316; background: rgba(249,115,22,0.08); }
+.tag-pill-x {
+  cursor: pointer;
+  color: var(--t50);
+  font-size: 14px;
+  line-height: 1;
+}
+.tag-pill-x:hover { color: var(--t80); }
+
 /* ── Ratio Picker ── */
 .ratio-grid {
   display: grid;
@@ -1103,8 +1172,10 @@ html, body {
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">标签</label>
-        <input class="form-input" type="text" placeholder="教程, AI, 产品介绍..." id="np-tags">
+        <label class="form-label">标签 <span style="color:var(--t50);font-weight:400">（最多 5 个，输入 # 加空格添加）</span></label>
+        <div class="tag-input-wrap" id="np-tag-wrap">
+          <input class="tag-input" type="text" placeholder="# 输入标签后按空格" id="np-tag-input">
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1139,79 +1210,32 @@ html, body {
       <section class="section">
         <div class="section-header">
           <h2 class="section-title">最近项目</h2>
-          <span class="section-link">查看全部</span>
         </div>
         <div class="project-grid">
-
-          <!-- Card 1: AI短视频课 -->
           <div class="project-card glass">
-            <div class="card-thumb">
-
-              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
-              </svg>
-            </div>
+            <div class="card-thumb"><svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg></div>
             <div class="card-body">
               <div class="card-title">AI短视频课</div>
-              <div class="card-meta">
-                <span class="card-badge">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
-                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
-                  </svg>
-                  5 集
-                </span>
-                <span class="card-time">2 小时前</span>
-              </div>
+              <div class="card-tags"><span class="card-tag tag-warm">#教程</span><span class="card-tag tag-accent">#AI</span></div>
+              <div class="card-meta"><span class="card-badge">5 集</span><span class="card-time">2 小时前</span></div>
             </div>
           </div>
-
-          <!-- Card 2: 产品介绍 -->
           <div class="project-card glass">
-            <div class="card-thumb">
-
-              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
-              </svg>
-            </div>
+            <div class="card-thumb"><svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg></div>
             <div class="card-body">
               <div class="card-title">产品介绍</div>
-              <div class="card-meta">
-                <span class="card-badge">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
-                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
-                  </svg>
-                  2 集
-                </span>
-                <span class="card-time">1 天前</span>
-              </div>
+              <div class="card-tags"><span class="card-tag tag-accent">#产品</span><span class="card-tag tag-warm">#营销</span></div>
+              <div class="card-meta"><span class="card-badge">2 集</span><span class="card-time">1 天前</span></div>
             </div>
           </div>
-
-          <!-- Card 3: Demo Reel -->
           <div class="project-card glass">
-            <div class="card-thumb">
-
-              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
-              </svg>
-            </div>
+            <div class="card-thumb"><svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg></div>
             <div class="card-body">
               <div class="card-title">Demo Reel</div>
-              <div class="card-meta">
-                <span class="card-badge">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
-                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
-                  </svg>
-                  3 集
-                </span>
-                <span class="card-time">3 天前</span>
-              </div>
+              <div class="card-tags"><span class="card-tag tag-accent">#演示</span></div>
+              <div class="card-meta"><span class="card-badge">3 集</span><span class="card-time">3 天前</span></div>
             </div>
           </div>
-
         </div>
       </section>
 
@@ -1222,116 +1246,44 @@ html, body {
         </div>
         <div class="project-grid">
 
-          <!-- Card 1: AI短视频课 -->
           <div class="project-card glass">
-            <div class="card-thumb">
-
-              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
-              </svg>
-            </div>
+            <div class="card-thumb"><svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg></div>
             <div class="card-body">
               <div class="card-title">AI短视频课</div>
-              <div class="card-meta">
-                <span class="card-badge">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
-                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
-                  </svg>
-                  5 集
-                </span>
-                <span class="card-time">2 小时前</span>
-              </div>
+              <div class="card-tags"><span class="card-tag tag-warm">#教程</span><span class="card-tag tag-accent">#AI</span></div>
+              <div class="card-meta"><span class="card-badge">5 集</span><span class="card-time">2 小时前</span></div>
             </div>
           </div>
-
-          <!-- Card 2: 产品介绍 -->
           <div class="project-card glass">
-            <div class="card-thumb">
-
-              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
-              </svg>
-            </div>
+            <div class="card-thumb"><svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg></div>
             <div class="card-body">
               <div class="card-title">产品介绍</div>
-              <div class="card-meta">
-                <span class="card-badge">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
-                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
-                  </svg>
-                  2 集
-                </span>
-                <span class="card-time">1 天前</span>
-              </div>
+              <div class="card-tags"><span class="card-tag tag-accent">#产品</span><span class="card-tag tag-warm">#营销</span></div>
+              <div class="card-meta"><span class="card-badge">2 集</span><span class="card-time">1 天前</span></div>
             </div>
           </div>
-
-          <!-- Card 3: Demo Reel -->
           <div class="project-card glass">
-            <div class="card-thumb">
-
-              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
-              </svg>
-            </div>
+            <div class="card-thumb"><svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg></div>
             <div class="card-body">
               <div class="card-title">Demo Reel</div>
-              <div class="card-meta">
-                <span class="card-badge">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
-                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
-                  </svg>
-                  3 集
-                </span>
-                <span class="card-time">3 天前</span>
-              </div>
+              <div class="card-tags"><span class="card-tag tag-accent">#演示</span></div>
+              <div class="card-meta"><span class="card-badge">3 集</span><span class="card-time">3 天前</span></div>
             </div>
           </div>
-
-          <!-- Card 4: 用户案例 -->
           <div class="project-card glass">
-            <div class="card-thumb">
-
-              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
-              </svg>
-            </div>
+            <div class="card-thumb"><svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg></div>
             <div class="card-body">
               <div class="card-title">用户案例</div>
-              <div class="card-meta">
-                <span class="card-badge">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
-                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
-                  </svg>
-                  1 集
-                </span>
-                <span class="card-time">1 周前</span>
-              </div>
+              <div class="card-tags"><span class="card-tag tag-warm">#案例</span><span class="card-tag tag-accent">#客户</span></div>
+              <div class="card-meta"><span class="card-badge">1 集</span><span class="card-time">1 周前</span></div>
             </div>
           </div>
-
-          <!-- Card 5: Onboarding -->
           <div class="project-card glass">
-            <div class="card-thumb">
-
-              <svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <polygon points="12,8 24,16 12,24" fill="currentColor"/>
-              </svg>
-            </div>
+            <div class="card-thumb"><svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg></div>
             <div class="card-body">
               <div class="card-title">Onboarding</div>
-              <div class="card-meta">
-                <span class="card-badge">
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                    <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/>
-                    <line x1="6" y1="3" x2="6" y2="13" stroke="currentColor" stroke-width="1.3"/>
-                  </svg>
-                  4 集
-                </span>
+              <div class="card-tags"><span class="card-tag tag-accent">#培训</span><span class="card-tag tag-warm">#新手</span></div>
+              <div class="card-meta"><span class="card-badge">4 集</span>
                 <span class="card-time">2 周前</span>
               </div>
             </div>
@@ -1381,6 +1333,23 @@ function pickRatio(card, ratio) {
   card.closest('.ratio-grid').querySelectorAll('.ratio-card').forEach(c => c.classList.remove('active'));
   card.classList.add('active');
 }
+
+// Tag input: type "#tag " (# + text + space) to add
+document.getElementById('np-tag-input').addEventListener('keyup', function(e) {
+  const wrap = document.getElementById('np-tag-wrap');
+  const tags = wrap.querySelectorAll('.tag-pill');
+  if (tags.length >= 5) { this.value = ''; return; }
+
+  const val = this.value.trim();
+  if (e.key === ' ' && val.startsWith('#') && val.length > 1) {
+    const tag = val;
+    this.value = '';
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill';
+    pill.innerHTML = tag + ' <span class="tag-pill-x" onclick="this.parentElement.remove()">×</span>';
+    wrap.insertBefore(pill, this);
+  }
+});
 
 function createProject() {
   const name = document.getElementById('np-name').value || 'Untitled';

@@ -1,56 +1,13 @@
-// nf-core scene registry — imports from categorized subdirectories.
+// nf-core scene registry — 5 representative scenes.
 import { auroraGradient } from "./backgrounds/auroraGradient.js";
-import { fluidBackground } from "./backgrounds/fluidBackground.js";
-import { starfield } from "./backgrounds/starfield.js";
-import { spotlightSweep } from "./backgrounds/spotlightSweep.js";
-import { pixelRain } from "./backgrounds/pixelRain.js";
-import { particleFlow } from "./backgrounds/particleFlow.js";
-import { orbitRings } from "./backgrounds/orbitRings.js";
-
 import { kineticHeadline } from "./typography/kineticHeadline.js";
-import { glitchText } from "./typography/glitchText.js";
-import { countdown } from "./typography/countdown.js";
-import { textOverlay } from "./typography/textOverlay.js";
-import { quoteBlock } from "./typography/quoteBlock.js";
-
 import { barChartReveal } from "./data/barChartReveal.js";
-import { lineChart } from "./data/lineChart.js";
-import { dataPulse } from "./data/dataPulse.js";
-import { pulseWave } from "./data/pulseWave.js";
-import { horizontalBars } from "./data/horizontalBars.js";
-
-import { imageHero } from "./media/imageHero.js";
-import { videoClip } from "./media/videoClip.js";
-import { videoWindow } from "./media/videoWindow.js";
-
-import { lowerThirdVelvet } from "./overlays/lowerThirdVelvet.js";
-import { cornerBadge } from "./overlays/cornerBadge.js";
-import { vignette } from "./overlays/vignette.js";
-import { codeBlock } from "./overlays/codeBlock.js";
-import { iconCardGrid } from "./overlays/iconCardGrid.js";
-import { svgOverlay } from "./overlays/svgOverlay.js";
-
-import { neonGrid } from "./shapes/neonGrid.js";
-import { meshGrid } from "./shapes/meshGrid.js";
 import { circleRipple } from "./shapes/circleRipple.js";
-import { shapeBurst } from "./shapes/shapeBurst.js";
-import { radialBurst } from "./shapes/radialBurst.js";
-
-import { htmlSlide } from "./browser/htmlSlide.js";
-import { markdownSlide } from "./browser/markdownSlide.js";
-import { lottieAnim } from "./browser/lottieAnim.js";
-
-import { ccFrame } from "./series/ccFrame.js";
-import { ccBigNumber } from "./series/ccBigNumber.js";
-import { ccPill } from "./series/ccPill.js";
-import { ccNote } from "./series/ccNote.js";
-import { ccDesc } from "./series/ccDesc.js";
-import { toolboxSlide } from "./series/toolboxSlide.js";
-
+import { lowerThirdVelvet } from "./overlays/lowerThirdVelvet.js";
 import { assertSceneContract, assertNoDuplicateIds } from "./_contract.js";
 import { META_TABLE, listSceneMeta } from "./meta.js";
 
-export const RENDER_FNS = { auroraGradient, barChartReveal, circleRipple, codeBlock, cornerBadge, countdown, dataPulse, fluidBackground, glitchText, horizontalBars, htmlSlide, iconCardGrid, imageHero, videoClip, videoWindow, kineticHeadline, lineChart, lottieAnim, lowerThirdVelvet, markdownSlide, meshGrid, neonGrid, orbitRings, particleFlow, pixelRain, pulseWave, quoteBlock, radialBurst, shapeBurst, spotlightSweep, starfield, svgOverlay, textOverlay, toolboxSlide, vignette, ccFrame, ccBigNumber, ccPill, ccNote, ccDesc };
+export const RENDER_FNS = { auroraGradient, barChartReveal, circleRipple, kineticHeadline, lowerThirdVelvet };
 
 function defaultParamsOf(meta) {
   const out = {};
