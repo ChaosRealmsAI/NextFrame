@@ -199,6 +199,32 @@ function loadPipelineData() {
 
 function renderScriptTab(segments) {
   pipelineSegments = segments;
+
+  // Update sidebar: segment navigation + stats
+  const sidebar = document.querySelector('#pl-tab-script .pl-sidebar');
+  if (sidebar) {
+    const totalChars = segments.reduce(function(s, seg) { return s + (seg.narration || '').length; }, 0);
+    const estSecs = Math.round(totalChars / 4); // ~4 chars/sec for Chinese
+    let sbHtml = '<div class="pl-sb-section"><div class="pl-sb-title">剧集信息</div>' +
+      '<div class="pl-sb-info-row"><span class="pl-sb-label">段落</span><span class="pl-sb-value">' + segments.length + '</span></div>' +
+      '<div class="pl-sb-info-row"><span class="pl-sb-label">字数</span><span class="pl-sb-value">' + totalChars + '</span></div>' +
+      '<div class="pl-sb-info-row"><span class="pl-sb-label">预估</span><span class="pl-sb-value">~' + estSecs + 's</span></div>' +
+    '</div>';
+    sbHtml += '<div class="pl-sb-section"><div class="pl-sb-title">段落导航</div>';
+    segments.forEach(function(seg, i) {
+      const role = seg.role || '';
+      const preview = (seg.narration || '').substring(0, 15) + '...';
+      sbHtml += '<div class="pl-seg-item" data-nf-action="scroll-to-segment" onclick="scrollToSegment(' + i + ')" style="display:flex;gap:8px;padding:8px;border-radius:8px;cursor:pointer;transition:background 0.2s">' +
+        '<div style="width:20px;height:20px;border-radius:50%;background:var(--accent-12);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0">' + (i + 1) + '</div>' +
+        '<div style="min-width:0"><div style="font-size:12px;font-weight:600;color:var(--t80)">' + escapeHtml(role || '段落 ' + (i + 1)) + '</div>' +
+        '<div style="font-size:11px;color:var(--t50);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(preview) + '</div></div>' +
+      '</div>';
+    });
+    sbHtml += '</div>';
+    sidebar.innerHTML = sbHtml;
+  }
+
+  // Main area: script cards
   const el = document.querySelector('#pl-tab-script .pl-main');
   if (!el) return;
   if (segments.length === 0) {
@@ -206,30 +232,54 @@ function renderScriptTab(segments) {
     return;
   }
 
-  let html = '';
+  let html = '<div style="padding:16px;overflow-y:auto;height:100%">';
   segments.forEach(function(seg, index) {
-    const segmentName = seg.name || seg.narration || seg.path || ('seg-' + (index + 1));
     const narration = seg.narration || seg.text || '';
     const visual = seg.visual || '';
     const role = seg.role || '';
-    const preview = pipelinePreviewState[segmentName];
-    html += '' +
-      '<div class="glass" data-nf-action="generate-script" style="padding:16px;margin-bottom:8px;border-radius:10px">' +
-        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">' +
-          '<div style="flex:1">' +
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
-              '<span style="font-size:13px;font-weight:600;color:var(--t100)">段落 ' + (index + 1) + '</span>' +
-              (role ? '<span style="font-size:11px;padding:2px 6px;background:var(--accent-12);color:var(--accent);border-radius:4px">' + escapeHtml(role) + '</span>' : '') +
-            '</div>' +
-            (narration ? '<div style="font-size:13px;color:var(--t80);line-height:1.6;margin-bottom:4px">' + escapeHtml(narration) + '</div>' : '') +
-            (visual ? '<div style="font-size:11px;color:var(--t50)">视觉: ' + escapeHtml(visual) + '</div>' : '') +
-          '</div>' +
-          '<button data-nf-action="preview-segment" onclick="previewSegmentVideo(\'' + escapeJsString(segmentName) + '\')" style="border:0;border-radius:999px;padding:8px 14px;background:rgba(255,255,255,0.08);color:var(--t100);cursor:pointer;flex-shrink:0">预览视频</button>' +
+    const logic = seg.logic || '';
+    const charCount = narration.length;
+    html += '<div class="glass" id="script-card-' + index + '" data-nf-action="edit-script" style="padding:20px;margin-bottom:12px;border-radius:12px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="font-size:13px;font-weight:600;color:var(--accent)">段 ' + (index + 1) + '</span>' +
+          (role ? '<span style="font-size:11px;padding:2px 8px;background:var(--accent-12);color:var(--accent);border-radius:4px">' + escapeHtml(role) + '</span>' : '') +
         '</div>' +
-        renderScriptPreview(preview) +
-      '</div>';
+        '<span style="font-family:var(--mono);font-size:11px;color:var(--t50)">' + charCount + ' 字</span>' +
+      '</div>' +
+      '<div contenteditable="true" data-nf-action="edit-narration" data-seg-index="' + index + '" style="font-family:var(--serif,Georgia,serif);font-size:16px;line-height:1.8;color:var(--t80);outline:none;min-height:40px;padding:8px 0;border-bottom:1px solid var(--border)" onblur="saveNarration(this)">' + escapeHtml(narration) + '</div>' +
+      (visual || logic ? '<div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap">' +
+        (visual ? '<div style="flex:1;min-width:120px"><div style="font-size:11px;font-weight:600;color:var(--t50);margin-bottom:4px">画面</div><div style="font-size:12px;color:var(--t65);line-height:1.5">' + escapeHtml(visual) + '</div></div>' : '') +
+        (logic ? '<div style="flex:1;min-width:120px"><div style="font-size:11px;font-weight:600;color:var(--t50);margin-bottom:4px">逻辑</div><div style="font-size:12px;color:var(--t65);line-height:1.5">' + escapeHtml(logic) + '</div></div>' : '') +
+      '</div>' : '') +
+    '</div>';
   });
+  html += '</div>';
   el.innerHTML = html;
+}
+
+function scrollToSegment(index) {
+  const card = document.getElementById('script-card-' + index);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function saveNarration(el) {
+  const index = parseInt(el.dataset.segIndex);
+  const text = el.textContent || '';
+  if (!pipelineSegments[index]) return;
+  pipelineSegments[index].narration = text;
+  // Save back to pipeline.json
+  if (typeof bridgeCall !== 'function' || !getCurrentEpisodeRef()) return;
+  const path = getCurrentEpisodeRef() + '/pipeline.json';
+  bridgeCall('fs.read', { path: path }).then(function(data) {
+    const raw = data.contents || data.content || '';
+    let parsed;
+    try { parsed = typeof raw === 'object' ? raw : JSON.parse(raw); } catch(_e) { parsed = {}; }
+    if (parsed.script && parsed.script.segments && parsed.script.segments[index]) {
+      parsed.script.segments[index].narration = text;
+      return bridgeCall('fs.write', { path: path, contents: JSON.stringify(parsed, null, 2) });
+    }
+  }).catch(function(e) { console.error('[script] save narration:', e); });
 }
 
 let pipelineAudioState = {};
@@ -531,6 +581,8 @@ window.renderOutputTab = renderOutputTab;
 window.startPipelineExport = startPipelineExport;
 window.cancelPipelineExport = cancelPipelineExport;
 window.previewSegmentVideo = previewSegmentVideo;
+window.scrollToSegment = scrollToSegment;
+window.saveNarration = saveNarration;
 window.generateTTS = generateTTS;
 window.playSegmentAudio = playSegmentAudio;
 window.renderClipsTab = renderClipsTab;
