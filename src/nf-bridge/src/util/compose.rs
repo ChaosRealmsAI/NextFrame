@@ -74,7 +74,7 @@ pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
                     output.status.code().unwrap_or(-1)
                 )
             };
-            return Err(format!(
+            return Err(format!( // Fix: included in the error string below
                 "failed to generate composition: {details}. Fix: verify the timeline input and inspect the compose bundle output for details."
             ));
         }

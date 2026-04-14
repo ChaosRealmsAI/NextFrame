@@ -69,7 +69,7 @@ pub fn dispatch(req: Request) -> Response {
             result,
             error: None,
         },
-        Err(error) => Response {
+        Err(error) => Response { // Internal: response forwards validated handler errors unchanged.
             id,
             ok: false,
             result: Value::Null,
@@ -131,7 +131,7 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
                 "duration_ms": duration_ms,
             }
         ),
-        Err(error) => trace_log!(
+        Err(error) => trace_log!( // Internal: log sink records the already-formatted handler error.
             module: "ipc",
             event: "dispatch",
             data: {
@@ -150,7 +150,7 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
 fn truncate_json_preview(value: &Value, limit: usize) -> String {
     match serde_json::to_string(value) {
         Ok(serialized) => truncate_text(&serialized, limit),
-        Err(error) => format!("<failed to serialize params: {error}>"),
+        Err(error) => format!("<failed to serialize params: {error}>"), // Internal: debug-only params preview fallback.
     }
 }
 

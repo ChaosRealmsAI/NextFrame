@@ -125,7 +125,7 @@ pub(crate) fn handle_export_start(params: &Value) -> Result<Value, String> {
                     },
                 );
             }
-            Err(error) => {
+            Err(error) => { // Internal: propagate recorder startup error with its existing Fix guidance.
                 return Ok(json!({
                     "ok": false,
                     "error": error,
@@ -260,7 +260,7 @@ fn start_next_queued(registry: &mut ProcessRegistry) -> Result<(), String> {
                 registry.active_pid = Some(job.pid);
                 return Ok(());
             }
-            Err(error) => {
+            Err(error) => { // Internal: preserve the recorder startup failure for status polling.
                 handle.terminal = Some(ProcessTerminal {
                     state: EXPORT_FAILED,
                     error: Some(error),
@@ -312,7 +312,7 @@ fn refresh_process_state(handle: &mut ProcessHandle) -> Result<(), String> {
                 state: EXPORT_DONE,
                 error: None,
             },
-            Err(error) => ProcessTerminal {
+            Err(error) => ProcessTerminal { // Internal: completion already stores a formatted export error.
                 state: EXPORT_FAILED,
                 error: Some(error),
             },
@@ -451,7 +451,7 @@ pub(crate) fn export_runtime() -> Result<&'static Runtime, String> {
             .map_err(|error| format!("failed to initialize export runtime: {error}"))
     }) {
         Ok(runtime) => Ok(runtime),
-        Err(error) => Err(error.clone()),
+        Err(error) => Err(error.clone()), // Internal: runtime init error is cached and returned unchanged.
     }
 }
 

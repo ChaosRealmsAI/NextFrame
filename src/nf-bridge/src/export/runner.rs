@@ -154,7 +154,7 @@ pub(crate) fn cleanup_intermediate_video(video_path: &Path, output_path: &Path) 
         return;
     }
 
-    if let Err(error) = fs::remove_file(video_path) {
+    if let Err(error) = fs::remove_file(video_path) { // Internal: cleanup warning only; export result already finalized.
         if error.kind() != ErrorKind::NotFound {
             trace_log!(
                 "warning: failed to remove intermediate export '{}': {error}",
@@ -205,9 +205,11 @@ fn run_test_export(
             })?;
             Ok(())
         }
-        "error" => Err("failed to run embedded recorder: stubbed export failure".to_string()),
-        _ => Err(format!(
-            "failed to run embedded recorder: unknown test export mode '{mode}'"
+        "error" => Err( // Fix: included in the error string below
+            "failed to run embedded recorder: stubbed export failure. Fix: set NF_BRIDGE_TEST_EXPORT_MODE=success or unset NF_BRIDGE_TEST_EXPORT_MODE when not running the export stub.".to_string(),
+        ),
+        _ => Err(format!( // Fix: included in the error string below
+            "failed to run embedded recorder: unknown test export mode '{mode}'. Fix: use NF_BRIDGE_TEST_EXPORT_MODE=success or NF_BRIDGE_TEST_EXPORT_MODE=error, or unset the variable."
         )),
     }
 }

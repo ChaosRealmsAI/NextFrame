@@ -90,8 +90,8 @@ fn validate_timeline_contract(timeline: &Value) -> Result<(), String> {
         .and_then(Value::as_str)
         .ok_or_else(|| "timeline.version must be a non-empty string".to_string())?;
     if version.trim().is_empty() || !is_semver_like(version) {
-        return Err(format!(
-            "timeline.version must be a semver-like string, got {version:?}"
+        return Err(format!( // Fix: included in the error string below
+            "failed to validate timeline.version: timeline.version must be a semver-like string, got {version:?}. Fix: provide a version like '0.1', '0.3', or '1.0.0'."
         ));
     }
 
@@ -108,7 +108,9 @@ fn validate_timeline_contract(timeline: &Value) -> Result<(), String> {
         return Ok(());
     }
 
-    Err("timeline must contain either tracks[] or layers[]".to_string())
+    Err( // Fix: included in the error string below
+        "failed to validate timeline: timeline must contain either tracks[] or layers[]. Fix: include a tracks array for legacy timelines or a layers array for current timelines.".to_string(),
+    )
 }
 
 fn validate_tracks(tracks: &[Value]) -> Result<(), String> {
@@ -145,7 +147,9 @@ fn validate_clip_fields(value: &Value, label: &str) -> Result<(), String> {
     validate_number_field(object, "dur")?;
     match object.get("params") {
         Some(Value::Object(_)) => Ok(()),
-        _ => Err(format!("{label}.params must be an object")),
+        _ => Err(format!( // Fix: included in the error string below
+            "failed to validate {label}.params: {label}.params must be an object. Fix: provide params as a JSON object for each clip or layer."
+        )),
     }
 }
 
@@ -157,9 +161,15 @@ fn validate_string_field(
     let value = object
         .get(key)
         .and_then(Value::as_str)
-        .ok_or_else(|| format!("{label}.{key} must be a non-empty string"))?;
+        .ok_or_else(|| {
+            format!(
+                "failed to validate {label}.{key}: {label}.{key} must be a non-empty string. Fix: provide a non-empty string value."
+            )
+        })?;
     if value.trim().is_empty() {
-        return Err(format!("{label}.{key} must be a non-empty string"));
+        return Err(format!( // Fix: included in the error string below
+            "failed to validate {label}.{key}: {label}.{key} must be a non-empty string. Fix: provide a non-empty string value."
+        ));
     }
     Ok(())
 }

@@ -156,8 +156,8 @@ fn read_test_dialog_path(key: &str) -> Option<Option<PathBuf>> {
 fn read_test_reveal_result() -> Option<Result<PathBuf, String>> {
     match env::var("NF_BRIDGE_TEST_REVEAL_MODE").ok()?.as_str() {
         "ok" => Some(Ok(PathBuf::new())),
-        "error" => Some(Err(
-            "failed to reveal path in the file manager: stubbed test failure".to_string(),
+        "error" => Some(Err( // Fix: included in the error string below
+            "failed to reveal path in the file manager: stubbed test failure. Fix: unset NF_BRIDGE_TEST_REVEAL_MODE=error or use NF_BRIDGE_TEST_REVEAL_MODE=ok for the reveal test path.".to_string(),
         )),
         _ => None,
     }

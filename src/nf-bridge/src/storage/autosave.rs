@@ -62,20 +62,18 @@ pub(crate) fn handle_autosave_list(_params: &Value) -> Result<Value, String> {
     let autosave_dir = autosave_dir_path()?;
     let metadata = match fs::metadata(&autosave_dir) {
         Ok(metadata) => metadata,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(json!([])),
-        Err(error) => {
-            return Err(format!(
-                // Fix: included in the error string below
-                "failed to inspect autosave directory '{}': {error}",
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(json!([])), // Internal: missing autosave dir means there are no entries yet.
+        Err(error) => { // Fix: included in the returned error string below
+            return Err(format!( // Fix: included in the error string below
+                "failed to inspect autosave directory '{}': {error}. Fix: verify the autosave directory permissions and try again.",
                 autosave_dir.display()
             ));
         }
     };
 
     if !metadata.is_dir() {
-        return Err(format!(
-            // Fix: included in the error string below
-            "autosave path is not a directory: {}",
+        return Err(format!( // Fix: included in the error string below
+            "failed to inspect autosave directory '{}': path is not a directory. Fix: remove or rename that file so nf-bridge can create the autosave directory.",
             autosave_dir.display()
         ));
     }
@@ -107,11 +105,10 @@ pub(crate) fn handle_autosave_clear(params: &Value) -> Result<Value, String> {
 
     let cleared = match fs::remove_file(&autosave_path) {
         Ok(()) => true,
-        Err(error) if error.kind() == ErrorKind::NotFound => false,
-        Err(error) => {
-            return Err(format!(
-                // Fix: included in the error string below
-                "failed to clear autosave '{}': {error}",
+        Err(error) if error.kind() == ErrorKind::NotFound => false, // Internal: clearing a missing autosave is a no-op.
+        Err(error) => { // Fix: included in the returned error string below
+            return Err(format!( // Fix: included in the error string below
+                "failed to clear autosave '{}': {error}. Fix: verify the autosave file permissions and try again.",
                 autosave_path.display()
             ));
         }

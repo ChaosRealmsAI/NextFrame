@@ -118,7 +118,7 @@ fn ensure_recent_storage_file() -> Result<PathBuf, String> {
             storage_path.display()
         )),
         Ok(_) => Ok(storage_path),
-        Err(error) if error.kind() == ErrorKind::NotFound => {
+        Err(error) if error.kind() == ErrorKind::NotFound => { // Internal: missing recent.json is initialized on first use.
             fs::write(&storage_path, "[]").map_err(|write_error| {
                 format!(
                     "failed to create recent file '{}': {write_error}",
