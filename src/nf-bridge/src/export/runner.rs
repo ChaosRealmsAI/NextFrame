@@ -46,6 +46,10 @@ pub(crate) fn run_embedded_recorder(
         return canceled_export_error();
     }
 
+    if let Some(mode) = env::var("NF_BRIDGE_TEST_EXPORT_MODE").ok() {
+        return run_test_export(mode.as_str(), &request, &mut log_file);
+    }
+
     let current_dir =
         env::current_dir().map_err(|error| format!("failed to read current directory: {error}"))?;
     let frame_path = resolve_recorder_frame_path_from_url(&request.url, &current_dir)?;
@@ -173,4 +177,32 @@ fn canceled_export_error() -> Result<(), String> {
     Err( // Fix: included in the error string below
         "failed to complete export: export was canceled. Fix: rerun the export if you still need the output.".to_string(),
     )
+}
+
+fn run_test_export(
+    mode: &str,
+    request: &RecorderRequest,
+    log_file: &mut fs::File,
+) -> Result<(), String> {
+    if let Some(parent) = request.output_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "failed to create stub export directory '{}': {error}",
+                parent.display()
+            )
+        })?;
+    }
+
+    match mode {
+        "success" => {
+            fs::write(&request.output_path, b"stub export")
+                .map_err(|error| format!("failed to write stub export output: {error}"))?;
+            writeln!(log_file, "Stub export completed").map_err(|error| {
+                format!("failed to write export log '{}': {error}", request.output_path.display())
+            })?;
+            Ok(())
+        }
+        "error" => Err("failed to run embedded recorder: stubbed export failure".to_string()),
+        _ => Err(format!("failed to run embedded recorder: unknown test export mode '{mode}'")),
+    }
 }

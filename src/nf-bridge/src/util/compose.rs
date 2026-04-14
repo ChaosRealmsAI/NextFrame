@@ -1,5 +1,6 @@
 //! utility composition helpers
 use serde_json::{json, Value};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -48,33 +49,35 @@ pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
         })?;
     }
 
-    let bundle_path = resolve_bundle_path()?;
+    if !write_test_compose_output(&output_path)? {
+        let bundle_path = resolve_bundle_path()?;
 
-    let output = Command::new("node")
-        .arg(&bundle_path)
-        .arg(&timeline_path)
-        .arg(&output_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|error| format!("failed to run compose bundle: {error}"))?;
+        let output = Command::new("node")
+            .arg(&bundle_path)
+            .arg(&timeline_path)
+            .arg(&output_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|error| format!("failed to run compose bundle: {error}"))?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let details = if !stderr.is_empty() {
-            stderr
-        } else if !stdout.is_empty() {
-            stdout
-        } else {
-            format!(
-                "bundle exited with code {}",
-                output.status.code().unwrap_or(-1)
-            )
-        };
-        return Err(format!( // Fix: included in the error string below
-            "failed to generate composition: {details}. Fix: verify the timeline input and inspect the compose bundle output for details."
-        ));
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let details = if !stderr.is_empty() {
+                stderr
+            } else if !stdout.is_empty() {
+                stdout
+            } else {
+                format!(
+                    "bundle exited with code {}",
+                    output.status.code().unwrap_or(-1)
+                )
+            };
+            return Err(format!(
+                "failed to generate composition: {details}. Fix: verify the timeline input and inspect the compose bundle output for details."
+            ));
+        }
     }
 
     let meta = fs::metadata(&output_path).map_err(|error| {
@@ -92,6 +95,22 @@ pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
         "path": output_path.display().to_string(),
         "size": meta.len(),
     }))
+}
+
+fn write_test_compose_output(output_path: &Path) -> Result<bool, String> {
+    let Some(html) = env::var_os("NF_BRIDGE_TEST_COMPOSE_HTML") else {
+        return Ok(false);
+    };
+    let html = html.to_string_lossy();
+
+    fs::write(output_path, html.as_ref()).map_err(|error| {
+        format!(
+            "failed to write stub compose output '{}': {error}",
+            output_path.display()
+        )
+    })?;
+
+    Ok(true)
 }
 
 #[cfg(not(test))]

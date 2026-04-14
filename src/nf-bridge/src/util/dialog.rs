@@ -2,6 +2,8 @@
 #[cfg(not(test))]
 use rfd::FileDialog;
 use serde_json::{json, Value};
+#[cfg(not(test))]
+use std::env;
 use std::path::{Path, PathBuf};
 #[cfg(not(test))]
 use std::process::Command;
@@ -46,6 +48,10 @@ pub(crate) fn handle_fs_reveal(params: &Value) -> Result<Value, String> {
 
 #[cfg(not(test))]
 pub(crate) fn show_open_dialog(filters: &[String]) -> Option<PathBuf> {
+    if let Some(path) = read_test_dialog_path("NF_BRIDGE_TEST_DIALOG_OPEN_PATH") {
+        return path;
+    }
+
     let mut dialog = FileDialog::new();
 
     if !filters.is_empty() {
@@ -63,6 +69,10 @@ pub(crate) fn show_open_dialog(_filters: &[String]) -> Option<PathBuf> {
 
 #[cfg(not(test))]
 pub(crate) fn show_save_dialog(default_name: &str) -> Option<PathBuf> {
+    if let Some(path) = read_test_dialog_path("NF_BRIDGE_TEST_DIALOG_SAVE_PATH") {
+        return path;
+    }
+
     let mut dialog = FileDialog::new().set_file_name(default_name);
 
     if let Some(extension) = Path::new(default_name)
@@ -82,6 +92,10 @@ pub(crate) fn show_save_dialog(default_name: &str) -> Option<PathBuf> {
 
 #[cfg(not(test))]
 pub(crate) fn reveal_in_file_manager(path: &Path) -> Result<(), String> {
+    if let Some(result) = read_test_reveal_result() {
+        return result.map(|_| ());
+    }
+
     #[cfg(target_os = "macos")]
     {
         run_platform_command("open", [String::from("-R"), path.display().to_string()])
@@ -126,6 +140,27 @@ pub(crate) fn run_platform_command(
 #[cfg(test)]
 pub(crate) fn reveal_in_file_manager(_path: &Path) -> Result<(), String> {
     Ok(())
+}
+
+#[cfg(not(test))]
+fn read_test_dialog_path(key: &str) -> Option<Option<PathBuf>> {
+    let value = env::var_os(key)?;
+    if value.is_empty() {
+        Some(None)
+    } else {
+        Some(Some(PathBuf::from(value)))
+    }
+}
+
+#[cfg(not(test))]
+fn read_test_reveal_result() -> Option<Result<PathBuf, String>> {
+    match env::var("NF_BRIDGE_TEST_REVEAL_MODE").ok()?.as_str() {
+        "ok" => Some(Ok(PathBuf::new())),
+        "error" => Some(Err(
+            "failed to reveal path in the file manager: stubbed test failure".to_string(),
+        )),
+        _ => None,
+    }
 }
 
 pub(crate) fn parse_dialog_filters(params: &Value) -> Result<Vec<String>, String> {

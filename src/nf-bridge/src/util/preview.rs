@@ -21,6 +21,18 @@ pub(crate) fn handle_preview_frame(params: &Value) -> Result<Value, String> {
     let width = params.get("width").and_then(Value::as_u64).unwrap_or(960);
     let height = params.get("height").and_then(Value::as_u64).unwrap_or(540);
 
+    if let Some(stub_path) = env::var_os("NF_BRIDGE_TEST_PREVIEW_PNG") {
+        let bytes = fs::read(PathBuf::from(stub_path))
+            .map_err(|e| format!("failed to read stub preview frame: {e}"))?;
+        let b64 = base64_encode(&bytes);
+        return Ok(json!({
+            "dataUrl": format!("data:image/png;base64,{b64}"),
+            "width": width,
+            "height": height,
+            "t": t,
+        }));
+    }
+
     // render to temp file
     let tmp_dir = env::temp_dir().join("nextframe-preview");
     let _ = fs::create_dir_all(&tmp_dir);

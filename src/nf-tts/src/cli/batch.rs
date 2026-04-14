@@ -159,7 +159,10 @@ pub async fn run(
 #[cfg(test)]
 mod tests {
     use super::{ensure_batch_success, prepare_jobs, resolve_batch_options, BatchOptions};
+    use crate::config::VoxConfig;
     use crate::output::manifest::{ManifestEntry, ManifestFailure};
+    use crate::output::manifest::Manifest;
+    use crate::queue::job::Job;
     use std::collections::HashMap;
 
     fn sample_job(id: usize, voice: Option<&str>) -> Job {

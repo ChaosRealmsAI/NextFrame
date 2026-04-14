@@ -220,6 +220,28 @@ pub(crate) fn screenshot_file(tab: usize) -> String {
     format!("/tmp/wp-screenshot-{tab}.png")
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn smoke_tab_command_paths_are_tab_scoped() {
+        assert_eq!(cmd_file(0), "/tmp/wp-cmd-0.js");
+        assert_eq!(result_file(3), "/tmp/wp-result-3.txt");
+        assert_eq!(screenshot_file(7), "/tmp/wp-screenshot-7.png");
+    }
+
+    #[test]
+    fn smoke_new_tab_html_lists_workspace_shortcuts() {
+        let html = new_tab_html();
+
+        assert!(html.contains("AutoMedia"));
+        assert!(html.contains(TABS[0].label));
+        assert!(html.contains(TABS[0].url));
+        assert!(html.contains("shortcut"));
+    }
+}
+
 pub(crate) fn upload_file(tab: usize) -> String {
     format!("/tmp/wp-upload-path-{tab}.txt")
 }

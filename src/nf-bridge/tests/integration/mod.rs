@@ -21,6 +21,7 @@ mod project_tests;
 mod recent_tests;
 mod scene_tests;
 mod segment_tests;
+mod system_tests;
 mod timeline_tests;
 
 fn dispatch_request(method: &str, params: Value) -> Response {
