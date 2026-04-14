@@ -1,10 +1,10 @@
 // Legacy canvas renderer kept outside engine/ so the old path can be removed.
 
 import { createCanvas } from "@napi-rs/canvas";
-import "../engine/legacy/fonts.js";
+import "./legacy-fonts.js";
 import { REGISTRY } from "./scene-registry.js";
-import { guarded } from "../engine/legacy/_guard.js";
-import { resolveTimeline } from "../engine/legacy/time.js";
+import { guarded } from "./guard.js";
+import { resolveTimeline } from "./legacy-timeline.js";
 import { resolveKeyframes } from "../../../nf-core/engine/keyframes.js";
 import { applyEnterEffect, applyExitEffect } from "../../../nf-core/animation/effects/index.js";
 import { applyFilters } from "../../../nf-core/filters/index.js";

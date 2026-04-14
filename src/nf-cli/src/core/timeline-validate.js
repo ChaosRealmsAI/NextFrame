@@ -2,8 +2,8 @@
 
 import { existsSync } from "node:fs";
 import { resolve as resolvePath, isAbsolute } from "node:path";
-import { guarded } from "../engine/legacy/_guard.js";
-import { resolveTimeline as resolveLegacyTimeline } from "../engine/legacy/time.js";
+import { guarded } from "./guard.js";
+import { resolveTimeline as resolveLegacyTimeline } from "./legacy-timeline.js";
 import { REGISTRY } from "./scene-registry.js";
 import { EFFECT_IDS } from "../../../nf-core/animation/effects/index.js";
 import { FILTER_IDS } from "../../../nf-core/filters/index.js";

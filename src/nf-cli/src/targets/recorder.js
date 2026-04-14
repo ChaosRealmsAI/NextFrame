@@ -5,8 +5,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { bakeBrowserScenes } from "../commands/bakeBrowser.js";
-import { guarded } from "../engine/legacy/_guard.js";
-import { resolveTimeline } from "../engine/legacy/time.js";
+import { guarded } from "../core/guard.js";
+import { resolveTimeline } from "../core/legacy-timeline.js";
 import { exportMP4 } from "./ffmpeg-mp4.js";
 import { generateHarness } from "./harness-gen.js";
 
