@@ -1,8 +1,11 @@
 target/
 .DS_Store
 *.log
+data/**/*.log
 .worktrees/
 .ally/
+.env
+cron.log
 projects/
 node_modules/
 test-results/
