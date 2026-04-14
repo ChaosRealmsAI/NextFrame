@@ -19,6 +19,11 @@ function extractOutput(argv) {
   return { cleaned, outputPath };
 }
 
+function normalizeBuildTimeline(timeline) {
+  if (!timeline || timeline.version || !Array.isArray(timeline.layers)) return timeline;
+  return { version: '0.3', ...timeline };
+}
+
 export async function run(argv) {
   const { cleaned, outputPath: shortOutput } = extractOutput(argv);
   const { positional, flags } = parseFlags(cleaned);
@@ -28,7 +33,7 @@ export async function run(argv) {
   const loaded = await loadTimeline(resolved.jsonPath);
   if (!loaded.ok) { emit(loaded, flags); return 2; }
 
-  const timeline = loaded.value;
+  const timeline = normalizeBuildTimeline(loaded.value);
   const fmt = detectFormat(timeline);
   if (fmt === 'v0.1') {
     const msg = { ok: false, error: { code: 'OLD_FORMAT', message: 'v0.1 tracks/clips format detected — build requires v0.3 layers[] format' } };
