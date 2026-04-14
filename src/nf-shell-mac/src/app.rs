@@ -334,6 +334,15 @@ fn eval_script_mode(wv: &objc2_web_kit::WKWebView, script_path: &str) {
         }
     }
 
+    // Read any window debug variables
+    for var_name in ["__deepDebug", "__debugResult", "__r1Result", "__r2", "__composeError"] {
+        if let Ok(val) = webview::eval_js(wv, &format!("window.{var_name} || ''")) {
+            if !val.is_empty() {
+                println!("{{\"{var_name}\":{}}}", serde_json::json!(val));
+            }
+        }
+    }
+
     // Always take a final screenshot
     let _ = webview::screenshot(wv, "/tmp/nf-eval-final.png");
     println!("{{\"screenshot\":\"/tmp/nf-eval-final.png\"}}");
