@@ -2,10 +2,9 @@
 import { emit, loadTimeline, parseFlags, parseTime } from "../_helpers/_io.js";
 import { resolveTimeline as resolveTimelineArgs, timelineUsage } from "../_helpers/_resolve.js";
 import { resolveTimeline as resolveLegacyTimeline } from "../_helpers/_legacy-timeline.js";
-import * as runtimeScenes from "../../../../nf-runtime/web/src/components/index.js";
+import { REGISTRY as SCENE_REGISTRY } from "../../lib/scene-registry.js";
 
 const USAGE = timelineUsage("describe-frame", " <t>", " <t>");
-const SCENE_REGISTRY = new Map(Object.entries(runtimeScenes));
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
