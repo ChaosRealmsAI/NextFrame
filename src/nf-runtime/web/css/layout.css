@@ -1,0 +1,164 @@
+/* ══════════════════════════════════════
+   APP SHELL
+   ══════════════════════════════════════ */
+.app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ══════════════════════════════════════
+   TOPBAR — 48px fixed
+   ══════════════════════════════════════ */
+/* ── Traffic light dots (browser preview, native app replaces with real ones) ── */
+.tb-traffic-lights {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 14px;
+  flex-shrink: 0;
+}
+.tb-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: opacity 0.15s ease;
+}
+.tb-dot:hover { opacity: 0.8; }
+.tb-dot--close { background: #ff5f57; }
+.tb-dot--minimize { background: #febc2e; }
+.tb-dot--zoom { background: #28c840; }
+
+/* ── Topbar — 48px, glass blurred, flexbox centered ── */
+.topbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  background: rgba(10,10,14,0.65);
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  box-shadow:
+    inset 0 -1px 0 rgba(0,0,0,0.40),
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 2px 8px rgba(0,0,0,0.30);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.tb-brand {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--t100);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  margin-left: 16px;
+}
+.tb-brand svg {
+  flex-shrink: 0;
+}
+
+.tb-spacer {
+  flex: 1;
+}
+
+/* ── Breadcrumb in topbar ── */
+.tb-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+}
+.tb-bc-sep {
+  color: var(--t50);
+  font-size: 12px;
+}
+.tb-bc-item {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t65);
+  cursor: pointer;
+  transition: color 0.15s var(--ease);
+}
+.tb-bc-item:hover { color: var(--t80); }
+.tb-bc-current {
+  color: var(--t100);
+  cursor: default;
+}
+.tb-bc-current:hover { color: var(--t100); }
+
+/* ── Pipeline tabs in topbar ── */
+.tb-pipeline-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 12px;
+}
+.tb-pl-tab {
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t50);
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.tb-pl-tab:hover {
+  color: var(--t80);
+  background: rgba(255,255,255,0.04);
+}
+.tb-pl-tab.active {
+  color: var(--accent);
+  background: var(--accent-06);
+}
+
+/* ══════════════════════════════════════
+   MAIN CONTENT
+   ══════════════════════════════════════ */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--sp-32) var(--sp-24);
+}
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-track { background: transparent; }
+.main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+.main::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+.content {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* ══════════════════════════════════════
+   VIEW SWITCHING
+   ══════════════════════════════════════ */
+.view { display: none; flex: 1; overflow: hidden; }
+.view.active { display: flex; flex-direction: column; }
+
+/* Home view keeps its existing <main> layout */
+.view-home.active { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+/* ══════════════════════════════════════
+   SHARED: View topbar (breadcrumb bar per view)
+   ══════════════════════════════════════ */
+.view-topbar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-16);
+  gap: var(--sp-8);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.20);
+}
+.view-topbar .tb-breadcrumb-item { cursor: pointer; }

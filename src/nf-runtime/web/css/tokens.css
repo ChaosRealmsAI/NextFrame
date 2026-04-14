@@ -1,0 +1,134 @@
+/* ══════════════════════════════════════════════════════════
+   NEXTFRAME HOME — Project Dashboard (web-v2)
+   Spec: DESIGN.md · Min font 12px · Min opacity 0.50
+   Fonts: Inter (UI) · JetBrains Mono (data)
+   ══════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Background */
+  --bg: #050507;
+
+  /* Accent — single purple, 4 densities */
+  --accent: #a78bfa;
+  --accent-20: rgba(167,139,250,0.20);
+  --accent-12: rgba(167,139,250,0.12);
+  --accent-06: rgba(167,139,250,0.06);
+
+  /* Text — 4 levels, hard floor 0.50 */
+  --t100: rgba(255,255,255,0.95);
+  --t80: rgba(255,255,255,0.80);
+  --t65: rgba(255,255,255,0.65);
+  --t50: rgba(255,255,255,0.50);
+
+  /* Semantic */
+  --green: #34d399;
+  --green-bg: rgba(52,211,153,0.12);
+  --yellow: #fbbf24;
+  --yellow-bg: rgba(251,191,36,0.12);
+
+  /* Borders */
+  --border: rgba(255,255,255,0.08);
+  --border-hover: rgba(255,255,255,0.14);
+  --border-light: rgba(255,255,255,0.05);
+
+  /* Typography */
+  --sans: 'Inter', -apple-system, system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+  /* Spacing (8-point grid) */
+  --sp-4: 4px;
+  --sp-6: 6px;
+  --sp-8: 8px;
+  --sp-12: 12px;
+  --sp-16: 16px;
+  --sp-20: 20px;
+  --sp-24: 24px;
+  --sp-32: 32px;
+  --sp-48: 48px;
+
+  /* Radius */
+  --r: 14px;
+  --r-sm: 10px;
+  --r-xs: 6px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --stagger: 60ms;
+
+  /* Glass — subtle depth, not heavy 3D */
+  --glass-bg: rgba(0,0,0,0.50);
+  --glass-blur: blur(16px) saturate(1.4);
+  --glass-shadow:
+    inset 0 1px 0 0 rgba(255,255,255,0.09),
+    inset 0 -1px 0 0 rgba(0,0,0,0.15),
+    0 2px 8px rgba(0,0,0,0.20);
+  --glass-shadow-hover:
+    inset 0 1px 0 0 rgba(255,255,255,0.09),
+    inset 0 -1px 0 0 rgba(0,0,0,0.15),
+    0 6px 20px rgba(0,0,0,0.35);
+  --glass-highlight:
+    linear-gradient(178deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 3%, transparent 12%),
+    linear-gradient(92deg, rgba(255,255,255,0.025) 0%, transparent 3%, transparent 97%, rgba(255,255,255,0.015) 100%);
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--t80);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Aurora Background — subtle purple glow top + bottom ── */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 20% at 50% 0%, rgba(139,92,246,0.14) 0%, transparent 100%),
+    radial-gradient(ellipse 50% 15% at 80% 0%, rgba(167,139,250,0.08) 0%, transparent 100%),
+    radial-gradient(ellipse 60% 15% at 50% 100%, rgba(124,58,237,0.08) 0%, transparent 100%),
+    radial-gradient(ellipse 40% 12% at 20% 100%, rgba(249,115,22,0.04) 0%, transparent 100%);
+}
+
+/* ── 3D Glass Panel ── */
+.glass {
+  position: relative;
+  border-radius: var(--r);
+  overflow: hidden;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  background: var(--glass-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--glass-shadow);
+}
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  background: var(--glass-highlight);
+}
+
+/* ══════════════════════════════════════
+   ANIMATIONS — fadeUp + stagger
+   ══════════════════════════════════════ */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
