@@ -42,6 +42,15 @@ Recording (separate binary): `nextframe-recorder slide <html> --out <mp4> --widt
 
 **Source pipeline** (src/crates/nf-*): download (yt-dlp) → transcribe (Whisper) → align (WhisperX) → cut (ffmpeg by sentence-id ranges) → link to project. Canonical data in source.json per source directory.
 
+## Before You Write Code (mandatory)
+
+1. **Read the relevant standard**: `cat spec/standards/00-index.md` → find the standard for your task → read it
+2. **Read the ADR**: `cat spec/cockpit-app/data/dev/adrs.json` → check if there's a locked decision about what you're changing
+3. **Read the BDD**: if working on a feature module, `cat spec/cockpit-app/bdd/{module}/bdd.json` → know the expected behavior
+4. **Read the crate CLAUDE.md**: `cat src/nf-xxx/CLAUDE.md` → know the local rules
+
+**Skipping these = writing code that may violate locked design decisions. If you don't find a relevant standard, say so — don't guess.**
+
 ## Core Rules
 
 - Do not add `unwrap`/`expect`/`panic`; workspace lints deny them. Use `#[allow(...)]` with comment on specific FFI functions only.
