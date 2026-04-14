@@ -90,8 +90,12 @@ fn write_dump(
     let js_str = NSString::from_str(js);
     let handler = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
         if !error.is_null() {
-            let err = unsafe { &*error };
-            write_result(&result_path, format!("error: {}", err.localizedDescription()));
+            // SAFETY: WebKit passes a valid NSError pointer when `error` is non-null.
+            let err = unsafe { &*error }; // SAFETY: see comment above.
+            write_result(
+                &result_path,
+                format!("error: {}", err.localizedDescription()),
+            );
             return;
         }
         if result.is_null() {
@@ -107,7 +111,9 @@ fn write_dump(
             Err(err) => write_result(&result_path, format!("error: {write_error_label}: {err}")),
         }
     });
-    unsafe {
+    // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+    unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }
 }
@@ -133,7 +139,8 @@ fn waitfor_element(webview: &WKWebView, selector: &str, timeout_ms: u64, result_
         dispatch::Queue::main().exec_after(
             std::time::Duration::from_millis(interval_ms),
             move || {
-                let webview = unsafe { &*(wv_ptr as *const WKWebView) };
+                // SAFETY: `wv_ptr` was captured from a live WKWebView and this poll runs on the main queue while that tab exists.
+                let webview = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
                 let rp = result_path.clone();
                 let js_clone = js.clone();
                 let handler = RcBlock::new(move |result: *mut AnyObject, _error: *mut NSError| {
@@ -163,7 +170,8 @@ fn waitfor_element(webview: &WKWebView, selector: &str, timeout_ms: u64, result_
                     serde_json::to_string(js.as_str()).unwrap_or_else(|_| "\"\"".to_owned())
                 );
                 let wrapped_str = NSString::from_str(&wrapped);
-                unsafe {
+                // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+                unsafe { // SAFETY: see comment above.
                     webview.evaluateJavaScript_completionHandler(&wrapped_str, Some(&handler));
                 }
             },
@@ -258,13 +266,17 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: String
         true
     } else if let Some(rest) = cmd.strip_prefix("wait ") {
         match parse_selector_and_timeout(rest, 5000) {
-            Ok((selector, timeout_ms)) => waitfor_element(webview, &selector, timeout_ms, result_path),
+            Ok((selector, timeout_ms)) => {
+                waitfor_element(webview, &selector, timeout_ms, result_path)
+            }
             Err(err) => write_error(&result_path, err),
         }
         true
     } else if let Some(rest) = cmd.strip_prefix("waitfor ") {
         match parse_selector_and_timeout(rest, 5000) {
-            Ok((selector, timeout_ms)) => waitfor_element(webview, &selector, timeout_ms, result_path),
+            Ok((selector, timeout_ms)) => {
+                waitfor_element(webview, &selector, timeout_ms, result_path)
+            }
             Err(err) => write_error(&result_path, err),
         }
         true

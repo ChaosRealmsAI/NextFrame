@@ -19,7 +19,8 @@ pub(super) fn js_string(result: *mut AnyObject) -> String {
     if result.is_null() {
         "null".to_owned()
     } else {
-        let s: &NSString = unsafe { &*(result as *const NSString) };
+        // SAFETY: these command helpers only use JS wrappers that stringify non-null results to NSString.
+        let s: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: see comment above.
         s.to_string()
     }
 }
@@ -33,7 +34,8 @@ pub(super) fn write_result(result_path: &str, value: impl AsRef<[u8]>) {
 }
 
 pub(super) fn catch_objc(f: impl FnOnce()) -> Result<(), String> {
-    let result = unsafe { objc2::exception::catch(AssertUnwindSafe(f)) };
+    // SAFETY: `objc2::exception::catch` is the intended wrapper around Objective-C message sends in this module.
+    let result = unsafe { objc2::exception::catch(AssertUnwindSafe(f)) }; // SAFETY: see comment above.
     result.map_err(|e| format!("ObjC exception: {e:?}"))
 }
 
@@ -91,7 +93,10 @@ pub(super) fn parse_selector_pair(input: &str, usage: &str) -> Result<(String, S
     Ok((first, second))
 }
 
-pub(super) fn parse_selector_and_value(input: &str, usage: &str) -> Result<(String, String), String> {
+pub(super) fn parse_selector_and_value(
+    input: &str,
+    usage: &str,
+) -> Result<(String, String), String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
         return Err(format!("usage: {usage}"));
@@ -146,7 +151,9 @@ pub(super) fn parse_selector_and_timeout(
     let mut parts = trimmed.rsplitn(2, ' ');
     let last = parts.next().unwrap_or_default().trim();
     let rest = parts.next().unwrap_or_default().trim();
-    if !rest.is_empty() && let Ok(timeout_ms) = last.parse::<u64>() {
+    if !rest.is_empty()
+        && let Ok(timeout_ms) = last.parse::<u64>()
+    {
         return Ok((rest.to_owned(), timeout_ms));
     }
     Ok((trimmed.to_owned(), default_timeout_ms))
@@ -181,10 +188,18 @@ pub(super) fn parse_rect(rect: &str) -> Result<(i64, i64, i64, i64), String> {
     if parts.len() != 4 {
         return Err(format!("bad rect {rect}"));
     }
-    let x = parts[0].parse::<i64>().map_err(|_| format!("bad rect {rect}"))?;
-    let y = parts[1].parse::<i64>().map_err(|_| format!("bad rect {rect}"))?;
-    let w = parts[2].parse::<i64>().map_err(|_| format!("bad rect {rect}"))?;
-    let h = parts[3].parse::<i64>().map_err(|_| format!("bad rect {rect}"))?;
+    let x = parts[0]
+        .parse::<i64>()
+        .map_err(|_| format!("bad rect {rect}"))?;
+    let y = parts[1]
+        .parse::<i64>()
+        .map_err(|_| format!("bad rect {rect}"))?;
+    let w = parts[2]
+        .parse::<i64>()
+        .map_err(|_| format!("bad rect {rect}"))?;
+    let h = parts[3]
+        .parse::<i64>()
+        .map_err(|_| format!("bad rect {rect}"))?;
     Ok((x, y, w, h))
 }
 
@@ -217,22 +232,28 @@ fn send_mouse_event(
 
     catch_objc(|| match event_type {
         NSEventType::LeftMouseDown => {
-            let _: () = unsafe { msg_send![webview, mouseDown: &*event] };
+            // SAFETY: `webview` is a live WKWebView and `mouseDown:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, mouseDown: &*event] }; // SAFETY: see comment above.
         }
         NSEventType::LeftMouseUp => {
-            let _: () = unsafe { msg_send![webview, mouseUp: &*event] };
+            // SAFETY: `webview` is a live WKWebView and `mouseUp:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, mouseUp: &*event] }; // SAFETY: see comment above.
         }
         NSEventType::RightMouseDown => {
-            let _: () = unsafe { msg_send![webview, rightMouseDown: &*event] };
+            // SAFETY: `webview` is a live WKWebView and `rightMouseDown:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, rightMouseDown: &*event] }; // SAFETY: see comment above.
         }
         NSEventType::RightMouseUp => {
-            let _: () = unsafe { msg_send![webview, rightMouseUp: &*event] };
+            // SAFETY: `webview` is a live WKWebView and `rightMouseUp:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, rightMouseUp: &*event] }; // SAFETY: see comment above.
         }
         NSEventType::MouseMoved => {
-            let _: () = unsafe { msg_send![webview, mouseMoved: &*event] };
+            // SAFETY: `webview` is a live WKWebView and `mouseMoved:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, mouseMoved: &*event] }; // SAFETY: see comment above.
         }
         NSEventType::LeftMouseDragged => {
-            let _: () = unsafe { msg_send![webview, mouseDragged: &*event] };
+            // SAFETY: `webview` is a live WKWebView and `mouseDragged:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, mouseDragged: &*event] }; // SAFETY: see comment above.
         }
         _ => {}
     })
@@ -317,7 +338,8 @@ pub(super) fn native_click_at(webview: &WKWebView, x: f64, y: f64) {
     );
     if let Some(event) = &down {
         let _ = catch_objc(|| {
-            let _: () = unsafe { msg_send![webview, mouseDown: &**event] };
+            // SAFETY: `webview` is a live WKWebView and `mouseDown:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, mouseDown: &**event] }; // SAFETY: see comment above.
         });
     }
 
@@ -334,7 +356,8 @@ pub(super) fn native_click_at(webview: &WKWebView, x: f64, y: f64) {
     );
     if let Some(event) = &up {
         let _ = catch_objc(|| {
-            let _: () = unsafe { msg_send![webview, mouseUp: &**event] };
+            // SAFETY: `webview` is a live WKWebView and `mouseUp:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, mouseUp: &**event] }; // SAFETY: see comment above.
         });
     }
 }

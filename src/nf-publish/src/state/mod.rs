@@ -1,10 +1,10 @@
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Mutex, OnceLock};
 
+use crate::delegates::{PilotNavDelegate, PilotUIDelegate};
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{NSButton, NSTextField, NSView};
 use objc2_web_kit::{WKWebView, WKWebViewConfiguration};
-use crate::delegates::{PilotNavDelegate, PilotUIDelegate};
 
 mod events;
 mod navigation;
@@ -340,7 +340,7 @@ pub(crate) struct AppState {
     pub(crate) user_agent: &'static str,
 }
 
-unsafe impl Send for AppState {}
-unsafe impl Sync for AppState {}
+unsafe impl Send for AppState {} // SAFETY: `AppState` only stores raw pointers to main-thread Cocoa objects and access is externally serialized through the app's main-thread usage.
+unsafe impl Sync for AppState {} // SAFETY: shared access goes through interior mutability/atomics, and the raw Cocoa pointers are only dereferenced on the main thread.
 
 pub(crate) static APP_STATE: OnceLock<AppState> = OnceLock::new();

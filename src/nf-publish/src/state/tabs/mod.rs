@@ -6,12 +6,12 @@ use objc2_app_kit::{NSButton, NSColor};
 use objc2_foundation::NSString;
 use serde::Serialize;
 
-use crate::ui::{rebuild_bookmarks_bar, rebuild_tab_strip};
 use crate::state::{
-    active_tab_id, address_field, back_button, bookmarks_bar_view, browser_tabs_snapshot,
-    browser_target, forward_button, reload_button, tab_strip_view, tab_title_from_state,
-    APP_STATE, BrowserTabKind, TABS,
+    APP_STATE, BrowserTabKind, TABS, active_tab_id, address_field, back_button, bookmarks_bar_view,
+    browser_tabs_snapshot, browser_target, forward_button, reload_button, tab_strip_view,
+    tab_title_from_state,
 };
+use crate::ui::{rebuild_bookmarks_bar, rebuild_tab_strip};
 
 pub(crate) use lifecycle::{
     close_tab, create_dynamic_tab, restore_dynamic_tabs, set_tab_loading_state, switch_tab,
@@ -55,7 +55,8 @@ fn refresh_browser_controls() {
             NSColor::colorWithSRGBRed_green_blue_alpha(0.72, 0.72, 0.74, 1.0)
         };
         button.setEnabled(enabled);
-        let _: () = unsafe { msg_send![button, setContentTintColor: &*tint] };
+        // SAFETY: `button` is a live NSButton and `setContentTintColor:` is a valid selector taking the NSColor produced above.
+        let _: () = unsafe { msg_send![button, setContentTintColor: &*tint] }; // SAFETY: see comment above.
     }
 
     let Some(state) = APP_STATE.get() else { return };
@@ -141,7 +142,8 @@ pub(crate) fn refresh_browser_ui() {
     refresh_browser_controls();
     refresh_bookmarks_bar();
     if let Some(state) = APP_STATE.get() {
-        let window = unsafe { &*state.window_ptr };
+        // SAFETY: `window_ptr` is initialized once from the retained main NSWindow during startup and remains valid for the app lifetime.
+        let window = unsafe { &*state.window_ptr }; // SAFETY: see comment above.
         crate::ui::move_traffic_lights(window);
     }
 }
@@ -178,7 +180,7 @@ pub(crate) fn all_tab_infos() -> Vec<BrowserTabInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::{dynamic_tab_icon, BrowserTab};
+    use crate::state::{BrowserTab, dynamic_tab_icon};
 
     fn test_tab(kind: BrowserTabKind, url: &str, title: &str) -> BrowserTab {
         BrowserTab {
@@ -206,8 +208,16 @@ mod tests {
 
     #[test]
     fn dynamic_tab_icon_maps_known_domains() {
-        let github = test_tab(BrowserTabKind::Dynamic, "https://github.com/openai", "GitHub");
-        let google = test_tab(BrowserTabKind::Dynamic, "https://google.com/search", "Google");
+        let github = test_tab(
+            BrowserTabKind::Dynamic,
+            "https://github.com/openai",
+            "GitHub",
+        );
+        let google = test_tab(
+            BrowserTabKind::Dynamic,
+            "https://google.com/search",
+            "Google",
+        );
         let unknown = test_tab(BrowserTabKind::Dynamic, "https://example.com", "Example");
 
         assert_eq!(dynamic_tab_icon(&github), "🐙");

@@ -2,15 +2,15 @@ use objc2::rc::Retained;
 use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
 use objc2_web_kit::WKWebView;
 
-use crate::ui::create_webview;
 use crate::state::{
-    cmd_file, current_url_for_webview, log_crash, new_tab_html, remove_view_from_superview,
-    result_file, screenshot_file, title_for_webview, upload_file, webview_for_tab,
-    webview_host_view, APP_STATE, BrowserTab, BrowserTabKind, SavedDynamicTab, TABS,
+    APP_STATE, BrowserTab, BrowserTabKind, SavedDynamicTab, TABS, cmd_file,
+    current_url_for_webview, log_crash, new_tab_html, remove_view_from_superview, result_file,
+    screenshot_file, title_for_webview, upload_file, webview_for_tab, webview_host_view,
 };
+use crate::ui::create_webview;
 
-use super::refresh_browser_ui;
 use super::super::persistence;
+use super::refresh_browser_ui;
 
 pub(crate) fn switch_tab(index: usize) {
     let Some(state) = APP_STATE.get() else { return };
@@ -34,14 +34,20 @@ pub(crate) fn switch_tab(index: usize) {
         (prev_ptr, next_ptr)
     };
 
-    let result = unsafe {
+    // SAFETY: `catch` is the intended Objective-C boundary here, and the stored webview pointers come from retained WKWebView instances in app state.
+    let result = unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         objc2::exception::catch(std::panic::AssertUnwindSafe(|| {
             if let Some(prev_ptr) = prev_ptr {
-                unsafe {
+                // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
+                unsafe { // SAFETY: see comment above.
+                    // SAFETY: see comment above.
                     (&*prev_ptr).setHidden(true);
                 }
             }
-            unsafe {
+            // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
+            unsafe { // SAFETY: see comment above.
+                // SAFETY: see comment above.
                 (&*next_ptr).setHidden(false);
             }
         }))
@@ -65,9 +71,12 @@ fn sync_tab_state_locked(tab: &mut BrowserTab, webview: &WKWebView) {
         tab.last_committed_url = tab.current_url.clone();
     }
     tab.title = title_for_webview(webview);
-    tab.is_loading = unsafe { webview.isLoading() };
-    tab.can_go_back = unsafe { webview.canGoBack() };
-    tab.can_go_forward = unsafe { webview.canGoForward() };
+    // SAFETY: `webview` is a live WKWebView and these are standard readonly state accessors.
+    tab.is_loading = unsafe { webview.isLoading() }; // SAFETY: see comment above.
+    // SAFETY: `webview` is a live WKWebView and these are standard readonly state accessors.
+    tab.can_go_back = unsafe { webview.canGoBack() }; // SAFETY: see comment above.
+    // SAFETY: `webview` is a live WKWebView and these are standard readonly state accessors.
+    tab.can_go_forward = unsafe { webview.canGoForward() }; // SAFETY: see comment above.
 }
 
 pub(crate) fn sync_tab_state_from_webview(tab_id: usize) {
@@ -78,7 +87,8 @@ pub(crate) fn sync_tab_state_from_webview(tab_id: usize) {
     let Some(tab) = tabs.iter_mut().find(|tab| tab.id == tab_id) else {
         return;
     };
-    let webview = unsafe { &*tab.webview_ptr };
+    // SAFETY: `tab.webview_ptr` comes from a retained WKWebView stored in app state and stays valid until tab teardown.
+    let webview = unsafe { &*tab.webview_ptr }; // SAFETY: see comment above.
     sync_tab_state_locked(tab, webview);
     let active = state.current_tab.load(std::sync::atomic::Ordering::Relaxed);
     persistence::save_browser_session_snapshot(&tabs, active);
@@ -118,9 +128,12 @@ pub(crate) fn create_dynamic_tab(
         .get()
         .ok_or_else(|| "app state not initialized".to_owned())?;
     let host = webview_host_view().ok_or_else(|| "missing webview host".to_owned())?;
-    let config = unsafe { &*state.config_ptr };
-    let ui_delegate = unsafe { &*state.ui_delegate_ptr };
-    let nav_delegate = unsafe { &*state.nav_delegate_ptr };
+    // SAFETY: these pointers are initialized once from retained startup objects and remain valid for the app lifetime.
+    let config = unsafe { &*state.config_ptr }; // SAFETY: see comment above.
+    // SAFETY: these pointers are initialized once from retained startup objects and remain valid for the app lifetime.
+    let ui_delegate = unsafe { &*state.ui_delegate_ptr }; // SAFETY: see comment above.
+    // SAFETY: these pointers are initialized once from retained startup objects and remain valid for the app lifetime.
+    let nav_delegate = unsafe { &*state.nav_delegate_ptr }; // SAFETY: see comment above.
     let frame = host.frame();
     let Some(mtm) = objc2_foundation::MainThreadMarker::new() else {
         return Err("main thread not available".to_owned());
@@ -136,12 +149,16 @@ pub(crate) fn create_dynamic_tab(
         ui_delegate,
         nav_delegate,
     );
-    unsafe {
+    // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
+    unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         webview.setCustomUserAgent(Some(&NSString::from_str(state.user_agent)));
     }
     if is_new_tab {
         let html = NSString::from_str(&new_tab_html());
-        unsafe {
+        // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
+        unsafe { // SAFETY: see comment above.
+            // SAFETY: see comment above.
             webview.loadHTMLString_baseURL(&html, None);
         }
     }
@@ -249,7 +266,8 @@ pub(crate) fn close_tab(tab_id: usize) -> Result<(), String> {
         (removed.webview_ptr, next_active, snapshot)
     };
 
-    let webview = unsafe { &*removed_ptr };
+    // SAFETY: `removed_ptr` was taken from a retained WKWebView removed from the tab list but still alive until we drop the retained owner.
+    let webview = unsafe { &*removed_ptr }; // SAFETY: see comment above.
     remove_view_from_superview(webview);
     let _ = std::fs::remove_file(cmd_file(tab_id));
     let _ = std::fs::remove_file(result_file(tab_id));

@@ -6,9 +6,7 @@ use objc2_foundation::{MainThreadMarker, NSPoint, NSRect, NSSize, NSString};
 
 use crate::state::{BOOKMARKS_BAR_HEIGHT, TAB_STRIP_HEIGHT, TOOLBAR_HEIGHT};
 
-use super::{
-    BrowserLayout, make_hairline, set_btn_tint, set_layer_bg, set_layer_radius, srgb,
-};
+use super::{BrowserLayout, make_hairline, set_btn_tint, set_layer_bg, set_layer_radius, srgb};
 
 pub(crate) fn create_browser_layout(
     mtm: MainThreadMarker,
@@ -20,7 +18,9 @@ pub(crate) fn create_browser_layout(
     let toolbar_bg = srgb(0.961, 0.957, 0.949, 1.0);
     let bookmarks_bg = srgb(0.976, 0.973, 0.968, 1.0);
 
-    let tab_strip = unsafe {
+    // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
+    let tab_strip = unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         NSView::initWithFrame(
             mtm.alloc(),
             NSRect::new(
@@ -35,7 +35,9 @@ pub(crate) fn create_browser_layout(
     set_layer_bg(&tab_strip, &tab_strip_bg);
 
     let toolbar_y = height - TAB_STRIP_HEIGHT - TOOLBAR_HEIGHT;
-    let toolbar = unsafe {
+    // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
+    let toolbar = unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         NSView::initWithFrame(
             mtm.alloc(),
             NSRect::new(
@@ -50,7 +52,9 @@ pub(crate) fn create_browser_layout(
     set_layer_bg(&toolbar, &toolbar_bg);
 
     let bookmarks_y = height - TAB_STRIP_HEIGHT - TOOLBAR_HEIGHT - BOOKMARKS_BAR_HEIGHT;
-    let bookmarks_bar = unsafe {
+    // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
+    let bookmarks_bar = unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         NSView::initWithFrame(
             mtm.alloc(),
             NSRect::new(
@@ -68,7 +72,9 @@ pub(crate) fn create_browser_layout(
     bookmarks_bar.addSubview(&bookmarks_line);
 
     let wv_h = height - TAB_STRIP_HEIGHT - TOOLBAR_HEIGHT - BOOKMARKS_BAR_HEIGHT;
-    let webview_host = unsafe {
+    // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
+    let webview_host = unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         NSView::initWithFrame(
             mtm.alloc(),
             NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(width, wv_h)),
@@ -78,7 +84,8 @@ pub(crate) fn create_browser_layout(
         NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
     );
 
-    let nav_font = unsafe { NSFont::systemFontOfSize(20.0) };
+    // SAFETY: `systemFontOfSize:` is an AppKit constructor returning a valid shared NSFont for this size on the main thread.
+    let nav_font = unsafe { NSFont::systemFontOfSize(20.0) }; // SAFETY: see comment above.
     let nav_tint = srgb(0.30, 0.30, 0.32, 1.0);
     let btn_y = (TOOLBAR_HEIGHT - 32.0) / 2.0;
     let back_button = make_nav_btn(
@@ -118,7 +125,9 @@ pub(crate) fn create_browser_layout(
     let addr_x = 116.0;
     let addr_h = 22.0;
     let addr_y = (TOOLBAR_HEIGHT - addr_h) / 2.0;
-    let address_field = unsafe {
+    // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSTextField is immediately initialized with a valid frame.
+    let address_field = unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         NSTextField::initWithFrame(
             mtm.alloc(),
             NSRect::new(
@@ -138,10 +147,14 @@ pub(crate) fn create_browser_layout(
     set_layer_bg(&address_field, &srgb(0.925, 0.920, 0.910, 1.0));
     set_layer_radius(&address_field, 6.0);
     address_field.setTextColor(Some(&srgb(0.15, 0.15, 0.16, 1.0)));
-    let addr_font = unsafe { NSFont::systemFontOfSize(13.0) };
-    unsafe { address_field.setFont(Some(&addr_font)) };
+    // SAFETY: `systemFontOfSize:` is an AppKit constructor returning a valid shared NSFont for this size on the main thread.
+    let addr_font = unsafe { NSFont::systemFontOfSize(13.0) }; // SAFETY: see comment above.
+    // SAFETY: `address_field` is a live NSTextField and `addr_font` is a valid NSFont instance.
+    unsafe { address_field.setFont(Some(&addr_font)) }; // SAFETY: see comment above.
     address_field.setPlaceholderString(Some(&NSString::from_str("Search or enter URL")));
-    unsafe {
+    // SAFETY: `target` is the Objective-C action target for the toolbar and `addressBarSubmitted:` is implemented on it.
+    unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         address_field.setTarget(Some(target));
         address_field.setAction(Some(sel!(addressBarSubmitted:)));
     }
@@ -170,7 +183,9 @@ fn make_nav_btn(
     target: &AnyObject,
     action: objc2::runtime::Sel,
 ) -> Retained<NSButton> {
-    let btn = unsafe {
+    // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
+    let btn = unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         NSButton::initWithFrame(
             mtm.alloc(),
             NSRect::new(NSPoint::new(x, y), NSSize::new(32.0, 32.0)),
@@ -178,9 +193,12 @@ fn make_nav_btn(
     };
     btn.setTitle(&NSString::from_str(title));
     btn.setBordered(false);
-    unsafe { btn.setFont(Some(font)) };
+    // SAFETY: `btn` is a live NSButton and `font` is a valid NSFont to install on the control.
+    unsafe { btn.setFont(Some(font)) }; // SAFETY: see comment above.
     set_btn_tint(&btn, tint);
-    unsafe {
+    // SAFETY: `target` is the Objective-C action target for the toolbar button and `action` is one of the implemented selectors on that target.
+    unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         btn.setTarget(Some(target));
         btn.setAction(Some(action));
     }

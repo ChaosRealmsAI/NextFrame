@@ -46,7 +46,8 @@ fn shortcut_tab_target(keycode: c_ushort) -> Option<usize> {
 }
 
 fn handle_browser_shortcut(event: NonNull<NSEvent>) -> bool {
-    let event = unsafe { event.as_ref() };
+    // SAFETY: AppKit passes a non-null NSEvent pointer to the local monitor callback for the duration of this call.
+    let event = unsafe { event.as_ref() }; // SAFETY: see comment above.
     if event.isARepeat() {
         return false;
     }
@@ -77,8 +78,10 @@ fn handle_browser_shortcut(event: NonNull<NSEvent>) -> bool {
             let Some(state) = APP_STATE.get() else {
                 return false;
             };
-            let field = unsafe { &*state.address_field_ptr };
-            if let Err(err) = catch_objc(|| unsafe {
+            // SAFETY: `address_field_ptr` is initialized once from the live toolbar NSTextField and remains valid for the app lifetime.
+            let field = unsafe { &*state.address_field_ptr }; // SAFETY: see comment above.
+            if let Err(err) = catch_objc(|| unsafe { // SAFETY: see comment above.
+                // SAFETY: `field` is a live NSTextField and both Objective-C selectors are standard text-field responder APIs.
                 field.selectText(None);
                 let _: bool = msg_send![field, becomeFirstResponder];
             }) {
@@ -105,7 +108,9 @@ pub(crate) fn install_browser_shortcuts() {
             event.as_ptr()
         }
     });
-    let monitor = unsafe {
+    // SAFETY: `addLocalMonitorForEventsMatchingMask:handler:` is the documented AppKit API and the block stays retained by the monitor.
+    let monitor = unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::KeyDown, &handler)
     };
     let Some(monitor) = monitor else {

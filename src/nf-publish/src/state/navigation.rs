@@ -38,7 +38,8 @@ pub(crate) fn current_webview() -> Option<&'static WKWebView> {
 
 pub(crate) fn webview_for_tab(tab_id: usize) -> Option<&'static WKWebView> {
     let ptr = webview_ptr_for_tab(tab_id)?;
-    Some(unsafe { &*ptr })
+    // SAFETY: tab webview pointers are stored from retained WKWebView instances in app state and remain valid until tab teardown.
+    Some(unsafe { &*ptr }) // SAFETY: see comment above.
 }
 
 pub(crate) fn tab_index_for_webview(wv: &WKWebView) -> Option<usize> {
@@ -54,42 +55,50 @@ pub(crate) fn tab_index_for_webview(wv: &WKWebView) -> Option<usize> {
 
 pub(crate) fn bookmarks_bar_view() -> Option<&'static NSView> {
     let state = APP_STATE.get()?;
-    Some(unsafe { &*state.bookmarks_bar_ptr })
+    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
+    Some(unsafe { &*state.bookmarks_bar_ptr }) // SAFETY: see comment above.
 }
 
 pub(crate) fn tab_strip_view() -> Option<&'static NSView> {
     let state = APP_STATE.get()?;
-    Some(unsafe { &*state.tab_strip_ptr })
+    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
+    Some(unsafe { &*state.tab_strip_ptr }) // SAFETY: see comment above.
 }
 
 pub(crate) fn webview_host_view() -> Option<&'static NSView> {
     let state = APP_STATE.get()?;
-    Some(unsafe { &*state.webview_host_ptr })
+    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
+    Some(unsafe { &*state.webview_host_ptr }) // SAFETY: see comment above.
 }
 
 pub(crate) fn address_field() -> Option<&'static NSTextField> {
     let state = APP_STATE.get()?;
-    Some(unsafe { &*state.address_field_ptr })
+    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
+    Some(unsafe { &*state.address_field_ptr }) // SAFETY: see comment above.
 }
 
 pub(crate) fn back_button() -> Option<&'static NSButton> {
     let state = APP_STATE.get()?;
-    Some(unsafe { &*state.back_button_ptr })
+    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
+    Some(unsafe { &*state.back_button_ptr }) // SAFETY: see comment above.
 }
 
 pub(crate) fn forward_button() -> Option<&'static NSButton> {
     let state = APP_STATE.get()?;
-    Some(unsafe { &*state.forward_button_ptr })
+    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
+    Some(unsafe { &*state.forward_button_ptr }) // SAFETY: see comment above.
 }
 
 pub(crate) fn reload_button() -> Option<&'static NSButton> {
     let state = APP_STATE.get()?;
-    Some(unsafe { &*state.reload_button_ptr })
+    // SAFETY: these UI pointers are initialized once from retained AppKit views during startup and remain valid for the app lifetime.
+    Some(unsafe { &*state.reload_button_ptr }) // SAFETY: see comment above.
 }
 
 pub(crate) fn browser_target() -> Option<&'static AnyObject> {
     let state = APP_STATE.get()?;
-    Some(unsafe { &*state.browser_target_ptr })
+    // SAFETY: `browser_target_ptr` points to the retained Objective-C action target created during startup and kept alive for the app lifetime.
+    Some(unsafe { &*state.browser_target_ptr }) // SAFETY: see comment above.
 }
 
 pub(crate) fn short_title(title: &str) -> String {
@@ -176,14 +185,16 @@ pub(crate) fn normalize_user_url(input: &str) -> Option<String> {
 }
 
 pub(crate) fn title_for_webview(webview: &WKWebView) -> String {
-    unsafe { webview.title() }
+    // SAFETY: `webview` is a live WKWebView and `title` is a valid getter that returns an autoreleased NSString if present.
+    unsafe { webview.title() } // SAFETY: see comment above.
         .map(|value| value.to_string())
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| "New Tab".to_owned())
 }
 
 pub(crate) fn current_url_for_webview(webview: &WKWebView) -> String {
-    unsafe { webview.URL() }
+    // SAFETY: `webview` is a live WKWebView and `URL` is a valid getter that returns an autoreleased NSURL if present.
+    unsafe { webview.URL() } // SAFETY: see comment above.
         .and_then(|url| url.absoluteString())
         .map(|value| value.to_string())
         .unwrap_or_default()
@@ -198,9 +209,12 @@ pub(crate) fn make_request(
 }
 
 pub(crate) fn remove_view_from_superview(view: &AnyObject) {
-    let _ = unsafe {
+    // SAFETY: `view` is an Objective-C view object and both `catch` and `removeFromSuperview` are valid at this AppKit boundary.
+    let _ = unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         objc2::exception::catch(std::panic::AssertUnwindSafe(|| {
-            let _: () = unsafe { msg_send![view, removeFromSuperview] };
+            // SAFETY: `view` is a live NSView/NSResponder object and `removeFromSuperview` is a valid selector on it.
+            let _: () = unsafe { msg_send![view, removeFromSuperview] }; // SAFETY: see comment above.
         }))
     };
 }

@@ -12,7 +12,8 @@ pub(crate) use input::{add_tag, jitter, paste_text_native, send_key_command, typ
 pub(crate) use shortcuts::install_browser_shortcuts;
 
 fn catch_objc(f: impl FnOnce()) -> Result<(), String> {
-    let result = unsafe { objc2::exception::catch(AssertUnwindSafe(f)) };
+    // SAFETY: `objc2::exception::catch` is the intended wrapper around Objective-C message sends in this module.
+    let result = unsafe { objc2::exception::catch(AssertUnwindSafe(f)) }; // SAFETY: see comment above.
     result.map_err(|e| format!("ObjC exception: {e:?}"))
 }
 
@@ -36,7 +37,8 @@ fn native_click_at(webview: &WKWebView, x: f64, y: f64) {
     );
     if let Some(event) = &down {
         let _ = catch_objc(|| {
-            let _: () = unsafe { msg_send![webview, mouseDown: &**event] };
+            // SAFETY: `webview` is a live WKWebView and `mouseDown:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, mouseDown: &**event] }; // SAFETY: see comment above.
         });
     }
 
@@ -53,7 +55,8 @@ fn native_click_at(webview: &WKWebView, x: f64, y: f64) {
     );
     if let Some(event) = &up {
         let _ = catch_objc(|| {
-            let _: () = unsafe { msg_send![webview, mouseUp: &**event] };
+            // SAFETY: `webview` is a live WKWebView and `mouseUp:` is a valid responder selector for the synthesized NSEvent.
+            let _: () = unsafe { msg_send![webview, mouseUp: &**event] }; // SAFETY: see comment above.
         });
     }
 }

@@ -1,8 +1,8 @@
-use super::{create_dynamic_tab, set_tab_loading_state};
 use super::super::persistence;
+use super::{create_dynamic_tab, set_tab_loading_state};
 use crate::state::{
-    active_tab_id, make_request, normalize_user_url, webview_for_tab, url_host, APP_STATE,
-    BrowserTabKind, TABS,
+    APP_STATE, BrowserTabKind, TABS, active_tab_id, make_request, normalize_user_url, url_host,
+    webview_for_tab,
 };
 
 pub(crate) fn open_bookmark(bookmark_index: usize) {
@@ -43,7 +43,9 @@ pub(crate) fn navigate_tab_to_url(tab_id: usize, url: &str) -> Result<(), String
 
     let request = make_request(&normalized)?;
     let webview = webview_for_tab(tab_id).ok_or_else(|| format!("tab {tab_id} missing webview"))?;
-    unsafe {
+    // SAFETY: `webview` is a live WKWebView and `request` is a valid NSURLRequest created from a normalized URL.
+    unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         webview.loadRequest(&request);
     }
     set_tab_loading_state(tab_id, true);
@@ -105,7 +107,9 @@ pub(crate) fn go_back(target: Option<usize>) -> Result<(), String> {
         .or_else(active_tab_id)
         .ok_or_else(|| "no active tab".to_owned())?;
     let webview = webview_for_tab(tab_id).ok_or_else(|| format!("tab {tab_id} missing webview"))?;
-    unsafe {
+    // SAFETY: `webview` is a live WKWebView and `goBack` is a valid navigation selector on WKWebView.
+    unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         webview.goBack();
     }
     set_tab_loading_state(tab_id, true);
@@ -117,7 +121,9 @@ pub(crate) fn go_forward(target: Option<usize>) -> Result<(), String> {
         .or_else(active_tab_id)
         .ok_or_else(|| "no active tab".to_owned())?;
     let webview = webview_for_tab(tab_id).ok_or_else(|| format!("tab {tab_id} missing webview"))?;
-    unsafe {
+    // SAFETY: `webview` is a live WKWebView and `goForward` is a valid navigation selector on WKWebView.
+    unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         webview.goForward();
     }
     set_tab_loading_state(tab_id, true);
@@ -129,7 +135,9 @@ pub(crate) fn reload_tab(target: Option<usize>) -> Result<(), String> {
         .or_else(active_tab_id)
         .ok_or_else(|| "no active tab".to_owned())?;
     let webview = webview_for_tab(tab_id).ok_or_else(|| format!("tab {tab_id} missing webview"))?;
-    unsafe {
+    // SAFETY: `webview` is a live WKWebView and `reload` is a valid navigation selector on WKWebView.
+    unsafe { // SAFETY: see comment above.
+        // SAFETY: see comment above.
         webview.reload();
     }
     set_tab_loading_state(tab_id, true);
