@@ -48,7 +48,7 @@ export function render(t, params, vp) {
   const metaLine = esc(params.metaLine || "原片 2:22:18 | 内容来源 00:08 - 01:21");
   const watchingDesc = esc(params.watchingDesc || "");
   const tagsRaw = params.tags || "";
-  const tagList = tagsRaw.split(",").map(s => s.trim()).filter(Boolean);
+  const tagList = Array.isArray(tagsRaw) ? tagsRaw : String(tagsRaw).split(",").map(s => s.trim()).filter(Boolean);
   const metaColor = params.metaColor || "rgba(245,236,224,0.3)";
   const watchingColor = params.watchingColor || "#da7756";
   const descColor = params.descColor || "rgba(245,236,224,0.5)";
