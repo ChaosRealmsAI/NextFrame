@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>NextFrame Demo — progressBar overlay</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, sans-serif; color: #fff; }
+#viewport { position: relative; overflow: hidden; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); }
+.layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; }
+#controls { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+#progress { width: 300px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; cursor: pointer; position: relative; }
+#progress-fill { height: 100%; background: #6366f1; border-radius: 2px; }
+#time { font-size: 12px; color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums; width: 80px; }
+#play-btn { background: rgba(99,102,241,0.2); border: 1px solid rgba(99,102,241,0.3); color: #6366f1; border-radius: 6px; padding: 4px 14px; cursor: pointer; font-size: 12px; }
+#title { font-size: 11px; color: rgba(255,255,255,0.25); margin-top: 8px; letter-spacing: 0.1em; }
+</style>
+</head>
+<body>
+
+<div id="viewport"></div>
+<div id="controls">
+  <button id="play-btn">⏸</button>
+  <div id="progress"><div id="progress-fill"></div></div>
+  <span id="time">0.00 / 8.00</span>
+</div>
+<div id="title">NEXTFRAME · progressBar overlay · 9:16 · 8s · LOOPING</div>
+
+<script>
+// ─── Config ───
+const DURATION = 8;
+const MAX_H = Math.min(window.innerHeight - 80, 750);
+const PH = MAX_H;
+const PW = Math.round(PH * 9 / 16);
+const W = PW, H = PH;
+
+const vp = document.getElementById('viewport');
+vp.style.width = PW + 'px';
+vp.style.height = PH + 'px';
+
+// ─── Timeline: auroraGradient bg + progressBar overlay ───
+const timeline = [
+  {
+    id: 'bg', scene: 'auroraGradient',
+    start: 0, dur: 8, z: 0, x: 0, y: 0, w: 1, h: 1,
+    params: { hueA: 270, hueB: 200, hueC: 320, intensity: 1.2, grain: 0.03, speed: 0.3 },
+  },
+  {
+    id: 'bar', scene: 'progressBar',
+    start: 0, dur: 8, z: 1, x: 0, y: 0, w: 1, h: 1,
+    params: { barHeight: 3, hue: 245, glowSize: 10, position: 'bottom' },
+  },
+];
+
+// ─── Scene Renderers ───
+
+function renderAurora(t, p, W, H) {
+  const T = t * p.speed;
+  // canvas id must be unique per frame — use timestamp trick
+  const cid = '__sc_bg_' + Math.round(T * 100);
+  return `<canvas width="${W}" height="${H}" style="width:100%;height:100%;display:block" id="${cid}"></canvas>
+<script>(function(){
+  var c=document.getElementById("${cid}"),x=c.getContext("2d"),W=${W},H=${H},T=${T};
+  var I=${p.intensity},G=${p.grain};
+  x.fillStyle="#0a0a12";x.fillRect(0,0,W,H);
+  x.globalCompositeOperation="lighter";
+  function b(cx,cy,r,h,a){var g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,"hsla("+h+","+Math.round(70*I)+"%,55%,"+a+")");g.addColorStop(1,"hsla("+h+","+Math.round(70*I)+"%,55%,0)");x.fillStyle=g;x.fillRect(0,0,W,H)}
+  b(W*(0.3+0.2*Math.sin(T*0.7)),H*(0.2+0.12*Math.cos(T*0.5)),W*0.8,${p.hueA},0.6);
+  b(W*(0.7+0.15*Math.cos(T*0.6)),H*(0.45+0.15*Math.sin(T*0.4)),W*0.7,${p.hueB},0.5);
+  b(W*(0.5+0.2*Math.sin(T*0.8)),H*(0.7+0.1*Math.cos(T*0.9)),W*0.75,${p.hueC},0.45);
+  b(W*(0.4+0.1*Math.cos(T*1.1)),H*(0.9+0.05*Math.sin(T*0.6)),W*0.5,${p.hueA+40},0.3);
+  x.globalCompositeOperation="source-over";
+  if(G>0.001){var d=x.getImageData(0,0,W,H),px=d.data,g2=255*G;for(var i=0;i<px.length;i+=16){var n=(Math.random()-0.5)*g2;px[i]+=n;px[i+1]+=n;px[i+2]+=n}x.putImageData(d,0,0)}
+})()</` + `script>`;
+}
+
+function renderProgressBar(t, p, W, H) {
+  const { barHeight, hue, glowSize, position } = p;
+  const progress = Math.min(1, t / DURATION);
+  const fillW = Math.round(W * progress);
+
+  const offsetY = position === 'top'
+    ? Math.round(H * 0.05)
+    : Math.round(H * 0.95);
+
+  const barTop = position === 'top'
+    ? offsetY
+    : offsetY - barHeight;
+
+  const dotX = fillW;
+  const dotY = barTop + Math.round(barHeight / 2);
+
+  const trackColor = `hsla(${hue},60%,60%,0.18)`;
+  const fillColor = `hsl(${hue},80%,65%)`;
+  const glowColor = `hsl(${hue},90%,70%)`;
+
+  return `<div style="position:absolute;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;overflow:hidden">
+  <div style="position:absolute;top:${barTop}px;left:0;width:${W}px;height:${barHeight}px;background:${trackColor};border-radius:${barHeight}px"></div>
+  <div style="position:absolute;top:${barTop}px;left:0;width:${fillW}px;height:${barHeight}px;background:${fillColor};border-radius:${barHeight}px"></div>
+  ${glowSize > 0 ? `<div style="position:absolute;top:${dotY - glowSize}px;left:${dotX - glowSize}px;width:${glowSize * 2}px;height:${glowSize * 2}px;border-radius:50%;background:radial-gradient(circle,${glowColor} 0%,transparent 70%);opacity:0.85"></div>` : ''}
+  <div style="position:absolute;top:${dotY - Math.ceil(barHeight * 1.5)}px;left:${dotX - Math.ceil(barHeight * 1.5)}px;width:${Math.ceil(barHeight * 3)}px;height:${Math.ceil(barHeight * 3)}px;border-radius:50%;background:${fillColor};box-shadow:0 0 ${Math.round(barHeight * 4)}px ${fillColor}"></div>
+</div>`;
+}
+
+const RENDERERS = {
+  auroraGradient: renderAurora,
+  progressBar: renderProgressBar,
+};
+
+// ─── Create layer containers ───
+const layers = {};
+timeline.sort((a, b) => a.z - b.z).forEach(layer => {
+  const div = document.createElement('div');
+  div.className = 'layer';
+  div.id = 'layer_' + layer.id;
+  div.style.zIndex = layer.z;
+  div.style.left = (layer.x * 100) + '%';
+  div.style.top = (layer.y * 100) + '%';
+  div.style.width = (layer.w * 100) + '%';
+  div.style.height = (layer.h * 100) + '%';
+  if (layer.opacity !== undefined) div.style.opacity = layer.opacity;
+  vp.appendChild(div);
+  layers[layer.id] = div;
+});
+
+// ─── Playback ───
+let playing = true, startTime = performance.now(), currentT = 0;
+const progressFill = document.getElementById('progress-fill');
+const timeEl = document.getElementById('time');
+const playBtn = document.getElementById('play-btn');
+
+playBtn.onclick = () => {
+  playing = !playing;
+  if (playing) { startTime = performance.now() - currentT * 1000; playBtn.textContent = '⏸'; }
+  else { playBtn.textContent = '▶'; }
+};
+document.getElementById('progress').onclick = (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  currentT = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * DURATION;
+  startTime = performance.now() - currentT * 1000;
+};
+
+function loop() {
+  if (playing) currentT = ((performance.now() - startTime) / 1000) % DURATION;
+  progressFill.style.width = (currentT / DURATION * 100) + '%';
+  timeEl.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2);
+
+  timeline.forEach(layer => {
+    const div = layers[layer.id];
+    const localT = currentT - layer.start;
+    if (localT < 0 || localT > layer.dur) { div.style.display = 'none'; return; }
+    div.style.display = 'block';
+    const renderer = RENDERERS[layer.scene];
+    if (renderer) {
+      const layerW = Math.round(W * layer.w);
+      const layerH = Math.round(H * layer.h);
+      const html = renderer(localT, layer.params, layerW, layerH);
+      if (div._lastHtml !== html) {
+        div.innerHTML = html;
+        div._lastHtml = html;
+        div.querySelectorAll('script').forEach(s => {
+          const fn = new Function(s.textContent);
+          try { fn(); } catch(e) {}
+        });
+      }
+    }
+  });
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
