@@ -104,22 +104,25 @@ function escapeInlineScript(value) {
     .replace(/\u2029/g, "\\u2029");
 }
 
-function normalizeSrtEntry(entry) {
+function normalizeSrtEntry(entry, offset = 0) {
   if (!entry || typeof entry !== "object") return null;
-  const start = Number(entry.s ?? entry.start ?? 0);
-  const end = Number(entry.e ?? entry.end ?? start);
+  const start = Number(entry.s ?? entry.start ?? 0) + offset;
+  const end = Number(entry.e ?? entry.end ?? start) + offset;
   const text = String(entry.t ?? entry.text ?? "");
-  if (!text) return null;
+  if (!text || !Number.isFinite(start) || !Number.isFinite(end)) return null;
   return { s: start, e: end, t: text };
 }
 
 function extractTimelineSrt(timeline) {
   const layers = Array.isArray(timeline?.layers) ? timeline.layers : [];
+  const cues = [];
   for (const layer of layers) {
     const srt = Array.isArray(layer?.params?.srt) ? layer.params.srt : null;
     if (!srt || srt.length === 0) continue;
-    return srt.map(normalizeSrtEntry).filter(Boolean);
+    const offset = Number(layer?.start || 0);
+    cues.push(...srt.map((entry) => normalizeSrtEntry(entry, offset)).filter(Boolean));
   }
+  if (cues.length > 0) return cues.sort((left, right) => left.s - right.s || left.e - right.e);
 
   const audio = timeline?.audio;
   if (!audio || typeof audio === "string") return [];
@@ -128,7 +131,7 @@ function extractTimelineSrt(timeline) {
     : Array.isArray(audio.segments)
       ? audio.segments.flatMap((segment) => segment?.sentences || [])
       : [];
-  return sentences.map(normalizeSrtEntry).filter(Boolean);
+  return sentences.map((entry) => normalizeSrtEntry(entry)).filter(Boolean);
 }
 
 function serializeSrtLiteral(entries) {
