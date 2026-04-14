@@ -68,11 +68,46 @@ Recording (separate binary): `nextframe-recorder slide <html> --out <mp4> --widt
 - No TODO/FIXME/HACK/XXX in production code.
 - Scenes must not cross-import from modules/ directory.
 
+## Pipeline State Machine (AI 做视频必读)
+
+视频生产全流程由状态机驱动，提示词和坑记录在 `src/nf-cli/src/commands/pipeline/recipes/` 下。
+
+**做视频前先读对应 recipe 的 step MD：**
+
+| Recipe | 路径 | 用途 |
+|--------|------|------|
+| **produce** | `pipeline/recipes/produce/` | 从素材到 MP4 的完整生产 |
+
+### produce 流程 (8 步)
+
+| Step | 文件 | 做什么 |
+|------|------|--------|
+| 0 | `00-ratio.md` | 定比例 9:16/16:9 — 一切的起点 |
+| 1 | `01-check.md` | 确认素材 + 检查该 ratio 下组件 |
+| 2 | `02-scene.md` | 做缺失组件 + preview 截图验证 |
+| 3 | `03-timeline.md` | 写 timeline JSON，字幕直接贴不转换 |
+| 4 | `04-validate.md` | nextframe validate 参数门禁 |
+| 5 | `05-build.md` | nextframe build + 自动截图 + AI 看图 |
+| 6 | `06-record.md` | recorder 录制 + ffprobe 验证 |
+| 7 | `07-concat.md` | 多段拼接（可选） |
+
+**踩坑记录:** `pipeline/recipes/produce/pitfalls.md` — 10 个已知坑 + 修复方法
+
+### 设计系统
+
+`src/nf-core/scenes/shared/design.js` 是所有 scene 的单一真相源：
+- `TOKENS` — 颜色（interview/lecture 两套）
+- `GRID` / `GRID_16x9` — 布局网格（精确像素坐标）
+- `TYPE` / `TYPE_16x9` — 字号/字重/字体
+- `findActiveSub(segments, t)` — 字幕两级查找（segment→英文, cn[]→中文）
+
 ## Key Paths
 
 - Engine core: `src/nf-core/engine/` (timeline, build, validate, keyframes)
 - Animation: `src/nf-core/animation/` (effects/ + transitions/)
 - Scene components: `src/nf-core/scenes/` (7 categories + meta.js + index.js)
+- Design system: `src/nf-core/scenes/shared/design.js` (TOKENS, GRID, TYPE, utilities)
+- Pipeline recipes: `src/nf-cli/src/commands/pipeline/recipes/` (state machine prompts)
 - CLI commands: `src/nf-cli/src/commands/` (timeline/, render/, project/, pipeline/, app/)
 - Source pipeline: `src/nf-source/` (core/, download/, transcribe/, align/, cut/, source/)
 - IPC dispatch: `src/nf-bridge/src/lib.rs` → `dispatch` / `dispatch_inner`
