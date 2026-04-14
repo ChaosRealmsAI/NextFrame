@@ -13,7 +13,6 @@ const scSubtitleFallbacks={
   142:'我几乎可以确定，我们有一条可靠的路径能走到那里，但如果说还存在一点点不确定性，那也确实还在。',
   143:'所以对十年这个时间尺度，我大概有 90% 把握，这已经接近你能有的最高确定性了。',
 };
-const scCardPreviewLimit=2;
 const scTimelineColors=['var(--accent)','#60a5fa','#34d399','#f97316'];
 let scSources=[]; let scActiveSource=0; let scClips=[]; let scTranscript=[]; let scRenderedClips=[]; let scPlayerCleanup=null;
 
@@ -46,6 +45,11 @@ function scExtractLanguageRows(sentence){
 
 function scGetSourceDuration(source){const spec=scSourceSpecs[source.name]||{};return spec.durationSec||0;}
 function scGetClipSpec(clip){return scClipSpecs[clip.name]||null;}
+function scPickPreviewSentences(sentences){
+  const translated=sentences.filter((sentence)=>sentence.languageRows.length>1);
+  if(translated[0])return [translated[0]];
+  return sentences.slice(0,1);
+}
 
 function scBuildClipModels(){
   const source=scSources[scActiveSource]; if(!source)return[];
@@ -59,7 +63,7 @@ function scBuildClipModels(){
     return {
       clip,index,startSec:spec.startSec,endSec:spec.endSec,durationSec:spec.endSec-spec.startSec,sourceDurationSec:sourceDuration,nfUrl:scNfUrl(clip.path),sizeLabel:scFormatBytes(clip.size),
       timecodeLabel:scFormatClock(spec.startSec,false)+' → '+scFormatClock(spec.endSec,false),sentences,linkedSegment:spec.linkedSegment,tags:spec.tags,reason:spec.reason,quality:spec.quality,confidence:spec.confidence,
-      previewSentences:sentences.slice(0,scCardPreviewLimit),sentenceRange:firstSentence&&lastSentence?firstSentence.id+'-'+lastSentence.id:'—',
+      previewSentences:scPickPreviewSentences(sentences),sentenceRange:firstSentence&&lastSentence?firstSentence.id+'-'+lastSentence.id:'—',
     };
   }).filter(Boolean);
 }
