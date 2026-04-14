@@ -268,6 +268,9 @@ function buildRuntime() {
     timeInfo.textContent = formatTime(time) + " / " + formatTime(duration);
     phaseInfo.textContent = "Phase: " + getPhaseLabel(activeVisible);
     playBtn.textContent = isPlaying ? "Pause" : "Play";
+    if (window.parent !== window) {
+      window.parent.postMessage({type:"nf-state", currentTime: clampTime(time), duration: duration, isPlaying: isPlaying}, "*");
+    }
   }
 
   function compose(time) {
@@ -480,6 +483,19 @@ function buildRuntime() {
       currentTime = duration;
       stopPlayback();
       compose(duration);
+    });
+  }
+
+  // postMessage API for iframe embedding (editor preview)
+  if (window.parent !== window) {
+    controls.style.display = "none";
+    window.addEventListener("message", function(event) {
+      var d = event.data;
+      if (!d || d.type !== "nf-cmd") return;
+      if (d.action === "play") play();
+      else if (d.action === "pause") pause();
+      else if (d.action === "toggle") togglePlayback();
+      else if (d.action === "seek" && typeof d.time === "number") seek(d.time);
     });
   }
 
