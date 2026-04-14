@@ -37,7 +37,7 @@ export async function run(argv) {
   }
 
   // Validate before building
-  const validation = validateTimelineV3(timeline);
+  const validation = await validateTimelineV3(timeline);
   if (!validation.ok) {
     if (flags.json) {
       process.stdout.write(JSON.stringify({ ok: false, error: { code: 'VALIDATION_FAILED', errors: validation.errors } }, null, 2) + '\n');

@@ -1,0 +1,63 @@
+{
+  "version": "0.3",
+  "duration": 12,
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "background": "#0b0b14",
+  "layers": [
+    {
+      "id": "bg",
+      "scene": "auroraGradient",
+      "start": 0,
+      "dur": 12,
+      "params": {
+        "hueA": 270,
+        "hueB": 200,
+        "hueC": 320,
+        "intensity": 1,
+        "grain": 0.04,
+        "speed": 0.3
+      }
+    },
+    {
+      "id": "poem",
+      "scene": "typewriterText",
+      "start": 0,
+      "dur": 12,
+      "params": {
+        "lines": [
+          "In the beginning",
+          "there was nothing.",
+          "Then came light.",
+          "And then, video."
+        ],
+        "hue": 180,
+        "saturation": 70,
+        "lightness": 85,
+        "fontSize": 0.055,
+        "charDelay": 0.07,
+        "lineGap": 0.6,
+        "cursorChar": "|",
+        "cursorBlink": 1.8,
+        "align": "center",
+        "bgOpacity": 0
+      }
+    },
+    {
+      "id": "ripple",
+      "scene": "circleRipple",
+      "start": 0,
+      "dur": 12,
+      "opacity": 0.3,
+      "params": {
+        "hueStart": 180,
+        "hueSpan": 120,
+        "ringCount": 8,
+        "interval": 0.3,
+        "lifespan": 2.5,
+        "thickness": 0.01
+      }
+    }
+  ]
+}
