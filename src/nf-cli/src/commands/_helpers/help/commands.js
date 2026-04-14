@@ -12,6 +12,7 @@ const command = (name, summary, usage, params, constraints, fix = DEFAULT_FIX) =
 
 export const TOP_LEVEL_COMMANDS = [
   group("Timeline", "new validate build lint-scenes scenes preview frame describe-frame render"),
+  group("Scene Dev", "scene-new scene-preview scene-validate"),
   group("Layer CRUD", "layer-list layer-add layer-move layer-resize layer-set layer-remove"),
   group("Project Hierarchy", "project-new project-list project-config episode-new episode-list segment-new segment-list"),
   group("Pipeline", "pipeline-get script-set script-get audio-set audio-get atom-add atom-list atom-remove output-add output-list output-publish"),
@@ -38,6 +39,12 @@ export const COMMAND_SPECS = Object.fromEntries([
     --output=PATH or -o PATH write HTML to a custom path
     --json emit structured result data`, `The timeline must validate before build succeeds.
     Legacy v0.1 tracks/clips timelines are rejected by build.`),
+  command("scene-new", "Create a new scene component skeleton (directory + index.js + preview.html).", `nextframe scene-new <name> --ratio=<16:9|9:16|4:3> --category=<cat> [--tech=dom]`, `--ratio target aspect ratio
+    --category backgrounds|typography|data|shapes|overlays|media|browser
+    --tech dom|canvas2d|svg|webgl|video|lottie`, `Creates a ready-to-edit skeleton. Next: edit render(), then scene-preview, then scene-validate.`),
+  command("scene-preview", "Open a scene's preview.html in the browser for visual verification.", `nextframe scene-preview <name> [--ratio=16:9]`, `<name> scene id (searches across categories)`, `BLOCKING step — must visually confirm no overflow, smooth animation, correct colors.`),
+  command("scene-validate", "Validate a scene against ADR-008 contract (16 checks).", `nextframe scene-validate <name> [--ratio=16:9] [--json]`, `<name> scene id
+    --json emit structured result`, `Checks meta fields, render output, screenshots, lint, preview.html existence. All must pass before commit.`),
   command("lint-scenes", "Audit scene component metadata, lifecycle methods, and stage-size rules.", `nextframe lint-scenes [--json]`, `--json emit per-file lint results as JSON`, `Reads scene modules from the runtime scene directory.
     Use this after adding or editing a scene component.`),
   command("scenes", "List all available scenes or inspect one scene contract, including params.", `nextframe scenes [--json]
