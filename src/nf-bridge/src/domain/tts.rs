@@ -1,4 +1,5 @@
-//! TTS bridge — spawn `vox` CLI for text-to-speech generation.
+//! Audio synthesis bridge — spawn `nextframe audio-synth` CLI.
+//! No direct vox dependency. nextframe CLI handles TTS + alignment internally.
 use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;
@@ -6,97 +7,109 @@ use std::process::Command;
 
 use crate::util::validation::require_string;
 
-/// Find the `vox` binary.
-fn vox_path() -> Result<PathBuf, String> {
-    which::which("vox").map_err(|_| {
-        "failed to find vox binary: not in PATH. Fix: install nf-tts or add vox to PATH.".into()
-    })
+/// Find the `nextframe` CLI binary (node script).
+fn nextframe_cli() -> Result<(String, Vec<String>), String> {
+    // The CLI is at src/nf-cli/bin/nextframe.js relative to the project
+    // In production it would be installed globally; for dev, use node + path
+    let script = std::env::current_dir()
+        .unwrap_or_default()
+        .join("src/nf-cli/bin/nextframe.js");
+    if script.exists() {
+        return Ok(("node".into(), vec![script.display().to_string()]));
+    }
+    // Try global install
+    if let Ok(path) = which::which("nextframe") {
+        return Ok((path.display().to_string(), vec![]));
+    }
+    Err("failed to find nextframe CLI. Fix: run from project root or install nextframe globally."
+        .into())
 }
 
-/// tts.synth — generate audio for a text segment.
-/// Params: { episode: string, segment: string, text: string, voice?: string, backend?: string }
-/// Output goes to <episode>/audio/<segment>/<segment>.mp3
-pub(crate) fn handle_tts_synth(params: &Value) -> Result<Value, String> {
+/// Resolve project name and episode name from full paths.
+fn resolve_names(project_path: &str, episode_path: &str) -> (String, String) {
+    let project_name = PathBuf::from(project_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let episode_name = PathBuf::from(episode_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    (project_name, episode_name)
+}
+
+/// audio.synth — generate TTS audio for a script segment via nextframe CLI.
+/// Params: { project: string, episode: string, segment: number, voice?: string, backend?: string }
+pub(crate) fn handle_audio_synth(params: &Value) -> Result<Value, String> {
+    let project = require_string(params, "project")?;
     let episode = require_string(params, "episode")?;
-    let segment_name = require_string(params, "segment")?;
-    let text = require_string(params, "text")?;
+    let segment = params
+        .get("segment")
+        .and_then(Value::as_u64)
+        .ok_or("missing required param: segment (1-based number)")?;
 
-    let episode_path = PathBuf::from(episode);
-    let audio_dir = episode_path.join("audio").join(segment_name);
-    fs::create_dir_all(&audio_dir)
-        .map_err(|e| format!("failed to create audio dir '{}': {e}", audio_dir.display()))?;
+    let (project_name, episode_name) = resolve_names(project, episode);
+    let (bin, prefix_args) = nextframe_cli()?;
 
-    let vox = vox_path()?;
-    let mut cmd = Command::new(&vox);
-    cmd.arg("synth").arg(text).arg("-d").arg(&audio_dir);
+    let mut cmd = Command::new(&bin);
+    for arg in &prefix_args {
+        cmd.arg(arg);
+    }
+    cmd.arg("audio-synth")
+        .arg(&project_name)
+        .arg(&episode_name)
+        .arg(format!("--segment={segment}"))
+        .arg("--json");
 
     if let Some(voice) = params.get("voice").and_then(Value::as_str) {
         if !voice.is_empty() {
-            cmd.arg("-v").arg(voice);
+            cmd.arg(format!("--voice={voice}"));
         }
     }
     if let Some(backend) = params.get("backend").and_then(Value::as_str) {
         if !backend.is_empty() {
-            cmd.arg("-b").arg(backend);
+            cmd.arg(format!("--backend={backend}"));
         }
     }
 
-    let output = cmd.output().map_err(|e| format!("failed to run vox synth: {e}"))?;
+    let output = cmd
+        .output()
+        .map_err(|e| format!("failed to run nextframe audio-synth: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("vox synth failed (exit {}): {stderr}", output.status));
+        return Err(format!(
+            "nextframe audio-synth failed (exit {}): {stderr}",
+            output.status
+        ));
     }
 
-    // Find generated MP3 file
-    let mp3 = find_first_file(&audio_dir, "mp3");
-    let timeline_json = find_first_file(&audio_dir, "timeline.json");
-
-    Ok(json!({
-        "audioDir": audio_dir.display().to_string(),
-        "mp3": mp3.map(|p| p.display().to_string()),
-        "timeline": timeline_json.map(|p| p.display().to_string()),
-    }))
-}
-
-/// tts.voices — list available TTS voices.
-/// Params: { lang?: string }
-pub(crate) fn handle_tts_voices(params: &Value) -> Result<Value, String> {
-    let vox = vox_path()?;
-    let mut cmd = Command::new(&vox);
-    cmd.arg("voices").arg("--json");
-
-    if let Some(lang) = params.get("lang").and_then(Value::as_str) {
-        if !lang.is_empty() {
-            cmd.arg("-l").arg(lang);
-        }
-    }
-
-    let output = cmd.output().map_err(|e| format!("failed to run vox voices: {e}"))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Try to parse as JSON array; fall back to raw text
     match serde_json::from_str::<Value>(&stdout) {
-        Ok(voices) => Ok(json!({ "voices": voices })),
-        Err(_) => Ok(json!({ "voices": stdout.trim() })),
+        Ok(result) => Ok(result),
+        Err(_) => Ok(json!({ "ok": true, "raw": stdout.trim() })),
     }
 }
 
-/// tts.status — check if audio exists for a segment.
-/// Params: { episode: string, segment: string }
-pub(crate) fn handle_tts_status(params: &Value) -> Result<Value, String> {
+/// audio.status — check if audio exists for a segment.
+/// Params: { episode: string, segment: number }
+pub(crate) fn handle_audio_status(params: &Value) -> Result<Value, String> {
     let episode = require_string(params, "episode")?;
-    let segment_name = require_string(params, "segment")?;
+    let segment = params
+        .get("segment")
+        .and_then(Value::as_u64)
+        .unwrap_or(1);
 
-    let audio_dir = PathBuf::from(episode).join("audio").join(segment_name);
-    let mp3 = find_first_file(&audio_dir, "mp3");
-    let timeline = find_first_file(&audio_dir, "timeline.json");
+    let audio_dir = PathBuf::from(&episode).join("audio").join(format!("seg-{segment}"));
+    let mp3 = find_first_file(&audio_dir, ".mp3");
+    let timeline = find_first_file(&audio_dir, ".timeline.json");
     let srt = find_first_file(&audio_dir, ".srt");
     let exists = mp3.is_some();
 
-    // If timeline exists, read and parse it for karaoke data
     let timeline_data = timeline.as_ref().and_then(|p| {
-        fs::read_to_string(p).ok().and_then(|c| serde_json::from_str::<Value>(&c).ok())
+        fs::read_to_string(p)
+            .ok()
+            .and_then(|c| serde_json::from_str::<Value>(&c).ok())
     });
 
     Ok(json!({
@@ -109,13 +122,13 @@ pub(crate) fn handle_tts_status(params: &Value) -> Result<Value, String> {
     }))
 }
 
-fn find_first_file(dir: &PathBuf, ext: &str) -> Option<PathBuf> {
+fn find_first_file(dir: &PathBuf, suffix: &str) -> Option<PathBuf> {
     let Ok(entries) = fs::read_dir(dir) else {
         return None;
     };
     for entry in entries.filter_map(Result::ok) {
         let name = entry.file_name().to_string_lossy().to_string();
-        if name.ends_with(ext) {
+        if name.ends_with(suffix) {
             return Some(entry.path());
         }
     }
@@ -129,7 +142,7 @@ fn find_first_file(dir: &PathBuf, ext: &str) -> Option<PathBuf> {
             if let Ok(sub) = fs::read_dir(&path) {
                 for sub_entry in sub.filter_map(Result::ok) {
                     let name = sub_entry.file_name().to_string_lossy().to_string();
-                    if name.ends_with(ext) {
+                    if name.ends_with(suffix) {
                         return Some(sub_entry.path());
                     }
                 }

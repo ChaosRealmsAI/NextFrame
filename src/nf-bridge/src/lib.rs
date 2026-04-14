@@ -17,8 +17,8 @@ use codec::{ffmpeg_command_path, handle_export_mux_audio};
 use domain::{
     handle_episode_create, handle_episode_list, handle_project_create, handle_project_list,
     handle_scene_list, handle_segment_list, handle_segment_video_url, handle_source_clips,
-    handle_source_cut, handle_timeline_load, handle_timeline_save, handle_tts_status,
-    handle_tts_synth, handle_tts_voices,
+    handle_audio_status, handle_audio_synth, handle_source_cut, handle_timeline_load,
+    handle_timeline_save,
 };
 use export::{
     handle_export_cancel, handle_export_log, handle_export_start, handle_export_status,
@@ -115,9 +115,8 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
         "segment.videoUrl" => handle_segment_video_url(&params),
         "source.cut" => handle_source_cut(&params),
         "source.clips" => handle_source_clips(&params),
-        "tts.synth" => handle_tts_synth(&params),
-        "tts.voices" => handle_tts_voices(&params),
-        "tts.status" => handle_tts_status(&params),
+        "audio.synth" => handle_audio_synth(&params),
+        "audio.status" => handle_audio_status(&params),
         "preview.frame" => handle_preview_frame(&params),
         "fs.mtime" => handle_fs_mtime(&params),
         _ => Err(format!( // Fix: included in the error string below
