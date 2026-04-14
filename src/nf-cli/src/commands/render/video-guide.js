@@ -1,26 +1,40 @@
 // nextframe video-guide [--type=lecture|interview] [timeline.json]
-// True state machine: detects state → outputs ONE action + exact commands.
-// AI reads output → executes → runs video-guide again → next state.
+// Strict state machine router. Detects state → outputs the FULL prompt for that state.
+// Each state has mandatory verification. AI cannot skip verification.
 
 import { parseFlags } from "../_helpers/_io.js";
 import { existsSync, readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { listScenes } from "../../../../nf-core/scenes/index.js";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const STATES_DIR = resolve(HERE, "states");
 
 const HELP = `nextframe video-guide [--type=lecture|interview] [timeline.json]
 
-State machine for video production. Run repeatedly — each call outputs ONE action.
+Strict state machine for video production.
+Each state outputs a COMPLETE prompt with mandatory verification.
+Run repeatedly — each call detects state and outputs next action.
 
-  nextframe video-guide --type=lecture          # Start: what scenes needed?
-  nextframe video-guide --type=interview        # Start: 9:16 interview scenes
-  nextframe video-guide timeline.json           # Detect state, give next action
+States:
+  01-scene-check    → Check what scenes exist
+  02-scene-create   → Create missing scenes
+  03-scene-verify   → ⛔ Verify each scene (screenshot + checklist)
+  04-timeline       → Assemble timeline JSON
+  05-build-verify   → Build HTML + ⛔ verify in browser
+  06-record-verify  → Record MP4 + ⛔ verify frames
+
+Usage:
+  nextframe video-guide --type=lecture     # Start
+  nextframe video-guide timeline.json      # Continue from current state
 `;
 
-// ═══ Video Type Recipes ═══
-// Each recipe defines: ratio, required scenes, and a timeline template
 const RECIPES = {
   lecture: {
     label: "16:9 讲解视频",
     ratio: "16:9",
+    ratioDir: "16x9",
     width: 1920,
     height: 1080,
     bg: "#1a1510",
@@ -30,19 +44,11 @@ const RECIPES = {
       { id: "subtitleBar", category: "overlays", description: "底部字幕条，SRT 驱动" },
       { id: "progressBar16x9", category: "overlays", description: "底部进度条" },
     ],
-    optionalScenes: [
-      { id: "codeTerminal", category: "browser", description: "代码块展示" },
-      { id: "flowDiagram", category: "data", description: "流程图：节点+箭头" },
-      { id: "eventList", category: "data", description: "竖排圆点列表" },
-      { id: "titleCard", category: "typography", description: "带眉题的大标题" },
-      { id: "quoteBlock", category: "typography", description: "金色引用块" },
-      { id: "slideChrome", category: "overlays", description: "顶栏品牌+水印" },
-      { id: "videoClip", category: "media", description: "嵌入真实 MP4 视频" },
-    ],
   },
   interview: {
     label: "9:16 访谈切片",
     ratio: "9:16",
+    ratioDir: "9x16",
     width: 1080,
     height: 1920,
     bg: "#0a0a0a",
@@ -52,11 +58,22 @@ const RECIPES = {
       { id: "interviewBiSub", category: "overlays", description: "双语字幕（中+英）" },
       { id: "progressBar9x16", category: "overlays", description: "底部进度条 9:16" },
     ],
-    optionalScenes: [
-      { id: "videoClip9x16", category: "media", description: "竖屏视频嵌入" },
-    ],
   },
 };
+
+function readState(filename) {
+  const path = resolve(STATES_DIR, filename);
+  if (!existsSync(path)) return `[ERROR: ${filename} not found at ${path}]`;
+  return readFileSync(path, "utf-8");
+}
+
+function fillTemplate(text, vars) {
+  let result = text;
+  for (const [key, value] of Object.entries(vars)) {
+    result = result.replace(new RegExp(`\\{${key}\\}`, "g"), String(value));
+  }
+  return result;
+}
 
 export async function run(argv) {
   const { positional, flags } = parseFlags(argv);
@@ -65,22 +82,18 @@ export async function run(argv) {
   const type = flags.type || null;
   const timelinePath = positional[0];
 
-  // ═══ STATE 1: No timeline, no type → show available types ═══
+  // ═══ No type, no timeline → show help ═══
   if (!timelinePath && !type) {
     process.stdout.write(`═══ VIDEO GUIDE — Choose a type ═══
 
-Available types:
-  --type=lecture     16:9 横屏讲解（课程、源码分析、概念讲解）
-  --type=interview   9:16 竖屏访谈切片（访谈、对话、评论）
-
-Run:
-  nextframe video-guide --type=lecture
-  nextframe video-guide --type=interview
+  nextframe video-guide --type=lecture     16:9 横屏讲解
+  nextframe video-guide --type=interview   9:16 竖屏访谈
+  nextframe video-guide timeline.json      从时间线继续
 `);
     return 0;
   }
 
-  // ═══ STATE 2: Has type, no timeline → check scenes ═══
+  // ═══ Has type → check scenes ═══
   if (!timelinePath && type) {
     const recipe = RECIPES[type];
     if (!recipe) {
@@ -90,91 +103,81 @@ Run:
 
     const scenes = await listScenes();
     const available = new Set(scenes.filter(s => s.ratio === recipe.ratio).map(s => s.id));
-
     const missing = recipe.requiredScenes.filter(s => !available.has(s.id));
-    const optMissing = recipe.optionalScenes.filter(s => !available.has(s.id));
-    const ready = recipe.requiredScenes.filter(s => available.has(s.id));
-
-    process.stdout.write(`═══ ${recipe.label} — Scene Check ═══
-
-Required scenes (${ready.length}/${recipe.requiredScenes.length} ready):
-`);
-    for (const s of recipe.requiredScenes) {
-      const ok = available.has(s.id);
-      process.stdout.write(`  ${ok ? "✓" : "✗"} ${s.id.padEnd(22)} ${s.description}\n`);
-    }
 
     if (missing.length > 0) {
-      // ═══ ACTION: Create missing scenes ═══
-      process.stdout.write(`
-═══ ACTION: Create ${missing.length} missing scene(s) ═══
+      // ═══ STATE 02: Create missing scenes ═══
+      process.stdout.write(`═══ STATE 02: Create Missing Scenes ═══
+Current: ${recipe.label}
+Missing: ${missing.length} scene(s)
 
 `);
+      const statePrompt = readState("02-scene-create.md");
+      process.stdout.write(statePrompt);
+
+      process.stdout.write(`\n═══ SPECIFIC: Create these scenes ═══\n\n`);
       for (const s of missing) {
-        const ratioDir = recipe.ratio.replace(":", "x");
-        process.stdout.write(`## ${s.id}
-nextframe scene-new ${s.id} --ratio=${recipe.ratio} --category=${s.category} --description="${s.description}"
-# → Edit index.js: customize render() for ${s.description}
-# → Edit meta.description: "${s.description}"
-# → Verify: open src/nf-core/scenes/${ratioDir}/${s.category}/${s.id}/preview.html
-# → Check: nextframe scenes ${s.id}
+        process.stdout.write(`## Create: ${s.id}
+\`\`\`bash
+node src/nf-cli/bin/nextframe.js scene-new ${s.id} --ratio=${recipe.ratio} --category=${s.category} --description="${s.description}"
+\`\`\`
+Then customize render() for: ${s.description}
 
 `);
       }
 
-      process.stdout.write(`After creating ALL scenes, run again:
+      process.stdout.write(`═══ After creating EACH scene → run STATE 03 verify ═══
+
+For each scene you created:
+`);
+      const verifyPrompt = readState("03-scene-verify.md");
+      const vars = { ratioDir: recipe.ratioDir, ratio: recipe.ratio, type };
+      process.stdout.write(fillTemplate(verifyPrompt, vars));
+
+      process.stdout.write(`\n═══ After ALL scenes verified → run again ═══
   nextframe video-guide --type=${type}
 `);
       return 0;
     }
 
-    // All required scenes ready → create timeline
-    process.stdout.write(`
-All required scenes ready! ✓
+    // ═══ STATE 04: All scenes ready → assemble timeline ═══
+    process.stdout.write(`═══ STATE 04: Assemble Timeline ═══
+Current: ${recipe.label}
+All ${recipe.requiredScenes.length} required scenes: ✓
 
-Optional scenes (not required but nice to have):
+Available scenes:
 `);
-    for (const s of recipe.optionalScenes) {
-      const ok = available.has(s.id);
-      process.stdout.write(`  ${ok ? "✓" : "○"} ${s.id.padEnd(22)} ${s.description}\n`);
+    for (const s of recipe.requiredScenes) {
+      process.stdout.write(`  ✓ ${s.id.padEnd(22)} ${s.description}\n`);
+    }
+    // Also list available optional scenes
+    const allForRatio = scenes.filter(s => s.ratio === recipe.ratio);
+    const extraScenes = allForRatio.filter(s => !recipe.requiredScenes.find(r => r.id === s.id));
+    if (extraScenes.length > 0) {
+      process.stdout.write(`\nExtra available scenes:\n`);
+      for (const s of extraScenes) {
+        process.stdout.write(`  + ${s.id.padEnd(22)} ${s.description}\n`);
+      }
     }
 
-    const timelineFile = `/tmp/${type}-demo.json`;
-    process.stdout.write(`
-═══ ACTION: Create timeline ═══
+    process.stdout.write(`\n`);
+    const timelinePrompt = readState("04-timeline-assemble.md");
+    const dur = type === "lecture" ? 30 : 20;
+    const timelineFile = `/tmp/${type}-video.json`;
+    const vars = {
+      ratio: recipe.ratio, width: recipe.width, height: recipe.height,
+      bg: recipe.bg, duration: dur, timelinePath: timelineFile, type,
+    };
+    process.stdout.write(fillTemplate(timelinePrompt, vars));
 
-Write your timeline JSON to: ${timelineFile}
-
-Template:
-{
-  "ratio": "${recipe.ratio}",
-  "width": ${recipe.width},
-  "height": ${recipe.height},
-  "fps": 30,
-  "duration": ${type === "lecture" ? 30 : 20},
-  "background": "${recipe.bg}",
-  "layers": [
-`);
-
-    // Output template layers with unique ids
-    for (let i = 0; i < recipe.requiredScenes.length; i++) {
-      const s = recipe.requiredScenes[i];
-      const dur = type === "lecture" ? 30 : 20;
-      const comma = i < recipe.requiredScenes.length - 1 ? "," : "";
-      const layerId = s.id.length <= 12 ? s.id : s.id.slice(0, 10) + i;
-      process.stdout.write(`    {"id":"${layerId}","scene":"${s.id}","start":0,"dur":${dur},"params":{}}${comma}\n`);
-    }
-
-    process.stdout.write(`  ]
-}
-
-After writing the file:
+    process.stdout.write(`\n═══ Timeline file to create: ${timelineFile} ═══
+After writing → validate → run:
   nextframe video-guide ${timelineFile}
 `);
     return 0;
   }
 
-  // ═══ STATE 3+: Has timeline → detect state ═══
+  // ═══ Has timeline → detect state ═══
   if (!existsSync(timelinePath)) {
     process.stderr.write(`error: ${timelinePath} not found\n`);
     return 2;
@@ -192,88 +195,66 @@ After writing the file:
   const dur = timeline.duration || 0;
   const w = timeline.width || 1920;
   const h = timeline.height || 1080;
+  const htmlPath = timelinePath.replace(/\.json$/, ".html");
+  const mp4Path = timelinePath.replace(/\.json$/, ".mp4");
 
-  // No layers
   if (layers.length === 0) {
-    process.stdout.write(`═══ ACTION: Add layers to timeline ═══
+    process.stdout.write(`═══ STATE 04: Timeline is empty — add layers ═══
+File: ${timelinePath} (${dur}s, ${w}x${h})
+Layers: 0
 
-Timeline: ${timelinePath} (${dur}s, ${w}x${h})
-Layers: 0 — empty!
-
-Add layers to the JSON file. Each layer = one scene.
-Bottom layer = background, top layer = overlays.
-
-After adding layers:
+Edit the file and add layers. Then:
   nextframe video-guide ${timelinePath}
 `);
     return 0;
   }
 
-  // Has layers — check if HTML exists
-  const htmlPath = timelinePath.replace(/\.json$/, ".html");
-  const mp4Path = timelinePath.replace(/\.json$/, ".mp4");
-
   if (!existsSync(htmlPath)) {
-    process.stdout.write(`═══ ACTION: Validate + Build ═══
-
+    // ═══ STATE 05: Build + Verify ═══
+    process.stdout.write(`═══ STATE 05: Build HTML + Verify ═══
 Timeline: ${timelinePath}
-Layers: ${layers.length} | Duration: ${dur}s
+Layers: ${layers.length} | Duration: ${dur}s | Size: ${w}x${h}
 
+Layer summary:
 `);
     for (let i = 0; i < layers.length; i++) {
       const l = layers[i];
       process.stdout.write(`  [${i}] ${(l.scene || "?").padEnd(20)} ${l.start || 0}s — ${((l.start || 0) + (l.dur || 0)).toFixed(0)}s\n`);
     }
+    process.stdout.write(`\n`);
 
-    process.stdout.write(`
-Commands:
-  nextframe validate ${timelinePath}
-  nextframe build ${timelinePath} -o ${htmlPath}
-  open ${htmlPath}
-
-Check in browser:
-  ✓ Background correct? (warm brown, not purple)
-  ✓ Text readable? No overlap?
-  ✓ Scrub through — all phases correct?
-  ✓ Progress bar fills?
-
-If OK:
-  nextframe video-guide ${timelinePath}
-If issues:
-  Fix timeline JSON → rebuild → recheck
-`);
+    const buildPrompt = readState("05-build-html.md");
+    const mid = Math.floor(dur / 2);
+    const vars = { timelinePath, htmlPath, width: w, height: h, duration: dur, mid, end: dur - 2 };
+    process.stdout.write(fillTemplate(buildPrompt, vars));
     return 0;
   }
 
-  // Has HTML — check if MP4 exists
   if (!existsSync(mp4Path)) {
-    process.stdout.write(`═══ ACTION: Record video ═══
-
+    // ═══ STATE 06: Record + Verify ═══
+    process.stdout.write(`═══ STATE 06: Record + Verify Video ═══
 HTML: ${htmlPath} ✓
-Duration: ${dur}s
+Duration: ${dur}s | Size: ${w}x${h}
 
-Record:
-  /Users/Zhuanz/bigbang/MediaAgentTeam/recorder/target/release/recorder slide ${htmlPath} --out ${mp4Path} --width ${w} --height ${h} --fps 30 --dpr 2
-
-Verify:
-  ffprobe ${mp4Path} 2>&1 | grep -E "Duration|Video:"
-  open ${mp4Path}
-
-After recording:
-  nextframe video-guide ${timelinePath}
 `);
+    const recordPrompt = readState("06-record-verify.md");
+    const mid = Math.floor(dur / 2);
+    const vars = { htmlPath, mp4Path, width: w, height: h, duration: dur, mid, end: dur - 2 };
+    process.stdout.write(fillTemplate(recordPrompt, vars));
     return 0;
   }
 
-  // Has MP4 — DONE
-  process.stdout.write(`═══ DONE ═══
+  // ═══ DONE ═══
+  process.stdout.write(`═══ PIPELINE COMPLETE ═══
 
 Timeline: ${timelinePath} ✓
 HTML:     ${htmlPath} ✓
 MP4:      ${mp4Path} ✓
+Duration: ${dur}s | ${w}x${h}
 
-Pipeline complete!
+Final check:
   open ${mp4Path}
+  ffprobe ${mp4Path} 2>&1 | grep -E "Duration|Video:"
 `);
   return 0;
 }
