@@ -8,14 +8,15 @@ import { TOOLS } from "../src/ai/tools.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
+const ENTRY = resolve(ROOT, "src", "index.ts");
 
 test("v3-architecture public entrypoints expose only v0.3 layer model", () => {
-  const binSource = readFileSync(resolve(ROOT, "bin/nextframe.js"), "utf8");
-  assert.match(binSource, /layer-add/);
-  assert.match(binSource, /layer-list/);
-  assert.doesNotMatch(binSource, /add-clip/);
-  assert.doesNotMatch(binSource, /move-clip/);
-  assert.doesNotMatch(binSource, /bake-browser/);
+  const entrySource = readFileSync(ENTRY, "utf8");
+  assert.match(entrySource, /layer-add/);
+  assert.match(entrySource, /layer-list/);
+  assert.doesNotMatch(entrySource, /add-clip/);
+  assert.doesNotMatch(entrySource, /move-clip/);
+  assert.doesNotMatch(entrySource, /bake-browser/);
 
   const toolNames = Object.keys(TOOLS).sort();
   assert.deepEqual(toolNames, [
