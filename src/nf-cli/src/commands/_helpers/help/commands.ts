@@ -15,6 +15,8 @@ const command = (name: string, summary: string, usage: string, params: string, c
 
 export const TOP_LEVEL_COMMANDS = [
   group("Timeline", "new validate build scenes preview frame describe-frame render"),
+  group("Anchors", "anchors"),
+  group("Tracks", "tracks"),
   group("WYSIWYG", "wysiwyg"),
   group("Scene Dev", "scene-new scene-preview scene-validate"),
   group("Layer CRUD", "layer-list layer-add layer-move layer-resize layer-set layer-remove"),
@@ -41,8 +43,26 @@ export const COMMAND_SPECS = Object.fromEntries([
     nextframe build <timeline.json> [--output=out.html] [-o out.html] [--json]`, `<project> <episode> <segment> build a segment from the project hierarchy
     <timeline.json> build a direct timeline file
     --output=PATH or -o PATH write HTML to a custom path
-    --json emit structured result data`, `The timeline must validate before build succeeds.
+    --json emit structured result data`, `The v0.3 layers[] path and the empty v0.8 skeleton path are supported.
     Legacy v0.1 and removed v0.6 timelines are rejected by build.`),
+  command("anchors", "Dispatch v0.8 anchor bookkeeping subcommands.", `nextframe anchors <subcommand>
+    nextframe anchors <subcommand> --help`, `Subcommands: from-tts, list, validate
+    Run nextframe anchors <subcommand> --help for subcommand-specific params and examples`, `Walking skeleton only: subcommands are registered but not implemented yet.`),
+  command("anchors from-tts", "Stub v0.8 anchor generation from TTS word timing.", `nextframe anchors from-tts <words.json> [--out=anchors.json] [--json]`, `<words.json> TTS timing payload
+    --out=PATH optional output path
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
+  command("anchors list", "Stub v0.8 anchor inspection command.", `nextframe anchors list <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
+  command("anchors validate", "Stub v0.8 anchor validation command.", `nextframe anchors validate <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
+  command("tracks", "Dispatch v0.8 track bookkeeping subcommands.", `nextframe tracks <subcommand>
+    nextframe tracks <subcommand> --help`, `Subcommands: add, list
+    Run nextframe tracks <subcommand> --help for subcommand-specific params and examples`, `Walking skeleton only: subcommands are registered but not implemented yet.`),
+  command("tracks add", "Stub v0.8 track creation command.", `nextframe tracks add <timeline.json> --kind=<audio|scene|subtitle|animation> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --kind required v0.8 track kind
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
+  command("tracks list", "Stub v0.8 track listing command.", `nextframe tracks list <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
   command("scene-new", "Create a new scene component skeleton (directory + index.js + preview.html).", `nextframe scene-new <name> --ratio=<16:9|9:16|4:3> --category=<cat> [--tech=dom]`, `--ratio target aspect ratio
     --category backgrounds|typography|data|shapes|overlays|media|browser
     --tech dom|canvas2d|svg|webgl|video|lottie`, `Creates a ready-to-edit skeleton. Next: edit render(), then scene-preview, then scene-validate.`),

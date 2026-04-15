@@ -3,6 +3,8 @@ import { parseFlags, loadTimeline, emit } from '../_helpers/_io.js';
 import { resolveTimeline, timelineUsage } from '../_helpers/_resolve.js';
 import { detectFormat, validateTimelineV3 } from '../_helpers/_timeline-validate.js';
 import { buildHTML } from '../../../../nf-core/engine/build.js';
+import { buildV08 } from '../../../../nf-core/engine/build-v08.js';
+import type { TimelineV08 } from '../../../../nf-core/types.js';
 
 function extractOutput(argv: string[]) {
   // Handle split output flags that parseFlags does not normalize.
@@ -42,6 +44,29 @@ export async function run(argv: string[]) {
   }
 
   const fmt = detectFormat(timeline);
+  if (fmt === 'v0.8') {
+    const { resolve: resolvePath } = await import('node:path');
+    const outPath = shortOutput
+      || (typeof flags.output === 'string' ? flags.output : null)
+      || (typeof flags.out === 'string' ? flags.out : null)
+      || resolvePath(process.cwd(), 'build.html');
+    try {
+      await buildV08(timeline as TimelineV08, outPath);
+      emit({ ok: true, value: { path: outPath } }, flags);
+      return 0;
+    } catch (error) {
+      emit({
+        ok: false,
+        error: {
+          code: 'BUILD_FAIL',
+          message: `Internal: ${(error as Error).message}`,
+          fix: 'use an empty v0.8 timeline until Phase 5 fills the builder stubs',
+        },
+      }, flags);
+      return 2;
+    }
+  }
+
   if (fmt === 'v0.1') {
     const msg = { ok: false, error: { code: 'OLD_FORMAT', message: 'v0.1 tracks/clips format detected — build requires v0.3 layers[] format' } };
     emit(msg, flags);

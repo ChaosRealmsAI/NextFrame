@@ -1,7 +1,7 @@
 // engine-v2/ops.js — layer CRUD operations for v0.3 flat layers[] format.
 // Each function reads/modifies timeline object, returns { ok, value/error }.
 
-import type { Clip, Timeline } from "../types.js";
+import type { LegacyClip as Clip, Timeline } from "../types.js";
 
 interface AddLayerOpts {
   scene: string;

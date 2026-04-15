@@ -1,5 +1,5 @@
 // Provides immutable helpers for adding, moving, resizing, and querying legacy timeline clips.
-import type { Timeline, Track, Clip, Marker } from "../../../nf-core/types.js";
+import type { Timeline, LegacyTrack as Track, LegacyClip as Clip, Marker } from "../../../nf-core/types.js";
 
 /** Loose timeline — may have incomplete fields before validation */
 type LooseTimeline = Record<string, unknown> & Partial<Timeline>;

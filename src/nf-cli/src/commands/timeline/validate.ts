@@ -4,6 +4,13 @@ import { parseFlags, loadTimeline, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineDir, timelineUsage } from "../_helpers/_resolve.js";
 import { detectFormat, validateTimelineLegacy, validateTimelineV3 } from "../_helpers/_timeline-validate.js";
 
+type TimelineCommandResult = {
+  ok: boolean;
+  errors: Array<{ code: string; message: string; ref?: string; hint?: string }>;
+  warnings: Array<{ code: string; message: string; ref?: string; hint?: string }>;
+  hints: Array<{ code: string; message: string; ref?: string; hint?: string }>;
+};
+
 export async function run(argv: string[]) {
   const removedField = "ma" + "tches";
   const { positional, flags } = parseFlags(argv);
@@ -19,33 +26,42 @@ export async function run(argv: string[]) {
   }
 
   const tl = loaded.value as Record<string, unknown>;
-  let result;
+  let result: TimelineCommandResult;
   if (tl.version === "0.6" || Array.isArray(tl[removedField])) {
     result = {
       ok: false,
       errors: [{
         code: "UNSUPPORTED_VERSION",
-        message: "v0.6 input is not supported by this validator",
-        hint: "rewrite the timeline in v0.3 format; no compatibility path exists",
+        message: "v0.6 input is not supported by the v0.8 timeline model",
+        hint: "rewrite the timeline in v0.3 or v0.8 format; no compatibility path exists",
       }],
       warnings: [],
       hints: [],
     };
   } else {
-  const fmt = detectFormat(tl);
+    const fmt = detectFormat(tl);
+    let fmtResult;
     if (fmt === "v0.1") {
       process.stderr.write("warn: v0.1 tracks/clips format detected — consider migrating to v0.3 layers[]\n");
-      result = validateTimelineLegacy(tl, { projectDir: timelineDir(resolved.jsonPath) });
+      fmtResult = validateTimelineLegacy(tl, { projectDir: timelineDir(resolved.jsonPath) });
     } else if (fmt === "v0.3") {
-      result = await validateTimelineV3(tl);
+      fmtResult = await validateTimelineV3(tl);
+    } else if (fmt === "v0.8") {
+      fmtResult = {
+        ok: false,
+        errors: [{ code: "NOT_IMPLEMENTED", message: "v0.8 timeline validation is not implemented in the walking skeleton" }],
+        warnings: [],
+        hints: [],
+      };
     } else {
-      result = {
+      fmtResult = {
         ok: false,
         errors: [{ code: "UNKNOWN_FORMAT", message: "timeline must contain either tracks[] or layers[]" }],
         warnings: [],
         hints: [],
       };
     }
+    result = fmtResult;
   }
   const fmt = detectFormat(tl);
 

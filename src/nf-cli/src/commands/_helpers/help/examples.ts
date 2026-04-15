@@ -15,6 +15,34 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
     nextframe build demo ep01 intro
     nextframe build ./timeline.json -o ./dist/intro.html
   `),
+  examples("anchors", `
+    nextframe anchors from-tts ./seg0.words.json --out=./anchors.json
+    nextframe anchors validate ./timeline-v08.json --json
+  `),
+  examples("anchors from-tts", `
+    nextframe anchors from-tts ./seg0.words.json --out=./anchors.json
+    nextframe anchors from-tts ./seg0.words.json --json
+  `),
+  examples("anchors list", `
+    nextframe anchors list ./timeline-v08.json
+    nextframe anchors list ./timeline-v08.json --json
+  `),
+  examples("anchors validate", `
+    nextframe anchors validate ./timeline-v08.json
+    nextframe anchors validate ./timeline-v08.json --json
+  `),
+  examples("tracks", `
+    nextframe tracks list ./timeline-v08.json
+    nextframe tracks add ./timeline-v08.json --kind=scene --json
+  `),
+  examples("tracks add", `
+    nextframe tracks add ./timeline-v08.json --kind=audio
+    nextframe tracks add ./timeline-v08.json --kind=scene --json
+  `),
+  examples("tracks list", `
+    nextframe tracks list ./timeline-v08.json
+    nextframe tracks list ./timeline-v08.json --json
+  `),
   examples("scenes", `
     nextframe scenes
     nextframe scenes headline --json
