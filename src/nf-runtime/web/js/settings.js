@@ -1,3 +1,4 @@
+// Settings panel — AI prompt overlay toggle and rendering
 let aiPromptsRendered = false;
 
 function toggleAIPrompts() {

@@ -1,3 +1,4 @@
+// Home page — project list, ratio picker, new project creation
 function pickRatio(card, ratio) {
   card.closest('.ratio-grid').querySelectorAll('.ratio-card').forEach(c => c.classList.remove('active'));
   card.classList.add('active');

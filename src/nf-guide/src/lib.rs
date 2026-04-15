@@ -54,7 +54,7 @@ pub fn discover_recipes(recipes_dir: impl AsRef<Path>) -> Result<Vec<(String, St
     })?;
 
     for entry in entries {
-        let entry = entry.map_err(|error| format!("failed to read recipes dir entry: {error}"))?;
+        let entry = entry.map_err(|error| format!("failed to read recipes dir entry: {error}. Fix: check directory permissions"))?;
         let path = entry.path();
         if !path.is_dir() || !path.join("recipe.json").is_file() {
             continue;
@@ -71,9 +71,9 @@ pub fn discover_recipes(recipes_dir: impl AsRef<Path>) -> Result<Vec<(String, St
 pub fn load_recipe(recipes_dir: impl AsRef<Path>, pipeline: &str) -> Result<Recipe, String> {
     let path = recipes_dir.as_ref().join(pipeline).join("recipe.json");
     let json = fs::read_to_string(&path)
-        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+        .map_err(|error| format!("failed to read {}: {error}. Fix: check the recipe path exists", path.display()))?;
     serde_json::from_str(&json)
-        .map_err(|error| format!("failed to parse {}: {error}", path.display()))
+        .map_err(|error| format!("failed to parse {}: {error}. Fix: ensure recipe.json is valid JSON", path.display()))
 }
 
 pub fn get_step_content(
@@ -89,11 +89,11 @@ pub fn get_step_content(
             .steps
             .iter()
             .find(|entry| entry.id == step)
-            .ok_or_else(|| format!("unknown step \"{step}\" in pipeline \"{pipeline}\""))?;
+            .ok_or_else(|| format!("unknown step \"{step}\" in pipeline \"{pipeline}\". Fix: run without step arg to see available steps"))?;
         recipes_dir.as_ref().join(pipeline).join(&entry.prompt)
     };
 
-    fs::read_to_string(&path).map_err(|error| format!("failed to read {}: {error}", path.display()))
+    fs::read_to_string(&path).map_err(|error| format!("failed to read {}: {error}. Fix: check the step markdown file exists in the recipe directory", path.display()))
 }
 
 #[cfg(test)]

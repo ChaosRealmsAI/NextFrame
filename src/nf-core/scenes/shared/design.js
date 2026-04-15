@@ -1,10 +1,10 @@
 // NextFrame Shared Design System
-// 通用工具 + 可选预设。Scene 通过 preset 名选色板/布局/字号。
-// 加新系列 = 加新 preset，不改工具函数。
+// Shared utilities + named presets. Scenes pick a color/layout/type preset by name.
+// Adding a new series = adding a new preset, no changes to utility functions.
 
 // ═══════════════════════════════════════════════════════════════
-// 1. PRESETS — 色板 + 布局 + 字号的命名组合
-//    scene 通过 getPreset(name) 获取，或直接用 params 覆盖
+// 1. PRESETS — named bundles of color palette + layout grid + typography
+//    Scenes call getPreset(name) to load, or override via params
 // ═══════════════════════════════════════════════════════════════
 
 export const PRESETS = {
