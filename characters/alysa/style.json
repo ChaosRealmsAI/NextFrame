@@ -1,0 +1,25 @@
+{
+  "character": "alysa",
+  "colors": {
+    "primary": "#FF6B35",
+    "secondary": "#4A1A6B",
+    "background": "#FFF8F0",
+    "accent": "#FFD23F",
+    "text": "#2D1B36"
+  },
+  "subtitle": {
+    "font_family": "圆体, PingFang SC, sans-serif",
+    "font_size": "1.6em",
+    "highlight_color": "#FF6B35",
+    "style": "活泼弹幕风，关键词变色"
+  },
+  "ppt_theme": {
+    "base": "obsidian-velvet",
+    "overrides": {
+      "--accent": "#FF6B35",
+      "--bg-card": "#FFF8F0",
+      "--text-primary": "#2D1B36"
+    }
+  },
+  "avatar_emoji": "🫠"
+}

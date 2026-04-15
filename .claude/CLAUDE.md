@@ -145,6 +145,29 @@ Key methods for AI verification:
 - No TODO/FIXME/HACK/XXX in production code.
 - Scenes must not cross-import from modules/ directory.
 
+## 3-layer Context Load (mandatory before ANY video work)
+
+**做 timeline / 脚本 / 组件前必须三层都加载**。缺一层 = 缺一层判断力。
+
+```
+Project      spec/standards/ + spec/reference/     (规范 + 参考)
+    +
+Character    characters/{role}/soul.md + voice.json + memory/MEMORY.md
+    +
+Theme        src/nf-core/scenes/{ratio}/{theme}/theme.md + tone.md
+    +
+Episode      timeline.json + research/（如有）
+```
+
+**开工第一件事**：AskUserQuestion 问用户"今天用哪个角色？哪个主题？"。不选不动。
+
+- `characters/README.md` — 角色目录说明
+- `spec/reference/narrative-methods.md` — 12 种叙事方法
+- `spec/reference/viral-cases.md` — 24 个真实爆款带数据
+- `spec/standards/project/video-production.md` — episode 级红线 + 必备文件 + 发布
+- `spec/standards/project/scene/scene-component-system.html` — scene 组件级 20 条硬规则
+- `spec/standards/general/verify-contract.md` — 所有 --json 验证 CLI 必须遵守的输出契约
+
 ## nf-guide is the SOLE state-machine truth (mandatory)
 
 **Any AI doing scene / timeline / video work — `nf-guide` is the entry point. No exceptions.**

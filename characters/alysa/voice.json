@@ -1,0 +1,17 @@
+{
+  "character": "alysa",
+  "tts": {
+    "backend": "volcengine",
+    "voice": "zh_female_vv_uranus_bigtts",
+    "speed_ratio": 1.0,
+    "default_emotion": null,
+    "emotion_map": {
+      "吐槽": { "emotion": "excited", "emotion_scale": 2 },
+      "惊讶": { "emotion": "surprise", "emotion_scale": 3 },
+      "认真": { "emotion": "serious", "emotion_scale": 2 },
+      "开心": { "emotion": "happy", "emotion_scale": 2 },
+      "无语": { "emotion": "calm", "emotion_scale": 1 }
+    }
+  },
+  "notes": "VV 2.0 (uranus) = 火山最新大模型 TTS，声音自然、情感丰富。speed_ratio 1.0 默认语速，之前 1.15 偏快已修正。emotion 只在特定段落显式标注时使用，默认不带情感让语音自然。"
+}
