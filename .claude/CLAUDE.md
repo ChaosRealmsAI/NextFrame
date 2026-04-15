@@ -145,25 +145,14 @@ Key methods for AI verification:
 - No TODO/FIXME/HACK/XXX in production code.
 - Scenes must not cross-import from modules/ directory.
 
-## Context Load (mandatory before ANY video work)
+## Product-dev specs (what to read when touching product code)
 
-**做 timeline / 脚本 / 组件前必须加载规范 + 主题层**。
+**本节仅为开发产品代码时的参考契约**。视频生产/脚本/组件打造等操作类流程走 `nf-guide` 状态机，不在这里引导。
 
-```
-Project      spec/standards/ + spec/reference/     (规范 + 参考)
-    +
-Theme        src/nf-core/scenes/{ratio}/{theme}/theme.md + tone.md
-    +
-Episode      timeline.json + research/（如有）
-```
-
-**开工前**：AskUserQuestion 问用户"用哪个主题？"。不选不动。
-
-- `spec/reference/narrative-methods.md` — 12 种叙事方法
-- `spec/reference/viral-cases.md` — 24 个真实爆款带数据
-- `spec/standards/project/video-production.md` — episode 级红线 + 必备文件 + 发布
-- `spec/standards/project/scene/scene-component-system.html` — scene 组件级 20 条硬规则
-- `spec/standards/general/verify-contract.md` — 所有 --json 验证 CLI 必须遵守的输出契约
+- `spec/standards/project/scene/scene-component-system.html` — scene 组件级 20 条硬规则（改 scene loader / CLI / 契约时读）
+- `spec/standards/project/video-production.md` — episode 级红线（改 build / record / publish pipeline 时读）
+- `spec/standards/general/verify-contract.md` — 所有 `--json` 验证 CLI 必须遵守的输出契约（实现新 CLI 时读）
+- `spec/reference/` — 叙事方法 / 爆款案例（不服务产品代码，由 `nf-guide` recipes 引用给用户侧 AI）
 
 ## nf-guide is the SOLE state-machine truth (mandatory)
 

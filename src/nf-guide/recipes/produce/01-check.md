@@ -1,5 +1,23 @@
 # Step 1: 确认素材 + 检查组件
 
+## 1.0 先定主题（强制）
+
+**开工第一件事**：用 AskUserQuestion 问用户"用哪个主题？"。用户回 "anthropic-warm" / "sv-interview" / 或其他已有 theme。
+
+拿到主题名后**必读 3 份文件**：
+
+```bash
+cat src/nf-core/scenes/{ratio-dir}/{theme}/theme.md    # 视觉语言
+cat src/nf-core/scenes/{ratio-dir}/{theme}/tone.md     # 话术风格（如有）
+cat src/nf-core/scenes/{ratio-dir}/{theme}/RETRO.md    # 上次教训（如有）
+```
+
+- `theme.md` 缺 → 先跑 `cargo run -p nf-guide -- design` 建主题，再回来
+- `tone.md` 缺 → 基于 theme.md 气质写一份或跳过（影响脚本质量，不阻塞）
+- `RETRO.md` 缺 → 首次使用本主题，正常
+
+**不读主题 = 视觉话术靠猜 = 做出来四不像**。
+
 ## 1.1 确认素材
 
 根据视频类型检查输入素材是否存在。
