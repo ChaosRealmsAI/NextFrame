@@ -1,0 +1,32 @@
+{
+  "id": "script",
+  "name": "Script Pipeline",
+  "description": "脚本写作管线：定整体结构 → 逐段写作 → 校验。Agent 按提示词写文案，CLI 用 script-set 落盘到 pipeline.json。",
+  "steps": [
+    {
+      "id": "outline",
+      "title": "定结构",
+      "prompt": "00-outline.md",
+      "gate": "outline-set",
+      "description": "Agent 决定本期分几段、每段角色/逻辑、整体节奏",
+      "agent_driven": true
+    },
+    {
+      "id": "write",
+      "title": "逐段写作",
+      "prompt": "01-write.md",
+      "gate": "all-segments-written",
+      "description": "Agent 按提示词写每段 narration + visual + role + logic，CLI script-set 落盘",
+      "agent_driven": true,
+      "per_item": "segment"
+    },
+    {
+      "id": "review",
+      "title": "校验整体",
+      "prompt": "02-review.md",
+      "gate": "script-reviewed",
+      "description": "通读全文，检查节奏/重复/钩子，必要时 script-set 修订",
+      "agent_driven": true
+    }
+  ]
+}
