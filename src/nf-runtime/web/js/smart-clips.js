@@ -324,12 +324,15 @@ async function loadSmartClips(){
 // Load per-clip translation files (clip_NN.translations.<lang>.json) and merge into clip sentence languageRows.
 // This supports the clips pipeline output format independent of sentences.json embedding.
 async function scLoadClipTranslations(episodePath){
-  const langs=['zh','ja','ko','fr','es','de'];
+  const clipsDir=episodePath+'/clips';
+  let entries=[]; try{const list=await bridgeCall('fs.listDir',{path:clipsDir}); entries=Array.isArray(list&&list.entries)?list.entries:[];}catch(_e){}
+  const availableLangs=new Set(); entries.forEach((entry)=>{const m=String(entry&&entry.name||'').match(/^clip_\d+\.translations\.([a-z]{2})\.json$/i); if(m)availableLangs.add(m[1].toLowerCase());});
+  if(!availableLangs.size)return;
   await Promise.all(scSources.flatMap((source)=>
     source.clips.map(async(clip)=>{
       const pad=String(clip.clipNum).padStart(2,'0');
-      for(const lang of langs){
-        const path=episodePath+'/clips/clip_'+pad+'.translations.'+lang+'.json';
+      for(const lang of availableLangs){
+        const path=clipsDir+'/clip_'+pad+'.translations.'+lang+'.json';
         const data=await scReadJson(path,null);
         if(!data||!Array.isArray(data.segments))continue;
         const label=scLangLabel(lang);

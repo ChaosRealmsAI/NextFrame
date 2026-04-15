@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Preview</title></head>
+<body style="background:#111;color:#fff;font-family:sans-serif;padding:20px">
+<div id="out"></div>
+<script type="module">
+import { meta, render } from "./index.js";
+document.getElementById("out").innerHTML = render(0, Object.fromEntries(Object.entries(meta.params||{}).map(([k,v])=>[k,v.default])), {width:1080,height:1920});
+</script>
+</body></html>
