@@ -78,19 +78,27 @@ function scaffold(opts: {
     ctx.textBaseline = "middle";
     ctx.fillText(params.text || "", W * 0.5, H * 0.5);`;
   } else if (type === "dom") {
-    renderSignature = "render(host, _t, params, vp)";
-    mountComment = "host is HTMLElement - use host.innerHTML or appendChild to mount";
+    renderSignature = "render(host, t, params, vp)";
+    mountComment = "host is HTMLElement. Animate by computing opacity/transform from t (NOT CSS @keyframes — compose rebuilds host each frame, CSS animations never finish). Keep frame_pure: false if render reads t.";
     renderBody = `    const color = params.color || "#f5ece0";
     const text = params.text || "";
+    // t-driven enter animation (do NOT use CSS @keyframes — see pitfalls.md #1)
+    const fadeDur = 0.6;
+    const p = Math.min(Math.max(t / fadeDur, 0), 1);
+    const eased = 1 - Math.pow(1 - p, 3); // easeOut cubic
+    const opacity = eased;
+    const ty = 20 * (1 - eased); // 20px → 0
+
     host.innerHTML = \`
       <div style="
         position: absolute;
         left: 50%;
         top: 50%;
-        transform: translate(-50%, -50%);
+        transform: translate(-50%, calc(-50% + \${ty}px));
         width: \${vp.width * 0.6}px;
         padding: 48px;
         color: \${color};
+        opacity: \${opacity};
         font: 600 40px/1.4 system-ui, -apple-system, 'PingFang SC', sans-serif;
         text-align: center;
       ">\${escapeHtml(text)}</div>

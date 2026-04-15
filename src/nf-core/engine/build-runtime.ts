@@ -424,6 +424,10 @@ export function buildRuntime() {
   // currently-active layer has frame_pure:false (t-driven animation). For
   // frame_pure components that don't read t, layer boundaries are the only
   // thing that can change — recorder can safely skip identical frames.
+  // ENTER_ANIMATION_WINDOW: CSS @keyframes animations in scene DOM typically run
+  // 0.5-0.8s. We report true for the first 1.0s after any layer's start so
+  // recorder captures the animation unfolding instead of just t=0 opacity:0.
+  var ENTER_ANIMATION_WINDOW = 1.0;
   window.__hasFrameChanged = function(prevT, curT) {
     for (var i = 0; i < layers.length; i += 1) {
       var L = layers[i];
@@ -434,6 +438,9 @@ export function buildRuntime() {
       var curActive = curT >= start && curT < end;
       if (prevActive !== curActive) return true;
       if (curActive) {
+        // In enter animation window — capture every frame so CSS animation shows.
+        var sinceStart = curT - start;
+        if (sinceStart >= 0 && sinceStart < ENTER_ANIMATION_WINDOW) return true;
         var scene = SCENES[L.scene];
         if (scene && scene.meta && scene.meta.frame_pure === false) return true;
       }

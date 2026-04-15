@@ -1,0 +1,2786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NextFrame Build</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #1a1209; color: #f4efe8; font-family: system-ui, -apple-system, sans-serif; }
+  body { position: relative; }
+  #stage-shell { position: fixed; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  #stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #1a1209; box-shadow: 0 24px 100px rgba(0, 0, 0, 0.35); }
+  #controls {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 56px; z-index: 9999;
+    display: flex; align-items: center; gap: 14px; padding: 0 20px;
+    background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
+  }
+  #playBtn {
+    height: 34px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer;
+    background: #f4efe8; color: #111; font: 600 13px/1 system-ui, -apple-system, sans-serif;
+  }
+  #scrubber { flex: 1; min-width: 160px; }
+  #timeInfo, #phaseInfo { font: 500 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  #phaseInfo { opacity: 0.78; }
+</style>
+</head>
+<body>
+<div id="stage-shell"><div id="stage"></div></div>
+<div id="controls">
+  <button id="playBtn" type="button">Play</button>
+  <input type="range" id="scrubber" min="0" max="10000" value="0">
+  <span id="timeInfo">0.00s / 0.00s</span>
+  <span id="phaseInfo">Phase: idle</span>
+</div>
+
+<script>
+window.__SLIDE_SEGMENTS = {  gap: 0, segments: [{ phaseId: "main", duration: 40, srt: [{ s: 0, e: 40, t: "" }] }] };
+const SRT = [];
+const TIMELINE = {
+  "version": "0.3",
+  "ratio": "16:9",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 40,
+  "background": "#1a1209",
+  "layers": [
+    {
+      "id": "bg-s1",
+      "scene": "warmGradient",
+      "start": 0,
+      "dur": 8,
+      "params": {
+        "vignette_opacity": 0.4
+      }
+    },
+    {
+      "id": "titlebar-s1",
+      "scene": "titleBar",
+      "start": 0,
+      "dur": 8,
+      "params": {
+        "series": "claude-code 源码讲解",
+        "episode": "E01"
+      }
+    },
+    {
+      "id": "dimnav-s1",
+      "scene": "dimNav",
+      "start": 0,
+      "dur": 8,
+      "params": {
+        "segments": 5,
+        "current": 1
+      }
+    },
+    {
+      "id": "content-s1",
+      "scene": "analogyCard",
+      "start": 0,
+      "dur": 8,
+      "params": {
+        "label": "类比引入",
+        "text": "你对我说「帮我写个天气工具」——\n你以为我收到的就这一句话？\n不是的。"
+      }
+    },
+    {
+      "id": "bg-s2",
+      "scene": "warmGradient",
+      "start": 8,
+      "dur": 8,
+      "params": {
+        "vignette_opacity": 0.4
+      }
+    },
+    {
+      "id": "titlebar-s2",
+      "scene": "titleBar",
+      "start": 8,
+      "dur": 8,
+      "params": {
+        "series": "claude-code 源码讲解",
+        "episode": "E01"
+      }
+    },
+    {
+      "id": "dimnav-s2",
+      "scene": "dimNav",
+      "start": 8,
+      "dur": 8,
+      "params": {
+        "segments": 5,
+        "current": 1
+      }
+    },
+    {
+      "id": "content-s2",
+      "scene": "statNumber",
+      "start": 8,
+      "dur": 8,
+      "params": {
+        "kicker": "Claude Code 源码实测",
+        "number": "87",
+        "unit": "类",
+        "label": "每次对话，系统悄悄注入的提示词种类"
+      }
+    },
+    {
+      "id": "bg-s3",
+      "scene": "warmGradient",
+      "start": 16,
+      "dur": 8,
+      "params": {
+        "vignette_opacity": 0.4
+      }
+    },
+    {
+      "id": "titlebar-s3",
+      "scene": "titleBar",
+      "start": 16,
+      "dur": 8,
+      "params": {
+        "series": "claude-code 源码讲解",
+        "episode": "E01"
+      }
+    },
+    {
+      "id": "dimnav-s3",
+      "scene": "dimNav",
+      "start": 16,
+      "dur": 8,
+      "params": {
+        "segments": 5,
+        "current": 2
+      }
+    },
+    {
+      "id": "content-s3",
+      "scene": "fourSlots",
+      "start": 16,
+      "dur": 8,
+      "params": {
+        "title": "API 请求的四个槽位",
+        "slots": [
+          {
+            "name": "system[]",
+            "desc": "你是谁 / 怎么做 / 出厂规则"
+          },
+          {
+            "name": "tools[]",
+            "desc": "手里有哪些工具可以用"
+          },
+          {
+            "name": "messages[]",
+            "desc": "对话 + 工具返回 + 系统塞入"
+          },
+          {
+            "name": "params",
+            "desc": "用哪个模型 / 最大 token / 思考模式"
+          }
+        ],
+        "highlight": -1
+      }
+    },
+    {
+      "id": "bg-s4",
+      "scene": "warmGradient",
+      "start": 24,
+      "dur": 8,
+      "params": {
+        "vignette_opacity": 0.4
+      }
+    },
+    {
+      "id": "titlebar-s4",
+      "scene": "titleBar",
+      "start": 24,
+      "dur": 8,
+      "params": {
+        "series": "claude-code 源码讲解",
+        "episode": "E01"
+      }
+    },
+    {
+      "id": "dimnav-s4",
+      "scene": "dimNav",
+      "start": 24,
+      "dur": 8,
+      "params": {
+        "segments": 5,
+        "current": 3
+      }
+    },
+    {
+      "id": "content-s4",
+      "scene": "codeBlock",
+      "start": 24,
+      "dur": 8,
+      "params": {
+        "language": "typescript",
+        "filename": "prompts.ts",
+        "code": "// Anthropic 出厂设置 — 9 段静态内容\nconst SYSTEM_PROMPT = [\n  identity,       // 我是谁\n  task_rules,     // 做任务的规则\n  safety_lines,   // 安全红线\n  tool_usage,     // 怎么用工具\n  tone_style,     // 语气风格\n  output_format,  // 输出效率要求\n  // ...\n].join('\\n\\n');\n\n// DYNAMIC_BOUNDARY 分界线\n// 上方：全球 CDN 缓存，一次计算所有人共享\n// 下方：每个用户不同，每次现拼",
+        "highlight_lines": [
+          11,
+          12,
+          13
+        ]
+      }
+    },
+    {
+      "id": "bg-s5",
+      "scene": "warmGradient",
+      "start": 32,
+      "dur": 8,
+      "params": {
+        "vignette_opacity": 0.4
+      }
+    },
+    {
+      "id": "titlebar-s5",
+      "scene": "titleBar",
+      "start": 32,
+      "dur": 8,
+      "params": {
+        "series": "claude-code 源码讲解",
+        "episode": "E01"
+      }
+    },
+    {
+      "id": "dimnav-s5",
+      "scene": "dimNav",
+      "start": 32,
+      "dur": 8,
+      "params": {
+        "segments": 5,
+        "current": 5
+      }
+    },
+    {
+      "id": "content-s5",
+      "scene": "goldenQuote",
+      "start": 32,
+      "dur": 8,
+      "params": {
+        "quote": "你写了 1 行，系统拼了 87 类。\n每一轮，重新拼一遍。",
+        "attribution": "— Claude Code 源码讲解 E01"
+      }
+    }
+  ]
+};
+// Shared scene utilities (design tokens, helpers)
+// no shared/design.js
+// Legacy 16:9 scene bundle compatibility
+"use strict";
+// @ts-nocheck
+window.__scenes = {};
+const TOKENS = { interview: { bg: "#111111", gold: "#e8c47a", warm: "#da7756", text: "#ffffff", textDim: "rgba(255,255,255,0.7)", textFaint: "rgba(255,255,255,0.3)", blue: "#7ec8e3", tagBg: "rgba(126,200,227,0.06)", tagBorder: "rgba(126,200,227,0.15)", tagText: "#7ec8e3", decoLine: "rgba(232,196,122,0.12)", decoLineDiamond: "rgba(232,196,122,0.2)", gridDot: "rgba(232,196,122,0.08)", glowTop: "rgba(232,196,122,0.03)", glowBottom: "rgba(232,196,122,0.02)", vignette: "rgba(17,17,17,0.5)", }, lecture: { bg: "#1a1510", codeBg: "#1e1e2e", accent: "#da7756", gold: "#d4b483", text: "#f5ece0", green: "#7ec699", comment: "#6a6a7a", red: "#e06c75", }, };
+const GRID = { sidePad: 80, header: { top: 0, height: 260 }, decoLine1: 258, video: { top: 276, height: 538, left: 80, right: 80 }, decoLine2: 820, subs: { top: 830, left: 140, right: 140, height: 340 }, timeInfo: 1186, topic: { top: 1224, height: 256 }, progress: 1496, decoLine3: 1580, brand: 1590, teamLine: 1760, };
+const TYPE = { seriesName: { size: 44, weight: 800, spacing: "0.06em", font: "'PingFang SC','Noto Sans SC',Inter,system-ui,sans-serif" }, title: { size: 60, weight: 700, spacing: "-0.01em", lineHeight: 1.2, font: "'PingFang SC','Noto Sans SC',Inter,system-ui,sans-serif" }, cnSub: { size: 52, weight: 700, lineHeight: 1.3, font: "-apple-system,'PingFang SC','Microsoft YaHei',system-ui,sans-serif" }, enSub: { size: 22, weight: 400, lineHeight: 1.6, font: "-apple-system,'PingFang SC',system-ui,sans-serif" }, topicLabel: { size: 20, weight: 600, spacing: "0.1em", font: "'PingFang SC','Noto Sans SC',sans-serif" }, topicText: { size: 24, weight: 500, lineHeight: 1.65, font: "'PingFang SC','Noto Sans SC',sans-serif" }, tag: { size: 22, weight: 500, spacing: "0.03em", font: "'SF Mono','JetBrains Mono',monospace" }, timeInfo: { size: 22, weight: 500, spacing: "0.05em", font: "'SF Mono','JetBrains Mono',monospace" }, brand: { size: 40, weight: 900, spacing: "0.2em", font: "'Iowan Old Style','Songti SC','Playfair Display',Georgia,serif" }, teamLine: { size: 20, weight: 500, spacing: "0.03em", font: "'SF Mono','JetBrains Mono',monospace" }, clipLabel: { size: 14, weight: 500, spacing: "0.08em", font: "'SF Mono','JetBrains Mono',monospace" }, };
+function findActiveSub(segments, t) { if (!Array.isArray(segments))
+    return null; for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (t >= seg.s && t < seg.e) {
+        const cnArr = Array.isArray(seg.cn) ? seg.cn : [];
+        for (let j = 0; j < cnArr.length; j++) {
+            const c = cnArr[j];
+            if (t >= c.s && t < c.e) {
+                return { en: seg.en || "", cn: c.text || "", speaker: seg.speaker || "" };
+            }
+        }
+        return { en: seg.en || "", cn: "", speaker: seg.speaker || "" };
+    }
+} return null; }
+function esc(value) { return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function escAttr(value) { return esc(value).replace(/'/g, "&#39;"); }
+function clamp01(value) { return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0)); }
+function easeOutCubic(value) { const p = clamp01(value); return 1 - Math.pow(1 - p, 3); }
+function scaleW(vp, px) { return Math.round((vp.width * px) / 1080); }
+function scaleH(vp, px) { return Math.round((vp.height * px) / 1920); }
+function sw16(vp, px) { return Math.round((vp.width * px) / 1920); }
+function sh16(vp, px) { return Math.round((vp.height * px) / 1080); }
+function fadeIn(t, delay, duration) { const d = Number.isFinite(delay) ? delay : 0; const dur = Number.isFinite(duration) ? duration : 0.45; return easeOutCubic((t - d) / Math.max(dur, 0.001)); }
+function decoLine(vp, y) { const left = scaleW(vp, GRID.sidePad); const lineY = scaleH(vp, y); const dSize = scaleW(vp, 10); return `<div style="position:absolute;left:${left}px;right:${left}px;top:${lineY}px;height:1px;background:linear-gradient(90deg,transparent,${TOKENS.interview.decoLine} 20%,${TOKENS.interview.decoLine} 80%,transparent);pointer-events:none">` + `<div style="position:absolute;left:0;top:${-dSize / 2}px;width:${dSize}px;height:${dSize}px;border:1px solid ${TOKENS.interview.decoLineDiamond};transform:rotate(45deg);background:${TOKENS.interview.bg}"></div>` + `<div style="position:absolute;right:0;top:${-dSize / 2}px;width:${dSize}px;height:${dSize}px;border:1px solid ${TOKENS.interview.decoLineDiamond};transform:rotate(45deg);background:${TOKENS.interview.bg}"></div>` + `</div>`; }
+(function () { const meta = { id: "codeTerminal", version: 1, ratio: "16:9", category: "browser", label: "Code Terminal", description: "代码块展示，带行号和语法高亮色彩。支持逐行淡入动画，适合讲解配置/代码。", tech: "dom", duration_hint: 10, loopable: false, z_hint: "middle", tags: ["代码", "code", "terminal", "highlight", "配置"], mood: ["technical", "focused"], theme: ["tech", "education"], default_theme: "anthropic-warm", themes: { "anthropic-warm": { bg:TOKENS.lecture.codeBg, border: "rgba(218,119,86,0.25)", lineNumColor: "#6b5d52", codeColor:TOKENS.lecture.text, commentColor:TOKENS.lecture.green, keywordColor:TOKENS.lecture.accent, stringColor:TOKENS.lecture.gold, numberColor: "#8ab4cc" }, "dark-pro": { bg: "#0d1117", border: "rgba(138,180,204,0.20)", lineNumColor: "#4a5568", codeColor: "#e2e8f0", commentColor:TOKENS.lecture.green, keywordColor: "#8ab4cc", stringColor:TOKENS.lecture.gold, numberColor:TOKENS.lecture.accent }, }, params: { lines: { type: "array", required: true, default: [], label: "代码行", semantic: "array of strings, each is one line. Use special prefixes: '//' for comment style, 'k:' for keyword", group: "content" }, title: { type: "string", default: "", label: "标题（可选）", group: "content" }, enterStagger: { type: "number", default: 0.15, label: "逐行延迟(s)", group: "animation", range: [0, 1], step: 0.05 }, enterDur: { type: "number", default: 0.3, label: "每行淡入时长(s)", group: "animation", range: [0.1, 1], step: 0.05 }, bg: { type: "color", default:TOKENS.lecture.codeBg, label: "背景色", group: "color" }, border: { type: "color", default: "rgba(218,119,86,0.25)", label: "边框色", group: "color" }, lineNumColor: { type: "color", default: "#6b5d52", label: "行号颜色", group: "color" }, codeColor: { type: "color", default:TOKENS.lecture.text, label: "代码颜色", group: "color" }, commentColor: { type: "color", default:TOKENS.lecture.green, label: "注释颜色", group: "color" }, keywordColor: { type: "color", default:TOKENS.lecture.accent, label: "关键字颜色", group: "color" }, stringColor: { type: "color", default:TOKENS.lecture.gold, label: "字符串颜色", group: "color" }, numberColor: { type: "color", default: "#8ab4cc", label: "数字颜色", group: "color" }, fontSize: { type: "number", default: 28, label: "字号(px)", group: "style", range: [14, 48], step: 2 }, x: { type: "number", default: 0, label: "X 偏移(px, 0=居中)", group: "style", range: [0, 1920], step: 10 }, y: { type: "number", default: 0, label: "Y 偏移(px, 0=居中)", group: "style", range: [0, 1080], step: 10 }, maxWidth: { type: "number", default: 1400, label: "最大宽度(px)", group: "style", range: [400, 1800], step: 50 }, }, ai: { when: "展示代码片段、配置文件、JSON 时使用。逐行淡入适合讲解节奏。", how: "lines 是字符串数组，每个元素一行。特殊前缀：'// ' 开头自动变注释色，字符串自动染色，关键字自动高亮。", example: { lines: ["// ~/.claude/settings.json", "{", '  "hooks": {', '    "PreToolUse": [', '      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "guard.sh" }] }', "    ]", "  }", "}",], enterStagger: 0.2, }, avoid: "代码行不要超过 20 行，否则字号要相应减小。不要用 tab 缩进（用空格）。", pairs_with: ["subtitleBar", "progressBar16x9", "darkGradient"], }, }; function colorize(line, p) { if (!line)
+    return "<br>"; const trimmed = line.trimStart(); if (trimmed.startsWith("//") || trimmed.startsWith("#")) {
+    return '<span style="color:' + p.commentColor + '">' + esc(line) + '</span>';
+} let result = ""; const KEYWORDS = ["const", "let", "var", "function", "return", "if", "else", "for", "while", "import", "export", "from", "true", "false", "null", "undefined"]; const KEYWORD_RE = new RegExp("\\b(" + KEYWORDS.join("|") + ")\\b", "g"); let i = 0; const chars = line; const segments = []; let cur = ""; while (i < chars.length) {
+    const ch = chars[i];
+    if (ch === '"' || ch === "'") {
+        if (cur) {
+            segments.push({ type: "code", text: cur });
+            cur = "";
+        }
+        let str = ch;
+        i++;
+        while (i < chars.length && chars[i] !== ch) {
+            if (chars[i] === "\\" && i + 1 < chars.length) {
+                str += chars[i] + chars[i + 1];
+                i += 2;
+                continue;
+            }
+            str += chars[i++];
+        }
+        str += (chars[i] || "");
+        i++;
+        segments.push({ type: "string", text: str });
+    }
+    else {
+        cur += ch;
+        i++;
+    }
+} if (cur)
+    segments.push({ type: "code", text: cur }); for (const seg of segments) {
+    if (seg.type === "string") {
+        result += '<span style="color:' + p.stringColor + '">' + esc(seg.text) + '</span>';
+    }
+    else {
+        let codeHtml = esc(seg.text);
+        codeHtml = codeHtml.replace(/\b(\d+\.?\d*)\b/g, '<span style="color:' + p.numberColor + '">$1</span>');
+        codeHtml = codeHtml.replace(new RegExp("\\b(" + KEYWORDS.join("|") + ")\\b", "g"), '<span style="color:' + p.keywordColor + '">$1</span>');
+        codeHtml = codeHtml.replace(/&quot;([^&]+)&quot;\s*:/g, '<span style="color:' + p.keywordColor + '">&quot;$1&quot;</span>:');
+        result += codeHtml;
+    }
+} return result; } function render(t, params, vp) { const p = {}; for (const k in meta.params)
+    p[k] = params[k] !== undefined ? params[k] : meta.params[k].default; const lines = Array.isArray(p.lines) ? p.lines : []; const fs = Number(p.fontSize); const lineH = Math.round(fs * 1.7); const padV = 36; const padH = 48; const lineNumW = 52; const blockH = lines.length * lineH + padV * 2 + (p.title ? lineH + 16 : 0); const blockW = Math.min(Number(p.maxWidth), vp.width - 120); const cx = Number(p.x) > 0 ? Number(p.x) : (vp.width - blockW) / 2; const cy = Number(p.y) > 0 ? Number(p.y) : (vp.height - blockH) / 2; let html = '<div style="position:absolute;left:' + cx + 'px;top:' + cy + 'px;width:' + blockW + 'px;min-height:' + blockH + 'px;' + 'background:' + p.bg + ';border:1px solid ' + p.border + ';border-radius:10px;overflow:hidden">'; const titleOp = easeOutCubic(t / (Number(p.enterDur) || 0.3)); const titleOpClamped = Math.max(0, Math.min(1, titleOp)); const dotSize = Math.round(fs * 0.4); const dotGap = Math.round(fs * 0.28); html += '<div style="display:flex;align-items:center;padding:' + Math.round(padV * 0.4) + 'px ' + padH + 'px;opacity:' + titleOpClamped + '">' + '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#ff5f57;margin-right:' + dotGap + 'px"></span>' + '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#febc2e;margin-right:' + dotGap + 'px"></span>' + '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#28c840;margin-right:' + Math.round(padH * 0.5) + 'px"></span>' + (p.title ? '<span style="font:500 ' + (fs - 6) + 'px system-ui,sans-serif;color:' + p.lineNumColor + '">' + esc(p.title) + '</span>' : '') + '</div>'; const globalOp = Math.max(0, Math.min(1, easeOutCubic(t / Math.max(Number(p.enterDur) || 0.3, 0.01)))); const codeLines = []; for (let idx = 0; idx < lines.length; idx++) {
+    const num = String(idx + 1).padStart(3, ' ');
+    const numHtml = '<span style="color:' + p.lineNumColor + '">' + num + '</span>  ';
+    codeLines.push(numHtml + colorize(lines[idx], p));
+} html += '<pre style="margin:0;padding:' + padV + 'px ' + padH + 'px;font:400 ' + fs + 'px \'SF Mono\',Menlo,monospace;color:' + p.codeColor + ';line-height:' + lineH + 'px;white-space:pre;tab-size:2;opacity:' + globalOp + '">' + codeLines.join('\n') + '</pre></div>'; return html; } function screenshots() { return [{ t: 0, label: "初始（无内容）" }, { t: 1.5, label: "逐行出现中" }, { t: 5, label: "全部显示" },]; } function lint(params, vp) { const errors = []; if (!Array.isArray(params.lines))
+    errors.push("lines 必须是数组。Fix: 传入字符串数组"); if (Array.isArray(params.lines) && params.lines.length === 0)
+    errors.push("lines 为空，代码块不会显示。Fix: 至少传入一行"); if (params.lines && params.lines.length > 25)
+    errors.push("lines 超过 25 行，建议减小 fontSize 或拆图。"); return { ok: errors.length === 0, errors }; } window.__scenes["codeTerminal"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { const meta = { id: "darkGradient", version: 1, ratio: "16:9", category: "backgrounds", label: "Dark Gradient", description: "深色暖棕背景，带极轻微的径向光晕。适合讲解、课程和访谈类视频，不会像极光背景那样抢戏。", tech: "dom", duration_hint: 30, loopable: true, z_hint: "bottom", tags: ["background", "dark", "gradient", "lecture", "subtle"], mood: ["calm", "focused", "professional"], theme: ["education", "lecture", "interview"], default_theme: "warm-lecture", themes: { "warm-lecture": { bg: "#1a1510", glowColor: "rgba(218,119,86,0.16)", glowX: 52, glowY: 34, glowSize: 54 }, "charcoal-focus": { bg: "#121214", glowColor: "rgba(138,180,204,0.12)", glowX: 50, glowY: 30, glowSize: 48 }, "espresso-soft": { bg: "#18110d", glowColor: "rgba(212,180,131,0.12)", glowX: 48, glowY: 28, glowSize: 44 }, }, params: { bg: { type: "color", default: "#1a1510", label: "背景色", semantic: "base background color covering the full viewport", group: "color" }, glowColor: { type: "color", default: "rgba(218,119,86,0.16)", label: "光晕色", semantic: "color used in the subtle radial glow overlay", group: "color" }, glowX: { type: "number", default: 52, label: "光晕 X(%)", semantic: "horizontal glow anchor in percent of viewport width", group: "layout", range: [0, 100], step: 1 }, glowY: { type: "number", default: 34, label: "光晕 Y(%)", semantic: "vertical glow anchor in percent of viewport height", group: "layout", range: [0, 100], step: 1 }, glowSize: { type: "number", default: 54, label: "光晕尺寸(%)", semantic: "radial glow falloff size in percent, larger values spread the glow wider", group: "style", range: [10, 120], step: 1 }, }, ai: { when: "做课程讲解、lecture video、访谈说明等需要克制背景的时候使用。", how: "放在最底层作为全屏背景。只调 bg 和 glowColor 就能快速换气质；glowX/glowY 控制光斑落点。", example: { bg: "#1a1510", glowColor: "rgba(218,119,86,0.16)", glowX: 52, glowY: 34, glowSize: 54 }, theme_guide: { "warm-lecture": "默认暖棕 lecture 背景", "charcoal-focus": "偏冷深灰，适合科技内容", "espresso-soft": "更柔和的棕黑" }, avoid: "不要再叠加其他背景 scene；glowSize 太大或 glowColor 太亮会让文字对比变差。", pairs_with: ["videoClip", "slideChrome", "subtitleBar"], }, }; function render(t, params, vp) { const bg = params.bg || "#1a1510"; const glowColor = params.glowColor || "rgba(218,119,86,0.16)"; const glowX = Number.isFinite(params.glowX) ? params.glowX : 52; const glowY = Number.isFinite(params.glowY) ? params.glowY : 34; const glowSize = Number.isFinite(params.glowSize) ? params.glowSize : 54; const glow = `radial-gradient(circle at ${glowX}% ${glowY}%, ${glowColor} 0%, transparent ${glowSize}%)`; const vignette = "linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.4) 100%)"; return `<div style="position:absolute;left:0;top:0;width:${vp.width}px;height:${vp.height}px;overflow:hidden;background:${bg}"> <div style="position:absolute;inset:0;background:${glow}"></div> <div style="position:absolute;inset:0;background:${vignette}"></div> </div>`; } function screenshots() { return [{ t: 0, label: "默认背景" }, { t: 8, label: "中段静帧" }, { t: 20, label: "长期保持" },]; } function lint(params, vp) { const errors = []; if (!params.bg)
+    errors.push("bg 不能为空。Fix: 传入背景色"); if (!params.glowColor)
+    errors.push("glowColor 不能为空。Fix: 传入光晕色"); if (params.glowX < 0 || params.glowX > 100)
+    errors.push("glowX 超出范围 [0, 100]。Fix: 设为 0–100"); if (params.glowY < 0 || params.glowY > 100)
+    errors.push("glowY 超出范围 [0, 100]。Fix: 设为 0–100"); if (params.glowSize < 10 || params.glowSize > 120)
+    errors.push("glowSize 超出范围 [10, 120]。Fix: 设为 10–120"); return { ok: errors.length === 0, errors }; } window.__scenes["darkGradient"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { const meta = { id: "headlineCenter", version: 1, ratio: "16:9", category: "typography", label: "Headline Center", description: "全屏居中大标题，支持内联 HTML 变色。只做标题。", tech: "dom", duration_hint: 10, loopable: false, z_hint: "middle", tags: ["标题", "headline", "居中", "大字"], mood: ["impactful", "dramatic"], theme: ["tech", "education", "presentation"], default_theme: "anthropic-warm", themes: { "anthropic-warm": { color: "#f5ece0", fontSize: 42 }, "large": { color: "#f5ece0", fontSize: 56 }, "subtle": { color: "rgba(245,236,224,.75)", fontSize: 36 }, }, params: { text: { type: "string", required: true, default: "给 AI 安了一个<span style='color:#da7756'>安检员</span>", label: "标题文字", semantic: "supports inline HTML like <span style='color:#da7756'>重点</span>", group: "content" }, color: { type: "color", default: "#f5ece0", label: "文字色", semantic: "headline text color", group: "color" }, fontSize: { type: "number", default: 42, label: "字号(px)", semantic: "font size", group: "style", range: [24, 72], step: 2 }, y: { type: "number", default: 0, label: "Y偏移(px, 0=居中)", semantic: "vertical offset", group: "style", range: [0, 1080], step: 10 }, enterDelay: { type: "number", default: 0, label: "出现延迟(s)", semantic: "fade-in delay", group: "animation", range: [0, 10], step: 0.1 }, }, ai: { when: "全屏居中一句大标题。phase 开头的主题句。", how: "text 支持 HTML 变色。搭配 flowDiagram 放下方。", example: { text: '给 AI 安了一个<span style="color:#da7756">安检员</span>' }, theme_guide: { "anthropic-warm": "暖色", "large": "大字", "subtle": "淡化" }, avoid: "不用于多行文字（用 titleCard）。", pairs_with: ["flowDiagram", "quoteBlock", "auroraGradient"], }, }; function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); } function fadeIn(t, start, dur) { return ease3((t - start) / dur); } function render(t, params, vp) { const p = {}; for (const k in meta.params)
+    p[k] = params[k] !== undefined ? params[k] : meta.params[k].default; const op = fadeIn(t, p.enterDelay || 0, 0.7); const fs = p.fontSize || 42; const color = p.color || "#f5ece0"; const maxWidth = Math.max(320, vp.width - 120); const posStyle = Number(p.y) > 0 ? "position:absolute;left:60px;right:60px;top:" + p.y + "px;text-align:center;max-width:" + maxWidth + "px;margin:0 auto" : "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 60px"; return '<div style="' + posStyle + '">' + '<div style="font:700 ' + fs + 'px Georgia,\'Noto Serif SC\',serif;color:' + color + ';text-align:center;line-height:1.3;opacity:' + op + ';max-width:' + maxWidth + 'px">' + (p.text || '') + '</div>' + '</div>'; } function screenshots() { return [{ t: 0, label: "透明" }, { t: 0.5, label: "淡入" }, { t: 2, label: "显示" }]; } function lint(params, vp) { const errors = []; if (!params.text)
+    errors.push("text 不能为空。Fix: 传入标题文字"); return { ok: errors.length === 0, errors: errors }; } window.__scenes["headlineCenter"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { const meta = { id: "progressBar16x9", version: 1, ratio: "16:9", category: "overlays", label: "Progress Bar", description: "底部细进度条。调用方每帧传入 progress(0-1)，无动画逻辑，视觉即时更新。", tech: "dom", duration_hint: 0, loopable: true, z_hint: "top", tags: ["进度条", "progress", "bar", "overlay", "底部"], mood: ["neutral"], theme: ["tech", "education", "vlog"], default_theme: "anthropic-warm", themes: { "anthropic-warm": { color: "#da7756", trackColor: "rgba(245,236,224,.08)" }, "dark-minimal": { color: "#8ab4cc", trackColor: "rgba(255,255,255,.08)" }, "signal-green": { color: "#7ec699", trackColor: "rgba(126,198,153,.18)" } }, params: { progress: { type: "number", required: true, default: 0.35, label: "进度 0-1", semantic: "current progress fraction, 0=empty 1=full", group: "content", range: [0, 1], step: 0.01 }, color: { type: "color", default: "#da7756", label: "进度条颜色", group: "color" }, trackColor: { type: "color", default: "rgba(245,236,224,.08)", label: "轨道颜色", group: "color" }, height: { type: "number", default: 4, label: "高度(px)", group: "style", range: [1, 20], step: 1 }, y: { type: "number", default: 50, label: "距底部(px)", group: "style", range: [0, 200], step: 5 }, borderRadius: { type: "number", default: 2, label: "圆角(px)", group: "style", range: [0, 10], step: 1 } }, ai: { when: "显示视频整体播放进度或章节进度。调用方计算 progress = currentTime / totalDuration 传入。", how: "progress 是 0-1 的小数。0 = 空，1 = 满。每帧由调用方更新，组件本身无时间逻辑。", example: { progress: 0.35, color: "#da7756", height: 4, y: 50 }, theme_guide: { "anthropic-warm": "橙色进度条 + 极淡轨道", "dark-minimal": "蓝色极简", "signal-green": "绿色强调" }, avoid: "height > 8 会显得突兀，建议 3-6px。不要用于倒计时（那是调用方的逻辑）。", pairs_with: ["subtitleBar", "slideChrome", "auroraGradient"] } }; function render(t, params, vp) { const p = {}; for (const k in meta.params)
+    p[k] = params[k] !== undefined ? params[k] : meta.params[k].default; const progress = Math.max(0, Math.min(1, Number(p.progress) || 0)); const h = p.height; const r = p.borderRadius; const y = p.y; const fillW = (progress * 100).toFixed(3) + '%'; return '<div style="position:absolute;bottom:' + y + 'px;left:0;right:0;width:' + vp.width + 'px;height:' + h + 'px;border-radius:' + r + 'px;background:' + p.trackColor + ';overflow:hidden">' + '<div style="height:100%;width:' + fillW + ';background:' + p.color + ';border-radius:' + r + 'px"></div>' + '</div>'; } function screenshots() { return [{ t: 0, label: "进度 0%（调用方传 progress:0）" }, { t: 0, label: "进度 35%（调用方传 progress:0.35）" }, { t: 0, label: "进度 100%（调用方传 progress:1）" }]; } function lint(params, vp) { const errors = []; if (params.progress === undefined || params.progress === null)
+    errors.push("progress 不能为空。Fix: 传入 0-1 之间的小数"); if (params.progress !== undefined && (params.progress < 0 || params.progress > 1))
+    errors.push("progress 必须在 0-1 之间。Fix: 当前值 " + params.progress + " 超出范围"); return { ok: errors.length === 0, errors: errors }; } window.__scenes["progressBar16x9"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { const meta = { id: "subtitleBar", version: 1, ratio: "16:9", category: "overlays", label: "Subtitle Bar", description: "底部字幕条。传入 srt 数组 [{s,e,t}]，按时间显示当前字幕文字。", tech: "dom", duration_hint: 30, loopable: true, z_hint: "top", tags: ["字幕", "subtitle", "srt", "overlay", "底部"], mood: ["neutral"], theme: ["education", "lecture", "vlog"], default_theme: "anthropic-warm", themes: { "anthropic-warm": { bgColor: "rgba(26,21,16,0.82)", textColor:TOKENS.lecture.text, accentColor:TOKENS.lecture.accent }, "dark-minimal": { bgColor: "rgba(0,0,0,0.72)", textColor: "#ffffff", accentColor: "#8ab4cc" }, "warm-gold": { bgColor: "rgba(26,21,16,0.85)", textColor:TOKENS.lecture.gold, accentColor:TOKENS.lecture.accent }, }, params: { srt: { type: "array", required: true, default: [], label: "字幕数组", semantic: "array of {s,e,t} objects: s=start(s), e=end(s), t=text", group: "content" }, bgColor: { type: "color", default: "rgba(26,21,16,0.82)", label: "背景色", group: "color" }, textColor: { type: "color", default:TOKENS.lecture.text, label: "文字色", group: "color" }, accentColor: { type: "color", default:TOKENS.lecture.accent, label: "强调色", group: "color" }, fontSize: { type: "number", default: 32, label: "字号(px)", group: "style", range: [18, 54], step: 2 }, y: { type: "number", default: 60, label: "距底部(px)", group: "style", range: [0, 300], step: 4 }, }, ai: { when: "需要字幕时使用。srt 数组由 TTS 生成或手写。", how: "srt 是 [{s:0, e:3, t:'文字'}] 数组。组件按绝对时间查找当前字幕（t 是 layer.start 起的相对时间）。", example: { srt: [{ s: 0, e: 5, t: "Hook：AI 的安检员" }, { s: 5, e: 10, t: "每次 AI 动手前先检查" }] }, avoid: "srt 时间段不要重叠；文字太长超出屏幕宽度时会自动换行。", pairs_with: ["progressBar16x9", "darkGradient"], }, }; function render(t, params, vp) { const p = {}; for (const k in meta.params)
+    p[k] = params[k] !== undefined ? params[k] : meta.params[k].default; const srt = Array.isArray(p.srt) ? p.srt : []; const entry = srt.find((e) => t >= Number(e.s || 0) && t < Number(e.e || 0)); const text = entry ? String(entry.t || "") : ""; if (!text)
+    return ""; const fs = p.fontSize || 32; const y = p.y || 60; const maxW = vp.width - 160; return '<div style="position:absolute;left:0;right:0;bottom:' + y + 'px;display:flex;justify-content:center;align-items:flex-end;padding:0 80px">' + '<div style="background:' + p.bgColor + ';color:' + p.textColor + ';font:500 ' + fs + 'px system-ui,sans-serif;' + 'padding:10px 28px;border-radius:6px;max-width:' + maxW + 'px;text-align:center;line-height:1.5;' + 'border-bottom:2px solid ' + p.accentColor + '">' + text + '</div>' + '</div>'; } function screenshots() { return [{ t: 1, label: "第一条字幕" }, { t: 6, label: "第二条字幕" }, { t: 20, label: "无字幕（空白）" },]; } function lint(params, vp) { const errors = []; if (!Array.isArray(params.srt))
+    errors.push("srt 必须是数组。Fix: 传入 [{s,e,t}] 数组"); if (Array.isArray(params.srt) && params.srt.length === 0)
+    errors.push("srt 数组为空，字幕不会显示。Fix: 至少传入一条字幕"); return { ok: errors.length === 0, errors }; } window.__scenes["subtitleBar"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { function escAttr(value) { return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); } const meta = { id: "videoClip", version: 1, ratio: "16:9", category: "media", label: "Video Clip", description: "嵌入真实视频文件（MP4），支持定位和圆角。用于访谈片段、B-roll 等需要播放原始视频的场景。", tech: "video", duration_hint: 0, loopable: false, z_hint: "middle", tags: ["video", "clip", "media", "b-roll", "interview"], mood: ["neutral", "cinematic", "documentary"], theme: ["education", "presentation", "interview"], default_theme: "full-bleed", themes: { "full-bleed": { x: 0, y: 0, width: 1920, height: 1080, borderRadius: 0, objectFit: "cover" }, "inset-rounded": { x: 120, y: 90, width: 1680, height: 900, borderRadius: 28, objectFit: "cover" }, "contain-frame": { x: 160, y: 80, width: 1600, height: 920, borderRadius: 20, objectFit: "contain" }, }, params: { src: { type: "string", required: true, default: "https://example.com/sample.mp4", label: "视频地址", semantic: "absolute local path or remote URL pointing to an mp4 file", group: "content" }, x: { type: "number", default: 0, label: "X 偏移(px)", semantic: "left offset from viewport origin", group: "layout", range: [0, 1920], step: 10 }, y: { type: "number", default: 0, label: "Y 偏移(px)", semantic: "top offset from viewport origin", group: "layout", range: [0, 1080], step: 10 }, width: { type: "number", default: 1920, label: "宽度(px)", semantic: "video width in pixels; default matches full viewport width in 16:9", group: "layout", range: [80, 1920], step: 10 }, height: { type: "number", default: 0, label: "高度(px)", semantic: "video height in pixels; 0 keeps the source aspect ratio automatically", group: "layout", range: [0, 1080], step: 10 }, borderRadius: { type: "number", default: 0, label: "圆角(px)", semantic: "corner radius applied to the video element", group: "style", range: [0, 120], step: 2 }, objectFit: { type: "enum", default: "cover", options: ["cover", "contain"], label: "填充模式", semantic: "cover fills the box, contain keeps the full frame visible", group: "style" }, }, ai: { when: "需要直接播放真实视频素材时使用，比如采访切片、讲解里的 B-roll、录屏片段。", how: "传入 src 指向 mp4 文件。height=0 时按素材原始比例自动算高；若同时给 width 和 height，则用 objectFit 控制裁切或留边。", example: { src: "/Users/demo/assets/interview.mp4", x: 120, y: 90, width: 1680, height: 900, borderRadius: 28, objectFit: "cover" }, theme_guide: { "full-bleed": "全屏铺满", "inset-rounded": "留安全边距和圆角", "contain-frame": "完整显示视频内容" }, avoid: "不要传空 src；objectFit=contain 时如果盒子比例和视频不一致会出现留边，这是预期行为。", pairs_with: ["darkGradient", "slideChrome", "subtitleBar"], }, }; function render(t, params, vp) { const src = params.src || ""; const x = Number.isFinite(params.x) ? params.x : 0; const y = Number.isFinite(params.y) ? params.y : 0; const width = Number.isFinite(params.width) && params.width > 0 ? params.width : vp.width; const height = Number.isFinite(params.height) && params.height > 0 ? params.height : 0; const borderRadius = Number.isFinite(params.borderRadius) ? Math.max(0, params.borderRadius) : 0; const objectFit = params.objectFit === "contain" ? "contain" : "cover"; const currentTime = Math.max(0, Number.isFinite(t) ? t : 0); const sizeStyle = height > 0 ? `width:${width}px;height:${height}px;object-fit:${objectFit};` : `width:${width}px;height:auto;max-height:${Math.max(0, vp.height - y)}px;`; return `<div style="position:absolute;left:0;top:0;width:${vp.width}px;height:${vp.height}px;overflow:hidden"> <video data-nf-persist="vc-${src.replace(/[^a-zA-Z0-9]/g, "").slice(-20)}" data-nf-time="${currentTime}" src="${escAttr(src)}" playsinline preload="auto" style="position:absolute;left:${x}px;top:${y}px;${sizeStyle}display:block;background:#000;border-radius:${borderRadius}px"></video> </div>`; } function screenshots() { return [{ t: 0, label: "片头帧" }, { t: 2, label: "中段画面" }, { t: 6, label: "后段画面" },]; } function lint(params, vp) { const errors = []; if (!params.src || typeof params.src !== "string" || params.src.trim() === "") {
+    errors.push("src 不能为空。Fix: 传入 mp4 的绝对路径或 URL");
+} if (params.width !== undefined && params.width <= 0) {
+    errors.push("width 必须大于 0。Fix: 设为正数宽度");
+} if (params.height !== undefined && params.height < 0) {
+    errors.push("height 不能小于 0。Fix: 设为 0 或正数");
+} if (params.borderRadius !== undefined && (params.borderRadius < 0 || params.borderRadius > 120)) {
+    errors.push("borderRadius 超出范围 [0, 120]。Fix: 设为 0–120");
+} if (!["cover", "contain"].includes(params.objectFit)) {
+    errors.push(`objectFit 无效值 "${params.objectFit}"。Fix: 只能是 "cover" 或 "contain"`);
+} if ((params.x || 0) >= vp.width) {
+    errors.push(`x=${params.x} 已超出画面宽度。Fix: 把 x 调整到 ${vp.width} 以内`);
+} if ((params.y || 0) >= vp.height) {
+    errors.push(`y=${params.y} 已超出画面高度。Fix: 把 y 调整到 ${vp.height} 以内`);
+} return { ok: errors.length === 0, errors }; } window.__scenes["videoClip"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+// Animation effects
+// Animation effects bundle
+(function(){
+function normalizeTime(v){var n=Number.isFinite(v)?v:0;return Math.min(1,Math.max(0,n));}
+function bounce(t){var p=normalizeTime(t);var n=7.5625;var d=2.75;if(p<1/d)return n*p*p;if(p<2/d){p-=1.5/d;return n*p*p+0.75;}if(p<2.5/d){p-=2.25/d;return n*p*p+0.9375;}p-=2.625/d;return n*p*p+0.984375;}
+// Shared animation utilities — CSS property parsing, clamping, and interpolation helpers
+const CSS_PROP_CACHE = new Map();
+
+function clamp(value, min, max) {
+  const number = Number.isFinite(value) ? value : min;
+  return Math.min(max, Math.max(min, number));
+}
+
+function clamp01(value) {
+  return clamp(value, 0, 1);
+}
+
+function round(value, precision = 4) {
+  const factor = 10 ** precision;
+  return Math.round((Number.isFinite(value) ? value : 0) * factor) / factor;
+}
+
+function percent(value) {
+  return `${round(value, 4)}%`;
+}
+
+function px(value) {
+  return `${round(value, 4)}px`;
+}
+
+function joinTransforms(...parts) {
+  const filtered = parts.flat().filter(Boolean);
+  return filtered.length > 0 ? filtered.join(" ") : "none";
+}
+
+function inset(top, right, bottom, left) {
+  return `inset(${percent(top)} ${percent(right)} ${percent(bottom)} ${percent(left)})`;
+}
+
+function circle(radiusPercent, x = "50%", y = "50%") {
+  return `circle(${percent(radiusPercent)} at ${x} ${y})`;
+}
+
+function toCssPropertyName(name) {
+  if (CSS_PROP_CACHE.has(name)) {
+    return CSS_PROP_CACHE.get(name);
+  }
+  const cssName = name.startsWith("--")
+    ? name
+    : name.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+  CSS_PROP_CACHE.set(name, cssName);
+  return cssName;
+}
+
+function normalizeStyle(style = {}) {
+  const out = {};
+  for (const [key, value] of Object.entries(style)) {
+    if (value === undefined || value === null || value === "") continue;
+    if (key === "opacity") {
+      out.opacity = round(clamp01(value), 4);
+      continue;
+    }
+    out[key] = typeof value === "number" ? round(value, 4) : value;
+  }
+  return out;
+}
+
+function serializeStyle(style = {}) {
+  const normalized = normalizeStyle(style);
+  return Object.entries(normalized)
+    .map(([key, value]) => `${toCssPropertyName(key)}:${value}`)
+    .join(";");
+}
+// Pure CSS fade-in.
+function fadeIn(progress) {
+  return { opacity: clamp01(progress) };
+}
+// Pure CSS fade-out.
+function fadeOut(progress) {
+  return { opacity: 1 - clamp01(progress) };
+}
+// Slides content upward into place while fading it in.
+function slideUp(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: (p),
+    transform: joinTransforms(`translate3d(0, ${px(distance * (1 - p))}, 0)`),
+  };
+}
+// Slides content downward while fading it out.
+function slideDown(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: 1 - p,
+    transform: joinTransforms(`translate3d(0, ${px(distance * p)}, 0)`),
+  };
+}
+// Slides content in from the left while fading it up.
+function slideLeft(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: (p),
+    transform: joinTransforms(`translate3d(${px(-distance * (1 - p))}, 0, 0)`),
+  };
+}
+// Slides content in from the right while fading it up.
+function slideRight(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: (p),
+    transform: joinTransforms(`translate3d(${px(distance * (1 - p))}, 0, 0)`),
+  };
+}
+// Grows content from a smaller scale while fading in.
+function scaleIn(progress) {
+  const p = clamp01(progress);
+  const scale = 0.6 + p * 0.4;
+  return {
+    opacity: (p),
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+// Shrinks content down while fading it out.
+function scaleOut(progress) {
+  const p = clamp01(progress);
+  const scale = 1 - p * 0.4;
+  return {
+    opacity: 1 - p,
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+// Springy overshoot entrance tuned for DOM/SVG.
+function springIn(progress) {
+  const p = clamp01(progress);
+  const spring = 1 - Math.exp(-6 * p) * Math.cos(p * Math.PI * 4) * (1 - p);
+  const scale = 0.5 + spring * 0.5;
+  return {
+    opacity:Math.min(1, p * 1.6),
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+// Springy exit with a subtle overshoot before settling out.
+function springOut(progress) {
+  const p = clamp01(progress);
+  const spring = 1 - Math.exp(-6 * p) * Math.cos(p * Math.PI * 4) * (1 - p);
+  const scale = 1.05 - spring * 0.45;
+  return {
+    opacity: 1 - p,
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+// Resolves from a soft blur to crisp content.
+function blurIn(progress, opts = {}) {
+  const p = clamp01(progress);
+  const maxBlur = opts.blur ?? 20;
+  const blur = maxBlur * (1 - p);
+  return {
+    opacity: (p),
+    filter: (blur > 0.01 ? `blur(${px(blur)})` : "none"),
+  };
+}
+// Blurs content away while fading it out.
+function blurOut(progress, opts = {}) {
+  const p = clamp01(progress);
+  const maxBlur = opts.blur ?? 20;
+  const blur = maxBlur * p;
+  return {
+    opacity: 1 - p,
+    filter: (blur > 0.01 ? `blur(${px(blur)})` : "none"),
+  };
+}
+// Reveals content from left to right with a clip mask.
+function wipeReveal(progress) {
+  const p = clamp01(progress);
+  return {
+    opacity: 1,
+    clipPath: inset(0, (1 - p) * 100, 0, 0),
+  };
+}
+// Bounce-in entrance with an elastic scale.
+function bounceIn(progress) {
+  const p = clamp01(progress);
+  const bounceProgress = bounce(p);
+  const scale = 0.35 + bounceProgress * 0.65;
+  return {
+    opacity:Math.min(1, p * 1.5),
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+var __NF_EFX={fadeIn,fadeOut,slideUp,slideDown,slideLeft,slideRight,scaleIn,scaleOut,springIn,springOut,blurIn,blurOut,wipeReveal,bounceIn};
+window.__nfEffect=function(name,progress,opts){var fn=__NF_EFX[name];if(!fn)return"";return serializeStyle(fn(clamp01(progress),opts||{}));};
+})();
+// warmGradient (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/anthropic-warm/bg-warmGradient.js)
+const warmGradient = (function(){
+// scenes/16x9/anthropic-warm/bg-warmGradient.js
+//
+// 暖棕渐变背景 - 主背景层：深暖棕底色 + 径向暗角 + 左上/右下柔光斑，所有 slide 的底部底色
+
+var _def = {
+  // ===== Identity =====
+  id: "warmGradient",
+  name: "暖棕渐变背景",
+  version: "1.0.0",
+
+  // ===== Belonging =====
+  ratio: "16:9",
+  theme: "anthropic-warm",
+  role: "bg",
+
+  // ===== Semantics =====
+  description: "主背景层：深暖棕底色 + 径向暗角 + 左上/右下柔光斑，所有 slide 的底部底色",
+  duration_hint: null,
+
+  // ===== Render type =====
+  type: "dom",
+  frame_pure: true,
+  assets: [],
+
+  // ===== AI understanding (18 fields) =====
+  intent: `
+    anthropic-warm 主题的地基。选 #1a1510 深暖棕而非纯黑，是因为纯黑太冷、缺乏书房质感。
+    径向暗角（center→corners rgba(0,0,0,.4)）防止四角视觉出血，把注意力向中心聚拢。
+    左上金柔光斑 rgba(212,180,131,.04) 和右下橙柔光斑 rgba(218,119,86,.03) 给画面注入
+    温度感，模拟窗边台灯漫反射——低调到几乎感觉不到，但去掉后画面会失去"暖"的气质。
+    所有其他组件叠在此背景之上，不重复画这两层效果。
+  `,
+
+  when_to_use: [
+    "每一张 slide 的最底层，z_layer=background",
+    "需要建立 anthropic-warm 视觉基调的任何场景",
+  ],
+
+  when_not_to_use: [
+    "已有自定义背景图/视频帧的场景——改用 bg-media 或直接在外层设置背景",
+    "不用 anthropic-warm 主题的 ratio",
+  ],
+
+  limitations: [
+    "纯静态，t 参数不驱动动画——如需动态背景需另建组件",
+    "暗角强度写死 .4，无法通过 params 调节",
+  ],
+
+  inspired_by: "Anthropic 官方品牌暖橙 + 3Blue1Brown 深色教学背景",
+  used_in: ["claude-code-源码讲解 E01-E07 全部 slide"],
+
+  requires: [],
+  pairs_well_with: ["chrome-titleBar", "chrome-footer", "content-keyPoints", "text-goldenQuote"],
+  conflicts_with: [],
+  alternatives: [],
+
+  visual_weight: "low",
+  z_layer: "background",
+  mood: ["warm", "calm", "focused"],
+
+  tags: ["background", "gradient", "warmth", "anthropic-warm", "base-layer"],
+
+  complexity: "simple",
+  performance: { cost: "low", notes: "pure CSS, zero paint cost" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-15", change: "initial — deep warm brown base + vignette + dual light spots" },
+  ],
+
+  // ===== Params =====
+  params: {
+    vignette_opacity: {
+      type: "number",
+      default: 0.4,
+      min: 0,
+      max: 0.8,
+      semantic: "四角暗角强度，0=无暗角，0.4=默认",
+    },
+  },
+
+  enter: null,
+  exit: null,
+
+  // ===== 3 functions =====
+  render(host, _t, params, vp) {
+    const vigOp = params.vignette_opacity != null ? params.vignette_opacity : 0.4;
+    const w = vp.width;
+    const h = vp.height;
+    host.innerHTML = `
+      <div style="
+        position:absolute;inset:0;
+        background:#1a1510;
+        width:${w}px;height:${h}px;
+        overflow:hidden;
+      ">
+        <\!-- left-top warm gold spot -->
+        <div style="
+          position:absolute;top:0;left:0;
+          width:${w * 0.55}px;height:${h * 0.55}px;
+          background:radial-gradient(ellipse at 20% 20%, rgba(212,180,131,0.04) 0%, transparent 70%);
+          pointer-events:none;
+        "></div>
+        <\!-- right-bottom orange spot -->
+        <div style="
+          position:absolute;bottom:0;right:0;
+          width:${w * 0.5}px;height:${h * 0.5}px;
+          background:radial-gradient(ellipse at 80% 80%, rgba(218,119,86,0.03) 0%, transparent 70%);
+          pointer-events:none;
+        "></div>
+        <\!-- vignette -->
+        <div style="
+          position:absolute;inset:0;
+          background:radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,${vigOp}) 100%);
+          pointer-events:none;
+        "></div>
+      </div>
+    `;
+  },
+
+  describe(_t, params, vp) {
+    return {
+      sceneId: "warmGradient",
+      phase: "hold",
+      progress: 1,
+      visible: true,
+      params,
+      elements: [
+        { type: "background", role: "base", value: "#1a1510" },
+        { type: "overlay", role: "vignette", value: `opacity ${params.vignette_opacity ?? 0.4}` },
+        { type: "overlay", role: "light-spot-tl", value: "gold rgba(212,180,131,.04)" },
+        { type: "overlay", role: "light-spot-br", value: "orange rgba(218,119,86,.03)" },
+      ],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
+
+  sample() {
+    return { vignette_opacity: 0.4 };
+  },
+};
+// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    _rawRender(host, t, params, vp);
+    return host.outerHTML;
+  };
+} else {
+  _adaptedRender = _rawRender;
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// titleBar (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/anthropic-warm/chrome-titleBar.js)
+const titleBar = (function(){
+// scenes/16x9/anthropic-warm/chrome-titleBar.js
+//
+// 顶部标题条 - 顶部 chrome：集名 + 集数标签 + 进度时间，固定在 y=0..72 安全区
+
+var _def = {
+  // ===== Identity =====
+  id: "titleBar",
+  name: "顶部标题条",
+  version: "1.0.0",
+
+  // ===== Belonging =====
+  ratio: "16:9",
+  theme: "anthropic-warm",
+  role: "chrome",
+
+  // ===== Semantics =====
+  description: "顶部 chrome：集名 + 集数标签 + 进度时间，固定在 y=0..72 安全区",
+  duration_hint: null,
+
+  // ===== Render type =====
+  type: "dom",
+  frame_pure: true,
+  assets: [],
+
+  // ===== AI understanding (18 fields) =====
+  intent: `
+    视频的"抬头"——观众任何时刻截图都能知道这是哪个系列哪一集。
+    左侧集名用 #f5ece0 正文色保持安静，右侧集数用 #da7756 橙色小标签突出身份感。
+    高度限定在 72px（grid 规定的 chrome 顶部条区域），不侵占主内容区。
+    半透明深色底条（rgba(26,21,16,.8)）让文字在任何背景上都可读，
+    同时不做成硬边框——边缘柔化，保持整体沉浸感。
+  `,
+
+  when_to_use: [
+    "所有内容 slide，作为固定顶部 chrome 层",
+    "需要在视频截图中保留集名和集数信息时",
+  ],
+
+  when_not_to_use: [
+    "封面/片头/片尾等全屏视觉 slide——顶部条会干扰大图视觉",
+    "已有自定义顶部 UI 的场景",
+  ],
+
+  limitations: [
+    "series 名称超过 20 个汉字会和 episode 标签重叠，需缩短",
+    "无动画，仅静态展示——进度动画在 overlay-progress 组件",
+  ],
+
+  inspired_by: "Anthropic 产品品牌条 + YouTube 频道标注风格",
+  used_in: ["claude-code-源码讲解 全系列"],
+
+  requires: [],
+  pairs_well_with: ["bg-warmGradient", "chrome-footer", "overlay-progress"],
+  conflicts_with: [],
+  alternatives: [],
+
+  visual_weight: "low",
+  z_layer: "chrome",
+  mood: ["informative", "calm"],
+
+  tags: ["chrome", "title", "header", "series", "episode", "navigation"],
+
+  complexity: "simple",
+  performance: { cost: "low", notes: "pure DOM, no paint overhead" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-15", change: "initial — series + episode label + right-side time" },
+  ],
+
+  // ===== Params =====
+  params: {
+    series: {
+      type: "string",
+      required: true,
+      semantic: "系列名称，如「Claude Code 源码讲解」",
+    },
+    episode: {
+      type: "string",
+      required: true,
+      semantic: "集数标签，如「E07」",
+    },
+    subtitle: {
+      type: "string",
+      default: "",
+      semantic: "本集副标题，如「以终为始」，可选",
+    },
+  },
+
+  enter: null,
+  exit: null,
+
+  // ===== 3 functions =====
+  render(host, _t, params, vp) {
+    const series = escapeHtml(params.series || "");
+    const episode = escapeHtml(params.episode || "");
+    const subtitle = escapeHtml(params.subtitle || "");
+    const h = 72;
+    const pad = Math.round(vp.width * 0.05); // 96px at 1920
+
+    host.innerHTML = `
+      <div style="
+        position:absolute;
+        top:0;left:0;
+        width:${vp.width}px;height:${h}px;
+        background:rgba(26,21,16,0.80);
+        backdrop-filter:blur(2px);
+        display:flex;align-items:center;
+        padding:0 ${pad}px;
+        box-sizing:border-box;
+        gap:${Math.round(vp.width * 0.012)}px;
+      ">
+        <\!-- episode badge -->
+        <span style="
+          background:#da7756;
+          color:#fff;
+          font:700 ${Math.round(vp.width * 0.0115)}px/1 system-ui,-apple-system,'PingFang SC',sans-serif;
+          padding:4px 12px;
+          border-radius:4px;
+          letter-spacing:0.04em;
+          white-space:nowrap;
+          flex-shrink:0;
+        ">${episode}</span>
+        <\!-- series name -->
+        <span style="
+          color:rgba(245,236,224,0.75);
+          font:400 ${Math.round(vp.width * 0.0115)}px/1 system-ui,-apple-system,'PingFang SC',sans-serif;
+          white-space:nowrap;
+          flex-shrink:0;
+        ">${series}</span>
+        ${subtitle ? `
+        <\!-- divider -->
+        <span style="color:rgba(245,236,224,0.25);font-size:${Math.round(vp.width*0.011)}px;">·</span>
+        <\!-- subtitle -->
+        <span style="
+          color:rgba(245,236,224,0.50);
+          font:400 ${Math.round(vp.width * 0.0115)}px/1 system-ui,-apple-system,'PingFang SC',sans-serif;
+          white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis;
+        ">${subtitle}</span>` : ""}
+        <\!-- spacer -->
+        <span style="flex:1"></span>
+        <\!-- brand dot -->
+        <span style="
+          width:8px;height:8px;
+          border-radius:50%;
+          background:#da7756;
+          flex-shrink:0;
+        "></span>
+      </div>
+    `;
+  },
+
+  describe(_t, params, vp) {
+    return {
+      sceneId: "titleBar",
+      phase: "hold",
+      progress: 1,
+      visible: true,
+      params,
+      elements: [
+        { type: "badge", role: "episode", value: params.episode },
+        { type: "text", role: "series", value: params.series },
+        { type: "text", role: "subtitle", value: params.subtitle || "" },
+      ],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: 72 },
+    };
+  },
+
+  sample() {
+    return {
+      series: "Claude Code 源码讲解",
+      episode: "E07",
+      subtitle: "以终为始",
+    };
+  },
+};
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    _rawRender(host, t, params, vp);
+    return host.outerHTML;
+  };
+} else {
+  _adaptedRender = _rawRender;
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// dimNav (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/anthropic-warm/chrome-dimNav.js)
+const dimNav = (function(){
+// scenes/16x9/anthropic-warm/chrome-dimNav.js
+//
+// 维度进度导航条 - 顶部 15 段进度条 + 当前维度计数，专为 15 维度讲解页面共享抬头
+
+var _def = {
+  // ===== Identity =====
+  id: "dimNav",
+  name: "维度导航条",
+  version: "1.0.0",
+
+  // ===== Belonging =====
+  ratio: "16:9",
+  theme: "anthropic-warm",
+  role: "chrome",
+
+  // ===== Semantics =====
+  description: "顶部 N 段进度条（done/current/todo 三态）+ mono 计数 X/N，全集 15 维度共享抬头",
+  duration_hint: null,
+
+  // ===== Render type =====
+  type: "dom",
+  frame_pure: true,
+  assets: [],
+
+  // ===== AI understanding =====
+  intent: `
+    E01 第三幕讲 15 个维度，足足 10 分钟。观众很容易「听到一半不知道自己在哪儿」。
+    这个 chrome 条的使命：观众任何时刻一瞥，就知道"现在在维度 X / 15，前面讲过 X-1 个，后面还有 N 个"。
+    对应脚本 §11-46 共 36 段旁白，跨 15 个 slide 文件（04-dim-factory 到 18-dim-caching）。
+    视觉语言：
+    - 15 个 4px 高细条均分顶部可用宽度，gap=6px（借鉴 YouTube 章节条）
+    - done 态：green-30 rgba(126,198,153,.3) 暗绿——进度感不抢戏
+    - current 态：ac 橙 #da7756 + 0 0 12px 发光——像"你现在在这儿"的灯
+    - todo 态：ink-8 rgba(245,236,224,.08) 幽灵暗色
+    - 右侧 mono 计数「X / N」：ac 橙强调 X，ink-75 分隔线，保持克制
+    固定在 top=48px 安全区，高度不超过 28px，不侵占主内容区。
+    不负责主标题（主标题用 chrome-titleBar）——两层 chrome 可以并存。
+    segments 参数让这个组件复用到其他集数不同维度数的视频。
+  `,
+
+  when_to_use: [
+    "E01 维度 1-15 讲解页面共享顶部（Slide 04-18）",
+    "任何分 N 段讲解的精读视频顶部进度指示",
+    "需要让观众对「还剩多少」有清晰感的长视频分段",
+  ],
+
+  when_not_to_use: [
+    "封面 / 目录 / 结尾等非分段内容页（会误导观众以为在某维度）",
+    "段数 < 5 或 > 25——太少不够直观、太多细条挤成线",
+    "已有自定义顶部 UI 的 slide",
+  ],
+
+  limitations: [
+    "只显示进度不带段标签（段标签放 chrome-titleBar 或主内容区）",
+    "segments 数量变化时 gap 自适应但字号不变",
+    "current 索引越界（>= segments）会被夹到 segments-1",
+  ],
+
+  inspired_by: "YouTube 章节进度条 + Apple Keynote 分步进度点",
+  used_in: ["claude-code-源码讲解 E01 Slide 04-18（15 维度）"],
+
+  requires: [],
+  pairs_well_with: ["chrome-titleBar", "bg-warmGradient", "content-analogyCard", "content-keyPoints"],
+  conflicts_with: [],
+  alternatives: ["overlay-progress（单条总进度）"],
+
+  visual_weight: "low",
+  z_layer: "chrome",
+  mood: ["informative", "orienting"],
+
+  tags: ["nav", "progress", "chrome", "dimension", "chapter", "segments"],
+
+  complexity: "simple",
+  performance: { cost: "low", notes: "static DOM, no per-frame animation" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-15", change: "initial — segmented top nav bar with done/current/todo states" },
+  ],
+
+  // ===== Params =====
+  params: {
+    segments: {
+      type: "number",
+      default: 15,
+      semantic: "段数，E01 是 15 个维度。建议 5-25 之间",
+    },
+    current: {
+      type: "number",
+      required: true,
+      semantic: "当前段索引（0-based）。设为 4 = 现在讲维度 5",
+    },
+    label: {
+      type: "string",
+      default: "",
+      semantic: "可选右侧 mono 计数前的标签，如「维度」。留空只显示数字",
+    },
+  },
+
+  enter: null,
+  exit: null,
+
+  // ===== 3 functions =====
+  render(host, _t, params, vp) {
+    const w = vp.width;
+    const h = vp.height;
+    const rawSeg = Number.isInteger(params.segments) ? params.segments : 15;
+    const segments = Math.max(1, Math.min(40, rawSeg));
+    const rawCur = Number.isInteger(params.current) ? params.current : 0;
+    const current = Math.max(0, Math.min(segments - 1, rawCur));
+    const label = escapeHtml(params.label || "");
+
+    const topPad = Math.round(h * 0.044);         // ~48px
+    const sideX = Math.round(w * 0.042);          // ~80px
+    const counterW = Math.round(w * 0.072);       // reserve right space
+    const barsArea = w - sideX * 2 - counterW - Math.round(w * 0.008);
+    const gap = 6;
+    const barW = Math.max(4, Math.floor((barsArea - gap * (segments - 1)) / segments));
+    const counterSize = Math.round(w * 0.0094);   // ~18px
+
+    const bars = [];
+    for (let i = 0; i < segments; i++) {
+      let bg, shadow = "";
+      if (i < current) {
+        bg = "rgba(126,198,153,0.30)";
+      } else if (i === current) {
+        bg = "#da7756";
+        shadow = "box-shadow:0 0 12px rgba(218,119,86,0.50);";
+      } else {
+        bg = "rgba(245,236,224,0.08)";
+      }
+      bars.push(`<div style="
+        width:${barW}px;
+        height:4px;
+        border-radius:2px;
+        background:${bg};
+        ${shadow}
+      "></div>`);
+    }
+
+    const counterHtml = `
+      <div style="
+        font:500 ${counterSize}px/1 'SF Mono','JetBrains Mono','Fira Code',Consolas,monospace;
+        color:rgba(245,236,224,0.75);
+        white-space:nowrap;
+      ">
+        ${label ? `<span style="color:rgba(245,236,224,0.50);margin-right:8px;">${label}</span>` : ""}
+        <strong style="color:#da7756;font-weight:600;">${current + 1}</strong>
+        <span style="color:rgba(245,236,224,0.35);margin:0 6px;">/</span>
+        <span>${segments}</span>
+      </div>
+    `;
+
+    host.innerHTML = `
+      <div style="
+        position:absolute;
+        top:${topPad}px;
+        left:${sideX}px;
+        right:${sideX}px;
+        display:flex;
+        align-items:center;
+        gap:16px;
+      ">
+        <div style="
+          display:flex;
+          gap:${gap}px;
+          flex:1;
+          align-items:center;
+        ">${bars.join("")}</div>
+        ${counterHtml}
+      </div>
+    `;
+  },
+
+  describe(_t, params, vp) {
+    const segments = Number.isInteger(params.segments) ? params.segments : 15;
+    const current = Number.isInteger(params.current) ? params.current : 0;
+    return {
+      sceneId: "dimNav",
+      phase: "hold",
+      progress: (current + 1) / segments,
+      visible: true,
+      params,
+      elements: [
+        { type: "progress", role: "segments", value: `${current + 1}/${segments}` },
+        { type: "text", role: "label", value: params.label || "" },
+      ],
+      boundingBox: {
+        x: Math.round(vp.width * 0.042),
+        y: Math.round(vp.height * 0.044),
+        w: Math.round(vp.width * 0.916),
+        h: 28,
+      },
+    };
+  },
+
+  sample() {
+    return {
+      segments: 15,
+      current: 4,
+      label: "维度",
+    };
+  },
+};
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    _rawRender(host, t, params, vp);
+    return host.outerHTML;
+  };
+} else {
+  _adaptedRender = _rawRender;
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// analogyCard (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/anthropic-warm/content-analogyCard.js)
+const analogyCard = (function(){
+// scenes/16x9/anthropic-warm/content-analogyCard.js
+//
+// 类比卡 - 用日常事物类比技术概念，serif 大字 + gold 边框卡片
+
+var _def = {
+  // ===== Identity =====
+  id: "analogyCard",
+  name: "类比卡",
+  version: "1.0.0",
+
+  // ===== Belonging =====
+  ratio: "16:9",
+  theme: "anthropic-warm",
+  role: "content",
+
+  // ===== Semantics =====
+  description: "gold 边框卡片 + serif 大字类比文本，用日常事物解释技术概念",
+  duration_hint: 4,
+
+  // ===== Render type =====
+  type: "dom",
+  frame_pure: true,
+  assets: [],
+
+  // ===== AI understanding =====
+  intent: `
+    Claude Code 源码讲解系列的灵魂组件——整个 E01 脚本出现 15+ 次类比
+    （微信、餐厅、快递包裹、员工手册、工具箱、CDN、旧笔记本、安检员、
+    瑞士军刀、看医生、真空压缩袋、洗衣机循环、总经理实习生……），
+    是方法论「深入浅出」的核心视觉载体。
+    用 Georgia serif 700 字体（#f5ece0）承载 36-40px 类比正文，
+    区别于 sans 正文的技术感，暗示"这一页是换个角度讲"。
+    卡片底色 gold-12 (rgba(212,180,131,.06)) + 1px gold 边 ，
+    左上角「类比」小标签（gold #d4b483 大写）快速让观众识别页面类型。
+    关键词用 <strong> 包裹显示为 ac 橙 #da7756，让扫视时抓得住重点。
+    最多 3 行，超过改成多页类比。
+  `,
+
+  when_to_use: [
+    "新技术概念出场时先用一个日常类比（微信/餐厅/员工手册 等）",
+    "抽象机制前先给一个生活中的对应物（CDN → 全球缓存 / 旧笔记本 → Memory）",
+    "复杂流程的总结页（洗衣机循环类比 Agent Loop）",
+  ],
+
+  when_not_to_use: [
+    "需要呈现技术事实本身（用 content-keyPoints 或 content-codeBlock）",
+    "类比文字超过 3 行——拆成多张 slide 或用普通正文",
+    "金句收尾场景（用 text-goldenQuote，那是 quote 不是 analogy）",
+  ],
+
+  limitations: [
+    "单卡一个类比，不做并列多卡（那是 compareCols 的工作）",
+    "正文建议 ≤ 60 汉字，超长会溢出卡片或字号被迫缩到难读",
+    "无逐字/逐段进入动画——整卡由 timeline enter/exit 控制",
+  ],
+
+  inspired_by: "3Blue1Brown 章节引入类比 + Anthropic 官方 doc 的 callout 卡片",
+  used_in: [
+    "claude-code-源码讲解 E01 Slide 02（微信类比）",
+    "claude-code-源码讲解 E01 Slide 11（预装 App 类比）",
+    "claude-code-源码讲解 E01 Slide 48（洗衣机循环类比）",
+  ],
+
+  requires: [],
+  pairs_well_with: ["bg-warmGradient", "chrome-titleBar", "content-keyPoints"],
+  conflicts_with: [],
+  alternatives: ["text-goldenQuote（金句不是类比）", "content-compareCols（并列对比）"],
+
+  visual_weight: "medium",
+  z_layer: "content",
+  mood: ["warm", "explanatory", "conversational"],
+
+  tags: ["analogy", "callout", "serif", "card", "explanation", "metaphor"],
+
+  complexity: "simple",
+  performance: { cost: "low", notes: "pure DOM card, no animation" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-15", change: "initial — gold card + serif analogy body + optional keyword highlights" },
+  ],
+
+  // ===== Params =====
+  params: {
+    label: {
+      type: "string",
+      default: "类比",
+      semantic: "卡片左上角小标签，默认「类比」，也可写「就像 / 想象一下 / 举个例子」",
+    },
+    text: {
+      type: "string",
+      required: true,
+      semantic: "类比正文，可用 **关键词** 标注橙色高亮（最多 3 处），建议 ≤ 60 汉字",
+    },
+  },
+
+  enter: null,
+  exit: null,
+
+  // ===== 3 functions =====
+  render(host, _t, params, vp) {
+    const label = escapeHtml(params.label || "类比");
+    const rawText = String(params.text || "");
+    const text = renderInline(rawText);
+    const w = vp.width;
+    const h = vp.height;
+
+    const cardW = Math.round(w * 0.5);           // 960px
+    const padV = Math.round(h * 0.054);          // ~58px
+    const padH = Math.round(w * 0.033);          // ~64px
+    const labelSize = Math.round(w * 0.0094);    // ~18px
+    const bodySize = Math.round(w * 0.0208);     // ~40px
+    const cardLeft = Math.round((w - cardW) / 2);
+    const cardTop = Math.round(h * 0.24);
+
+    host.innerHTML = `
+      <div style="
+        position:absolute;
+        left:${cardLeft}px;
+        top:${cardTop}px;
+        width:${cardW}px;
+        padding:${padV}px ${padH}px;
+        background:rgba(212,180,131,0.06);
+        border:1px solid rgba(212,180,131,0.18);
+        border-radius:12px;
+      ">
+        <div style="
+          display:inline-block;
+          color:#d4b483;
+          font:600 ${labelSize}px/1 system-ui,-apple-system,'PingFang SC',sans-serif;
+          letter-spacing:0.08em;
+          text-transform:uppercase;
+          padding:4px 14px;
+          border:1px solid rgba(212,180,131,0.30);
+          border-radius:4px;
+          margin-bottom:${Math.round(h*0.03)}px;
+        ">${label}</div>
+        <div style="
+          color:#f5ece0;
+          font:700 ${bodySize}px/1.6 Georgia,'Hiragino Mincho ProN','Noto Serif SC',serif;
+        ">${text}</div>
+      </div>
+    `;
+  },
+
+  describe(_t, params, vp) {
+    return {
+      sceneId: "analogyCard",
+      phase: "hold",
+      progress: 1,
+      visible: true,
+      params,
+      elements: [
+        { type: "text", role: "label", value: params.label || "类比" },
+        { type: "text", role: "body", value: params.text || "" },
+      ],
+      boundingBox: {
+        x: Math.round(vp.width * 0.25),
+        y: Math.round(vp.height * 0.24),
+        w: Math.round(vp.width * 0.5),
+        h: Math.round(vp.height * 0.5),
+      },
+    };
+  },
+
+  sample() {
+    return {
+      label: "类比",
+      text: "你打微信说「你好」两个字，但实际发出去的数据包里，有**头像、昵称、时间戳、加密签名**——几十个字段。你打的那两个字，只是其中很小一部分。",
+    };
+  },
+};
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Markdown-lite: **word** → <strong> with ac orange
+function renderInline(s) {
+  const escaped = escapeHtml(s);
+  return escaped.replace(/\*\*([^*]+)\*\*/g, (_m, kw) =>
+    `<strong style="color:#da7756;font-weight:700;">${kw}</strong>`
+  );
+}
+// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    _rawRender(host, t, params, vp);
+    return host.outerHTML;
+  };
+} else {
+  _adaptedRender = _rawRender;
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// statNumber (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/anthropic-warm/content-statNumber.js)
+const statNumber = (function(){
+// scenes/16x9/anthropic-warm/content-statNumber.js
+//
+// 大数字 - 视觉锤式的巨大数字 + 单位 + 说明，强化关键数据点
+
+var _def = {
+  // ===== Identity =====
+  id: "statNumber",
+  name: "大数字",
+  version: "1.0.0",
+
+  // ===== Belonging =====
+  ratio: "16:9",
+  theme: "anthropic-warm",
+  role: "content",
+
+  // ===== Semantics =====
+  description: "单个巨大数字（ac 橙 200-300px）+ 单位 + 上方 kicker + 下方说明，作为视觉锤",
+  duration_hint: 3,
+
+  // ===== Render type =====
+  type: "dom",
+  frame_pure: true,
+  assets: [],
+
+  // ===== AI understanding =====
+  intent: `
+    E01 脚本最抓人的钩子是具体数字："87 类"、"3000 多字"、"2 万字"、"2.5 万字"、"3.5 万字"、
+    "100 万 token"、"8 万 → 4 万"。这些数字每个都值得一张独立 slide 砸在观众脸上。
+    类比衣戈猜想「信息密度」「数字爆破」的手法——一个大数字 = 一个认知锚点。
+    视觉 (参考 style/landscape-atoms/stat-number.html)：
+    - 数字本体：ac 橙 #da7756，字号 ~240px（viewport.width * 0.125），超粗 900，
+      让它成为屏幕上最重的东西，观众视线必被抓住
+    - 单位（字/类/轮/token）：紧贴数字右下角，gold #d4b483，~64px，下沉 baseline
+    - kicker（上方预告）：ink-75 uppercase 小字，~22px，letter-spacing 0.14em，
+      讲"这个数字指的是什么"（如 "API 请求规模"）
+    - 说明（下方收束）：ink 正文 ~32px，一句话解释数字的意义
+      （如"最干净的状态下，已经 2 万字了"）
+    - 副字（可选）：gold + 斜体，用来放"对比上一个数字"的信息
+      （如"比 Session 1 多了 0.5 万字"）
+    所有文字居中对齐，整块垂直居中在主内容区。
+    一张 slide 只讲一个数字——数字和上下文共同构成视觉锤。
+  `,
+
+  when_to_use: [
+    "开场爆点数字（E01 Slide 01「87 类」）",
+    "每个 Session 结尾的规模总结（2 万/2.5 万/4 万字）",
+    "压缩前后 delta（8 万 → 4 万）",
+    "任何需要把一个具体数字『敲进观众脑子』的时刻",
+  ],
+
+  when_not_to_use: [
+    "有多个并列数字——用 content-compareCols 或 stat-grid",
+    "数字本身没有强信息量（『3』『5』这种普通计数）",
+    "数字是代码里的配置值（用 content-codeBlock 更合适）",
+  ],
+
+  limitations: [
+    "单个数字最多 6 个字符（含逗号），如 1,000,000 还行，再长字号会被挤小",
+    "unit 建议 ≤ 3 汉字 / 6 英文字符",
+    "不做数字动画（计数效果由 timeline 动画负责，这里保持 frame_pure）",
+  ],
+
+  inspired_by: "衣戈猜想数字爆点 + NYT Graphics 年度报告大数字 + stat-number.html",
+  used_in: [
+    "claude-code-源码讲解 E01 Slide 01（87 类）",
+    "claude-code-源码讲解 E01 Slide 23（Session 1：2.5 万字）",
+    "claude-code-源码讲解 E01 Slide 32（Session 3：20 轮）",
+  ],
+
+  requires: [],
+  pairs_well_with: ["bg-warmGradient", "chrome-titleBar", "content-analogyCard", "text-goldenQuote"],
+  conflicts_with: [],
+  alternatives: ["text-goldenQuote（金句不是数字）", "content-keyPoints（多条并列）"],
+
+  visual_weight: "high",
+  z_layer: "content",
+  mood: ["impactful", "emphatic"],
+
+  tags: ["stat", "number", "hero", "emphasis", "hook", "metric"],
+
+  complexity: "simple",
+  performance: { cost: "low", notes: "pure DOM text, no SVG" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-15", change: "initial — hero number + unit + kicker + caption" },
+  ],
+
+  // ===== Params =====
+  params: {
+    kicker: {
+      type: "string",
+      default: "",
+      semantic: "数字上方的小字预告，uppercase（如「API 请求规模」），≤ 20 字",
+    },
+    number: {
+      type: "string",
+      required: true,
+      semantic: "数字本身，可含逗号和小数点（如 '87' '2.5万' '100K'），≤ 6 字符视觉最好",
+    },
+    unit: {
+      type: "string",
+      default: "",
+      semantic: "数字单位（如「类」「字」「token」「轮」），≤ 3 汉字",
+    },
+    caption: {
+      type: "string",
+      default: "",
+      semantic: "下方一句话说明，≤ 30 汉字（如「最干净状态下的包裹规模」）",
+    },
+    sub: {
+      type: "string",
+      default: "",
+      semantic: "可选副字（gold 斜体），做对比或补充（如「比上一轮多 5000 字」）",
+    },
+  },
+
+  enter: null,
+  exit: null,
+
+  // ===== 3 functions =====
+  render(host, _t, params, vp) {
+    const w = vp.width;
+    const h = vp.height;
+    const kicker = escapeHtml(params.kicker || "");
+    const number = escapeHtml(params.number || "");
+    const unit = escapeHtml(params.unit || "");
+    const caption = escapeHtml(params.caption || "");
+    const sub = escapeHtml(params.sub || "");
+
+    const numberSize = Math.round(w * 0.125);       // ~240px
+    const unitSize = Math.round(w * 0.0333);        // ~64px
+    const kickerSize = Math.round(w * 0.0115);      // ~22px
+    const captionSize = Math.round(w * 0.0167);     // ~32px
+    const subSize = Math.round(w * 0.0125);         // ~24px
+
+    const contentTop = Math.round(h * 0.22);
+    const blockH = Math.round(h * 0.6);
+
+    host.innerHTML = `
+      <div style="
+        position:absolute;
+        left:0;
+        top:${contentTop}px;
+        width:${w}px;
+        height:${blockH}px;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:${Math.round(h*0.026)}px;
+      ">
+        ${kicker ? `<div style="
+          color:rgba(245,236,224,0.75);
+          font:600 ${kickerSize}px/1.3 system-ui,-apple-system,'PingFang SC',sans-serif;
+          letter-spacing:0.14em;
+          text-transform:uppercase;
+          text-align:center;
+        ">${kicker}</div>` : ""}
+        <div style="
+          display:flex;
+          align-items:baseline;
+          justify-content:center;
+          gap:${Math.round(w*0.011)}px;
+          line-height:1;
+        ">
+          <span style="
+            color:#da7756;
+            font:900 ${numberSize}px/1 system-ui,-apple-system,'PingFang SC',sans-serif;
+            letter-spacing:-0.02em;
+            text-shadow:0 4px 24px rgba(218,119,86,0.25);
+          ">${number}</span>
+          ${unit ? `<span style="
+            color:#d4b483;
+            font:700 ${unitSize}px/1 system-ui,-apple-system,'PingFang SC',sans-serif;
+            margin-left:6px;
+          ">${unit}</span>` : ""}
+        </div>
+        ${caption ? `<div style="
+          color:#f5ece0;
+          font:500 ${captionSize}px/1.4 system-ui,-apple-system,'PingFang SC',sans-serif;
+          text-align:center;
+          max-width:${Math.round(w*0.7)}px;
+        ">${caption}</div>` : ""}
+        ${sub ? `<div style="
+          color:#d4b483;
+          font:400 italic ${subSize}px/1.4 Georgia,'Hiragino Mincho ProN','Noto Serif SC',serif;
+          text-align:center;
+          opacity:0.9;
+        ">${sub}</div>` : ""}
+      </div>
+    `;
+  },
+
+  describe(_t, params, vp) {
+    return {
+      sceneId: "statNumber",
+      phase: "hold",
+      progress: 1,
+      visible: true,
+      params,
+      elements: [
+        { type: "text", role: "kicker", value: params.kicker || "" },
+        { type: "text", role: "number", value: params.number || "" },
+        { type: "text", role: "unit", value: params.unit || "" },
+        { type: "text", role: "caption", value: params.caption || "" },
+      ],
+      boundingBox: {
+        x: 0,
+        y: Math.round(vp.height * 0.22),
+        w: vp.width,
+        h: Math.round(vp.height * 0.6),
+      },
+    };
+  },
+
+  sample() {
+    return {
+      kicker: "API 请求里到底有什么",
+      number: "87",
+      unit: "类",
+      caption: "你写了 1 行，系统拼了 87 类。每一轮，重新拼一遍。",
+      sub: "我数过了 —— Claude Code 本人",
+    };
+  },
+};
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    _rawRender(host, t, params, vp);
+    return host.outerHTML;
+  };
+} else {
+  _adaptedRender = _rawRender;
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// fourSlots (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/anthropic-warm/content-fourSlots.js)
+const fourSlots = (function(){
+// scenes/16x9/anthropic-warm/content-fourSlots.js
+//
+// 四槽位网格 - 2×2 布局，展示 API 请求骨架的四个格子 (system/tools/messages/params)
+
+var _def = {
+  // ===== Identity =====
+  id: "fourSlots",
+  name: "四槽位网格",
+  version: "1.0.0",
+
+  // ===== Belonging =====
+  ratio: "16:9",
+  theme: "anthropic-warm",
+  role: "content",
+
+  // ===== Semantics =====
+  description: "2×2 网格四个格子，mono 槽位名 + sans 说明，专为讲「四个槽位 = API 请求骨架」设计",
+  duration_hint: 6,
+
+  // ===== Render type =====
+  type: "dom",
+  frame_pure: true,
+  assets: [],
+
+  // ===== AI understanding =====
+  intent: `
+    E01 脚本第二幕整幕只讲一件事——「不管内容多少，API 请求骨架就四个格子」。
+    system[] / tools[] / messages[] / params —— 这四个槽位在 E01 的 §5-10 被一一拆开，
+    又在 S1/S2/S3 三个 Session 里反复"往里塞东西"。是整集叙事的骨架。
+    因此需要一个单独的视觉组件，把这四个格子稳稳立起来，后续所有"注入"都围绕它说事。
+    2×2 等高网格，每格独立卡片：mono 槽位名（#da7756 橙，大写感强，像代码）+ sans 人话说明（#f5ece0 ink 正文）。
+    卡片间距 gap=32px（对齐网格），让四格之间呼吸感充足但仍是"一组"。
+    可选当前高亮（highlight 索引 0-3）——在 §6-9 逐个介绍时按节拍亮起对应格子。
+    高亮格子边变 ac 橙 + 外发光，不高亮的保持 ghost 底色。
+    参数默认值就是 E01 §5-9 里讲的那四个槽位，sample() 直接抄脚本原话。
+  `,
+
+  when_to_use: [
+    "E01 Slide 03「四个槽位」总览 + Slide 05-10 逐槽位介绍（带 highlight）",
+    "任何需要展示 2×2 结构化分类的场景（提示词槽位 / 4 象限模型）",
+    "S1/S2/S3 每轮 API 请求拆解前的骨架复习页",
+  ],
+
+  when_not_to_use: [
+    "槽位数不是 4 个（3 个用 flow-diagram、5 个以上用 keyPoints）",
+    "槽位之间有时序/箭头关系——那是 flow-diagram 的工作",
+    "每格内容超过 2 行短句——改用 compareCols 或拆页",
+  ],
+
+  limitations: [
+    "固定 2×2，不支持 1×4 / 4×1 横条（横条走 pillTags）",
+    "每格说明建议 ≤ 30 汉字，超长会换行影响格子等高",
+    "highlight 只能单选索引（0-3 或 null），不支持多格同时亮",
+  ],
+
+  inspired_by: "API 请求的 schema 截图 + Notion 数据库 kanban 2×2 视图",
+  used_in: [
+    "claude-code-源码讲解 E01 Slide 03（四槽位总览）",
+    "claude-code-源码讲解 E01 Slide 05-10（逐槽位高亮）",
+  ],
+
+  requires: [],
+  pairs_well_with: ["bg-warmGradient", "chrome-titleBar", "content-injectPath"],
+  conflicts_with: [],
+  alternatives: ["content-keyPoints（有序列表）", "content-compareCols（2 格对比）"],
+
+  visual_weight: "high",
+  z_layer: "content",
+  mood: ["structured", "technical", "systematic"],
+
+  tags: ["grid", "2x2", "slots", "api", "structure", "schema"],
+
+  complexity: "moderate",
+  performance: { cost: "low", notes: "static DOM grid, no per-frame updates" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-15", change: "initial — 2x2 slot grid with optional highlight index" },
+  ],
+
+  // ===== Params =====
+  params: {
+    title: {
+      type: "string",
+      default: "",
+      semantic: "可选标题，如「API 请求的四个槽位」",
+    },
+    slots: {
+      type: "array",
+      required: true,
+      semantic: "恰好 4 项数组，每项 { key: 'system[]', desc: '你是谁、怎么做' }",
+    },
+    highlight: {
+      type: "number",
+      default: -1,
+      semantic: "高亮索引 0-3，-1 表示不高亮。讲到第 N 个槽位时设为 N",
+    },
+  },
+
+  enter: null,
+  exit: null,
+
+  // ===== 3 functions =====
+  render(host, _t, params, vp) {
+    const slotsRaw = Array.isArray(params.slots) ? params.slots.slice(0, 4) : [];
+    while (slotsRaw.length < 4) slotsRaw.push({ key: "—", desc: "" });
+    const title = params.title || "";
+    const hl = Number.isInteger(params.highlight) ? params.highlight : -1;
+    const w = vp.width;
+    const h = vp.height;
+
+    const padX = Math.round(w * 0.05);
+    const contentTop = Math.round(h * 0.18);
+    const gap = Math.round(w * 0.017);           // ~32px
+    const gridW = w - padX * 2;
+    const cellW = Math.round((gridW - gap) / 2);
+    const cellH = Math.round(h * 0.3);           // ~324px each
+
+    const keySize = Math.round(w * 0.0188);       // ~36px mono
+    const descSize = Math.round(w * 0.0146);      // ~28px body
+    const titleSize = Math.round(w * 0.0208);
+
+    const cellHtml = slotsRaw.map((s, i) => {
+      const active = i === hl;
+      const border = active
+        ? "1px solid rgba(218,119,86,0.55)"
+        : "1px solid rgba(245,236,224,0.10)";
+      const bg = active
+        ? "rgba(218,119,86,0.08)"
+        : "rgba(245,236,224,0.04)";
+      const shadow = active
+        ? "box-shadow:0 0 40px rgba(218,119,86,0.22);"
+        : "";
+      const key = escapeHtml(s.key || "");
+      const desc = escapeHtml(s.desc || "");
+      return `
+        <div style="
+          width:${cellW}px;
+          height:${cellH}px;
+          padding:${Math.round(h*0.037)}px ${Math.round(w*0.022)}px;
+          background:${bg};
+          border:${border};
+          border-radius:12px;
+          display:flex;
+          flex-direction:column;
+          justify-content:center;
+          gap:${Math.round(h*0.022)}px;
+          ${shadow}
+        ">
+          <div style="
+            color:#da7756;
+            font:700 ${keySize}px/1.2 'SF Mono','JetBrains Mono','Fira Code',Consolas,monospace;
+            letter-spacing:0.02em;
+          ">${key}</div>
+          <div style="
+            color:#f5ece0;
+            font:500 ${descSize}px/1.55 system-ui,-apple-system,'PingFang SC',sans-serif;
+          ">${desc}</div>
+        </div>
+      `;
+    }).join("");
+
+    const titleHtml = title ? `
+      <div style="
+        color:rgba(245,236,224,0.75);
+        font:600 ${titleSize}px/1.3 system-ui,-apple-system,'PingFang SC',sans-serif;
+        margin-bottom:${Math.round(h*0.028)}px;
+      ">${escapeHtml(title)}</div>
+    ` : "";
+
+    host.innerHTML = `
+      <div style="
+        position:absolute;
+        left:${padX}px;
+        top:${contentTop}px;
+        width:${gridW}px;
+      ">
+        ${titleHtml}
+        <div style="
+          display:grid;
+          grid-template-columns:repeat(2,${cellW}px);
+          grid-template-rows:repeat(2,${cellH}px);
+          gap:${gap}px;
+        ">${cellHtml}</div>
+      </div>
+    `;
+  },
+
+  describe(_t, params, vp) {
+    const slots = Array.isArray(params.slots) ? params.slots : [];
+    return {
+      sceneId: "fourSlots",
+      phase: "hold",
+      progress: 1,
+      visible: true,
+      params,
+      elements: [
+        { type: "text", role: "title", value: params.title || "" },
+        ...slots.map((s, i) => ({
+          type: "slot",
+          role: `slot-${i}`,
+          value: s.key,
+          active: i === params.highlight,
+        })),
+      ],
+      boundingBox: {
+        x: Math.round(vp.width * 0.05),
+        y: Math.round(vp.height * 0.18),
+        w: Math.round(vp.width * 0.9),
+        h: Math.round(vp.height * 0.66),
+      },
+    };
+  },
+
+  sample() {
+    return {
+      title: "API 请求的四个槽位",
+      slots: [
+        { key: "system[]", desc: "你是谁、你该怎么做（员工手册）" },
+        { key: "tools[]", desc: "你手里有哪些工具（每个带说明书）" },
+        { key: "messages[]", desc: "对话历史 + 系统悄悄塞的东西" },
+        { key: "params", desc: "用哪个模型、最多多少 token、思考模式" },
+      ],
+      highlight: 2,
+    };
+  },
+};
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    _rawRender(host, t, params, vp);
+    return host.outerHTML;
+  };
+} else {
+  _adaptedRender = _rawRender;
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// codeBlock (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/anthropic-warm/content-codeBlock.js)
+const codeBlock = (function(){
+// scenes/16x9/anthropic-warm/content-codeBlock.js
+//
+// 代码块 - 等宽代码展示：行号 + 简单 syntax highlight，讲源码时的核心组件
+
+var _def = {
+  // ===== Identity =====
+  id: "codeBlock",
+  name: "代码块",
+  version: "1.0.0",
+
+  // ===== Belonging =====
+  ratio: "16:9",
+  theme: "anthropic-warm",
+  role: "content",
+
+  // ===== Semantics =====
+  description: "等宽代码展示：行号 + 简单 syntax highlight，讲源码时的核心组件",
+  duration_hint: 8,
+
+  // ===== Render type =====
+  type: "dom",
+  frame_pure: true,
+  assets: [],
+
+  // ===== AI understanding (18 fields) =====
+  intent: `
+    「源码讲解」系列最重要的内容组件。直接展示真实代码片段，配合旁白解读。
+    用 DOM 而非 canvas 的理由：中文注释在 canvas 上会显示方框，DOM 原生支持 CJK。
+    背景用 #15110c（inset 色，比主背景更深），营造"终端/编辑器"感，不用纯黑避免割裂。
+    行号用 rgba(245,236,224,.25) 低对比，不抢眼；代码本体 #f5ece0，关键词高亮：
+    keyword=#da7756橙、string=#7ec699绿、comment=rgba(245,236,224,.40)灰。
+    只做 keyword/string/comment 三类高亮——够用且不需要引入 prism.js 等外部库。
+    可选 highlight_lines 把某行加 rgba(218,119,86,.12) 底色，配合旁白点出关键行。
+  `,
+
+  when_to_use: [
+    "展示真实源码片段，配旁白逐行解读",
+    "对比「理解的代码」和「实际代码」",
+    "展示 prompts.ts / claude.ts 等关键文件的片段",
+  ],
+
+  when_not_to_use: [
+    "代码超过 20 行——屏幕放不下，改拆成多张 slide 或用 2 列对比",
+    "伪代码/概念演示——改用 content-keyPoints 更清晰",
+    "需要行级动画逐行出现——当前版本无此能力，需自定义",
+  ],
+
+  limitations: [
+    "highlight 规则仅处理 JS/TS 关键词 + 字符串 + 注释，Python/Rust 等仅字符串和注释有效",
+    "每行建议 ≤ 60 字符，超长会横向溢出（无 scroll）",
+    "最多约 18-20 行，超过会溢出主内容区",
+  ],
+
+  inspired_by: "VS Code Dark+ 主题配色 + Anthropic 暖棕调色盘",
+  used_in: ["claude-code-源码讲解 E07 代码演示 slide"],
+
+  requires: [],
+  pairs_well_with: ["bg-warmGradient", "chrome-titleBar", "content-keyPoints"],
+  conflicts_with: [],
+  alternatives: ["content-keyPoints（纯文字要点）"],
+
+  visual_weight: "high",
+  z_layer: "content",
+  mood: ["technical", "focused"],
+
+  tags: ["code", "syntax-highlight", "monospace", "source", "technical", "typescript"],
+
+  complexity: "medium",
+  performance: { cost: "low", notes: "DOM innerHTML, highlight is pure string regex — no external lib" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-15", change: "initial — line numbers + keyword/string/comment highlight + highlight_lines" },
+  ],
+
+  // ===== Params =====
+  params: {
+    language: {
+      type: "string",
+      default: "typescript",
+      semantic: "语言标签，仅显示用（不影响高亮逻辑）",
+    },
+    filename: {
+      type: "string",
+      default: "",
+      semantic: "文件名，显示在代码块顶部，如「prompts.ts」",
+    },
+    code: {
+      type: "string",
+      required: true,
+      semantic: "代码字符串，换行用 \\n",
+    },
+    highlight_lines: {
+      type: "array",
+      default: [],
+      semantic: "1-indexed 行号数组，标亮这些行，如 [3, 4, 5]",
+    },
+  },
+
+  enter: null,
+  exit: null,
+
+  // ===== 3 functions =====
+  render(host, _t, params, vp) {
+    const code = params.code || "";
+    const filename = params.filename || "";
+    const language = params.language || "typescript";
+    const highlightLines = Array.isArray(params.highlight_lines) ? params.highlight_lines : [];
+
+    const w = vp.width;
+    const h = vp.height;
+    const padX = Math.round(w * 0.05);
+    const contentTop = 96;
+    const topOffset = Math.round(h * 0.037);
+
+    const monoSize = Math.round(w * 0.0125); // ~24px
+    const lineH = 1.65;
+
+    const lines = code.split("\n");
+
+    const linesHtml = lines.map((line, i) => {
+      const lineNum = i + 1;
+      const isHighlighted = highlightLines.includes(lineNum);
+      const highlightedCode = syntaxHighlight(line);
+      return `
+        <div style="
+          display:flex;
+          background:${isHighlighted ? "rgba(218,119,86,0.12)" : "transparent"};
+          border-left:${isHighlighted ? "2px solid #da7756" : "2px solid transparent"};
+          padding:0 ${Math.round(w*0.01)}px;
+          min-height:${Math.round(monoSize * lineH)}px;
+          align-items:center;
+        ">
+          <span style="
+            color:rgba(245,236,224,0.25);
+            font:400 ${monoSize}px/${lineH} 'SF Mono','JetBrains Mono','Fira Code',Consolas,monospace;
+            min-width:${Math.round(w*0.022)}px;
+            text-align:right;
+            padding-right:${Math.round(w*0.01)}px;
+            user-select:none;
+            flex-shrink:0;
+          ">${lineNum}</span>
+          <span style="
+            color:#f5ece0;
+            font:400 ${monoSize}px/${lineH} 'SF Mono','JetBrains Mono','Fira Code',Consolas,monospace;
+            white-space:pre;
+          ">${highlightedCode}</span>
+        </div>
+      `;
+    }).join("");
+
+    const headerHtml = (filename || language) ? `
+      <div style="
+        display:flex;align-items:center;justify-content:space-between;
+        padding:${Math.round(h*0.012)}px ${Math.round(w*0.015)}px;
+        border-bottom:1px solid rgba(245,236,224,0.10);
+      ">
+        <span style="
+          color:rgba(245,236,224,0.50);
+          font:400 ${Math.round(w*0.0115)}px/1 'SF Mono','JetBrains Mono','Fira Code',Consolas,monospace;
+        ">${escapeHtml(filename)}</span>
+        <span style="
+          color:rgba(245,236,224,0.25);
+          font:400 ${Math.round(w*0.0104)}px/1 system-ui,-apple-system,'PingFang SC',sans-serif;
+        ">${escapeHtml(language)}</span>
+      </div>
+    ` : "";
+
+    host.innerHTML = `
+      <div style="
+        position:absolute;
+        left:${padX}px;
+        top:${contentTop + topOffset}px;
+        width:${w - padX * 2}px;
+        background:#15110c;
+        border-radius:8px;
+        border:1px solid rgba(245,236,224,0.10);
+        overflow:hidden;
+      ">
+        ${headerHtml}
+        <div style="
+          padding:${Math.round(h*0.018)}px 0;
+          overflow:hidden;
+        ">
+          ${linesHtml}
+        </div>
+      </div>
+    `;
+  },
+
+  describe(_t, params, vp) {
+    const lines = (params.code || "").split("\n");
+    return {
+      sceneId: "codeBlock",
+      phase: "hold",
+      progress: 1,
+      visible: true,
+      params,
+      elements: [
+        { type: "text", role: "filename", value: params.filename || "" },
+        { type: "code", role: "content", value: `${lines.length} lines`, language: params.language },
+        { type: "highlight", role: "highlighted-lines", value: (params.highlight_lines || []).join(",") },
+      ],
+      boundingBox: {
+        x: Math.round(vp.width * 0.05),
+        y: 136,
+        w: Math.round(vp.width * 0.9),
+        h: Math.round(vp.height * 0.75),
+      },
+    };
+  },
+
+  sample() {
+    return {
+      filename: "prompts.ts",
+      language: "typescript",
+      highlight_lines: [4, 5, 6],
+      code: `// Claude Code 提示词拼装核心逻辑
+// 每次对话都重新执行一遍
+async function buildSystemPrompt(ctx: Context): Promise<string[]> {
+  const slots: string[] = [];
+  slots.push(await getFactoryDefaults(ctx));   // 出厂设置
+  slots.push(await getUserConfig(ctx));          // 用户配置
+  slots.push(await getSessionContext(ctx));      // 会话上下文
+  slots.push(await getToolResults(ctx));         // 工具结果
+  return slots.filter(Boolean);
+}`,
+    };
+  },
+};
+// Minimal syntax highlighter — keyword / string / comment only, no external lib
+function syntaxHighlight(line) {
+  // escape HTML first
+  let s = escapeHtml(line);
+  // single-line comment
+  s = s.replace(/(\/\/.*$)/g, '<span style="color:rgba(245,236,224,0.40)">$1</span>');
+  // strings (double / single / backtick) — only if not already inside comment span
+  s = s.replace(/(&quot;[^&]*&quot;|&#x27;[^&#]*&#x27;|`[^`]*`)/g,
+    '<span style="color:#7ec699">$1</span>');
+  // keywords
+  const kws = ['const', 'let', 'var', 'function', 'async', 'await', 'return',
+    'export', 'import', 'from', 'class', 'interface', 'type', 'extends',
+    'implements', 'new', 'if', 'else', 'for', 'while', 'of', 'in',
+    'true', 'false', 'null', 'undefined', 'void', 'string', 'number',
+    'boolean', 'Promise', 'string\\[\\]'];
+  kws.forEach(kw => {
+    s = s.replace(new RegExp(`\\b(${kw})\\b`, "g"),
+      '<span style="color:#da7756">$1</span>');
+  });
+  return s;
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    _rawRender(host, t, params, vp);
+    return host.outerHTML;
+  };
+} else {
+  _adaptedRender = _rawRender;
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// goldenQuote (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/anthropic-warm/text-goldenQuote.js)
+const goldenQuote = (function(){
+// scenes/16x9/anthropic-warm/text-goldenQuote.js
+//
+// 金句卡 - serif 大字金句 + 金色引号装饰，视频收尾或转折点的强调画面
+
+var _def = {
+  // ===== Identity =====
+  id: "goldenQuote",
+  name: "金句卡",
+  version: "1.0.0",
+
+  // ===== Belonging =====
+  ratio: "16:9",
+  theme: "anthropic-warm",
+  role: "text",
+
+  // ===== Semantics =====
+  description: "serif 大字金句 + 金色引号装饰，视频收尾或转折点的强调画面",
+  duration_hint: 6,
+
+  // ===== Render type =====
+  type: "dom",
+  frame_pure: true,
+  assets: [],
+
+  // ===== AI understanding (18 fields) =====
+  intent: `
+    每集视频最值得截图传播的那一帧。金句需要视觉仪式感：serif 字体（Georgia 或宋体）
+    比 sans 更有历史重量感；#d4b483 金色引号大号装饰（120px），用 opacity 0.3 的
+    开闭双引号在文字前后浮现，不喧宾夺主但提供视觉锚点。
+    文字主色仍用 #f5ece0 米白，行高 1.5 让中文长句呼吸感好。
+    可选 attribution 署名用小号 Caption (22px) + gold 色，如「— Claude Code 本人」。
+    整体居中布局，垂直居中于主内容区（72px 顶部 chrome 以下），留足天地白。
+    设计参考：Apple keynote 金句页 + 3Blue1Brown 片尾语录。
+  `,
+
+  when_to_use: [
+    "每集视频的收尾金句，情绪高点",
+    "章节转折点，用一句话总结前一章节的核心洞察",
+    "B 站封面图，配 thumbnail 截图用",
+  ],
+
+  when_not_to_use: [
+    "内容超过 40 个汉字——字太小且不够金句感，改用 content-keyPoints",
+    "需要多行对比的场合——改用 content-fourSlots",
+  ],
+
+  limitations: [
+    "建议金句 ≤ 35 汉字，超过会分两行且引号装饰错位",
+    "serif 字体依赖系统字体：macOS 有 Hiragino Mincho ProN，Windows 可能降级为宋体",
+  ],
+
+  inspired_by: "Apple keynote 金句页 + 3Blue1Brown 片尾语录风格",
+  used_in: ["claude-code-源码讲解 E07 收尾金句 Slide 33"],
+
+  requires: [],
+  pairs_well_with: ["bg-warmGradient", "chrome-footer"],
+  conflicts_with: ["content-keyPoints（同时出现会竞争视觉焦点）"],
+  alternatives: ["text-headline（无引号装饰的标题）"],
+
+  visual_weight: "high",
+  z_layer: "text",
+  mood: ["inspirational", "warm", "closing"],
+
+  tags: ["quote", "serif", "golden", "closing", "highlight", "summary", "golden-quote"],
+
+  complexity: "simple",
+  performance: { cost: "low", notes: "pure DOM text, no images" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-15", change: "initial — serif quote + gold decorative marks + optional attribution" },
+  ],
+
+  // ===== Params =====
+  params: {
+    quote: {
+      type: "string",
+      required: true,
+      semantic: "金句正文，建议 ≤ 35 汉字",
+    },
+    attribution: {
+      type: "string",
+      default: "",
+      semantic: "可选署名，如「— Claude Code 本人」",
+    },
+  },
+
+  enter: null,
+  exit: null,
+
+  // ===== 3 functions =====
+  render(host, _t, params, vp) {
+    const quote = escapeHtml(params.quote || "");
+    const attribution = escapeHtml(params.attribution || "");
+    const w = vp.width;
+    const h = vp.height;
+
+    const quoteSize = Math.round(w * 0.0292);  // ~56px H2
+    const markSize = Math.round(w * 0.0625);   // ~120px decorative
+    const attrSize = Math.round(w * 0.0115);   // ~22px Caption
+    const chromePad = 72; // top chrome height
+    const padX = Math.round(w * 0.12);
+    const availH = h - chromePad;
+
+    host.innerHTML = `
+      <div style="
+        position:absolute;
+        left:${padX}px;
+        top:${chromePad}px;
+        width:${w - padX * 2}px;
+        height:${availH}px;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:${Math.round(h * 0.037)}px;
+      ">
+        <\!-- open quote mark -->
+        <div style="
+          font:700 ${markSize}px/1 Georgia,'Hiragino Mincho ProN','Noto Serif SC',serif;
+          color:rgba(212,180,131,0.30);
+          line-height:0.6;
+          align-self:flex-start;
+          margin-left:${Math.round(w*-0.005)}px;
+          user-select:none;
+        ">"</div>
+
+        <\!-- quote text -->
+        <div style="
+          color:#f5ece0;
+          font:700 ${quoteSize}px/1.5 Georgia,'Hiragino Mincho ProN','Noto Serif SC',serif;
+          text-align:center;
+          letter-spacing:0.02em;
+          margin-top:${Math.round(h*-0.06)}px;
+          max-width:${w - padX * 2}px;
+        ">${quote}</div>
+
+        <\!-- close quote mark -->
+        <div style="
+          font:700 ${markSize}px/1 Georgia,'Hiragino Mincho ProN','Noto Serif SC',serif;
+          color:rgba(212,180,131,0.30);
+          line-height:0.6;
+          align-self:flex-end;
+          margin-right:${Math.round(w*-0.005)}px;
+          margin-top:${Math.round(h*-0.04)}px;
+          user-select:none;
+        ">"</div>
+
+        ${attribution ? `
+        <\!-- attribution -->
+        <div style="
+          color:#d4b483;
+          font:400 ${attrSize}px/1.4 system-ui,-apple-system,'PingFang SC',sans-serif;
+          letter-spacing:0.06em;
+          margin-top:${Math.round(h*0.018)}px;
+        ">${attribution}</div>` : ""}
+      </div>
+    `;
+  },
+
+  describe(_t, params, vp) {
+    return {
+      sceneId: "goldenQuote",
+      phase: "hold",
+      progress: 1,
+      visible: true,
+      params,
+      elements: [
+        { type: "text", role: "quote", value: params.quote },
+        { type: "text", role: "attribution", value: params.attribution || "" },
+        { type: "decoration", role: "quote-marks", value: "gold open+close" },
+      ],
+      boundingBox: {
+        x: Math.round(vp.width * 0.12),
+        y: 72,
+        w: Math.round(vp.width * 0.76),
+        h: vp.height - 72,
+      },
+    };
+  },
+
+  sample() {
+    return {
+      quote: "你写了 1 行，系统拼了 87 类。每一轮，重新拼一遍。",
+      attribution: "— Claude Code 本人",
+    };
+  },
+};
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    _rawRender(host, t, params, vp);
+    return host.outerHTML;
+  };
+} else {
+  _adaptedRender = _rawRender;
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+const SCENES = Object.assign({}, window.__scenes || {}, {
+"warmGradient": warmGradient,
+"titleBar": titleBar,
+"dimNav": dimNav,
+"analogyCard": analogyCard,
+"statNumber": statNumber,
+"fourSlots": fourSlots,
+"codeBlock": codeBlock,
+"goldenQuote": goldenQuote
+});
+(() => {
+  const stageShell = document.getElementById("stage-shell");
+  const stage = document.getElementById("stage");
+  const controls = document.getElementById("controls");
+  const playBtn = document.getElementById("playBtn");
+  const scrubber = document.getElementById("scrubber");
+  const timeInfo = document.getElementById("timeInfo");
+  const phaseInfo = document.getElementById("phaseInfo");
+  const audioEl = document.getElementById("timeline-audio");
+  const timeline = TIMELINE || {};
+  const fps = Number(timeline.fps || 30);
+  const duration = Math.max(0, Number(timeline.duration || 0));
+  const viewport = {
+    width: Number(timeline.width || 1920),
+    height: Number(timeline.height || 1080),
+  };
+  const layers = Array.isArray(timeline.layers) ? timeline.layers : [];
+  if (audioEl && timeline.audio) {
+    const _audioSrc = typeof timeline.audio === "object" ? (timeline.audio.src || "") : String(timeline.audio);
+    if (_audioSrc) { audioEl.src = _audioSrc; window.__audioSrc = _audioSrc; }
+  }
+  let currentTime = 0;
+  let rafId = 0;
+  let isPlaying = false;
+  let recorderMode = false;
+  let dragActive = false;
+  let clockBaseTime = 0;
+  let clockBaseNow = 0;
+  let lastVisible = [];
+
+  function clampTime(value) {
+    if (!Number.isFinite(value)) return 0;
+    if (value < 0) return 0;
+    if (value > duration) return duration;
+    return value;
+  }
+
+  function formatTime(value) {
+    return clampTime(value).toFixed(2) + "s";
+  }
+
+  function applyScale() {
+    const controlsH = 56;
+    const availW = window.innerWidth;
+    const availH = window.innerHeight - controlsH;
+    const scale = Math.min(availW / viewport.width, availH / viewport.height);
+    const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+    const scaledW = viewport.width * safeScale;
+    const scaledH = viewport.height * safeScale;
+    stageShell.style.transform = "scale(" + safeScale + ")";
+    stageShell.style.left = Math.round((availW - scaledW) / 2) + "px";
+    stageShell.style.top = Math.round((availH - scaledH) / 2) + "px";
+  }
+
+  function replayInlineScripts(root) {
+    const scripts = root.querySelectorAll("script");
+    scripts.forEach((oldScript) => {
+      const newScript = document.createElement("script");
+      for (const attr of oldScript.attributes) {
+        newScript.setAttribute(attr.name, attr.value);
+      }
+      newScript.textContent = oldScript.textContent;
+      oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+  }
+
+  function renderSceneError(layer, message) {
+    return '<div style="position:absolute;inset:24px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,120,120,.35);background:rgba(20,0,0,.4);color:#ffb4b4;font:600 18px monospace">' +
+      message + " (" + String(layer.scene || "unknown") + ")</div>";
+  }
+
+  // Auto-generate SRT from timeline.audio.sentences (if audio-synth was used)
+  const _autoSrt = (function() {
+    const audio = timeline.audio;
+    if (!audio || typeof audio === "string") return null;
+    // audio can be {src:"path", sentences:[{text,start,end,words}]} from pipeline
+    const sentences = audio.sentences || (audio.segments && audio.segments.flatMap(function(seg) { return seg.sentences || []; }));
+    if (!Array.isArray(sentences) || sentences.length === 0) return null;
+    return sentences.map(function(s) { return { s: Number(s.start || 0), e: Number(s.end || 0), t: String(s.text || "") }; }).filter(function(e) { return e.t; });
+  })();
+
+  function resolveSceneParams(scene, rawParams, layerDataSource) {
+    const input = rawParams && typeof rawParams === "object" ? rawParams : {};
+    const meta = scene && scene.meta && typeof scene.meta === "object" ? scene.meta : {};
+    const paramsMeta = meta.params && typeof meta.params === "object" ? meta.params : {};
+    const defaults = {};
+    for (const [key, spec] of Object.entries(paramsMeta)) {
+      if (spec && Object.prototype.hasOwnProperty.call(spec, "default")) {
+        defaults[key] = spec.default;
+      }
+    }
+    const themes = meta.themes && typeof meta.themes === "object" ? meta.themes : {};
+    const themeKey = input.theme || meta.default_theme;
+    const themeValues = themeKey && themes[themeKey] && typeof themes[themeKey] === "object"
+      ? themes[themeKey]
+      : {};
+    const merged = { ...defaults, ...themeValues, ...input };
+    // Auto-inject SRT if layer has dataSource:"audio" and scene has srt param
+    if (layerDataSource === "audio" && _autoSrt && !merged.srt) {
+      merged.srt = _autoSrt;
+    }
+    // Auto-inject progress for progressBar scenes
+    if (layerDataSource === "progress" || (meta.id && meta.id.toLowerCase().indexOf("progress") >= 0)) {
+      // progress is handled per-frame in compose, not here
+    }
+    return merged;
+  }
+
+  function getPhaseLabel(visible) {
+    const active = visible[visible.length - 1];
+    if (!active) return "idle";
+    const meta = active.scene && active.scene.meta ? active.scene.meta : {};
+    const label = meta.label || active.layer.scene || "scene";
+    const layerId = active.layer.id || active.layer.scene || "layer";
+    return layerId + " · " + label;
+  }
+
+  function updateControls(time, visible) {
+    const activeVisible = visible && visible.length ? visible : lastVisible;
+    if (!dragActive) {
+      scrubber.value = duration > 0
+        ? String(Math.round((clampTime(time) / duration) * 10000))
+        : "0";
+    }
+    timeInfo.textContent = formatTime(time) + " / " + formatTime(duration);
+    phaseInfo.textContent = "Phase: " + getPhaseLabel(activeVisible);
+    playBtn.textContent = isPlaying ? "Pause" : "Play";
+    if (window.parent !== window) {
+      window.parent.postMessage({type:"nf-state", currentTime: clampTime(time), duration: duration, isPlaying: isPlaying}, "*");
+    }
+  }
+
+  function compose(time) {
+    const t = clampTime(time);
+    currentTime = t;
+    const visible = [];
+    const html = [];
+    for (let index = 0; index < layers.length; index += 1) {
+      const layer = layers[index];
+      const start = Number(layer.start || 0);
+      const dur = Number(layer.dur || 0);
+      if (t < start || t >= start + dur) continue;
+      const scene = SCENES[layer.scene];
+      let inner = "";
+      if (!scene || typeof scene.render !== "function") {
+        inner = renderSceneError(layer, "Missing scene renderer");
+      } else {
+        try {
+          inner = scene.render(t - start, resolveSceneParams(scene, layer.params, layer.dataSource), viewport);
+        } catch (err) {
+          inner = renderSceneError(layer, String(err && err.message ? err.message : err));
+        }
+      }
+      // Compute enter/exit effect CSS if layer has animation specs
+      var fxStyle = "";
+      if (typeof window.__nfEffect === "function") {
+        var localT = t - start;
+        var enterSpec = layer.enter;
+        var exitSpec = layer.exit;
+        if (enterSpec && enterSpec.effect && localT < (enterSpec.dur || 0.5)) {
+          var eProg = localT / (enterSpec.dur || 0.5);
+          fxStyle = window.__nfEffect(enterSpec.effect, eProg, enterSpec);
+        } else if (exitSpec && exitSpec.effect && localT > dur - (exitSpec.dur || 0.5)) {
+          var xProg = (localT - (dur - (exitSpec.dur || 0.5))) / (exitSpec.dur || 0.5);
+          fxStyle = window.__nfEffect(exitSpec.effect, xProg, exitSpec);
+        }
+      }
+      visible.push({ layer, scene });
+      html.push(
+        '<div class="nf-layer" data-layer-id="' + String(layer.id || layer.scene || index) + '"' +
+        ' style="position:absolute;inset:0;pointer-events:none;z-index:' + index + ';' + fxStyle + '">' +
+        inner +
+        "</div>"
+      );
+    }
+    // Persistent video elements: don't destroy & recreate, just update currentTime
+    const existingVideos = {};
+    stage.querySelectorAll("video[data-nf-persist]").forEach(function(v) {
+      existingVideos[v.getAttribute("data-nf-persist")] = v.parentElement.parentElement;
+    });
+
+    // Build new DOM, but reuse persistent video layers
+    const frag = document.createElement("div");
+    frag.innerHTML = html.join("");
+    const newChildren = Array.from(frag.children);
+
+    // Check which layers have persistent video
+    const usedPersist = new Set();
+    for (const child of newChildren) {
+      const vid = child.querySelector("video[data-nf-persist]");
+      if (vid) {
+        const key = vid.getAttribute("data-nf-persist");
+        if (existingVideos[key]) {
+          // Reuse existing layer — just update currentTime
+          const existingLayer = existingVideos[key];
+          const existingVid = existingLayer.querySelector("video[data-nf-persist]");
+          const newTime = parseFloat(vid.getAttribute("data-nf-time") || "0");
+          if (existingVid && Math.abs(existingVid.currentTime - newTime) > 0.1) {
+            existingVid.currentTime = newTime;
+          }
+          existingLayer.style.zIndex = child.style.zIndex;
+          usedPersist.add(key);
+        }
+      }
+    }
+
+    // Remove layers that are no longer visible (but keep persistent ones that are still active)
+    Array.from(stage.children).forEach(function(child) {
+      const vid = child.querySelector("video[data-nf-persist]");
+      if (vid && usedPersist.has(vid.getAttribute("data-nf-persist"))) return; // keep
+      child.remove();
+    });
+
+    // Add new layers (skip ones already persisted)
+    for (const child of newChildren) {
+      const vid = child.querySelector("video[data-nf-persist]");
+      if (vid && existingVideos[vid.getAttribute("data-nf-persist")]) continue; // already in DOM
+      stage.appendChild(child);
+    }
+
+    replayInlineScripts(stage);
+    lastVisible = visible;
+    updateControls(t, visible);
+    return { time: t, visible };
+  }
+
+  function syncClock(time) {
+    clockBaseTime = clampTime(time);
+    clockBaseNow = performance.now();
+  }
+
+  function stopPlayback() {
+    isPlaying = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+    if (audioEl) audioEl.pause();
+    updateControls(currentTime, []);
+  }
+
+  function tick() {
+    if (!isPlaying) return;
+    const nextTime = audioEl
+      ? clampTime(audioEl.currentTime)
+      : clampTime(clockBaseTime + (performance.now() - clockBaseNow) / 1000);
+    compose(nextTime);
+    if (nextTime >= duration) {
+      stopPlayback();
+      compose(duration);
+      return;
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  // Sync all persistent video elements
+  function syncVideos(t, playing) {
+    stage.querySelectorAll("video[data-nf-persist]").forEach(function(v) {
+      if (playing && v.paused) v.play().catch(function(){});
+      if (!playing && !v.paused) v.pause();
+      // Only seek if drift > 0.3s
+      if (Math.abs(v.currentTime - t) > 0.3) v.currentTime = t;
+    });
+  }
+
+  function play() {
+    if (isPlaying || duration <= 0 || recorderMode) return;
+    if (currentTime >= duration) {
+      currentTime = 0;
+      if (audioEl) audioEl.currentTime = 0;
+    }
+    isPlaying = true;
+    syncClock(currentTime);
+    if (audioEl) {
+      audioEl.currentTime = currentTime;
+      const playPromise = audioEl.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {
+          stopPlayback();
+          compose(currentTime);
+        });
+      }
+    }
+    syncVideos(currentTime, true);
+    updateControls(currentTime, []);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function pause() {
+    if (!isPlaying) return;
+    if (audioEl) currentTime = clampTime(audioEl.currentTime);
+    else currentTime = clampTime(clockBaseTime + (performance.now() - clockBaseNow) / 1000);
+    stopPlayback();
+    syncVideos(currentTime, false);
+    compose(currentTime);
+  }
+
+  function togglePlayback() {
+    if (isPlaying) pause();
+    else play();
+  }
+
+  function seek(time) {
+    const nextTime = clampTime(time);
+    currentTime = nextTime;
+    syncClock(nextTime);
+    if (audioEl) audioEl.currentTime = nextTime;
+    return compose(nextTime);
+  }
+
+  function scrubberTime() {
+    return duration <= 0
+      ? 0
+      : (Number(scrubber.value || 0) / 10000) * duration;
+  }
+
+  function extractTime(data) {
+    if (typeof data === "number") return clampTime(data);
+    if (data && Number.isFinite(data.time)) return clampTime(Number(data.time));
+    if (data && Number.isFinite(data.t)) return clampTime(Number(data.t));
+    if (data && Number.isFinite(data.currentTime)) return clampTime(Number(data.currentTime));
+    return currentTime;
+  }
+
+  function enableRecorderMode() {
+    if (recorderMode) return;
+    recorderMode = true;
+    stopPlayback();
+    controls.style.display = "none";
+  }
+
+  window.__onFrame = function(data) {
+    enableRecorderMode();
+    const result = seek(extractTime(data));
+    // Force layout flush + paint for WKWebView recorder
+    void stage.offsetHeight;
+    void stage.getBoundingClientRect();
+    return result;
+  };
+
+  playBtn.addEventListener("click", () => togglePlayback());
+  scrubber.addEventListener("pointerdown", () => { dragActive = true; });
+  scrubber.addEventListener("pointerup", () => { dragActive = false; });
+  scrubber.addEventListener("input", () => {
+    if (isPlaying) pause();
+    seek(scrubberTime());
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.code !== "Space") return;
+    const tag = event.target && event.target.tagName ? event.target.tagName : "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    event.preventDefault();
+    togglePlayback();
+  });
+  window.addEventListener("resize", applyScale);
+
+  if (audioEl) {
+    audioEl.addEventListener("ended", () => {
+      currentTime = duration;
+      stopPlayback();
+      compose(duration);
+    });
+  }
+
+  // Iframe embedding mode — use setInterval instead of rAF (rAF may not fire in WKWebView iframes)
+  const _iframeMode = (window.parent !== window);
+  let _intervalId = 0;
+  if (_iframeMode) {
+    controls.style.display = "none";
+    // Override play to use setInterval instead of rAF
+    const _origPlay = play;
+    play = function() {
+      _origPlay();
+      if (isPlaying && !_intervalId) {
+        _intervalId = setInterval(function() {
+          if (!isPlaying) { clearInterval(_intervalId); _intervalId = 0; return; }
+          tick(performance.now());
+        }, 33); // ~30fps
+      }
+    };
+    const _origPause = pause;
+    pause = function() {
+      _origPause();
+      if (_intervalId) { clearInterval(_intervalId); _intervalId = 0; }
+    };
+    window.addEventListener("message", function(event) {
+      const d = event.data;
+      if (!d || d.type !== "nf-cmd") return;
+      if (d.action === "play") play();
+      else if (d.action === "pause") pause();
+      else if (d.action === "toggle") togglePlayback();
+      else if (d.action === "seek" && typeof d.time === "number") seek(d.time);
+    });
+  }
+
+  applyScale();
+  // Support #t=N in URL to start at a specific time
+  const hashTime = parseFloat((location.hash.match(/t=([\d.]+)/) || [])[1]);
+  const initTime = isFinite(hashTime) ? hashTime : 0;
+  compose(initTime);
+  // Expose controls for external access (iframe parent, console, AppleScript)
+  window.__nfSeek = seek;
+  window.__nfPlay = play;
+  window.__nfPause = stopPlayback;
+  window.__nfToggle = togglePlayback;
+  window.__nfState = function() { return { currentTime: currentTime, duration: duration, isPlaying: isPlaying }; };
+  window.__nfPlay = play;
+  window.__nfPause = pause;
+})();
+</script>
+</body>
+</html>

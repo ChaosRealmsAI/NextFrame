@@ -77,45 +77,40 @@ render(host, t, params, vp) {
   // params = 已 merge default 的参数
   // host = 容器 HTMLElement，mutate innerHTML 或 appendChild
 
-  // 一次性入场动画（防重播）
-  if (host._rendered && t > 1.0) return;
-  host._rendered = true;
+  // t-driven 入场动画（compose 每帧调 render，CSS @keyframes 在这架构下无效 — 见 pitfalls #1）
+  // 把 t 直接映射为 opacity / translateY，frame_pure 必须 false
+  const fadeDur = 0.6;
+  const p = Math.min(Math.max(t / fadeDur, 0), 1);
+  const eased = 1 - Math.pow(1 - p, 3);  // easeOut cubic
+  const labelDelay = 0.2;
+  const labelP = Math.min(Math.max((t - labelDelay) / fadeDur, 0), 1);
+  const labelEased = 1 - Math.pow(1 - labelP, 3);
 
   // 从 theme.md 复制 hex 写死（不 import token）
   host.innerHTML = `
-    <style>
-      @keyframes fadeUp {
-        from { opacity: 0; transform: translateY(24px); }
-        to   { opacity: 1; transform: translateY(0); }
-      }
-      .card {
-        position: absolute;
-        left: 50%; top: 50%;
-        transform: translate(-50%, -50%);
-        width: ${vp.width * 0.6}px;
-        padding: 56px 64px;
-        background: rgba(212,180,131,0.06);
-        border: 1px solid rgba(212,180,131,0.18);
-        border-radius: 12px;
-        opacity: 0;
-        animation: fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.2s both;
-      }
-      .label {
+    <div style="
+      position: absolute;
+      left: 50%; top: 50%;
+      width: ${vp.width * 0.6}px;
+      padding: 56px 64px;
+      background: rgba(212,180,131,0.06);
+      border: 1px solid rgba(212,180,131,0.18);
+      border-radius: 12px;
+      transform: translate(-50%, calc(-50% + ${20 * (1-eased)}px));
+      opacity: ${eased};
+    ">
+      <div style="
         font: 600 14px/1 'SF Mono', monospace;
         color: #d4b483;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-      }
-      .text {
+        opacity: ${labelEased};
+      ">${escapeHtml(params.label || '类比')}</div>
+      <div style="
         font: 400 40px/1.6 Georgia, 'Noto Serif SC', serif;
         color: #f5ece0;
         margin-top: 32px;
-      }
-      .text strong { color: #da7756; font-weight: 700; }
-    </style>
-    <div class="card">
-      <div class="label">${escapeHtml(params.label || '类比')}</div>
-      <div class="text">${params.text || ''}</div>
+      "><strong style='color:#da7756;font-weight:700'>${escapeHtml(params.text || '')}</strong></div>
     </div>
   `;
 }
@@ -125,11 +120,11 @@ function escapeHtml(s) {
 }
 ```
 
-**关键点**：
-- `host._rendered` 缓存首次渲染状态 — 防止 compose 每帧 innerHTML 重置导致动画重播
-- inline `<style>` + `@keyframes` + `animation` — 不依赖外部 CSS
-- 所有颜色/字号/坐标写死 — 零 import
-- CSS 用 `var(--ease)` 太啰嗦，直接 inline `cubic-bezier(0.16,1,0.3,1)`
+**关键点（已更新）**：
+- **动画走 t-driven 不用 CSS @keyframes** — compose 每帧 createElement 新 host，CSS animation 会重置永不完成。把 t 直接算成 opacity / transform。
+- **frame_pure 必须 false** — 读了 t 做动画的组件必须这么标，否则 recorder 跳帧
+- 所有颜色/字号/坐标写死，零 import
+- 多元素 stagger 靠 labelDelay 偏移 t 值实现
 
 ### Canvas 组件（逐像素效果）
 
