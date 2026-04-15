@@ -30,7 +30,7 @@ OVER=$(find "${LINT_DIRS[@]}" -type f \( -name '*.rs' -o -name '*.js' \) \
   -not -path '*/target/*' -not -path '*/node_modules/*' \
   -not -path '*/.worktrees/*' -not -path '*/poc/*' \
   -not -path '*/output/*' -not -path '*/test*' \
-  -not -path '*/.ally/*' -not -name 'scene-bundle.js' \
+  -not -path '*/.ally/*' \
   | xargs wc -l 2>/dev/null | awk '$1 > 500 {print}' | grep -v total || true)
 if [ -n "$OVER" ]; then echo "FAIL: files >500 lines:" && echo "$OVER"; FAIL=1; else echo "PASS"; fi
 
@@ -43,11 +43,11 @@ OVER_TEST=$(find "${LINT_DIRS[@]}" -type f \( -name '*test*' -o -name '*tests*' 
 if [ -n "$OVER_TEST" ]; then echo "FAIL: test files >800 lines:" && echo "$OVER_TEST"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 6. JS var usage ==="
-VAR_COUNT=$(grep -rn '\bvar ' src/nf-runtime/web/src/ --include='*.js' 2>/dev/null | wc -l | tr -d ' ')
+VAR_COUNT=$(grep -rn '\bvar ' src/nf-runtime/web/js/ src/nf-core/ src/nf-cli/src/ --include='*.js' 2>/dev/null | grep -v 'node_modules' | grep -v '/target/' | wc -l | tr -d ' ')
 if [ "$VAR_COUNT" -gt 0 ]; then echo "FAIL: $VAR_COUNT var usages found"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 7. console.log ==="
-LOG_COUNT=$(grep -rn 'console\.log' src/nf-runtime/web/src/ --include='*.js' 2>/dev/null | grep -v '\[bridge\]' | wc -l | tr -d ' ')
+LOG_COUNT=$(grep -rn 'console\.log' src/nf-runtime/web/js/ --include='*.js' 2>/dev/null | grep -v '\[bridge\]' | wc -l | tr -d ' ')
 if [ "$LOG_COUNT" -gt 0 ]; then echo "FAIL: $LOG_COUNT console.log found"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 8. TODO/FIXME ==="
@@ -55,7 +55,7 @@ TODO_COUNT=$(grep -rn -P '//\s*(TODO|FIXME|HACK|XXX)\b|/\*\s*(TODO|FIXME|HACK|XX
 if [ "$TODO_COUNT" -gt 0 ]; then echo "FAIL: $TODO_COUNT TODO/FIXME found"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 9. scene cross-import ==="
-CROSS=$(grep -rn "from.*modules/" src/nf-runtime/web/src/components/ --include='*.js' 2>/dev/null || true)
+CROSS=$(grep -rn "from.*modules/" src/nf-core/scenes/ --include='*.js' 2>/dev/null || true)
 if [ -n "$CROSS" ]; then echo "FAIL: scenes import modules:" && echo "$CROSS"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 10. Cargo.toml deny rules ==="
