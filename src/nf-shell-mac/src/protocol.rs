@@ -33,17 +33,14 @@ macro_rules! define_scheme_handler {
             #[ivars = SchemeHandlerIvars]
             pub(crate) struct $name;
 
-            // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
-            unsafe impl NSObjectProtocol for $name {} // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
+            // SAFETY: objc2 trait — NSObject subclass, main-thread callbacks.
+            unsafe impl NSObjectProtocol for $name {}
 
             #[allow(non_snake_case)]
-            // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
+            // SAFETY: WKURLSchemeHandler — WebKit calls with valid objects on main thread.
             unsafe impl WKURLSchemeHandler for $name {
-                // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
                 #[unsafe(method(webView:startURLSchemeTask:))]
-                // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
                 unsafe fn web_view_start_urlscheme_task(
-                    // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
                     &self,
                     _web_view: &WKWebView,
                     task: &ProtocolObject<dyn WKURLSchemeTask>,
@@ -52,9 +49,7 @@ macro_rules! define_scheme_handler {
                 }
 
                 #[unsafe(method(webView:stopURLSchemeTask:))]
-                // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
                 unsafe fn web_view_stop_urlscheme_task(
-                    // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
                     &self,
                     _web_view: &WKWebView,
                     _task: &ProtocolObject<dyn WKURLSchemeTask>,
@@ -196,10 +191,7 @@ fn send_reply(
         Some(&version),
         Some(&headers),
     ) else {
-        return Err(
-            "Internal: failed to create HTTP response. Fix: verify the reply URL and headers are valid Objective-C values."
-                .to_string(),
-        );
+        return Err("Internal: failed to create HTTP response.".to_string());
     };
     unsafe {
         // SAFETY: Task protocol requires didReceiveResponse, then didReceiveData, then didFinish in order.
