@@ -34,10 +34,12 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
   examples("wysiwyg", `
     nextframe wysiwyg diff ./timeline.json --time=3.5
     nextframe wysiwyg edit /abs/path/timeline.json --layer=2 --action=move --dx=12 --dy=6 --json
+    nextframe wysiwyg diff ./timeline.json --t=3.5
+    nextframe wysiwyg simulate ./timeline.json --layer=2 move 120 60 --json
   `),
   examples("wysiwyg diff", `
-    nextframe wysiwyg diff ./timeline.json --time=3.5
-    nextframe wysiwyg diff ./timeline.json --time=00:03.5 --json
+    nextframe wysiwyg diff ./timeline.json --t=3.5
+    nextframe wysiwyg diff ./timeline.json --t=00:03.5 --json
   `),
   examples("wysiwyg edit", `
     nextframe wysiwyg edit /abs/path/timeline.json --layer=2 --action=move --dx=12 --dy=6
