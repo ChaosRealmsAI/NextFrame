@@ -1,0 +1,35 @@
+{
+  "id": "component",
+  "name": "Craft one scene component",
+  "description": "打造单个高审美、会动、可读性强的 scene 组件。4 步：选型 → 审美 → 实现 → 自检",
+  "steps": [
+    {
+      "id": "pick",
+      "title": "选组件类型 + 视觉主体",
+      "prompt": "00-pick.md",
+      "gate": "component-type-chosen",
+      "description": "定 role/type/尺寸/视觉主体模式"
+    },
+    {
+      "id": "aesthetics",
+      "title": "审美约束 + 动画契约",
+      "prompt": "01-aesthetics.md",
+      "gate": "aesthetics-understood",
+      "description": "配色/字号/留白/动画原则（对标小Lin说×Kurzgesagt×3B1B）"
+    },
+    {
+      "id": "craft",
+      "title": "实现",
+      "prompt": "02-craft.md",
+      "gate": "component-file-saved",
+      "description": "scene-new 生成骨架 + 填 intent + 实现 render + CSS 动画"
+    },
+    {
+      "id": "verify",
+      "title": "自检",
+      "prompt": "03-verify.md",
+      "gate": "component-passes-smoke-and-gallery",
+      "description": "smoke + gallery 双验证 + checklist 人眼过一遍"
+    }
+  ]
+}

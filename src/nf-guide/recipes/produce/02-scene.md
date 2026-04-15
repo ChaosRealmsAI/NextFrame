@@ -1,7 +1,17 @@
-# Step 2: 做组件 — 单文件自包含 + 按 type 选 render
+# Step 2: 做组件
+
+> **做单个高质量组件**：走专用 recipe `nf-guide -- component`（4 步：pick → aesthetics → craft → verify，带审美/动画/视觉主体规范）。
+> **本页只讲批量流程 + 契约总览**。
+
+```bash
+cargo run -p nf-guide -- component              # 打造单组件的完整状态机
+cargo run -p nf-guide -- component pick         # 选 role/type/视觉主体
+cargo run -p nf-guide -- component aesthetics   # 吸收 5 位顶级创作者 DNA
+cargo run -p nf-guide -- component craft        # CLI 生成 + 填内容 + CSS 动画
+cargo run -p nf-guide -- component verify       # smoke + gallery + checklist 13 项
+```
 
 > **完整规范见**: `spec/standards/project/scene/scene-component-system.html`
-> 这一步只讲 AI 实操流程，不重复规范细节。
 
 ## 2.0a 前置检查：theme.md 存在吗？
 
