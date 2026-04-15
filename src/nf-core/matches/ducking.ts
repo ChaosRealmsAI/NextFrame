@@ -50,6 +50,16 @@ function getMatchOption(match: Match, key: "duckTo" | "fadeMs"): unknown {
   return match[key];
 }
 
+function resolveDuckTo(match: Match): number | undefined {
+  const duckTo = getMatchOption(match, "duckTo");
+  return isValidDuckingLevel(duckTo) ? duckTo : undefined;
+}
+
+function resolveFadeMs(match: Match): number | undefined {
+  const fadeMs = getMatchOption(match, "fadeMs");
+  return isValidFadeMs(fadeMs) ? fadeMs : undefined;
+}
+
 function buildValidationResult(errors: ValidationIssue[]): ValidationResult {
   return {
     ok: errors.length === 0,
@@ -141,18 +151,56 @@ export function validate(match: Match, timeline: Timeline): ValidationResult {
   return buildValidationResult(errors);
 }
 
+function getNormalizedSegments(track: AudioTrack): Segment[] {
+  const segments = getSourceSegments(track) ?? [];
+  return [...segments].sort((left, right) => left.startMs - right.startMs);
+}
+
+function buildDuckingSchedule(segments: Segment[], duckTo: number, fadeMs: number): DuckingSchedulePoint[] {
+  if (segments.length === 0) {
+    return [];
+  }
+
+  const schedule: DuckingSchedulePoint[] = [];
+  let activeStartMs = segments[0].startMs;
+  let activeEndMs = segments[0].endMs;
+
+  for (const segment of segments.slice(1)) {
+    const gapMs = segment.startMs - activeEndMs;
+    if (gapMs < fadeMs * 2) {
+      if (segment.endMs > activeEndMs) {
+        activeEndMs = segment.endMs;
+      }
+      continue;
+    }
+
+    schedule.push({ tMs: activeStartMs, volume: duckTo });
+    schedule.push({ tMs: activeEndMs + fadeMs, volume: 1.0 });
+    activeStartMs = segment.startMs;
+    activeEndMs = segment.endMs;
+  }
+
+  schedule.push({ tMs: activeStartMs, volume: duckTo });
+  schedule.push({ tMs: activeEndMs + fadeMs, volume: 1.0 });
+  schedule.sort((left, right) => left.tMs - right.tMs || right.volume - left.volume);
+  return schedule;
+}
+
 export function expand(match: Match, timeline: Timeline): Partial<Timeline> {
   const source = findTrack(timeline, match.source);
   const target = findTrack(timeline, match.target);
+  const duckTo = resolveDuckTo(match);
+  const fadeMs = resolveFadeMs(match);
 
-  if (!source || !target || source.id === target.id) {
+  if (!source || !target || source.id === target.id || duckTo === undefined || fadeMs === undefined) {
     return { tracks: [] };
   }
 
+  const schedule = buildDuckingSchedule(getNormalizedSegments(source), duckTo, fadeMs);
   const trackPatch: DuckingTrackPatch = {
     id: target.id,
     kind: "audio",
-    duckingSchedule: [],
+    duckingSchedule: schedule,
   };
 
   return {
