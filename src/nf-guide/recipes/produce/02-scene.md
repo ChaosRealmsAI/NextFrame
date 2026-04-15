@@ -3,6 +3,19 @@
 > **完整规范见**: `spec/standards/project/scene/scene-component-system.html`
 > 这一步只讲 AI 实操流程，不重复规范细节。
 
+## 2.0a 前置检查：theme.md 存在吗？
+
+```bash
+ls src/nf-core/scenes/{ratio-dir}/{theme}/theme.md
+```
+
+- ✅ 存在 → 继续往下
+- ❌ 不存在 → **先跑 design recipe 出 theme.md**：
+  ```bash
+  cargo run -p nf-guide -- design        # 3 步: brief → tokens → write
+  ```
+  没有 theme.md 就开始写组件 = 设计语言靠猜 = 后续组件不一致。
+
 ## 2.0 起手原则（必须先过脑子）
 
 1. **一个组件 = 一个 .js 文件**，路径：`src/nf-core/scenes/{ratio}/{theme}/{role}-{name}.js`
