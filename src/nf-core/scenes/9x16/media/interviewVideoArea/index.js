@@ -44,7 +44,8 @@ export function render(t, params, vp) {
 
   const radius = scaleW(vp, 12, baseW);
   const rawSrc = params.src || "";
-  const videoSrc = rawSrc.startsWith("/") ? "nfdata://localhost" + encodeURI(rawSrc) : rawSrc;
+  const marker = rawSrc.indexOf("/projects/");
+  const videoSrc = marker >= 0 ? "nfdata://localhost/" + encodeURI(rawSrc.slice(marker + "/projects/".length)) : rawSrc;
 
   return `
     <div style="position:absolute;left:${left}px;top:${top}px;width:${w}px;height:${h}px;border-radius:${radius}px;overflow:hidden;background:#000;">
