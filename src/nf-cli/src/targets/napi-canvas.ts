@@ -1,6 +1,9 @@
 // napi-canvas render target — renders a timeline frame to PNG bytes using @napi-rs/canvas.
 import { renderAt } from "nf-core/engine/render.js";
 import type { Timeline } from "nf-core/types.js";
+import { ensureCanvasFonts } from "../lib/canvas-factory.js";
+
+ensureCanvasFonts();
 
 interface RenderFrameOpts {
   width?: number;

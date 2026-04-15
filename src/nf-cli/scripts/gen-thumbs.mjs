@@ -3,12 +3,11 @@
 // Canvas scenes: render with curated params at the best time.
 // Browser scenes: render sample content via puppeteer if available, else use fallback.
 
-import { createCanvas } from "@napi-rs/canvas";
+import { createCanvas } from "../src/lib/canvas-factory.js";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { REGISTRY, SCENE_IDS, META_TABLE } from "../src/scenes/index.js";
-import "../src/engine/legacy/fonts.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(HERE, "../preview/thumbs");

@@ -1,17 +1,14 @@
 #!/usr/bin/env node
 // Composite demo: stack bg + chrome + content components on one canvas.
 // Mimics a real slide from claude-code-源码讲解.
-import { writeFile } from "node:fs/promises";
-import { createCanvas, GlobalFonts } from "../src/nf-cli/node_modules/@napi-rs/canvas/index.js";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createCanvas } from "../src/nf-cli/src/lib/canvas-factory.js";
 
-try { GlobalFonts.registerFromPath("/System/Library/Fonts/Hiragino Sans GB.ttc", "PingFang SC"); } catch {}
-try { GlobalFonts.registerFromPath("/System/Library/Fonts/Hiragino Sans GB.ttc", "system-ui"); } catch {}
-try { GlobalFonts.registerFromPath("/System/Library/Fonts/Hiragino Sans GB.ttc", "-apple-system"); } catch {}
-try { GlobalFonts.registerFromPath("/System/Library/Fonts/Supplemental/Songti.ttc", "Georgia"); } catch {}
-try { GlobalFonts.registerFromPath("/System/Library/Fonts/Supplemental/Songti.ttc", "Hiragino Mincho ProN"); } catch {}
-try { GlobalFonts.registerFromPath("/System/Library/Fonts/SFNSMono.ttf", "SF Mono"); } catch {}
-
-const DIR = "/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/anthropic-warm";
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DIR = join(__dirname, "../src/nf-core/scenes/16x9/anthropic-warm");
+const OUT = "/tmp/scene-previews";
 const W = 1920, H = 1080;
 
 async function load(name) {
@@ -20,6 +17,7 @@ async function load(name) {
 }
 
 async function composite(layers, outName) {
+  await mkdir(OUT, { recursive: true });
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext("2d");
   for (const layer of layers) {
@@ -28,7 +26,7 @@ async function composite(layers, outName) {
     c.render(ctx, layer.t || 0.5, params, { width: W, height: H });
   }
   const png = await canvas.encode("png");
-  const out = `/tmp/scene-previews/composite-${outName}.png`;
+  const out = `${OUT}/composite-${outName}.png`;
   await writeFile(out, png);
   console.log(`✓ ${out}`);
 }

@@ -12,7 +12,6 @@ const SUBCOMMANDS = {
   "scene-new": () => import("../src/commands/render/scene-new.js"),
   "scene-preview": () => import("../src/commands/render/scene-preview.js"),
   "scene-validate": () => import("../src/commands/render/scene-validate.js"),
-  "video-guide": () => import("../src/commands/render/video-guide.js"),
   preview: () => import("../src/commands/render/preview.js"),
   frame: () => import("../src/commands/render/frame.js"),
   "describe-frame": () => import("../src/commands/render/describe-frame.js"),

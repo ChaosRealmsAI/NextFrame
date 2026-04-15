@@ -3,11 +3,7 @@
 import { readdir, mkdir, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCanvas, GlobalFonts } from "../src/nf-cli/node_modules/@napi-rs/canvas/index.js";
-
-// Register CJK font so previews don't show □ for Chinese
-try { GlobalFonts.registerFromPath("/System/Library/Fonts/Hiragino Sans GB.ttc", "PingFang SC"); } catch {}
-try { GlobalFonts.registerFromPath("/System/Library/Fonts/Hiragino Sans GB.ttc", "system-ui"); } catch {}
+import { createCanvas } from "../src/nf-cli/src/lib/canvas-factory.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIR = join(__dirname, "../src/nf-core/scenes/16x9/anthropic-warm");

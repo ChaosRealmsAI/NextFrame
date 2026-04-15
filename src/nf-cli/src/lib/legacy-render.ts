@@ -1,7 +1,6 @@
 // Legacy canvas renderer kept outside engine/ so the old path can be removed.
 
-import { createCanvas } from "@napi-rs/canvas";
-import "./legacy-fonts.js";
+import { createCanvas } from "./canvas-factory.js";
 import { REGISTRY } from "./scene-registry.js";
 import { guarded } from "./guard.js";
 import { resolveTimeline } from "./legacy-timeline.js";
