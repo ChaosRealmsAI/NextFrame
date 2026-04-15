@@ -108,7 +108,7 @@ window.__nfDiagnose = function () {
             settings: document.getElementById('settings-panel')?.classList.contains('open') || false,
             newProject: document.getElementById('new-project-modal')?.classList.contains('open') || false,
         },
-        actions: Array.from(document.querySelectorAll('[data-nf-action]')).map((el) => el.dataset.nfAction),
+        actions:Array.from(document.querySelectorAll('[data-nf-action]')).map((el) => el.dataset.nfAction),
         editor: typeof window.__nfEditorDiagnose === 'function' ? JSON.parse(window.__nfEditorDiagnose()) : null,
     }, null, 2);
 };

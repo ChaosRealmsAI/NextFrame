@@ -17,7 +17,7 @@ function normalizeEditorTimeline(timeline) {
     const rawLayers = Array.isArray(source.layers) ? source.layers : (Array.isArray(source.clips) ? source.clips : []);
     const layers = rawLayers.map(function (layer) {
         return Object.assign({}, layer, {
-            start: Number.isFinite(layer && layer.start) ? layer.start : 0,
+            start:Number.isFinite(layer && layer.start) ? layer.start : 0,
             dur: getEditorLayerDuration(layer),
         });
     });
@@ -131,7 +131,7 @@ async function ensureEditorSceneBundle(timeline) {
 }
 function syncEditorTransportState(currentTime, isPlaying) {
     const state = {
-        currentTime: Number.isFinite(currentTime) ? currentTime : 0,
+        currentTime:Number.isFinite(currentTime) ? currentTime : 0,
         duration: getEditorTimelineDuration(),
         isPlaying: !!isPlaying,
     };
@@ -391,8 +391,8 @@ window.__nfEditorDiagnose = function () {
     const engineState = engine && typeof engine.getState === 'function' ? engine.getState() : null;
     return JSON.stringify({
         ready: !!(engine && Object.keys(scenes).length && stage),
-        sceneCount: Object.keys(scenes).length,
-        sceneIds: Object.keys(scenes),
+        sceneCount:Object.keys(scenes).length,
+        sceneIds:Object.keys(scenes),
         engineLoaded: !!engine,
         stagePresent: !!stage,
         stageChildren: stage ? stage.children.length : 0,

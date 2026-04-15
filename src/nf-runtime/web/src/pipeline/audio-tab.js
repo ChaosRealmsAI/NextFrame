@@ -17,7 +17,7 @@ function getAudioSegmentsForRender(segments) {
     const mergedSegments = pipelineSegments.map(function (seg, index) {
         const segmentNumber = index + 1;
         return Object.assign({
-            id: String(segmentNumber),
+            id:String(segmentNumber),
             segment: segmentNumber,
             narration: seg.narration || seg.text || '',
         }, audioBySegment[segmentNumber] || {});

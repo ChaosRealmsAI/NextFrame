@@ -121,7 +121,7 @@ function previewSegmentVideo(segmentName) {
             loading: false,
             exists: false,
             path: '',
-            error: errObj && errObj.message ? errObj.message : String(error || 'failed to load segment video'),
+            error: errObj && errObj.message ? errObj.message :String(error || 'failed to load segment video'),
         };
         renderScriptTab(pipelineSegments);
     });

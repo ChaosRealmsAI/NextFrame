@@ -42,7 +42,7 @@ export function listFilters() {
  * @param {number} height
  * @param {Array<string|{type:string}>} filters
  * @param {number} [t=0] — local clip time for time-varying filters
- * @param {{createCanvas?: Function}} [runtime]
+ * @param {{createCanvas?: function}} [runtime]
  */
 export function applyFilters(ctx, width, height, filters, t = 0, runtime = {}) {
     if (!filters || !filters.length)

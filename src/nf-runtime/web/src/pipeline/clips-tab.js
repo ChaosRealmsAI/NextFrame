@@ -11,9 +11,9 @@ function scExtractLanguageRows(sentence) {
     const rows = [];
     const translations = sentence && sentence.translations && typeof sentence.translations === 'object' ? sentence.translations : {};
     if (sentence && sentence.text)
-        rows.push({ label: 'EN', text: String(sentence.text), primary: true });
+        rows.push({ label: 'EN', text:String(sentence.text), primary: true });
     ['zh', 'ja', 'ko', 'fr', 'es', 'de'].forEach((key) => { const text = translations[key] || sentence[key] || ''; if (text)
-        rows.push({ label: langLabel(key), text: String(text), primary: false }); });
+        rows.push({ label: langLabel(key), text:String(text), primary: false }); });
     return rows;
 }
 function scWordStart(word) { return Number(word && ((word.startSec != null) ? word.startSec : word.start)); }
@@ -21,7 +21,7 @@ function scWordEnd(word) { return Number(word && ((word.endSec != null) ? word.e
 function scNormalizeWord(word, timeOffset) {
     const startSec = scWordStart(word) - timeOffset;
     const endSec = scWordEnd(word) - timeOffset;
-    return { text: String(word && word.text || ''), startSec: Number.isFinite(startSec) ? Math.max(0, startSec) : 0, endSec: Number.isFinite(endSec) ? Math.max(0, endSec) : Math.max(0, startSec || 0) };
+    return { text:String(word && word.text || ''), startSec:Number.isFinite(startSec) ? Math.max(0, startSec) : 0, endSec:Number.isFinite(endSec) ? Math.max(0, endSec) :Math.max(0, startSec || 0) };
 }
 function scReadJson(path, fallback) {
     if (typeof bridgeCall !== 'function' || !path)
@@ -49,11 +49,11 @@ function scBuildSourceSentences(data, words) {
         const endSec = Number(sentence && sentence.end);
         const sentenceWords = (Array.isArray(sentence && sentence.words) ? sentence.words : rawWords.filter((word) => Number(word && word.end) > startSec && Number(word && word.start) < endSec)).map((word) => scNormalizeWord(word, 0));
         return {
-            id: Number(sentence && sentence.id),
-            startSec: Number.isFinite(startSec) ? startSec : 0,
-            endSec: Number.isFinite(endSec) ? endSec : 0,
-            durationSec: Math.max(0, (Number.isFinite(endSec) ? endSec : 0) - (Number.isFinite(startSec) ? startSec : 0)),
-            text: String(sentence && sentence.text || ''),
+            id:Number(sentence && sentence.id),
+            startSec:Number.isFinite(startSec) ? startSec : 0,
+            endSec:Number.isFinite(endSec) ? endSec : 0,
+            durationSec:Math.max(0, (Number.isFinite(endSec) ? endSec : 0) - (Number.isFinite(startSec) ? startSec : 0)),
+            text:String(sentence && sentence.text || ''),
             words: sentenceWords,
             languageRows: scExtractLanguageRows(sentence),
         };
@@ -70,19 +70,19 @@ function scBuildSourceModel(dirEntry, fileEntries, meta, sentencesData, wordsDat
     const ext = videoPath.split('.').pop() || '';
     return {
         index,
-        slug: String(dirEntry.name || ''),
-        dirPath: String(dirEntry.path || ''),
+        slug:String(dirEntry.name || ''),
+        dirPath:String(dirEntry.path || ''),
         path: videoPath,
         nfUrl: toNfdataUrl(videoPath),
         meta: meta && typeof meta === 'object' ? meta : {},
         title: '',
         planTitle: planTitle || '',
-        durationSec: Number.isFinite(durationSec) && durationSec > 0 ? durationSec : (Number.isFinite(fallbackDurationSec) && fallbackDurationSec > 0 ? fallbackDurationSec : 0),
+        durationSec:Number.isFinite(durationSec) && durationSec > 0 ? durationSec : (Number.isFinite(fallbackDurationSec) && fallbackDurationSec > 0 ? fallbackDurationSec : 0),
         durationLabel: '—',
         formatLabel: metaFormat.trim() ? metaFormat.trim().toUpperCase() : (ext ? ext.toUpperCase() : '—'),
         resolutionLabel: '—',
-        totalSentences: Number(sentencesData && sentencesData.total_sentences) || sentences.length,
-        totalWords: Number(wordsData && wordsData.total_words) || words.length,
+        totalSentences:Number(sentencesData && sentencesData.total_sentences) || sentences.length,
+        totalWords:Number(wordsData && wordsData.total_words) || words.length,
         sentences,
         words,
         clips: [],
@@ -116,8 +116,8 @@ function scBuildClipModel(source, clip, fileMeta, planMeta, index) {
     const clipWords = source.words.filter((word) => word.endSec > startSec && word.startSec < endSec).map((word) => scNormalizeWord(word, startSec));
     const sentences = clipSentences.map((sentence) => ({
         id: sentence.id,
-        startSec: Math.max(0, sentence.startSec - startSec),
-        endSec: Math.max(0, sentence.endSec - startSec),
+        startSec:Math.max(0, sentence.startSec - startSec),
+        endSec:Math.max(0, sentence.endSec - startSec),
         absStartSec: sentence.startSec,
         absEndSec: sentence.endSec,
         durationSec: sentence.durationSec,
@@ -127,21 +127,21 @@ function scBuildClipModel(source, clip, fileMeta, planMeta, index) {
     }));
     return {
         index,
-        clipNum: Number(clip && clip.clip_num) || index + 1,
-        title: String(clip && clip.title || planMeta && planMeta.title || fileMeta && fileMeta.name || 'Clip'),
-        fileName: String(fileMeta && fileMeta.name || clip && clip.file || ('clip_' + String(index + 1).padStart(2, '0') + '.mp4')),
-        path: String(fileMeta && fileMeta.path || ''),
+        clipNum:Number(clip && clip.clip_num) || index + 1,
+        title:String(clip && clip.title || planMeta && planMeta.title || fileMeta && fileMeta.name || 'Clip'),
+        fileName:String(fileMeta && fileMeta.name || clip && clip.file || ('clip_' + String(index + 1).padStart(2, '0') + '.mp4')),
+        path:String(fileMeta && fileMeta.path || ''),
         nfUrl: toNfdataUrl(String(fileMeta && fileMeta.path || '')),
-        startSec: Number.isFinite(startSec) ? startSec : 0,
-        endSec: Number.isFinite(endSec) ? endSec : 0,
-        durationSec: Number(clip && clip.duration) || Math.max(0, (Number.isFinite(endSec) ? endSec : 0) - (Number.isFinite(startSec) ? startSec : 0)),
+        startSec:Number.isFinite(startSec) ? startSec : 0,
+        endSec:Number.isFinite(endSec) ? endSec : 0,
+        durationSec:Number(clip && clip.duration) || Math.max(0, (Number.isFinite(endSec) ? endSec : 0) - (Number.isFinite(startSec) ? startSec : 0)),
         timecodeLabel: formatClock(startSec, false) + ' → ' + formatClock(endSec, false),
         sentenceRange: '句 ' + String(clip && clip.from_id || '—') + '-' + String(clip && clip.to_id || '—'),
-        fromId: Number(clip && clip.from_id) || 0,
-        toId: Number(clip && clip.to_id) || 0,
+        fromId:Number(clip && clip.from_id) || 0,
+        toId:Number(clip && clip.to_id) || 0,
         sizeLabel: formatBytes(Number(fileMeta && fileMeta.size)),
-        textPreview: String(clip && clip.text_preview || ''),
-        why: String(planMeta && planMeta.why || ''),
+        textPreview:String(clip && clip.text_preview || ''),
+        why:String(planMeta && planMeta.why || ''),
         sentences,
         words: clipWords,
         rawClip: clip && typeof clip === 'object' ? clip : {},
@@ -267,7 +267,7 @@ function scRenderCurrentSentence(subtitleEl, sentence, emptyText) {
     const translationRows = rows.filter((row) => row !== primaryRow && !row.primary && row.text);
     const words = (Array.isArray(sentence.words) && sentence.words.length ? sentence.words : [{ text: primaryRow.text || sentence.text || '···', startSec: sentence.startSec, endSec: sentence.endSec }]);
     subtitleEl.innerHTML = '<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">' + escapeHtml(primaryRow.label || 'EN') + '</span><span class="sc-modal-sub-original">' + words.map((word) => '<span class="sc-modal-word sc-word-pending">' + escapeHtml(word.text) + '</span>').join(' ') + '</span></div>' + translationRows.map((row) => '<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">' + escapeHtml(row.label) + '</span><span class="sc-modal-sub-trans">' + escapeHtml(row.text) + '</span></div>').join('');
-    return { words, spans: Array.from(subtitleEl.querySelectorAll('.sc-modal-word')), states: words.map(() => ''), key: String(sentence.id) + '-' + String(sentence.startSec) };
+    return { words, spans:Array.from(subtitleEl.querySelectorAll('.sc-modal-word')), states: words.map(() => ''), key:String(sentence.id) + '-' + String(sentence.startSec) };
 }
 function scBindPlayer(video, playback) {
     const subtitleEl = document.getElementById('sc-modal-subtitle');
@@ -337,7 +337,7 @@ function scOpenPlayer(index, seekSec) {
         scPlayerCleanup();
     panel.innerHTML = '<button class="sc-modal-close" type="button" data-nf-action="close-smart-player" onclick="scClosePlayer()">&times;</button><div class="sc-modal-video-shell"><video id="sc-modal-video" src="' + escapeHtml(clipModel.nfUrl) + '" controls autoplay playsinline></video></div><div class="sc-modal-subtitle" id="sc-modal-subtitle"></div><div class="sc-modal-transport"><div class="sc-modal-progress" id="sc-modal-progress"><div class="sc-modal-progress-fill" id="sc-modal-progress-fill"></div></div><div class="sc-modal-meta"><span class="sc-modal-tc" id="sc-modal-current">00:00.0</span><span class="sc-modal-clip-name" id="sc-modal-title"></span><span class="sc-modal-tc" id="sc-modal-total">00:00.0</span></div></div>';
     overlay.classList.add('open');
-    scBindPlayer(document.getElementById('sc-modal-video'), { title: clipModel.title, sentences: clipModel.sentences, durationSec: clipModel.durationSec, seekSec: Number(seekSec), emptyText: '···' });
+    scBindPlayer(document.getElementById('sc-modal-video'), { title: clipModel.title, sentences: clipModel.sentences, durationSec: clipModel.durationSec, seekSec:Number(seekSec), emptyText: '···' });
 }
 function scOpenClipSentence(clipIndex, sentenceIndex) {
     const clip = scRenderedClips[clipIndex];
@@ -356,7 +356,7 @@ function scOpenSourcePlayer(seekSec) {
         scPlayerCleanup();
     panel.innerHTML = '<button class="sc-modal-close" type="button" data-nf-action="close-smart-player" onclick="scClosePlayer()">&times;</button><div class="sc-modal-video-shell"><video id="sc-modal-video" src="' + escapeHtml(source.nfUrl) + '" controls autoplay playsinline></video></div><div class="sc-modal-subtitle" id="sc-modal-subtitle"></div><div class="sc-modal-transport"><div class="sc-modal-progress" id="sc-modal-progress"><div class="sc-modal-progress-fill" id="sc-modal-progress-fill"></div></div><div class="sc-modal-meta"><span class="sc-modal-tc" id="sc-modal-current">00:00.0</span><span class="sc-modal-clip-name" id="sc-modal-title"></span><span class="sc-modal-tc" id="sc-modal-total">00:00.0</span></div></div>';
     overlay.classList.add('open');
-    scBindPlayer(document.getElementById('sc-modal-video'), { title: source.title + ' · ' + (source.resolutionLabel !== '—' ? source.resolutionLabel : source.formatLabel), sentences: source.sentences, durationSec: source.durationSec, seekSec: Number(seekSec), emptyText: '原视频预览' });
+    scBindPlayer(document.getElementById('sc-modal-video'), { title: source.title + ' · ' + (source.resolutionLabel !== '—' ? source.resolutionLabel : source.formatLabel), sentences: source.sentences, durationSec: source.durationSec, seekSec:Number(seekSec), emptyText: '原视频预览' });
 }
 function scClosePlayer() { const overlay = document.getElementById('sc-player-modal'); if (typeof scPlayerCleanup === 'function') {
     scPlayerCleanup();
@@ -473,7 +473,7 @@ async function scLoadClipTranslations(episodePath) {
                 if (!sentence)
                     return;
                 const cnCues = Array.isArray(seg.cn) ? seg.cn : [];
-                const text = cnCues.map((cue) => typeof cue === 'string' ? cue : String(cue && cue.text || '')).join('');
+                const text = cnCues.map((cue) => typeof cue === 'string' ? cue :String(cue && cue.text || '')).join('');
                 if (!text)
                     return;
                 const existing = sentence.languageRows.find((r) => r.label === label);

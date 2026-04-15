@@ -86,7 +86,7 @@ function pollExportStatus() {
         stopExportPolling();
         updateExportState({
             state: 'failed',
-            error: errObj && errObj.message ? errObj.message : String(error || 'failed to read export status'),
+            error: errObj && errObj.message ? errObj.message :String(error || 'failed to read export status'),
         });
     });
 }
@@ -129,7 +129,7 @@ function startPipelineExport() {
         const errObj = error;
         updateExportState({
             state: 'failed',
-            error: errObj && errObj.message ? errObj.message : String(error || 'failed to start export'),
+            error: errObj && errObj.message ? errObj.message :String(error || 'failed to start export'),
         });
     });
 }
@@ -149,7 +149,7 @@ function cancelPipelineExport() {
         const errObj = error;
         updateExportState({
             state: 'failed',
-            error: errObj && errObj.message ? errObj.message : String(error || 'failed to cancel export'),
+            error: errObj && errObj.message ? errObj.message :String(error || 'failed to cancel export'),
         });
     });
 }
