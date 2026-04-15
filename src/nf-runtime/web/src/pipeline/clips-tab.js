@@ -2,21 +2,12 @@
 const scTimelineColors=['var(--accent)','#60a5fa','#34d399','#f97316'];
 let scSources=[]; let scActiveSource=0; let scRenderedClips=[]; let scPlayerCleanup=null; let scLoadToken=0;
 
-function scEscape(value){return String(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function scNfUrl(path){if(!path)return'';const marker=path.indexOf('/projects/');return marker<0?path:'nfdata://localhost/'+encodeURI(path.slice(marker+'/projects/'.length));}
-function scFormatBytes(bytes){if(!Number.isFinite(bytes)||bytes<=0)return'—';const mb=bytes/(1024*1024);return mb>=100?Math.round(mb)+'MB':mb.toFixed(1)+'MB';}
-function scLangLabel(key){const labels={zh:'中',ja:'日',ko:'韩',fr:'FR',es:'ES',de:'DE'};return labels[key]||String(key||'').slice(0,2).toUpperCase();}
-function scFormatClock(totalSeconds,withTenths){if(!Number.isFinite(totalSeconds)||totalSeconds<0)return withTenths?'00:00.0':'00:00';const hours=Math.floor(totalSeconds/3600);const minutes=Math.floor((totalSeconds%3600)/60);const seconds=totalSeconds%60;if(withTenths){const base=String(minutes).padStart(2,'0')+':'+seconds.toFixed(1).padStart(4,'0');return hours>0?String(hours).padStart(2,'0')+':'+base:base;}const mm=hours>0?Math.floor((totalSeconds%3600)/60):Math.floor(totalSeconds/60);const ss=Math.floor(totalSeconds%60);const core=String(mm).padStart(2,'0')+':'+String(ss).padStart(2,'0');return hours>0?String(hours).padStart(2,'0')+':'+core:core;}
-function scFormatResolution(width,height){if(!Number.isFinite(height)||height<=0)return'—';if(height>=2160)return'4K';if(height>=1440)return'1440p';if(height>=1080)return'1080p';if(height>=720)return'720p';if(width>0)return width+'×'+height;return String(height)+'p';}
-function scHumanizeSlug(value){return String(value||'').split(/[-_]+/).filter(Boolean).map((part)=>part.charAt(0).toUpperCase()+part.slice(1)).join(' ');}
-function scFormatSourceTitle(source,index){if(source.meta&&typeof source.meta.title==='string'&&source.meta.title.trim())return source.meta.title.trim(); if(source.planTitle&&source.planTitle.trim())return source.planTitle.trim(); return scHumanizeSlug(source.slug||('source-'+index));}
-function scStringifyMeta(value){if(value==null||value==='')return''; if(Array.isArray(value))return value.map(scStringifyMeta).filter(Boolean).join(', '); if(typeof value==='object'){try{return JSON.stringify(value);}catch(_error){return'[object]';}} return String(value);}
-function scRenderEmptySubtitle(text){return'<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-original">'+scEscape(text||'···')+'</span></div>';}
+function scRenderEmptySubtitle(text){return'<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-original">'+escapeHtml(text||'···')+'</span></div>';}
 
 function scExtractLanguageRows(sentence){
   const rows=[]; const translations=sentence&&sentence.translations&&typeof sentence.translations==='object'?sentence.translations:{};
   if(sentence&&sentence.text)rows.push({label:'EN',text:sentence.text,primary:true});
-  ['zh','ja','ko','fr','es','de'].forEach((key)=>{const text=translations[key]||sentence[key]||''; if(text)rows.push({label:scLangLabel(key),text,primary:false});});
+  ['zh','ja','ko','fr','es','de'].forEach((key)=>{const text=translations[key]||sentence[key]||''; if(text)rows.push({label:langLabel(key),text,primary:false});});
   return rows;
 }
 
@@ -69,7 +60,7 @@ function scBuildSourceModel(dirEntry,fileEntries,meta,sentencesData,wordsData,pl
     slug:dirEntry.name,
     dirPath:dirEntry.path,
     path:videoPath,
-    nfUrl:scNfUrl(videoPath),
+    nfUrl:toNfdataUrl(videoPath),
     meta:meta&&typeof meta==='object'?meta:{},
     title:'',
     planTitle:planTitle||'',
@@ -123,15 +114,15 @@ function scBuildClipModel(source,clip,fileMeta,planMeta,index){
     title:String(clip&&clip.title||planMeta&&planMeta.title||fileMeta&&fileMeta.name||'Clip'),
     fileName:String(fileMeta&&fileMeta.name||clip&&clip.file||('clip_'+String(index+1).padStart(2,'0')+'.mp4')),
     path:String(fileMeta&&fileMeta.path||''),
-    nfUrl:scNfUrl(fileMeta&&fileMeta.path||''),
+    nfUrl:toNfdataUrl(fileMeta&&fileMeta.path||''),
     startSec:Number.isFinite(startSec)?startSec:0,
     endSec:Number.isFinite(endSec)?endSec:0,
     durationSec:Number(clip&&clip.duration)||Math.max(0,(Number.isFinite(endSec)?endSec:0)-(Number.isFinite(startSec)?startSec:0)),
-    timecodeLabel:scFormatClock(startSec,false)+' → '+scFormatClock(endSec,false),
+    timecodeLabel:formatClock(startSec,false)+' → '+formatClock(endSec,false),
     sentenceRange:'句 '+String(clip&&clip.from_id||'—')+'-'+String(clip&&clip.to_id||'—'),
     fromId:Number(clip&&clip.from_id)||0,
     toId:Number(clip&&clip.to_id)||0,
-    sizeLabel:scFormatBytes(Number(fileMeta&&fileMeta.size)),
+    sizeLabel:formatBytes(Number(fileMeta&&fileMeta.size)),
     textPreview:String(clip&&clip.text_preview||''),
     why:String(planMeta&&planMeta.why||''),
     sentences,
@@ -144,7 +135,7 @@ function scBuildClipModel(source,clip,fileMeta,planMeta,index){
 function scAttachClipsToSources(sources,cutReport,plan,clipFiles){
   const success=Array.isArray(cutReport&&cutReport.success)?cutReport.success:[]; const planClips=Array.isArray(plan&&plan.clips)?plan.clips:[]; const clipFileMap={};
   clipFiles.forEach((clip)=>{clipFileMap[clip.name]=clip;});
-  sources.forEach((source,index)=>{source.title=scFormatSourceTitle(source,index); source.durationLabel=scFormatClock(source.durationSec,false); source.clips=[];});
+  sources.forEach((source,index)=>{source.title=formatSourceTitle(source,index); source.durationLabel=formatClock(source.durationSec,false); source.clips=[];});
   success.forEach((clip)=>{
     const matchingSource=sources.find((source)=>scSourceOwnsClip(source,clip))||(sources.length===1?sources[0]:null); if(!matchingSource)return;
     const planMeta=planClips.find((item)=>Number(item&&item.from)===Number(clip&&clip.from_id)&&Number(item&&item.to)===Number(clip&&clip.to_id))||planClips.find((item)=>Number(item&&item.id)===Number(clip&&clip.clip_num))||null;
@@ -160,9 +151,9 @@ function scWarmSourceMetadata(source){
   const video=document.createElement('video'); video.preload='metadata'; video.muted=true; video.playsInline=true; video.src=source.nfUrl;
   const cleanup=()=>{video.removeAttribute('src'); video.load();};
   video.addEventListener('loadedmetadata',()=>{
-    if((!source.durationSec||source.durationSec<=0)&&Number.isFinite(video.duration)&&video.duration>0){source.durationSec=video.duration; source.durationLabel=scFormatClock(source.durationSec,false);}
-    source.resolutionLabel=scFormatResolution(video.videoWidth,video.videoHeight); if(source.meta&&typeof source.meta.format==='string'&&source.meta.format.trim())source.formatLabel=source.meta.format.trim();
-    if(Number(source.meta&&source.meta.duration_sec)>0){source.durationSec=Number(source.meta.duration_sec); source.durationLabel=scFormatClock(source.durationSec,false);}
+    if((!source.durationSec||source.durationSec<=0)&&Number.isFinite(video.duration)&&video.duration>0){source.durationSec=video.duration; source.durationLabel=formatClock(source.durationSec,false);}
+    source.resolutionLabel=formatResolution(video.videoWidth,video.videoHeight); if(source.meta&&typeof source.meta.format==='string'&&source.meta.format.trim())source.formatLabel=source.meta.format.trim();
+    if(Number(source.meta&&source.meta.duration_sec)>0){source.durationSec=Number(source.meta.duration_sec); source.durationLabel=formatClock(source.durationSec,false);}
     scRenderSidebar(); if(scSources[scActiveSource]===source)scRenderMain(); cleanup();
   },{once:true});
   video.addEventListener('error',cleanup,{once:true});
@@ -175,8 +166,8 @@ function scRenderSidebar(){
   html+=scSources.map((source,index)=>{
     const active=index===scActiveSource?' active':'';
     return'<button class="sc-src-item'+active+'" type="button" data-nf-action="select-smart-source" onclick="scSelectSource('+index+')">'+
-      '<span class="sc-src-name">'+scEscape(source.title)+'</span>'+
-      '<span class="sc-src-meta"><span>'+scEscape(source.durationLabel||'—')+'</span><span>'+scEscape(source.resolutionLabel||'—')+'</span><span>'+scEscape(source.formatLabel||'—')+'</span></span>'+
+      '<span class="sc-src-name">'+escapeHtml(source.title)+'</span>'+
+      '<span class="sc-src-meta"><span>'+escapeHtml(source.durationLabel||'—')+'</span><span>'+escapeHtml(source.resolutionLabel||'—')+'</span><span>'+escapeHtml(source.formatLabel||'—')+'</span></span>'+
       '<span class="sc-src-count">'+source.clips.length+' clips · '+(source.totalSentences||0)+' 句</span></button>';
   }).join('');
   root.innerHTML=html;
@@ -184,7 +175,7 @@ function scRenderSidebar(){
 
 function scRenderTimeline(clips,source){
   const durationSec=Number(source&&source.durationSec); if(!Number.isFinite(durationSec)||durationSec<=0)return'';
-  const ticks=Array.from({length:6},(_item,index)=>scFormatClock(durationSec*(index/5),false));
+  const ticks=Array.from({length:6},(_item,index)=>formatClock(durationSec*(index/5),false));
   const regions=clips.map((clipModel)=>{
     const left=(clipModel.startSec/durationSec)*100; const width=((clipModel.endSec-clipModel.startSec)/durationSec)*100; const color=scTimelineColors[clipModel.index%scTimelineColors.length];
     return'<button class="sc-tl-region" type="button" data-nf-action="focus-smart-clip" onclick="document.getElementById(\'sc-clip-'+clipModel.index+'\')?.scrollIntoView({block:\'start\',behavior:\'smooth\'})" style="left:'+left.toFixed(2)+'%;width:'+Math.max(width,1).toFixed(2)+'%;background:'+color+'"><span class="sc-tl-region-label">'+String(clipModel.clipNum).padStart(2,'0')+'</span></button>';
@@ -193,8 +184,8 @@ function scRenderTimeline(clips,source){
 }
 
 function scRenderClipSentence(clipIndex,sentence,sentenceIndex){
-  const rows=(sentence.languageRows&&sentence.languageRows.length?sentence.languageRows:[{label:'EN',text:sentence.text||'字幕缺失',primary:true}]).filter((row)=>row.primary||row.text).map((row)=>'<div class="sc-sent-lang-row"><span class="sc-sent-lang-label">'+scEscape(row.label)+'</span><span class="'+(row.primary?'sc-sent-text':'sc-sent-trans')+'">'+scEscape(row.text)+'</span></div>').join('');
-  return'<button class="sc-sent-row'+(sentenceIndex===0?' active':'')+'" type="button" data-nf-action="seek-smart-sentence" onclick="scOpenClipSentence('+clipIndex+','+sentenceIndex+')"><span class="sc-sent-tc">'+scFormatClock(sentence.startSec,true)+'</span><div class="sc-sent-content">'+rows+'</div><span class="sc-sent-dur">'+sentence.durationSec.toFixed(1)+'s</span></button>';
+  const rows=(sentence.languageRows&&sentence.languageRows.length?sentence.languageRows:[{label:'EN',text:sentence.text||'字幕缺失',primary:true}]).filter((row)=>row.primary||row.text).map((row)=>'<div class="sc-sent-lang-row"><span class="sc-sent-lang-label">'+escapeHtml(row.label)+'</span><span class="'+(row.primary?'sc-sent-text':'sc-sent-trans')+'">'+escapeHtml(row.text)+'</span></div>').join('');
+  return'<button class="sc-sent-row'+(sentenceIndex===0?' active':'')+'" type="button" data-nf-action="seek-smart-sentence" onclick="scOpenClipSentence('+clipIndex+','+sentenceIndex+')"><span class="sc-sent-tc">'+formatClock(sentence.startSec,true)+'</span><div class="sc-sent-content">'+rows+'</div><span class="sc-sent-dur">'+sentence.durationSec.toFixed(1)+'s</span></button>';
 }
 
 function scRenderMain(){
@@ -203,18 +194,18 @@ function scRenderMain(){
   scRenderedClips=Array.isArray(source.clips)?source.clips:[];
   scRenderSidebar();
   const tags=[
-    '<span class="sc-tag sc-tag-warm">'+scEscape(source.durationLabel||'—')+'</span>',
-    '<span class="sc-tag sc-tag-default">'+scEscape(source.resolutionLabel||'—')+'</span>',
-    '<span class="sc-tag sc-tag-default">'+scEscape(source.formatLabel||'—')+'</span>',
+    '<span class="sc-tag sc-tag-warm">'+escapeHtml(source.durationLabel||'—')+'</span>',
+    '<span class="sc-tag sc-tag-default">'+escapeHtml(source.resolutionLabel||'—')+'</span>',
+    '<span class="sc-tag sc-tag-default">'+escapeHtml(source.formatLabel||'—')+'</span>',
     '<span class="sc-tag sc-tag-accent">'+(source.totalSentences||0)+' sentences</span>',
     '<span class="sc-tag sc-tag-accent">'+scRenderedClips.length+' clips</span>',
   ].join('');
   const timelineHtml=scRenderedClips.length?scRenderTimeline(scRenderedClips,source):'';
   const cardsHtml=scRenderedClips.length?scRenderedClips.map((clipModel)=>'<div class="sc-clip-card'+(clipModel.index===0?' active':'')+'" id="sc-clip-'+clipModel.index+'">'+
-      '<div class="sc-clip-top"><span class="sc-clip-num">'+clipModel.clipNum+'</span><span class="sc-clip-name">'+scEscape(clipModel.title)+'</span><span class="sc-clip-dur">'+Math.round(clipModel.durationSec)+'s</span><span class="sc-clip-tc">'+clipModel.timecodeLabel+'</span></div>'+
-      '<div class="sc-clip-body"><button class="sc-clip-video" type="button" data-nf-action="preview-smart-clip" onclick="scOpenPlayer('+clipModel.index+')"><video src="'+scEscape(clipModel.nfUrl)+'" preload="auto" muted playsinline onloadedmetadata="this.currentTime=0.1"></video><span class="sc-play-overlay"><span class="sc-play-circle">&#9654;</span></span></button><div class="sc-sentences">'+clipModel.sentences.map((sentence,sentenceIndex)=>scRenderClipSentence(clipModel.index,sentence,sentenceIndex)).join('')+'</div></div>'+
-      '<div class="sc-meta-bar"><span class="sc-meta-tag">'+scEscape(clipModel.sentenceRange)+'</span><span class="sc-meta-tag">duration '+scFormatClock(clipModel.durationSec,true)+'</span><span class="sc-meta-tag">'+scEscape(clipModel.sizeLabel)+'</span><button class="sc-more-btn" type="button" data-nf-action="open-smart-clip-meta" onclick="scOpenMeta('+clipModel.index+')">更多 ↗</button></div></div>').join(''):'<div class="sc-empty">暂无切片数据</div>';
-  root.innerHTML='<div class="sc-detail-header"><div class="sc-detail-top"><div><div class="sc-detail-name">'+scEscape(source.title)+'</div><div class="sc-detail-meta">'+scRenderedClips.length+' clips · '+(source.totalSentences||0)+' sentences</div></div><button class="sc-preview-btn" type="button" data-nf-action="preview-smart-source" onclick="scOpenSourcePlayer()">&#9654; 预览原视频</button></div><div class="sc-detail-path">'+scEscape(source.path||source.dirPath)+'</div><div class="sc-detail-tags">'+tags+'</div></div>'+timelineHtml+'<div class="sc-clip-scroll">'+cardsHtml+'</div>';
+      '<div class="sc-clip-top"><span class="sc-clip-num">'+clipModel.clipNum+'</span><span class="sc-clip-name">'+escapeHtml(clipModel.title)+'</span><span class="sc-clip-dur">'+Math.round(clipModel.durationSec)+'s</span><span class="sc-clip-tc">'+clipModel.timecodeLabel+'</span></div>'+
+      '<div class="sc-clip-body"><button class="sc-clip-video" type="button" data-nf-action="preview-smart-clip" onclick="scOpenPlayer('+clipModel.index+')"><video src="'+escapeHtml(clipModel.nfUrl)+'" preload="auto" muted playsinline onloadedmetadata="this.currentTime=0.1"></video><span class="sc-play-overlay"><span class="sc-play-circle">&#9654;</span></span></button><div class="sc-sentences">'+clipModel.sentences.map((sentence,sentenceIndex)=>scRenderClipSentence(clipModel.index,sentence,sentenceIndex)).join('')+'</div></div>'+
+      '<div class="sc-meta-bar"><span class="sc-meta-tag">'+escapeHtml(clipModel.sentenceRange)+'</span><span class="sc-meta-tag">duration '+formatClock(clipModel.durationSec,true)+'</span><span class="sc-meta-tag">'+escapeHtml(clipModel.sizeLabel)+'</span><button class="sc-more-btn" type="button" data-nf-action="open-smart-clip-meta" onclick="scOpenMeta('+clipModel.index+')">更多 ↗</button></div></div>').join(''):'<div class="sc-empty">暂无切片数据</div>';
+  root.innerHTML='<div class="sc-detail-header"><div class="sc-detail-top"><div><div class="sc-detail-name">'+escapeHtml(source.title)+'</div><div class="sc-detail-meta">'+scRenderedClips.length+' clips · '+(source.totalSentences||0)+' sentences</div></div><button class="sc-preview-btn" type="button" data-nf-action="preview-smart-source" onclick="scOpenSourcePlayer()">&#9654; 预览原视频</button></div><div class="sc-detail-path">'+escapeHtml(source.path||source.dirPath)+'</div><div class="sc-detail-tags">'+tags+'</div></div>'+timelineHtml+'<div class="sc-clip-scroll">'+cardsHtml+'</div>';
 }
 
 function scRenderCurrentSentence(subtitleEl,sentence,emptyText){
@@ -224,7 +215,7 @@ function scRenderCurrentSentence(subtitleEl,sentence,emptyText){
   const primaryRow=rows.find((row)=>row.primary)||rows[0]||{label:'EN',text:sentence.text||'',primary:true};
   const translationRows=rows.filter((row)=>row!==primaryRow&&!row.primary&&row.text);
   const words=(Array.isArray(sentence.words)&&sentence.words.length?sentence.words:[{text:primaryRow.text||sentence.text||'···',startSec:sentence.startSec,endSec:sentence.endSec}]);
-  subtitleEl.innerHTML='<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">'+scEscape(primaryRow.label||'EN')+'</span><span class="sc-modal-sub-original">'+words.map((word)=>'<span class="sc-modal-word sc-word-pending">'+scEscape(word.text)+'</span>').join(' ')+'</span></div>'+translationRows.map((row)=>'<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">'+scEscape(row.label)+'</span><span class="sc-modal-sub-trans">'+scEscape(row.text)+'</span></div>').join('');
+  subtitleEl.innerHTML='<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">'+escapeHtml(primaryRow.label||'EN')+'</span><span class="sc-modal-sub-original">'+words.map((word)=>'<span class="sc-modal-word sc-word-pending">'+escapeHtml(word.text)+'</span>').join(' ')+'</span></div>'+translationRows.map((row)=>'<div class="sc-modal-sub-lang-row"><span class="sc-modal-sub-lang-label">'+escapeHtml(row.label)+'</span><span class="sc-modal-sub-trans">'+escapeHtml(row.text)+'</span></div>').join('');
   return{words,spans:Array.from(subtitleEl.querySelectorAll('.sc-modal-word')),states:words.map(()=>''),key:String(sentence.id)+'-'+String(sentence.startSec)};
 }
 
@@ -247,7 +238,7 @@ function scBindPlayer(video,playback){
 
   function sync(){
     const duration=Number.isFinite(video.duration)&&video.duration>0?video.duration:(Number(playback.durationSec)||0); const current=Number.isFinite(video.currentTime)?video.currentTime:0;
-    currentEl.textContent=scFormatClock(current,true); totalEl.textContent=scFormatClock(duration,true); fillEl.style.width=duration?((current/duration)*100).toFixed(2)+'%':'0%';
+    currentEl.textContent=formatClock(current,true); totalEl.textContent=formatClock(duration,true); fillEl.style.width=duration?((current/duration)*100).toFixed(2)+'%':'0%';
     const sentence=activeSentenceAt(current); const sentenceKey=sentence?String(sentence.id)+'-'+String(sentence.startSec):'';
     if(sentenceKey!==subtitleState.key)subtitleState=scRenderCurrentSentence(subtitleEl,sentence,playback.emptyText||'···');
     updateWordClasses(current);
@@ -265,7 +256,7 @@ function scBindPlayer(video,playback){
 function scOpenPlayer(index,seekSec){
   const clipModel=scRenderedClips[index]; const overlay=document.getElementById('sc-player-modal'); const panel=document.getElementById('sc-player-panel'); if(!clipModel||!overlay||!panel)return;
   if(typeof scPlayerCleanup==='function')scPlayerCleanup();
-  panel.innerHTML='<button class="sc-modal-close" type="button" data-nf-action="close-smart-player" onclick="scClosePlayer()">&times;</button><div class="sc-modal-video-shell"><video id="sc-modal-video" src="'+scEscape(clipModel.nfUrl)+'" controls autoplay playsinline></video></div><div class="sc-modal-subtitle" id="sc-modal-subtitle"></div><div class="sc-modal-transport"><div class="sc-modal-progress" id="sc-modal-progress"><div class="sc-modal-progress-fill" id="sc-modal-progress-fill"></div></div><div class="sc-modal-meta"><span class="sc-modal-tc" id="sc-modal-current">00:00.0</span><span class="sc-modal-clip-name" id="sc-modal-title"></span><span class="sc-modal-tc" id="sc-modal-total">00:00.0</span></div></div>';
+  panel.innerHTML='<button class="sc-modal-close" type="button" data-nf-action="close-smart-player" onclick="scClosePlayer()">&times;</button><div class="sc-modal-video-shell"><video id="sc-modal-video" src="'+escapeHtml(clipModel.nfUrl)+'" controls autoplay playsinline></video></div><div class="sc-modal-subtitle" id="sc-modal-subtitle"></div><div class="sc-modal-transport"><div class="sc-modal-progress" id="sc-modal-progress"><div class="sc-modal-progress-fill" id="sc-modal-progress-fill"></div></div><div class="sc-modal-meta"><span class="sc-modal-tc" id="sc-modal-current">00:00.0</span><span class="sc-modal-clip-name" id="sc-modal-title"></span><span class="sc-modal-tc" id="sc-modal-total">00:00.0</span></div></div>';
   overlay.classList.add('open'); scBindPlayer(document.getElementById('sc-modal-video'),{title:clipModel.title,sentences:clipModel.sentences,durationSec:clipModel.durationSec,seekSec:Number(seekSec),emptyText:'···'});
 }
 
@@ -277,7 +268,7 @@ function scOpenClipSentence(clipIndex,sentenceIndex){
 function scOpenSourcePlayer(seekSec){
   const source=scSources[scActiveSource]; const overlay=document.getElementById('sc-player-modal'); const panel=document.getElementById('sc-player-panel'); if(!source||!overlay||!panel)return;
   if(typeof scPlayerCleanup==='function')scPlayerCleanup();
-  panel.innerHTML='<button class="sc-modal-close" type="button" data-nf-action="close-smart-player" onclick="scClosePlayer()">&times;</button><div class="sc-modal-video-shell"><video id="sc-modal-video" src="'+scEscape(source.nfUrl)+'" controls autoplay playsinline></video></div><div class="sc-modal-subtitle" id="sc-modal-subtitle"></div><div class="sc-modal-transport"><div class="sc-modal-progress" id="sc-modal-progress"><div class="sc-modal-progress-fill" id="sc-modal-progress-fill"></div></div><div class="sc-modal-meta"><span class="sc-modal-tc" id="sc-modal-current">00:00.0</span><span class="sc-modal-clip-name" id="sc-modal-title"></span><span class="sc-modal-tc" id="sc-modal-total">00:00.0</span></div></div>';
+  panel.innerHTML='<button class="sc-modal-close" type="button" data-nf-action="close-smart-player" onclick="scClosePlayer()">&times;</button><div class="sc-modal-video-shell"><video id="sc-modal-video" src="'+escapeHtml(source.nfUrl)+'" controls autoplay playsinline></video></div><div class="sc-modal-subtitle" id="sc-modal-subtitle"></div><div class="sc-modal-transport"><div class="sc-modal-progress" id="sc-modal-progress"><div class="sc-modal-progress-fill" id="sc-modal-progress-fill"></div></div><div class="sc-modal-meta"><span class="sc-modal-tc" id="sc-modal-current">00:00.0</span><span class="sc-modal-clip-name" id="sc-modal-title"></span><span class="sc-modal-tc" id="sc-modal-total">00:00.0</span></div></div>';
   overlay.classList.add('open'); scBindPlayer(document.getElementById('sc-modal-video'),{title:source.title+' · '+(source.resolutionLabel!=='—'?source.resolutionLabel:source.formatLabel),sentences:source.sentences,durationSec:source.durationSec,seekSec:Number(seekSec),emptyText:'原视频预览'});
 }
 
@@ -285,11 +276,11 @@ function scClosePlayer(){const overlay=document.getElementById('sc-player-modal'
 
 function scOpenMeta(index){
   const clipModel=scRenderedClips[index]; const overlay=document.getElementById('sc-meta-modal'); const panel=document.getElementById('sc-meta-panel'); if(!clipModel||!overlay||!panel)return;
-  const metaObject={title:clipModel.title,why:clipModel.why,source_sentence_range:clipModel.sentenceRange,source_timecode:clipModel.timecodeLabel,duration:scFormatClock(clipModel.durationSec,true),file_size:clipModel.sizeLabel,file:clipModel.fileName,path:clipModel.path,text_preview:clipModel.textPreview};
+  const metaObject={title:clipModel.title,why:clipModel.why,source_sentence_range:clipModel.sentenceRange,source_timecode:clipModel.timecodeLabel,duration:formatClock(clipModel.durationSec,true),file_size:clipModel.sizeLabel,file:clipModel.fileName,path:clipModel.path,text_preview:clipModel.textPreview};
   Object.keys(clipModel.rawClip||{}).forEach((key)=>{if(metaObject[key]==null||metaObject[key]==='')metaObject[key]=clipModel.rawClip[key];});
   Object.keys(clipModel.rawPlan||{}).forEach((key)=>{if(metaObject[key]==null||metaObject[key]==='')metaObject[key]=clipModel.rawPlan[key];});
-  const rows=Object.keys(metaObject).filter((key)=>scStringifyMeta(metaObject[key])).map((key)=>[key,scStringifyMeta(metaObject[key])]);
-  panel.innerHTML='<button class="sc-modal-close" type="button" data-nf-action="close-smart-clip-meta" onclick="scCloseMeta()">&times;</button><div class="sc-meta-title">'+scEscape(clipModel.fileName)+' · 元信息</div>'+rows.map((row)=>'<div class="sc-meta-row"><span class="sc-meta-key">'+scEscape(row[0])+'</span><span class="sc-meta-val">'+scEscape(row[1])+'</span></div>').join('');
+  const rows=Object.keys(metaObject).filter((key)=>stringifyMeta(metaObject[key])).map((key)=>[key,stringifyMeta(metaObject[key])]);
+  panel.innerHTML='<button class="sc-modal-close" type="button" data-nf-action="close-smart-clip-meta" onclick="scCloseMeta()">&times;</button><div class="sc-meta-title">'+escapeHtml(clipModel.fileName)+' · 元信息</div>'+rows.map((row)=>'<div class="sc-meta-row"><span class="sc-meta-key">'+escapeHtml(row[0])+'</span><span class="sc-meta-val">'+escapeHtml(row[1])+'</span></div>').join('');
   overlay.classList.add('open');
 }
 
@@ -324,9 +315,9 @@ async function loadSmartClips(){
   if(!scSources.length){scRenderSidebar(); scRenderMain(); return;}
   await scLoadClipTranslations(episodePath);
   scSources.forEach(scWarmSourceMetadata);
-  if(scSources.length===1&&!scSources[0].title){scSources[0].title=planTitle||scHumanizeSlug(scSources[0].slug);}
-  if(!scSources[0].title)scSources[0].title=scFormatSourceTitle(scSources[0],0);
-  scSources.forEach((source,index)=>{if(!source.title)source.title=scFormatSourceTitle(source,index); if(!source.durationLabel||source.durationLabel==='—')source.durationLabel=scFormatClock(source.durationSec,false); if(source.meta&&typeof source.meta.format==='string'&&source.meta.format.trim())source.formatLabel=source.meta.format.trim();});
+  if(scSources.length===1&&!scSources[0].title){scSources[0].title=planTitle||humanizeSlug(scSources[0].slug);}
+  if(!scSources[0].title)scSources[0].title=formatSourceTitle(scSources[0],0);
+  scSources.forEach((source,index)=>{if(!source.title)source.title=formatSourceTitle(source,index); if(!source.durationLabel||source.durationLabel==='—')source.durationLabel=formatClock(source.durationSec,false); if(source.meta&&typeof source.meta.format==='string'&&source.meta.format.trim())source.formatLabel=source.meta.format.trim();});
   scRenderSidebar(); scRenderMain();
 }
 
@@ -344,7 +335,7 @@ async function scLoadClipTranslations(episodePath){
         const path=clipsDir+'/clip_'+pad+'.translations.'+lang+'.json';
         const data=await scReadJson(path,null);
         if(!data||!Array.isArray(data.segments))continue;
-        const label=scLangLabel(lang);
+        const label=langLabel(lang);
         data.segments.forEach((seg)=>{
           const sentence=clip.sentences.find((s)=>s.id===seg.id);
           if(!sentence)return;

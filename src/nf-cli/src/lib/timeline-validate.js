@@ -5,9 +5,9 @@ import { resolve as resolvePath, isAbsolute } from "node:path";
 import { guarded } from "./guard.js";
 import { resolveTimeline as resolveLegacyTimeline } from "./legacy-timeline.js";
 import { getREGISTRY } from "./scene-registry.js";
-import { EFFECT_IDS } from "nf-core/animation/effects/index.js";
-import { FILTER_IDS } from "nf-core/filters/index.js";
-import { TRANSITION_IDS } from "nf-core/animation/transitions/index.js";
+import { EFFECT_IDS } from "../../../nf-core/animation/effects/index.js";
+import { FILTER_IDS } from "../../../nf-core/filters/index.js";
+import { TRANSITION_IDS } from "../../../nf-core/animation/transitions/index.js";
 
 let REGISTRY = new Map();
 
