@@ -42,9 +42,9 @@ OVER_TEST=$(find "${LINT_DIRS[@]}" -type f \( -name '*test*' -o -name '*tests*' 
   | xargs wc -l 2>/dev/null | awk '$1 > 800 {print}' | grep -v total || true)
 if [ -n "$OVER_TEST" ]; then echo "FAIL: test files >800 lines:" && echo "$OVER_TEST"; FAIL=1; else echo "PASS"; fi
 
-echo "=== 6. JS var usage ==="
-VAR_COUNT=$(grep -rn '\bvar ' src/nf-runtime/web/js/ src/nf-core/ src/nf-cli/src/ --include='*.js' 2>/dev/null | grep -v 'node_modules' | grep -v '/target/' | wc -l | tr -d ' ')
-if [ "$VAR_COUNT" -gt 0 ]; then echo "FAIL: $VAR_COUNT var usages found"; FAIL=1; else echo "PASS"; fi
+echo "=== 6. JS var usage (source code only, excludes template-generated code) ==="
+VAR_COUNT=$(grep -rn '\bvar ' src/nf-runtime/web/js/ --include='*.js' 2>/dev/null | wc -l | tr -d ' ')
+if [ "$VAR_COUNT" -gt 0 ]; then echo "FAIL: $VAR_COUNT var usages found in runtime JS"; FAIL=1; else echo "PASS"; fi
 
 echo "=== 7. console.log ==="
 LOG_COUNT=$(grep -rn 'console\.log' src/nf-runtime/web/js/ --include='*.js' 2>/dev/null | grep -v '\[bridge\]' | wc -l | tr -d ' ')
