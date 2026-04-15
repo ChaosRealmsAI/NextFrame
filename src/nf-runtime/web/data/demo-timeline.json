@@ -1,0 +1,80 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 36,
+  "layers": [
+    {
+      "scene": "darkGradient",
+      "start": 0,
+      "dur": 36,
+      "params": {
+        "bg": "#17120e",
+        "glowColor": "rgba(218,119,86,0.18)",
+        "glowX": 54,
+        "glowY": 34,
+        "glowSize": 58
+      }
+    },
+    {
+      "scene": "headlineCenter",
+      "start": 1,
+      "dur": 6.5,
+      "params": {
+        "text": "智能剪辑 Demo<br><span style=\"color:#da7756\">DOM 预览直出</span>",
+        "fontSize": 56,
+        "color": "#f5ece0",
+        "enterDelay": 0.2
+      }
+    },
+    {
+      "scene": "codeTerminal",
+      "start": 9,
+      "dur": 13,
+      "params": {
+        "title": "demo-timeline.json",
+        "fontSize": 26,
+        "maxWidth": 1320,
+        "y": 240,
+        "lines": [
+          "{",
+          "  \"scene\": \"headlineCenter\",",
+          "  \"start\": 1,",
+          "  \"dur\": 6.5,",
+          "  \"params\": { \"text\": \"DOM preview\" }",
+          "}",
+          "// Preview engine composes this directly in the stage"
+        ]
+      }
+    },
+    {
+      "scene": "headlineCenter",
+      "start": 23,
+      "dur": 7,
+      "params": {
+        "text": "同一条时间线<br><span style=\"color:#d4b483\">无项目耦合</span>",
+        "fontSize": 48,
+        "color": "#f5ece0",
+        "y": 300,
+        "enterDelay": 0.1
+      }
+    },
+    {
+      "scene": "subtitleBar",
+      "start": 0,
+      "dur": 36,
+      "params": {
+        "fontSize": 28,
+        "y": 54,
+        "srt": [
+          { "s": 0, "e": 5, "t": "预览区现在直接由 DOM 场景时间线驱动。" },
+          { "s": 5, "e": 11, "t": "编辑页不再依赖 pipeline.json 或 segment 文件。" },
+          { "s": 11, "e": 18, "t": "每一层都用 v0.3 合约里的 dur 字段描述持续时间。" },
+          { "s": 18, "e": 25, "t": "transport.js 负责播放、暂停、跳转和空格键控制。" },
+          { "s": 25, "e": 31, "t": "底部轨道直接渲染已加载的 timeline layers。" },
+          { "s": 31, "e": 36, "t": "这是一条硬编码 demo timeline，用来证明端到端通路。" }
+        ]
+      }
+    }
+  ]
+}
