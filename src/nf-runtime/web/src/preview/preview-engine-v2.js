@@ -16,7 +16,8 @@
                 return api.getState();
             },
             setTime(time) {
-                state.time = Number.isFinite(time) ? time : 0;
+                const nextTime = Number.isFinite(time) ? time : 0;
+                setStageTime(nextTime);
                 emitState();
                 return api.getState();
             },
