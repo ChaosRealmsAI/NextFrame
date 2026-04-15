@@ -42,7 +42,8 @@ pub(crate) fn rebuild_bookmarks_bar(bar: &NSView, target: &AnyObject, statuses: 
 
     for (index, (tab, _)) in TABS.iter().zip(BOOKMARK_COLORS.iter()).enumerate() {
         let status = statuses.get(index).copied().unwrap_or(None);
-        let dot = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
+        let dot = unsafe {
+            // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
             // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
             NSView::initWithFrame(
                 mtm.alloc(),
@@ -55,7 +56,8 @@ pub(crate) fn rebuild_bookmarks_bar(bar: &NSView, target: &AnyObject, statuses: 
 
         let label_x = x + dot_size + 6.0;
         let button_w = bookmark_label_width(tab.label);
-        let button = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
+        let button = unsafe {
+            // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
             // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
             NSButton::initWithFrame(
                 mtm.alloc(),
@@ -73,7 +75,8 @@ pub(crate) fn rebuild_bookmarks_bar(bar: &NSView, target: &AnyObject, statuses: 
         // SAFETY: `button` is a live NSButton and `setAlignment:` is a valid NSTextAlignment setter on its AppKit class cluster.
         let _: () = unsafe { msg_send![&*button, setAlignment: 0i64] }; // SAFETY: `button` is a live NSButton and `setAlignment:` is a valid NSTextAlignment setter on its AppKit class cluster.
         set_btn_tint(&button, &label_color);
-        unsafe { // SAFETY: `target` implements `sidebarTabClicked:` and is valid for AppKit target-action dispatch.
+        unsafe {
+            // SAFETY: `target` implements `sidebarTabClicked:` and is valid for AppKit target-action dispatch.
             // SAFETY: `target` implements `sidebarTabClicked:` and is valid for AppKit target-action dispatch.
             button.setTarget(Some(target));
             button.setAction(Some(sel!(sidebarTabClicked:)));
@@ -117,7 +120,8 @@ pub(crate) fn rebuild_tab_strip(tab_strip: &NSView, target: &AnyObject, tabs: &[
             tab.title.clone()
         };
 
-        let btn = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
+        let btn = unsafe {
+            // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
             // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
             NSButton::initWithFrame(
                 mtm.alloc(),
@@ -131,12 +135,14 @@ pub(crate) fn rebuild_tab_strip(tab_strip: &NSView, target: &AnyObject, tabs: &[
         unsafe { btn.setFont(Some(&tab_font)) }; // SAFETY: `btn` is a live NSButton and `tab_font` is a valid NSFont instance.
         // SAFETY: `btn` is a live NSButton and `setAlignment:` is a valid NSTextAlignment setter on its AppKit class cluster.
         let _: () = unsafe { msg_send![&*btn, setAlignment: 0i64] }; // SAFETY: `btn` is a live NSButton and `setAlignment:` is a valid NSTextAlignment setter on its AppKit class cluster.
-        let _: () = unsafe { // SAFETY: `btn` is a live NSButton and `setAlignment:` is a valid NSTextAlignment setter on its AppKit class cluster.
+        let _: () = unsafe {
+            // SAFETY: `btn` is a live NSButton and `setAlignment:` is a valid NSTextAlignment setter on its AppKit class cluster.
             // SAFETY: `btn` exposes an NSCell and both selectors are valid NSCell setters for truncation behavior.
             let cell: *const objc2::runtime::AnyObject = msg_send![&*btn, cell];
             msg_send![cell, setLineBreakMode: 4i64]
         };
-        let _: () = unsafe { // SAFETY: `btn` exposes an NSCell and `setWraps:` is a valid selector to disable wrapping for tab titles.
+        let _: () = unsafe {
+            // SAFETY: `btn` exposes an NSCell and `setWraps:` is a valid selector to disable wrapping for tab titles.
             // SAFETY: `btn` exposes an NSCell and `setWraps:` is a valid selector to disable wrapping for tab titles.
             let cell: *const objc2::runtime::AnyObject = msg_send![&*btn, cell];
             msg_send![cell, setWraps: false]
@@ -149,14 +155,16 @@ pub(crate) fn rebuild_tab_strip(tab_strip: &NSView, target: &AnyObject, tabs: &[
         } else {
             set_btn_tint(&btn, &inactive_text);
         }
-        unsafe { // SAFETY: `target` implements `runtimeTabClicked:` and is valid for AppKit target-action dispatch.
+        unsafe {
+            // SAFETY: `target` implements `runtimeTabClicked:` and is valid for AppKit target-action dispatch.
             // SAFETY: `target` implements `runtimeTabClicked:` and is valid for AppKit target-action dispatch.
             btn.setTarget(Some(target));
             btn.setAction(Some(sel!(runtimeTabClicked:)));
         }
         tab_strip.addSubview(&btn);
 
-        let close = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
+        let close = unsafe {
+            // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
             // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
             NSButton::initWithFrame(
                 mtm.alloc(),
@@ -185,7 +193,8 @@ pub(crate) fn rebuild_tab_strip(tab_strip: &NSView, target: &AnyObject, tabs: &[
         } else {
             set_btn_tint(&close, &srgb(0.62, 0.62, 0.64, 1.0));
         }
-        unsafe { // SAFETY: `target` implements `closeTabClicked:` and is valid for AppKit target-action dispatch.
+        unsafe {
+            // SAFETY: `target` implements `closeTabClicked:` and is valid for AppKit target-action dispatch.
             // SAFETY: `target` implements `closeTabClicked:` and is valid for AppKit target-action dispatch.
             close.setTarget(Some(target));
             close.setAction(Some(sel!(closeTabClicked:)));
@@ -201,7 +210,8 @@ pub(crate) fn rebuild_tab_strip(tab_strip: &NSView, target: &AnyObject, tabs: &[
 
         x += tab_w;
         if !tab.active && idx + 1 < tabs.len() && !tabs[idx + 1].active {
-            let sep = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
+            let sep = unsafe {
+                // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
                 // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSView is immediately initialized with a valid frame.
                 NSView::initWithFrame(
                     mtm.alloc(),
@@ -214,7 +224,8 @@ pub(crate) fn rebuild_tab_strip(tab_strip: &NSView, target: &AnyObject, tabs: &[
         x += 1.0;
     }
 
-    let plus = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
+    let plus = unsafe {
+        // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
         // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSButton is immediately initialized with a valid frame.
         NSButton::initWithFrame(
             mtm.alloc(),
@@ -231,7 +242,8 @@ pub(crate) fn rebuild_tab_strip(tab_strip: &NSView, target: &AnyObject, tabs: &[
     // SAFETY: `plus` is a live NSButton and `plus_font` is a valid NSFont instance.
     unsafe { plus.setFont(Some(&plus_font)) }; // SAFETY: `plus` is a live NSButton and `plus_font` is a valid NSFont instance.
     set_btn_tint(&plus, &srgb(0.55, 0.55, 0.57, 1.0));
-    unsafe { // SAFETY: `target` implements `newTabClicked:` and is valid for AppKit target-action dispatch.
+    unsafe {
+        // SAFETY: `target` implements `newTabClicked:` and is valid for AppKit target-action dispatch.
         // SAFETY: `target` implements `newTabClicked:` and is valid for AppKit target-action dispatch.
         plus.setTarget(Some(target));
         plus.setAction(Some(sel!(newTabClicked:)));

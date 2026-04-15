@@ -24,18 +24,21 @@ fn catch_objc(f: impl FnOnce()) -> Result<(), String> {
 }
 
 define_class!(
-    #[unsafe(super(NSObject))] // SAFETY: `PilotUIDelegate` subclasses `NSObject`, which matches the Objective-C runtime contract for this class.
+    #[unsafe(super(NSObject))]
+    // SAFETY: `PilotUIDelegate` subclasses `NSObject`, which matches the Objective-C runtime contract for this class.
     // SAFETY: `PilotUIDelegate` subclasses `NSObject`, which matches the Objective-C runtime contract for this class.
     #[thread_kind = MainThreadOnly]
     #[name = "PilotUIDelegate"]
     #[ivars = ()]
     pub(crate) struct PilotUIDelegate;
     unsafe impl NSObjectProtocol for PilotUIDelegate {} // SAFETY: this class is an `NSObject` subclass and upholds the `NSObjectProtocol` requirements on the main thread.
-    unsafe impl WKUIDelegate for PilotUIDelegate { // SAFETY: this class is an `NSObject` subclass and upholds the `NSObjectProtocol` requirements on the main thread.
+    unsafe impl WKUIDelegate for PilotUIDelegate {
+        // SAFETY: this class is an `NSObject` subclass and upholds the `NSObjectProtocol` requirements on the main thread.
         // SAFETY: the class is registered with the Objective-C runtime with the selectors WKWebView expects for `WKUIDelegate`.
         /// Handle target="_blank" links — open in new dynamic tab
         #[unsafe(method(webView:createWebViewWithConfiguration:forNavigationAction:windowFeatures:))] // SAFETY: this selector signature matches WebKit's documented `WKUIDelegate` entry point.
-        unsafe fn webView_createWebViewWithConfiguration_forNavigationAction_windowFeatures( // SAFETY: this selector signature matches WebKit's documented `WKUIDelegate` entry point.
+        unsafe fn webView_createWebViewWithConfiguration_forNavigationAction_windowFeatures(
+            // SAFETY: this selector signature matches WebKit's documented `WKUIDelegate` entry point.
             // SAFETY: Objective-C calls this with the registered selector/signature on the main thread.
             &self,
             _wv: &WKWebView,
@@ -54,7 +57,8 @@ define_class!(
         }
 
         #[unsafe(method(webView:runOpenPanelWithParameters:initiatedByFrame:completionHandler:))] // SAFETY: this selector signature matches WebKit's documented file-picker delegate callback.
-        unsafe fn webView_runOpenPanelWithParameters_initiatedByFrame_completionHandler( // SAFETY: this selector signature matches WebKit's documented file-picker delegate callback.
+        unsafe fn webView_runOpenPanelWithParameters_initiatedByFrame_completionHandler(
+            // SAFETY: this selector signature matches WebKit's documented file-picker delegate callback.
             // SAFETY: Objective-C calls this with the registered selector/signature on the main thread.
             &self,
             wv: &WKWebView,
@@ -112,17 +116,20 @@ impl PilotUIDelegate {
 }
 
 define_class!(
-    #[unsafe(super(NSObject))] // SAFETY: `PilotNavDelegate` subclasses `NSObject`, which matches the Objective-C runtime contract for this class.
+    #[unsafe(super(NSObject))]
+    // SAFETY: `PilotNavDelegate` subclasses `NSObject`, which matches the Objective-C runtime contract for this class.
     // SAFETY: `PilotNavDelegate` subclasses `NSObject`, which matches the Objective-C runtime contract for this class.
     #[thread_kind = MainThreadOnly]
     #[name = "PilotNavDelegate"]
     #[ivars = ()]
     pub(crate) struct PilotNavDelegate;
     unsafe impl NSObjectProtocol for PilotNavDelegate {} // SAFETY: this class is an `NSObject` subclass and upholds the `NSObjectProtocol` requirements on the main thread.
-    unsafe impl WKNavigationDelegate for PilotNavDelegate { // SAFETY: this class is an `NSObject` subclass and upholds the `NSObjectProtocol` requirements on the main thread.
+    unsafe impl WKNavigationDelegate for PilotNavDelegate {
+        // SAFETY: this class is an `NSObject` subclass and upholds the `NSObjectProtocol` requirements on the main thread.
         // SAFETY: the class is registered with the Objective-C runtime with the selectors WKWebView expects for `WKNavigationDelegate`.
         #[unsafe(method(webView:decidePolicyForNavigationAction:decisionHandler:))] // SAFETY: this selector signature matches WebKit's documented policy-decision delegate callback.
-        unsafe fn webView_decidePolicyForNavigationAction_decisionHandler( // SAFETY: this selector signature matches WebKit's documented policy-decision delegate callback.
+        unsafe fn webView_decidePolicyForNavigationAction_decisionHandler(
+            // SAFETY: this selector signature matches WebKit's documented policy-decision delegate callback.
             // SAFETY: Objective-C calls this with the registered selector/signature on the main thread.
             &self,
             _wv: &WKWebView,
@@ -133,7 +140,8 @@ define_class!(
         }
 
         #[unsafe(method(webView:didStartProvisionalNavigation:))] // SAFETY: this selector signature matches WebKit's provisional-navigation callback.
-        unsafe fn webView_didStartProvisionalNavigation( // SAFETY: this selector signature matches WebKit's provisional-navigation callback.
+        unsafe fn webView_didStartProvisionalNavigation(
+            // SAFETY: this selector signature matches WebKit's provisional-navigation callback.
             // SAFETY: Objective-C calls this with the registered selector/signature on the main thread.
             &self,
             wv: &WKWebView,
@@ -145,7 +153,8 @@ define_class!(
         }
 
         #[unsafe(method(webView:didCommitNavigation:))] // SAFETY: this selector signature matches WebKit's commit-navigation callback.
-        unsafe fn webView_didCommitNavigation(&self, wv: &WKWebView, _nav: Option<&WKNavigation>) { // SAFETY: this selector signature matches WebKit's commit-navigation callback.
+        unsafe fn webView_didCommitNavigation(&self, wv: &WKWebView, _nav: Option<&WKNavigation>) {
+            // SAFETY: this selector signature matches WebKit's commit-navigation callback.
             // SAFETY: Objective-C calls this with the registered selector/signature on the main thread.
             if let Some(tab_id) = tab_index_for_webview(wv) {
                 update_tab_after_navigation_event(tab_id);
@@ -153,7 +162,8 @@ define_class!(
         }
 
         #[unsafe(method(webView:didFinishNavigation:))] // SAFETY: this selector signature matches WebKit's finish-navigation callback.
-        unsafe fn webView_didFinishNavigation(&self, wv: &WKWebView, _nav: Option<&WKNavigation>) { // SAFETY: this selector signature matches WebKit's finish-navigation callback.
+        unsafe fn webView_didFinishNavigation(&self, wv: &WKWebView, _nav: Option<&WKNavigation>) {
+            // SAFETY: this selector signature matches WebKit's finish-navigation callback.
             // SAFETY: Objective-C calls this with the registered selector/signature on the main thread.
             if let Some(tab_id) = tab_index_for_webview(wv) {
                 crate::state::set_tab_loading_state(tab_id, false);
@@ -162,7 +172,8 @@ define_class!(
         }
 
         #[unsafe(method(webView:didFailProvisionalNavigation:withError:))] // SAFETY: this selector signature matches WebKit's provisional-failure callback.
-        unsafe fn webView_didFailProvisionalNavigation_withError( // SAFETY: this selector signature matches WebKit's provisional-failure callback.
+        unsafe fn webView_didFailProvisionalNavigation_withError(
+            // SAFETY: this selector signature matches WebKit's provisional-failure callback.
             // SAFETY: Objective-C calls this with the registered selector/signature on the main thread.
             &self,
             wv: &WKWebView,
@@ -181,7 +192,8 @@ define_class!(
         }
 
         #[unsafe(method(webView:didFailNavigation:withError:))] // SAFETY: this selector signature matches WebKit's navigation-failure callback.
-        unsafe fn webView_didFailNavigation_withError( // SAFETY: this selector signature matches WebKit's navigation-failure callback.
+        unsafe fn webView_didFailNavigation_withError(
+            // SAFETY: this selector signature matches WebKit's navigation-failure callback.
             // SAFETY: Objective-C calls this with the registered selector/signature on the main thread.
             &self,
             wv: &WKWebView,

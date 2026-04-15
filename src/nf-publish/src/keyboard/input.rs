@@ -213,7 +213,8 @@ pub(crate) fn send_key_command(webview: &WKWebView, key: &str) -> Result<(), Str
 }
 
 pub(crate) fn paste_text_native(webview: &WKWebView, text: &str) -> Result<(), String> {
-    unsafe { // SAFETY: `NSPasteboard` responds to these standard pasteboard selectors and the temporary NSString values live for the duration of the calls.
+    unsafe {
+        // SAFETY: `NSPasteboard` responds to these standard pasteboard selectors and the temporary NSString values live for the duration of the calls.
         // SAFETY: `NSPasteboard` responds to these standard pasteboard selectors and the temporary NSString values live for the duration of the calls.
         let pb: Retained<AnyObject> = msg_send![objc2::class!(NSPasteboard), generalPasteboard];
         let _: () = msg_send![&*pb, clearContents];
@@ -409,7 +410,8 @@ pub(crate) fn add_tag(webview: &WKWebView, tag: &str, result_path: &str) {
         });
     });
 
-    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }

@@ -39,7 +39,8 @@ unsafe extern "C" {} // SAFETY: This empty extern block only requests the linker
 unsafe extern "C" {} // SAFETY: This empty extern block only requests the linker to link CoreVideo.
 
 // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid for the linked process lifetime.
-unsafe extern "C" { // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
+unsafe extern "C" {
+    // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
     // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
     // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
     // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.

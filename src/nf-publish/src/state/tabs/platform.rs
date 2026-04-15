@@ -78,7 +78,8 @@ pub(crate) fn navigate_tab_to_url(tab_id: usize, url: &str) -> Result<(), String
             "Retry after the tab finishes initializing or reopen the tab.",
         )
     })?;
-    unsafe { // SAFETY: `webview` is a live WKWebView and `request` is a valid NSURLRequest created from a normalized URL.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `request` is a valid NSURLRequest created from a normalized URL.
         // SAFETY: `webview` is a live WKWebView and `request` is a valid NSURLRequest created from a normalized URL.
         webview.loadRequest(&request);
     }
@@ -174,7 +175,8 @@ pub(crate) fn go_back(target: Option<usize>) -> Result<(), String> {
             "Retry after the tab finishes initializing or reopen the tab.",
         )
     })?;
-    unsafe { // SAFETY: `webview` is a live WKWebView and `goBack` is a valid navigation selector on WKWebView.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `goBack` is a valid navigation selector on WKWebView.
         // SAFETY: `webview` is a live WKWebView and `goBack` is a valid navigation selector on WKWebView.
         webview.goBack();
     }
@@ -197,7 +199,8 @@ pub(crate) fn go_forward(target: Option<usize>) -> Result<(), String> {
             "Retry after the tab finishes initializing or reopen the tab.",
         )
     })?;
-    unsafe { // SAFETY: `webview` is a live WKWebView and `goForward` is a valid navigation selector on WKWebView.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `goForward` is a valid navigation selector on WKWebView.
         // SAFETY: `webview` is a live WKWebView and `goForward` is a valid navigation selector on WKWebView.
         webview.goForward();
     }
@@ -220,7 +223,8 @@ pub(crate) fn reload_tab(target: Option<usize>) -> Result<(), String> {
             "Retry after the tab finishes initializing or reopen the tab.",
         )
     })?;
-    unsafe { // SAFETY: `webview` is a live WKWebView and `reload` is a valid navigation selector on WKWebView.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `reload` is a valid navigation selector on WKWebView.
         // SAFETY: `webview` is a live WKWebView and `reload` is a valid navigation selector on WKWebView.
         webview.reload();
     }

@@ -28,7 +28,8 @@ pub(crate) struct SchemeHandlers {
 macro_rules! define_scheme_handler {
     ($name:ident) => {
         define_class!(
-            #[unsafe(super(NSObject))] // SAFETY: the generated scheme-handler class is registered as an NSObject subclass for objc2.
+            #[unsafe(super(NSObject))]
+            // SAFETY: the generated scheme-handler class is registered as an NSObject subclass for objc2.
             #[thread_kind = MainThreadOnly]
             #[ivars = SchemeHandlerIvars]
             pub(crate) struct $name;
@@ -36,9 +37,11 @@ macro_rules! define_scheme_handler {
             unsafe impl NSObjectProtocol for $name {} // SAFETY: $name is an NSObject subclass that satisfies NSObjectProtocol expectations.
 
             #[allow(non_snake_case)]
-            unsafe impl WKURLSchemeHandler for $name { // SAFETY: $name is registered with WebKit as a main-thread URL scheme handler.
+            unsafe impl WKURLSchemeHandler for $name {
+                // SAFETY: $name is registered with WebKit as a main-thread URL scheme handler.
                 #[unsafe(method(webView:startURLSchemeTask:))] // SAFETY: Selector matches WKURLSchemeHandler's Objective-C start callback.
-                unsafe fn web_view_start_urlscheme_task( // SAFETY: WebKit supplies a live task and web view for the duration of this callback.
+                unsafe fn web_view_start_urlscheme_task(
+                    // SAFETY: WebKit supplies a live task and web view for the duration of this callback.
                     &self,
                     _web_view: &WKWebView,
                     task: &ProtocolObject<dyn WKURLSchemeTask>,
@@ -47,7 +50,8 @@ macro_rules! define_scheme_handler {
                 }
 
                 #[unsafe(method(webView:stopURLSchemeTask:))] // SAFETY: Selector matches WKURLSchemeHandler's Objective-C stop callback.
-                unsafe fn web_view_stop_urlscheme_task( // SAFETY: WebKit supplies a live task and web view when cancelling an in-flight load.
+                unsafe fn web_view_stop_urlscheme_task(
+                    // SAFETY: WebKit supplies a live task and web view when cancelling an in-flight load.
                     &self,
                     _web_view: &WKWebView,
                     _task: &ProtocolObject<dyn WKURLSchemeTask>,
@@ -208,7 +212,8 @@ fn send_reply(
                 .to_string(),
         );
     };
-    unsafe { // SAFETY: WKURLSchemeTask requires response, optional data, then finish while the task is live.
+    unsafe {
+        // SAFETY: WKURLSchemeTask requires response, optional data, then finish while the task is live.
         task.didReceiveResponse(&response);
         if !reply.body.is_empty() {
             let data = NSData::with_bytes(&reply.body);

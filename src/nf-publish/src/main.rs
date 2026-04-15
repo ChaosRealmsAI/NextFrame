@@ -59,7 +59,8 @@ fn main() {
         NSPoint::new(win_x, win_y),
         NSSize::new(win_width, win_height),
     );
-    let window = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSWindow is immediately initialized with a valid frame/style tuple.
+    let window = unsafe {
+        // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSWindow is immediately initialized with a valid frame/style tuple.
         // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSWindow is immediately initialized with a valid frame/style tuple.
         NSWindow::initWithContentRect_styleMask_backing_defer(
             mtm.alloc(),
@@ -83,7 +84,8 @@ fn main() {
         window.center();
     }
 
-    let container = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and `alloc()` returns an NSView ready for `initWithFrame:`.
+    let container = unsafe {
+        // SAFETY: `mtm` guarantees main-thread AppKit access and `alloc()` returns an NSView ready for `initWithFrame:`.
         // SAFETY: `mtm` guarantees main-thread AppKit access and `alloc()` returns an NSView ready for `initWithFrame:`.
         objc2_app_kit::NSView::initWithFrame(
             mtm.alloc(),
@@ -122,7 +124,8 @@ fn main() {
     };
     // SAFETY: `store_id` is a valid NSUUID and `mtm` guarantees main-thread access to create the persistent website data store.
     let data_store = unsafe { WKWebsiteDataStore::dataStoreForIdentifier(&store_id, mtm) }; // SAFETY: `store_id` is a valid NSUUID and `mtm` guarantees main-thread access to create the persistent website data store.
-    unsafe { // SAFETY: `store_id` is a valid NSUUID and `mtm` guarantees main-thread access to create the persistent website data store.
+    unsafe {
+        // SAFETY: `store_id` is a valid NSUUID and `mtm` guarantees main-thread access to create the persistent website data store.
         // SAFETY: `config` and `data_store` are live WebKit objects and `setWebsiteDataStore:` is the supported configuration API.
         config.setWebsiteDataStore(&data_store);
     }
@@ -327,7 +330,8 @@ fn main() {
 })();
 "#,
     );
-    let user_script = unsafe { // SAFETY: `mtm` guarantees main-thread WebKit object creation and the injected source string lives for the duration of initialization.
+    let user_script = unsafe {
+        // SAFETY: `mtm` guarantees main-thread WebKit object creation and the injected source string lives for the duration of initialization.
         // SAFETY: `mtm` guarantees main-thread WebKit object creation and the injected source string lives for the duration of initialization.
         WKUserScript::initWithSource_injectionTime_forMainFrameOnly(
             mtm.alloc(),
@@ -338,7 +342,8 @@ fn main() {
     };
     // SAFETY: `config` is a live WKWebViewConfiguration and `userContentController` is a valid accessor returning its controller.
     let content_controller = unsafe { config.userContentController() }; // SAFETY: `config` is a live WKWebViewConfiguration and `userContentController` is a valid accessor returning its controller.
-    unsafe { // SAFETY: `config` is a live WKWebViewConfiguration and `userContentController` is a valid accessor returning its controller.
+    unsafe {
+        // SAFETY: `config` is a live WKWebViewConfiguration and `userContentController` is a valid accessor returning its controller.
         // SAFETY: `content_controller` owns the user scripts for `config`, and `user_script` is a valid WKUserScript instance.
         content_controller.addUserScript(&user_script);
     }
@@ -371,7 +376,8 @@ fn main() {
             .map(|u| u.as_str())
             .unwrap_or(tab.url);
         let wv = create_webview(mtm, wv_frame, url, &config, &ui_delegate, &nav_delegate);
-        unsafe { // SAFETY: `wv` is a live WKWebView and `setCustomUserAgent:` accepts the retained NSString constant used for all tabs.
+        unsafe {
+            // SAFETY: `wv` is a live WKWebView and `setCustomUserAgent:` accepts the retained NSString constant used for all tabs.
             // SAFETY: `wv` is a live WKWebView and `setCustomUserAgent:` accepts the retained NSString constant used for all tabs.
             wv.setCustomUserAgent(Some(user_agent));
         }
@@ -392,7 +398,8 @@ fn main() {
         webviews.push(wv);
     }
 
-    unsafe { // SAFETY: `address_field` is a live NSTextField and `browser_target` implements the NSTextField delegate methods used by the address bar.
+    unsafe {
+        // SAFETY: `address_field` is a live NSTextField and `browser_target` implements the NSTextField delegate methods used by the address bar.
         // SAFETY: `address_field` is a live NSTextField and `browser_target` implements the NSTextField delegate methods used by the address bar.
         layout
             .address_field
@@ -442,7 +449,8 @@ fn main() {
     window.setContentView(Some(&container));
     window.makeKeyAndOrderFront(None);
     #[allow(deprecated)]
-    unsafe { // SAFETY: the app is fully initialized and `activateIgnoringOtherApps:` is the intended AppKit call to bring it to the foreground.
+    unsafe {
+        // SAFETY: the app is fully initialized and `activateIgnoringOtherApps:` is the intended AppKit call to bring it to the foreground.
         // SAFETY: the app is fully initialized and `activateIgnoringOtherApps:` is the intended AppKit call to bring it to the foreground.
         app.activateIgnoringOtherApps(true);
     }

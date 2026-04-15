@@ -7,8 +7,7 @@ use super::project::projects_root;
 use crate::util::validation::{require_string, require_value};
 
 pub(crate) fn run_nextframe_cli(args: &[&str]) -> Result<Value, String> {
-    let cli_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../nf-cli/bin/nextframe.js");
+    let cli_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../nf-cli/bin/nextframe.js");
     if !cli_path.is_file() {
         return Err(format!(
             "failed to find nextframe CLI at '{}'. Fix: ensure src/nf-cli/bin/nextframe.js exists.",

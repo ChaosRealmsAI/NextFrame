@@ -25,7 +25,8 @@ pub fn run() {
     app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
 
     // Dark appearance
-    unsafe { // SAFETY: app is a live NSApplication on the main thread, and these selectors are valid AppKit APIs.
+    unsafe {
+        // SAFETY: app is a live NSApplication on the main thread, and these selectors are valid AppKit APIs.
         let dark_name = NSString::from_str("NSAppearanceNameDarkAqua");
         let appearance: Option<Retained<objc2_app_kit::NSAppearance>> =
             objc2_app_kit::NSAppearance::appearanceNamed(&dark_name);
@@ -46,7 +47,8 @@ pub fn run() {
         NSSize::new(WINDOW_WIDTH, WINDOW_HEIGHT),
     );
 
-    let window: Retained<NSWindow> = unsafe { // SAFETY: rect, style, and backing are valid for NSWindow's designated initializer on the main thread.
+    let window: Retained<NSWindow> = unsafe {
+        // SAFETY: rect, style, and backing are valid for NSWindow's designated initializer on the main thread.
         msg_send![
             NSWindow::alloc(mtm),
             initWithContentRect: rect,
@@ -60,7 +62,8 @@ pub fn run() {
     window.center();
 
     // Window background matches app background — prevents gray flash during resize
-    unsafe { // SAFETY: NSColor creation and setBackgroundColor are standard AppKit messages on a live main-thread window.
+    unsafe {
+        // SAFETY: NSColor creation and setBackgroundColor are standard AppKit messages on a live main-thread window.
         let bg_color: *mut AnyObject = msg_send![
             objc2::class!(NSColor),
             colorWithRed: 0.020f64,
@@ -72,7 +75,8 @@ pub fn run() {
     }
 
     // Transparent titlebar
-    unsafe { // SAFETY: window is live and both messages are standard NSWindow titlebar configuration calls.
+    unsafe {
+        // SAFETY: window is live and both messages are standard NSWindow titlebar configuration calls.
         let _: () = msg_send![&window, setTitlebarAppearsTransparent: true];
         let _: () = msg_send![&window, setTitleVisibility: 1i64]; // NSWindowTitleHidden
     }
@@ -150,7 +154,8 @@ pub fn run() {
         std::process::exit(0);
     }
 
-    unsafe { // SAFETY: activateIgnoringOtherApps is a standard NSApplication method on the live app singleton.
+    unsafe {
+        // SAFETY: activateIgnoringOtherApps is a standard NSApplication method on the live app singleton.
         let _: () = msg_send![&app, activateIgnoringOtherApps: true];
     }
 

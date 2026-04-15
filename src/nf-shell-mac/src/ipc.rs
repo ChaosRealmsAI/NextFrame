@@ -67,7 +67,8 @@ define_class!(
 
     unsafe impl NSObjectProtocol for BridgeHandler {} // SAFETY: BridgeHandler is an NSObject subclass that satisfies NSObjectProtocol expectations.
 
-    unsafe impl WKScriptMessageHandler for BridgeHandler { // SAFETY: BridgeHandler is registered with WebKit as a main-thread script message handler.
+    unsafe impl WKScriptMessageHandler for BridgeHandler {
+        // SAFETY: BridgeHandler is registered with WebKit as a main-thread script message handler.
         #[unsafe(method(userContentController:didReceiveScriptMessage:))] // SAFETY: Selector matches WKScriptMessageHandler's Objective-C callback signature.
         fn did_receive(
             this: &BridgeHandler,
@@ -108,7 +109,8 @@ define_class!(
 
             // Send response back to JS via evaluateJavaScript
             let wv_ptr = this.ivars().webview.get();
-            let Some(wv) = (unsafe { wv_ptr.as_ref() }) else { // SAFETY: wv_ptr is stored from a live WKWebView and only read while the handler is retained.
+            let Some(wv) = (unsafe { wv_ptr.as_ref() }) else {
+                // SAFETY: wv_ptr is stored from a live WKWebView and only read while the handler is retained.
                 return;
             };
 
@@ -122,7 +124,8 @@ define_class!(
             let js = format!("window.__ipcResolve('{escaped}')");
             let ns_js = NSString::from_str(&js);
 
-            unsafe { // SAFETY: evaluateJavaScript is called on the live WKWebView from WebKit's required main thread.
+            unsafe {
+                // SAFETY: evaluateJavaScript is called on the live WKWebView from WebKit's required main thread.
                 wv.evaluateJavaScript_completionHandler(&ns_js, None);
             }
 
@@ -142,7 +145,8 @@ pub fn install(
 
     // Inject bridge JS at document start
     let source = NSString::from_str(IPC_BRIDGE_SCRIPT);
-    let script = unsafe { // SAFETY: source is valid NSString content and this designated initializer must run on the main thread.
+    let script = unsafe {
+        // SAFETY: source is valid NSString content and this designated initializer must run on the main thread.
         WKUserScript::initWithSource_injectionTime_forMainFrameOnly(
             WKUserScript::alloc(mtm),
             &source,
@@ -150,7 +154,8 @@ pub fn install(
             true,
         )
     };
-    unsafe { // SAFETY: controller and script are live WebKit objects, and addUserScript only registers the injected script.
+    unsafe {
+        // SAFETY: controller and script are live WebKit objects, and addUserScript only registers the injected script.
         controller.addUserScript(&script);
     }
 
@@ -162,7 +167,8 @@ pub fn install(
 
     // Register handler
     let name = NSString::from_str(IPC_HANDLER_NAME);
-    unsafe { // SAFETY: handler implements WKScriptMessageHandler and controller retains it for future callbacks.
+    unsafe {
+        // SAFETY: handler implements WKScriptMessageHandler and controller retains it for future callbacks.
         controller.addScriptMessageHandler_name(ProtocolObject::from_ref(&*handler), &name);
     }
 
