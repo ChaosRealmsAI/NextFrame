@@ -95,17 +95,20 @@ function buildHtml(opts: {
 }): string {
   const [W, H] = RATIO_WH[opts.ratio];
   const dirUrl = `http://localhost:${opts.port}/src/nf-core/scenes/${RATIO_DIRS[opts.ratio]}/${opts.theme}`;
+  const ratioDir = RATIO_DIRS[opts.ratio];
   const sceneCards = opts.scenes.map(s => `
       <div class="b-card">
         <div class="card-head">
-          <h3 class="b-card-title">${s.id}</h3>
+          <a href="preview-${s.id}-${ratioDir}-${opts.theme}.html" class="b-card-title" style="color:inherit;text-decoration:none">${s.id} →</a>
           <div class="b-flex b-gap-2">
             <span class="tag tag-type-${s.type}">${s.type}</span>
             ${s.role ? `<span class="tag tag-role">${s.role}</span>` : ""}
           </div>
         </div>
         <p class="b-muted desc">${s.description || ""}</p>
-        <div class="stage-wrap"><div id="scene-${s.id}" class="stage" data-src="${s.filename}"></div></div>
+        <a href="preview-${s.id}-${ratioDir}-${opts.theme}.html" style="text-decoration:none;display:block" title="点击看详情 + 时间轴">
+          <div class="stage-wrap"><div id="scene-${s.id}" class="stage" data-src="${s.filename}"></div></div>
+        </a>
       </div>`).join("");
 
   const compositeCard = opts.composite && opts.scenes.length >= 2 ? `
