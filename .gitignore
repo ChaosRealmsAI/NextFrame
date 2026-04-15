@@ -10,6 +10,7 @@ projects/
 .autopilot/
 .ally/
 .worktrees/
+.worktrees-*.md
 
 # Secrets / env
 .env
@@ -27,14 +28,20 @@ Thumbs.db
 # Test / output artifacts
 test-results/
 output/
-!src/nf-tts/src/output/
-!src/nf-tts/src/output/*.rs
+
+# Accidental CLI output files
+-o
 
 # Media (large binary files)
 *.mp4
 *.mp3
 *.wav
-*.png
 *.jpg
 *.jpeg
-!src/nf-runtime/web/data/*.json
+
+# Allow scene preview thumbnails
+# (tracked PNGs in src/nf-cli/preview/thumbs/ are intentional)
+
+# Example outputs (generated, not source)
+src/nf-cli/examples/out/
+src/nf-source/**/fixtures/*.mp4
