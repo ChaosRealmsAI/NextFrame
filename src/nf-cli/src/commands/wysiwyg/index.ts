@@ -3,6 +3,7 @@ import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help/index.
 
 const SUBCOMMANDS = {
   diff: () => import("./diff.js"),
+  edit: () => import("./edit.js"),
   simulate: () => import("./edit.js"),
 };
 
