@@ -282,12 +282,21 @@ function handleTimelineTrackClick(event) {
   previewFrame(layer.start + layer.dur * pct);
 }
 
-function updatePreviewAspectRatio() {
+function updatePreviewScale() {
   const canvas = document.querySelector('.ed-preview-canvas');
-  if (!canvas || !edTimelineData) return;
+  const stage = document.getElementById('preview-stage');
+  if (!canvas || !stage || !edTimelineData) return;
   const w = edTimelineData.width || 1920;
   const h = edTimelineData.height || 1080;
   canvas.style.aspectRatio = w + ' / ' + h;
+  stage.style.width = w + 'px';
+  stage.style.height = h + 'px';
+  stage.style.transformOrigin = '0 0';
+  const canvasRect = canvas.getBoundingClientRect();
+  const scaleX = canvasRect.width / w;
+  const scaleY = canvasRect.height / h;
+  const scale = Math.min(scaleX, scaleY);
+  stage.style.transform = 'scale(' + scale + ')';
 }
 
 async function composePreview() {
@@ -298,7 +307,7 @@ async function composePreview() {
   const stage = ensureEditorPreviewStage();
   if (!stage) return null;
   stage.innerHTML = '';
-  updatePreviewAspectRatio();
+  updatePreviewScale();
   window.previewEngine.setStage(stage);
   window.edPreviewMode = 'dom';
   window.previewEngine.loadTimeline(edTimelineData);
@@ -405,6 +414,7 @@ window.__nfEditorDiagnose = function() {
   }, null, 2);
 };
 
+window.addEventListener('resize', function() { updatePreviewScale(); });
 window.loadEditorTimeline = loadEditorTimeline;
 window.showEditorEmpty = showEditorEmpty;
 window.renderEditorFromTimeline = renderEditorFromTimeline;
