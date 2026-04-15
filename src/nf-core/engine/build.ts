@@ -4,6 +4,7 @@
 import { writeFileSync } from "node:fs";
 
 import type { Timeline } from "../types.js";
+import { dispatchExpand } from "../matches/index.js";
 import { extractTimelineSrt, serializeSrtLiteral } from "./build-srt.js";
 import {
   buildAnimationBundle,
@@ -35,6 +36,15 @@ interface SceneModule {
   filePath: string;
   code: string;
   label?: string;
+}
+
+function expandMatches(timeline: Timeline): Timeline {
+  if (!Array.isArray(timeline.matches) || timeline.matches.length === 0) {
+    return timeline;
+  }
+  // TODO v0.6-walking: iterate timeline.matches, call dispatchExpand for each
+  void dispatchExpand;
+  throw new Error("not implemented: match expansion");
 }
 
 function detectRatioId(timeline: Timeline): string {
@@ -161,6 +171,7 @@ function coerceLayerParams(timeline: Timeline, sceneModules: SceneModule[]) {
 
 export function buildHTML(timeline: Timeline, outputPath: string) {
   try {
+    timeline = expandMatches(timeline || {});
     const sceneModules = collectModularSceneModules(timeline || {});
     coerceLayerParams(timeline || {}, sceneModules);
     const html = buildDocument(timeline || {}, sceneModules);
