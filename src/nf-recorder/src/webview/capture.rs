@@ -257,7 +257,8 @@ impl WebViewHost {
                 .max(1.0) as usize,
         );
         // SAFETY: `config` is live, and WebKit accepts this width setter on the main thread.
-        unsafe { // SAFETY: `config` is live, and WebKit accepts this width setter on the main thread.
+        unsafe {
+            // SAFETY: `config` is live, and WebKit accepts this width setter on the main thread.
             // SAFETY: `config` is live, and WebKit accepts this width setter on the main thread.
             // SAFETY: `config` is live, and WebKit accepts this width setter on the main thread.
             config.setSnapshotWidth(Some(&snapshot_width));
@@ -267,7 +268,8 @@ impl WebViewHost {
         let block = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {
             autoreleasepool(|_| {
                 // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
-                let result = if let Some(error) = unsafe { error.as_ref() } { // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
+                let result = if let Some(error) = unsafe { error.as_ref() } {
+                    // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
                     // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
                     // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
                     Err(
@@ -284,7 +286,8 @@ impl WebViewHost {
                         ),
                     )
                 // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes ownership.
-                } else if let Some(image) = unsafe { Retained::retain(image) } { // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes ownership.
+                } else if let Some(image) = unsafe { Retained::retain(image) } {
+                    // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes ownership.
                     // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes ownership.
                     // SAFETY: WebKit keeps `image` alive for this callback, and `retain` takes ownership.
                     Ok(image)
@@ -303,7 +306,8 @@ impl WebViewHost {
         });
 
         // SAFETY: `self.web_view`, `config`, and `block` are live main-thread Objective-C objects.
-        unsafe { // SAFETY: `self.web_view`, `config`, and `block` are live main-thread Objective-C objects.
+        unsafe {
+            // SAFETY: `self.web_view`, `config`, and `block` are live main-thread Objective-C objects.
             // SAFETY: `self.web_view`, `config`, and `block` are live main-thread Objective-C objects.
             // SAFETY: `self.web_view`, `config`, and `block` are live main-thread Objective-C objects.
             self.web_view
@@ -392,7 +396,8 @@ impl WebViewHost {
         let block = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
             autoreleasepool(|_| {
                 // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
-                let result = if let Some(error) = unsafe { error.as_ref() } { // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
+                let result = if let Some(error) = unsafe { error.as_ref() } {
+                    // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
                     // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
                     // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
                     if is_unsupported_js_result(error) {
@@ -424,7 +429,8 @@ impl WebViewHost {
         });
 
         // SAFETY: `self.web_view` is live, and WebKit accepts this script and completion handler on the main thread.
-        unsafe { // SAFETY: `self.web_view` is live, and WebKit accepts this script and completion handler on the main thread.
+        unsafe {
+            // SAFETY: `self.web_view` is live, and WebKit accepts this script and completion handler on the main thread.
             // SAFETY: `self.web_view` is live, and WebKit accepts this script and completion handler on the main thread.
             // SAFETY: `self.web_view` is live, and WebKit accepts this script and completion handler on the main thread.
             self.web_view

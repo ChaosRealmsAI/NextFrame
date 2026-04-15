@@ -195,12 +195,7 @@ mod tests {
         // http://localhost:9000/tmp/.../audio/clip.mp4
         let abs_str = abs_audio.to_string_lossy();
         let url = format!("http://localhost:9000{abs_str}");
-        let resolved = resolve_media_src(
-            &url,
-            Some("http://localhost:9000"),
-            &root,
-            &html,
-        );
+        let resolved = resolve_media_src(&url, Some("http://localhost:9000"), &root, &html);
 
         assert_eq!(resolved.as_deref(), Some(abs_audio.as_path()));
         let _ = fs::remove_dir_all(root);

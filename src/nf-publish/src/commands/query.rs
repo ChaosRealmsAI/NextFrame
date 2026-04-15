@@ -124,7 +124,8 @@ fn write_dump(
             ),
         }
     });
-    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }

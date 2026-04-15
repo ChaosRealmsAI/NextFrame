@@ -39,22 +39,26 @@ pub fn create(
 
     let store = unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) }; // SAFETY: mtm proves this WebKit data store is created on the required main thread.
 
-    unsafe { // SAFETY: config and store are live WebKit objects, and setWebsiteDataStore just attaches the store to this configuration.
+    unsafe {
+        // SAFETY: config and store are live WebKit objects, and setWebsiteDataStore just attaches the store to this configuration.
         config.setWebsiteDataStore(&store);
     }
 
     let rect = NSRect::new(NSPoint::new(0.0, 0.0), size);
 
     // Enable developer extras for debugging
-    unsafe { // SAFETY: prefs is the live WKPreferences object for this configuration and the selector matches the private API used here.
+    unsafe {
+        // SAFETY: prefs is the live WKPreferences object for this configuration and the selector matches the private API used here.
         let prefs = config.preferences();
         let _: () = objc2::msg_send![&prefs, _setDeveloperExtrasEnabled: true];
     }
 
-    let web_view = unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), rect, &config) }; // SAFETY: mtm, rect, and config satisfy WKWebView's designated initializer on the main thread.
+    let web_view =
+        unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), rect, &config) }; // SAFETY: mtm, rect, and config satisfy WKWebView's designated initializer on the main thread.
 
     // Allow non-opaque background so window dragging works with -webkit-app-region
-    unsafe { // SAFETY: web_view is live and this private selector only toggles WebKit background drawing behavior.
+    unsafe {
+        // SAFETY: web_view is live and this private selector only toggles WebKit background drawing behavior.
         let _: () = objc2::msg_send![&web_view, _setDrawsBackground: false];
     }
 
@@ -81,7 +85,8 @@ fn register_scheme_handler(
     handler: &ProtocolObject<dyn WKURLSchemeHandler>,
 ) {
     let scheme = NSString::from_str(scheme);
-    unsafe { // SAFETY: config is live and handler is a registered Objective-C object implementing WKURLSchemeHandler.
+    unsafe {
+        // SAFETY: config is live and handler is a registered Objective-C object implementing WKURLSchemeHandler.
         config.setURLSchemeHandler_forURLScheme(Some(handler), &scheme);
     }
 }
@@ -99,7 +104,8 @@ pub fn eval_js(web_view: &WKWebView, script: &str) -> Result<String, String> {
                 "JS error: {desc}. Fix: inspect the evaluated script and browser console output."
             ))
         } else if !result.is_null() {
-            let s: Retained<NSString> = unsafe { // SAFETY: result was checked for null and description returns an NSString for Objective-C objects.
+            let s: Retained<NSString> = unsafe {
+                // SAFETY: result was checked for null and description returns an NSString for Objective-C objects.
                 objc2::msg_send![result, description]
             };
             Ok(s.to_string())
@@ -109,7 +115,8 @@ pub fn eval_js(web_view: &WKWebView, script: &str) -> Result<String, String> {
         *slot_clone.borrow_mut() = Some(val);
     });
 
-    unsafe { // SAFETY: web_view is live on the main thread and WebKit accepts this completion block for JavaScript evaluation.
+    unsafe {
+        // SAFETY: web_view is live on the main thread and WebKit accepts this completion block for JavaScript evaluation.
         web_view.evaluateJavaScript_completionHandler(&ns_script, Some(&block));
     }
 
@@ -132,7 +139,8 @@ pub fn eval_js(web_view: &WKWebView, script: &str) -> Result<String, String> {
 
 fn load_fallback(web_view: &WKWebView) {
     let html = NSString::from_str(FALLBACK_HTML);
-    unsafe { // SAFETY: web_view is live and html is a valid NSString passed to WebKit's fallback HTML loader.
+    unsafe {
+        // SAFETY: web_view is live and html is a valid NSString passed to WebKit's fallback HTML loader.
         web_view.loadHTMLString_baseURL(&html, None);
     }
 }
@@ -144,7 +152,8 @@ pub fn pump_run_loop_pub(duration: Duration) {
 
 /// Pump the main run loop for a given duration (needed for async WebKit ops).
 fn pump_run_loop(duration: Duration) {
-    unsafe { // SAFETY: the imported CoreFoundation symbols are process-global and this just pumps the current run loop in default mode.
+    unsafe {
+        // SAFETY: the imported CoreFoundation symbols are process-global and this just pumps the current run loop in default mode.
         let deadline = Instant::now() + duration;
         while Instant::now() < deadline {
             extern "C" {
@@ -201,7 +210,8 @@ pub fn screenshot(web_view: &WKWebView, out_path: &str) -> Result<(), String> {
         *slot_clone.borrow_mut() = Some(result);
     });
 
-    unsafe { // SAFETY: web_view, config, and block are live main-thread objects accepted by takeSnapshotWithConfiguration.
+    unsafe {
+        // SAFETY: web_view, config, and block are live main-thread objects accepted by takeSnapshotWithConfiguration.
         web_view.takeSnapshotWithConfiguration_completionHandler(Some(&config), &block);
     }
 
@@ -223,7 +233,8 @@ pub fn screenshot(web_view: &WKWebView, out_path: &str) -> Result<(), String> {
     )??;
 
     // Convert NSImage → PNG data → write to disk
-    unsafe { // SAFETY: image is live, AppKit TIFF/bitmap APIs are called on the main thread, and NSData bytes stay valid for the slice below.
+    unsafe {
+        // SAFETY: image is live, AppKit TIFF/bitmap APIs are called on the main thread, and NSData bytes stay valid for the slice below.
         let tiff = image
             .TIFFRepresentation()
             .ok_or_else(|| {

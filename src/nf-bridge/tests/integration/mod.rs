@@ -104,7 +104,8 @@ impl HomeDirOverrideGuard {
         let homepath = env::var_os("HOMEPATH");
 
         // SAFETY: integration tests serialize HOME mutations with HOME_ENV_TEST_LOCK.
-        unsafe { // SAFETY: integration tests serialize HOME mutations with HOME_ENV_TEST_LOCK.
+        unsafe {
+            // SAFETY: integration tests serialize HOME mutations with HOME_ENV_TEST_LOCK.
             env::set_var("HOME", path);
             env::remove_var("USERPROFILE");
             env::remove_var("HOMEDRIVE");
@@ -139,7 +140,8 @@ impl Drop for HomeDirOverrideGuard {
 
 fn restore_env_var(key: &str, value: Option<&OsString>) {
     // SAFETY: integration tests serialize HOME mutations with HOME_ENV_TEST_LOCK.
-    unsafe { // SAFETY: integration tests serialize HOME mutations with HOME_ENV_TEST_LOCK.
+    unsafe {
+        // SAFETY: integration tests serialize HOME mutations with HOME_ENV_TEST_LOCK.
         match value {
             Some(value) => env::set_var(key, value),
             None => env::remove_var(key),

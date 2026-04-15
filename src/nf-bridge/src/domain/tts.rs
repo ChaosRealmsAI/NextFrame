@@ -9,8 +9,7 @@ use crate::util::validation::require_string;
 
 /// Find the `nextframe` CLI binary (node script).
 fn nextframe_cli() -> Result<(String, Vec<String>), String> {
-    let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../nf-cli/bin/nextframe.js");
+    let script = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../nf-cli/bin/nextframe.js");
     if script.exists() {
         return Ok(("node".into(), vec![script.display().to_string()]));
     }

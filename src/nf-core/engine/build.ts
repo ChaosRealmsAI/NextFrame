@@ -77,7 +77,6 @@ function buildDocument(timeline: Timeline, sceneModules: SceneModule[]) {
     .map((scene: SceneModule) => `${JSON.stringify(scene.id)}: ${scene.varName}`)
     .join(",\n");
   const background = String(timeline.background || "#05050c");
-  const shellBackground = "#03050a";
   const width = Number(timeline.width || 1920);
   const height = Number(timeline.height || 1080);
   const inlineSrt = extractTimelineSrt(timeline);
@@ -107,7 +106,7 @@ ${buildRuntime()}`);
 <title>NextFrame Build</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: ${shellBackground}; color: #f4efe8; font-family: system-ui, -apple-system, sans-serif; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: ${background}; color: #f4efe8; font-family: system-ui, -apple-system, sans-serif; }
   body { position: relative; }
   #stage-shell { position: fixed; width: ${width}px; height: ${height}px; transform-origin: 0 0; }
   #stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: ${background}; box-shadow: 0 24px 100px rgba(0, 0, 0, 0.35); }

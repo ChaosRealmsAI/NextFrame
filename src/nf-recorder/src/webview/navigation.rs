@@ -46,7 +46,8 @@ impl WebViewHost {
         let read_access_url =
             NSURL::fileURLWithPath(&NSString::from_str(&read_access_root.to_string_lossy()));
         // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
-        let navigation = unsafe { // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
+        let navigation = unsafe {
+            // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
             // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
             // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
             self.web_view

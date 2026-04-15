@@ -66,7 +66,8 @@ impl SegmentEncoder {
         })?;
 
         // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
-        unsafe { // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
+        unsafe {
+            // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
             // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
             // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
             // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
@@ -94,7 +95,8 @@ impl SegmentEncoder {
         });
 
         // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
-        unsafe { // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
+        unsafe {
+            // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
             // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
             // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
             // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
@@ -194,7 +196,8 @@ impl SegmentEncoder {
 
         let mut error: *mut NSError = ptr::null_mut();
         // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
-        let writer: Option<Retained<AnyObject>> = unsafe { // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
+        let writer: Option<Retained<AnyObject>> = unsafe {
+            // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
             // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
             // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
             // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
@@ -216,7 +219,8 @@ impl SegmentEncoder {
             );
         };
         // SAFETY: `writer` is live, and this setter is valid before writing starts.
-        unsafe { // SAFETY: `writer` is live, and this setter is valid before writing starts.
+        unsafe {
+            // SAFETY: `writer` is live, and this setter is valid before writing starts.
             // SAFETY: `writer` is live, and this setter is valid before writing starts.
             // SAFETY: `writer` is live, and this setter is valid before writing starts.
             // SAFETY: `writer` is live, and this setter is valid before writing starts.
@@ -224,7 +228,8 @@ impl SegmentEncoder {
         }
 
         // SAFETY: `writer` is live, and these settings are queried with the documented media type.
-        let can_apply: bool = unsafe { // SAFETY: `writer` is live, and these settings are queried with the documented media type.
+        let can_apply: bool = unsafe {
+            // SAFETY: `writer` is live, and these settings are queried with the documented media type.
             // SAFETY: `writer` is live, and these settings are queried with the documented media type.
             // SAFETY: `writer` is live, and these settings are queried with the documented media type.
             // SAFETY: `writer` is live, and these settings are queried with the documented media type.
@@ -249,7 +254,8 @@ impl SegmentEncoder {
         }
 
         // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
-        let input: Option<Retained<AnyObject>> = unsafe { // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
+        let input: Option<Retained<AnyObject>> = unsafe {
+            // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
             // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
             // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
             // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
@@ -270,7 +276,8 @@ impl SegmentEncoder {
             );
         };
         // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
-        unsafe { // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
+        unsafe {
+            // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
             // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
             // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
             // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
@@ -290,7 +297,8 @@ impl SegmentEncoder {
             );
         }
         // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
-        unsafe { // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
+        unsafe {
+            // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
             // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
             // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
             // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
@@ -298,7 +306,8 @@ impl SegmentEncoder {
         }
 
         // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
-        let adaptor: Option<Retained<AnyObject>> = unsafe { // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
+        let adaptor: Option<Retained<AnyObject>> = unsafe {
+            // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
             // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
             // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
             // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
@@ -332,7 +341,8 @@ impl SegmentEncoder {
             );
         }
         // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
-        unsafe { // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
+        unsafe {
+            // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
             // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
             // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
             // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
@@ -405,7 +415,8 @@ impl SegmentEncoder {
         })?;
         let presentation_time = frame_time(self.frame_count, self.fps)?;
         // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
-        let appended: bool = unsafe { // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
+        let appended: bool = unsafe {
+            // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
             // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
             // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
             // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
@@ -416,7 +427,8 @@ impl SegmentEncoder {
             ]
         };
         // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
-        unsafe { // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
+        unsafe {
+            // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
             // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
             // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
             // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.

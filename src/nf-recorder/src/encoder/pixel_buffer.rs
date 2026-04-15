@@ -23,7 +23,8 @@ use crate::{error_with_fix, internal_error_with_fix};
 const kCGInterpolationHigh: i32 = 3;
 
 // SAFETY: This imports CoreGraphics with the declared system signature for valid CGContext pointers.
-unsafe extern "C" { // SAFETY: This imports CoreGraphics with the declared system signature for valid CGContext pointers.
+unsafe extern "C" {
+    // SAFETY: This imports CoreGraphics with the declared system signature for valid CGContext pointers.
     // SAFETY: This imports CoreGraphics with the declared system signature for valid CGContext pointers.
     // SAFETY: This imports CoreGraphics with the declared system signature for valid CGContext pointers.
     fn CGContextSetInterpolationQuality(context: *const std::ffi::c_void, quality: i32);
@@ -44,7 +45,8 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
     let attributes = pixel_buffer_attributes(frame_size);
     let mut pixel_buffer: CVPixelBufferRef = ptr::null_mut();
     // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
-    let create_result = unsafe { // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
+    let create_result = unsafe {
+        // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
         // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
         // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
         CVPixelBufferCreate(
@@ -107,7 +109,8 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
         let bitmap_info =
             CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
         // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
-        let context = unsafe { // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
+        let context = unsafe {
+            // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
             // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
             // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
             CGBitmapContextCreate(
@@ -131,7 +134,8 @@ pub(super) fn create_pixel_buffer_from_cgimage_scaled(
         // Set high-quality interpolation when upscaling
         if is_upscaling {
             // SAFETY: `context` is live, and CoreGraphics accepts its pointer for interpolation changes.
-            unsafe { // SAFETY: `context` is live, and CoreGraphics accepts its pointer for interpolation changes.
+            unsafe {
+                // SAFETY: `context` is live, and CoreGraphics accepts its pointer for interpolation changes.
                 // SAFETY: `context` is live, and CoreGraphics accepts its pointer for interpolation changes.
                 // SAFETY: `context` is live, and CoreGraphics accepts its pointer for interpolation changes.
                 let ctx_ptr: *const CGContext = &*context;
@@ -190,7 +194,8 @@ pub(super) fn create_pixel_buffer_from_cgimage(
     let attributes = pixel_buffer_attributes(frame_size);
     let mut pixel_buffer: CVPixelBufferRef = ptr::null_mut();
     // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
-    let create_result = unsafe { // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
+    let create_result = unsafe {
+        // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
         // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
         // SAFETY: `pixel_buffer` is writable out-storage, and the attributes match this BGRA buffer request.
         CVPixelBufferCreate(
@@ -253,7 +258,8 @@ pub(super) fn create_pixel_buffer_from_cgimage(
         let bitmap_info =
             CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
         // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
-        let context = unsafe { // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
+        let context = unsafe {
+            // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
             // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
             // SAFETY: `base_address`, dimensions, stride, and format match the locked BGRA pixel buffer.
             CGBitmapContextCreate(

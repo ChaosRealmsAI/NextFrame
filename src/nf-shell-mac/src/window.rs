@@ -81,7 +81,8 @@ define_class!(
 
     unsafe impl NSObjectProtocol for WindowDragHandler {} // SAFETY: WindowDragHandler is an NSObject subclass that satisfies NSObjectProtocol expectations.
 
-    unsafe impl WKScriptMessageHandler for WindowDragHandler { // SAFETY: WindowDragHandler is registered with WebKit as a main-thread script message handler.
+    unsafe impl WKScriptMessageHandler for WindowDragHandler {
+        // SAFETY: WindowDragHandler is registered with WebKit as a main-thread script message handler.
         #[unsafe(method(userContentController:didReceiveScriptMessage:))] // SAFETY: Selector matches WKScriptMessageHandler's Objective-C callback.
         fn did_receive(
             this: &WindowDragHandler,
@@ -95,7 +96,8 @@ define_class!(
 
             let msg = body.to_string();
 
-            let Some(window) = (unsafe { this.ivars().window.as_ref() }) else { // SAFETY: install_window_drag_bridge stores a live NSWindow pointer that outlives the handler.
+            let Some(window) = (unsafe { this.ivars().window.as_ref() }) else {
+                // SAFETY: install_window_drag_bridge stores a live NSWindow pointer that outlives the handler.
                 return;
             };
 
@@ -103,7 +105,8 @@ define_class!(
                 start_window_drag(window);
             } else if msg == "zoom_window" {
                 // Use zoom with animation context for smooth transition
-                unsafe { // SAFETY: NSAnimationContext is invoked on the main thread with blocks that stay alive for the message send.
+                unsafe {
+                    // SAFETY: NSAnimationContext is invoked on the main thread with blocks that stay alive for the message send.
                     let _: () = objc2::msg_send![
                         objc2::class!(NSAnimationContext),
                         runAnimationGroup: &*block2::RcBlock::new(move |ctx: *mut AnyObject| {
@@ -130,7 +133,8 @@ pub(crate) fn install_window_drag_bridge(
     let controller = unsafe { config.userContentController() }; // SAFETY: config is a live WKWebViewConfiguration on the main thread.
 
     let source = NSString::from_str(WINDOW_DRAG_SCRIPT);
-    let script = unsafe { // SAFETY: source is valid NSString content and this designated initializer must run on the main thread.
+    let script = unsafe {
+        // SAFETY: source is valid NSString content and this designated initializer must run on the main thread.
         WKUserScript::initWithSource_injectionTime_forMainFrameOnly(
             WKUserScript::alloc(mtm),
             &source,
@@ -138,7 +142,8 @@ pub(crate) fn install_window_drag_bridge(
             true,
         )
     };
-    unsafe { // SAFETY: controller is live during web view setup and addUserScript only registers the drag script.
+    unsafe {
+        // SAFETY: controller is live during web view setup and addUserScript only registers the drag script.
         controller.addUserScript(&script);
     }
 
@@ -152,7 +157,8 @@ pub(crate) fn install_window_drag_bridge(
 
     let handler_name = NSString::from_str(WINDOW_DRAG_HANDLER_NAME);
     let protocol_handler = ProtocolObject::from_ref(&*handler);
-    unsafe { // SAFETY: handler implements WKScriptMessageHandler and the retained controller registers it for callbacks.
+    unsafe {
+        // SAFETY: handler implements WKScriptMessageHandler and the retained controller registers it for callbacks.
         handler
             .ivars()
             .controller
@@ -173,7 +179,8 @@ fn start_window_drag(window: &NSWindow) {
         return;
     };
 
-    unsafe { // SAFETY: We use the current AppKit event or a synthesized left-mouse-down event before calling performWindowDragWithEvent:.
+    unsafe {
+        // SAFETY: We use the current AppKit event or a synthesized left-mouse-down event before calling performWindowDragWithEvent:.
         // or synthesize a left-mouse-down event before calling `performWindowDragWithEvent:`.
         let event = if current_event.r#type().0 == 0x15 {
             let event: Retained<NSEvent> = msg_send![
@@ -199,7 +206,8 @@ fn start_window_drag(window: &NSWindow) {
 
 /// Reposition traffic lights to vertically center in our 48px HTML topbar.
 pub(crate) fn position_traffic_lights(window: &NSWindow) {
-    unsafe { // SAFETY: standardWindowButton queries AppKit titlebar controls from a live NSWindow on the main thread.
+    unsafe {
+        // SAFETY: standardWindowButton queries AppKit titlebar controls from a live NSWindow on the main thread.
         let close = window.standardWindowButton(NSWindowButton::CloseButton);
         let Some(close) = close else {
             return;
@@ -211,7 +219,8 @@ pub(crate) fn position_traffic_lights(window: &NSWindow) {
     }
 }
 
-unsafe fn inset_traffic_lights(window: &NSWindow, x: f64, _y: f64) { // SAFETY: caller passes a live NSWindow on the main thread before mutating titlebar subviews.
+unsafe fn inset_traffic_lights(window: &NSWindow, x: f64, _y: f64) {
+    // SAFETY: caller passes a live NSWindow on the main thread before mutating titlebar subviews.
     // SAFETY: This follows Wry's macOS inset strategy: resize the titlebar container view,
     // then move the standard buttons horizontally so AppKit keeps them aligned on relayout.
     let Some(close) = window.standardWindowButton(NSWindowButton::CloseButton) else {
@@ -249,7 +258,8 @@ unsafe fn inset_traffic_lights(window: &NSWindow, x: f64, _y: f64) { // SAFETY: 
 
 /// Register resize/layout notifications to reapply traffic light positions.
 pub(crate) fn register_resize_observer(window: &NSWindow) {
-    unsafe { // SAFETY: notification-center access and observer registration happen on the main thread for a window that lives for the app run loop.
+    unsafe {
+        // SAFETY: notification-center access and observer registration happen on the main thread for a window that lives for the app run loop.
         let center: *mut AnyObject = msg_send![objc2::class!(NSNotificationCenter), defaultCenter];
 
         // Only reposition AFTER animations/resize complete — not during.

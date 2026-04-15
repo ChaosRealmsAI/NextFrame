@@ -15,7 +15,16 @@ fn resolve_bundler_path() -> PathBuf {
         .join("src")
         .join("nf-core")
         .join("engine")
-        .join("bundle-for-preview.js")
+        .join("bundle-for-preview.ts")
+}
+
+fn resolve_tsx_path() -> PathBuf {
+    crate::path::workspace_root()
+        .join("src")
+        .join("nf-cli")
+        .join("node_modules")
+        .join(".bin")
+        .join("tsx")
 }
 
 fn extract_scene_ids(timeline: &Value) -> Vec<String> {
@@ -38,6 +47,7 @@ fn extract_scene_ids(timeline: &Value) -> Vec<String> {
 
 fn bundle_hash(scene_ids: &[String]) -> String {
     let mut hasher = Sha256::new();
+    hasher.update(b"preview-bundle:v2\n");
     for scene_id in scene_ids {
         hasher.update(scene_id.as_bytes());
         hasher.update(b"\n");
@@ -89,7 +99,14 @@ pub(crate) fn handle_preview_bundle(params: &Value) -> Result<Value, String> {
         })?;
 
         let bundler_path = resolve_bundler_path();
-        let output = Command::new("node")
+        let tsx_path = resolve_tsx_path();
+        if !tsx_path.is_file() {
+            return Err(format!(
+                "failed to run preview bundler: missing '{}'. Fix: install nf-cli dependencies so tsx is available.",
+                tsx_path.display()
+            ));
+        }
+        let output = Command::new(&tsx_path)
             .arg(&bundler_path)
             .arg(&timeline_path)
             .arg(&output_path)

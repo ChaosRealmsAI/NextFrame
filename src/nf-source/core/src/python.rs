@@ -34,11 +34,13 @@ mod tests {
         let temp = tempfile::tempdir()?;
         let preferred = temp.path().join("python3");
 
-        unsafe { // SAFETY: tests serialize environment mutation with `env_lock`, so process-global env mutation is synchronized here.
+        unsafe {
+            // SAFETY: tests serialize environment mutation with `env_lock`, so process-global env mutation is synchronized here.
             std::env::set_var("VIDEOCUT_CORE_TEST_PYTHON_BIN", "custom-python");
         }
         let resolved = python_bin("VIDEOCUT_CORE_TEST_PYTHON_BIN", &preferred);
-        unsafe { // SAFETY: tests serialize environment mutation with `env_lock`, so removing the env var cannot race other tests here.
+        unsafe {
+            // SAFETY: tests serialize environment mutation with `env_lock`, so removing the env var cannot race other tests here.
             std::env::remove_var("VIDEOCUT_CORE_TEST_PYTHON_BIN");
         }
 

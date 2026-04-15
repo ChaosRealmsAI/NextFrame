@@ -4,6 +4,8 @@
 const ED_DEMO_TIMELINE_PATH = 'data/demo-timeline.json';
 let edTimelineData = null;
 let edActiveClip = null;
+let edSceneBundleScript = null;
+let edSceneBundleUrl = '';
 const editorClock = (seconds) => window.formatClock(seconds, true);
 function getEditorLayerDuration(layer) {
     const dur = Number(layer && layer.dur);
@@ -117,6 +119,13 @@ function loadEditorSceneBundleScript(url) {
     });
 }
 async function ensureEditorSceneBundle(timeline) {
+    const sceneIds = Array.isArray(timeline === null || timeline === void 0 ? void 0 : timeline.layers)
+        ? timeline.layers.map(function (layer) { return layer && layer.scene; }).filter(Boolean)
+        : [];
+    const existingScenes = window.__scenes || {};
+    if (sceneIds.length && sceneIds.every(function (sceneId) { return !!existingScenes[sceneId]; })) {
+        return { ok: true, value: { url: '', cached: true, sceneIds: sceneIds } };
+    }
     const bundle = await bridgeCall('preview.bundle', { timeline: timeline });
     const bundleValue = bundle.ok === true ? bundle.value : null;
     const url = bundleValue && bundleValue.url ? bundleValue.url : '';
@@ -276,7 +285,7 @@ function updatePreviewScale() {
     stage.style.height = h + 'px';
     stage.style.transformOrigin = '0 0';
     stage.style.position = 'absolute';
-    requestAnimationFrame(function () {
+    const applyScale = function () {
         const cw = canvas.clientWidth;
         const ch = canvas.clientHeight;
         if (cw <= 0 || ch <= 0)
@@ -285,7 +294,10 @@ function updatePreviewScale() {
         stage.style.transform = 'scale(' + scale + ')';
         stage.style.left = Math.round((cw - w * scale) / 2) + 'px';
         stage.style.top = Math.round((ch - h * scale) / 2) + 'px';
-    });
+    };
+    applyScale();
+    requestAnimationFrame(applyScale);
+    window.setTimeout(applyScale, 50);
 }
 async function composePreview() {
     if (!edTimelineData || !canUseDomPreview())
@@ -317,16 +329,22 @@ async function composePreview() {
     }
     return result;
 }
-async function loadEditorTimeline() {
+async function resolveEditorTimelineInput(input) {
+    if (input && typeof input === 'object')
+        return input;
+    const path = typeof input === 'string' && input ? input : ED_DEMO_TIMELINE_PATH;
+    const response = await fetch(path, { cache: 'no-store' });
+    if (!response.ok)
+        throw new Error('Failed to fetch timeline JSON');
+    return response.json();
+}
+async function loadEditorTimeline(input) {
     if (!canUseDomPreview()) {
         showEditorEmpty('DOM 预览引擎不可用');
         return null;
     }
     try {
-        const response = await fetch(ED_DEMO_TIMELINE_PATH, { cache: 'no-store' });
-        if (!response.ok)
-            throw new Error('Failed to fetch demo timeline');
-        const data = await response.json();
+        const data = await resolveEditorTimelineInput(input);
         renderEditorFromTimeline(data);
         await ensureEditorSceneBundle(data);
         await composePreview();

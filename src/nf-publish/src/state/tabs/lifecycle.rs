@@ -38,12 +38,14 @@ pub(crate) fn switch_tab(index: usize) {
 
     if let Err(err) = with_objc_boundary("switch browser tab", || {
         if let Some(prev_ptr) = prev_ptr {
-            unsafe { // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
+            unsafe {
+                // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
                 // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
                 (&*prev_ptr).setHidden(true);
             }
         }
-        unsafe { // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
+        unsafe {
+            // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
             // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
             (&*next_ptr).setHidden(false);
         }
@@ -157,13 +159,15 @@ pub(crate) fn create_dynamic_tab(
         ui_delegate,
         nav_delegate,
     );
-    unsafe { // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
         // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
         webview.setCustomUserAgent(Some(&NSString::from_str(state.user_agent)));
     }
     if is_new_tab {
         let html = NSString::from_str(&new_tab_html());
-        unsafe { // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
+        unsafe {
+            // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
             // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
             webview.loadHTMLString_baseURL(&html, None);
         }

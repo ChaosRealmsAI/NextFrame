@@ -1,5 +1,6 @@
 //! Shared nextframe CLI gateway for pipeline IPC handlers.
 use serde_json::Value;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -7,8 +8,7 @@ use super::project::projects_root;
 use crate::util::validation::{require_string, require_value};
 
 pub(crate) fn run_nextframe_cli(args: &[&str]) -> Result<Value, String> {
-    let cli_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../nf-cli/bin/nextframe.js");
+    let cli_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../nf-cli/bin/nextframe.js");
     if !cli_path.is_file() {
         return Err(format!(
             "failed to find nextframe CLI at '{}'. Fix: ensure src/nf-cli/bin/nextframe.js exists.",
@@ -39,13 +39,16 @@ pub(crate) fn run_nextframe_cli(args: &[&str]) -> Result<Value, String> {
 pub(crate) fn handle_script_get(params: &Value) -> Result<Value, String> {
     let project = require_string(params, "project")?;
     let episode = require_string(params, "episode")?;
-    let (project_name, episode_name) = resolve_project_episode_names(project, episode);
-    let segment_arg = optional_u64_flag(params, "segment", "segment")?;
-    let mut args = vec!["script-get", project_name.as_str(), episode_name.as_str()];
-    if let Some(ref segment_arg) = segment_arg {
-        args.push(segment_arg.as_str());
+    let segment = optional_u64(params, "segment")?;
+    let pipeline = load_episode_pipeline(project, episode)?;
+    let script = pipeline
+        .get("script")
+        .cloned()
+        .unwrap_or_else(empty_script_stage);
+    match segment {
+        Some(segment_number) => Ok(find_segment(&script, segment_number)),
+        None => Ok(script),
     }
-    run_nextframe_cli(&args)
 }
 
 pub(crate) fn handle_script_set(params: &Value) -> Result<Value, String> {
@@ -80,13 +83,16 @@ pub(crate) fn handle_script_set(params: &Value) -> Result<Value, String> {
 pub(crate) fn handle_audio_get(params: &Value) -> Result<Value, String> {
     let project = require_string(params, "project")?;
     let episode = require_string(params, "episode")?;
-    let (project_name, episode_name) = resolve_project_episode_names(project, episode);
-    let segment_arg = optional_u64_flag(params, "segment", "segment")?;
-    let mut args = vec!["audio-get", project_name.as_str(), episode_name.as_str()];
-    if let Some(ref segment_arg) = segment_arg {
-        args.push(segment_arg.as_str());
+    let segment = optional_u64(params, "segment")?;
+    let pipeline = load_episode_pipeline(project, episode)?;
+    let audio = pipeline
+        .get("audio")
+        .cloned()
+        .unwrap_or_else(empty_audio_stage);
+    match segment {
+        Some(segment_number) => Ok(find_segment(&audio, segment_number)),
+        None => Ok(audio),
     }
-    run_nextframe_cli(&args)
 }
 
 pub(crate) fn handle_source_list(params: &Value) -> Result<Value, String> {
@@ -162,10 +168,6 @@ fn required_u64_flag(params: &Value, key: &str, flag: &str) -> Result<String, St
     Ok(format!("--{flag}={}", require_u64(params, key)?))
 }
 
-fn optional_u64_flag(params: &Value, key: &str, flag: &str) -> Result<Option<String>, String> {
-    optional_u64(params, key).map(|value| value.map(|value| format!("--{flag}={value}")))
-}
-
 fn optional_string_flag(params: &Value, key: &str, flag: &str) -> Result<Option<String>, String> {
     let Some(value) = params.get(key) else {
         return Ok(None);
@@ -195,6 +197,68 @@ fn optional_u64(params: &Value, key: &str) -> Result<Option<u64>, String> {
         }),
         None => Ok(None),
     }
+}
+
+fn load_episode_pipeline(project: &str, episode: &str) -> Result<Value, String> {
+    let episode_path = resolve_episode_path(project, episode);
+    let pipeline_path = episode_path.join("pipeline.json");
+    match fs::read_to_string(&pipeline_path) {
+        Ok(contents) => serde_json::from_str::<Value>(&contents).map_err(|error| {
+            format!(
+                "failed to parse '{}': {error}. Fix: ensure pipeline.json contains valid JSON.",
+                pipeline_path.display()
+            )
+        }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok(Value::Object(serde_json::Map::from_iter([
+                ("version".to_string(), Value::String("0.4".to_string())),
+                ("script".to_string(), empty_script_stage()),
+                ("audio".to_string(), empty_audio_stage()),
+                ("atoms".to_string(), Value::Array(Vec::new())),
+                ("outputs".to_string(), Value::Array(Vec::new())),
+            ])))
+        }
+        Err(error) => Err(format!(
+            "failed to read '{}': {error}. Fix: ensure the episode directory is readable.",
+            pipeline_path.display()
+        )),
+    }
+}
+
+fn empty_script_stage() -> Value {
+    Value::Object(serde_json::Map::from_iter([
+        (
+            "principles".to_string(),
+            Value::Object(serde_json::Map::new()),
+        ),
+        ("arc".to_string(), Value::Array(Vec::new())),
+        ("segments".to_string(), Value::Array(Vec::new())),
+    ]))
+}
+
+fn empty_audio_stage() -> Value {
+    Value::Object(serde_json::Map::from_iter([
+        ("voice".to_string(), Value::Null),
+        ("speed".to_string(), Value::from(1.0)),
+        ("segments".to_string(), Value::Array(Vec::new())),
+    ]))
+}
+
+fn find_segment(stage: &Value, segment_number: u64) -> Value {
+    stage
+        .get("segments")
+        .and_then(Value::as_array)
+        .and_then(|segments| {
+            segments.iter().find(|segment| {
+                segment
+                    .get("segment")
+                    .and_then(Value::as_u64)
+                    .map(|value| value == segment_number)
+                    .unwrap_or(false)
+            })
+        })
+        .cloned()
+        .unwrap_or(Value::Null)
 }
 
 fn cli_error_message(stdout: &str, stderr: &str) -> String {

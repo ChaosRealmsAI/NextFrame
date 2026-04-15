@@ -4,257 +4,93 @@
   "width": 1080,
   "height": 1920,
   "fps": 30,
-  "duration": 81.31,
-  "background": "#111111",
+  "duration": 30,
+  "background": "#0b0f17",
   "audio": {
     "src": "/Users/Zhuanz/bigbang/MediaAgentTeam/series/硅谷访谈/E01-Dario-Amodei-指数终局/clips/clip_01.mp4"
   },
   "layers": [
     {
-      "id": "chrome",
-      "scene": "interviewChrome",
+      "id": "bg",
+      "scene": "darkGradient",
       "start": 0,
-      "dur": 81.31,
+      "dur": 30,
       "params": {
-        "seriesName": "速通硅谷访谈 · E01 · Dario Amodei",
-        "title": "指数快到头了，大众浑然不知",
-        "clipLabel": "CLIP 01",
-        "origRange": "原片 2:22:19 ｜ 内容来源：00:00 — 01:21",
-        "topicLabel": "正在聊",
-        "topic": "AI 能力增长的指数曲线为什么还没到头，以及公众认知为什么仍然落后。",
-        "tags": [
-          "Dwarkesh Podcast",
-          "Dario Amodei",
-          "原声 1:21"
-        ],
-        "brand": "NEXTFRAME",
-        "teamLine": "Produced by NextFrame AI-native video pipeline"
+        "bg": "#0b0f17",
+        "glowColor": "rgba(122, 162, 255, 0.22)",
+        "glowX": 50,
+        "glowY": 20,
+        "glowSize": 42
       }
     },
     {
-      "id": "videoArea",
-      "scene": "interviewVideoArea",
+      "id": "title",
+      "scene": "headlineCenter",
       "start": 0,
-      "dur": 81.31,
-      "videoOverlay": {
-        "x": "7.4074%",
-        "y": "14.3750%",
-        "w": "85.1852%",
-        "h": "28.0208%"
-      },
+      "dur": 6,
+      "params": {
+        "text": "9:16 JSON Preview",
+        "fontSize": 62,
+        "y": -690,
+        "color": "#f5ece0"
+      }
+    },
+    {
+      "id": "video",
+      "scene": "videoClip",
+      "start": 0,
+      "dur": 30,
       "params": {
         "src": "/Users/Zhuanz/bigbang/MediaAgentTeam/series/硅谷访谈/E01-Dario-Amodei-指数终局/clips/clip_01.mp4",
-        "clipLabel": "CLIP 01 / 01"
+        "x": 90,
+        "y": 250,
+        "width": 900,
+        "height": 1160,
+        "borderRadius": 28,
+        "objectFit": "cover"
       }
     },
     {
-      "id": "biSub",
-      "scene": "interviewBiSub",
+      "id": "sub",
+      "scene": "subtitleBar",
       "start": 0,
-      "dur": 81.31,
+      "dur": 30,
       "params": {
-        "segments": [
+        "fontSize": 36,
+        "y": 120,
+        "bgColor": "rgba(11, 15, 23, 0.86)",
+        "textColor": "#f5ece0",
+        "accentColor": "#7aa2ff",
+        "srt": [
           {
             "s": 0.2,
-            "e": 1.63,
-            "speaker": "dwarkesh",
-            "en": "So we talked three years ago.",
-            "cn": [
-              {
-                "text": "我们三年前谈过一次。",
-                "s": 0.2,
-                "e": 1.63
-              }
-            ]
-          },
-          {
-            "s": 1.63,
             "e": 5,
-            "speaker": "dwarkesh",
-            "en": "I'm curious in your view, what has been the biggest update of the last three years?",
-            "cn": [
-              {
-                "text": "这三年，你最大的认知更新是什么？",
-                "s": 1.63,
-                "e": 5
-              }
-            ]
+            "t": "桌面端现在直接按 JSON 生成 9:16 预览。"
           },
           {
-            "s": 5.16,
-            "e": 7.98,
-            "speaker": "dwarkesh",
-            "en": "What has been the biggest difference between what I felt like last three years versus now?",
-            "cn": [
-              {
-                "text": "三年前和现在，差别在哪里？",
-                "s": 5.16,
-                "e": 7.98
-              }
-            ]
+            "s": 5,
+            "e": 15,
+            "t": "顶部小窗保持等比缩放，播放和拖拽都走同一套 runtime。"
           },
           {
-            "s": 8.12,
-            "e": 19.47,
-            "speaker": "dario",
-            "en": "Yeah, I would say actually the underlying technology, like the exponential of the technology, has gone broadly speaking, I would say about as I expected it to go.",
-            "cn": [
-              {
-                "text": "底层技术的指数增长，基本跟我预期差不多。",
-                "s": 8.12,
-                "e": 19.47
-              }
-            ]
-          },
-          {
-            "s": 19.47,
-            "e": 25.67,
-            "speaker": "dario",
-            "en": "I mean, there's like plus or minus, you know, a couple, there's plus or minus a year or two here, there's plus or minus a year or two there.",
-            "cn": [
-              {
-                "text": "当然，会有一两年的偏差。",
-                "s": 19.47,
-                "e": 25.67
-              }
-            ]
-          },
-          {
-            "s": 25.67,
-            "e": 29.42,
-            "speaker": "dario",
-            "en": "I don't know that I was predicted the specific direction of code.",
-            "cn": [
-              {
-                "text": "代码这个方向，我倒没特别预判到。",
-                "s": 25.67,
-                "e": 29.42
-              }
-            ]
-          },
-          {
-            "s": 29.64,
-            "e": 46.85,
-            "speaker": "dario",
-            "en": "But actually when I look at the exponential, it is roughly what I expected in terms of the March of the Models from like, you know, smart high school student to smart college student to like, you know, beginning to do PhD and professional stuff and in the case of code reaching beyond that.",
-            "cn": [
-              {
-                "text": "但看整体的指数曲线，",
-                "s": 29.64,
-                "e": 33.33
-              },
-              {
-                "text": "跟我预期差不多——",
-                "s": 33.33,
-                "e": 36.2
-              },
-              {
-                "text": "从聪明的高中生水平，",
-                "s": 36.2,
-                "e": 39.89
-              },
-              {
-                "text": "到大学生，到博士级，",
-                "s": 39.89,
-                "e": 43.17
-              },
-              {
-                "text": "代码甚至超过了博士级。",
-                "s": 43.17,
-                "e": 46.85
-              }
-            ]
-          },
-          {
-            "s": 46.85,
-            "e": 48.68,
-            "speaker": "dario",
-            "en": "So, you know, the frontier is a little bit uneven.",
-            "cn": [
-              {
-                "text": "所以，前沿进展有点参差不齐。",
-                "s": 46.85,
-                "e": 48.68
-              }
-            ]
-          },
-          {
-            "s": 49.18,
-            "e": 50.42,
-            "speaker": "dario",
-            "en": "It's roughly what I expected.",
-            "cn": [
-              {
-                "text": "但大体上跟我预期一致。",
-                "s": 49.18,
-                "e": 50.42
-              }
-            ]
-          },
-          {
-            "s": 51.08,
-            "e": 53.46,
-            "speaker": "dario",
-            "en": "I will tell you though, what the most surprising thing has been.",
-            "cn": [
-              {
-                "text": "不过，最让我意外的是另一件事。",
-                "s": 51.08,
-                "e": 53.46
-              }
-            ]
-          },
-          {
-            "s": 53.56,
-            "e": 61.54,
-            "speaker": "dario",
-            "en": "The most surprising thing has been the lack of public recognition of how close we are to the end of the exponential.",
-            "cn": [
-              {
-                "text": "大众完全没意识到，我们离指数终点有多近。",
-                "s": 53.56,
-                "e": 61.54
-              }
-            ]
-          },
-          {
-            "s": 61.58,
-            "e": 81.08,
-            "speaker": "dario",
-            "en": "To me, it is absolutely wild that you have, within the bubble and outside the bubble, but you have people talking about these, just the same tired old hot button political issues and like, or around us, we're like, here's the end of the exponential.",
-            "cn": [
-              {
-                "text": "对我来说，真的太荒诞了——",
-                "s": 61.58,
-                "e": 65.64
-              },
-              {
-                "text": "不管在圈子里还是圈子外，",
-                "s": 65.64,
-                "e": 70.11
-              },
-              {
-                "text": "大家还在扯那些陈词滥调，",
-                "s": 70.11,
-                "e": 74.58
-              },
-              {
-                "text": "我们这边说——指数快到头了！",
-                "s": 74.58,
-                "e": 81.08
-              }
-            ]
+            "s": 15,
+            "e": 30,
+            "t": "音视频和时间线状态由 iframe 运行时同步回剪辑界面。"
           }
         ]
       }
     },
     {
       "id": "progress",
-      "scene": "progressBar9x16",
+      "scene": "progressBar16x9",
       "start": 0,
-      "dur": 81.31,
+      "dur": 30,
       "params": {
-        "duration": 81.31
+        "color": "#7aa2ff",
+        "trackColor": "rgba(245, 236, 224, 0.12)",
+        "height": 6,
+        "y": 84,
+        "borderRadius": 999
       }
     }
   ]
