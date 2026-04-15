@@ -234,3 +234,75 @@ recorder slide 检测到 2 个 video layer → 2 次 ffmpeg overlay filter，用
 **修复**：不依赖这个缓存。直接用 t-driven 动画（见坑 1）。这个缓存模式只在 scene-preview 详情页（host 是持久 stage element）有效，timeline compose 场景不适用。
 
 **防复发**：把坑 1 的修复（t-driven）作为唯一推荐方案，弃用 `_rendered` cache 方案。
+
+---
+
+## 坑 13 · recorder 录出的 MP4 所有帧都一样（40s 卡在 frame 0）
+
+**症状**：`recorder slide` 产出 MP4，拉时间轴发现每一秒都是同一张画面，像静态图。
+
+**根因**：built HTML 不 emit `window.__hasFrameChanged(prevT, curT)`。recorder 默认 skip 机制基于 cue/subtitle 边界 — 如果 timeline 只有 1 个空 subtitle 覆盖全程，recorder 认定"页面从不变"，只录第 0 帧重用到最后。
+
+**修复**：`build-runtime.ts` emit 的 HTML 必须包含：
+```js
+window.__hasFrameChanged = function(prevT, curT) {
+  // 检测 layer 进入/离开、frame_pure:false 层、enter animation window
+  ...
+};
+```
+
+**防复发**：`scene-component-system.html` D 组第 5 条"built HTML 必须有 __hasFrameChanged 钩子"。`scene-smoke` 可加静态扫描检查。
+
+---
+
+## 坑 14 · recorder width/dpr 和 CSS 坐标空间不匹配
+
+**症状**：video overlay 位置对，但视频超出设计的槽位；或者槽位对，但视频偏移。
+
+**根因**：`OVERLAY_X_CSS = 80` 等常量写在 `overlay/ffmpeg.rs`，假设 CSS 画布是 **1080×1920**。但 recorder 允许 `--width 540 --height 960 --dpr 2`（输出也是 1080×1920 Retina），此时 CSS 是 540×960，80/540 ≠ 80/1080，坐标比例错位。
+
+**修复两种都行**：
+- **推荐**：`--width 1080 --height 1920 --dpr 1` 让 CSS 空间 = 设计空间
+- 或：scene render 里用 `(80/1080) * vp.width` 把设计空间映射到任何 viewport
+
+**防复发**：produce/06-record.md step prompt 里写死推荐命令。未来改 overlay 常量要和 scene 组件坐标联动。
+
+---
+
+## 坑 15 · build-scenes.ts adapter 不处理 v3 default export
+
+**症状**：`nextframe build` 成功但 build 出的 HTML 里 scene 跑不起来，层渲染为 error 占位。
+
+**根因**：历史 `buildSceneBundle` 只识别 v1/v2 scenes 的 `export const meta` + `export function render`。v3 用 `export default {...}` → `stripESM` 转成 `return {...}`，老 adapter 找不到命名的 `render`。
+
+**修复**：已合入 `build-scenes.ts` — 新 adapter 匹配 `return {...}` 用正则抓默认对象，取 `_def.render.bind(_def)` 并包 DOM-mutation 形态（type=dom/svg/media）转 string-returning（type=canvas）。
+
+**防复发**：每次 scene 契约改动要同步 check `buildSceneBundle` 是否兼容。
+
+---
+
+## 坑 16 · overlay_video_layers 只合视频不合音频 → MP4 静音
+
+**症状**：`recorder slide` 出来的 MP4 视频画面正确切换，但无声。log 提示 `warn: no audio file found (path=None), muxing silent track`。
+
+**根因**：`overlay/ffmpeg.rs` 的 `overlay_video_layers` 只 `-map 0:a?`（0 = recorded，silent），不 mix 每个 clip 的 `:a` 流。
+
+**修复**：`build_audio_layer_filter` 函数新加，每个 clip 的 `:a` 经 `atrim=0:DUR,asetpts=PTS-STARTPTS,adelay=START_MS|START_MS` → `amix` 所有 clip → `-map [aout]`，codec AAC 192k。
+
+**防复发**：`ffprobe` 验证是 MP4 自验必备：
+```bash
+ffprobe -show_entries stream=codec_type,codec_name,duration /tmp/out.mp4
+# 必须看到 codec_type=audio / codec_name=aac / 非 0 duration
+```
+
+---
+
+## 坑 17 · 新主题下所有 scene 被 user 清空 重建时没吸收历史经验
+
+**症状**：重建 content-videoArea 时忘记加 `videoOverlay: true` flag + `--video` 路径模式，结果 ffmpeg 不认这层是视频。
+
+**根因**：clear-slate 重建周期中，AI 只抄 scene-new scaffold，没读 pitfalls.md 的历史方案。
+
+**修复**：component recipe 的 00-pick step 在"选 type=media"时**强制链接 pitfalls 坑 11**。
+
+**防复发**：`nf-guide component pick` prompt 里 type=media 分支下嵌入"必读 pitfalls.md 坑 11"链接。
