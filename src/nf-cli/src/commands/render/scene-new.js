@@ -73,15 +73,13 @@ function scaffold(o) {
     \`;`;
     } else if (type === "svg") {
         sig = "render(host, _t, params, vp)";
-        comment = "host is <svg> element - appendChild path/rect/line/text";
-        body = `    host.setAttribute("viewBox", \`0 0 \${vp.width} \${vp.height}\`);
-    const ns = "http://www.w3.org/2000/svg";
-    const circle = document.createElementNS(ns, "circle");
-    circle.setAttribute("cx", String(vp.width * 0.5));
-    circle.setAttribute("cy", String(vp.height * 0.5));
-    circle.setAttribute("r", "100");
-    circle.setAttribute("fill", params.color || "#da7756");
-    host.appendChild(circle);`;
+        comment = "host is <svg> element - set innerHTML with SVG markup (works in jsdom and real DOM)";
+        body = `    const color = params.color || "#da7756";
+    host.innerHTML = \`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 \${vp.width} \${vp.height}" style="width:100%;height:100%">
+        <circle cx="\${vp.width * 0.5}" cy="\${vp.height * 0.5}" r="100" fill="\${color}" />
+      </svg>
+    \`;`;
     } else {
         sig = "render(host, _t, params, vp)";
         comment = "host is a container HTMLElement - mount <video> / <img> / <audio>";
