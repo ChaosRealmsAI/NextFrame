@@ -20,13 +20,30 @@ cat src/nf-core/scenes/shared/design.js
 ```
 
 这个文件是**唯一真相源**。里面有：
-- `TOKENS.interview.*` — 9:16 颜色（金色 #e8c47a，背景 #111111 等）
-- `TOKENS.lecture.*` — 16:9 颜色（金色 #d4b483，背景 #1a1510 等）
-- `GRID` — 9:16 布局网格（header 0-260px, video 276-814px, subs 830-1170px 等）
-- `GRID_16x9` — 16:9 布局网格
-- `TYPE` / `TYPE_16x9` — 字号/字重/字体
-- `findActiveSub(segments, t)` — 字幕两级查找函数
-- `esc()`, `fadeIn()`, `scaleW()`, `scaleH()` 等工具函数
+
+### 预设系统（新 scene 必须用）
+```javascript
+import { getPreset, esc, scaleW, scaleH, fadeIn, findActiveSub, decoLine } from "../../../shared/design.js";
+
+const preset = getPreset("interview-dark");  // 或 "lecture-warm"
+const { colors, layout, type } = preset;
+// 用 colors.primary, layout.video.top, type.title.size — 不硬编码
+```
+
+### 可用预设
+| 预设名 | ratio | 场景 |
+|--------|-------|------|
+| `interview-dark` | 9:16 | 深黑底+金色，访谈切片 |
+| `lecture-warm` | 16:9 | 暖棕底+金色，讲解教程 |
+
+**加新系列 = 在 PRESETS 里加一条，不改工具代码。**
+
+### 工具函数（通用，不绑预设）
+- `esc(value)` — HTML 转义
+- `scaleW(vp, px, baseW)` / `scaleH(vp, px, baseH)` — 像素缩放
+- `fadeIn(t, delay, duration)` — 淡入动画
+- `findActiveSub(segments, t)` — 字幕两级查找
+- `decoLine(vp, y, colors, baseW, baseH)` — 装饰分隔线（颜色从外部传）
 
 ## 2.2 组件契约
 
@@ -70,20 +87,28 @@ export function lint(params, vp) {
 
 ## 2.3 关键规则
 
-### 颜色 — 全部从 TOKENS 取
+### 颜色/布局/字号 — 全部从 preset 取
 ```javascript
-// ✅ 对
-color: TOKENS.interview.gold
+const preset = getPreset("interview-dark"); // 在 render 函数开头
+const { colors, layout, type } = preset;
+
+// ✅ 对 — 从 preset 取
+color: colors.primary
+top: scaleH(vp, layout.video.top, layout.baseH)
+fontSize: scaleW(vp, type.title.size, layout.baseW)
+
 // ❌ 错 — 禁止硬编码
 color: "#e8c47a"
+top: scaleH(vp, 276)
 ```
 
-### 位置 — 全部从 GRID 取
+### 位置 — 从 preset.layout 取（不用全局 GRID）
 ```javascript
+const { layout } = getPreset("interview-dark");
 // ✅ 对
+const top = scaleH(vp, layout.video.top, layout.baseH);
+// ❌ 错 — 用全局 GRID（硬绑某个预设）
 const top = scaleH(vp, GRID.video.top);
-// ❌ 错 — 禁止硬编码像素
-const top = scaleH(vp, 276);
 ```
 
 ### 字幕 — 用 findActiveSub 两级查找

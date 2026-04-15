@@ -55,19 +55,18 @@ nextframe scenes
 
 **设计原则：** 全程不变的元素合成一个"chrome"组件，随时间变化的各自独立。减少 layer 数量，方便维护。
 
-### 16:9 需要 9 个
+### 16:9 讲解（按需组合，不是全部都要）
 
-| scene | 类别 | 作用 |
-|-------|------|------|
-| darkGradient | backgrounds | 深色暖棕背景 |
-| headlineCenter | typography | 全屏居中大标题 |
-| codeTerminal | browser | 代码块（单个 pre 元素） |
-| flowDiagram | data | 流程图（单个 svg 元素） |
-| lecturePanel | typography | 右侧说明面板 |
-| subtitleBar | overlays | 底部字幕条 |
-| progressBar | overlays | 底部进度条 |
-| slideChrome | overlays | 顶部品牌栏 + 水印 |
-| videoClip | media | 视频嵌入 |
+| scene | 类型 | 作用 | 何时需要 |
+|-------|------|------|---------|
+| lectureChrome | **静态** | 背景+顶栏+进度条+水印 | 必选 |
+| headlineCenter | **动态** | 全屏居中大标题（有淡入） | phase 1 标题 |
+| codeTerminal | **动态** | 代码块（单个 pre） | 展示代码时 |
+| flowDiagram | **动态** | 流程图（单个 svg） | 展示流程时 |
+| lecturePanel | **动态** | 右侧说明面板 | 双栏布局时 |
+| subtitleBar | **动态** | 底部字幕条 | 有配音时 |
+
+**跟 9:16 一样的原则：** 不变的合成 chrome，变的各自独立。不需要全部组件 — 按内容选。
 
 ## 分支
 
