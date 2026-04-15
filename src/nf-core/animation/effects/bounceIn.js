@@ -7,7 +7,7 @@ export function bounceIn(progress) {
   const bounceProgress = bounce(p);
   const scale = 0.35 + bounceProgress * 0.65;
   return {
-    opacity: Math.min(1, p * 1.5),
+    opacity:Math.min(1, p * 1.5),
     transform: joinTransforms(`scale(${round(scale)})`),
     transformOrigin: "50% 50%",
   };
