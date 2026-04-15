@@ -94,8 +94,36 @@
         }
       });
       applySelection();
+      syncVideos(at, state.isPlaying);
     }
     return active.map(function(item) { return { scene: item.scene, index: item.index, layerData: item.layerData }; });
+  }
+
+  function primeVideoFrame(video, t) {
+    if (video.dataset.nfPrimed === '1') return;
+    var p = video.play();
+    if (p && typeof p.then === 'function') {
+      p.then(function() {
+        setTimeout(function() {
+          video.pause();
+          if (Math.abs(video.currentTime - t) > 0.05) video.currentTime = t;
+          video.dataset.nfPrimed = '1';
+        }, 80);
+      }).catch(function() {});
+    }
+  }
+
+  function syncVideos(t, playing) {
+    if (!state.stageEl) return;
+    state.stageEl.querySelectorAll('video[data-nf-persist]').forEach(function(v) {
+      if (playing) {
+        if (v.paused) v.play().catch(function() {});
+      } else {
+        primeVideoFrame(v, t);
+        if (!v.paused) v.pause();
+      }
+      if (!playing && Math.abs(v.currentTime - t) > 0.2) v.currentTime = t;
+    });
   }
 
   function pause() {
