@@ -58,7 +58,10 @@ echo "=== 9. scene cross-import ==="
 CROSS=$(grep -rn "from.*modules/" src/nf-core/scenes/ --include='*.js' 2>/dev/null || true)
 if [ -n "$CROSS" ]; then echo "FAIL: scenes import modules:" && echo "$CROSS"; FAIL=1; else echo "PASS"; fi
 
-echo "=== 10. Cargo.toml deny rules ==="
+echo "=== 10. TS/JS boundary ==="
+bash scripts/lint-boundary.sh || FAIL=1
+
+echo "=== 11. Cargo.toml deny rules ==="
 for RULE in unwrap_used expect_used panic unreachable todo wildcard_imports; do
   if ! grep -q "$RULE.*deny" Cargo.toml 2>/dev/null; then
     echo "FAIL: $RULE not deny in Cargo.toml"; FAIL=1

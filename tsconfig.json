@@ -1,17 +1,12 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    // File Layout
-    // "rootDir": "./src",
-    // "outDir": "./dist",
-
-    // Environment Settings
-    // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "target": "esnext",
     "lib": ["esnext", "dom"],
     "types": ["node"],
     "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -20,6 +15,11 @@
     "strict": true,
     "noImplicitAny": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "target", "src/**/*.test.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts"],
+  "exclude": [
+    "node_modules",
+    "target",
+    "src/**/*.test.ts",
+    "src/nf-cli/test/**"
+  ]
 }
