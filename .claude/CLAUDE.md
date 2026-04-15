@@ -58,6 +58,43 @@ Recording (separate binary): `nextframe-recorder slide <html> --out <mp4> --widt
 
 **Skipping these = writing code that may violate locked design decisions. If you don't find a relevant standard, say so — don't guess.**
 
+## AI Self-Verification (use these, don't use screencapture)
+
+The desktop app has built-in AI operation interfaces. **Always use these instead of external tools like screencapture or AppleScript.**
+
+### Screenshot (product-internal, pixel-perfect)
+
+```bash
+# Quick screenshot of current state
+cargo run -p nf-shell-mac -- --screenshot
+# → saves to /tmp/nf-screenshot.png, then Read to inspect
+
+# Full verification: auto-navigate all pages, screenshot each
+cargo run -p nf-shell-mac -- --verify
+# → /tmp/nf-verify-home.png, nf-verify-editor.png, nf-verify-pipeline.png, etc.
+
+# Custom script: navigate + screenshot at specific points
+cargo run -p nf-shell-mac -- --eval-script my-test.js
+# Script can call: __screenshot("/tmp/my-check.png")
+```
+
+### Diagnose (JS functions, call via --eval-script)
+
+```js
+__nfDiagnose()         // App state: current view, project, episode, active tab, modals, actions
+__nfEditorDiagnose()   // Editor state: scene count, engine loaded, timeline, tracks, playback
+```
+
+### Bridge IPC (45+ methods via bridgeCall)
+
+Key methods for AI verification:
+- `preview.bundle({ timeline })` — generate scene bundle for preview
+- `preview.frame({ timelinePath, t })` — render frame at time t
+- `compose.generate({ timelinePath })` — build HTML from timeline
+- `timeline.load/save` — read/write timeline JSON
+- `project.list/create`, `episode.list/create`, `segment.list`
+- `fs.read/write/listDir` — filesystem operations
+
 ## Core Rules
 
 - Do not add `unwrap`/`expect`/`panic`; workspace lints deny them. Use `#[allow(...)]` with comment on specific FFI functions only.
