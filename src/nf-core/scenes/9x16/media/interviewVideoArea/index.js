@@ -42,12 +42,16 @@ export function render(t, params, vp) {
 
   const clipLabelSize = scaleW(vp, 14, baseW);
 
+  const radius = scaleW(vp, 12, baseW);
+  const rawSrc = params.src || "";
+  const videoSrc = rawSrc.startsWith("/") ? "nfdata://localhost" + encodeURI(rawSrc) : rawSrc;
+
   return `
-    <div style="position:absolute;left:${left}px;top:${top}px;width:${w}px;height:${h}px;border-radius:${scaleW(vp, 12, baseW)}px;overflow:hidden;background:#000;">
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0.18;">
+    <div style="position:absolute;left:${left}px;top:${top}px;width:${w}px;height:${h}px;border-radius:${radius}px;overflow:hidden;background:#000;">
+      ${videoSrc ? `<video src="${esc(videoSrc)}" style="width:100%;height:100%;object-fit:cover;display:block;" muted playsinline data-nf-persist="true"></video>` : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0.18;">
         <div style="font-family:'SF Mono','JetBrains Mono',monospace;font-size:${clipLabelSize}px;font-weight:500;letter-spacing:0.08em;color:${colors.primary || "#e8c47a"};text-transform:uppercase;">VIDEO CLIP ${esc(String(params.clipNum || 1))} / ${esc(String(params.totalClips || 1))}</div>
-      </div>
-      <div style="position:absolute;inset:0;border-radius:${scaleW(vp, 12, baseW)}px;border:1px solid rgba(232,196,122,0.12);pointer-events:none;"></div>
+      </div>`}
+      <div style="position:absolute;inset:0;border-radius:${radius}px;border:1px solid rgba(232,196,122,0.12);pointer-events:none;"></div>
     </div>
   `;
 }

@@ -72,7 +72,27 @@
       }
     }
     if (state.stageEl) {
-      state.stageEl.innerHTML = active.map(function(item) { return item.markup; }).join('');
+      var existing = state.stageEl.querySelectorAll('.nf-layer');
+      var activeIndices = {};
+      active.forEach(function(item) { activeIndices[item.index] = item; });
+      // Remove layers no longer active (skip those with persist elements)
+      existing.forEach(function(el) {
+        var idx = Number(el.dataset.index);
+        if (!activeIndices[idx]) el.remove();
+      });
+      // Update or create each active layer
+      active.forEach(function(item) {
+        var el = state.stageEl.querySelector('.nf-layer[data-index="' + item.index + '"]');
+        if (el) {
+          // Preserve video/audio elements with data-nf-persist
+          var persist = el.querySelector('[data-nf-persist]');
+          if (!persist) { el.innerHTML = item.markup.replace(/^<div[^>]*>/, '').replace(/<\/div>$/, ''); }
+        } else {
+          var tmp = document.createElement('div');
+          tmp.innerHTML = item.markup;
+          if (tmp.firstChild) state.stageEl.appendChild(tmp.firstChild);
+        }
+      });
       applySelection();
     }
     return active.map(function(item) { return { scene: item.scene, index: item.index, layerData: item.layerData }; });
