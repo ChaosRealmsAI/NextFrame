@@ -60,17 +60,29 @@ pub(crate) fn resolve_media_src(
         if let Some(base_url) = server_base_url
             && let Some(relative) = raw.strip_prefix(base_url)
         {
-            let path = root.join(urlencoding_decode(relative.trim_start_matches('/')));
+            let decoded = urlencoding_decode(relative.trim_start_matches('/'));
+            let path = root.join(&decoded);
             if path.exists() {
                 return Some(path);
+            }
+            // The browser URL-resolves absolute paths like /Users/xxx/clip.mp4
+            // into http://localhost:PORT/Users/xxx/clip.mp4 — restore the leading /
+            let as_absolute = PathBuf::from(format!("/{decoded}"));
+            if as_absolute.is_absolute() && as_absolute.exists() {
+                return Some(as_absolute);
             }
         }
         if let Some((_, path_part)) = raw.split_once("://")
             && let Some((_, slash_and_path)) = path_part.split_once('/')
         {
-            let path = root.join(urlencoding_decode(slash_and_path));
+            let decoded = urlencoding_decode(slash_and_path);
+            let path = root.join(&decoded);
             if path.exists() {
                 return Some(path);
+            }
+            let as_absolute = PathBuf::from(format!("/{decoded}"));
+            if as_absolute.is_absolute() && as_absolute.exists() {
+                return Some(as_absolute);
             }
         }
         return None;
@@ -162,6 +174,35 @@ mod tests {
         let resolved = resolve_media_src(&url, None, Path::new("/"), &html);
 
         assert_eq!(resolved.as_deref(), Some(media.as_path()));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn resolves_absolute_path_via_http_url() {
+        // When build-runtime sets audioEl.src = "/tmp/xxx/clip.mp4", the browser
+        // resolves it to http://localhost:PORT/tmp/xxx/clip.mp4. The resolver must
+        // restore the leading "/" to find the file on disk.
+        let root = crate::util::create_temp_dir().unwrap();
+        let html = root.join("demo.html");
+        fs::write(&html, "<html></html>").unwrap();
+
+        // Create a file at an absolute path (inside temp dir to avoid polluting fs)
+        let abs_audio = root.join("audio").join("clip.mp4");
+        fs::create_dir_all(abs_audio.parent().unwrap()).unwrap();
+        fs::write(&abs_audio, b"audio data").unwrap();
+
+        // Simulate: browser turned /tmp/.../audio/clip.mp4 into
+        // http://localhost:9000/tmp/.../audio/clip.mp4
+        let abs_str = abs_audio.to_string_lossy();
+        let url = format!("http://localhost:9000{abs_str}");
+        let resolved = resolve_media_src(
+            &url,
+            Some("http://localhost:9000"),
+            &root,
+            &html,
+        );
+
+        assert_eq!(resolved.as_deref(), Some(abs_audio.as_path()));
         let _ = fs::remove_dir_all(root);
     }
 }

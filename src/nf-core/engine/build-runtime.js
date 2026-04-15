@@ -27,7 +27,7 @@ export function buildRuntime() {
   const layers = Array.isArray(timeline.layers) ? timeline.layers : [];
   if (audioEl && timeline.audio) {
     var _audioSrc = typeof timeline.audio === "object" ? (timeline.audio.src || "") : String(timeline.audio);
-    if (_audioSrc) audioEl.src = _audioSrc;
+    if (_audioSrc) { audioEl.src = _audioSrc; window.__audioSrc = _audioSrc; }
   }
   let currentTime = 0;
   let rafId = 0;

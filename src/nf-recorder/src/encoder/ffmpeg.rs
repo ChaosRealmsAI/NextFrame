@@ -177,6 +177,10 @@ pub(super) fn mux_audio_track(
         args.push("-i".into());
         args.push(audio_path.as_os_str().to_string_lossy().into_owned());
     } else {
+        trace_log!(
+            "warn: no audio file found (path={:?}), muxing silent track",
+            audio_path
+        );
         args.extend([
             "-f".into(),
             "lavfi".into(),
