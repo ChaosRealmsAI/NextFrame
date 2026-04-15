@@ -1,4 +1,4 @@
-import type { Match, PlanCtx, Timeline, ValidationResult } from "../types.js";
+import type { Match, PlanCtx, SceneClip, Timeline, ValidationResult } from "../types.js";
 import {
   buildStubPlan,
   getRatioFromPlanCtx,
@@ -157,8 +157,68 @@ export function validate(match: Match, timeline: Timeline): ValidationResult {
   return finalizeValidation(errors, warnings);
 }
 
-export function expand(_match: Match, _timeline: Timeline): Partial<Timeline> {
-  throw new Error("not implemented");
+export function expand(match: Match, timeline: Timeline): Partial<Timeline> {
+  const tracks = Array.isArray(timeline.tracks) ? timeline.tracks : [];
+  const source = tracks.find((track) => track?.id === match.source);
+  const target = tracks.find((track) => track?.id === match.target);
+
+  if (!source || source.kind !== "audio") {
+    throw new Error(`Fix: scene-per-segment source '${match.source}' must be an audio track`);
+  }
+  if (!target || target.kind !== "scene") {
+    throw new Error(`Fix: scene-per-segment target '${match.target}' must be a scene track`);
+  }
+  if (!Array.isArray(source.meta?.segments) || source.meta.segments.length === 0) {
+    throw new Error(`Fix: audio track '${match.source}' must include meta.segments`);
+  }
+  if (!Array.isArray(match.plan)) {
+    throw new Error("Fix: scene-per-segment match.plan must be an array");
+  }
+
+  const planBySegmentId = new Map<string, SegmentPlan>();
+  for (const entry of match.plan) {
+    if (isPlanEntry(entry)) {
+      planBySegmentId.set(entry.segmentId, entry);
+    }
+  }
+
+  const clips: SceneClip[] = [];
+
+  for (const segment of source.meta.segments) {
+    const entry = planBySegmentId.get(segment.id);
+    if (!entry) {
+      throw new Error(`Fix: scene-per-segment plan is missing segment '${segment.id}'`);
+    }
+
+    const start = segment.startMs / 1000;
+    const end = segment.endMs / 1000;
+    if (entry.scene === "@prev") {
+      const previous = clips[clips.length - 1];
+      if (!previous) {
+        throw new Error(`Fix: segment '${segment.id}' cannot use '@prev' without a previous scene clip`);
+      }
+      previous.dur = roundSeconds(end - Number(previous.start || 0));
+      continue;
+    }
+
+    clips.push({
+      scene: entry.scene,
+      start: roundSeconds(start),
+      dur: roundSeconds(end - start),
+      params: stableCopy(entry.params ?? {}),
+    });
+  }
+
+  return {
+    tracks: [
+      {
+        ...target,
+        id: match.target,
+        kind: "scene",
+        clips,
+      },
+    ],
+  };
 }
 
 function validateSceneParams(
@@ -297,4 +357,21 @@ function finalizeValidation(
     errors,
     warnings,
   };
+}
+
+function roundSeconds(value: number): number {
+  return Number(value.toFixed(6));
+}
+
+function stableCopy<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stableCopy(item)) as T;
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nested]) => [key, stableCopy(nested)]);
+    return Object.fromEntries(entries) as T;
+  }
+  return value;
 }
