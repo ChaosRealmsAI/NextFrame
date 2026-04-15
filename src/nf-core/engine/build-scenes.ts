@@ -4,9 +4,13 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import type { Timeline } from "../types.js";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCENES_DIR = resolve(HERE, "../scenes");
 const SCENE_REGISTRY_URL = pathToFileURL(resolve(SCENES_DIR, "index.js")).href;
+const LEGACY_BUNDLE_PATH = resolve(HERE, "../../nf-runtime/web/src/components/scene-bundle.js");
+const IMPORT_RE = /^\s*import\s+.+?\s+from\s+["'](.+?)["'];?\s*$/gm;
 
 /**
  * Strip ES module syntax so source can be wrapped in an IIFE for the browser bundle.
@@ -18,6 +22,22 @@ export function stripESM(code: string) {
     .replace(/^export\s*\{[^}]*\};?\s*$/gm, "")
     .replace(/^export\s+async\s+function\s+/gm, "async function ")
     .replace(/^export\s+(function|const|let|var|class)\s+/gm, "$1 ");
+}
+
+/**
+ * Inline relative scene dependencies such as ../../tokens.js before stripping ESM.
+ */
+export function inlineLocalImports(filePath: string, seen: Set<string> = new Set()): string {
+  const resolvedPath = resolve(filePath);
+  if (seen.has(resolvedPath)) return "";
+  seen.add(resolvedPath);
+
+  const source = readFileSync(resolvedPath, "utf8");
+  return source.replace(IMPORT_RE, (_line, specifier: string) => {
+    if (!specifier.startsWith(".")) return "";
+    const dependencyPath = resolve(dirname(resolvedPath), specifier);
+    return `${inlineLocalImports(dependencyPath, seen)}\n`;
+  });
 }
 
 /**
@@ -42,6 +62,7 @@ export function readDiscoveredScenes(ratio: string) {
     for (const entry of registry.values()) {
       if (!entry?.META || entry.META.ratio !== ratio) continue;
       if (entry.source && entry.source !== "official") continue;
+      if (!entry.path) continue;
       entries.push({
         id: entry.id,
         label: entry.META.label || entry.id,
@@ -59,6 +80,14 @@ export function readDiscoveredScenes(ratio: string) {
   return JSON.parse(output || "[]");
 }
 
+export function readLegacyBundleSource(): string {
+  try {
+    return readFileSync(LEGACY_BUNDLE_PATH, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
 /**
  * Collect scene modules referenced by the timeline. Returns an array of
  * { id, label, varName, filePath, code } objects ready for bundling.
@@ -70,7 +99,7 @@ interface DiscoveredScene {
   ratio: string;
 }
 
-export function collectSceneModules(timeline: NfTimeline) {
+export function collectSceneModules(timeline: Timeline) {
   const ratio = String(timeline?.ratio || "16:9");
   const discovered: DiscoveredScene[] = readDiscoveredScenes(ratio);
   const byId = new Map(discovered.map((entry: DiscoveredScene) => [entry.id, entry]));
@@ -103,7 +132,7 @@ export function collectSceneModules(timeline: NfTimeline) {
       label: entry.label,
       varName,
       filePath,
-      code: stripESM(readFileSync(filePath, "utf8")).trim(),
+      code: stripESM(inlineLocalImports(filePath)).trim(),
     };
   });
 }

@@ -152,9 +152,16 @@ export async function run(argv: string[]) {
 
   await browser.close();
 
+  const screenshotSummary = screenshots.map((s) => ({ time: s.time, path: s.path, visible: s.visibleCount }));
   const result = {
     ok: true,
-    screenshots: screenshots.map((s) => ({ time: s.time, path: s.path, visible: s.visibleCount })),
+    value: {
+      screenshots: screenshotSummary,
+      issues,
+      jsErrors: errors,
+      htmlPath,
+    },
+    screenshots: screenshotSummary,
     issues,
     jsErrors: errors,
     htmlPath,

@@ -1,0 +1,175 @@
+// nextframe bundle-scenes --ratio 16:9 --out /path/to/scene-bundle.js
+// Bundle discovered scene modules into one browser-ready JS file.
+import { readdir, mkdir, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { dirname, resolve, relative } from "node:path";
+import { createRequire } from "node:module";
+import { buildSharedPreamble, inlineLocalImports, readLegacyBundleSource, readDiscoveredScenes, stripESM, } from "../../../../nf-core/engine/build-scenes.js";
+const HELP = `nextframe bundle-scenes --ratio 16:9 --out src/nf-runtime/web/js/scene-bundle.js
+
+Bundle official scene render functions into one browser-ready JS file.
+
+Flags:
+  --ratio <id>  aspect ratio to bundle (default: 16:9)
+  --out <path>  output file to write
+
+Examples:
+  nextframe bundle-scenes --ratio 16:9 --out /tmp/test-bundle.js
+  nextframe bundle-scenes --ratio=9:16 --out=src/nf-runtime/web/js/scene-bundle.js
+`;
+const RATIO_DIRS = {
+    "16:9": "16x9",
+    "9:16": "9x16",
+    "4:3": "4x3",
+};
+const require = createRequire(import.meta.url);
+const NF_CORE_ROOT = resolve(dirname(require.resolve("nf-core/engine/build-scenes.js")), "..");
+const SCENES_ROOT = resolve(NF_CORE_ROOT, "scenes");
+export async function run(argv) {
+    const { flags, positional } = parseArgs(argv);
+    if (flags.help || flags.h) {
+        process.stdout.write(HELP);
+        return 0;
+    }
+    if (positional.length > 0) {
+        process.stderr.write(`error: unexpected positional arguments: ${positional.join(" ")}\n`);
+        process.stderr.write("Fix: use only --ratio and --out flags\n");
+        return 3;
+    }
+    const ratio = String(flags.ratio || "16:9");
+    const outFlag = flags.out;
+    if (!RATIO_DIRS[ratio]) {
+        process.stderr.write(`error: unsupported ratio "${ratio}"\n`);
+        process.stderr.write('Fix: use one of 16:9, 9:16, 4:3\n');
+        return 2;
+    }
+    if (!outFlag || typeof outFlag !== "string") {
+        process.stderr.write("error: missing required --out <path>\n");
+        process.stderr.write("Fix: pass --out with a writable file path\n");
+        return 3;
+    }
+    const outPath = resolve(outFlag);
+    const scenes = await discoverSceneEntries(ratio);
+    const bundle = await buildBundle(ratio, scenes);
+    await mkdir(dirname(outPath), { recursive: true });
+    await writeFile(outPath, bundle);
+    process.stdout.write(`wrote ${outPath} (${scenes.length} scenes, ratio ${ratio})\n`);
+    return 0;
+}
+function parseArgs(argv) {
+    const positional = [];
+    const flags = {};
+    for (let i = 0; i < argv.length; i += 1) {
+        const arg = argv[i];
+        if (arg === "--help" || arg === "-h") {
+            flags.help = true;
+            continue;
+        }
+        if (!arg.startsWith("--")) {
+            positional.push(arg);
+            continue;
+        }
+        const eq = arg.indexOf("=");
+        if (eq > 0) {
+            flags[arg.slice(2, eq)] = arg.slice(eq + 1);
+            continue;
+        }
+        const key = arg.slice(2);
+        const next = argv[i + 1];
+        if (next && !next.startsWith("-")) {
+            flags[key] = next;
+            i += 1;
+            continue;
+        }
+        flags[key] = true;
+    }
+    return { positional, flags };
+}
+async function discoverSceneEntries(ratio) {
+    const discovered = readDiscoveredScenes(ratio);
+    const entries = [];
+    const seenPaths = new Set();
+    for (const scene of discovered) {
+        const relPath = String(scene.path || "");
+        seenPaths.add(relPath);
+        entries.push({
+            id: String(scene.id),
+            relPath,
+            filePath: resolve(SCENES_ROOT, relPath, "index.js"),
+        });
+    }
+    const ratioDir = RATIO_DIRS[ratio];
+    const ratioRoot = resolve(SCENES_ROOT, ratioDir);
+    if (!existsSync(ratioRoot)) {
+        return entries;
+    }
+    const themes = await readdir(ratioRoot, { withFileTypes: true });
+    for (const theme of themes) {
+        if (!theme.isDirectory())
+            continue;
+        const themeRoot = resolve(ratioRoot, theme.name);
+        const categories = await readdir(themeRoot, { withFileTypes: true });
+        for (const category of categories) {
+            if (!category.isDirectory())
+                continue;
+            const categoryRoot = resolve(themeRoot, category.name);
+            const sceneDirs = await readdir(categoryRoot, { withFileTypes: true });
+            for (const sceneDir of sceneDirs) {
+                if (!sceneDir.isDirectory())
+                    continue;
+                const filePath = resolve(categoryRoot, sceneDir.name, "index.js");
+                if (!existsSync(filePath))
+                    continue;
+                const relPath = relative(SCENES_ROOT, resolve(categoryRoot, sceneDir.name));
+                if (seenPaths.has(relPath))
+                    continue;
+                seenPaths.add(relPath);
+                entries.push({
+                    id: sceneDir.name,
+                    relPath,
+                    filePath,
+                });
+            }
+        }
+    }
+    entries.sort((left, right) => left.id.localeCompare(right.id) || left.relPath.localeCompare(right.relPath));
+    return entries;
+}
+async function buildBundle(ratio, scenes) {
+    const legacyBundle = ratio === "16:9" ? readLegacyBundleSource() : "";
+    const parts = legacyBundle
+        ? [legacyBundle]
+        : [
+            "// Auto-generated by nextframe bundle-scenes. Do not edit.",
+            `// Ratio: ${ratio}`,
+            "window.__scenes = {};",
+        ];
+    const sharedPreamble = String(buildSharedPreamble() || "").trim();
+    if (sharedPreamble && sharedPreamble !== "// no shared/design.js") {
+        parts.push(sharedPreamble);
+    }
+    for (const scene of scenes) {
+        const code = stripESM(inlineLocalImports(scene.filePath)).trim();
+        parts.push(buildSceneIIFE(scene.id, code));
+    }
+    return parts.join("\n\n") + "\n";
+}
+function buildSceneIIFE(id, code) {
+    return `(function() {
+  // === ${id} ===
+${indent(code, 2)}
+  window.__scenes[${JSON.stringify(id)}] = {
+    meta: typeof meta !== "undefined" ? meta : null,
+    render: typeof render === "function" ? render : null,
+    screenshots: typeof screenshots === "function" ? screenshots : null,
+    lint: typeof lint === "function" ? lint : null,
+  };
+})();`;
+}
+function indent(value, spaces) {
+    const prefix = " ".repeat(spaces);
+    return String(value)
+        .split("\n")
+        .map((line) => (line ? prefix + line : line))
+        .join("\n");
+}

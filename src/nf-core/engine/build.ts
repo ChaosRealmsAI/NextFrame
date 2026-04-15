@@ -3,12 +3,15 @@
 // and build-runtime (browser playback runtime).
 import { writeFileSync } from "node:fs";
 
+import type { Timeline } from "../types.js";
 import { extractTimelineSrt, serializeSrtLiteral } from "./build-srt.js";
 import {
   buildAnimationBundle,
   buildSceneBundle,
+  readLegacyBundleSource,
   buildSharedPreamble,
   collectSceneModules,
+  readDiscoveredScenes,
 } from "./build-scenes.js";
 import { buildRuntime, SCRUBBER_MAX_VALUE } from "./build-runtime.js";
 
@@ -34,7 +37,30 @@ interface SceneModule {
   label?: string;
 }
 
-function buildDocument(timeline: NfTimeline, sceneModules: SceneModule[]) {
+function detectRatioId(timeline: Timeline): string {
+  if (typeof (timeline as { ratio?: unknown }).ratio === "string") {
+    return String((timeline as { ratio?: unknown }).ratio);
+  }
+  const width = Number(timeline.width || timeline.project?.width || 0);
+  const height = Number(timeline.height || timeline.project?.height || 0);
+  if (width > 0 && height > 0) {
+    if (Math.abs(width - height) < 50) return "4:3";
+    return width >= height ? "16:9" : "9:16";
+  }
+  return "16:9";
+}
+
+function collectModularSceneModules(timeline: Timeline): SceneModule[] {
+  const modularIds = new Set(readDiscoveredScenes(detectRatioId(timeline)).map((scene: { id: string }) => scene.id));
+  const filteredTimeline: Timeline = {
+    ...timeline,
+    layers: (timeline.layers || []).filter((layer) => layer?.scene && modularIds.has(layer.scene)),
+  };
+  return collectSceneModules(filteredTimeline) as SceneModule[];
+}
+
+function buildDocument(timeline: Timeline, sceneModules: SceneModule[]) {
+  const legacyBundle = readLegacyBundleSource();
   const sharedPreamble = buildSharedPreamble();
   const sceneBundles = sceneModules.map(buildSceneBundle).join("\n\n");
   const sceneMap = sceneModules
@@ -53,12 +79,14 @@ const SRT = ${serializeSrtLiteral(inlineSrt)};
 const TIMELINE = ${JSON.stringify(timeline, null, 2)};
 // Shared scene utilities (design tokens, helpers)
 ${sharedPreamble}
+// Legacy 16:9 scene bundle compatibility
+${legacyBundle}
 // Animation effects
 ${animBundle}
 ${sceneBundles}
-const SCENES = {
+const SCENES = Object.assign({}, window.__scenes || {}, {
 ${sceneMap}
-};
+});
 ${buildRuntime()}`);
   return `<!DOCTYPE html>
 <html lang="en">
@@ -111,7 +139,7 @@ ${scriptBody}
  * Coerce layer params to match scene meta schema types.
  * Prevents runtime type errors from AI-generated timelines.
  */
-function coerceLayerParams(timeline: NfTimeline, sceneModules: SceneModule[]) {
+function coerceLayerParams(timeline: Timeline, sceneModules: SceneModule[]) {
   const metaByScene = new Map(sceneModules.map((m: SceneModule) => [m.id, m]));
   for (const layer of timeline.layers || []) {
     if (!layer.params || !layer.scene) continue;
@@ -131,9 +159,9 @@ function coerceLayerParams(timeline: NfTimeline, sceneModules: SceneModule[]) {
   }
 }
 
-export function buildHTML(timeline: NfTimeline, outputPath: string) {
+export function buildHTML(timeline: Timeline, outputPath: string) {
   try {
-    const sceneModules = collectSceneModules(timeline || {});
+    const sceneModules = collectModularSceneModules(timeline || {});
     coerceLayerParams(timeline || {}, sceneModules);
     const html = buildDocument(timeline || {}, sceneModules);
     writeFileSync(outputPath, html, "utf8");

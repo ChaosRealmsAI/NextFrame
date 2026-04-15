@@ -242,15 +242,15 @@
 }
 
 .section {
-  opacity: 0;
-  animation: fadeUp 0.5s var(--ease) forwards;
+  opacity: 1;
+  animation: fadeUp 0.5s var(--ease);
 }
 .section:nth-child(1) { animation-delay: 0ms; }
 .section:nth-child(2) { animation-delay: 120ms; }
 
 .project-card {
-  opacity: 0;
-  animation: fadeUp 0.45s var(--ease) forwards;
+  opacity: 1;
+  animation: fadeUp 0.45s var(--ease);
 }
 
 /* Stagger per card within each grid */

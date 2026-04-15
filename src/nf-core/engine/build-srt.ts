@@ -1,5 +1,7 @@
 // SRT (subtitle) extraction and serialization utilities for build pipeline.
 
+import type { Timeline } from "../types.js";
+
 /**
  * Normalize a single SRT cue entry, applying an optional time offset.
  * Returns null if the entry is invalid.
@@ -17,7 +19,7 @@ export function normalizeSrtEntry(entry: Record<string, unknown> | null, offset 
  * Walk timeline layers and audio metadata to collect all SRT cues.
  * Layer-level `params.srt` takes priority; falls back to audio sentences/segments.
  */
-export function extractTimelineSrt(timeline: NfTimeline) {
+export function extractTimelineSrt(timeline: Timeline) {
   const layers = Array.isArray(timeline?.layers) ? timeline.layers : [];
   const cues = [];
   for (const layer of layers) {

@@ -1,6 +1,8 @@
 // engine-v2/ops.js — layer CRUD operations for v0.3 flat layers[] format.
 // Each function reads/modifies timeline object, returns { ok, value/error }.
 
+import type { Clip, Timeline } from "../types.js";
+
 interface AddLayerOpts {
   scene: string;
   id?: string;
@@ -26,7 +28,7 @@ interface LayerRecord {
   [key: string]: unknown;
 }
 
-export function addLayer(timeline: NfTimeline, opts: AddLayerOpts) {
+export function addLayer(timeline: Timeline, opts: AddLayerOpts) {
   if (!opts.scene) return { ok: false, error: { code: 'MISSING_SCENE', message: 'opts.scene is required' } };
   const id = opts.id || `${opts.scene}-${(timeline.layers || []).length + 1}`;
   const layer: LayerRecord = {
@@ -45,15 +47,15 @@ export function addLayer(timeline: NfTimeline, opts: AddLayerOpts) {
   return { ok: true, value: layer };
 }
 
-export function removeLayer(timeline: NfTimeline, id: string) {
-  const idx = (timeline.layers || []).findIndex((l: NfLayer) => l.id === id);
+export function removeLayer(timeline: Timeline, id: string) {
+  const idx = (timeline.layers || []).findIndex((l: Clip) => l.id === id);
   if (idx === -1) return { ok: false, error: { code: 'NOT_FOUND', message: `layer "${id}" not found` } };
   const removed = (timeline.layers || []).splice(idx, 1)[0];
   return { ok: true, value: removed };
 }
 
-export function moveLayer(timeline: NfTimeline, id: string, newStart: number) {
-  const layer = (timeline.layers || []).find((l: NfLayer) => l.id === id);
+export function moveLayer(timeline: Timeline, id: string, newStart: number) {
+  const layer = (timeline.layers || []).find((l: Clip) => l.id === id);
   if (!layer) return { ok: false, error: { code: 'NOT_FOUND', message: `layer "${id}" not found` } };
   if (typeof newStart !== 'number' || newStart < 0) {
     return { ok: false, error: { code: 'BAD_TIME', message: 'newStart must be a non-negative number' } };
@@ -62,8 +64,8 @@ export function moveLayer(timeline: NfTimeline, id: string, newStart: number) {
   return { ok: true, value: layer };
 }
 
-export function resizeLayer(timeline: NfTimeline, id: string, newDur: number) {
-  const layer = (timeline.layers || []).find((l: NfLayer) => l.id === id);
+export function resizeLayer(timeline: Timeline, id: string, newDur: number) {
+  const layer = (timeline.layers || []).find((l: Clip) => l.id === id);
   if (!layer) return { ok: false, error: { code: 'NOT_FOUND', message: `layer "${id}" not found` } };
   if (typeof newDur !== 'number' || newDur <= 0) {
     return { ok: false, error: { code: 'BAD_DUR', message: 'newDur must be positive' } };
@@ -72,8 +74,8 @@ export function resizeLayer(timeline: NfTimeline, id: string, newDur: number) {
   return { ok: true, value: layer };
 }
 
-export function setLayerProp(timeline: NfTimeline, id: string, key: string, value: unknown) {
-  const layer = (timeline.layers || []).find((l: NfLayer) => l.id === id);
+export function setLayerProp(timeline: Timeline, id: string, key: string, value: unknown) {
+  const layer = (timeline.layers || []).find((l: Clip) => l.id === id);
   if (!layer) return { ok: false, error: { code: 'NOT_FOUND', message: `layer "${id}" not found` } };
   if (key === 'params' && typeof value === 'object' && value !== null) {
     layer.params = { ...(layer.params || {}), ...value };
@@ -83,7 +85,7 @@ export function setLayerProp(timeline: NfTimeline, id: string, key: string, valu
   return { ok: true, value: layer };
 }
 
-export function setLayerProps(timeline: NfTimeline, id: string, props: Record<string, unknown>) {
+export function setLayerProps(timeline: Timeline, id: string, props: Record<string, unknown>) {
   if (!props || typeof props !== "object" || Array.isArray(props)) {
     return { ok: false, error: { code: "BAD_PROPS", message: "props must be an object" } };
   }
@@ -95,10 +97,10 @@ export function setLayerProps(timeline: NfTimeline, id: string, props: Record<st
   return result || setLayerProp(timeline, id, "params", {});
 }
 
-export function listLayers(timeline: NfTimeline) {
+export function listLayers(timeline: Timeline) {
   return {
     ok: true,
-    value: (timeline.layers || []).map((l: NfLayer) => ({
+    value: (timeline.layers || []).map((l: Clip) => ({
       id: l.id,
       scene: l.scene,
       start: l.start,

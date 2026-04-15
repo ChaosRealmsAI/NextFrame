@@ -2,6 +2,7 @@
 import { parseFlags, loadTimeline, saveTimeline, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineUsage } from "../_helpers/_resolve.js";
 import { addLayer, listLayers, moveLayer, removeLayer, resizeLayer, setLayerProps } from "../../../../nf-core/engine/ops.js";
+import type { Timeline } from "../../../../nf-core/types.js";
 import { validateTimelineV3 } from "../_helpers/_timeline-validate.js";
 
 export async function run(argv: string[], context: { subcommand?: string; params?: Record<string, unknown> } = {}) {
@@ -17,7 +18,7 @@ export async function run(argv: string[], context: { subcommand?: string; params
     emit(loaded, flags);
     return 2;
   }
-  const timeline = loaded.value as NfTimeline;
+  const timeline = loaded.value as Timeline;
 
   const subcommand = context.subcommand;
   let result;
@@ -50,7 +51,7 @@ export async function run(argv: string[], context: { subcommand?: string; params
   }
 
   if (subcommand !== "layer-list") {
-    const validation = await validateTimelineV3(timeline);
+    const validation = await validateTimelineV3(timeline as Record<string, unknown>);
     if (!validation.ok) {
       emit({ ...validation, ok: false, error: { code: "VALIDATION_FAILED", message: validation.errors?.[0]?.message || "validation failed" } }, flags);
       return 2;

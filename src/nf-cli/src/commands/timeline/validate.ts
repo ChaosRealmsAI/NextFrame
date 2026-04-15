@@ -48,6 +48,5 @@ export async function run(argv: string[]) {
     if (result.ok) process.stdout.write("ok\n");
   }
   if (!result.ok) return 2;
-  if (result.warnings.length > 0) return 1;
   return 0;
 }

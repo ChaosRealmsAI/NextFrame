@@ -1,6 +1,6 @@
 // Renders timelines in headless Chrome and captures frames or MP4 output from them.
 import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -102,6 +102,33 @@ export async function encodeFramesToMp4(frameDir: string, outputPath: string, op
   }
 }
 
+export async function exportBrowser(timeline: Record<string, unknown>, outputPath: string, opts: { fps?: number; crf?: number; ffmpegPath?: string } = {}) {
+  const { fps, duration, width, height } = timelineMetrics(timeline);
+  const frameDir = await mkdtemp(join(tmpdir(), "nextframe-browser-frames-"));
+  try {
+    await mkdir(frameDir, { recursive: true });
+    const totalFrames = Math.max(1, Math.round(duration * (opts.fps || fps)));
+    const times = Array.from({ length: totalFrames }, (_, index) => index / (opts.fps || fps));
+    const captured = await captureFrames(timeline, times, frameDir, opts);
+    if (!captured.ok) return captured;
+    const encoded = await encodeFramesToMp4(frameDir, outputPath, opts);
+    if (!encoded.ok) return encoded;
+    return {
+      ok: true,
+      value: {
+        outputPath,
+        width,
+        height,
+        fps: opts.fps || fps,
+        duration,
+        framesRendered: times.length,
+      },
+    };
+  } finally {
+    await rm(frameDir, { recursive: true, force: true });
+  }
+}
+
 export async function openRenderedTimeline(timeline: Record<string, unknown>, opts: { fps?: number; crf?: number; ffmpegPath?: string; t?: number } = {}) {
   const { width, height } = timelineMetrics(timeline);
   const htmlDir = await mkdtemp(join(tmpdir(), "nextframe-v3-"));
@@ -120,7 +147,8 @@ export async function openRenderedTimeline(timeline: Record<string, unknown>, op
   });
   const page = await browser.newPage();
   await page.goto(`file://${htmlPath}`, { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => window.__NEXTFRAME_READY === true, { timeout: 15000 });
+  await page.waitForSelector("#stage", { timeout: 15000 });
+  await new Promise((resolve) => setTimeout(resolve, 500));
 
   return {
     browser,

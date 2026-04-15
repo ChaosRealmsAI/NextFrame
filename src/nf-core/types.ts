@@ -67,12 +67,21 @@ export interface Marker {
 
 /** Raw or resolved timeline. */
 export interface Timeline {
+  version?: string;
   schema?: string;
   width?: number;
   height?: number;
   fps?: number;
   duration?: number;
+  ratio?: string;
   background?: string;
+  audio?: string | {
+    src?: string;
+    sentences?: Array<Record<string, unknown>>;
+    segments?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+  };
+  _audioSrc?: string;
   /** v0.1 flat layer list */
   layers?: Clip[];
   /** v0.2 multi-track */

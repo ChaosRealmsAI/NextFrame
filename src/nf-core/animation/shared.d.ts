@@ -1,0 +1,11 @@
+export function clamp(value: number, min: number, max: number): number;
+export function clamp01(value: number): number;
+export function round(value: number, precision?: number): number;
+export function percent(value: number): string;
+export function px(value: number): string;
+export function joinTransforms(...parts: Array<string | false | null | undefined>): string;
+export function inset(top: number, right: number, bottom: number, left: number): string;
+export function circle(radiusPercent: number, x?: string, y?: string): string;
+export function toCssPropertyName(name: string): string;
+export function normalizeStyle(style?: Record<string, unknown>): Record<string, unknown>;
+export function serializeStyle(style?: Record<string, unknown>): string;

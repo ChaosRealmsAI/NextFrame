@@ -112,10 +112,6 @@ export async function validateTimelineV3(timeline: LooseTimeline) {
   if (errors.length > 0) return { ok: false, errors, warnings, hints };
 
   const layers = timeline.layers!;
-  if (layers.length === 0) {
-    errors.push({ code: "NO_LAYERS", message: "timeline has 0 layers. Fix: add at least one layer" });
-    return { ok: false, errors, warnings, hints };
-  }
 
   if (!timeline.ratio) {
     const inferred = timeline.height! > timeline.width! ? "9:16" : "16:9";

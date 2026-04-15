@@ -7,7 +7,8 @@ import { parseFlags, loadTimeline, emit } from "../_helpers/_io.js";
 import { configureProjectCacheEnv, resolveTimeline, timelineDir, timelineUsage } from "../_helpers/_resolve.js";
 import { exportMP4, muxMP4Audio } from "../../targets/ffmpeg-mp4.js";
 import { exportRecorder } from "../../targets/recorder.js";
-import { validateTimelineLegacy } from "../_helpers/_timeline-validate.js";
+import { exportBrowser } from "../../targets/browser.js";
+import { detectFormat, validateTimelineLegacy, validateTimelineV3 } from "../_helpers/_timeline-validate.js";
 
 const USAGE = timelineUsage("render", "", " <out.mp4>");
 const DEFAULT_CRF = 20;
@@ -15,7 +16,7 @@ const DEFAULT_CRF = 20;
 const HELP = `${USAGE}
 
 flags:
-  --target <name>  export backend (supported: ffmpeg, recorder)
+  --target <name>  export backend (supported: ffmpeg, recorder, browser)
   --fps <n>        override export fps
   --crf <n>        override video quality (0..51)
   --width <n>      override render width
@@ -87,12 +88,12 @@ export async function run(argv: string[]) {
     return 2;
   }
   const target = flags.target || "ffmpeg";
-  if (target !== "ffmpeg" && target !== "recorder") {
+  if (target !== "ffmpeg" && target !== "recorder" && target !== "browser") {
     emit({
       ok: false,
       error: {
         code: "UNKNOWN_TARGET",
-        hint: "supported: ffmpeg, recorder",
+        hint: "supported: ffmpeg, recorder, browser",
       },
     }, flags);
     return 2;
@@ -113,7 +114,11 @@ export async function run(argv: string[]) {
 
     // BDD cli-render-8 invariant: render must validate before touching ffmpeg.
     const projectDir = timelineDir(resolved.jsonPath);
-    const v = validateTimelineLegacy(loaded.value as Record<string, unknown>, { projectDir });
+    const timeline = loaded.value as Record<string, unknown>;
+    const format = detectFormat(timeline);
+    const v = format === "v0.3"
+      ? await validateTimelineV3(timeline)
+      : validateTimelineLegacy(timeline, { projectDir });
     if (v.errors && v.errors.length > 0) {
       emit({ ok: false, error: v.errors[0] }, flags);
       return 2;
@@ -135,10 +140,15 @@ export async function run(argv: string[]) {
     await mkdir(dirname(outPath), { recursive: true });
     const start = Date.now();
     let r: Record<string, unknown> | undefined;
-    const exporter = target === "recorder" ? exportRecorder : exportMP4;
+    const exporter =
+      target === "browser"
+        ? exportBrowser
+        : target === "recorder"
+          ? exportRecorder
+          : exportMP4;
     if (audioPath) {
       const tempVideoPath = makeTempVideoPath(outPath);
-      const videoOnly = await exporter(loaded.value as Record<string, unknown>, tempVideoPath, opts) as Record<string, unknown>;
+      const videoOnly = await exporter(timeline, tempVideoPath, opts) as Record<string, unknown>;
       if (!videoOnly.ok) {
         r = toMuxFailure(videoOnly) as Record<string, unknown>;
       } else {
@@ -153,7 +163,7 @@ export async function run(argv: string[]) {
         }
       }
     } else {
-      r = await exporter(loaded.value as Record<string, unknown>, outPath, opts) as Record<string, unknown>;
+      r = await exporter(timeline, outPath, opts) as Record<string, unknown>;
     }
     if (!flags.quiet) process.stderr.write("\n");
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);

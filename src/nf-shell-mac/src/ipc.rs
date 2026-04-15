@@ -38,9 +38,15 @@ const IPC_BRIDGE_SCRIPT: &str = r#"
       if (!pending) return;
       delete window.__ipc[resp.id];
       if (resp.ok) {
-        pending.resolve(resp.result);
+        pending.resolve({ ok: true, value: resp.result });
       } else {
-        pending.reject(new Error(resp.error || 'unknown error'));
+        pending.resolve({
+          ok: false,
+          error: {
+            code: 'IPC_ERROR',
+            message: resp.error || 'unknown error',
+          },
+        });
       }
     } catch (e) {
       console.error('[ipc] resolve error:', e);
