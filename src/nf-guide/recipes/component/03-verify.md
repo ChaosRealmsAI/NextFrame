@@ -1,6 +1,24 @@
-# Step 3 · 自检（smoke + gallery + checklist 三关）
+# Step 3 · 自检（lint + smoke + gallery + checklist 四关）
 
-## 1 · smoke test（30 字段 + render 不抛）
+## 1 · scene-lint（AST 扫 6 种硬错，防呆第一道）
+
+```bash
+node src/nf-cli/bin/nextframe.js scene-lint --ratio=<ratio> --theme=<theme>
+```
+
+检查 6 种坑：
+- **L1** CSS @keyframes 在 render 里（pit 1）
+- **L2** 语法错（含 ASCII `"` 嵌中文，pit 6）
+- **L3** frame_pure:true 但读 t（pit 4）
+- **L4** videoOverlay:true 缺黑框（pit 11）
+- **L5** render 签名与 type 不匹配
+- **L6** intent < 50 字
+
+出 error → 改完重跑。出 warning → 看情况决定修不修。
+
+**必须 0 error 才能进下一步。**
+
+## 2 · smoke test（30 字段 + render 不抛）
 
 ```bash
 node src/nf-cli/bin/nextframe.js scene-smoke --ratio=<ratio> --theme=<theme>
@@ -16,7 +34,7 @@ node src/nf-cli/bin/nextframe.js scene-smoke --ratio=<ratio> --theme=<theme>
 
 ---
 
-## 2 · gallery 真实视觉（浏览器）
+## 3 · gallery 真实视觉（浏览器）
 
 ```bash
 node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme>
@@ -36,7 +54,7 @@ node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme>
 
 ---
 
-## 3 · Checklist 13 项（人眼/AI 过一遍）
+## 4 · Checklist 13 项（人眼/AI 过一遍）
 
 ### 视觉主体（命门）
 
@@ -81,7 +99,7 @@ node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme>
 
 ---
 
-## 4 · 红旗（立刻重做）
+## 5 · 红旗（立刻重做）
 
 出现以下任一 → **整组件重做**，不是补丁：
 
@@ -98,10 +116,11 @@ node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme>
 
 ---
 
-## 5 · 完成 = 3 条全绿
+## 6 · 完成 = 4 条全绿
 
 ```
-✓ smoke test pass
+✓ scene-lint 0 errors
+✓ scene-smoke pass
 ✓ gallery 看到预期效果（含动画）
 ✓ checklist 13 项全过
 ```
