@@ -189,19 +189,37 @@ export default {
 };
 ```
 
-### recorder 命令
+### recorder 命令（正确做法 — recorder slide 自动检测多 clip）
 
 ```bash
-# 对 --width 1080 --dpr 1（output 1080x1920）
-nextframe-recorder clip timeline.html --video clip.mp4 --out out.mp4 \
+# timeline 里每层 videoArea 各自带 params.src + videoOverlay 坐标
+# recorder slide 会自动扫描所有 videoOverlay 层 → 多 ffmpeg overlay 合成
+nextframe-recorder slide timeline.html --out out.mp4 \
   --width 1080 --height 1920 --dpr 1 --fps 30
-
-# 对 --width 540 --dpr 2（也是 output 1080x1920，retina 风格）
-nextframe-recorder clip timeline.html --video clip.mp4 --out out.mp4 \
-  --width 540 --height 960 --dpr 2 --fps 30
 ```
 
-**不要用 slide 模式**（`recorder slide`）— 那个没有 --video overlay 能力。
+看 log 是否有 `overlay: compositing N video layer(s)` → N = 检测到的视频层数。
+
+**切屏（同 timeline 多视频）示例**：
+
+```json
+{
+  "layers": [
+    { "id": "video-a", "scene": "videoArea", "start": 0, "dur": 3,
+      "params": { "src": "/tmp/clip-a.mp4" },
+      "videoOverlay": { "x": 80, "y": 276, "w": 920, "h": 538 } },
+    { "id": "video-b", "scene": "videoArea", "start": 3, "dur": 3,
+      "params": { "src": "/tmp/clip-b.mp4" },
+      "videoOverlay": { "x": 80, "y": 276, "w": 920, "h": 538 } }
+  ]
+}
+```
+
+recorder slide 检测到 2 个 video layer → 2 次 ffmpeg overlay filter，用 `enable='between(t,START,END)'` 时段门控 → 视频按时间段自动切换。
+
+### ❌ 别用 recorder clip 模式
+
+`recorder clip --video ONE_FILE` 只支持全程一个 video，无法切屏。**clip 模式是单片段访谈的简化版**，多片段访谈必须用 slide 模式 + timeline 层 videoOverlay 字段。
 
 **防复发**：scene 规范 B 组加一条"type=media 的 video 组件必须有 videoOverlay:true 且坐标和 recorder ffmpeg 常量对齐"。
 
