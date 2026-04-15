@@ -61,8 +61,7 @@ pub fn create(
     let url_str = std::env::var("NF_START_URL")
         .or_else(|_| {
             std::env::args()
-                .skip_while(|a| !a.starts_with("--url="))
-                .next()
+                .find(|a| a.starts_with("--url="))
                 .map(|a| a.trim_start_matches("--url=").to_string())
                 .ok_or(std::env::VarError::NotPresent)
         })
