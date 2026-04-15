@@ -1,0 +1,17 @@
+{
+  "id": "brandFooter",
+  "name": "Brand Footer",
+  "description": "NEXTFRAME brand text + tagline at bottom of frame",
+  "version": "1.0.0",
+  "author": "nextframe",
+  "license": "MIT",
+  "category": "brand",
+  "tags": ["brand", "footer", "logo", "nextframe"],
+  "ratio": "9:16",
+  "theme": "interview-dark",
+  "videoOverlay": false,
+  "duration": { "min": 1, "max": 600, "default": 60 },
+  "enter": { "effect": "springIn", "dur": 0.6 },
+  "exit": { "effect": "fadeOut", "dur": 0.5 },
+  "params": {}
+}

@@ -1,0 +1,22 @@
+{
+  "id": "interviewHeader",
+  "name": "Interview Header",
+  "description": "Series name + episode number + title + guest name in gold/white",
+  "version": "1.0.0",
+  "author": "nextframe",
+  "license": "MIT",
+  "category": "typography",
+  "tags": ["interview", "title", "header", "chinese"],
+  "ratio": "9:16",
+  "theme": "interview-dark",
+  "videoOverlay": false,
+  "duration": { "min": 2, "max": 600, "default": 60 },
+  "enter": { "effect": "slideDown", "dur": 0.8 },
+  "exit": { "effect": "fadeOut", "dur": 0.5 },
+  "params": {
+    "series": { "type": "string", "required": true, "description": "Series name", "example": "速通硅谷访谈" },
+    "episode": { "type": "string", "required": true, "description": "Episode number", "example": "E01" },
+    "title": { "type": "string", "required": true, "description": "Episode title", "example": "指数快到头了，大众浑然不知" },
+    "guest": { "type": "string", "required": false, "default": "", "description": "Guest name", "example": "Dario Amodei" }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "interviewVideoArea",
+  "name": "Interview Video Area",
+  "description": "Video placeholder frame with border — recorder overlays real video here",
+  "version": "1.0.0",
+  "author": "nextframe",
+  "license": "MIT",
+  "category": "media",
+  "tags": ["interview", "video", "overlay", "frame"],
+  "ratio": "9:16",
+  "theme": "interview-dark",
+  "videoOverlay": true,
+  "duration": { "min": 1, "max": 600, "default": 60 },
+  "enter": { "effect": "fadeIn", "dur": 0.3 },
+  "exit": { "effect": "fadeOut", "dur": 0.3 },
+  "params": {
+    "src": { "type": "string", "required": true, "description": "Video file path" },
+    "clipNum": { "type": "number", "required": false, "default": 1, "description": "Current clip number" },
+    "totalClips": { "type": "number", "required": false, "default": 1, "description": "Total clips in episode" }
+  }
+}

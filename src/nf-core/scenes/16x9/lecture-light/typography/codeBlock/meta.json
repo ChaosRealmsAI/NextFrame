@@ -1,0 +1,21 @@
+{
+  "id": "codeBlock",
+  "name": "Code Block",
+  "description": "Syntax-highlighted code display with dark terminal look",
+  "version": "1.0.0",
+  "author": "nextframe",
+  "license": "MIT",
+  "category": "typography",
+  "tags": ["code", "terminal", "syntax", "programming"],
+  "ratio": "16:9",
+  "theme": "lecture-light",
+  "videoOverlay": false,
+  "duration": { "min": 3, "max": 60, "default": 10 },
+  "enter": { "effect": "scaleIn", "dur": 0.5 },
+  "exit": { "effect": "fadeOut", "dur": 0.4 },
+  "params": {
+    "code": { "type": "string", "required": true, "description": "Code to display" },
+    "lang": { "type": "string", "required": false, "default": "js", "description": "Language hint", "enum": ["js", "ts", "python", "rust", "bash", "json"] },
+    "filename": { "type": "string", "required": false, "default": "", "description": "File name shown at top" }
+  }
+}

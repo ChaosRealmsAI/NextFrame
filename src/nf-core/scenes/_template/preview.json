@@ -1,0 +1,7 @@
+{
+  "params": {},
+  "snapshots": [
+    { "t": 0, "label": "Initial state" },
+    { "t": 5, "label": "Steady state" }
+  ]
+}

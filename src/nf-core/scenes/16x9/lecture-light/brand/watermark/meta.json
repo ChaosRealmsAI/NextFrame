@@ -1,0 +1,17 @@
+{
+  "id": "watermark",
+  "name": "Watermark",
+  "description": "Subtle brand watermark at bottom",
+  "version": "1.0.0",
+  "author": "nextframe",
+  "license": "MIT",
+  "category": "brand",
+  "tags": ["brand", "watermark", "logo"],
+  "ratio": "16:9",
+  "theme": "lecture-light",
+  "videoOverlay": false,
+  "duration": { "min": 1, "max": 600, "default": 30 },
+  "enter": { "effect": "fadeIn", "dur": 0.5 },
+  "exit": { "effect": "fadeOut", "dur": 0.3 },
+  "params": {}
+}

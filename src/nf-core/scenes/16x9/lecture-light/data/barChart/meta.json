@@ -1,0 +1,21 @@
+{
+  "id": "barChart",
+  "name": "Bar Chart",
+  "description": "Vertical bar chart with labels and values",
+  "version": "1.0.0",
+  "author": "nextframe",
+  "license": "MIT",
+  "category": "data",
+  "tags": ["chart", "bar", "data", "comparison"],
+  "ratio": "16:9",
+  "theme": "lecture-light",
+  "videoOverlay": false,
+  "duration": { "min": 3, "max": 30, "default": 8 },
+  "enter": { "effect": "slideUp", "dur": 0.6 },
+  "exit": { "effect": "fadeOut", "dur": 0.4 },
+  "params": {
+    "title": { "type": "string", "required": false, "default": "", "description": "Chart title" },
+    "data": { "type": "array", "required": true, "description": "Array of {label, value} objects", "example": [{"label": "A", "value": 42}] },
+    "maxValue": { "type": "number", "required": false, "default": 0, "description": "Max Y axis value (0 = auto from data)", "min": 0 }
+  }
+}
