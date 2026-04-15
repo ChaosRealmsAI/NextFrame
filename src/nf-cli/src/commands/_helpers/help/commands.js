@@ -48,7 +48,6 @@ export const COMMAND_SPECS = Object.fromEntries([
   command("scene-preview", "Open a scene's preview.html in the browser for visual verification.", `nextframe scene-preview <name> [--ratio=16:9]`, `<name> scene id (searches across categories)`, `BLOCKING step — must visually confirm no overflow, smooth animation, correct colors.`),
   command("scene-validate", "Validate a scene against ADR-008 contract (16 checks).", `nextframe scene-validate <name> [--ratio=16:9] [--json]`, `<name> scene id
     --json emit structured result`, `Checks meta fields, render output, screenshots, lint, preview.html existence. All must pass before commit.`),
-  // lint-scenes: DEPRECATED — replaced by scene-validate (ADR-008 format)
   command("scenes", "List all available scenes or inspect one scene contract, including params.", `nextframe scenes [--json]
     nextframe scenes <id> [--json]`, `<id> inspect a single scene
     --json emit structured scene metadata`, `Use this before layer-add so the AI does not guess scene ids or params.

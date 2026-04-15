@@ -15,7 +15,6 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
     nextframe build demo ep01 intro
     nextframe build ./timeline.json -o ./dist/intro.html
   `),
-  // lint-scenes: DEPRECATED
   examples("scenes", `
     nextframe scenes
     nextframe scenes headline --json

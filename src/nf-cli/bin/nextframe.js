@@ -7,8 +7,6 @@ const SUBCOMMANDS = {
   new: () => import("../src/commands/timeline/new.js"),
   validate: () => import("../src/commands/timeline/validate.js"),
   build: () => import("../src/commands/timeline/build.js"),
-  // lint-scenes: DEPRECATED — replaced by scene-validate (ADR-008 format)
-  // "lint-scenes": () => import("../src/commands/render/lint-scenes.js"),
   scenes: () => import("../src/commands/render/scenes.js"),
   "bundle-scenes": () => import("../src/commands/render/bundle-scenes.js"),
   "scene-new": () => import("../src/commands/render/scene-new.js"),
@@ -24,7 +22,6 @@ const SUBCOMMANDS = {
   "project-config": () => import("../src/commands/project/project-config.js"),
   "episode-new": () => import("../src/commands/project/episode-new.js"),
   "episode-list": () => import("../src/commands/project/episode-list.js"),
-  design: () => import("../src/commands/pipeline/design.js"),
   "pipeline-get": () => import("../src/commands/pipeline/pipeline-get.js"),
   "script-set": () => import("../src/commands/pipeline/script-set.js"),
   "script-get": () => import("../src/commands/pipeline/script-get.js"),
@@ -57,8 +54,6 @@ const SUBCOMMANDS = {
   "app-pipeline": () => import("../src/commands/app/app-pipeline.js"),
   "app-eval": () => import("../src/commands/app/app-eval.js"),
   "app-screenshot": () => import("../src/commands/app/app-screenshot.js"),
-  // serve: not yet wired — needs project context param
-  // serve: () => import("../src/commands/render/serve.js"),
   help: null,
 };
 

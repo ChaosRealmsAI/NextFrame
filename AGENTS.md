@@ -1,15 +1,12 @@
 # NextFrame
 
-AI-native video editor. Rust + JS, macOS.
+AI-native video engine. Rust + JS, macOS.
 
-## Before You Write Code (mandatory)
+## Before You Write Code
 
-1. Read the relevant standard: `cat spec/standards/00-index.md` → find and read the standard for your task
-2. Read ADR if changing architecture: `cat spec/cockpit-app/data/dev/adrs.json`
-3. Read BDD if working on a feature: `cat spec/cockpit-app/bdd/{module}/bdd.json`
-4. Read crate CLAUDE.md: `cat src/nf-xxx/CLAUDE.md`
-
-**No standard found? Say so. Don't guess.**
+1. Read the crate's CLAUDE.md: `cat src/nf-xxx/CLAUDE.md`
+2. Check scene contracts: `node src/nf-cli/bin/nextframe.js scenes`
+3. Read the design system: `cat src/nf-core/scenes/shared/design.js`
 
 ## Setup
 ```bash
@@ -17,17 +14,10 @@ cargo check --workspace
 node src/nf-cli/bin/nextframe.js --help
 ```
 
-## Standards
-```bash
-cat spec/standards/00-index.md           # index of all standards
-cat spec/standards/general/              # universal rules
-cat spec/standards/project/              # NextFrame-specific rules
-cat spec/standards/scorecard.md          # quality audit framework
-```
-
 ## Testing
 ```bash
 cargo test --workspace
+cargo clippy --workspace -- -D warnings
 bash scripts/lint-all.sh                 # 10-gate quality check
 ```
 
@@ -36,5 +26,6 @@ bash scripts/lint-all.sh                 # 10-gate quality check
 - IPC methods use `domain.camelCase`; register in `src/nf-bridge/src/lib.rs`.
 - Errors include `Fix:` suggestion or `Internal:` prefix.
 - No `unwrap`/`expect`/`panic` in production code.
-- Check scene contracts: `node src/nf-cli/bin/nextframe.js scenes`.
+- Scene components are pure functions: `(t, params, vp) => HTML string`.
+- Use `getPreset()` from design.js — no hardcoded colors.
 - Prod files ≤ 500 lines, test files ≤ 800 lines.
