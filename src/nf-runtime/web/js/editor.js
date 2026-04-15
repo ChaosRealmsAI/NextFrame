@@ -292,11 +292,13 @@ function updatePreviewScale() {
   stage.style.width = w + 'px';
   stage.style.height = h + 'px';
   stage.style.transformOrigin = '0 0';
-  const canvasRect = canvas.getBoundingClientRect();
-  const scaleX = canvasRect.width / w;
-  const scaleY = canvasRect.height / h;
-  const scale = Math.min(scaleX, scaleY);
-  stage.style.transform = 'scale(' + scale + ')';
+  requestAnimationFrame(function() {
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
+    if (cw <= 0 || ch <= 0) return;
+    const scale = Math.min(cw / w, ch / h);
+    stage.style.transform = 'scale(' + scale + ')';
+  });
 }
 
 async function composePreview() {
