@@ -1,81 +1,254 @@
 {
-  "width": 1920,
-  "height": 1080,
+  "version": "0.3",
+  "ratio": "9:16",
+  "width": 1080,
+  "height": 1920,
   "fps": 30,
-  "duration": 36,
+  "duration": 81.31,
+  "background": "#111111",
+  "audio": {
+    "src": "/Users/Zhuanz/bigbang/MediaAgentTeam/series/硅谷访谈/E01-Dario-Amodei-指数终局/clips/clip_01.mp4"
+  },
   "layers": [
     {
-      "scene": "lectureChrome",
+      "id": "chrome",
+      "scene": "interviewChrome",
       "start": 0,
-      "dur": 36,
+      "dur": 81.31,
       "params": {
-        "seriesName": "NEXTFRAME // EDITOR PREVIEW",
-        "chapter": "DYNAMIC BUNDLE",
-        "title": "Timeline-scoped scene loading for the DOM preview",
+        "seriesName": "速通硅谷访谈 · E01 · Dario Amodei",
+        "title": "指数快到头了，大众浑然不知",
+        "clipLabel": "CLIP 01",
+        "origRange": "原片 2:22:18 ｜ 内容来源：00:00 — 01:21",
+        "topicLabel": "正在聊",
+        "topic": "Anthropic 的指数曲线为什么还没到头，以及社会为什么几乎没意识到这一点。",
+        "tags": [
+          "Dwarkesh Podcast",
+          "Dario Amodei",
+          "原声 1:21"
+        ],
         "brand": "NEXTFRAME",
-        "duration": 36
+        "teamLine": "Produced by NextFrame AI-native video pipeline"
       }
     },
     {
-      "scene": "headlineCenter",
-      "start": 1,
-      "dur": 6.5,
+      "id": "video",
+      "scene": "interviewVideoArea",
+      "start": 0,
+      "dur": 81.31,
       "params": {
-        "kicker": "EDITOR PREVIEW",
-        "title": "按时间线按需打包场景",
-        "subtitle": "The editor requests only the scenes referenced by the loaded timeline.",
-        "enterDelay": 0.2
+        "src": "/Users/Zhuanz/bigbang/MediaAgentTeam/series/硅谷访谈/E01-Dario-Amodei-指数终局/clips/clip_01.mp4",
+        "clipLabel": "CLIP 01 / 01"
       }
     },
     {
-      "scene": "codeTerminal",
-      "start": 9,
-      "dur": 13,
+      "id": "bisub",
+      "scene": "interviewBiSub",
+      "start": 0,
+      "dur": 81.31,
       "params": {
-        "windowTitle": "demo-timeline.json",
-        "sectionTitle": "What changed in the preview path",
-        "code": "editor.js\\n  -> bridgeCall(\"preview.bundle\", { timeline })\\n  -> nf://localhost/generated/scene-bundle-{hash}.js\\n  -> window.__scenes\\n  -> previewEngine.loadTimeline()",
-        "notes": [
+        "segments": [
           {
-            "label": "Bundle",
-            "text": "Only referenced scene IDs are included in the generated classic JS bundle."
+            "s": 0.2,
+            "e": 1.63,
+            "speaker": "dwarkesh",
+            "en": "So we talked three years ago.",
+            "cn": [
+              {
+                "text": "我们三年前谈过一次。",
+                "s": 0.2,
+                "e": 1.63
+              }
+            ]
           },
           {
-            "label": "Cache",
-            "text": "The bridge reuses the same bundle file when the sorted scene ID set is unchanged."
+            "s": 1.63,
+            "e": 5,
+            "speaker": "dwarkesh",
+            "en": "I'm curious in your view, what has been the biggest update of the last three years?",
+            "cn": [
+              {
+                "text": "这三年，你最大的认知更新是什么？",
+                "s": 1.63,
+                "e": 5
+              }
+            ]
           },
           {
-            "label": "Render",
-            "text": "The DOM preview engine keeps rendering in the same document without an iframe."
+            "s": 5.16,
+            "e": 7.98,
+            "speaker": "dwarkesh",
+            "en": "What has been the biggest difference between what I felt like last three years versus now?",
+            "cn": [
+              {
+                "text": "三年前和现在，差别在哪里？",
+                "s": 5.16,
+                "e": 7.98
+              }
+            ]
+          },
+          {
+            "s": 8.12,
+            "e": 19.47,
+            "speaker": "dario",
+            "en": "Yeah, I would say actually the underlying technology, like the exponential of the technology, has gone broadly speaking, I would say about as I expected it to go.",
+            "cn": [
+              {
+                "text": "底层技术的指数增长，基本跟我预期差不多。",
+                "s": 8.12,
+                "e": 19.47
+              }
+            ]
+          },
+          {
+            "s": 19.47,
+            "e": 25.67,
+            "speaker": "dario",
+            "en": "I mean, there's like plus or minus, you know, a couple, there's plus or minus a year or two here, there's plus or minus a year or two there.",
+            "cn": [
+              {
+                "text": "当然，会有一两年的偏差。",
+                "s": 19.47,
+                "e": 25.67
+              }
+            ]
+          },
+          {
+            "s": 25.67,
+            "e": 29.42,
+            "speaker": "dario",
+            "en": "I don't know that I was predicted the specific direction of code.",
+            "cn": [
+              {
+                "text": "代码这个方向，我倒没特别预判到。",
+                "s": 25.67,
+                "e": 29.42
+              }
+            ]
+          },
+          {
+            "s": 29.64,
+            "e": 46.85,
+            "speaker": "dario",
+            "en": "But actually when I look at the exponential, it is roughly what I expected in terms of the March of the Models from like, you know, smart high school student to smart college student to like, you know, beginning to do PhD and professional stuff and in the case of code reaching beyond that.",
+            "cn": [
+              {
+                "text": "但看整体的指数曲线，",
+                "s": 29.64,
+                "e": 33.33
+              },
+              {
+                "text": "跟我预期差不多——",
+                "s": 33.33,
+                "e": 36.2
+              },
+              {
+                "text": "从聪明的高中生水平，",
+                "s": 36.2,
+                "e": 39.89
+              },
+              {
+                "text": "到大学生，到博士级，",
+                "s": 39.89,
+                "e": 43.17
+              },
+              {
+                "text": "代码甚至超过了博士级。",
+                "s": 43.17,
+                "e": 46.85
+              }
+            ]
+          },
+          {
+            "s": 46.85,
+            "e": 48.68,
+            "speaker": "dario",
+            "en": "So, you know, the frontier is a little bit uneven.",
+            "cn": [
+              {
+                "text": "所以，前沿进展有点参差不齐。",
+                "s": 46.85,
+                "e": 48.68
+              }
+            ]
+          },
+          {
+            "s": 49.18,
+            "e": 50.42,
+            "speaker": "dario",
+            "en": "It's roughly what I expected.",
+            "cn": [
+              {
+                "text": "但大体上跟我预期一致。",
+                "s": 49.18,
+                "e": 50.42
+              }
+            ]
+          },
+          {
+            "s": 51.08,
+            "e": 53.46,
+            "speaker": "dario",
+            "en": "I will tell you though, what the most surprising thing has been.",
+            "cn": [
+              {
+                "text": "不过，最让我意外的是另一件事。",
+                "s": 51.08,
+                "e": 53.46
+              }
+            ]
+          },
+          {
+            "s": 53.56,
+            "e": 61.54,
+            "speaker": "dario",
+            "en": "The most surprising thing has been the lack of public recognition of how close we are to the end of the exponential.",
+            "cn": [
+              {
+                "text": "大众完全没意识到，我们离指数终点有多近。",
+                "s": 53.56,
+                "e": 61.54
+              }
+            ]
+          },
+          {
+            "s": 61.58,
+            "e": 81.08,
+            "speaker": "dario",
+            "en": "To me, it is absolutely wild that you have, within the bubble and outside the bubble, but you have people talking about these, just the same tired old hot button political issues and like, or around us, we're like, here's the end of the exponential.",
+            "cn": [
+              {
+                "text": "对我来说，真的太荒诞了——",
+                "s": 61.58,
+                "e": 65.64
+              },
+              {
+                "text": "不管在圈子里还是圈子外，",
+                "s": 65.64,
+                "e": 70.11
+              },
+              {
+                "text": "大家还在扯那些陈词滥调，",
+                "s": 70.11,
+                "e": 74.58
+              },
+              {
+                "text": "我们这边说——指数快到头了！",
+                "s": 74.58,
+                "e": 81.08
+              }
+            ]
           }
         ]
       }
     },
     {
-      "scene": "headlineCenter",
-      "start": 23,
-      "dur": 7,
-      "params": {
-        "kicker": "SAME PREVIEW ENGINE",
-        "title": "不同时间线，不同场景包",
-        "subtitle": "The editor no longer depends on a manually maintained static scene-bundle.js.",
-        "enterDelay": 0.1
-      }
-    },
-    {
-      "scene": "subtitleBar",
+      "id": "progress",
+      "scene": "progressBar9x16",
       "start": 0,
-      "dur": 36,
+      "dur": 81.31,
       "params": {
-        "label": "PREVIEW",
-        "srt": [
-          { "s": 0, "e": 6, "zh": "编辑器现在会按时间线动态请求场景包。", "en": "The editor now requests a scene bundle from the loaded timeline." },
-          { "s": 6, "e": 12, "zh": "Bridge 只生成当前时间线实际引用到的场景。", "en": "The bridge only generates scenes that the current timeline actually references." },
-          { "s": 12, "e": 18, "zh": "生成后的 classic JS 通过 nf://localhost/generated/... 提供。", "en": "The generated classic JS is served from nf://localhost/generated/..." },
-          { "s": 18, "e": 25, "zh": "脚本加载完成后，window.__scenes 会在同一文档里可用。", "en": "After the script loads, window.__scenes is available in the same document." },
-          { "s": 25, "e": 31, "zh": "随后 previewEngine.loadTimeline() 和 compose(0) 正常执行。", "en": "Then previewEngine.loadTimeline() and compose(0) run as before." },
-          { "s": 31, "e": 36, "zh": "这个 demo 时间线现在与 nf-core 场景目录保持一致。", "en": "This demo timeline now matches the scenes present under nf-core." }
-        ]
+        "duration": 81.31
       }
     }
   ]
