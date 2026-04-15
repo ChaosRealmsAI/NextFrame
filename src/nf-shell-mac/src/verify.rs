@@ -149,26 +149,6 @@ pub(crate) fn verify_app(wv: &objc2_web_kit::WKWebView) {
     );
     webview::pump_run_loop_pub(std::time::Duration::from_millis(300));
 
-    // ── AI PROMPTS MODAL ──
-    check!(
-        "open AI prompts",
-        webview::eval_js(wv, "toggleAIPrompts(); 'opened'")
-    );
-    webview::pump_run_loop_pub(std::time::Duration::from_millis(500));
-    check!(
-        "prompt sections",
-        webview::eval_js(
-            wv,
-            "document.querySelectorAll('.prompt-section').length + ' sections'"
-        )
-    );
-    let _ = webview::screenshot(wv, "/tmp/nf-verify-ai-prompts.png");
-    check!(
-        "close AI prompts",
-        webview::eval_js(wv, "toggleAIPrompts(); 'closed'")
-    );
-    webview::pump_run_loop_pub(std::time::Duration::from_millis(300));
-
     // ── NAVIGATE TO PROJECT ──
     check!("navigate to project", webview::eval_js(wv, "var cards=document.querySelectorAll('.project-card');if(cards.length>0){cards[0].click();'clicked'}else{'no cards'}"));
     webview::pump_run_loop_pub(std::time::Duration::from_secs(2));

@@ -181,8 +181,6 @@ declare const TransportControls: typeof Component;
 declare const SettingsPanel: typeof Component;
 declare const Modal: typeof Component;
 declare const NewProjectModal: typeof Component;
-declare const AIPromptsModal: typeof Component;
-declare const AI_PROMPTS: Array<{ icon: string; title: string; prompts: string[] }>;
 
 // ── Project/episode helpers ───────────────────────────────────────────────────
 
@@ -315,13 +313,11 @@ declare function getEpisodeNameFromPath(): string;
 
 declare function toggleSettings(): void;
 declare function toggleNewProject(): void;
-declare function toggleAIPrompts(): void;
 declare function toggleSelect(trigger: HTMLElement): void;
 declare function pickOption(option: HTMLElement): void;
 declare function pickRatio(card: HTMLElement, ratio: string): void;
 declare function switchTab(tab: string): void;
 declare function switchTabByStage(stage: string): void;
-declare function copyPrompt(el: HTMLElement): void;
 declare function composePreview(): void;
 declare function previewFrame(t: number): void;
 
@@ -452,13 +448,11 @@ interface Window {
   getEpisodeNameFromPath: typeof getEpisodeNameFromPath;
   toggleSettings: typeof toggleSettings;
   toggleNewProject: typeof toggleNewProject;
-  toggleAIPrompts: typeof toggleAIPrompts;
   toggleSelect: typeof toggleSelect;
   pickOption: typeof pickOption;
   pickRatio: typeof pickRatio;
   switchTab: typeof switchTab;
   switchTabByStage: typeof switchTabByStage;
-  copyPrompt: typeof copyPrompt;
   composePreview: typeof composePreview;
   previewFrame: typeof previewFrame;
   scOpenClipSentence: typeof scOpenClipSentence;
@@ -471,14 +465,12 @@ interface Window {
   scHandlePlayerOverlay: typeof scHandlePlayerOverlay;
   scSelectSource: typeof scSelectSource;
   STAGE_TO_TAB: typeof STAGE_TO_TAB;
-  AI_PROMPTS: typeof AI_PROMPTS;
   HomeView: typeof HomeView;
   Topbar: typeof Topbar;
   TransportControls: typeof TransportControls;
   SettingsPanel: typeof SettingsPanel;
   Modal: typeof Modal;
   NewProjectModal: typeof NewProjectModal;
-  AIPromptsModal: typeof AIPromptsModal;
   currentProjectName: string;
   currentProjectPath: string;
   currentEpisodeName: string;

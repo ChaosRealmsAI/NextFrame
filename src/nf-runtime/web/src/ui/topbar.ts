@@ -82,16 +82,6 @@ class Topbar extends Component {
         'button',
         {
           class: 'tb-icon-btn',
-          title: 'AI 指令库',
-          'data-nf-action': 'open-ai-prompts',
-          onclick: () => window.toggleAIPrompts(),
-        },
-        this.icon('<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1l1.8 3.6L14 5.3l-3 2.9.7 4.1L8 10.5 4.3 12.3l.7-4.1-3-2.9 4.2-.7Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" fill="none"/></svg>'),
-      ),
-      h(
-        'button',
-        {
-          class: 'tb-icon-btn',
           title: 'Settings',
           'data-nf-action': 'open-settings',
           onclick: () => window.toggleSettings(),

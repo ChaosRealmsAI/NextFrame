@@ -17,12 +17,10 @@ const appStore = new Store({
   currentView: 'home',
   activeTab: 'script',
   settingsOpen: false,
-  aiPromptsOpen: false,
 });
 
 let topbarComponent: Component | null = null;
 let settingsPanelComponent: Component | null = null;
-let aiPromptsModalComponent: Component | null = null;
 let homeViewComponent: Component | null = null;
 let newProjectModalComponent: (Component & { toggle?(): void }) | null = null;
 let transportComponent: Component | null = null;
@@ -89,12 +87,6 @@ function toggleSettings(): void {
   if (settingsPanelComponent) settingsPanelComponent.update({ open: next });
 }
 
-function toggleAIPrompts(): void {
-  const next = !appStore.get('aiPromptsOpen');
-  appStore.set('aiPromptsOpen', next);
-  if (aiPromptsModalComponent) aiPromptsModalComponent.update({ open: next });
-}
-
 function toggleNewProject(): void {
   if (newProjectModalComponent && newProjectModalComponent.toggle) newProjectModalComponent.toggle();
 }
@@ -116,7 +108,6 @@ window.__nfDiagnose = function() {
     activeTab: appStore.get('activeTab'),
     modals: {
       settings: document.getElementById('settings-panel')?.classList.contains('open') || false,
-      aiPrompts: document.getElementById('ai-modal')?.classList.contains('open') || false,
       newProject: document.getElementById('new-project-modal')?.classList.contains('open') || false,
     },
     actions: Array.from(document.querySelectorAll<HTMLElement>('[data-nf-action]')).map((el) => el.dataset.nfAction),
@@ -138,14 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
     overlayAction: 'close-settings',
     panelAction: 'settings-panel',
     onOverlayClick: () => toggleSettings(),
-  }));
-  aiPromptsModalComponent = mountComponent('ai-prompts-root', new AIPromptsModal({
-    open: false,
-    overlayId: 'ai-overlay',
-    panelId: 'ai-modal',
-    overlayAction: 'close-modal',
-    panelAction: 'ai-modal',
-    onOverlayClick: () => toggleAIPrompts(),
   }));
   homeViewComponent = mountComponent('home-root', new HomeView());
   newProjectModalComponent = mountComponent('new-project-root', new NewProjectModal({
@@ -174,6 +157,5 @@ window.showView = showView;
 window.switchTab = switchTab;
 window.switchTabByStage = switchTabByStage;
 window.toggleSettings = toggleSettings;
-window.toggleAIPrompts = toggleAIPrompts;
 window.toggleNewProject = toggleNewProject;
 window.STAGE_TO_TAB = STAGE_TO_TAB;

@@ -43,14 +43,21 @@ cat src/nf-core/scenes/{ratio}/{theme}/theme.md
 
 ## 2.3 复制模板起步
 
+每个 theme 下有 2 个模板（`_` 前缀的文件 loader 自动忽略，不会出现在 `nextframe scenes` 列表）：
+
 ```bash
-# Canvas 类（参考）
+# Canvas 类（ctx 绘制）
 cat src/nf-core/scenes/16x9/anthropic-warm/text-headline.js
 
-# DOM 类（待补 — 第一个 dom 模板还没建，参考 spec 新签名手写）
+# DOM 类（host.innerHTML 挂内容）
+cat src/nf-core/scenes/16x9/anthropic-warm/_template-dom.js
 ```
 
+**选对模板 = type 选对**（canvas vs dom）。选错了 render 签名不匹配，smoke test 直接挂。
+
 整段复制 → 改 id/name/role → 改 intent + when_to_use + 配伍三组 → 改 params → 改 render/describe/sample。
+
+**复制模板后第一件事**：改 id、改 role、改 status 从 `experimental` 改成 `stable`。
 
 ## 2.4 11 必填字段速查
 
@@ -126,15 +133,19 @@ node --check src/nf-core/scenes/{ratio}/{theme}/{role}-{name}.js
 # 2. 加载（出现在列表）
 node src/nf-cli/bin/nextframe.js scenes | grep {id}
 
-# 3. smoke test（30 字段 + render+describe+sample 不抛 + 输出 PNG）
-node scripts/scene-smoke-test.mjs
+# 3. smoke test（30 字段 + render+describe+sample 不抛）
+# 自动按 c.type 分派：canvas → 画 PNG；dom/svg/media → fake host 验证 mutation
+# 从仓库根目录跑：
+cd /Users/Zhuanz/bigbang/NextFrame && node scripts/scene-smoke-test.mjs
 
-# 4. composite（多组件叠加，看真实 slide 视觉）
-node scripts/scene-demo-composite.mjs
-# 然后 Read /tmp/scene-previews/composite-*.png 自查
+# 4. 真实视觉（dom 类需要浏览器，canvas 类可读 /tmp/scene-previews/{id}.png）
+# dom 视觉验证 = 在真实 timeline 里 build → WKWebView 截图（走 step 05）
 ```
 
 任一不过 → 改 → 重跑，循环到全过。
+
+**canvas 组件**：smoke test 直接输出 PNG，AI 用 Read 工具看图自查。
+**dom/svg/media 组件**：smoke test 只验证 render 有输出（host 被 mutate），真实视觉在 step 05 build 阶段验证。
 
 ## 2.10 检查清单（checklist）
 

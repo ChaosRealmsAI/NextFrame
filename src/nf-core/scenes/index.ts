@@ -52,7 +52,7 @@ async function discoverDir(baseDir: string, source: "official" | "custom"): Prom
 
       for (const entry of themeEntries) {
         // New flat layout: {ratio}/{theme}/{role-name}.js with default export object
-        if (entry.isFile() && entry.name.endsWith(".js") && entry.name !== "theme.md") {
+        if (entry.isFile() && entry.name.endsWith(".js") && !entry.name.startsWith("_")) {
           const filePath = join(themePath, entry.name);
           try {
             const mod = await import(pathToFileURL(filePath).href) as { default?: Record<string, unknown> };

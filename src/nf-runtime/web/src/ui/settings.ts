@@ -158,63 +158,6 @@ class SettingsPanel extends Modal {
   }
 }
 
-class AIPromptsModal extends Modal {
-  renderBody() {
-    const sections = Array.isArray(window.AI_PROMPTS) ? window.AI_PROMPTS : [];
-    return h(
-      'div',
-      {
-        id: this.props.panelId,
-        class: 'modal-panel' + (this.props.open ? ' open' : ''),
-        'data-nf-action': this.props.panelAction || 'ai-modal',
-        style: { width: '520px', maxHeight: '580px' },
-      },
-      h(
-        'div',
-        { class: 'modal-header' },
-        h('span', { class: 'modal-title' }, '✨ AI 指令库'),
-        h('button', { class: 'settings-close', 'data-nf-action': 'close-modal', onclick: () => window.toggleAIPrompts() }, '×'),
-      ),
-      h(
-        'div',
-        { class: 'modal-body', id: 'ai-prompts-body' },
-        ...sections.map((section: { icon: string; title: string; prompts: string[] }) => h(
-          'div',
-          { class: 'prompt-section' },
-          h('div', { class: 'prompt-section-title' }, section.icon + ' ' + section.title),
-          ...section.prompts.map((prompt: string) => h(
-            'div',
-            {
-              class: 'prompt-item',
-              'data-nf-action': 'copy-ai-prompt',
-              onclick: (event: MouseEvent) => window.copyPrompt((event.currentTarget as HTMLElement)),
-            },
-            h('span', { class: 'prompt-text' }, prompt),
-            h('span', { class: 'prompt-copy' }, '复制'),
-          )),
-        )),
-      ),
-    );
-  }
-
-  renderPanel() {
-    return this.renderBody();
-  }
-}
-
-function copyPrompt(el: HTMLElement): void {
-  const text = el.querySelector('.prompt-text')?.textContent || '';
-  const copy = el.querySelector('.prompt-copy');
-  if (navigator.clipboard) navigator.clipboard.writeText(text);
-  if (!copy) return;
-  copy.textContent = '已复制';
-  copy.classList.add('copied');
-  window.setTimeout(() => {
-    copy.textContent = '复制';
-    copy.classList.remove('copied');
-  }, 1500);
-}
-
 function toggleSelect(trigger: HTMLElement): void {
   const select = trigger.closest('.nf-select');
   document.querySelectorAll('.nf-select.open').forEach((item) => {
@@ -240,8 +183,6 @@ document.addEventListener('click', (event) => {
 });
 
 window.SettingsPanel = SettingsPanel;
-window.AIPromptsModal = AIPromptsModal;
-window.copyPrompt = copyPrompt;
 window.toggleSelect = toggleSelect;
 window.pickOption = pickOption;
 window.createMarkupNode = createMarkupNode;
