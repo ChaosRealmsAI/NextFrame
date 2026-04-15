@@ -45,3 +45,6 @@ output/
 # Example outputs (generated, not source)
 src/nf-cli/examples/out/
 src/nf-source/**/fixtures/*.mp4
+
+# Auto-generated scene gallery previews
+gallery-*.html
