@@ -46,20 +46,26 @@ pub fn apply(op: EditOp, timeline: &mut Timeline) -> Result<()> {
     };
     match action {
         LayerAction::Move { dx, dy } => {
-            target.x += dx;
-            target.y += dy;
+            target.layout.x += dx;
+            target.layout.y += dy;
         }
         LayerAction::Resize { dw, dh } => {
-            let next_width = target.width + dw;
-            let next_height = target.height + dh;
-            if next_width <= 0.0 || next_height <= 0.0 {
+            let next_w = target.layout.w + dw;
+            let next_h = target.layout.h + dh;
+            if next_w <= 0.0 || next_h <= 0.0 {
                 bail!("resize would make the layer non-positive. Fix: keep resulting width and height above 0");
             }
-            target.width = next_width;
-            target.height = next_height;
+            target.layout.w = next_w;
+            target.layout.h = next_h;
         }
         LayerAction::EditText { text } => {
-            target.text = text;
+            if let serde_json::Value::Object(ref mut map) = target.params {
+                map.insert("text".to_string(), serde_json::Value::String(text));
+            } else {
+                let mut map = serde_json::Map::new();
+                map.insert("text".to_string(), serde_json::Value::String(text));
+                target.params = serde_json::Value::Object(map);
+            }
         }
     }
     Ok(())
