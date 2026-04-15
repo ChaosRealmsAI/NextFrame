@@ -35,7 +35,7 @@
                 return {
                     stage: state.stage,
                     timeline: state.timeline,
-                    time: state.time,
+                    time: getStageTime(),
                     selectedLayer: state.selectedLayer,
                     ratio: state.ratio,
                 };
