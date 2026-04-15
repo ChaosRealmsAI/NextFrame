@@ -61,6 +61,9 @@ if [ -n "$CROSS" ]; then echo "FAIL: scenes import modules:" && echo "$CROSS"; F
 echo "=== 10. TS/JS boundary ==="
 bash scripts/lint-boundary.sh || FAIL=1
 
+echo "=== 10b. v0.8 anchor refs (no literal ms) ==="
+bash scripts/lint-anchors.sh || FAIL=1
+
 echo "=== 11. Cargo.toml deny rules ==="
 for RULE in unwrap_used expect_used panic unreachable todo wildcard_imports; do
   if ! grep -q "$RULE.*deny" Cargo.toml 2>/dev/null; then
