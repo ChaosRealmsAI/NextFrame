@@ -4,6 +4,8 @@ const ED_DEMO_TIMELINE_PATH = 'data/demo-timeline.json';
 
 let edTimelineData = null;
 let edActiveClip = null;
+let edSceneBundleUrl = '';
+let edSceneBundleScript = null;
 
 function getEditorLayerDuration(layer) {
   const dur = Number(layer && layer.dur);
@@ -92,8 +94,50 @@ function clearEditorPreviewContent() {
 
 function canUseDomPreview() {
   const engine = window.previewEngine;
-  return !!(window.__scenes && engine && typeof engine.setStage === 'function' &&
+  return !!(engine && typeof engine.setStage === 'function' &&
     typeof engine.loadTimeline === 'function' && typeof engine.compose === 'function');
+}
+
+function resetEditorSceneBundle() {
+  window.__scenes = {};
+  if (edSceneBundleScript && edSceneBundleScript.parentNode) {
+    edSceneBundleScript.parentNode.removeChild(edSceneBundleScript);
+  }
+  edSceneBundleScript = null;
+  edSceneBundleUrl = '';
+}
+
+function loadEditorSceneBundleScript(url) {
+  return new Promise(function(resolve, reject) {
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = false;
+    script.dataset.nfPreviewBundle = 'true';
+    script.onload = function() {
+      edSceneBundleScript = script;
+      edSceneBundleUrl = url;
+      resolve();
+    };
+    script.onerror = function() {
+      if (script.parentNode) script.parentNode.removeChild(script);
+      edSceneBundleScript = null;
+      edSceneBundleUrl = '';
+      reject(new Error('Failed to load preview scene bundle'));
+    };
+    (document.head || document.body || document.documentElement).appendChild(script);
+  });
+}
+
+async function ensureEditorSceneBundle(timeline) {
+  const bundle = await bridgeCall('preview.bundle', { timeline: timeline });
+  const url = bundle && bundle.url ? bundle.url : '';
+  if (!url) throw new Error('Missing preview bundle URL');
+  if (edSceneBundleUrl === url && window.__scenes && Object.keys(window.__scenes).length) {
+    return bundle;
+  }
+  resetEditorSceneBundle();
+  await loadEditorSceneBundleScript(url);
+  return bundle;
 }
 
 function syncEditorTransportState(currentTime, isPlaying) {
@@ -248,6 +292,9 @@ function updatePreviewAspectRatio() {
 
 async function composePreview() {
   if (!edTimelineData || !canUseDomPreview()) return null;
+  if (!window.__scenes || !Object.keys(window.__scenes).length) {
+    throw new Error('Preview scene bundle is not loaded');
+  }
   const stage = ensureEditorPreviewStage();
   if (!stage) return null;
   stage.innerHTML = '';
@@ -281,6 +328,7 @@ async function loadEditorTimeline() {
     if (!response.ok) throw new Error('Failed to fetch demo timeline');
     const data = await response.json();
     renderEditorFromTimeline(data);
+    await ensureEditorSceneBundle(data);
     await composePreview();
     return edTimelineData;
   } catch {

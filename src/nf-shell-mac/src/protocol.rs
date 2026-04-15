@@ -109,8 +109,8 @@ fn serve_task(task: &ProtocolObject<dyn WKURLSchemeTask>, root: &Path) {
 
 fn build_reply(request: &NSURLRequest, url: &NSURL, root: &Path, include_body: bool) -> HttpReply {
     let request_path = url.path().map(|path| path.to_string()).unwrap_or_default();
-    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    let file_path = match resolve_file_path(&root, &request_path) {
+    let (request_root, relative_path) = resolve_request_target(root, &request_path);
+    let file_path = match resolve_file_path(&request_root, &relative_path) {
         Ok(path) => path,
         Err(status) => return status_reply(status),
     };
@@ -169,6 +169,20 @@ fn build_reply(request: &NSURLRequest, url: &NSURL, root: &Path, include_body: b
         range: None,
         accepts_ranges: true,
     }
+}
+
+fn resolve_request_target(root: &Path, request_path: &str) -> (PathBuf, String) {
+    if let Some(stripped) = request_path.strip_prefix("/generated/") {
+        return (
+            nf_bridge::path::preview_bundle_cache_dir(),
+            format!("/{stripped}"),
+        );
+    }
+
+    (
+        root.canonicalize().unwrap_or_else(|_| root.to_path_buf()),
+        request_path.to_string(),
+    )
 }
 
 fn send_reply(
