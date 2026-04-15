@@ -1,187 +1,162 @@
-# Step 2: 做组件 + 单独验证
+# Step 2: 做组件 — 单文件自包含 + 按 type 选 render
 
-缺什么组件就做什么。每个组件：写 → preview 截图 → AI 读图验证 → 不对就改 → 循环。
+> **完整规范见**: `spec/standards/project/scene/scene-component-system.html`
+> 这一步只讲 AI 实操流程，不重复规范细节。
 
-## 2.0 静态/动态分离原则
+## 2.0 起手原则（必须先过脑子）
 
-**全程不变的元素合成一个"chrome"组件。随时间变化的各自独立。**
+1. **一个组件 = 一个 .js 文件**，路径：`src/nf-core/scenes/{ratio}/{theme}/{role}-{name}.js`
+2. **零 import** — 颜色/坐标/工具函数全在文件里写死或内联
+3. **default export 一个对象** — 含 11 必填 + 18 AI 理解字段 + render/describe/sample 三函数
+4. **文件本身就是文档** — 未来 AI 看一眼就能用、改、抄，不用读 README
 
-| 类型 | 举例 | 说明 |
-|------|------|------|
-| 静态 chrome | 背景、标题、品牌、元信息 | 合成 1 个组件，减少 layer 数量 |
-| 动态 | 字幕、进度条、视频区 | 各自独立，有自己的时间逻辑 |
+## 2.1 决定 type（最关键的一步，选错全错）
 
-判断标准：**这个元素在 t=0 和 t=最后一帧 长得一模一样吗？** 是 → 静态，合进 chrome。不是 → 动态，单独组件。
+```
+需要嵌入真实视频/图/音频？      → media
+是矢量图标 / 几何箭头？         → svg
+是 UI 布局（卡片/列表/标签/聊天）? → dom（默认！）
+是逐像素效果（grain/blur/粒子）? → canvas
+不确定？                         → 先 dom，扛不住再升级
+```
 
-## 2.1 先读设计规范
+| type | render 签名 | 最常见用途 |
+|------|-------------|-----------|
+| **dom** | `render(host, _t, params, vp)` mutate host | 卡片 / 列表 / 标签 / 聊天 / 标题 / 代码块 |
+| **svg** | `render(host, _t, params, vp)` 追加 SVG 子元素 | 流程图箭头 / 矢量图标 |
+| **canvas** | `render(ctx, _t, params, vp)` ctx.fillXxx | 滤镜 / 粒子 / 真实视频帧合成 |
+| **media** | `render(host, _t, params, vp)` 挂 video/img | B-roll / 封面图 |
+
+**反模式警告**：把 UI 类组件硬塞 canvas → 中文字体方框 + 布局靠手算 + 改字号要重画。
+
+## 2.2 读 theme.md 拿设计语言
+
+每个 theme 都有 `theme.md`，**纯文档，AI 读、代码不 import**：
 
 ```bash
-cat src/nf-core/scenes/shared/design.js
+cat src/nf-core/scenes/{ratio}/{theme}/theme.md
 ```
 
-这个文件是**唯一真相源**。里面有：
+里面有：配色 hex / 字体 / 字号阶梯 / 网格坐标 / 气质描述 / 图层顺序。
 
-### 预设系统（新 scene 必须用）
-```javascript
-import { getPreset, esc, scaleW, scaleH, fadeIn, findActiveSub, decoLine } from "../../../shared/design.js";
+**所有值复制粘贴到组件里，写死。改 theme 用 sed 批量改，不抽 token。**
 
-const preset = getPreset("interview-dark");  // 或 "lecture-warm"
-const { colors, layout, type } = preset;
-// 用 colors.primary, layout.video.top, type.title.size — 不硬编码
-```
-
-### 可用预设
-| 预设名 | ratio | 场景 |
-|--------|-------|------|
-| `interview-dark` | 9:16 | 深黑底+金色，访谈切片 |
-| `lecture-warm` | 16:9 | 暖棕底+金色，讲解教程 |
-
-**加新系列 = 在 PRESETS 里加一条，不改工具代码。**
-
-### 工具函数（通用，不绑预设）
-- `esc(value)` — HTML 转义
-- `scaleW(vp, px, baseW)` / `scaleH(vp, px, baseH)` — 像素缩放
-- `fadeIn(t, delay, duration)` — 淡入动画
-- `findActiveSub(segments, t)` — 字幕两级查找
-- `decoLine(vp, y, colors, baseW, baseH)` — 装饰分隔线（颜色从外部传）
-
-## 2.2 组件契约
-
-每个 scene 必须导出 4 个接口：
-
-```javascript
-export const meta = {
-  id: "sceneName",           // 唯一 ID
-  version: 1,
-  ratio: "9:16",             // 或 "16:9"
-  category: "overlays",      // backgrounds/media/overlays/typography/browser/data
-  label: "Human Name",
-  description: "做什么的",
-  tech: "dom",
-  duration_hint: 20,
-  videoOverlay: true,         // 仅视频 scene 需要，recorder 靠这个检测
-  default_theme: "dark-interview",
-  themes: { "dark-interview": {} },
-  params: {
-    paramName: { type: "string", default: "", label: "说明", group: "content" }
-  },
-  ai: { when: "什么时候用", how: "怎么用" }
-};
-
-export function render(t, params, vp) {
-  // t = 当前时间(秒), params = 参数, vp = {width, height}
-  // 返回 HTML 字符串
-  return `<div>...</div>`;
-}
-
-export function screenshots() {
-  return [{ t: 0.5, label: "标签" }, { t: 5, label: "中间" }, { t: 19, label: "结尾" }];
-}
-
-export function lint(params, vp) {
-  const errors = [];
-  // 检查参数合法性
-  return { ok: errors.length === 0, errors };
-}
-```
-
-## 2.3 关键规则
-
-### 颜色/布局/字号 — 全部从 preset 取
-```javascript
-const preset = getPreset("interview-dark"); // 在 render 函数开头
-const { colors, layout, type } = preset;
-
-// ✅ 对 — 从 preset 取
-color: colors.primary
-top: scaleH(vp, layout.video.top, layout.baseH)
-fontSize: scaleW(vp, type.title.size, layout.baseW)
-
-// ❌ 错 — 禁止硬编码
-color: "#e8c47a"
-top: scaleH(vp, 276)
-```
-
-### 位置 — 从 preset.layout 取（不用全局 GRID）
-```javascript
-const { layout } = getPreset("interview-dark");
-// ✅ 对
-const top = scaleH(vp, layout.video.top, layout.baseH);
-// ❌ 错 — 用全局 GRID（硬绑某个预设）
-const top = scaleH(vp, GRID.video.top);
-```
-
-### 字幕 — 用 findActiveSub 两级查找
-```javascript
-import { findActiveSub } from "../../../shared/design.js";
-
-// render 函数里：
-const active = findActiveSub(params.segments, t);
-if (active) {
-  // active.cn = 当前中文
-  // active.en = 当前英文（segment 级别）
-  // active.speaker = 说话人 → 决定颜色
-}
-```
-
-**禁止把 segments 拍平成 SRT 数组** — 英文跟 segment 走，中文跟 cn[] 子 cue 走。拍平会导致英文重复跳动。
-
-### 视频 — meta 必须有 videoOverlay: true
-```javascript
-export const meta = {
-  // ...
-  videoOverlay: true,  // recorder 靠这个检测哪个层需要 ffmpeg 合成
-};
-```
-
-### WKWebView 兼容
-- 代码块 → 用单个 `<pre>` 元素，不用多个 `<div>`
-- 流程图 → 用单个 `<svg>` 元素，不用多个 positioned div
-- 原因：WKWebView CALayer.render 在快速 DOM 更新时会丢失多个 absolute-positioned 元素
-
-## 2.4 写完后验证
+## 2.3 复制模板起步
 
 ```bash
-# 1. 确认被发现
-nextframe scenes <id>
+# Canvas 类（参考）
+cat src/nf-core/scenes/16x9/anthropic-warm/text-headline.js
 
-# 2. 硬编码检测（应该 0 结果）
-grep -n "#[0-9a-fA-F]\{3,8\}" src/nf-core/scenes/{ratio}/*/*/index.js
-
-# 3. 人眼预览（带 Play/Pause + 拖动条）
-nextframe scene-preview <id> --ratio=9:16
-
-# 4. AI 截图验证（自动截 t=0.5s 和 t=5s）
-nextframe scene-preview <id> --ratio=9:16 --screenshot=/tmp/scene-check
-# 输出截图路径 → Read 截图确认:
-#   - 内容可见（不是空白/黑屏）
-#   - 位置在 GRID 定义的区域内
-#   - 颜色匹配 TOKENS
-#   - 文字可读
+# DOM 类（待补 — 第一个 dom 模板还没建，参考 spec 新签名手写）
 ```
 
-**截图不对 → 改代码 → 再跑 scene-preview --screenshot → 再看。循环直到满意。**
+整段复制 → 改 id/name/role → 改 intent + when_to_use + 配伍三组 → 改 params → 改 render/describe/sample。
 
-**注意：** preview.html 由 `scene-new` 自动生成（design.js 已内联）。不要手写 preview.html。
+## 2.4 11 必填字段速查
 
-## 2.5 参考老版本
+```
+身份: id / name / version
+归属: ratio / theme / role        ← role: bg|chrome|content|text|overlay|data
+语义: description / duration_hint
+渲染: type / frame_pure / assets
+契约: params
+```
 
-如果做 9:16 访谈组件，参考：
+## 2.5 18 AI 理解字段速查
+
+```
+理解意图（6）: intent / when_to_use / when_not_to_use / limitations / inspired_by / used_in
+配伍关系（4）: requires / pairs_well_with / conflicts_with / alternatives
+视觉权重（3）: visual_weight / z_layer / mood
+索引工程（5）: tags / complexity / performance / status / changelog
+```
+
+**`intent` 必须 ≥ 50 字真实推理**（为什么要这个组件、设计取舍、视觉哲学），不能写"This is a foo"。
+
+## 2.6 写 render 的硬规则
+
+| # | 规则 | 反例 |
+|---|------|------|
+| 1 | 用 `viewport.width / height`，不硬编码 1920/1080 | `ctx.fillText(t, 540, 1500)` |
+| 2 | 颜色 hex 直接写，不 import token | `import { TOKENS }` |
+| 3 | frame_pure: 同 t 同 params → 同画面 | `Date.now()` / `Math.random()` |
+| 4 | 不 import 任何东西 | `import { utils }` |
+| 5 | 系统字体（PingFang SC / Hiragino / Songti / SF Mono），不外部下载 | google fonts CDN |
+| 6 | 文件 ≤ 500 行 | — |
+| 7 | 未用的参数加 `_` 前缀（`_t`），躲 TS strict | `function (ctx, t, ...) {}` |
+
+## 2.7 写 describe 的目的
+
+让 AI **不用看像素**就知道组件当前在演什么：
+
+```javascript
+describe(_t, params, vp) {
+  return {
+    sceneId: "...",
+    phase: "enter" | "hold" | "exit" | "hidden",
+    progress: 0..1,
+    visible: true,
+    params,
+    elements: [{ type, role, value, ... }],   // 当前画面上的逻辑元素
+    boundingBox: { x, y, w, h },
+  };
+}
+```
+
+debug / 自验 / AI 回看时神器。
+
+## 2.8 写 sample 的目的
+
+返回**能直接跑**的参数样例。最好用真实业务内容（从 script.md 摘）。
+
+```javascript
+sample() {
+  return { title: "...", subtitle: "..." };
+}
+```
+
+CLI 三层披露（L2）输出 sample 时直接复用。
+
+## 2.9 写完后自验（强制 4 步）
 
 ```bash
-# 老版本的完整实现
-cat /Users/Zhuanz/bigbang/MediaAgentTeam/series/硅谷访谈/E01-Dario-Amodei-指数终局/frames/slide-base.js
-cat /Users/Zhuanz/bigbang/MediaAgentTeam/series/硅谷访谈/E01-Dario-Amodei-指数终局/frames/clip-slide.js
-cat /Users/Zhuanz/bigbang/MediaAgentTeam/series/硅谷访谈/E01-Dario-Amodei-指数终局/frames/subs-zone.js
+# 1. 语法
+node --check src/nf-core/scenes/{ratio}/{theme}/{role}-{name}.js
+
+# 2. 加载（出现在列表）
+node src/nf-cli/bin/nextframe.js scenes | grep {id}
+
+# 3. smoke test（30 字段 + render+describe+sample 不抛 + 输出 PNG）
+node scripts/scene-smoke-test.mjs
+
+# 4. composite（多组件叠加，看真实 slide 视觉）
+node scripts/scene-demo-composite.mjs
+# 然后 Read /tmp/scene-previews/composite-*.png 自查
 ```
 
-这三个文件是视觉参考的终极真相。布局、颜色、字号、间距都从这里来。
-design.js 的 GRID/TYPE/TOKENS 就是从这里提取的。
+任一不过 → 改 → 重跑，循环到全过。
+
+## 2.10 检查清单（checklist）
+
+- [ ] 文件路径正确 `scenes/{ratio}/{theme}/{role}-{name}.js`
+- [ ] default export 对象
+- [ ] 11 必填字段全有
+- [ ] 18 AI 理解字段全有，intent ≥ 50 字真实推理
+- [ ] type 选对（UI → dom，不要默认 canvas）
+- [ ] render 签名与 type 匹配
+- [ ] 零 `import` 关键字
+- [ ] 颜色/坐标/字体写死，不 import token
+- [ ] frame_pure: 无 Date.now / Math.random
+- [ ] viewport-relative 坐标
+- [ ] sample() 用真实业务内容
+- [ ] node --check 通过
+- [ ] nextframe scenes 列表能看到
+- [ ] smoke + composite 视觉自查通过
 
 ## 下一步
 
-全部组件 preview 通过后：
+全部组件验证通过后：
 
 ```bash
-nf-guide produce timeline
+nf-guide produce timeline   # 进入 step 03，写 timeline JSON
 ```
