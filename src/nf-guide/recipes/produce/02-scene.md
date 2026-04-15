@@ -167,11 +167,12 @@ node src/nf-cli/bin/nextframe.js scenes | grep {id}
 
 # 3. smoke test（30 字段 + render+describe+sample 不抛）
 # 自动按 c.type 分派：canvas → 画 PNG；dom/svg/media → fake host 验证 mutation
-# 从仓库根目录跑：
-cd /Users/Zhuanz/bigbang/NextFrame && node scripts/scene-smoke-test.mjs
+node src/nf-cli/bin/nextframe.js scene-smoke --ratio=16:9 --theme={theme}
 
-# 4. 真实视觉（dom 类需要浏览器，canvas 类可读 /tmp/scene-previews/{id}.png）
-# dom 视觉验证 = 在真实 timeline 里 build → WKWebView 截图（走 step 05）
+# 4. 真实视觉（批量预览 + 浏览器渲染 dom/svg/media）
+node src/nf-cli/bin/nextframe.js scene-gallery --ratio=16:9 --theme={theme}
+# 自动生成 gallery-16x9-{theme}.html + 内置 http server 8765 + 开浏览器
+# AI 可 curl 取页面源码或让用户人眼看
 ```
 
 任一不过 → 改 → 重跑，循环到全过。
