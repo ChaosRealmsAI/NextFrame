@@ -31,6 +31,23 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
     nextframe render demo ep01 intro --target=ffmpeg
     nextframe render ./timeline.json ./intro.mp4 --target=recorder --crf=18
   `),
+  examples("match", `
+    nextframe match plan e01 --rule scene-per-segment
+    nextframe match validate ./timeline.json --json
+    nextframe match preview ./narration-plan.json --seg 3
+  `),
+  examples("match plan", `
+    nextframe match plan e01 --rule scene-per-segment
+    nextframe match plan e01 --rule ducking --json
+  `),
+  examples("match validate", `
+    nextframe match validate demo ep01 intro
+    nextframe match validate ./timeline.json --json
+  `),
+  examples("match preview", `
+    nextframe match preview ./narration-plan.json --seg 3
+    nextframe match preview ./timeline.json --seg 1 --json
+  `),
   examples("layer-list", `
     nextframe layer-list demo ep01 intro
     nextframe layer-list ./timeline.json --json

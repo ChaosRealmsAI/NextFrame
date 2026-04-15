@@ -15,6 +15,7 @@ const command = (name: string, summary: string, usage: string, params: string, c
 
 export const TOP_LEVEL_COMMANDS = [
   group("Timeline", "new validate build scenes preview frame describe-frame render"),
+  group("Match", "match"),
   group("Scene Dev", "scene-new scene-preview scene-validate"),
   group("Layer CRUD", "layer-list layer-add layer-move layer-resize layer-set layer-remove"),
   group("Project Hierarchy", "project-new project-list project-config episode-new episode-list segment-new segment-list"),
@@ -78,6 +79,23 @@ export const COMMAND_SPECS = Object.fromEntries([
     --quiet suppress progress output
     --json emit structured export result data`, `The timeline is validated before rendering starts.
     Direct timeline.json mode requires an explicit output mp4 path.`),
+  command("match", "Plan, validate, and preview v0.6 tracks+matches workflows.", `nextframe match <subcommand>
+    nextframe match <subcommand> --help`, `Subcommands: plan, validate, preview
+    Run nextframe match <subcommand> --help for subcommand-specific params and examples`, `Use this only for v0.6 tracks+matches timelines.
+    The rule implementation is selected by name and dispatched through nf-core/matches.`),
+  command("match plan", "Generate a rule-specific match plan skeleton for one episode.", `nextframe match plan <episode> --rule <name> [--json]`, `<episode> target episode identifier or path token for planning
+    --rule <name> required match rule name such as scene-per-segment
+    --json emit structured output`, `The selected rule must exist in nf-core/matches.
+    Planning is rule-specific and does not write timestamps by hand.`),
+  command("match validate", "Validate timeline matches against registered rules.", `nextframe match validate <project> <episode> <segment> [--json]
+    nextframe match validate <timeline.json> [--json]`, `<project> <episode> <segment> resolve to ~/NextFrame/projects/<project>/<episode>/<segment>.json
+    <timeline.json> validate a direct file path instead of project hierarchy
+    --json emit structured validation output`, `Validation dispatches by match.rule.
+    Non-zero exit means usage failure or rule validation failure.`),
+  command("match preview", "Preview one planned segment without running a full render.", `nextframe match preview <plan> --seg <N> [--json]`, `<plan> path to a saved match plan or timeline artifact
+    --seg <N> required 1-based segment number
+    --json emit structured output`, `Preview targets exactly one segment.
+    Segment numbers are 1-based positive integers.`),
   command("layer-list", "List layers in a timeline with id, scene, start, dur, and end.", `nextframe layer-list <project> <episode> <segment> [--json]
     nextframe layer-list <timeline.json> [--json]`, `--json emit structured layer rows`, `Use this before move/set/remove so you operate on a real layer id.`),
   command("layer-add", "Add one layer with a scene id, timing, params, and optional layout/animation props.", `nextframe layer-add <project> <episode> <segment> <scene> [--id=ID] [--start=N] [--dur=N] [--params=JSON] [--x=VALUE] [--y=VALUE] [--w=VALUE] [--h=VALUE] [--z=N] [--enter=NAME] [--exit=NAME] [--transition=NAME] [--opacity=N] [--blend=MODE] [--json]
