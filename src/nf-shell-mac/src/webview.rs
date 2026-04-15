@@ -58,7 +58,16 @@ pub fn create(
         let _: () = objc2::msg_send![&web_view, _setDrawsBackground: false];
     }
 
-    let start_url = NSURL::URLWithString(&NSString::from_str("nf://localhost/index.html"));
+    let url_str = std::env::var("NF_START_URL")
+        .or_else(|_| {
+            std::env::args()
+                .skip_while(|a| !a.starts_with("--url="))
+                .next()
+                .map(|a| a.trim_start_matches("--url=").to_string())
+                .ok_or(std::env::VarError::NotPresent)
+        })
+        .unwrap_or_else(|_| "nf://localhost/index.html".to_string());
+    let start_url = NSURL::URLWithString(&NSString::from_str(&url_str));
     if let Some(start_url) = start_url {
         let request = NSURLRequest::requestWithURL(&start_url);
         let navigation = unsafe { web_view.loadRequest(&request) }; // SAFETY: web_view is a live WKWebView and request is a valid NSURLRequest.
