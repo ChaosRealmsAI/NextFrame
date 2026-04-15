@@ -21,6 +21,13 @@ cargo clippy --workspace -- -D warnings
 bash scripts/lint-all.sh                 # 10-gate quality check
 ```
 
+## TypeScript / JavaScript Boundary
+
+Two execution contexts — write TS in the wrong one and the browser build breaks.
+
+- **Node zone (TypeScript OK):** `engine/`, `animation/apply.ts`, CLI commands, filters — full TS syntax
+- **Browser-inline zone (JS only):** `scenes/**/*.js`, `animation/effects/*.ts`, `animation/shared.ts`, `scenes/shared/design.js` — these get `stripESM()` and inlined raw into `<script>`. No type annotations (`: string`, `interface`, generics). Content must be valid JS even if file extension is `.ts`.
+
 ## Key Conventions
 - All crate names start with `nf-`.
 - IPC methods use `domain.camelCase`; register in `src/nf-bridge/src/lib.rs`.

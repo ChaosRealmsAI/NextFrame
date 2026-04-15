@@ -95,6 +95,25 @@ Key methods for AI verification:
 - `project.list/create`, `episode.list/create`, `segment.list`
 - `fs.read/write/listDir` — filesystem operations
 
+## TypeScript / JavaScript Boundary (mandatory)
+
+The project has two JS execution contexts. **Writing TS in the wrong zone = browser runtime crash.**
+
+| Zone | Language | Why |
+|------|----------|-----|
+| **Node zone** (engine/, animation/apply.ts, CLI, filters/) | TypeScript — full syntax OK | Runs in Node with TS support |
+| **Browser-inline zone** (scenes, animation/effects/, animation/shared.ts, design.js) | JS only — no TS type annotations | `stripESM()` inlines raw text into `<script>`, browser has no TS compiler |
+
+**Browser-inline zone** = any file read by `stripESM()` / `buildAnimationBundle()` / `buildSharedPreamble()` and injected into HTML.
+
+Rules:
+- `src/nf-core/scenes/**/*.js` — keep `.js`, pure functions, no type annotations
+- `src/nf-core/scenes/shared/design.js` — keep `.js`, inlined as design preamble
+- `src/nf-core/animation/effects/*.ts` + `animation/shared.ts` — `.ts` extension OK but **must not contain type annotations** (`: string`, `interface`, `as const`, generics). Content must be valid JS.
+- Everything else in `src/nf-core/` and `src/nf-cli/` — full TypeScript, write types freely
+
+**How to check:** `grep -rn ': [A-Z]' src/nf-core/animation/effects/` — if any match, it'll break the browser build.
+
 ## Core Rules
 
 - Do not add `unwrap`/`expect`/`panic`; workspace lints deny them. Use `#[allow(...)]` with comment on specific FFI functions only.
