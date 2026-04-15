@@ -106,7 +106,9 @@ mod tests {
     use std::process;
 
     fn make_test_recipes() -> PathBuf {
-        let dir = env::temp_dir().join(format!("nf-guide-test-{}", process::id()));
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let unique = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = env::temp_dir().join(format!("nf-guide-test-{}-{}", process::id(), unique));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(dir.join("alpha")).unwrap();
         fs::write(
