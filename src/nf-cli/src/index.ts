@@ -11,6 +11,7 @@ const SUBCOMMANDS = {
   "scene-preview": () => import("./commands/render/scene-preview.js"),
   "scene-validate": () => import("./commands/render/scene-validate.js"),
   "scene-gallery": () => import("./commands/render/scene-gallery.js"),
+  "scene-smoke": () => import("./commands/render/scene-smoke.js"),
   preview: () => import("./commands/render/preview.js"),
   frame: () => import("./commands/render/frame.js"),
   "describe-frame": () => import("./commands/render/describe-frame.js"),
