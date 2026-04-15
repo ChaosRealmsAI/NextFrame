@@ -1,5 +1,14 @@
+import { execFileSync } from "node:child_process";
 import type { AudioTrack, PlanCtx, SceneEntry, SceneParam, Segment } from "../types.js";
 import { listScenesForRatio } from "../scenes/index.js";
+import {
+  buildFallbackParams,
+  buildParamsForScene,
+  hasCodeishText,
+  hasNumber,
+  pickFallbackScene,
+  rankScenesForSegment,
+} from "./_plan-scoring.js";
 
 export interface SegmentPlan {
   segmentId: string;
@@ -21,18 +30,12 @@ export interface SceneSpec {
   ratio?: string;
   description?: string;
   params: SceneParamDef[];
+  contractAllowedParams?: string[];
+  contractDefaultedParams?: string[];
 }
 
-const TEXT_PARAM_NAMES = [
-  "text",
-  "quote",
-  "title",
-  "headline",
-  "caption",
-  "summary",
-  "description",
-  "label",
-];
+const SCENE_SPEC_CACHE = new Map<string, SceneSpec[]>();
+const SCENE_INDEX_URL = new URL("../scenes/index.js", import.meta.url).href;
 
 export function getAudioTrackFromPlanCtx(ctx: PlanCtx): AudioTrack | null {
   if (ctx.source?.kind === "audio") {
@@ -82,6 +85,8 @@ export function normalizeSceneSpec(entry: unknown): SceneSpec | null {
           ? candidate.META.description
           : undefined,
     params: normalizeParamDefs(candidate.params ?? candidate.META?.params),
+    contractAllowedParams: normalizeStringArray((candidate as { contractAllowedParams?: unknown }).contractAllowedParams),
+    contractDefaultedParams: normalizeStringArray((candidate as { contractDefaultedParams?: unknown }).contractDefaultedParams),
   };
 }
 
@@ -94,6 +99,108 @@ export async function loadSceneSpecsForPlan(ctx: PlanCtx): Promise<SceneSpec[]> 
   }
   const discovered = await listScenesForRatio(ratio);
   return discovered.map(normalizeSceneSpec).filter((entry): entry is SceneSpec => entry !== null);
+}
+
+export function loadSceneSpecsForValidation(ratio: string): SceneSpec[] {
+  if (SCENE_SPEC_CACHE.has(ratio)) {
+    return SCENE_SPEC_CACHE.get(ratio) || [];
+  }
+
+  const script = `
+    import { getRegistry } from ${JSON.stringify(SCENE_INDEX_URL)};
+
+    function normalizeParamDefs(raw) {
+      if (Array.isArray(raw)) {
+        return raw
+          .filter((entry) => entry && typeof entry === "object" && typeof entry.name === "string")
+          .map((entry) => ({
+            name: entry.name,
+            type: entry.type,
+            required: entry.required === true,
+            hasDefault: Object.prototype.hasOwnProperty.call(entry, "default"),
+            defaultValue: entry.default,
+          }));
+      }
+      if (!raw || typeof raw !== "object") {
+        return [];
+      }
+      return Object.entries(raw).map(([name, value]) => ({
+        name,
+        type: value?.type,
+        required: value?.required === true,
+        hasDefault: Boolean(value && Object.prototype.hasOwnProperty.call(value, "default")),
+        defaultValue: value?.default,
+      }));
+    }
+
+    function normalizeParamValue(param) {
+      if (param.hasDefault) {
+        return param.defaultValue;
+      }
+      switch (param.type) {
+        case "number":
+          return 1;
+        case "boolean":
+          return true;
+        case "array":
+          return [];
+        default:
+          return "__scene_contract_probe__";
+      }
+    }
+
+    function readDescribeParams(meta, params) {
+      if (typeof meta?.describe !== "function") {
+        return null;
+      }
+      try {
+        const described = meta.describe(0, params, { width: 1920, height: 1080 });
+        const describedParams = described?.params;
+        if (!describedParams || typeof describedParams !== "object" || Array.isArray(describedParams)) {
+          return null;
+        }
+        return describedParams;
+      } catch {
+        return null;
+      }
+    }
+
+    const registry = await getRegistry();
+    const scenes = [...registry.values()]
+      .filter((entry) => entry?.META?.ratio === ${JSON.stringify(ratio)})
+      .map((entry) => {
+        const meta = entry.META || {};
+        const params = normalizeParamDefs(meta.params);
+        const probeParams = Object.fromEntries(params.map((param) => [param.name, normalizeParamValue(param)]));
+        const defaultParams = Object.fromEntries(params.filter((param) => param.hasDefault).map((param) => [param.name, param.defaultValue]));
+        const probeDescribe = readDescribeParams(meta, probeParams);
+        const defaultDescribe = readDescribeParams(meta, defaultParams);
+        return {
+          id: typeof meta.id === "string" ? meta.id : entry.id,
+          ratio: typeof meta.ratio === "string" ? meta.ratio : undefined,
+          description: typeof meta.description === "string" ? meta.description : undefined,
+          params,
+          contractAllowedParams: probeDescribe ? Object.keys(probeDescribe) : params.map((param) => param.name),
+          contractDefaultedParams: defaultDescribe
+            ? Object.keys(defaultDescribe).filter((key) => Object.prototype.hasOwnProperty.call(defaultParams, key))
+            : params.filter((param) => param.hasDefault).map((param) => param.name),
+        };
+      });
+    process.stdout.write(JSON.stringify(scenes));
+  `;
+
+  try {
+    const stdout = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+      encoding: "utf8",
+    });
+    const parsed = JSON.parse(stdout) as unknown[];
+    const normalized = parsed.map(normalizeSceneSpec).filter((entry): entry is SceneSpec => entry !== null);
+    SCENE_SPEC_CACHE.set(ratio, normalized);
+    return normalized;
+  } catch {
+    SCENE_SPEC_CACHE.set(ratio, []);
+    return [];
+  }
 }
 
 export async function buildStubPlan(ctx: PlanCtx): Promise<SegmentPlan[]> {
@@ -126,26 +233,6 @@ export async function buildStubPlan(ctx: PlanCtx): Promise<SegmentPlan[]> {
   });
 }
 
-export function pickFallbackScene(scenes: SceneSpec[]): SceneSpec | null {
-  return (
-    scenes.find((scene) => scene.id === "headlineCenter")
-    || scenes.find((scene) => TEXT_PARAM_NAMES.some((name) => hasParam(scene, name)))
-    || scenes[0]
-    || null
-  );
-}
-
-export function buildFallbackParams(scene: SceneSpec | null, segment: Segment): Record<string, unknown> {
-  if (!scene) {
-    return {};
-  }
-  const primaryTextParam = TEXT_PARAM_NAMES.find((name) => hasParam(scene, name));
-  if (primaryTextParam) {
-    return { [primaryTextParam]: segment.text };
-  }
-  return {};
-}
-
 function addEmphasis(plan: SegmentPlan, segment: Segment, index: number): SegmentPlan {
   const emphasis: string[] = [];
   if (hasNumber(segment.text)) {
@@ -161,228 +248,6 @@ function addEmphasis(plan: SegmentPlan, segment: Segment, index: number): Segmen
     emphasis.push("opening");
   }
   return emphasis.length > 0 ? { ...plan, emphasis } : plan;
-}
-
-function rankScenesForSegment(scenes: SceneSpec[], segment: Segment, hint: string): SceneSpec[] {
-  return [...scenes]
-    .map((scene, index) => ({
-      scene,
-      score: scoreScene(scene, segment, hint) - index / 1000,
-    }))
-    .sort((left, right) => right.score - left.score)
-    .map((entry) => entry.scene);
-}
-
-function scoreScene(scene: SceneSpec, segment: Segment, hint: string): number {
-  const haystack = `${scene.id} ${scene.description || ""}`.toLowerCase();
-  const text = segment.text.trim();
-  const short = text.length <= 40;
-  const long = text.length >= 88;
-  const codeish = hasCodeishText(text);
-  const numeric = hasNumber(text);
-  const codeScene = supportsCodeScene(scene, haystack);
-  const numberScene = supportsNumberScene(scene, haystack);
-  const textScene = TEXT_PARAM_NAMES.some((name) => hasParam(scene, name));
-  let score = 0;
-
-  if (hint) {
-    if (scene.id.toLowerCase() === hint) {
-      score += 1000;
-    } else if (haystack.includes(hint)) {
-      score += 160;
-    }
-  }
-
-  if (codeish) {
-    if (codeScene) {
-      score += 260;
-    } else if (textScene) {
-      score -= 120;
-    } else {
-      score -= 40;
-    }
-  } else if (codeScene) {
-    score -= 20;
-  }
-
-  if (numeric) {
-    if (numberScene) {
-      score += 220;
-    } else if (textScene) {
-      score -= 60;
-    } else {
-      score -= 20;
-    }
-  } else if (numberScene) {
-    score -= 10;
-  }
-
-  if (short && !codeish && !numeric) {
-    if (/(headline|quote|golden)/i.test(scene.id) || /(headline|quote|title)/i.test(haystack)) {
-      score += 70;
-    }
-  }
-
-  if (long && !codeish) {
-    if (/(quote|key|compare|topic|headline)/i.test(scene.id) || /(quote|key|compare|topic)/i.test(haystack)) {
-      score += 60;
-    }
-  }
-
-  if (scene.id === "headlineCenter") {
-    score += 55;
-  }
-
-  if (textScene && !codeish && !numeric) {
-    score += 25;
-  }
-
-  return score;
-}
-
-function buildParamsForScene(scene: SceneSpec, segment: Segment): Record<string, unknown> | null {
-  const params: Record<string, unknown> = {};
-  const numberMatch = segment.text.match(/-?\d+(?:[.,]\d+)?%?/);
-  const code = extractCodeSnippet(segment.text);
-  const rows = [{ text: segment.text }];
-  const command = segment.text.trim().replace(/^`+|`+$/g, "");
-
-  for (const param of scene.params) {
-    const value = inferParamValue(param, segment.text, {
-      number: numberMatch?.[0],
-      code,
-      command,
-      rows,
-    });
-    if (value !== undefined) {
-      params[param.name] = value;
-      continue;
-    }
-    if (param.required && !param.hasDefault) {
-      return null;
-    }
-  }
-
-  return params;
-}
-
-function inferParamValue(
-  param: SceneParamDef,
-  text: string,
-  derived: {
-    number?: string;
-    code?: string;
-    command: string;
-    rows: Array<Record<string, unknown>>;
-  },
-): unknown {
-  const name = param.name.toLowerCase();
-
-  if (TEXT_PARAM_NAMES.includes(name)) {
-    return text;
-  }
-  if (name === "number" && derived.number) {
-    return derived.number;
-  }
-  if (name === "unit" && derived.number) {
-    return extractUnit(text, derived.number);
-  }
-  if (name === "code" && derived.code) {
-    return derived.code;
-  }
-  if (name === "lines" && derived.code) {
-    return derived.code.split("\n");
-  }
-  if (name === "command" && hasCodeishText(text)) {
-    return derived.command;
-  }
-  if (name === "rows" && hasCodeishText(text)) {
-    return derived.rows;
-  }
-  if (name === "filename" && derived.code) {
-    return guessFilename(text);
-  }
-  if (name === "language" && derived.code) {
-    return guessLanguage(text);
-  }
-  if ((name === "kicker" || name === "sub") && derived.number) {
-    return text;
-  }
-  if ((name === "caption" || name === "summary") && derived.number) {
-    return text;
-  }
-  return undefined;
-}
-
-function extractCodeSnippet(text: string): string | undefined {
-  const trimmed = text.trim();
-  if (!hasCodeishText(trimmed)) {
-    return undefined;
-  }
-  const fenced = trimmed.match(/```[a-zA-Z0-9_-]*\n([\s\S]+?)```/);
-  if (fenced?.[1]) {
-    return fenced[1].trim();
-  }
-  if (/^`[^`].*`$/s.test(trimmed)) {
-    return trimmed.slice(1, -1).trim();
-  }
-  return trimmed;
-}
-
-function extractUnit(text: string, numberToken: string): string {
-  const idx = text.indexOf(numberToken);
-  if (idx < 0) {
-    return "";
-  }
-  const suffix = text.slice(idx + numberToken.length).trim();
-  const match = suffix.match(/^([\p{L}%]+|[a-zA-Z]+)\b/u);
-  return match?.[1] || "";
-}
-
-function guessFilename(text: string): string {
-  const fileMatch = text.match(/\b[\w.-]+\.(ts|tsx|js|jsx|json|rs|py|md)\b/i);
-  return fileMatch?.[0] || "snippet.txt";
-}
-
-function guessLanguage(text: string): string {
-  if (/\b(fn|let|const|import|export|interface|type)\b/.test(text)) {
-    return /:\s*[A-Z][A-Za-z0-9_<>,[\]\s|]+/.test(text) ? "typescript" : "javascript";
-  }
-  if (/\b(def|import |from |print\()/.test(text)) {
-    return "python";
-  }
-  if (/\b(pub|impl|let mut|fn )/.test(text)) {
-    return "rust";
-  }
-  return "text";
-}
-
-function hasParam(scene: SceneSpec, name: string): boolean {
-  return scene.params.some((param) => param.name === name);
-}
-
-function supportsCodeScene(scene: SceneSpec, haystack: string): boolean {
-  return (
-    /(code|terminal|inject|path)/i.test(scene.id)
-    || /(code|terminal|shell|cli)/i.test(haystack)
-    || ["code", "lines", "command", "rows", "filename", "language"].some((name) => hasParam(scene, name))
-  );
-}
-
-function supportsNumberScene(scene: SceneSpec, haystack: string): boolean {
-  return (
-    /(stat|number|metric|count|score)/i.test(scene.id)
-    || /(number|metric|digit|stat)/i.test(haystack)
-    || ["number", "unit", "value", "metric"].some((name) => hasParam(scene, name))
-  );
-}
-
-function hasCodeishText(text: string): boolean {
-  return /[`{}[\]();<>/=]|(^|\s)(npm|npx|pnpm|yarn|cargo|git|node|cd|ls|rm|cp|mv)\b|\w+\(/.test(text);
-}
-
-function hasNumber(text: string): boolean {
-  return /\d/.test(text);
 }
 
 function getUserHint(ctx: PlanCtx): string {
@@ -421,4 +286,11 @@ function normalizeParamDefs(raw: unknown): SceneParamDef[] {
       hasDefault: Boolean(value && Object.prototype.hasOwnProperty.call(value, "default")),
       defaultValue: value?.default,
     }));
+}
+
+function normalizeStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  return value.filter((entry): entry is string => typeof entry === "string");
 }
