@@ -27,15 +27,17 @@ function assetsOf(timeline: LooseTimeline): Record<string, unknown>[] {
 }
 
 function ensureTrack(timeline: LooseTimeline, trackId: string): LooseTrack {
-  timeline.tracks = tracksOf(timeline);
-  let track = (timeline.tracks as LooseTrack[]).find((entry) => entry.id === trackId);
-  if (!track) {
-    track = {
+  const tracks = tracksOf(timeline);
+  timeline.tracks = tracks;
+  let track = tracks.find((entry) => entry.id === trackId);
+  if (track === undefined) {
+    const created: LooseTrack = {
       id: trackId,
       kind: trackId.startsWith("a") ? "audio" : "video",
       clips: [],
     };
-    (timeline.tracks as LooseTrack[]).push(track);
+    tracks.push(created);
+    track = created;
   }
   track.clips = Array.isArray(track.clips) ? track.clips : [];
   return track;

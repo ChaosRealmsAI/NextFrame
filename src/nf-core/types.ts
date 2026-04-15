@@ -45,12 +45,56 @@ export interface Clip {
   [key: string]: unknown;
 }
 
-export interface Track {
-  id?: string;
-  kind?: string;
-  muted?: boolean;
-  clips?: Clip[];
+export interface AudioClip extends Clip {
+  src?: string;
+  volume?: number;
 }
+
+export interface VideoClip extends Clip {
+  src?: string;
+}
+
+export interface SceneClip extends Clip {}
+
+export interface SubtitleClip extends Clip {
+  text?: string;
+  word?: Word;
+}
+
+export interface OverlayClip extends Clip {}
+
+interface BaseTrack<TKind extends string, TClip extends Clip> {
+  id?: string;
+  kind?: TKind;
+  muted?: boolean;
+  clips?: TClip[];
+}
+
+export interface AudioTrack extends BaseTrack<"audio", AudioClip> {
+  src?: string;
+  volume?: number;
+  meta?: {
+    segments: Segment[];
+    duration_ms: number;
+  };
+}
+
+export interface VideoTrack extends BaseTrack<"video", VideoClip> {}
+
+export interface SceneTrack extends BaseTrack<"scene", SceneClip> {}
+
+export interface SubtitleTrack extends BaseTrack<"subtitle", SubtitleClip> {
+  style?: Record<string, unknown>;
+}
+
+export interface OverlayTrack extends BaseTrack<"overlay", OverlayClip> {}
+
+export type Track =
+  | AudioTrack
+  | VideoTrack
+  | SceneTrack
+  | SubtitleTrack
+  | OverlayTrack;
 
 export interface Chapter {
   id?: string;
@@ -86,6 +130,8 @@ export interface Timeline {
   layers?: Clip[];
   /** v0.2 multi-track */
   tracks?: Track[];
+  matches?: Match[];
+  _audioFingerprint?: string;
   assets?: Asset[];
   chapters?: Chapter[];
   markers?: Marker[];
@@ -112,7 +158,10 @@ export interface Episode {
 
 export interface Segment {
   id: string;
-  text?: string;
+  text: string;
+  startMs: number;
+  endMs: number;
+  words: Word[];
   start?: number;
   end?: number;
   duration?: number;
@@ -122,8 +171,51 @@ export interface Segment {
   audio?: string;
   video?: string;
   cn?: string[];
-  /** Parsed subtitle entries */
-  words?: Array<{ word: string; start: number; end: number }>;
+}
+
+export interface Word {
+  w: string;
+  s: number;
+  e: number;
+}
+
+export interface Match {
+  rule: string;
+  source: string;
+  target: string;
+  plan?: unknown;
+  [key: string]: unknown;
+}
+
+export interface PlanCtx<Options = unknown> {
+  timeline: Timeline;
+  rule?: string;
+  match?: Match;
+  ratio?: string;
+  source?: Track;
+  target?: Track;
+  options?: Options;
+  [key: string]: unknown;
+}
+
+export interface ValidationIssue {
+  code: string;
+  message: string;
+  ref?: string;
+  hint?: string;
+}
+
+export interface ValidationResult {
+  ok: boolean;
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+}
+
+export interface MatchRule<Plan = unknown, Options = unknown> {
+  name: string;
+  plan(ctx: PlanCtx<Options>): Promise<Plan>;
+  validate(match: Match, timeline: Timeline): ValidationResult;
+  expand(match: Match, timeline: Timeline): Partial<Timeline>;
 }
 
 export type BridgeResult<T = unknown> =
