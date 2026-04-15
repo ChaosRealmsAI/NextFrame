@@ -9,7 +9,7 @@ import {
   buildSharedPreamble,
   readDiscoveredScenes,
   stripESM,
-} from "nf-core/engine/build-scenes.js";
+} from "../../../../nf-core/engine/build-scenes.js";
 
 const HELP = `nextframe bundle-scenes --ratio 16:9 --out src/nf-runtime/web/js/scene-bundle.js
 

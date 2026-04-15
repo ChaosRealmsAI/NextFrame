@@ -5,9 +5,9 @@ import "./legacy-fonts.js";
 import { REGISTRY } from "./scene-registry.js";
 import { guarded } from "./guard.js";
 import { resolveTimeline } from "./legacy-timeline.js";
-import { resolveKeyframes } from "nf-core/engine/keyframes.js";
-import { applyEnterEffect, applyExitEffect } from "nf-core/animation/effects/index.js";
-import { applyFilters } from "nf-core/filters/index.js";
+import { resolveKeyframes } from "../../../nf-core/engine/keyframes.js";
+import { applyEnterEffect, applyExitEffect } from "../../../nf-core/animation/effects/index.js";
+import { applyFilters } from "../../../nf-core/filters/index.js";
 
 export class CanvasPool {
   #capacity;

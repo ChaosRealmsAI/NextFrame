@@ -9,7 +9,7 @@ import { resolve, dirname, basename } from "node:path";
 import { tmpdir } from "node:os";
 import { parseFlags, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineUsage } from "../_helpers/_resolve.js";
-import { buildHTML } from "nf-core/engine/build.js";
+import { buildHTML } from "../../../../nf-core/engine/build.js";
 
 function getPreviewViewport(timeline) {
   const width = timeline?.project?.width || timeline?.width || 1920;
