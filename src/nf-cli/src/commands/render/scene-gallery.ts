@@ -124,7 +124,7 @@ function buildHtml(opts: {
 <title>${opts.theme} · ${opts.ratio} · 组件预览</title>
 <link rel="stylesheet" href="https://boom-cdn.vercel.app/themes/obsidian-velvet.css">
 <style>
-  .stage { position: relative; width: ${W}px; height: ${H}px; transform-origin: top left; background: #1a1510; }
+  .stage { position: relative; width: ${W}px; height: ${H}px; transform-origin: top left; background: #000; }
   .stage-wrap { position: relative; width: 100%; padding-top: ${aspectPercent}%; overflow: hidden; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.5); background: #0a0a0a; }
   .stage-wrap .stage { position: absolute; top: 0; left: 0; }
   .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
