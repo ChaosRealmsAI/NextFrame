@@ -67,15 +67,15 @@ The desktop app has built-in AI operation interfaces. **Always use these instead
 ```bash
 # Quick screenshot of current state
 cargo run -p nf-shell-mac -- --screenshot
-# → saves to /tmp/nf-screenshot.png, then Read to inspect
+# → saves to tmp/nf-screenshot.png (项目根 tmp/), then Read to inspect
 
 # Full verification: auto-navigate all pages, screenshot each
 cargo run -p nf-shell-mac -- --verify
-# → /tmp/nf-verify-home.png, nf-verify-editor.png, nf-verify-pipeline.png, etc.
+# → tmp/nf-verify-home.png, nf-verify-editor.png, nf-verify-pipeline.png, etc.
 
 # Custom script: navigate + screenshot at specific points
 cargo run -p nf-shell-mac -- --eval-script my-test.js
-# Script can call: __screenshot("/tmp/my-check.png")
+# Script can call: __screenshot("tmp/my-check.png")
 ```
 
 ### Diagnose (JS functions, call via --eval-script)
