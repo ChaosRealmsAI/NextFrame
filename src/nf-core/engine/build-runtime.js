@@ -161,10 +161,24 @@ export function buildRuntime() {
           inner = renderSceneError(layer, String(err && err.message ? err.message : err));
         }
       }
+      // Compute enter/exit effect CSS if layer has animation specs
+      var fxStyle = "";
+      if (typeof window.__nfEffect === "function") {
+        var localT = t - start;
+        var enterSpec = layer.enter;
+        var exitSpec = layer.exit;
+        if (enterSpec && enterSpec.effect && localT < (enterSpec.dur || 0.5)) {
+          var eProg = localT / (enterSpec.dur || 0.5);
+          fxStyle = window.__nfEffect(enterSpec.effect, eProg, enterSpec);
+        } else if (exitSpec && exitSpec.effect && localT > dur - (exitSpec.dur || 0.5)) {
+          var xProg = (localT - (dur - (exitSpec.dur || 0.5))) / (exitSpec.dur || 0.5);
+          fxStyle = window.__nfEffect(exitSpec.effect, xProg, exitSpec);
+        }
+      }
       visible.push({ layer, scene });
       html.push(
         '<div class="nf-layer" data-layer-id="' + String(layer.id || layer.scene || index) + '"' +
-        ' style="position:absolute;inset:0;pointer-events:none;z-index:' + index + ';">' +
+        ' style="position:absolute;inset:0;pointer-events:none;z-index:' + index + ';' + fxStyle + '">' +
         inner +
         "</div>"
       );

@@ -122,3 +122,35 @@ export function buildSharedPreamble() {
     return "// no shared/design.js";
   }
 }
+
+const EFFECT_NAMES = [
+  "fadeIn", "fadeOut", "slideUp", "slideDown", "slideLeft", "slideRight",
+  "scaleIn", "scaleOut", "springIn", "springOut", "blurIn", "blurOut",
+  "wipeReveal", "bounceIn",
+];
+
+/**
+ * Bundle animation effects into an IIFE that exposes window.__nfEffect(name, progress, opts).
+ * Used by build-runtime.js to apply enter/exit effects to layer divs.
+ */
+export function buildAnimationBundle() {
+  const animDir = resolve(HERE, "../animation");
+  const effectsDir = resolve(animDir, "effects");
+  try {
+    const sharedCode = stripESM(readFileSync(resolve(animDir, "shared.js"), "utf8")).trim();
+    const effectCodes = EFFECT_NAMES.map((name) =>
+      stripESM(readFileSync(resolve(effectsDir, `${name}.js`), "utf8")).trim()
+    );
+    return `// Animation effects bundle
+(function(){
+function normalizeTime(v){var n=Number.isFinite(v)?v:0;return Math.min(1,Math.max(0,n));}
+function bounce(t){var p=normalizeTime(t);var n=7.5625;var d=2.75;if(p<1/d)return n*p*p;if(p<2/d){p-=1.5/d;return n*p*p+0.75;}if(p<2.5/d){p-=2.25/d;return n*p*p+0.9375;}p-=2.625/d;return n*p*p+0.984375;}
+${sharedCode}
+${effectCodes.join("\n")}
+var __NF_EFX={${EFFECT_NAMES.join(",")}};
+window.__nfEffect=function(name,progress,opts){var fn=__NF_EFX[name];if(!fn)return"";return serializeStyle(fn(clamp01(progress),opts||{}));};
+})();`;
+  } catch {
+    return "// no animation bundle";
+  }
+}

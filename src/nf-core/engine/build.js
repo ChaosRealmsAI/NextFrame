@@ -5,6 +5,7 @@ import { writeFileSync } from "node:fs";
 
 import { extractTimelineSrt, serializeSrtLiteral } from "./build-srt.js";
 import {
+  buildAnimationBundle,
   buildSceneBundle,
   buildSharedPreamble,
   collectSceneModules,
@@ -38,11 +39,14 @@ function buildDocument(timeline, sceneModules) {
   const dur = Number(timeline.duration || 0);
   const audioSrc = timeline.audio && typeof timeline.audio === "object" ? String(timeline.audio.src || "") : typeof timeline.audio === "string" ? timeline.audio : "";
   const audioField = audioSrc ? `audio: ${JSON.stringify(audioSrc)},` : "";
+  const animBundle = buildAnimationBundle();
   const scriptBody = escapeInlineScript(`window.__SLIDE_SEGMENTS = { ${audioField} gap: 0, segments: [{ phaseId: "main", duration: ${dur}, srt: [{ s: 0, e: ${dur}, t: "" }] }] };
 const SRT = ${serializeSrtLiteral(inlineSrt)};
 const TIMELINE = ${JSON.stringify(timeline, null, 2)};
 // Shared scene utilities (design tokens, helpers)
 ${sharedPreamble}
+// Animation effects
+${animBundle}
 ${sceneBundles}
 const SCENES = {
 ${sceneMap}
