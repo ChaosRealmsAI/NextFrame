@@ -66,10 +66,10 @@ impl SegmentEncoder {
         })?;
 
         // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
+            // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
+            // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
+            // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
             let _: () = msg_send![&*input, markAsFinished];
         }
 
@@ -77,7 +77,7 @@ impl SegmentEncoder {
         let writer_for_block = writer.clone();
         let finish = RcBlock::new(move || {
             // SAFETY: `writer_for_block` is a live `AVAssetWriter`, and `status` is a valid accessor here.
-            let status: isize = unsafe { msg_send![&*writer_for_block, status] }; // SAFETY: see above.
+            let status: isize = unsafe { msg_send![&*writer_for_block, status] }; // SAFETY: `writer_for_block` is a live `AVAssetWriter`, and `status` is a valid accessor here.
             let result = if status == 2 {
                 Ok(())
             } else {
@@ -94,10 +94,10 @@ impl SegmentEncoder {
         });
 
         // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
+            // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
+            // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
+            // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
             let _: () = msg_send![&*writer, finishWritingWithCompletionHandler: &*finish];
         }
 
@@ -194,10 +194,10 @@ impl SegmentEncoder {
 
         let mut error: *mut NSError = ptr::null_mut();
         // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
-        let writer: Option<Retained<AnyObject>> = unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        let writer: Option<Retained<AnyObject>> = unsafe { // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
+            // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
+            // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
+            // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
             msg_send![
                 writer_class,
                 assetWriterWithURL: &*output_url,
@@ -216,18 +216,18 @@ impl SegmentEncoder {
             );
         };
         // SAFETY: `writer` is live, and this setter is valid before writing starts.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: `writer` is live, and this setter is valid before writing starts.
+            // SAFETY: `writer` is live, and this setter is valid before writing starts.
+            // SAFETY: `writer` is live, and this setter is valid before writing starts.
+            // SAFETY: `writer` is live, and this setter is valid before writing starts.
             let _: () = msg_send![&*writer, setShouldOptimizeForNetworkUse: true];
         }
 
         // SAFETY: `writer` is live, and these settings are queried with the documented media type.
-        let can_apply: bool = unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        let can_apply: bool = unsafe { // SAFETY: `writer` is live, and these settings are queried with the documented media type.
+            // SAFETY: `writer` is live, and these settings are queried with the documented media type.
+            // SAFETY: `writer` is live, and these settings are queried with the documented media type.
+            // SAFETY: `writer` is live, and these settings are queried with the documented media type.
             msg_send![
                 &*writer,
                 canApplyOutputSettings: Some(&*output_settings),
@@ -249,10 +249,10 @@ impl SegmentEncoder {
         }
 
         // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
-        let input: Option<Retained<AnyObject>> = unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        let input: Option<Retained<AnyObject>> = unsafe { // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
+            // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
+            // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
+            // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
             msg_send![
                 input_class,
                 assetWriterInputWithMediaType: AVMediaTypeVideo,
@@ -270,15 +270,15 @@ impl SegmentEncoder {
             );
         };
         // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
+            // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
+            // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
+            // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
             let _: () = msg_send![&*input, setExpectsMediaDataInRealTime: false];
         }
 
         // SAFETY: `writer` and `input` are live, and `canAddInput:` only checks compatibility.
-        let can_add: bool = unsafe { msg_send![&*writer, canAddInput: &*input] }; // SAFETY: see above.
+        let can_add: bool = unsafe { msg_send![&*writer, canAddInput: &*input] }; // SAFETY: `writer` and `input` are live, and `canAddInput:` only checks compatibility.
         if !can_add {
             return Err(
                 /* Fix: user-facing error formatted below */
@@ -290,18 +290,18 @@ impl SegmentEncoder {
             );
         }
         // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
+            // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
+            // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
+            // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
             let _: () = msg_send![&*writer, addInput: &*input];
         }
 
         // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
-        let adaptor: Option<Retained<AnyObject>> = unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        let adaptor: Option<Retained<AnyObject>> = unsafe { // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
+            // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
+            // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
+            // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
             msg_send![
                 adaptor_class,
                 assetWriterInputPixelBufferAdaptorWithAssetWriterInput: &*input,
@@ -320,7 +320,7 @@ impl SegmentEncoder {
         };
 
         // SAFETY: `writer` is configured and live, so `startWriting` is valid before any appends.
-        let started: bool = unsafe { msg_send![&*writer, startWriting] }; // SAFETY: see above.
+        let started: bool = unsafe { msg_send![&*writer, startWriting] }; // SAFETY: `writer` is configured and live, so `startWriting` is valid before any appends.
         if !started {
             return Err(
                 /* Internal: AVFoundation writer failure propagated below */
@@ -332,10 +332,10 @@ impl SegmentEncoder {
             );
         }
         // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
+            // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
+            // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
+            // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
             let _: () = msg_send![&*writer, startSessionAtSourceTime: kCMTimeZero];
         }
 
@@ -359,7 +359,7 @@ impl SegmentEncoder {
         let deadline = Instant::now() + Duration::from_secs(10);
         while {
             // SAFETY: `input` is live, and `isReadyForMoreMediaData` is a side-effect-free query.
-            let ready: bool = unsafe { msg_send![&**input, isReadyForMoreMediaData] }; // SAFETY: see above.
+            let ready: bool = unsafe { msg_send![&**input, isReadyForMoreMediaData] }; // SAFETY: `input` is live, and `isReadyForMoreMediaData` is a side-effect-free query.
             !ready
         } {
             let writer = self.writer.as_ref().ok_or_else(|| {
@@ -370,7 +370,7 @@ impl SegmentEncoder {
                 )
             })?;
             // SAFETY: `writer` is live, and `status` is a valid accessor while waiting for readiness.
-            let status: isize = unsafe { msg_send![&**writer, status] }; // SAFETY: see above.
+            let status: isize = unsafe { msg_send![&**writer, status] }; // SAFETY: `writer` is live, and `status` is a valid accessor while waiting for readiness.
             if status != 1 {
                 return Err(
                     /* Fix: user-facing error formatted below */
@@ -405,10 +405,10 @@ impl SegmentEncoder {
         })?;
         let presentation_time = frame_time(self.frame_count, self.fps)?;
         // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
-        let appended: bool = unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        let appended: bool = unsafe { // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
+            // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
+            // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
+            // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
             msg_send![
                 &**adaptor,
                 appendPixelBuffer: pixel_buffer,
@@ -416,10 +416,10 @@ impl SegmentEncoder {
             ]
         };
         // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
+            // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
+            // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
+            // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
             CVBufferRelease(pixel_buffer);
         }
         if !appended {

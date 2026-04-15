@@ -5,7 +5,7 @@
 //!   Tab N: /tmp/wp-cmd-N.js → /tmp/wp-result-N.txt → /tmp/wp-screenshot-N.png
 //!   Legacy: /tmp/wp-cmd.js → /tmp/wp-result.txt (routes to current tab)
 
-#![allow(non_snake_case, unused_unsafe)]
+#![allow(non_snake_case, unused_unsafe)] // SAFETY: publish glue intentionally mirrors Objective-C selector names and keeps explicit FFI boundaries readable.
 
 mod commands;
 #[allow(unsafe_op_in_unsafe_fn)]
@@ -59,7 +59,7 @@ fn main() {
         NSPoint::new(win_x, win_y),
         NSSize::new(win_width, win_height),
     );
-    let window = unsafe {
+    let window = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSWindow is immediately initialized with a valid frame/style tuple.
         // SAFETY: `mtm` guarantees main-thread AppKit access and the allocated NSWindow is immediately initialized with a valid frame/style tuple.
         NSWindow::initWithContentRect_styleMask_backing_defer(
             mtm.alloc(),
@@ -73,7 +73,7 @@ fn main() {
     // Traffic lights inline with tab strip — transparent title bar
     window.setTitlebarAppearsTransparent(true);
     // SAFETY: `window` is a live NSWindow and `setTitleVisibility:` is a valid selector taking the NSWindowTitleVisibility integer constant.
-    let _: () = unsafe { objc2::msg_send![&*window, setTitleVisibility: 1i64] }; // SAFETY: see comment above. NSWindowTitleHidden
+    let _: () = unsafe { objc2::msg_send![&*window, setTitleVisibility: 1i64] }; // SAFETY: `window` is a live NSWindow and `setTitleVisibility:` is a valid selector taking the NSWindowTitleVisibility integer constant. NSWindowTitleHidden
     // Center traffic lights in tab strip — Zed approach:
     // Direct setFrame on each button, using real titlebar height from contentLayoutRect.
     // Must be reapplied on resize (macOS resets positions).
@@ -83,7 +83,7 @@ fn main() {
         window.center();
     }
 
-    let container = unsafe {
+    let container = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and `alloc()` returns an NSView ready for `initWithFrame:`.
         // SAFETY: `mtm` guarantees main-thread AppKit access and `alloc()` returns an NSView ready for `initWithFrame:`.
         objc2_app_kit::NSView::initWithFrame(
             mtm.alloc(),
@@ -110,7 +110,7 @@ fn main() {
     container.addSubview(&layout.webview_host);
 
     // SAFETY: `mtm` guarantees main-thread WebKit construction for `WKWebViewConfiguration::new`.
-    let config = unsafe { WKWebViewConfiguration::new(mtm) }; // SAFETY: see comment above.
+    let config = unsafe { WKWebViewConfiguration::new(mtm) }; // SAFETY: `mtm` guarantees main-thread WebKit construction for `WKWebViewConfiguration::new`.
 
     // Fixed UUID → same persistent cookie store regardless of app bundle location
     let Some(store_id) = NSUUID::initWithUUIDString(
@@ -121,8 +121,8 @@ fn main() {
         std::process::abort();
     };
     // SAFETY: `store_id` is a valid NSUUID and `mtm` guarantees main-thread access to create the persistent website data store.
-    let data_store = unsafe { WKWebsiteDataStore::dataStoreForIdentifier(&store_id, mtm) }; // SAFETY: see comment above.
-    unsafe {
+    let data_store = unsafe { WKWebsiteDataStore::dataStoreForIdentifier(&store_id, mtm) }; // SAFETY: `store_id` is a valid NSUUID and `mtm` guarantees main-thread access to create the persistent website data store.
+    unsafe { // SAFETY: `store_id` is a valid NSUUID and `mtm` guarantees main-thread access to create the persistent website data store.
         // SAFETY: `config` and `data_store` are live WebKit objects and `setWebsiteDataStore:` is the supported configuration API.
         config.setWebsiteDataStore(&data_store);
     }
@@ -327,7 +327,7 @@ fn main() {
 })();
 "#,
     );
-    let user_script = unsafe {
+    let user_script = unsafe { // SAFETY: `mtm` guarantees main-thread WebKit object creation and the injected source string lives for the duration of initialization.
         // SAFETY: `mtm` guarantees main-thread WebKit object creation and the injected source string lives for the duration of initialization.
         WKUserScript::initWithSource_injectionTime_forMainFrameOnly(
             mtm.alloc(),
@@ -337,8 +337,8 @@ fn main() {
         )
     };
     // SAFETY: `config` is a live WKWebViewConfiguration and `userContentController` is a valid accessor returning its controller.
-    let content_controller = unsafe { config.userContentController() }; // SAFETY: see comment above.
-    unsafe {
+    let content_controller = unsafe { config.userContentController() }; // SAFETY: `config` is a live WKWebViewConfiguration and `userContentController` is a valid accessor returning its controller.
+    unsafe { // SAFETY: `config` is a live WKWebViewConfiguration and `userContentController` is a valid accessor returning its controller.
         // SAFETY: `content_controller` owns the user scripts for `config`, and `user_script` is a valid WKUserScript instance.
         content_controller.addUserScript(&user_script);
     }
@@ -371,7 +371,7 @@ fn main() {
             .map(|u| u.as_str())
             .unwrap_or(tab.url);
         let wv = create_webview(mtm, wv_frame, url, &config, &ui_delegate, &nav_delegate);
-        unsafe {
+        unsafe { // SAFETY: `wv` is a live WKWebView and `setCustomUserAgent:` accepts the retained NSString constant used for all tabs.
             // SAFETY: `wv` is a live WKWebView and `setCustomUserAgent:` accepts the retained NSString constant used for all tabs.
             wv.setCustomUserAgent(Some(user_agent));
         }
@@ -392,7 +392,7 @@ fn main() {
         webviews.push(wv);
     }
 
-    unsafe {
+    unsafe { // SAFETY: `address_field` is a live NSTextField and `browser_target` implements the NSTextField delegate methods used by the address bar.
         // SAFETY: `address_field` is a live NSTextField and `browser_target` implements the NSTextField delegate methods used by the address bar.
         layout
             .address_field
@@ -442,7 +442,7 @@ fn main() {
     window.setContentView(Some(&container));
     window.makeKeyAndOrderFront(None);
     #[allow(deprecated)]
-    unsafe {
+    unsafe { // SAFETY: the app is fully initialized and `activateIgnoringOtherApps:` is the intended AppKit call to bring it to the foreground.
         // SAFETY: the app is fully initialized and `activateIgnoringOtherApps:` is the intended AppKit call to bring it to the foreground.
         app.activateIgnoringOtherApps(true);
     }

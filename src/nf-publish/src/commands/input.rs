@@ -67,7 +67,7 @@ fn handle_selector_action(
         match parse_coords(&coords) {
             Ok((x, y)) => {
                 // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
-                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
                 match action(wv, x, y) {
                     Ok(message) => write_result(&result_path, message),
                     Err(err) /* Fix: propagate or serialize the formatted error below */ => write_error(&result_path, err),
@@ -76,7 +76,7 @@ fn handle_selector_action(
             Err(err) /* Fix: propagate or serialize the formatted error below */ => write_error(&result_path, err),
         }
     });
-    unsafe {
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }
@@ -233,7 +233,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
                         match (parse_coords(from_coords), parse_coords(to_coords)) {
                             (Ok((from_x, from_y)), Ok((to_x, to_y))) => {
                                 // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
-                                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
                                 match native_drag_at(wv, from_x, from_y, to_x, to_y) {
                                     Ok(()) => write_result(
                                         &result_path,
@@ -307,7 +307,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
             }
             if let Ok((x, y)) = parse_coords(&coords) {
                 // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
-                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
                 native_click_at(wv, x, y);
                 std::thread::sleep(std::time::Duration::from_millis(200));
                 match paste_text(wv, &text_for_paste) {
@@ -331,7 +331,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
                 ),
             );
         });
-        unsafe {
+        unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
         }
@@ -355,7 +355,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
                 return;
             }
             // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
-            let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+            let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
             let mut count = 0;
             for coord in coords_str.split('|') {
                 if let Ok((x, y)) = parse_coords(coord) {
@@ -366,7 +366,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
             }
             write_result(&result_path, format!("ok: dismissed {count}"));
         });
-        unsafe {
+        unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
         }

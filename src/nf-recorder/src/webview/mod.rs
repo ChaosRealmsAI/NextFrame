@@ -65,9 +65,9 @@ impl WebViewHost {
         };
         let initial_rect = NSRect::new(initial_origin, NSSize::new(view_width, view_height));
         // SAFETY: `mtm` proves main-thread access, and these arguments form a valid window initializer.
-        let window: Retained<NSWindow> = unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
+        let window: Retained<NSWindow> = unsafe { // SAFETY: `mtm` proves main-thread access, and these arguments form a valid window initializer.
+            // SAFETY: `mtm` proves main-thread access, and these arguments form a valid window initializer.
+            // SAFETY: `mtm` proves main-thread access, and these arguments form a valid window initializer.
             msg_send![
                 NSWindow::alloc(mtm),
                 initWithContentRect: initial_rect,
@@ -79,9 +79,9 @@ impl WebViewHost {
         window.setTitle(&NSString::from_str("recorder"));
         window.setFrame_display(initial_rect, true);
         // SAFETY: `window` is live, and `setIgnoresMouseEvents:` is valid for an initialized window.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: `window` is live, and `setIgnoresMouseEvents:` is valid for an initialized window.
+            // SAFETY: `window` is live, and `setIgnoresMouseEvents:` is valid for an initialized window.
+            // SAFETY: `window` is live, and `setIgnoresMouseEvents:` is valid for an initialized window.
             let _: () = msg_send![&window, setIgnoresMouseEvents: true];
         }
         if headed {
@@ -90,9 +90,9 @@ impl WebViewHost {
             pump_main_run_loop(Duration::from_millis(150));
         } else {
             // SAFETY: `window` is live, and these setters only adjust presentation attributes.
-            unsafe {
-                // SAFETY: see above.
-                // SAFETY: see above.
+            unsafe { // SAFETY: `window` is live, and these setters only adjust presentation attributes.
+                // SAFETY: `window` is live, and these setters only adjust presentation attributes.
+                // SAFETY: `window` is live, and these setters only adjust presentation attributes.
                 let _: () = msg_send![&window, setAlphaValue: 0.0f64];
                 let _: () = msg_send![&window, setOpaque: false];
                 let _: () = msg_send![&window, setHasShadow: false];
@@ -155,20 +155,20 @@ impl WebViewHost {
             )
         })?;
         // SAFETY: `mtm` proves main-thread access, which `WKWebViewConfiguration::new` requires.
-        let config = unsafe { WKWebViewConfiguration::new(mtm) }; // SAFETY: see above.
+        let config = unsafe { WKWebViewConfiguration::new(mtm) }; // SAFETY: `mtm` proves main-thread access, which `WKWebViewConfiguration::new` requires.
         // SAFETY: `mtm` proves main-thread access, which `nonPersistentDataStore` requires.
-        let store = unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) }; // SAFETY: see above.
+        let store = unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) }; // SAFETY: `mtm` proves main-thread access, which `nonPersistentDataStore` requires.
         // SAFETY: `config` and `store` are live WebKit objects being configured before initialization.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: `config` and `store` are live WebKit objects being configured before initialization.
+            // SAFETY: `config` and `store` are live WebKit objects being configured before initialization.
+            // SAFETY: `config` and `store` are live WebKit objects being configured before initialization.
             config.setWebsiteDataStore(&store);
             config.setMediaTypesRequiringUserActionForPlayback(WKAudiovisualMediaTypes::All);
         }
         // SAFETY: `mtm`, the frame, and `config` satisfy `WKWebView`'s designated initializer contract.
-        let web_view = unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
+        let web_view = unsafe { // SAFETY: `mtm`, the frame, and `config` satisfy `WKWebView`'s designated initializer contract.
+            // SAFETY: `mtm`, the frame, and `config` satisfy `WKWebView`'s designated initializer contract.
+            // SAFETY: `mtm`, the frame, and `config` satisfy `WKWebView`'s designated initializer contract.
             WKWebView::initWithFrame_configuration(
                 WKWebView::alloc(mtm),
                 NSRect::new(NSPoint::new(0.0, 0.0), target_size),
@@ -177,9 +177,9 @@ impl WebViewHost {
         };
         web_view.setWantsLayer(true);
         // SAFETY: `web_view` responds to `_setPageMuted:` on macOS, and this only toggles mute state.
-        unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
+        unsafe { // SAFETY: `web_view` responds to `_setPageMuted:` on macOS, and this only toggles mute state.
+            // SAFETY: `web_view` responds to `_setPageMuted:` on macOS, and this only toggles mute state.
+            // SAFETY: `web_view` responds to `_setPageMuted:` on macOS, and this only toggles mute state.
             let _: () = msg_send![&web_view, _setPageMuted: 0x3u64];
         }
         Ok(web_view)

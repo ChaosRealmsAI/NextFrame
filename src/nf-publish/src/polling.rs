@@ -78,7 +78,7 @@ fn evaluate_session_for_tab(tab: usize, webview: &WKWebView) {
             "expired".to_owned()
         } else {
             // SAFETY: this JS wrapper normalizes non-null results to NSString.
-            let s: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: see comment above.
+            let s: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: this JS wrapper normalizes non-null results to NSString.
             s.to_string()
         };
         let status = SessionStatus::from_js_result(&raw);
@@ -90,11 +90,11 @@ fn evaluate_session_for_tab(tab: usize, webview: &WKWebView) {
                 dispatch::Queue::main().exec_after(std::time::Duration::from_secs(3), move || {
                     let read_js = NSString::from_str("window.__sessionCheck||'expired'");
                     // SAFETY: `wv_ptr` was captured from a live WKWebView and this follow-up runs on the main queue while that tab exists.
-                    let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                    let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView and this follow-up runs on the main queue while that tab exists.
                     let handler2 = RcBlock::new(move |result: *mut AnyObject, _: *mut NSError| {
                         let raw = if !result.is_null() {
                             // SAFETY: this JS wrapper normalizes non-null results to NSString.
-                            let ns: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: see comment above.
+                            let ns: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: this JS wrapper normalizes non-null results to NSString.
                             ns.to_string()
                         } else {
                             "expired".to_owned()
@@ -106,7 +106,7 @@ fn evaluate_session_for_tab(tab: usize, webview: &WKWebView) {
                             SessionStatus::Expired => check_session(tab, SessionStatus::Expired),
                         }
                     });
-                    unsafe {
+                    unsafe { // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
                         // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
                         wv.evaluateJavaScript_completionHandler(&read_js, Some(&handler2));
                     }
@@ -114,7 +114,7 @@ fn evaluate_session_for_tab(tab: usize, webview: &WKWebView) {
             }
         }
     });
-    unsafe {
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js, Some(&handler));
     }
@@ -166,7 +166,7 @@ fn keep_alive_all() {
         let handler = RcBlock::new(move |result: *mut AnyObject, _error: *mut NSError| {
             let status = if !result.is_null() {
                 // SAFETY: this JS wrapper normalizes non-null results to NSString.
-                let s: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: see comment above.
+                let s: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: this JS wrapper normalizes non-null results to NSString.
                 s.to_string()
             } else {
                 "null".to_owned()
@@ -187,7 +187,7 @@ fn keep_alive_all() {
                 );
             }
         });
-        unsafe {
+        unsafe { // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             wv.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
         }
@@ -213,7 +213,7 @@ pub(crate) fn start_command_poll() {
             std::thread::sleep(std::time::Duration::from_millis(POLL_MS));
             tick += 1;
             dispatch::Queue::main().exec_async(move || {
-                let objc_result = unsafe {
+                let objc_result = unsafe { // SAFETY: `catch` is the intended Objective-C boundary around poll callbacks running on the main queue.
                     // SAFETY: `catch` is the intended Objective-C boundary around poll callbacks running on the main queue.
                     objc2::exception::catch(std::panic::AssertUnwindSafe(|| {
                         let result =

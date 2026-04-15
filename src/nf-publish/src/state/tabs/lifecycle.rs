@@ -38,12 +38,12 @@ pub(crate) fn switch_tab(index: usize) {
 
     if let Err(err) = with_objc_boundary("switch browser tab", || {
         if let Some(prev_ptr) = prev_ptr {
-            unsafe {
+            unsafe { // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
                 // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
                 (&*prev_ptr).setHidden(true);
             }
         }
-        unsafe {
+        unsafe { // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
             // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
             (&*next_ptr).setHidden(false);
         }
@@ -67,11 +67,11 @@ fn sync_tab_state_locked(tab: &mut BrowserTab, webview: &WKWebView) {
     }
     tab.title = title_for_webview(webview);
     // SAFETY: `webview` is a live WKWebView and these are standard readonly state accessors.
-    tab.is_loading = unsafe { webview.isLoading() }; // SAFETY: see comment above.
+    tab.is_loading = unsafe { webview.isLoading() }; // SAFETY: `webview` is a live WKWebView and these are standard readonly state accessors.
     // SAFETY: `webview` is a live WKWebView and these are standard readonly state accessors.
-    tab.can_go_back = unsafe { webview.canGoBack() }; // SAFETY: see comment above.
+    tab.can_go_back = unsafe { webview.canGoBack() }; // SAFETY: `webview` is a live WKWebView and these are standard readonly state accessors.
     // SAFETY: `webview` is a live WKWebView and these are standard readonly state accessors.
-    tab.can_go_forward = unsafe { webview.canGoForward() }; // SAFETY: see comment above.
+    tab.can_go_forward = unsafe { webview.canGoForward() }; // SAFETY: `webview` is a live WKWebView and these are standard readonly state accessors.
 }
 
 pub(crate) fn sync_tab_state_from_webview(tab_id: usize) {
@@ -157,13 +157,13 @@ pub(crate) fn create_dynamic_tab(
         ui_delegate,
         nav_delegate,
     );
-    unsafe {
+    unsafe { // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
         // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
         webview.setCustomUserAgent(Some(&NSString::from_str(state.user_agent)));
     }
     if is_new_tab {
         let html = NSString::from_str(&new_tab_html());
-        unsafe {
+        unsafe { // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
             // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
             webview.loadHTMLString_baseURL(&html, None);
         }

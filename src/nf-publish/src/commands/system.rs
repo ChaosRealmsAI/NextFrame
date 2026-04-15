@@ -13,7 +13,7 @@ use super::{js_string, parse_rect, parse_selector_arg, write_error, write_result
 
 fn current_url_for_webview(webview: &WKWebView) -> String {
     // SAFETY: `webview` is a live WKWebView and `URL` is a valid getter that returns an autoreleased NSURL if present.
-    unsafe { webview.URL() } // SAFETY: see comment above.
+    unsafe { webview.URL() } // SAFETY: `webview` is a live WKWebView and `URL` is a valid getter that returns an autoreleased NSURL if present.
         .and_then(|url| url.absoluteString())
         .map(|value| value.to_string())
         .unwrap_or_default()
@@ -118,7 +118,7 @@ fn run_check_command(webview: &WKWebView, result_path: String) {
             dispatch::Queue::main().exec_after(std::time::Duration::from_secs(3), move || {
                 let read_js = NSString::from_str("String(window.__wpCheckStatus||'pending')");
                 // SAFETY: `wv_ptr` was captured from a live WKWebView and this follow-up runs on the main queue while that tab exists.
-                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView and this follow-up runs on the main queue while that tab exists.
                 let handler2 = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
                     let status = if !error.is_null() || result.is_null() {
                         "expired".to_owned()
@@ -127,7 +127,7 @@ fn run_check_command(webview: &WKWebView, result_path: String) {
                     };
                     write_check_result(&rp2, &platform2, &status, Some(&url2));
                 });
-                unsafe {
+                unsafe { // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
                     // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
                     wv.evaluateJavaScript_completionHandler(&read_js, Some(&handler2));
                 }
@@ -138,7 +138,7 @@ fn run_check_command(webview: &WKWebView, result_path: String) {
         let status = normalize_check_status(&raw);
         write_check_result(&rp, &platform_for_result, &status, Some(&url_for_result));
     });
-    unsafe {
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js, Some(&handler));
     }
@@ -179,7 +179,7 @@ pub(super) fn handle_command(
                 let handler = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
                     if !error.is_null() {
                         // SAFETY: WebKit passes a valid NSError pointer when `error` is non-null.
-                        let err = unsafe { &*error }; // SAFETY: see comment above.
+                        let err = unsafe { &*error }; // SAFETY: WebKit passes a valid NSError pointer when `error` is non-null.
                         write_error(
                             &result_path,
                             error_with_fix(
@@ -207,7 +207,7 @@ pub(super) fn handle_command(
                             let rp = result_path.clone();
                             let message = format!("ok: {x},{y},{w},{h}");
                             // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
-                            let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                            let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView and the WebKit callback executes on the main queue while that tab exists.
                             take_screenshot_with_callback(
                                 wv,
                                 screenshot_path.clone(),

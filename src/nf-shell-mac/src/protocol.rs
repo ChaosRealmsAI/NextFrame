@@ -28,20 +28,17 @@ pub(crate) struct SchemeHandlers {
 macro_rules! define_scheme_handler {
     ($name:ident) => {
         define_class!(
-            #[unsafe(super(NSObject))]
+            #[unsafe(super(NSObject))] // SAFETY: the generated scheme-handler class is registered as an NSObject subclass for objc2.
             #[thread_kind = MainThreadOnly]
             #[ivars = SchemeHandlerIvars]
             pub(crate) struct $name;
 
-            // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
-            unsafe impl NSObjectProtocol for $name {}
+            unsafe impl NSObjectProtocol for $name {} // SAFETY: $name is an NSObject subclass that satisfies NSObjectProtocol expectations.
 
             #[allow(non_snake_case)]
-            // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
-            unsafe impl WKURLSchemeHandler for $name {
-                #[unsafe(method(webView:startURLSchemeTask:))]
-                // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
-                unsafe fn web_view_start_urlscheme_task(
+            unsafe impl WKURLSchemeHandler for $name { // SAFETY: $name is registered with WebKit as a main-thread URL scheme handler.
+                #[unsafe(method(webView:startURLSchemeTask:))] // SAFETY: Selector matches WKURLSchemeHandler's Objective-C start callback.
+                unsafe fn web_view_start_urlscheme_task( // SAFETY: WebKit supplies a live task and web view for the duration of this callback.
                     &self,
                     _web_view: &WKWebView,
                     task: &ProtocolObject<dyn WKURLSchemeTask>,
@@ -49,9 +46,8 @@ macro_rules! define_scheme_handler {
                     serve_task(task, &self.ivars().root);
                 }
 
-                #[unsafe(method(webView:stopURLSchemeTask:))]
-                // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
-                unsafe fn web_view_stop_urlscheme_task(
+                #[unsafe(method(webView:stopURLSchemeTask:))] // SAFETY: Selector matches WKURLSchemeHandler's Objective-C stop callback.
+                unsafe fn web_view_stop_urlscheme_task( // SAFETY: WebKit supplies a live task and web view when cancelling an in-flight load.
                     &self,
                     _web_view: &WKWebView,
                     _task: &ProtocolObject<dyn WKURLSchemeTask>,
@@ -198,8 +194,7 @@ fn send_reply(
                 .to_string(),
         );
     };
-    unsafe {
-        // SAFETY: Task protocol requires didReceiveResponse, then didReceiveData, then didFinish in order.
+    unsafe { // SAFETY: WKURLSchemeTask requires response, optional data, then finish while the task is live.
         task.didReceiveResponse(&response);
         if !reply.body.is_empty() {
             let data = NSData::with_bytes(&reply.body);
@@ -220,7 +215,7 @@ fn insert_header(headers: &NSMutableDictionary<NSString, NSString>, key: &str, v
     let key = NSString::from_str(key);
     let value = NSString::from_str(value);
     let key = ProtocolObject::from_ref(&*key);
-    unsafe { headers.setObject_forKey(&value, key) }; // SAFETY: NSString key and value are valid Objective-C objects for NSMutableDictionary insertion.
+    unsafe { headers.setObject_forKey(&value, key) }; // SAFETY: key and value are live NSString objects inserted into an Objective-C NSMutableDictionary.
 }
 
 fn resolve_file_path(root: &Path, raw_path: &str) -> Result<PathBuf, i64> {

@@ -56,7 +56,7 @@ impl WebViewHost {
 
     pub(super) fn current_url(&self) -> Option<String> {
         // SAFETY: `self.web_view` is live, and `URL` returns either null or a live borrowed `NSURL`.
-        unsafe { self.web_view.URL() } // SAFETY: see above.
+        unsafe { self.web_view.URL() } // SAFETY: `self.web_view` is live, and `URL` returns either null or a live borrowed `NSURL`.
             .and_then(|url| url.absoluteString().map(|value| value.to_string()))
     }
 }
@@ -72,6 +72,6 @@ pub(super) fn pump_main_run_loop(duration: Duration) {
     let run_loop = NSRunLoop::currentRunLoop();
     let date = NSDate::dateWithTimeIntervalSinceNow(duration.as_secs_f64());
     // SAFETY: `NSDefaultRunLoopMode` is a valid process-global Foundation NSString constant.
-    let default_mode = unsafe { NSDefaultRunLoopMode }; // SAFETY: see above.
+    let default_mode = unsafe { NSDefaultRunLoopMode }; // SAFETY: `NSDefaultRunLoopMode` is a valid process-global Foundation NSString constant.
     let _ = run_loop.runMode_beforeDate(default_mode, &date);
 }

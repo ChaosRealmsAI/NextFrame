@@ -28,7 +28,7 @@ impl EnvOverrideGuard {
         }
         let value: OsString = value.into();
         // SAFETY: integration tests serialize these process-wide env mutations with ENV_OVERRIDE_TEST_LOCK.
-        unsafe {
+        unsafe { // SAFETY: integration tests serialize these process-wide env mutations with ENV_OVERRIDE_TEST_LOCK.
             env::set_var(key, &value);
         }
     }

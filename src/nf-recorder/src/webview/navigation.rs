@@ -20,7 +20,7 @@ impl WebViewHost {
         })?;
         let request = NSURLRequest::requestWithURL(&url);
         // SAFETY: `self.web_view` and `request` are live Objective-C objects for this load call.
-        let navigation = unsafe { self.web_view.loadRequest(&request) }; // SAFETY: see above.
+        let navigation = unsafe { self.web_view.loadRequest(&request) }; // SAFETY: `self.web_view` and `request` are live Objective-C objects for this load call.
         if navigation.is_none() {
             return Err(
                 /* Fix: user-facing error formatted below */
@@ -46,9 +46,9 @@ impl WebViewHost {
         let read_access_url =
             NSURL::fileURLWithPath(&NSString::from_str(&read_access_root.to_string_lossy()));
         // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
-        let navigation = unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
+        let navigation = unsafe { // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
+            // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
+            // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
             self.web_view
                 .loadFileURL_allowingReadAccessToURL(&file_url, &read_access_url)
         };
@@ -81,9 +81,9 @@ impl WebViewHost {
         while started.elapsed() < timeout {
             self.sync_view_hierarchy();
             // SAFETY: `self.web_view` is live, and `isLoading` is a side-effect-free query.
-            last_loading = unsafe { self.web_view.isLoading() }; // SAFETY: see above.
+            last_loading = unsafe { self.web_view.isLoading() }; // SAFETY: `self.web_view` is live, and `isLoading` is a side-effect-free query.
             // SAFETY: `self.web_view` is live, and `estimatedProgress` is a side-effect-free query.
-            last_progress = unsafe { self.web_view.estimatedProgress() }; // SAFETY: see above.
+            last_progress = unsafe { self.web_view.estimatedProgress() }; // SAFETY: `self.web_view` is live, and `estimatedProgress` is a side-effect-free query.
             last_url = self.current_url();
             saw_navigation |= last_loading
                 || last_progress > 0.0

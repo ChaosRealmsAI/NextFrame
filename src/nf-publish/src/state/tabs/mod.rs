@@ -57,7 +57,7 @@ fn refresh_browser_controls() {
         };
         button.setEnabled(enabled);
         // SAFETY: `button` is a live NSButton and `setContentTintColor:` is a valid selector taking the NSColor produced above.
-        let _: () = unsafe { msg_send![button, setContentTintColor: &*tint] }; // SAFETY: see comment above.
+        let _: () = unsafe { msg_send![button, setContentTintColor: &*tint] }; // SAFETY: `button` is a live NSButton and `setContentTintColor:` is a valid selector taking the NSColor produced above.
     }
 
     let Some(state) = APP_STATE.get() else { return };
@@ -144,7 +144,7 @@ pub(crate) fn refresh_browser_ui() {
     refresh_bookmarks_bar();
     if let Some(state) = APP_STATE.get() {
         // SAFETY: `window_ptr` is initialized once from the retained main NSWindow during startup and remains valid for the app lifetime.
-        let window = unsafe { &*state.window_ptr }; // SAFETY: see comment above.
+        let window = unsafe { &*state.window_ptr }; // SAFETY: `window_ptr` is initialized once from the retained main NSWindow during startup and remains valid for the app lifetime.
         crate::ui::move_traffic_lights(window);
     }
 }

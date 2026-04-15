@@ -16,10 +16,10 @@ use crate::error_with_fix;
 use super::FrameSize;
 
 // SAFETY: These imported framework constants are process-global and valid for the life of the process.
-unsafe extern "C" {
-    // SAFETY: see above.
-    // SAFETY: see above.
-    // SAFETY: see above.
+unsafe extern "C" { // SAFETY: These imported framework constants are process-global and valid for the life of the process.
+    // SAFETY: These imported framework constants are process-global and valid for the life of the process.
+    // SAFETY: These imported framework constants are process-global and valid for the life of the process.
+    // SAFETY: These imported framework constants are process-global and valid for the life of the process.
     static AVVideoAverageBitRateKey: &'static NSString;
     static AVVideoCodecKey: &'static NSString;
     static AVVideoCodecTypeH264: &'static NSString;
@@ -48,13 +48,13 @@ pub(super) fn pixel_buffer_attributes(
 
     let keys = [
         // SAFETY: This imported CoreVideo key is a valid process-global NSString constant.
-        unsafe { kCVPixelBufferPixelFormatTypeKey }, // SAFETY: see above.
+        unsafe { kCVPixelBufferPixelFormatTypeKey }, // SAFETY: This imported CoreVideo key is a valid process-global NSString constant.
         // SAFETY: This imported CoreVideo key is a valid process-global NSString constant.
-        unsafe { kCVPixelBufferWidthKey }, // SAFETY: see above.
+        unsafe { kCVPixelBufferWidthKey }, // SAFETY: This imported CoreVideo key is a valid process-global NSString constant.
         // SAFETY: This imported CoreVideo key is a valid process-global NSString constant.
-        unsafe { kCVPixelBufferHeightKey }, // SAFETY: see above.
+        unsafe { kCVPixelBufferHeightKey }, // SAFETY: This imported CoreVideo key is a valid process-global NSString constant.
         // SAFETY: This imported CoreVideo key is a valid process-global NSString constant.
-        unsafe { kCVPixelBufferIOSurfacePropertiesKey }, // SAFETY: see above.
+        unsafe { kCVPixelBufferIOSurfacePropertiesKey }, // SAFETY: This imported CoreVideo key is a valid process-global NSString constant.
     ];
     let values: [&NSObject; 4] = [
         &*pixel_format_value,
@@ -77,11 +77,11 @@ pub(super) fn video_output_settings(
     let max_keyframe_interval = NSNumber::numberWithUnsignedInteger(target_keyframe_interval(fps));
     let compression_keys = [
         // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
-        unsafe { AVVideoAverageBitRateKey }, // SAFETY: see above.
+        unsafe { AVVideoAverageBitRateKey }, // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
         // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
-        unsafe { AVVideoMaxKeyFrameIntervalKey }, // SAFETY: see above.
+        unsafe { AVVideoMaxKeyFrameIntervalKey }, // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
         // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
-        unsafe { AVVideoProfileLevelKey }, // SAFETY: see above.
+        unsafe { AVVideoProfileLevelKey }, // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
     ];
     let compression_values: [&NSObject; 3] = [
         &*bitrate_value,
@@ -92,17 +92,17 @@ pub(super) fn video_output_settings(
 
     let keys = [
         // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
-        unsafe { AVVideoCodecKey }, // SAFETY: see above.
+        unsafe { AVVideoCodecKey }, // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
         // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
-        unsafe { AVVideoWidthKey }, // SAFETY: see above.
+        unsafe { AVVideoWidthKey }, // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
         // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
-        unsafe { AVVideoHeightKey }, // SAFETY: see above.
+        unsafe { AVVideoHeightKey }, // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
         // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
-        unsafe { AVVideoCompressionPropertiesKey }, // SAFETY: see above.
+        unsafe { AVVideoCompressionPropertiesKey }, // SAFETY: This imported AVFoundation key is a valid process-global NSString constant.
     ];
     let values: [&NSObject; 4] = [
         // SAFETY: This imported AVFoundation value is a valid process-global NSString constant.
-        unsafe { AVVideoCodecTypeH264 }, // SAFETY: see above.
+        unsafe { AVVideoCodecTypeH264 }, // SAFETY: This imported AVFoundation value is a valid process-global NSString constant.
         &*width_value,
         &*height_value,
         &*compression_properties,
@@ -150,11 +150,11 @@ fn select_h264_profile_level(frame_size: FrameSize, fps: usize) -> H264ProfileLe
 fn profile_level_nsobject(frame_size: FrameSize, fps: usize) -> &'static NSObject {
     match select_h264_profile_level(frame_size, fps) {
         // SAFETY: This imported AVFoundation profile constant is a valid process-global NSString.
-        H264ProfileLevel::High31 | H264ProfileLevel::High40 | H264ProfileLevel::High51 => unsafe {
-            // SAFETY: see above.
-            // SAFETY: see above.
+        H264ProfileLevel::High31 | H264ProfileLevel::High40 | H264ProfileLevel::High51 => unsafe { // SAFETY: This imported AVFoundation profile constant is a valid process-global NSString.
+            // SAFETY: This imported AVFoundation profile constant is a valid process-global NSString.
+            // SAFETY: This imported AVFoundation profile constant is a valid process-global NSString.
             AVVideoProfileLevelH264HighAutoLevel
-        }, // SAFETY: see above.
+        }, // SAFETY: This imported AVFoundation profile constant is a valid process-global NSString.
     }
 }
 
@@ -174,15 +174,15 @@ pub(super) fn nsurl_from_path(path: &Path) -> Retained<NSURL> {
 
 pub(super) fn writer_error_string(writer: &AnyObject, action: &str, fix: &str) -> String {
     // SAFETY: `writer` is an `AVAssetWriter`, so `error` returns either null or a live `NSError *`.
-    let error: *mut NSError = unsafe { msg_send![writer, error] }; // SAFETY: see above.
+    let error: *mut NSError = unsafe { msg_send![writer, error] }; // SAFETY: `writer` is an `AVAssetWriter`, so `error` returns either null or a live `NSError *`.
     ns_error_ptr_to_string(error, action, fix)
 }
 
 pub(super) fn ns_error_ptr_to_string(error: *mut NSError, action: &str, fix: &str) -> String {
     // SAFETY: Objective-C error out-pointers are either null or valid for this formatting scope.
-    match unsafe { error.as_ref() } {
-        // SAFETY: see above.
-        // SAFETY: see above.
+    match unsafe { error.as_ref() } { // SAFETY: Objective-C error out-pointers are either null or valid for this formatting scope.
+        // SAFETY: Objective-C error out-pointers are either null or valid for this formatting scope.
+        // SAFETY: Objective-C error out-pointers are either null or valid for this formatting scope.
         Some(error) => error_with_fix(action, ns_error_to_string(error), fix),
         None => error_with_fix(
             action,
@@ -205,7 +205,7 @@ pub(super) fn pump_main_run_loop(duration: Duration) {
     let run_loop = NSRunLoop::currentRunLoop();
     let date = NSDate::dateWithTimeIntervalSinceNow(duration.as_secs_f64());
     // SAFETY: `NSDefaultRunLoopMode` is a valid process-global Foundation NSString constant.
-    let default_mode = unsafe { NSDefaultRunLoopMode }; // SAFETY: see above.
+    let default_mode = unsafe { NSDefaultRunLoopMode }; // SAFETY: `NSDefaultRunLoopMode` is a valid process-global Foundation NSString constant.
     let _ = run_loop.runMode_beforeDate(default_mode, &date);
 }
 

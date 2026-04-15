@@ -93,7 +93,7 @@ fn write_dump(
     let handler = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
         if !error.is_null() {
             // SAFETY: WebKit passes a valid NSError pointer when `error` is non-null.
-            let err = unsafe { &*error }; // SAFETY: see comment above.
+            let err = unsafe { &*error }; // SAFETY: WebKit passes a valid NSError pointer when `error` is non-null.
             write_error(
                 &result_path,
                 error_with_fix(
@@ -124,7 +124,7 @@ fn write_dump(
             ),
         }
     });
-    unsafe {
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }
@@ -152,7 +152,7 @@ fn waitfor_element(webview: &WKWebView, selector: &str, timeout_ms: u64, result_
             std::time::Duration::from_millis(interval_ms),
             move || {
                 // SAFETY: `wv_ptr` was captured from a live WKWebView and this poll runs on the main queue while that tab exists.
-                let webview = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                let webview = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView and this poll runs on the main queue while that tab exists.
                 let rp = result_path.clone();
                 let js_clone = js.clone();
                 let handler = RcBlock::new(move |result: *mut AnyObject, _error: *mut NSError| {
