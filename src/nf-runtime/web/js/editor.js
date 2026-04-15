@@ -306,6 +306,32 @@ function edSelectClip(idOrIndex) {
   selectTimelineClip(index);
 }
 
+function edTimelineSeekFromX(clientX) {
+  const tlEl = document.querySelector('.ed-timeline');
+  if (!tlEl) return;
+  const rect = tlEl.getBoundingClientRect();
+  const labelArea = 100;
+  const trackWidth = rect.width - labelArea;
+  if (trackWidth <= 0) return;
+  const pct = Math.max(0, Math.min(1, (clientX - rect.left - labelArea) / trackWidth));
+  const time = pct * getEditorTimelineDuration();
+  if (typeof window.sendPreviewCmd === 'function') window.sendPreviewCmd('seek', time);
+  else previewFrame(time);
+}
+
+(function wireTimelineInteraction() {
+  const ruler = document.getElementById('ed-tl-ruler2');
+  if (ruler) ruler.addEventListener('click', function(e) { edTimelineSeekFromX(e.clientX); });
+  const playhead = document.getElementById('ed-tl-playhead2');
+  const hitArea = playhead ? playhead.querySelector('.ed-tl-playhead-hit') : null;
+  if (hitArea) {
+    let dragging = false;
+    hitArea.addEventListener('pointerdown', function(e) { e.preventDefault(); dragging = true; hitArea.setPointerCapture(e.pointerId); });
+    document.addEventListener('pointermove', function(e) { if (dragging) edTimelineSeekFromX(e.clientX); });
+    document.addEventListener('pointerup', function() { dragging = false; });
+  }
+})();
+
 window.__nfEditorDiagnose = function() {
   const engine = window.previewEngine;
   const scenes = window.__scenes || {};
