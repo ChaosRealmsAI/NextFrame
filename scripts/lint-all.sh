@@ -77,3 +77,7 @@ else
   echo "SOME CHECKS FAILED"
   exit 1
 fi
+
+
+echo "=== v0.7 architecture lint ==="
+bash "$(dirname "$0")/lint-v07.sh" || exit 1
