@@ -292,12 +292,15 @@ function updatePreviewScale() {
   stage.style.width = w + 'px';
   stage.style.height = h + 'px';
   stage.style.transformOrigin = '0 0';
+  stage.style.position = 'absolute';
   requestAnimationFrame(function() {
     const cw = canvas.clientWidth;
     const ch = canvas.clientHeight;
     if (cw <= 0 || ch <= 0) return;
     const scale = Math.min(cw / w, ch / h);
     stage.style.transform = 'scale(' + scale + ')';
+    stage.style.left = ((cw - w * scale) / 2) + 'px';
+    stage.style.top = ((ch - h * scale) / 2) + 'px';
   });
 }
 
