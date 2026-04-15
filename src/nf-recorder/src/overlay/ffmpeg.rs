@@ -61,6 +61,40 @@ pub(super) fn build_video_layer_filter(layers: &[VideoOverlaySpec]) -> String {
     filters.join(";")
 }
 
+/// Build an audio filter chain that extracts each overlay video's audio track,
+/// delays it to its timeline start, and mixes everything into [aout].
+/// Returns empty string if no layers (caller should skip audio mapping).
+pub(super) fn build_audio_layer_filter(layers: &[VideoOverlaySpec]) -> String {
+    if layers.is_empty() {
+        return String::new();
+    }
+    let mut filters = Vec::with_capacity(layers.len() + 1);
+    let mut labels = Vec::with_capacity(layers.len());
+    for (index, layer) in layers.iter().enumerate() {
+        let label = format!("[aud{index}]");
+        let delay_ms = (layer.start_sec * 1000.0).round().max(0.0) as u64;
+        let dur = layer.duration_sec.max(0.0);
+        // atrim the source audio to its clip duration, reset PTS, delay to timeline start
+        filters.push(format!(
+            "[{}:a]atrim=0:{:.6},asetpts=PTS-STARTPTS,adelay={delay_ms}|{delay_ms}{label}",
+            index + 1,
+            dur
+        ));
+        labels.push(label);
+    }
+    if labels.len() == 1 {
+        // Single clip — still need a named output
+        filters.push(format!("{}aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[aout]", labels[0]));
+    } else {
+        let mix_inputs = labels.join("");
+        filters.push(format!(
+            "{mix_inputs}amix=inputs={}:duration=longest:normalize=0,aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo[aout]",
+            labels.len()
+        ));
+    }
+    filters.join(";")
+}
+
 pub fn overlay_video_layers(recorded: &Path, layers: &[VideoOverlaySpec]) -> Result<(), String> {
     if layers.is_empty() {
         return Ok(());
@@ -68,18 +102,24 @@ pub fn overlay_video_layers(recorded: &Path, layers: &[VideoOverlaySpec]) -> Res
 
     trace_log!("overlay: compositing {} video layer(s)", layers.len());
     let temp_out = recorded.with_extension("overlay.mp4");
-    let filter = build_video_layer_filter(layers);
+    let video_filter = build_video_layer_filter(layers);
+    let audio_filter = build_audio_layer_filter(layers);
+    let combined_filter = if audio_filter.is_empty() {
+        video_filter
+    } else {
+        format!("{video_filter};{audio_filter}")
+    };
     let mut command = Command::new("ffmpeg");
     command.args(["-y", "-i"]).arg(recorded);
     for layer in layers {
         command.arg("-i").arg(&layer.source_path);
     }
     let status = command
-        .args(["-filter_complex", &filter])
+        .args(["-filter_complex", &combined_filter])
         .args(["-map", "[out]"])
-        .args(["-map", "0:a?"])
+        .args(["-map", "[aout]"])
         .args(["-c:v", "h264_videotoolbox", "-q:v", "65"])
-        .args(["-c:a", "copy"])
+        .args(["-c:a", "aac", "-b:a", "192k"])
         .args(["-movflags", "+faststart"])
         .arg(&temp_out)
         .output()
