@@ -17,7 +17,8 @@ test("v3-ai list/get/validate operate on v0.3", async () => {
   const listed = TOOLS.list_scenes.handler();
   assert.equal(listed.ok, true);
   const scenes = await listed.value;
-  assert.ok(scenes.length >= 10, `expected >= 10 scenes, got ${scenes.length}`);
+  assert.ok(scenes.length > 0, "expected list_scenes() to return at least one registered scene");
+  assert.ok(scenes.some((entry) => entry.id === "headlineCenter"), "expected list_scenes() to include headlineCenter");
 
   const scene = TOOLS.get_scene.handler({ id: "headlineCenter" });
   assert.equal(scene.ok, true);

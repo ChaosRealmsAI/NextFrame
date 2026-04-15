@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const CLI = resolve(ROOT, "bin/nextframe.js");
+const TSX = resolve(ROOT, "node_modules", ".bin", "tsx");
 const FIXTURE = resolve(HERE, "fixtures", "minimal-v3.json");
 
 const HAS_CHROME = [
@@ -25,7 +26,7 @@ const HAS_FFMPEG = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status
 
 // frame/preview/render commands need napi-canvas which may not be installed
 const HAS_NAPI_CANVAS = (() => {
-  const r = spawnSync("node", ["-e", "import('./src/targets/napi-canvas.js')"], { cwd: ROOT, stdio: "ignore", timeout: 5000 });
+  const r = spawnSync(TSX, ["-e", "import('./src/targets/napi-canvas.js')"], { cwd: ROOT, stdio: "ignore", timeout: 5000 });
   return r.status === 0;
 })();
 
