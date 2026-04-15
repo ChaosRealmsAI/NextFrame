@@ -86,14 +86,17 @@ export async function run(argv: string[]) {
 
   const byCategory: Record<string, unknown[]> = {};
   for (const s of scenes) {
-    const cat = s.category || "other";
+    const sr = s as unknown as Record<string, unknown>;
+    const cat = (sr.category || sr.role || "other") as string;
     (byCategory[cat] || (byCategory[cat] = [])).push(s);
   }
   for (const [cat, items] of Object.entries(byCategory).sort()) {
     process.stdout.write(`  ${cat}:\n`);
     for (const s of items as Array<Record<string, unknown>>) {
       const ratio = s["ratio"] || "?";
-      process.stdout.write(`    ${String(s["id"]).padEnd(22)} [${ratio}] ${s["label"]} — ${s["description"]}\n`);
+      const label = s["label"] || s["name"] || "";
+      const theme = s["theme"] ? ` ${s["theme"]}` : "";
+      process.stdout.write(`    ${String(s["id"]).padEnd(22)} [${ratio}${theme}] ${label} — ${s["description"]}\n`);
     }
   }
   return 0;
