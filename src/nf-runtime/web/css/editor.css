@@ -1,6 +1,5 @@
 /* ══════════════════════════════════════
-   VIEW: EDITOR — Two-column smart edit
-   Matches prototype: spec/prototypes/v0.6/editor-preview.html
+   VIEW: EDITOR — DOM preview timeline
    ══════════════════════════════════════ */
 
 /* ── Main layout ── */
@@ -8,18 +7,10 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 8px;
+  gap: 0;
   padding: 8px;
   overflow: hidden;
   font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
-}
-
-/* ══ LEFT PANEL — Clips list ══ */
-.ed-panel-left {
-  width: 240px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
 }
 .ed-clip-header {
   padding: 12px 14px 8px;
@@ -118,6 +109,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
   min-width: 0;
   min-height: 0;
 }
@@ -140,6 +132,11 @@
   background: #0a0a0e;
   border: 1px solid var(--border);
   cursor: default;
+}
+.ed-preview-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 .ed-preview-gradient {
   position: absolute;
@@ -346,6 +343,15 @@
   padding: 4px 0 4px 100px;
   min-height: 100%;
 }
+.ed-tl-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 20px;
+  color: var(--t50);
+  font-size: 13px;
+}
 .ed-tl-track {
   height: 24px;
   margin: 2px 0;
@@ -431,13 +437,7 @@
 /* ══ RESPONSIVE ══ */
 @media (max-width: 720px) {
   .ed-body {
-    flex-direction: column;
     overflow: auto;
-  }
-  .ed-panel-left {
-    width: auto;
-    min-width: 0;
-    max-height: 200px;
   }
   .ed-timeline {
     height: 140px;
