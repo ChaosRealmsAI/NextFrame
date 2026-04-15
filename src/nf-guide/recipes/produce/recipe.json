@@ -11,6 +11,14 @@
       "description": "确定视频比例，驱动后续全部决策"
     },
     {
+      "id": "tts",
+      "title": "TTS 生成（Type C 起点，可跳过）",
+      "prompt": "00a-tts.md",
+      "gate": "tts-ready",
+      "description": "Type C 纯 TTS 视频：nf-tts synth 产出 mp3 + char-level timeline.json",
+      "optional": true
+    },
+    {
       "id": "check",
       "title": "确认素材 + 检查组件",
       "prompt": "01-check.md",

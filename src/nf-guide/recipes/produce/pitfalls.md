@@ -2,6 +2,30 @@
 
 每个坑来自真实调试经历。触发时状态机自动提示。
 
+## v0.6 tracks + matches
+
+### `nextframe build` 报 "v0.1 tracks/clips format detected"
+- **触发**: tracks[] 存在但没写 matches[]
+- **现象**: build 拒绝启动，误认为是 v0.1 老格式
+- **修复**: 加 `matches: []`（哪怕空数组）+ 至少一条 rule；或用 `nextframe match from-tts` 一键生成
+- **防呆**: detectFormat 已识别 v0.6（有 tracks + matches 就认）
+
+### TTS mp3 文件没扩展名
+- **触发**: `nf-tts synth -o narration` 产出文件叫 `narration`（无 `.mp3`）
+- **现象**: 后续 `from-tts` 或 build 找不到音频
+- **修复**: 合成后手动 `mv narration narration.mp3`
+- **防呆**: `nextframe match from-tts` 会自动猜 `<stem>.mp3`，找不到就报错
+
+### 手改了 segment.startMs
+- **触发**: 为了对齐某个句子手动改 timeline.json 里的时间戳
+- **现象**: `match validate` 报 "timestamps edited manually"
+- **修复**: 重跑 TTS 而不是改时间；文本要调整就重新合成
+
+### matches 里 plan 引用的 scene 不存在
+- **触发**: AI 写的 plan 选了某个 scene 名在 registry 里没有
+- **现象**: `match validate` 拒绝 + 给 `suggest` 列表
+- **修复**: 按 suggest 改 scene 名；或者 `nextframe scenes` 看全量
+
 ## 字幕
 
 ### 字幕对齐错乱
