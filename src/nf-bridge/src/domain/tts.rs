@@ -48,7 +48,9 @@ pub(crate) fn handle_audio_synth(params: &Value) -> Result<Value, String> {
     let segment = params
         .get("segment")
         .and_then(Value::as_u64)
-        .ok_or("missing required param: segment (1-based number)")?;
+        .ok_or(
+            "missing required param: segment (1-based number). Fix: provide params.segment as a 1-based segment number.",
+        )?;
 
     let (project_name, episode_name) = resolve_names(project, episode);
     let (bin, prefix_args) = nextframe_cli()?;
@@ -76,12 +78,16 @@ pub(crate) fn handle_audio_synth(params: &Value) -> Result<Value, String> {
 
     let output = cmd
         .output()
-        .map_err(|e| format!("failed to run nextframe audio-synth: {e}"))?;
+        .map_err(|e| {
+            format!(
+                "failed to run nextframe audio-synth: {e}. Fix: ensure node and the NextFrame CLI are installed and available."
+            )
+        })?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!(
-            "nextframe audio-synth failed (exit {}): {stderr}",
+            "nextframe audio-synth failed (exit {}): {stderr}. Fix: verify the project, episode, segment, and voice options, then retry.",
             output.status
         ));
     }

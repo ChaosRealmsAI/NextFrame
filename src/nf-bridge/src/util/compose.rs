@@ -43,7 +43,7 @@ pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
             format!(
-                "failed to create output directory '{}': {error}",
+                "failed to create output directory '{}': {error}. Fix: create the parent directory or choose a writable output path.",
                 parent.display()
             )
         })?;
@@ -61,7 +61,11 @@ pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
-            .map_err(|error| format!("failed to run nextframe build: {error}"))?;
+            .map_err(|error| {
+                format!(
+                    "failed to run nextframe build: {error}. Fix: ensure node and the NextFrame CLI are installed and available."
+                )
+            })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -84,7 +88,7 @@ pub(crate) fn handle_compose_generate(params: &Value) -> Result<Value, String> {
 
     let meta = fs::metadata(&output_path).map_err(|error| {
         format!(
-            "failed to stat composed html {}: {error}",
+            "failed to stat composed html {}: {error}. Fix: verify the HTML output file was created successfully and is readable.",
             output_path.display()
         )
     })?;
@@ -107,7 +111,7 @@ fn write_test_compose_output(output_path: &Path) -> Result<bool, String> {
 
     fs::write(output_path, html.as_ref()).map_err(|error| {
         format!(
-            "failed to write stub compose output '{}': {error}",
+            "failed to write stub compose output '{}': {error}. Fix: choose a writable output path or clear the test stub override.",
             output_path.display()
         )
     })?;
@@ -140,7 +144,12 @@ fn open_in_browser(path: &Path) -> Result<(), String> {
 
     let status = command
         .status()
-        .map_err(|error| format!("failed to open '{}': {error}", path.display()))?;
+        .map_err(|error| {
+            format!(
+                "failed to open '{}': {error}. Fix: open the file manually or verify the system browser command is available.",
+                path.display()
+            )
+        })?;
     if status.success() {
         Ok(())
     } else {

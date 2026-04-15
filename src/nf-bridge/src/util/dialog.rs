@@ -38,7 +38,12 @@ pub(crate) fn handle_fs_reveal(params: &Value) -> Result<Value, String> {
     let path = require_string(params, "path")?;
     let path_buf = resolve_reveal_path(path)?;
     reveal_in_file_manager(&path_buf)
-        .map_err(|error| format!("failed to reveal '{}': {error}", path_buf.display()))?;
+        .map_err(|error| {
+            format!(
+                "failed to reveal '{}': {error}. Fix: verify the path exists and that the desktop file manager can open it.",
+                path_buf.display()
+            )
+        })?;
 
     Ok(json!({
         "path": path_buf.display().to_string(),
@@ -183,13 +188,15 @@ pub(crate) fn parse_dialog_filters(params: &Value) -> Result<Vec<String>, String
                     .get("extensions")
                     .and_then(Value::as_array)
                     .ok_or_else(|| {
-                        format!("params.filters[{index}].extensions must be an array")
+                        format!(
+                            "failed to read params.filters[{index}].extensions: params.filters[{index}].extensions must be an array. Fix: provide extensions as a JSON array of strings."
+                        )
                     })?;
 
                 for (extension_index, value) in values.iter().enumerate() {
                     let extension = value.as_str().ok_or_else(|| {
                         format!(
-                            "params.filters[{index}].extensions[{extension_index}] must be a string"
+                            "failed to read params.filters[{index}].extensions[{extension_index}]: params.filters[{index}].extensions[{extension_index}] must be a string. Fix: provide each extension as a string value."
                         )
                     })?;
 

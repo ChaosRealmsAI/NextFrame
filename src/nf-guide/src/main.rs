@@ -108,7 +108,10 @@ fn main() -> ExitCode {
                 steps_pipeline = iter.next();
             }
             _ if arg.starts_with("--") => {
-                eprintln!("unknown flag: {arg}\n\n{}", usage());
+                eprintln!(
+                    "unknown flag: {arg}. Fix: use --help to see the supported nf-guide flags.\n\n{}",
+                    usage()
+                );
                 return ExitCode::from(2);
             }
             _ => positional.push(arg),
@@ -149,7 +152,10 @@ fn main() -> ExitCode {
                     ExitCode::SUCCESS
                 }
                 Err(error) => {
-                    eprintln!("failed to read {}: {error}", path.display());
+                    eprintln!(
+                        "failed to read {}: {error}. Fix: verify the pipeline guide exists and is readable.",
+                        path.display()
+                    );
                     ExitCode::from(1)
                 }
             }

@@ -247,7 +247,7 @@ fn run() -> Result<(), String> {
             let video = absolute_path(&args.video)?;
             if !video.exists() {
                 return Err(/* Fix: user-facing error formatted below */ format!(
-                    "failed to validate the clip overlay video: --video file not found: {}. Fix: Pass an existing local video file to `--video`.",
+                    "failed to validate the clip overlay video: --video file not found: {}. Fix: pass an existing local video file to `--video`.",
                     video.display()
                 ));
             }
@@ -276,12 +276,12 @@ fn maybe_write_output_json(output: &RecordOutput) -> Result<(), String> {
 fn write_output_json(path: &Path, output: &RecordOutput) -> Result<(), String> {
     let bytes = serde_json::to_vec(output).map_err(|err| {
         format!(
-            "failed to serialize the recorder output JSON: {err}. Fix: Retry the command after removing unsupported values from the recorder output payload."
+            "failed to serialize the recorder output JSON: {err}. Fix: retry the command after removing unsupported values from the recorder output payload."
         )
     })?;
     fs::write(path, bytes).map_err(|err| {
         format!(
-            "failed to write the recorder output JSON: {}: {err}. Fix: Ensure the destination directory exists and is writable, then retry.",
+            "failed to write the recorder output JSON: {}: {err}. Fix: ensure the destination directory exists and is writable, then retry.",
             path.display()
         )
     })

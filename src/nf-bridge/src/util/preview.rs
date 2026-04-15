@@ -23,7 +23,11 @@ pub(crate) fn handle_preview_frame(params: &Value) -> Result<Value, String> {
 
     if let Some(stub_path) = env::var_os("NF_BRIDGE_TEST_PREVIEW_PNG") {
         let bytes = fs::read(PathBuf::from(stub_path))
-            .map_err(|e| format!("failed to read stub preview frame: {e}"))?;
+            .map_err(|e| {
+                format!(
+                    "failed to read stub preview frame: {e}. Fix: point NF_BRIDGE_TEST_PREVIEW_PNG at a readable PNG file."
+                )
+            })?;
         let b64 = base64_encode(&bytes);
         return Ok(json!({
             "dataUrl": format!("data:image/png;base64,{b64}"),
@@ -52,7 +56,11 @@ pub(crate) fn handle_preview_frame(params: &Value) -> Result<Value, String> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .map_err(|e| format!("failed to run nextframe frame: {e}"))?;
+        .map_err(|e| {
+            format!(
+                "failed to run nextframe frame: {e}. Fix: ensure node and the NextFrame CLI are installed and available."
+            )
+        })?;
 
     if !status.success() {
         return Err(format!( // Fix: included in the error string below
@@ -63,10 +71,18 @@ pub(crate) fn handle_preview_frame(params: &Value) -> Result<Value, String> {
 
     // read PNG and encode as base64
     let mut file = std::fs::File::open(&out_path)
-        .map_err(|e| format!("failed to open rendered frame: {e}"))?;
+        .map_err(|e| {
+            format!(
+                "failed to open rendered frame: {e}. Fix: verify the preview renderer produced the PNG output file."
+            )
+        })?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)
-        .map_err(|e| format!("failed to read rendered frame: {e}"))?;
+        .map_err(|e| {
+            format!(
+                "failed to read rendered frame: {e}. Fix: verify the preview PNG is readable and retry the frame render."
+            )
+        })?;
 
     let b64 = base64_encode(&bytes);
 
