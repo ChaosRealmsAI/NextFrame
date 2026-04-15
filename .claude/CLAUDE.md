@@ -108,7 +108,7 @@ The project has two JS execution contexts. **Writing TS in the wrong zone = brow
 
 Rules:
 - `src/nf-core/scenes/**/*.js` — keep `.js`, pure functions, no type annotations
-- `src/nf-core/scenes/shared/design.js` — keep `.js`, inlined as design preamble
+- `src/nf-core/scenes/{ratio}/{theme}/*.js` — keep `.js`, default-export object, zero import (see scene v3 spec at `spec/standards/project/scene/scene-component-system.html`)
 - `src/nf-core/animation/effects/*.ts` + `animation/shared.ts` — `.ts` extension OK but **must not contain type annotations** (`: string`, `interface`, `as const`, generics). Content must be valid JS.
 - Everything else in `src/nf-core/` and `src/nf-cli/` — full TypeScript, write types freely
 
@@ -124,44 +124,57 @@ Rules:
 - No TODO/FIXME/HACK/XXX in production code.
 - Scenes must not cross-import from modules/ directory.
 
-## Pipeline State Machine (AI 做视频必读)
+## nf-guide is the SOLE state-machine truth (mandatory)
 
-视频生产全流程由状态机驱动，提示词和坑记录在 `src/nf-cli/src/commands/pipeline/recipes/` 下。
+**Any AI doing scene / timeline / video work — `nf-guide` is the entry point. No exceptions.**
 
-**做视频前先读对应 recipe 的 step MD：**
+`src/nf-guide/` (Rust crate) reads markdown recipes from `src/nf-guide/recipes/{recipe}/`. Each recipe is a state machine of step-by-step prompts.
 
-| Recipe | 路径 | 用途 |
-|--------|------|------|
-| **produce** | `pipeline/recipes/produce/` | 从素材到 MP4 的完整生产 |
+### Progressive disclosure (3 levels — AI 自己按需展开)
 
-### produce 流程 (8 步)
+```bash
+# L1 列表 — 有哪些菜谱
+cargo run -p nf-guide
 
-| Step | 文件 | 做什么 |
-|------|------|--------|
-| 0 | `00-ratio.md` | 定比例 9:16/16:9 — 一切的起点 |
-| 1 | `01-check.md` | 确认素材 + 检查该 ratio 下组件 |
-| 2 | `02-scene.md` | 做缺失组件 + preview 截图验证 |
-| 3 | `03-timeline.md` | 写 timeline JSON，字幕直接贴不转换 |
-| 4 | `04-validate.md` | nextframe validate 参数门禁 |
-| 5 | `05-build.md` | nextframe build + 自动截图 + AI 看图 |
-| 6 | `06-record.md` | recorder 录制 + ffprobe 验证 |
-| 7 | `07-concat.md` | 多段拼接（可选） |
+# L2 流程 — 看一个菜谱的整体步骤
+cargo run -p nf-guide -- {recipe}
 
-**踩坑记录:** `pipeline/recipes/produce/pitfalls.md` — 10 个已知坑 + 修复方法
+# L3 步骤 — 看某一步的完整 prompt
+cargo run -p nf-guide -- {recipe} {step}
+```
 
-### 设计系统
+**这份 CLAUDE.md 不展开 recipe 内容**。recipes 会随产品演进不断增加（新主题、新输出格式、新 pipeline），写死在 CLAUDE.md 里就成了滞后的副本。**AI 用 CLI 现取现读**，永远是最新的。
 
-`src/nf-core/scenes/shared/design.js` 是所有 scene 的单一真相源：
-- `TOKENS` — 颜色（interview/lecture 两套）
-- `GRID` / `GRID_16x9` — 布局网格（精确像素坐标）
-- `TYPE` / `TYPE_16x9` — 字号/字重/字体
-- `findActiveSub(segments, t)` — 字幕两级查找（segment→英文, cn[]→中文）
+### Maintenance rule (CRITICAL for future-AI usability)
+
+**Every time you change scene contract / CLI command / pipeline behavior, update the matching recipe step.** Stale prompts = future AI follows wrong instructions = product breaks invisibly.
+
+- Changed `nextframe scenes` output? Update the relevant step (run `nf-guide` to find it).
+- Added a new ratio / theme? Update the discovery / check steps.
+- New verification command? Update the verify section of the relevant step.
+- Found a new pitfall? Append to the recipe's `pitfalls.md`.
+- 加了新 recipe？放进 `src/nf-guide/recipes/{name}/` — L1 自动发现。
+
+**Don't write parallel state machines elsewhere** (e.g., `src/nf-cli/src/commands/render/states/` was deleted — it was a duplicate that drifted). nf-guide is the only state machine.
+
+### Design system per theme
+
+Each scene theme has its own `theme.md` next to the components:
+
+```
+src/nf-core/scenes/{ratio}/{theme}/theme.md
+```
+
+Pure documentation. AI reads it before writing components. **Code does NOT import theme.md** — colors / fonts / grid are written directly into each component file (single source of truth = the component file itself).
+
+Themes shipped: `9x16/interview-dark`, `16x9/lecture-light`, `16x9/anthropic-warm`.
 
 ## Key Paths
 
 - Engine core: `src/nf-core/engine/` (timeline, build, validate, keyframes)
 - Animation: `src/nf-core/animation/` (effects/ + transitions/)
-- Scene components: `src/nf-core/scenes/` (7 categories + meta.js + index.js)
+- Scene components: `src/nf-core/scenes/{ratio}/{theme}/{role}-{name}.js` (single-file self-contained, see scene v3 spec)
+- Scene state-machine prompts: `src/nf-guide/recipes/` (Rust binary `nf-guide` is the only entry point)
 - Design system: `src/nf-core/scenes/shared/design.js` (TOKENS, GRID, TYPE, utilities)
 - Pipeline recipes: `src/nf-cli/src/commands/pipeline/recipes/` (state machine prompts)
 - CLI commands: `src/nf-cli/src/commands/` (timeline/, render/, project/, pipeline/, app/)
