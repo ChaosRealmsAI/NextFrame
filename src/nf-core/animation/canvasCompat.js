@@ -1,3 +1,4 @@
+// Canvas compatibility layer — translates CSS-like animation props to canvas draw calls
 import { clamp01 } from "./shared.js";
 
 const TRANSFORM_RE = /([a-zA-Z0-9]+)\(([^)]+)\)/g;

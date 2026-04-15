@@ -1,3 +1,4 @@
+// Animation applicator — resolves easing curves and applies animated property values
 import { EASINGS, cubicBezier, springConfigurable, steps } from "../engine/keyframes.js";
 import { EFFECT_FNS, EFFECT_IDS } from "./effects/index.js";
 import { TRANSITION_FNS, TRANSITION_IDS } from "./transitions/index.js";

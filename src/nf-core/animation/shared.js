@@ -1,3 +1,4 @@
+// Shared animation utilities — CSS property parsing, clamping, and interpolation helpers
 const CSS_PROP_CACHE = new Map();
 
 export function clamp(value, min, max) {

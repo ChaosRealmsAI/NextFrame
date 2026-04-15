@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Scene validator CLI — checks scene component contracts (render, describe, defaults, validate)
 /**
  * Scene 验证工具 — AI 在开发和使用阶段都用这个自检。
  *
