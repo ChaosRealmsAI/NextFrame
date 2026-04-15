@@ -95,24 +95,45 @@ Key methods for AI verification:
 - `project.list/create`, `episode.list/create`, `segment.list`
 - `fs.read/write/listDir` — filesystem operations
 
-## TypeScript / JavaScript Boundary (mandatory)
+## TypeScript / JavaScript Boundary (mandatory — enforced by `scripts/lint-boundary.sh`)
 
-The project has two JS execution contexts. **Writing TS in the wrong zone = browser runtime crash.**
+**Rule**: 谁直接吃这份代码，决定语言。WKWebView `<script>` 直载 + stripESM inline + OS exec → JS。只被 Node `import` → TS。
 
-| Zone | Language | Why |
-|------|----------|-----|
-| **Node zone** (engine/, animation/apply.ts, CLI, filters/) | TypeScript — full syntax OK | Runs in Node with TS support |
-| **Browser-inline zone** (scenes, animation/effects/, animation/shared.ts, design.js) | JS only — no TS type annotations | `stripESM()` inlines raw text into `<script>`, browser has no TS compiler |
+### JS-only zones (必须是合法 JS，禁写 .ts)
 
-**Browser-inline zone** = any file read by `stripESM()` / `buildAnimationBundle()` / `buildSharedPreamble()` and injected into HTML.
+| 路径 | 为什么 |
+|------|--------|
+| `src/nf-runtime/web/src/**` | WKWebView `<script src="*.js">` 直接加载 |
+| `src/nf-core/scenes/**` | stripESM 内联进 HTML |
+| `src/nf-core/animation/effects/**` | browser-inline |
+| `src/nf-core/animation/transitions/**` | browser-inline |
+| `src/nf-core/animation/shared.js`, `canvasCompat.js` | browser-inline |
+| `src/nf-core/filters/**` | browser-inline |
+| `src/nf-cli/bin/nextframe.js` | package.json bin，OS 直接 exec |
+| `src/nf-cli/preview/app.js` | preview HTML 直接加载 |
 
-Rules:
-- `src/nf-core/scenes/**/*.js` — keep `.js`, pure functions, no type annotations
-- `src/nf-core/scenes/{ratio}/{theme}/*.js` — keep `.js`, default-export object, zero import (see scene v3 spec at `spec/standards/project/scene/scene-component-system.html`)
-- `src/nf-core/animation/effects/*.ts` + `animation/shared.ts` — `.ts` extension OK but **must not contain type annotations** (`: string`, `interface`, `as const`, generics). Content must be valid JS.
-- Everything else in `src/nf-core/` and `src/nf-cli/` — full TypeScript, write types freely
+### TS-authoritative zones (必须 .ts，禁同名 .js)
 
-**How to check:** `grep -rn ': [A-Z]' src/nf-core/animation/effects/` — if any match, it'll break the browser build.
+| 路径 | 为什么 |
+|------|--------|
+| `src/nf-cli/src/**` | Node CLI 内部，通过 `tsx` 运行 |
+| `src/nf-cli/test/**` | Node 测试，tsx 跑 |
+| `src/nf-core/engine/**` | Node 构建逻辑 |
+| `src/nf-core/animation/apply.ts` | 仅 Node 侧调用，不 inline |
+
+### CLI 运行机制（重要）
+
+`bin/nextframe.js` 是一层 shim，spawn `tsx` 执行 `src/nf-cli/src/index.ts`。**不需要任何构建步骤**；改 .ts 立即生效。
+
+### 双份禁令（硬约束）
+
+同名 `.ts` + `.js` 永不共存。`scripts/lint-boundary.sh` 在 pre-commit 和 `lint-all.sh` 里跑 4 条规则：
+1. 任何 src/ 下同 stem 的 .ts/.js 对 → FAIL
+2. JS-only 区出现 .ts（非 .d.ts）→ FAIL
+3. TS-only 区出现 .js → FAIL
+4. index.html `<script src=>` 引用的文件不存在 → FAIL
+
+违反 = commit 直接拒。2026-04 一次 TS 迁移就是缺这个 lint 才出事。
 
 ## Core Rules
 
