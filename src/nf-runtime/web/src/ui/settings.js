@@ -4,7 +4,7 @@ function createMarkupNode(markup) {
   return wrapper.firstElementChild || document.createTextNode('');
 }
 
-function createSelect(options, activeValue) {
+function createSelect(options, activeValue, onPick) {
   return h(
     'div',
     { class: 'nf-select', 'data-value': activeValue },
@@ -28,7 +28,10 @@ function createSelect(options, activeValue) {
             class: 'nf-select-option' + (option.value === activeValue ? ' active' : ''),
             'data-val': option.value,
             'data-nf-action': 'pick-option',
-            onclick: (event) => window.pickOption(event.currentTarget),
+            onclick: (event) => {
+              window.pickOption(event.currentTarget);
+              if (typeof onPick === 'function') onPick(option.value);
+            },
           },
           option.label,
         ),
@@ -38,6 +41,16 @@ function createSelect(options, activeValue) {
 }
 
 class SettingsPanel extends Modal {
+  constructor(props = {}) {
+    super(props);
+    this.state = {
+      language: 'zh',
+      resolution: '1080p',
+      fps: '30',
+      codec: 'h264',
+    };
+  }
+
   overlayClassName() {
     return 'settings-overlay';
   }
@@ -75,7 +88,7 @@ class SettingsPanel extends Modal {
               { value: 'en', label: 'English' },
               { value: 'zh', label: '简体中文' },
               { value: 'ja', label: '日本語' },
-            ], 'zh'),
+            ], this.state.language, (value) => this.setState({ language: value })),
           ),
           h(
             'div',
@@ -96,7 +109,7 @@ class SettingsPanel extends Modal {
               { value: '1080p', label: '1920×1080' },
               { value: '4k', label: '3840×2160' },
               { value: '720p', label: '1280×720' },
-            ], '1080p'),
+            ], this.state.resolution, (value) => this.setState({ resolution: value })),
           ),
           h(
             'div',
@@ -106,7 +119,7 @@ class SettingsPanel extends Modal {
               { value: '30', label: '30' },
               { value: '24', label: '24' },
               { value: '60', label: '60' },
-            ], '30'),
+            ], this.state.fps, (value) => this.setState({ fps: value })),
           ),
           h(
             'div',
@@ -116,7 +129,7 @@ class SettingsPanel extends Modal {
               { value: 'h264', label: 'h264' },
               { value: 'h265', label: 'h265' },
               { value: 'prores', label: 'ProRes' },
-            ], 'h264'),
+            ], this.state.codec, (value) => this.setState({ codec: value })),
           ),
         ),
         h(

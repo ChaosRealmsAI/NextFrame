@@ -72,18 +72,36 @@ function renderCard(project) {
 class NewProjectModal extends Modal {
   constructor(props = {}) {
     super(props);
-    this.state = { tags: [], ratio: '16:9', open: false };
+    this.state = {
+      name: '',
+      path: '~/NextFrame/projects',
+      ratio: '16:9',
+      tags: [],
+      tagInput: '',
+      open: false,
+    };
   }
 
   isOpen() {
     return !!this.state.open;
   }
 
+  syncDraftFromDom() {
+    const nameEl = document.getElementById('np-name');
+    const pathEl = document.getElementById('np-path');
+    const tagInputEl = document.getElementById('np-tag-input');
+    if (nameEl) this.state.name = nameEl.value;
+    if (pathEl) this.state.path = pathEl.textContent || this.state.path;
+    if (tagInputEl) this.state.tagInput = tagInputEl.value;
+  }
+
   toggle() {
+    this.syncDraftFromDom();
     this.setState({ open: !this.state.open });
   }
 
   close() {
+    this.syncDraftFromDom();
     this.setState({ open: false });
   }
 
@@ -94,21 +112,24 @@ class NewProjectModal extends Modal {
       event.currentTarget.value = '';
       return;
     }
-    event.currentTarget.value = '';
-    this.setState({ tags: this.state.tags.concat(value) });
+    this.syncDraftFromDom();
+    this.setState({ tags: this.state.tags.concat(value), tagInput: '' });
   }
 
   removeTag(tag) {
+    this.syncDraftFromDom();
     this.setState({ tags: this.state.tags.filter((item) => item !== tag) });
   }
 
   setRatio(ratio) {
+    this.syncDraftFromDom();
     this.setState({ ratio });
   }
 
   createProject() {
-    const name = document.getElementById('np-name')?.value || 'Untitled';
-    const path = document.getElementById('np-path')?.textContent || '~/NextFrame/projects';
+    this.syncDraftFromDom();
+    const name = this.state.name || 'Untitled';
+    const path = this.state.path || '~/NextFrame/projects';
     if (typeof bridgeCall === 'function') {
       bridgeCall('project.create', { name, path, ratio: this.state.ratio, tags: this.state.tags }).then(() => {
         this.close();
@@ -149,12 +170,19 @@ class NewProjectModal extends Modal {
         { class: 'modal-body' },
         h('div', { class: 'form-group' },
           h('label', { class: 'form-label' }, '项目名称'),
-          h('input', { class: 'form-input', type: 'text', placeholder: 'My Video Project', id: 'np-name', 'data-nf-action': 'input-name' }),
+          h('input', {
+            class: 'form-input',
+            type: 'text',
+            placeholder: 'My Video Project',
+            id: 'np-name',
+            'data-nf-action': 'input-name',
+            value: this.state.name,
+          }),
         ),
         h('div', { class: 'form-group' },
           h('label', { class: 'form-label' }, '保存位置'),
           h('div', { class: 'form-path-row' },
-            h('span', { class: 'form-path', id: 'np-path' }, '~/NextFrame/projects'),
+            h('span', { class: 'form-path', id: 'np-path' }, this.state.path),
             h('button', { class: 'form-path-btn', 'data-nf-action': 'select-folder', onclick: () => window.alert('选择文件夹') }, '选择'),
           ),
         ),
@@ -186,6 +214,7 @@ class NewProjectModal extends Modal {
               placeholder: '# 输入标签后按空格',
               id: 'np-tag-input',
               'data-nf-action': 'input-tags',
+              value: this.state.tagInput,
               onkeyup: (event) => this.addTagFromInput(event),
             }),
           ),
