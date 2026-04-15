@@ -31,6 +31,18 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
     nextframe render demo ep01 intro --target=ffmpeg
     nextframe render ./timeline.json ./intro.mp4 --target=recorder --crf=18
   `),
+  examples("wysiwyg", `
+    nextframe wysiwyg diff ./timeline.json --time=3.5
+    nextframe wysiwyg simulate ./timeline.json --layer=2 move 120 60 --json
+  `),
+  examples("wysiwyg diff", `
+    nextframe wysiwyg diff ./timeline.json --time=3.5
+    nextframe wysiwyg diff ./timeline.json --time=00:03.5 --json
+  `),
+  examples("wysiwyg simulate", `
+    nextframe wysiwyg simulate ./timeline.json --layer=2 move 120 60
+    nextframe wysiwyg simulate ./timeline.json --layer=1 edit-text "New title" --json
+  `),
   examples("match", `
     nextframe match plan e01 --rule scene-per-segment
     nextframe match validate ./timeline.json --json

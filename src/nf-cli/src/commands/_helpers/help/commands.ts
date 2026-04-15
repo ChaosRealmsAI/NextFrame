@@ -15,6 +15,7 @@ const command = (name: string, summary: string, usage: string, params: string, c
 
 export const TOP_LEVEL_COMMANDS = [
   group("Timeline", "new validate build scenes preview frame describe-frame render"),
+  group("WYSIWYG", "wysiwyg"),
   group("Match", "match"),
   group("Scene Dev", "scene-new scene-preview scene-validate"),
   group("Layer CRUD", "layer-list layer-add layer-move layer-resize layer-set layer-remove"),
@@ -79,6 +80,20 @@ export const COMMAND_SPECS = Object.fromEntries([
     --quiet suppress progress output
     --json emit structured export result data`, `The timeline is validated before rendering starts.
     Direct timeline.json mode requires an explicit output mp4 path.`),
+  command("wysiwyg", "Dispatch v0.7 WYSIWYG scaffold subcommands.", `nextframe wysiwyg <subcommand>
+    nextframe wysiwyg <subcommand> --help`, `Subcommands: diff, simulate
+    Run nextframe wysiwyg <subcommand> --help for subcommand-specific params`, `This is additive v0.7 scaffolding only.
+    The current implementation returns placeholder results and performs no editing or rendering.`),
+  command("wysiwyg diff", "Stub frame-perfect DOM vs wgpu diff entrypoint.", `nextframe wysiwyg diff <timeline.json> --time=T [--json]`, `<timeline.json> direct path to a timeline file
+    --time=T required frame time in seconds or mm:ss(.f)
+    --json emit structured placeholder output`, `Walking skeleton only: no diffing work is performed yet.
+    Time must parse to a finite non-negative value.`),
+  command("wysiwyg simulate", "Stub inline-edit simulation entrypoint.", `nextframe wysiwyg simulate <timeline.json> --layer=N <action> [arg ...] [--json]`, `<timeline.json> direct path to a timeline file
+    --layer=N required zero-based layer index
+    <action> edit action label such as move, resize, or edit-text
+    [arg ...] optional action args passed through untouched
+    --json emit structured placeholder output`, `Walking skeleton only: no edits are applied yet.
+    Layer indexes must parse to non-negative integers.`),
   command("match", "Plan, validate, and preview v0.6 tracks+matches workflows.", `nextframe match <subcommand>
     nextframe match <subcommand> --help`, `Subcommands: plan, validate, preview
     Run nextframe match <subcommand> --help for subcommand-specific params and examples`, `Use this only for v0.6 tracks+matches timelines.

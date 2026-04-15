@@ -54,6 +54,7 @@ const SUBCOMMANDS = {
   "app-pipeline": () => import("./commands/app/app-pipeline.js"),
   "app-eval": () => import("./commands/app/app-eval.js"),
   "app-screenshot": () => import("./commands/app/app-screenshot.js"),
+  wysiwyg: () => import("./commands/wysiwyg/index.js"),
   help: null,
 };
 
