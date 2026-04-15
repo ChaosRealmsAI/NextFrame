@@ -57,6 +57,7 @@ function hasExplicitBounds(layer: LooseLayer | null | undefined) {
 
 export function detectFormat(timeline: LooseTimeline) {
   if (Array.isArray(timeline?.layers)) return "v0.3";
+  if (Array.isArray(timeline?.tracks) && Array.isArray((timeline as Record<string, unknown>)?.matches)) return "v0.6";
   if (Array.isArray(timeline?.tracks)) return "v0.1";
   return "unknown";
 }

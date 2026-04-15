@@ -41,7 +41,16 @@ export async function run(argv: string[]) {
     return 2;
   }
 
-  // Validate before building
+  // v0.6: tracks + matches — builder expands matches and derives layers automatically
+  if (fmt === 'v0.6') {
+    const { resolve } = await import('node:path');
+    const outPath = (flags.output as string) || shortOutput || resolve(process.cwd(), 'build.html');
+    const result = buildHTML(timeline as Parameters<typeof buildHTML>[0], outPath);
+    emit(result, flags);
+    return result.ok ? 0 : 2;
+  }
+
+  // Validate before building (v0.3 path)
   const validation = await validateTimelineV3(timeline);
   if (!validation.ok) {
     if (flags.json) {
