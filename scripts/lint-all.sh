@@ -30,7 +30,7 @@ OVER=$(find "${LINT_DIRS[@]}" -type f \( -name '*.rs' -o -name '*.js' \) \
   -not -path '*/target/*' -not -path '*/node_modules/*' \
   -not -path '*/.worktrees/*' -not -path '*/poc/*' \
   -not -path '*/output/*' -not -path '*/test*' \
-  -not -path '*/.ally/*' \
+  -not -path '*/.ally/*' -not -name '*-bundle.js' \
   | xargs wc -l 2>/dev/null | awk '$1 > 500 {print}' | grep -v total || true)
 if [ -n "$OVER" ]; then echo "FAIL: files >500 lines:" && echo "$OVER"; FAIL=1; else echo "PASS"; fi
 
