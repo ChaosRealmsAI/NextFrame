@@ -88,7 +88,35 @@ findActiveSub() 需要两级结构才能正确对齐英文和中文。
 
 **路径建议：** 用绝对路径。相对路径在 recorder 里可能解析错误。
 
-## 3.5 9:16 访谈的完整 layer 清单
+## 3.5 videoOverlay — 视频叠加坐标（必填！）
+
+**Why:** recorder 录制时分两步：先截 HTML 画面（所有 scene 层），再用 ffmpeg 把真实视频叠到指定位置。如果 layer 上没写 `videoOverlay` 坐标，recorder 默认全屏叠加 → 视频铺满整个画面 → 标题、字幕、进度条、品牌全部被遮住 → 最终视频只有原始访谈画面，什么 UI 都看不见。
+
+**规则:** 任何 scene 的 `meta.videoOverlay` 为 true 的 layer，timeline 里**必须**写 `videoOverlay` 坐标对象。
+
+```json
+{
+  "id": "video",
+  "scene": "interviewVideoArea",
+  "start": 0,
+  "dur": 81.31,
+  "videoOverlay": {
+    "x": "7.4074%",
+    "y": "14.3750%",
+    "w": "85.1852%",
+    "h": "28.0208%"
+  },
+  "params": { ... }
+}
+```
+
+**坐标怎么算:** x/y 是左上角，w/h 是宽高，百分比基于画布尺寸。从 design.js 的 GRID 取：
+- 9:16: x=80/1080=7.4074%, y=276/1920=14.375%, w=920/1080=85.1852%, h=538/1920=28.0208%
+- 16:9: 查 GRID_16x9 的 content 区域算
+
+**怎么确认:** 运行 `nextframe scenes interviewVideoArea`，看 meta.videoOverlay 是否为 true。是 → 必须写坐标。
+
+## 3.6 9:16 访谈的完整 layer 清单
 
 ```json
 "layers": [
@@ -97,7 +125,9 @@ findActiveSub() 需要两级结构才能正确对齐英文和中文。
     "series": "速通硅谷访谈", "episode": "E01", "guest": "Dario Amodei",
     "title": "指数快到头了，大众浑然不知"
   }},
-  { "id": "video",    "scene": "interviewVideoArea",  "start": 0, "dur": DUR, "params": {
+  { "id": "video",    "scene": "interviewVideoArea",  "start": 0, "dur": DUR,
+    "videoOverlay": { "x": "7.4074%", "y": "14.3750%", "w": "85.1852%", "h": "28.0208%" },
+    "params": {
     "src": "/absolute/path/to/clip_01.mp4", "clipNum": 1, "totalClips": 3
   }},
   { "id": "bisub",    "scene": "interviewBiSub",      "start": 0, "dur": DUR, "params": {
