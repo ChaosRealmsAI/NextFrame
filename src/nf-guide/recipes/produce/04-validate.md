@@ -36,7 +36,7 @@ nextframe validate timeline.json
 
 ## 常见错误场景
 
-### "unknown scene interviewBiSub"
+### "unknown scene bilingualSub"
 组件不存在。回 Step 2 创建：
 ```bash
 nf-guide produce scene

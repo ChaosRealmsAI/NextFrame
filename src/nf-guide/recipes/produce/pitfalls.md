@@ -70,7 +70,7 @@
 - **触发**: timeline 的视频 layer 没写 `videoOverlay: {x,y,w,h}` 百分比坐标
 - **现象**: 最终视频只有原始访谈画面，标题/字幕/进度条/品牌全被遮住
 - **Why**: recorder 先截 HTML 画面，再用 ffmpeg 把真实视频叠上去。没坐标 → 默认全屏叠加
-- **修复**: layer 上加 `"videoOverlay": {"x":"7.4074%","y":"14.3750%","w":"85.1852%","h":"28.0208%"}`，坐标从 design.js GRID 算
+- **修复**: layer 上加 `"videoOverlay": {"x":"7.4074%","y":"14.3750%","w":"85.1852%","h":"28.0208%"}`，坐标从 theme.md 网格段取（或参考 scene videoArea 的 render 坐标）
 - **防呆**: 检查 `nextframe scenes <name>` 的 meta.videoOverlay 是否为 true → 是则必须写坐标
 
 ## 录制

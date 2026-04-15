@@ -56,35 +56,36 @@ ls data/*.json  # 或数据文件
 
 纯创作不需要 fine.json，但需要知道总时长和内容分几个阶段（phase）。
 
-## 1.2 检查组件
+## 1.2 检查主题下有哪些组件（不要假设名字，CLI 查）
+
+**别写死组件名。每个主题有自己的一套。用 CLI 发现当前实际可用的：**
 
 ```bash
-nextframe scenes
+# 列出该 ratio + theme 下所有 scene
+node src/nf-cli/bin/nextframe.js scenes --ratio={ratio} | grep {theme}
+
+# 看某组件接口
+node src/nf-cli/bin/nextframe.js scenes {id}
 ```
 
-### 9:16 需要 4 个（静态合并后）
+### 典型组件分类（role 维度，每个主题都有）
 
-| scene | 类型 | 作用 |
-|-------|------|------|
-| interviewChrome | **静态** | 背景+标题+元信息+品牌 — 全程不变的所有元素合在一个组件 |
-| interviewVideoArea | **动态** | 视频嵌入框（recorder 叠加真实视频） |
-| interviewBiSub | **动态** | 双语字幕（两级查找：segment→英文, cn[]→中文） |
-| progressBar9x16 | **动态** | 进度条 |
+| role | 职责 | 常见组件名（各主题不同）|
+|------|------|---------|
+| **bg** | 背景层（全屏渐变 + 暗角） | 每主题 1 个 |
+| **chrome** | 品牌顶栏 / 底栏（集数 / 署名） | 每主题 1-2 个 |
+| **content** | 主内容（卡片 / 列表 / 代码 / 类比） | 每主题 3-8 个 |
+| **text** | 大标题 / 金句 | 每主题 1-3 个 |
+| **overlay** | 小徽章 / 进度条 / 章节标 | 可选 |
+| **data** | 图表 / 大数字 | 可选 |
 
-**设计原则：** 全程不变的元素合成一个"chrome"组件，随时间变化的各自独立。减少 layer 数量，方便维护。
+### 视频嵌入（访谈类专用）
 
-### 16:9 讲解（按需组合，不是全部都要）
+想嵌入真实 mp4 视频片段 → 该主题必须有 `type=media + videoOverlay:true` 的组件（通常名为 `videoArea`）。看 component/pitfalls.md 坑 11 完整流程。
 
-| scene | 类型 | 作用 | 何时需要 |
-|-------|------|------|---------|
-| lectureChrome | **静态** | 背景+顶栏+进度条+水印 | 必选 |
-| headlineCenter | **动态** | 全屏居中大标题（有淡入） | phase 1 标题 |
-| codeTerminal | **动态** | 代码块（单个 pre） | 展示代码时 |
-| flowDiagram | **动态** | 流程图（单个 svg） | 展示流程时 |
-| lecturePanel | **动态** | 右侧说明面板 | 双栏布局时 |
-| subtitleBar | **动态** | 底部字幕条 | 有配音时 |
+### 缺组件怎么办
 
-**跟 9:16 一样的原则：** 不变的合成 chrome，变的各自独立。不需要全部组件 — 按内容选。
+`nf-guide -- component` 进 4 步状态机做新组件。
 
 ## 分支
 

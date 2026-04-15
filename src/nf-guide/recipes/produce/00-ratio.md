@@ -38,7 +38,7 @@ recorder: --width 1920 --height 1080
 ## 必读
 
 ```bash
-cat src/nf-core/scenes/shared/design.js
+cat src/nf-core/scenes/{ratio}/{theme}/theme.md
 ```
 看 GRID (9:16) 和 GRID_16x9 (16:9) 两套布局的区别。所有像素坐标都在这里。
 

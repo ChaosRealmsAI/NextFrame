@@ -87,7 +87,7 @@ nf-guide produce pitfalls
 
 ## 设计系统
 
-所有视觉参数从 `src/nf-core/scenes/shared/design.js` 读取：
+所有视觉参数从 `src/nf-core/scenes/{ratio}/{theme}/theme.md` 读取：
 - TOKENS — 颜色
 - GRID / GRID_16x9 — 布局坐标
 - TYPE / TYPE_16x9 — 字号字体
