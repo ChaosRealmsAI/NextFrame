@@ -83,10 +83,11 @@ export const COMMAND_SPECS = Object.fromEntries([
   command("wysiwyg", "Dispatch v0.7 WYSIWYG scaffold subcommands.", `nextframe wysiwyg <subcommand>
     nextframe wysiwyg <subcommand> --help`, `Subcommands: diff, simulate
     Run nextframe wysiwyg <subcommand> --help for subcommand-specific params`, `This is additive v0.7 scaffolding only.
-    The current implementation returns placeholder results and performs no editing or rendering.`),
-  command("wysiwyg diff", "Stub frame-perfect DOM vs wgpu diff entrypoint.", `nextframe wysiwyg diff <timeline.json> --time=T [--json]`, `<timeline.json> direct path to a timeline file
-    --time=T required frame time in seconds or mm:ss(.f)
-    --json emit structured placeholder output`, `Walking skeleton only: no diffing work is performed yet.
+    diff captures and compares frames; simulate remains a placeholder.`),
+  command("wysiwyg diff", "Compare a preview frame against the current export-frame stub.", `nextframe wysiwyg diff <timeline.json> --t=T [--json]`, `<timeline.json> direct path to a timeline file
+    --t=T required frame time in seconds or mm:ss(.f)
+    --time=T legacy alias for --t
+    --json accepted for CLI compatibility; output is always JSON`, `The current export path is a walking skeleton and copies the preview frame before diffing.
     Time must parse to a finite non-negative value.`),
   command("wysiwyg simulate", "Stub inline-edit simulation entrypoint.", `nextframe wysiwyg simulate <timeline.json> --layer=N <action> [arg ...] [--json]`, `<timeline.json> direct path to a timeline file
     --layer=N required zero-based layer index

@@ -32,12 +32,12 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
     nextframe render ./timeline.json ./intro.mp4 --target=recorder --crf=18
   `),
   examples("wysiwyg", `
-    nextframe wysiwyg diff ./timeline.json --time=3.5
+    nextframe wysiwyg diff ./timeline.json --t=3.5
     nextframe wysiwyg simulate ./timeline.json --layer=2 move 120 60 --json
   `),
   examples("wysiwyg diff", `
-    nextframe wysiwyg diff ./timeline.json --time=3.5
-    nextframe wysiwyg diff ./timeline.json --time=00:03.5 --json
+    nextframe wysiwyg diff ./timeline.json --t=3.5
+    nextframe wysiwyg diff ./timeline.json --t=00:03.5 --json
   `),
   examples("wysiwyg simulate", `
     nextframe wysiwyg simulate ./timeline.json --layer=2 move 120 60
