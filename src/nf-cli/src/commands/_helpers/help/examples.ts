@@ -49,23 +49,6 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
     nextframe wysiwyg simulate /abs/path/timeline.json --layer=2 --action=resize --dw=8 --dh=4
     nextframe wysiwyg simulate /abs/path/timeline.json --layer=1 --action=edit-text --value="New title" --json
   `),
-  examples("match", `
-    nextframe match plan e01 --rule scene-per-segment
-    nextframe match validate ./timeline.json --json
-    nextframe match preview ./narration-plan.json --seg 3
-  `),
-  examples("match plan", `
-    nextframe match plan e01 --rule scene-per-segment
-    nextframe match plan e01 --rule ducking --json
-  `),
-  examples("match validate", `
-    nextframe match validate demo ep01 intro
-    nextframe match validate ./timeline.json --json
-  `),
-  examples("match preview", `
-    nextframe match preview ./narration-plan.json --seg 3
-    nextframe match preview ./timeline.json --seg 1 --json
-  `),
   examples("layer-list", `
     nextframe layer-list demo ep01 intro
     nextframe layer-list ./timeline.json --json

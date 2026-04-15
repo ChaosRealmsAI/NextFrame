@@ -130,7 +130,6 @@ export interface Timeline {
   layers?: Clip[];
   /** v0.2 multi-track */
   tracks?: Track[];
-  matches?: Match[];
   _audioFingerprint?: string;
   assets?: Asset[];
   chapters?: Chapter[];
@@ -162,60 +161,12 @@ export interface Segment {
   startMs: number;
   endMs: number;
   words: Word[];
-  start?: number;
-  end?: number;
-  duration?: number;
-  language?: string;
-  model?: string;
-  previousTranscript?: string;
-  audio?: string;
-  video?: string;
-  cn?: string[];
 }
 
 export interface Word {
   w: string;
   s: number;
   e: number;
-}
-
-export interface Match {
-  rule: string;
-  source: string;
-  target: string;
-  plan?: unknown;
-  [key: string]: unknown;
-}
-
-export interface PlanCtx<Options = unknown> {
-  timeline: Timeline;
-  rule?: string;
-  match?: Match;
-  ratio?: string;
-  source?: Track;
-  target?: Track;
-  options?: Options;
-  [key: string]: unknown;
-}
-
-export interface ValidationIssue {
-  code: string;
-  message: string;
-  ref?: string;
-  hint?: string;
-}
-
-export interface ValidationResult {
-  ok: boolean;
-  errors: ValidationIssue[];
-  warnings: ValidationIssue[];
-}
-
-export interface MatchRule<Plan = unknown, Options = unknown> {
-  name: string;
-  plan(ctx: PlanCtx<Options>): Promise<Plan>;
-  validate(match: Match, timeline: Timeline): ValidationResult;
-  expand(match: Match, timeline: Timeline): Partial<Timeline>;
 }
 
 export type BridgeResult<T = unknown> =

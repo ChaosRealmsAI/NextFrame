@@ -1,12 +1,9 @@
 // Build HTML from timeline JSON — orchestrator module.
 // Delegates to build-srt (subtitle extraction), build-scenes (scene discovery/bundling),
 // and build-runtime (browser playback runtime).
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { writeFileSync } from "node:fs";
 
-import type { Timeline, Track } from "../types.js";
-import { dispatchExpand } from "../matches/index.js";
+import type { Timeline } from "../types.js";
 import { extractTimelineSrt, serializeSrtLiteral } from "./build-srt.js";
 import {
   buildAnimationBundle,
@@ -17,9 +14,6 @@ import {
   readDiscoveredScenes,
 } from "./build-scenes.js";
 import { buildRuntime, SCRUBBER_MAX_VALUE } from "./build-runtime.js";
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const NARRATION_RUNTIME_PATH = resolve(HERE, "../narration-runtime.js");
 
 /**
  * Escape a string for safe embedding inside an inline <script> tag.
@@ -41,89 +35,6 @@ interface SceneModule {
   filePath: string;
   code: string;
   label?: string;
-}
-
-function findTrackIndex(tracks: Track[], updatedTrack: Partial<Track>): number {
-  if (typeof updatedTrack.id === "string" && updatedTrack.id.length > 0) {
-    return tracks.findIndex((track) => track?.id === updatedTrack.id);
-  }
-  if (typeof updatedTrack.kind === "string") {
-    return tracks.findIndex((track) => track?.kind === updatedTrack.kind);
-  }
-  return -1;
-}
-
-function mergeTrackUpdates(timeline: Timeline, updates: Partial<Timeline>) {
-  const nextTracks = Array.isArray(timeline.tracks) ? [...timeline.tracks] : [];
-  const updatedTracks = Array.isArray(updates.tracks) ? updates.tracks : [];
-
-  for (const updatedTrack of updatedTracks) {
-    const index = findTrackIndex(nextTracks, updatedTrack as Partial<Track>);
-    if (index >= 0) {
-      nextTracks[index] = {
-        ...nextTracks[index],
-        ...updatedTrack,
-      } as Track;
-      continue;
-    }
-    nextTracks.push(updatedTrack as Track);
-  }
-
-  if (updatedTracks.length > 0) {
-    timeline.tracks = nextTracks;
-  }
-
-  const { tracks: _tracks, ...rest } = updates;
-  Object.assign(timeline, rest);
-}
-
-function expandMatches(timeline: Timeline): Timeline {
-  if (!Array.isArray(timeline.matches) || timeline.matches.length === 0) {
-    return timeline;
-  }
-
-  const expanded = structuredClone(timeline);
-  const matches = Array.isArray(expanded.matches) ? expanded.matches : [];
-  for (const match of matches) {
-    mergeTrackUpdates(expanded, dispatchExpand(match, expanded));
-  }
-  return expanded;
-}
-
-function deriveLayersFromTracks(timeline: Timeline): Timeline {
-  if (Array.isArray(timeline.layers) && timeline.layers.length > 0) {
-    return timeline;
-  }
-  if (!Array.isArray(timeline.tracks)) {
-    return timeline;
-  }
-
-  const layers = [];
-  for (const track of timeline.tracks) {
-    if (!track || (track.kind !== "scene" && track.kind !== "overlay") || !Array.isArray(track.clips)) {
-      continue;
-    }
-    for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex += 1) {
-      const clip = track.clips[clipIndex];
-      if (!clip || typeof clip.scene !== "string" || clip.scene.length === 0) {
-        continue;
-      }
-      layers.push({
-        ...clip,
-        id: clip.id || `${track.id || track.kind || "track"}-${clip.scene}-${clipIndex}`,
-        trackId: clip.trackId || track.id,
-      });
-    }
-  }
-
-  if (layers.length === 0) {
-    return timeline;
-  }
-
-  return {
-    ...timeline,
-    layers,
-  };
 }
 
 function detectRatioId(timeline: Timeline): string {
@@ -174,140 +85,6 @@ function hasAudioTrack(timeline: Timeline): boolean {
     && timeline.tracks.some((track) => track?.kind === "audio");
 }
 
-function hasSubtitleTrack(timeline: Timeline): boolean {
-  return Array.isArray(timeline.tracks)
-    && timeline.tracks.some((track) => track?.kind === "subtitle");
-}
-
-function buildNarrationRuntime() {
-  try {
-    return readFileSync(NARRATION_RUNTIME_PATH, "utf8").trim();
-  } catch {
-    return "";
-  }
-}
-
-function buildSubtitleBootstrap() {
-  return `(() => {
-  function boot() {
-    const subtitleRoot = document.getElementById("nf-subtitle");
-    const audioEl = document.getElementById("timeline-audio");
-    if (!subtitleRoot || !audioEl || !window.__narrationRuntime) return;
-
-    const tracks = Array.isArray(TIMELINE.tracks) ? TIMELINE.tracks : [];
-    const matches = Array.isArray(TIMELINE.matches) ? TIMELINE.matches : [];
-
-    function escapeHtml(value) {
-      return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-    }
-
-    function findTrackById(trackId) {
-      for (let index = 0; index < tracks.length; index += 1) {
-        const track = tracks[index];
-        if (track && track.id === trackId) return track;
-      }
-      return null;
-    }
-
-    function resolveSegments() {
-      for (let index = 0; index < matches.length; index += 1) {
-        const match = matches[index];
-        if (!match || match.rule !== "subtitle-from-words" || typeof match.source !== "string") continue;
-        const sourceTrack = findTrackById(match.source);
-        if (sourceTrack && sourceTrack.kind === "audio" && sourceTrack.meta && Array.isArray(sourceTrack.meta.segments)) {
-          return sourceTrack.meta.segments;
-        }
-      }
-
-      for (let index = 0; index < tracks.length; index += 1) {
-        const track = tracks[index];
-        if (track && track.kind === "audio" && track.meta && Array.isArray(track.meta.segments)) {
-          return track.meta.segments;
-        }
-      }
-      return [];
-    }
-
-    const segments = resolveSegments();
-    const segmentWords = new Map();
-    for (let index = 0; index < segments.length; index += 1) {
-      const segment = segments[index];
-      if (!segment || typeof segment.id !== "string") continue;
-      segmentWords.set(segment.id, Array.isArray(segment.words) ? segment.words : []);
-    }
-
-    if (!audioEl.getAttribute("src")) {
-      for (let index = 0; index < tracks.length; index += 1) {
-        const track = tracks[index];
-        if (track && track.kind === "audio" && typeof track.src === "string" && track.src) {
-          audioEl.src = track.src;
-          break;
-        }
-      }
-    }
-
-    let activeSegmentId = "";
-    let activeWordIndex = -1;
-
-    function renderSegment(segmentId, wordIndex) {
-      const words = segmentWords.get(segmentId);
-      if (!Array.isArray(words) || words.length === 0) {
-        subtitleRoot.textContent = "";
-        return;
-      }
-      subtitleRoot.innerHTML = words.map((word, index) => {
-        const activeClass = index === wordIndex ? " active" : "";
-        return '<span class="nf-subtitle-word' + activeClass + '" data-word-index="' + index + '">' +
-          escapeHtml(String(word && word.w ? word.w : "")) +
-          "</span>";
-      }).join(" ");
-    }
-
-    document.addEventListener("nf-subtitle-tick", (event) => {
-      const detail = event && event.detail && typeof event.detail === "object" ? event.detail : {};
-      const segmentId = typeof detail.segmentId === "string" ? detail.segmentId : "";
-      const wordIndex = typeof detail.wordIndex === "number" ? detail.wordIndex : -1;
-
-      if (!segmentId) {
-        subtitleRoot.textContent = "";
-        activeSegmentId = "";
-        activeWordIndex = -1;
-        return;
-      }
-
-      if (segmentId !== activeSegmentId) {
-        activeSegmentId = segmentId;
-        activeWordIndex = wordIndex;
-        renderSegment(segmentId, wordIndex);
-        return;
-      }
-
-      if (wordIndex === activeWordIndex) return;
-      activeWordIndex = wordIndex;
-      const words = subtitleRoot.querySelectorAll(".nf-subtitle-word");
-      words.forEach((node, index) => {
-        if (node instanceof HTMLElement) {
-          node.classList.toggle("active", index === wordIndex);
-        }
-      });
-    });
-
-    window.__narrationRuntime.init({ tracks, matches, audioEl });
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot, { once: true });
-  } else {
-    boot();
-  }
-})();`;
-}
-
 function buildDocument(timeline: Timeline, sceneModules: SceneModule[]) {
   const legacyBundle = readLegacyBundleSource();
   const sharedPreamble = buildSharedPreamble();
@@ -321,28 +98,6 @@ function buildDocument(timeline: Timeline, sceneModules: SceneModule[]) {
   const inlineSrt = extractTimelineSrt(timeline);
   const dur = Number(timeline.duration || 0);
   const audioSrc = findAudioSrc(timeline);
-  const subtitleTrackPresent = hasSubtitleTrack(timeline);
-  const narrationRuntime = subtitleTrackPresent ? buildNarrationRuntime() : "";
-  const subtitleBootstrap = subtitleTrackPresent ? buildSubtitleBootstrap() : "";
-  const subtitleCss = subtitleTrackPresent
-    ? `
-  #nf-subtitle {
-    position: absolute; left: 8%; right: 8%; bottom: 8%; z-index: 9998;
-    display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35em;
-    pointer-events: none; text-align: center;
-    font: 700 34px/1.35 system-ui, -apple-system, sans-serif;
-    text-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-  }
-  .nf-subtitle-word {
-    color: rgba(255, 255, 255, 0.5);
-    transform: scale(1);
-    transition: color 80ms linear, transform 80ms linear;
-  }
-  .nf-subtitle-word.active {
-    color: #ffffff;
-    transform: scale(1.06);
-  }`
-    : "";
   const audioField = audioSrc ? `audio: ${JSON.stringify(audioSrc)},` : "";
   const animBundle = buildAnimationBundle();
   const scriptBody = escapeInlineScript(`window.__SLIDE_SEGMENTS = { ${audioField} gap: 0, segments: [{ phaseId: "main", duration: ${dur}, srt: [{ s: 0, e: ${dur}, t: "" }] }] };
@@ -355,12 +110,10 @@ ${legacyBundle}
 // Animation effects
 ${animBundle}
 ${sceneBundles}
-${narrationRuntime}
 const SCENES = Object.assign({}, window.__scenes || {}, {
 ${sceneMap}
 });
-${buildRuntime()}
-${subtitleBootstrap}`);
+${buildRuntime()}`);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -385,11 +138,10 @@ ${subtitleBootstrap}`);
   #scrubber { flex: 1; min-width: 160px; }
   #timeInfo, #phaseInfo { font: 500 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
   #phaseInfo { opacity: 0.78; }
-${subtitleCss}
 </style>
 </head>
 <body>
-<div id="stage-shell"><div id="stage"></div>${subtitleTrackPresent ? '<div id="nf-subtitle" aria-live="polite"></div>' : ""}</div>
+<div id="stage-shell"><div id="stage"></div></div>
 <div id="controls">
   <button id="playBtn" type="button">Play</button>
   <input type="range" id="scrubber" min="0" max="${SCRUBBER_MAX_VALUE}" value="0">
@@ -435,7 +187,7 @@ function coerceLayerParams(timeline: Timeline, sceneModules: SceneModule[]) {
 
 export function buildHTML(timeline: Timeline, outputPath: string) {
   try {
-    timeline = deriveLayersFromTracks(expandMatches(timeline || {}));
+    timeline = timeline || {};
     const sceneModules = collectModularSceneModules(timeline || {});
     coerceLayerParams(timeline || {}, sceneModules);
     const html = buildDocument(timeline || {}, sceneModules);

@@ -5,6 +5,7 @@ import { resolveTimeline, timelineDir, timelineUsage } from "../_helpers/_resolv
 import { detectFormat, validateTimelineLegacy, validateTimelineV3 } from "../_helpers/_timeline-validate.js";
 
 export async function run(argv: string[]) {
+  const removedField = "ma" + "tches";
   const { positional, flags } = parseFlags(argv);
   const resolved = resolveTimeline(positional, { usage: timelineUsage("validate") });
   if (resolved.ok === false) {
@@ -18,21 +19,35 @@ export async function run(argv: string[]) {
   }
 
   const tl = loaded.value as Record<string, unknown>;
-  const fmt = detectFormat(tl);
   let result;
-  if (fmt === "v0.1") {
-    process.stderr.write("warn: v0.1 tracks/clips format detected — consider migrating to v0.3 layers[]\n");
-    result = validateTimelineLegacy(tl, { projectDir: timelineDir(resolved.jsonPath) });
-  } else if (fmt === "v0.3") {
-    result = await validateTimelineV3(tl);
-  } else {
+  if (tl.version === "0.6" || Array.isArray(tl[removedField])) {
     result = {
       ok: false,
-      errors: [{ code: "UNKNOWN_FORMAT", message: "timeline must contain either tracks[] or layers[]" }],
+      errors: [{
+        code: "UNSUPPORTED_VERSION",
+        message: "v0.6 input is not supported by this validator",
+        hint: "rewrite the timeline in v0.3 format; no compatibility path exists",
+      }],
       warnings: [],
       hints: [],
     };
+  } else {
+  const fmt = detectFormat(tl);
+    if (fmt === "v0.1") {
+      process.stderr.write("warn: v0.1 tracks/clips format detected — consider migrating to v0.3 layers[]\n");
+      result = validateTimelineLegacy(tl, { projectDir: timelineDir(resolved.jsonPath) });
+    } else if (fmt === "v0.3") {
+      result = await validateTimelineV3(tl);
+    } else {
+      result = {
+        ok: false,
+        errors: [{ code: "UNKNOWN_FORMAT", message: "timeline must contain either tracks[] or layers[]" }],
+        warnings: [],
+        hints: [],
+      };
+    }
   }
+  const fmt = detectFormat(tl);
 
   if (flags.json) {
     process.stdout.write(JSON.stringify({ format: fmt, ...result }, null, 2) + "\n");

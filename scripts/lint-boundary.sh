@@ -60,7 +60,6 @@ TS_ZONES=(
   "src/nf-cli/src"
   "src/nf-cli/test"
   "src/nf-core/engine"
-  "src/nf-core/matches"
 )
 for z in "${TS_ZONES[@]}"; do
   [ -d "$z" ] || continue

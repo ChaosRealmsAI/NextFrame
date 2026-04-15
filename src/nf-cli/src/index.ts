@@ -44,7 +44,6 @@ const SUBCOMMANDS = {
   "source-polish": () => import("./commands/pipeline/source-polish.js"),
   "source-list": () => import("./commands/pipeline/source-list.js"),
   "source-link": () => import("./commands/pipeline/source-link.js"),
-  match: () => import("./commands/match.js"),
   "layer-add": () => import("./commands/timeline/layers.js"),
   "layer-move": () => import("./commands/timeline/layers.js"),
   "layer-resize": () => import("./commands/timeline/layers.js"),

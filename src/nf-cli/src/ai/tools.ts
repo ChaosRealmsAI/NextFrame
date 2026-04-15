@@ -2,7 +2,7 @@
 import { getREGISTRY, listScenes, getScene } from '../lib/scene-registry.js';
 import { validateTimelineV3 } from '../lib/timeline-validate.js';
 import { describeAt } from '../lib/v3-describe.js';
-import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from 'nf-core/engine/ops.js';
+import { addLayer, removeLayer, moveLayer, resizeLayer, setLayerProp, listLayers } from '../../../nf-core/engine/ops.js';
 import type { Timeline } from '../../../nf-core/types.js';
 
 type LooseTimeline = Record<string, unknown> & Partial<Timeline>;
@@ -99,13 +99,13 @@ export const TOOLS = {
       scene,
       at
     }: { timeline: LooseTimeline; scene?: string; at?: number }) => {
-      const matches: Array<{ id: string; scene: string; start: number; dur: number; end: number }> = [];
+      const rows: Array<{ id: string; scene: string; start: number; dur: number; end: number }> = [];
       for (const layer of (timeline.layers || []) as Layer[]) {
         if (scene && layer.scene !== scene) continue;
         if (typeof at === "number" && (at < layer.start || at >= layer.start + layer.dur)) continue;
-        matches.push({ id: layer.id, scene: layer.scene, start: layer.start, dur: layer.dur, end: layer.start + layer.dur });
+        rows.push({ id: layer.id, scene: layer.scene, start: layer.start, dur: layer.dur, end: layer.start + layer.dur });
       }
-      return { ok: true, value: matches };
+      return { ok: true, value: rows };
     },
   },
   get_layer: {

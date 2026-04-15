@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { parseFlags, loadTimeline, emit, parseTime } from "../_helpers/_io.js";
 import { configureProjectCacheEnv, defaultFramePath, resolveTimeline, segmentFramePath, timelineUsage } from "../_helpers/_resolve.js";
 import { renderFramePNG } from "../../targets/napi-canvas.js";
-import type { Timeline } from "nf-core/types.js";
+import type { Timeline } from "../../../../nf-core/types.js";
 
 const USAGE = timelineUsage("frame", " <t>", " <t> <out.png>");
 
