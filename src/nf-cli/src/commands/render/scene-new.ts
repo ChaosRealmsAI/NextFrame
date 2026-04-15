@@ -1,356 +1,346 @@
-// nextframe scene-new <name> --ratio=16:9 --category=data --tech=dom [--description="..."]
-// Creates scene with WORKING render code (not TODOs). Ready to preview immediately.
+// nextframe scene-new --id=<camelCase> --role=<role> --type=<type> --ratio=<ratio> --theme=<theme> [--name="..."] [--description="..."]
+//
+// Generates a new scene component file with FULL 11-required + 18 AI-understanding
+// fields scaffolded, inline comments explaining each, and a type-correct render stub.
+//
+// Output path: src/nf-core/scenes/{ratioDir}/{theme}/{role}-{id}.js
 
 import { parseFlags } from "../_helpers/_io.js";
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 
 const __HERE = dirname(fileURLToPath(import.meta.url));
-const DESIGN_JS_PATH = resolve(__HERE, "../../../../nf-core/scenes/shared/design.js");
+const SCENES_ROOT = resolve(__HERE, "../../../../nf-core/scenes");
 
-const RATIOS = ["16:9", "9:16", "4:3"];
-const RATIO_DIRS: Record<string, string> = { "16:9": "16x9", "9:16": "9x16", "4:3": "4x3" };
-const RATIO_SIZES: Record<string, number[]> = { "16:9": [1920, 1080], "9:16": [1080, 1920], "4:3": [1440, 1080] };
-const CATEGORIES = ["backgrounds", "typography", "data", "shapes", "overlays", "media", "browser"];
-const TECHS = ["canvas2d", "webgl", "svg", "dom", "video", "lottie"];
+const RATIOS = ["16:9", "9:16", "1:1", "4:3"] as const;
+const RATIO_DIRS: Record<string, string> = { "16:9": "16x9", "9:16": "9x16", "1:1": "1x1", "4:3": "4x3" };
+const ROLES = ["bg", "chrome", "content", "text", "overlay", "data"] as const;
+const TYPES = ["canvas", "dom", "svg", "media"] as const;
 
-const HELP = `nextframe scene-new <name> --ratio=<16:9|9:16|4:3> --category=<cat> [--tech=dom] [--description="..."]
+const HELP = `nextframe scene-new --id=<camelCase> --role=<role> --type=<type> --ratio=<ratio> --theme=<theme> [opts]
 
-Create a new scene component with WORKING code. Opens preview immediately.
+Generate a new scene component scaffold that conforms to the scene v3 contract
+(11 required + 18 AI-understanding fields + render/describe/sample).
+
+Required:
+  --id          component id, camelCase, globally unique within theme (e.g. bilingualSub)
+  --role        bg | chrome | content | text | overlay | data
+  --type        canvas | dom | svg | media  — determines render() signature
+  --ratio       16:9 | 9:16 | 1:1 | 4:3
+  --theme       theme name, e.g. anthropic-warm (must have existing theme.md)
+
+Optional:
+  --name        display name (defaults to id)
+  --description one-line description
+  --force       overwrite if file exists
 
 Example:
-  nextframe scene-new subtitleBar --ratio=16:9 --category=overlays --description="底部字幕条，SRT 驱动"
+  nextframe scene-new --id=chapterMark --role=overlay --type=dom --ratio=16:9 --theme=anthropic-warm \\
+    --name="章节标记" --description="左上角章节编号 + 标题"
 
-Creates ready-to-use scene:
-  src/nf-core/scenes/16x9/overlays/subtitleBar/
-  ├── index.js       (working render + complete meta)
-  └── preview.html   (self-contained preview with controls)
+Creates: src/nf-core/scenes/16x9/anthropic-warm/overlay-chapterMark.js
 
-After creation you MUST:
-  1. Edit index.js — customize render() for your specific visual
-  2. open preview.html — verify visually in browser
-  3. nextframe scenes <name> — confirm meta loads correctly
+After creation:
+  - Fill intent (>= 50 chars real design reasoning, not boilerplate)
+  - Customize params, render body, sample() with real content
+  - Run: node scripts/scene-smoke-test.mjs (from repo root)
+  - nextframe scenes <id> to verify
 `;
 
-// Category-specific render templates that actually work
-function renderTemplate(name: string, category: string, ratio: string) {
-  const [w, h] = RATIO_SIZES[ratio];
-  switch (category) {
-    case "backgrounds":
-      return `export function render(t, params, vp) {
-  const bg = params.bg || "#1a1510";
-  const glowColor = params.glowColor || "rgba(218,119,86,0.12)";
-  return '<div style="position:absolute;left:0;top:0;width:' + vp.width + 'px;height:' + vp.height + 'px;background:' + bg + '">' +
-    '<div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,' + glowColor + ' 0%,transparent 60%)"></div>' +
-  '</div>';
-}`;
+function scaffold(opts: {
+  id: string;
+  role: string;
+  type: string;
+  ratio: string;
+  theme: string;
+  name: string;
+  description: string;
+}): string {
+  const { id, role, type, ratio, theme, name, description } = opts;
+  const today = new Date().toISOString().slice(0, 10);
 
-    case "typography":
-      return `export function render(t, params, vp) {
-  const text = params.text || "标题文字";
-  const fontSize = params.fontSize || ${ratio === "9:16" ? 36 : 48};
-  const color = params.color || "#f5ece0";
-  const accentColor = params.accentColor || "#da7756";
-  const opacity = Math.min(1, t / 0.5); // 0.5s fade in
-  const y = params.y || 0;
-  const pos = y > 0
-    ? 'position:absolute;left:60px;right:60px;top:' + y + 'px;text-align:center'
-    : 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 60px';
-  return '<div style="' + pos + '">' +
-    '<div style="font:700 ' + fontSize + 'px Georgia,\\'Noto Serif SC\\',serif;color:' + color + ';text-align:center;line-height:1.3;opacity:' + opacity + '">' + text + '</div>' +
-  '</div>';
-}`;
+  let renderSignature: string;
+  let renderBody: string;
+  let mountComment: string;
 
-    case "overlays":
-      return `export function render(t, params, vp) {
-  const color = params.color || "#da7756";
-  const height = params.height || 3;
-  let progress = typeof params.progress === "number" ? params.progress : (params.duration ? t / params.duration : 0);
-  progress = Math.max(0, Math.min(1, progress));
-  return '<div style="position:absolute;left:0;bottom:0;width:' + vp.width + 'px;height:' + height + 'px;background:rgba(245,236,224,0.08)">' +
-    '<div style="height:100%;width:' + (progress * 100) + '%;background:' + color + ';transition:none"></div>' +
-  '</div>';
-}`;
+  if (type === "canvas") {
+    renderSignature = "render(ctx, _t, params, vp)";
+    mountComment = "ctx is CanvasRenderingContext2D - fillRect / fillText / arc to draw";
+    renderBody = `    const W = vp.width;
+    const H = vp.height;
+    const color = params.color || "#f5ece0";
+    const size = 48;
 
-    case "data":
-      return `function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-
-export function render(t, params, vp) {
-  const items = params.items || [{ label: "Item 1" }, { label: "Item 2" }, { label: "Item 3" }];
-  const color = params.color || "#da7756";
-  const textColor = params.textColor || "#f5ece0";
-  const opacity = Math.min(1, t / 0.6);
-  const html = items.map(function(item, i) {
-    const itemOp = Math.min(1, Math.max(0, (t - i * 0.2) / 0.4));
-    return '<div style="display:flex;align-items:center;gap:12px;opacity:' + itemOp + '">' +
-      '<div style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex-shrink:0"></div>' +
-      '<div style="font:500 18px system-ui,sans-serif;color:' + textColor + '">' + esc(item.label) + '</div>' +
-    '</div>';
-  }).join("");
-  return '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:' + opacity + '">' +
-    '<div style="display:flex;flex-direction:column;gap:16px">' + html + '</div>' +
-  '</div>';
-}`;
-
-    case "browser":
-      return `function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-
-export function render(t, params, vp) {
-  const title = params.title || "Terminal";
-  const lines = params.lines || [{ text: "$ echo hello", type: "command" }, { text: "hello", type: "output" }];
-  const bg = params.bg || "#1e1e2e";
-  const width = params.width || ${ratio === "9:16" ? 900 : 1400};
-  const x = params.x || ${ratio === "9:16" ? 90 : 260};
-  const y = params.y || ${ratio === "9:16" ? 200 : 120};
-  const opacity = Math.min(1, t / 0.5);
-
-  const linesHtml = lines.map(function(line, i) {
-    const lineOp = Math.min(1, Math.max(0, (t - 0.3 - i * 0.15) / 0.3));
-    const color = line.type === "command" ? "#7ec699" : line.type === "comment" ? "rgba(245,236,224,0.4)" : "#f5ece0";
-    return '<div style="opacity:' + lineOp + ';color:' + color + '">' + esc(line.text) + '</div>';
-  }).join("");
-
-  return '<div style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + width + 'px;opacity:' + opacity + '">' +
-    '<div style="background:#2a2a3a;border-radius:10px 10px 0 0;padding:8px 16px;display:flex;gap:6px">' +
-      '<div style="width:10px;height:10px;border-radius:50%;background:#e06c75"></div>' +
-      '<div style="width:10px;height:10px;border-radius:50%;background:#d4b483"></div>' +
-      '<div style="width:10px;height:10px;border-radius:50%;background:#7ec699"></div>' +
-      '<div style="font:500 12px system-ui;color:rgba(245,236,224,0.5);margin-left:8px">' + esc(title) + '</div>' +
-    '</div>' +
-    '<div style="background:' + bg + ';border-radius:0 0 10px 10px;padding:20px;font:14px \\'SF Mono\\',\\'JetBrains Mono\\',monospace;line-height:1.7">' +
-      linesHtml +
-    '</div>' +
-  '</div>';
-}`;
-
-    case "media":
-      return `export function render(t, params, vp) {
-  const src = params.src || "";
-  const x = params.x || 0;
-  const y = params.y || 0;
-  const width = params.width || vp.width;
-  const height = params.height || vp.height;
-  const borderRadius = params.borderRadius || 0;
-  const opacity = Math.min(1, t / 0.3);
-  const currentTime = t;
-  const persistKey = "vc-" + String(src).replace(/[^a-zA-Z0-9]/g, "").slice(-20);
-
-  if (!src) {
-    return '<div style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + width + 'px;height:' + height + 'px;background:#2a2319;border-radius:' + borderRadius + 'px;display:flex;align-items:center;justify-content:center;color:rgba(245,236,224,0.3);font:14px system-ui">No video src</div>';
+    ctx.fillStyle = color;
+    ctx.font = \`600 \${size}px system-ui, -apple-system, "PingFang SC", sans-serif\`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(params.text || "", W * 0.5, H * 0.5);`;
+  } else if (type === "dom") {
+    renderSignature = "render(host, _t, params, vp)";
+    mountComment = "host is HTMLElement - use host.innerHTML or appendChild to mount";
+    renderBody = `    const color = params.color || "#f5ece0";
+    const text = params.text || "";
+    host.innerHTML = \`
+      <div style="
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: \${vp.width * 0.6}px;
+        padding: 48px;
+        color: \${color};
+        font: 600 40px/1.4 system-ui, -apple-system, 'PingFang SC', sans-serif;
+        text-align: center;
+      ">\${escapeHtml(text)}</div>
+    \`;`;
+  } else if (type === "svg") {
+    renderSignature = "render(host, _t, params, vp)";
+    mountComment = "host is <svg> element - appendChild path/rect/line/text";
+    renderBody = `    host.setAttribute("viewBox", \`0 0 \${vp.width} \${vp.height}\`);
+    const ns = "http://www.w3.org/2000/svg";
+    const circle = document.createElementNS(ns, "circle");
+    circle.setAttribute("cx", String(vp.width * 0.5));
+    circle.setAttribute("cy", String(vp.height * 0.5));
+    circle.setAttribute("r", "100");
+    circle.setAttribute("fill", params.color || "#da7756");
+    host.appendChild(circle);`;
+  } else {
+    renderSignature = "render(host, _t, params, vp)";
+    mountComment = "host is a container HTMLElement - mount <video> / <img> / <audio>";
+    renderBody = `    host.innerHTML = \`
+      <video src="\${params.src}" style="
+        position: absolute;
+        left: 0; top: 0;
+        width: \${vp.width}px;
+        height: \${vp.height}px;
+        object-fit: cover;
+      " autoplay muted></video>
+    \`;`;
   }
-  return '<div style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + width + 'px;height:' + height + 'px;border-radius:' + borderRadius + 'px;overflow:hidden;opacity:' + opacity + '">' +
-    '<video data-nf-persist="' + persistKey + '" data-nf-time="' + currentTime + '" src="' + src + '" playsinline preload="auto" style="width:100%;height:100%;object-fit:cover"></video>' +
-  '</div>';
-}`;
 
-    case "shapes":
-      return `export function render(t, params, vp) {
-  const color = params.color || "#da7756";
-  const size = params.size || 200;
-  const x = params.x || (vp.width / 2);
-  const y = params.y || (vp.height / 2);
-  const scale = Math.min(1, t / 0.5);
-  return '<div style="position:absolute;left:' + (x - size/2) + 'px;top:' + (y - size/2) + 'px;width:' + size + 'px;height:' + size + 'px;border-radius:50%;border:3px solid ' + color + ';transform:scale(' + scale + ');opacity:' + scale + '"></div>';
-}`;
+  const sampleDefault = type === "media"
+    ? `{ src: "assets/placeholder.mp4" }`
+    : `{ text: "示例内容", color: "#f5ece0" }`;
 
-    default:
-      return `export function render(t, params, vp) {
-  return '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#f5ece0;font:24px system-ui">' + (params.text || "${name}") + '</div>';
-}`;
-  }
-}
+  const paramsDefault = type === "media"
+    ? `    src: {
+      type: "string",
+      required: true,
+      semantic: "媒体资源 URL (必须在 assets 数组里声明)",
+    },`
+    : `    text: {
+      type: "string",
+      required: true,
+      semantic: "显示文本",
+    },
+    color: {
+      type: "color",
+      default: "#f5ece0",
+      semantic: "文字颜色",
+    },`;
 
-function metaTemplate(name: string, category: string, ratio: string, tech: string, description: string) {
-  const [w, h] = RATIO_SIZES[ratio];
-  const zHint = category === "backgrounds" ? "bottom" : category === "overlays" ? "top" : "middle";
-  const desc = description || `${name} — ${category} component for ${ratio}`;
-  return `export const meta = {
-  id: "${name}",
-  version: 1,
+  const assetsValue = type === "media" ? `["__REPLACE_WITH_REAL_URL__"]` : `[]`;
+
+  const zLayer = role === "bg" ? "background"
+    : (role === "chrome" || role === "overlay") ? "foreground"
+    : "mid";
+
+  const escapeHelper = type === "dom"
+    ? `
+
+// Inline utility (zero import rule) - each dom component copies this
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}`
+    : "";
+
+  return `// scenes/${RATIO_DIRS[ratio]}/${theme}/${role}-${id}.js
+//
+// ${name} - ${description}
+//
+// Scaffolded by \`nextframe scene-new\` on ${today}.
+// Contract: scene v3 - single file, zero import, 11 required + 18 AI-understanding fields.
+// Full spec: spec/standards/project/scene/scene-component-system.html
+//
+// TODO after generation:
+//   [ ] Fill \`intent\` with >= 50 chars of real design reasoning (not boilerplate)
+//   [ ] Populate \`when_to_use\` / \`when_not_to_use\` / \`limitations\` with specifics
+//   [ ] Adjust \`params\` schema to match your actual inputs
+//   [ ] Customize render() body - current code is a minimal placeholder
+//   [ ] sample() returns realistic params (pull real content from script.md when possible)
+//   [ ] Run: node scripts/scene-smoke-test.mjs (from repo root)
+
+export default {
+  // ===== Identity (globally unique + SemVer) =====
+  id: "${id}",
+  name: "${name}",
+  version: "1.0.0",
+
+  // ===== Belonging (ratio + theme determine coord system and design language) =====
   ratio: "${ratio}",
-  category: "${category}",
-  label: "${name}",
-  description: "${desc}",
-  tech: "${tech}",
-  duration_hint: 10,
-  loopable: ${category === "backgrounds"},
-  z_hint: "${zHint}",
-  tags: ["${category}", "${name.toLowerCase()}"],
-  mood: ["professional"],
-  theme: ["tech"],
-  default_theme: "anthropic-warm",
-  themes: {
-    "anthropic-warm": {},
+  theme: "${theme}",
+  role: "${role}",               // bg | chrome | content | text | overlay | data
+
+  // ===== Semantics =====
+  description: "${description.replace(/"/g, '\\"')}",
+  duration_hint: null,           // null = follows timeline; number = suggested seconds
+
+  // ===== Render type (determines render signature) =====
+  type: "${type}",
+  frame_pure: true,              // same t + params => same frame; forbid Date.now / Math.random
+  assets: ${assetsValue},        // external resource URL list; empty = zero external deps
+
+  // ========================================
+  // ===== AI understanding layer (18 fields) =====
+  // ========================================
+
+  // Why this component exists, design tradeoffs, visual philosophy (>= 50 chars real reasoning)
+  intent: \`
+    TODO: write 50+ chars of real design reasoning. Examples:
+    "why this layout / why this color / why this font size /
+     why pairs with X / why conflicts with Y / visual style source".
+    Do NOT write "this is a component that shows text" boilerplate.
+  \`,
+
+  // Concrete scenarios (so AI search hits)
+  when_to_use: [
+    "TODO: concrete scenario 1",
+    "TODO: concrete scenario 2",
+  ],
+
+  // Anti-patterns (with pointers to alternatives)
+  when_not_to_use: [
+    "TODO: case where this is wrong (use xxx instead)",
+  ],
+
+  // Known limitations (RTL, char length, screen ratio, etc.)
+  limitations: [
+    "TODO: list limits",
+  ],
+
+  inspired_by: "TODO: design source of inspiration",
+  used_in: [],                   // real timeline paths that use this, fill later
+
+  // ===== Compatibility (relationships) =====
+  requires: [],                  // must pair with these component ids
+  pairs_well_with: [],           // common good partners
+  conflicts_with: [],            // cannot coexist with these
+  alternatives: [],              // other choices for same need
+
+  // ===== Visual weight (focus + layer + mood) =====
+  visual_weight: "medium",       // light | medium | heavy
+  z_layer: "${zLayer}",
+  mood: ["calm"],                // calm | intense | playful | serious | professional | ...
+
+  // ===== Index (tag search dimensions, CN + EN synonyms) =====
+  tags: ["${id}", "${role}", "${theme}"],
+
+  // ===== Engineering (complexity + performance + status + changelog) =====
+  complexity: "simple",          // simple | medium | complex
+  performance: { cost: "low", notes: "TODO: perf notes" },
+  status: "experimental",        // experimental | beta | stable | deprecated
+  changelog: [
+    { version: "1.0.0", date: "${today}", change: "initial (scene-new generated)" },
+  ],
+
+  // ========================================
+  // ===== Params contract (each needs type + semantic) =====
+  // ========================================
+  params: {
+${paramsDefault}
   },
-  params: {},
-  ai: {
-    when: "Use as ${category} layer in ${ratio} video",
-    how: "Add as layer: { scene: \\"${name}\\", start: 0, dur: 10, params: {} }",
-    example: {},
-    avoid: "",
-    pairs_with: [],
+
+  // ===== Animation hooks (null or timeline animation name) =====
+  enter: null,
+  exit: null,
+
+  // ========================================
+  // ===== 3 functions =====
+  // ========================================
+
+  // ${mountComment}
+  ${renderSignature} {
+${renderBody}
   },
-};`;
-}
 
-function previewTemplate(name: string, ratio: string, tech: string, renderCode: string) {
-  const [w, h] = RATIO_SIZES[ratio];
-  const scaleX = ratio === "9:16" ? 0.35 : 0.5;
-  const previewW = Math.round(w * scaleX);
-  const previewH = Math.round(h * scaleX);
+  // Structured state - lets AI know what's on-screen without reading pixels
+  describe(_t, params, vp) {
+    return {
+      sceneId: "${id}",
+      phase: "show",             // enter | hold | exit | hidden | show
+      progress: 1,                // 0..1
+      visible: true,
+      params,
+      elements: [
+        // TODO: list logical elements currently on screen { type, role, value, ... }
+      ],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
 
-  // Inline design.js so preview works without ESM imports (file:// CORS)
-  let designInline = "";
-  try {
-    designInline = readFileSync(DESIGN_JS_PATH, "utf8")
-      .replace(/^import\s+.+?;?\s*$/gm, "")
-      .replace(/^export\s+(function|const|let|var|class)\s+/gm, "$1 ")
-      .replace(/^export\s*\{[^}]*\};?\s*$/gm, "");
-  } catch { /* no design.js */ }
-
-  // Strip ESM from scene render code
-  const inlineRender = renderCode
-    .replace(/^import\s+.+?;?\s*$/gm, "")
-    .replace(/^export\s+/gm, "")
-    .replace(/^function esc/gm, "function esc");
-
-  return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<title>${name} ${ratio} Preview</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-direction:column;align-items:center;padding:20px;min-height:100vh}
-.info{font-size:13px;color:#888;margin-bottom:12px}.info span{color:#da7756;font-weight:700}
-.canvas-wrap{position:relative;width:${previewW}px;height:${previewH}px;background:#1a1510;border:1px solid #333;border-radius:8px;overflow:hidden}
-.canvas-inner{width:${w}px;height:${h}px;transform-origin:0 0;transform:scale(${scaleX});position:absolute;top:0;left:0}
-.controls{margin-top:16px;display:flex;gap:16px;align-items:center}
-.controls input[type=range]{width:400px}
-.controls button{background:#da7756;color:#fff;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:14px}
-.time-display{font-family:monospace;font-size:14px;color:#da7756;min-width:80px}
-</style>
-</head>
-<body>
-<div class="info"><span>${name}</span> · ${ratio} · ${tech}</div>
-<div class="canvas-wrap"><div class="canvas-inner" id="canvas"></div></div>
-<div class="controls">
-  <button id="playBtn">▶ Play</button>
-  <input type="range" id="scrubber" min="0" max="1000" value="0">
-  <div class="time-display" id="timeDisplay">0.00s</div>
-</div>
-<script>
-(function(){
-  // ── Design system (shared/design.js inlined) ──
-  ${designInline}
-  // ── Scene ──
-  ${inlineRender}
-
-  const DEMO = {};
-  const duration = 10;
-  const canvas = document.getElementById('canvas');
-  const scrubber = document.getElementById('scrubber');
-  const td = document.getElementById('timeDisplay');
-  const pb = document.getElementById('playBtn');
-  function rf(t){canvas.innerHTML='<div style="position:absolute;inset:0;background:#1a1510"></div><div style="position:absolute;inset:0">'+render(t,DEMO,{width:${w},height:${h}})+'</div>';}
-  scrubber.addEventListener('input',function(){const t=(scrubber.value/1000)*duration;td.textContent=t.toFixed(2)+'s';rf(t);});
-  let playing=false,st=0,so=0;
-  function tick(){if(!playing)return;const t=((Date.now()-st)/1000+so)%duration;scrubber.value=(t/duration)*1000;td.textContent=t.toFixed(2)+'s';rf(t);requestAnimationFrame(tick);}
-  pb.addEventListener('click',function(){playing=!playing;if(playing){st=Date.now();so=(scrubber.value/1000)*duration;pb.textContent='⏸ Pause';tick();}else{pb.textContent='▶ Play';}});
-  rf(0);
-})();
-</script>
-</body>
-</html>`;
-}
-
-export async function run(argv: string[]) {
-  const { positional, flags } = parseFlags(argv);
-
-  if (flags.help || positional.length === 0) {
-    process.stdout.write(HELP);
-    return positional.length === 0 ? 3 : 0;
-  }
-
-  const name = positional[0];
-  const ratio = String(flags.ratio || "16:9");
-  const category = flags.category ? String(flags.category) : undefined;
-  const tech = String(flags.tech || "dom");
-  const description = String(flags.description || "");
-
-  if (!RATIOS.includes(ratio)) {
-    process.stderr.write(`error: ratio must be one of ${RATIOS.join(", ")}\n`);
-    return 2;
-  }
-  if (!category || !CATEGORIES.includes(category)) {
-    process.stderr.write(`error: --category required, must be one of ${CATEGORIES.join(", ")}\n`);
-    return 2;
-  }
-  if (!TECHS.includes(tech)) {
-    process.stderr.write(`error: --tech must be one of ${TECHS.join(", ")}\n`);
-    return 2;
-  }
-
-  const scenesRoot = resolve(__HERE, "../../../../nf-core/scenes");
-  const dir = resolve(scenesRoot, RATIO_DIRS[ratio], category, name);
-
-  if (existsSync(dir)) {
-    process.stderr.write(`error: ${dir} already exists\n`);
-    return 2;
-  }
-
-  mkdirSync(dir, { recursive: true });
-
-  const renderCode = renderTemplate(name, category, ratio);
-  const metaCode = metaTemplate(name, category, ratio, tech, description);
-
-  // Build index.js
-  const helperCode = renderCode.includes("function esc(")
-    ? ""
-    : 'function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }\n';
-
-  const indexJs = `${metaCode}
-
-${helperCode}function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); }
-function fadeIn(t, start, dur) { return ease3((t - start) / dur); }
-
-${renderCode}
-
-export function screenshots() {
-  return [
-    { t: 0, label: "start" },
-    { t: 5, label: "mid" },
-    { t: 9, label: "end" },
-  ];
-}
-
-export function lint(params) {
-  return { ok: true, errors: [] };
-}
+  // Sample params that actually run (used by CLI L2 disclosure, timeline authors copy this)
+  sample() {
+    return ${sampleDefault};
+  },
+};${escapeHelper}
 `;
+}
 
-  const previewHtml = previewTemplate(name, ratio, tech, renderCode);
+export async function run(argv: string[]): Promise<number> {
+  const { flags } = parseFlags(argv);
+  if (flags.help) { process.stdout.write(HELP); return 0; }
 
-  writeFileSync(resolve(dir, "index.js"), indexJs);
-  writeFileSync(resolve(dir, "preview.html"), previewHtml);
+  const id = String(flags.id || "").trim();
+  const role = String(flags.role || "").trim();
+  const type = String(flags.type || "").trim();
+  const ratio = String(flags.ratio || "").trim();
+  const theme = String(flags.theme || "").trim();
+  const name = String(flags.name || id).trim();
+  const description = String(flags.description || `${role} component for ${theme}`).trim();
+  const force = Boolean(flags.force);
 
-  process.stdout.write(`✓ Created ${name} (${ratio} ${category})
-  ${dir}/
+  const errors: string[] = [];
+  if (!/^[a-z][a-zA-Z0-9]*$/.test(id)) errors.push(`--id must be camelCase (got "${id}")`);
+  if (!ROLES.includes(role as typeof ROLES[number])) errors.push(`--role must be one of: ${ROLES.join(", ")}`);
+  if (!TYPES.includes(type as typeof TYPES[number])) errors.push(`--type must be one of: ${TYPES.join(", ")}`);
+  if (!RATIOS.includes(ratio as typeof RATIOS[number])) errors.push(`--ratio must be one of: ${RATIOS.join(", ")}`);
+  if (!theme) errors.push("--theme required");
 
-Scene is WORKING — preview immediately:
-  open ${dir}/preview.html
+  if (errors.length) {
+    for (const e of errors) process.stderr.write(`error: ${e}\n`);
+    process.stderr.write(`\nRun: nextframe scene-new --help\n`);
+    return 1;
+  }
 
-Then customize:
-  1. Edit index.js render() — change the visual
-  2. Edit index.js meta.params — declare your parameters
-  3. Edit index.js meta.description — write a one-line Chinese description
-  4. Refresh preview.html in browser to verify
-  5. nextframe scenes ${name} — confirm it loads
+  const themeDir = join(SCENES_ROOT, RATIO_DIRS[ratio], theme);
+  if (!existsSync(themeDir)) {
+    process.stderr.write(`error: theme dir does not exist: ${themeDir}\n`);
+    process.stderr.write(`       create it first with a theme.md, then retry.\n`);
+    return 1;
+  }
 
-Scene contract reference:
-  cat src/nf-core/scenes/16x9/backgrounds/darkGradient/index.js
-`);
+  const fileName = `${role}-${id}.js`;
+  const filePath = join(themeDir, fileName);
+  if (existsSync(filePath) && !force) {
+    process.stderr.write(`error: file already exists: ${filePath}\n`);
+    process.stderr.write(`       pass --force to overwrite\n`);
+    return 1;
+  }
+
+  const content = scaffold({ id, role, type, ratio, theme, name, description });
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, content);
+
+  process.stdout.write(`✓ created ${filePath}\n`);
+  process.stdout.write(`\nnext:\n`);
+  process.stdout.write(`  1. Fill TODOs (intent >= 50 chars, params, render body, sample)\n`);
+  process.stdout.write(`  2. node scripts/scene-smoke-test.mjs\n`);
+  process.stdout.write(`  3. node src/nf-cli/bin/nextframe.js scenes | grep ${id}\n`);
   return 0;
 }

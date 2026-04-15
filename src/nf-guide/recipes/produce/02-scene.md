@@ -41,23 +41,42 @@ cat src/nf-core/scenes/{ratio}/{theme}/theme.md
 
 **所有值复制粘贴到组件里，写死。改 theme 用 sed 批量改，不抽 token。**
 
-## 2.3 复制模板起步
+## 2.3 CLI 生成骨架（不要手抄模板）
 
-每个 theme 下有 2 个模板（`_` 前缀的文件 loader 自动忽略，不会出现在 `nextframe scenes` 列表）：
+用 `nextframe scene-new` 一条命令生成完整骨架：
 
 ```bash
-# Canvas 类（ctx 绘制）
-cat src/nf-core/scenes/16x9/anthropic-warm/text-headline.js
-
-# DOM 类（host.innerHTML 挂内容）
-cat src/nf-core/scenes/16x9/anthropic-warm/_template-dom.js
+node src/nf-cli/bin/nextframe.js scene-new \
+  --id=chapterMark \
+  --role=overlay \
+  --type=dom \
+  --ratio=16:9 \
+  --theme=anthropic-warm \
+  --name="章节标记" \
+  --description="左上角章节编号 + 标题"
 ```
 
-**选对模板 = type 选对**（canvas vs dom）。选错了 render 签名不匹配，smoke test 直接挂。
+CLI 会：
+- 按 `type` 生成正确的 render 签名（canvas → `(ctx,...)`, dom/svg/media → `(host,...)`）
+- 内置所有 11 必填 + 18 AI 理解字段 + describe + sample
+- 内置型适配的 render 示例代码（能直接跑，不是空函数）
+- 内置注释说明每个字段干嘛
+- 自动校验 id 是 camelCase、role/type/ratio 在枚举内、theme 目录存在
+- 输出文件路径 `{ratio}/{theme}/{role}-{id}.js`
 
-整段复制 → 改 id/name/role → 改 intent + when_to_use + 配伍三组 → 改 params → 改 render/describe/sample。
+**生成后要做的**（文件里有 TODO 清单提醒）：
 
-**复制模板后第一件事**：改 id、改 role、改 status 从 `experimental` 改成 `stable`。
+1. 填 `intent`（≥ 50 字真实推理，不是套话）
+2. 填 `when_to_use` / `when_not_to_use` / `limitations` 具体内容
+3. 调 `params` schema 匹配你真实要的入参
+4. 改 `render()` body（骨架是可跑示例，但不是你的最终视觉）
+5. 改 `sample()` 返回真实业务内容
+6. `status` 从 `experimental` 改成 `stable`
+
+**别干的事**：
+- ❌ 别手写 file from scratch — 一定用 CLI 生成骨架
+- ❌ 别复制已有组件改 — 容易漏字段
+- ❌ 别直接提交含 TODO 的文件 — TODO 全填完再提交
 
 ## 2.4 11 必填字段速查
 
