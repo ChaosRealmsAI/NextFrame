@@ -23,9 +23,9 @@
 
 | 步骤 | 查提示词 | 谁做 | 实际 CLI |
 |------|---------|------|---------|
-| 0 | `nextframe state-prompt script outline` | **Agent** | （只是规划，无 CLI） |
-| 1 | `nextframe state-prompt script write` | **Agent** | `nextframe script-set <project> <episode> --segment N --narration "..." --visual "..." --role "..." --logic "..."` |
-| 2 | `nextframe state-prompt script review` | **Agent** | `nextframe script-get <project> <episode> [--segment N]` |
+| 0 | `nf-guide script outline` | **Agent** | （只是规划，无 CLI） |
+| 1 | `nf-guide script write` | **Agent** | `nextframe script-set <project> <episode> --segment N --narration "..." --visual "..." --role "..." --logic "..."` |
+| 2 | `nf-guide script review` | **Agent** | `nextframe script-get <project> <episode> [--segment N]` |
 
 ## 状态检测
 
@@ -43,10 +43,10 @@
 
 ## Agent 怎么进场
 
-1. `nextframe state-prompt script` — 看流程
-2. `nextframe state-prompt script outline` — 拿到 outline 提示词
+1. `nf-guide script` — 看流程
+2. `nf-guide script outline` — 拿到 outline 提示词
 3. Agent 决定 N 段
-4. 对每段 N: `nextframe state-prompt script write` → 写 → `nextframe script-set ... --segment N --narration ...`
-5. `nextframe state-prompt script review` → 通读校验
+4. 对每段 N: `nf-guide script write` → 写 → `nextframe script-set ... --segment N --narration ...`
+5. `nf-guide script review` → 通读校验
 
 **CLI 不调 LLM。Agent 自己写。**

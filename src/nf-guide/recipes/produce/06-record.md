@@ -82,5 +82,5 @@ open output.mp4
 
 如果需要多段拼接：
 ```bash
-nextframe state-prompt produce concat
+nf-guide produce concat
 ```

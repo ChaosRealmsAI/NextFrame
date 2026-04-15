@@ -88,5 +88,5 @@ nextframe build timeline.json --no-preview
 3 张截图全部确认 OK 后：
 
 ```bash
-nextframe state-prompt produce record
+nf-guide produce record
 ```

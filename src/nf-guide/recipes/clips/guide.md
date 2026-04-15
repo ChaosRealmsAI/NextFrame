@@ -1,6 +1,6 @@
 # Clips Pipeline — 智能切片状态机
 
-长视频 → 挑亮点 → 切片 → 多语言字幕 → 传播文案。每步有提示词，跑 `nextframe state-prompt clips <step>` 获取。
+长视频 → 挑亮点 → 切片 → 多语言字幕 → 传播文案。每步有提示词，跑 `nf-guide clips <step>` 获取。
 
 ## 流程图
 
@@ -39,18 +39,18 @@
 
 ## 每步命令
 
-**查提示词**：`nextframe state-prompt clips <step>`
+**查提示词**：`nf-guide clips <step>`
 **实际执行**：看每步 MD 里的 CLI（例如 `nf-source download ...` / `nf-cli source-translate ...`）
 
 | 步骤 | 查提示词 | 谁做 | 产物（gate） |
 |------|---------|------|--------------|
-| 0 | `nextframe state-prompt clips download` | Code | `sources/<slug>/source.mp4` + `meta.json` |
-| 1 | `nextframe state-prompt clips transcribe` | Code | `sources/<slug>/sentences.json` + `words.json` |
-| 2 | `nextframe state-prompt clips plan` | **Agent** | `plan.json` |
-| 3 | `nextframe state-prompt clips cut` | Code | `clips/clip_NN.mp4` + `cut_report.json` |
-| 4 | `nextframe state-prompt clips translate` | **Agent** | `clips/clip_NN.translations.<lang>.json` |
-| 5 | `nextframe state-prompt clips polish` | **Agent** | `clips/clip_NN.caption.<lang>.md` |
-| 6 | `nextframe state-prompt clips publish` | Code | `clips/clip_NN.publish.json` |
+| 0 | `nf-guide clips download` | Code | `sources/<slug>/source.mp4` + `meta.json` |
+| 1 | `nf-guide clips transcribe` | Code | `sources/<slug>/sentences.json` + `words.json` |
+| 2 | `nf-guide clips plan` | **Agent** | `plan.json` |
+| 3 | `nf-guide clips cut` | Code | `clips/clip_NN.mp4` + `cut_report.json` |
+| 4 | `nf-guide clips translate` | **Agent** | `clips/clip_NN.translations.<lang>.json` |
+| 5 | `nf-guide clips polish` | **Agent** | `clips/clip_NN.caption.<lang>.md` |
+| 6 | `nf-guide clips publish` | Code | `clips/clip_NN.publish.json` |
 
 ## 粒度原则
 
@@ -96,9 +96,9 @@ episode/
 ## Agent 怎么进场
 
 Agent（Claude / GPT / 你这个会话）执行时：
-1. `nextframe state-prompt clips` → 看这份 guide，知道整体流程
-2. `nextframe state-prompt clips <step>` → 拿到那步的完整操作手册
+1. `nf-guide clips` → 看这份 guide，知道整体流程
+2. `nf-guide clips <step>` → 拿到那步的完整操作手册
 3. 按手册里的 CLI 操作 + 提示词规则干活，写产物
-4. 下一步再跑 `nextframe state-prompt clips <next-step>`
+4. 下一步再跑 `nf-guide clips <next-step>`
 
 **CLI 不调 LLM API、不需要 API key。Agent 就是 LLM。**

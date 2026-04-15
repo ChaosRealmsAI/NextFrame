@@ -23,9 +23,9 @@
 
 | 步骤 | 查提示词 | 谁做 | 实际 CLI |
 |------|---------|------|---------|
-| 0 | `nextframe state-prompt audio voice` | **Agent** | 决定后通过 `audio-synth --voice X --backend Y` 隐式写入 |
-| 1 | `nextframe state-prompt audio synth` | Code | `nextframe audio-synth <project> <episode> --segment N [--voice ...] [--backend edge|volcengine]` |
-| 2 | `nextframe state-prompt audio review` | **Agent** | 用 `audio.status` IPC 或直接听 `audio/seg-N/*.mp3` |
+| 0 | `nf-guide audio voice` | **Agent** | 决定后通过 `audio-synth --voice X --backend Y` 隐式写入 |
+| 1 | `nf-guide audio synth` | Code | `nextframe audio-synth <project> <episode> --segment N [--voice ...] [--backend edge|volcengine]` |
+| 2 | `nf-guide audio review` | **Agent** | 用 `audio.status` IPC 或直接听 `audio/seg-N/*.mp3` |
 
 ## 状态检测
 
@@ -46,10 +46,10 @@
 
 ## Agent 怎么进场
 
-1. `nextframe state-prompt audio` — 看流程
-2. `nextframe state-prompt audio voice` — 拿到 voice 决策提示词
+1. `nf-guide audio` — 看流程
+2. `nf-guide audio voice` — 拿到 voice 决策提示词
 3. 决定 engine + voice
 4. 对每个 script segment N: `nextframe audio-synth <project> <episode> --segment N --voice X --backend edge`
-5. `nextframe state-prompt audio review` — 听检查
+5. `nf-guide audio review` — 听检查
 
 **vox CLI 是内置工具**，audio-synth 内部已经接好。Agent 只决策 + 触发。

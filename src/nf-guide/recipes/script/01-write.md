@@ -75,4 +75,4 @@ nextframe script-set <project> <episode> \
 
 ### 写完进 Step 2
 
-所有段都 script-set 完成 → `nextframe state-prompt script review`。
+所有段都 script-set 完成 → `nf-guide script review`。

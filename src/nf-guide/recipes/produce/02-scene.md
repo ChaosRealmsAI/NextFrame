@@ -183,5 +183,5 @@ design.js 的 GRID/TYPE/TOKENS 就是从这里提取的。
 全部组件 preview 通过后：
 
 ```bash
-nextframe state-prompt produce timeline
+nf-guide produce timeline
 ```

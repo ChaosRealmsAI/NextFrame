@@ -1,5 +1,5 @@
 [workspace]
-members = ["src/nf-shell-mac", "src/nf-bridge", "src/nf-recorder", "src/nf-tts", "src/nf-publish", "src/nf-source/core", "src/nf-source/download", "src/nf-source/transcribe", "src/nf-source/align", "src/nf-source/cut", "src/nf-source/source"]
+members = ["src/nf-shell-mac", "src/nf-bridge", "src/nf-recorder", "src/nf-tts", "src/nf-publish", "src/nf-source/core", "src/nf-source/download", "src/nf-source/transcribe", "src/nf-source/align", "src/nf-source/cut", "src/nf-source/source", "src/nf-guide"]
 resolver = "2"
 
 [workspace.package]

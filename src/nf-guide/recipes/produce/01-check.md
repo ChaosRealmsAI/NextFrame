@@ -70,15 +70,15 @@ nextframe scenes
 
 ## 分支
 
-- **全有** → 跳到 `nextframe state-prompt produce timeline`
-- **缺组件** → 进 `nextframe state-prompt produce scene`
+- **全有** → 跳到 `nf-guide produce timeline`
+- **缺组件** → 进 `nf-guide produce scene`
 
 ## 下一步
 
 ```bash
 # 缺组件
-nextframe state-prompt produce scene
+nf-guide produce scene
 
 # 组件齐全
-nextframe state-prompt produce timeline
+nf-guide produce timeline
 ```

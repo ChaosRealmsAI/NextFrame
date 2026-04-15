@@ -1409,6 +1409,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nf-guide"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nf-publish"
 version = "0.1.0"
 dependencies = [

@@ -1,6 +1,6 @@
 # Produce Pipeline — 视频生产状态机
 
-从素材到最终 MP4 的完整流程。每步有提示词，跑 `nextframe state-prompt produce <step>` 获取。
+从素材到最终 MP4 的完整流程。每步有提示词，跑 `nf-guide produce <step>` 获取。
 
 ## 流程图
 
@@ -56,19 +56,19 @@
 
 | Step | 命令 | 做什么 | 门禁 |
 |------|------|--------|------|
-| ratio | `nextframe state-prompt produce ratio` | 定 9:16 或 16:9 | ratio 确定 |
-| check | `nextframe state-prompt produce check` | 素材 + 组件齐全？ | 全有 or 缺啥 |
-| scene | `nextframe state-prompt produce scene` | 做组件 + preview 验证 | 全部 preview OK |
-| timeline | `nextframe state-prompt produce timeline` | 写 JSON，字幕直接贴 | JSON 写好 |
-| validate | `nextframe state-prompt produce validate` | nextframe validate | 0 errors |
-| build | `nextframe state-prompt produce build` | nextframe build + 看截图 | 3 张截图 OK |
-| record | `nextframe state-prompt produce record` | recorder + ffprobe | MP4 验证通过 |
-| concat | `nextframe state-prompt produce concat` | ffmpeg 拼接（可选） | 时长匹配 |
+| ratio | `nf-guide produce ratio` | 定 9:16 或 16:9 | ratio 确定 |
+| check | `nf-guide produce check` | 素材 + 组件齐全？ | 全有 or 缺啥 |
+| scene | `nf-guide produce scene` | 做组件 + preview 验证 | 全部 preview OK |
+| timeline | `nf-guide produce timeline` | 写 JSON，字幕直接贴 | JSON 写好 |
+| validate | `nf-guide produce validate` | nextframe validate | 0 errors |
+| build | `nf-guide produce build` | nextframe build + 看截图 | 3 张截图 OK |
+| record | `nf-guide produce record` | recorder + ffprobe | MP4 验证通过 |
+| concat | `nf-guide produce concat` | ffmpeg 拼接（可选） | 时长匹配 |
 
 ## 查看所有已知坑
 
 ```bash
-nextframe state-prompt produce pitfalls
+nf-guide produce pitfalls
 ```
 
 ## 两种视频类型
