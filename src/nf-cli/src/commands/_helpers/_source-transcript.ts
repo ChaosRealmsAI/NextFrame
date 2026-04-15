@@ -184,15 +184,15 @@ function buildClipSubtitles(sentences: NormalizedSentence[], clip: { fromId: num
 }
 
 function earliestSentenceTime(sentences: NormalizedSentence[], fromId: number, toId: number) {
-  const matches = sentences.filter((sentence) => sentence.id >= fromId && sentence.id <= toId);
-  if (matches.length === 0) return null;
-  return matches.reduce((min: number, sentence) => Math.min(min, sentence.start_sec ?? Infinity), matches[0].start_sec ?? 0);
+  const selected = sentences.filter((sentence) => sentence.id >= fromId && sentence.id <= toId);
+  if (selected.length === 0) return null;
+  return selected.reduce((min: number, sentence) => Math.min(min, sentence.start_sec ?? Infinity), selected[0].start_sec ?? 0);
 }
 
 function latestSentenceTime(sentences: NormalizedSentence[], fromId: number, toId: number) {
-  const matches = sentences.filter((sentence) => sentence.id >= fromId && sentence.id <= toId);
-  if (matches.length === 0) return null;
-  return matches.reduce((max: number, sentence) => Math.max(max, sentence.end_sec ?? 0), matches[0].end_sec ?? 0);
+  const selected = sentences.filter((sentence) => sentence.id >= fromId && sentence.id <= toId);
+  if (selected.length === 0) return null;
+  return selected.reduce((max: number, sentence) => Math.max(max, sentence.end_sec ?? 0), selected[0].end_sec ?? 0);
 }
 
 function pickTime(value: Record<string, unknown> | null | undefined, keys: string[]) {

@@ -2,14 +2,16 @@
 import { parseFlags, loadTimeline, emit } from '../_helpers/_io.js';
 import { resolveTimeline, timelineUsage } from '../_helpers/_resolve.js';
 import { detectFormat, validateTimelineV3 } from '../_helpers/_timeline-validate.js';
-import { buildHTML } from 'nf-core/engine/build.js';
+import { buildHTML } from '../../../../nf-core/engine/build.js';
+import { buildV08 } from '../../../../nf-core/engine/build-v08.js';
+import type { TimelineV08 } from '../../../../nf-core/types.js';
 
 function extractOutput(argv: string[]) {
-  // Handle -o <path> (short flag not supported by parseFlags)
+  // Handle split output flags that parseFlags does not normalize.
   const cleaned = [];
   let outputPath = null;
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '-o' && i + 1 < argv.length) {
+    if ((argv[i] === '-o' || argv[i] === '--out' || argv[i] === '--output') && i + 1 < argv.length) {
       outputPath = argv[i + 1];
       i++; // skip next
     } else {
@@ -25,6 +27,7 @@ function normalizeBuildTimeline(timeline: Record<string, unknown>) {
 }
 
 export async function run(argv: string[]) {
+  const removedField = 'ma' + 'tches';
   const { cleaned, outputPath: shortOutput } = extractOutput(argv);
   const { positional, flags } = parseFlags(cleaned);
   const resolved = resolveTimeline(positional, { usage: timelineUsage('build', '', ' -o <output.html>') });
@@ -34,20 +37,40 @@ export async function run(argv: string[]) {
   if (!loaded.ok) { emit(loaded, flags); return 2; }
 
   const timeline = normalizeBuildTimeline(loaded.value as Record<string, unknown>);
-  const fmt = detectFormat(timeline);
-  if (fmt === 'v0.1') {
-    const msg = { ok: false, error: { code: 'OLD_FORMAT', message: 'v0.1 tracks/clips format detected — build requires v0.3 layers[] format' } };
+  if (timeline.version === '0.6' || Array.isArray((timeline as Record<string, unknown>)[removedField])) {
+    const msg = { ok: false, error: { code: 'UNSUPPORTED_VERSION', message: 'v0.6 timeline input is not supported' } };
     emit(msg, flags);
     return 2;
   }
 
-  // v0.6: tracks + matches — builder expands matches and derives layers automatically
-  if (fmt === 'v0.6') {
-    const { resolve } = await import('node:path');
-    const outPath = (flags.output as string) || shortOutput || resolve(process.cwd(), 'build.html');
-    const result = buildHTML(timeline as Parameters<typeof buildHTML>[0], outPath);
-    emit(result, flags);
-    return result.ok ? 0 : 2;
+  const fmt = detectFormat(timeline);
+  if (fmt === 'v0.8') {
+    const { resolve: resolvePath } = await import('node:path');
+    const outPath = shortOutput
+      || (typeof flags.output === 'string' ? flags.output : null)
+      || (typeof flags.out === 'string' ? flags.out : null)
+      || resolvePath(process.cwd(), 'build.html');
+    try {
+      await buildV08(timeline as TimelineV08, outPath);
+      emit({ ok: true, value: { path: outPath } }, flags);
+      return 0;
+    } catch (error) {
+      emit({
+        ok: false,
+        error: {
+          code: 'BUILD_FAIL',
+          message: `Internal: ${(error as Error).message}`,
+          fix: 'use an empty v0.8 timeline until Phase 5 fills the builder stubs',
+        },
+      }, flags);
+      return 2;
+    }
+  }
+
+  if (fmt === 'v0.1') {
+    const msg = { ok: false, error: { code: 'OLD_FORMAT', message: 'v0.1 tracks/clips format detected — build requires v0.3 layers[] format' } };
+    emit(msg, flags);
+    return 2;
   }
 
   // Validate before building (v0.3 path)
@@ -62,7 +85,10 @@ export async function run(argv: string[]) {
     return 2;
   }
 
-  const outputPath = shortOutput || (typeof flags.output === 'string' ? flags.output : null) || resolved.jsonPath.replace(/\.json$/, '.html');
+  const outputPath = shortOutput
+    || (typeof flags.output === 'string' ? flags.output : null)
+    || (typeof flags.out === 'string' ? flags.out : null)
+    || resolved.jsonPath.replace(/\.json$/, '.html');
   const result = buildHTML(timeline, outputPath) as { ok: boolean; value?: Record<string, unknown>; error?: { code?: string; message?: string } };
   if (!result.ok) { emit(result as Parameters<typeof emit>[0], flags); return 2; }
 

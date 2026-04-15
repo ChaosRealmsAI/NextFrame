@@ -38,7 +38,7 @@ type LooseLayer = Record<string, unknown> & {
 };
 type LooseTimeline = Record<string, unknown> & {
   version?: string; schema?: string; width?: number; height?: number; fps?: number; duration?: number;
-  ratio?: string; audio?: unknown; layers?: LooseLayer[]; tracks?: LooseTrack[];
+  ratio?: string; audio?: unknown; layers?: LooseLayer[]; tracks?: LooseTrack[]; anchors?: Record<string, unknown>;
   chapters?: Array<Record<string, unknown>>; markers?: Array<Record<string, unknown>>;
   assets?: Array<Record<string, unknown>>; background?: string;
   project?: { width?: number; height?: number; fps?: number };
@@ -56,8 +56,9 @@ function hasExplicitBounds(layer: LooseLayer | null | undefined) {
 }
 
 export function detectFormat(timeline: LooseTimeline) {
+  if ((timeline as { version?: unknown })?.version === "0.8") return "v0.8";
   if (Array.isArray(timeline?.layers)) return "v0.3";
-  if (Array.isArray(timeline?.tracks) && Array.isArray((timeline as Record<string, unknown>)?.matches)) return "v0.6";
+  if (Array.isArray(timeline?.tracks) && (timeline as { anchors?: unknown })?.anchors) return "v0.8";
   if (Array.isArray(timeline?.tracks)) return "v0.1";
   return "unknown";
 }

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# TS/JS boundary lint — prevents the drift that caused v0.5 regression.
+# TS/JS boundary lint — prevents JS/TS zone drift in browser-inline and Node-only code.
 #
 # 4 rules:
 #   1. No same-stem .ts/.js duplicate anywhere in src/
-#   2. JS-only zones (web/src, scenes, animation effects/transitions/filters)
+#   2. JS-only zones (web/src, scenes, animation effects/transitions/filters/runtime-v08)
 #      must not contain .ts files (except .d.ts).
-#   3. TS-authoritative zones (nf-cli/src, nf-cli/test, nf-core/engine)
+#   3. TS-authoritative zones (nf-cli/src, nf-cli/test, nf-core/engine, anchors, kinds)
 #      must not contain .js files.
 #   4. Every <script src="*.js"> in index.html must resolve to an existing file.
 #
@@ -36,6 +36,7 @@ JS_ZONES=(
   "src/nf-core/animation/effects"
   "src/nf-core/animation/transitions"
   "src/nf-core/filters"
+  "src/nf-core/runtime-v08"
 )
 for z in "${JS_ZONES[@]}"; do
   [ -d "$z" ] || continue
@@ -60,7 +61,6 @@ TS_ZONES=(
   "src/nf-cli/src"
   "src/nf-cli/test"
   "src/nf-core/engine"
-  "src/nf-core/matches"
 )
 for z in "${TS_ZONES[@]}"; do
   [ -d "$z" ] || continue

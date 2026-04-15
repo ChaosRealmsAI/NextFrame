@@ -1,6 +1,19 @@
 // Shared domain types for the NextFrame engine.
 // All modules in nf-core and nf-cli should import types from here.
 
+import type { AnchorDict as V08AnchorDict } from "./anchors/types.js";
+import type { Kind as V08Kind, Clip, Track, Track as V08Track } from "./kinds/types.js";
+
+export type { AnchorDict, AnchorEntry, AnchorRef, ExprAst, Issue } from "./anchors/types.js";
+export type { Kind, Clip, Track, KindSchema } from "./kinds/types.js";
+
+export interface TimelineV08 {
+  version: "0.8";
+  anchors: V08AnchorDict;
+  tracks: Array<V08Track<V08Kind>>;
+  media?: Record<string, unknown>;
+}
+
 export interface Asset {
   id: string;
   path: string;
@@ -30,7 +43,7 @@ export interface ClipEffects {
   exit?: EffectConfig;
 }
 
-export interface Clip {
+export interface LegacyClip {
   id?: string;
   scene: string;
   start: number;
@@ -45,25 +58,25 @@ export interface Clip {
   [key: string]: unknown;
 }
 
-export interface AudioClip extends Clip {
+export interface AudioClip extends LegacyClip {
   src?: string;
   volume?: number;
 }
 
-export interface VideoClip extends Clip {
+export interface VideoClip extends LegacyClip {
   src?: string;
 }
 
-export interface SceneClip extends Clip {}
+export interface SceneClip extends LegacyClip {}
 
-export interface SubtitleClip extends Clip {
+export interface SubtitleClip extends LegacyClip {
   text?: string;
   word?: Word;
 }
 
-export interface OverlayClip extends Clip {}
+export interface OverlayClip extends LegacyClip {}
 
-interface BaseTrack<TKind extends string, TClip extends Clip> {
+interface BaseTrack<TKind extends string, TClip extends LegacyClip> {
   id?: string;
   kind?: TKind;
   muted?: boolean;
@@ -89,7 +102,7 @@ export interface SubtitleTrack extends BaseTrack<"subtitle", SubtitleClip> {
 
 export interface OverlayTrack extends BaseTrack<"overlay", OverlayClip> {}
 
-export type Track =
+export type LegacyTrack =
   | AudioTrack
   | VideoTrack
   | SceneTrack
@@ -127,10 +140,9 @@ export interface Timeline {
   };
   _audioSrc?: string;
   /** v0.1 flat layer list */
-  layers?: Clip[];
+  layers?: LegacyClip[];
   /** v0.2 multi-track */
-  tracks?: Track[];
-  matches?: Match[];
+  tracks?: LegacyTrack[];
   _audioFingerprint?: string;
   assets?: Asset[];
   chapters?: Chapter[];
@@ -162,60 +174,12 @@ export interface Segment {
   startMs: number;
   endMs: number;
   words: Word[];
-  start?: number;
-  end?: number;
-  duration?: number;
-  language?: string;
-  model?: string;
-  previousTranscript?: string;
-  audio?: string;
-  video?: string;
-  cn?: string[];
 }
 
 export interface Word {
   w: string;
   s: number;
   e: number;
-}
-
-export interface Match {
-  rule: string;
-  source: string;
-  target: string;
-  plan?: unknown;
-  [key: string]: unknown;
-}
-
-export interface PlanCtx<Options = unknown> {
-  timeline: Timeline;
-  rule?: string;
-  match?: Match;
-  ratio?: string;
-  source?: Track;
-  target?: Track;
-  options?: Options;
-  [key: string]: unknown;
-}
-
-export interface ValidationIssue {
-  code: string;
-  message: string;
-  ref?: string;
-  hint?: string;
-}
-
-export interface ValidationResult {
-  ok: boolean;
-  errors: ValidationIssue[];
-  warnings: ValidationIssue[];
-}
-
-export interface MatchRule<Plan = unknown, Options = unknown> {
-  name: string;
-  plan(ctx: PlanCtx<Options>): Promise<Plan>;
-  validate(match: Match, timeline: Timeline): ValidationResult;
-  expand(match: Match, timeline: Timeline): Partial<Timeline>;
 }
 
 export type BridgeResult<T = unknown> =

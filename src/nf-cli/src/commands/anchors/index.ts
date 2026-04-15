@@ -1,21 +1,19 @@
-// Dispatches nextframe match subcommands.
-import { defaultFixSuggestion, renderCommandHelp } from "./_helpers/help/index.js";
+import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help/index.js";
 
 const SUBCOMMANDS = {
-  plan: () => import("./match/plan.js"),
-  validate: () => import("./match/validate.js"),
-  preview: () => import("./match/preview.js"),
-  "from-tts": () => import("./match/from-tts.js"),
+  "from-tts": () => import("./from-tts.js"),
+  list: () => import("./list.js"),
+  validate: () => import("./validate.js"),
 };
 
 export async function run(argv: string[]) {
   const subcommand = argv[0];
   if (!subcommand || subcommand === "help" || subcommand === "--help" || subcommand === "-h") {
-    process.stdout.write(renderCommandHelp("match") ?? "");
+    process.stdout.write(renderCommandHelp("anchors") ?? "");
     return 0;
   }
   if (argv[1] === "--help" || argv[1] === "-h") {
-    const help = renderCommandHelp(`match ${subcommand}`);
+    const help = renderCommandHelp(`anchors ${subcommand}`);
     if (help) {
       process.stdout.write(help);
       return 0;
@@ -24,8 +22,8 @@ export async function run(argv: string[]) {
 
   const loader = SUBCOMMANDS[subcommand as keyof typeof SUBCOMMANDS];
   if (!loader) {
-    process.stderr.write(`error: unknown match subcommand "${subcommand}"\n`);
-    process.stderr.write('Fix: run "nextframe match --help" to see supported match subcommands\n');
+    process.stderr.write(`error: unknown anchors subcommand "${subcommand}"\n`);
+    process.stderr.write('Fix: run "nextframe anchors --help" to see supported anchors subcommands\n');
     return 3;
   }
 

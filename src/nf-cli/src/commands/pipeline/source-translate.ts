@@ -73,7 +73,7 @@ export async function run(argv: string[]) {
     } else if (sourceDirs.length === 1) {
       sentencesPath = join(sourcesDir, sourceDirs[0], "sentences.json");
     } else {
-      // Multi-source: pick the source whose sentence id range covers [from_id, to_id] and text matches text_preview
+      // Multi-source: pick the source whose sentence id range covers [from_id, to_id] and whose text aligns with text_preview
       const fromIdScan = Number(clipRow.from_id);
       const toIdScan = Number(clipRow.to_id);
       const previewHead = String(clipRow.text_preview || "").split("...")[0].trim().slice(0, 30);

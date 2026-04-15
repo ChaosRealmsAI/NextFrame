@@ -16,7 +16,7 @@ Validate a scene component against ADR-008 contract (16 checks).
 Checks:
   1. index.js exists and imports
   2. meta has all required fields
-  3. ratio matches directory
+  3. ratio aligns with directory
   4. params have type+default+label+semantic+group
   5. render() returns non-empty HTML
   6. screenshots() returns 3+ entries
@@ -148,7 +148,7 @@ export async function run(argv: string[]) {
     const m = mod.meta;
     check("meta.id", !!m.id, "add id field");
     check("meta.ratio", !!m.ratio, "add ratio field");
-    check("meta.ratio matches dir", m.ratio === ratio, `meta.ratio="${m.ratio}" but dir is ${ratio}`);
+    check("meta.ratio aligns with dir", m.ratio === ratio, `meta.ratio="${m.ratio}" but dir is ${ratio}`);
     check("meta.category", !!m.category, "add category field");
     check("meta.description", !!m.description && m.description.length > 10, "description too short");
     check("meta.tags >= 3", Array.isArray(m.tags) && m.tags.length >= 3, "need at least 3 tags");

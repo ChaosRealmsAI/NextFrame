@@ -15,8 +15,9 @@ const command = (name: string, summary: string, usage: string, params: string, c
 
 export const TOP_LEVEL_COMMANDS = [
   group("Timeline", "new validate build scenes preview frame describe-frame render"),
+  group("Anchors", "anchors"),
+  group("Tracks", "tracks"),
   group("WYSIWYG", "wysiwyg"),
-  group("Match", "match"),
   group("Scene Dev", "scene-new scene-preview scene-validate"),
   group("Layer CRUD", "layer-list layer-add layer-move layer-resize layer-set layer-remove"),
   group("Project Hierarchy", "project-new project-list project-config episode-new episode-list segment-new segment-list"),
@@ -42,8 +43,26 @@ export const COMMAND_SPECS = Object.fromEntries([
     nextframe build <timeline.json> [--output=out.html] [-o out.html] [--json]`, `<project> <episode> <segment> build a segment from the project hierarchy
     <timeline.json> build a direct timeline file
     --output=PATH or -o PATH write HTML to a custom path
-    --json emit structured result data`, `The timeline must validate before build succeeds.
-    Legacy v0.1 tracks/clips timelines are rejected by build.`),
+    --json emit structured result data`, `The v0.3 layers[] path and the empty v0.8 skeleton path are supported.
+    Legacy v0.1 and removed v0.6 timelines are rejected by build.`),
+  command("anchors", "Dispatch v0.8 anchor bookkeeping subcommands.", `nextframe anchors <subcommand>
+    nextframe anchors <subcommand> --help`, `Subcommands: from-tts, list, validate
+    Run nextframe anchors <subcommand> --help for subcommand-specific params and examples`, `Walking skeleton only: subcommands are registered but not implemented yet.`),
+  command("anchors from-tts", "Stub v0.8 anchor generation from TTS word timing.", `nextframe anchors from-tts <words.json> [--out=anchors.json] [--json]`, `<words.json> TTS timing payload
+    --out=PATH optional output path
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
+  command("anchors list", "Stub v0.8 anchor inspection command.", `nextframe anchors list <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
+  command("anchors validate", "Stub v0.8 anchor validation command.", `nextframe anchors validate <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
+  command("tracks", "Dispatch v0.8 track bookkeeping subcommands.", `nextframe tracks <subcommand>
+    nextframe tracks <subcommand> --help`, `Subcommands: add, list
+    Run nextframe tracks <subcommand> --help for subcommand-specific params and examples`, `Walking skeleton only: subcommands are registered but not implemented yet.`),
+  command("tracks add", "Stub v0.8 track creation command.", `nextframe tracks add <timeline.json> --kind=<audio|scene|subtitle|animation> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --kind required v0.8 track kind
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
+  command("tracks list", "Stub v0.8 track listing command.", `nextframe tracks list <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
   command("scene-new", "Create a new scene component skeleton (directory + index.js + preview.html).", `nextframe scene-new <name> --ratio=<16:9|9:16|4:3> --category=<cat> [--tech=dom]`, `--ratio target aspect ratio
     --category backgrounds|typography|data|shapes|overlays|media|browser
     --tech dom|canvas2d|svg|webgl|video|lottie`, `Creates a ready-to-edit skeleton. Next: edit render(), then scene-preview, then scene-validate.`),
@@ -53,7 +72,7 @@ export const COMMAND_SPECS = Object.fromEntries([
   command("scenes", "List all available scenes or inspect one scene contract, including params.", `nextframe scenes [--json]
     nextframe scenes <id> [--json]`, `<id> inspect a single scene
     --json emit structured scene metadata`, `Use this before layer-add so the AI does not guess scene ids or params.
-    Pick scenes whose ratio matches the target timeline ratio.`),
+    Pick scenes whose ratio aligns with the target timeline ratio.`),
   command("preview", "Render screenshots plus a layout map at selected times for AI verification.", `nextframe preview <project> <episode> <segment> [--time=T | --times=T1,T2] [--out=DIR] [--auto] [--json]
     nextframe preview <timeline.json> [--time=T | --times=T1,T2] [--out=DIR] [--auto] [--json]`, `--time=T capture one time in seconds
     --times=T1,T2 capture a comma-separated list of times in seconds
@@ -99,23 +118,6 @@ export const COMMAND_SPECS = Object.fromEntries([
   command("wysiwyg simulate", "Compatibility alias for wysiwyg edit.", `nextframe wysiwyg simulate <timeline.json> --layer=N --action=<move|resize|edit-text> [--dx=N --dy=N --dw=N --dh=N --value=TEXT] [--json]`, `Same flags and behavior as nextframe wysiwyg edit.
     <timeline.json> must be an absolute path`, `This alias exists for older callers.
     Prefer nextframe wysiwyg edit in new scripts.`),
-  command("match", "Plan, validate, and preview v0.6 tracks+matches workflows.", `nextframe match <subcommand>
-    nextframe match <subcommand> --help`, `Subcommands: plan, validate, preview
-    Run nextframe match <subcommand> --help for subcommand-specific params and examples`, `Use this only for v0.6 tracks+matches timelines.
-    The rule implementation is selected by name and dispatched through nf-core/matches.`),
-  command("match plan", "Generate a rule-specific match plan skeleton for one episode.", `nextframe match plan <episode> --rule <name> [--json]`, `<episode> target episode identifier or path token for planning
-    --rule <name> required match rule name such as scene-per-segment
-    --json emit structured output`, `The selected rule must exist in nf-core/matches.
-    Planning is rule-specific and does not write timestamps by hand.`),
-  command("match validate", "Validate timeline matches against registered rules.", `nextframe match validate <project> <episode> <segment> [--json]
-    nextframe match validate <timeline.json> [--json]`, `<project> <episode> <segment> resolve to ~/NextFrame/projects/<project>/<episode>/<segment>.json
-    <timeline.json> validate a direct file path instead of project hierarchy
-    --json emit structured validation output`, `Validation dispatches by match.rule.
-    Non-zero exit means usage failure or rule validation failure.`),
-  command("match preview", "Preview one planned segment without running a full render.", `nextframe match preview <plan> --seg <N> [--json]`, `<plan> path to a saved match plan or timeline artifact
-    --seg <N> required 1-based segment number
-    --json emit structured output`, `Preview targets exactly one segment.
-    Segment numbers are 1-based positive integers.`),
   command("layer-list", "List layers in a timeline with id, scene, start, dur, and end.", `nextframe layer-list <project> <episode> <segment> [--json]
     nextframe layer-list <timeline.json> [--json]`, `--json emit structured layer rows`, `Use this before move/set/remove so you operate on a real layer id.`),
   command("layer-add", "Add one layer with a scene id, timing, params, and optional layout/animation props.", `nextframe layer-add <project> <episode> <segment> <scene> [--id=ID] [--start=N] [--dur=N] [--params=JSON] [--x=VALUE] [--y=VALUE] [--w=VALUE] [--h=VALUE] [--z=N] [--enter=NAME] [--exit=NAME] [--transition=NAME] [--opacity=N] [--blend=MODE] [--json]

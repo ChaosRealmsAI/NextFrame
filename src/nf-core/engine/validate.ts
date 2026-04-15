@@ -9,7 +9,7 @@ import { REGISTRY } from "../scenes/index.js";
 import { EFFECT_IDS } from "../animation/effects/index.js";
 import { FILTER_IDS } from "../filters/index.js";
 import { TRANSITION_IDS } from "../animation/transitions/index.js";
-import type { Timeline, Track, Clip } from "../types.js";
+import type { Timeline, LegacyTrack as Track, LegacyClip as Clip } from "../types.js";
 
 interface ValidationError {
   code: string;

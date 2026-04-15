@@ -21,7 +21,7 @@ import { resolveTimeline } from "./time.js";
 import { resolveKeyframes } from "./keyframes.js";
 import { applyEnterEffect, applyExitEffect } from "../animation/effects/index.js";
 import { applyFilters } from "../filters/index.js";
-import type { Timeline, Track, Clip, Chapter, Marker } from "../types.js";
+import type { Timeline, LegacyTrack as Track, LegacyClip as Clip, Chapter, Marker } from "../types.js";
 
 type NapiCanvas = ReturnType<typeof createCanvas>;
 
