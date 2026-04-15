@@ -33,15 +33,19 @@ export const COMMAND_EXAMPLES = Object.fromEntries([
   `),
   examples("wysiwyg", `
     nextframe wysiwyg diff ./timeline.json --time=3.5
-    nextframe wysiwyg simulate ./timeline.json --layer=2 move 120 60 --json
+    nextframe wysiwyg edit /abs/path/timeline.json --layer=2 --action=move --dx=12 --dy=6 --json
   `),
   examples("wysiwyg diff", `
     nextframe wysiwyg diff ./timeline.json --time=3.5
     nextframe wysiwyg diff ./timeline.json --time=00:03.5 --json
   `),
+  examples("wysiwyg edit", `
+    nextframe wysiwyg edit /abs/path/timeline.json --layer=2 --action=move --dx=12 --dy=6
+    nextframe wysiwyg edit /abs/path/timeline.json --layer=1 --action=edit-text --value="New title" --json
+  `),
   examples("wysiwyg simulate", `
-    nextframe wysiwyg simulate ./timeline.json --layer=2 move 120 60
-    nextframe wysiwyg simulate ./timeline.json --layer=1 edit-text "New title" --json
+    nextframe wysiwyg simulate /abs/path/timeline.json --layer=2 --action=resize --dw=8 --dh=4
+    nextframe wysiwyg simulate /abs/path/timeline.json --layer=1 --action=edit-text --value="New title" --json
   `),
   examples("match", `
     nextframe match plan e01 --rule scene-per-segment

@@ -11,6 +11,60 @@
         selectedIndex: -1,
         _intervalId: 0
     };
+    function toFinite(value, fallback) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : fallback;
+    }
+    function getLayerLayout(layer) {
+        const layout = layer && typeof layer.layout === 'object' ? layer.layout : {};
+        return {
+            x: toFinite(layout.x !== undefined ? layout.x : layer && layer.x, 0),
+            y: toFinite(layout.y !== undefined ? layout.y : layer && layer.y, 0),
+            w: toFinite(layout.w !== undefined ? layout.w : (layer && (layer.w !== undefined ? layer.w : layer.width)), 100),
+            h: toFinite(layout.h !== undefined ? layout.h : (layer && (layer.h !== undefined ? layer.h : layer.height)), 100)
+        };
+    }
+    function applyLayoutToLayerData(layer, nextLayout) {
+        if (!layer || !nextLayout)
+            return;
+        if (!layer.layout || typeof layer.layout !== 'object')
+            layer.layout = {};
+        layer.layout.x = nextLayout.x;
+        layer.layout.y = nextLayout.y;
+        layer.layout.w = nextLayout.w;
+        layer.layout.h = nextLayout.h;
+        layer.x = nextLayout.x;
+        layer.y = nextLayout.y;
+        layer.w = nextLayout.w;
+        layer.h = nextLayout.h;
+        layer.width = nextLayout.w;
+        layer.height = nextLayout.h;
+    }
+    function applyLayerStyle(el, layer) {
+        if (!el)
+            return;
+        const layout = getLayerLayout(layer);
+        el.style.left = layout.x + '%';
+        el.style.top = layout.y + '%';
+        el.style.width = layout.w + '%';
+        el.style.height = layout.h + '%';
+    }
+    function syncGlobals() {
+        window.timeline = state.timeline.layers;
+        window.__wysiwygTimeline = state.timeline;
+    }
+    function emitSelectionChange() {
+        const index = state.selectedIndex;
+        const layer = index >= 0 ? state.timeline.layers[index] || null : null;
+        window.dispatchEvent(new CustomEvent('wysiwyg:selection-changed', {
+            detail: { index: index, layer: layer }
+        }));
+    }
+    function emitStageRendered() {
+        window.dispatchEvent(new CustomEvent('wysiwyg:stage-rendered', {
+            detail: { selectedIndex: state.selectedIndex }
+        }));
+    }
     function getDuration(layer) {
         const value = Number.isFinite(layer && layer.dur) ? layer.dur : layer && layer.duration;
         return Number.isFinite(value) && value > 0 ? value : 0;
@@ -45,7 +99,9 @@
         if (!state.stageEl)
             return;
         state.stageEl.querySelectorAll('.nf-layer').forEach(function (el) {
-            el.style.outline = Number(el.dataset.index) === state.selectedIndex ? '2px dashed #3b82f6' : '';
+            const isSelected = Number(el.dataset.index) === state.selectedIndex;
+            el.classList.toggle('is-selected', isSelected);
+            el.style.outline = isSelected ? '2px dashed #3b82f6' : '';
         });
     }
     function compose(t) {
@@ -65,7 +121,7 @@
             active.push({ scene: layer.scene || '', index: i, layerData: layer, markup: '' });
             if (state.stageEl) {
                 active[active.length - 1].markup =
-                    '<div class="nf-layer" data-layer="' + (layer.scene || '') + '" data-index="' + i + '" style="position:absolute;inset:0;pointer-events:auto;z-index:' + i + '">' +
+                    '<div class="nf-layer" data-layer="' + (layer.scene || '') + '" data-index="' + i + '" style="position:absolute;pointer-events:auto;z-index:' + i + '">' +
                         (typeof html === 'string' ? html : '') +
                         '</div>';
             }
@@ -95,10 +151,13 @@
                     tmp.innerHTML = item.markup;
                     if (tmp.firstChild)
                         state.stageEl.appendChild(tmp.firstChild);
+                    el = state.stageEl.querySelector('.nf-layer[data-index="' + item.index + '"]');
                 }
+                applyLayerStyle(el, item.layerData);
             });
             applySelection();
             syncVideos(at, state.isPlaying);
+            emitStageRendered();
         }
         return active.map(function (item) { return { scene: item.scene, index: item.index, layerData: item.layerData }; });
     }
@@ -204,6 +263,7 @@
             pause();
         state.selectedIndex = Number(layerEl.dataset.index);
         applySelection();
+        emitSelectionChange();
         const layerData = state.timeline.layers[state.selectedIndex];
         if (typeof api.onSelect === 'function' && layerData) {
             api.onSelect({ scene: layerData.scene, index: state.selectedIndex, layerData: layerData });
@@ -236,6 +296,7 @@
             height: source.height || (source.project && source.project.height) || 1080,
             fps: source.fps || (source.project && source.project.fps) || 30
         };
+        syncGlobals();
         state.currentTime = 0;
         state.selectedIndex = -1;
         pause();
@@ -244,8 +305,10 @@
         return { duration: duration, layerCount: layers.length, width: state.timeline.width, height: state.timeline.height };
     }
     function select(index) {
-        state.selectedIndex = Number.isFinite(index) ? index : -1;
+        const next = Number(index);
+        state.selectedIndex = Number.isFinite(next) && next >= 0 && next < state.timeline.layers.length ? next : -1;
         applySelection();
+        emitSelectionChange();
     }
     const api = {
         loadTimeline: loadTimeline,
@@ -261,11 +324,51 @@
         onSelect: null
     };
     window.previewEngine = api;
+    window.__wysiwygGetSelected = getSelected;
+    window.__wysiwygSelect = select;
     window.__nfPlay = play;
     window.__nfPause = pause;
     window.__nfSeek = seek;
     window.__nfToggle = toggle;
     window.__nfState = getState;
+    function getSelected() {
+        return state.selectedIndex;
+    }
+    window.addEventListener('wysiwyg:layout-changed', function (event) {
+        const detail = event.detail || {};
+        const index = Number(detail.index);
+        const layer = state.timeline.layers[index];
+        if (!layer)
+            return;
+        const nextLayout = {
+            x: toFinite(detail.layout && detail.layout.x, getLayerLayout(layer).x),
+            y: toFinite(detail.layout && detail.layout.y, getLayerLayout(layer).y),
+            w: toFinite(detail.layout && detail.layout.w, getLayerLayout(layer).w),
+            h: toFinite(detail.layout && detail.layout.h, getLayerLayout(layer).h)
+        };
+        applyLayoutToLayerData(layer, nextLayout);
+        syncGlobals();
+        if (state.stageEl) {
+            applyLayerStyle(state.stageEl.querySelector('.nf-layer[data-index="' + index + '"]'), layer);
+        }
+    });
+    window.addEventListener('wysiwyg:text-changed', function (event) {
+        const detail = event.detail || {};
+        const index = Number(detail.index);
+        const layer = state.timeline.layers[index];
+        if (!layer)
+            return;
+        const text = typeof detail.text === 'string' ? detail.text : '';
+        if (typeof layer.text === 'string' && (!layer.params || typeof layer.params !== 'object' || layer.params.text === undefined)) {
+            layer.text = text;
+        }
+        else {
+            if (!layer.params || typeof layer.params !== 'object')
+                layer.params = {};
+            layer.params.text = text;
+        }
+        syncGlobals();
+    });
     window.addEventListener('message', function (event) {
         const data = event.data || {};
         if (data.type !== 'nf-cmd')
