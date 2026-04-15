@@ -18,9 +18,16 @@ function normalizeEditorTimeline(timeline) {
     const source = timeline && typeof timeline === 'object' ? timeline : {};
     const rawLayers = Array.isArray(source.layers) ? source.layers : (Array.isArray(source.clips) ? source.clips : []);
     const layers = rawLayers.map(function (layer) {
+        const layout = layer && typeof layer.layout === 'object' ? layer.layout : {};
         return Object.assign({}, layer, {
             start:Number.isFinite(layer && layer.start) ? layer.start : 0,
             dur: getEditorLayerDuration(layer),
+            layout: {
+                x:Number.isFinite(layout.x) ? layout.x : (Number.isFinite(layer && layer.x) ? layer.x : 0),
+                y:Number.isFinite(layout.y) ? layout.y : (Number.isFinite(layer && layer.y) ? layer.y : 0),
+                w:Number.isFinite(layout.w) ? layout.w : (Number.isFinite(layer && layer.w) ? layer.w : (Number.isFinite(layer && layer.width) ? layer.width : 100)),
+                h:Number.isFinite(layout.h) ? layout.h : (Number.isFinite(layer && layer.h) ? layer.h : (Number.isFinite(layer && layer.height) ? layer.height : 100)),
+            },
         });
     });
     const duration = Number.isFinite(source.duration) && source.duration > 0
@@ -238,6 +245,8 @@ function renderEditorFromTimeline(timeline) {
     edTimelineData = normalizeEditorTimeline(timeline);
     edActiveClip = null;
     renderEditorTracks();
+    if (typeof window.renderEditorInspector === 'function')
+        window.renderEditorInspector();
     updateEditorPreviewState(0, getEditorTimelineDuration());
     return edTimelineData;
 }
@@ -249,6 +258,8 @@ function selectTimelineClip(index) {
     if (window.previewEngine && typeof window.previewEngine.select === 'function') {
         window.previewEngine.select(index);
     }
+    if (typeof window.renderEditorInspector === 'function')
+        window.renderEditorInspector();
 }
 function previewFrame(time) {
     if (!canUseDomPreview())
@@ -327,6 +338,8 @@ async function composePreview() {
     else {
         updateEditorPreviewState(engineState.currentTime, engineState.duration);
     }
+    if (typeof window.renderEditorInspector === 'function')
+        window.renderEditorInspector();
     return result;
 }
 async function resolveEditorTimelineInput(input) {
@@ -359,10 +372,13 @@ function renderEditorClipList() {
     return null;
 }
 function renderEditorTimeline() {
+    renderEditorTracks();
     return document.getElementById('ed-tl-body2');
 }
 function renderEditorInspector() {
-    return null;
+    if (window.wysiwygInspector && typeof window.wysiwygInspector.render === 'function')
+        return window.wysiwygInspector.render();
+    return document.getElementById('ed-wysiwyg-inspector');
 }
 function edSelectClip(idOrIndex) {
     const index = typeof idOrIndex === 'number' ? idOrIndex : resolveEditorSelectionIndex(idOrIndex);

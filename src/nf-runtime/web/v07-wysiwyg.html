@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>v0.7 WYSIWYG Prototype — 预览即导出</title>
+<link rel="stylesheet" href="css/tokens.css">
+<style>
+  :root {
+    --nf-time: 0s;
+    --nf-time-num: 0;
+    --nf-dur-num: 30;
+    --nf-ratio-num: 1.7777777778;
+    --topbar-h: 48px;
+    --timeline-h: 224px;
+    --inspector-w: 304px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    position: relative;
+    min-height: 100vh;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  .shell {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: var(--topbar-h) minmax(0, 1fr) var(--timeline-h);
+    height: 100vh;
+  }
+
+  .topbar {
+    height: var(--topbar-h);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: blur(24px) saturate(1.6);
+    background: rgba(10,10,14,0.65);
+    border-bottom: 1px solid rgba(255,255,255,0.10);
+    box-shadow:
+      inset 0 -1px 0 rgba(0,0,0,0.40),
+      inset 0 1px 0 rgba(255,255,255,0.05),
+      0 2px 8px rgba(0,0,0,0.30);
+    position: relative;
+    z-index: 10;
+  }
+
+  .tb-traffic-lights {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+    padding-left: 14px;
+    flex-shrink: 0;
+  }
+
+  .tb-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    transition: opacity 0.15s ease;
+  }
+
+  .tb-dot:hover { opacity: 0.8; }
+  .tb-dot--close { background: #ff5f57; }
+  .tb-dot--minimize { background: #febc2e; }
+  .tb-dot--zoom { background: #28c840; }
+
+  .tb-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+    margin-left: 16px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    color: var(--t100);
+    flex-shrink: 0;
+  }
+
+  .tb-brand svg {
+    flex-shrink: 0;
+  }
+
+  .tb-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+    min-width: 0;
+  }
+
+  .tb-bc-sep {
+    color: var(--t50);
+    font-size: 12px;
+  }
+
+  .tb-bc-item {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--t65);
+    white-space: nowrap;
+  }
+
+  .tb-bc-current {
+    color: var(--t100);
+  }
+
+  .tb-spacer {
+    flex: 1;
+  }
+
+  .topbar-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+    padding-right: var(--sp-16);
+  }
+
+  .tb-meta {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--t50);
+  }
+
+  .ratio-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: calc(var(--r-xs) + 2px);
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.03);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .ratio-btn,
+  .mode-btn {
+    height: 28px;
+    border-radius: var(--r-xs);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--t65);
+    cursor: pointer;
+    transition:
+      color 0.16s var(--ease),
+      background 0.16s var(--ease),
+      border-color 0.16s var(--ease),
+      box-shadow 0.16s var(--ease);
+  }
+
+  .ratio-btn {
+    min-width: 48px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .ratio-btn:hover,
+  .mode-btn:hover {
+    color: var(--t80);
+    border-color: var(--border-hover);
+    background: rgba(255,255,255,0.05);
+  }
+
+  .ratio-btn.active {
+    color: var(--accent);
+    background: var(--accent-20);
+    border-color: rgba(167,139,250,0.24);
+  }
+
+  .mode-btn {
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-color: var(--border);
+    background: rgba(255,255,255,0.04);
+  }
+
+  .mode-btn--accent {
+    color: var(--t100);
+    background: linear-gradient(180deg, rgba(167,139,250,0.22) 0%, rgba(167,139,250,0.12) 100%);
+    border-color: rgba(167,139,250,0.30);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .mode-btn--accent:hover {
+    color: var(--t100);
+    background: linear-gradient(180deg, rgba(167,139,250,0.28) 0%, rgba(167,139,250,0.16) 100%);
+    border-color: rgba(167,139,250,0.40);
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--inspector-w);
+    gap: var(--sp-8);
+    padding: var(--sp-8);
+    padding-bottom: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .canvas {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background:
+      radial-gradient(circle at 18% 18%, rgba(167,139,250,0.14), transparent 28%),
+      radial-gradient(circle at 82% 14%, rgba(255,255,255,0.05), transparent 18%),
+      linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.10) 100%),
+      #07080c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .canvas::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px) 0 0 / 24px 24px,
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px) 0 0 / 24px 24px;
+    mask-image: linear-gradient(180deg, rgba(0,0,0,0.55), transparent 100%);
+    pointer-events: none;
+  }
+
+  .stage-wrap {
+    width: min(calc(100% - 48px), calc((100vh - 320px) * var(--nf-ratio-num)));
+    aspect-ratio: var(--nf-ratio-num);
+    position: relative;
+  }
+
+  .stage {
+    position: absolute;
+    inset: 0;
+    container-type: size;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(167,139,250,0.08), transparent 44%),
+      linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.08) 100%),
+      #030305;
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    box-shadow:
+      0 28px 80px rgba(0,0,0,0.42),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  [data-ratio="9:16"] .stage-wrap {
+    height: calc(100% - 48px);
+    width: calc(100% - 48px);
+    max-width: calc((100vh - 320px) * var(--nf-ratio-num));
+  }
+
+  .nf-layer {
+    position: absolute;
+    transform-origin: 0 0;
+  }
+
+  .nf-layer[data-visible="false"] {
+    display: none;
+  }
+
+  .nf-layer.is-selected {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .nf-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border: 2px solid var(--accent);
+    border-radius: 3px;
+    display: none;
+    cursor: pointer;
+    z-index: 100;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+  }
+
+  .is-selected > .nf-handle {
+    display: block;
+  }
+
+  .nf-handle.nw { left: -5px; top: -5px; cursor: nwse-resize; }
+  .nf-handle.ne { right: -5px; top: -5px; cursor: nesw-resize; }
+  .nf-handle.sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
+  .nf-handle.se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+
+  .scene-darkGradient {
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 58% 28%, rgba(167,139,250,0.16), transparent 48%),
+      linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.18) 100%),
+      #12131a;
+  }
+
+  .scene-videoClip {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%),
+      rgba(255,255,255,0.04);
+    border: 1px solid rgba(167,139,250,0.14);
+    border-radius: .9cqw;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--t50);
+    font-family: var(--mono);
+    font-size: 2cqw;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .scene-headline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
+    font-family: var(--sans);
+  }
+
+  .scene-headline [contenteditable] {
+    outline: none;
+    min-width: 20cqw;
+    padding: .3cqh 1.2cqw;
+    border-radius: .7cqw;
+  }
+
+  .scene-headline [contenteditable]:focus {
+    background: var(--accent-06);
+    outline: 1px dashed var(--accent);
+  }
+
+  .scene-sub {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 2cqh;
+    color: var(--t100);
+    font-family: var(--sans);
+    text-align: center;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.65);
+  }
+
+  [data-mode="record"] .nf-layer.is-selected { outline: none; }
+  [data-mode="record"] .nf-handle { display: none !important; }
+
+  .inspector {
+    padding: var(--sp-16);
+    border-radius: var(--r-sm);
+    overflow-y: auto;
+  }
+
+  .inspector::-webkit-scrollbar { width: 4px; }
+  .inspector::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 999px; }
+
+  .panel-kicker {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--t50);
+    margin-bottom: var(--sp-4);
+    position: relative;
+    z-index: 2;
+  }
+
+  .panel-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--t100);
+    margin-bottom: var(--sp-4);
+    position: relative;
+    z-index: 2;
+  }
+
+  .panel-copy {
+    font-size: 12px;
+    color: var(--t50);
+    margin-bottom: var(--sp-16);
+    position: relative;
+    z-index: 2;
+  }
+
+  .insp-field {
+    margin-bottom: var(--sp-12);
+    position: relative;
+    z-index: 2;
+  }
+
+  .insp-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--t50);
+    margin-bottom: var(--sp-6);
+  }
+
+  .insp-field input {
+    width: 100%;
+    height: 34px;
+    padding: 0 var(--sp-12);
+    color: var(--t80);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xs);
+    transition:
+      border-color 0.16s var(--ease),
+      background 0.16s var(--ease);
+  }
+
+  .insp-field input:hover {
+    border-color: var(--border-hover);
+  }
+
+  .insp-field input:focus {
+    outline: none;
+    border-color: rgba(167,139,250,0.34);
+    background: rgba(255,255,255,0.05);
+    box-shadow: 0 0 0 3px rgba(167,139,250,0.10);
+  }
+
+  .insp-field input[type="number"],
+  .tc,
+  .ruler-scale,
+  .track-label,
+  .track-clip {
+    font-family: var(--mono);
+  }
+
+  .insp-empty {
+    color: var(--t50);
+    font-size: 12px;
+    line-height: 1.7;
+    padding: var(--sp-24) 0;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  .timeline {
+    margin: var(--sp-8);
+    margin-top: 0;
+    display: grid;
+    grid-template-rows: 48px minmax(0, 1fr);
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: var(--r-sm);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 30%),
+      #090a0f;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.03),
+      0 12px 36px rgba(0,0,0,0.28);
+  }
+
+  .transport {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-12);
+    padding: 0 var(--sp-16);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(0,0,0,0.22);
+  }
+
+  .transport button {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--r-xs);
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    color: var(--t80);
+    cursor: pointer;
+    transition:
+      border-color 0.16s var(--ease),
+      background 0.16s var(--ease),
+      color 0.16s var(--ease);
+  }
+
+  .transport button:hover {
+    border-color: var(--border-hover);
+    background: rgba(255,255,255,0.06);
+    color: var(--t100);
+  }
+
+  .tc {
+    color: var(--t50);
+    font-size: 11px;
+  }
+
+  .status {
+    min-width: 96px;
+    text-align: right;
+  }
+
+  .ruler {
+    flex: 1;
+    position: relative;
+    height: 28px;
+    border-radius: var(--r-xs);
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%),
+      #05060a;
+    border: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+  }
+
+  .ruler::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(90deg, rgba(255,255,255,0.08) 0, rgba(255,255,255,0.08) 1px, transparent 1px);
+    background-size: 10% 100%;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .ruler-scale {
+    position: absolute;
+    inset: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--t50);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .ruler-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-06) 0%, var(--accent-12) 100%);
+    width: calc(var(--nf-time-num,0) / var(--nf-dur-num,30) * 100%);
+  }
+
+  .playhead {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background: var(--accent);
+    left: calc(var(--nf-time-num,0) / var(--nf-dur-num,30) * 100%);
+    pointer-events: none;
+    z-index: 3;
+    box-shadow: 0 0 12px rgba(167,139,250,0.45);
+  }
+
+  .tracks {
+    padding: var(--sp-12) var(--sp-16);
+    overflow-y: auto;
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.015) 0%, transparent 100%),
+      #08090d;
+  }
+
+  .tracks::-webkit-scrollbar { width: 4px; }
+  .tracks::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 999px; }
+
+  .track {
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    height: 24px;
+    align-items: center;
+    margin-bottom: 4px;
+    gap: var(--sp-8);
+  }
+
+  .track-label {
+    color: var(--t50);
+    font-size: 10px;
+    text-align: right;
+    padding-right: var(--sp-4);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .track-lane {
+    height: 18px;
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--r-xs);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%),
+      rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .track-clip {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    padding: 2px 8px;
+    border-radius: var(--r-xs);
+    background: linear-gradient(180deg, var(--accent-12) 0%, var(--accent-06) 100%);
+    color: var(--t80);
+    border: 1px solid rgba(167,139,250,0.16);
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 10px;
+    line-height: 14px;
+  }
+
+  .track-clip.active {
+    background: var(--accent);
+    color: #140c23;
+    border-color: rgba(255,255,255,0.18);
+  }
+
+  .track-playhead {
+    position: absolute;
+    top: -4px;
+    width: 2px;
+    height: calc(100% + 8px);
+    background: var(--accent);
+    left: calc(var(--nf-time-num,0) / var(--nf-dur-num,30) * 100%);
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 0 0 12px rgba(167,139,250,0.45);
+  }
+
+  .hint {
+    position: absolute;
+    left: var(--sp-16);
+    bottom: var(--sp-16);
+    padding: 6px 10px;
+    border-radius: var(--r-xs);
+    border: 1px solid rgba(255,255,255,0.05);
+    background: rgba(0,0,0,0.32);
+    color: var(--t50);
+    font-size: 11px;
+    pointer-events: none;
+    backdrop-filter: blur(10px);
+  }
+</style>
+</head>
+<body data-ratio="16:9" data-mode="edit">
+<div class="aurora"></div>
+<div class="shell">
+  <header class="topbar">
+    <div class="tb-traffic-lights">
+      <div class="tb-dot tb-dot--close"></div>
+      <div class="tb-dot tb-dot--minimize"></div>
+      <div class="tb-dot tb-dot--zoom"></div>
+    </div>
+    <div class="tb-brand">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="16" height="16" rx="4" stroke="#a78bfa" stroke-width="1.5"></rect>
+        <polygon points="7,5 13,9 7,13" fill="#a78bfa"></polygon>
+      </svg>
+      <span>NextFrame</span>
+    </div>
+    <nav class="tb-breadcrumb" aria-label="Prototype">
+      <span class="tb-bc-sep">/</span>
+      <span class="tb-bc-item">Prototype</span>
+      <span class="tb-bc-sep">/</span>
+      <span class="tb-bc-item tb-bc-current">WYSIWYG v0.7</span>
+    </nav>
+    <div class="tb-spacer"></div>
+    <div class="topbar-tools">
+      <span class="tb-meta">Ratio</span>
+      <div class="ratio-group">
+        <button class="ratio-btn active" data-r="16:9">16:9</button>
+        <button class="ratio-btn" data-r="9:16">9:16</button>
+        <button class="ratio-btn" data-r="1:1">1:1</button>
+      </div>
+      <span class="tb-meta">Mode</span>
+      <button class="mode-btn" id="modeBtn">编辑</button>
+      <button class="mode-btn mode-btn--accent" id="recordBtn">▶ 导出</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="canvas" id="canvas">
+      <div class="stage-wrap" id="stageWrap">
+        <div class="stage" id="stage"><!-- layers 动态挂载 --></div>
+      </div>
+      <div class="hint">点击任意元素选中 · 双击文字就地改 · 拖角改尺寸 · 拖进度条 seek</div>
+    </div>
+    <aside class="inspector glass" id="inspector">
+      <div class="panel-kicker">Inspector</div>
+      <div class="panel-title">Selected Layer</div>
+      <div class="panel-copy">布局值按 stage 百分比编辑，数值输入保持 frame-pure。</div>
+      <div class="insp-empty" id="inspEmpty">未选中任何元素<br><br>点击画面上的场景选中</div>
+      <div id="inspBody" style="display:none"></div>
+    </aside>
+  </div>
+
+  <div class="timeline">
+    <div class="transport">
+      <button id="playBtn">▶</button>
+      <span class="tc" id="tc">00:00.0 / 00:30.0</span>
+      <div class="ruler" id="ruler">
+        <div class="ruler-scale">
+          <span>00:00</span>
+          <span>00:10</span>
+          <span>00:20</span>
+          <span>00:30</span>
+        </div>
+        <div class="ruler-fill"></div>
+        <div class="playhead"></div>
+      </div>
+      <span class="tc status" id="status">编辑模式</span>
+    </div>
+    <div class="tracks" id="tracks"><div class="track-playhead"></div></div>
+  </div>
+</div>
+
+<script>
+// —— 未来 timeline v0.7 JSON 格式示例 ——
+// 不同于 v0.6：每 layer 带 position/size（percent-of-stage），渲染用 cqw/cqh，零 JS scale
+const DEMO_TIMELINE = {
+  version: "0.7",
+  ratio: "16:9",
+  width: 1920, height: 1080,
+  fps: 30, duration: 30,
+  layers: [
+    { id:"bg", scene:"darkGradient", start:0, dur:30,
+      layout:{ x:0, y:0, w:100, h:100 }, // 占 stage 百分比
+      params:{} },
+    { id:"video", scene:"videoClip", start:0, dur:30,
+      layout:{ x:11, y:6.5, w:78, h:78 },
+      params:{ src:"demo.mp4", label:"[Video Placeholder]" } },
+    { id:"headline", scene:"headlineCenter", start:0, dur:5,
+      layout:{ x:10, y:40, w:80, h:20 },
+      params:{ text:"桌面剪辑预览<br><span style='color:var(--accent)'>预览即导出</span>", fontSize:5.4 } }, // fontSize = cqw
+    { id:"sub", scene:"subtitleBar", start:0, dur:30,
+      layout:{ x:0, y:82, w:100, h:12 },
+      params:{ srt:[{s:0.2,e:5,t:"我们三年前谈过一次。"},
+                    {s:5.5,e:12,t:"底层技术的指数增长，基本符合预期。"},
+                    {s:13,e:22,t:"大众完全没意识到，我们离指数终点有多近。"},
+                    {s:23,e:30,t:"这是一个所见即所得的预览。"}],
+               fontSize:2.5 } }
+  ]
+};
+
+const state = {
+  timeline: DEMO_TIMELINE,
+  currentTime: 0,
+  isPlaying: false,
+  selected: null,
+  mode: "edit",
+  ratio: "16:9",
+  rafId: null, lastFrameTime: 0
+};
+
+const ratioNum = (r)=>{ const [a,b] = r.split(":").map(Number); return a/b; };
+
+function setRatio(r){
+  state.ratio = r;
+  state.timeline.ratio = r;
+  if(r==="16:9"){state.timeline.width=1920;state.timeline.height=1080}
+  else if(r==="9:16"){state.timeline.width=1080;state.timeline.height=1920}
+  else {state.timeline.width=1080;state.timeline.height=1080}
+  document.body.dataset.ratio = r;
+  document.documentElement.style.setProperty("--nf-ratio-num", ratioNum(r));
+  document.querySelectorAll(".ratio-btn").forEach(b=>b.classList.toggle("active", b.dataset.r===r));
+}
+
+// —— 渲染 stage —— //
+function renderStage(){
+  const stage = document.getElementById("stage");
+  stage.innerHTML = "";
+  state.timeline.layers.forEach((layer, idx)=>{
+    const el = document.createElement("div");
+    el.className = "nf-layer scene-"+layer.scene;
+    el.dataset.layerId = layer.id;
+    el.dataset.index = idx;
+    const L = layer.layout;
+    el.style.left = L.x+"%"; el.style.top = L.y+"%";
+    el.style.width = L.w+"%"; el.style.height = L.h+"%";
+
+    if(layer.scene === "darkGradient"){
+      // already styled by class
+    } else if(layer.scene === "videoClip"){
+      el.classList.add("scene-videoClip");
+      el.textContent = layer.params.label || "[Video]";
+    } else if(layer.scene === "headlineCenter"){
+      const span = document.createElement("div");
+      span.contentEditable = "true";
+      span.innerHTML = layer.params.text;
+      span.style.fontSize = layer.params.fontSize+"cqw";
+      span.style.color = "#f5ece0";
+      span.style.fontWeight = "700";
+      span.addEventListener("blur", ()=>{ layer.params.text = span.innerHTML; });
+      el.appendChild(span);
+    } else if(layer.scene === "subtitleBar"){
+      el.style.fontSize = layer.params.fontSize+"cqw";
+      el.textContent = ""; // will fill on frame
+      el.dataset.role = "sub";
+    }
+
+    // 4 handles
+    ["nw","ne","sw","se"].forEach(c=>{
+      const h = document.createElement("div");
+      h.className = "nf-handle "+c;
+      h.dataset.corner = c;
+      el.appendChild(h);
+    });
+
+    el.addEventListener("click", (e)=>{
+      if(e.target.classList.contains("nf-handle")) return;
+      if(e.target.contentEditable === "true") return;
+      selectLayer(idx);
+      e.stopPropagation();
+    });
+
+    stage.appendChild(el);
+  });
+  renderTimeTracks();
+}
+
+function renderTimeTracks(){
+  const dur = state.timeline.duration;
+  document.documentElement.style.setProperty("--nf-dur-num", dur);
+  const tracks = document.getElementById("tracks");
+  // keep playhead
+  const ph = tracks.querySelector(".track-playhead");
+  tracks.innerHTML = "";
+  tracks.appendChild(ph);
+  state.timeline.layers.forEach((layer, idx)=>{
+    const t = document.createElement("div");
+    t.className = "track";
+    const left = (layer.start/dur)*100;
+    const width = (layer.dur/dur)*100;
+    t.innerHTML = `<div class="track-label">${layer.scene}</div>
+      <div class="track-lane"><div class="track-clip${state.selected===idx?' active':''}" data-index="${idx}"
+        style="left:${left}%;width:${width}%">${layer.id}</div></div>`;
+    tracks.appendChild(t);
+  });
+  tracks.querySelectorAll(".track-clip").forEach(c=>{
+    c.addEventListener("click", ()=>selectLayer(Number(c.dataset.index)));
+  });
+}
+
+// —— 选中联动 —— //
+function selectLayer(idx){
+  state.selected = idx;
+  document.querySelectorAll(".nf-layer").forEach((el,i)=>el.classList.toggle("is-selected", i===idx));
+  document.querySelectorAll(".track-clip").forEach(c=>c.classList.toggle("active", Number(c.dataset.index)===idx));
+  renderInspector();
+}
+
+function renderInspector(){
+  const empty = document.getElementById("inspEmpty");
+  const body = document.getElementById("inspBody");
+  if(state.selected===null){ empty.style.display="block"; body.style.display="none"; return;}
+  empty.style.display="none"; body.style.display="block";
+  const layer = state.timeline.layers[state.selected];
+  body.innerHTML = `
+    <div class="insp-field"><label>scene</label><input value="${layer.scene}" disabled></div>
+    <div class="insp-field"><label>id</label><input value="${layer.id}"></div>
+    <div class="insp-field"><label>start (s)</label><input type="number" value="${layer.start}" step="0.1" data-k="start"></div>
+    <div class="insp-field"><label>dur (s)</label><input type="number" value="${layer.dur}" step="0.1" data-k="dur"></div>
+    <div class="insp-field"><label>x %</label><input type="number" value="${layer.layout.x}" step="0.5" data-k="x"></div>
+    <div class="insp-field"><label>y %</label><input type="number" value="${layer.layout.y}" step="0.5" data-k="y"></div>
+    <div class="insp-field"><label>w %</label><input type="number" value="${layer.layout.w}" step="0.5" data-k="w"></div>
+    <div class="insp-field"><label>h %</label><input type="number" value="${layer.layout.h}" step="0.5" data-k="h"></div>
+  `;
+  body.querySelectorAll("input[data-k]").forEach(inp=>{
+    inp.addEventListener("input", ()=>{
+      const k = inp.dataset.k;
+      const v = Number(inp.value);
+      if(["start","dur"].includes(k)) layer[k] = v;
+      else layer.layout[k] = v;
+      renderStage();
+      selectLayer(state.selected);
+    });
+  });
+}
+
+// —— 时间：只改 CSS 变量，逐帧由 frame loop 驱动 scene 显示 —— //
+function setTime(t){
+  const dur = state.timeline.duration;
+  t = Math.max(0, Math.min(dur, t));
+  state.currentTime = t;
+  document.documentElement.style.setProperty("--nf-time", t+"s");
+  document.documentElement.style.setProperty("--nf-time-num", t);
+  const tc = `${String(Math.floor(t/60)).padStart(2,"0")}:${(t%60).toFixed(1).padStart(4,"0")} / ${String(Math.floor(dur/60)).padStart(2,"0")}:${(dur%60).toFixed(1).padStart(4,"0")}`;
+  document.getElementById("tc").textContent = tc;
+  // layer visibility based on start/dur
+  state.timeline.layers.forEach((layer,i)=>{
+    const el = document.querySelector(`.nf-layer[data-index="${i}"]`);
+    if(!el) return;
+    const visible = t >= layer.start && t <= layer.start + layer.dur;
+    el.dataset.visible = visible?"true":"false";
+    // subtitle: find current line
+    if(layer.scene === "subtitleBar"){
+      const line = (layer.params.srt||[]).find(s=>t>=s.s && t<=s.e);
+      el.textContent = line?line.t:"";
+    }
+  });
+}
+
+// —— 播放循环 —— //
+function play(){
+  state.isPlaying = true;
+  document.getElementById("playBtn").textContent = "⏸";
+  state.lastFrameTime = performance.now();
+  const tick = (now)=>{
+    if(!state.isPlaying) return;
+    const dt = (now - state.lastFrameTime)/1000;
+    state.lastFrameTime = now;
+    let nt = state.currentTime + dt;
+    if(nt >= state.timeline.duration){ nt = state.timeline.duration; pause(); }
+    setTime(nt);
+    state.rafId = requestAnimationFrame(tick);
+  };
+  state.rafId = requestAnimationFrame(tick);
+}
+function pause(){
+  state.isPlaying = false;
+  document.getElementById("playBtn").textContent = "▶";
+  if(state.rafId) cancelAnimationFrame(state.rafId);
+}
+
+// —— 拖 handle 改尺寸 —— //
+document.addEventListener("pointerdown", (e)=>{
+  const h = e.target.closest(".nf-handle");
+  if(!h) return;
+  e.preventDefault();
+  const layerEl = h.parentElement;
+  const idx = Number(layerEl.dataset.index);
+  const layer = state.timeline.layers[idx];
+  const stage = document.getElementById("stage");
+  const stageR = stage.getBoundingClientRect();
+  const corner = h.dataset.corner;
+  const startX = e.clientX, startY = e.clientY;
+  const L0 = {...layer.layout};
+  const move = (ev)=>{
+    const dxP = (ev.clientX - startX)/stageR.width*100;
+    const dyP = (ev.clientY - startY)/stageR.height*100;
+    if(corner.includes("e")) layer.layout.w = Math.max(5, L0.w + dxP);
+    if(corner.includes("s")) layer.layout.h = Math.max(5, L0.h + dyP);
+    if(corner.includes("w")){ layer.layout.x = L0.x+dxP; layer.layout.w = Math.max(5,L0.w - dxP); }
+    if(corner.includes("n")){ layer.layout.y = L0.y+dyP; layer.layout.h = Math.max(5,L0.h - dyP); }
+    layerEl.style.left = layer.layout.x+"%"; layerEl.style.top = layer.layout.y+"%";
+    layerEl.style.width = layer.layout.w+"%"; layerEl.style.height = layer.layout.h+"%";
+  };
+  const up = ()=>{ window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",up); renderInspector(); };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+});
+
+// —— 拖动 layer 本体改位置 —— //
+document.addEventListener("pointerdown", (e)=>{
+  if(e.target.closest(".nf-handle")) return;
+  if(e.target.contentEditable === "true") return;
+  const layerEl = e.target.closest(".nf-layer");
+  if(!layerEl) return;
+  if(e.detail > 1) return; // 双击让位给文本编辑
+  const idx = Number(layerEl.dataset.index);
+  selectLayer(idx);
+  const layer = state.timeline.layers[idx];
+  const stage = document.getElementById("stage");
+  const stageR = stage.getBoundingClientRect();
+  const startX = e.clientX, startY = e.clientY;
+  const L0 = {...layer.layout};
+  let moved = false;
+  const move = (ev)=>{
+    moved = true;
+    const dxP = (ev.clientX - startX)/stageR.width*100;
+    const dyP = (ev.clientY - startY)/stageR.height*100;
+    layer.layout.x = L0.x + dxP; layer.layout.y = L0.y + dyP;
+    layerEl.style.left = layer.layout.x+"%"; layerEl.style.top = layer.layout.y+"%";
+  };
+  const up = ()=>{ window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",up); if(moved) renderInspector(); };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+});
+
+// —— seek on ruler —— //
+document.getElementById("ruler").addEventListener("click",(e)=>{
+  const r = e.currentTarget.getBoundingClientRect();
+  const pct = Math.max(0,Math.min(1,(e.clientX - r.left)/r.width));
+  setTime(pct * state.timeline.duration);
+});
+
+// —— transport —— //
+document.getElementById("playBtn").onclick = ()=>{ state.isPlaying?pause():play(); };
+
+// —— ratio switch —— //
+document.querySelectorAll(".ratio-btn").forEach(b=>b.onclick = ()=>{
+  setRatio(b.dataset.r);
+  renderStage();
+  setTime(state.currentTime);
+});
+
+// —— mode switch（编辑/导出） —— //
+document.getElementById("modeBtn").onclick = ()=>{
+  state.mode = state.mode==="edit"?"export":"edit";
+  document.body.dataset.mode = state.mode;
+  document.getElementById("modeBtn").textContent = state.mode==="edit"?"编辑":"导出预览";
+  document.getElementById("status").textContent = state.mode==="edit"?"编辑模式":"导出预览（关 overlay）";
+};
+
+// —— 录制按钮（模拟）—— //
+document.getElementById("recordBtn").onclick = ()=>{
+  state.mode = "record";
+  document.body.dataset.mode = "record";
+  document.getElementById("status").textContent = "录制中：预览=导出画面";
+  state.selected = null;
+  document.querySelectorAll(".nf-layer").forEach(el=>el.classList.remove("is-selected"));
+  setTime(0);
+  play();
+};
+
+// —— AI 可操作接口（挂 window）—— //
+window.__wysiwygDiagnose = ()=>JSON.stringify({
+  ratio: state.ratio,
+  mode: state.mode,
+  currentTime: state.currentTime,
+  isPlaying: state.isPlaying,
+  selected: state.selected,
+  layerCount: state.timeline.layers.length,
+  stageChildren: document.querySelectorAll(".nf-layer").length
+},null,2);
+window.__setTime = setTime;
+window.__selectLayer = selectLayer;
+window.__setRatio = (r)=>{setRatio(r);renderStage();setTime(state.currentTime);};
+
+// —— boot —— //
+setRatio("16:9");
+renderStage();
+setTime(0);
+</script>
+</body>
+</html>

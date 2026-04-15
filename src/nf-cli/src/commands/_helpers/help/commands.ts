@@ -15,6 +15,7 @@ const command = (name: string, summary: string, usage: string, params: string, c
 
 export const TOP_LEVEL_COMMANDS = [
   group("Timeline", "new validate build scenes preview frame describe-frame render"),
+  group("WYSIWYG", "wysiwyg"),
   group("Match", "match"),
   group("Scene Dev", "scene-new scene-preview scene-validate"),
   group("Layer CRUD", "layer-list layer-add layer-move layer-resize layer-set layer-remove"),
@@ -79,6 +80,25 @@ export const COMMAND_SPECS = Object.fromEntries([
     --quiet suppress progress output
     --json emit structured export result data`, `The timeline is validated before rendering starts.
     Direct timeline.json mode requires an explicit output mp4 path.`),
+  command("wysiwyg", "Dispatch v0.7 WYSIWYG subcommands.", `nextframe wysiwyg <subcommand>
+    nextframe wysiwyg <subcommand> --help`, `Subcommands: diff, edit
+    Run nextframe wysiwyg <subcommand> --help for subcommand-specific params`, `Use edit to apply inline text/layout operations to a direct timeline JSON file.
+    simulate remains as a compatibility alias for edit.`),
+  command("wysiwyg diff", "Stub frame-perfect DOM vs wgpu diff entrypoint.", `nextframe wysiwyg diff <timeline.json> --time=T [--json]`, `<timeline.json> direct path to a timeline file
+    --time=T required frame time in seconds or mm:ss(.f)
+    --json emit structured placeholder output`, `Walking skeleton only: no diffing work is performed yet.
+    Time must parse to a finite non-negative value.`),
+  command("wysiwyg edit", "Apply one inline edit op to a timeline JSON file.", `nextframe wysiwyg edit <timeline.json> --layer=N --action=<move|resize|edit-text> [--dx=N --dy=N --dw=N --dh=N --value=TEXT] [--json]`, `<timeline.json> absolute path to a timeline file
+    --layer=N required zero-based layer index
+    --action required edit action: move, resize, or edit-text
+    --dx/--dy move delta in percent units
+    --dw/--dh resize delta in percent units
+    --value required replacement text for edit-text
+    --json emit structured output`, `The file is rewritten atomically after nf-wysiwyg applies the requested operation.
+    simulate is accepted as an alias for edit.`),
+  command("wysiwyg simulate", "Compatibility alias for wysiwyg edit.", `nextframe wysiwyg simulate <timeline.json> --layer=N --action=<move|resize|edit-text> [--dx=N --dy=N --dw=N --dh=N --value=TEXT] [--json]`, `Same flags and behavior as nextframe wysiwyg edit.
+    <timeline.json> must be an absolute path`, `This alias exists for older callers.
+    Prefer nextframe wysiwyg edit in new scripts.`),
   command("match", "Plan, validate, and preview v0.6 tracks+matches workflows.", `nextframe match <subcommand>
     nextframe match <subcommand> --help`, `Subcommands: plan, validate, preview
     Run nextframe match <subcommand> --help for subcommand-specific params and examples`, `Use this only for v0.6 tracks+matches timelines.
