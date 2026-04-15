@@ -126,7 +126,11 @@ export function collectSceneModules(timeline: Timeline) {
       varName = `${baseName}_${suffix}`;
     }
     usedNames.add(varName);
-    const filePath = resolve(SCENES_DIR, entry.path, "index.js");
+    // Flat layout: path ends with .js (e.g. "16x9/anthropic-warm/bg-warmGradient.js")
+    // Legacy nested layout: path is a directory, index.js lives inside
+    const filePath = entry.path.endsWith(".js")
+      ? resolve(SCENES_DIR, entry.path)
+      : resolve(SCENES_DIR, entry.path, "index.js");
     return {
       id,
       label: entry.label,
@@ -141,10 +145,35 @@ export function collectSceneModules(timeline: Timeline) {
  * Wrap a single scene module in an IIFE that exposes { meta, render }.
  */
 export function buildSceneBundle(scene: { id: string; filePath: string; varName: string; code: string }) {
+  // v3 flat-layout scenes use `export default { id, render(host, t, params, vp) {...} }`
+  // stripESM converts that to `return { ... }` which the IIFE returns directly.
+  // We capture the returned def object and adapt the DOM-mutation render if needed.
+  const adaptedCode = scene.code.replace(
+    /^return\s+(\{[\s\S]*\});\s*$/m,
+    "var _def = $1;"
+  );
+  const wasAdapted = adaptedCode !== scene.code;
+  const body = wasAdapted
+    ? `${adaptedCode}
+// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    _rawRender(host, t, params, vp);
+    return host.outerHTML;
+  };
+} else {
+  _adaptedRender = _rawRender;
+}
+return { meta: _def || null, render: _adaptedRender };`
+    : `${scene.code}
+return { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null };`;
   return `// ${scene.id} (${scene.filePath})
 const ${scene.varName} = (function(){
-${scene.code}
-return { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null };
+${body}
 })();`;
 }
 

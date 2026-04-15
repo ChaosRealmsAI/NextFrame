@@ -50,7 +50,9 @@ export function buildRuntime() {
   }
 
   function applyScale() {
-    const controlsH = 56;
+    const controlsH = controls && window.getComputedStyle(controls).display !== "none"
+      ? Math.max(0, controls.offsetHeight || 56)
+      : 0;
     const availW = window.innerWidth;
     const availH = window.innerHeight - controlsH;
     const scale = Math.min(availW / viewport.width, availH / viewport.height);
@@ -335,6 +337,7 @@ export function buildRuntime() {
     recorderMode = true;
     stopPlayback();
     controls.style.display = "none";
+    applyScale();
   }
 
   window.__onFrame = function(data) {
@@ -415,6 +418,28 @@ export function buildRuntime() {
   window.__nfState = function() { return { currentTime: currentTime, duration: duration, isPlaying: isPlaying }; };
   window.__nfPlay = play;
   window.__nfPause = pause;
+
+  // Recorder protocol: lets nf-recorder decide whether to capture a frame.
+  // Returns true when any layer enters/exits between prevT and curT, OR when any
+  // currently-active layer has frame_pure:false (t-driven animation). For
+  // frame_pure components that don't read t, layer boundaries are the only
+  // thing that can change — recorder can safely skip identical frames.
+  window.__hasFrameChanged = function(prevT, curT) {
+    for (var i = 0; i < layers.length; i += 1) {
+      var L = layers[i];
+      var start = Number(L.start || 0);
+      var dur = Number(L.dur || 0);
+      var end = start + dur;
+      var prevActive = prevT >= start && prevT < end;
+      var curActive = curT >= start && curT < end;
+      if (prevActive !== curActive) return true;
+      if (curActive) {
+        var scene = SCENES[L.scene];
+        if (scene && scene.meta && scene.meta.frame_pure === false) return true;
+      }
+    }
+    return false;
+  };
 })();`;
 }
 

@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import type { Timeline } from "../types.js";
-import { buildSharedPreamble, collectSceneModules, readDiscoveredScenes, readLegacyBundleSource } from "./build-scenes.js";
+import { buildSharedPreamble, collectSceneModules, readDiscoveredScenes } from "./build-scenes.js";
 
 function fail(message: string): never {
   throw new Error(`failed to bundle preview scenes: ${message}. Fix: verify the timeline JSON references scenes that exist under src/nf-core/scenes.`);
@@ -49,16 +49,14 @@ async function main() {
   const timeline = JSON.parse(await fs.readFile(timelinePath, "utf8")) as Timeline;
   const scenes = collectModularSceneModules(timeline);
   const preamble = String(buildSharedPreamble() || "").trim();
-  const legacyBundle = readLegacyBundleSource();
-  const chunks = [legacyBundle || "window.__scenes = window.__scenes || {};"];
-  if (preamble && preamble !== "// no shared/design.js") {
-    chunks.push(preamble);
-  }
+  const chunks = ["(() => {", "window.__scenes = window.__scenes || {};"];
+  if (preamble && preamble !== "// no shared/design.js") chunks.push(preamble);
 
   for (const scene of scenes) {
     chunks.push(buildSceneIIFE(scene));
   }
 
+  chunks.push("})();");
   await fs.mkdir(path.dirname(outputPath), { recursive: true });
   await fs.writeFile(outputPath, `${chunks.join("\n\n")}\n`, "utf8");
 }
