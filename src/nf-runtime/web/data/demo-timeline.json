@@ -5,15 +5,15 @@
   "duration": 36,
   "layers": [
     {
-      "scene": "darkGradient",
+      "scene": "lectureChrome",
       "start": 0,
       "dur": 36,
       "params": {
-        "bg": "#17120e",
-        "glowColor": "rgba(218,119,86,0.18)",
-        "glowX": 54,
-        "glowY": 34,
-        "glowSize": 58
+        "seriesName": "NEXTFRAME // EDITOR PREVIEW",
+        "chapter": "DYNAMIC BUNDLE",
+        "title": "Timeline-scoped scene loading for the DOM preview",
+        "brand": "NEXTFRAME",
+        "duration": 36
       }
     },
     {
@@ -21,9 +21,9 @@
       "start": 1,
       "dur": 6.5,
       "params": {
-        "text": "智能剪辑 Demo<br><span style=\"color:#da7756\">DOM 预览直出</span>",
-        "fontSize": 56,
-        "color": "#f5ece0",
+        "kicker": "EDITOR PREVIEW",
+        "title": "按时间线按需打包场景",
+        "subtitle": "The editor requests only the scenes referenced by the loaded timeline.",
         "enterDelay": 0.2
       }
     },
@@ -32,18 +32,22 @@
       "start": 9,
       "dur": 13,
       "params": {
-        "title": "demo-timeline.json",
-        "fontSize": 26,
-        "maxWidth": 1320,
-        "y": 240,
-        "lines": [
-          "{",
-          "  \"scene\": \"headlineCenter\",",
-          "  \"start\": 1,",
-          "  \"dur\": 6.5,",
-          "  \"params\": { \"text\": \"DOM preview\" }",
-          "}",
-          "// Preview engine composes this directly in the stage"
+        "windowTitle": "demo-timeline.json",
+        "sectionTitle": "What changed in the preview path",
+        "code": "editor.js\\n  -> bridgeCall(\"preview.bundle\", { timeline })\\n  -> nf://localhost/generated/scene-bundle-{hash}.js\\n  -> window.__scenes\\n  -> previewEngine.loadTimeline()",
+        "notes": [
+          {
+            "label": "Bundle",
+            "text": "Only referenced scene IDs are included in the generated classic JS bundle."
+          },
+          {
+            "label": "Cache",
+            "text": "The bridge reuses the same bundle file when the sorted scene ID set is unchanged."
+          },
+          {
+            "label": "Render",
+            "text": "The DOM preview engine keeps rendering in the same document without an iframe."
+          }
         ]
       }
     },
@@ -52,10 +56,9 @@
       "start": 23,
       "dur": 7,
       "params": {
-        "text": "同一条时间线<br><span style=\"color:#d4b483\">无项目耦合</span>",
-        "fontSize": 48,
-        "color": "#f5ece0",
-        "y": 300,
+        "kicker": "SAME PREVIEW ENGINE",
+        "title": "不同时间线，不同场景包",
+        "subtitle": "The editor no longer depends on a manually maintained static scene-bundle.js.",
         "enterDelay": 0.1
       }
     },
@@ -64,15 +67,14 @@
       "start": 0,
       "dur": 36,
       "params": {
-        "fontSize": 28,
-        "y": 54,
+        "label": "PREVIEW",
         "srt": [
-          { "s": 0, "e": 5, "t": "预览区现在直接由 DOM 场景时间线驱动。" },
-          { "s": 5, "e": 11, "t": "编辑页不再依赖 pipeline.json 或 segment 文件。" },
-          { "s": 11, "e": 18, "t": "每一层都用 v0.3 合约里的 dur 字段描述持续时间。" },
-          { "s": 18, "e": 25, "t": "transport.js 负责播放、暂停、跳转和空格键控制。" },
-          { "s": 25, "e": 31, "t": "底部轨道直接渲染已加载的 timeline layers。" },
-          { "s": 31, "e": 36, "t": "这是一条硬编码 demo timeline，用来证明端到端通路。" }
+          { "s": 0, "e": 6, "zh": "编辑器现在会按时间线动态请求场景包。", "en": "The editor now requests a scene bundle from the loaded timeline." },
+          { "s": 6, "e": 12, "zh": "Bridge 只生成当前时间线实际引用到的场景。", "en": "The bridge only generates scenes that the current timeline actually references." },
+          { "s": 12, "e": 18, "zh": "生成后的 classic JS 通过 nf://localhost/generated/... 提供。", "en": "The generated classic JS is served from nf://localhost/generated/..." },
+          { "s": 18, "e": 25, "zh": "脚本加载完成后，window.__scenes 会在同一文档里可用。", "en": "After the script loads, window.__scenes is available in the same document." },
+          { "s": 25, "e": 31, "zh": "随后 previewEngine.loadTimeline() 和 compose(0) 正常执行。", "en": "Then previewEngine.loadTimeline() and compose(0) run as before." },
+          { "s": 31, "e": 36, "zh": "这个 demo 时间线现在与 nf-core 场景目录保持一致。", "en": "This demo timeline now matches the scenes present under nf-core." }
         ]
       }
     }

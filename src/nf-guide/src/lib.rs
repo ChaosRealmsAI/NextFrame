@@ -54,11 +54,7 @@ pub fn discover_recipes(recipes_dir: impl AsRef<Path>) -> Result<Vec<(String, St
     })?;
 
     for entry in entries {
-        let entry = entry.map_err(|error| {
-            format!(
-                "failed to read recipes dir entry: {error}. Fix: verify the recipes directory contents are accessible."
-            )
-        })?;
+        let entry = entry.map_err(|error| format!("failed to read recipes dir entry: {error}"))?;
         let path = entry.path();
         if !path.is_dir() || !path.join("recipe.json").is_file() {
             continue;
@@ -75,18 +71,9 @@ pub fn discover_recipes(recipes_dir: impl AsRef<Path>) -> Result<Vec<(String, St
 pub fn load_recipe(recipes_dir: impl AsRef<Path>, pipeline: &str) -> Result<Recipe, String> {
     let path = recipes_dir.as_ref().join(pipeline).join("recipe.json");
     let json = fs::read_to_string(&path)
-        .map_err(|error| {
-            format!(
-                "failed to read {}: {error}. Fix: verify the recipe file exists and is readable.",
-                path.display()
-            )
-        })?;
-    serde_json::from_str(&json).map_err(|error| {
-        format!(
-            "failed to parse {}: {error}. Fix: correct the recipe JSON syntax and retry.",
-            path.display()
-        )
-    })
+        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+    serde_json::from_str(&json)
+        .map_err(|error| format!("failed to parse {}: {error}", path.display()))
 }
 
 pub fn get_step_content(
@@ -102,20 +89,11 @@ pub fn get_step_content(
             .steps
             .iter()
             .find(|entry| entry.id == step)
-            .ok_or_else(|| {
-                format!(
-                    "unknown step \"{step}\" in pipeline \"{pipeline}\". Fix: run `nf-guide --steps {pipeline}` to list valid step ids."
-                )
-            })?;
+            .ok_or_else(|| format!("unknown step \"{step}\" in pipeline \"{pipeline}\""))?;
         recipes_dir.as_ref().join(pipeline).join(&entry.prompt)
     };
 
-    fs::read_to_string(&path).map_err(|error| {
-        format!(
-            "failed to read {}: {error}. Fix: verify the guide markdown file exists and is readable.",
-            path.display()
-        )
-    })
+    fs::read_to_string(&path).map_err(|error| format!("failed to read {}: {error}", path.display()))
 }
 
 #[cfg(test)]
@@ -126,11 +104,14 @@ mod tests {
     use super::*;
     use std::fs;
     use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn make_test_recipes() -> PathBuf {
-        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-        let unique = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let dir = env::temp_dir().join(format!("nf-guide-test-{}-{}", process::id(), unique));
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let dir = env::temp_dir().join(format!("nf-guide-test-{}-{unique}", process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(dir.join("alpha")).unwrap();
         fs::write(
@@ -212,12 +193,12 @@ mod tests {
     #[test]
     fn default_recipes_dir_honors_env_override() {
         // SAFETY: tests run sequentially within this module — set+unset is acceptable
-        unsafe { // SAFETY: tests run sequentially within this module — set+unset is acceptable
+        unsafe {
             env::set_var("NF_GUIDE_RECIPES", "/tmp/custom-recipes");
         }
         let dir = default_recipes_dir();
         assert_eq!(dir, PathBuf::from("/tmp/custom-recipes"));
-        unsafe { // SAFETY: this test clears the env override it just installed, still within the same serialized test scope.
+        unsafe {
             env::remove_var("NF_GUIDE_RECIPES");
         }
     }

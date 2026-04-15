@@ -1,6 +1,7 @@
 //! utility path helpers
 use std::env;
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 
 pub fn home_dir() -> Option<PathBuf> {
@@ -36,4 +37,18 @@ pub(crate) fn home_root() -> Result<PathBuf, String> {
 
 pub(crate) fn canonical_or_raw(path: PathBuf) -> PathBuf {
     fs::canonicalize(&path).unwrap_or(path)
+}
+
+pub fn workspace_root() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let root = manifest_dir
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or(manifest_dir);
+    canonical_or_raw(root)
+}
+
+pub fn preview_bundle_cache_dir() -> PathBuf {
+    workspace_root().join(".cache").join("preview-bundles")
 }

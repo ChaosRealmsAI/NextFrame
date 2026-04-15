@@ -105,7 +105,7 @@ export function collectSceneModules(timeline) {
  */
 export function buildSceneBundle(scene) {
   return `// ${scene.id} (${scene.filePath})
-var ${scene.varName} = (function(){
+const ${scene.varName} = (function(){
 ${scene.code}
 return { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null };
 })();`;

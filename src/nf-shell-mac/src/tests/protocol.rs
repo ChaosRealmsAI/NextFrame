@@ -126,6 +126,14 @@ fn resolve_defaults_to_index_html() {
 }
 
 #[test]
+fn resolve_request_target_maps_generated_prefix_to_cache_dir() {
+    let web_root = create_test_dir("resolve-generated-root");
+    let (root, request_path) = resolve_request_target(&web_root, "/generated/scene-bundle-hash.js");
+    assert_eq!(root, nf_bridge::path::preview_bundle_cache_dir());
+    assert_eq!(request_path, "/scene-bundle-hash.js");
+}
+
+#[test]
 fn resolve_finds_existing_file() {
     let tmp = create_test_dir("resolve-existing");
     fs::write(tmp.join("hello.txt"), "hi").unwrap();

@@ -31,7 +31,7 @@ use storage::{
     handle_recent_add, handle_recent_clear, handle_recent_list,
 };
 use util::dialog::{handle_fs_dialog_open, handle_fs_dialog_save, handle_fs_reveal};
-use util::{handle_compose_generate, handle_log, handle_preview_frame};
+use util::{handle_compose_generate, handle_log, handle_preview_bundle, handle_preview_frame};
 
 pub mod path {
     pub use crate::util::path::*;
@@ -126,6 +126,7 @@ fn dispatch_inner(method: &str, params: Value) -> Result<Value, String> {
         "audio.synth" => handle_audio_synth(&params),
         "audio.status" => handle_audio_status(&params),
         "preview.frame" => handle_preview_frame(&params),
+        "preview.bundle" => handle_preview_bundle(&params),
         "fs.mtime" => handle_fs_mtime(&params),
         _ => Err(format!( // Fix: included in the error string below
             "failed to dispatch request: unknown method: {method}. Fix: use one of the supported nf-bridge IPC methods."

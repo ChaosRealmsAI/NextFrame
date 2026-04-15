@@ -49,13 +49,13 @@ function renderTemplate(name, category, ratio) {
 
     case "typography":
       return `export function render(t, params, vp) {
-  var text = params.text || "标题文字";
-  var fontSize = params.fontSize || ${ratio === "9:16" ? 36 : 48};
-  var color = params.color || "#f5ece0";
-  var accentColor = params.accentColor || "#da7756";
-  var opacity = Math.min(1, t / 0.5); // 0.5s fade in
-  var y = params.y || 0;
-  var pos = y > 0
+  const text = params.text || "标题文字";
+  const fontSize = params.fontSize || ${ratio === "9:16" ? 36 : 48};
+  const color = params.color || "#f5ece0";
+  const accentColor = params.accentColor || "#da7756";
+  const opacity = Math.min(1, t / 0.5); // 0.5s fade in
+  const y = params.y || 0;
+  const pos = y > 0
     ? 'position:absolute;left:60px;right:60px;top:' + y + 'px;text-align:center'
     : 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 60px';
   return '<div style="' + pos + '">' +
@@ -65,9 +65,9 @@ function renderTemplate(name, category, ratio) {
 
     case "overlays":
       return `export function render(t, params, vp) {
-  var color = params.color || "#da7756";
-  var height = params.height || 3;
-  var progress = typeof params.progress === "number" ? params.progress : (params.duration ? t / params.duration : 0);
+  const color = params.color || "#da7756";
+  const height = params.height || 3;
+  let progress = typeof params.progress === "number" ? params.progress : (params.duration ? t / params.duration : 0);
   progress = Math.max(0, Math.min(1, progress));
   return '<div style="position:absolute;left:0;bottom:0;width:' + vp.width + 'px;height:' + height + 'px;background:rgba(245,236,224,0.08)">' +
     '<div style="height:100%;width:' + (progress * 100) + '%;background:' + color + ';transition:none"></div>' +
@@ -78,12 +78,12 @@ function renderTemplate(name, category, ratio) {
       return `function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
 export function render(t, params, vp) {
-  var items = params.items || [{ label: "Item 1" }, { label: "Item 2" }, { label: "Item 3" }];
-  var color = params.color || "#da7756";
-  var textColor = params.textColor || "#f5ece0";
-  var opacity = Math.min(1, t / 0.6);
-  var html = items.map(function(item, i) {
-    var itemOp = Math.min(1, Math.max(0, (t - i * 0.2) / 0.4));
+  const items = params.items || [{ label: "Item 1" }, { label: "Item 2" }, { label: "Item 3" }];
+  const color = params.color || "#da7756";
+  const textColor = params.textColor || "#f5ece0";
+  const opacity = Math.min(1, t / 0.6);
+  const html = items.map(function(item, i) {
+    const itemOp = Math.min(1, Math.max(0, (t - i * 0.2) / 0.4));
     return '<div style="display:flex;align-items:center;gap:12px;opacity:' + itemOp + '">' +
       '<div style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex-shrink:0"></div>' +
       '<div style="font:500 18px system-ui,sans-serif;color:' + textColor + '">' + esc(item.label) + '</div>' +
@@ -98,17 +98,17 @@ export function render(t, params, vp) {
       return `function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
 export function render(t, params, vp) {
-  var title = params.title || "Terminal";
-  var lines = params.lines || [{ text: "$ echo hello", type: "command" }, { text: "hello", type: "output" }];
-  var bg = params.bg || "#1e1e2e";
-  var width = params.width || ${ratio === "9:16" ? 900 : 1400};
-  var x = params.x || ${ratio === "9:16" ? 90 : 260};
-  var y = params.y || ${ratio === "9:16" ? 200 : 120};
-  var opacity = Math.min(1, t / 0.5);
+  const title = params.title || "Terminal";
+  const lines = params.lines || [{ text: "$ echo hello", type: "command" }, { text: "hello", type: "output" }];
+  const bg = params.bg || "#1e1e2e";
+  const width = params.width || ${ratio === "9:16" ? 900 : 1400};
+  const x = params.x || ${ratio === "9:16" ? 90 : 260};
+  const y = params.y || ${ratio === "9:16" ? 200 : 120};
+  const opacity = Math.min(1, t / 0.5);
 
-  var linesHtml = lines.map(function(line, i) {
-    var lineOp = Math.min(1, Math.max(0, (t - 0.3 - i * 0.15) / 0.3));
-    var color = line.type === "command" ? "#7ec699" : line.type === "comment" ? "rgba(245,236,224,0.4)" : "#f5ece0";
+  const linesHtml = lines.map(function(line, i) {
+    const lineOp = Math.min(1, Math.max(0, (t - 0.3 - i * 0.15) / 0.3));
+    const color = line.type === "command" ? "#7ec699" : line.type === "comment" ? "rgba(245,236,224,0.4)" : "#f5ece0";
     return '<div style="opacity:' + lineOp + ';color:' + color + '">' + esc(line.text) + '</div>';
   }).join("");
 
@@ -127,15 +127,15 @@ export function render(t, params, vp) {
 
     case "media":
       return `export function render(t, params, vp) {
-  var src = params.src || "";
-  var x = params.x || 0;
-  var y = params.y || 0;
-  var width = params.width || vp.width;
-  var height = params.height || vp.height;
-  var borderRadius = params.borderRadius || 0;
-  var opacity = Math.min(1, t / 0.3);
-  var currentTime = t;
-  var persistKey = "vc-" + String(src).replace(/[^a-zA-Z0-9]/g, "").slice(-20);
+  const src = params.src || "";
+  const x = params.x || 0;
+  const y = params.y || 0;
+  const width = params.width || vp.width;
+  const height = params.height || vp.height;
+  const borderRadius = params.borderRadius || 0;
+  const opacity = Math.min(1, t / 0.3);
+  const currentTime = t;
+  const persistKey = "vc-" + String(src).replace(/[^a-zA-Z0-9]/g, "").slice(-20);
 
   if (!src) {
     return '<div style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + width + 'px;height:' + height + 'px;background:#2a2319;border-radius:' + borderRadius + 'px;display:flex;align-items:center;justify-content:center;color:rgba(245,236,224,0.3);font:14px system-ui">No video src</div>';
@@ -147,11 +147,11 @@ export function render(t, params, vp) {
 
     case "shapes":
       return `export function render(t, params, vp) {
-  var color = params.color || "#da7756";
-  var size = params.size || 200;
-  var x = params.x || (vp.width / 2);
-  var y = params.y || (vp.height / 2);
-  var scale = Math.min(1, t / 0.5);
+  const color = params.color || "#da7756";
+  const size = params.size || 200;
+  const x = params.x || (vp.width / 2);
+  const y = params.y || (vp.height / 2);
+  const scale = Math.min(1, t / 0.5);
   return '<div style="position:absolute;left:' + (x - size/2) + 'px;top:' + (y - size/2) + 'px;width:' + size + 'px;height:' + size + 'px;border-radius:50%;border:3px solid ' + color + ';transform:scale(' + scale + ');opacity:' + scale + '"></div>';
 }`;
 
@@ -248,16 +248,16 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
   // ── Scene ──
   ${inlineRender}
 
-  var DEMO = {};
-  var duration = 10;
-  var canvas = document.getElementById('canvas');
-  var scrubber = document.getElementById('scrubber');
-  var td = document.getElementById('timeDisplay');
-  var pb = document.getElementById('playBtn');
+  const DEMO = {};
+  const duration = 10;
+  const canvas = document.getElementById('canvas');
+  const scrubber = document.getElementById('scrubber');
+  const td = document.getElementById('timeDisplay');
+  const pb = document.getElementById('playBtn');
   function rf(t){canvas.innerHTML='<div style="position:absolute;inset:0;background:#1a1510"></div><div style="position:absolute;inset:0">'+render(t,DEMO,{width:${w},height:${h}})+'</div>';}
-  scrubber.addEventListener('input',function(){var t=(scrubber.value/1000)*duration;td.textContent=t.toFixed(2)+'s';rf(t);});
-  var playing=false,st=0,so=0;
-  function tick(){if(!playing)return;var t=((Date.now()-st)/1000+so)%duration;scrubber.value=(t/duration)*1000;td.textContent=t.toFixed(2)+'s';rf(t);requestAnimationFrame(tick);}
+  scrubber.addEventListener('input',function(){const t=(scrubber.value/1000)*duration;td.textContent=t.toFixed(2)+'s';rf(t);});
+  let playing=false,st=0,so=0;
+  function tick(){if(!playing)return;const t=((Date.now()-st)/1000+so)%duration;scrubber.value=(t/duration)*1000;td.textContent=t.toFixed(2)+'s';rf(t);requestAnimationFrame(tick);}
   pb.addEventListener('click',function(){playing=!playing;if(playing){st=Date.now();so=(scrubber.value/1000)*duration;pb.textContent='⏸ Pause';tick();}else{pb.textContent='▶ Play';}});
   rf(0);
 })();

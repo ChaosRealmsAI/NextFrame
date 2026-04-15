@@ -26,7 +26,7 @@ export function buildRuntime() {
   };
   const layers = Array.isArray(timeline.layers) ? timeline.layers : [];
   if (audioEl && timeline.audio) {
-    var _audioSrc = typeof timeline.audio === "object" ? (timeline.audio.src || "") : String(timeline.audio);
+    const _audioSrc = typeof timeline.audio === "object" ? (timeline.audio.src || "") : String(timeline.audio);
     if (_audioSrc) { audioEl.src = _audioSrc; window.__audioSrc = _audioSrc; }
   }
   let currentTime = 0;
@@ -325,7 +325,7 @@ export function buildRuntime() {
 
   window.__onFrame = function(data) {
     enableRecorderMode();
-    var result = seek(extractTime(data));
+    const result = seek(extractTime(data));
     // Force layout flush + paint for WKWebView recorder
     void stage.offsetHeight;
     void stage.getBoundingClientRect();
@@ -358,12 +358,12 @@ export function buildRuntime() {
   }
 
   // Iframe embedding mode — use setInterval instead of rAF (rAF may not fire in WKWebView iframes)
-  var _iframeMode = (window.parent !== window);
-  var _intervalId = 0;
+  const _iframeMode = (window.parent !== window);
+  let _intervalId = 0;
   if (_iframeMode) {
     controls.style.display = "none";
     // Override play to use setInterval instead of rAF
-    var _origPlay = play;
+    const _origPlay = play;
     play = function() {
       _origPlay();
       if (isPlaying && !_intervalId) {
@@ -373,13 +373,13 @@ export function buildRuntime() {
         }, 33); // ~30fps
       }
     };
-    var _origPause = pause;
+    const _origPause = pause;
     pause = function() {
       _origPause();
       if (_intervalId) { clearInterval(_intervalId); _intervalId = 0; }
     };
     window.addEventListener("message", function(event) {
-      var d = event.data;
+      const d = event.data;
       if (!d || d.type !== "nf-cmd") return;
       if (d.action === "play") play();
       else if (d.action === "pause") pause();
@@ -390,8 +390,8 @@ export function buildRuntime() {
 
   applyScale();
   // Support #t=N in URL to start at a specific time
-  var hashTime = parseFloat((location.hash.match(/t=([\\d.]+)/) || [])[1]);
-  var initTime = isFinite(hashTime) ? hashTime : 0;
+  const hashTime = parseFloat((location.hash.match(/t=([\\d.]+)/) || [])[1]);
+  const initTime = isFinite(hashTime) ? hashTime : 0;
   compose(initTime);
   // Expose controls for external access (iframe parent, console, AppleScript)
   window.__nfSeek = seek;
