@@ -13,6 +13,8 @@
     --nf-ratio-num: 1.7777777778;
     --topbar-h: 48px;
     --timeline-h: 224px;
+    --tl-label: 220px;
+    --tl-status: 104px;
     --inspector-w: 304px;
   }
 
@@ -471,12 +473,19 @@
   }
 
   .transport {
-    display: flex;
+    display: grid;
+    grid-template-columns: var(--tl-label) 1fr var(--tl-status);
     align-items: center;
-    gap: var(--sp-12);
+    gap: var(--sp-8);
     padding: 0 var(--sp-16);
     border-bottom: 1px solid rgba(255,255,255,0.05);
     background: rgba(0,0,0,0.22);
+  }
+
+  .transport-left {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-12);
   }
 
   .transport button {
@@ -579,7 +588,7 @@
 
   .track {
     display: grid;
-    grid-template-columns: 108px 1fr;
+    grid-template-columns: var(--tl-label) 1fr var(--tl-status);
     height: 24px;
     align-items: center;
     margin-bottom: 4px;
@@ -637,7 +646,7 @@
     width: 2px;
     height: calc(100% + 8px);
     background: var(--accent);
-    left: calc(var(--nf-time-num,0) / var(--nf-dur-num,30) * 100%);
+    left: calc(var(--sp-16) + var(--tl-label) + var(--sp-8) + (100% - var(--sp-16) * 2 - var(--tl-label) - var(--sp-8) - var(--tl-status) - var(--sp-8)) * var(--nf-time-num,0) / var(--nf-dur-num,30));
     pointer-events: none;
     z-index: 10;
     box-shadow: 0 0 12px rgba(167,139,250,0.45);
@@ -712,8 +721,10 @@
 
   <div class="timeline">
     <div class="transport">
-      <button id="playBtn">▶</button>
-      <span class="tc" id="tc">00:00.0 / 00:30.0</span>
+      <div class="transport-left">
+        <button id="playBtn">▶</button>
+        <span class="tc" id="tc">00:00.0 / 00:30.0</span>
+      </div>
       <div class="ruler" id="ruler">
         <div class="ruler-scale">
           <span>00:00</span>
