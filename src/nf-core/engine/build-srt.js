@@ -21,10 +21,39 @@ export function extractTimelineSrt(timeline) {
   const layers = Array.isArray(timeline?.layers) ? timeline.layers : [];
   const cues = [];
   for (const layer of layers) {
-    const srt = Array.isArray(layer?.params?.srt) ? layer.params.srt : null;
-    if (!srt || srt.length === 0) continue;
     const offset = Number(layer?.start || 0);
-    cues.push(...srt.map((entry) => normalizeSrtEntry(entry, offset)).filter(Boolean));
+    // Check flat SRT array (params.srt)
+    const srt = Array.isArray(layer?.params?.srt) ? layer.params.srt : null;
+    if (srt && srt.length > 0) {
+      cues.push(...srt.map((entry) => normalizeSrtEntry(entry, offset)).filter(Boolean));
+      continue;
+    }
+    // Check two-level segments (params.segments from fine.json)
+    // Extract all cn[] sub-cues as SRT entries for the recorder's frame skip logic
+    const segments = Array.isArray(layer?.params?.segments) ? layer.params.segments : null;
+    if (segments && segments.length > 0) {
+      for (const seg of segments) {
+        if (!seg || typeof seg !== "object") continue;
+        const cnArr = Array.isArray(seg.cn) ? seg.cn : [];
+        for (const cn of cnArr) {
+          if (!cn || typeof cn !== "object") continue;
+          const s = Number(cn.s ?? 0) + offset;
+          const e = Number(cn.e ?? s) + offset;
+          const t = String(cn.text ?? "");
+          if (t && Number.isFinite(s) && Number.isFinite(e)) {
+            cues.push({ s, e, t });
+          }
+        }
+        // Also add segment-level English as a cue (so recorder knows frame changed)
+        if (seg.en && cnArr.length === 0) {
+          const s = Number(seg.s ?? 0) + offset;
+          const e = Number(seg.e ?? s) + offset;
+          if (Number.isFinite(s) && Number.isFinite(e)) {
+            cues.push({ s, e, t: String(seg.en) });
+          }
+        }
+      }
+    }
   }
   if (cues.length > 0) return cues.sort((left, right) => left.s - right.s || left.e - right.e);
 
