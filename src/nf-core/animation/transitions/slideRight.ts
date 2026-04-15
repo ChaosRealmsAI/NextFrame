@@ -1,7 +1,7 @@
 import { clamp01, joinTransforms, round } from "../shared.js";
 
 // Slides B in from the right over A.
-export function slideRight(progress: any) {
+export function slideRight(progress: number) {
   const p = clamp01(progress);
   return {
     layerA: { opacity: 1 },

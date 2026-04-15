@@ -1,5 +1,7 @@
 // Parses pipeline command flags and formats tabular pipeline command output.
-export function parseIntegerFlag(name: any, raw: any, options = {}) {
+type FlagResult = { ok: true; value: number } | { ok: false; error: { code: string; message: string } };
+
+export function parseIntegerFlag(name: string, raw: unknown, options: { min?: number } = {}): FlagResult {
   const value = Number(raw);
   if (!Number.isInteger(value)) {
     return invalidFlag(name, raw, "must be an integer");
@@ -10,7 +12,7 @@ export function parseIntegerFlag(name: any, raw: any, options = {}) {
   return { ok: true, value };
 }
 
-export function parseNumberFlag(name: any, raw: any, options = {}) {
+export function parseNumberFlag(name: string, raw: unknown, options: { min?: number } = {}): FlagResult {
   const value = Number(raw);
   if (!Number.isFinite(value)) {
     return invalidFlag(name, raw, "must be a number");
@@ -21,35 +23,37 @@ export function parseNumberFlag(name: any, raw: any, options = {}) {
   return { ok: true, value };
 }
 
-export function parseJsonFlag(name: any, raw: any) {
+type JsonFlagResult = { ok: true; value: unknown } | { ok: false; error: { code: string; message: string } };
+
+export function parseJsonFlag(name: string, raw: unknown): JsonFlagResult {
   try {
-    return { ok: true, value: JSON.parse(raw) };
+    return { ok: true, value: JSON.parse(String(raw)) };
   } catch (err) {
-    return invalidFlag(name, raw, err.message);
+    return invalidFlag(name, raw, (err as Error).message);
   }
 }
 
-export function formatTable(headers: any, rows: any) {
-  const widths = headers.map((header: any, index: any) =>
-    Math.max(header.length, ...rows.map((row: any) => String(row[index] ?? "").length))
+export function formatTable(headers: string[], rows: string[][]) {
+  const widths = headers.map((header: string, index: number) =>
+    Math.max(header.length, ...rows.map((row: string[]) => String(row[index] ?? "").length))
   );
   const lines = [
-    headers.map((header: any, index: any) => header.padEnd(widths[index])).join("  "),
-    ...rows.map((row: any) => row.map((cell: any, index: any) => String(cell ?? "").padEnd(widths[index])).join("  ")),
+    headers.map((header: string, index: number) => header.padEnd(widths[index])).join("  "),
+    ...rows.map((row: string[]) => row.map((cell: string, index: number) => String(cell ?? "").padEnd(widths[index])).join("  ")),
   ];
   return lines.join("\n");
 }
 
-export function objectOr(value: any) {
+export function objectOr(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
-function invalidFlag(name: any, raw: any, detail: any) {
+function invalidFlag(name: unknown, raw: unknown, detail: string): { ok: false; error: { code: string; message: string } } {
   return {
-    ok: false,
+    ok: false as const,
     error: {
       code: "INVALID_FLAG",
-      message: `invalid --${name}=${raw}: ${detail}`,
+      message: `invalid --${String(name)}=${String(raw)}: ${detail}`,
     },
   };
 }

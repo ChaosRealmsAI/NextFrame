@@ -19,7 +19,7 @@ const HAS_CHROME = [
   "/usr/bin/google-chrome",
   "/usr/bin/chromium",
   "/usr/bin/chromium-browser",
-].filter(Boolean).some((path) => existsSync(path));
+].filter((p): p is string => typeof p === "string").some((path) => existsSync(path));
 
 const HAS_FFMPEG = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status === 0;
 
@@ -29,7 +29,7 @@ const HAS_NAPI_CANVAS = (() => {
   return r.status === 0;
 })();
 
-function runCli(args: any, expectedStatus = 0) {
+function runCli(args: string[], expectedStatus = 0) {
   const result = spawnSync("node", [CLI, ...args], {
     cwd: ROOT,
     encoding: "utf8",

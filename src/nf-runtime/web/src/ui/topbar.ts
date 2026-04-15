@@ -1,11 +1,11 @@
 class Topbar extends Component {
-  icon(markup: any) {
+  icon(markup: string): Node {
     const wrapper = document.createElement('span');
     wrapper.innerHTML = markup;
     return wrapper.firstElementChild || document.createTextNode('');
   }
 
-  renderPipelineTab(stage: any, label: any) {
+  renderPipelineTab(stage: string, label: string) {
     const isActive = this.props.activeTab === stage;
     return h(
       'div',
@@ -62,10 +62,10 @@ class Topbar extends Component {
             onclick: projectClickable ? () => window.showView('project') : null,
             style: { cursor: projectClickable ? 'pointer' : 'default' },
           },
-          currentProjectName,
+          String(currentProjectName),
         ),
         h('span', { class: 'tb-bc-sep', id: 'bc-sep2', style: { display: showPipelineTabs ? '' : 'none' } }, '/'),
-        h('span', { class: 'tb-bc-item tb-bc-current', id: 'bc-level2' }, showPipelineTabs ? currentEpisodeName : ''),
+        h('span', { class: 'tb-bc-item tb-bc-current', id: 'bc-level2' }, showPipelineTabs ? String(currentEpisodeName) : ''),
       ),
       h(
         'div',

@@ -10,7 +10,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const CLI = resolve(ROOT, "bin/nextframe.js");
 
-function runCli(args: any, expectedStatus = 0) {
+function runCli(args: string[], expectedStatus = 0) {
   const result = spawnSync("node", [CLI, ...args], {
     cwd: ROOT,
     encoding: "utf8",
@@ -20,7 +20,7 @@ function runCli(args: any, expectedStatus = 0) {
   return result;
 }
 
-function tmpPath(prefix: any) {
+function tmpPath(prefix: string) {
   return mkdtempSync(join(tmpdir(), `${prefix}-`));
 }
 

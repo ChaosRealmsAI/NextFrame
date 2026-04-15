@@ -15,7 +15,7 @@ import {
 
 const HELP = "usage: nextframe source-translate <project> <episode> --clip <N> --lang <lang> [--apply <response.json>] [--dry-run] [--root=PATH] [--json]";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseSourceFlags(argv, ["clip", "lang", "apply", "root", "source"]);
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName || !flags.clip) {
@@ -27,11 +27,11 @@ export async function run(argv: any) {
   const lang = typeof flags.lang === "string" ? flags.lang : "zh";
   const root = resolveRoot(flags);
 
-  let context;
+  let context: { root: string; projectName: string; projectPath: string; projectFile: string; project: unknown; episodeName: string; episodePath: string; episodeFile: string };
   try {
-    context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
-    emit({ ok: false, error: { code: "EPISODE_NOT_FOUND", message: err.message } }, flags);
+    context = await loadProjectContext(root, projectName, episodeName) as typeof context;
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "EPISODE_NOT_FOUND", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -46,7 +46,7 @@ export async function run(argv: any) {
   }
 
   const reportRows = Array.isArray(cutReport?.success) ? cutReport.success : Array.isArray(cutReport) ? cutReport : [];
-  const clipRow = reportRows.find((row: any) => Number(row?.clip_num) === clipNum || Number(row?.id) === clipNum);
+  const clipRow = reportRows.find((row: Record<string, unknown>) => Number(row?.clip_num) === clipNum || Number(row?.id) === clipNum);
   if (!clipRow) {
     emit({ ok: false, error: { code: "CLIP_NOT_FOUND", message: `clip ${clipNum} not found in cut_report.json` } }, flags);
     return 2;
@@ -82,7 +82,7 @@ export async function run(argv: any) {
         try {
           const candidate = await readJson(join(sourcesDir, dirName, "sentences.json"));
           const sents = Array.isArray(candidate?.sentences) ? candidate.sentences : [];
-          const fromS = sents.find((s: any) => Number(s?.id) === fromIdScan);
+          const fromS = sents.find((s: Record<string, unknown>) => Number(s?.id) === fromIdScan);
           if (fromS && (!previewHead || String(fromS.text || "").includes(previewHead.slice(0, 15)))) {
             matched = dirName;
             break;
@@ -95,8 +95,8 @@ export async function run(argv: any) {
       }
       sentencesPath = join(sourcesDir, matched, "sentences.json");
     }
-  } catch (err) {
-    emit({ ok: false, error: { code: "SOURCE_NOT_FOUND", message: `no source found in ${sourcesDir}: ${err.message}` } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SOURCE_NOT_FOUND", message: `no source found in ${sourcesDir}: ${(err as Error).message}` } }, flags);
     return 2;
   }
 
@@ -111,9 +111,9 @@ export async function run(argv: any) {
   const fromId = Number(clipRow.from_id);
   const toId = Number(clipRow.to_id);
   const allSentences = Array.isArray(sentencesData?.sentences) ? sentencesData.sentences : [];
-  const clipSentences = allSentences.filter((s: any) => Number(s?.id) >= fromId && Number(s?.id) <= toId);
+  const clipSentences = allSentences.filter((s: Record<string, unknown>) => Number(s?.id) >= fromId && Number(s?.id) <= toId);
 
-  const segments = clipSentences.map((s: any) => ({
+  const segments = clipSentences.map((s: Record<string, unknown>) => ({
     id: Number(s.id),
     en: String(s.text || ""),
     start: Number(s.start),
@@ -129,16 +129,16 @@ export async function run(argv: any) {
     let agentResponse;
     try {
       agentResponse = await readJson(responsePath);
-    } catch (err) {
-      emit({ ok: false, error: { code: "RESPONSE_READ_FAILED", message: err.message } }, flags);
+    } catch (err: unknown) {
+      emit({ ok: false, error: { code: "RESPONSE_READ_FAILED", message: (err as Error).message } }, flags);
       return 2;
     }
 
-    const responseMap = {};
+    const responseMap: Record<number, unknown[]> = {};
     const rows = Array.isArray(agentResponse) ? agentResponse : [];
     rows.forEach((row) => { responseMap[Number(row.id)] = Array.isArray(row.cn) ? row.cn : []; });
 
-    const finalSegments = segments.map((seg: any) => {
+    const finalSegments = segments.map((seg: { id: number; en: string; start: number; end: number }) => {
       const cnTexts = responseMap[seg.id] || [];
       const cues = interpolateCues(cnTexts, seg.start, seg.end);
       return { id: seg.id, en: seg.en, start: seg.start, end: seg.end, cn: cues };
@@ -166,7 +166,7 @@ export async function run(argv: any) {
     clip_title: String(clipRow.title || `clip_${clipNumPad}`),
     lang,
     output_path: outPath,
-    segments: segments.map((s: any) => ({
+    segments: segments.map((s: Record<string, unknown>) => ({
       id: s.id,
       en: s.en
     })),
@@ -191,23 +191,23 @@ export async function run(argv: any) {
 }
 
 // Linear time interpolation: distribute cue texts across [segStart, segEnd] proportional to char count.
-function interpolateCues(cnTexts: any, segStart: any, segEnd: any) {
-  const texts = cnTexts.map((t: any) => typeof t === "string" ? t : String(t?.text || ""));
+function interpolateCues(cnTexts: unknown[], segStart: number, segEnd: number) {
+  const texts = cnTexts.map((t: unknown) => typeof t === "string" ? t : String((t as Record<string, unknown>)?.text || ""));
   if (!texts.length) return [];
   if (!Number.isFinite(segStart) || !Number.isFinite(segEnd) || segEnd <= segStart) {
-    return texts.map((text: any) => ({
+    return texts.map((text: string) => ({
       text,
       start: segStart || 0,
       end: segEnd || 0
     }));
   }
 
-  const totalChars = texts.reduce((sum: any, t: any) => sum + t.length, 0);
+  const totalChars = texts.reduce((sum: number, t: string) => sum + t.length, 0);
   const totalDuration = segEnd - segStart;
-  const cues: any = [];
+  const cues: { text: string; start: number; end: number }[] = [];
   let cursor = segStart;
 
-  texts.forEach((text: any, index: any) => {
+  texts.forEach((text: string, index: number) => {
     const charShare = totalChars > 0 ? text.length / totalChars : 1 / texts.length;
     const cueEnd = index === texts.length - 1 ? segEnd : Math.round((cursor + charShare * totalDuration) * 1000) / 1000;
     cues.push({ text, start: Math.round(cursor * 1000) / 1000, end: cueEnd });

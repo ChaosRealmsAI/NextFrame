@@ -3,40 +3,45 @@
 //   { keys: [[0, 24], [1, 48], [4, 48], [5, 24]], ease: "easeOut" }
 // resolveKeyframes(params, t) returns a new object with all keys resolved.
 
-function clamp01(value: any) {
+interface KeyframeSpec {
+  keys: [number, unknown][];
+  ease?: string | ((t: number) => number);
+}
+
+function clamp01(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.min(1, Math.max(0, value));
 }
 
-function normalizeTime(value: any) {
+function normalizeTime(value: number) {
   return clamp01(value);
 }
 
-export function linear(t: any) {
+export function linear(t: number) {
   return normalizeTime(t);
 }
 
-export function easeIn(t: any) {
+export function easeIn(t: number) {
   const p = normalizeTime(t);
   return p * p;
 }
 
-export function easeOut(t: any) {
+export function easeOut(t: number) {
   const p = normalizeTime(t);
   return p * (2 - p);
 }
 
-export function easeInOut(t: any) {
+export function easeInOut(t: number) {
   const p = normalizeTime(t);
   return p < 0.5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
 }
 
-export function spring(t: any) {
+export function spring(t: number) {
   const p = normalizeTime(t);
   return 1 - Math.cos(p * Math.PI * 0.5) * Math.exp(-6 * p);
 }
 
-export function bounce(t: any) {
+export function bounce(t: number) {
   let p = normalizeTime(t);
   const n = 7.5625;
   const d = 2.75;
@@ -53,29 +58,29 @@ export function bounce(t: any) {
   return n * p * p + 0.984375;
 }
 
-export function elastic(t: any) {
+export function elastic(t: number) {
   const p = normalizeTime(t);
   return p === 0 || p === 1 ? p : Math.pow(2, -10 * p) * Math.sin((p - 0.1) * 5 * Math.PI) + 1;
 }
 
-export function expo(t: any) {
+export function expo(t: number) {
   const p = normalizeTime(t);
   return p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
 }
 
-export function back(t: any) {
+export function back(t: number) {
   const p = normalizeTime(t);
   const c = 1.70158;
   const c3 = c + 1;
   return 1 + c3 * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
 }
 
-export function circ(t: any) {
+export function circ(t: number) {
   const p = normalizeTime(t);
   return Math.sqrt(1 - Math.pow(p - 1, 2));
 }
 
-export function springConfigurable(t: any, config = {}) {
+export function springConfigurable(t: number, config: { damping?: number; stiffness?: number; mass?: number } = {}) {
   const p = normalizeTime(t);
   const damping = Math.max(0.0001, config.damping ?? 12);
   const stiffness = Math.max(0.0001, config.stiffness ?? 180);
@@ -95,7 +100,7 @@ export function springConfigurable(t: any, config = {}) {
   return 1 - Math.exp(-omega0 * p) * (1 + omega0 * p);
 }
 
-export function cubicBezier(x1: any, y1: any, x2: any, y2: any) {
+export function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
   const cx = 3 * x1;
   const bx = 3 * (x2 - x1) - cx;
   const ax = 1 - cx - bx;
@@ -103,19 +108,19 @@ export function cubicBezier(x1: any, y1: any, x2: any, y2: any) {
   const by = 3 * (y2 - y1) - cy;
   const ay = 1 - cy - by;
 
-  function sampleCurveX(t: any) {
+  function sampleCurveX(t: number) {
     return ((ax * t + bx) * t + cx) * t;
   }
 
-  function sampleCurveY(t: any) {
+  function sampleCurveY(t: number) {
     return ((ay * t + by) * t + cy) * t;
   }
 
-  function sampleDerivativeX(t: any) {
+  function sampleDerivativeX(t: number) {
     return (3 * ax * t + 2 * bx) * t + cx;
   }
 
-  return (t: any) => {
+  return (t: number) => {
     const p = normalizeTime(t);
     if (p === 0 || p === 1) return p;
 
@@ -142,9 +147,9 @@ export function cubicBezier(x1: any, y1: any, x2: any, y2: any) {
   };
 }
 
-export function steps(count: any) {
+export function steps(count: number) {
   const safeCount = Math.max(1, Math.floor(count || 1));
-  return (t: any) => {
+  return (t: number) => {
     const p = normalizeTime(t);
     if (p === 1) return 1;
     return Math.floor(p * safeCount) / safeCount;
@@ -173,11 +178,11 @@ const EASINGS = {
  * @param {number} t — local clip time in seconds
  * @returns {object} — resolved params with static values only
  */
-export function resolveKeyframes(params: any, t: any) {
+export function resolveKeyframes(params: Record<string, unknown>, t: number) {
   if (!params || typeof params !== "object") return params;
-  const out = {};
+  const out: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(params)) {
-    out[key] = isKeyframed(val) ? interpolate(val, t) : val;
+    out[key] = isKeyframed(val) ? interpolate(val as KeyframeSpec, t) : val;
   }
   return out;
 }
@@ -185,8 +190,8 @@ export function resolveKeyframes(params: any, t: any) {
 /**
  * Check if a value is a keyframe object.
  */
-export function isKeyframed(val: any) {
-  return val !== null && typeof val === "object" && Array.isArray(val.keys) && val.keys.length >= 1;
+export function isKeyframed(val: unknown): val is KeyframeSpec {
+  return val !== null && typeof val === "object" && Array.isArray((val as Record<string, unknown>).keys) && ((val as Record<string, unknown>).keys as unknown[]).length >= 1;
 }
 
 /**
@@ -195,7 +200,7 @@ export function isKeyframed(val: any) {
  * @param {number} t
  * @returns {any}
  */
-export function interpolate(kf: any, t: any) {
+export function interpolate(kf: KeyframeSpec, t: number) {
   const keys = kf.keys;
   const ease = resolveEasing(kf.ease);
 
@@ -224,7 +229,7 @@ export function interpolate(kf: any, t: any) {
 /**
  * Lerp between two values based on type.
  */
-function lerpValue(a: any, b: any, p: any) {
+function lerpValue(a: unknown, b: unknown, p: number): unknown {
   // Numbers — simple lerp
   if (typeof a === "number" && typeof b === "number") {
     return a + (b - a) * p;
@@ -242,7 +247,7 @@ function lerpValue(a: any, b: any, p: any) {
 /**
  * Lerp two hex colors in RGB space.
  */
-function lerpColor(hexA: any, hexB: any, p: any) {
+function lerpColor(hexA: string, hexB: string, p: number) {
   const [rA, gA, bA] = hexToRgb(hexA);
   const [rB, gB, bB] = hexToRgb(hexB);
   const r = Math.round(rA + (rB - rA) * p);
@@ -251,16 +256,16 @@ function lerpColor(hexA: any, hexB: any, p: any) {
   return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
 }
 
-function hexToRgb(hex: any) {
+function hexToRgb(hex: string) {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
 }
 
-function resolveEasing(ease: any) {
-  if (typeof ease === "function") return ease;
-  if (typeof ease === "string" && EASINGS[ease]) {
-    if (ease === "springConfigurable") return (t: any) => springConfigurable(t);
-    return EASINGS[ease];
+function resolveEasing(ease: unknown): (t: number) => number {
+  if (typeof ease === "function") return ease as (t: number) => number;
+  if (typeof ease === "string" && EASINGS[ease as keyof typeof EASINGS]) {
+    if (ease === "springConfigurable") return (t: number) => springConfigurable(t);
+    return EASINGS[ease as keyof typeof EASINGS] as (t: number) => number;
   }
   return EASINGS.linear;
 }

@@ -1,8 +1,10 @@
 // v0.3 layer-based frame description helpers.
 
-export function describeAt(timeline: any, t: any) {
-  const active = [];
-  for (const layer of timeline.layers || []) {
+interface LooseLayer { id: string; scene: string; start: number; dur: number; params?: Record<string, unknown> }
+
+export function describeAt(timeline: Record<string, unknown>, t: number) {
+  const active: Array<{ id: string; scene: string; localT: number; progress: number; params: Record<string, unknown> }> = [];
+  for (const layer of (timeline.layers || []) as LooseLayer[]) {
     const end = layer.start + layer.dur;
     if (t >= layer.start && t < end) {
       const localT = t - layer.start;
@@ -15,5 +17,5 @@ export function describeAt(timeline: any, t: any) {
       });
     }
   }
-  return { ok: true, value: { time: t, active, count: active.length } };
+  return { ok: true as const, value: { time: t, active, count: active.length } };
 }

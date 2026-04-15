@@ -12,7 +12,7 @@ import { resolveRoot, loadProjectContext } from "../_helpers/_project.js";
 const HELP = "usage: nextframe audio-synth <project> <episode> --segment=N [--voice=NAME] [--backend=edge|volcengine] [--root=PATH] [--json]";
 const ALLOWED_BACKENDS = new Set(["edge", "volcengine"]);
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName || flags.segment === undefined) {
@@ -44,10 +44,10 @@ export async function run(argv: any) {
   }
 
   const root = resolveRoot(flags);
-  let context;
+  let context: { root: string; projectName: string; projectPath: string; projectFile: string; project: unknown; episodeName: string; episodePath: string; episodeFile: string };
   try {
-    context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
+    context = await loadProjectContext(root, projectName, episodeName) as typeof context;
+  } catch (err: unknown) {
     emit(loadContextError(err, projectName, episodeName), flags);
     return 2;
   }
@@ -55,8 +55,8 @@ export async function run(argv: any) {
   let pipeline;
   try {
     pipeline = await loadPipeline(context.projectPath, episodeName);
-  } catch (err) {
-    emit({ ok: false, error: { code: "LOAD_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -96,7 +96,7 @@ export async function run(argv: any) {
       ok: false,
       error: {
         code: "VOX_NOT_FOUND",
-        message: err.message,
+        message: (err as Error).message,
         fix: "install vox and make sure it is available on PATH, then retry",
       },
     }, flags);
@@ -170,7 +170,7 @@ export async function run(argv: any) {
       ok: false,
       error: {
         code: "LOAD_FAIL",
-        message: `failed to read ${timelinePath}: ${err.message}`,
+        message: `failed to read ${timelinePath}: ${(err as Error).message}`,
       },
     }, flags);
     return 2;
@@ -203,8 +203,8 @@ export async function run(argv: any) {
       ...pipeline,
       audio: nextAudio,
     });
-  } catch (err) {
-    emit({ ok: false, error: { code: "SAVE_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SAVE_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -217,7 +217,7 @@ export async function run(argv: any) {
   return 0;
 }
 
-function buildSynthArgs(text: any, outputDir: any, stem: any, voice: any, backend: any) {
+function buildSynthArgs(text: string, outputDir: string, stem: string, voice: string | undefined, backend: string | undefined) {
   const args = ["synth", text, "-d", outputDir, "-o", `${stem}.mp3`];
   if (voice) args.push("--voice", voice);
   if (backend) args.push("--backend", backend);
@@ -232,7 +232,7 @@ function resolveVoxPath() {
   return output;
 }
 
-function normalizeTimelineSegments(rawSegments: any) {
+function normalizeTimelineSegments(rawSegments: unknown) {
   if (!Array.isArray(rawSegments)) return [];
   return rawSegments.map((segment) => {
     const start = toSeconds(segment?.start_ms);
@@ -247,7 +247,7 @@ function normalizeTimelineSegments(rawSegments: any) {
   });
 }
 
-function normalizeWords(rawWords: any) {
+function normalizeWords(rawWords: unknown) {
   if (!Array.isArray(rawWords)) return [];
   return rawWords.map((word) => {
     const start = toSeconds(word?.start_ms);
@@ -261,27 +261,28 @@ function normalizeWords(rawWords: any) {
   });
 }
 
-function deriveDuration(sentences: any) {
-  const end = sentences.reduce((max: any, sentence: any) => Math.max(max, Number(sentence?.end) || 0), 0);
+function deriveDuration(sentences: { end: number }[]) {
+  const end = sentences.reduce((max: number, sentence: { end: number }) => Math.max(max, Number(sentence?.end) || 0), 0);
   return roundSeconds(end);
 }
 
-function toSeconds(rawMs: any) {
+function toSeconds(rawMs: unknown) {
   const value = Number(rawMs);
   return Number.isFinite(value) ? roundSeconds(value / 1000) : 0;
 }
 
-function roundSeconds(value: any) {
+function roundSeconds(value: number) {
   return Math.round(Math.max(0, value) * 1000) / 1000;
 }
 
-function formatExecError(err: any) {
-  const stderr = String(err?.stderr || "").trim();
-  const stdout = String(err?.stdout || "").trim();
-  return stderr || stdout || err?.message || String(err);
+function formatExecError(err: unknown) {
+  const errObj = err as Record<string, unknown> | null;
+  const stderr = String(errObj?.stderr || "").trim();
+  const stdout = String(errObj?.stdout || "").trim();
+  return stderr || stdout || (err as Error)?.message || String(err);
 }
 
-function invalidFlag(name: any, raw: any, detail: any) {
+function invalidFlag(name: string, raw: unknown, detail: string) {
   return {
     ok: false,
     error: {
@@ -291,8 +292,8 @@ function invalidFlag(name: any, raw: any, detail: any) {
   };
 }
 
-function loadContextError(err: any, projectName: any, episodeName: any) {
-  if (err.code === "ENOENT") {
+function loadContextError(err: unknown, projectName: string, episodeName: string) {
+  if ((err as NodeJS.ErrnoException).code === "ENOENT") {
     return {
       ok: false,
       error: {
@@ -301,7 +302,7 @@ function loadContextError(err: any, projectName: any, episodeName: any) {
       },
     };
   }
-  return { ok: false, error: { code: "LOAD_FAIL", message: err.message } };
+  return { ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } };
 }
 
 export default run;

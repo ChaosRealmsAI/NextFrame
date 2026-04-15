@@ -14,8 +14,8 @@ export const RATIO_IDS = Object.keys(RATIOS);
  * @param {string} id — "16:9", "9:16", "4:3", "1:1"
  * @returns {{ id, width, height, label } | null}
  */
-export function getRatio(id: any) {
-  return RATIOS[id] || null;
+export function getRatio(id: string) {
+  return RATIOS[id as keyof typeof RATIOS] || null;
 }
 
 /**
@@ -29,7 +29,7 @@ export function getRatio(id: any) {
  * @param {string} ratioId
  * @returns {boolean}
  */
-export function isSceneCompatible(sceneMeta: any, ratioId: any) {
+export function isSceneCompatible(sceneMeta: { ratio?: string | null }, ratioId: string) {
   if (!sceneMeta.ratio) return true;
   return sceneMeta.ratio === ratioId;
 }
@@ -43,7 +43,7 @@ export function isSceneCompatible(sceneMeta: any, ratioId: any) {
  * @param {function} getSceneMeta — (sceneId) => { ratio?: string }
  * @returns {string[]} errors
  */
-export function validateSegmentRatio(layers: any, ratioId: any, getSceneMeta: any) {
+export function validateSegmentRatio(layers: { scene: string }[], ratioId: string, getSceneMeta: (sceneId: string) => { ratio?: string } | null) {
   const errors = [];
   const ratio = getRatio(ratioId);
   if (!ratio) {

@@ -1,10 +1,15 @@
-function createMarkupNode(markup: any) {
+function createMarkupNode(markup: string): Node {
   const wrapper = document.createElement('span');
   wrapper.innerHTML = markup;
   return wrapper.firstElementChild || document.createTextNode('');
 }
 
-function createSelect(options: any, activeValue: any, onPick: any) {
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+function createSelect(options: SelectOption[], activeValue: string, onPick: (value: string) => void) {
   return h(
     'div',
     { class: 'nf-select', 'data-value': activeValue },
@@ -13,22 +18,22 @@ function createSelect(options: any, activeValue: any, onPick: any) {
       {
         class: 'nf-select-trigger',
         'data-nf-action': 'toggle-select',
-        onclick: (event: any) => window.toggleSelect(event.currentTarget),
+        onclick: (event: MouseEvent) => window.toggleSelect((event.currentTarget as HTMLElement)),
       },
-      h('span', { class: 'nf-select-value' }, options.find((option: any) => option.value === activeValue)?.label || options[0].label),
+      h('span', { class: 'nf-select-value' }, options.find((option: SelectOption) => option.value === activeValue)?.label || options[0].label),
       h('span', { class: 'nf-select-arrow' }, '▾'),
     ),
     h(
       'div',
       { class: 'nf-select-dropdown' },
-      options.map((option: any) => h(
+      ...options.map((option: SelectOption) => h(
         'div',
         {
           class: 'nf-select-option' + (option.value === activeValue ? ' active' : ''),
           'data-val': option.value,
           'data-nf-action': 'pick-option',
-          onclick: (event: any) => {
-            window.pickOption(event.currentTarget);
+          onclick: (event: MouseEvent) => {
+            window.pickOption((event.currentTarget as HTMLElement));
             if (typeof onPick === 'function') onPick(option.value);
           },
         },
@@ -40,7 +45,7 @@ function createSelect(options: any, activeValue: any, onPick: any) {
 }
 
 class SettingsPanel extends Modal {
-  constructor(props = {}) {
+  constructor(props: Record<string, unknown> = {}) {
     super(props);
     this.state = {
       language: 'zh',
@@ -87,7 +92,7 @@ class SettingsPanel extends Modal {
               { value: 'en', label: 'English' },
               { value: 'zh', label: '简体中文' },
               { value: 'ja', label: '日本語' },
-            ], this.state.language, (value: any) => this.setState({ language: value })),
+            ], this.state.language as string, (value: string) => this.setState({ language: value })),
           ),
           h(
             'div',
@@ -108,7 +113,7 @@ class SettingsPanel extends Modal {
               { value: '1080p', label: '1920×1080' },
               { value: '4k', label: '3840×2160' },
               { value: '720p', label: '1280×720' },
-            ], this.state.resolution, (value: any) => this.setState({ resolution: value })),
+            ], this.state.resolution as string, (value: string) => this.setState({ resolution: value })),
           ),
           h(
             'div',
@@ -118,7 +123,7 @@ class SettingsPanel extends Modal {
               { value: '30', label: '30' },
               { value: '24', label: '24' },
               { value: '60', label: '60' },
-            ], this.state.fps, (value: any) => this.setState({ fps: value })),
+            ], this.state.fps as string, (value: string) => this.setState({ fps: value })),
           ),
           h(
             'div',
@@ -128,7 +133,7 @@ class SettingsPanel extends Modal {
               { value: 'h264', label: 'h264' },
               { value: 'h265', label: 'h265' },
               { value: 'prores', label: 'ProRes' },
-            ], this.state.codec, (value: any) => this.setState({ codec: value })),
+            ], this.state.codec as string, (value: string) => this.setState({ codec: value })),
           ),
         ),
         h(
@@ -173,23 +178,21 @@ class AIPromptsModal extends Modal {
       h(
         'div',
         { class: 'modal-body', id: 'ai-prompts-body' },
-        sections.map((section: any) => h(
+        ...sections.map((section: { icon: string; title: string; prompts: string[] }) => h(
           'div',
           { class: 'prompt-section' },
           h('div', { class: 'prompt-section-title' }, section.icon + ' ' + section.title),
-          section.prompts.map((prompt: any) => h(
+          ...section.prompts.map((prompt: string) => h(
             'div',
             {
               class: 'prompt-item',
               'data-nf-action': 'copy-ai-prompt',
-              onclick: (event: any) => window.copyPrompt(event.currentTarget),
+              onclick: (event: MouseEvent) => window.copyPrompt((event.currentTarget as HTMLElement)),
             },
             h('span', { class: 'prompt-text' }, prompt),
             h('span', { class: 'prompt-copy' }, '复制'),
-          ),
-          ),
-        ),
-        ),
+          )),
+        )),
       ),
     );
   }
@@ -199,7 +202,7 @@ class AIPromptsModal extends Modal {
   }
 }
 
-function copyPrompt(el: any) {
+function copyPrompt(el: HTMLElement): void {
   const text = el.querySelector('.prompt-text')?.textContent || '';
   const copy = el.querySelector('.prompt-copy');
   if (navigator.clipboard) navigator.clipboard.writeText(text);
@@ -212,7 +215,7 @@ function copyPrompt(el: any) {
   }, 1500);
 }
 
-function toggleSelect(trigger: any) {
+function toggleSelect(trigger: HTMLElement): void {
   const select = trigger.closest('.nf-select');
   document.querySelectorAll('.nf-select.open').forEach((item) => {
     if (item !== select) item.classList.remove('open');
@@ -220,19 +223,19 @@ function toggleSelect(trigger: any) {
   if (select) select.classList.toggle('open');
 }
 
-function pickOption(option: any) {
+function pickOption(option: HTMLElement): void {
   const select = option.closest('.nf-select');
   if (!select) return;
   const valueEl = select.querySelector('.nf-select-value');
   if (valueEl) valueEl.textContent = option.textContent;
-  select.querySelectorAll('.nf-select-option').forEach((item: any) => item.classList.remove('active'));
+  select.querySelectorAll('.nf-select-option').forEach((item: Element) => item.classList.remove('active'));
   option.classList.add('active');
   select.classList.remove('open');
-  if (option.dataset.val) select.dataset.value = option.dataset.val;
+  if (option.dataset.val) (select as HTMLElement).dataset.value = option.dataset.val;
 }
 
 document.addEventListener('click', (event) => {
-  if (event.target.closest('.nf-select')) return;
+  if ((event.target as HTMLElement).closest('.nf-select')) return;
   document.querySelectorAll('.nf-select.open').forEach((item) => item.classList.remove('open'));
 });
 

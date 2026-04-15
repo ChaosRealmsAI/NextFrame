@@ -3,7 +3,7 @@ window.currentProjectName = '';
 window.currentEpisodePath = '';
 window.currentEpisodeName = '';
 
-const STAGE_TO_TAB = {
+const STAGE_TO_TAB: Record<string, string> = {
   script: 'pl-tab-script',
   audio: 'pl-tab-audio',
   clips: 'pl-tab-asset',
@@ -20,14 +20,14 @@ const appStore = new Store({
   aiPromptsOpen: false,
 });
 
-let topbarComponent: any = null;
-let settingsPanelComponent: any = null;
-let aiPromptsModalComponent: any = null;
-let homeViewComponent = null;
-let newProjectModalComponent: any = null;
-let transportComponent = null;
+let topbarComponent: Component | null = null;
+let settingsPanelComponent: Component | null = null;
+let aiPromptsModalComponent: Component | null = null;
+let homeViewComponent: Component | null = null;
+let newProjectModalComponent: (Component & { toggle?(): void }) | null = null;
+let transportComponent: Component | null = null;
 
-function syncTopbar() {
+function syncTopbar(): void {
   if (!topbarComponent) return;
   topbarComponent.update({
     currentView: appStore.get('currentView'),
@@ -37,10 +37,10 @@ function syncTopbar() {
   });
 }
 
-function switchTabByStage(stage: any) {
+function switchTabByStage(stage: string): void {
   const targetStage = stage in STAGE_TO_TAB ? stage : 'script';
   appStore.set('activeTab', targetStage);
-  document.querySelectorAll('.tb-pl-tab').forEach((tabEl) => {
+  document.querySelectorAll<HTMLElement>('.tb-pl-tab').forEach((tabEl) => {
     tabEl.classList.toggle('active', tabEl.dataset.stage === targetStage);
   });
   document.querySelectorAll('.pl-tab-content').forEach((panel) => panel.classList.remove('active'));
@@ -49,15 +49,15 @@ function switchTabByStage(stage: any) {
   syncTopbar();
 }
 
-function showView(viewName: any, data: any) {
+function showView(viewName: string, data?: Record<string, unknown>): void {
   document.querySelectorAll('.view').forEach((view) => view.classList.remove('active'));
   const target = document.getElementById('view-' + viewName);
   if (target) target.classList.add('active');
 
   if (viewName === 'project') {
     if (data && data.path) {
-      window.currentProjectPath = data.path;
-      window.currentProjectName = data.name || '';
+      window.currentProjectPath = data.path as string;
+      window.currentProjectName = (data.name || '') as string;
     }
     const nameEl = document.getElementById('vp-project-name');
     if (nameEl) nameEl.textContent = window.currentProjectName;
@@ -66,10 +66,10 @@ function showView(viewName: any, data: any) {
 
   if (viewName === 'pipeline') {
     if (data && data.episodePath) {
-      window.currentEpisodePath = data.episodePath;
-      window.currentEpisodeName = data.episodeName || '';
+      window.currentEpisodePath = data.episodePath as string;
+      window.currentEpisodeName = (data.episodeName || '') as string;
     }
-    switchTabByStage(appStore.get('activeTab') || 'script');
+    switchTabByStage((appStore.get('activeTab') as string) || 'script');
     if (typeof loadPipelineData === 'function') loadPipelineData();
     if (typeof loadEditorTimeline === 'function') loadEditorTimeline();
     if (typeof loadSmartClips === 'function') loadSmartClips();
@@ -79,28 +79,27 @@ function showView(viewName: any, data: any) {
   syncTopbar();
 }
 
-function switchTab(tabEl: any) {
-  if (!tabEl) return;
-  switchTabByStage(tabEl.dataset.stage || 'script');
+function switchTab(tab: string): void {
+  switchTabByStage(tab || 'script');
 }
 
-function toggleSettings() {
+function toggleSettings(): void {
   const next = !appStore.get('settingsOpen');
   appStore.set('settingsOpen', next);
   if (settingsPanelComponent) settingsPanelComponent.update({ open: next });
 }
 
-function toggleAIPrompts() {
+function toggleAIPrompts(): void {
   const next = !appStore.get('aiPromptsOpen');
   appStore.set('aiPromptsOpen', next);
   if (aiPromptsModalComponent) aiPromptsModalComponent.update({ open: next });
 }
 
-function toggleNewProject() {
-  if (newProjectModalComponent) newProjectModalComponent.toggle();
+function toggleNewProject(): void {
+  if (newProjectModalComponent && newProjectModalComponent.toggle) newProjectModalComponent.toggle();
 }
 
-function mountComponent(rootId: any, instance: any) {
+function mountComponent(rootId: string, instance: Component): Component | null {
   const root = document.getElementById(rootId);
   if (!root) return null;
   instance.mount(root);
@@ -120,7 +119,7 @@ window.__nfDiagnose = function() {
       aiPrompts: document.getElementById('ai-modal')?.classList.contains('open') || false,
       newProject: document.getElementById('new-project-modal')?.classList.contains('open') || false,
     },
-    actions: Array.from(document.querySelectorAll('[data-nf-action]')).map((el) => el.dataset.nfAction),
+    actions: Array.from(document.querySelectorAll<HTMLElement>('[data-nf-action]')).map((el) => el.dataset.nfAction),
     editor: typeof window.__nfEditorDiagnose === 'function' ? JSON.parse(window.__nfEditorDiagnose()) : null,
   }, null, 2);
 };
@@ -155,11 +154,11 @@ document.addEventListener('DOMContentLoaded', () => {
     overlayAction: 'close-modal',
     panelAction: 'new-project-modal',
     onOverlayClick: () => toggleNewProject(),
-  }));
+  })) as (Component & { toggle?(): void }) | null;
   transportComponent = mountComponent('transport-root', new TransportControls());
 
-  window.__nfHomeView = homeViewComponent;
-  window.__nfNewProjectModal = newProjectModalComponent;
+  window.__nfHomeView = homeViewComponent as typeof window.__nfHomeView;
+  window.__nfNewProjectModal = newProjectModalComponent as typeof window.__nfNewProjectModal;
   window.__nfStore = appStore;
 
   syncTopbar();

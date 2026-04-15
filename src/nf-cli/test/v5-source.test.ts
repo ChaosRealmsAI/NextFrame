@@ -12,7 +12,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const CLI = resolve(ROOT, "bin/nextframe.js");
 
-function runCli(args: any, expectedStatus = 0, options = {}) {
+function runCli(args: string[], expectedStatus = 0, options: { env?: NodeJS.ProcessEnv } = {}) {
   const result = spawnSync("node", [CLI, ...args], {
     cwd: ROOT,
     encoding: "utf8",
@@ -133,8 +133,8 @@ test("source-link appends linked video atoms to pipeline.json", () => {
     assert.equal(payload.ok, true);
     assert.equal(payload.added, 2);
     assert.equal(pipeline.atoms.length, 2);
-    assert.deepEqual(pipeline.atoms.map((atom: any) => atom.id), [1, 2]);
-    assert.deepEqual(pipeline.atoms.map((atom: any) => atom.name), ["Intro", "Outro"]);
+    assert.deepEqual(pipeline.atoms.map((atom: Record<string, unknown>) => atom.id), [1, 2]);
+    assert.deepEqual(pipeline.atoms.map((atom: Record<string, unknown>) => atom.name), ["Intro", "Outro"]);
     assert.equal(pipeline.atoms[0].type, "video");
     assert.equal(pipeline.atoms[0].file, resolve(sourceDir, "clips/clip_01.mp4"));
     assert.equal(pipeline.atoms[0].source_ref, join(sourceDir, "source.json"));
@@ -325,13 +325,13 @@ test("source helpers slugify titles and validate source.json schema", () => {
   assert(validation.errors.some((error) => error.includes("clips[0].subtitles[0].text")));
 });
 
-function writeSource(root: any, name: any, source: any) {
+function writeSource(root: string, name: string, source: Record<string, unknown>) {
   const dir = join(root, name);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "source.json"), JSON.stringify(source, null, 2) + "\n");
 }
 
-function createMockSourceBin(root: any) {
+function createMockSourceBin(root: string) {
   const path = join(root, "mock-nf-source.js");
   writeFileSync(path, `#!/usr/bin/env node
 const { mkdirSync, writeFileSync } = require("node:fs");

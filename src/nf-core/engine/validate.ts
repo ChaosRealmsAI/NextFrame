@@ -1,32 +1,36 @@
-// Timeline validator implementing the 6 safety gates from
-// spec/architecture/05-safety.md.
+// Timeline validator implementing the 6 safety gates.
 // Returns {ok, errors[], warnings[], hints[]} — never throws.
-
-/** @typedef {import("../types.d.ts").Timeline} Timeline */
 
 import { existsSync } from "node:fs";
 import { resolve as resolvePath, isAbsolute } from "node:path";
 import { resolveTimeline } from "./time.js";
 import { guarded } from "./_guard.js";
-import { REGISTRY } from "../../scenes/index.js";
-import { EFFECT_IDS } from "../../fx/effects/index.js";
-import { FILTER_IDS } from "../../fx/filters/index.js";
-import { TRANSITION_IDS } from "../../fx/transitions/index.js";
+import { REGISTRY } from "../scenes/index.js";
+import { EFFECT_IDS } from "../animation/effects/index.js";
+import { FILTER_IDS } from "../filters/index.js";
+import { TRANSITION_IDS } from "../animation/transitions/index.js";
+import type { Timeline, Track, Clip } from "../types.js";
+
+interface ValidationError {
+  code: string;
+  message: string;
+  ref?: string;
+  hint?: string;
+}
 
 const SUPPORTED_SCHEMAS = new Set(["nextframe/v0.1"]);
 const SUPPORTED_FPS = new Set([24, 25, 30, 60]);
 const VERSION_RE = /^\d+\.\d+(?:\.\d+)?$/;
 
-/**
- * @param {Timeline} timeline
- * @param {{projectDir?: string}} [opts]
- * @returns {{ok: boolean, errors: object[], warnings: object[], hints: object[]}}
- */
-export function validateTimeline(timeline: any, opts = {}) {
-  const errors = [];
-  const warnings: any = [];
-  const hints: any = [];
-  const projectDir = opts.projectDir || process.cwd();
+interface ValidateOpts {
+  projectDir?: string;
+}
+
+export function validateTimeline(timeline: Timeline, opts: ValidateOpts = {}): Record<string, unknown> {
+  const errors: ValidationError[] = [];
+  const warnings: ValidationError[] = [];
+  const hints: ValidationError[] = [];
+  const projectDir = opts.projectDir ?? process.cwd();
 
   // Gate 1: schema
   const schemaErrs = gateSchema(timeline);
@@ -36,20 +40,21 @@ export function validateTimeline(timeline: any, opts = {}) {
   }
 
   // Gate 2: symbolic time resolve
-  const r = resolveTimeline(timeline);
+  const r = resolveTimeline(timeline) as { ok: boolean; value?: unknown; error?: { code?: string; message?: string; ref?: string; hint?: string } };
   if (!r.ok) {
+    const err = r.error ?? {};
     errors.push({
-      code: r.error.code || "TIME_RESOLVE_ERROR",
-      message: r.error.message,
-      ref: r.error.ref,
-      hint: r.error.hint,
+      code: err.code ?? "TIME_RESOLVE_ERROR",
+      message: err.message ?? "time resolution failed",
+      ref: err.ref,
+      hint: err.hint,
     });
     return guarded("validateTimeline", { ok: false, error: errors[0], errors, warnings, hints });
   }
-  const resolved = r.value;
+  const resolved = r.value as Timeline;
 
   // Gate 3: asset existence
-  for (const asset of resolved.assets || []) {
+  for (const asset of resolved.assets ?? []) {
     if (!asset.path) continue;
     const abs = isAbsolute(asset.path) ? asset.path : resolvePath(projectDir, asset.path);
     if (!existsSync(abs)) {
@@ -62,12 +67,9 @@ export function validateTimeline(timeline: any, opts = {}) {
     }
   }
 
-  // Gate 4: reference completeness — checked by gate 2 (resolveTimeline already
-  // throws TIME_REF_NOT_FOUND for dangling clip/marker/chapter references).
-
-  // Also check clip.scene refers to a known scene
-  for (const trk of resolved.tracks || []) {
-    for (const clip of trk.clips || []) {
+  // Gate 4: clip.scene references a known scene
+  for (const trk of resolved.tracks ?? []) {
+    for (const clip of trk.clips ?? []) {
       if (!REGISTRY.has(clip.scene)) {
         errors.push({
           code: "UNKNOWN_SCENE",
@@ -80,16 +82,16 @@ export function validateTimeline(timeline: any, opts = {}) {
   }
 
   // Validate effect/filter/transition type names
-  for (const trk of resolved.tracks || []) {
-    for (const clip of trk.clips || []) {
+  for (const trk of resolved.tracks ?? []) {
+    for (const clip of trk.clips ?? []) {
       if (clip.effects?.enter?.type && !EFFECT_IDS.includes(clip.effects.enter.type)) {
         warnings.push({ code: "UNKNOWN_EFFECT", message: `clip "${clip.id}" enter effect "${clip.effects.enter.type}" not found`, ref: clip.id, hint: `available: ${EFFECT_IDS.join(", ")}` });
       }
       if (clip.effects?.exit?.type && !EFFECT_IDS.includes(clip.effects.exit.type)) {
         warnings.push({ code: "UNKNOWN_EFFECT", message: `clip "${clip.id}" exit effect "${clip.effects.exit.type}" not found`, ref: clip.id, hint: `available: ${EFFECT_IDS.join(", ")}` });
       }
-      for (const f of clip.filters || []) {
-        const ft = typeof f === "string" ? f : f.type;
+      for (const f of clip.filters ?? []) {
+        const ft = typeof f === "object" && f !== null ? (f as { type?: string }).type : undefined;
         if (ft && !FILTER_IDS.includes(ft)) {
           warnings.push({ code: "UNKNOWN_FILTER", message: `clip "${clip.id}" filter "${ft}" not found`, ref: clip.id, hint: `available: ${FILTER_IDS.join(", ")}` });
         }
@@ -100,12 +102,10 @@ export function validateTimeline(timeline: any, opts = {}) {
     }
   }
 
-  // Gate 5/6 (assertion + diff sanity) belong to apply_patch, not validate.
-
   // Range checks: every clip's [start, start+dur] in [0, duration]
-  const dur = resolved.duration;
-  for (const trk of resolved.tracks || []) {
-    for (const clip of trk.clips || []) {
+  const dur = resolved.duration ?? 0;
+  for (const trk of resolved.tracks ?? []) {
+    for (const clip of trk.clips ?? []) {
       const s = clip.start;
       const d = clip.dur;
       if (typeof s !== "number" || typeof d !== "number") continue;
@@ -120,13 +120,13 @@ export function validateTimeline(timeline: any, opts = {}) {
   }
 
   // Same-track overlap detection (warning only)
-  for (const trk of resolved.tracks || []) {
-    const sorted = [...(trk.clips || [])].filter((c) => typeof c.start === "number")
+  for (const trk of resolved.tracks ?? []) {
+    const sorted = [...(trk.clips ?? [])].filter((c): c is Clip & { start: number; dur: number } => typeof c.start === "number")
       .sort((a, b) => a.start - b.start);
     for (let i = 1; i < sorted.length; i++) {
       const a = sorted[i - 1];
       const b = sorted[i];
-      if (a.start + a.dur > b.start + 1e-6) {
+      if (a.start + (a.dur ?? 0) > b.start + 1e-6) {
         warnings.push({
           code: "CLIP_OVERLAP",
           message: `clips "${a.id}" and "${b.id}" overlap on track "${trk.id}"`,
@@ -140,88 +140,98 @@ export function validateTimeline(timeline: any, opts = {}) {
   return guarded("validateTimeline", { ok: true, value: resolved, errors, warnings, hints, resolved });
 }
 
-function gateSchema(t: any) {
-  const errs = [];
+function gateSchema(t: unknown): ValidationError[] {
+  const errs: ValidationError[] = [];
   if (!t || typeof t !== "object") {
     errs.push({ code: "BAD_TIMELINE", message: "timeline is not an object" });
     return errs;
   }
-  if (typeof t.version !== "string" || !t.version.trim()) {
+  const timeline = t as Record<string, unknown>;
+  if (typeof timeline.version !== "string" || !String(timeline.version).trim()) {
     errs.push({
       code: "MISSING_VERSION",
       message: "version is required",
       hint: 'set version to "0.1" for nextframe/v0.1 timelines',
     });
-  } else if (!VERSION_RE.test(t.version.trim())) {
+  } else if (!VERSION_RE.test(String(timeline.version).trim())) {
     errs.push({
       code: "BAD_VERSION",
-      message: `version "${t.version}" must be a semver-like string`,
+      message: `version "${timeline.version}" must be a semver-like string`,
       hint: 'expected values look like "0.1" or "0.3"',
     });
   }
-  if (typeof t.schema !== "string" || !SUPPORTED_SCHEMAS.has(t.schema)) {
+  if (typeof timeline.schema !== "string" || !SUPPORTED_SCHEMAS.has(timeline.schema as string)) {
     errs.push({
       code: "BAD_SCHEMA",
-      message: `unsupported schema "${t.schema}"`,
+      message: `unsupported schema "${timeline.schema}"`,
       hint: `supported: ${[...SUPPORTED_SCHEMAS].join(", ")}`,
     });
   }
-  if (typeof t.duration !== "number" || t.duration <= 0) {
+  if (typeof timeline.duration !== "number" || (timeline.duration as number) <= 0) {
     errs.push({ code: "BAD_DURATION", message: "duration must be > 0" });
   }
-  if (!t.project || typeof t.project !== "object") {
+  const project = timeline.project;
+  if (!project || typeof project !== "object") {
     errs.push({ code: "BAD_PROJECT", message: "project is required" });
   } else {
-    if (typeof t.project.width !== "number" || t.project.width < 360 || t.project.width > 7680) {
+    const p = project as Record<string, unknown>;
+    if (typeof p.width !== "number" || (p.width as number) < 360 || (p.width as number) > 7680) {
       errs.push({ code: "BAD_PROJECT", message: "project.width must be between 360 and 7680" });
     }
-    if (typeof t.project.height !== "number" || t.project.height < 360 || t.project.height > 7680) {
+    if (typeof p.height !== "number" || (p.height as number) < 360 || (p.height as number) > 7680) {
       errs.push({ code: "BAD_PROJECT", message: "project.height must be between 360 and 7680" });
     }
-    if (typeof t.project.fps !== "number" || !SUPPORTED_FPS.has(t.project.fps)) {
+    if (typeof p.fps !== "number" || !SUPPORTED_FPS.has(p.fps as number)) {
       errs.push({ code: "BAD_PROJECT", message: `project.fps must be one of ${[...SUPPORTED_FPS].join(", ")}` });
     }
   }
-  if (!Array.isArray(t.tracks) || t.tracks.length === 0) {
+  const tracks = timeline.tracks as unknown[];
+  if (!Array.isArray(tracks) || tracks.length === 0) {
     errs.push({ code: "NO_TRACKS", message: "tracks must be a non-empty array" });
     return errs;
   }
-  // Unique track ids and clip ids
-  const trackIds = new Set();
-  const clipIds = new Set();
-  for (const trk of t.tracks) {
-    if (!trk.id) {
+  const trackIds = new Set<string>();
+  const clipIds = new Set<string>();
+  for (const trk of tracks) {
+    if (!trk || typeof trk !== "object") continue;
+    const track = trk as Record<string, unknown>;
+    if (!track.id) {
       errs.push({ code: "MISSING_TRACK_ID", message: "track missing id" });
       continue;
     }
-    if (trackIds.has(trk.id)) {
-      errs.push({ code: "DUP_TRACK_ID", message: `duplicate track id "${trk.id}"`, ref: trk.id });
+    const trackId = track.id as string;
+    if (trackIds.has(trackId)) {
+      errs.push({ code: "DUP_TRACK_ID", message: `duplicate track id "${trackId}"`, ref: trackId });
     }
-    trackIds.add(trk.id);
-    if (!Array.isArray(trk.clips)) {
-      errs.push({ code: "BAD_TRACK", message: `track "${trk.id}" clips must be an array`, ref: trk.id });
+    trackIds.add(trackId);
+    const clips = track.clips as unknown[];
+    if (!Array.isArray(clips)) {
+      errs.push({ code: "BAD_TRACK", message: `track "${trackId}" clips must be an array`, ref: trackId });
       continue;
     }
-    for (const clip of trk.clips || []) {
-      if (!clip.id) {
+    for (const clip of clips) {
+      if (!clip || typeof clip !== "object") continue;
+      const c = clip as Record<string, unknown>;
+      if (!c.id) {
         errs.push({ code: "MISSING_CLIP_ID", message: "clip missing id" });
         continue;
       }
-      if (clipIds.has(clip.id)) {
-        errs.push({ code: "DUP_CLIP_ID", message: `duplicate clip id "${clip.id}"`, ref: clip.id });
+      const clipId = c.id as string;
+      if (clipIds.has(clipId)) {
+        errs.push({ code: "DUP_CLIP_ID", message: `duplicate clip id "${clipId}"`, ref: clipId });
       }
-      clipIds.add(clip.id);
-      if (!clip.scene || typeof clip.scene !== "string") {
-        errs.push({ code: "MISSING_SCENE", message: `clip "${clip.id}" missing scene`, ref: clip.id });
+      clipIds.add(clipId);
+      if (!c.scene || typeof c.scene !== "string") {
+        errs.push({ code: "MISSING_SCENE", message: `clip "${clipId}" missing scene`, ref: clipId });
       }
-      if (clip.start == null) {
-        errs.push({ code: "MISSING_START", message: `clip "${clip.id}" missing start`, ref: clip.id });
+      if (c.start == null) {
+        errs.push({ code: "MISSING_START", message: `clip "${clipId}" missing start`, ref: clipId });
       }
-      if (clip.dur == null) {
-        errs.push({ code: "MISSING_DUR", message: `clip "${clip.id}" missing dur`, ref: clip.id });
+      if (c.dur == null) {
+        errs.push({ code: "MISSING_DUR", message: `clip "${clipId}" missing dur`, ref: clipId });
       }
-      if (!clip.params || typeof clip.params !== "object" || Array.isArray(clip.params)) {
-        errs.push({ code: "MISSING_PARAMS", message: `clip "${clip.id}" missing params object`, ref: clip.id });
+      if (!c.params || typeof c.params !== "object" || Array.isArray(c.params)) {
+        errs.push({ code: "MISSING_PARAMS", message: `clip "${clipId}" missing params object`, ref: clipId });
       }
     }
   }

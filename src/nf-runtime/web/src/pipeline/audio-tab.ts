@@ -2,23 +2,24 @@
 // Depends on: pipeline-utils.js (escapeHtml, toNfdataUrl, formatTimecode, getCurrentProjectRef, getCurrentEpisodeRef)
 // Shared state: pipelineSegments, pipelineAudioStage, pipelineAudioState (defined in pipeline.js)
 
-let activeKaraokeAudio: any = null;
-let activeKaraokeRaf: any = null;
-let activeKaraokeSegment: any = null;
+let activeKaraokeAudio: HTMLAudioElement | null = null;
+let activeKaraokeRaf: number | null = null;
+let activeKaraokeSegment: number | null = null;
 
-function getAudioSegmentsForRender(segments: any) {
+function getAudioSegmentsForRender(segments: NfSegment[]): NfSegment[] {
   const audioSegments = Array.isArray(segments) ? segments : [];
   if (pipelineSegments.length === 0) return audioSegments;
 
-  const audioBySegment = {};
+  const audioBySegment: Record<number, NfSegment> = {};
   audioSegments.forEach(function(seg, index) {
     const segmentNumber = Number(seg.segment) || (index + 1);
     audioBySegment[segmentNumber] = seg;
   });
 
-  const mergedSegments = pipelineSegments.map(function(seg, index) {
+  const mergedSegments: NfSegment[] = pipelineSegments.map(function(seg, index) {
     const segmentNumber = index + 1;
     return Object.assign({
+      id: String(segmentNumber),
       segment: segmentNumber,
       narration: seg.narration || seg.text || '',
     }, audioBySegment[segmentNumber] || {});
@@ -32,16 +33,16 @@ function getAudioSegmentsForRender(segments: any) {
   return mergedSegments;
 }
 
-function getAudioSegmentNarration(seg: any, index: any) {
+function getAudioSegmentNarration(seg: NfSegment, index: number): string {
   if (seg && (seg.narration || seg.text)) return seg.narration || seg.text || '';
   const segmentNumber = Number(seg && seg.segment) || (index + 1);
-  const scriptSegment = pipelineSegments[segmentNumber - 1] || {};
+  const scriptSegment: NfSegment = pipelineSegments[segmentNumber - 1] || { id: '' };
   return scriptSegment.narration || scriptSegment.text || '';
 }
 
-function renderAudioTab(segments: any) {
+function renderAudioTab(segments: unknown[]): void {
   const el = document.querySelector('#pl-tab-audio .pl-main');
-  const audioSegments = getAudioSegmentsForRender(segments);
+  const audioSegments = getAudioSegmentsForRender(segments as NfSegment[]);
   if (!el) return;
   if (audioSegments.length === 0) {
     el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t50)">暂无音频数据</div>';
@@ -50,12 +51,13 @@ function renderAudioTab(segments: any) {
   audioSegments.forEach(function(seg, index) {
     const segmentNumber = Number(seg.segment) || (index + 1);
     if (!pipelineAudioState[segmentNumber] && typeof bridgeCall === 'function' && getCurrentEpisodeRef()) {
-      bridgeCall('audio.status', { episode: getCurrentEpisodeRef(), segment: segmentNumber }).then(function(data: any) {
+      bridgeCall<Record<string, unknown>>('audio.status', { episode: getCurrentEpisodeRef(), segment: segmentNumber }).then(function(result: NfBridgeResult<Record<string, unknown>>) {
+        const data = result.ok === true ? result.value : {} as Record<string, unknown>;
         pipelineAudioState[segmentNumber] = {
           exists: !!data.exists,
-          mp3: toNfdataUrl(data.mp3 || ''),
+          mp3: toNfdataUrl((data.mp3 || '') as string),
           timelineData: data.timelineData || null,
-          srt: toNfdataUrl(data.srt || ''),
+          srt: toNfdataUrl((data.srt || '') as string),
         };
         renderAudioTabInner(audioSegments);
       }).catch(function() {});
@@ -64,7 +66,7 @@ function renderAudioTab(segments: any) {
   renderAudioTabInner(audioSegments);
 }
 
-function renderAudioTabInner(segments: any) {
+function renderAudioTabInner(segments: NfSegment[]): void {
   const el = document.querySelector('#pl-tab-audio .pl-main');
   if (!el) return;
 
@@ -72,27 +74,27 @@ function renderAudioTabInner(segments: any) {
   const sidebar = document.querySelector('#pl-tab-audio .pl-sidebar');
   if (sidebar) {
     let generatedCount = 0;
-    segments.forEach(function(seg: any, index: any) {
+    segments.forEach(function(seg: NfSegment, index: number) {
       const sn = Number(seg.segment) || (index + 1);
-      if (pipelineAudioState[sn] && pipelineAudioState[sn].exists) generatedCount++;
+      if (pipelineAudioState[sn] && pipelineAudioState[sn]!.exists) generatedCount++;
     });
     const stageVoice = (pipelineAudioStage && pipelineAudioStage.voice) || '';
     const stageSpeed = pipelineAudioStage && typeof pipelineAudioStage.speed === 'number' ? pipelineAudioStage.speed : null;
     const stageEngine = (pipelineAudioStage && pipelineAudioStage.engine) || '';
     let sbHtml = '<div class="pl-sb-section"><div class="pl-sb-title">音频设置</div>' +
-      '<div class="pl-sb-info-row"><span class="pl-sb-label">引擎</span><span class="pl-sb-value">' + escapeHtml(stageEngine || '—') + '</span></div>' +
-      '<div class="pl-sb-info-row"><span class="pl-sb-label">语音</span><span class="pl-sb-value">' + escapeHtml(stageVoice || '—') + '</span></div>' +
+      '<div class="pl-sb-info-row"><span class="pl-sb-label">引擎</span><span class="pl-sb-value">' + escapeHtml(String(stageEngine || '—')) + '</span></div>' +
+      '<div class="pl-sb-info-row"><span class="pl-sb-label">语音</span><span class="pl-sb-value">' + escapeHtml(String(stageVoice || '—')) + '</span></div>' +
       '<div class="pl-sb-info-row"><span class="pl-sb-label">语速</span><span class="pl-sb-value">' + (stageSpeed !== null ? stageSpeed.toFixed(1) + 'x' : '—') + '</span></div>' +
       '<div class="pl-sb-stats" style="display:flex;gap:16px;margin-top:12px">' +
         '<div style="text-align:center"><div style="font-size:18px;font-weight:700;color:var(--green)">' + generatedCount + '</div><div style="font-size:11px;color:var(--t50)">已生成</div></div>' +
         '<div style="text-align:center"><div style="font-size:18px;font-weight:700;color:var(--t80)">' + segments.length + '</div><div style="font-size:11px;color:var(--t50)">总段数</div></div>' +
       '</div></div>';
     sbHtml += '<div class="pl-sb-section"><div class="pl-sb-title">段落导航</div>';
-    segments.forEach(function(seg: any, index: any) {
+    segments.forEach(function(seg: NfSegment, index: number) {
       const sn = Number(seg.segment) || (index + 1);
       const narr = getAudioSegmentNarration(seg, index) || '';
       const preview = narr.substring(0, 12) + (narr.length > 12 ? '...' : '');
-      const hasAudio = pipelineAudioState[sn] && pipelineAudioState[sn].exists;
+      const hasAudio = pipelineAudioState[sn] && pipelineAudioState[sn]!.exists;
       const dotColor = hasAudio ? 'var(--green)' : 'var(--t50)';
       sbHtml += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer" onclick="document.getElementById(\'audio-card-' + sn + '\')?.scrollIntoView({behavior:\'smooth\',block:\'start\'})">' +
         '<div style="width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--t80)">' + sn + '</div>' +
@@ -105,14 +107,14 @@ function renderAudioTabInner(segments: any) {
   }
 
   let html = '<div style="padding:16px;overflow-y:auto;height:100%">';
-  segments.forEach(function(seg: any, index: any) {
+  segments.forEach(function(seg: NfSegment, index: number) {
     const segmentNumber = Number(seg.segment) || (index + 1);
     const narration = getAudioSegmentNarration(seg, index) || '';
-    const state = pipelineAudioState[segmentNumber] || {};
+    const state: NfAudioStateEntry = pipelineAudioState?.[segmentNumber] || { exists: false };
     const hasAudio = state.exists && state.mp3;
-    const tl = state.timelineData;
-    const sentences = (tl && tl.segments) || [];
-    const duration = seg.duration || (sentences.length > 0 ? sentences[sentences.length - 1].end_ms / 1000 : 0);
+    const tl = state.timelineData as Record<string, unknown> | undefined;
+    const sentences = (tl && Array.isArray(tl.segments) ? tl.segments : []) as Record<string, unknown>[];
+    const duration = (seg as Record<string, unknown>).duration as number || (sentences.length > 0 ? Number(sentences[sentences.length - 1].end_ms) / 1000 : 0);
     const statusLabel = hasAudio ? '已生成' : '待生成';
     const statusColor = hasAudio ? 'var(--green)' : 'var(--t50)';
 
@@ -140,14 +142,14 @@ function renderAudioTabInner(segments: any) {
     // Sentence breakdown with karaoke
     if (hasAudio && sentences.length > 0) {
       html += '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--t50);margin-bottom:8px">逐句分解</div>';
-      sentences.forEach(function(sent: any) {
-        const startMs = sent.start_ms || 0;
-        const endMs = sent.end_ms || 0;
+      sentences.forEach(function(sent: Record<string, unknown>) {
+        const startMs = (sent.start_ms || 0) as number;
+        const endMs = (sent.end_ms || 0) as number;
         const dur = ((endMs - startMs) / 1000).toFixed(1);
-        const words = sent.words || [];
+        const words = (sent.words || []) as Record<string, unknown>[];
         const wordSpans = words.length > 0
-          ? words.map(function(w: any) { return '<span class="ch" data-start="' + (w.start_ms || 0) + '" data-end="' + (w.end_ms || 0) + '">' + escapeHtml(w.word || w.char || '') + '</span>'; }).join('')
-          : escapeHtml(sent.text || '');
+          ? words.map(function(w: Record<string, unknown>) { return '<span class="ch" data-start="' + ((w.start_ms || 0) as number) + '" data-end="' + ((w.end_ms || 0) as number) + '">' + escapeHtml(String(w.word || w.char || '')) + '</span>'; }).join('')
+          : escapeHtml(String(sent.text || ''));
         html += '<div class="sentence-row" data-seg="' + segmentNumber + '" style="display:grid;grid-template-columns:auto 1fr auto;align-items:start;padding:8px 10px;border-radius:6px;gap:10px;border-left:2px solid transparent">' +
           '<span style="font-family:var(--mono);font-size:12px;color:var(--t50);white-space:nowrap">' + formatTimecode(startMs) + '</span>' +
           '<div><span class="s-text" style="font-size:13px;color:var(--t80);line-height:1.5">' + wordSpans + '</span>' +
@@ -165,34 +167,31 @@ function renderAudioTabInner(segments: any) {
   el.innerHTML = html;
 }
 
-function generateTTS(segmentNumber: any) {
+function generateTTS(segmentNumber: number): void {
   if (typeof bridgeCall !== 'function' || !getCurrentEpisodeRef()) return;
-  pipelineAudioState[segmentNumber] = Object.assign({}, pipelineAudioState[segmentNumber], { generating: true, error: '' });
-  renderAudioTabInner(getAudioSegmentsForRender(pipelineAudioStage.segments));
-  bridgeCall('audio.synth', {
+  pipelineAudioState[segmentNumber] = Object.assign({}, pipelineAudioState[segmentNumber], { generating: true, error: '' }) as NfAudioStateEntry;
+  renderAudioTabInner(getAudioSegmentsForRender((pipelineAudioStage as Record<string, unknown>).segments as NfSegment[]));
+  bridgeCall<Record<string, unknown>>('audio.synth', {
     project: getCurrentProjectRef(),
     episode: getCurrentEpisodeRef(),
     segment: segmentNumber,
-  }).then(function(data: any) {
+  }).then(function(result: NfBridgeResult<Record<string, unknown>>) {
+    const data = result.ok === true ? result.value : {} as Record<string, unknown>;
     pipelineAudioState[segmentNumber] = {
       exists: true,
-      mp3: data.mp3 || '',
+      mp3: (data.mp3 || '') as string,
       timelineData: data.timelineData || null,
-      generating: false,
-      error: '',
     };
-    renderAudioTabInner(getAudioSegmentsForRender(pipelineAudioStage.segments));
-  }).catch(function(error: any) {
+    renderAudioTabInner(getAudioSegmentsForRender((pipelineAudioStage as Record<string, unknown>).segments as NfSegment[]));
+  }).catch(function(error: unknown) {
     pipelineAudioState[segmentNumber] = {
       exists: false,
-      generating: false,
-      error: String(error),
     };
-    renderAudioTabInner(getAudioSegmentsForRender(pipelineAudioStage.segments));
+    renderAudioTabInner(getAudioSegmentsForRender((pipelineAudioStage as Record<string, unknown>).segments as NfSegment[]));
   });
 }
 
-function toggleKaraokeAudio(segmentNumber: any) {
+function toggleKaraokeAudio(segmentNumber: number): void {
   if (activeKaraokeAudio && activeKaraokeSegment === segmentNumber && !activeKaraokeAudio.paused) {
     activeKaraokeAudio.pause();
     const btn = document.getElementById('play-btn-' + segmentNumber);
@@ -202,7 +201,7 @@ function toggleKaraokeAudio(segmentNumber: any) {
   playKaraokeAudio(segmentNumber);
 }
 
-function playKaraokeAudio(segmentNumber: any) {
+function playKaraokeAudio(segmentNumber: number): void {
   // Stop any playing audio
   if (activeKaraokeAudio) {
     activeKaraokeAudio.pause();
@@ -222,9 +221,9 @@ function playKaraokeAudio(segmentNumber: any) {
   activeKaraokeAudio = audio;
   activeKaraokeSegment = segmentNumber;
   const btn = document.getElementById('play-btn-' + segmentNumber);
-  const chars = card.querySelectorAll('.ch');
-  const progressFills = card.querySelectorAll('.s-progress-fill');
-  const sentenceRows = card.querySelectorAll('.sentence-row');
+  const chars = card.querySelectorAll<HTMLElement>('.ch');
+  const progressFills = card.querySelectorAll<HTMLElement>('.s-progress-fill');
+  const sentenceRows = card.querySelectorAll<HTMLElement>('.sentence-row');
 
   function tick() {
     const ms = audio.currentTime * 1000;
@@ -247,7 +246,7 @@ function playKaraokeAudio(segmentNumber: any) {
     sentenceRows.forEach(function(row, i) {
       const fill = progressFills[i];
       if (!fill) return;
-      const rowChars = row.querySelectorAll('.ch');
+      const rowChars = row.querySelectorAll<HTMLElement>('.ch');
       if (rowChars.length === 0) return;
       const rowStart = Number(rowChars[0].dataset.start) || 0;
       const rowEnd = Number(rowChars[rowChars.length - 1].dataset.end) || 1;
@@ -271,7 +270,7 @@ function playKaraokeAudio(segmentNumber: any) {
   };
 }
 
-function playSegmentAudio(mp3Path: any) {
+function playSegmentAudio(mp3Path: string): void {
   if (activeKaraokeAudio) { activeKaraokeAudio.pause(); activeKaraokeAudio = null; }
   const audio = new Audio(mp3Path);
   activeKaraokeAudio = audio;

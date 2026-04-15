@@ -1,20 +1,20 @@
 // Adds deterministic film grain noise to pixel buffers or canvas overlays.
-function clamp01(value: any, fallback: any) {
+function clamp01(value: number | undefined, fallback: number) {
   const normalized = value ?? fallback;
   return Math.max(0, Math.min(1, normalized));
 }
 
-export function getFilmGrainIntensity(params = {}) {
+export function getFilmGrainIntensity(params: { intensity?: number; amount?: number; _t?: number } = {}) {
   return clamp01(params.intensity ?? params.amount, 0.04);
 }
 
-function nextNoise(seed: any) {
+function nextNoise(seed: number) {
   return (seed * 1664525 + 1013904223) >>> 0;
 }
 
-function createNoiseCanvas(createCanvas: any, width: any, height: any, seedBase: any) {
-  const noiseCanvas = createCanvas(width, height);
-  const noiseCtx = noiseCanvas.getContext("2d");
+function createNoiseCanvas(createCanvas: (w: number, h: number) => unknown, width: number, height: number, seedBase: number) {
+  const noiseCanvas = createCanvas(width, height) as HTMLCanvasElement;
+  const noiseCtx = noiseCanvas.getContext("2d")!;
   const noiseData = noiseCtx.createImageData(width, height);
   let seed = seedBase >>> 0;
 
@@ -32,7 +32,7 @@ function createNoiseCanvas(createCanvas: any, width: any, height: any, seedBase:
 }
 
 // Deterministic film grain — seed varies per frame via t, no Math.random.
-export function filmGrain(data: any, w: any, h: any, params: any) {
+export function filmGrain(data: Uint8ClampedArray, w: number, h: number, params: { intensity?: number; amount?: number; _t?: number }) {
   const amount = getFilmGrainIntensity(params) * 255;
   const t = params._t || 0;
   let seed = 5381 + Math.floor(t * 1000);
@@ -45,7 +45,7 @@ export function filmGrain(data: any, w: any, h: any, params: any) {
   }
 }
 
-export function applyFilmGrainOverlay(ctx: any, w: any, h: any, params = {}, createCanvas: any) {
+export function applyFilmGrainOverlay(ctx: CanvasRenderingContext2D, w: number, h: number, params: { intensity?: number; amount?: number; _t?: number } = {}, createCanvas: (w: number, h: number) => unknown) {
   const intensity = getFilmGrainIntensity(params);
   if (intensity <= 0 || typeof createCanvas !== "function") return;
 

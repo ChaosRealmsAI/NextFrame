@@ -1,7 +1,7 @@
 import { clamp01, px } from "../shared.js";
 
 // Blurs content away while fading it out.
-export function blurOut(progress: any, opts = {}) {
+export function blurOut(progress: number, opts: { blur?: number } = {}) {
   const p = clamp01(progress);
   const maxBlur = opts.blur ?? 20;
   const blur = maxBlur * p;

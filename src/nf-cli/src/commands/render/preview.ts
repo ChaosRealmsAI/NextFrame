@@ -11,9 +11,10 @@ import { parseFlags, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineUsage } from "../_helpers/_resolve.js";
 import { buildHTML } from "../../../../nf-core/engine/build.js";
 
-function getPreviewViewport(timeline: any) {
-  const width = timeline?.project?.width || timeline?.width || 1920;
-  const height = timeline?.project?.height || timeline?.height || 1080;
+function getPreviewViewport(timeline: Record<string, unknown>) {
+  const proj = timeline.project as Record<string, unknown> | undefined;
+  const width = Number(proj?.width || timeline.width || 1920);
+  const height = Number(proj?.height || timeline.height || 1080);
   const isPortrait = height > width;
   const isSquare = Math.abs(width - height) < 50;
 
@@ -26,10 +27,10 @@ function getPreviewViewport(timeline: any) {
   return { width: 1440, height: 900 };
 }
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const resolved = resolveTimeline(positional, { usage: timelineUsage("preview", " [--times=0,5,10]") });
-  if (!resolved.ok) {
+  if (resolved.ok === false) {
     emit(resolved, flags);
     return resolved.error?.code === "USAGE" ? 3 : 2;
   }
@@ -38,15 +39,15 @@ export async function run(argv: any) {
   let timeline;
   try {
     timeline = JSON.parse(await readFile(jsonPath, "utf-8"));
-  } catch (e) {
-    emit({ ok: false, error: { code: "READ_FAIL", message: e.message } }, flags);
+  } catch (e: unknown) {
+    emit({ ok: false, error: { code: "READ_FAIL", message: (e as Error).message } }, flags);
     return 2;
   }
 
   // Determine which times to screenshot
-  let times: any = [];
+  let times: number[] = [];
   if (flags.time != null) {
-    times = [parseFloat(flags.time)];
+    times = [parseFloat(String(flags.time))];
   } else if (flags.times) {
     times = String(flags.times).split(",").map(Number).filter(Number.isFinite);
   } else if (flags.auto || (!flags.time && !flags.times)) {
@@ -60,7 +61,7 @@ export async function run(argv: any) {
   }
 
   // Build HTML to temp file
-  const outDir = flags.out ? resolve(flags.out) : resolve(tmpdir(), "nextframe-preview");
+  const outDir = flags.out ? resolve(String(flags.out)) : resolve(tmpdir(), "nextframe-preview");
   await mkdir(outDir, { recursive: true });
   const htmlPath = resolve(outDir, "preview.html");
   const buildResult = buildHTML(timeline, htmlPath);
@@ -87,8 +88,8 @@ export async function run(argv: any) {
   const page = await browser.newPage();
   await page.setViewport(getPreviewViewport(timeline));
 
-  const errors: any = [];
-  page.on("pageerror", (err: any) => errors.push(err.message));
+  const errors: string[] = [];
+  page.on("pageerror", (err: { message: string }) => errors.push((err as Error).message));
 
   await page.goto("file://" + htmlPath, { waitUntil: "domcontentloaded" });
   await new Promise((r) => setTimeout(r, 500));
@@ -98,24 +99,25 @@ export async function run(argv: any) {
   const issues = [];
 
   for (const t of times) {
-    await page.evaluate((time: any) => window.__onFrame({ time }), t);
+    await page.evaluate((time: number) => (window as Window & { __onFrame?: (t: number) => void }).__onFrame?.(time), t);
     await new Promise((r) => setTimeout(r, 300));
 
     const framePath = resolve(outDir, `frame-${t.toFixed(1)}s.png`);
     await page.screenshot({ path: framePath });
 
     // Analyze frame: layout + overlap detection
-    const analysis = await page.evaluate((time: any) => {
+    const analysis = await page.evaluate((time: number) => {
       const layers = document.querySelectorAll(".nf-layer");
-      const visible: any = [];
+      const visible: Record<string, unknown>[] = [];
       const stage = document.getElementById("stage");
       const sr = stage ? stage.getBoundingClientRect() : { left: 0, top: 0, width: 1920, height: 1080 };
 
       layers.forEach((el) => {
-        if (el.style.display === "none") return;
-        const id = el.dataset.layerId;
-        const opacity = parseFloat(el.style.opacity) || 1;
-        const rect = el.getBoundingClientRect();
+        const hel = el as HTMLElement;
+        if (hel.style.display === "none") return;
+        const id = hel.dataset["layerId"];
+        const opacity = parseFloat(hel.style.opacity) || 1;
+        const rect = hel.getBoundingClientRect();
         // Position relative to stage
         const x = Math.round(rect.left - sr.left);
         const y = Math.round(rect.top - sr.top);
@@ -123,9 +125,9 @@ export async function run(argv: any) {
         const h = Math.round(rect.height);
         const isFullscreen = w >= sr.width * 0.9 && h >= sr.height * 0.9;
         // Get blend mode and z-index
-        const cs = getComputedStyle(el);
+        const cs = getComputedStyle(hel);
         const blend = cs.mixBlendMode || "normal";
-        const zIndex = el.style.zIndex || "auto";
+        const zIndex = hel.style.zIndex || "auto";
         // Check if has actual content (not just empty container)
         const hasContent = el.querySelector("canvas, svg, div, img, video, h1, p, span") !== null;
         visible.push({ id, x, y, w, h, opacity: +opacity.toFixed(2), isFullscreen, blend, zIndex, hasContent });
@@ -136,10 +138,10 @@ export async function run(argv: any) {
 
     // Detect issues — exclude known background/overlay layers
     const fullscreenContent = analysis.visible.filter(
-      (v: any) => v.isFullscreen && v.opacity > 0.3 && !BG_IDS.test(v.id)
+      (v: Record<string, unknown>) => v.isFullscreen && Number(v.opacity) > 0.3 && !BG_IDS.test(String(v.id))
     );
     if (fullscreenContent.length > 1) {
-      issues.push({ time: t, type: "CONTENT_OVERLAP", message: `${fullscreenContent.length} fullscreen content layers visible at same time`, layers: fullscreenContent.map((v: any) => v.id) });
+      issues.push({ time: t, type: "CONTENT_OVERLAP", message: `${fullscreenContent.length} fullscreen content layers visible at same time`, layers: fullscreenContent.map((v: Record<string, unknown>) => v.id) });
     }
     if (analysis.visibleCount === 0) {
       issues.push({ time: t, type: "EMPTY_FRAME", message: "no visible layers — blank frame" });
@@ -190,28 +192,29 @@ export async function run(argv: any) {
   return issues.length > 0 ? 1 : 0;
 }
 
-function autoDetectFrames(timeline: any) {
-  const times = new Set();
-  const dur = timeline.duration || 10;
+function autoDetectFrames(timeline: Record<string, unknown>) {
+  const times = new Set<number>();
+  const dur = Number(timeline.duration || 10);
 
   // Always include start and near-end
   times.add(0.5);
   times.add(dur - 0.5);
 
   // Each layer's start + midpoint
-  for (const layer of timeline.layers || []) {
-    const s = layer.start || 0;
-    const d = layer.dur || 5;
+  const layers = Array.isArray(timeline.layers) ? timeline.layers : [];
+  for (const layer of layers as Record<string, unknown>[]) {
+    const s = Number(layer.start || 0);
+    const d = Number(layer.dur || 5);
     times.add(Math.round((s + 0.5) * 10) / 10); // just after start
     times.add(Math.round((s + d / 2) * 10) / 10); // midpoint
   }
 
   // Deduplicate and sort, limit to ~10 frames
-  const sorted = [...times].filter((t) => t >= 0 && t <= dur).sort((a, b) => a - b);
+  const sorted = [...times].filter((t) => t >= 0 && t <= Number(dur)).sort((a, b) => a - b);
 
   // If too many, sample evenly
   if (sorted.length > 12) {
-    const step = dur / 10;
+    const step = Number(dur) / 10;
     const sampled = [];
     for (let t = 0.5; t < dur; t += step) {
       sampled.push(Math.round(t * 10) / 10);

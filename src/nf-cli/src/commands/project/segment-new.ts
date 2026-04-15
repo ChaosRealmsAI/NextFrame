@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 
 import { parseFlags, emit } from "../_helpers/_io.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [projectName, episodeName, name] = positional;
   if (!projectName || !episodeName || !name) {
@@ -35,12 +35,12 @@ export async function run(argv: any) {
     await writeFile(path, JSON.stringify(timeline, null, 2) + "\n", { flag: "wx" });
     project.updated = stamp;
     await writeFile(projectFile, JSON.stringify(project, null, 2) + "\n");
-  } catch (err) {
-    if (err.code === "EEXIST") {
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
       emit({ ok: false, error: { code: "SEGMENT_EXISTS", message: `segment already exists: ${path}` } }, flags);
       return 2;
     }
-    emit({ ok: false, error: { code: "CREATE_FAIL", message: err.message } }, flags);
+    emit({ ok: false, error: { code: "CREATE_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -53,7 +53,7 @@ export async function run(argv: any) {
   return 0;
 }
 
-function makeEmptyTimeline(flags: any) {
+function makeEmptyTimeline(flags: Record<string, string | boolean>) {
   return {
     version: "0.3",
     schema: "nextframe/v0.3",
@@ -66,15 +66,15 @@ function makeEmptyTimeline(flags: any) {
   };
 }
 
-function finiteOr(raw: any, fallback: any) {
+function finiteOr(raw: unknown, fallback: number) {
   const value = Number(raw);
   return Number.isFinite(value) ? value : fallback;
 }
 
-async function loadJson(path: any) {
+async function loadJson(path: string) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
-function resolveRoot(flags: any) {
-  return resolve(flags.root || join(homedir(), "NextFrame", "projects"));
+function resolveRoot(flags: Record<string, string | boolean>) {
+  return resolve(typeof flags.root === "string" ? flags.root : join(homedir(), "NextFrame", "projects"));
 }

@@ -1,10 +1,10 @@
 // Applies a grayscale filter and exposes its matching CSS filter string.
-function clamp01(value: any, fallback: any) {
+function clamp01(value: number | undefined, fallback: number) {
   const normalized = value ?? fallback;
   return Math.max(0, Math.min(1, normalized));
 }
 
-export function grayscale(data: any, w: any, h: any, params: any) {
+export function grayscale(data: Uint8ClampedArray, w: number, h: number, params: { amount?: number }) {
   const amount = clamp01(params.amount, 1);
   for (let i = 0; i < data.length; i += 4) {
     const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
@@ -14,6 +14,6 @@ export function grayscale(data: any, w: any, h: any, params: any) {
   }
 }
 
-export function getGrayscaleCssFilter(params = {}) {
+export function getGrayscaleCssFilter(params: { amount?: number } = {}) {
   return `grayscale(${clamp01(params.amount, 1)})`;
 }

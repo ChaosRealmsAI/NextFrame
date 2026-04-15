@@ -6,12 +6,12 @@ import { defaultFixSuggestion, renderCommandHelp } from "../_helpers/help/index.
 const HOST = "127.0.0.1";
 const PORT = 19820;
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [sub] = positional;
 
   if (!sub || sub === "help" || sub === "--help" || sub === "-h") {
-    process.stdout.write(renderCommandHelp("app-pipeline"));
+    process.stdout.write(renderCommandHelp("app-pipeline") ?? "");
     return 0;
   }
   if (argv[1] === "--help" || argv[1] === "-h") {
@@ -93,29 +93,29 @@ export async function run(argv: any) {
         process.stderr.write('Fix: run "nextframe app-pipeline --help" to see supported app-pipeline subcommands\n');
         return 3;
     }
-  } catch (error) {
-    process.stderr.write(`error: ${error.message}\n`);
+  } catch (error: unknown) {
+    process.stderr.write(`error: ${(error as Error).message}\n`);
     process.stderr.write(`Fix: ${defaultFixSuggestion()}\n`);
     return 2;
   }
 }
 
-async function httpPost(path: any, body: any) {
+async function httpPost(path: string, body: string | Record<string, unknown>) {
   return request(path, {
     method: "POST",
     body,
   });
 }
 
-async function httpGet(path: any) {
+async function httpGet(path: string) {
   return request(path, { method: "GET" });
 }
 
-function request(path: any, options: any) {
+function request(path: string, options: { method: string; body?: string | Record<string, unknown> }) {
   const rawBody = options.body;
   const body =
     typeof rawBody === "string" ? rawBody : rawBody === undefined ? "" : JSON.stringify(rawBody);
-  const headers = {};
+  const headers: Record<string, string | number> = {};
   if (body) {
     headers["Content-Type"] =
       typeof rawBody === "string" ? "text/plain; charset=utf-8" : "application/json; charset=utf-8";
@@ -148,7 +148,7 @@ function request(path: any, options: any) {
     );
 
     req.on("error", (error) => {
-      if (error.code === "ECONNREFUSED") {
+      if ((error as NodeJS.ErrnoException).code === "ECONNREFUSED") {
         reject(new Error("desktop app not running on port 19820"));
         return;
       }
@@ -162,7 +162,7 @@ function request(path: any, options: any) {
   });
 }
 
-function parseMaybeJson(value: any) {
+function parseMaybeJson(value: string) {
   try {
     return JSON.parse(value);
   } catch (_error) {

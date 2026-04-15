@@ -4,6 +4,7 @@
   "description": "NextFrame engine core — timeline, animation, scenes, filters",
   "type": "module",
   "exports": {
+    "./types.js": "./types.js",
     "./engine/*": "./engine/*",
     "./animation/*": "./animation/*",
     "./filters/*": "./filters/*",

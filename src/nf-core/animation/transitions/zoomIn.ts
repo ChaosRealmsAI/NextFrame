@@ -1,7 +1,7 @@
 import { clamp01, joinTransforms, round } from "../shared.js";
 
 // A punches forward and fades while B settles in behind it.
-export function zoomIn(progress: any) {
+export function zoomIn(progress: number) {
   const p = clamp01(progress);
   return {
     layerA: {

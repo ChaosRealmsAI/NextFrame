@@ -15,7 +15,7 @@ import { buildRuntime, SCRUBBER_MAX_VALUE } from "./build-runtime.js";
 /**
  * Escape a string for safe embedding inside an inline <script> tag.
  */
-function escapeInlineScript(value: any) {
+function escapeInlineScript(value: string) {
   return String(value)
     .replace(/<\/script/gi, "<\\/script")
     .replace(/<!--/g, "<\\!--")
@@ -26,18 +26,26 @@ function escapeInlineScript(value: any) {
 /**
  * Assemble the full HTML document from timeline data and collected scene modules.
  */
-function buildDocument(timeline: any, sceneModules: any) {
+interface SceneModule {
+  id: string;
+  varName: string;
+  filePath: string;
+  code: string;
+  label?: string;
+}
+
+function buildDocument(timeline: NfTimeline, sceneModules: SceneModule[]) {
   const sharedPreamble = buildSharedPreamble();
   const sceneBundles = sceneModules.map(buildSceneBundle).join("\n\n");
   const sceneMap = sceneModules
-    .map((scene: any) => `${JSON.stringify(scene.id)}: ${scene.varName}`)
+    .map((scene: SceneModule) => `${JSON.stringify(scene.id)}: ${scene.varName}`)
     .join(",\n");
   const background = String(timeline.background || "#05050c");
   const width = Number(timeline.width || 1920);
   const height = Number(timeline.height || 1080);
   const inlineSrt = extractTimelineSrt(timeline);
   const dur = Number(timeline.duration || 0);
-  const audioSrc = timeline.audio && typeof timeline.audio === "object" ? String(timeline.audio.src || "") : typeof timeline.audio === "string" ? timeline.audio : "";
+  const audioSrc = timeline.audio && typeof timeline.audio === "object" ? String((timeline.audio as Record<string, unknown>).src || "") : typeof timeline.audio === "string" ? timeline.audio : "";
   const audioField = audioSrc ? `audio: ${JSON.stringify(audioSrc)},` : "";
   const animBundle = buildAnimationBundle();
   const scriptBody = escapeInlineScript(`window.__SLIDE_SEGMENTS = { ${audioField} gap: 0, segments: [{ phaseId: "main", duration: ${dur}, srt: [{ s: 0, e: ${dur}, t: "" }] }] };
@@ -103,8 +111,8 @@ ${scriptBody}
  * Coerce layer params to match scene meta schema types.
  * Prevents runtime type errors from AI-generated timelines.
  */
-function coerceLayerParams(timeline: any, sceneModules: any) {
-  const metaByScene = new Map(sceneModules.map((m: any) => [m.id, m]));
+function coerceLayerParams(timeline: NfTimeline, sceneModules: SceneModule[]) {
+  const metaByScene = new Map(sceneModules.map((m: SceneModule) => [m.id, m]));
   for (const layer of timeline.layers || []) {
     if (!layer.params || !layer.scene) continue;
     // Coerce via scene code eval is too risky — just normalize known problem patterns:
@@ -116,14 +124,14 @@ function coerceLayerParams(timeline: any, sceneModules: any) {
     }
   }
   // Normalize audio: ensure string src is available for the runtime
-  if (timeline.audio && typeof timeline.audio === "object" && timeline.audio.src) {
-    timeline._audioSrc = String(timeline.audio.src);
+  if (timeline.audio && typeof timeline.audio === "object" && (timeline.audio as Record<string, unknown>).src) {
+    timeline._audioSrc = String((timeline.audio as Record<string, unknown>).src);
   } else if (typeof timeline.audio === "string") {
     timeline._audioSrc = timeline.audio;
   }
 }
 
-export function buildHTML(timeline: any, outputPath: any) {
+export function buildHTML(timeline: NfTimeline, outputPath: string) {
   try {
     const sceneModules = collectSceneModules(timeline || {});
     coerceLayerParams(timeline || {}, sceneModules);
@@ -146,7 +154,7 @@ export function buildHTML(timeline: any, outputPath: any) {
       ok: false,
       error: {
         code: "BUILD_FAIL",
-        message: `Internal: ${err.message}`,
+        message: `Internal: ${(err as Error).message}`,
         fix: "check timeline scene ids, ratio, and output path",
       },
     };

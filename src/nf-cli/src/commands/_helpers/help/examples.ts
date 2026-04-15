@@ -1,6 +1,6 @@
 // Provides example invocations for CLI help output.
-const lines = (text: any) => text.trim().split("\n").map((line: any) => line.trim()).filter(Boolean);
-const examples = (name: any, text: any) => [name, lines(text)];
+const lines = (text: string) => text.trim().split("\n").map((line: string) => line.trim()).filter(Boolean);
+const examples = (name: string, text: string) => [name, lines(text)];
 
 export const COMMAND_EXAMPLES = Object.fromEntries([
   examples("new", `

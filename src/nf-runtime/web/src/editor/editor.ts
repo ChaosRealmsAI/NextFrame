@@ -2,30 +2,38 @@
 // Two preview modes: 'dom' (scene-bundle real-time) or 'html' (load built HTML).
 const ED_DEMO_TIMELINE_PATH = 'data/demo-timeline.json';
 
-let edTimelineData: any = null;
-let edActiveClip: any = null;
-const editorClock = (seconds: any) => window.formatClock(seconds, true);
+interface EditorTimeline {
+  width: number;
+  height: number;
+  fps: number;
+  duration: number;
+  layers: NfLayer[];
+}
 
-function getEditorLayerDuration(layer: any) {
+let edTimelineData: EditorTimeline | null = null;
+let edActiveClip: number | null = null;
+const editorClock = (seconds: number) => window.formatClock(seconds, true);
+
+function getEditorLayerDuration(layer: NfLayer): number {
   const dur = Number(layer && layer.dur);
   if (Number.isFinite(dur) && dur > 0) return dur;
   const legacyDuration = Number(layer && layer.duration);
   return Number.isFinite(legacyDuration) && legacyDuration > 0 ? legacyDuration : 0;
 }
 
-function normalizeEditorTimeline(timeline: any) {
-  const source = timeline && typeof timeline === 'object' ? timeline : {};
-  const rawLayers = Array.isArray(source.layers) ? source.layers : (Array.isArray(source.clips) ? source.clips : []);
-  const layers = rawLayers.map(function(layer: any) {
+function normalizeEditorTimeline(timeline: NfTimeline): EditorTimeline {
+  const source = timeline && typeof timeline === 'object' ? timeline : {} as NfTimeline;
+  const rawLayers = Array.isArray(source.layers) ? source.layers : (Array.isArray((source as Record<string, unknown>).clips) ? (source as Record<string, unknown>).clips as NfLayer[] : []);
+  const layers = rawLayers.map(function(layer: NfLayer) {
     return Object.assign({}, layer, {
       start: Number.isFinite(layer && layer.start) ? layer.start : 0,
       dur: getEditorLayerDuration(layer),
     });
   });
-  const duration = Number.isFinite(source.duration) && source.duration > 0
-    ? source.duration
-    : layers.reduce(function(maxEnd: any, layer: any) {
-      return Math.max(maxEnd, layer.start + layer.dur);
+  const duration = Number.isFinite(source.duration) && (source.duration as number) > 0
+    ? source.duration as number
+    : layers.reduce(function(maxEnd: number, layer: NfLayer) {
+      return Math.max(maxEnd, layer.start + (layer.dur || 0));
     }, 0);
 
   return {
@@ -37,37 +45,37 @@ function normalizeEditorTimeline(timeline: any) {
   };
 }
 
-function getEditorTimelineDuration() {
+function getEditorTimelineDuration(): number {
   if (!edTimelineData || !Array.isArray(edTimelineData.layers)) return 0;
-  return edTimelineData.duration || edTimelineData.layers.reduce(function(maxEnd: any, layer: any) {
+  return edTimelineData.duration || edTimelineData.layers.reduce(function(maxEnd: number, layer: NfLayer) {
     return Math.max(maxEnd, layer.start + getEditorLayerDuration(layer));
   }, 0);
 }
 
-function updateEditorPreviewState(currentTime: any, totalDuration: any) {
+function updateEditorPreviewState(currentTime: number, totalDuration: number): void {
   const time = Number.isFinite(currentTime) ? currentTime : 0;
   const duration = Number.isFinite(totalDuration) ? totalDuration : getEditorTimelineDuration();
   const previewTc = document.querySelector('.ed-preview-tc');
   if (previewTc) previewTc.textContent = editorClock(time) + ' / ' + editorClock(duration);
   const transportTc = document.querySelector('.ed-transport-tc');
   if (transportTc) transportTc.textContent = editorClock(time);
-  const fill = document.querySelector('.ed-transport-fill');
+  const fill = document.querySelector<HTMLElement>('.ed-transport-fill');
   if (fill) {
     const pct = duration > 0 ? Math.max(0, Math.min(100, time / duration * 100)) : 0;
     fill.style.width = pct.toFixed(1) + '%';
   }
 }
 
-function toggleEditorPreviewPlaceholder(isVisible: any) {
-  document.querySelectorAll('.ed-preview-gradient, .ed-play-btn').forEach(function(el) {
+function toggleEditorPreviewPlaceholder(isVisible: boolean): void {
+  document.querySelectorAll<HTMLElement>('.ed-preview-gradient, .ed-play-btn').forEach(function(el) {
     el.style.display = isVisible ? '' : 'none';
   });
 }
 
-function ensureEditorPreviewStage() {
+function ensureEditorPreviewStage(): HTMLElement | null {
   const canvas = document.querySelector('.ed-preview-canvas');
   if (!canvas) return null;
-  let stage = canvas.querySelector('#preview-stage');
+  let stage = canvas.querySelector<HTMLElement>('#preview-stage');
   if (!stage) {
     stage = document.createElement('div');
     stage.id = 'preview-stage';
@@ -78,20 +86,20 @@ function ensureEditorPreviewStage() {
   return stage;
 }
 
-function clearEditorPreviewContent() {
+function clearEditorPreviewContent(): void {
   const stage = ensureEditorPreviewStage();
   if (stage) stage.innerHTML = '';
   window.edPreviewMode = 'none';
   toggleEditorPreviewPlaceholder(true);
 }
 
-function canUseDomPreview() {
+function canUseDomPreview(): boolean {
   const engine = window.previewEngine;
   return !!(engine && typeof engine.setStage === 'function' &&
     typeof engine.loadTimeline === 'function' && typeof engine.compose === 'function');
 }
 
-function resetEditorSceneBundle() {
+function resetEditorSceneBundle(): void {
   window.__scenes = {};
   if (edSceneBundleScript && edSceneBundleScript.parentNode) {
     edSceneBundleScript.parentNode.removeChild(edSceneBundleScript);
@@ -100,8 +108,8 @@ function resetEditorSceneBundle() {
   edSceneBundleUrl = '';
 }
 
-function loadEditorSceneBundleScript(url: any) {
-  return new Promise(function(resolve, reject) {
+function loadEditorSceneBundleScript(url: string): Promise<void> {
+  return new Promise<void>(function(resolve, reject) {
     const script = document.createElement('script');
     script.src = url;
     script.async = false;
@@ -121,9 +129,10 @@ function loadEditorSceneBundleScript(url: any) {
   });
 }
 
-async function ensureEditorSceneBundle(timeline: any) {
-  const bundle = await bridgeCall('preview.bundle', { timeline: timeline });
-  const url = bundle && bundle.url ? bundle.url : '';
+async function ensureEditorSceneBundle(timeline: Record<string, unknown>) {
+  const bundle = await bridgeCall<{ url?: string }>('preview.bundle', { timeline: timeline });
+  const bundleValue = bundle.ok === true ? bundle.value : null;
+  const url = bundleValue && bundleValue.url ? bundleValue.url : '';
   if (!url) throw new Error('Missing preview bundle URL');
   if (edSceneBundleUrl === url && window.__scenes && Object.keys(window.__scenes).length) {
     return bundle;
@@ -133,7 +142,7 @@ async function ensureEditorSceneBundle(timeline: any) {
   return bundle;
 }
 
-function syncEditorTransportState(currentTime: any, isPlaying: any) {
+function syncEditorTransportState(currentTime: number, isPlaying: boolean): void {
   const state = {
     currentTime: Number.isFinite(currentTime) ? currentTime : 0,
     duration: getEditorTimelineDuration(),
@@ -146,36 +155,37 @@ function syncEditorTransportState(currentTime: any, isPlaying: any) {
   updateEditorPreviewState(state.currentTime, state.duration);
 }
 
-function resolveEditorSelectionIndex(selection: any) {
+function resolveEditorSelectionIndex(selection: unknown): number | null {
   if (typeof selection === 'number') return selection;
   if (!selection || !edTimelineData || !Array.isArray(edTimelineData.layers)) return null;
-  const candidate = typeof selection.index === 'number' ? selection.index : null;
+  const selObj = selection as Record<string, unknown>;
+  const candidate = typeof selObj.index === 'number' ? selObj.index : null;
   if (candidate !== null) return candidate;
   const clipId = typeof selection === 'string'
     ? selection
-    : (selection.id || selection.layerId || selection.sceneId || selection.scene || '');
+    : (selObj.id || selObj.layerId || selObj.sceneId || selObj.scene || '') as string;
   if (!clipId) return null;
-  const index = edTimelineData.layers.findIndex(function(layer: any) {
-    return [layer.id, layer.layerId, layer.sceneId, layer.scene, layer.name].includes(clipId);
+  const index = edTimelineData.layers.findIndex(function(layer: NfLayer) {
+    return [layer.id, (layer as Record<string, unknown>).layerId, (layer as Record<string, unknown>).sceneId, layer.scene, (layer as Record<string, unknown>).name].includes(clipId);
   });
   return index >= 0 ? index : null;
 }
 
-function syncEditorSelectionUI(index: any) {
-  document.querySelectorAll('.ed-tl-clip[data-index]').forEach(function(el) {
+function syncEditorSelectionUI(index: number | null): void {
+  document.querySelectorAll<HTMLElement>('.ed-tl-clip[data-index]').forEach(function(el) {
     el.classList.toggle('active', Number(el.dataset.index) === index);
   });
 }
 
-function bindEditorPreviewSelection() {
+function bindEditorPreviewSelection(): void {
   if (!window.previewEngine) return;
-  window.previewEngine.onSelect = function(selection: any) {
+  window.previewEngine.onSelect = function(selection: { index: number }) {
     const index = resolveEditorSelectionIndex(selection);
     if (index !== null) edSelectClip(index);
   };
 }
 
-function showEditorEmpty(message: any) {
+function showEditorEmpty(message?: string): void {
   edTimelineData = null;
   edActiveClip = null;
   const rulerEl = document.getElementById('ed-tl-ruler2');
@@ -189,7 +199,7 @@ function showEditorEmpty(message: any) {
   syncEditorSelectionUI(null);
 }
 
-function renderEditorTracks() {
+function renderEditorTracks(): void {
   const rulerEl = document.getElementById('ed-tl-ruler2');
   const bodyEl = document.getElementById('ed-tl-body2');
   const duration = getEditorTimelineDuration();
@@ -213,13 +223,13 @@ function renderEditorTracks() {
     rulerEl.innerHTML = rulerHtml;
   }
 
-  bodyEl.innerHTML = layers.map(function(layer: any, index: any) {
-    const name = layer.scene || layer.name || ('Layer ' + (index + 1));
+  bodyEl.innerHTML = layers.map(function(layer: NfLayer, index: number) {
+    const name = (layer.scene || (layer as Record<string, unknown>).name || ('Layer ' + (index + 1))) as string;
     const left = duration > 0 ? (layer.start / duration * 100) : 0;
-    const width = duration > 0 ? (layer.dur / duration * 100) : 0;
+    const width = duration > 0 ? ((layer.dur || 0) / duration * 100) : 0;
     return '<div class="ed-tl-track">' +
       '<span class="ed-tl-track-label">' + escapeHtml(name) + '</span>' +
-      '<div class="ed-tl-clip" data-index="' + index + '" data-start="' + layer.start + '" data-dur="' + layer.dur + '"' +
+      '<div class="ed-tl-clip" data-index="' + index + '" data-start="' + layer.start + '" data-dur="' + (layer.dur || 0) + '"' +
       ' style="left:' + left.toFixed(1) + '%;width:' + width.toFixed(1) + '%" onclick="handleTimelineTrackClick(event)">' +
       escapeHtml(name) +
       '</div>' +
@@ -228,7 +238,7 @@ function renderEditorTracks() {
   syncEditorSelectionUI(edActiveClip);
 }
 
-function renderEditorFromTimeline(timeline: any) {
+function renderEditorFromTimeline(timeline: NfTimeline): EditorTimeline {
   edTimelineData = normalizeEditorTimeline(timeline);
   edActiveClip = null;
   renderEditorTracks();
@@ -236,7 +246,7 @@ function renderEditorFromTimeline(timeline: any) {
   return edTimelineData;
 }
 
-function selectTimelineClip(index: any) {
+function selectTimelineClip(index: number): void {
   if (!edTimelineData || !Array.isArray(edTimelineData.layers) || !edTimelineData.layers[index]) return;
   edActiveClip = index;
   syncEditorSelectionUI(index);
@@ -245,18 +255,19 @@ function selectTimelineClip(index: any) {
   }
 }
 
-function previewFrame(time: any) {
+function previewFrame(time: number) {
   if (!canUseDomPreview()) return Promise.resolve(null);
   const safeTime = Math.max(0, Math.min(Number.isFinite(time) ? time : 0, getEditorTimelineDuration()));
   toggleEditorPreviewPlaceholder(false);
-  const engine = window.previewEngine;
+  const engine = window.previewEngine!;
   const result = typeof engine.seek === 'function' ? engine.seek(safeTime) : engine.compose(safeTime);
   syncEditorTransportState(safeTime, false);
   return Promise.resolve(result);
 }
 
-function handleTimelineTrackClick(event: any) {
-  const clipEl = event.target && event.target.closest ? event.target.closest('.ed-tl-clip[data-index]') : null;
+function handleTimelineTrackClick(event: MouseEvent): void {
+  const target = event.target as HTMLElement;
+  const clipEl = target && target.closest ? target.closest('.ed-tl-clip[data-index]') as HTMLElement | null : null;
   if (!clipEl || !edTimelineData) return;
   const index = Number(clipEl.dataset.index);
   const layer = edTimelineData.layers[index];
@@ -264,10 +275,10 @@ function handleTimelineTrackClick(event: any) {
   edSelectClip(index);
   const rect = clipEl.getBoundingClientRect();
   const pct = rect.width > 0 ? Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) : 0;
-  previewFrame(layer.start + layer.dur * pct);
+  previewFrame(layer.start + (layer.dur || 0) * pct);
 }
 
-function updatePreviewScale() {
+function updatePreviewScale(): void {
   const canvas = document.querySelector('.ed-preview-canvas');
   const stage = document.getElementById('preview-stage');
   if (!canvas || !stage || !edTimelineData) return;
@@ -297,18 +308,18 @@ async function composePreview() {
   if (!stage) return null;
   stage.innerHTML = '';
   updatePreviewScale();
-  window.previewEngine.setStage(stage);
+  window.previewEngine!.setStage(stage as HTMLElement);
   window.edPreviewMode = 'dom';
-  window.previewEngine.loadTimeline(edTimelineData);
+  window.previewEngine!.loadTimeline(edTimelineData as unknown as NfTimeline);
   bindEditorPreviewSelection();
   if (typeof window.bindPreviewStateSource === 'function') window.bindPreviewStateSource();
   toggleEditorPreviewPlaceholder(false);
-  const result = window.previewEngine.compose(0);
-  const engineState = typeof window.previewEngine.getState === 'function'
-    ? window.previewEngine.getState()
+  const result = window.previewEngine!.compose(0);
+  const engineState = typeof window.previewEngine!.getState === 'function'
+    ? window.previewEngine!.getState()
     : { currentTime: 0, duration: getEditorTimelineDuration(), isPlaying: false };
   if (typeof window.syncPreviewTransportState === 'function') {
-    window.syncPreviewTransportState(engineState);
+    window.syncPreviewTransportState(engineState as unknown as Record<string, unknown>);
   } else {
     updateEditorPreviewState(engineState.currentTime, engineState.duration);
   }
@@ -347,13 +358,13 @@ function renderEditorInspector() {
   return null;
 }
 
-function edSelectClip(idOrIndex: any) {
+function edSelectClip(idOrIndex: number | string): void {
   const index = typeof idOrIndex === 'number' ? idOrIndex : resolveEditorSelectionIndex(idOrIndex);
   if (index === null) return;
   selectTimelineClip(index);
 }
 
-function edTimelineSeekFromX(clientX: any) {
+function edTimelineSeekFromX(clientX: number): void {
   const tlEl = document.querySelector('.ed-timeline');
   if (!tlEl) return;
   const rect = tlEl.getBoundingClientRect();
@@ -373,7 +384,7 @@ function edTimelineSeekFromX(clientX: any) {
   const hitArea = playhead ? playhead.querySelector('.ed-tl-playhead-hit') : null;
   if (hitArea) {
     let dragging = false;
-    hitArea.addEventListener('pointerdown', function(e) { e.preventDefault(); dragging = true; hitArea.setPointerCapture(e.pointerId); });
+    hitArea.addEventListener('pointerdown', function(e) { e.preventDefault(); dragging = true; (hitArea as HTMLElement).setPointerCapture((e as PointerEvent).pointerId); });
     document.addEventListener('pointermove', function(e) { if (dragging) edTimelineSeekFromX(e.clientX); });
     document.addEventListener('pointerup', function() { dragging = false; });
   }

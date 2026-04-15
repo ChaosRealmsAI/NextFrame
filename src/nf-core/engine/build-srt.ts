@@ -4,7 +4,7 @@
  * Normalize a single SRT cue entry, applying an optional time offset.
  * Returns null if the entry is invalid.
  */
-export function normalizeSrtEntry(entry: any, offset = 0) {
+export function normalizeSrtEntry(entry: Record<string, unknown> | null, offset = 0) {
   if (!entry || typeof entry !== "object") return null;
   const start = Number(entry.s ?? entry.start ?? 0) + offset;
   const end = Number(entry.e ?? entry.end ?? start) + offset;
@@ -17,7 +17,7 @@ export function normalizeSrtEntry(entry: any, offset = 0) {
  * Walk timeline layers and audio metadata to collect all SRT cues.
  * Layer-level `params.srt` takes priority; falls back to audio sentences/segments.
  */
-export function extractTimelineSrt(timeline: any) {
+export function extractTimelineSrt(timeline: NfTimeline) {
   const layers = Array.isArray(timeline?.layers) ? timeline.layers : [];
   const cues = [];
   for (const layer of layers) {
@@ -25,7 +25,7 @@ export function extractTimelineSrt(timeline: any) {
     // Check flat SRT array (params.srt)
     const srt = Array.isArray(layer?.params?.srt) ? layer.params.srt : null;
     if (srt && srt.length > 0) {
-      cues.push(...srt.map((entry: any) => normalizeSrtEntry(entry, offset)).filter(Boolean));
+      cues.push(...srt.map((entry: Record<string, unknown>) => normalizeSrtEntry(entry, offset)).filter((c): c is { s: number; e: number; t: string } => c !== null));
       continue;
     }
     // Check two-level segments (params.segments from fine.json)
@@ -55,22 +55,24 @@ export function extractTimelineSrt(timeline: any) {
       }
     }
   }
-  if (cues.length > 0) return cues.sort((left, right) => left.s - right.s || left.e - right.e);
+  const nonNull = cues.filter((c): c is { s: number; e: number; t: string } => c !== null);
+  if (nonNull.length > 0) return nonNull.sort((left, right) => left.s - right.s || left.e - right.e);
 
-  const audio = timeline?.audio;
+  const audio = timeline?.audio as Record<string, unknown> | string | undefined;
   if (!audio || typeof audio === "string") return [];
-  const sentences = Array.isArray(audio.sentences)
-    ? audio.sentences
-    : Array.isArray(audio.segments)
-      ? audio.segments.flatMap((segment: any) => segment?.sentences || [])
+  const audioObj = audio as Record<string, unknown>;
+  const sentences = Array.isArray(audioObj.sentences)
+    ? audioObj.sentences as Record<string, unknown>[]
+    : Array.isArray(audioObj.segments)
+      ? (audioObj.segments as Record<string, unknown>[]).flatMap((segment: Record<string, unknown>) => (segment?.sentences as Record<string, unknown>[]) || [])
       : [];
-  return sentences.map((entry: any) => normalizeSrtEntry(entry)).filter(Boolean);
+  return sentences.map((entry: Record<string, unknown>) => normalizeSrtEntry(entry)).filter((c): c is { s: number; e: number; t: string } => c !== null);
 }
 
 /**
  * Serialize an array of SRT cues into a JS literal string (for inline script).
  */
-export function serializeSrtLiteral(entries: any) {
+export function serializeSrtLiteral(entries: { s: number; e: number; t: string }[]) {
   if (!Array.isArray(entries) || entries.length === 0) return "[]";
   return `[
 ${entries.map((entry) => `  { s: ${JSON.stringify(entry.s)}, e: ${JSON.stringify(entry.e)}, t: ${JSON.stringify(entry.t)} }`).join(",\n")}

@@ -6,7 +6,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { createRequire } from "node:module";
 
-const RATIO_DIRS = { "16:9": "16x9", "9:16": "9x16", "4:3": "4x3" };
+const RATIO_DIRS: Record<string, string> = { "16:9": "16x9", "9:16": "9x16", "4:3": "4x3" };
 const CATEGORIES = ["backgrounds", "typography", "data", "shapes", "overlays", "media", "browser"];
 
 const HELP = `nextframe scene-validate <name> [--ratio=16:9] [--json]
@@ -31,7 +31,7 @@ Example:
   nextframe scene-validate flowDiagram --ratio=16:9 --json
 `;
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   if (flags.help || positional.length === 0) {
     process.stdout.write(HELP);
@@ -39,7 +39,7 @@ export async function run(argv: any) {
   }
 
   const name = positional[0];
-  const ratio = flags.ratio || "16:9";
+  const ratio = String(flags.ratio || "16:9");
   const ratioDir = RATIO_DIRS[ratio];
   if (!ratioDir) {
     process.stderr.write(`error: unknown ratio "${ratio}"\n`);
@@ -101,20 +101,20 @@ export async function run(argv: any) {
           if (result.ok) { process.stdout.write(`✓ All ${result.checks?.length || 0} checks passed\n`); }
           else {
             for (const e of result.errors || []) { process.stdout.write(`  ✗ ${e}\n`); }
-            process.stdout.write(`\n${result.checks?.filter((c: any) => c.ok).length || 0}/${result.checks?.length || 0} passed — FIX REQUIRED\n`);
+            process.stdout.write(`\n${result.checks?.filter((c: Record<string, unknown>) => c.ok).length || 0}/${result.checks?.length || 0} passed — FIX REQUIRED\n`);
           }
         }
         return result.ok ? 0 : 1;
       } catch { process.stdout.write(out); return 0; }
-    } catch (e) {
+    } catch (e: unknown) {
       process.stdout.write(`Scene: ${name} (${ratio})\nDir: ${sceneDir}\n\n`);
-      const out = e.stdout || e.stderr || "";
+      const out = (e as { stdout?: string; stderr?: string }).stdout || (e as { stdout?: string; stderr?: string }).stderr || "";
       try {
         const result = JSON.parse(out);
         if (flags.json) { process.stdout.write(JSON.stringify(result, null, 2) + "\n"); }
         else {
           for (const e2 of result.errors || []) { process.stdout.write(`  ✗ ${e2}\n`); }
-          process.stdout.write(`\n${result.checks?.filter((c: any) => c.ok).length || 0}/${result.checks?.length || 0} passed — FIX REQUIRED\n`);
+          process.stdout.write(`\n${result.checks?.filter((c: Record<string, unknown>) => c.ok).length || 0}/${result.checks?.length || 0} passed — FIX REQUIRED\n`);
         }
         return 1;
       } catch { process.stdout.write(out + "\n"); return 1; }
@@ -122,11 +122,11 @@ export async function run(argv: any) {
   }
 
   // Fallback: manual validation (validate-scene.js not found)
-  const checks: any = [];
+  const checks: { label: string; ok: boolean; fix?: string }[] = [];
   let passed = 0;
   let failed = 0;
 
-  function check(label: any, ok: any, fix: any) {
+  function check(label: string, ok: boolean, fix: string) {
     if (ok) { passed++; checks.push({ label, ok: true }); }
     else { failed++; checks.push({ label, ok: false, fix }); }
   }
@@ -184,7 +184,7 @@ export async function run(argv: any) {
   // Report
   const total = passed + failed;
   if (flags.json) {
-    process.stdout.write(JSON.stringify({ passed: failed === 0, total, passed: passed, failed, checks }, null, 2) + "\n");
+    process.stdout.write(JSON.stringify({ ok: failed === 0, total, passed, failed, checks }, null, 2) + "\n");
   } else {
     process.stdout.write(`Scene: ${name} (${ratio})\nDir: ${sceneDir}\n\n`);
     for (const c of checks) {

@@ -1,28 +1,28 @@
 // Formats CLI help text for individual commands and the root command listing.
-const renderList = (items: any) => {
+const renderList = (items: string[] | undefined) => {
   if (!items || items.length === 0) return "";
-  return items.map((item: any) => `  - ${item}`).join("\n");
+  return items.map((item: string) => `  - ${item}`).join("\n");
 };
 
-const renderSection = (title: any, items: any) => {
+const renderSection = (title: string, items: string[] | undefined) => {
   if (!items || items.length === 0) return "";
   return `${title}:\n${renderList(items)}`;
 };
 
-export function renderCommandHelp(name: any, entry: any) {
+export function renderCommandHelp(name: string, entry: Record<string, unknown> | null) {
   if (!entry) return null;
   const parts = [
     `${name} — ${entry.summary}`,
-    renderSection("Usage", entry.usage),
-    renderSection("Params", entry.params),
-    renderSection("Examples", entry.examples),
-    renderSection("Constraints", entry.constraints),
-    renderSection("Fix", [entry.fix]),
+    renderSection("Usage", entry.usage as string[] | undefined),
+    renderSection("Params", entry.params as string[] | undefined),
+    renderSection("Examples", entry.examples as string[] | undefined),
+    renderSection("Constraints", entry.constraints as string[] | undefined),
+    renderSection("Fix", [entry.fix as string]),
   ].filter(Boolean);
   return `${parts.join("\n\n")}\n`;
 }
 
-export function renderRootHelp(groups: any, specs: any, defaultFix: any) {
+export function renderRootHelp(groups: { title: string; commands: string[] }[], specs: Record<string, Record<string, unknown>>, defaultFix: string) {
   const lines = [
     "nextframe — AI video editor CLI",
     "",

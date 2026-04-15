@@ -25,7 +25,7 @@ import {
 const LEGACY_HELP = "usage: nextframe source-download <url> --library <path> [--format 720]";
 const HELP = "usage: nextframe source-download <project> <episode> --url <url> [--format 720] [--root=PATH] [--json]";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseSourceFlags(argv, ["library", "format", "url", "root"]);
   if (looksLikeSourcePath(positional[0])) {
     return runLegacy(positional, flags);
@@ -33,7 +33,7 @@ export async function run(argv: any) {
   return runProjectMode(positional, flags);
 }
 
-async function runLegacy(positional: any, flags: any) {
+async function runLegacy(positional: string[], flags: Record<string, string | boolean>) {
   const [url] = positional;
   if (!url || !flags.library) {
     fail("USAGE", LEGACY_HELP);
@@ -74,12 +74,12 @@ async function runLegacy(positional: any, flags: any) {
     await writeSourceJson(finalDir, source);
     success({ ok: true, source_dir: finalDir, source });
     return 0;
-  } catch (error) {
-    fail("SOURCE_DOWNLOAD_FAILED", error.message);
+  } catch (error: unknown) {
+    fail("SOURCE_DOWNLOAD_FAILED", (error as Error).message);
   }
 }
 
-async function runProjectMode(positional: any, flags: any) {
+async function runProjectMode(positional: string[], flags: Record<string, string | boolean>) {
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName || !flags.url) {
     emit({ ok: false, error: { code: "USAGE", message: HELP } }, flags);
@@ -89,10 +89,10 @@ async function runProjectMode(positional: any, flags: any) {
   const url = String(flags.url);
   const format = normalizeFormat(flags.format);
   const root = resolveRoot(flags);
-  let context;
+  let context: { root: string; projectName: string; projectPath: string; projectFile: string; project: unknown; episodeName: string; episodePath: string; episodeFile: string };
   try {
-    context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
+    context = await loadProjectContext(root, projectName, episodeName) as typeof context;
+  } catch (err: unknown) {
     emit(loadContextError(err, projectName, episodeName), flags);
     return 2;
   }
@@ -130,8 +130,8 @@ async function runProjectMode(positional: any, flags: any) {
     });
     await writeSourceJson(finalDir, source);
     result = { ok: true, source_dir: finalDir, source };
-  } catch (err) {
-    emit({ ok: false, error: { code: "SOURCE_DOWNLOAD_FAILED", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SOURCE_DOWNLOAD_FAILED", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -143,8 +143,8 @@ async function runProjectMode(positional: any, flags: any) {
   return 0;
 }
 
-function loadContextError(err: any, projectName: any, episodeName: any) {
-  if (err.code === "ENOENT") {
+function loadContextError(err: unknown, projectName: string, episodeName: string) {
+  if ((err as NodeJS.ErrnoException).code === "ENOENT") {
     return {
       ok: false,
       error: {
@@ -153,7 +153,7 @@ function loadContextError(err: any, projectName: any, episodeName: any) {
       },
     };
   }
-  return { ok: false, error: { code: "LOAD_FAIL", message: err.message } };
+  return { ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } };
 }
 
 export default run;

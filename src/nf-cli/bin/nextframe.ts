@@ -65,7 +65,7 @@ async function main() {
   }
 
   const subcommand = argv[0];
-  const loader = SUBCOMMANDS[subcommand];
+  const loader = SUBCOMMANDS[subcommand as keyof typeof SUBCOMMANDS];
   if (!loader) {
     process.stderr.write(`failed to run command: unknown subcommand "${subcommand}"\n`);
     process.stderr.write('Fix: run "nextframe --help" to see every available command\n');
@@ -84,7 +84,7 @@ async function main() {
     const code = await mod.run(argv.slice(1), { subcommand });
     process.exit(typeof code === "number" ? code : 0);
   } catch (error) {
-    const detail = error?.stack || error?.message || String(error);
+    const detail = (error as Error)?.stack || (error as Error)?.message || String(error);
     process.stderr.write(`failed to load or run "${subcommand}": ${detail}\n`);
     process.stderr.write(`Fix: ${defaultFixSuggestion()}\n`);
     process.exit(2);

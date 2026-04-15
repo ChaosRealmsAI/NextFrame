@@ -22,7 +22,7 @@ test("v3-ai list/get/validate operate on v0.3", async () => {
   const scene = TOOLS.get_scene.handler({ id: "headlineCenter" });
   assert.equal(scene.ok, true);
   const sceneVal = await scene.value;
-  assert.equal(sceneVal.id, "headlineCenter");
+  assert.equal(sceneVal!.id, "headlineCenter");
 
   const legacy = await TOOLS.validate_timeline.handler({ timeline: { tracks: [] } });
   assert.equal(legacy.ok, false);
@@ -48,9 +48,11 @@ test("v3-ai describe/find/apply/assert cover active layer semantics", () => {
     ],
   });
   assert.equal(applied.ok, true);
-  assert.equal(applied.value.applied, 2);
-  assert.equal(applied.value.timeline.layers[1].start, 0.2);
-  assert.equal(applied.value.timeline.layers[1].opacity, 0.4);
+  const appliedValue = applied.value as Record<string, unknown>;
+  assert.equal(appliedValue.applied, 2);
+  const appliedTimeline = appliedValue.timeline as Record<string, unknown>;
+  assert.equal((appliedTimeline.layers as Record<string, unknown>[])[1].start, 0.2);
+  assert.equal((appliedTimeline.layers as Record<string, unknown>[])[1].opacity, 0.4);
 
   const assertion = TOOLS.assert_at.handler({
     timeline,
@@ -62,5 +64,5 @@ test("v3-ai describe/find/apply/assert cover active layer semantics", () => {
     ],
   });
   assert.equal(assertion.ok, true);
-  assert.equal(assertion.value.failed.length, 0);
+  assert.equal((assertion.value as { failed: unknown[] }).failed.length, 0);
 });

@@ -6,14 +6,14 @@ import { resolveRoot, loadProjectContext } from "../_helpers/_project.js";
 
 const ATOM_TYPES = new Set(["component", "video", "image"]);
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName) {
     emit({ ok: false, error: { code: "USAGE", message: "usage: nextframe atom-add <project> <episode> --type=component|video|image --name=TEXT [flags] [--root=PATH] [--json]" } }, flags);
     return 3;
   }
-  if (!flags.type || !ATOM_TYPES.has(flags.type) || !flags.name) {
+  if (!flags.type || !ATOM_TYPES.has(String(flags.type)) || !flags.name) {
     emit({ ok: false, error: { code: "USAGE", message: "atom-add requires --type=component|video|image and --name" } }, flags);
     return 3;
   }
@@ -42,7 +42,7 @@ export async function run(argv: any) {
         emit({ ok: false, error: { code: "INVALID_FLAG", message: "--params must be a JSON object" } }, flags);
         return 3;
       }
-      params = parsedParams.value;
+      params = parsedParams.value as Record<string, unknown>;
     }
   }
   if (flags.type === "video") {
@@ -66,7 +66,7 @@ export async function run(argv: any) {
   let context;
   try {
     context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
+  } catch (err: unknown) {
     emit(loadContextError(err, projectName, episodeName), flags);
     return 2;
   }
@@ -74,12 +74,12 @@ export async function run(argv: any) {
   let pipeline;
   try {
     pipeline = await loadPipeline(context.projectPath, episodeName);
-  } catch (err) {
-    emit({ ok: false, error: { code: "LOAD_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
-  const id = pipeline.atoms.reduce((max: any, atom: any) => Math.max(max, Number(atom.id) || 0), 0) + 1;
+  const id = pipeline.atoms.reduce((max: number, atom: Record<string, unknown>) => Math.max(max, Number(atom.id) || 0), 0) + 1;
   const atom = buildAtom(flags, id, {
     segmentNumber,
     duration,
@@ -92,8 +92,8 @@ export async function run(argv: any) {
       ...pipeline,
       atoms: [...pipeline.atoms, atom],
     });
-  } catch (err) {
-    emit({ ok: false, error: { code: "SAVE_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SAVE_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -106,7 +106,7 @@ export async function run(argv: any) {
   return 0;
 }
 
-function buildAtom(flags: any, id: any, state: any) {
+function buildAtom(flags: Record<string, string | boolean>, id: number, state: { segmentNumber?: number; duration?: number; params?: Record<string, unknown> }) {
   if (flags.type === "component") {
     return {
       id,
@@ -136,8 +136,8 @@ function buildAtom(flags: any, id: any, state: any) {
   };
 }
 
-function loadContextError(err: any, projectName: any, episodeName: any) {
-  if (err.code === "ENOENT") {
+function loadContextError(err: unknown, projectName: string, episodeName: string) {
+  if ((err as NodeJS.ErrnoException).code === "ENOENT") {
     return {
       ok: false,
       error: {
@@ -146,5 +146,5 @@ function loadContextError(err: any, projectName: any, episodeName: any) {
       },
     };
   }
-  return { ok: false, error: { code: "LOAD_FAIL", message: err.message } };
+  return { ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } };
 }

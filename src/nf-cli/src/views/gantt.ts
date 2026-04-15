@@ -5,11 +5,18 @@ const MAX_WIDTH = 80;
 const MIN_CHART_WIDTH = 32;
 const DESIRED_TICKS = 10;
 
-function clamp(v: any, min: any, max: any) {
+interface NormClip { id: string; label: string; start: number; end: number }
+interface NormTrack { id: string; clips: NormClip[]; markers: never[] }
+interface NormChapter { id: string; label: string; start: number; end: number }
+interface NormMarker { id: string; label: string; time: number }
+interface NormTimeline { title: string; duration: number; tracks: NormTrack[]; chapters: NormChapter[]; markers: NormMarker[]; clipCount: number }
+interface Layout { trackLabelWidth: number; rightLabelWidth: number; chartWidth: number }
+
+function clamp(v: number, min: number, max: number): number {
   return Math.min(Math.max(v, min), max);
 }
 
-function truncate(text: any, w: any) {
+function truncate(text: unknown, w: number): string {
   const s = String(text ?? "");
   if (w <= 0) return "";
   if (s.length <= w) return s;
@@ -17,11 +24,11 @@ function truncate(text: any, w: any) {
   return `${s.slice(0, w - 3)}...`;
 }
 
-function padRight(text: any, w: any) {
+function padRight(text: unknown, w: number): string {
   return truncate(text, w).padEnd(w, " ");
 }
 
-function fmtTime(seconds: any, withTenths: any) {
+function fmtTime(seconds: number, withTenths: boolean): string {
   const safe = Math.max(0, Number(seconds) || 0);
   if (withTenths) {
     const tenths = Math.round(safe * 10);
@@ -40,7 +47,7 @@ function fmtTime(seconds: any, withTenths: any) {
  * @param {object} timeline - Timeline with raw seconds (post-resolveTimeline)
  * @returns {string} ASCII gantt
  */
-export function renderGantt(timeline: any) {
+export function renderGantt(timeline: Record<string, unknown>): string {
   const norm = normalize(timeline);
   const layout = createLayout(norm);
   const ticks = buildTicks(norm.duration, pickTickStep(norm.duration));
@@ -53,61 +60,61 @@ export function renderGantt(timeline: any) {
   return lines.join("\n");
 }
 
-function normalize(timeline: any) {
-  const title = timeline.title || timeline.project?.name || "NextFrame Project";
-  const duration = Number.isFinite(timeline.duration) && timeline.duration > 0 ? timeline.duration : 1;
+function normalize(timeline: Record<string, unknown>): NormTimeline {
+  const title = (timeline.title as string) || (timeline.project as Record<string, unknown> | undefined)?.name as string || "NextFrame Project";
+  const duration = Number.isFinite(timeline.duration) && (timeline.duration as number) > 0 ? timeline.duration as number : 1;
 
-  const tracks = (timeline.tracks || []).map((trk: any, i: any) => {
+  const tracks = ((timeline.tracks || []) as Record<string, unknown>[]).map((trk, i) => {
     const id = String(trk.id || `T${i + 1}`);
-    const clips = (trk.clips || [])
-      .map((clip: any, ci: any) => {
+    const clips = ((trk.clips || []) as Record<string, unknown>[])
+      .map((clip, ci) => {
         const start = typeof clip.start === "number" ? clip.start : 0;
         const dur = typeof clip.dur === "number" ? clip.dur : 0;
         return {
-          id: clip.id || `clip-${ci + 1}`,
+          id: (clip.id as string) || `clip-${ci + 1}`,
           label: String(clip.scene || clip.id || `clip-${ci + 1}`),
           start: clamp(start, 0, duration),
           end: clamp(start + dur, start, duration),
         };
       })
-      .sort((a: any, b: any) => a.start - b.start);
-    return { id, clips, markers: [] };
+      .sort((a, b) => a.start - b.start);
+    return { id, clips, markers: [] as never[] };
   });
 
-  const chapters = (timeline.chapters || [])
+  const chapters = ((timeline.chapters || []) as Record<string, unknown>[])
     .map((c, i) => ({
-    id: c.id || `chapter-${i + 1}`,
-    label: c.name || c.id || `chapter-${i + 1}`,
+    id: (c.id as string) || `chapter-${i + 1}`,
+    label: (c.name as string) || (c.id as string) || `chapter-${i + 1}`,
     start: clamp(typeof c.start === "number" ? c.start : 0, 0, duration),
     end: clamp(typeof c.end === "number" ? c.end : duration, 0, duration)
   }))
-    .sort((a: any, b: any) => a.start - b.start);
+    .sort((a, b) => a.start - b.start);
 
-  const markers = (timeline.markers || []).map((m, i) => ({
-    id: m.id || `marker-${i + 1}`,
-    label: m.name || m.id || `marker-${i + 1}`,
+  const markers = ((timeline.markers || []) as Record<string, unknown>[]).map((m, i) => ({
+    id: (m.id as string) || `marker-${i + 1}`,
+    label: (m.name as string) || (m.id as string) || `marker-${i + 1}`,
     time: clamp(typeof m.t === "number" ? m.t : 0, 0, duration)
   }));
 
-  const clipCount = tracks.reduce((a: any, t: any) => a + t.clips.length, 0);
+  const clipCount = tracks.reduce((a, t) => a + t.clips.length, 0);
 
   return { title, duration, tracks, chapters, markers, clipCount };
 }
 
-function summaryLine(t: any) {
+function summaryLine(t: NormTimeline): string {
   const suffix = ` · ${fmtTime(t.duration, true)} · ${t.tracks.length} tracks · ${t.clipCount} clips · ${t.chapters.length} chapters`;
   const avail = Math.max(8, MAX_WIDTH - suffix.length);
   return `${truncate(t.title, avail)}${suffix}`;
 }
 
-function createLayout(t: any) {
+function createLayout(t: NormTimeline): Layout {
   const trackLabelWidth = clamp(
-    Math.max(4, ...t.tracks.map((tr: any) => String(tr.id).length)),
+    Math.max(4, ...t.tracks.map((tr) => String(tr.id).length)),
     4,
     6
   );
   const sideLabel = clamp(
-    Math.max(0, ...t.tracks.flatMap((tr: any) => tr.clips.map((c: any) => c.label.length))),
+    Math.max(0, ...t.tracks.flatMap((tr) => tr.clips.map((c) => c.label.length))),
     0,
     16
   );
@@ -118,9 +125,9 @@ function createLayout(t: any) {
   return { trackLabelWidth, rightLabelWidth, chartWidth };
 }
 
-function pickTickStep(duration: any) {
+function pickTickStep(duration: number): number {
   const target = duration / DESIRED_TICKS;
-  const cands = [];
+  const cands: number[] = [];
   for (let e = -2; e <= 5; e++) {
     const base = 10 ** e;
     for (const m of [1, 2, 2.5, 5, 10, 15, 20, 30]) cands.push(base * m);
@@ -141,7 +148,7 @@ function pickTickStep(duration: any) {
   return best;
 }
 
-function buildTicks(duration: any, step: any) {
+function buildTicks(duration: number, step: number): number[] {
   const ticks = [0];
   const eps = step / 1000;
   for (let t = step; t < duration - eps; t += step) {
@@ -151,28 +158,28 @@ function buildTicks(duration: any, step: any) {
   return ticks;
 }
 
-function posFor(t: any, duration: any, w: any) {
+function posFor(t: number, duration: number, w: number): number {
   if (w <= 1 || duration <= 0) return 0;
   return clamp(Math.round((t / duration) * (w - 1)), 0, w - 1);
 }
 
-function place(buf: any, start: any, text: any) {
+function place(buf: string[], start: number, text: string): void {
   for (let i = 0; i < text.length; i++) {
     const p = start + i;
     if (p >= 0 && p < buf.length) buf[p] = text[i];
   }
 }
 
-function compose(left: any, chart: any, layout: any, right: any) {
+function compose(left: string, chart: string[], layout: Layout, right: string): string {
   const l = `${padRight(left, layout.trackLabelWidth)} `;
   const r = layout.rightLabelWidth > 0 ? ` ${padRight(right || "", layout.rightLabelWidth)}` : "";
   return `${l}${chart.join("")}${r}`;
 }
 
-function chapterLines(t: any, layout: any) {
+function chapterLines(t: NormTimeline, layout: Layout): string[] {
   if (t.chapters.length === 0) return [];
-  const labels = new Array(layout.chartWidth).fill(" ");
-  const bounds = new Array(layout.chartWidth).fill(" ");
+  const labels = new Array<string>(layout.chartWidth).fill(" ");
+  const bounds = new Array<string>(layout.chartWidth).fill(" ");
   for (const ch of t.chapters) {
     const s = posFor(ch.start, t.duration, layout.chartWidth);
     const e = posFor(ch.end, t.duration, layout.chartWidth);
@@ -190,11 +197,13 @@ function chapterLines(t: any, layout: any) {
   return [compose("", labels, layout, ""), compose("", bounds, layout, "")];
 }
 
-function axisLines(t: any, layout: any, ticks: any) {
-  const showTenths = t.duration <= 10 || ticks.some((tk: any, i: any) => i > 0 && tk % 1 !== 0);
-  const labels = new Array(layout.chartWidth).fill(" ");
-  const ruler = new Array(layout.chartWidth).fill("─");
-  const placements = ticks.map((tk: any, i: any) => {
+interface TickPlacement { i: number; start: number; end: number; label: string }
+
+function axisLines(t: NormTimeline, layout: Layout, ticks: number[]): string[] {
+  const showTenths = t.duration <= 10 || ticks.some((tk, i) => i > 0 && tk % 1 !== 0);
+  const labels = new Array<string>(layout.chartWidth).fill(" ");
+  const ruler = new Array<string>(layout.chartWidth).fill("─");
+  const placements: TickPlacement[] = ticks.map((tk, i) => {
     const p = posFor(tk, t.duration, layout.chartWidth);
     const lbl = fmtTime(tk, showTenths);
     let s = p - Math.floor(lbl.length / 2);
@@ -203,7 +212,7 @@ function axisLines(t: any, layout: any, ticks: any) {
     s = clamp(s, 0, Math.max(0, layout.chartWidth - lbl.length));
     return { i, start: s, end: s + lbl.length - 1, label: lbl };
   });
-  const sel = [placements[0]];
+  const sel: TickPlacement[] = [placements[0]];
   const last = placements[placements.length - 1];
   for (let i = 1; i < placements.length - 1; i++) {
     const c = placements[i];
@@ -211,7 +220,7 @@ function axisLines(t: any, layout: any, ticks: any) {
     if (c.start > prev.end + 1 && c.end < last.start - 1) sel.push(c);
   }
   if (last.i !== placements[0].i) sel.push(last);
-  ticks.forEach((tk: any, i: any) => {
+  ticks.forEach((tk, i) => {
     const p = posFor(tk, t.duration, layout.chartWidth);
     if (i === 0) ruler[p] = "├";
     else if (i === ticks.length - 1) ruler[p] = "┤";
@@ -221,22 +230,22 @@ function axisLines(t: any, layout: any, ticks: any) {
   return [compose("", labels, layout, ""), compose("", ruler, layout, "")];
 }
 
-function drawClip(buf: any, clip: any, t: any, layout: any) {
+function drawClip(buf: string[], clip: NormClip, t: NormTimeline, layout: Layout): void {
   const s = posFor(clip.start, t.duration, layout.chartWidth);
   const e = Math.max(s, posFor(clip.end, t.duration, layout.chartWidth));
   for (let i = s; i <= e; i++) buf[i] = "▓";
 }
 
-function trackLines(t: any, layout: any) {
-  const lines = [];
+function trackLines(t: NormTimeline, layout: Layout): string[] {
+  const lines: string[] = [];
   for (const trk of t.tracks) {
     let leftLabel = trk.id;
     if (trk.clips.length === 0) {
-      lines.push(compose(leftLabel, new Array(layout.chartWidth).fill(" "), layout, ""));
+      lines.push(compose(leftLabel, new Array<string>(layout.chartWidth).fill(" "), layout, ""));
       continue;
     }
     for (const clip of trk.clips) {
-      const row = new Array(layout.chartWidth).fill(" ");
+      const row = new Array<string>(layout.chartWidth).fill(" ");
       drawClip(row, clip, t, layout);
       lines.push(compose(leftLabel, row, layout, clip.label));
       leftLabel = "";
@@ -245,7 +254,7 @@ function trackLines(t: any, layout: any) {
   if (t.markers.length > 0) {
     let lbl = "MARK";
     for (const m of t.markers) {
-      const row = new Array(layout.chartWidth).fill(" ");
+      const row = new Array<string>(layout.chartWidth).fill(" ");
       const p = posFor(m.time, t.duration, layout.chartWidth);
       row[p] = "▲";
       lines.push(compose(lbl, row, layout, m.label));

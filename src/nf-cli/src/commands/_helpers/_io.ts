@@ -3,9 +3,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { defaultFixSuggestion } from "./help/index.js";
 
-export function parseFlags(argv: any) {
-  const positional = [];
-  const flags = {};
+export type CliFlags = Record<string, string | boolean>;
+
+export function parseFlags(argv: string[]): { positional: string[]; flags: CliFlags } {
+  const positional: string[] = [];
+  const flags: CliFlags = {};
   for (const arg of argv) {
     if (arg.startsWith("--")) {
       const eq = arg.indexOf("=");
@@ -18,28 +20,37 @@ export function parseFlags(argv: any) {
   return { positional, flags };
 }
 
-export async function loadTimeline(path: any) {
+export async function loadTimeline(path: string): Promise<{ ok: true; value: unknown } | { ok: false; error: { code: string; message: string } }> {
   try {
     const text = await readFile(path, "utf8");
     return { ok: true, value: JSON.parse(text) };
   } catch (err) {
+    const e = err as Error;
     return {
       ok: false,
-      error: { code: "LOAD_FAIL", message: `cannot load ${path}: ${err.message}` },
+      error: { code: "LOAD_FAIL", message: `cannot load ${path}: ${e.message}` },
     };
   }
 }
 
-export async function saveTimeline(path: any, timeline: any) {
+export async function saveTimeline(path: string, timeline: unknown): Promise<{ ok: true } | { ok: false; error: { code: string; message: string } }> {
   try {
     await writeFile(path, JSON.stringify(timeline, null, 2) + "\n");
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: { code: "SAVE_FAIL", message: err.message } };
+    const e = err as Error;
+    return { ok: false, error: { code: "SAVE_FAIL", message: e.message } };
   }
 }
 
-export function emit(result: any, flags: any) {
+interface EmitResult {
+  ok: boolean;
+  value?: unknown;
+  message?: string;
+  error?: { code?: string; message?: string; fix?: string; hint?: string };
+}
+
+export function emit(result: EmitResult, flags: CliFlags): void {
   const normalized = normalizeResult(result);
   if (flags.json) {
     process.stdout.write(JSON.stringify(normalized, null, 2) + "\n");
@@ -60,7 +71,7 @@ export function emit(result: any, flags: any) {
   }
 }
 
-function normalizeResult(result: any) {
+function normalizeResult(result: EmitResult): EmitResult & { error?: EmitResult["error"] & { fix?: string } } {
   if (!result || result.ok || !result.error) return result;
   const fix = result.error.fix || result.error.hint || defaultFixSuggestion();
   return {
@@ -72,7 +83,7 @@ function normalizeResult(result: any) {
   };
 }
 
-export function parseTime(spec: any) {
+export function parseTime(spec: unknown) {
   if (typeof spec === "number") return spec;
   const trimmed = String(spec).trim();
   // mm:ss.f

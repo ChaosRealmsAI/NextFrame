@@ -1,6 +1,6 @@
-function appendChildNode(parent: any, child: any) {
+function appendChildNode(parent: HTMLElement, child: string | number | boolean | Node | null | undefined | unknown[]) {
   if (Array.isArray(child)) {
-    child.forEach((item) => appendChildNode(parent, item));
+    child.forEach((item) => appendChildNode(parent, item as string | number | boolean | Node | null | undefined | unknown[]));
     return;
   }
   if (child == null || child === false) return;
@@ -8,23 +8,23 @@ function appendChildNode(parent: any, child: any) {
     parent.append(String(child));
     return;
   }
-  parent.appendChild(child);
+  parent.appendChild(child as Node);
 }
 
-function h(tag: any, attrs = {}, ...children: any[]) {
+function h(tag: string, attrs: Record<string, unknown> | null = {}, ...children: (string | Node | null | undefined)[]) {
   const el = document.createElement(tag);
-  Object.entries(attrs).forEach(([key, value]) => {
+  Object.entries(attrs || {}).forEach(([key, value]) => {
     if (value == null || value === false) return;
     if (key.startsWith('on') && typeof value === 'function') {
-      el.addEventListener(key.slice(2).toLowerCase(), value);
+      el.addEventListener(key.slice(2).toLowerCase(), value as EventListener);
     } else if (key === 'class') {
-      el.className = value;
+      el.className = value as string;
     } else if (key === 'style' && typeof value === 'object') {
       Object.assign(el.style, value);
     } else if (value === true) {
       el.setAttribute(key, '');
     } else {
-      el.setAttribute(key, value);
+      el.setAttribute(key, value as string);
     }
   });
   children.forEach((child) => appendChildNode(el, child));

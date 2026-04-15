@@ -7,11 +7,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCENES_DIR = path.join(ROOT, "scenes");
 const DESIGN_PATH = path.join(SCENES_DIR, "shared", "design.js");
 
-function fail(message: any) {
+function fail(message: string): never {
   throw new Error(`failed to bundle preview scenes: ${message}. Fix: verify the timeline JSON references scenes that exist under src/nf-core/scenes.`);
 }
 
-function normalizeRatio(timeline: any) {
+function normalizeRatio(timeline: NfTimeline) {
   if (timeline && typeof timeline.ratio === "string") {
     return timeline.ratio.replace(":", "x");
   }
@@ -23,9 +23,9 @@ function normalizeRatio(timeline: any) {
   return null;
 }
 
-function extractSceneIds(timeline: any) {
-  const layers = Array.isArray(timeline?.layers) ? timeline.layers : (Array.isArray(timeline?.clips) ? timeline.clips : []);
-  return [...new Set(layers.map((layer: any) => layer?.scene).filter(Boolean))];
+function extractSceneIds(timeline: NfTimeline) {
+  const layers = Array.isArray(timeline?.layers) ? timeline.layers : [];
+  return [...new Set(layers.map((layer: NfLayer) => layer?.scene).filter((s): s is string => typeof s === "string"))];
 }
 
 async function buildSceneIndex() {
@@ -55,13 +55,13 @@ async function buildSceneIndex() {
   return index;
 }
 
-function stripEsm(source: any) {
+function stripEsm(source: string) {
   return source
     .replace(/^\s*import\s+.+?;\s*$/gm, "")
     .replace(/^\s*export\s+/gm, "");
 }
 
-function prepareDesignPreamble(source: any) {
+function prepareDesignPreamble(source: string) {
   return stripEsm(source)
     .replace(
       /function scaleW\s*\([^)]*\)\s*\{[\s\S]*?\n\}/,
@@ -73,15 +73,15 @@ function prepareDesignPreamble(source: any) {
     );
 }
 
-function resolveScenePath(index: any, sceneId: any, preferredRatio: any) {
+function resolveScenePath(index: Map<string, { path: string; ratio: string }[]>, sceneId: string, preferredRatio: string | null) {
   const matches = index.get(sceneId) || [];
-  if (!matches.length) fail(`scene "${sceneId}" was not found`);
+  if (!matches.length) return fail(`scene "${sceneId}" was not found`);
   if (preferredRatio) {
-    const exact = matches.find((entry: any) => entry.ratio === preferredRatio);
+    const exact = matches.find((entry: { path: string; ratio: string }) => entry.ratio === preferredRatio);
     if (exact) return exact.path;
   }
   if (matches.length === 1) return matches[0].path;
-  fail(`scene "${sceneId}" matched multiple ratios`);
+  return fail(`scene "${sceneId}" matched multiple ratios`);
 }
 
 async function main() {

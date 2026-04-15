@@ -1,34 +1,52 @@
 // Preview UI controller. Pure vanilla ES module.
 
-const $ = (sel: any) => document.querySelector(sel);
+interface PreviewTimeline {
+  schema: string;
+  duration: number;
+  project: { width: number; height: number; fps: number; name?: string };
+  tracks: Array<{ id: string; clips: Array<{ id: string; scene: string; start: number; dur: number; params: Record<string, unknown> }> }>;
+}
 
-let state = {
+interface ValidationResult {
+  ok: boolean;
+  errors?: Array<{ code: string; message: string }>;
+  warnings?: Array<{ message: string }>;
+}
+
+const $ = (sel: string) => document.querySelector(sel) as HTMLElement;
+
+let state: {
+  path: string;
+  timeline: PreviewTimeline | null;
+  selected: { clipId: string; trackId: string } | null;
+  t: number;
+} = {
   path: "examples/launch.timeline.json",
   timeline: null,
   selected: null,
   t: 0,
 };
 
-function fmtTime(sec: any) {
+function fmtTime(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = (sec - m * 60).toFixed(1);
   return `${m}:${s.padStart(4, "0")}`;
 }
 
 async function loadTimeline() {
-  state.path = $("#tl-path").value.trim();
+  state.path = ($("#tl-path") as HTMLInputElement).value.trim();
   const r = await fetch(`/api/timeline?path=${encodeURIComponent(state.path)}`).then((x) => x.json());
   if (!r.ok) return logErr(r.error?.message || "load failed");
   state.timeline = r.value.timeline;
   state.t = 0;
-  $("#scrub").max = state.timeline.duration;
-  $("#scrub").value = 0;
+  ($("#scrub") as HTMLInputElement).max = String(state.timeline!.duration);
+  ($("#scrub") as HTMLInputElement).value = "0";
   renderMeta();
   renderClips();
   renderValidation(r.value.validation);
   await refreshFrame();
   await refreshGantt();
-  $("#mp4-player").hidden = true;
+  ($("#mp4-player") as HTMLVideoElement).hidden = true;
   $("#mp4-player").removeAttribute("src");
 }
 
@@ -50,7 +68,7 @@ async function refreshFrame() {
   if (!state.timeline) return;
   const url = `/api/frame?path=${encodeURIComponent(state.path)}&t=${state.t}&w=960&_=${Date.now()}`;
   $("#preview-placeholder").style.display = "none";
-  $("#preview-img").src = url;
+  ($("#preview-img") as HTMLImageElement).src = url;
   $("#time-label").textContent = `${fmtTime(state.t)} / ${fmtTime(state.timeline.duration)}`;
 }
 
@@ -62,7 +80,7 @@ async function refreshGantt() {
 }
 
 async function renderMP4() {
-  const btn = $("#btn-render");
+  const btn = $("#btn-render") as HTMLButtonElement;
   btn.disabled = true;
   btn.textContent = "Rendering…";
   try {
@@ -72,7 +90,7 @@ async function renderMP4() {
       body: JSON.stringify({ path: state.path }),
     }).then((x) => x.json());
     if (!r.ok) return logErr(r.error?.message || "render failed");
-    const v = $("#mp4-player");
+    const v = $("#mp4-player") as HTMLVideoElement;
     v.src = r.value.url;
     v.hidden = false;
     v.play();
@@ -84,14 +102,14 @@ async function renderMP4() {
 }
 
 function renderMeta() {
-  const t = state.timeline;
+  const t = state.timeline!;
   $("#timeline-meta").innerHTML = `
     <div>${t.schema} · ${t.project.width}×${t.project.height} @ ${t.project.fps}fps · ${t.duration}s</div>
     <div>${t.tracks.length} tracks · ${totalClips(t)} clips</div>
   `;
 }
 
-function totalClips(t: any) {
+function totalClips(t: PreviewTimeline): number {
   let n = 0;
   for (const tr of t.tracks) n += (tr.clips || []).length;
   return n;
@@ -100,7 +118,7 @@ function totalClips(t: any) {
 function renderClips() {
   const list = $("#clip-list");
   list.innerHTML = "";
-  for (const trk of state.timeline.tracks) {
+  for (const trk of state.timeline!.tracks) {
     for (const clip of trk.clips || []) {
       const row = document.createElement("div");
       row.className = "clip-row";
@@ -116,45 +134,48 @@ function renderClips() {
   }
 }
 
-function selectClip(clipId: any, trackId: any) {
+function selectClip(clipId: string, trackId: string) {
   state.selected = { clipId, trackId };
-  document.querySelectorAll(".clip-row").forEach((r) => r.classList.toggle("selected", r.dataset.id === clipId));
-  const track = state.timeline.tracks.find((t: any) => t.id === trackId);
-  const clip = track.clips.find((c: any) => c.id === clipId);
+  document.querySelectorAll(".clip-row").forEach((r) => r.classList.toggle("selected", (r as HTMLElement).dataset["id"] === clipId));
+  const track = state.timeline!.tracks.find((t) => t.id === trackId)!;
+  const clip = track.clips.find((c) => c.id === clipId)!;
   renderClipInspector(clip, track);
   // jump scrubber to clip start
   if (typeof clip.start === "number") {
     state.t = clip.start;
-    $("#scrub").value = clip.start;
+    ($("#scrub") as HTMLInputElement).value = String(clip.start);
     refreshFrame();
   }
 }
 
-function renderClipInspector(clip: any, track: any) {
+interface PreviewClip { id: string; scene: string; start: number; dur: number; params: Record<string, unknown> }
+interface PreviewTrack { id: string; clips: PreviewClip[] }
+
+function renderClipInspector(clip: PreviewClip, track: PreviewTrack) {
   const el = $("#clip-inspector");
   el.innerHTML = "";
-  const mkField = (label: any, value: any, type: any, onChange: any) => {
+  const mkField = (label: string, value: unknown, type: string, onChange: (v: string | number) => void) => {
     const d = document.createElement("div");
     d.className = "field";
     const l = document.createElement("label"); l.textContent = label;
-    const i = document.createElement("input"); i.type = type; i.value = value;
+    const i = document.createElement("input"); i.type = type; i.value = String(value);
     i.addEventListener("change", () => onChange(type === "number" ? Number(i.value) : i.value));
     d.appendChild(l); d.appendChild(i); el.appendChild(d);
   };
 
-  const hdr = (txt: any) => {
+  const hdr = (txt: string) => {
     const h = document.createElement("div"); h.className = "hdr"; h.textContent = txt; el.appendChild(h);
   };
 
   hdr(`${clip.id} · ${clip.scene}`);
   mkField("track", track.id, "text", () => {});
-  mkField("start", clip.start, "number", (v: any) => { clip.start = v; onClipEdit(); });
-  mkField("dur", clip.dur, "number", (v: any) => { clip.dur = v; onClipEdit(); });
+  mkField("start", clip.start, "number", (v) => { (clip as unknown as Record<string, unknown>).start = v; onClipEdit(); });
+  mkField("dur", clip.dur, "number", (v) => { (clip as unknown as Record<string, unknown>).dur = v; onClipEdit(); });
 
   hdr("params");
-  const params = clip.params || (clip.params = {});
+  const params = clip.params || ((clip as unknown as Record<string, unknown>).params = {});
   for (const [k, v] of Object.entries(params)) {
-    mkField(k, v, typeof v === "number" ? "number" : "text", (nv: any) => { params[k] = nv; onClipEdit(); });
+    mkField(k, v, typeof v === "number" ? "number" : "text", (nv) => { params[k] = nv; onClipEdit(); });
   }
 }
 
@@ -165,18 +186,18 @@ async function onClipEdit() {
   await refreshGantt();
 }
 
-function renderValidation(v: any) {
+function renderValidation(v: ValidationResult | null) {
   if (!v) return;
   const el = $("#validation");
   if (v.ok) {
-    el.innerHTML = `<div class="v-ok">✓ ok</div>` + (v.warnings?.length ? v.warnings.map((w: any) => `<div class="v-warn">⚠︎ ${w.message}</div>`).join("") : "");
+    el.innerHTML = `<div class="v-ok">✓ ok</div>` + (v.warnings?.length ? v.warnings.map((w) => `<div class="v-warn">⚠︎ ${w.message}</div>`).join("") : "");
   } else {
-    el.innerHTML = v.errors.map((e: any) => `<div class="v-err">✗ ${e.code}: ${e.message}</div>`).join("");
+    el.innerHTML = (v.errors || []).map((e) => `<div class="v-err">✗ ${e.code}: ${e.message}</div>`).join("");
   }
 }
 
 async function askAI() {
-  const prompt = $("#ai-prompt").value.trim();
+  const prompt = ($("#ai-prompt") as HTMLInputElement).value.trim();
   if (!prompt) return;
   const log = $("#ai-log");
   log.textContent = "Starting sonnet…";
@@ -186,14 +207,14 @@ async function askAI() {
     body: JSON.stringify({ path: state.path, prompt }),
   }).then((x) => x.json());
   if (!r.ok) { log.textContent = `error: ${r.error?.message}`; return; }
-  const jobId = r.value.jobId;
+  const jobId = r.value.jobId as string;
   log.textContent = `job ${jobId} running…`;
   // Poll
   const poll = async () => {
     const s = await fetch(`/api/ai-status?id=${jobId}`).then((x) => x.json());
     if (!s.ok) { log.textContent = `poll error: ${s.error?.message}`; return; }
-    const job = s.value;
-    log.textContent = job.logs.map((l: any) => `[${l.stream}] ${l.text}`).join("");
+    const job = s.value as { done: boolean; status: string; exitCode: number; logs: Array<{ stream: string; text: string }> };
+    log.textContent = job.logs.map((l) => `[${l.stream}] ${l.text}`).join("");
     if (job.done) {
       log.textContent += `\n--- ${job.status} (exit=${job.exitCode}) ---`;
       await loadTimeline();
@@ -204,7 +225,7 @@ async function askAI() {
   poll();
 }
 
-function logErr(msg: any) {
+function logErr(msg: string) {
   $("#validation").innerHTML = `<div class="v-err">${msg}</div>`;
 }
 
@@ -213,9 +234,9 @@ $("#btn-load").addEventListener("click", loadTimeline);
 $("#btn-save").addEventListener("click", saveTimeline);
 $("#btn-render").addEventListener("click", renderMP4);
 $("#btn-ai").addEventListener("click", askAI);
-$("#scrub").addEventListener("input", (e: any) => { state.t = Number(e.target.value); refreshFrame(); });
-$("#btn-prev").addEventListener("click", () => { state.t = Math.max(0, state.t - 0.1); $("#scrub").value = state.t; refreshFrame(); });
-$("#btn-next").addEventListener("click", () => { state.t = Math.min(state.timeline?.duration || 0, state.t + 0.1); $("#scrub").value = state.t; refreshFrame(); });
+$("#scrub").addEventListener("input", (e: Event) => { state.t = Number((e.target as HTMLInputElement).value); refreshFrame(); });
+$("#btn-prev").addEventListener("click", () => { state.t = Math.max(0, state.t - 0.1); ($("#scrub") as HTMLInputElement).value = String(state.t); refreshFrame(); });
+$("#btn-next").addEventListener("click", () => { state.t = Math.min(state.timeline?.duration || 0, state.t + 0.1); ($("#scrub") as HTMLInputElement).value = String(state.t); refreshFrame(); });
 
 // auto-load on start
 loadTimeline();

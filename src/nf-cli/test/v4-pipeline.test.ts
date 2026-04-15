@@ -10,7 +10,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const CLI = resolve(ROOT, "bin/nextframe.js");
 
-function runCli(args: any, expectedStatus = 0, options = {}) {
+function runCli(args: string[], expectedStatus = 0, options: { env?: NodeJS.ProcessEnv } = {}) {
   const result = spawnSync("node", [CLI, ...args], {
     cwd: ROOT,
     encoding: "utf8",
@@ -160,7 +160,7 @@ test("audio-synth generates vox artifacts and registers generated audio metadata
   }
 });
 
-function writeFakeVox(binDir: any) {
+function writeFakeVox(binDir: string) {
   const script = join(binDir, "vox");
   writeFileSync(script, `#!/usr/bin/env node
 const fs = require("node:fs");

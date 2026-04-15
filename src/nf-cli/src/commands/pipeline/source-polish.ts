@@ -15,7 +15,7 @@ import { readFile, writeFile } from "node:fs/promises";
 
 const HELP = "usage: nextframe source-polish <project> <episode> --clip <N> --lang <lang> [--apply <caption.md>] [--dry-run] [--root=PATH] [--json]";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseSourceFlags(argv, ["clip", "lang", "apply", "root"]);
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName || !flags.clip) {
@@ -27,11 +27,11 @@ export async function run(argv: any) {
   const lang = typeof flags.lang === "string" ? flags.lang : "zh";
   const root = resolveRoot(flags);
 
-  let context;
+  let context: { root: string; projectName: string; projectPath: string; projectFile: string; project: unknown; episodeName: string; episodePath: string; episodeFile: string };
   try {
-    context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
-    emit({ ok: false, error: { code: "EPISODE_NOT_FOUND", message: err.message } }, flags);
+    context = await loadProjectContext(root, projectName, episodeName) as typeof context;
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "EPISODE_NOT_FOUND", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -46,8 +46,8 @@ export async function run(argv: any) {
       const content = await readFile(sourcePath, "utf8");
       await ensureDirectory(clipsDir);
       await writeFile(outPath, content, "utf8");
-    } catch (err) {
-      emit({ ok: false, error: { code: "APPLY_FAILED", message: err.message } }, flags);
+    } catch (err: unknown) {
+      emit({ ok: false, error: { code: "APPLY_FAILED", message: (err as Error).message } }, flags);
       return 2;
     }
     if (flags.json) {
@@ -69,7 +69,7 @@ export async function run(argv: any) {
   }
 
   const reportRows = Array.isArray(cutReport?.success) ? cutReport.success : Array.isArray(cutReport) ? cutReport : [];
-  const clipRow = reportRows.find((row: any) => Number(row?.clip_num) === clipNum || Number(row?.id) === clipNum);
+  const clipRow = reportRows.find((row: Record<string, unknown>) => Number(row?.clip_num) === clipNum || Number(row?.id) === clipNum);
   if (!clipRow) {
     emit({ ok: false, error: { code: "CLIP_NOT_FOUND", message: `clip ${clipNum} not found in cut_report.json` } }, flags);
     return 2;
@@ -85,8 +85,8 @@ export async function run(argv: any) {
   }
 
   const zhText = translationsData?.segments
-    ? translationsData.segments.flatMap((seg: any) => Array.isArray(seg.cn)
-    ? seg.cn.map((cue: any) => typeof cue === "string" ? cue : String(cue?.text || ""))
+    ? translationsData.segments.flatMap((seg: Record<string, unknown>) => Array.isArray(seg.cn)
+    ? seg.cn.map((cue: unknown) => typeof cue === "string" ? cue : String((cue as Record<string, unknown>)?.text || ""))
     : []
       ).join("")
     : "(translations not found — run source-translate first)";

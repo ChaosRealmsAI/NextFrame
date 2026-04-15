@@ -21,9 +21,9 @@ test("legacy validator requires version and clip contract fields", () => {
   });
 
   assert.equal(result.ok, false);
-  assert.ok(result.errors.some((error: any) => error.code === "MISSING_VERSION"));
-  assert.ok(result.errors.some((error: any) => error.code === "MISSING_SCENE"));
-  assert.ok(result.errors.some((error: any) => error.code === "MISSING_DUR"));
+  assert.ok(result.errors.some((error: { code: string }) => error.code === "MISSING_VERSION"));
+  assert.ok(result.errors.some((error: { code: string }) => error.code === "MISSING_SCENE"));
+  assert.ok(result.errors.some((error: { code: string }) => error.code === "MISSING_DUR"));
 });
 
 test("v0.3 validator requires version and params and flags legacy input", async () => {

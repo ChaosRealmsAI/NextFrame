@@ -1,7 +1,7 @@
 import { clamp01, joinTransforms, px } from "../shared.js";
 
 // Slides content downward while fading it out.
-export function slideDown(progress: any, opts = {}) {
+export function slideDown(progress: number, opts: { distance?: number } = {}) {
   const p = clamp01(progress);
   const distance = opts.distance ?? 40;
   return {

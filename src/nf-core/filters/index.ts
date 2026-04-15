@@ -29,13 +29,15 @@ const CSS_FILTER_FNS = {
   sepia: getSepiaCssFilter,
 };
 
-export function getFilter(id: any) {
-  if (!FILTER_FNS[id]) return null;
-  return { id, apply: FILTER_FNS[id], META: FILTER_TABLE[id] };
+export function getFilter(id: string) {
+  const fn = (FILTER_FNS as Record<string, typeof FILTER_FNS[keyof typeof FILTER_FNS]>)[id];
+  const meta = (FILTER_TABLE as Record<string, typeof FILTER_TABLE[keyof typeof FILTER_TABLE]>)[id];
+  if (!fn) return null;
+  return { id, apply: fn, META: meta };
 }
 
 export function listFilters() {
-  return FILTER_IDS.map((id) => FILTER_TABLE[id]);
+  return FILTER_IDS.map((id) => (FILTER_TABLE as Record<string, typeof FILTER_TABLE[keyof typeof FILTER_TABLE]>)[id]);
 }
 
 /**
@@ -47,9 +49,9 @@ export function listFilters() {
  * @param {number} [t=0] — local clip time for time-varying filters
  * @param {{createCanvas?: Function}} [runtime]
  */
-export function applyFilters(ctx: any, width: any, height: any, filters: any, t = 0, runtime = {}) {
+export function applyFilters(ctx: CanvasRenderingContext2D, width: number, height: number, filters: (string | { type: string; [key: string]: unknown })[], t = 0, runtime: { createCanvas?: (w: number, h: number) => unknown } = {}) {
   if (!filters || !filters.length) return;
-  const specs = filters.map((f: any) => typeof f === "string" ? { type: f, _t: t } : { ...f, _t: t });
+  const specs = filters.map((f: string | { type: string; [key: string]: unknown }) => typeof f === "string" ? { type: f, _t: t } : { ...f, _t: t });
   const canUseCssFilters = typeof ctx.filter === "string" && typeof runtime.createCanvas === "function";
 
   if (canUseCssFilters) {
@@ -59,33 +61,33 @@ export function applyFilters(ctx: any, width: any, height: any, filters: any, t 
 
   const imageData = ctx.getImageData(0, 0, width, height);
   for (const spec of specs) {
-    const fn = FILTER_FNS[spec.type];
-    if (fn) fn(imageData.data, width, height, spec);
+    const fn = (FILTER_FNS as Record<string, typeof FILTER_FNS[keyof typeof FILTER_FNS]>)[spec.type];
+    if (fn) fn(imageData.data, width, height, spec as Parameters<typeof fn>[3]);
   }
   ctx.putImageData(imageData, 0, 0);
 }
 
-function applyCssFilters(ctx: any, width: any, height: any, specs: any, createCanvas: any) {
+function applyCssFilters(ctx: CanvasRenderingContext2D, width: number, height: number, specs: { type: string; _t: number; [key: string]: unknown }[], createCanvas: ((w: number, h: number) => unknown) | undefined) {
   const filterChain = [];
   for (const spec of specs) {
-    const buildCss = CSS_FILTER_FNS[spec.type];
-    if (buildCss) filterChain.push(buildCss(spec));
+    const buildCss = (CSS_FILTER_FNS as Record<string, (typeof CSS_FILTER_FNS)[keyof typeof CSS_FILTER_FNS]>)[spec.type];
+    if (buildCss) filterChain.push(buildCss(spec as Parameters<typeof buildCss>[0]));
   }
 
   if (filterChain.length > 0) {
-    const source = createCanvas(width, height);
-    const sourceCtx = source.getContext("2d");
+    const source = createCanvas!(width, height) as unknown as HTMLCanvasElement;
+    const sourceCtx = source.getContext("2d")!;
     sourceCtx.drawImage(ctx.canvas, 0, 0, width, height);
     const previousFilter = ctx.filter;
     ctx.save();
     ctx.clearRect(0, 0, width, height);
     ctx.filter = filterChain.join(" ");
-    ctx.drawImage(source, 0, 0, width, height);
+    ctx.drawImage(source as unknown as CanvasImageSource, 0, 0, width, height);
     ctx.restore();
     ctx.filter = previousFilter;
   }
 
   for (const spec of specs) {
-    if (spec.type === "filmGrain") applyFilmGrainOverlay(ctx, width, height, spec, createCanvas);
+    if (spec.type === "filmGrain" && createCanvas) applyFilmGrainOverlay(ctx, width, height, spec, createCanvas);
   }
 }

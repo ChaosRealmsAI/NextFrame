@@ -8,6 +8,7 @@ import { resolveTimeline } from "./legacy-timeline.js";
 import { resolveKeyframes } from "../../../nf-core/engine/keyframes.js";
 import { applyEnterEffect, applyExitEffect } from "../../../nf-core/animation/effects/index.js";
 import { applyFilters } from "../../../nf-core/filters/index.js";
+import type { Timeline } from "../../../nf-core/types.js";
 
 export class CanvasPool {
   #capacity;
@@ -18,7 +19,7 @@ export class CanvasPool {
     this.#capacity = capacity;
   }
 
-  acquire(width: any, height: any) {
+  acquire(width: number, height: number) {
     const key = `${width}x${height}`;
     let bucket = this.#buckets.get(key);
     if (!bucket) {
@@ -56,7 +57,7 @@ export class CanvasPool {
     return slot.canvas;
   }
 
-  release(canvas: any) {
+  release(canvas: ReturnType<typeof createCanvas>) {
     const lease = this.#leases.get(canvas);
     if (!lease) return;
     this.#leases.delete(canvas);
@@ -66,12 +67,20 @@ export class CanvasPool {
   }
 }
 
-export function renderAt(timeline: any, t: any, opts = {}) {
-  let resolved = timeline;
+interface RenderAtOpts {
+  width?: number;
+  height?: number;
+  useCanvasPool?: boolean;
+  canvasPool?: CanvasPool | null;
+  offscreenCanvasPool?: CanvasPool | null;
+}
+
+export function renderAt(timeline: unknown, t: number, opts: RenderAtOpts = {}) {
+  let resolved: Timeline = timeline as Timeline;
   if (needsResolve(timeline)) {
-    const result = resolveTimeline(timeline);
+    const result = resolveTimeline(timeline as Timeline);
     if (!result.ok) return guarded("renderAt", { ok: false, error: result.error });
-    resolved = result.value;
+    resolved = result.value as Timeline;
   }
   const width = opts.width || resolved.project?.width || 1920;
   const height = opts.height || resolved.project?.height || 1080;
@@ -124,9 +133,9 @@ export function renderAt(timeline: any, t: any, opts = {}) {
             } finally {
               offscreenCtx.restore();
             }
-            if (hasFilters) applyFilters(offscreenCtx, width, height, clip.filters, localT);
+            if (hasFilters) applyFilters(offscreenCtx, width, height, clip.filters ?? [], localT);
           } catch (error) {
-            drawCrashMarker(ctx, width, height, clip.scene, error);
+            drawCrashMarker(ctx, width, height, clip.scene, error as Error);
             offscreen?.release();
             continue;
           }
@@ -158,7 +167,7 @@ export function renderAt(timeline: any, t: any, opts = {}) {
   }
 }
 
-function resetContext(ctx: any, width: any, height: any) {
+function resetContext(ctx: ReturnType<ReturnType<typeof createCanvas>["getContext"]>, width: number, height: number) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
@@ -166,7 +175,7 @@ function resetContext(ctx: any, width: any, height: any) {
   ctx.clearRect(0, 0, width, height);
 }
 
-function acquireCanvas(pool: any, width: any, height: any) {
+function acquireCanvas(pool: CanvasPool | null, width: number, height: number) {
   if (!pool) {
     return { canvas: createCanvas(width, height), release() {} };
   }
@@ -179,7 +188,7 @@ function acquireCanvas(pool: any, width: any, height: any) {
   };
 }
 
-function drawMissingSceneMarker(ctx: any, width: any, sceneId: any) {
+function drawMissingSceneMarker(ctx: ReturnType<ReturnType<typeof createCanvas>["getContext"]>, width: number, sceneId: string) {
   ctx.save();
   ctx.fillStyle = "#ff0044";
   ctx.fillRect(0, 0, width, 32);
@@ -189,7 +198,7 @@ function drawMissingSceneMarker(ctx: any, width: any, sceneId: any) {
   ctx.restore();
 }
 
-function drawCrashMarker(ctx: any, width: any, height: any, sceneId: any, error: any) {
+function drawCrashMarker(ctx: ReturnType<ReturnType<typeof createCanvas>["getContext"]>, width: number, height: number, sceneId: string, error: Error) {
   ctx.save();
   ctx.fillStyle = "rgba(255,0,0,0.7)";
   ctx.fillRect(0, height - 40, width, 40);
@@ -199,18 +208,19 @@ function drawCrashMarker(ctx: any, width: any, height: any, sceneId: any, error:
   ctx.restore();
 }
 
-function needsResolve(timeline: any) {
-  for (const track of timeline.tracks || []) {
-    for (const clip of track.clips || []) {
+function needsResolve(timeline: unknown) {
+  const tl = timeline as Record<string, unknown>;
+  for (const track of (tl.tracks || []) as Record<string, unknown>[]) {
+    for (const clip of (track.clips || []) as Record<string, unknown>[]) {
       if (typeof clip.start !== "number" || typeof clip.dur !== "number") return true;
     }
   }
-  for (const chapter of timeline.chapters || []) {
+  for (const chapter of (tl.chapters || []) as Record<string, unknown>[]) {
     if (typeof chapter.start !== "number" || (chapter.end !== undefined && typeof chapter.end !== "number")) {
       return true;
     }
   }
-  for (const marker of timeline.markers || []) {
+  for (const marker of (tl.markers || []) as Record<string, unknown>[]) {
     if (typeof marker.t !== "number") return true;
   }
   return false;

@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 
 import { parseFlags, emit } from "../_helpers/_io.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [projectName] = positional;
   if (!projectName) {
@@ -27,8 +27,8 @@ export async function run(argv: any) {
   let episodes;
   try {
     episodes = await listEpisodes(projectPath);
-  } catch (err) {
-    emit({ ok: false, error: { code: "LIST_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "LIST_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -40,7 +40,7 @@ export async function run(argv: any) {
   return 0;
 }
 
-async function listEpisodes(projectPath: any) {
+async function listEpisodes(projectPath: string) {
   const entries = await readdir(projectPath, { withFileTypes: true });
   const episodes = [];
   for (const entry of entries) {
@@ -51,7 +51,7 @@ async function listEpisodes(projectPath: any) {
     try {
       meta = await loadJson(metaPath);
     } catch (err) {
-      if (err.code === "ENOENT") continue;
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
       throw err;
     }
     const segments = await listSegments(path);
@@ -66,7 +66,7 @@ async function listEpisodes(projectPath: any) {
   return episodes.sort(compareEpisodes);
 }
 
-async function listSegments(path: any) {
+async function listSegments(path: string) {
   const entries = await readdir(path, { withFileTypes: true });
   const segments = [];
   for (const entry of entries) {
@@ -77,19 +77,19 @@ async function listSegments(path: any) {
   return segments;
 }
 
-function compareEpisodes(a: any, b: any) {
+function compareEpisodes(a: { order: number; name: string }, b: { order: number; name: string }) {
   if (a.order !== b.order) return a.order - b.order;
   return String(a.name).localeCompare(String(b.name));
 }
 
-async function loadJson(path: any) {
+async function loadJson(path: string) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
-function renderTable(episodes: any) {
+function renderTable(episodes: { name: string; order: number; segments: number; totalDuration: number }[]) {
   if (episodes.length === 0) return "(no episodes)";
   const headers = ["NAME", "ORDER", "SEGMENTS", "TOTAL DURATION"];
-  const rows = episodes.map((episode: any) => [
+  const rows = episodes.map((episode: { name: string; order: number; segments: number; totalDuration: number }) => [
     String(episode.name),
     String(episode.order),
     String(episode.segments),
@@ -98,22 +98,22 @@ function renderTable(episodes: any) {
   return formatTable(headers, rows);
 }
 
-function formatTable(headers: any, rows: any) {
-  const widths = headers.map((header: any, index: any) =>
-    Math.max(header.length, ...rows.map((row: any) => String(row[index] ?? "").length))
+function formatTable(headers: string[], rows: string[][]) {
+  const widths = headers.map((header: string, index: number) =>
+    Math.max(header.length, ...rows.map((row: string[]) => String(row[index] ?? "").length))
   );
   const lines = [
-    headers.map((header: any, index: any) => header.padEnd(widths[index])).join("  "),
-    ...rows.map((row: any) => row.map((cell: any, index: any) => String(cell ?? "").padEnd(widths[index])).join("  ")),
+    headers.map((header: string, index: number) => header.padEnd(widths[index])).join("  "),
+    ...rows.map((row: string[]) => row.map((cell: string, index: number) => String(cell ?? "").padEnd(widths[index])).join("  ")),
   ];
   return lines.join("\n");
 }
 
-function finiteOr(raw: any, fallback: any) {
+function finiteOr(raw: unknown, fallback: number) {
   const value = Number(raw);
   return Number.isFinite(value) ? value : fallback;
 }
 
-function resolveRoot(flags: any) {
-  return resolve(flags.root || join(homedir(), "NextFrame", "projects"));
+function resolveRoot(flags: Record<string, string | boolean>) {
+  return resolve(typeof flags.root === "string" ? flags.root : join(homedir(), "NextFrame", "projects"));
 }

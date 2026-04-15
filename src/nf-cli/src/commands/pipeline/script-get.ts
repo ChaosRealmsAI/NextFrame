@@ -4,7 +4,7 @@ import { loadPipeline } from "../_helpers/_pipeline.js";
 import { parseIntegerFlag } from "../_helpers/_pipeline-utils.js";
 import { resolveRoot, loadProjectContext } from "../_helpers/_project.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName) {
@@ -12,7 +12,7 @@ export async function run(argv: any) {
     return 3;
   }
 
-  let segmentNumber: any;
+  let segmentNumber: number | undefined;
   if (flags.segment !== undefined) {
     const parsedSegment = parseIntegerFlag("segment", flags.segment, { min: 1 });
     if (!parsedSegment.ok) {
@@ -26,7 +26,7 @@ export async function run(argv: any) {
   let context;
   try {
     context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
+  } catch (err: unknown) {
     emit(loadContextError(err, projectName, episodeName), flags);
     return 2;
   }
@@ -34,20 +34,20 @@ export async function run(argv: any) {
   let pipeline;
   try {
     pipeline = await loadPipeline(context.projectPath, episodeName);
-  } catch (err) {
-    emit({ ok: false, error: { code: "LOAD_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
   const value = segmentNumber === undefined
     ? pipeline.script
-    : pipeline.script.segments.find((segment: any) => Number(segment.segment) === segmentNumber) || null;
+    : pipeline.script.segments.find((segment: Record<string, unknown>) => Number(segment.segment) === segmentNumber) || null;
   emit({ ok: true, value }, flags);
   return 0;
 }
 
-function loadContextError(err: any, projectName: any, episodeName: any) {
-  if (err.code === "ENOENT") {
+function loadContextError(err: unknown, projectName: string, episodeName: string) {
+  if ((err as NodeJS.ErrnoException).code === "ENOENT") {
     return {
       ok: false,
       error: {
@@ -56,5 +56,5 @@ function loadContextError(err: any, projectName: any, episodeName: any) {
       },
     };
   }
-  return { ok: false, error: { code: "LOAD_FAIL", message: err.message } };
+  return { ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } };
 }

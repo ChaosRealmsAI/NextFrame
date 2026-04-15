@@ -3,7 +3,7 @@ import { fail, listSources, parseSourceFlags, success } from "../_helpers/_sourc
 
 const HELP = "usage: nextframe source-list --library <path>";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { flags } = parseSourceFlags(argv, ["library"]);
   if (!flags.library) {
     fail("USAGE", HELP);
@@ -13,8 +13,8 @@ export async function run(argv: any) {
     const rows = await listSources(String(flags.library));
     success(rows);
     return 0;
-  } catch (error) {
-    fail("SOURCE_LIST_FAILED", error.message);
+  } catch (error: unknown) {
+    fail("SOURCE_LIST_FAILED", (error as Error).message);
   }
 }
 

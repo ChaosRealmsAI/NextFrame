@@ -8,8 +8,9 @@ import { getREGISTRY } from "./scene-registry.js";
 import { EFFECT_IDS } from "../../../nf-core/animation/effects/index.js";
 import { FILTER_IDS } from "../../../nf-core/filters/index.js";
 import { TRANSITION_IDS } from "../../../nf-core/animation/transitions/index.js";
+import type { SceneParam, SceneEntry, Timeline } from "../../../nf-core/types.js";
 
-let REGISTRY = new Map();
+let REGISTRY: Map<string, SceneEntry> = new Map();
 
 // Scenes that are expected to overlay fullscreen — skip overlap warnings for these
 const BG_SCENES = new Set([
@@ -30,11 +31,31 @@ const SUPPORTED_FPS = new Set([24, 25, 30, 60]);
 const V1_VERSION_RE = /^\d+\.\d+(?:\.\d+)?$/;
 const V3_VERSION_RE = /^\d+\.\d+(?:\.\d+)?$/;
 
-function hasExplicitBounds(layer: any) {
+interface ValidationDiagnostic { code: string; message: string; ref?: string; hint?: string }
+type LooseLayer = Record<string, unknown> & {
+  id?: string; scene?: string; start?: number; dur?: number; params?: Record<string, unknown>;
+  blend?: string; opacity?: number; x?: unknown; y?: unknown; w?: unknown; h?: unknown;
+};
+type LooseTimeline = Record<string, unknown> & {
+  version?: string; schema?: string; width?: number; height?: number; fps?: number; duration?: number;
+  ratio?: string; audio?: unknown; layers?: LooseLayer[]; tracks?: LooseTrack[];
+  chapters?: Array<Record<string, unknown>>; markers?: Array<Record<string, unknown>>;
+  assets?: Array<Record<string, unknown>>; background?: string;
+  project?: { width?: number; height?: number; fps?: number };
+};
+type LooseTrack = Record<string, unknown> & { id?: string; clips?: LooseClip[] };
+type LooseClip = Record<string, unknown> & {
+  id?: string; scene?: string; start?: number; dur?: number; params?: Record<string, unknown>;
+  effects?: { enter?: { type?: string }; exit?: { type?: string } };
+  filters?: Array<string | { type?: string }>;
+  transition?: { type?: string };
+};
+
+function hasExplicitBounds(layer: LooseLayer | null | undefined) {
   return layer?.x != null || layer?.y != null || layer?.w != null || layer?.h != null;
 }
 
-export function detectFormat(timeline: any) {
+export function detectFormat(timeline: LooseTimeline) {
   if (Array.isArray(timeline?.layers)) return "v0.3";
   if (Array.isArray(timeline?.tracks)) return "v0.1";
   return "unknown";
@@ -45,7 +66,7 @@ export function detectFormat(timeline: any) {
  * Registry keys use "ratio:id" format; bare ids may match multiple ratios.
  * Returns the entry for the given timelineRatio if available, otherwise first match.
  */
-function registryLookup(sceneId: any, timelineRatio: any) {
+function registryLookup(sceneId: string, timelineRatio: string | null) {
   if (REGISTRY.has(sceneId)) return REGISTRY.get(sceneId);
   // Try ratio:id key
   const prefixed = timelineRatio ? `${timelineRatio}:${sceneId}` : null;
@@ -57,11 +78,11 @@ function registryLookup(sceneId: any, timelineRatio: any) {
   return null;
 }
 
-export async function validateTimelineV3(timeline: any) {
+export async function validateTimelineV3(timeline: LooseTimeline) {
   REGISTRY = await getREGISTRY();
-  const errors = [];
-  const warnings: any = [];
-  const hints: any = [];
+  const errors: ValidationDiagnostic[] = [];
+  const warnings: ValidationDiagnostic[] = [];
+  const hints: ValidationDiagnostic[] = [];
 
   if (Array.isArray(timeline?.tracks) && !Array.isArray(timeline?.layers)) {
     return {
@@ -90,17 +111,18 @@ export async function validateTimelineV3(timeline: any) {
   if (!Array.isArray(timeline.layers)) errors.push({ code: "MISSING_FIELD", message: "layers[] is required" });
   if (errors.length > 0) return { ok: false, errors, warnings, hints };
 
-  if (timeline.layers.length === 0) {
+  const layers = timeline.layers!;
+  if (layers.length === 0) {
     errors.push({ code: "NO_LAYERS", message: "timeline has 0 layers. Fix: add at least one layer" });
     return { ok: false, errors, warnings, hints };
   }
 
   if (!timeline.ratio) {
-    const inferred = timeline.height > timeline.width ? "9:16" : "16:9";
+    const inferred = timeline.height! > timeline.width! ? "9:16" : "16:9";
     warnings.push({ code: "MISSING_RATIO", message: `ratio not specified — inferred "${inferred}" from ${timeline.width}x${timeline.height}. Fix: add "ratio": "${inferred}"` });
   } else {
     const expectPortrait = timeline.ratio === "9:16";
-    const actualPortrait = timeline.height > timeline.width;
+    const actualPortrait = timeline.height! > timeline.width!;
     if (expectPortrait !== actualPortrait) {
       errors.push({ code: "RATIO_MISMATCH", message: `ratio "${timeline.ratio}" doesn't match ${timeline.width}x${timeline.height}. Fix: correct ratio or dimensions` });
     }
@@ -108,7 +130,8 @@ export async function validateTimelineV3(timeline: any) {
 
   if (timeline.audio !== undefined && timeline.audio !== null) {
     if (typeof timeline.audio === "object" && !Array.isArray(timeline.audio)) {
-      if (!timeline.audio.src || typeof timeline.audio.src !== "string") {
+      const audioObj = timeline.audio as Record<string, unknown>;
+      if (!audioObj.src || typeof audioObj.src !== "string") {
         errors.push({ code: "BAD_AUDIO", message: "timeline.audio object missing .src string. Fix: set audio.src to file path, or use a plain string" });
       }
     } else if (typeof timeline.audio !== "string") {
@@ -117,7 +140,7 @@ export async function validateTimelineV3(timeline: any) {
   }
 
   const ids = new Set();
-  for (const layer of timeline.layers) {
+  for (const layer of layers) {
     if (!layer.id) errors.push({ code: "MISSING_ID", message: "layer missing id" });
     if (!layer.scene) errors.push({ code: "MISSING_SCENE", message: `layer "${layer.id}" missing scene` });
     if (layer.start == null) errors.push({ code: "MISSING_START", message: `layer "${layer.id}" missing start` });
@@ -131,9 +154,9 @@ export async function validateTimelineV3(timeline: any) {
     }
     ids.add(layer.id);
 
-    const isPortrait = timeline.height > timeline.width;
-    const isSquare = Math.abs(timeline.width - timeline.height) < 50;
-    const aspectRatio = timeline.width / timeline.height;
+    const isPortrait = timeline.height! > timeline.width!;
+    const isSquare = Math.abs(timeline.width! - timeline.height!) < 50;
+    const aspectRatio = timeline.width! / timeline.height!;
     const is43 = !isPortrait && !isSquare && aspectRatio >= 1.2 && aspectRatio <= 1.5;
     const timelineRatio = isSquare ? "1:1" : isPortrait ? "9:16" : is43 ? "4:3" : "16:9";
 
@@ -161,7 +184,7 @@ export async function validateTimelineV3(timeline: any) {
 
     // Deep param validation against scene meta.params schema
     if (registryEntry?.META?.params && layer.params && typeof layer.params === "object") {
-      const paramSchema = registryEntry.META.params;
+      const paramSchema = (registryEntry as SceneEntry).META!.params as Record<string, SceneParam>;
       for (const [key, spec] of Object.entries(paramSchema)) {
         const val = layer.params[key];
         if (spec.required && (val === undefined || val === null || val === "")) {
@@ -202,7 +225,7 @@ export async function validateTimelineV3(timeline: any) {
 
     if (typeof layer.start === "number" && typeof layer.dur === "number") {
       const end = layer.start + layer.dur;
-      if (end > timeline.duration + 0.01) {
+      if (end > timeline.duration! + 0.01) {
         warnings.push({
           code: "OVERFLOW",
           message: `layer "${layer.id}" ends at ${end.toFixed(2)}s but timeline is ${timeline.duration}s`,
@@ -211,8 +234,8 @@ export async function validateTimelineV3(timeline: any) {
     }
   }
 
-  const contentLayers = timeline.layers.filter((layer: any) => {
-    if (BG_SCENES.has(layer.scene)) return false;
+  const contentLayers = layers.filter((layer) => {
+    if (layer.scene && BG_SCENES.has(layer.scene)) return false;
     if (layer.blend && layer.blend !== "normal") return false;
     if (layer.opacity != null && layer.opacity < 0.5) return false;
     if (hasExplicitBounds(layer)) return false;
@@ -220,11 +243,11 @@ export async function validateTimelineV3(timeline: any) {
   });
   for (let index = 0; index < contentLayers.length; index++) {
     const a = contentLayers[index];
-    const aEnd = a.start + a.dur;
+    const aEnd = (a.start as number) + (a.dur as number);
     for (let otherIndex = index + 1; otherIndex < contentLayers.length; otherIndex++) {
       const b = contentLayers[otherIndex];
-      const bEnd = b.start + b.dur;
-      const overlap = Math.min(aEnd, bEnd) - Math.max(a.start, b.start);
+      const bEnd = (b.start as number) + (b.dur as number);
+      const overlap = Math.min(aEnd, bEnd) - Math.max(a.start as number, b.start as number);
       if (overlap > 1.5) {
         warnings.push({
           code: "FULLSCREEN_OVERLAP",
@@ -234,12 +257,12 @@ export async function validateTimelineV3(timeline: any) {
     }
   }
 
-  const isVertical = timeline.height > timeline.width;
-  for (const layer of timeline.layers) {
+  const isVertical = (timeline.height ?? 0) > (timeline.width ?? 0);
+  for (const layer of layers) {
     const fontSize = layer.params?.fontSize;
     if (typeof fontSize === "number" && fontSize >= 1) {
       const minFont = isVertical ? 24 : 18;
-      const maxTitle = Math.floor(timeline.width / 20);
+      const maxTitle = Math.floor(timeline.width! / 20);
       if (fontSize < minFont) {
         warnings.push({
           code: "FONT_TOO_SMALL",
@@ -263,8 +286,8 @@ export async function validateTimelineV3(timeline: any) {
     }
 
     if (layer.x != null && layer.w != null) {
-      const x = parseFloat(layer.x);
-      const w = parseFloat(layer.w);
+      const x = parseFloat(String(layer.x));
+      const w = parseFloat(String(layer.w));
       if (String(layer.x).includes("%") && String(layer.w).includes("%") && x + w > 102) {
         warnings.push({
           code: "CONTENT_OVERFLOW",
@@ -273,8 +296,8 @@ export async function validateTimelineV3(timeline: any) {
       }
     }
     if (layer.y != null && layer.h != null) {
-      const y = parseFloat(layer.y);
-      const h = parseFloat(layer.h);
+      const y = parseFloat(String(layer.y));
+      const h = parseFloat(String(layer.h));
       if (String(layer.y).includes("%") && String(layer.h).includes("%") && y + h > 102) {
         warnings.push({
           code: "CONTENT_OVERFLOW",
@@ -283,7 +306,7 @@ export async function validateTimelineV3(timeline: any) {
       }
     }
 
-    if (isVertical && !BG_SCENES.has(layer.scene) && !hasExplicitBounds(layer)) {
+    if (isVertical && layer.scene && !BG_SCENES.has(layer.scene) && !hasExplicitBounds(layer)) {
       hints.push({
         code: "SAFE_ZONE_HINT",
         message: `layer "${layer.id}" is fullscreen in portrait mode without x/y/w/h. Consider safe-zone padding to reduce text clipping near the edges.`,
@@ -294,10 +317,10 @@ export async function validateTimelineV3(timeline: any) {
   return { ok: errors.length === 0, errors, warnings, hints };
 }
 
-export function validateTimelineLegacy(timeline: any, opts = {}) {
-  const errors = [];
-  const warnings: any = [];
-  const hints: any = [];
+export function validateTimelineLegacy(timeline: LooseTimeline, opts: { projectDir?: string } = {}) {
+  const errors: ValidationDiagnostic[] = [];
+  const warnings: ValidationDiagnostic[] = [];
+  const hints: ValidationDiagnostic[] = [];
   const projectDir = opts.projectDir || process.cwd();
 
   const schemaErrs = gateLegacySchema(timeline);
@@ -306,8 +329,12 @@ export function validateTimelineLegacy(timeline: any, opts = {}) {
     return guarded("validateTimeline", { ok: false, error: errors[0], errors, warnings, hints });
   }
 
-  const resolvedTimeline = resolveLegacyTimeline(timeline);
-  if (!resolvedTimeline.ok) {
+  type LegacyResolveResult =
+    | { ok: true; value: Timeline & Record<string, unknown>; lookup?: unknown }
+    | { ok: false; error: { code?: string; message: string; ref?: string; hint?: string } };
+
+  const resolvedTimeline = resolveLegacyTimeline(timeline as unknown as Parameters<typeof resolveLegacyTimeline>[0]) as unknown as LegacyResolveResult;
+  if (resolvedTimeline.ok === false) {
     errors.push({
       code: resolvedTimeline.error.code || "TIME_RESOLVE_ERROR",
       message: resolvedTimeline.error.message,
@@ -370,7 +397,7 @@ export function validateTimelineLegacy(timeline: any, opts = {}) {
       const start = clip.start;
       const clipDuration = clip.dur;
       if (typeof start !== "number" || typeof clipDuration !== "number") continue;
-      if (start < 0 || start + clipDuration > duration + 1e-6) {
+      if (start < 0 || start + clipDuration > (duration ?? 0) + 1e-6) {
         errors.push({
           code: "TIME_OUT_OF_RANGE",
           message: `clip "${clip.id}" [${start}, ${start + clipDuration}] outside [0, ${duration}]`,
@@ -401,7 +428,7 @@ export function validateTimelineLegacy(timeline: any, opts = {}) {
   return guarded("validateTimeline", { ok: true, value: resolved, errors, warnings, hints, resolved });
 }
 
-function gateLegacySchema(timeline: any) {
+function gateLegacySchema(timeline: LooseTimeline) {
   const errors = [];
   if (!timeline || typeof timeline !== "object") {
     errors.push({ code: "BAD_TIMELINE", message: "timeline is not an object" });

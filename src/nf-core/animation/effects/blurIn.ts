@@ -1,7 +1,7 @@
 import { clamp01, px } from "../shared.js";
 
 // Resolves from a soft blur to crisp content.
-export function blurIn(progress: any, opts = {}) {
+export function blurIn(progress: number, opts: { blur?: number } = {}) {
   const p = clamp01(progress);
   const maxBlur = opts.blur ?? 20;
   const blur = maxBlur * (1 - p);

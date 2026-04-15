@@ -3,7 +3,7 @@ import { parseFlags, emit } from "../_helpers/_io.js";
 import { objectOr } from "../_helpers/_pipeline-utils.js";
 import { resolveRoot, loadProjectContext, touchProject } from "../_helpers/_project.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [projectName, tail] = positional;
   if (!projectName || (!flags.get && !flags.set) || (flags.get && flags.set)) {
@@ -14,19 +14,19 @@ export async function run(argv: any) {
   const root = resolveRoot(flags);
   let context;
   try {
-    context = await loadProjectContext(root, projectName);
+    context = await loadProjectContext(root, projectName, undefined);
   } catch (err) {
-    if (err.code === "ENOENT") {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       emit({ ok: false, error: { code: "PROJECT_NOT_FOUND", message: `project not found: ${projectName}` } }, flags);
       return 2;
     }
-    emit({ ok: false, error: { code: "LOAD_FAIL", message: err.message } }, flags);
+    emit({ ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
   if (flags.get) {
     const key = typeof flags.get === "string" ? flags.get : tail;
-    const shared = objectOr(context.project.shared);
+    const shared = objectOr(context.project.shared) as Record<string, unknown>;
     const value = key ? shared[key] ?? null : shared;
     if (flags.json) {
       process.stdout.write(JSON.stringify({ ok: true, key: key || null, value }, null, 2) + "\n");
@@ -63,8 +63,8 @@ export async function run(argv: any) {
 
   try {
     await touchProject(context.projectFile, project);
-  } catch (err) {
-    emit({ ok: false, error: { code: "SAVE_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SAVE_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -77,7 +77,7 @@ export async function run(argv: any) {
   return 0;
 }
 
-function parseConfigValue(rawValue: any) {
+function parseConfigValue(rawValue: string) {
   const trimmed = String(rawValue);
   if (trimmed === "true") return true;
   if (trimmed === "false") return false;

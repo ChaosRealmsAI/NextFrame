@@ -1,10 +1,10 @@
 // Applies a warm-tone color filter and exposes its matching CSS filter string.
-function clamp01(value: any, fallback: any) {
+function clamp01(value: number | undefined, fallback: number) {
   const normalized = value ?? fallback;
   return Math.max(0, Math.min(1, normalized));
 }
 
-export function warmTone(data: any, w: any, h: any, params: any) {
+export function warmTone(data: Uint8ClampedArray, w: number, h: number, params: { intensity?: number }) {
   const intensity = clamp01(params.intensity, 0.5);
   for (let i = 0; i < data.length; i += 4) {
     data[i]     = Math.min(255, data[i] + 12 * intensity);     // R boost

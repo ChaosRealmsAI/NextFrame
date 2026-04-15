@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 const HELP = "usage: nextframe source-align <source-dir> --srt <file> [--lang auto]";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseSourceFlags(argv, ["srt", "lang"]);
   const [sourceDirArg] = positional;
   if (!sourceDirArg || !flags.srt) {
@@ -39,8 +39,8 @@ export async function run(argv: any) {
     await writeSourceJson(sourceDir, nextSource);
     success({ ok: true, source_dir: sourceDir, transcript, source: nextSource });
     return 0;
-  } catch (error) {
-    fail("SOURCE_ALIGN_FAILED", error.message);
+  } catch (error: unknown) {
+    fail("SOURCE_ALIGN_FAILED", (error as Error).message);
   }
 }
 

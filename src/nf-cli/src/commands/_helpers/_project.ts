@@ -3,19 +3,19 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
-export function resolveRoot(flags: any) {
-  return resolve(flags.root || join(homedir(), "NextFrame", "projects"));
+export function resolveRoot(flags: Record<string, string | boolean>) {
+  return resolve(typeof flags.root === "string" ? flags.root : join(homedir(), "NextFrame", "projects"));
 }
 
-export async function loadJson(path: any) {
+export async function loadJson(path: string) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
-export async function saveJson(path: any, value: any) {
+export async function saveJson(path: string, value: unknown) {
   await writeFile(path, JSON.stringify(value, null, 2) + "\n");
 }
 
-export async function loadProjectContext(root: any, projectName: any, episodeName: any) {
+export async function loadProjectContext(root: string, projectName: string, episodeName: string | undefined) {
   const projectPath = join(root, projectName);
   const projectFile = join(projectPath, "project.json");
   const project = await loadJson(projectFile);
@@ -28,7 +28,7 @@ export async function loadProjectContext(root: any, projectName: any, episodeNam
   return { ...context, episodeName, episodePath, episodeFile };
 }
 
-export async function touchProject(projectFile: any, project: any) {
+export async function touchProject(projectFile: string, project: Record<string, unknown>) {
   const nextProject = {
     ...project,
     updated: new Date().toISOString(),

@@ -1,16 +1,18 @@
 // Guard helpers for structured legacy-engine-style results.
 
-function isStructuredError(error: any) {
-  return !!error && typeof error === "object" && typeof error.code === "string" && typeof error.message === "string";
+interface StructuredError { code: string; message: string; [key: string]: unknown }
+
+function isStructuredError(error: unknown): error is StructuredError {
+  return !!error && typeof error === "object" && typeof (error as StructuredError).code === "string" && typeof (error as StructuredError).message === "string";
 }
 
-function reportGuard(name: any, problem: any, result: any) {
+function reportGuard<T>(name: string, problem: string, result: T): T {
   if (process.env.NEXTFRAME_GUARD !== "1") return result;
   process.stderr.write(`[NEXTFRAME_GUARD] ${name}: ${problem}\n`);
   return result;
 }
 
-export function guarded(name: any, result: any) {
+export function guarded<T extends Record<string, unknown>>(name: string, result: T): T {
   if (process.env.NEXTFRAME_GUARD !== "1") return result;
   if (!result || typeof result !== "object" || typeof result.ok !== "boolean") {
     return reportGuard(name, "return must be an object with boolean ok", result);

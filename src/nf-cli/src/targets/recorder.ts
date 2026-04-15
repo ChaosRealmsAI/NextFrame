@@ -4,33 +4,44 @@ import { once } from "node:events";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { bakeBrowserScenes } from "../commands/bakeBrowser.js";
 import { guarded } from "../lib/guard.js";
 import { resolveTimeline } from "../lib/legacy-timeline.js";
 import { exportMP4 } from "./ffmpeg-mp4.js";
 import { generateHarness } from "./harness-gen.js";
+import type { Timeline } from "../../../nf-core/types.js";
 
-function normalizeCrf(value: any) {
+interface ExportRecorderOpts {
+  fps?: number;
+  crf?: number;
+  width?: number;
+  height?: number;
+  dpr?: number;
+  projectDir?: string;
+  recorderPath?: string;
+  onProgress?: (frameIdx: number, total: number) => void;
+}
+
+function normalizeCrf(value: unknown) {
   if (value === undefined || value === null) return 20;
   const crf = Number(value);
   if (!Number.isInteger(crf) || crf < 0 || crf > 51) return null;
   return crf;
 }
 
-function recorderBinary(opts = {}) {
+function recorderBinary(opts: ExportRecorderOpts) {
   return opts.recorderPath || "nextframe-recorder";
 }
 
-function isRecorderAvailable(binary: any) {
+function isRecorderAvailable(binary: string) {
   const probe = spawnSync(binary, ["--help"], { stdio: "ignore" });
-  return probe.error?.code !== "ENOENT";
+  return (probe.error as NodeJS.ErrnoException | null)?.code !== "ENOENT";
 }
 
-function warnRecorderFallback(binary: any) {
+function warnRecorderFallback(binary: string) {
   process.stderr.write(`warning: ${binary} not found in PATH, falling back to ffmpeg\n`);
 }
 
-async function runRecorder(binary: any, htmlFile: any, outputPath: any, opts: any) {
+async function runRecorder(binary: string, htmlFile: string, outputPath: string, opts: { fps: number; crf: number; dpr: number; width: number; height: number }) {
   const args = [
     "slide",
     htmlFile,
@@ -46,32 +57,34 @@ async function runRecorder(binary: any, htmlFile: any, outputPath: any, opts: an
   try {
     child = spawn(binary, args, { stdio: ["ignore", "ignore", "pipe"] });
   } catch (err) {
+    const e = err as NodeJS.ErrnoException;
     return {
       ok: false,
       error: {
-        code: err.code === "ENOENT" ? "RECORDER_NOT_FOUND" : "RECORDER_SPAWN",
-        message: err.message,
+        code: e.code === "ENOENT" ? "RECORDER_NOT_FOUND" : "RECORDER_SPAWN",
+        message: e.message ?? String(err),
       },
     };
   }
 
   let stderr = "";
-  let spawnError = null;
+  let spawnError: NodeJS.ErrnoException | null = null;
   child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk) => {
+  child.stderr.on("data", (chunk: string) => {
     stderr += chunk;
   });
-  child.on("error", (err) => {
+  child.on("error", (err: NodeJS.ErrnoException) => {
     spawnError = err;
   });
 
   const [exitCode] = await once(child, "close");
   if (spawnError) {
+    const se = spawnError as NodeJS.ErrnoException;
     return {
       ok: false,
       error: {
-        code: spawnError.code === "ENOENT" ? "RECORDER_NOT_FOUND" : "RECORDER_SPAWN",
-        message: spawnError.message,
+        code: se.code === "ENOENT" ? "RECORDER_NOT_FOUND" : "RECORDER_SPAWN",
+        message: se.message,
       },
     };
   }
@@ -96,16 +109,16 @@ async function runRecorder(binary: any, htmlFile: any, outputPath: any, opts: an
  * @param {{fps?: number, crf?: number, width?: number, height?: number, projectDir?: string, recorderPath?: string, onProgress?: (frameIdx: number, total: number) => void}} [opts]
  * @returns {Promise<{ok: true, value: object} | {ok: false, error: object}>}
  */
-export async function exportRecorder(timeline: any, outputPath: any, opts = {}) {
-  const r = resolveTimeline(timeline);
+export async function exportRecorder(timeline: unknown, outputPath: string, opts: ExportRecorderOpts = {}) {
+  const r = resolveTimeline(timeline as Timeline);
   if (!r.ok) return guarded("exportRecorder", { ok: false, error: r.error });
-  const resolved = r.value;
+  const resolved = r.value as Timeline;
 
   const fps = opts.fps || resolved.project?.fps || 30;
   const width = opts.width || resolved.project?.width || 1920;
   const height = opts.height || resolved.project?.height || 1080;
-  const dpr = Number.isFinite(opts.dpr) && opts.dpr > 0 ? opts.dpr : 1;
-  const duration = resolved.duration;
+  const dpr = Number.isFinite(opts.dpr) && (opts.dpr ?? 0) > 0 ? (opts.dpr ?? 1) : 1;
+  const duration = resolved.duration ?? 0;
   const totalFrames = Math.round(duration * fps);
   const crf = normalizeCrf(opts.crf);
   if (crf === null) {
@@ -132,7 +145,7 @@ export async function exportRecorder(timeline: any, outputPath: any, opts = {}) 
       height,
     });
     if (!recorded.ok) {
-      if (recorded.error.code === "RECORDER_NOT_FOUND") {
+      if (recorded.error?.code === "RECORDER_NOT_FOUND") {
         warnRecorderFallback(binary);
         return exportViaFfmpegFallback(timeline, outputPath, opts, { width, height });
       }
@@ -155,15 +168,7 @@ export async function exportRecorder(timeline: any, outputPath: any, opts = {}) 
   }
 }
 
-async function exportViaFfmpegFallback(timeline: any, outputPath: any, opts: any, size: any) {
-  const baked = await bakeBrowserScenes(timeline, {
-    width: size.width,
-    height: size.height,
-    rootDir: opts.projectDir,
-  });
-  if (!baked.ok) {
-    return guarded("exportRecorder", baked);
-  }
-
-  return exportMP4(timeline, outputPath, opts);
+async function exportViaFfmpegFallback(timeline: unknown, outputPath: string, opts: ExportRecorderOpts, _size: { width: number; height: number }) {
+  const { fps, crf, width, height, onProgress } = opts;
+  return exportMP4(timeline, outputPath, { fps, crf, width, height, onProgress });
 }

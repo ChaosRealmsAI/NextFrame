@@ -4,7 +4,7 @@ import { loadPipeline, savePipeline } from "../_helpers/_pipeline.js";
 import { parseIntegerFlag } from "../_helpers/_pipeline-utils.js";
 import { resolveRoot, loadProjectContext } from "../_helpers/_project.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName || flags.id === undefined) {
@@ -22,7 +22,7 @@ export async function run(argv: any) {
   let context;
   try {
     context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
+  } catch (err: unknown) {
     emit(loadContextError(err, projectName, episodeName), flags);
     return 2;
   }
@@ -30,12 +30,12 @@ export async function run(argv: any) {
   let pipeline;
   try {
     pipeline = await loadPipeline(context.projectPath, episodeName);
-  } catch (err) {
-    emit({ ok: false, error: { code: "LOAD_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
-  const index = pipeline.atoms.findIndex((atom: any) => Number(atom.id) === parsedId.value);
+  const index = pipeline.atoms.findIndex((atom: Record<string, unknown>) => Number(atom.id) === parsedId.value);
   if (index < 0) {
     emit({ ok: false, error: { code: "ATOM_NOT_FOUND", message: `atom not found: ${parsedId.value}` } }, flags);
     return 2;
@@ -48,8 +48,8 @@ export async function run(argv: any) {
       ...pipeline,
       atoms,
     });
-  } catch (err) {
-    emit({ ok: false, error: { code: "SAVE_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SAVE_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -62,8 +62,8 @@ export async function run(argv: any) {
   return 0;
 }
 
-function loadContextError(err: any, projectName: any, episodeName: any) {
-  if (err.code === "ENOENT") {
+function loadContextError(err: unknown, projectName: string, episodeName: string) {
+  if ((err as NodeJS.ErrnoException).code === "ENOENT") {
     return {
       ok: false,
       error: {
@@ -72,5 +72,5 @@ function loadContextError(err: any, projectName: any, episodeName: any) {
       },
     };
   }
-  return { ok: false, error: { code: "LOAD_FAIL", message: err.message } };
+  return { ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } };
 }

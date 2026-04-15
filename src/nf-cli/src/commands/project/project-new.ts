@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 
 import { parseFlags, emit } from "../_helpers/_io.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [name] = positional;
   if (!name) {
@@ -26,12 +26,12 @@ export async function run(argv: any) {
     await mkdir(root, { recursive: true });
     await mkdir(path);
     await writeFile(join(path, "project.json"), JSON.stringify(project, null, 2) + "\n");
-  } catch (err) {
-    if (err.code === "EEXIST") {
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
       emit({ ok: false, error: { code: "PROJECT_EXISTS", message: `project already exists: ${path}` } }, flags);
       return 2;
     }
-    emit({ ok: false, error: { code: "CREATE_FAIL", message: err.message } }, flags);
+    emit({ ok: false, error: { code: "CREATE_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -44,6 +44,6 @@ export async function run(argv: any) {
   return 0;
 }
 
-function resolveRoot(flags: any) {
-  return resolve(flags.root || join(homedir(), "NextFrame", "projects"));
+function resolveRoot(flags: Record<string, string | boolean>) {
+  return resolve(typeof flags.root === "string" ? flags.root : join(homedir(), "NextFrame", "projects"));
 }

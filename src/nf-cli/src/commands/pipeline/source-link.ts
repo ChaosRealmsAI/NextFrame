@@ -7,7 +7,7 @@ import { fail, parseSourceFlags, readSourceJson, success } from "../_helpers/_so
 
 const HELP = "usage: nextframe source-link <source-dir> --project <name> --episode <name> [--root <path>]";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseSourceFlags(argv, ["project", "episode", "root"]);
   const [sourceDirArg] = positional;
   if (!sourceDirArg || !flags.project || !flags.episode) {
@@ -19,15 +19,16 @@ export async function run(argv: any) {
 
   try {
     const source = await readSourceJson(sourceDir);
-    const context = await loadProjectContext(root, String(flags.project), String(flags.episode));
+    const contextRaw = await loadProjectContext(root, String(flags.project), String(flags.episode));
+    const context = contextRaw as typeof contextRaw & { episodeName: string };
     const pipeline = await loadPipeline(context.projectPath, context.episodeName);
-    const nextId = pipeline.atoms.reduce((max: any, atom: any) => Math.max(max, Number(atom.id) || 0), 0) + 1;
+    const nextId = pipeline.atoms.reduce((max: number, atom: Record<string, unknown>) => Math.max(max, Number(atom.id) || 0), 0) + 1;
     const sourceRef = join(sourceDir, "source.json");
-    const atoms = source.clips.map((clip, index) => ({
+    const atoms = source.clips.map((clip: Record<string, unknown>, index: number) => ({
       id: nextId + index,
       type: "video",
       name: clip.title,
-      file: resolve(sourceDir, clip.file),
+      file: resolve(sourceDir, String(clip.file ?? "")),
       duration: clip.duration_sec,
       source_ref: sourceRef,
       source_clip_id: clip.id,
@@ -41,7 +42,7 @@ export async function run(argv: any) {
     success({ ok: true, added: atoms.length, atoms, pipeline: nextPipeline });
     return 0;
   } catch (error) {
-    fail("SOURCE_LINK_FAILED", error.message);
+    fail("SOURCE_LINK_FAILED", (error as Error).message);
   }
 }
 

@@ -4,7 +4,7 @@ import { loadPipeline, savePipeline } from "../_helpers/_pipeline.js";
 import { parseIntegerFlag } from "../_helpers/_pipeline-utils.js";
 import { resolveRoot, loadProjectContext } from "../_helpers/_project.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName || flags.id === undefined || !flags.platform) {
@@ -22,7 +22,7 @@ export async function run(argv: any) {
   let context;
   try {
     context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
+  } catch (err: unknown) {
     emit(loadContextError(err, projectName, episodeName), flags);
     return 2;
   }
@@ -30,12 +30,12 @@ export async function run(argv: any) {
   let pipeline;
   try {
     pipeline = await loadPipeline(context.projectPath, episodeName);
-  } catch (err) {
-    emit({ ok: false, error: { code: "LOAD_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
-  const index = pipeline.outputs.findIndex((output: any) => Number(output.id) === parsedId.value);
+  const index = pipeline.outputs.findIndex((output: Record<string, unknown>) => Number(output.id) === parsedId.value);
   if (index < 0) {
     emit({ ok: false, error: { code: "OUTPUT_NOT_FOUND", message: `output not found: ${parsedId.value}` } }, flags);
     return 2;
@@ -44,7 +44,7 @@ export async function run(argv: any) {
   const publishedAt = new Date().toISOString();
   const output = pipeline.outputs[index];
   const published = Array.isArray(output.published)
-    ? output.published.filter((entry: any) => entry.platform !== flags.platform)
+    ? output.published.filter((entry: Record<string, unknown>) => entry.platform !== flags.platform)
     : [];
   published.push({ platform: flags.platform, publishedAt });
   const nextOutput = { ...output, published };
@@ -56,8 +56,8 @@ export async function run(argv: any) {
       ...pipeline,
       outputs,
     });
-  } catch (err) {
-    emit({ ok: false, error: { code: "SAVE_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SAVE_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -70,8 +70,8 @@ export async function run(argv: any) {
   return 0;
 }
 
-function loadContextError(err: any, projectName: any, episodeName: any) {
-  if (err.code === "ENOENT") {
+function loadContextError(err: unknown, projectName: string, episodeName: string) {
+  if ((err as NodeJS.ErrnoException).code === "ENOENT") {
     return {
       ok: false,
       error: {
@@ -80,5 +80,5 @@ function loadContextError(err: any, projectName: any, episodeName: any) {
       },
     };
   }
-  return { ok: false, error: { code: "LOAD_FAIL", message: err.message } };
+  return { ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } };
 }

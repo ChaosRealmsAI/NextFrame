@@ -1,7 +1,7 @@
 import { clamp01, inset } from "../shared.js";
 
 // B reveals from the bottom while A is clipped away from the bottom.
-export function wipeUp(progress: any) {
+export function wipeUp(progress: number) {
   const p = clamp01(progress);
   return {
     layerA: { clipPath: inset(0, 0, p * 100, 0) },

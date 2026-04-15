@@ -38,13 +38,16 @@ export const EFFECT_FNS = { fadeIn, fadeOut, slideUp, slideDown, slideLeft, slid
 export const EFFECT_IDS = Object.keys(EFFECT_FNS);
 export const EFFECT_NAMES = [...EFFECT_IDS];
 
-export function getEffect(id: any) {
-  if (!EFFECT_FNS[id]) return null;
-  return { id, apply: EFFECT_FNS[id], META: EFFECT_TABLE[id] };
+export function getEffect(id: string) {
+  const fns = EFFECT_FNS as Record<string, (typeof EFFECT_FNS)[keyof typeof EFFECT_FNS]>;
+  const table = EFFECT_TABLE as Record<string, (typeof EFFECT_TABLE)[keyof typeof EFFECT_TABLE]>;
+  if (!fns[id]) return null;
+  return { id, apply: fns[id], META: table[id] };
 }
 
 export function listEffects() {
-  return EFFECT_IDS.map((id) => EFFECT_TABLE[id]);
+  const table = EFFECT_TABLE as Record<string, (typeof EFFECT_TABLE)[keyof typeof EFFECT_TABLE]>;
+  return EFFECT_IDS.map((id) => table[id]);
 }
 
 /**
@@ -55,14 +58,14 @@ export function listEffects() {
  * @param {number} canvasWidth
  * @param {number} canvasHeight
  */
-export function applyEnterEffect(ctx: any, localT: any, effect: any, canvasWidth: any, canvasHeight: any) {
+export function applyEnterEffect(ctx: CanvasRenderingContext2D, localT: number, effect: { type: string; dur?: number; [key: string]: unknown }, canvasWidth: number, canvasHeight: number) {
   if (!effect || !effect.type) return;
-  const fn = EFFECT_FNS[effect.type];
+  const fn = (EFFECT_FNS as Record<string, (progress: number, opts?: Record<string, unknown>) => Record<string, unknown>>)[effect.type];
   if (!fn) return;
   const dur = effect.dur || 0.5;
   if (localT >= dur) return; // effect done
   const progress = Math.min(1, localT / dur);
-  const style = fn(progress, effect);
+  const style = fn(progress, effect as Record<string, unknown>);
   applyCanvasStyle(ctx, canvasWidth, canvasHeight, style);
 }
 
@@ -75,14 +78,14 @@ export function applyEnterEffect(ctx: any, localT: any, effect: any, canvasWidth
  * @param {number} canvasWidth
  * @param {number} canvasHeight
  */
-export function applyExitEffect(ctx: any, localT: any, clipDur: any, effect: any, canvasWidth: any, canvasHeight: any) {
+export function applyExitEffect(ctx: CanvasRenderingContext2D, localT: number, clipDur: number, effect: { type: string; dur?: number; [key: string]: unknown }, canvasWidth: number, canvasHeight: number) {
   if (!effect || !effect.type) return;
-  const fn = EFFECT_FNS[effect.type];
+  const fn = (EFFECT_FNS as Record<string, (progress: number, opts?: Record<string, unknown>) => Record<string, unknown>>)[effect.type];
   if (!fn) return;
   const dur = effect.dur || 0.5;
   const exitStart = clipDur - dur;
   if (localT < exitStart) return; // not yet
   const progress = Math.min(1, (localT - exitStart) / dur);
-  const style = fn(progress, effect);
+  const style = fn(progress, effect as Record<string, unknown>);
   applyCanvasStyle(ctx, canvasWidth, canvasHeight, style);
 }

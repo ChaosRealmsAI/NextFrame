@@ -14,16 +14,16 @@
 // "add" | "multiply" | "overlay" | "darken" | "difference" } on the clip.
 // Frame-pure: no caches, no random, no Date.
 
-/** @typedef {import("../types.d.ts").Timeline} Timeline */
-
 import { createCanvas } from "@napi-rs/canvas";
-import "./fonts.js"; // side-effect: register CJK fonts
-import { REGISTRY } from "../../scenes/index.js";
+import { REGISTRY } from "../scenes/index.js";
 import { guarded } from "./_guard.js";
 import { resolveTimeline } from "./time.js";
 import { resolveKeyframes } from "./keyframes.js";
-import { applyEnterEffect, applyExitEffect } from "../../fx/effects/index.js";
-import { applyFilters } from "../../fx/filters/index.js";
+import { applyEnterEffect, applyExitEffect } from "../animation/effects/index.js";
+import { applyFilters } from "../filters/index.js";
+import type { Timeline, Track, Clip, Chapter, Marker } from "../types.js";
+
+type NapiCanvas = ReturnType<typeof createCanvas>;
 
 export class CanvasPool {
   #capacity;
@@ -34,7 +34,7 @@ export class CanvasPool {
     this.#capacity = capacity;
   }
 
-  acquire(width: any, height: any) {
+  acquire(width: number, height: number) {
     const key = `${width}x${height}`;
     let bucket = this.#buckets.get(key);
     if (!bucket) {
@@ -72,7 +72,7 @@ export class CanvasPool {
     return slot.canvas;
   }
 
-  release(canvas: any) {
+  release(canvas: NapiCanvas) {
     const lease = this.#leases.get(canvas);
     if (!lease) return;
     this.#leases.delete(canvas);
@@ -82,7 +82,7 @@ export class CanvasPool {
   }
 }
 
-function resetContext(ctx: any, width: any, height: any) {
+function resetContext(ctx: CanvasRenderingContext2D, width: number, height: number) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
@@ -90,7 +90,7 @@ function resetContext(ctx: any, width: any, height: any) {
   ctx.clearRect(0, 0, width, height);
 }
 
-function acquireCanvas(pool: any, width: any, height: any) {
+function acquireCanvas(pool: CanvasPool | null, width: number, height: number) {
   if (!pool) {
     return { canvas: createCanvas(width, height), release() {} };
   }
@@ -110,12 +110,20 @@ function acquireCanvas(pool: any, width: any, height: any) {
  * @param {{width?: number, height?: number, useCanvasPool?: boolean, canvasPool?: CanvasPool | null, offscreenCanvasPool?: CanvasPool | null}} [opts]
  * @returns {{ok: true, canvas: object, value: object, release: () => void} | {ok: false, error: object}}
  */
-export function renderAt(timeline: any, t: any, opts = {}) {
-  let resolved = timeline;
+interface RenderAtOpts {
+  width?: number;
+  height?: number;
+  useCanvasPool?: boolean;
+  canvasPool?: CanvasPool | null;
+  offscreenCanvasPool?: CanvasPool | null;
+}
+
+export function renderAt(timeline: Timeline, t: number, opts: RenderAtOpts = {}) {
+  let resolved: Timeline = timeline;
   if (needsResolve(timeline)) {
     const r = resolveTimeline(timeline);
-    if (!r.ok) return guarded("renderAt", { ok: false, error: r.error });
-    resolved = r.value;
+    if (!r.ok) return guarded("renderAt", { ok: false as const, error: r.error });
+    resolved = r.value as Timeline;
   }
   const width = opts.width || resolved.project?.width || 1920;
   const height = opts.height || resolved.project?.height || 1080;
@@ -158,7 +166,7 @@ export function renderAt(timeline: any, t: any, opts = {}) {
           // Direct draw into main canvas — scene fully owns background.
           try {
             ctx.save();
-            entry.render(localT, resolvedParams, ctx, t);
+            if (entry.render) entry.render(localT, resolvedParams, ctx, t);
           } finally {
             ctx.restore();
           }
@@ -169,13 +177,13 @@ export function renderAt(timeline: any, t: any, opts = {}) {
             offscreen = acquireCanvas(useCanvasPool ? opts.offscreenCanvasPool || null : null, width, height);
             const offCtx = offscreen.canvas.getContext("2d");
             try {
-              offCtx.save();
-              entry.render(localT, resolvedParams, offCtx, t);
+              offCtx?.save();
+              if (entry.render && offCtx) entry.render(localT, resolvedParams, offCtx, t);
             } finally {
-              offCtx.restore();
+              offCtx?.restore();
             }
             // Apply filters (post-processing on pixels)
-            if (hasFilters) applyFilters(offCtx, width, height, clip.filters, localT);
+            if (hasFilters && offCtx) applyFilters(offCtx, width, height, clip.filters ?? [], localT);
           } catch (err) {
             drawCrashMarker(ctx, width, height, clip.scene, err);
             offscreen?.release();
@@ -210,7 +218,7 @@ export function renderAt(timeline: any, t: any, opts = {}) {
   }
 }
 
-function drawMissingSceneMarker(ctx: any, width: any, sceneId: any) {
+function drawMissingSceneMarker(ctx: CanvasRenderingContext2D, width: number, sceneId: string) {
   ctx.save();
   ctx.fillStyle = "#ff0044";
   ctx.fillRect(0, 0, width, 32);
@@ -220,28 +228,28 @@ function drawMissingSceneMarker(ctx: any, width: any, sceneId: any) {
   ctx.restore();
 }
 
-function drawCrashMarker(ctx: any, width: any, height: any, sceneId: any, err: any) {
+function drawCrashMarker(ctx: CanvasRenderingContext2D, width: number, height: number, sceneId: string, err: unknown) {
   ctx.save();
   ctx.fillStyle = "rgba(255,0,0,0.7)";
   ctx.fillRect(0, height - 40, width, 40);
   ctx.fillStyle = "#fff";
   ctx.font = "16px sans-serif";
-  ctx.fillText(`scene "${sceneId}" crashed: ${err.message}`, 12, height - 14);
+  ctx.fillText(`scene "${sceneId}" crashed: ${(err as Error).message}`, 12, height - 14);
   ctx.restore();
 }
 
-function needsResolve(timeline: any) {
-  for (const trk of timeline.tracks || []) {
-    for (const clip of trk.clips || []) {
+function needsResolve(timeline: Timeline) {
+  for (const trk of timeline.tracks ?? []) {
+    for (const clip of trk.clips ?? []) {
       if (typeof clip.start !== "number" || typeof clip.dur !== "number") return true;
     }
   }
-  for (const ch of timeline.chapters || []) {
+  for (const ch of timeline.chapters ?? []) {
     if (typeof ch.start !== "number" || (ch.end !== undefined && typeof ch.end !== "number")) {
       return true;
     }
   }
-  for (const m of timeline.markers || []) {
+  for (const m of timeline.markers ?? []) {
     if (typeof m.t !== "number") return true;
   }
   return false;

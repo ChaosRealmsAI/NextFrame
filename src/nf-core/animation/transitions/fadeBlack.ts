@@ -1,7 +1,7 @@
 import { clamp01, round } from "../shared.js";
 
 // Fades through black by dimming A, then brightening B from black.
-export function fadeBlack(progress: any) {
+export function fadeBlack(progress: number) {
   const p = clamp01(progress);
 
   if (p < 0.5) {

@@ -35,11 +35,14 @@ export const TRANSITION_FNS = { dissolve, wipeLeft, wipeUp, wipeRight, wipeDown,
 export const TRANSITION_IDS = Object.keys(TRANSITION_FNS);
 export const TRANSITION_NAMES = [...TRANSITION_IDS];
 
-export function getTransition(id: any) {
-  if (!TRANSITION_FNS[id]) return null;
-  return { id, apply: TRANSITION_FNS[id], META: TRANSITION_TABLE[id] };
+export function getTransition(id: string) {
+  const fns = TRANSITION_FNS as Record<string, (typeof TRANSITION_FNS)[keyof typeof TRANSITION_FNS]>;
+  const table = TRANSITION_TABLE as Record<string, (typeof TRANSITION_TABLE)[keyof typeof TRANSITION_TABLE]>;
+  if (!fns[id]) return null;
+  return { id, apply: fns[id], META: table[id] };
 }
 
 export function listTransitions() {
-  return TRANSITION_IDS.map((id) => TRANSITION_TABLE[id]);
+  const table = TRANSITION_TABLE as Record<string, (typeof TRANSITION_TABLE)[keyof typeof TRANSITION_TABLE]>;
+  return TRANSITION_IDS.map((id) => table[id]);
 }

@@ -2,7 +2,14 @@
 // Depends on: pipeline-utils.js (escapeHtml, normalizeSegmentPreviewParams, fallbackSegmentPreviewParams, getCurrentProjectRef, getCurrentEpisodeRef)
 // Shared state: pipelineSegments, pipelinePreviewState (defined in pipeline.js)
 
-function renderScriptPreview(state: any) {
+interface ScriptPreviewState {
+  loading?: boolean;
+  error?: string;
+  exists?: boolean;
+  path?: string;
+}
+
+function renderScriptPreview(state: ScriptPreviewState | null): string {
   if (!state) return '';
   if (state.loading) {
     return '<div style="margin-top:12px;font-size:12px;color:var(--t65)">正在加载视频预览...</div>';
@@ -16,26 +23,26 @@ function renderScriptPreview(state: any) {
   return '<div style="margin-top:12px;font-size:12px;color:var(--t65)">该段暂无视频文件</div>';
 }
 
-function renderScriptTab(segments: any) {
-  pipelineSegments = segments;
+function renderScriptTab(segments?: NfSegment[]): void {
+  pipelineSegments = segments || [];
 
   // Update sidebar: segment navigation + stats
   const sidebar = document.querySelector('#pl-tab-script .pl-sidebar');
   if (sidebar) {
-    const totalChars = segments.reduce(function(s: any, seg: any) { return s + (seg.narration || '').length; }, 0);
+    const totalChars = pipelineSegments.reduce(function(s: number, seg: NfSegment) { return s + ((seg.narration || '') as string).length; }, 0);
     const estSecs = Math.round(totalChars / 4); // ~4 chars/sec for Chinese
     let sbHtml = '<div class="pl-sb-section"><div class="pl-sb-title">剧集信息</div>' +
-      '<div class="pl-sb-info-row"><span class="pl-sb-label">段落</span><span class="pl-sb-value">' + segments.length + '</span></div>' +
+      '<div class="pl-sb-info-row"><span class="pl-sb-label">段落</span><span class="pl-sb-value">' + pipelineSegments.length + '</span></div>' +
       '<div class="pl-sb-info-row"><span class="pl-sb-label">字数</span><span class="pl-sb-value">' + totalChars + '</span></div>' +
       '<div class="pl-sb-info-row"><span class="pl-sb-label">预估</span><span class="pl-sb-value">~' + estSecs + 's</span></div>' +
     '</div>';
     sbHtml += '<div class="pl-sb-section"><div class="pl-sb-title">段落导航</div>';
-    segments.forEach(function(seg: any, i: any) {
-      const role = seg.role || '';
-      const preview = (seg.narration || '').substring(0, 15) + '...';
+    pipelineSegments.forEach(function(seg: NfSegment, i: number) {
+      const role = (seg as Record<string, unknown>).role || '';
+      const preview = ((seg.narration || '') as string).substring(0, 15) + '...';
       sbHtml += '<div class="pl-seg-item" data-nf-action="scroll-to-segment" onclick="scrollToSegment(' + i + ')" style="display:flex;gap:8px;padding:8px;border-radius:8px;cursor:pointer;transition:background 0.2s">' +
         '<div style="width:20px;height:20px;border-radius:50%;background:var(--accent-12);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0">' + (i + 1) + '</div>' +
-        '<div style="min-width:0"><div style="font-size:12px;font-weight:600;color:var(--t80)">' + escapeHtml(role || '段落 ' + (i + 1)) + '</div>' +
+        '<div style="min-width:0"><div style="font-size:12px;font-weight:600;color:var(--t80)">' + escapeHtml(String(role || '段落 ' + (i + 1))) + '</div>' +
         '<div style="font-size:11px;color:var(--t50);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(preview) + '</div></div>' +
       '</div>';
     });
@@ -46,17 +53,17 @@ function renderScriptTab(segments: any) {
   // Main area: script cards
   const el = document.querySelector('#pl-tab-script .pl-main');
   if (!el) return;
-  if (segments.length === 0) {
+  if (pipelineSegments.length === 0) {
     el.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t50)">暂无脚本段落</div>';
     return;
   }
 
   let html = '<div style="padding:16px;overflow-y:auto;height:100%">';
-  segments.forEach(function(seg: any, index: any) {
-    const narration = seg.narration || seg.text || '';
-    const visual = seg.visual || '';
-    const role = seg.role || '';
-    const logic = seg.logic || '';
+  pipelineSegments.forEach(function(seg: NfSegment, index: number) {
+    const narration = (seg.narration || seg.text || '') as string;
+    const visual = ((seg as Record<string, unknown>).visual || '') as string;
+    const role = ((seg as Record<string, unknown>).role || '') as string;
+    const logic = ((seg as Record<string, unknown>).logic || '') as string;
     const charCount = narration.length;
     html += '<div class="glass" id="script-card-' + index + '" data-nf-action="edit-script" style="padding:20px;margin-bottom:12px;border-radius:12px">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
@@ -77,13 +84,13 @@ function renderScriptTab(segments: any) {
   el.innerHTML = html;
 }
 
-function scrollToSegment(index: any) {
+function scrollToSegment(index: number): void {
   const card = document.getElementById('script-card-' + index);
   if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function saveNarration(el: any) {
-  const index = Number.parseInt(el.dataset.segIndex, 10);
+function saveNarration(el: HTMLElement): void {
+  const index = Number.parseInt((el as HTMLElement).dataset.segIndex || '', 10);
   const text = el.textContent || '';
   if (!pipelineSegments[index]) return;
   pipelineSegments[index].narration = text;
@@ -93,35 +100,37 @@ function saveNarration(el: any) {
     episode: getCurrentEpisodeRef(),
     segment: index + 1,
     narration: text,
-  }).catch(function(error: any) {
+  }).catch(function(error: unknown) {
     console.error('[script] save narration:', error);
   });
 }
 
-function previewSegmentVideo(segmentName: any) {
+function previewSegmentVideo(segmentName: string): void {
   if (typeof bridgeCall !== 'function' || !segmentName) return;
-  pipelinePreviewState[segmentName] = { loading: true };
+  (pipelinePreviewState as Record<string, unknown>)[segmentName] = { loading: true };
   renderScriptTab(pipelineSegments);
 
-  bridgeCall('segment.videoUrl', normalizeSegmentPreviewParams(segmentName)).catch(function(error: any) {
+  bridgeCall('segment.videoUrl', normalizeSegmentPreviewParams(segmentName)).catch(function(error: unknown) {
     if (!error || String(error).indexOf('invalid params') === -1) {
       throw error;
     }
     return bridgeCall('segment.videoUrl', fallbackSegmentPreviewParams(segmentName));
-  }).then(function(data: any) {
-    pipelinePreviewState[segmentName] = {
+  }).then(function(result: NfBridgeResult) {
+    const data = result.ok === true ? result.value as Record<string, unknown> : {} as Record<string, unknown>;
+    (pipelinePreviewState as Record<string, unknown>)[segmentName] = {
       loading: false,
       exists: !!data.exists,
       path: data.path || '',
       error: '',
     };
     renderScriptTab(pipelineSegments);
-  }).catch(function(error: any) {
-    pipelinePreviewState[segmentName] = {
+  }).catch(function(error: unknown) {
+    const errObj = error as { message?: string };
+    (pipelinePreviewState as Record<string, unknown>)[segmentName] = {
       loading: false,
       exists: false,
       path: '',
-      error: error && error.message ? error.message : String(error || 'failed to load segment video'),
+      error: errObj && errObj.message ? errObj.message : String(error || 'failed to load segment video'),
     };
     renderScriptTab(pipelineSegments);
   });

@@ -11,7 +11,7 @@ const SCENE_REGISTRY_URL = pathToFileURL(resolve(SCENES_DIR, "index.js")).href;
 /**
  * Strip ES module syntax so source can be wrapped in an IIFE for the browser bundle.
  */
-export function stripESM(code: any) {
+export function stripESM(code: string) {
   return code
     .replace(/^import\s+.+?;?\s*$/gm, "")
     .replace(/^export\s+default\s+/gm, "return ")
@@ -23,7 +23,7 @@ export function stripESM(code: any) {
 /**
  * Turn an arbitrary string into a valid JS identifier.
  */
-export function toIdentifier(value: any) {
+export function toIdentifier(value: unknown) {
   const clean = String(value || "")
     .replace(/[^A-Za-z0-9_$]+/g, "_")
     .replace(/^([^A-Za-z_$])/, "_$1");
@@ -33,7 +33,7 @@ export function toIdentifier(value: any) {
 /**
  * Spawn a child process to read the scene registry for a given aspect ratio.
  */
-export function readDiscoveredScenes(ratio: any) {
+export function readDiscoveredScenes(ratio: string) {
   const script = `
     import { getRegistry } from ${JSON.stringify(SCENE_REGISTRY_URL)};
     const ratio = ${JSON.stringify(ratio)};
@@ -63,11 +63,18 @@ export function readDiscoveredScenes(ratio: any) {
  * Collect scene modules referenced by the timeline. Returns an array of
  * { id, label, varName, filePath, code } objects ready for bundling.
  */
-export function collectSceneModules(timeline: any) {
+interface DiscoveredScene {
+  id: string;
+  label?: string;
+  path: string;
+  ratio: string;
+}
+
+export function collectSceneModules(timeline: NfTimeline) {
   const ratio = String(timeline?.ratio || "16:9");
-  const discovered = readDiscoveredScenes(ratio);
-  const byId = new Map(discovered.map((entry: any) => [entry.id, entry]));
-  const requested: any = [];
+  const discovered: DiscoveredScene[] = readDiscoveredScenes(ratio);
+  const byId = new Map(discovered.map((entry: DiscoveredScene) => [entry.id, entry]));
+  const requested: string[] = [];
   for (const layer of timeline.layers || []) {
     if (!layer?.scene || requested.includes(layer.scene)) continue;
     requested.push(layer.scene);
@@ -80,7 +87,8 @@ export function collectSceneModules(timeline: any) {
 
   const usedNames = new Set();
   return requested.map((id) => {
-    const entry = byId.get(id);
+    const entry = byId.get(id) as { path: string; label?: string } | undefined;
+    if (!entry) throw new Error(`scene entry not found: ${id}`);
     const baseName = toIdentifier(id);
     let varName = baseName;
     let suffix = 1;
@@ -103,7 +111,7 @@ export function collectSceneModules(timeline: any) {
 /**
  * Wrap a single scene module in an IIFE that exposes { meta, render }.
  */
-export function buildSceneBundle(scene: any) {
+export function buildSceneBundle(scene: { id: string; filePath: string; varName: string; code: string }) {
   return `// ${scene.id} (${scene.filePath})
 const ${scene.varName} = (function(){
 ${scene.code}

@@ -1,4 +1,4 @@
-function timeAgo(dateStr: any) {
+function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60000);
   if (minutes < 60) return minutes + ' 分钟前';
@@ -10,8 +10,8 @@ function timeAgo(dateStr: any) {
   return weeks + ' 周前';
 }
 
-function buildProjectThumb(project: any) {
-  const thumbUrl = project.thumbnail ? 'nfdata://localhost/' + encodeURI(project.name || '') + '/' + project.thumbnail : '';
+function buildProjectThumb(project: Record<string, unknown>) {
+  const thumbUrl = project.thumbnail ? 'nfdata://localhost/' + encodeURI(String(project.name || '')) + '/' + project.thumbnail : '';
   if (!thumbUrl) {
     return h(
       'div',
@@ -29,7 +29,7 @@ function buildProjectThumb(project: any) {
   });
 }
 
-function buildProjectCardElement(project: any) {
+function buildProjectCardElement(project: Record<string, unknown>) {
   return h(
     'div',
     {
@@ -42,35 +42,35 @@ function buildProjectCardElement(project: any) {
     h(
       'div',
       { class: 'card-body' },
-      h('div', { class: 'card-title' }, project.name || 'Untitled'),
+      h('div', { class: 'card-title' }, String(project.name || 'Untitled')),
       h(
         'div',
         { class: 'card-meta' },
         h('span', { class: 'card-badge' }, String(project.episodes || 0) + ' 集'),
-        h('span', { class: 'card-time' }, project.updated ? timeAgo(project.updated) : ''),
+        h('span', { class: 'card-time' }, project.updated ? timeAgo(project.updated as string) : ''),
       ),
     ),
   );
 }
 
-function renderCard(project: any) {
-  const safeName = escapeJsString(project.name || 'Untitled');
-  const safePath = escapeJsString(project.path || '');
-  const thumbUrl = project.thumbnail ? 'nfdata://localhost/' + encodeURI(project.name || '') + '/' + project.thumbnail : '';
+function renderCard(project: Record<string, unknown>): string {
+  const safeName = escapeJsString(String(project.name || 'Untitled'));
+  const safePath = escapeJsString(String(project.path || ''));
+  const thumbUrl = project.thumbnail ? 'nfdata://localhost/' + encodeURI(String(project.name || '')) + '/' + project.thumbnail : '';
   const thumbStyle = thumbUrl ? ' style="background-image:url(' + thumbUrl + ');background-size:cover;background-position:center"' : '';
-  return '<div class="project-card glass" data-nf-action="open-project" data-path="' + escapeHtml(project.path || '') + '" onclick="showView(\'project\',{name:\'' + safeName + '\',path:\'' + safePath + '\'})">' +
+  return '<div class="project-card glass" data-nf-action="open-project" data-path="' + escapeHtml(String(project.path || '')) + '" onclick="showView(\'project\',{name:\'' + safeName + '\',path:\'' + safePath + '\'})">' +
     '<div class="card-thumb"' + thumbStyle + '>' +
     (thumbUrl ? '' : '<svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg>') +
     '</div>' +
     '<div class="card-body">' +
-    '<div class="card-title">' + escapeHtml(project.name || 'Untitled') + '</div>' +
+    '<div class="card-title">' + escapeHtml(String(project.name || 'Untitled')) + '</div>' +
     '<div class="card-meta"><span class="card-badge">' + String(project.episodes || 0) + ' 集</span>' +
-    '<span class="card-time">' + (project.updated ? timeAgo(project.updated) : '') + '</span></div>' +
+    '<span class="card-time">' + (project.updated ? timeAgo(project.updated as string) : '') + '</span></div>' +
     '</div></div>';
 }
 
 class NewProjectModal extends Modal {
-  constructor(props = {}) {
+  constructor(props: Record<string, unknown> = {}) {
     super(props);
     this.state = {
       name: '',
@@ -87,9 +87,9 @@ class NewProjectModal extends Modal {
   }
 
   syncDraftFromDom() {
-    const nameEl = document.getElementById('np-name');
+    const nameEl = document.getElementById('np-name') as HTMLInputElement | null;
     const pathEl = document.getElementById('np-path');
-    const tagInputEl = document.getElementById('np-tag-input');
+    const tagInputEl = document.getElementById('np-tag-input') as HTMLInputElement | null;
     if (nameEl) this.state.name = nameEl.value;
     if (pathEl) this.state.path = pathEl.textContent || this.state.path;
     if (tagInputEl) this.state.tagInput = tagInputEl.value;
@@ -105,23 +105,25 @@ class NewProjectModal extends Modal {
     this.setState({ open: false });
   }
 
-  addTagFromInput(event: any) {
-    const value = (event.currentTarget.value || '').trim();
+  addTagFromInput(event: KeyboardEvent) {
+    const target = event.currentTarget as HTMLInputElement;
+    const value = (target.value || '').trim();
     if (event.key !== ' ' || !value.startsWith('#') || value.length <= 1) return;
-    if (this.state.tags.length >= 5) {
-      event.currentTarget.value = '';
+    const tags = this.state.tags as string[];
+    if (tags.length >= 5) {
+      target.value = '';
       return;
     }
     this.syncDraftFromDom();
-    this.setState({ tags: this.state.tags.concat(value), tagInput: '' });
+    this.setState({ tags: tags.concat(value), tagInput: '' });
   }
 
-  removeTag(tag: any) {
+  removeTag(tag: string) {
     this.syncDraftFromDom();
-    this.setState({ tags: this.state.tags.filter((item: any) => item !== tag) });
+    this.setState({ tags: (this.state.tags as string[]).filter((item: string) => item !== tag) });
   }
 
-  setRatio(ratio: any) {
+  setRatio(ratio: string) {
     this.syncDraftFromDom();
     this.setState({ ratio });
   }
@@ -140,7 +142,7 @@ class NewProjectModal extends Modal {
     this.close();
   }
 
-  renderRatioCard(ratio: any, desc: any, previewClass: any) {
+  renderRatioCard(ratio: string, desc: string, previewClass: string) {
     const active = this.state.ratio === ratio;
     return h(
       'div',
@@ -182,7 +184,7 @@ class NewProjectModal extends Modal {
         h('div', { class: 'form-group' },
           h('label', { class: 'form-label' }, '保存位置'),
           h('div', { class: 'form-path-row' },
-            h('span', { class: 'form-path', id: 'np-path' }, this.state.path),
+            h('span', { class: 'form-path', id: 'np-path' }, String(this.state.path || '')),
             h('button', { class: 'form-path-btn', 'data-nf-action': 'select-folder', onclick: () => window.alert('选择文件夹') }, '选择'),
           ),
         ),
@@ -200,7 +202,7 @@ class NewProjectModal extends Modal {
           h(
             'div',
             { class: 'tag-input-wrap', id: 'np-tag-wrap' },
-            this.state.tags.map((tag: any) => h(
+            ...(this.state.tags as string[]).map((tag: string) => h(
               'span',
               { class: 'tag-pill' },
               tag + ' ',
@@ -214,7 +216,7 @@ class NewProjectModal extends Modal {
               id: 'np-tag-input',
               'data-nf-action': 'input-tags',
               value: this.state.tagInput,
-              onkeyup: (event: any) => this.addTagFromInput(event),
+              onkeyup: (event: KeyboardEvent) => this.addTagFromInput(event),
             }),
           ),
         ),
@@ -234,33 +236,34 @@ class NewProjectModal extends Modal {
 }
 
 class HomeView extends Component {
-  constructor(props = {}) {
+  constructor(props: Record<string, unknown> = {}) {
     super(props);
     this.state = { projects: [], search: '' };
   }
 
-  setProjects(projects: any) {
+  setProjects(projects: unknown[]) {
     this.setState({ projects: Array.isArray(projects) ? projects : [] });
   }
 
-  setSearch(value: any) {
+  setSearch(value: string) {
     this.setState({ search: value || '' });
   }
 
   filteredProjects() {
-    const search = this.state.search.trim().toLowerCase();
-    if (!search) return this.state.projects;
-    return this.state.projects.filter((project: any) => {
+    const search = (this.state.search as string).trim().toLowerCase();
+    const projects = this.state.projects as Record<string, unknown>[];
+    if (!search) return projects;
+    return projects.filter((project: Record<string, unknown>) => {
       return String(project.name || '').toLowerCase().includes(search);
     });
   }
 
-  renderSection(title: any, projects: any) {
+  renderSection(title: string, projects: Record<string, unknown>[]) {
     return h(
       'section',
       { class: 'section' },
       h('div', { class: 'section-header' }, h('h2', { class: 'section-title' }, title)),
-      h('div', { class: 'project-grid' }, projects.map((project: any) => buildProjectCardElement(project))),
+      h('div', { class: 'project-grid' }, ...projects.map((project: Record<string, unknown>) => buildProjectCardElement(project))),
     );
   }
 
@@ -286,7 +289,7 @@ class HomeView extends Component {
               type: 'text',
               placeholder: '搜索项目...',
               value: this.state.search,
-              oninput: (event: any) => this.setSearch(event.currentTarget.value),
+              oninput: (event: Event) => this.setSearch((event.currentTarget as HTMLInputElement).value),
             }),
           ),
           h(
@@ -303,23 +306,24 @@ class HomeView extends Component {
   }
 }
 
-function pickRatio(card: any, ratio: any) {
-  if (window.__nfNewProjectModal) window.__nfNewProjectModal.setRatio(ratio);
+function pickRatio(card: HTMLElement, ratio: string): void {
+  if (window.__nfNewProjectModal) window.__nfNewProjectModal.setRatio!(ratio);
   if (!card || !card.closest) return;
-  card.closest('.ratio-grid')?.querySelectorAll('.ratio-card').forEach((item: any) => item.classList.remove('active'));
+  card.closest('.ratio-grid')?.querySelectorAll('.ratio-card').forEach((item: Element) => item.classList.remove('active'));
   card.classList.add('active');
 }
 
-function createProject() {
-  if (window.__nfNewProjectModal) window.__nfNewProjectModal.createProject();
+function createProject(): void {
+  if (window.__nfNewProjectModal) window.__nfNewProjectModal.createProject!();
 }
 
-function loadProjects() {
+function loadProjects(): void {
   if (typeof bridgeCall !== 'function') return;
-  bridgeCall('project.list', {}).then((data: any) => {
-    const projects = data.projects || [];
-    if (window.__nfHomeView) window.__nfHomeView.setProjects(projects);
-  }).catch((error: any) => {
+  bridgeCall<Record<string, unknown>>('project.list', {}).then((result: NfBridgeResult<Record<string, unknown>>) => {
+    const data = result.ok === true ? result.value : {} as Record<string, unknown>;
+    const projects = (data.projects || []) as unknown[];
+    if (window.__nfHomeView) window.__nfHomeView.setProjects!(projects);
+  }).catch((error: unknown) => {
     console.error('[home] load projects failed:', error);
   });
 }

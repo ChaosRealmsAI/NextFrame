@@ -1,7 +1,7 @@
 import { clamp01, joinTransforms, round } from "../shared.js";
 
 // Shrinks content down while fading it out.
-export function scaleOut(progress: any) {
+export function scaleOut(progress: number) {
   const p = clamp01(progress);
   const scale = 1 - p * 0.4;
   return {

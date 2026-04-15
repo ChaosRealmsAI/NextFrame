@@ -1,7 +1,7 @@
 import { circle, clamp01 } from "../shared.js";
 
 // Reveals B through an expanding iris over A.
-export function irisOpen(progress: any) {
+export function irisOpen(progress: number) {
   const p = clamp01(progress);
   return {
     layerA: { opacity: 1 },

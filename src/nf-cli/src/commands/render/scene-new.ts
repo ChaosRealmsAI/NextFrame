@@ -11,8 +11,8 @@ const __HERE = dirname(fileURLToPath(import.meta.url));
 const DESIGN_JS_PATH = resolve(__HERE, "../../../../nf-core/scenes/shared/design.js");
 
 const RATIOS = ["16:9", "9:16", "4:3"];
-const RATIO_DIRS = { "16:9": "16x9", "9:16": "9x16", "4:3": "4x3" };
-const RATIO_SIZES = { "16:9": [1920, 1080], "9:16": [1080, 1920], "4:3": [1440, 1080] };
+const RATIO_DIRS: Record<string, string> = { "16:9": "16x9", "9:16": "9x16", "4:3": "4x3" };
+const RATIO_SIZES: Record<string, number[]> = { "16:9": [1920, 1080], "9:16": [1080, 1920], "4:3": [1440, 1080] };
 const CATEGORIES = ["backgrounds", "typography", "data", "shapes", "overlays", "media", "browser"];
 const TECHS = ["canvas2d", "webgl", "svg", "dom", "video", "lottie"];
 
@@ -35,7 +35,7 @@ After creation you MUST:
 `;
 
 // Category-specific render templates that actually work
-function renderTemplate(name: any, category: any, ratio: any) {
+function renderTemplate(name: string, category: string, ratio: string) {
   const [w, h] = RATIO_SIZES[ratio];
   switch (category) {
     case "backgrounds":
@@ -162,7 +162,7 @@ export function render(t, params, vp) {
   }
 }
 
-function metaTemplate(name: any, category: any, ratio: any, tech: any, description: any) {
+function metaTemplate(name: string, category: string, ratio: string, tech: string, description: string) {
   const [w, h] = RATIO_SIZES[ratio];
   const zHint = category === "backgrounds" ? "bottom" : category === "overlays" ? "top" : "middle";
   const desc = description || `${name} — ${category} component for ${ratio}`;
@@ -195,7 +195,7 @@ function metaTemplate(name: any, category: any, ratio: any, tech: any, descripti
 };`;
 }
 
-function previewTemplate(name: any, ratio: any, tech: any, renderCode: any) {
+function previewTemplate(name: string, ratio: string, tech: string, renderCode: string) {
   const [w, h] = RATIO_SIZES[ratio];
   const scaleX = ratio === "9:16" ? 0.35 : 0.5;
   const previewW = Math.round(w * scaleX);
@@ -266,7 +266,7 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
 </html>`;
 }
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
 
   if (flags.help || positional.length === 0) {
@@ -275,10 +275,10 @@ export async function run(argv: any) {
   }
 
   const name = positional[0];
-  const ratio = flags.ratio || "16:9";
-  const category = flags.category;
-  const tech = flags.tech || "dom";
-  const description = flags.description || "";
+  const ratio = String(flags.ratio || "16:9");
+  const category = flags.category ? String(flags.category) : undefined;
+  const tech = String(flags.tech || "dom");
+  const description = String(flags.description || "");
 
   if (!RATIOS.includes(ratio)) {
     process.stderr.write(`error: ratio must be one of ${RATIOS.join(", ")}\n`);

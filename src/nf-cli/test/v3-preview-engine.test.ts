@@ -18,7 +18,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const CLI = resolve(ROOT, "bin/nextframe.js");
 const FIXTURE = resolve(HERE, "fixtures", "minimal-v3.json");
-function runCli(args: any) {
+function runCli(args: string[]) {
   const r = spawnSync("node", [CLI, ...args], { cwd: ROOT, encoding: "utf8", timeout: 120_000 });
   assert.equal(r.status, 0, r.stderr || r.stdout);
   return r;
@@ -27,13 +27,13 @@ function runCli(args: any) {
 // ── fitStageToContainer scaling math ──
 
 test("scale preserves 16:9 across container shapes", () => {
-  function calcFit(cW: any, cH: any, sW: any, sH: any) {
+  function calcFit(cW: number, cH: number, sW: number, sH: number) {
     const scale = Math.min(cW / sW, cH / sH);
     return { w: Math.round(sW * scale), h: Math.round(sH * scale), scale };
   }
   const ratio = 1920 / 1080;
 
-  const cases = [
+  const cases: [number, number, string][] = [
     [960, 544, "typical preview"],
     [800, 600, "4:3 container"],
     [1920, 1080, "1:1 match"],
@@ -57,7 +57,7 @@ test("scale preserves 16:9 across container shapes", () => {
 // ── Wrapper centering ──
 
 test("wrapper centering produces correct offsets", () => {
-  function calcCenter(cW: any, cH: any, sW: any, sH: any) {
+  function calcCenter(cW: number, cH: number, sW: number, sH: number) {
     const scale = Math.min(cW / sW, cH / sH);
     const scaledW = Math.round(sW * scale);
     const scaledH = Math.round(sH * scale);
@@ -124,7 +124,7 @@ test("CSS transform scale must not change clientWidth/Height", () => {
 // ── nfdata:// query string stripping ──
 
 test("nfdata query string stripped before file lookup", () => {
-  function strip(p: any) { return p.split("?")[0]; }
+  function strip(p: string) { return p.split("?")[0]; }
 
   assert.equal(strip("a/b.html?t=123"), "a/b.html");
   assert.equal(strip("file.html"), "file.html");

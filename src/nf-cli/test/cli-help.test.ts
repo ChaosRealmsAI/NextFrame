@@ -9,7 +9,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const CLI = resolve(ROOT, "bin/nextframe.js");
 
-function runCli(args: any) {
+function runCli(args: string[]) {
   return spawnSync("node", [CLI, ...args], {
     cwd: ROOT,
     encoding: "utf8",

@@ -1,7 +1,7 @@
 import { circle, clamp01 } from "../shared.js";
 
 // Shrinks A into an iris while B takes over underneath.
-export function irisClose(progress: any) {
+export function irisClose(progress: number) {
   const p = clamp01(progress);
   return {
     layerA: { clipPath: circle((1 - p) * 75) },

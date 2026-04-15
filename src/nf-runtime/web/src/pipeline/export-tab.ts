@@ -2,10 +2,10 @@
 // Depends on: pipeline-utils.js (escapeHtml, formatExportPercent, formatExportEta, getCurrentProjectRef, getCurrentEpisodeRef)
 // Shared state: pipelineRenderEntries, pipelineExportState, pipelineExportPollTimer (defined in pipeline.js)
 
-function renderOutputProgressCard() {
+function renderOutputProgressCard(): string {
   if (!pipelineExportState) return '';
-  const state = pipelineExportState.state || 'running';
-  const percent = typeof pipelineExportState.percent === 'number' ? pipelineExportState.percent : 0;
+  const state = String((pipelineExportState as Record<string, unknown>).state || 'running');
+  const percent = typeof (pipelineExportState as Record<string, unknown>).percent === 'number' ? (pipelineExportState as Record<string, unknown>).percent as number : 0;
   const barWidth = Math.max(0, Math.min(100, percent));
   const statusColor = state === 'failed' ? '#ff8f8f' : (state === 'done' ? 'var(--green)' : 'var(--t100)');
   const errorHtml = pipelineExportState.error
@@ -26,50 +26,51 @@ function renderOutputProgressCard() {
       '<div style="height:8px;border-radius:999px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:12px">' +
         '<div style="height:100%;width:' + barWidth.toFixed(1) + '%;background:linear-gradient(90deg,#34d399,#60a5fa)"></div>' +
       '</div>' +
-      (pipelineExportState.logPath ? '<div style="font-family:var(--mono);font-size:11px;color:var(--t50);margin-top:8px">' + escapeHtml(pipelineExportState.logPath) + '</div>' : '') +
+      ((pipelineExportState as Record<string, unknown>).logPath ? '<div style="font-family:var(--mono);font-size:11px;color:var(--t50);margin-top:8px">' + escapeHtml(String((pipelineExportState as Record<string, unknown>).logPath)) + '</div>' : '') +
       errorHtml +
     '</div>';
 }
 
-function renderOutputEntries(entries: any) {
+function renderOutputEntries(entries: Record<string, unknown>[]): string {
   if (entries.length === 0) {
     return '<div style="display:flex;align-items:center;justify-content:center;min-height:180px;color:var(--t50)">暂无导出记录</div>';
   }
 
   let html = '';
-  entries.forEach(function(entry: any) {
+  entries.forEach(function(entry: Record<string, unknown>) {
     html += '<div class="glass" data-nf-action="export-video" style="padding:16px;margin-bottom:8px;border-radius:10px">' +
-      '<div style="font-size:13px;font-weight:600;color:var(--t100)">' + escapeHtml(entry.name || entry.path || 'Export') + '</div>' +
-      '<div style="font-size:12px;color:var(--t65);margin-top:4px">' + escapeHtml(entry.status || '') + '</div>' +
+      '<div style="font-size:13px;font-weight:600;color:var(--t100)">' + escapeHtml(String(entry.name || entry.path || 'Export')) + '</div>' +
+      '<div style="font-size:12px;color:var(--t65);margin-top:4px">' + escapeHtml(String(entry.status || '')) + '</div>' +
     '</div>';
   });
   return html;
 }
 
-function renderOutputTab(entries: any) {
-  pipelineRenderEntries = entries;
+function renderOutputTab(entries?: Record<string, unknown>[]): void {
+  pipelineRenderEntries = entries || [];
   const el = document.querySelector('#pl-tab-output .pl-output-main');
   if (!el) return;
   el.innerHTML = '' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">' +
       '<div>' +
         '<div style="font-size:16px;font-weight:600;color:var(--t100)">版本历史</div>' +
-        '<div style="font-family:var(--mono);font-size:12px;color:var(--t50);margin-top:4px">' + entries.length + ' 个版本</div>' +
+        '<div style="font-family:var(--mono);font-size:12px;color:var(--t50);margin-top:4px">' + pipelineRenderEntries.length + ' 个版本</div>' +
       '</div>' +
       '<button data-nf-action="export-start" onclick="startPipelineExport()" style="border:0;border-radius:999px;padding:10px 16px;background:linear-gradient(135deg,#34d399,#60a5fa);color:#08111f;font-weight:600;cursor:pointer">开始导出</button>' +
     '</div>' +
     renderOutputProgressCard() +
-    renderOutputEntries(entries);
+    renderOutputEntries(pipelineRenderEntries);
 }
 
-function updateExportState(patch: any) {
-  pipelineExportState = Object.assign({}, pipelineExportState || {}, patch);
+function updateExportState(patch: Record<string, unknown>): void {
+  pipelineExportState = Object.assign({}, pipelineExportState || {}, patch) as NfExportState;
   renderOutputTab(pipelineRenderEntries);
 }
 
-function pollExportStatus() {
-  if (typeof bridgeCall !== 'function' || !pipelineExportState || !pipelineExportState.pid) return;
-  bridgeCall('export.status', { pid: pipelineExportState.pid }).then(function(data: any) {
+function pollExportStatus(): void {
+  if (typeof bridgeCall !== 'function' || !pipelineExportState || !(pipelineExportState as Record<string, unknown>).pid) return;
+  bridgeCall<Record<string, unknown>>('export.status', { pid: (pipelineExportState as Record<string, unknown>).pid }).then(function(result: NfBridgeResult<Record<string, unknown>>) {
+    const data = result.ok === true ? result.value : {} as Record<string, unknown>;
     updateExportState({
       state: data.state || 'running',
       percent: typeof data.percent === 'number' ? data.percent : 0,
@@ -84,16 +85,17 @@ function pollExportStatus() {
     }
 
     scheduleExportPolling(2000);
-  }).catch(function(error: any) {
+  }).catch(function(error: unknown) {
+    const errObj = error as { message?: string };
     stopExportPolling();
     updateExportState({
       state: 'failed',
-      error: error && error.message ? error.message : String(error || 'failed to read export status'),
+      error: errObj && errObj.message ? errObj.message : String(error || 'failed to read export status'),
     });
   });
 }
 
-function startPipelineExport() {
+function startPipelineExport(): void {
   if (typeof bridgeCall !== 'function' || !getCurrentEpisodeRef()) return;
   stopExportPolling();
   updateExportState({
@@ -105,18 +107,19 @@ function startPipelineExport() {
     logPath: '',
   });
 
-  bridgeCall('export.start', {
+  bridgeCall<Record<string, unknown>>('export.start', {
     outputPath: getCurrentEpisodeRef() + '/exports/output.mp4',
     width: 1920,
     height: 1080,
     fps: 30,
     duration: 45.0,
-  }).then(function(data: any) {
-    if (!data.ok) {
+  }).then(function(result: NfBridgeResult<Record<string, unknown>>) {
+    const data = result.ok === true ? result.value : {} as Record<string, unknown>;
+    if (result.ok === false) {
       updateExportState({
         state: 'failed',
-        error: data.error || 'failed to start export',
-        logPath: data.logPath || '',
+        error: (data.error || 'failed to start export') as string,
+        logPath: (data.logPath || '') as string,
       });
       return;
     }
@@ -128,28 +131,31 @@ function startPipelineExport() {
       error: '',
     });
     pollExportStatus();
-  }).catch(function(error: any) {
+  }).catch(function(error: unknown) {
+    const errObj = error as { message?: string };
     updateExportState({
       state: 'failed',
-      error: error && error.message ? error.message : String(error || 'failed to start export'),
+      error: errObj && errObj.message ? errObj.message : String(error || 'failed to start export'),
     });
   });
 }
 
-function cancelPipelineExport() {
-  if (typeof bridgeCall !== 'function' || !pipelineExportState || !pipelineExportState.pid) return;
-  bridgeCall('export.cancel', { pid: pipelineExportState.pid }).then(function(data: any) {
+function cancelPipelineExport(): void {
+  if (typeof bridgeCall !== 'function' || !pipelineExportState || !(pipelineExportState as Record<string, unknown>).pid) return;
+  bridgeCall<Record<string, unknown>>('export.cancel', { pid: (pipelineExportState as Record<string, unknown>).pid }).then(function(result: NfBridgeResult<Record<string, unknown>>) {
+    const data = result.ok === true ? result.value : {} as Record<string, unknown>;
     stopExportPolling();
     updateExportState({
-      state: data.ok ? 'failed' : 'failed',
-      percent: pipelineExportState.percent || 0,
+      state: 'failed',
+      percent: pipelineExportState!.progress || 0,
       eta: 0,
-      error: data.ok ? 'canceled' : (data.error || 'failed to cancel export'),
+      error: result.ok === true ? 'canceled' : ((data.error || 'failed to cancel export') as string),
     });
-  }).catch(function(error: any) {
+  }).catch(function(error: unknown) {
+    const errObj = error as { message?: string };
     updateExportState({
       state: 'failed',
-      error: error && error.message ? error.message : String(error || 'failed to cancel export'),
+      error: errObj && errObj.message ? errObj.message : String(error || 'failed to cancel export'),
     });
   });
 }

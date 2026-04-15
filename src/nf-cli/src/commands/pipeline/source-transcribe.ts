@@ -29,7 +29,7 @@ import {
 const LEGACY_HELP = "usage: nextframe source-transcribe <source-dir> [--model base.en] [--lang auto]";
 const HELP = "usage: nextframe source-transcribe <project> <episode> --source <name> [--model base.en] [--lang auto] [--root=PATH] [--json]";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseSourceFlags(argv, ["model", "lang", "source", "root"]);
   if (looksLikeSourcePath(positional[0])) {
     return runLegacy(positional, flags);
@@ -37,7 +37,7 @@ export async function run(argv: any) {
   return runProjectMode(positional, flags);
 }
 
-async function runLegacy(positional: any, flags: any) {
+async function runLegacy(positional: string[], flags: Record<string, string | boolean>) {
   const [sourceDirArg] = positional;
   if (!sourceDirArg) {
     fail("USAGE", LEGACY_HELP);
@@ -73,12 +73,12 @@ async function runLegacy(positional: any, flags: any) {
     await writeSourceJson(sourceDir, nextSource);
     success({ ok: true, source_dir: sourceDir, transcript, source: nextSource });
     return 0;
-  } catch (error) {
-    fail("SOURCE_TRANSCRIBE_FAILED", error.message);
+  } catch (error: unknown) {
+    fail("SOURCE_TRANSCRIBE_FAILED", (error as Error).message);
   }
 }
 
-async function runProjectMode(positional: any, flags: any) {
+async function runProjectMode(positional: string[], flags: Record<string, string | boolean>) {
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName || !flags.source) {
     emit({ ok: false, error: { code: "USAGE", message: HELP } }, flags);
@@ -88,10 +88,10 @@ async function runProjectMode(positional: any, flags: any) {
   const model = typeof flags.model === "string" ? flags.model : "base.en";
   const lang = typeof flags.lang === "string" ? flags.lang : "auto";
   const root = resolveRoot(flags);
-  let context;
+  let context: { root: string; projectName: string; projectPath: string; projectFile: string; project: unknown; episodeName: string; episodePath: string; episodeFile: string };
   try {
-    context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
+    context = await loadProjectContext(root, projectName, episodeName) as typeof context;
+  } catch (err: unknown) {
     emit(loadContextError(err, projectName, episodeName), flags);
     return 2;
   }
@@ -99,8 +99,8 @@ async function runProjectMode(positional: any, flags: any) {
   let sourceDir;
   try {
     sourceDir = await resolveEpisodeSourceDir(context.episodePath, flags.source);
-  } catch (err) {
-    emit({ ok: false, error: { code: "SOURCE_NOT_FOUND", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SOURCE_NOT_FOUND", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -130,8 +130,8 @@ async function runProjectMode(positional: any, flags: any) {
     const nextSource = { ...source, transcript };
     await writeSourceJson(sourceDir, nextSource);
     result = { ok: true, source_dir: sourceDir, transcript, source: nextSource };
-  } catch (err) {
-    emit({ ok: false, error: { code: "SOURCE_TRANSCRIBE_FAILED", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SOURCE_TRANSCRIBE_FAILED", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -143,8 +143,8 @@ async function runProjectMode(positional: any, flags: any) {
   return 0;
 }
 
-function loadContextError(err: any, projectName: any, episodeName: any) {
-  if (err.code === "ENOENT") {
+function loadContextError(err: unknown, projectName: string, episodeName: string) {
+  if ((err as NodeJS.ErrnoException).code === "ENOENT") {
     return {
       ok: false,
       error: {
@@ -153,7 +153,7 @@ function loadContextError(err: any, projectName: any, episodeName: any) {
       },
     };
   }
-  return { ok: false, error: { code: "LOAD_FAIL", message: err.message } };
+  return { ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } };
 }
 
 export default run;

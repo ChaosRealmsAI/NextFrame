@@ -4,7 +4,7 @@ import { loadPipeline, savePipeline } from "../_helpers/_pipeline.js";
 import { parseIntegerFlag, parseJsonFlag } from "../_helpers/_pipeline-utils.js";
 import { resolveRoot, loadProjectContext } from "../_helpers/_project.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName) {
@@ -20,7 +20,7 @@ export async function run(argv: any) {
     return 3;
   }
 
-  let segmentNumber: any;
+  let segmentNumber: number | undefined;
   if (hasSegment) {
     if (flags.segment === undefined || flags.narration === undefined) {
       emit({ ok: false, error: { code: "USAGE", message: "script-set segment updates require --segment and --narration" } }, flags);
@@ -52,7 +52,7 @@ export async function run(argv: any) {
   let context;
   try {
     context = await loadProjectContext(root, projectName, episodeName);
-  } catch (err) {
+  } catch (err: unknown) {
     emit(loadContextError(err, projectName, episodeName), flags);
     return 2;
   }
@@ -60,8 +60,8 @@ export async function run(argv: any) {
   let pipeline;
   try {
     pipeline = await loadPipeline(context.projectPath, episodeName);
-  } catch (err) {
-    emit({ ok: false, error: { code: "LOAD_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
@@ -70,7 +70,7 @@ export async function run(argv: any) {
   if (principleEntries.length > 0) {
     nextScript.principles = { ...pipeline.script.principles };
     for (const [key, value] of principleEntries) {
-      nextScript.principles[key.slice("principles-".length)] = value;
+      (nextScript.principles as Record<string, unknown>)[key.slice("principles-".length)] = value;
     }
   }
 
@@ -98,12 +98,12 @@ export async function run(argv: any) {
       ...pipeline,
       script: nextScript,
     });
-  } catch (err) {
-    emit({ ok: false, error: { code: "SAVE_FAIL", message: err.message } }, flags);
+  } catch (err: unknown) {
+    emit({ ok: false, error: { code: "SAVE_FAIL", message: (err as Error).message } }, flags);
     return 2;
   }
 
-  const result = { ok: true, script: nextPipeline.script };
+  const result: { ok: boolean; script: unknown; segment?: unknown } = { ok: true, script: nextPipeline.script };
   if (nextSegment) result.segment = nextSegment;
   if (flags.json) {
     process.stdout.write(JSON.stringify(result, null, 2) + "\n");
@@ -115,8 +115,8 @@ export async function run(argv: any) {
   return 0;
 }
 
-function loadContextError(err: any, projectName: any, episodeName: any) {
-  if (err.code === "ENOENT") {
+function loadContextError(err: unknown, projectName: string, episodeName: string) {
+  if ((err as NodeJS.ErrnoException).code === "ENOENT") {
     return {
       ok: false,
       error: {
@@ -125,5 +125,5 @@ function loadContextError(err: any, projectName: any, episodeName: any) {
       },
     };
   }
-  return { ok: false, error: { code: "LOAD_FAIL", message: err.message } };
+  return { ok: false, error: { code: "LOAD_FAIL", message: (err as Error).message } };
 }

@@ -4,10 +4,10 @@ import { parseFlags, loadTimeline, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineDir, timelineUsage } from "../_helpers/_resolve.js";
 import { detectFormat, validateTimelineLegacy, validateTimelineV3 } from "../_helpers/_timeline-validate.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const resolved = resolveTimeline(positional, { usage: timelineUsage("validate") });
-  if (!resolved.ok) {
+  if (resolved.ok === false) {
     emit(resolved, flags);
     return resolved.error?.code === "USAGE" ? 3 : 2;
   }
@@ -17,13 +17,14 @@ export async function run(argv: any) {
     return 2;
   }
 
-  const fmt = detectFormat(loaded.value);
+  const tl = loaded.value as Record<string, unknown>;
+  const fmt = detectFormat(tl);
   let result;
   if (fmt === "v0.1") {
     process.stderr.write("warn: v0.1 tracks/clips format detected — consider migrating to v0.3 layers[]\n");
-    result = validateTimelineLegacy(loaded.value, { projectDir: timelineDir(resolved.jsonPath) });
+    result = validateTimelineLegacy(tl, { projectDir: timelineDir(resolved.jsonPath) });
   } else if (fmt === "v0.3") {
-    result = await validateTimelineV3(loaded.value);
+    result = await validateTimelineV3(tl);
   } else {
     result = {
       ok: false,

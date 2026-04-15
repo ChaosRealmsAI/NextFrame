@@ -4,10 +4,10 @@ import { resolveTimeline, timelineUsage } from "../_helpers/_resolve.js";
 import { addLayer, listLayers, moveLayer, removeLayer, resizeLayer, setLayerProps } from "../../../../nf-core/engine/ops.js";
 import { validateTimelineV3 } from "../_helpers/_timeline-validate.js";
 
-export async function run(argv: any, context = {}) {
+export async function run(argv: string[], context: { subcommand?: string; params?: Record<string, unknown> } = {}) {
   const { positional, flags } = parseFlags(argv);
   const resolved = resolveTimeline(positional, { usage: timelineUsage(context.subcommand || "layer-list") });
-  if (!resolved.ok) {
+  if (resolved.ok === false) {
     emit(resolved, flags);
     return resolved.error?.code === "USAGE" ? 3 : 2;
   }
@@ -17,7 +17,7 @@ export async function run(argv: any, context = {}) {
     emit(loaded, flags);
     return 2;
   }
-  const timeline = loaded.value;
+  const timeline = loaded.value as NfTimeline;
 
   const subcommand = context.subcommand;
   let result;
@@ -29,10 +29,10 @@ export async function run(argv: any, context = {}) {
       result = addLayer(timeline, parseLayerAddPayload(resolved.rest, flags));
       break;
     case "layer-move":
-      result = moveLayer(timeline, resolved.rest[0], toNumber(flags.start));
+      result = moveLayer(timeline, resolved.rest[0], toNumber(flags.start) ?? 0);
       break;
     case "layer-resize":
-      result = resizeLayer(timeline, resolved.rest[0], toNumber(flags.dur));
+      result = resizeLayer(timeline, resolved.rest[0], toNumber(flags.dur) ?? 0);
       break;
     case "layer-remove":
       result = removeLayer(timeline, resolved.rest[0]);
@@ -52,7 +52,7 @@ export async function run(argv: any, context = {}) {
   if (subcommand !== "layer-list") {
     const validation = await validateTimelineV3(timeline);
     if (!validation.ok) {
-      emit({ ok: false, error: { code: "VALIDATION_FAILED", message: validation.errors?.[0]?.message || "validation failed" }, ...validation }, flags);
+      emit({ ...validation, ok: false, error: { code: "VALIDATION_FAILED", message: validation.errors?.[0]?.message || "validation failed" } }, flags);
       return 2;
     }
     const saved = await saveTimeline(resolved.jsonPath, timeline);
@@ -68,29 +68,29 @@ export async function run(argv: any, context = {}) {
   return 0;
 }
 
-function parseLayerAddPayload(rest: any, flags: any) {
+function parseLayerAddPayload(rest: string[], flags: Record<string, string | boolean>) {
   const [scene] = rest;
   return {
-    id: flags.id || `${scene}-${Date.now()}`,
+    id: typeof flags.id === "string" ? flags.id : `${scene}-${Date.now()}`,
     scene,
     start: toNumber(flags.start),
     dur: toNumber(flags.dur),
     params: parseJsonFlag(flags.params),
-    x: flags.x,
-    y: flags.y,
-    w: flags.w,
-    h: flags.h,
+    x: typeof flags.x === "string" ? flags.x : undefined,
+    y: typeof flags.y === "string" ? flags.y : undefined,
+    w: typeof flags.w === "string" ? flags.w : undefined,
+    h: typeof flags.h === "string" ? flags.h : undefined,
     zIndex: toNumber(flags.z),
-    enter: flags.enter,
-    exit: flags.exit,
-    transition: flags.transition,
+    enter: typeof flags.enter === "string" ? parseJsonFlag(flags.enter) : undefined,
+    exit: typeof flags.exit === "string" ? parseJsonFlag(flags.exit) : undefined,
+    transition: typeof flags.transition === "string" ? flags.transition : undefined,
     opacity: toNumber(flags.opacity),
-    blend: flags.blend,
+    blend: typeof flags.blend === "string" ? flags.blend : undefined,
   };
 }
 
-function parseAssignments(args: any, flags: any) {
-  const props = {};
+function parseAssignments(args: string[], flags: Record<string, string | boolean>) {
+  const props: Record<string, unknown> = {};
   for (const arg of args) {
     const eq = arg.indexOf("=");
     if (eq <= 0) continue;
@@ -104,16 +104,16 @@ function parseAssignments(args: any, flags: any) {
   return props;
 }
 
-function parseJsonFlag(raw: any) {
+function parseJsonFlag(raw: unknown): Record<string, unknown> | undefined {
   if (!raw) return undefined;
   try {
-    return JSON.parse(String(raw));
+    return JSON.parse(String(raw)) as Record<string, unknown>;
   } catch {
     return undefined;
   }
 }
 
-function parseScalar(raw: any) {
+function parseScalar(raw: string) {
   if (raw === "true") return true;
   if (raw === "false") return false;
   if (raw === "null") return null;
@@ -125,7 +125,7 @@ function parseScalar(raw: any) {
   }
 }
 
-function toNumber(raw: any) {
+function toNumber(raw: unknown) {
   if (raw === undefined) return undefined;
   const value = Number(raw);
   return Number.isFinite(value) ? value : undefined;

@@ -25,24 +25,25 @@ flags:
   --json           output structured JSON
 `;
 
-function toMuxFailure(result: any) {
+function toMuxFailure(result: Record<string, unknown>) {
   if (result?.ok || !result?.error) return result;
-  if (result.error.code !== "FFMPEG_SPAWN" && result.error.code !== "FFMPEG_FAILED") return result;
+  const err = result.error as Record<string, unknown>;
+  if (err.code !== "FFMPEG_SPAWN" && err.code !== "FFMPEG_FAILED") return result;
   return {
     ok: false,
     error: {
       code: "MUX_FAIL",
-      message: result.error.message,
-      hint: result.error.hint,
+      message: err.message,
+      hint: err.hint,
     },
   };
 }
 
-function makeTempVideoPath(outPath: any) {
+function makeTempVideoPath(outPath: string) {
   return join(dirname(outPath), `.nextframe-video-${randomUUID()}.mp4`);
 }
 
-function parseCrfFlag(raw: any) {
+function parseCrfFlag(raw: unknown) {
   if (raw === undefined) return { ok: true, value: undefined };
   const crf = Number(raw);
   if (!Number.isInteger(crf) || crf < 0 || crf > 51) {
@@ -51,7 +52,7 @@ function parseCrfFlag(raw: any) {
   return { ok: true, value: crf };
 }
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   if (argv.includes("--help") || argv.includes("-h")) {
     process.stdout.write(HELP);
     return 0;
@@ -59,16 +60,17 @@ export async function run(argv: any) {
 
   const { positional, flags } = parseFlags(argv);
   const resolved = resolveTimeline(positional, { usage: USAGE });
-  if (!resolved.ok) {
+  if (resolved.ok === false) {
+    const code = resolved.error.code;
     emit(resolved, flags);
-    return resolved.error?.code === "USAGE" ? 3 : 2;
+    return code === "USAGE" ? 3 : 2;
   }
-  if (!resolved.legacy && resolved.rest.length > 0) {
+  if (resolved.legacy === false && resolved.rest.length > 0) {
     emit({ ok: false, error: { code: "USAGE", message: USAGE } }, flags);
     return 3;
   }
-  const outPath = resolved.legacy ? resolved.rest[0] : resolved.mp4Path;
-  const audioPath = flags.audio ? resolve(flags.audio) : null;
+  const outPath = resolved.legacy === false ? resolved.mp4Path : resolved.rest[0];
+  const audioPath = flags.audio ? resolve(String(flags.audio)) : null;
   if (!outPath) {
     emit({ ok: false, error: { code: "USAGE", message: USAGE } }, flags);
     return 3;
@@ -101,7 +103,7 @@ export async function run(argv: any) {
     return 2;
   }
   const effectiveCrf = crf.value ?? DEFAULT_CRF;
-  const restoreCacheEnv = !resolved.legacy ? configureProjectCacheEnv(resolved.cachePath) : () => {};
+  const restoreCacheEnv = resolved.legacy === false ? configureProjectCacheEnv(resolved.cachePath) : () => {};
   try {
     const loaded = await loadTimeline(resolved.jsonPath);
     if (!loaded.ok) {
@@ -111,62 +113,67 @@ export async function run(argv: any) {
 
     // BDD cli-render-8 invariant: render must validate before touching ffmpeg.
     const projectDir = timelineDir(resolved.jsonPath);
-    const v = validateTimelineLegacy(loaded.value, { projectDir });
+    const v = validateTimelineLegacy(loaded.value as Record<string, unknown>, { projectDir });
     if (v.errors && v.errors.length > 0) {
-      emit({ ok: false, error: v.errors[0], errors: v.errors, hints: v.hints }, flags);
+      emit({ ok: false, error: v.errors[0] }, flags);
       return 2;
     }
-    const opts = {};
+    const opts: {
+      fps?: number; crf?: number; width?: number; height?: number;
+      projectDir?: string; onProgress?: (i: number, total: number) => void;
+    } = {};
     if (flags.fps) opts.fps = Number(flags.fps);
     if (crf.value !== undefined) opts.crf = crf.value;
     if (flags.width) opts.width = Number(flags.width);
     if (flags.height) opts.height = Number(flags.height);
     opts.projectDir = projectDir;
-    opts.onProgress = (i: any, total: any) => {
+    opts.onProgress = (i: number, total: number) => {
       if (!flags.quiet) {
         process.stderr.write(`  rendered ${i}/${total} frames\r`);
       }
     };
     await mkdir(dirname(outPath), { recursive: true });
     const start = Date.now();
-    let r;
+    let r: Record<string, unknown> | undefined;
     const exporter = target === "recorder" ? exportRecorder : exportMP4;
     if (audioPath) {
       const tempVideoPath = makeTempVideoPath(outPath);
-      const videoOnly = await exporter(loaded.value, tempVideoPath, opts);
+      const videoOnly = await exporter(loaded.value as Record<string, unknown>, tempVideoPath, opts) as Record<string, unknown>;
       if (!videoOnly.ok) {
-        r = toMuxFailure(videoOnly);
+        r = toMuxFailure(videoOnly) as Record<string, unknown>;
       } else {
-        const muxed = await muxMP4Audio(tempVideoPath, audioPath, outPath);
+        const muxed = await muxMP4Audio(tempVideoPath, audioPath, outPath) as Record<string, unknown>;
         if (!muxed.ok) {
           r = muxed;
         } else {
           try {
             unlinkSync(tempVideoPath);
           } catch {}
-          r = { ok: true, value: { ...videoOnly.value, outputPath: outPath, audioPath } };
+          r = { ok: true, value: { ...(videoOnly.value as Record<string, unknown>), outputPath: outPath, audioPath } };
         }
       }
     } else {
-      r = await exporter(loaded.value, outPath, opts);
+      r = await exporter(loaded.value as Record<string, unknown>, outPath, opts) as Record<string, unknown>;
     }
     if (!flags.quiet) process.stderr.write("\n");
     const elapsed = ((Date.now() - start) / 1000).toFixed(2);
     if (!r.ok) {
-      emit(r, flags);
+      emit(r as unknown as Parameters<typeof emit>[0], flags);
       return 2;
     }
-    if (!resolved.legacy) {
-      const logged = await appendExportLog(resolved, outPath, r.value, effectiveCrf);
+    if (resolved.legacy === false) {
+      const logged = await appendExportLog(resolved as unknown as Record<string, unknown>, outPath, r.value as Record<string, unknown>, effectiveCrf);
       if (!logged.ok) {
         emit(logged, flags);
         return 2;
       }
     }
     if (flags.json) {
-      process.stdout.write(JSON.stringify({ ok: true, value: { ...r.value, elapsedSeconds: Number(elapsed) } }, null, 2) + "\n");
+      const rv = r.value as Record<string, unknown>;
+      process.stdout.write(JSON.stringify({ ok: true, value: { ...rv, elapsedSeconds: Number(elapsed) } }, null, 2) + "\n");
     } else {
-      process.stdout.write(`wrote ${outPath} (${r.value.framesRendered} frames @ ${r.value.fps}fps, ${elapsed}s)\n`);
+      const rv = r.value as Record<string, unknown>;
+      process.stdout.write(`wrote ${outPath} (${rv.framesRendered} frames @ ${rv.fps}fps, ${elapsed}s)\n`);
     }
     return 0;
   } finally {
@@ -174,13 +181,13 @@ export async function run(argv: any) {
   }
 }
 
-async function appendExportLog(resolved: any, outPath: any, renderValue: any, crf: any) {
-  const exportDir = dirname(resolved.exportsPath);
+async function appendExportLog(resolved: Record<string, unknown>, outPath: string, renderValue: Record<string, unknown>, crf: number) {
+  const exportDir = dirname(String(resolved.exportsPath));
   let history = [];
 
   await mkdir(exportDir, { recursive: true });
   try {
-    const text = await readFile(resolved.exportsPath, "utf8");
+    const text = await readFile(String(resolved.exportsPath), "utf8");
     const parsed = JSON.parse(text);
     if (!Array.isArray(parsed)) {
       return {
@@ -192,13 +199,13 @@ async function appendExportLog(resolved: any, outPath: any, renderValue: any, cr
       };
     }
     history = parsed;
-  } catch (err) {
-    if (err.code !== "ENOENT") {
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
       return {
         ok: false,
         error: {
           code: "EXPORT_LOG_FAIL",
-          message: `cannot read export log: ${err.message}`,
+          message: `cannot read export log: ${(err as Error).message}`,
         },
       };
     }
@@ -218,14 +225,14 @@ async function appendExportLog(resolved: any, outPath: any, renderValue: any, cr
   });
 
   try {
-    await writeFile(resolved.exportsPath, JSON.stringify(history, null, 2) + "\n");
+    await writeFile(String(resolved.exportsPath), JSON.stringify(history, null, 2) + "\n");
     return { ok: true };
   } catch (err) {
     return {
       ok: false,
       error: {
         code: "EXPORT_LOG_FAIL",
-        message: `cannot write export log: ${err.message}`,
+        message: `cannot write export log: ${(err as Error).message}`,
       },
     };
   }

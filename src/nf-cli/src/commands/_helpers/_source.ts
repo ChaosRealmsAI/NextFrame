@@ -25,7 +25,7 @@ const REPO_ROOT = resolve(HERE, "../../../../..");
 const DEFAULT_FORMAT = "720p";
 const SOURCE_JSON = "source.json";
 
-export function parseSourceFlags(argv: any, valuedFlags = []) {
+export function parseSourceFlags(argv: string[], valuedFlags: string[] = []) {
   const valued = new Set(valuedFlags);
   const normalized = [];
   for (let index = 0; index < argv.length; index += 1) {
@@ -48,7 +48,7 @@ export function parseSourceFlags(argv: any, valuedFlags = []) {
   return parseFlags(normalized);
 }
 
-export function looksLikeSourcePath(value: any) {
+export function looksLikeSourcePath(value: unknown) {
   return typeof value === "string" && value.includes("/");
 }
 
@@ -56,7 +56,7 @@ export function resolveLibraryRoot() {
   return resolve(homedir(), "NextFrame", "library");
 }
 
-export async function resolveEpisodeSourceDir(episodePath: any, sourceName: any) {
+export async function resolveEpisodeSourceDir(episodePath: string, sourceName: string | boolean | undefined) {
   const episodeSourcesDir = join(resolve(episodePath), "sources");
   const baseDir = (await directoryExists(episodeSourcesDir))
     ? episodeSourcesDir
@@ -67,7 +67,7 @@ export async function resolveEpisodeSourceDir(episodePath: any, sourceName: any)
   return findFirstSourceDir(baseDir);
 }
 
-export function slugifyTitle(title: any) {
+export function slugifyTitle(title: unknown) {
   const value = String(title || "")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -78,7 +78,7 @@ export function slugifyTitle(title: any) {
   return value || "source";
 }
 
-export function normalizeFormat(rawFormat: any) {
+export function normalizeFormat(rawFormat: unknown) {
   if (rawFormat === undefined || rawFormat === null || rawFormat === true || rawFormat === "") {
     return DEFAULT_FORMAT;
   }
@@ -95,7 +95,7 @@ export function createSourceDocument({
   downloadedAt = new Date().toISOString(),
   transcript = null,
   clips = []
-}: any) {
+}: { id: string; title: string; url: string; durationSec: unknown; format?: string; downloadedAt?: string; transcript?: Record<string, unknown> | null; clips?: unknown[] }) {
   return {
     version: "1",
     id,
@@ -109,69 +109,73 @@ export function createSourceDocument({
   };
 }
 
-export function validateSourceDocument(value: any) {
+export function validateSourceDocument(value: unknown) {
   const errors = [];
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { ok: false, errors: ["source document must be an object"] };
   }
-  if (value.version !== "1") errors.push("version must be \"1\"");
-  if (!isNonEmptyString(value.id)) errors.push("id must be a non-empty string");
-  if (!isNonEmptyString(value.title)) errors.push("title must be a non-empty string");
-  if (!isNonEmptyString(value.url)) errors.push("url must be a non-empty string");
-  if (!Number.isFinite(Number(value.duration_sec)) || Number(value.duration_sec) < 0) {
+  const doc = value as Record<string, unknown>;
+  if (doc.version !== "1") errors.push("version must be \"1\"");
+  if (!isNonEmptyString(doc.id)) errors.push("id must be a non-empty string");
+  if (!isNonEmptyString(doc.title)) errors.push("title must be a non-empty string");
+  if (!isNonEmptyString(doc.url)) errors.push("url must be a non-empty string");
+  if (!Number.isFinite(Number(doc.duration_sec)) || Number(doc.duration_sec) < 0) {
     errors.push("duration_sec must be a finite non-negative number");
   }
-  if (!isNonEmptyString(value.format)) errors.push("format must be a non-empty string");
-  if (!isNonEmptyString(value.downloaded_at)) errors.push("downloaded_at must be a non-empty string");
-  if (value.transcript !== null) {
-    if (!value.transcript || typeof value.transcript !== "object" || Array.isArray(value.transcript)) {
+  if (!isNonEmptyString(doc.format)) errors.push("format must be a non-empty string");
+  if (!isNonEmptyString(doc.downloaded_at)) errors.push("downloaded_at must be a non-empty string");
+  if (doc.transcript !== null) {
+    if (!doc.transcript || typeof doc.transcript !== "object" || Array.isArray(doc.transcript)) {
       errors.push("transcript must be null or an object");
     } else {
-      if (!Number.isInteger(value.transcript.total_sentences) || value.transcript.total_sentences < 0) {
+      const transcript = doc.transcript as Record<string, unknown>;
+      if (!Number.isInteger(transcript.total_sentences) || (transcript.total_sentences as number) < 0) {
         errors.push("transcript.total_sentences must be a non-negative integer");
       }
-      if (!Number.isInteger(value.transcript.total_words) || value.transcript.total_words < 0) {
+      if (!Number.isInteger(transcript.total_words) || (transcript.total_words as number) < 0) {
         errors.push("transcript.total_words must be a non-negative integer");
       }
-      if (value.transcript.language !== null && value.transcript.language !== undefined && !isNonEmptyString(value.transcript.language)) {
+      if (transcript.language !== null && transcript.language !== undefined && !isNonEmptyString(transcript.language)) {
         errors.push("transcript.language must be a string when present");
       }
-      if (value.transcript.model !== null && value.transcript.model !== undefined && !isNonEmptyString(value.transcript.model)) {
+      if (transcript.model !== null && transcript.model !== undefined && !isNonEmptyString(transcript.model)) {
         errors.push("transcript.model must be a string when present");
       }
     }
   }
-  if (!Array.isArray(value.clips)) {
+  if (!Array.isArray(doc.clips)) {
     errors.push("clips must be an array");
   } else {
-    value.clips.forEach((clip: any, index: any) => {
+    doc.clips.forEach((clip: unknown, index: number) => {
       if (!clip || typeof clip !== "object" || Array.isArray(clip)) {
         errors.push(`clips[${index}] must be an object`);
         return;
       }
-      if (!Number.isInteger(Number(clip.id)) || Number(clip.id) < 1) errors.push(`clips[${index}].id must be a positive integer`);
-      if (!isNonEmptyString(clip.title)) errors.push(`clips[${index}].title must be a non-empty string`);
-      if (!Number.isInteger(Number(clip.from_id)) || Number(clip.from_id) < 1) errors.push(`clips[${index}].from_id must be a positive integer`);
-      if (!Number.isInteger(Number(clip.to_id)) || Number(clip.to_id) < 1) errors.push(`clips[${index}].to_id must be a positive integer`);
-      if (!Number.isFinite(Number(clip.start_sec))) errors.push(`clips[${index}].start_sec must be finite`);
-      if (!Number.isFinite(Number(clip.end_sec))) errors.push(`clips[${index}].end_sec must be finite`);
-      if (!Number.isFinite(Number(clip.duration_sec)) || Number(clip.duration_sec) < 0) {
+      const c = clip as Record<string, unknown>;
+      if (!Number.isInteger(Number(c.id)) || Number(c.id) < 1) errors.push(`clips[${index}].id must be a positive integer`);
+      if (!isNonEmptyString(c.title)) errors.push(`clips[${index}].title must be a non-empty string`);
+      if (!Number.isInteger(Number(c.from_id)) || Number(c.from_id) < 1) errors.push(`clips[${index}].from_id must be a positive integer`);
+      if (!Number.isInteger(Number(c.to_id)) || Number(c.to_id) < 1) errors.push(`clips[${index}].to_id must be a positive integer`);
+      if (!Number.isFinite(Number(c.start_sec))) errors.push(`clips[${index}].start_sec must be finite`);
+      if (!Number.isFinite(Number(c.end_sec))) errors.push(`clips[${index}].end_sec must be finite`);
+      if (!Number.isFinite(Number(c.duration_sec)) || Number(c.duration_sec) < 0) {
         errors.push(`clips[${index}].duration_sec must be a finite non-negative number`);
       }
-      if (!isNonEmptyString(clip.file)) errors.push(`clips[${index}].file must be a non-empty string`);
-      if (!Array.isArray(clip.subtitles)) {
+      if (!isNonEmptyString(c.file)) errors.push(`clips[${index}].file must be a non-empty string`);
+      if (!Array.isArray(c.subtitles)) {
         errors.push(`clips[${index}].subtitles must be an array`);
       } else {
-        clip.subtitles.forEach((subtitle: any, subtitleIndex: any) => {
+        c.subtitles.forEach((subtitle: unknown, subtitleIndex: number) => {
           if (!subtitle || typeof subtitle !== "object" || Array.isArray(subtitle)) {
             errors.push(`clips[${index}].subtitles[${subtitleIndex}] must be an object`);
             return;
           }
-          if (!isNonEmptyString(subtitle.text)) errors.push(`clips[${index}].subtitles[${subtitleIndex}].text must be a non-empty string`);
-          if (!Number.isInteger(Number(subtitle.start_ms)) || Number(subtitle.start_ms) < 0) {
+          const sub = subtitle as Record<string, unknown>;
+          if (!isNonEmptyString(sub.text)) errors.push(`clips[${index}].subtitles[${subtitleIndex}].text must be a non-empty string`);
+          if (!Number.isInteger(Number(sub.start_ms)) || Number(sub.start_ms) < 0) {
             errors.push(`clips[${index}].subtitles[${subtitleIndex}].start_ms must be a non-negative integer`);
           }
-          if (!Number.isInteger(Number(subtitle.end_ms)) || Number(subtitle.end_ms) < 0) {
+          if (!Number.isInteger(Number(sub.end_ms)) || Number(sub.end_ms) < 0) {
             errors.push(`clips[${index}].subtitles[${subtitleIndex}].end_ms must be a non-negative integer`);
           }
         });
@@ -181,15 +185,15 @@ export function validateSourceDocument(value: any) {
   return { ok: errors.length === 0, errors };
 }
 
-export async function readJson(path: any) {
+export async function readJson(path: string) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
-export async function writeJson(path: any, value: any) {
+export async function writeJson(path: string, value: unknown) {
   await writeFile(path, JSON.stringify(value, null, 2) + "\n");
 }
 
-export async function readSourceJson(sourceDirOrFile: any) {
+export async function readSourceJson(sourceDirOrFile: string) {
   const path = toSourceJsonPath(sourceDirOrFile);
   const value = await readJson(path);
   const validation = validateSourceDocument(value);
@@ -199,7 +203,7 @@ export async function readSourceJson(sourceDirOrFile: any) {
   return value;
 }
 
-export async function writeSourceJson(sourceDirOrFile: any, value: any) {
+export async function writeSourceJson(sourceDirOrFile: string, value: unknown) {
   const validation = validateSourceDocument(value);
   if (!validation.ok) {
     throw new Error(`invalid source.json: ${validation.errors.join("; ")}`);
@@ -208,12 +212,12 @@ export async function writeSourceJson(sourceDirOrFile: any, value: any) {
   return value;
 }
 
-export async function listSources(libraryPath: any) {
-  let entries = [];
+export async function listSources(libraryPath: string) {
+  let entries: import("node:fs").Dirent[] = [];
   try {
     entries = await readdir(resolve(libraryPath), { withFileTypes: true });
-  } catch (error) {
-    if (error.code === "ENOENT") return [];
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
   }
 
@@ -230,8 +234,8 @@ export async function listSources(libraryPath: any) {
         transcript_status: source.transcript ? "ready" : "pending",
         clip_count: Array.isArray(source.clips) ? source.clips.length : 0,
       });
-    } catch (error) {
-      if (error.code === "ENOENT") continue;
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
       throw error;
     }
   }
@@ -257,7 +261,7 @@ export async function assertSourceBinAvailable(binPath = resolveSourceBin()) {
   }
 }
 
-export function runSourceBinary(args: any, options = {}) {
+export function runSourceBinary(args: string[], options: { binPath?: string; cwd?: string } = {}) {
   const result = spawnSync(options.binPath || resolveSourceBin(), args, {
     cwd: options.cwd,
     encoding: "utf8",
@@ -274,11 +278,11 @@ export function runSourceBinary(args: any, options = {}) {
   return result;
 }
 
-export async function ensureDirectory(path: any) {
+export async function ensureDirectory(path: string) {
   await mkdir(path, { recursive: true });
 }
 
-export async function prepareDownloadDirectory(libraryPath: any) {
+export async function prepareDownloadDirectory(libraryPath: string) {
   const base = resolve(libraryPath);
   await ensureDirectory(base);
   const tempDir = join(base, `.nf-source-download-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
@@ -286,7 +290,7 @@ export async function prepareDownloadDirectory(libraryPath: any) {
   return tempDir;
 }
 
-export async function finalizeDownloadDirectory(tempDir: any, title: any) {
+export async function finalizeDownloadDirectory(tempDir: string, title: string) {
   const baseDir = dirname(resolve(tempDir));
   const baseSlug = slugifyTitle(title);
   let finalSlug = baseSlug;
@@ -300,63 +304,63 @@ export async function finalizeDownloadDirectory(tempDir: any, title: any) {
   return { finalDir, finalSlug };
 }
 
-export function success(value: any) {
+export function success(value: unknown) {
   process.stdout.write(JSON.stringify(value, null, 2) + "\n");
 }
 
-export function fail(code: any, message: any, extra = {}) {
+export function fail(code: string, message: string, extra: { fix?: string; hint?: string; [key: string]: unknown } = {}): never {
   const error = { code, message, fix: extra.fix || extra.hint || defaultFixSuggestion(), ...extra };
   process.stdout.write(JSON.stringify({ ok: false, error }, null, 2) + "\n");
   process.exit(1);
 }
 
-export async function readMetaJson(sourceDir: any) {
+export async function readMetaJson(sourceDir: string) {
   return readJson(join(resolve(sourceDir), "meta.json"));
 }
 
-function toFinite(value: any, fallback: any) { const num = Number(value); return Number.isFinite(num) ? num : fallback; }
+function toFinite(value: unknown, fallback: number) { const num = Number(value); return Number.isFinite(num) ? num : fallback; }
 
-function isNonEmptyString(value: any) { return typeof value === "string" && value.trim().length > 0; }
+function isNonEmptyString(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0; }
 
-function toSourceJsonPath(sourceDirOrFile: any) {
+function toSourceJsonPath(sourceDirOrFile: string) {
   const resolved = resolve(sourceDirOrFile);
   return resolved.endsWith(`/${SOURCE_JSON}`) || resolved.endsWith(`\\${SOURCE_JSON}`)
     ? resolved
     : join(resolved, SOURCE_JSON);
 }
 
-async function pathExists(path: any) {
+async function pathExists(path: string) {
   try {
     await stat(path);
     return true;
-  } catch (error) {
-    if (error.code === "ENOENT") return false;
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
     throw error;
   }
 }
 
-async function directoryExists(path: any) {
+async function directoryExists(path: string) {
   try {
     return (await stat(path)).isDirectory();
-  } catch (error) {
-    if (error.code === "ENOENT") return false;
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
     throw error;
   }
 }
 
-async function requireSourceDir(path: any) {
+async function requireSourceDir(path: string) {
   if (await pathExists(join(path, SOURCE_JSON))) {
     return resolve(path);
   }
   throw new Error(`source not found: ${resolve(path)}`);
 }
 
-async function findFirstSourceDir(baseDir: any) {
-  let entries = [];
+async function findFirstSourceDir(baseDir: string) {
+  let entries: import("node:fs").Dirent[] = [];
   try {
     entries = await readdir(resolve(baseDir), { withFileTypes: true });
-  } catch (error) {
-    if (error.code === "ENOENT") {
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       throw new Error(`no source directories found at ${resolve(baseDir)}`);
     }
     throw error;

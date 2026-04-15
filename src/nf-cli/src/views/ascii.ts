@@ -15,7 +15,7 @@ const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
  * @param {number} [height=24]
  * @returns {Promise<string>}
  */
-export async function pngToAscii(pngBuffer: any, width = TARGET_WIDTH, height = TARGET_HEIGHT) {
+export async function pngToAscii(pngBuffer: Buffer | Uint8Array, width = TARGET_WIDTH, height = TARGET_HEIGHT) {
   const decoded = decodePNG(pngBuffer);
   const scaled = scaleRaster(decoded.data, decoded.width, decoded.height, width, height);
   return rasterToAscii(scaled, width, height);
@@ -28,7 +28,7 @@ export async function pngToAscii(pngBuffer: any, width = TARGET_WIDTH, height = 
  * @param {number} height
  * @returns {string}
  */
-export function rasterToAscii(data: any, width: any, height: any) {
+export function rasterToAscii(data: Buffer | Uint8Array | Uint8ClampedArray, width: number, height: number): string {
   const lumas = new Float32Array(width * height);
   let minL = 1;
   let maxL = 0;
@@ -43,7 +43,7 @@ export function rasterToAscii(data: any, width: any, height: any) {
     if (lum > maxL) maxL = lum;
   }
   const range = maxL - minL || 1;
-  const lines = [];
+  const lines: string[] = [];
   for (let y = 0; y < height; y++) {
     let line = "";
     for (let x = 0; x < width; x++) {
@@ -56,14 +56,14 @@ export function rasterToAscii(data: any, width: any, height: any) {
   return lines.join("\n");
 }
 
-function decodePNG(pngBuffer: any) {
+function decodePNG(pngBuffer: Buffer | Uint8Array) {
   const bytes = Buffer.isBuffer(pngBuffer) ? pngBuffer : Buffer.from(pngBuffer);
   if (!bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
     throw new Error("png signature mismatch");
   }
   let width = 0;
   let height = 0;
-  const idat = [];
+  const idat: Buffer[] = [];
   for (let offset = PNG_SIGNATURE.length; offset < bytes.length;) {
     const length = bytes.readUInt32BE(offset);
     const type = bytes.subarray(offset + 4, offset + 8).toString("ascii");
@@ -84,7 +84,7 @@ function decodePNG(pngBuffer: any) {
   const out = Buffer.alloc(width * height * 4);
   let src = 0;
   let dst = 0;
-  let prev = null;
+  let prev: Buffer | null = null;
   for (let y = 0; y < height; y++) {
     const filter = raw[src++];
     const row = Buffer.from(raw.subarray(src, src + stride));
@@ -97,7 +97,7 @@ function decodePNG(pngBuffer: any) {
   return { width, height, data: out };
 }
 
-function unfilterRow(row: any, prev: any, filter: any, bpp: any) {
+function unfilterRow(row: Buffer, prev: Buffer | null, filter: number, bpp: number): void {
   for (let i = 0; i < row.length; i++) {
     const left = i >= bpp ? row[i - bpp] : 0;
     const up = prev ? prev[i] : 0;
@@ -109,7 +109,7 @@ function unfilterRow(row: any, prev: any, filter: any, bpp: any) {
   }
 }
 
-function paeth(a: any, b: any, c: any) {
+function paeth(a: number, b: number, c: number): number {
   const p = a + b - c;
   const pa = Math.abs(p - a);
   const pb = Math.abs(p - b);
@@ -119,7 +119,7 @@ function paeth(a: any, b: any, c: any) {
   return c;
 }
 
-function scaleRaster(data: any, srcWidth: any, srcHeight: any, outWidth: any, outHeight: any) {
+function scaleRaster(data: Buffer, srcWidth: number, srcHeight: number, outWidth: number, outHeight: number): Buffer {
   const out = Buffer.alloc(outWidth * outHeight * 4);
   for (let y = 0; y < outHeight; y++) {
     const srcY = Math.min(srcHeight - 1, Math.floor((y / outHeight) * srcHeight));

@@ -3,13 +3,14 @@ import { emit, loadTimeline, parseFlags, parseTime } from "../_helpers/_io.js";
 import { resolveTimeline as resolveTimelineArgs, timelineUsage } from "../_helpers/_resolve.js";
 import { resolveTimeline as resolveLegacyTimeline } from "../_helpers/_legacy-timeline.js";
 import { REGISTRY as SCENE_REGISTRY } from "../../lib/scene-registry.js";
+import type { Timeline } from "../../../../nf-core/types.js";
 
 const USAGE = timelineUsage("describe-frame", " <t>", " <t>");
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const resolved = resolveTimelineArgs(positional, { usage: USAGE });
-  if (!resolved.ok) {
+  if (resolved.ok === false) {
     emit(resolved, flags);
     return resolved.error?.code === "USAGE" ? 3 : 2;
   }
@@ -37,13 +38,13 @@ export async function run(argv: any) {
     return 2;
   }
 
-  const normalized = normalizeTimeline(loaded.value);
+  const normalized = normalizeTimeline(loaded.value as Record<string, unknown>);
   if (!normalized.ok) {
-    emit(normalized, flags);
+    emit(normalized as unknown as Parameters<typeof emit>[0], flags);
     return 2;
   }
 
-  const described = describeFrame(normalized.value, t);
+  const described = describeFrame(normalized.value as Record<string, unknown>[], t);
   if (!described.ok) {
     emit(described, flags);
     return 2;
@@ -53,11 +54,11 @@ export async function run(argv: any) {
   return 0;
 }
 
-function normalizeTimeline(timeline: any) {
+function normalizeTimeline(timeline: Record<string, unknown>) {
   if (Array.isArray(timeline?.layers)) {
     return {
       ok: true,
-      value: timeline.layers.map((layer: any) => ({
+      value: timeline.layers.map((layer: Record<string, unknown>) => ({
         ...layer,
         start: Number(layer?.start),
         dur: Number(layer?.dur)
@@ -77,17 +78,18 @@ function normalizeTimeline(timeline: any) {
   }
 
   const resolved = resolveLegacyTimeline(timeline);
-  if (!resolved.ok) {
+  if (resolved.ok === false) {
     return resolved;
   }
 
   const layers = [];
-  for (const track of resolved.value.tracks || []) {
+  const resolvedTimeline = resolved.value as Timeline;
+  for (const track of resolvedTimeline.tracks || []) {
     if (track?.muted || track?.kind === "audio") continue;
     for (const clip of track.clips || []) {
       layers.push({
-        ...clip,
-        trackId: clip?.trackId || track?.id || null,
+        ...(clip as Record<string, unknown>),
+        trackId: (clip as Record<string, unknown>)["trackId"] || track?.id || null,
         start: Number(clip?.start),
         dur: Number(clip?.dur),
       });
@@ -97,18 +99,20 @@ function normalizeTimeline(timeline: any) {
   return { ok: true, value: layers };
 }
 
-export function describeFrame(layers: any, t: any) {
+export function describeFrame(layers: Record<string, unknown>[], t: number) {
   const activeClips = [];
 
   for (const clip of layers) {
-    if (!Number.isFinite(clip?.start) || !Number.isFinite(clip?.dur) || clip.dur <= 0) {
+    const clipStart = Number(clip.start);
+    const clipDur = Number(clip.dur);
+    if (!Number.isFinite(clipStart) || !Number.isFinite(clipDur) || clipDur <= 0) {
       continue;
     }
-    if (t < clip.start || t >= clip.start + clip.dur) {
+    if (t < clipStart || t >= clipStart + clipDur) {
       continue;
     }
 
-    const scene = SCENE_REGISTRY.get(clip.scene);
+    const scene = SCENE_REGISTRY.get(clip.scene as string);
     if (!scene || typeof scene.describe !== "function") {
       return {
         ok: false,
@@ -124,14 +128,14 @@ export function describeFrame(layers: any, t: any) {
       activeClips.push({
         id: clip.id || null,
         scene: clip.scene,
-        describe_result: scene.describe(clip.params || clip.data || {}, clip, t - clip.start),
+        describe_result: scene.describe((clip.params || clip.data || {}) as Record<string, unknown>, clip, t - clipStart),
       });
     } catch (error) {
       return {
         ok: false,
         error: {
           code: "DESCRIBE_FAIL",
-          message: `scene "${clip.scene}" describe() failed for clip "${clip.id || "unknown"}": ${error.message}`,
+          message: `scene "${clip.scene}" describe() failed for clip "${clip.id || "unknown"}": ${(error as Error).message}`,
           hint: "check the scene describe() implementation and the clip params it receives",
         },
       };

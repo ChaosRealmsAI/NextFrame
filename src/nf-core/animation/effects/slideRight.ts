@@ -1,7 +1,7 @@
 import { clamp01, joinTransforms, px } from "../shared.js";
 
 // Slides content in from the right while fading it up.
-export function slideRight(progress: any, opts = {}) {
+export function slideRight(progress: number, opts: { distance?: number } = {}) {
   const p = clamp01(progress);
   const distance = opts.distance ?? 40;
   return {

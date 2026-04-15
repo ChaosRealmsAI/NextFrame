@@ -61,13 +61,13 @@ const RECIPES = {
   },
 };
 
-function readState(filename: any) {
+function readState(filename: string) {
   const path = resolve(STATES_DIR, filename);
   if (!existsSync(path)) return `[ERROR: ${filename} not found at ${path}]`;
   return readFileSync(path, "utf-8");
 }
 
-function fillTemplate(text: any, vars: any) {
+function fillTemplate(text: string, vars: Record<string, unknown>) {
   let result = text;
   for (const [key, value] of Object.entries(vars)) {
     result = result.replace(new RegExp(`\\{${key}\\}`, "g"), String(value));
@@ -75,11 +75,11 @@ function fillTemplate(text: any, vars: any) {
   return result;
 }
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   if (flags.help) { process.stdout.write(HELP); return 0; }
 
-  const type = flags.type || null;
+  const type = flags.type ? String(flags.type) : null;
   const timelinePath = positional[0];
 
   // ═══ No type, no timeline → show help ═══
@@ -95,15 +95,15 @@ export async function run(argv: any) {
 
   // ═══ Has type → check scenes ═══
   if (!timelinePath && type) {
-    const recipe = RECIPES[type];
+    const recipe = (RECIPES as Record<string, typeof RECIPES[keyof typeof RECIPES]>)[type];
     if (!recipe) {
       process.stderr.write(`error: unknown type "${type}". Use: lecture | interview\n`);
       return 2;
     }
 
     const scenes = await listScenes();
-    const available = new Set(scenes.filter((s: any) => s.ratio === recipe.ratio).map((s: any) => s.id));
-    const missing = recipe.requiredScenes.filter((s: any) => !available.has(s.id));
+    const available = new Set(scenes.filter((s) => (s as unknown as Record<string, unknown>).ratio === recipe.ratio).map((s) => (s as unknown as Record<string, unknown>).id));
+    const missing = recipe.requiredScenes.filter((s: Record<string, unknown>) => !available.has(s.id as string));
 
     if (missing.length > 0) {
       // ═══ STATE 02: Create missing scenes ═══
@@ -151,8 +151,8 @@ Available scenes:
       process.stdout.write(`  ✓ ${s.id.padEnd(22)} ${s.description}\n`);
     }
     // Also list available optional scenes
-    const allForRatio = scenes.filter((s: any) => s.ratio === recipe.ratio);
-    const extraScenes = allForRatio.filter((s: any) => !recipe.requiredScenes.find((r: any) => r.id === s.id));
+    const allForRatio = scenes.filter((s) => (s as unknown as Record<string, unknown>).ratio === recipe.ratio);
+    const extraScenes = allForRatio.filter((s) => !recipe.requiredScenes.find((r: { id: string }) => r.id === s.id));
     if (extraScenes.length > 0) {
       process.stdout.write(`\nExtra available scenes:\n`);
       for (const s of extraScenes) {
@@ -186,8 +186,8 @@ After writing → validate → run:
   let timeline;
   try {
     timeline = JSON.parse(readFileSync(timelinePath, "utf-8"));
-  } catch (e) {
-    process.stderr.write(`error: cannot parse ${timelinePath}: ${e.message}\n`);
+  } catch (e: unknown) {
+    process.stderr.write(`error: cannot parse ${timelinePath}: ${(e as Error).message}\n`);
     return 2;
   }
 

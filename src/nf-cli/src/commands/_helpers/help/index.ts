@@ -10,7 +10,7 @@ import { renderCommandHelp as formatCommandHelp, renderRootHelp as formatRootHel
 
 export { hasCommandHelp, listTopLevelHelpCommands };
 
-export function renderCommandHelp(name: any) {
+export function renderCommandHelp(name: string) {
   return formatCommandHelp(name, getCommandSpec(name));
 }
 

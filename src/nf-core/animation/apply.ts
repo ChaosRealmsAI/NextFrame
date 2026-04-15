@@ -6,12 +6,12 @@ import { clamp01, serializeStyle } from "./shared.js";
 
 const EASING_FACTORY_NAMES = new Set(["cubicBezier", "steps", "springConfigurable"]);
 
-function parseFactorySpec(spec: any) {
+function parseFactorySpec(spec: string) {
   const trimmed = spec.trim();
 
   const bezierMatch = trimmed.match(/^cubicBezier\(([^)]+)\)$/);
   if (bezierMatch) {
-    const values = bezierMatch[1].split(",").map((value: any) => Number.parseFloat(value.trim()));
+    const values = bezierMatch[1].split(",").map((value: string) => Number.parseFloat(value.trim()));
     if (values.length === 4 && values.every(Number.isFinite)) {
       return cubicBezier(values[0], values[1], values[2], values[3]);
     }
@@ -27,41 +27,42 @@ function parseFactorySpec(spec: any) {
 
   const springMatch = trimmed.match(/^springConfigurable\(([^)]+)\)$/);
   if (springMatch) {
-    const values = springMatch[1].split(",").map((value: any) => Number.parseFloat(value.trim()));
+    const values = springMatch[1].split(",").map((value: string) => Number.parseFloat(value.trim()));
     if (values.length >= 1 && values.every(Number.isFinite)) {
       const [damping, stiffness, mass] = values;
-      return (t: any) => springConfigurable(t, { damping, stiffness, mass });
+      return (t: number) => springConfigurable(t, { damping, stiffness, mass });
     }
   }
 
   return null;
 }
 
-function resolveEasing(spec: any) {
+function resolveEasing(spec: unknown) {
   if (typeof spec === "function") return spec;
 
   if (spec && typeof spec === "object") {
-    const type = spec.type ?? spec.name;
+    const obj = spec as Record<string, unknown>;
+    const type = obj.type ?? obj.name;
     if (type === "cubicBezier") {
-      return cubicBezier(spec.x1, spec.y1, spec.x2, spec.y2);
+      return cubicBezier(obj.x1 as number, obj.y1 as number, obj.x2 as number, obj.y2 as number);
     }
     if (type === "steps") {
-      return steps(spec.count ?? spec.n ?? spec.steps);
+      return steps(Number(obj.count ?? obj.n ?? obj.steps));
     }
     if (type === "springConfigurable") {
-      return (t: any) => springConfigurable(t, spec);
+      return (t: number) => springConfigurable(t, spec as { damping?: number; stiffness?: number; mass?: number });
     }
-    if (typeof type === "string" && EASINGS[type] && !EASING_FACTORY_NAMES.has(type)) {
-      return EASINGS[type];
+    if (typeof type === "string" && EASINGS[type as keyof typeof EASINGS] && !EASING_FACTORY_NAMES.has(type)) {
+      return EASINGS[type as keyof typeof EASINGS];
     }
   }
 
   if (typeof spec === "string") {
-    if (EASINGS[spec] && !EASING_FACTORY_NAMES.has(spec)) {
-      return EASINGS[spec];
+    if (EASINGS[spec as keyof typeof EASINGS] && !EASING_FACTORY_NAMES.has(spec)) {
+      return EASINGS[spec as keyof typeof EASINGS];
     }
     if (spec === "springConfigurable") {
-      return (t: any) => springConfigurable(t);
+      return (t: number) => springConfigurable(t);
     }
     return parseFactorySpec(spec) ?? EASINGS.linear;
   }
@@ -73,18 +74,20 @@ export const EASING_NAMES = Object.keys(EASINGS);
 export const EFFECT_NAMES = [...EFFECT_IDS];
 export const TRANSITION_NAMES = [...TRANSITION_IDS];
 
-export function ease(easingName: any, t: any) {
+export function ease(easingName: unknown, t: number) {
   const fn = resolveEasing(easingName);
   return clamp01(fn(clamp01(t)));
 }
 
-export function getEffectCSS(effectName: any, progress: any, opts = {}) {
-  const fn = EFFECT_FNS[effectName] || EFFECT_FNS.fadeIn;
+export function getEffectCSS(effectName: string, progress: number, opts: Record<string, unknown> = {}) {
+  const effectFns = EFFECT_FNS as Record<string, (progress: number, opts?: Record<string, unknown>) => Record<string, unknown>>;
+  const fn = effectFns[effectName] || (EFFECT_FNS.fadeIn as (progress: number, opts?: Record<string, unknown>) => Record<string, unknown>);
   return serializeStyle(fn(clamp01(progress), opts));
 }
 
-export function getTransitionCSS(transitionName: any, progress: any, opts = {}) {
-  const fn = TRANSITION_FNS[transitionName] || TRANSITION_FNS.dissolve;
+export function getTransitionCSS(transitionName: string, progress: number, opts: Record<string, unknown> = {}) {
+  const transitionFns = TRANSITION_FNS as Record<string, (progress: number, opts?: Record<string, unknown>) => { layerA: Record<string, unknown>; layerB: Record<string, unknown> }>;
+  const fn = transitionFns[transitionName] || (TRANSITION_FNS.dissolve as (progress: number, opts?: Record<string, unknown>) => { layerA: Record<string, unknown>; layerB: Record<string, unknown> });
   const styles = fn(clamp01(progress), opts);
   return {
     layerA: serializeStyle(styles.layerA),

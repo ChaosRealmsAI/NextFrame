@@ -1,7 +1,7 @@
 import { clamp01, round } from "../shared.js";
 
 // Fades through a bright white flash using desaturation and exposure.
-export function fadeWhite(progress: any) {
+export function fadeWhite(progress: number) {
   const p = clamp01(progress);
 
   if (p < 0.5) {

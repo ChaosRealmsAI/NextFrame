@@ -3,12 +3,12 @@ import { COMMAND_EXAMPLES } from "./examples.js";
 
 export const DEFAULT_FIX = "run the same command with --help to see required params, examples, and constraints";
 
-const lines = (text: any) => text.trim().split("\n").map((line: any) => line.trim()).filter(Boolean);
-const group = (title, commands) => ({
+const lines = (text: string) => text.trim().split("\n").map((line: string) => line.trim()).filter(Boolean);
+const group = (title: string, commands: string) => ({
   title,
   commands: commands.trim().split(/\s+/)
 });
-const command = (name: any, summary: any, usage: any, params: any, constraints: any, fix = DEFAULT_FIX) => [
+const command = (name: string, summary: string, usage: string, params: string, constraints: string, fix = DEFAULT_FIX) => [
   name,
   { summary, usage: lines(usage), params: lines(params), examples: COMMAND_EXAMPLES[name] || [], constraints: lines(constraints), fix },
 ];
@@ -298,6 +298,6 @@ export const COMMAND_SPECS = Object.fromEntries([
     The desktop app must be running.`),
 ]);
 
-export const getCommandSpec = (name: any) => COMMAND_SPECS[name] || null;
+export const getCommandSpec = (name: string) => COMMAND_SPECS[name] || null;
 export const listTopLevelHelpCommands = () => TOP_LEVEL_COMMANDS.flatMap((entry) => entry.commands);
-export const hasCommandHelp = (name: any) => Object.prototype.hasOwnProperty.call(COMMAND_SPECS, name);
+export const hasCommandHelp = (name: string) => Object.prototype.hasOwnProperty.call(COMMAND_SPECS, name);

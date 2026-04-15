@@ -11,11 +11,11 @@ import { createServer } from "node:http";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCENES_ROOT = resolve(HERE, "../../../../nf-core/scenes");
-const RATIO_DIRS = { "16:9": "16x9", "9:16": "9x16", "4:3": "4x3" };
-const DIMS = { "16:9": [1920, 1080], "9:16": [1080, 1920], "4:3": [1440, 1080] };
+const RATIO_DIRS: Record<string, string> = { "16:9": "16x9", "9:16": "9x16", "4:3": "4x3" };
+const DIMS: Record<string, number[]> = { "16:9": [1920, 1080], "9:16": [1080, 1920], "4:3": [1440, 1080] };
 const CATEGORIES = ["backgrounds", "typography", "data", "shapes", "overlays", "media", "browser"];
 
-function stripESM(code: any) {
+function stripESM(code: string) {
   return code
     .replace(/^import\s+.+?;?\s*$/gm, "")
     .replace(/^export\s+default\s+/gm, "return ")
@@ -24,7 +24,7 @@ function stripESM(code: any) {
     .replace(/^export\s+(function|const|let|var|class)\s+/gm, "$1 ");
 }
 
-function buildPreview(name: any, ratio: any, scenePath: any) {
+function buildPreview(name: string, ratio: string, scenePath: string) {
   const [w, h] = DIMS[ratio];
   const scaleX = ratio === "9:16" ? 0.35 : 0.5;
   const previewW = Math.round(w * scaleX);
@@ -120,7 +120,7 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
 </html>`;
 }
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   if (flags.help || positional.length === 0) {
     process.stdout.write(`scene-preview — Preview a scene with Play/Pause + scrubber, or screenshot for AI verification.
@@ -137,7 +137,7 @@ Example:
   }
 
   const name = positional[0];
-  const ratio = flags.ratio || "9:16";
+  const ratio = String(flags.ratio || "9:16");
   const port = Number(flags.port) || 3300;
   const ratioDir = RATIO_DIRS[ratio];
   if (!ratioDir) { process.stderr.write(`Unknown ratio "${ratio}"\n`); return 2; }
@@ -170,14 +170,14 @@ Example:
         args: [`--window-size=800,1000`],
       });
       const page = await browser.newPage();
-      const [w, h] = DIMS[ratio];
+      const [w, h] = DIMS[ratio] ?? [1080, 1920];
       await page.setViewport({ width: 800, height: 1000, deviceScaleFactor: 2 });
       await page.goto(`file://${htmlPath}`, { waitUntil: "networkidle0" });
       // Screenshot at t=0.5 (default) and t=5
       for (const t of [0.5, 5]) {
         await page.evaluate((time, dur) => {
-          const scrub = document.getElementById("scrubber");
-          if (scrub) { scrub.value = (time / dur) * 1000; scrub.dispatchEvent(new Event("input")); }
+          const scrub = document.getElementById("scrubber") as HTMLInputElement | null;
+          if (scrub) { scrub.value = String((time / dur) * 1000); scrub.dispatchEvent(new Event("input")); }
         }, t, 10);
         await new Promise((r) => setTimeout(r, 200));
         const shotPath = resolve(outDir, `${name}-t${t}s.png`);

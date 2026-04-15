@@ -9,10 +9,20 @@
  *   // or call: AIPrompts.init(containerEl, promptsData)
  */
 
-const AIPrompts = (() => {
-  let allSections: any = [];
+interface AIPromptSection {
+  icon: string;
+  title: string;
+  prompts: string[];
+}
 
-  function render(container: any, sections: any) {
+interface AIPromptsData {
+  sections: AIPromptSection[];
+}
+
+const AIPrompts = (() => {
+  let allSections: AIPromptSection[] = [];
+
+  function render(container: HTMLElement, sections: AIPromptSection[]) {
     allSections = sections;
 
     let html = '<div class="ai-prompts">';
@@ -31,12 +41,12 @@ const AIPrompts = (() => {
     html += '</div>';
     container.innerHTML = html;
 
-    container.querySelector('#ai-prompts-filter').addEventListener('input', (e: any) => {
-      filter(container, e.target.value.trim().toLowerCase());
+    container.querySelector('#ai-prompts-filter')!.addEventListener('input', (e: Event) => {
+      filter(container, (e.target as HTMLInputElement).value.trim().toLowerCase());
     });
   }
 
-  function renderSection(section: any) {
+  function renderSection(section: AIPromptSection): string {
     let html = '<div class="prompt-section">';
     html += '<div class="prompt-section-title">' + section.icon + ' ' + section.title + '</div>';
     for (const prompt of section.prompts) {
@@ -49,15 +59,15 @@ const AIPrompts = (() => {
     return html;
   }
 
-  function filter(container: any, query: any) {
+  function filter(container: HTMLElement, query: string) {
     const sectionEls = container.querySelectorAll('.prompt-section');
     let idx = 0;
     for (const section of allSections) {
-      const el = sectionEls[idx++];
+      const el = sectionEls[idx++] as HTMLElement | undefined;
       if (!el) continue;
-      const items = el.querySelectorAll('.prompt-item');
+      const items = el.querySelectorAll<HTMLElement>('.prompt-item');
       let visibleCount = 0;
-      section.prompts.forEach((prompt: any, i: any) => {
+      section.prompts.forEach((prompt: string, i: number) => {
         const match = !query || prompt.toLowerCase().includes(query) || section.title.toLowerCase().includes(query);
         if (items[i]) {
           items[i].style.display = match ? '' : 'none';
@@ -68,9 +78,9 @@ const AIPrompts = (() => {
     }
   }
 
-  function copy(itemEl: any) {
-    const text = itemEl.querySelector('.prompt-text').textContent;
-    const copyEl = itemEl.querySelector('.prompt-copy');
+  function copy(itemEl: HTMLElement) {
+    const text = itemEl.querySelector('.prompt-text')!.textContent!;
+    const copyEl = itemEl.querySelector('.prompt-copy')!;
 
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
@@ -91,11 +101,11 @@ const AIPrompts = (() => {
     }, 1500);
   }
 
-  function escapePromptHtml(str: any) {
+  function escapePromptHtml(str: string): string {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  async function init(container: any, data: any) {
+  async function init(container: HTMLElement, data: AIPromptsData | null) {
     if (data) {
       render(container, data.sections);
       return;
@@ -107,16 +117,16 @@ const AIPrompts = (() => {
         // Fallback: loaded from root index.html
         resp = await fetch('shared/ai-prompts/prompts.json');
       }
-      const json = await resp.json();
+      const json = await resp.json() as AIPromptsData;
       render(container, json.sections);
-    } catch (e) {
-      const scriptDir = document.querySelector('script[src*="ai-prompts"]');
+    } catch (_e) {
+      const scriptDir = document.querySelector<HTMLScriptElement>('script[src*="ai-prompts"]');
       const base = scriptDir ? scriptDir.src.replace(/ai-prompts\.js$/, '') : '';
       try {
         const resp = await fetch(base + 'prompts.json');
-        const json = await resp.json();
+        const json = await resp.json() as AIPromptsData;
         render(container, json.sections);
-      } catch (e2) {
+      } catch (_e2) {
         container.innerHTML = '<p style="color:rgba(255,255,255,0.5);text-align:center;padding:40px">无法加载指令库</p>';
       }
     }
@@ -124,7 +134,7 @@ const AIPrompts = (() => {
 
   document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('ai-prompts-root');
-    if (root) init(root);
+    if (root) init(root, null);
   });
 
   return { init, copy };

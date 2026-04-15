@@ -4,7 +4,7 @@ import { resolveTimeline, timelineUsage } from '../_helpers/_resolve.js';
 import { detectFormat, validateTimelineV3 } from '../_helpers/_timeline-validate.js';
 import { buildHTML } from 'nf-core/engine/build.js';
 
-function extractOutput(argv: any) {
+function extractOutput(argv: string[]) {
   // Handle -o <path> (short flag not supported by parseFlags)
   const cleaned = [];
   let outputPath = null;
@@ -19,21 +19,21 @@ function extractOutput(argv: any) {
   return { cleaned, outputPath };
 }
 
-function normalizeBuildTimeline(timeline: any) {
+function normalizeBuildTimeline(timeline: Record<string, unknown>) {
   if (!timeline || timeline.version || !Array.isArray(timeline.layers)) return timeline;
   return { version: '0.3', ...timeline };
 }
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { cleaned, outputPath: shortOutput } = extractOutput(argv);
   const { positional, flags } = parseFlags(cleaned);
   const resolved = resolveTimeline(positional, { usage: timelineUsage('build', '', ' -o <output.html>') });
-  if (!resolved.ok) { emit(resolved, flags); return resolved.error?.code === 'USAGE' ? 3 : 2; }
+  if (resolved.ok === false) { emit(resolved, flags); return resolved.error?.code === 'USAGE' ? 3 : 2; }
 
   const loaded = await loadTimeline(resolved.jsonPath);
   if (!loaded.ok) { emit(loaded, flags); return 2; }
 
-  const timeline = normalizeBuildTimeline(loaded.value);
+  const timeline = normalizeBuildTimeline(loaded.value as Record<string, unknown>);
   const fmt = detectFormat(timeline);
   if (fmt === 'v0.1') {
     const msg = { ok: false, error: { code: 'OLD_FORMAT', message: 'v0.1 tracks/clips format detected — build requires v0.3 layers[] format' } };
@@ -53,9 +53,9 @@ export async function run(argv: any) {
     return 2;
   }
 
-  const outputPath = shortOutput || flags.output || resolved.jsonPath.replace(/\.json$/, '.html');
-  const result = buildHTML(timeline, outputPath);
-  if (!result.ok) { emit(result, flags); return 2; }
+  const outputPath = shortOutput || (typeof flags.output === 'string' ? flags.output : null) || resolved.jsonPath.replace(/\.json$/, '.html');
+  const result = buildHTML(timeline, outputPath) as { ok: boolean; value?: Record<string, unknown>; error?: { code?: string; message?: string } };
+  if (!result.ok) { emit(result as Parameters<typeof emit>[0], flags); return 2; }
 
   // Auto-preview: screenshot key frames for AI visual verification
   if (!flags['no-preview']) {
@@ -70,16 +70,16 @@ export async function run(argv: any) {
         raw = execFileSync(process.execPath, [
           cliEntry, 'preview', resolved.jsonPath, '--auto', '--json', `--out=${previewDir}`,
         ], { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'ignore'] });
-      } catch (execErr) {
+      } catch (execErr: unknown) {
         // Preview exits non-zero when issues found — stdout still has valid JSON
-        raw = execErr.stdout || '';
+        raw = (execErr as { stdout?: string }).stdout || '';
       }
       const previewResult = JSON.parse(raw);
       if (previewResult?.screenshots) {
-        result.value.previews = previewResult.screenshots.map((s: any) => s.path);
+        if (result.value) result.value.previews = previewResult.screenshots.map((s: Record<string, unknown>) => s.path);
       }
       if (previewResult?.issues?.length > 0) {
-        result.value.warnings = previewResult.issues.map((i: any) => `${i.type} at t=${i.time}s: ${i.message}`);
+        if (result.value) result.value.warnings = previewResult.issues.map((i: Record<string, unknown>) => `${i.type} at t=${i.time}s: ${i.message}`);
       }
     } catch {
       // Preview is best-effort — don't fail the build if puppeteer is unavailable

@@ -8,10 +8,10 @@ const APP_HOST = "127.0.0.1";
 const APP_PORT = 19820;
 const DEFAULT_TIMEOUT_MS = 10000;
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const subcommand = argv[0];
   if (!subcommand || subcommand === "help" || subcommand === "--help" || subcommand === "-h") {
-    process.stdout.write(renderCommandHelp("app"));
+    process.stdout.write(renderCommandHelp("app") ?? "");
     return 0;
   }
   if (argv[1] === "--help" || argv[1] === "-h") {
@@ -33,14 +33,14 @@ export async function run(argv: any) {
     process.stderr.write(`error: unknown app subcommand "${subcommand}"\n`);
     process.stderr.write('Fix: run "nextframe app --help" to see supported app subcommands\n');
     return 3;
-  } catch (error) {
-    process.stderr.write(`error: ${error.message}\n`);
+  } catch (error: unknown) {
+    process.stderr.write(`error: ${(error as Error).message}\n`);
     process.stderr.write(`Fix: ${defaultFixSuggestion()}\n`);
     return 2;
   }
 }
 
-async function runEval(argv: any) {
+async function runEval(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const script = positional.join(" ").trim();
   if (!script) {
@@ -69,7 +69,7 @@ async function runEval(argv: any) {
   return 0;
 }
 
-async function runScreenshot(argv: any) {
+async function runScreenshot(argv: string[]) {
   const { flags } = parseFlags(argv);
   const outPath = typeof flags.out === "string" ? flags.out : "/tmp/nf-screenshot.png";
   const query = `?out=${encodeURIComponent(outPath)}`;
@@ -97,14 +97,14 @@ async function runScreenshot(argv: any) {
   return 0;
 }
 
-async function runDiagnose(argv: any) {
+async function runDiagnose(argv: string[]) {
   const { flags } = parseFlags(argv);
   const result = await appJsonRequest("/diagnose");
   emit({ ok: true, value: result }, flags);
   return 0;
 }
 
-async function runNavigate(argv: any) {
+async function runNavigate(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [project, episode, segment] = positional;
   const view = typeof flags.view === "string" ? flags.view : "editor";
@@ -135,7 +135,7 @@ async function runNavigate(argv: any) {
   return 0;
 }
 
-async function runClick(argv: any) {
+async function runClick(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const x = Number(positional[0]);
   const y = Number(positional[1]);
@@ -182,19 +182,19 @@ async function runClick(argv: any) {
   return 0;
 }
 
-async function runStatus(argv: any) {
+async function runStatus(argv: string[]) {
   const { flags } = parseFlags(argv);
   const result = await appJsonRequest("/status");
   emit({ ok: true, value: { running: true, ...result } }, flags);
   return 0;
 }
 
-function parseTimeout(value: any) {
+function parseTimeout(value: unknown) {
   const timeoutMs = Number(value);
   return Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
 }
 
-async function appJsonRequest(path: any, options = {}) {
+async function appJsonRequest(path: string, options: AppRequestOptions = {}) {
   const text = await appRequest(path, options);
   const parsed = parseMaybeJson(text);
   if (typeof parsed === "string") {
@@ -203,7 +203,7 @@ async function appJsonRequest(path: any, options = {}) {
   return parsed;
 }
 
-function parseMaybeJson(value: any) {
+function parseMaybeJson(value: string) {
   try {
     return JSON.parse(value);
   } catch (_error) {
@@ -211,11 +211,18 @@ function parseMaybeJson(value: any) {
   }
 }
 
-function appRequest(path: any, options = {}) {
+interface AppRequestOptions {
+  body?: string;
+  method?: string;
+  timeoutMs?: number;
+  contentType?: string;
+}
+
+function appRequest(path: string, options: AppRequestOptions = {}): Promise<string> {
   const body = typeof options.body === "string" ? options.body : "";
   const method = options.method || (body ? "POST" : "GET");
   const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
-  const headers = {};
+  const headers: Record<string, string | number> = {};
   if (body) {
     headers["Content-Type"] = options.contentType || "text/plain; charset=utf-8";
     headers["Content-Length"] = Buffer.byteLength(body);
@@ -248,7 +255,7 @@ function appRequest(path: any, options = {}) {
     );
 
     req.on("error", (error) => {
-      if (error.code === "ECONNREFUSED") {
+      if ((error as NodeJS.ErrnoException).code === "ECONNREFUSED") {
         reject(new Error("desktop app not running on port 19820"));
         return;
       }

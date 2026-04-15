@@ -6,15 +6,16 @@ import { once } from "node:events";
 import { guarded } from "../lib/guard.js";
 import { CanvasPool, renderAt } from "../lib/legacy-render.js";
 import { resolveTimeline } from "../lib/legacy-timeline.js";
+import type { Timeline } from "../../../nf-core/types.js";
 
-function normalizeCrf(value: any) {
+function normalizeCrf(value: unknown) {
   if (value === undefined || value === null) return 20;
   const crf = Number(value);
   if (!Number.isInteger(crf) || crf < 0 || crf > 51) return null;
   return crf;
 }
 
-function copyFrameData(source: any, target: any) {
+function copyFrameData(source: { copy?: (target: Buffer, targetStart: number, sourceStart: number, sourceEnd: number) => void } & ArrayLike<number>, target: Buffer) {
   if (typeof source.copy === "function") {
     source.copy(target, 0, 0, target.length);
     return;
@@ -22,8 +23,8 @@ function copyFrameData(source: any, target: any) {
   target.set(source);
 }
 
-function writeFrame(stream: any, chunk: any) {
-  return new Promise((resolve, reject) => {
+function writeFrame(stream: NodeJS.WritableStream, chunk: Buffer) {
+  return new Promise<void>((resolve, reject) => {
     let needsDrain = false;
     let writeDone = false;
     let drainDone = false;
@@ -40,7 +41,7 @@ function writeFrame(stream: any, chunk: any) {
       cleanup();
       resolve();
     };
-    const onError = (err: any) => {
+    const onError = (err: Error) => {
       if (settled) return;
       settled = true;
       cleanup();
@@ -53,7 +54,7 @@ function writeFrame(stream: any, chunk: any) {
 
     stream.once("error", onError);
     try {
-      needsDrain = !stream.write(chunk, (err: any) => {
+      needsDrain = !stream.write(chunk, (err: Error | null | undefined) => {
         if (err) {
           onError(err);
           return;
@@ -61,8 +62,8 @@ function writeFrame(stream: any, chunk: any) {
         writeDone = true;
         finish();
       });
-    } catch (err) {
-      onError(err);
+    } catch (err: unknown) {
+      onError(err instanceof Error ? err : new Error(String(err)));
       return;
     }
 
@@ -82,15 +83,25 @@ function writeFrame(stream: any, chunk: any) {
  * @param {{fps?: number, crf?: number, width?: number, height?: number, ffmpegPath?: string, useCanvasPool?: boolean, onProgress?: (frameIdx, total) => void}} [opts]
  * @returns {Promise<{ok: true, value: object} | {ok: false, error: object}>}
  */
-export async function exportMP4(timeline: any, outputPath: any, opts = {}) {
-  const r = resolveTimeline(timeline);
+interface ExportMP4Opts {
+  fps?: number;
+  crf?: number;
+  width?: number;
+  height?: number;
+  ffmpegPath?: string;
+  useCanvasPool?: boolean;
+  onProgress?: (frameIdx: number, total: number) => void;
+}
+
+export async function exportMP4(timeline: unknown, outputPath: string, opts: ExportMP4Opts = {}) {
+  const r = resolveTimeline(timeline as Timeline);
   if (!r.ok) return guarded("exportMP4", { ok: false, error: r.error });
-  const resolved = r.value;
+  const resolved = r.value as Timeline;
 
   const fps = opts.fps || resolved.project?.fps || 30;
   const width = opts.width || resolved.project?.width || 1920;
   const height = opts.height || resolved.project?.height || 1080;
-  const duration = resolved.duration;
+  const duration = resolved.duration ?? 0;
   const totalFrames = Math.round(duration * fps);
   const ffmpegPath = opts.ffmpegPath || "ffmpeg";
   const crf = normalizeCrf(opts.crf);
@@ -116,8 +127,8 @@ export async function exportMP4(timeline: any, outputPath: any, opts = {}) {
   let ffmpeg;
   try {
     ffmpeg = spawn(ffmpegPath, ffmpegArgs, { stdio: ["pipe", "ignore", "pipe"] });
-  } catch (err) {
-    return guarded("exportMP4", { ok: false, error: { code: "FFMPEG_SPAWN", message: err.message } });
+  } catch (err: unknown) {
+    return guarded("exportMP4", { ok: false, error: { code: "FFMPEG_SPAWN", message: (err as Error).message } });
   }
 
   let stderr = "";
@@ -132,17 +143,21 @@ export async function exportMP4(timeline: any, outputPath: any, opts = {}) {
   const rgbaBuffers = [Buffer.allocUnsafe(frameBytes), Buffer.allocUnsafe(frameBytes)];
   const writeDone = [Promise.resolve(), Promise.resolve()];
   let renderedFrames = 0;
-  let firstError = null;
-  let pipeError = null;
+  let firstError: Record<string, unknown> | null = null;
+  let pipeError: Error | null = null;
 
-  const renderFrameIntoSlot = (frameIdx: any, slot: any) => {
+  interface RenderOk { ok: true; canvas: { data: () => Buffer }; value: Record<string, unknown>; release: () => void }
+  interface RenderErr { ok: false; error: Record<string, unknown> }
+  type RenderResult = RenderOk | RenderErr;
+
+  const renderFrameIntoSlot = (frameIdx: number, slot: number): RenderResult => {
     const frame = renderAt(resolved, frameIdx / fps, {
       width,
       height,
       useCanvasPool,
       canvasPool,
       offscreenCanvasPool,
-    });
+    }) as unknown as RenderResult;
     if (!frame.ok) return frame;
     try {
       copyFrameData(frame.canvas.data(), rgbaBuffers[slot]);
@@ -155,7 +170,7 @@ export async function exportMP4(timeline: any, outputPath: any, opts = {}) {
   if (totalFrames > 0) {
     const firstFrame = renderFrameIntoSlot(0, 0);
     if (!firstFrame.ok) {
-      firstError = firstFrame.error;
+      firstError = (firstFrame as RenderErr).error;
     }
   }
 
@@ -170,7 +185,7 @@ export async function exportMP4(timeline: any, outputPath: any, opts = {}) {
         await writeDone[nextSlot];
         const nextFrame = renderFrameIntoSlot(nextFrameIdx, nextSlot);
         if (!nextFrame.ok) {
-          firstError = nextFrame.error;
+          firstError = (nextFrame as RenderErr).error;
           break;
         }
       }
@@ -181,8 +196,8 @@ export async function exportMP4(timeline: any, outputPath: any, opts = {}) {
       }
     }
     await Promise.all(writeDone);
-  } catch (err) {
-    pipeError = err;
+  } catch (err: unknown) {
+    pipeError = err as Error;
   }
 
   ffmpeg.stdin.end();
@@ -233,7 +248,7 @@ export async function exportMP4(timeline: any, outputPath: any, opts = {}) {
  * @param {{ffmpegPath?: string}} [opts]
  * @returns {Promise<{ok: true, value: object} | {ok: false, error: object}>}
  */
-export async function muxMP4Audio(videoPath: any, audioPath: any, outputPath: any, opts = {}) {
+export async function muxMP4Audio(videoPath: string, audioPath: string, outputPath: string, opts: { ffmpegPath?: string } = {}) {
   const ffmpegPath = opts.ffmpegPath || "ffmpeg";
   const ffmpegArgs = [
     "-y",
@@ -248,10 +263,10 @@ export async function muxMP4Audio(videoPath: any, audioPath: any, outputPath: an
   let ffmpeg;
   try {
     ffmpeg = spawn(ffmpegPath, ffmpegArgs, { stdio: ["ignore", "ignore", "pipe"] });
-  } catch (err) {
+  } catch (err: unknown) {
     return guarded("muxMP4Audio", {
       ok: false,
-      error: { code: "MUX_FAIL", message: err.message, hint: `ffmpeg ${ffmpegArgs.join(" ")}` },
+      error: { code: "MUX_FAIL", message: (err as Error).message, hint: `ffmpeg ${ffmpegArgs.join(" ")}` },
     });
   }
 

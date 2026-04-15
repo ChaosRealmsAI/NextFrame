@@ -1,7 +1,7 @@
 import { clamp01, inset } from "../shared.js";
 
 // Reveals content from left to right with a clip mask.
-export function wipeReveal(progress: any) {
+export function wipeReveal(progress: number) {
   const p = clamp01(progress);
   return {
     opacity: 1,

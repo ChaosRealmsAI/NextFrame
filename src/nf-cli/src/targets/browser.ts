@@ -9,6 +9,12 @@ import { once } from "node:events";
 import { buildHTML } from "../../../nf-core/engine/build.js";
 import { timelineMetrics } from "../lib/timeline-utils.js";
 
+/** Minimal structural type for puppeteer Page — avoids importing puppeteer-core types at top level */
+interface PuppeteerPage {
+  evaluate: (fn: ((...args: unknown[]) => unknown) | string, ...args: unknown[]) => Promise<unknown>;
+  $: (sel: string) => Promise<{ screenshot: (opts: Record<string, unknown>) => Promise<unknown> } | null>;
+}
+
 const CHROME_CANDIDATES = [
   process.env.PUPPETEER_EXECUTABLE_PATH,
   process.env.CHROME_BIN,
@@ -19,20 +25,20 @@ const CHROME_CANDIDATES = [
   "/usr/bin/chromium-browser",
 ].filter(Boolean);
 
-export async function captureFrameToFile(timeline: any, outPath: any, opts = {}) {
+export async function captureFrameToFile(timeline: Record<string, unknown>, outPath: string, opts: { t?: number; fps?: number; crf?: number; ffmpegPath?: string } = {}) {
   const session = await openRenderedTimeline(timeline, opts);
   try {
     await seekTimeline(session.page, opts.t ?? 0);
     await screenshotStage(session.page, outPath);
     return { ok: true, value: { path: outPath } };
-  } catch (error) {
-    return { ok: false, error: { code: "FRAME_CAPTURE_FAILED", message: error.message } };
+  } catch (error: unknown) {
+    return { ok: false, error: { code: "FRAME_CAPTURE_FAILED", message: (error as Error).message } };
   } finally {
     await session.close();
   }
 }
 
-export async function captureFrames(timeline: any, times: any, outDir: any, opts = {}) {
+export async function captureFrames(timeline: Record<string, unknown>, times: number[], outDir: string, opts: { t?: number; fps?: number; crf?: number; ffmpegPath?: string } = {}) {
   const session = await openRenderedTimeline(timeline, opts);
   const screenshots = [];
   try {
@@ -44,14 +50,14 @@ export async function captureFrames(timeline: any, times: any, outDir: any, opts
       screenshots.push({ t, path: outPath });
     }
     return { ok: true, value: screenshots };
-  } catch (error) {
-    return { ok: false, error: { code: "FRAME_CAPTURE_FAILED", message: error.message } };
+  } catch (error: unknown) {
+    return { ok: false, error: { code: "FRAME_CAPTURE_FAILED", message: (error as Error).message } };
   } finally {
     await session.close();
   }
 }
 
-export async function encodeFramesToMp4(frameDir: any, outputPath: any, opts = {}) {
+export async function encodeFramesToMp4(frameDir: string, outputPath: string, opts: { fps?: number; crf?: number; ffmpegPath?: string } = {}) {
   const fps = Number(opts.fps) || 30;
   const crf = Number.isInteger(Number(opts.crf)) ? Number(opts.crf) : 20;
   const ffmpegArgs = [
@@ -84,19 +90,19 @@ export async function encodeFramesToMp4(frameDir: any, outputPath: any, opts = {
       };
     }
     return { ok: true, value: { outputPath } };
-  } catch (error) {
+  } catch (error: unknown) {
     return {
       ok: false,
       error: {
         code: "FFMPEG_SPAWN",
-        message: error.message,
+        message: (error as Error).message,
         hint: `ffmpeg ${ffmpegArgs.join(" ")}`,
       },
     };
   }
 }
 
-export async function openRenderedTimeline(timeline: any, opts = {}) {
+export async function openRenderedTimeline(timeline: Record<string, unknown>, opts: { fps?: number; crf?: number; ffmpegPath?: string; t?: number } = {}) {
   const { width, height } = timelineMetrics(timeline);
   const htmlDir = await mkdtemp(join(tmpdir(), "nextframe-v3-"));
   const htmlPath = join(htmlDir, "render.html");
@@ -128,14 +134,16 @@ export async function openRenderedTimeline(timeline: any, opts = {}) {
   };
 }
 
-export async function seekTimeline(page: any, t: any) {
-  await page.evaluate(async (time: any) => {
-    window.__NEXTFRAME_ENGINE.renderFrame(time);
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  }, Number(t) || 0);
+export async function seekTimeline(page: PuppeteerPage, t: number) {
+  await page.evaluate(((time: unknown) => {
+    const engine = (window as unknown as Record<string, unknown>).__NEXTFRAME_ENGINE as { renderFrame?: (t: number) => void; compose?: (t: number) => void } | undefined;
+    if (engine?.renderFrame) engine.renderFrame(time as number);
+    else if (engine?.compose) engine.compose(time as number);
+    return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }) as (...args: unknown[]) => unknown, Number(t) || 0);
 }
 
-async function screenshotStage(page: any, outPath: any) {
+async function screenshotStage(page: PuppeteerPage, outPath: string) {
   const stage = await page.$("#stage");
   if (!stage) {
     throw new Error("missing #stage element");

@@ -5,7 +5,7 @@ const TRANSFORM_RE = /([a-zA-Z0-9]+)\(([^)]+)\)/g;
 const INSET_RE = /^inset\((.+)\)$/;
 const CIRCLE_RE = /^circle\((.+?) at (.+?) (.+?)\)$/;
 
-function parseUnit(token: any, size: any) {
+function parseUnit(token: string, size: number) {
   const value = String(token).trim();
   if (value.endsWith("%")) {
     return Number.parseFloat(value.slice(0, -1)) * 0.01 * size;
@@ -16,12 +16,12 @@ function parseUnit(token: any, size: any) {
   return Number.parseFloat(value);
 }
 
-function applyTransform(ctx: any, width: any, height: any, transform: any) {
+function applyTransform(ctx: CanvasRenderingContext2D, width: number, height: number, transform: string | undefined) {
   if (!transform || transform === "none") return;
 
   for (const match of transform.matchAll(TRANSFORM_RE)) {
     const name = match[1];
-    const args = match[2].split(",").map((part: any) => part.trim()).filter(Boolean);
+    const args = match[2].split(",").map((part: string) => part.trim()).filter(Boolean);
 
     if (name === "translateX") {
       ctx.translate(parseUnit(args[0], width), 0);
@@ -45,7 +45,7 @@ function applyTransform(ctx: any, width: any, height: any, transform: any) {
   }
 }
 
-function applyClipPath(ctx: any, width: any, height: any, clipPath: any) {
+function applyClipPath(ctx: CanvasRenderingContext2D, width: number, height: number, clipPath: string | undefined) {
   if (!clipPath) return;
 
   const insetMatch = clipPath.match(INSET_RE);
@@ -73,7 +73,14 @@ function applyClipPath(ctx: any, width: any, height: any, clipPath: any) {
   }
 }
 
-export function applyCanvasStyle(ctx: any, width: any, height: any, style = {}) {
+interface CanvasStyle {
+  opacity?: number;
+  filter?: string;
+  transform?: string;
+  clipPath?: string;
+}
+
+export function applyCanvasStyle(ctx: CanvasRenderingContext2D, width: number, height: number, style: CanvasStyle = {}) {
   if (style.opacity !== undefined) {
     ctx.globalAlpha *= clamp01(style.opacity);
   }

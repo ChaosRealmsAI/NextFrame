@@ -1,7 +1,7 @@
 // Creates a new legacy timeline JSON file with optional seed content.
 import { parseFlags, saveTimeline, emit } from "../_helpers/_io.js";
 
-export async function run(argv: any) {
+export async function run(argv: string[]) {
   const { positional, flags } = parseFlags(argv);
   const [outPath] = positional;
   if (!outPath) {
@@ -25,7 +25,7 @@ export async function run(argv: any) {
   return 0;
 }
 
-function makeEmptyTimeline(flags: any) {
+function makeEmptyTimeline(flags: Record<string, string | boolean>) {
   const width = finiteOr(flags.width, 1920);
   const height = finiteOr(flags.height, 1080);
   return {
@@ -79,7 +79,7 @@ function makeLegacySeedTimeline() {
   };
 }
 
-function finiteOr(raw: any, fallback: any) {
+function finiteOr(raw: unknown, fallback: number) {
   const value = Number(raw);
   return Number.isFinite(value) ? value : fallback;
 }

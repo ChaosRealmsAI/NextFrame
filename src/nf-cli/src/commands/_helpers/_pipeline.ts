@@ -22,17 +22,17 @@ export function emptyPipeline() {
   };
 }
 
-export async function loadPipeline(projectPath: any, episodeName: any) {
+export async function loadPipeline(projectPath: string, episodeName: string) {
   const path = join(projectPath, episodeName, "pipeline.json");
   try {
     return normalizePipeline(await loadJson(path));
   } catch (err) {
-    if (err.code === "ENOENT") return emptyPipeline();
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return emptyPipeline();
     throw err;
   }
 }
 
-export async function savePipeline(projectPath: any, episodeName: any, pipeline: any) {
+export async function savePipeline(projectPath: string, episodeName: string, pipeline: Record<string, unknown>) {
   const path = join(projectPath, episodeName, "pipeline.json");
   const nextPipeline = normalizePipeline(pipeline);
   await writeFile(path, JSON.stringify(nextPipeline, null, 2) + "\n");
@@ -44,40 +44,42 @@ export async function savePipeline(projectPath: any, episodeName: any, pipeline:
   return nextPipeline;
 }
 
-function normalizePipeline(pipeline: any) {
+function normalizePipeline(pipeline: unknown) {
   const base = emptyPipeline();
-  const next = pipeline && typeof pipeline === "object" ? pipeline : {};
+  const next = pipeline && typeof pipeline === "object" ? pipeline as Record<string, unknown> : {} as Record<string, unknown>;
+  const scriptObj = objectOr(next.script) as Record<string, unknown>;
+  const audioObj = objectOr(next.audio) as Record<string, unknown>;
   return {
     ...base,
     ...next,
     script: {
       ...base.script,
-      ...objectOr(next.script),
-      principles: objectOr(next.script?.principles),
-      arc: arrayOr(next.script?.arc),
-      segments: arrayOr(next.script?.segments),
+      ...scriptObj,
+      principles: objectOr(scriptObj.principles),
+      arc: arrayOr(scriptObj.arc),
+      segments: arrayOr(scriptObj.segments),
     },
     audio: {
       ...base.audio,
-      ...objectOr(next.audio),
-      voice: next.audio?.voice ?? base.audio.voice,
-      speed: finiteOr(next.audio?.speed, base.audio.speed),
-      segments: arrayOr(next.audio?.segments),
+      ...audioObj,
+      voice: audioObj.voice ?? base.audio.voice,
+      speed: finiteOr(audioObj.speed, base.audio.speed),
+      segments: arrayOr(audioObj.segments),
     },
     atoms: arrayOr(next.atoms),
     outputs: arrayOr(next.outputs),
   };
 }
 
-function objectOr(value: any) {
+function objectOr(value: unknown) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
-function arrayOr(value: any) {
+function arrayOr(value: unknown) {
   return Array.isArray(value) ? value : [];
 }
 
-function finiteOr(raw: any, fallback: any) {
+function finiteOr(raw: unknown, fallback: number) {
   const value = Number(raw);
   return Number.isFinite(value) ? value : fallback;
 }

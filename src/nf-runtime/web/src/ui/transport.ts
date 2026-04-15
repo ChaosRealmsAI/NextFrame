@@ -4,7 +4,7 @@ const pauseIconMarkup = '<svg width="18" height="18" viewBox="0 0 18 18" fill="n
 const heroPlayIconMarkup = '<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><polygon points="7,4 17,11 7,18" fill="currentColor"/></svg>';
 const heroPauseIconMarkup = '<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="5" y="4" width="4" height="14" rx="1" fill="currentColor"/><rect x="13" y="4" width="4" height="14" rx="1" fill="currentColor"/></svg>';
 
-function iconButton(id: any, title: any, action: any, markup: any) {
+function iconButton(id: string, title: string, action: () => void, markup: string) {
   return h(
     'button',
     { class: 'ed-t-btn' + (id === 'ed-btn-play' ? ' play-main' : ''), id, type: 'button', title, onclick: action },
@@ -12,14 +12,14 @@ function iconButton(id: any, title: any, action: any, markup: any) {
   );
 }
 
-function updatePlayButton(playing: any) {
+function updatePlayButton(playing: boolean): void {
   const mainBtn = document.getElementById('ed-btn-play');
   const heroBtn = document.querySelector('.ed-play-btn');
   if (mainBtn) mainBtn.innerHTML = playing ? pauseIconMarkup : playIconMarkup;
   if (heroBtn) heroBtn.innerHTML = playing ? heroPauseIconMarkup : heroPlayIconMarkup;
 }
 
-function updatePlayhead(currentTime: any, duration: any) {
+function updatePlayhead(currentTime: number, duration: number): void {
   const playhead = document.getElementById('ed-tl-playhead2');
   if (!playhead) return;
   const timeline = playhead.parentElement;
@@ -29,17 +29,17 @@ function updatePlayhead(currentTime: any, duration: any) {
   playhead.style.left = 100 + pct * trackWidth + 'px';
 }
 
-function updateTransportThumb(currentTime: any, duration: any) {
-  const thumb = document.querySelector('.ed-transport-thumb');
+function updateTransportThumb(currentTime: number, duration: number): void {
+  const thumb = document.querySelector<HTMLElement>('.ed-transport-thumb');
   if (!thumb) return;
   const pct = duration > 0 ? Math.max(0, Math.min(100, currentTime / duration * 100)) : 0;
   thumb.style.left = pct.toFixed(1) + '%';
 }
 
-function syncPreviewTransportState(state: any) {
-  const nextState = state || {};
-  edPlaybackState.currentTime = Number.isFinite(nextState.currentTime) ? nextState.currentTime : 0;
-  edPlaybackState.duration = Number.isFinite(nextState.duration) ? nextState.duration : 0;
+function syncPreviewTransportState(state: NfPreviewState | Record<string, unknown>): void {
+  const nextState = state || {} as Record<string, unknown>;
+  edPlaybackState.currentTime = Number.isFinite(nextState.currentTime) ? nextState.currentTime as number : 0;
+  edPlaybackState.duration = Number.isFinite(nextState.duration) ? nextState.duration as number : 0;
   edPlaybackState.isPlaying = !!nextState.isPlaying;
   window.updateEditorPreviewState(edPlaybackState.currentTime, edPlaybackState.duration);
   updatePlayButton(edPlaybackState.isPlaying);
@@ -47,11 +47,11 @@ function syncPreviewTransportState(state: any) {
   updateTransportThumb(edPlaybackState.currentTime, edPlaybackState.duration);
 }
 
-function bindPreviewStateSource() {
+function bindPreviewStateSource(): void {
   if (window.previewEngine) window.previewEngine.onStateChange = syncPreviewTransportState;
 }
 
-function sendPreviewCmd(action: any, time: any) {
+function sendPreviewCmd(action: string, time?: number) {
   const engine = window.previewEngine;
   if (!engine) return;
   if (action === 'play' && typeof engine.play === 'function') engine.play();
@@ -71,32 +71,32 @@ function sendPreviewCmd(action: any, time: any) {
   }
 }
 
-function wireProgressBar() {
-  const bar = document.querySelector('.ed-transport-progress');
+function wireProgressBar(): void {
+  const bar = document.querySelector<HTMLElement>('.ed-transport-progress');
   if (!bar || bar.dataset.bound === 'true') return;
   bar.dataset.bound = 'true';
-  function seekFromPointer(event: any) {
-    const rect = bar.getBoundingClientRect();
+  function seekFromPointer(event: PointerEvent) {
+    const rect = bar!.getBoundingClientRect();
     const pct = rect.width > 0 ? Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) : 0;
     sendPreviewCmd('seek', pct * edPlaybackState.duration);
   }
   bar.addEventListener('pointerdown', (event) => {
     seekFromPointer(event);
-    function onMove(moveEvent: any) {
+    function onMove(moveEvent: PointerEvent) {
       seekFromPointer(moveEvent);
     }
     function onUp() {
-      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointermove', onMove as EventListener);
       document.removeEventListener('pointerup', onUp);
     }
-    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointermove', onMove as EventListener);
     document.addEventListener('pointerup', onUp);
   });
 }
 
 document.addEventListener('keydown', (event) => {
   if (event.code !== 'Space') return;
-  const tag = event.target && event.target.tagName;
+  const tag = (event.target as HTMLElement)?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   event.preventDefault();
   sendPreviewCmd('toggle');
@@ -105,7 +105,7 @@ document.addEventListener('keydown', (event) => {
 class TransportControls extends Component {
   didMount() {
     wireProgressBar();
-    const heroBtn = document.querySelector('.ed-play-btn');
+    const heroBtn = document.querySelector<HTMLElement>('.ed-play-btn');
     if (heroBtn) heroBtn.onclick = () => sendPreviewCmd('toggle');
     updatePlayButton(false);
   }
