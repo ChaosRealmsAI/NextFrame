@@ -1,6 +1,10 @@
 // Editor timeline and preview integration for the WKWebView editor.
 let edTimelineData = null;
 let edActiveClip = null;
+let edCurrentTime = 0;
+let edPlaying = false;
+let edRafId = null;
+let edLastFrameTime = 0;
 function buildEditorTimelinePath() { return window.currentEpisodePath + '/timeline.json'; }
 function normalizeEditorTimeline(timeline) {
   if (!timeline || typeof timeline !== 'object') return timeline;
@@ -24,15 +28,19 @@ function formatEditorTimecode(seconds) {
   return String(minutes).padStart(2, '0') + ':' + (safeSeconds - minutes * 60).toFixed(1).padStart(4, '0');
 }
 function updateEditorPreviewState(t, totalDuration) {
+  edCurrentTime = Number.isFinite(t) ? t : edCurrentTime;
+  const dur = Number.isFinite(totalDuration) ? totalDuration : getEditorTimelineDuration();
   const previewTc = document.querySelector('.ed-preview-tc');
-  if (previewTc) previewTc.textContent = formatEditorTimecode(t) + ' / ' + formatEditorTimecode(totalDuration);
+  if (previewTc) previewTc.textContent = formatEditorTimecode(edCurrentTime) + ' / ' + formatEditorTimecode(dur);
   const transportTc = document.querySelector('.ed-transport-tc');
-  if (transportTc) transportTc.textContent = formatEditorTimecode(t);
+  if (transportTc) transportTc.textContent = formatEditorTimecode(edCurrentTime);
+  const pct = dur > 0 ? Math.max(0, Math.min(100, edCurrentTime / dur * 100)) : 0;
   const progressFill = document.querySelector('.ed-transport-fill');
-  if (progressFill) {
-    const pct = totalDuration > 0 ? Math.max(0, Math.min(100, t / totalDuration * 100)) : 0;
-    progressFill.style.width = pct.toFixed(1) + '%';
-  }
+  if (progressFill) progressFill.style.width = pct.toFixed(1) + '%';
+  const thumb = document.querySelector('.ed-transport-thumb');
+  if (thumb) thumb.style.left = pct.toFixed(1) + '%';
+  edUpdatePlayhead();
+  edUpdateVideoCounter();
 }
 function toggleEditorPreviewPlaceholder(isVisible) {
   document.querySelectorAll('.ed-preview-gradient, .ed-play-btn').forEach(function(el) { el.style.display = isVisible ? '' : 'none'; });
@@ -371,6 +379,90 @@ function edSelectClip(idOrIndex) {
   syncEditorSelectionUI(edActiveClip);
 }
 tagEditorControls();
+
+// ══ PLAYBACK ══
+var ED_ICON_PAUSE = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="4" y="3" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="10.5" y="3" width="3.5" height="12" rx="1" fill="currentColor"/></svg>';
+var ED_ICON_PLAY = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none"><polygon points="5,3 15,9 5,15" fill="currentColor"/></svg>';
+function edUpdatePlayhead() {
+  var dur = getEditorTimelineDuration(); var ph = document.getElementById('ed-tl-playhead2');
+  var tl = ph ? ph.closest('.ed-timeline') : null;
+  if (!ph || !tl || dur <= 0) return;
+  ph.style.left = (100 + (edCurrentTime / dur) * (tl.clientWidth - 100)) + 'px';
+}
+function edUpdateVideoCounter() {
+  var c = document.getElementById('ed-video-counter'); if (!c) return;
+  var n = edTimelineData && Array.isArray(edTimelineData.layers) ? edTimelineData.layers.length : 0;
+  c.textContent = (edActiveClip !== null ? edActiveClip + 1 : n ? 1 : 0) + '/' + n;
+}
+function edDomPreview(method) {
+  if (window.edPreviewMode !== 'dom' || !window.previewEngine) return;
+  if (typeof window.previewEngine[method] === 'function') window.previewEngine[method](edCurrentTime);
+}
+function edSeekTo(t) {
+  var dur = getEditorTimelineDuration();
+  edCurrentTime = Math.max(0, Math.min(t, dur));
+  updateEditorPreviewState(edCurrentTime, dur);
+  edDomPreview('seek') || edDomPreview('compose');
+}
+function edPlay() {
+  if (edPlaying) return;
+  var dur = getEditorTimelineDuration(); if (dur <= 0) return;
+  if (edCurrentTime >= dur) edCurrentTime = 0;
+  edPlaying = true;
+  var btn = document.getElementById('ed-btn-play'); if (btn) btn.innerHTML = ED_ICON_PAUSE;
+  edLastFrameTime = performance.now(); edRafId = requestAnimationFrame(edTick);
+}
+function edPause() {
+  if (!edPlaying) return; edPlaying = false;
+  var btn = document.getElementById('ed-btn-play'); if (btn) btn.innerHTML = ED_ICON_PLAY;
+  if (edRafId) { cancelAnimationFrame(edRafId); edRafId = null; }
+}
+function edTick(now) {
+  var dur = getEditorTimelineDuration();
+  edCurrentTime += (now - edLastFrameTime) / 1000; edLastFrameTime = now;
+  if (edCurrentTime >= dur) { edCurrentTime = dur; edPause(); }
+  updateEditorPreviewState(edCurrentTime, dur); edDomPreview('compose');
+  if (edPlaying) edRafId = requestAnimationFrame(edTick);
+}
+function edStepClip(delta) {
+  var layers = edTimelineData && Array.isArray(edTimelineData.layers) ? edTimelineData.layers : [];
+  if (!layers.length) return;
+  var idx = edActiveClip !== null ? Math.max(0, Math.min(edActiveClip + delta, layers.length - 1)) : 0;
+  edSelectClip(idx); if (layers[idx]) edSeekTo(layers[idx].start || 0);
+}
+function edClickSeek(el, e) {
+  var rect = el.getBoundingClientRect();
+  edSeekTo(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * getEditorTimelineDuration());
+}
+(function edBindTransport() {
+  var toggle = function() { edPlaying ? edPause() : edPlay(); };
+  var ids = { 'ed-btn-play': toggle, 'ed-btn-start': function() { edStepClip(-1); }, 'ed-btn-end': function() { edStepClip(1); }, 'ed-btn-back5': function() { edSeekTo(edCurrentTime - 5); }, 'ed-btn-fwd5': function() { edSeekTo(edCurrentTime + 5); } };
+  Object.keys(ids).forEach(function(id) { var el = document.getElementById(id); if (el) el.onclick = ids[id]; });
+  var pvBtn = document.querySelector('.ed-play-btn'); if (pvBtn) pvBtn.onclick = toggle;
+  var progress = document.querySelector('.ed-transport-progress');
+  if (progress) progress.addEventListener('click', function(e) { edClickSeek(progress, e); });
+  var ruler = document.getElementById('ed-tl-ruler2');
+  if (ruler) ruler.addEventListener('click', function(e) { edClickSeek(ruler, e); });
+  var ph = document.getElementById('ed-tl-playhead2');
+  var phHit = ph ? ph.querySelector('.ed-tl-playhead-hit') : null;
+  var tlEl = ph ? ph.closest('.ed-timeline') : null;
+  if (phHit && tlEl) {
+    var dragging = false;
+    phHit.addEventListener('pointerdown', function(e) { e.preventDefault(); dragging = true; phHit.setPointerCapture(e.pointerId); });
+    document.addEventListener('pointermove', function(e) {
+      if (!dragging) return;
+      var r = tlEl.getBoundingClientRect(); var w = r.width - 100;
+      edSeekTo(Math.max(0, Math.min(1, (e.clientX - r.left - 100) / w)) * getEditorTimelineDuration());
+    });
+    document.addEventListener('pointerup', function() { dragging = false; });
+  }
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  });
+  window.addEventListener('resize', function() { edUpdatePlayhead(); });
+})();
+
 window.loadEditorTimeline = loadEditorTimeline;
 window.showEditorEmpty = showEditorEmpty;
 window.renderEditorFromTimeline = renderEditorFromTimeline;
@@ -384,3 +476,7 @@ window.composePreview = composePreview;
 window.previewFrame = previewFrame;
 window.handleTimelineTrackClick = handleTimelineTrackClick;
 window.handleTimelineInspectorChange = handleTimelineInspectorChange;
+window.edPlay = edPlay;
+window.edPause = edPause;
+window.edSeekTo = edSeekTo;
+window.edStepClip = edStepClip;
