@@ -35,7 +35,7 @@ function formatClock(totalSeconds, withTenths) {
         const base = String(minutes).padStart(2, '0') + ':' + seconds.toFixed(1).padStart(4, '0');
         return hours > 0 ? String(hours).padStart(2, '0') + ':' + base : base;
     }
-    const mm = hours > 0 ? Math.floor((totalSeconds % 3600) / 60) : Math.floor(totalSeconds / 60);
+    const mm = hours > 0 ? Math.floor((totalSeconds % 3600) / 60) :Math.floor(totalSeconds / 60);
     const ss = Math.floor(totalSeconds % 60);
     const core = String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
     return hours > 0 ? String(hours).padStart(2, '0') + ':' + core : core;

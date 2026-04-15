@@ -61,7 +61,7 @@ function loadPipelineData() {
                 voice: audio.voice || null,
                 speed: typeof audio.speed === 'number' ? audio.speed : 1,
                 engine: audio.engine || null,
-                segments: Array.isArray(audio.segments) ? audio.segments : [],
+                segments:Array.isArray(audio.segments) ? audio.segments : [],
             };
             renderAudioTab(pipelineAudioStage.segments);
         }).catch(function (error) {

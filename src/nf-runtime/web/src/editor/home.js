@@ -154,7 +154,7 @@ class HomeView extends Component {
         this.state = { projects: [], search: '' };
     }
     setProjects(projects) {
-        this.setState({ projects: Array.isArray(projects) ? projects : [] });
+        this.setState({ projects:Array.isArray(projects) ? projects : [] });
     }
     setSearch(value) {
         this.setState({ search: value || '' });
