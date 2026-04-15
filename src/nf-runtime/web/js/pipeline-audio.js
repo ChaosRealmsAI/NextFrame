@@ -76,10 +76,13 @@ function renderAudioTabInner(segments) {
       const sn = Number(seg.segment) || (index + 1);
       if (pipelineAudioState[sn] && pipelineAudioState[sn].exists) generatedCount++;
     });
+    const stageVoice = (pipelineAudioStage && pipelineAudioStage.voice) || '';
+    const stageSpeed = pipelineAudioStage && typeof pipelineAudioStage.speed === 'number' ? pipelineAudioStage.speed : null;
+    const stageEngine = (pipelineAudioStage && pipelineAudioStage.engine) || '';
     let sbHtml = '<div class="pl-sb-section"><div class="pl-sb-title">音频设置</div>' +
-      '<div class="pl-sb-info-row"><span class="pl-sb-label">引擎</span><span class="pl-sb-value">Edge TTS</span></div>' +
-      '<div class="pl-sb-info-row"><span class="pl-sb-label">语音</span><span class="pl-sb-value">zh-CN-XiaoxiaoNeural</span></div>' +
-      '<div class="pl-sb-info-row"><span class="pl-sb-label">语速</span><span class="pl-sb-value">1.0x</span></div>' +
+      '<div class="pl-sb-info-row"><span class="pl-sb-label">引擎</span><span class="pl-sb-value">' + escapeHtml(stageEngine || '—') + '</span></div>' +
+      '<div class="pl-sb-info-row"><span class="pl-sb-label">语音</span><span class="pl-sb-value">' + escapeHtml(stageVoice || '—') + '</span></div>' +
+      '<div class="pl-sb-info-row"><span class="pl-sb-label">语速</span><span class="pl-sb-value">' + (stageSpeed !== null ? stageSpeed.toFixed(1) + 'x' : '—') + '</span></div>' +
       '<div class="pl-sb-stats" style="display:flex;gap:16px;margin-top:12px">' +
         '<div style="text-align:center"><div style="font-size:18px;font-weight:700;color:var(--green)">' + generatedCount + '</div><div style="font-size:11px;color:var(--t50)">已生成</div></div>' +
         '<div style="text-align:center"><div style="font-size:18px;font-weight:700;color:var(--t80)">' + segments.length + '</div><div style="font-size:11px;color:var(--t50)">总段数</div></div>' +

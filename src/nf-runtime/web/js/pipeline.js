@@ -16,7 +16,7 @@ let pipelineEpisodeScope = '';
 
 function resetPipelineEpisodeState() {
   pipelineSegments = [];
-  pipelineAudioStage = { voice: null, speed: 1, segments: [] };
+  pipelineAudioStage = { voice: null, speed: 1, engine: null, segments: [] };
   pipelineAudioState = {};
   pipelinePreviewState = {};
   pipelineExportState = null;
@@ -63,12 +63,13 @@ function loadPipelineData() {
       pipelineAudioStage = {
         voice: audio.voice || null,
         speed: typeof audio.speed === 'number' ? audio.speed : 1,
+        engine: audio.engine || null,
         segments: Array.isArray(audio.segments) ? audio.segments : [],
       };
       renderAudioTab(pipelineAudioStage.segments);
     }).catch(function(error) {
       console.error('[pipeline] audio.get:', error);
-      pipelineAudioStage = { voice: null, speed: 1, segments: [] };
+      pipelineAudioStage = { voice: null, speed: 1, engine: null, segments: [] };
       renderAudioTab([]);
     });
   }
