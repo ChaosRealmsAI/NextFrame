@@ -5,6 +5,7 @@ const SUBCOMMANDS = {
   plan: () => import("./match/plan.js"),
   validate: () => import("./match/validate.js"),
   preview: () => import("./match/preview.js"),
+  "from-tts": () => import("./match/from-tts.js"),
 };
 
 export async function run(argv: string[]) {
