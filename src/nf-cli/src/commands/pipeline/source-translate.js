@@ -16,7 +16,7 @@ import {
 const HELP = "usage: nextframe source-translate <project> <episode> --clip <N> --lang <lang> [--apply <response.json>] [--dry-run] [--root=PATH] [--json]";
 
 export async function run(argv) {
-  const { positional, flags } = parseSourceFlags(argv, ["clip", "lang", "apply", "root"]);
+  const { positional, flags } = parseSourceFlags(argv, ["clip", "lang", "apply", "root", "source"]);
   const [projectName, episodeName] = positional;
   if (!projectName || !episodeName || !flags.clip) {
     emit({ ok: false, error: { code: "USAGE", message: HELP } }, flags);
@@ -52,17 +52,51 @@ export async function run(argv) {
     return 2;
   }
 
-  // Find the source that was used — locate first source dir with sentences.json
+  // Resolve which source this clip belongs to:
+  // 1. If --source flag given, use it directly
+  // 2. Otherwise, scan all source dirs and find the one whose sentences.json contains [from_id, to_id] with matching text_preview
   const sourcesDir = join(context.episodePath, "sources");
   let sentencesPath;
   try {
     const { readdir } = await import("node:fs/promises");
     const entries = await readdir(sourcesDir, { withFileTypes: true });
-    const sourceDir = entries.find((e) => e.isDirectory());
-    if (!sourceDir) throw new Error("no source dir");
-    sentencesPath = join(sourcesDir, sourceDir.name, "sentences.json");
+    const sourceDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+    if (!sourceDirs.length) throw new Error("no source dir");
+
+    if (typeof flags.source === "string" && flags.source.trim()) {
+      const explicit = flags.source.trim();
+      if (!sourceDirs.includes(explicit)) {
+        emit({ ok: false, error: { code: "SOURCE_NOT_FOUND", message: `--source '${explicit}' not in ${sourcesDir}` } }, flags);
+        return 2;
+      }
+      sentencesPath = join(sourcesDir, explicit, "sentences.json");
+    } else if (sourceDirs.length === 1) {
+      sentencesPath = join(sourcesDir, sourceDirs[0], "sentences.json");
+    } else {
+      // Multi-source: pick the source whose sentence id range covers [from_id, to_id] and text matches text_preview
+      const fromIdScan = Number(clipRow.from_id);
+      const toIdScan = Number(clipRow.to_id);
+      const previewHead = String(clipRow.text_preview || "").split("...")[0].trim().slice(0, 30);
+      let matched = null;
+      for (const dirName of sourceDirs) {
+        try {
+          const candidate = await readJson(join(sourcesDir, dirName, "sentences.json"));
+          const sents = Array.isArray(candidate?.sentences) ? candidate.sentences : [];
+          const fromS = sents.find((s) => Number(s?.id) === fromIdScan);
+          if (fromS && (!previewHead || String(fromS.text || "").includes(previewHead.slice(0, 15)))) {
+            matched = dirName;
+            break;
+          }
+        } catch (_e) { /* skip */ }
+      }
+      if (!matched) {
+        emit({ ok: false, error: { code: "SOURCE_AMBIGUOUS", message: `multiple sources, could not match clip ${clipNum}. Pass --source <slug> explicitly. Available: ${sourceDirs.join(", ")}` } }, flags);
+        return 2;
+      }
+      sentencesPath = join(sourcesDir, matched, "sentences.json");
+    }
   } catch (err) {
-    emit({ ok: false, error: { code: "SOURCE_NOT_FOUND", message: `no source found in ${sourcesDir}` } }, flags);
+    emit({ ok: false, error: { code: "SOURCE_NOT_FOUND", message: `no source found in ${sourcesDir}: ${err.message}` } }, flags);
     return 2;
   }
 

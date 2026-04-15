@@ -86,9 +86,18 @@ function scBuildSourceModel(dirEntry,fileEntries,meta,sentencesData,wordsData,pl
 }
 
 function scSourceOwnsClip(source,clip){
-  const first=source.sentences.find((sentence)=>sentence.id===Number(clip&&clip.from_id));
-  const last=source.sentences.find((sentence)=>sentence.id===Number(clip&&clip.to_id));
-  if(first&&last)return true;
+  // 1. If cut_report carries explicit source slug → trust it (best signal)
+  const clipSource=String(clip&&(clip.source||clip.source_slug)||'').trim();
+  if(clipSource)return clipSource===source.slug;
+  // 2. Text-preview match: compare first 20 chars of clip.text_preview to source's sentence[from_id].text
+  const fromId=Number(clip&&clip.from_id); const toId=Number(clip&&clip.to_id);
+  const first=source.sentences.find((sentence)=>sentence.id===fromId);
+  const last=source.sentences.find((sentence)=>sentence.id===toId);
+  if(!first||!last)return false;
+  const previewHead=String(clip&&clip.text_preview||'').split('...')[0].trim().slice(0,20).toLowerCase();
+  const sentenceHead=String(first.text||'').trim().slice(0,20).toLowerCase();
+  if(previewHead&&sentenceHead)return previewHead.startsWith(sentenceHead.slice(0,12))||sentenceHead.startsWith(previewHead.slice(0,12));
+  // 3. Fallback to time-range overlap
   const startSec=Number(clip&&clip.start); const endSec=Number(clip&&clip.end);
   return Number.isFinite(startSec)&&Number.isFinite(endSec)&&source.sentences.some((sentence)=>sentence.endSec>startSec&&sentence.startSec<endSec);
 }
