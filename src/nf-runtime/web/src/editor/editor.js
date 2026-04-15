@@ -4,6 +4,7 @@ const ED_DEMO_TIMELINE_PATH = 'data/demo-timeline.json';
 
 let edTimelineData = null;
 let edActiveClip = null;
+const editorClock = (seconds) => window.formatClock(seconds, true);
 
 function getEditorLayerDuration(layer) {
   const dur = Number(layer && layer.dur);
@@ -43,19 +44,13 @@ function getEditorTimelineDuration() {
   }, 0);
 }
 
-function formatEditorTimecode(seconds) {
-  const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
-  const minutes = Math.floor(safeSeconds / 60);
-  return String(minutes).padStart(2, '0') + ':' + (safeSeconds - minutes * 60).toFixed(1).padStart(4, '0');
-}
-
 function updateEditorPreviewState(currentTime, totalDuration) {
   const time = Number.isFinite(currentTime) ? currentTime : 0;
   const duration = Number.isFinite(totalDuration) ? totalDuration : getEditorTimelineDuration();
   const previewTc = document.querySelector('.ed-preview-tc');
-  if (previewTc) previewTc.textContent = formatEditorTimecode(time) + ' / ' + formatEditorTimecode(duration);
+  if (previewTc) previewTc.textContent = editorClock(time) + ' / ' + editorClock(duration);
   const transportTc = document.querySelector('.ed-transport-tc');
-  if (transportTc) transportTc.textContent = formatEditorTimecode(time);
+  if (transportTc) transportTc.textContent = editorClock(time);
   const fill = document.querySelector('.ed-transport-fill');
   if (fill) {
     const pct = duration > 0 ? Math.max(0, Math.min(100, time / duration * 100)) : 0;
@@ -181,10 +176,10 @@ function renderEditorTracks() {
     const left = duration > 0 ? (layer.start / duration * 100) : 0;
     const width = duration > 0 ? (layer.dur / duration * 100) : 0;
     return '<div class="ed-tl-track">' +
-      '<span class="ed-tl-track-label">' + escapeEditorAttr(name) + '</span>' +
+      '<span class="ed-tl-track-label">' + escapeHtml(name) + '</span>' +
       '<div class="ed-tl-clip" data-index="' + index + '" data-start="' + layer.start + '" data-dur="' + layer.dur + '"' +
       ' style="left:' + left.toFixed(1) + '%;width:' + width.toFixed(1) + '%" onclick="handleTimelineTrackClick(event)">' +
-      escapeEditorAttr(name) +
+      escapeHtml(name) +
       '</div>' +
       '</div>';
   }).join('');
@@ -197,14 +192,6 @@ function renderEditorFromTimeline(timeline) {
   renderEditorTracks();
   updateEditorPreviewState(0, getEditorTimelineDuration());
   return edTimelineData;
-}
-
-function escapeEditorAttr(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 function selectTimelineClip(index) {
@@ -367,3 +354,5 @@ window.edSelectClip = edSelectClip;
 window.composePreview = composePreview;
 window.previewFrame = previewFrame;
 window.handleTimelineTrackClick = handleTimelineTrackClick;
+window.updateEditorPreviewState = updateEditorPreviewState;
+window.getEditorTimelineDuration = getEditorTimelineDuration;

@@ -41,7 +41,7 @@ const AIPrompts = (() => {
     html += '<div class="prompt-section-title">' + section.icon + ' ' + section.title + '</div>';
     for (const prompt of section.prompts) {
       html += '<div class="prompt-item" onclick="AIPrompts.copy(this)">';
-      html += '<span class="prompt-text">' + escapeHtml(prompt) + '</span>';
+      html += '<span class="prompt-text">' + escapePromptHtml(prompt) + '</span>';
       html += '<span class="prompt-copy">复制</span>';
       html += '</div>';
     }
@@ -91,7 +91,7 @@ const AIPrompts = (() => {
     }, 1500);
   }
 
-  function escapeHtml(str) {
+  function escapePromptHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
