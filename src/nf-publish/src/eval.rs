@@ -26,10 +26,10 @@ fn encode_and_write_screenshot(image: &NSImage, screenshot_path: &str) -> Result
     })?;
     // SAFETY: `NSDictionary::new()` returns an empty immutable dictionary object that can be viewed as the typed properties dictionary WebKit expects here.
     let dict: &NSDictionary<NSString> =
-        unsafe { &*(NSDictionary::new().as_ref() as *const _ as *const _) }; // SAFETY: see comment above.
+        unsafe { &*(NSDictionary::new().as_ref() as *const _ as *const _) }; // SAFETY: `NSDictionary::new()` returns an empty immutable dictionary object that can be viewed as the typed properties dictionary WebKit expects here.
     // SAFETY: `bitmap` is a valid NSBitmapImageRep and `representationUsingType:properties:` accepts the empty properties dictionary for PNG encoding.
     let png =
-        unsafe { bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, dict) } // SAFETY: see comment above.
+        unsafe { bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, dict) } // SAFETY: `bitmap` is a valid NSBitmapImageRep and `representationUsingType:properties:` accepts the empty properties dictionary for PNG encoding.
             .ok_or_else(|| {
                 error_with_fix(
                     "encode the screenshot as PNG",
@@ -38,7 +38,7 @@ fn encode_and_write_screenshot(image: &NSImage, screenshot_path: &str) -> Result
                 )
             })?;
     // SAFETY: `png` is NSData returned by AppKit and remains alive for this scope, so exposing its bytes is valid.
-    let bytes = unsafe { png.as_bytes_unchecked() }; // SAFETY: see comment above.
+    let bytes = unsafe { png.as_bytes_unchecked() }; // SAFETY: `png` is NSData returned by AppKit and remains alive for this scope, so exposing its bytes is valid.
     std::fs::write(screenshot_path, bytes).map_err(|err| {
         error_with_fix(
             "write the screenshot PNG",
@@ -70,14 +70,14 @@ pub(crate) fn take_screenshot_with_callback<F>(
             )
         } else {
             // SAFETY: WebKit passes a valid NSImage pointer when `image` is non-null for this completion handler invocation.
-            let image = unsafe { &*image }; // SAFETY: see comment above.
+            let image = unsafe { &*image }; // SAFETY: WebKit passes a valid NSImage pointer when `image` is non-null for this completion handler invocation.
             encode_and_write_screenshot(image, &ss_path)
         };
         if let Some(callback) = callback.borrow_mut().take() {
             callback(result);
         }
     });
-    unsafe {
+    unsafe { // SAFETY: `webview` is a live WKWebView and the completion block outlives the async snapshot operation.
         // SAFETY: `webview` is a live WKWebView and the completion block outlives the async snapshot operation.
         webview.takeSnapshotWithConfiguration_completionHandler(None, &handler);
     }
@@ -117,7 +117,7 @@ pub(crate) fn eval_js(webview: &WKWebView, js: &str, result_path: String) {
     let handler = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
         if !error.is_null() {
             // SAFETY: WebKit passes a valid NSError pointer when `error` is non-null.
-            let err = unsafe { &*error }; // SAFETY: see comment above.
+            let err = unsafe { &*error }; // SAFETY: WebKit passes a valid NSError pointer when `error` is non-null.
             let message = error_with_fix(
                 "evaluate JavaScript in the webview",
                 err.localizedDescription(),
@@ -126,13 +126,13 @@ pub(crate) fn eval_js(webview: &WKWebView, js: &str, result_path: String) {
             let _ = std::fs::write(&res_path, format!("error: {message}"));
         } else if !result.is_null() {
             // SAFETY: this wrapper stringifies JS results, so non-null `result` is an NSString.
-            let s: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: see comment above.
+            let s: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: this wrapper stringifies JS results, so non-null `result` is an NSString.
             let _ = std::fs::write(&res_path, format!("ok: {s}"));
         } else {
             let _ = std::fs::write(&res_path, "ok: null");
         }
     });
-    unsafe {
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and block.
         // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }

@@ -39,7 +39,7 @@ fn set_layer_bg(view: &NSView, color: &NSColor) {
     if let Some(layer) = view.layer() {
         let cg = color.CGColor();
         // SAFETY: `layer` is a live CALayer from this NSView and `setBackgroundColor:` accepts the CGColor pointer returned by AppKit.
-        let _: () = unsafe { msg_send![&*layer, setBackgroundColor: Some(&*cg)] }; // SAFETY: see comment above.
+        let _: () = unsafe { msg_send![&*layer, setBackgroundColor: Some(&*cg)] }; // SAFETY: `layer` is a live CALayer from this NSView and `setBackgroundColor:` accepts the CGColor pointer returned by AppKit.
     }
 }
 
@@ -47,7 +47,7 @@ fn set_layer_radius(view: &NSView, radius: f64) {
     view.setWantsLayer(true);
     if let Some(layer) = view.layer() {
         // SAFETY: `layer` is a live CALayer from this NSView and `setCornerRadius:` is a valid CALayer selector for an f64 radius.
-        let _: () = unsafe { msg_send![&*layer, setCornerRadius: radius] }; // SAFETY: see comment above.
+        let _: () = unsafe { msg_send![&*layer, setCornerRadius: radius] }; // SAFETY: `layer` is a live CALayer from this NSView and `setCornerRadius:` is a valid CALayer selector for an f64 radius.
     }
 }
 
@@ -55,15 +55,15 @@ fn set_top_corners(view: &NSView, radius: f64) {
     view.setWantsLayer(true);
     if let Some(layer) = view.layer() {
         // SAFETY: `layer` is a live CALayer from this NSView and `setCornerRadius:` is a valid CALayer selector for an f64 radius.
-        let _: () = unsafe { msg_send![&*layer, setCornerRadius: radius] }; // SAFETY: see comment above.
+        let _: () = unsafe { msg_send![&*layer, setCornerRadius: radius] }; // SAFETY: `layer` is a live CALayer from this NSView and `setCornerRadius:` is a valid CALayer selector for an f64 radius.
         // SAFETY: `layer` is a live CALayer and `setMaskedCorners:` accepts the CACornerMask bitset used here.
-        let _: () = unsafe { msg_send![&*layer, setMaskedCorners: 3u64] }; // SAFETY: see comment above.
+        let _: () = unsafe { msg_send![&*layer, setMaskedCorners: 3u64] }; // SAFETY: `layer` is a live CALayer and `setMaskedCorners:` accepts the CACornerMask bitset used here.
     }
 }
 
 fn set_btn_tint(btn: &NSButton, color: &NSColor) {
     // SAFETY: `btn` is a live NSButton and `setContentTintColor:` is a valid selector taking an NSColor.
-    let _: () = unsafe { msg_send![btn, setContentTintColor: color] }; // SAFETY: see comment above.
+    let _: () = unsafe { msg_send![btn, setContentTintColor: color] }; // SAFETY: `btn` is a live NSButton and `setContentTintColor:` is a valid selector taking an NSColor.
 }
 
 fn remove_all_subviews(view: &NSView) {
@@ -72,13 +72,13 @@ fn remove_all_subviews(view: &NSView) {
         let child = &*subviews.objectAtIndex(idx);
         let _ = catch_objc(|| {
             // SAFETY: `child` came from `view.subviews()` and `removeFromSuperview` is valid for every NSView.
-            let _: () = unsafe { msg_send![child, removeFromSuperview] }; // SAFETY: see comment above.
+            let _: () = unsafe { msg_send![child, removeFromSuperview] }; // SAFETY: `child` came from `view.subviews()` and `removeFromSuperview` is valid for every NSView.
         });
     }
 }
 
 fn make_hairline(mtm: MainThreadMarker, x: f64, y: f64, w: f64, h: f64) -> Retained<NSView> {
-    let view = unsafe {
+    let view = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and `alloc()` returns an uninitialized NSView ready for `initWithFrame:`.
         // SAFETY: `mtm` guarantees main-thread AppKit access and `alloc()` returns an uninitialized NSView ready for `initWithFrame:`.
         NSView::initWithFrame(
             mtm.alloc(),
@@ -102,7 +102,7 @@ pub(crate) fn move_traffic_lights(window: &objc2_app_kit::NSWindow) {
     let padding_x = 10.0f64;
     let padding_y = 10.0f64;
 
-    unsafe {
+    unsafe { // SAFETY: `window` is a live NSWindow on the main thread and the queried standard buttons/contentLayoutRect selectors are valid NSWindow APIs.
         // SAFETY: `window` is a live NSWindow on the main thread and the queried standard buttons/contentLayoutRect selectors are valid NSWindow APIs.
         let close = window.standardWindowButton(NSWindowButton::CloseButton);
         let mini = window.standardWindowButton(NSWindowButton::MiniaturizeButton);
@@ -147,8 +147,8 @@ pub(crate) fn create_webview(
     nav_delegate: &PilotNavDelegate,
 ) -> Retained<WKWebView> {
     // SAFETY: `mtm` guarantees main-thread WebKit construction and `config` stays alive for the life of the app state.
-    let webview = unsafe { WKWebView::initWithFrame_configuration(mtm.alloc(), frame, config) }; // SAFETY: see comment above.
-    unsafe {
+    let webview = unsafe { WKWebView::initWithFrame_configuration(mtm.alloc(), frame, config) }; // SAFETY: `mtm` guarantees main-thread WebKit construction and `config` stays alive for the life of the app state.
+    unsafe { // SAFETY: `mtm` guarantees main-thread WebKit construction and `config` stays alive for the life of the app state.
         // SAFETY: `webview` is freshly created and both delegates are Objective-C objects implementing the protocols WebKit expects.
         webview.setUIDelegate(Some(ProtocolObject::from_ref(ui_delegate)));
         webview.setNavigationDelegate(Some(ProtocolObject::from_ref(nav_delegate)));
@@ -158,7 +158,7 @@ pub(crate) fn create_webview(
     );
     if let Some(url) = NSURL::URLWithString(&NSString::from_str(url)) {
         let request = NSURLRequest::requestWithURL(&url);
-        unsafe {
+        unsafe { // SAFETY: `request` is a valid NSURLRequest and `loadRequest:` is the standard WKWebView navigation entry point.
             // SAFETY: `request` is a valid NSURLRequest and `loadRequest:` is the standard WKWebView navigation entry point.
             webview.loadRequest(&request);
         }

@@ -38,7 +38,7 @@ pub(crate) fn send_key_to_webview(
     if let Some(event) = &down
         && let Err(err) /* Internal: Objective-C responder failure is logged locally below */ = catch_objc(|| {
             // SAFETY: `webview` is a live WKWebView and `keyDown:` is a valid responder selector for the synthesized NSEvent.
-            let _: () = unsafe { msg_send![webview, keyDown: &**event] }; // SAFETY: see comment above.
+            let _: () = unsafe { msg_send![webview, keyDown: &**event] }; // SAFETY: `webview` is a live WKWebView and `keyDown:` is a valid responder selector for the synthesized NSEvent.
         })
     {
         crate::state::log_crash("WARN", "keyboard", &format!("keyDown: {err}"));
@@ -59,7 +59,7 @@ pub(crate) fn send_key_to_webview(
     if let Some(event) = &up
         && let Err(err) /* Internal: Objective-C responder failure is logged locally below */ = catch_objc(|| {
             // SAFETY: `webview` is a live WKWebView and `keyUp:` is a valid responder selector for the synthesized NSEvent.
-            let _: () = unsafe { msg_send![webview, keyUp: &**event] }; // SAFETY: see comment above.
+            let _: () = unsafe { msg_send![webview, keyUp: &**event] }; // SAFETY: `webview` is a live WKWebView and `keyUp:` is a valid responder selector for the synthesized NSEvent.
         })
     {
         crate::state::log_crash("WARN", "keyboard", &format!("keyUp: {err}"));
@@ -213,7 +213,7 @@ pub(crate) fn send_key_command(webview: &WKWebView, key: &str) -> Result<(), Str
 }
 
 pub(crate) fn paste_text_native(webview: &WKWebView, text: &str) -> Result<(), String> {
-    unsafe {
+    unsafe { // SAFETY: `NSPasteboard` responds to these standard pasteboard selectors and the temporary NSString values live for the duration of the calls.
         // SAFETY: `NSPasteboard` responds to these standard pasteboard selectors and the temporary NSString values live for the duration of the calls.
         let pb: Retained<AnyObject> = msg_send![objc2::class!(NSPasteboard), generalPasteboard];
         let _: () = msg_send![&*pb, clearContents];
@@ -304,7 +304,7 @@ pub(crate) fn type_text_native(webview: &WKWebView, text: &str, result_path: &st
         let delay_ms: u64 = (0..i).map(|j| jitter(55, 130, j as u64)).sum();
         dispatch::Queue::main().exec_after(std::time::Duration::from_millis(delay_ms), move || {
             // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this work runs back on the main queue before the tab is torn down.
-            let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+            let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this work runs back on the main queue before the tab is torn down.
             let (chars, keycode, modifiers) = key_spec_for_text(ch);
             send_key_to_webview(wv, &chars, keycode, modifiers);
             if i == total - 1 {
@@ -333,7 +333,7 @@ pub(crate) fn add_tag(webview: &WKWebView, tag: &str, result_path: &str) {
             "null".to_owned()
         } else {
             // SAFETY: this JavaScript callback returns a string result, so non-null `result` is an NSString.
-            let s: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: see comment above.
+            let s: &NSString = unsafe { &*(result as *const NSString) }; // SAFETY: this JavaScript callback returns a string result, so non-null `result` is an NSString.
             s.to_string()
         };
 
@@ -347,7 +347,7 @@ pub(crate) fn add_tag(webview: &WKWebView, tag: &str, result_path: &str) {
         };
 
         // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this handler runs on the main queue.
-        let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+        let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this handler runs on the main queue.
         native_click_at(wv, x, y);
 
         let chars: Vec<char> = tag_owned.chars().collect();
@@ -358,7 +358,7 @@ pub(crate) fn add_tag(webview: &WKWebView, tag: &str, result_path: &str) {
                 let wv_ptr = wv_ptr;
                 move || {
                     // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this work runs on the main queue.
-                    let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                    let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this work runs on the main queue.
                     if let Err(err) /* Fix: propagate or log the formatted error below */ = send_key_command(wv, "cmd+right") {
                         crate::state::log_crash(
                             "WARN",
@@ -374,7 +374,7 @@ pub(crate) fn add_tag(webview: &WKWebView, tag: &str, result_path: &str) {
                 let wv_ptr = wv_ptr;
                 move || {
                     // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this work runs on the main queue.
-                    let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                    let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this work runs on the main queue.
                     if let Err(err) /* Fix: propagate or log the formatted error below */ = send_key_command(wv, &ch.to_string()) {
                         crate::state::log_crash(
                             "WARN",
@@ -393,7 +393,7 @@ pub(crate) fn add_tag(webview: &WKWebView, tag: &str, result_path: &str) {
             let wv_ptr = wv_ptr;
             move || {
                 // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this work runs on the main queue.
-                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: see comment above.
+                let wv = unsafe { &*(wv_ptr as *const WKWebView) }; // SAFETY: `wv_ptr` was captured from a live WKWebView owned by app state and this work runs on the main queue.
                 if let Err(err) /* Fix: propagate or log the formatted error below */ = send_key_command(wv, "space") {
                     let _ = std::fs::write(&rp, format!("error: {err}"));
                     return;
@@ -409,7 +409,7 @@ pub(crate) fn add_tag(webview: &WKWebView, tag: &str, result_path: &str) {
         });
     });
 
-    unsafe {
+    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }

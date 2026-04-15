@@ -37,7 +37,7 @@ fn native_click_at(webview: &WKWebView, x: f64, y: f64) {
     if let Some(event) = &down {
         let _ = catch_objc(|| {
             // SAFETY: `webview` is a live WKWebView and `mouseDown:` is a valid responder selector for the synthesized NSEvent.
-            let _: () = unsafe { msg_send![webview, mouseDown: &**event] }; // SAFETY: see comment above.
+            let _: () = unsafe { msg_send![webview, mouseDown: &**event] }; // SAFETY: `webview` is a live WKWebView and `mouseDown:` is a valid responder selector for the synthesized NSEvent.
         });
     }
 
@@ -55,7 +55,7 @@ fn native_click_at(webview: &WKWebView, x: f64, y: f64) {
     if let Some(event) = &up {
         let _ = catch_objc(|| {
             // SAFETY: `webview` is a live WKWebView and `mouseUp:` is a valid responder selector for the synthesized NSEvent.
-            let _: () = unsafe { msg_send![webview, mouseUp: &**event] }; // SAFETY: see comment above.
+            let _: () = unsafe { msg_send![webview, mouseUp: &**event] }; // SAFETY: `webview` is a live WKWebView and `mouseUp:` is a valid responder selector for the synthesized NSEvent.
         });
     }
 }

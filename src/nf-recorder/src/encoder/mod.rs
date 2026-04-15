@@ -28,21 +28,21 @@ type CFDictionaryRef = *const c_void;
 
 #[link(name = "AVFoundation", kind = "framework")]
 // SAFETY: This empty extern block only requests the linker to link AVFoundation.
-unsafe extern "C" {} // SAFETY: see above.
+unsafe extern "C" {} // SAFETY: This empty extern block only requests the linker to link AVFoundation.
 
 #[link(name = "CoreMedia", kind = "framework")]
 // SAFETY: This empty extern block only requests the linker to link CoreMedia.
-unsafe extern "C" {} // SAFETY: see above.
+unsafe extern "C" {} // SAFETY: This empty extern block only requests the linker to link CoreMedia.
 
 #[link(name = "CoreVideo", kind = "framework")]
 // SAFETY: This empty extern block only requests the linker to link CoreVideo.
-unsafe extern "C" {} // SAFETY: see above.
+unsafe extern "C" {} // SAFETY: This empty extern block only requests the linker to link CoreVideo.
 
 // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
-unsafe extern "C" {
-    // SAFETY: see above.
-    // SAFETY: see above.
-    // SAFETY: see above.
+unsafe extern "C" { // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
+    // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
+    // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
+    // SAFETY: These imported framework symbols use Apple's declared signatures and stay valid while linked.
     static AVFileTypeMPEG4: &'static NSString;
     static AVMediaTypeVideo: &'static NSString;
 

@@ -51,13 +51,13 @@ impl Drop for TempHome {
         match &self.previous_home {
             Some(value) => {
                 // SAFETY: tests serialize HOME mutations with `HOME_ENV_LOCK`.
-                unsafe {
+                unsafe { // SAFETY: tests serialize HOME mutations with `HOME_ENV_LOCK`.
                     std::env::set_var("HOME", value);
                 }
             }
             None => {
                 // SAFETY: tests serialize HOME mutations with `HOME_ENV_LOCK`.
-                unsafe {
+                unsafe { // SAFETY: tests serialize HOME mutations with `HOME_ENV_LOCK`.
                     std::env::remove_var("HOME");
                 }
             }

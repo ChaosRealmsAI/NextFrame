@@ -67,12 +67,12 @@ pub fn is_nsimage_black(image: &NSImage) -> Result<bool, String> {
 
     for y in (0..height).step_by(step_y) {
         // SAFETY: `data` points to the bitmap allocation, and this row offset stays within it.
-        let row = unsafe { data.add(y * bytes_per_row) }; // SAFETY: see above.
+        let row = unsafe { data.add(y * bytes_per_row) }; // SAFETY: `data` points to the bitmap allocation, and this row offset stays within it.
         for x in (0..width).step_by(step_x) {
             // SAFETY: this pixel offset stays within the current row for the sampled coordinates.
-            let pixel = unsafe { row.add(x * samples_per_pixel) }; // SAFETY: see above.
+            let pixel = unsafe { row.add(x * samples_per_pixel) }; // SAFETY: this pixel offset stays within the current row for the sampled coordinates.
             // SAFETY: `pixel` points to one pixel, and `samples_per_pixel` matches the bitmap metadata.
-            let channels = unsafe { std::slice::from_raw_parts(pixel, samples_per_pixel) }; // SAFETY: see above.
+            let channels = unsafe { std::slice::from_raw_parts(pixel, samples_per_pixel) }; // SAFETY: `pixel` points to one pixel, and `samples_per_pixel` matches the bitmap metadata.
             let (r, g, b) = rgb_components(channels, format);
             if r > threshold || g > threshold || b > threshold {
                 return Ok(false);
@@ -85,9 +85,9 @@ pub fn is_nsimage_black(image: &NSImage) -> Result<bool, String> {
 /// Extracts a `CGImage` from an `NSImage`.
 pub fn cgimage_from_nsimage(image: &NSImage) -> Result<Retained<CGImage>, String> {
     // SAFETY: `image` is live, and AppKit allows null rect/context/hints for this conversion call.
-    unsafe {
-        // SAFETY: see above.
-        // SAFETY: see above.
+    unsafe { // SAFETY: `image` is live, and AppKit allows null rect/context/hints for this conversion call.
+        // SAFETY: `image` is live, and AppKit allows null rect/context/hints for this conversion call.
+        // SAFETY: `image` is live, and AppKit allows null rect/context/hints for this conversion call.
         image
             .CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None)
             .ok_or_else(|| {
@@ -129,9 +129,9 @@ pub fn layer_render_cgimage(
     let bitmap_info =
         CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
     // SAFETY: `buffer` owns the target bytes, and the dimensions and format match this bitmap context.
-    let context = unsafe {
-        // SAFETY: see above.
-        // SAFETY: see above.
+    let context = unsafe { // SAFETY: `buffer` owns the target bytes, and the dimensions and format match this bitmap context.
+        // SAFETY: `buffer` owns the target bytes, and the dimensions and format match this bitmap context.
+        // SAFETY: `buffer` owns the target bytes, and the dimensions and format match this bitmap context.
         CGBitmapContextCreate(
             buffer.as_mut_ptr().cast::<c_void>(),
             width,
@@ -166,7 +166,7 @@ pub fn layer_render_cgimage(
     CGContext::scale_ctm(Some(context.as_ref()), scale_x, -scale_y);
 
     // SAFETY: `layer` and `context` are live, and `renderInContext:` accepts a valid bitmap context.
-    let _: () = unsafe { msg_send![layer, renderInContext: &*context] }; // SAFETY: see above.
+    let _: () = unsafe { msg_send![layer, renderInContext: &*context] }; // SAFETY: `layer` and `context` are live, and `renderInContext:` accepts a valid bitmap context.
 
     let image = CGBitmapContextCreateImage(Some(&context)).ok_or_else(|| {
         error_with_fix(
@@ -194,9 +194,9 @@ pub fn is_cgimage_mostly_black(image: &CGImage) -> Result<bool, String> {
     let bitmap_info =
         CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
     // SAFETY: `buffer` owns the thumbnail bytes, and the dimensions and format match this context.
-    let context = unsafe {
-        // SAFETY: see above.
-        // SAFETY: see above.
+    let context = unsafe { // SAFETY: `buffer` owns the thumbnail bytes, and the dimensions and format match this context.
+        // SAFETY: `buffer` owns the thumbnail bytes, and the dimensions and format match this context.
+        // SAFETY: `buffer` owns the thumbnail bytes, and the dimensions and format match this context.
         CGBitmapContextCreate(
             buffer.as_mut_ptr().cast::<c_void>(),
             thumbnail_width,

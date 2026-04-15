@@ -178,7 +178,7 @@ pub(crate) fn normalize_user_url(input: &str) -> Option<String> {
 
 pub(crate) fn title_for_webview(webview: &WKWebView) -> String {
     // SAFETY: `webview` is a live WKWebView and `title` is a valid getter that returns an autoreleased NSString if present.
-    unsafe { webview.title() } // SAFETY: see comment above.
+    unsafe { webview.title() } // SAFETY: `webview` is a live WKWebView and `title` is a valid getter that returns an autoreleased NSString if present.
         .map(|value| value.to_string())
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| "New Tab".to_owned())
@@ -186,7 +186,7 @@ pub(crate) fn title_for_webview(webview: &WKWebView) -> String {
 
 pub(crate) fn current_url_for_webview(webview: &WKWebView) -> String {
     // SAFETY: `webview` is a live WKWebView and `URL` is a valid getter that returns an autoreleased NSURL if present.
-    unsafe { webview.URL() } // SAFETY: see comment above.
+    unsafe { webview.URL() } // SAFETY: `webview` is a live WKWebView and `URL` is a valid getter that returns an autoreleased NSURL if present.
         .and_then(|url| url.absoluteString())
         .map(|value| value.to_string())
         .unwrap_or_default()
@@ -201,11 +201,11 @@ pub(crate) fn make_request(
 }
 
 pub(crate) fn remove_view_from_superview(view: &AnyObject) {
-    let _ = unsafe {
+    let _ = unsafe { // SAFETY: `view` is an Objective-C view object and both `catch` and `removeFromSuperview` are valid at this AppKit boundary.
         // SAFETY: `view` is an Objective-C view object and both `catch` and `removeFromSuperview` are valid at this AppKit boundary.
         objc2::exception::catch(std::panic::AssertUnwindSafe(|| {
             // SAFETY: `view` is a live NSView/NSResponder object and `removeFromSuperview` is a valid selector on it.
-            let _: () = unsafe { msg_send![view, removeFromSuperview] }; // SAFETY: see comment above.
+            let _: () = unsafe { msg_send![view, removeFromSuperview] }; // SAFETY: `view` is a live NSView/NSResponder object and `removeFromSuperview` is a valid selector on it.
         }))
     };
 }

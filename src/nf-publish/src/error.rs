@@ -20,7 +20,7 @@ pub(crate) fn ensure_fix(err: impl Into<String>, action: &str, fix: &str) -> Str
 /// `action` describes the high-level operation for the error message (e.g. "update the macOS publish UI").
 pub(crate) fn with_objc_boundary(action: &str, f: impl FnOnce()) -> Result<(), String> {
     // SAFETY: `objc2::exception::catch` is the intended wrapper around Objective-C message sends at FFI boundaries.
-    let result = unsafe { objc2::exception::catch(AssertUnwindSafe(f)) }; // SAFETY: see comment above.
+    let result = unsafe { objc2::exception::catch(AssertUnwindSafe(f)) }; // SAFETY: `objc2::exception::catch` is the intended wrapper around Objective-C message sends at FFI boundaries.
     result.map_err(|e| {
         error_with_fix(
             action,
