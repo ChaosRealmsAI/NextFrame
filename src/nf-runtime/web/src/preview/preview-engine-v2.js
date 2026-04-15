@@ -6,7 +6,6 @@
         const state = {
             stage: config.stage || null,
             timeline: null,
-            time: 0,
             selectedLayer: -1,
             ratio: "",
         };
