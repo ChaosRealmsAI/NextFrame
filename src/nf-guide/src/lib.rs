@@ -104,9 +104,14 @@ mod tests {
     use super::*;
     use std::fs;
     use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn make_test_recipes() -> PathBuf {
-        let dir = env::temp_dir().join(format!("nf-guide-test-{}", process::id()));
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let dir = env::temp_dir().join(format!("nf-guide-test-{}-{unique}", process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(dir.join("alpha")).unwrap();
         fs::write(

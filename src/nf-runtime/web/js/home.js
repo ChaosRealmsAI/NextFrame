@@ -50,10 +50,10 @@ function timeAgo(dateStr) {
 }
 
 function renderCard(p) {
-  var safeName = (p.name || 'Untitled').replace(/'/g, "\\'");
-  var safePath = (p.path || '').replace(/'/g, "\\'");
-  var thumbUrl = p.thumbnail ? 'nfdata://localhost/' + encodeURI(p.name || '') + '/' + p.thumbnail : '';
-  var thumbStyle = thumbUrl ? 'background-image:url(' + thumbUrl + ');background-size:cover;background-position:center' : '';
+  const safeName = (p.name || 'Untitled').replace(/'/g, "\\'");
+  const safePath = (p.path || '').replace(/'/g, "\\'");
+  const thumbUrl = p.thumbnail ? 'nfdata://localhost/' + encodeURI(p.name || '') + '/' + p.thumbnail : '';
+  const thumbStyle = thumbUrl ? 'background-image:url(' + thumbUrl + ');background-size:cover;background-position:center' : '';
   return '<div class="project-card glass" data-nf-action="open-project" data-path="' + (p.path || '') + '" onclick="showView(\'project\',{name:\'' + safeName + '\',path:\'' + safePath + '\'})">' +
     '<div class="card-thumb"' + (thumbStyle ? ' style="' + thumbStyle + '"' : '') + '>' +
       (thumbUrl ? '' : '<svg class="card-thumb-icon" width="32" height="32" viewBox="0 0 32 32" fill="none"><polygon points="12,8 24,16 12,24" fill="currentColor"/></svg>') +

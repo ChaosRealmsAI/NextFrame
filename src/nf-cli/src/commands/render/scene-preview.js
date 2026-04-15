@@ -67,18 +67,18 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
   // ── Scene ──
   ${sceneCode}
 
-  var duration = (typeof meta !== 'undefined' && meta.duration_hint) || 10;
-  var params = {};
+  const duration = (typeof meta !== 'undefined' && meta.duration_hint) || 10;
+  const params = {};
   if (typeof meta !== 'undefined' && meta.params) {
-    for (var k in meta.params) {
-      var spec = meta.params[k];
+    for (const k in meta.params) {
+      const spec = meta.params[k];
       if (spec && spec.default !== undefined) params[k] = spec.default;
     }
   }
-  var canvas = document.getElementById('canvas');
-  var scrubber = document.getElementById('scrubber');
-  var td = document.getElementById('timeDisplay');
-  var pb = document.getElementById('playBtn');
+  const canvas = document.getElementById('canvas');
+  const scrubber = document.getElementById('scrubber');
+  const td = document.getElementById('timeDisplay');
+  const pb = document.getElementById('playBtn');
 
   function rf(t) {
     if (typeof render === 'function') {
@@ -91,15 +91,17 @@ body{background:#111;color:#fff;font-family:system-ui;display:flex;flex-directio
   }
 
   scrubber.addEventListener('input', function() {
-    var t = (scrubber.value / 1000) * duration;
+    const t = (scrubber.value / 1000) * duration;
     td.textContent = t.toFixed(2) + 's';
     rf(t);
   });
 
-  var playing = false, st = 0, so = 0;
+  let playing = false;
+  let st = 0;
+  let so = 0;
   function tick() {
     if (!playing) return;
-    var t = ((Date.now() - st) / 1000 + so) % duration;
+    const t = ((Date.now() - st) / 1000 + so) % duration;
     scrubber.value = (t / duration) * 1000;
     td.textContent = t.toFixed(2) + 's';
     rf(t);
