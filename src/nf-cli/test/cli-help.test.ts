@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const CLI = resolve(ROOT, "bin/nextframe.js");
+const ENTRY = resolve(ROOT, "src", "index.ts");
 
 function runCli(args: string[]) {
   return spawnSync("node", [CLI, ...args], {
@@ -18,7 +19,7 @@ function runCli(args: string[]) {
 }
 
 function registeredCommands() {
-  const source = readFileSync(CLI, "utf8");
+  const source = readFileSync(ENTRY, "utf8");
   const body = source.match(/const SUBCOMMANDS = \{([\s\S]*?)\n\};/)[1];
   return [...body.matchAll(/^[ \t]*(?:"([^"]+)"|([A-Za-z0-9_-]+)):\s*\(\) =>/gm)]
     .map((match) => match[1] || match[2]);
