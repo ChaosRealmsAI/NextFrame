@@ -1,5 +1,16 @@
 // Match rule for auto-generating subtitles from narration word metadata.
-import type { AudioTrack, Match, PlanCtx, SubtitleTrack, Timeline, Track, ValidationIssue, ValidationResult } from "../types.js";
+import type {
+  AudioTrack,
+  Match,
+  PlanCtx,
+  Segment,
+  SubtitleClip,
+  SubtitleTrack,
+  Timeline,
+  Track,
+  ValidationIssue,
+  ValidationResult,
+} from "../types.js";
 
 export const name = "subtitle-from-words";
 
@@ -98,6 +109,61 @@ export function validate(match: Match, timeline: Timeline): ValidationResult {
   return errors.length > 0 ? failResult(errors) : okResult();
 }
 
-export function expand(_match: Match, _timeline: Timeline): Partial<Timeline> {
-  throw new Error("not implemented");
+function getRequiredTracks(match: Match, timeline: Timeline): { source: AudioTrack; target: SubtitleTrack; level: MatchLevel } {
+  const validation = validate(match, timeline);
+  if (!validation.ok) {
+    throw new Error(validation.errors[0]?.message || "invalid subtitle-from-words match");
+  }
+
+  const source = findTrack(match.source, timeline);
+  const target = findTrack(match.target, timeline);
+  const level = normalizeLevel(match);
+  if (!isAudioTrack(source) || !isSubtitleTrack(target) || !level) {
+    throw new Error("invalid subtitle-from-words match");
+  }
+  return { source, target, level };
+}
+
+function buildWordClips(segment: Segment, targetId: string): SubtitleClip[] {
+  return segment.words.map((word, wordIndex) => ({
+    id: `${targetId}-${segment.id}-word-${wordIndex}`,
+    scene: "subtitleWord",
+    start: word.s / 1000,
+    dur: (word.e - word.s) / 1000,
+    text: word.w,
+    word,
+    segmentId: segment.id,
+    wordIndex,
+    sentenceText: segment.text,
+  }));
+}
+
+function buildSentenceClip(segment: Segment, targetId: string): SubtitleClip {
+  return {
+    id: `${targetId}-${segment.id}-sentence`,
+    scene: "subtitleSentence",
+    start: segment.startMs / 1000,
+    dur: (segment.endMs - segment.startMs) / 1000,
+    text: segment.text,
+    segmentId: segment.id,
+    sentenceText: segment.text,
+  };
+}
+
+export function expand(match: Match, timeline: Timeline): Partial<Timeline> {
+  const { source, target, level } = getRequiredTracks(match, timeline);
+  const targetId = String(target.id || match.target || "subtitle");
+  const segments = source.meta?.segments || [];
+  const clips = level === "sentence"
+    ? segments.map((segment) => buildSentenceClip(segment, targetId))
+    : segments.flatMap((segment) => buildWordClips(segment, targetId));
+
+  return {
+    tracks: [
+      {
+        ...target,
+        clips,
+      },
+    ],
+  };
 }
