@@ -22,16 +22,19 @@ impl WebViewHost {
         // SAFETY: `self.web_view` and `request` are live Objective-C objects for this load call.
         let navigation = unsafe { self.web_view.loadRequest(&request) }; // SAFETY: see above.
         if navigation.is_none() {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "load the target URL into WKWebView",
-                format!(
-                    "WKWebView refused loadRequest for {}",
-                    url.absoluteString()
-                        .map(|value| value.to_string())
-                        .unwrap_or_else(|| "<invalid-url>".into())
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "load the target URL into WKWebView",
+                    format!(
+                        "WKWebView refused loadRequest for {}",
+                        url.absoluteString()
+                            .map(|value| value.to_string())
+                            .unwrap_or_else(|| "<invalid-url>".into())
+                    ),
+                    "Verify the URL is reachable from the local recorder webview and retry.",
                 ),
-                "Verify the URL is reachable from the local recorder webview and retry.",
-            ));
+            );
         }
         self.window.displayIfNeeded();
         Ok(())
@@ -43,21 +46,25 @@ impl WebViewHost {
         let read_access_url =
             NSURL::fileURLWithPath(&NSString::from_str(&read_access_root.to_string_lossy()));
         // SAFETY: `self.web_view`, `file_url`, and `read_access_url` are live for this load call.
-        let navigation = unsafe { // SAFETY: see above.
+        let navigation = unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             self.web_view
                 .loadFileURL_allowingReadAccessToURL(&file_url, &read_access_url)
         };
         if navigation.is_none() {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "load the local frame file into WKWebView",
-                format!(
-                    "WKWebView refused loadFileURL for {} with read access {}",
-                    file_path.display(),
-                    read_access_root.display()
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "load the local frame file into WKWebView",
+                    format!(
+                        "WKWebView refused loadFileURL for {} with read access {}",
+                        file_path.display(),
+                        read_access_root.display()
+                    ),
+                    "Ensure the frame file exists under the allowed read-access root and retry.",
                 ),
-                "Ensure the frame file exists under the allowed read-access root and retry.",
-            ));
+            );
         }
         self.window.displayIfNeeded();
         Ok(())
@@ -120,13 +127,16 @@ impl WebViewHost {
             }
             pump_main_run_loop(Duration::from_millis(25));
         }
-        Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "wait for the page to finish loading",
-            format!(
-                "timed out waiting for page load (readyState={last_ready_state:?}, estimatedProgress={last_progress:.3}, isLoading={last_loading}, url={last_url:?})"
+        Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "wait for the page to finish loading",
+                format!(
+                    "timed out waiting for page load (readyState={last_ready_state:?}, estimatedProgress={last_progress:.3}, isLoading={last_loading}, url={last_url:?})"
+                ),
+                "Retry after simplifying the page load or ensuring local assets are reachable.",
             ),
-            "Retry after simplifying the page load or ensuring local assets are reachable.",
-        ))
+        )
     }
 
     /// Applies recorder-specific DOM adjustments before capture begins.
@@ -176,14 +186,17 @@ impl WebViewHost {
                 }
             }
         }
-        Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "prepare the page for recording",
-            format!(
-                "failed to run the recorder DOM setup after load: {}",
-                last_error.unwrap_or_else(|| "unknown JS error".into())
+        Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "prepare the page for recording",
+                format!(
+                    "failed to run the recorder DOM setup after load: {}",
+                    last_error.unwrap_or_else(|| "unknown JS error".into())
+                ),
+                "Ensure the page JS can run after load and that `window.__onFrame` is defined before capture begins.",
             ),
-            "Ensure the page JS can run after load and that `window.__onFrame` is defined before capture begins.",
-        ))
+        )
     }
 }
 

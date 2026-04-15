@@ -25,14 +25,14 @@ pub(crate) use navigation::{
 };
 #[allow(unused_imports)]
 pub(crate) use navigation::{current_webview, tab_index_for_webview, webview_for_tab};
+#[cfg(test)]
+pub(crate) use persistence::save_browser_session_snapshot;
 #[allow(unused_imports)]
 pub(crate) use persistence::{
     LoadedBrowserSession, SavedDynamicTab, SessionHistoryEntry, SessionState, load_browser_session,
     load_sessions, load_tab_urls, load_window_frame, save_browser_session, save_tab_urls,
     save_window_frame,
 };
-#[cfg(test)]
-pub(crate) use persistence::save_browser_session_snapshot;
 #[allow(unused_imports)]
 pub(crate) use session::{SessionStatus, check_session, session_statuses};
 #[allow(unused_imports)]

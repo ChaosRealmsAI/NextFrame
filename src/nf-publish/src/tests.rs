@@ -71,10 +71,7 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system time should be after UNIX_EPOCH")
         .as_nanos();
-    std::env::temp_dir().join(format!(
-        "{prefix}-{}-{nanos}",
-        std::process::id()
-    ))
+    std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()))
 }
 
 fn fake_browser_tab(
@@ -110,7 +107,10 @@ fn state_initialization_loads_default_workspace_sessions_when_missing() {
         "expected one session slot per workspace tab"
     );
     assert_eq!(
-        sessions.iter().map(|session| session.label.as_str()).collect::<Vec<_>>(),
+        sessions
+            .iter()
+            .map(|session| session.label.as_str())
+            .collect::<Vec<_>>(),
         TABS.iter().map(|tab| tab.label).collect::<Vec<_>>(),
         "default session labels should follow the workspace tabs"
     );

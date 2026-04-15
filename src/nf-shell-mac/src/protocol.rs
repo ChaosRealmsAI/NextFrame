@@ -6,10 +6,10 @@ use std::path::{Path, PathBuf};
 
 use objc2::rc::Retained;
 use objc2::runtime::{NSObject, ProtocolObject};
-use objc2::{AnyThread, DeclaredClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
+use objc2::{define_class, msg_send, AnyThread, DeclaredClass, MainThreadMarker, MainThreadOnly};
 use objc2_foundation::{
-    NSCocoaErrorDomain, NSData, NSError, NSHTTPURLResponse, NSMutableDictionary,
-    NSObjectProtocol, NSString, NSURL, NSURLRequest,
+    NSCocoaErrorDomain, NSData, NSError, NSHTTPURLResponse, NSMutableDictionary, NSObjectProtocol,
+    NSString, NSURLRequest, NSURL,
 };
 use objc2_web_kit::{WKURLSchemeHandler, WKURLSchemeTask, WKWebView};
 
@@ -33,12 +33,17 @@ macro_rules! define_scheme_handler {
             #[ivars = SchemeHandlerIvars]
             pub(crate) struct $name;
 
-            unsafe impl NSObjectProtocol for $name {}
+            // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
+            unsafe impl NSObjectProtocol for $name {} // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
 
             #[allow(non_snake_case)]
+            // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
             unsafe impl WKURLSchemeHandler for $name {
+                // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
                 #[unsafe(method(webView:startURLSchemeTask:))]
+                // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
                 unsafe fn web_view_start_urlscheme_task(
+                    // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
                     &self,
                     _web_view: &WKWebView,
                     task: &ProtocolObject<dyn WKURLSchemeTask>,
@@ -47,7 +52,9 @@ macro_rules! define_scheme_handler {
                 }
 
                 #[unsafe(method(webView:stopURLSchemeTask:))]
+                // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
                 unsafe fn web_view_stop_urlscheme_task(
+                    // SAFETY: WebKit calls this with valid task/webview objects on the main thread.
                     &self,
                     _web_view: &WKWebView,
                     _task: &ProtocolObject<dyn WKURLSchemeTask>,
@@ -167,7 +174,11 @@ fn build_reply(request: &NSURLRequest, url: &NSURL, root: &Path, include_body: b
     }
 }
 
-fn send_reply(task: &ProtocolObject<dyn WKURLSchemeTask>, url: &NSURL, reply: &HttpReply) -> Result<(), String> {
+fn send_reply(
+    task: &ProtocolObject<dyn WKURLSchemeTask>,
+    url: &NSURL,
+    reply: &HttpReply,
+) -> Result<(), String> {
     let headers = NSMutableDictionary::<NSString, NSString>::new();
     insert_header(&headers, "Content-Type", reply.mime);
     insert_header(&headers, "Content-Length", &reply.len.to_string());
@@ -185,9 +196,13 @@ fn send_reply(task: &ProtocolObject<dyn WKURLSchemeTask>, url: &NSURL, reply: &H
         Some(&version),
         Some(&headers),
     ) else {
-        return Err("failed to create HTTP response".to_string());
+        return Err(
+            "Internal: failed to create HTTP response. Fix: verify the reply URL and headers are valid Objective-C values."
+                .to_string(),
+        );
     };
-    unsafe { // SAFETY: Task protocol requires didReceiveResponse, then didReceiveData, then didFinish in order.
+    unsafe {
+        // SAFETY: Task protocol requires didReceiveResponse, then didReceiveData, then didFinish in order.
         task.didReceiveResponse(&response);
         if !reply.body.is_empty() {
             let data = NSData::with_bytes(&reply.body);
@@ -242,7 +257,8 @@ fn resolve_file_path(root: &Path, raw_path: &str) -> Result<PathBuf, i64> {
 
 fn read_range(path: &Path, start: u64, end: u64) -> Result<Vec<u8>, ErrorKind> {
     let mut file = File::open(path).map_err(|err| err.kind())?;
-    file.seek(SeekFrom::Start(start)).map_err(|err| err.kind())?;
+    file.seek(SeekFrom::Start(start))
+        .map_err(|err| err.kind())?;
     let mut body = vec![0u8; end.saturating_sub(start).saturating_add(1) as usize];
     file.read_exact(&mut body).map_err(|err| err.kind())?;
     Ok(body)
@@ -253,7 +269,11 @@ fn parse_range_header(header: &str, total_len: u64) -> Option<(u64, u64)> {
     let (start, end) = header.split_once('-')?;
     let max = total_len.checked_sub(1)?;
     let start = start.parse::<u64>().ok()?;
-    let end = if end.trim().is_empty() { max } else { end.parse::<u64>().ok()?.min(max) };
+    let end = if end.trim().is_empty() {
+        max
+    } else {
+        end.parse::<u64>().ok()?.min(max)
+    };
     (start <= end).then_some((start, end))
 }
 
@@ -283,7 +303,11 @@ fn status_reply(status: i64) -> HttpReply {
 }
 
 fn mime_type(path: &Path) -> &'static str {
-    match path.extension().and_then(|ext| ext.to_str()).unwrap_or_default() {
+    match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default()
+    {
         "html" => "text/html; charset=utf-8",
         "css" => "text/css; charset=utf-8",
         "js" => "text/javascript; charset=utf-8",
@@ -394,7 +418,10 @@ mod tests {
     }
     #[test]
     fn mime_unknown_extension_fallback() {
-        assert_eq!(mime_type(Path::new("archive.tar.gz")), "application/octet-stream");
+        assert_eq!(
+            mime_type(Path::new("archive.tar.gz")),
+            "application/octet-stream"
+        );
         assert_eq!(mime_type(Path::new("noext")), "application/octet-stream");
     }
     #[test]
@@ -430,7 +457,10 @@ mod tests {
     #[test]
     fn resolve_defaults_to_index_html() {
         let tmp = create_test_dir("resolve-index");
-        assert_eq!(resolve_file_path(&tmp, "/"), Ok(tmp.canonicalize().unwrap().join("index.html")));
+        assert_eq!(
+            resolve_file_path(&tmp, "/"),
+            Ok(tmp.canonicalize().unwrap().join("index.html"))
+        );
     }
     #[test]
     fn resolve_finds_existing_file() {

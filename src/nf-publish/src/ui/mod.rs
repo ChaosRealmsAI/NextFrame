@@ -78,7 +78,8 @@ fn remove_all_subviews(view: &NSView) {
 }
 
 fn make_hairline(mtm: MainThreadMarker, x: f64, y: f64, w: f64, h: f64) -> Retained<NSView> {
-    let view = unsafe { // SAFETY: `mtm` guarantees main-thread AppKit access and `alloc()` returns an uninitialized NSView ready for `initWithFrame:`.
+    let view = unsafe {
+        // SAFETY: `mtm` guarantees main-thread AppKit access and `alloc()` returns an uninitialized NSView ready for `initWithFrame:`.
         NSView::initWithFrame(
             mtm.alloc(),
             NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)),
@@ -101,7 +102,8 @@ pub(crate) fn move_traffic_lights(window: &objc2_app_kit::NSWindow) {
     let padding_x = 10.0f64;
     let padding_y = 10.0f64;
 
-    unsafe { // SAFETY: `window` is a live NSWindow on the main thread and the queried standard buttons/contentLayoutRect selectors are valid NSWindow APIs.
+    unsafe {
+        // SAFETY: `window` is a live NSWindow on the main thread and the queried standard buttons/contentLayoutRect selectors are valid NSWindow APIs.
         let close = window.standardWindowButton(NSWindowButton::CloseButton);
         let mini = window.standardWindowButton(NSWindowButton::MiniaturizeButton);
         let zoom = window.standardWindowButton(NSWindowButton::ZoomButton);
@@ -146,7 +148,8 @@ pub(crate) fn create_webview(
 ) -> Retained<WKWebView> {
     // SAFETY: `mtm` guarantees main-thread WebKit construction and `config` stays alive for the life of the app state.
     let webview = unsafe { WKWebView::initWithFrame_configuration(mtm.alloc(), frame, config) }; // SAFETY: see comment above.
-    unsafe { // SAFETY: `webview` is freshly created and both delegates are Objective-C objects implementing the protocols WebKit expects.
+    unsafe {
+        // SAFETY: `webview` is freshly created and both delegates are Objective-C objects implementing the protocols WebKit expects.
         webview.setUIDelegate(Some(ProtocolObject::from_ref(ui_delegate)));
         webview.setNavigationDelegate(Some(ProtocolObject::from_ref(nav_delegate)));
     }
@@ -155,7 +158,8 @@ pub(crate) fn create_webview(
     );
     if let Some(url) = NSURL::URLWithString(&NSString::from_str(url)) {
         let request = NSURLRequest::requestWithURL(&url);
-        unsafe { // SAFETY: `request` is a valid NSURLRequest and `loadRequest:` is the standard WKWebView navigation entry point.
+        unsafe {
+            // SAFETY: `request` is a valid NSURLRequest and `loadRequest:` is the standard WKWebView navigation entry point.
             webview.loadRequest(&request);
         }
     }

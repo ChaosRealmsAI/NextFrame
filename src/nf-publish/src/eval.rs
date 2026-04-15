@@ -60,11 +60,14 @@ pub(crate) fn take_screenshot_with_callback<F>(
     let callback = Rc::new(RefCell::new(Some(callback)));
     let handler = RcBlock::new(move |image: *mut NSImage, _error: *mut NSError| {
         let result = if image.is_null() {
-            Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "capture the screenshot",
-                "WebKit returned no image",
-                "Retry after the page finishes rendering.",
-            ))
+            Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "capture the screenshot",
+                    "WebKit returned no image",
+                    "Retry after the page finishes rendering.",
+                ),
+            )
         } else {
             // SAFETY: WebKit passes a valid NSImage pointer when `image` is non-null for this completion handler invocation.
             let image = unsafe { &*image }; // SAFETY: see comment above.
@@ -74,7 +77,8 @@ pub(crate) fn take_screenshot_with_callback<F>(
             callback(result);
         }
     });
-    unsafe { // SAFETY: `webview` is a live WKWebView and the completion block outlives the async snapshot operation.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and the completion block outlives the async snapshot operation.
         webview.takeSnapshotWithConfiguration_completionHandler(None, &handler);
     }
 }
@@ -128,7 +132,8 @@ pub(crate) fn eval_js(webview: &WKWebView, js: &str, result_path: String) {
             let _ = std::fs::write(&res_path, "ok: null");
         }
     });
-    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and block.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }
 }

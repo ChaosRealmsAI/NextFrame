@@ -108,7 +108,8 @@ pub(crate) fn install_browser_shortcuts() {
             event.as_ptr()
         }
     });
-    let monitor = unsafe { // SAFETY: `addLocalMonitorForEventsMatchingMask:handler:` is the documented AppKit API and the block stays retained by the monitor.
+    let monitor = unsafe {
+        // SAFETY: `addLocalMonitorForEventsMatchingMask:handler:` is the documented AppKit API and the block stays retained by the monitor.
         NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::KeyDown, &handler)
     };
     let Some(monitor) = monitor else {

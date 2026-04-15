@@ -135,11 +135,14 @@ fn named_key_spec(key: &str) -> Option<(String, c_ushort)> {
 pub(crate) fn send_key_command(webview: &WKWebView, key: &str) -> Result<(), String> {
     let key = key.trim();
     if key.is_empty() {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "parse the key command",
-            "the key argument was empty",
-            "Pass a key such as `enter`, `cmd+v`, or `a`.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "parse the key command",
+                "the key argument was empty",
+                "Pass a key such as `enter`, `cmd+v`, or `a`.",
+            ),
+        );
     }
 
     let mut modifiers = NSEventModifierFlags::empty();
@@ -161,11 +164,14 @@ pub(crate) fn send_key_command(webview: &WKWebView, key: &str) -> Result<(), Str
             "alt" | "option" => modifiers = modifiers.union(NSEventModifierFlags::Option),
             "ctrl" | "control" => modifiers = modifiers.union(NSEventModifierFlags::Control),
             _ => {
-                return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                    "parse the key modifier",
-                    format!("unsupported modifier `{part}`"),
-                    "Use only `cmd`, `shift`, `alt`, or `ctrl` modifiers.",
-                ));
+                return Err(
+                    /* Fix: user-facing error formatted below */
+                    error_with_fix(
+                        "parse the key modifier",
+                        format!("unsupported modifier `{part}`"),
+                        "Use only `cmd`, `shift`, `alt`, or `ctrl` modifiers.",
+                    ),
+                );
             }
         }
     }
@@ -187,11 +193,14 @@ pub(crate) fn send_key_command(webview: &WKWebView, key: &str) -> Result<(), Str
     {
         key_spec_for_text(ch)
     } else {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "parse the key command",
-            format!("unsupported key `{key_part}`"),
-            "Use a single character or one of the supported named keys such as `enter`, `tab`, `left`, or `space`.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "parse the key command",
+                format!("unsupported key `{key_part}`"),
+                "Use a single character or one of the supported named keys such as `enter`, `tab`, `left`, or `space`.",
+            ),
+        );
     };
 
     send_key_to_webview(
@@ -204,7 +213,8 @@ pub(crate) fn send_key_command(webview: &WKWebView, key: &str) -> Result<(), Str
 }
 
 pub(crate) fn paste_text_native(webview: &WKWebView, text: &str) -> Result<(), String> {
-    unsafe { // SAFETY: `NSPasteboard` responds to these standard pasteboard selectors and the temporary NSString values live for the duration of the calls.
+    unsafe {
+        // SAFETY: `NSPasteboard` responds to these standard pasteboard selectors and the temporary NSString values live for the duration of the calls.
         let pb: Retained<AnyObject> = msg_send![objc2::class!(NSPasteboard), generalPasteboard];
         let _: () = msg_send![&*pb, clearContents];
         let ns_str = NSString::from_str(text);
@@ -399,7 +409,8 @@ pub(crate) fn add_tag(webview: &WKWebView, tag: &str, result_path: &str) {
         });
     });
 
-    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }
 }

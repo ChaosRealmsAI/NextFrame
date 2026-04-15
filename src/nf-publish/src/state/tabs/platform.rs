@@ -38,11 +38,14 @@ pub(crate) fn navigate_tab_to_url(tab_id: usize, url: &str) -> Result<(), String
     })?;
     let kind = {
         let Ok(tabs) = state.browser_tabs.lock() else {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "read the browser tab state",
-                "the tab state lock is poisoned",
-                "Retry the command. If it keeps failing, restart nf-publish.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "read the browser tab state",
+                    "the tab state lock is poisoned",
+                    "Retry the command. If it keeps failing, restart nf-publish.",
+                ),
+            );
         };
         tabs.iter().find(|tab| tab.id == tab_id).map(|tab| tab.kind)
     }
@@ -57,11 +60,14 @@ pub(crate) fn navigate_tab_to_url(tab_id: usize, url: &str) -> Result<(), String
     if let BrowserTabKind::Workspace(index) = kind
         && !workspace_allows_url(index, &normalized)
     {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "navigate the workspace tab",
-            format!("workspace tab {index} only allows {}", TABS[index].url),
-            "Open the target URL in a dynamic tab instead of a locked workspace tab.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "navigate the workspace tab",
+                format!("workspace tab {index} only allows {}", TABS[index].url),
+                "Open the target URL in a dynamic tab instead of a locked workspace tab.",
+            ),
+        );
     }
 
     let request = make_request(&normalized)?;
@@ -72,7 +78,8 @@ pub(crate) fn navigate_tab_to_url(tab_id: usize, url: &str) -> Result<(), String
             "Retry after the tab finishes initializing or reopen the tab.",
         )
     })?;
-    unsafe { // SAFETY: `webview` is a live WKWebView and `request` is a valid NSURLRequest created from a normalized URL.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `request` is a valid NSURLRequest created from a normalized URL.
         webview.loadRequest(&request);
     }
     set_tab_loading_state(tab_id, true);
@@ -121,11 +128,14 @@ pub(crate) fn navigate_active_input(input: &str) -> Result<usize, String> {
     let active = state.current_tab.load(std::sync::atomic::Ordering::Relaxed);
     let kind = {
         let Ok(tabs) = state.browser_tabs.lock() else {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "read the browser tab state",
-                "the tab state lock is poisoned",
-                "Retry the command. If it keeps failing, restart nf-publish.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "read the browser tab state",
+                    "the tab state lock is poisoned",
+                    "Retry the command. If it keeps failing, restart nf-publish.",
+                ),
+            );
         };
         tabs.iter().find(|tab| tab.id == active).map(|tab| tab.kind)
     }
@@ -164,7 +174,8 @@ pub(crate) fn go_back(target: Option<usize>) -> Result<(), String> {
             "Retry after the tab finishes initializing or reopen the tab.",
         )
     })?;
-    unsafe { // SAFETY: `webview` is a live WKWebView and `goBack` is a valid navigation selector on WKWebView.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `goBack` is a valid navigation selector on WKWebView.
         webview.goBack();
     }
     set_tab_loading_state(tab_id, true);
@@ -186,7 +197,8 @@ pub(crate) fn go_forward(target: Option<usize>) -> Result<(), String> {
             "Retry after the tab finishes initializing or reopen the tab.",
         )
     })?;
-    unsafe { // SAFETY: `webview` is a live WKWebView and `goForward` is a valid navigation selector on WKWebView.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `goForward` is a valid navigation selector on WKWebView.
         webview.goForward();
     }
     set_tab_loading_state(tab_id, true);
@@ -208,7 +220,8 @@ pub(crate) fn reload_tab(target: Option<usize>) -> Result<(), String> {
             "Retry after the tab finishes initializing or reopen the tab.",
         )
     })?;
-    unsafe { // SAFETY: `webview` is a live WKWebView and `reload` is a valid navigation selector on WKWebView.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `reload` is a valid navigation selector on WKWebView.
         webview.reload();
     }
     set_tab_loading_state(tab_id, true);

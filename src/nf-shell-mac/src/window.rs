@@ -6,9 +6,7 @@ use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
 use objc2::{
     define_class, msg_send, rc::Retained, DeclaredClass, MainThreadMarker, MainThreadOnly,
 };
-use objc2_app_kit::{
-    NSApplication, NSEvent, NSEventType, NSWindow, NSWindowButton,
-};
+use objc2_app_kit::{NSApplication, NSEvent, NSEventType, NSWindow, NSWindowButton};
 use objc2_foundation::{NSObjectProtocol, NSPoint, NSString};
 use objc2_web_kit::{
     WKScriptMessage, WKScriptMessageHandler, WKUserContentController, WKUserScript,
@@ -81,9 +79,12 @@ define_class!(
     #[ivars = WindowDragHandlerIvars]
     struct WindowDragHandler;
 
-    unsafe impl NSObjectProtocol for WindowDragHandler {}
+    // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
+    unsafe impl NSObjectProtocol for WindowDragHandler {} // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
 
+    // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
     unsafe impl WKScriptMessageHandler for WindowDragHandler {
+        // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
         #[unsafe(method(userContentController:didReceiveScriptMessage:))]
         fn did_receive(
             this: &WindowDragHandler,
@@ -97,7 +98,8 @@ define_class!(
 
             let msg = body.to_string();
 
-            let Some(window) = (unsafe { this.ivars().window.as_ref() }) else { // SAFETY: window pointer was set during install and the NSWindow outlives this handler.
+            let Some(window) = (unsafe { this.ivars().window.as_ref() }) else {
+                // SAFETY: window pointer was set during install and the NSWindow outlives this handler.
                 return;
             };
 
@@ -105,7 +107,8 @@ define_class!(
                 start_window_drag(window);
             } else if msg == "zoom_window" {
                 // Use zoom with animation context for smooth transition
-                unsafe { // SAFETY: NSAnimationContext runAnimationGroup is called on the main thread with valid blocks.
+                unsafe {
+                    // SAFETY: NSAnimationContext runAnimationGroup is called on the main thread with valid blocks.
                     let _: () = objc2::msg_send![
                         objc2::class!(NSAnimationContext),
                         runAnimationGroup: &*block2::RcBlock::new(move |ctx: *mut AnyObject| {
@@ -132,7 +135,8 @@ pub(crate) fn install_window_drag_bridge(
     let controller = unsafe { config.userContentController() }; // SAFETY: `config` is a live configuration object created on the main thread.
 
     let source = NSString::from_str(WINDOW_DRAG_SCRIPT);
-    let script = unsafe { // SAFETY: The script is injected into the main frame before page scripts run.
+    let script = unsafe {
+        // SAFETY: The script is injected into the main frame before page scripts run.
         WKUserScript::initWithSource_injectionTime_forMainFrameOnly(
             WKUserScript::alloc(mtm),
             &source,
@@ -140,7 +144,8 @@ pub(crate) fn install_window_drag_bridge(
             true,
         )
     };
-    unsafe { // SAFETY: `controller` is retained and accepts user scripts during web view setup.
+    unsafe {
+        // SAFETY: `controller` is retained and accepts user scripts during web view setup.
         controller.addUserScript(&script);
     }
 
@@ -154,7 +159,8 @@ pub(crate) fn install_window_drag_bridge(
 
     let handler_name = NSString::from_str(WINDOW_DRAG_HANDLER_NAME);
     let protocol_handler = ProtocolObject::from_ref(&*handler);
-    unsafe { // SAFETY: `handler` implements `WKScriptMessageHandler`, and the controller retains the bridge.
+    unsafe {
+        // SAFETY: `handler` implements `WKScriptMessageHandler`, and the controller retains the bridge.
         handler
             .ivars()
             .controller
@@ -175,7 +181,8 @@ fn start_window_drag(window: &NSWindow) {
         return;
     };
 
-    unsafe { // SAFETY: We mirror Tao's macOS drag path: use the current AppKit event when possible,
+    unsafe {
+        // SAFETY: We mirror Tao's macOS drag path: use the current AppKit event when possible,
         // or synthesize a left-mouse-down event before calling `performWindowDragWithEvent:`.
         let event = if current_event.r#type().0 == 0x15 {
             let event: Retained<NSEvent> = msg_send![
@@ -201,7 +208,8 @@ fn start_window_drag(window: &NSWindow) {
 
 /// Reposition traffic lights to vertically center in our 48px HTML topbar.
 pub(crate) fn position_traffic_lights(window: &NSWindow) {
-    unsafe { // SAFETY: Standard titlebar buttons are queried from a live NSWindow on the main thread.
+    unsafe {
+        // SAFETY: Standard titlebar buttons are queried from a live NSWindow on the main thread.
         let close = window.standardWindowButton(NSWindowButton::CloseButton);
         let Some(close) = close else {
             return;
@@ -213,7 +221,9 @@ pub(crate) fn position_traffic_lights(window: &NSWindow) {
     }
 }
 
+// SAFETY: caller ensures valid NSWindow pointer on main thread.
 unsafe fn inset_traffic_lights(window: &NSWindow, x: f64, _y: f64) {
+    // SAFETY: caller ensures valid NSWindow pointer on main thread.
     // SAFETY: This follows Wry's macOS inset strategy: resize the titlebar container view,
     // then move the standard buttons horizontally so AppKit keeps them aligned on relayout.
     let Some(close) = window.standardWindowButton(NSWindowButton::CloseButton) else {
@@ -251,7 +261,8 @@ unsafe fn inset_traffic_lights(window: &NSWindow, x: f64, _y: f64) {
 
 /// Register resize/layout notifications to reapply traffic light positions.
 pub(crate) fn register_resize_observer(window: &NSWindow) {
-    unsafe { // SAFETY: The default notification center is process-global and the observed window outlives the app run loop.
+    unsafe {
+        // SAFETY: The default notification center is process-global and the observed window outlives the app run loop.
         let center: *mut AnyObject = msg_send![objc2::class!(NSNotificationCenter), defaultCenter];
 
         // Only reposition AFTER animations/resize complete — not during.

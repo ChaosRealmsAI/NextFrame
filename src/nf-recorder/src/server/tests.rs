@@ -219,8 +219,8 @@ fn request(server: &HttpFileServer, method: &str, path: &str) -> HttpResponse {
 }
 
 fn try_request(address: &str, method: &str, path: &str) -> Result<HttpResponse, String> {
-    let mut stream = TcpStream::connect(address)
-        .map_err(|err| format!("connect to {address}: {err}"))?;
+    let mut stream =
+        TcpStream::connect(address).map_err(|err| format!("connect to {address}: {err}"))?;
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
         .map_err(|err| format!("set read timeout for {address}: {err}"))?;
@@ -244,9 +244,8 @@ fn parse_response(response: &[u8]) -> Result<HttpResponse, String> {
         .ok_or_else(|| "HTTP response should contain a header terminator".to_string())?;
     let header_bytes = &response[..header_end];
     let body = response[header_end + 4..].to_vec();
-    let header_text =
-        std::str::from_utf8(header_bytes)
-            .map_err(|err| format!("response headers should be valid UTF-8: {err}"))?;
+    let header_text = std::str::from_utf8(header_bytes)
+        .map_err(|err| format!("response headers should be valid UTF-8: {err}"))?;
     let mut lines = header_text.lines();
     let status_line = lines
         .next()

@@ -27,11 +27,14 @@ impl SegmentEncoder {
     /// Finalizes the writer and muxes the optional audio track into the output segment.
     pub fn finish(self) -> Result<(), String> {
         if self.frame_count == 0 {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "finish the encoded segment",
-                "no video frames were appended",
-                "Record at least one frame before finishing the segment.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "finish the encoded segment",
+                    "no video frames were appended",
+                    "Record at least one frame before finishing the segment.",
+                ),
+            );
         }
 
         let Self {
@@ -63,7 +66,8 @@ impl SegmentEncoder {
         })?;
 
         // SAFETY: `input` is a live `AVAssetWriterInput`, and finish only marks it complete once.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*input, markAsFinished];
@@ -77,17 +81,21 @@ impl SegmentEncoder {
             let result = if status == 2 {
                 Ok(())
             } else {
-                Err(/* Internal: AVFoundation writer failure formatted below */ writer_error_string(
-                    &writer_for_block,
-                    "finish the encoded segment",
-                    "Inspect the AVAssetWriter error details and retry the recording job.",
-                ))
+                Err(
+                    /* Internal: AVFoundation writer failure formatted below */
+                    writer_error_string(
+                        &writer_for_block,
+                        "finish the encoded segment",
+                        "Inspect the AVAssetWriter error details and retry the recording job.",
+                    ),
+                )
             };
             let _ = done_tx.send(result);
         });
 
         // SAFETY: `writer` and `finish` are live Objective-C objects for this completion registration.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*writer, finishWritingWithCompletionHandler: &*finish];
@@ -147,21 +155,27 @@ impl SegmentEncoder {
             height: CGImage::height(Some(cg_image)),
         };
         if frame_size.width == 0 || frame_size.height == 0 {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "initialize the video writer",
-                "the captured frame image was empty",
-                "Retry after the page finishes rendering and the capture size is non-zero.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "initialize the video writer",
+                    "the captured frame image was empty",
+                    "Retry after the page finishes rendering and the capture size is non-zero.",
+                ),
+            );
         }
         if !frame_size.width.is_multiple_of(2) || !frame_size.height.is_multiple_of(2) {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "initialize the video writer",
-                format!(
-                    "the captured frame size {}x{} is not even",
-                    frame_size.width, frame_size.height
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "initialize the video writer",
+                    format!(
+                        "the captured frame size {}x{} is not even",
+                        frame_size.width, frame_size.height
+                    ),
+                    "Use even pixel dimensions for H.264 output.",
                 ),
-                "Use even pixel dimensions for H.264 output.",
-            ));
+            );
         }
         self.init_writer(frame_size)
     }
@@ -180,7 +194,8 @@ impl SegmentEncoder {
 
         let mut error: *mut NSError = ptr::null_mut();
         // SAFETY: `writer_class`, `output_url`, and `error` satisfy `AVAssetWriter`'s factory contract.
-        let writer: Option<Retained<AnyObject>> = unsafe { // SAFETY: see above.
+        let writer: Option<Retained<AnyObject>> = unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
@@ -191,21 +206,26 @@ impl SegmentEncoder {
             ]
         };
         let Some(writer) = writer else {
-            return Err(/* Internal: Apple framework failure formatted below */ ns_error_ptr_to_string(
-                error,
-                "initialize AVAssetWriter",
-                "Check the output path and codec availability, then retry the recording job.",
-            ));
+            return Err(
+                /* Internal: Apple framework failure formatted below */
+                ns_error_ptr_to_string(
+                    error,
+                    "initialize AVAssetWriter",
+                    "Check the output path and codec availability, then retry the recording job.",
+                ),
+            );
         };
         // SAFETY: `writer` is live, and this setter is valid before writing starts.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*writer, setShouldOptimizeForNetworkUse: true];
         }
 
         // SAFETY: `writer` is live, and these settings are queried with the documented media type.
-        let can_apply: bool = unsafe { // SAFETY: see above.
+        let can_apply: bool = unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
@@ -215,18 +235,22 @@ impl SegmentEncoder {
             ]
         };
         if !can_apply {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "configure AVAssetWriter output settings",
-                format!(
-                    "AVAssetWriter rejected output settings for {}x{}",
-                    frame_size.width, frame_size.height
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "configure AVAssetWriter output settings",
+                    format!(
+                        "AVAssetWriter rejected output settings for {}x{}",
+                        frame_size.width, frame_size.height
+                    ),
+                    "Use a supported output size, fps, and codec combination.",
                 ),
-                "Use a supported output size, fps, and codec combination.",
-            ));
+            );
         }
 
         // SAFETY: `input_class` and these arguments satisfy `AVAssetWriterInput`'s factory contract.
-        let input: Option<Retained<AnyObject>> = unsafe { // SAFETY: see above.
+        let input: Option<Retained<AnyObject>> = unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
@@ -236,14 +260,18 @@ impl SegmentEncoder {
             ]
         };
         let Some(input) = input else {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "create AVAssetWriterInput",
-                "AVAssetWriterInput returned nil",
-                "Retry after ensuring AVFoundation video encoding is available.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "create AVAssetWriterInput",
+                    "AVAssetWriterInput returned nil",
+                    "Retry after ensuring AVFoundation video encoding is available.",
+                ),
+            );
         };
         // SAFETY: `input` is live, and this setter is valid before the input is added to the writer.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*input, setExpectsMediaDataInRealTime: false];
@@ -252,21 +280,26 @@ impl SegmentEncoder {
         // SAFETY: `writer` and `input` are live, and `canAddInput:` only checks compatibility.
         let can_add: bool = unsafe { msg_send![&*writer, canAddInput: &*input] }; // SAFETY: see above.
         if !can_add {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "attach the video input to AVAssetWriter",
-                "AVAssetWriter rejected the video input",
-                "Retry with supported output settings and codec configuration.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "attach the video input to AVAssetWriter",
+                    "AVAssetWriter rejected the video input",
+                    "Retry with supported output settings and codec configuration.",
+                ),
+            );
         }
         // SAFETY: `writer` and `input` are live, and initialization adds the input at most once.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*writer, addInput: &*input];
         }
 
         // SAFETY: `adaptor_class`, `input`, and `pb_attributes` satisfy the adaptor factory contract.
-        let adaptor: Option<Retained<AnyObject>> = unsafe { // SAFETY: see above.
+        let adaptor: Option<Retained<AnyObject>> = unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
@@ -276,24 +309,31 @@ impl SegmentEncoder {
             ]
         };
         let Some(adaptor) = adaptor else {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "create AVAssetWriterInputPixelBufferAdaptor",
-                "the pixel buffer adaptor returned nil",
-                "Retry after ensuring AVFoundation video encoding is available.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "create AVAssetWriterInputPixelBufferAdaptor",
+                    "the pixel buffer adaptor returned nil",
+                    "Retry after ensuring AVFoundation video encoding is available.",
+                ),
+            );
         };
 
         // SAFETY: `writer` is configured and live, so `startWriting` is valid before any appends.
         let started: bool = unsafe { msg_send![&*writer, startWriting] }; // SAFETY: see above.
         if !started {
-            return Err(/* Internal: AVFoundation writer failure propagated below */ writer_error_string(
-                &writer,
-                "start AVAssetWriter",
-                "Check the output path and codec availability, then retry the recording job.",
-            ));
+            return Err(
+                /* Internal: AVFoundation writer failure propagated below */
+                writer_error_string(
+                    &writer,
+                    "start AVAssetWriter",
+                    "Check the output path and codec availability, then retry the recording job.",
+                ),
+            );
         }
         // SAFETY: `writer` has started writing, and `kCMTimeZero` is the documented initial session time.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             let _: () = msg_send![&*writer, startSessionAtSourceTime: kCMTimeZero];
@@ -332,20 +372,26 @@ impl SegmentEncoder {
             // SAFETY: `writer` is live, and `status` is a valid accessor while waiting for readiness.
             let status: isize = unsafe { msg_send![&**writer, status] }; // SAFETY: see above.
             if status != 1 {
-                return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                    "append the captured frame",
-                    format!(
-                        "AVAssetWriter entered a failed state while waiting for input (status={status})"
+                return Err(
+                    /* Fix: user-facing error formatted below */
+                    error_with_fix(
+                        "append the captured frame",
+                        format!(
+                            "AVAssetWriter entered a failed state while waiting for input (status={status})"
+                        ),
+                        "Inspect the AVAssetWriter error details and retry the recording job.",
                     ),
-                    "Inspect the AVAssetWriter error details and retry the recording job.",
-                ));
+                );
             }
             if Instant::now() >= deadline {
-                return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                    "append the captured frame",
-                    "AVAssetWriter was not ready for more data after 10 seconds",
-                    "Reduce output size or retry after system load drops.",
-                ));
+                return Err(
+                    /* Fix: user-facing error formatted below */
+                    error_with_fix(
+                        "append the captured frame",
+                        "AVAssetWriter was not ready for more data after 10 seconds",
+                        "Reduce output size or retry after system load drops.",
+                    ),
+                );
             }
             pump_main_run_loop(Duration::from_millis(1));
         }
@@ -359,7 +405,8 @@ impl SegmentEncoder {
         })?;
         let presentation_time = frame_time(self.frame_count, self.fps)?;
         // SAFETY: `adaptor` is live, `pixel_buffer` stays valid through the call, and time is monotonic.
-        let appended: bool = unsafe { // SAFETY: see above.
+        let appended: bool = unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             msg_send![
@@ -369,7 +416,8 @@ impl SegmentEncoder {
             ]
         };
         // SAFETY: this function owns one retain on `pixel_buffer`, so releasing it once is correct.
-        unsafe { // SAFETY: see above.
+        unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             // SAFETY: see above.
             CVBufferRelease(pixel_buffer);
@@ -382,11 +430,14 @@ impl SegmentEncoder {
                     "Retry the recording job after ensuring the encoder stays initialized.",
                 )
             })?;
-            return Err(/* Internal: AVFoundation writer failure propagated below */ writer_error_string(
-                writer,
-                "append the captured frame",
-                "Inspect the AVAssetWriter error details and retry the recording job.",
-            ));
+            return Err(
+                /* Internal: AVFoundation writer failure propagated below */
+                writer_error_string(
+                    writer,
+                    "append the captured frame",
+                    "Inspect the AVAssetWriter error details and retry the recording job.",
+                ),
+            );
         }
 
         self.frame_count += 1;

@@ -60,7 +60,13 @@ pub(crate) fn eval_script_mode(wv: &objc2_web_kit::WKWebView, script_path: &str)
     }
 
     // Read any window debug variables
-    for var_name in ["__deepDebug", "__debugResult", "__r1Result", "__r2", "__composeError"] {
+    for var_name in [
+        "__deepDebug",
+        "__debugResult",
+        "__r1Result",
+        "__r2",
+        "__composeError",
+    ] {
         if let Ok(val) = webview::eval_js(wv, &format!("window.{var_name} || ''")) {
             if !val.is_empty() {
                 println!("{{\"{var_name}\":{}}}", serde_json::json!(val));
@@ -296,15 +302,30 @@ pub(crate) fn verify_app(wv: &objc2_web_kit::WKWebView) {
         )
     );
     webview::pump_run_loop_pub(std::time::Duration::from_secs(5));
-    check!("smart clips sources", webview::eval_js(wv, "scSources.length + ' sources, clips=' + scClips.length"));
-    check!("smart clips cards", webview::eval_js(wv, "document.querySelectorAll('.sc-clip-card').length + ' cards'"));
+    check!(
+        "smart clips sources",
+        webview::eval_js(wv, "scSources.length + ' sources, clips=' + scClips.length")
+    );
+    check!(
+        "smart clips cards",
+        webview::eval_js(
+            wv,
+            "document.querySelectorAll('.sc-clip-card').length + ' cards'"
+        )
+    );
     check!("smart clips visible", webview::eval_js(wv, "var c=document.querySelector('.sc-clip-card');c?c.getBoundingClientRect().top+'px':'invisible'"));
     // Scroll to first clip card
-    let _ = webview::eval_js(wv, "var c=document.querySelector('.sc-clip-card');if(c)c.scrollIntoView({block:'start'})");
+    let _ = webview::eval_js(
+        wv,
+        "var c=document.querySelector('.sc-clip-card');if(c)c.scrollIntoView({block:'start'})",
+    );
     webview::pump_run_loop_pub(std::time::Duration::from_millis(500));
     let _ = webview::screenshot(wv, "/tmp/nf-verify-rich-clips.png");
     // Also take a full-page screenshot before scrolling
-    let _ = webview::eval_js(wv, "var m=document.querySelector('#pl-tab-asset .pl-main');if(m)m.scrollTop=0");
+    let _ = webview::eval_js(
+        wv,
+        "var m=document.querySelector('#pl-tab-asset .pl-main');if(m)m.scrollTop=0",
+    );
     webview::pump_run_loop_pub(std::time::Duration::from_millis(300));
     let _ = webview::screenshot(wv, "/tmp/nf-verify-rich-clips-top.png");
 

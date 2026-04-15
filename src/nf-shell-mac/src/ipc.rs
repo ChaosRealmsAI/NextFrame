@@ -59,9 +59,12 @@ define_class!(
     #[ivars = BridgeHandlerIvars]
     pub struct BridgeHandler;
 
-    unsafe impl NSObjectProtocol for BridgeHandler {}
+    // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
+    unsafe impl NSObjectProtocol for BridgeHandler {} // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
 
+    // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
     unsafe impl WKScriptMessageHandler for BridgeHandler {
+        // SAFETY: objc2 trait impl — type inherits from NSObject, callbacks run on main thread.
         #[unsafe(method(userContentController:didReceiveScriptMessage:))]
         fn did_receive(
             this: &BridgeHandler,
@@ -102,7 +105,8 @@ define_class!(
 
             // Send response back to JS via evaluateJavaScript
             let wv_ptr = this.ivars().webview.get();
-            let Some(wv) = (unsafe { wv_ptr.as_ref() }) else { // SAFETY: wv_ptr was set to a valid WKWebView during install; dereference is safe while the webview lives.
+            let Some(wv) = (unsafe { wv_ptr.as_ref() }) else {
+                // SAFETY: wv_ptr was set to a valid WKWebView during install; dereference is safe while the webview lives.
                 return;
             };
 
@@ -116,7 +120,8 @@ define_class!(
             let js = format!("window.__ipcResolve('{escaped}')");
             let ns_js = NSString::from_str(&js);
 
-            unsafe { // SAFETY: evaluateJavaScript is valid for WKWebView on the main thread.
+            unsafe {
+                // SAFETY: evaluateJavaScript is valid for WKWebView on the main thread.
                 wv.evaluateJavaScript_completionHandler(&ns_js, None);
             }
 
@@ -136,7 +141,8 @@ pub fn install(
 
     // Inject bridge JS at document start
     let source = NSString::from_str(IPC_BRIDGE_SCRIPT);
-    let script = unsafe { // SAFETY: WKUserScript designated initializer called with valid NSString source on the main thread.
+    let script = unsafe {
+        // SAFETY: WKUserScript designated initializer called with valid NSString source on the main thread.
         WKUserScript::initWithSource_injectionTime_forMainFrameOnly(
             WKUserScript::alloc(mtm),
             &source,
@@ -144,25 +150,22 @@ pub fn install(
             true,
         )
     };
-    unsafe { // SAFETY: controller is a live WKUserContentController and script is a valid WKUserScript.
+    unsafe {
+        // SAFETY: controller is a live WKUserContentController and script is a valid WKUserScript.
         controller.addUserScript(&script);
     }
 
     // Create handler
-    let handler = mtm
-        .alloc::<BridgeHandler>()
-        .set_ivars(BridgeHandlerIvars {
-            webview: std::cell::Cell::new(webview_ptr),
-        });
+    let handler = mtm.alloc::<BridgeHandler>().set_ivars(BridgeHandlerIvars {
+        webview: std::cell::Cell::new(webview_ptr),
+    });
     let handler: Retained<BridgeHandler> = unsafe { msg_send![super(handler), init] }; // SAFETY: NSObject init on a freshly allocated BridgeHandler instance.
 
     // Register handler
     let name = NSString::from_str(IPC_HANDLER_NAME);
-    unsafe { // SAFETY: handler conforms to WKScriptMessageHandler; controller retains it for message dispatch.
-        controller.addScriptMessageHandler_name(
-            ProtocolObject::from_ref(&*handler),
-            &name,
-        );
+    unsafe {
+        // SAFETY: handler conforms to WKScriptMessageHandler; controller retains it for message dispatch.
+        controller.addScriptMessageHandler_name(ProtocolObject::from_ref(&*handler), &name);
     }
 
     tracing::info!("[ipc] bridge installed: handler={IPC_HANDLER_NAME}");

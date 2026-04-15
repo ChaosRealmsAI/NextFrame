@@ -57,8 +57,10 @@ async fn collect_audio(
     loop {
         let message = match stream.next().await {
             Some(Ok(message)) => message,
-            Some(Err(error)) => bail!("WebSocket 收包失败: {error}"),
-            None => bail!("WebSocket 连接中断"),
+            Some(Err(error)) => {
+                bail!("WebSocket 收包失败: {error}. Fix: 检查网络连接并重试。")
+            }
+            None => bail!("WebSocket 连接中断。Fix: 检查网络连接或稍后重试。"),
         };
 
         match message {
@@ -66,11 +68,13 @@ async fn collect_audio(
                 FrameResult::Audio(chunk) => audio.extend_from_slice(&chunk),
                 FrameResult::SessionFinished => return Ok(audio),
                 FrameResult::Error { code, message } => {
-                    bail!("火山引擎错误 {code}: {message}");
+                    bail!(
+                        "火山引擎错误 {code}: {message}. Fix: 检查账号凭证、resource_id 与 voice 配置。"
+                    );
                 }
                 FrameResult::Other => {}
             },
-            Message::Close(_) => bail!("连接在完成前关闭"),
+            Message::Close(_) => bail!("连接在完成前关闭。Fix: 检查服务端状态后重试。"),
             _ => {}
         }
     }
@@ -112,7 +116,9 @@ fn build_send_frame(text: &str, params: &SynthParams) -> Result<Vec<u8>> {
     });
     if !additions.is_empty() {
         let additions = serde_json::to_string(&serde_json::Value::Object(additions))
-            .context("failed to serialize volcengine additions")?;
+            .context(
+                "Internal: failed to serialize volcengine additions. Fix: verify additions are valid JSON values.",
+            )?;
         req_params["additions"] = json!(additions);
     }
 
@@ -121,7 +127,9 @@ fn build_send_frame(text: &str, params: &SynthParams) -> Result<Vec<u8>> {
         "user": {"uid": &uid[..8]},
         "req_params": req_params
     }))
-    .context("failed to serialize volcengine request payload")?;
+    .context(
+        "Internal: failed to serialize volcengine request payload. Fix: verify the request payload contains serializable JSON values.",
+    )?;
 
     let mut frame = Vec::with_capacity(8 + payload.len());
     frame.extend_from_slice(&[0x11, 0x10, 0x10, 0x00]);

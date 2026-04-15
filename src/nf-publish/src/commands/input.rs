@@ -76,7 +76,8 @@ fn handle_selector_action(
             Err(err) /* Fix: propagate or serialize the formatted error below */ => write_error(&result_path, err),
         }
     });
-    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
     }
 }
@@ -281,8 +282,7 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
         true
     } else if let Some(rest) = cmd.strip_prefix("inputel ") {
         let rest = rest.trim();
-        let (selector, text_for_paste) =
-            match parse_selector_and_value(rest, "inputel <selector> <text>") {
+        let (selector, text_for_paste) = match parse_selector_and_value(rest, "inputel <selector> <text>") {
                 Ok(values) => values,
                 Err(err) /* Fix: propagate or serialize the formatted error below */ => {
                     write_error(result_path, err);
@@ -331,7 +331,8 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
                 ),
             );
         });
-        unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+        unsafe {
+            // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
         }
         true
@@ -365,7 +366,8 @@ pub(super) fn handle_command(webview: &WKWebView, cmd: &str, result_path: &str) 
             }
             write_result(&result_path, format!("ok: dismissed {count}"));
         });
-        unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+        unsafe {
+            // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
             webview.evaluateJavaScript_completionHandler(&js_str, Some(&handler));
         }
         true

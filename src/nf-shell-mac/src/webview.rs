@@ -9,13 +9,13 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{AnyThread, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{NSBitmapImageRep, NSImage};
-use objc2_foundation::{NSError, NSPoint, NSRect, NSSize, NSString, NSURL, NSURLRequest};
+use objc2_foundation::{NSError, NSPoint, NSRect, NSSize, NSString, NSURLRequest, NSURL};
 use objc2_web_kit::{
     WKSnapshotConfiguration, WKURLSchemeHandler, WKWebView, WKWebViewConfiguration,
     WKWebsiteDataStore,
 };
 
-use crate::protocol::{NF_SCHEME, NFDATA_SCHEME, SchemeHandlers};
+use crate::protocol::{SchemeHandlers, NFDATA_SCHEME, NF_SCHEME};
 
 /// Create a WKWebView that loads the home page from disk.
 pub fn create(
@@ -25,7 +25,11 @@ pub fn create(
     configure: impl FnOnce(&WKWebViewConfiguration),
 ) -> Result<Retained<WKWebView>, String> {
     let config = unsafe { WKWebViewConfiguration::new(mtm) }; // SAFETY: mtm proves main-thread, required by WKWebViewConfiguration::new.
-    register_scheme_handler(&config, NF_SCHEME, ProtocolObject::from_ref(&*scheme_handlers.nf));
+    register_scheme_handler(
+        &config,
+        NF_SCHEME,
+        ProtocolObject::from_ref(&*scheme_handlers.nf),
+    );
     register_scheme_handler(
         &config,
         NFDATA_SCHEME,
@@ -35,14 +39,16 @@ pub fn create(
 
     let store = unsafe { WKWebsiteDataStore::nonPersistentDataStore(mtm) }; // SAFETY: mtm proves main-thread, required by nonPersistentDataStore.
 
-    unsafe { // SAFETY: config and store are live WebKit objects.
+    unsafe {
+        // SAFETY: config and store are live WebKit objects.
         config.setWebsiteDataStore(&store);
     }
 
     let rect = NSRect::new(NSPoint::new(0.0, 0.0), size);
 
     // Enable developer extras for debugging
-    unsafe { // SAFETY: _setDeveloperExtrasEnabled: is valid for WKPreferences.
+    unsafe {
+        // SAFETY: _setDeveloperExtrasEnabled: is valid for WKPreferences.
         let prefs = config.preferences();
         let _: () = objc2::msg_send![&prefs, _setDeveloperExtrasEnabled: true];
     }
@@ -52,7 +58,8 @@ pub fn create(
         unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), rect, &config) }; // SAFETY: FFI call to Objective-C runtime on the main thread.
 
     // Allow non-opaque background so window dragging works with -webkit-app-region
-    unsafe { // SAFETY: _setDrawsBackground: is a private but widely-used WKWebView method.
+    unsafe {
+        // SAFETY: _setDrawsBackground: is a private but widely-used WKWebView method.
         let _: () = objc2::msg_send![&web_view, _setDrawsBackground: false];
     }
 
@@ -79,7 +86,8 @@ fn register_scheme_handler(
     handler: &ProtocolObject<dyn WKURLSchemeHandler>,
 ) {
     let scheme = NSString::from_str(scheme);
-    unsafe { // SAFETY: config is a live WKWebViewConfiguration and handler conforms to WKURLSchemeHandler.
+    unsafe {
+        // SAFETY: config is a live WKWebViewConfiguration and handler conforms to WKURLSchemeHandler.
         config.setURLSchemeHandler_forURLScheme(Some(handler), &scheme);
     }
 }
@@ -93,9 +101,12 @@ pub fn eval_js(web_view: &WKWebView, script: &str) -> Result<String, String> {
     let block = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
         let val = if !error.is_null() {
             let desc = unsafe { &*error }.localizedDescription().to_string(); // SAFETY: error is non-null (checked above), a valid NSError from evaluateJavaScript callback.
-            Err(format!("JS error: {desc}"))
+            Err(format!(
+                "JS error: {desc}. Fix: inspect the evaluated script and browser console output."
+            ))
         } else if !result.is_null() {
-            let s: Retained<NSString> = unsafe { // SAFETY: result is non-null (checked above), a valid Objective-C object; description returns NSString.
+            let s: Retained<NSString> = unsafe {
+                // SAFETY: result is non-null (checked above), a valid Objective-C object; description returns NSString.
                 objc2::msg_send![result, description]
             };
             Ok(s.to_string())
@@ -105,24 +116,32 @@ pub fn eval_js(web_view: &WKWebView, script: &str) -> Result<String, String> {
         *slot_clone.borrow_mut() = Some(val);
     });
 
-    unsafe { // SAFETY: web_view is a live WKWebView; evaluateJavaScript is valid on the main thread with a completion block.
+    unsafe {
+        // SAFETY: web_view is a live WKWebView; evaluateJavaScript is valid on the main thread with a completion block.
         web_view.evaluateJavaScript_completionHandler(&ns_script, Some(&block));
     }
 
     let started = Instant::now();
     while slot.borrow().is_none() {
         if started.elapsed() > Duration::from_secs(5) {
-            return Err("JS eval timed out".to_string());
+            return Err(
+                "JS eval timed out. Fix: ensure the page is responsive and the script completes within 5 seconds."
+                    .to_string(),
+            );
         }
         pump_run_loop(Duration::from_millis(10));
     }
-    let result = slot.borrow_mut().take().ok_or("no result".to_string())?;
+    let result = slot.borrow_mut().take().ok_or(
+        "Internal: JS eval completed without storing a result. Fix: inspect the completion handler path."
+            .to_string(),
+    )?;
     result
 }
 
 fn load_fallback(web_view: &WKWebView) {
     let html = NSString::from_str(FALLBACK_HTML);
-    unsafe { // SAFETY: web_view is a live WKWebView and html is a valid NSString.
+    unsafe {
+        // SAFETY: web_view is a live WKWebView and html is a valid NSString.
         web_view.loadHTMLString_baseURL(&html, None);
     }
 }
@@ -134,7 +153,8 @@ pub fn pump_run_loop_pub(duration: Duration) {
 
 /// Pump the main run loop for a given duration (needed for async WebKit ops).
 fn pump_run_loop(duration: Duration) {
-    unsafe { // SAFETY: CFRunLoopRunInMode is a safe C function for pumping the run loop.
+    unsafe {
+        // SAFETY: CFRunLoopRunInMode is a safe C function for pumping the run loop.
         let deadline = Instant::now() + duration;
         while Instant::now() < deadline {
             extern "C" {
@@ -155,8 +175,10 @@ type SnapshotSlot = Rc<RefCell<Option<Result<Retained<NSImage>, String>>>>;
 
 /// Take a screenshot of the WKWebView and save as PNG to the given path.
 pub fn screenshot(web_view: &WKWebView, out_path: &str) -> Result<(), String> {
-    let mtm =
-        MainThreadMarker::new().ok_or_else(|| "screenshot must run on main thread".to_string())?;
+    let mtm = MainThreadMarker::new().ok_or_else(|| {
+        "screenshot must run on main thread. Fix: call screenshot from the AppKit main thread."
+            .to_string()
+    })?;
 
     // Wait for page to render (fonts + animations need time)
     pump_run_loop(Duration::from_secs(4));
@@ -170,18 +192,27 @@ pub fn screenshot(web_view: &WKWebView, out_path: &str) -> Result<(), String> {
         let result = if !image.is_null() {
             match unsafe { Retained::retain(image) } { // SAFETY: image is a valid NSImage pointer returned by WebKit.
                 Some(img) => Ok(img),
-                None => Err("null image".to_string()),
+                None => Err(
+                    "Internal: snapshot callback returned a null image pointer. Fix: inspect the WebKit snapshot callback contract."
+                        .to_string(),
+                ),
             }
         } else if !error.is_null() {
             let desc = unsafe { &*error }.localizedDescription().to_string(); // SAFETY: error is non-null (checked above), a valid NSError from the snapshot callback.
-            Err(format!("snapshot error: {desc}"))
+            Err(format!(
+                "snapshot error: {desc}. Fix: ensure the web view is loaded before taking a snapshot."
+            ))
         } else {
-            Err("snapshot returned nil".to_string())
+            Err(
+                "Internal: snapshot returned nil without an NSError. Fix: inspect the WebKit snapshot completion path."
+                    .to_string(),
+            )
         };
         *slot_clone.borrow_mut() = Some(result);
     });
 
-    unsafe { // SAFETY: web_view, config, and block are live main-thread objects.
+    unsafe {
+        // SAFETY: web_view, config, and block are live main-thread objects.
         web_view.takeSnapshotWithConfiguration_completionHandler(Some(&config), &block);
     }
 
@@ -189,31 +220,51 @@ pub fn screenshot(web_view: &WKWebView, out_path: &str) -> Result<(), String> {
     let started = Instant::now();
     while slot.borrow().is_none() {
         if started.elapsed() > Duration::from_secs(10) {
-            return Err("snapshot timed out after 10s".to_string());
+            return Err(
+                "snapshot timed out after 10s. Fix: wait for the page to finish rendering before capturing."
+                    .to_string(),
+            );
         }
         pump_run_loop(Duration::from_millis(10));
     }
 
-    let image = slot.borrow_mut().take().ok_or("no result")??;
+    let image = slot.borrow_mut().take().ok_or(
+        "Internal: snapshot completed without storing a result. Fix: inspect the snapshot completion handler."
+            .to_string(),
+    )??;
 
     // Convert NSImage → PNG data → write to disk
-    unsafe { // SAFETY: TIFFRepresentation and initWithData are standard AppKit methods.
+    unsafe {
+        // SAFETY: TIFFRepresentation and initWithData are standard AppKit methods.
         let tiff = image
             .TIFFRepresentation()
-            .ok_or_else(|| "failed to get TIFF data".to_string())?;
+            .ok_or_else(|| {
+                "Internal: failed to get TIFF data. Fix: verify the snapshot image contains bitmap data."
+                    .to_string()
+            })?;
         let bitmap = NSBitmapImageRep::initWithData(NSBitmapImageRep::alloc(), &tiff)
-            .ok_or_else(|| "failed to create bitmap rep".to_string())?;
+            .ok_or_else(|| {
+                "Internal: failed to create bitmap rep. Fix: verify the TIFF snapshot data is valid."
+                    .to_string()
+            })?;
 
         let png_type: objc2_app_kit::NSBitmapImageFileType =
             objc2_app_kit::NSBitmapImageFileType::PNG;
         let png_data: Option<Retained<objc2_foundation::NSData>> = objc2::msg_send![&bitmap, representationUsingType: png_type, properties: std::ptr::null::<AnyObject>()];
 
-        let data = png_data.ok_or_else(|| "failed to create PNG data".to_string())?;
+        let data = png_data.ok_or_else(|| {
+            "Internal: failed to create PNG data. Fix: verify the bitmap representation supports PNG export."
+                .to_string()
+        })?;
         // Use NSData's bytes/length via CoreFoundation-compatible approach
         let len: usize = objc2::msg_send![&data, length];
         let ptr: *const std::ffi::c_void = objc2::msg_send![&data, bytes];
         let bytes = std::slice::from_raw_parts(ptr as *const u8, len);
-        std::fs::write(out_path, bytes).map_err(|e| format!("failed to write {out_path}: {e}"))?;
+        std::fs::write(out_path, bytes).map_err(|e| {
+            format!(
+                "failed to write {out_path}: {e}. Fix: verify the output path exists and is writable."
+            )
+        })?;
     }
 
     tracing::info!("screenshot saved to {out_path}");

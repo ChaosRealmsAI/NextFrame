@@ -154,7 +154,8 @@ pub(crate) fn cleanup_intermediate_video(video_path: &Path, output_path: &Path) 
         return;
     }
 
-    if let Err(error) = fs::remove_file(video_path) { // Internal: cleanup warning only; export result already finalized.
+    if let Err(error) = fs::remove_file(video_path) {
+        // Internal: cleanup warning only; export result already finalized.
         if error.kind() != ErrorKind::NotFound {
             trace_log!(
                 "warning: failed to remove intermediate export '{}': {error}",

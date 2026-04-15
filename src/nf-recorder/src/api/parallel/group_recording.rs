@@ -53,11 +53,14 @@ pub(super) fn record_parallel(
     };
 
     if num_procs <= 1 {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "configure parallel recording",
-            "`--parallel 1` is equivalent to serial mode",
-            "Omit `--parallel` or pass a value greater than 1.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "configure parallel recording",
+                "`--parallel 1` is equivalent to serial mode",
+                "Omit `--parallel` or pass a value greater than 1.",
+            ),
+        );
     }
 
     let exe = resolve_parallel_executable()?;
@@ -155,23 +158,29 @@ pub(super) fn record_parallel(
 
     if failed {
         let _ = fs::remove_dir_all(&temp_root);
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "complete the parallel recording job",
-            "one or more recorder subprocesses exited with a failure",
-            &format!(
-                "Inspect the subprocess stderr output and set {RECORDER_PATH_ENV} to the recorder CLI binary when using library-driven parallel mode."
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "complete the parallel recording job",
+                "one or more recorder subprocesses exited with a failure",
+                &format!(
+                    "Inspect the subprocess stderr output and set {RECORDER_PATH_ENV} to the recorder CLI binary when using library-driven parallel mode."
+                ),
             ),
-        ));
+        );
     }
 
     for (idx, path) in group_outputs.iter().enumerate() {
         if !path.exists() {
             let _ = fs::remove_dir_all(&temp_root);
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                &format!("collect output from recorder process {}", idx + 1),
-                format!("expected output file is missing: {}", path.display()),
-                "Inspect the subprocess stderr output and retry the recording job.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    &format!("collect output from recorder process {}", idx + 1),
+                    format!("expected output file is missing: {}", path.display()),
+                    "Inspect the subprocess stderr output and retry the recording job.",
+                ),
+            );
         }
     }
 

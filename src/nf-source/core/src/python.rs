@@ -35,12 +35,14 @@ mod tests {
         let preferred = temp.path().join("python3");
 
         // SAFETY: tests serialize environment mutation with `env_lock`.
-        unsafe { // SAFETY: tests serialize environment mutation with `env_lock`.
+        unsafe {
+            // SAFETY: tests serialize environment mutation with `env_lock`.
             std::env::set_var("VIDEOCUT_CORE_TEST_PYTHON_BIN", "custom-python");
         }
         let resolved = python_bin("VIDEOCUT_CORE_TEST_PYTHON_BIN", &preferred);
         // SAFETY: tests serialize environment mutation with `env_lock`.
-        unsafe { // SAFETY: tests serialize environment mutation with `env_lock`.
+        unsafe {
+            // SAFETY: tests serialize environment mutation with `env_lock`.
             std::env::remove_var("VIDEOCUT_CORE_TEST_PYTHON_BIN");
         }
 

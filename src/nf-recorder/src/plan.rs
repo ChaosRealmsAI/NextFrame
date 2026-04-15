@@ -61,11 +61,14 @@ pub fn collect_frame_files(cli: &CommonArgs) -> Result<Vec<PathBuf>, String> {
         return if cli.dir.is_some() {
             Ok(Vec::new())
         } else {
-            Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "collect frame files",
-                "no frame files were provided",
-                "Pass one or more HTML frame files or use `--dir <frames-dir>`.",
-            ))
+            Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "collect frame files",
+                    "no frame files were provided",
+                    "Pass one or more HTML frame files or use `--dir <frames-dir>`.",
+                ),
+            )
         };
     }
     if cli.dir.is_some() {
@@ -73,11 +76,14 @@ pub fn collect_frame_files(cli: &CommonArgs) -> Result<Vec<PathBuf>, String> {
     } else {
         for path in &files {
             if !path.exists() {
-                return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                    "collect frame files",
-                    format!("frame file was not found: {}", path.display()),
-                    "Pass an existing HTML frame file path and retry.",
-                ));
+                return Err(
+                    /* Fix: user-facing error formatted below */
+                    error_with_fix(
+                        "collect frame files",
+                        format!("frame file was not found: {}", path.display()),
+                        "Pass an existing HTML frame file path and retry.",
+                    ),
+                );
             }
         }
     }
@@ -85,11 +91,14 @@ pub fn collect_frame_files(cli: &CommonArgs) -> Result<Vec<PathBuf>, String> {
         return if cli.dir.is_some() {
             Ok(Vec::new())
         } else {
-            Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "collect frame files",
-                "none of the requested frame files exist",
-                "Verify the HTML frame file paths and retry the command.",
-            ))
+            Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "collect frame files",
+                    "none of the requested frame files exist",
+                    "Verify the HTML frame file paths and retry the command.",
+                ),
+            )
         };
     }
     let files = files

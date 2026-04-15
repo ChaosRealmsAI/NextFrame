@@ -44,18 +44,24 @@ pub(super) fn extract_clip_timing(
     };
 
     if !start_sec.is_finite() || start_sec < 0.0 {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "parse the timeline clip timing",
-            format!("timeline clip {clip_label} has invalid start time: {start_sec}"),
-            "Use a finite non-negative start time for the clip and retry.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "parse the timeline clip timing",
+                format!("timeline clip {clip_label} has invalid start time: {start_sec}"),
+                "Use a finite non-negative start time for the clip and retry.",
+            ),
+        );
     }
     if !duration_sec.is_finite() || duration_sec <= 0.0 {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "parse the timeline clip timing",
-            format!("timeline clip {clip_label} has invalid duration: {duration_sec}"),
-            "Use a finite positive duration for the clip and retry.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "parse the timeline clip timing",
+                format!("timeline clip {clip_label} has invalid duration: {duration_sec}"),
+                "Use a finite positive duration for the clip and retry.",
+            ),
+        );
     }
 
     Ok(ClipTiming {

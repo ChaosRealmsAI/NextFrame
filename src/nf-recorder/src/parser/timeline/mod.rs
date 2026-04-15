@@ -133,14 +133,17 @@ pub(crate) fn parse_nextframe_timeline(path: &Path) -> Result<Vec<FrameMetadata>
         .or_else(|| timeline.meta.as_ref().and_then(|meta| meta.fps))
         .unwrap_or(30.0);
     if !fps.is_finite() || fps <= 0.0 {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "parse the NextFrame timeline fps",
-            format!(
-                "invalid fps in {}: expected a finite number greater than 0, got {fps}",
-                timeline_path.display()
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "parse the NextFrame timeline fps",
+                format!(
+                    "invalid fps in {}: expected a finite number greater than 0, got {fps}",
+                    timeline_path.display()
+                ),
+                "Set `fps` to a positive finite number in the timeline JSON and retry.",
             ),
-            "Set `fps` to a positive finite number in the timeline JSON and retry.",
-        ));
+        );
     }
 
     let anchors = build_timeline_anchors(&timeline);

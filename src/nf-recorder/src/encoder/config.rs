@@ -16,7 +16,8 @@ use crate::error_with_fix;
 use super::FrameSize;
 
 // SAFETY: These imported framework constants are process-global and valid for the life of the process.
-unsafe extern "C" { // SAFETY: see above.
+unsafe extern "C" {
+    // SAFETY: see above.
     // SAFETY: see above.
     // SAFETY: see above.
     static AVVideoAverageBitRateKey: &'static NSString;
@@ -149,7 +150,8 @@ fn select_h264_profile_level(frame_size: FrameSize, fps: usize) -> H264ProfileLe
 fn profile_level_nsobject(frame_size: FrameSize, fps: usize) -> &'static NSObject {
     match select_h264_profile_level(frame_size, fps) {
         // SAFETY: This imported AVFoundation profile constant is a valid process-global NSString.
-        H264ProfileLevel::High31 | H264ProfileLevel::High40 | H264ProfileLevel::High51 => unsafe { // SAFETY: see above.
+        H264ProfileLevel::High31 | H264ProfileLevel::High40 | H264ProfileLevel::High51 => unsafe {
+            // SAFETY: see above.
             // SAFETY: see above.
             AVVideoProfileLevelH264HighAutoLevel
         }, // SAFETY: see above.
@@ -178,7 +180,8 @@ pub(super) fn writer_error_string(writer: &AnyObject, action: &str, fix: &str) -
 
 pub(super) fn ns_error_ptr_to_string(error: *mut NSError, action: &str, fix: &str) -> String {
     // SAFETY: Objective-C error out-pointers are either null or valid for this formatting scope.
-    match unsafe { error.as_ref() } { // SAFETY: see above.
+    match unsafe { error.as_ref() } {
+        // SAFETY: see above.
         // SAFETY: see above.
         Some(error) => error_with_fix(action, ns_error_to_string(error), fix),
         None => error_with_fix(

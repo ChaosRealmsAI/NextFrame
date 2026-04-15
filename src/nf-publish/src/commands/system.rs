@@ -127,7 +127,8 @@ fn run_check_command(webview: &WKWebView, result_path: String) {
                     };
                     write_check_result(&rp2, &platform2, &status, Some(&url2));
                 });
-                unsafe { // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+                unsafe {
+                    // SAFETY: `wv` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
                     wv.evaluateJavaScript_completionHandler(&read_js, Some(&handler2));
                 }
             });
@@ -137,7 +138,8 @@ fn run_check_command(webview: &WKWebView, result_path: String) {
         let status = normalize_check_status(&raw);
         write_check_result(&rp, &platform_for_result, &status, Some(&url_for_result));
     });
-    unsafe { // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `evaluateJavaScript:completionHandler:` accepts this NSString and completion block.
         webview.evaluateJavaScript_completionHandler(&js, Some(&handler));
     }
 }

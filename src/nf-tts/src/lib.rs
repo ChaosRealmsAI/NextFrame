@@ -47,10 +47,7 @@ mod tests {
         cfg.default_backend = Some("volcengine".to_string());
 
         // Explicit arg wins over config default
-        assert_eq!(
-            cfg.resolve_backend(Some("edge".to_string())),
-            "edge"
-        );
+        assert_eq!(cfg.resolve_backend(Some("edge".to_string())), "edge");
         // Falls back to config default when arg is None
         assert_eq!(cfg.resolve_backend(None), "volcengine");
     }
@@ -62,10 +59,7 @@ mod tests {
         cfg.aliases
             .insert("narrator".to_string(), "en-US-GuyNeural".to_string());
 
-        assert_eq!(
-            cfg.configured_voice().unwrap(),
-            "en-US-GuyNeural"
-        );
+        assert_eq!(cfg.configured_voice().unwrap(), "en-US-GuyNeural");
     }
 
     #[test]

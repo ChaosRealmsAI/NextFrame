@@ -119,7 +119,8 @@ pub(crate) fn handle_fs_write_base64(params: &Value) -> Result<Value, String> {
 pub(crate) fn validate_path(raw_path: &str) -> Result<PathBuf, String> {
     let normalized = raw_path.trim();
     if normalized.is_empty() {
-        return Err( // Fix: included in the error string below
+        return Err(
+            // Fix: included in the error string below
             "failed to validate path: value is empty. Fix: provide a non-empty path.".to_string(),
         );
     }
@@ -175,7 +176,8 @@ pub(crate) fn resolve_write_path(raw_path: &str) -> Result<PathBuf, String> {
         }
         Ok(_) => {}
         Err(error) if error.kind() == ErrorKind::NotFound => {} // Internal: unresolved symlink target is handled as a normal writable path.
-        Err(error) => { // Fix: included in the returned error string below
+        Err(error) => {
+            // Fix: included in the returned error string below
             return Err(format!( // Fix: included in the error string below
                 "failed to inspect path: could not inspect '{}': {error}. Fix: verify the path is accessible and try again.",
                 path.display()
@@ -222,7 +224,8 @@ pub(crate) fn resolve_home_write_path(raw_path: &str) -> Result<PathBuf, String>
         }
         Ok(_) => {}
         Err(error) if error.kind() == ErrorKind::NotFound => {} // Internal: unresolved symlink target is handled as a normal writable path.
-        Err(error) => { // Fix: included in the returned error string below
+        Err(error) => {
+            // Fix: included in the returned error string below
             return Err(format!( // Fix: included in the error string below
                 "failed to inspect path: could not inspect '{}': {error}. Fix: verify the path is accessible and try again.",
                 path.display()

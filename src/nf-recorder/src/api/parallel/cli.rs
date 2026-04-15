@@ -13,14 +13,17 @@ pub(super) fn resolve_parallel_executable() -> Result<PathBuf, String> {
         if path.is_file() {
             return Ok(path);
         }
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "resolve the recorder executable",
-            format!(
-                "{RECORDER_PATH_ENV} does not point to a file: {}",
-                path.display()
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "resolve the recorder executable",
+                format!(
+                    "{RECORDER_PATH_ENV} does not point to a file: {}",
+                    path.display()
+                ),
+                "Set the environment variable to the `nextframe-recorder` CLI binary.",
             ),
-            "Set the environment variable to the `nextframe-recorder` CLI binary.",
-        ));
+        );
     }
 
     let current = env::current_exe().map_err(|err| {
@@ -34,11 +37,14 @@ pub(super) fn resolve_parallel_executable() -> Result<PathBuf, String> {
         return Ok(current);
     }
 
-    Err(/* Fix: user-facing error formatted below */ error_with_fix(
-        "resolve the recorder executable",
-        "the current executable path is not a file",
-        "Set NEXTFRAME_RECORDER_PATH to the `nextframe-recorder` CLI binary.",
-    ))
+    Err(
+        /* Fix: user-facing error formatted below */
+        error_with_fix(
+            "resolve the recorder executable",
+            "the current executable path is not a file",
+            "Set NEXTFRAME_RECORDER_PATH to the `nextframe-recorder` CLI binary.",
+        ),
+    )
 }
 
 pub(super) fn build_cli_args(args: &RecordArgs) -> Vec<OsString> {

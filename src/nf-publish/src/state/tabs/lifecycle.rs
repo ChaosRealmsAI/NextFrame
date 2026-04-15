@@ -38,11 +38,13 @@ pub(crate) fn switch_tab(index: usize) {
 
     if let Err(err) = with_objc_boundary("switch browser tab", || {
         if let Some(prev_ptr) = prev_ptr {
-            unsafe { // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
+            unsafe {
+                // SAFETY: `prev_ptr` points to the previously visible retained WKWebView for this tab set.
                 (&*prev_ptr).setHidden(true);
             }
         }
-        unsafe { // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
+        unsafe {
+            // SAFETY: `next_ptr` points to the retained WKWebView selected as the new active tab.
             (&*next_ptr).setHidden(false);
         }
     }) {
@@ -135,11 +137,14 @@ pub(crate) fn create_dynamic_tab(
     let nav_delegate = unsafe { &*state.nav_delegate_ptr }; // SAFETY: `nav_delegate_ptr` is initialized from the retained startup WKNavigationDelegate object and lives for the app lifetime.
     let frame = host.frame();
     let Some(mtm) = objc2_foundation::MainThreadMarker::new() else {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "create the browser tab",
-            "the main thread is not available",
-            "Retry the command from the main UI thread.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "create the browser tab",
+                "the main thread is not available",
+                "Retry the command from the main UI thread.",
+            ),
+        );
     };
     let webview = create_webview(
         mtm,
@@ -152,12 +157,14 @@ pub(crate) fn create_dynamic_tab(
         ui_delegate,
         nav_delegate,
     );
-    unsafe { // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
+    unsafe {
+        // SAFETY: `webview` is a live WKWebView and `setCustomUserAgent:` accepts the shared NSString created from the stored user agent.
         webview.setCustomUserAgent(Some(&NSString::from_str(state.user_agent)));
     }
     if is_new_tab {
         let html = NSString::from_str(&new_tab_html());
-        unsafe { // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
+        unsafe {
+            // SAFETY: `webview` is a live WKWebView and `loadHTMLString:baseURL:` accepts this temporary NSString and a `None` base URL.
             webview.loadHTMLString_baseURL(&html, None);
         }
     }
@@ -170,11 +177,14 @@ pub(crate) fn create_dynamic_tab(
         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     {
         let Ok(mut tabs) = state.browser_tabs.lock() else {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "update the browser tab state",
-                "the tab state lock is poisoned",
-                "Retry the command. If it keeps failing, restart nf-publish.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "update the browser tab state",
+                    "the tab state lock is poisoned",
+                    "Retry the command. If it keeps failing, restart nf-publish.",
+                ),
+            );
         };
         tabs.push(BrowserTab {
             id: new_id,
@@ -221,11 +231,14 @@ pub(crate) fn close_tab(tab_id: usize) -> Result<(), String> {
         let current = state.current_tab.load(std::sync::atomic::Ordering::Relaxed);
         {
             let Ok(mut tabs) = state.browser_tabs.lock() else {
-                return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                    "update the browser tab state",
-                    "the tab state lock is poisoned",
-                    "Retry the command. If it keeps failing, restart nf-publish.",
-                ));
+                return Err(
+                    /* Fix: user-facing error formatted below */
+                    error_with_fix(
+                        "update the browser tab state",
+                        "the tab state lock is poisoned",
+                        "Retry the command. If it keeps failing, restart nf-publish.",
+                    ),
+                );
             };
             if let Some(tab) = tabs.iter_mut().find(|tab| tab.id == tab_id) {
                 tab.visible = false;
@@ -263,18 +276,24 @@ pub(crate) fn close_tab(tab_id: usize) -> Result<(), String> {
     let current = state.current_tab.load(std::sync::atomic::Ordering::Relaxed);
     let (removed_ptr, next_active, snapshot) = {
         let Ok(mut tabs) = state.browser_tabs.lock() else {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "update the browser tab state",
-                "the tab state lock is poisoned",
-                "Retry the command. If it keeps failing, restart nf-publish.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "update the browser tab state",
+                    "the tab state lock is poisoned",
+                    "Retry the command. If it keeps failing, restart nf-publish.",
+                ),
+            );
         };
         let Some(position) = tabs.iter().position(|tab| tab.id == tab_id) else {
-            return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                "close the browser tab",
-                format!("tab {tab_id} was not found"),
-                "List tabs again and retry with a valid tab id.",
-            ));
+            return Err(
+                /* Fix: user-facing error formatted below */
+                error_with_fix(
+                    "close the browser tab",
+                    format!("tab {tab_id} was not found"),
+                    "List tabs again and retry with a valid tab id.",
+                ),
+            );
         };
         let removed = tabs.remove(position);
         let next_active = if current == tab_id {

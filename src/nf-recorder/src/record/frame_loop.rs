@@ -209,14 +209,17 @@ pub(super) fn capture_frame(
             std::thread::sleep(Duration::from_millis(100));
         }
     }
-    Err(/* Fix: user-facing error formatted below */ error_with_fix(
-        "capture a non-black frame",
-        format!(
-            "segment {} frame {} remained black after {} snapshot attempts",
-            segment_index + 1,
-            frame_index + 1,
-            BLACK_FRAME_MAX_RETRIES + 1
+    Err(
+        /* Fix: user-facing error formatted below */
+        error_with_fix(
+            "capture a non-black frame",
+            format!(
+                "segment {} frame {} remained black after {} snapshot attempts",
+                segment_index + 1,
+                frame_index + 1,
+                BLACK_FRAME_MAX_RETRIES + 1
+            ),
+            "Retry after ensuring the page is rendering visible content, or rerun with `--headed` to inspect the frame.",
         ),
-        "Retry after ensuring the page is rendering visible content, or rerun with `--headed` to inspect the frame.",
-    ))
+    )
 }

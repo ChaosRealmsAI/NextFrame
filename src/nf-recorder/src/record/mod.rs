@@ -1,6 +1,6 @@
 //! recording module exports
-pub(crate) mod config;
 mod cleanup;
+pub(crate) mod config;
 mod frame_loop;
 mod setup;
 

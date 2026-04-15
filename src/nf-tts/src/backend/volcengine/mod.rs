@@ -92,7 +92,7 @@ impl Backend for VolcengineBackend {
 
     async fn synthesize(&self, text: &str, params: &SynthParams) -> Result<SynthResult> {
         if text.trim().is_empty() {
-            bail!("输入文本为空");
+            bail!("输入文本为空。Fix: 传入至少一个非空字符。");
         }
 
         let timeout_secs = (60 + text.chars().count() as u64 / 10).min(180);
@@ -101,10 +101,12 @@ impl Backend for VolcengineBackend {
             self.synthesize_inner(text, params),
         )
         .await
-        .map_err(|_| anyhow::anyhow!("火山引擎请求超时（>{timeout_secs}s）"))??;
+        .map_err(|_| {
+            anyhow::anyhow!("火山引擎请求超时（>{timeout_secs}s）。Fix: 缩短文本长度，或稍后重试。")
+        })??;
 
         if audio.is_empty() {
-            bail!("未收到音频数据");
+            bail!("未收到音频数据。Fix: 检查火山引擎账号配置与文本内容后重试。");
         }
 
         let sentences = split_sentences(text);

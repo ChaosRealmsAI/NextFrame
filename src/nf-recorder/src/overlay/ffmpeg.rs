@@ -93,11 +93,14 @@ pub fn overlay_video_layers(recorded: &Path, layers: &[VideoOverlaySpec]) -> Res
 
     if !status.status.success() {
         let stderr = String::from_utf8_lossy(&status.stderr);
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "overlay video layers with ffmpeg",
-            &stderr[stderr.len().saturating_sub(500)..],
-            "Inspect the ffmpeg stderr output, verify the input files, and retry.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "overlay video layers with ffmpeg",
+                &stderr[stderr.len().saturating_sub(500)..],
+                "Inspect the ffmpeg stderr output, verify the input files, and retry.",
+            ),
+        );
     }
 
     fs::rename(&temp_out, recorded).map_err(|err| {
@@ -113,7 +116,11 @@ pub fn overlay_video_layers(recorded: &Path, layers: &[VideoOverlaySpec]) -> Res
 /// Overlay a source video into the recorded clip's black video area.
 /// Video area design coords: x:80 y:276 w:920 h:538 (scaled by dpr for actual output).
 pub fn overlay_video(recorded: &Path, video: &Path, dpr: f64) -> Result<(), String> {
-    trace_log!("overlay: {} -> video area (dpr={:.2})", video.display(), dpr);
+    trace_log!(
+        "overlay: {} -> video area (dpr={:.2})",
+        video.display(),
+        dpr
+    );
     let temp_out = recorded.with_extension("overlay.mp4");
 
     let filter = build_overlay_filter(dpr);
@@ -139,11 +146,14 @@ pub fn overlay_video(recorded: &Path, video: &Path, dpr: f64) -> Result<(), Stri
 
     if !status.status.success() {
         let stderr = String::from_utf8_lossy(&status.stderr);
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "overlay the source video with ffmpeg",
-            &stderr[stderr.len().saturating_sub(300)..],
-            "Inspect the ffmpeg stderr output, verify the input files, and retry.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "overlay the source video with ffmpeg",
+                &stderr[stderr.len().saturating_sub(300)..],
+                "Inspect the ffmpeg stderr output, verify the input files, and retry.",
+            ),
+        );
     }
 
     fs::rename(&temp_out, recorded).map_err(|err| {

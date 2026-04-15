@@ -8,12 +8,13 @@ use objc2::MainThreadMarker;
 use crate::CommonArgs;
 use crate::api::RecordOutput;
 use crate::overlay::{
-    PerfLogContext, PerfMetrics, build_video_overlay_specs, overlay_video, overlay_video_layers, write_perf_log,
+    PerfLogContext, PerfMetrics, build_video_overlay_specs, overlay_video, overlay_video_layers,
+    write_perf_log,
 };
 use crate::parser::SlideType;
 use crate::plan::{build_segment_plans, detect_root};
-use crate::record::record_segment;
 use crate::record::config::SegmentRecordingConfig;
+use crate::record::record_segment;
 use crate::util::{auto_jobs, create_temp_dir};
 use crate::{encoder, error_with_fix, internal_error_with_fix, server, webview};
 
@@ -119,11 +120,7 @@ pub(super) fn record_single(
                 segment_durations: &segment_durations,
                 progress_color: None,
             };
-            let summary = record_segment(
-                &mut host,
-                plan,
-                &cfg,
-            )?;
+            let summary = record_segment(&mut host, plan, &cfg)?;
             offset_sec += plan.effective_duration_sec;
             total_frames += summary.total_frames;
 
@@ -260,13 +257,16 @@ pub(super) fn concat_output(
             Ok(actual) if actual > 0.0 => {
                 let delta = f64::abs(actual - expected_duration_sec);
                 if delta > 2.0 {
-                    return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-                        "verify the concatenated output duration",
-                        format!(
-                            "Internal: output duration was {actual:.1}s but expected {expected_duration_sec:.1}s (delta {delta:.1}s); segments likely have incompatible time bases"
+                    return Err(
+                        /* Fix: user-facing error formatted below */
+                        error_with_fix(
+                            "verify the concatenated output duration",
+                            format!(
+                                "Internal: output duration was {actual:.1}s but expected {expected_duration_sec:.1}s (delta {delta:.1}s); segments likely have incompatible time bases"
+                            ),
+                            "Retry without parallel segment mixing, and if it persists inspect the generated segment files before concat.",
                         ),
-                        "Retry without parallel segment mixing, and if it persists inspect the generated segment files before concat.",
-                    ));
+                    );
                 }
                 trace_log!("duration check: {actual:.1}s ~= {expected_duration_sec:.1}s ok");
             }

@@ -134,11 +134,7 @@ pub(super) fn format_perf_log_line(
     .to_string()
 }
 
-pub fn write_perf_log(
-    _out: &Path,
-    metrics: &PerfMetrics<'_>,
-    context: PerfLogContext<'_>,
-) {
+pub fn write_perf_log(_out: &Path, metrics: &PerfMetrics<'_>, context: PerfLogContext<'_>) {
     use std::io::Write;
 
     if env::var_os(crate::api::OUTPUT_JSON_ENV).is_some() {
@@ -153,12 +149,7 @@ pub fn write_perf_log(
         .map(|arg| arg.to_string_lossy().into_owned())
         .collect::<Vec<_>>();
 
-    let line = format_perf_log_line(
-        ts,
-        metrics,
-        &context,
-        &command_args,
-    );
+    let line = format_perf_log_line(ts, metrics, &context, &command_args);
 
     let log_path = context
         .output_path

@@ -92,7 +92,8 @@ pub(crate) fn require_string_alias<'a>(
         }
     }
 
-    Err(format!( // Fix: included in the error string below
+    Err(format!(
+        // Fix: included in the error string below
         "failed to read params.{}: missing params.{}. Fix: provide params.{} in the request.",
         keys[0], keys[0], keys[0]
     ))

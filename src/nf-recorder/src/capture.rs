@@ -35,23 +35,29 @@ pub fn is_nsimage_black(image: &NSImage) -> Result<bool, String> {
         return Ok(true);
     }
     if samples_per_pixel < 3 || bits_per_pixel < 24 {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "inspect the snapshot bitmap",
-            format!(
-                "unsupported bitmap format with samplesPerPixel={} and bitsPerPixel={}",
-                samples_per_pixel, bits_per_pixel
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "inspect the snapshot bitmap",
+                format!(
+                    "unsupported bitmap format with samplesPerPixel={} and bitsPerPixel={}",
+                    samples_per_pixel, bits_per_pixel
+                ),
+                "Capture the frame using a standard RGBA snapshot format and retry.",
             ),
-            "Capture the frame using a standard RGBA snapshot format and retry.",
-        ));
+        );
     }
 
     let data = bitmap.bitmapData();
     if data.is_null() {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "inspect the snapshot bitmap",
-            "NSBitmapImageRep returned a null bitmapData pointer",
-            "Retry the capture after the page finishes rendering.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "inspect the snapshot bitmap",
+                "NSBitmapImageRep returned a null bitmapData pointer",
+                "Retry the capture after the page finishes rendering.",
+            ),
+        );
     }
     let bytes_per_row = bitmap.bytesPerRow() as usize;
     let format = bitmap.bitmapFormat();
@@ -79,7 +85,8 @@ pub fn is_nsimage_black(image: &NSImage) -> Result<bool, String> {
 /// Extracts a `CGImage` from an `NSImage`.
 pub fn cgimage_from_nsimage(image: &NSImage) -> Result<Retained<CGImage>, String> {
     // SAFETY: `image` is live, and AppKit allows null rect/context/hints for this conversion call.
-    unsafe { // SAFETY: see above.
+    unsafe {
+        // SAFETY: see above.
         // SAFETY: see above.
         image
             .CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None)
@@ -100,11 +107,14 @@ pub fn layer_render_cgimage(
     height: usize,
 ) -> Result<Retained<CGImage>, String> {
     if width == 0 || height == 0 {
-        return Err(/* Fix: user-facing error formatted below */ error_with_fix(
-            "render the webview layer",
-            "the render target size is zero",
-            "Pass a non-zero capture width and height before retrying.",
-        ));
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "render the webview layer",
+                "the render target size is zero",
+                "Pass a non-zero capture width and height before retrying.",
+            ),
+        );
     }
 
     let bytes_per_row = width * 4;
@@ -119,7 +129,8 @@ pub fn layer_render_cgimage(
     let bitmap_info =
         CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
     // SAFETY: `buffer` owns the target bytes, and the dimensions and format match this bitmap context.
-    let context = unsafe { // SAFETY: see above.
+    let context = unsafe {
+        // SAFETY: see above.
         // SAFETY: see above.
         CGBitmapContextCreate(
             buffer.as_mut_ptr().cast::<c_void>(),
@@ -183,7 +194,8 @@ pub fn is_cgimage_mostly_black(image: &CGImage) -> Result<bool, String> {
     let bitmap_info =
         CGImageByteOrderInfo::Order32Little.0 | CGImageAlphaInfo::PremultipliedFirst.0;
     // SAFETY: `buffer` owns the thumbnail bytes, and the dimensions and format match this context.
-    let context = unsafe { // SAFETY: see above.
+    let context = unsafe {
+        // SAFETY: see above.
         // SAFETY: see above.
         CGBitmapContextCreate(
             buffer.as_mut_ptr().cast::<c_void>(),

@@ -6,8 +6,8 @@ use crate::clock::SegmentClock;
 use crate::encoder::SegmentEncoder;
 use crate::plan::{SegmentPlan, VideoLayerInfo};
 use crate::progress::ProgressBar;
-use crate::webview::{WebViewHost, relative_http_url};
 use crate::webview::inject::FrameState;
+use crate::webview::{WebViewHost, relative_http_url};
 
 use super::config::SegmentRecordingConfig;
 use super::resolve_media_src;
