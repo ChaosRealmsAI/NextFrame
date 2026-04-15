@@ -188,12 +188,12 @@ mod tests {
     #[test]
     fn default_recipes_dir_honors_env_override() {
         // SAFETY: tests run sequentially within this module — set+unset is acceptable
-        unsafe {
+        unsafe { // SAFETY: tests run sequentially within this module — set+unset is acceptable
             env::set_var("NF_GUIDE_RECIPES", "/tmp/custom-recipes");
         }
         let dir = default_recipes_dir();
         assert_eq!(dir, PathBuf::from("/tmp/custom-recipes"));
-        unsafe {
+        unsafe { // SAFETY: this test clears the env override it just installed, still within the same serialized test scope.
             env::remove_var("NF_GUIDE_RECIPES");
         }
     }
