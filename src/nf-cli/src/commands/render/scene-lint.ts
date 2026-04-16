@@ -115,6 +115,49 @@ function lintFile(filePath: string, content: string, meta: Record<string, unknow
       what: `type=${type} 但 render 第 1 参叫 "${paramName}"，应为 host`,
       fix: `${type}: render(host, t, params, vp)`,
     });
+  } else if ((type === "shader" || type === "particle" || type === "motion") && paramName !== "host") {
+    issues.push({
+      severity: "error", code: "SIG_MISMATCH", file: rel, line: sigLineNo,
+      what: `type=${type} 但 render 第 1 参叫 "${paramName}"，应为 host`,
+      fix: `${type}: render(host, t, params, vp) → returns config object (see ADR-020)`,
+    });
+  }
+
+  // L7 (v0.9 ADR-020): frame-pure runtime types forbid non-deterministic APIs
+  // TODO(v0.9 implement): finer AST matching; current regex catches obvious cases only.
+  if (type === "shader" || type === "motion") {
+    const forbidden = [
+      [/\bsetInterval\s*\(/, "setInterval"],
+      [/\bsetTimeout\s*\(/, "setTimeout"],
+      [/\brequestAnimationFrame\s*\(/, "requestAnimationFrame"],
+    ] as const;
+    for (const [re, name] of forbidden) {
+      if (re.test(renderBody)) {
+        issues.push({
+          severity: "error", code: "L7_NONDETERMINISTIC_API", file: rel, line: sigLineNo,
+          what: `type=${type} forbids ${name}() — breaks frame-pure (ADR-020)`,
+          fix: `All time flows via render's t parameter. Let gallery/recorder drive t externally.`,
+        });
+      }
+    }
+  }
+  if (type === "motion") {
+    if (/\bDate\.now\s*\(/.test(renderBody) || /\bperformance\.now\s*\(/.test(renderBody)) {
+      issues.push({
+        severity: "error", code: "L7_WALLCLOCK_IN_MOTION", file: rel, line: sigLineNo,
+        what: `motion scene forbids Date.now/performance.now — breaks frame-pure (ADR-020)`,
+        fix: `All values must flow from interp(track, t). No reading wall clock.`,
+      });
+    }
+  }
+  if (type === "particle") {
+    if (/\bMath\.random\s*\(/.test(renderBody)) {
+      issues.push({
+        severity: "error", code: "L7_MATH_RANDOM_IN_PARTICLE", file: rel, line: sigLineNo,
+        what: `particle scene forbids Math.random — breaks determinism (ADR-020)`,
+        fix: `Use mulberry32(emitter.seed + i * 37) from runtime/particle.js.`,
+      });
+    }
   }
 
   // L1: @keyframes in dom/svg/media render

@@ -16,7 +16,8 @@ const SCENES_ROOT = resolve(__HERE, "../../../../nf-core/scenes");
 const RATIOS = ["16:9", "9:16", "1:1", "4:3"] as const;
 const RATIO_DIRS: Record<string, string> = { "16:9": "16x9", "9:16": "9x16", "1:1": "1x1", "4:3": "4x3" };
 const ROLES = ["bg", "chrome", "content", "text", "overlay", "data"] as const;
-const TYPES = ["canvas", "dom", "svg", "media"] as const;
+// v0.9 ADR-020: added shader / particle / motion (frame-pure runtime types)
+const TYPES = ["canvas", "dom", "svg", "media", "shader", "particle", "motion"] as const;
 
 const HELP = `nextframe scene-new --id=<camelCase> --role=<role> --type=<type> --ratio=<ratio> --theme=<theme> [opts]
 
@@ -112,7 +113,7 @@ function scaffold(opts: {
         <circle cx="\${vp.width * 0.5}" cy="\${vp.height * 0.5}" r="100" fill="\${color}" />
       </svg>
     \`;`;
-  } else {
+  } else if (type === "media") {
     renderSignature = "render(host, _t, params, vp)";
     mountComment = "host is a container HTMLElement - mount <video> / <img> / <audio>";
     renderBody = `    host.innerHTML = \`
@@ -124,6 +125,68 @@ function scaffold(opts: {
         object-fit: cover;
       " autoplay muted></video>
     \`;`;
+  } else if (type === "shader") {
+    renderSignature = "render(host, _t, params, _vp)";
+    mountComment = "v0.9 ADR-020: framework mounts <canvas> + compiles program; scene returns { frag, uniforms? }. t flows via auto-injected uT uniform. L7 forbids setInterval/setTimeout/requestAnimationFrame in this render.";
+    renderBody = `    void host;  // framework manages <canvas> mount
+    return {
+      // Fragment shader source. Reads built-in uniforms uT (time) and uR (viewport).
+      // Add extra uniforms in \`uniforms\` object below and reference them here.
+      frag: \`
+        precision highp float;
+        uniform float uT;
+        uniform vec2 uR;
+        uniform float uHue;
+        void main() {
+          vec2 uv = gl_FragCoord.xy / uR.xy;
+          float v = 0.5 + 0.5 * sin(uT + uv.x * 6.283 + uHue);
+          gl_FragColor = vec4(v, v * 0.5, 1.0 - v, 1.0);
+        }
+      \`,
+      uniforms: {
+        uHue: params.hue ?? 0.0,
+      }
+    };`;
+  } else if (type === "particle") {
+    renderSignature = "render(host, _t, params, _vp)";
+    mountComment = "v0.9 ADR-020: framework mounts <canvas> (2D) + calls runtime/particle.js. scene returns { emitter, field?, render }. Must NOT call Math.random — use mulberry32(emitter.seed + i*37) from runtime.";
+    renderBody = `    void host;  // framework manages <canvas> + loop
+    return {
+      emitter: {
+        count: params.count ?? 200,
+        seed: params.seed ?? 42,
+      },
+      // Optional velocity/position field. Pure function (x,y,t) → offset.
+      // field: (x, y, t) => ({ vx: Math.sin(t * 0.3), vy: 0 }),
+      render: (ctx, p, t) => {
+        const alpha = 0.4 + p.depth * 0.6 * (0.7 + 0.3 * Math.sin(t * 2 + p.i));
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+      }
+    };`;
+  } else {
+    // type === "motion" (NF-Motion, ADR-020)
+    renderSignature = "render(host, _t, params, _vp)";
+    mountComment = "v0.9 ADR-020: framework calls runtime/motion.js. scene returns { duration, size, layers }. Use behavior presets (impact/pulse/...) + shapes (heart/star/...) from runtime/motion.js. L7 forbids Date.now/performance.now.";
+    renderBody = `    void host;  // framework renders SVG per layers
+    const duration = params.duration ?? 2.5;
+    return {
+      duration,
+      size: [400, 400],
+      layers: [
+        {
+          type: "shape",
+          shape: "heart",
+          at: [200, 200],
+          size: 100,
+          fill: params.color ?? "#ff5889",
+          behavior: "impact",
+          startAt: 0,
+          duration: 1.5,
+        },
+      ],
+    };`;
   }
 
   const sampleDefault = type === "media"

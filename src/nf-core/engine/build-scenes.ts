@@ -155,6 +155,10 @@ export function buildSceneBundle(scene: { id: string; filePath: string; varName:
   const wasAdapted = adaptedCode !== scene.code;
   const body = wasAdapted
     ? `${adaptedCode}
+// v0.9 ADR-020 dispatcher: shader/particle/motion types return a config object from render().
+// TODO(v0.9 implement): detect _def.type and bind to runtime/{shader|particle|motion}.js.
+// For walking phase, these types fall through to the v3 adapter below; actual dispatch
+// to runtimes happens in Step 7 when runtime files become executable.
 // Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
 var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
 var _adaptedRender = null;
@@ -162,7 +166,11 @@ if (_rawRender && _rawRender.length >= 4) {
   _adaptedRender = function(t, params, vp) {
     var host = document.createElement("div");
     host.style.cssText = "position:absolute;inset:0;";
-    _rawRender(host, t, params, vp);
+    var _out = _rawRender(host, t, params, vp);
+    // v0.9: new types return config — pack it for runtime consumption by gallery/compose.
+    if (_out && typeof _out === "object") {
+      return { __v09_type: _def && _def.type, config: _out };
+    }
     return host.outerHTML;
   };
 } else {

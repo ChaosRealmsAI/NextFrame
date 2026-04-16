@@ -27,7 +27,8 @@ const REQUIRED = [
   "visual_weight","z_layer","mood","tags","complexity","performance","status","changelog",
   "render","describe","sample",
 ];
-const VALID_TYPES = new Set(["canvas", "dom", "svg", "media"]);
+// v0.9 ADR-020: added shader / particle / motion (frame-pure runtime types)
+const VALID_TYPES = new Set(["canvas", "dom", "svg", "media", "shader", "particle", "motion"]);
 
 const HELP = `nextframe scene-smoke --ratio=<ratio> --theme=<theme> [opts]
 
@@ -121,7 +122,7 @@ export async function run(argv: string[]): Promise<number> {
         if (cr[k] === undefined) result.missing.push(k);
       }
       if (!VALID_TYPES.has(String(cr.type))) {
-        result.errors.push(`invalid type "${cr.type}" (must be canvas|dom|svg|media)`);
+        result.errors.push(`invalid type "${cr.type}" (must be canvas|dom|svg|media|shader|particle|motion)`);
       }
       if (typeof cr.intent === "string" && cr.intent.length < 50) {
         result.errors.push(`intent too short (${cr.intent.length} chars)`);
@@ -144,6 +145,18 @@ export async function run(argv: string[]): Promise<number> {
             (cr.render as ((ctx: unknown, t: number, p: unknown, vp: unknown) => void))(ctx, 0.5, params, { width: W, height: H });
             const png = await canvas.encode("png");
             writeFileSync(join(outDir, file.replace(".js", ".png")), png);
+          } else if (cr.type === "shader" || cr.type === "particle" || cr.type === "motion") {
+            // v0.9 walking: new frame-pure types — render() returns a config object instead of mutating host.
+            // TODO(v0.9 implement): verify return shape per type contract (ADR-020):
+            //   shader   → { frag: string, uniforms?: object }
+            //   particle → { emitter, field?, render }
+            //   motion   → { duration, size, layers }
+            // TODO: --verify-frame-pure flag → run render twice, compare output (pixels/state/SVG innerHTML)
+            const host = makeFakeHost();
+            const out = (cr.render as ((h: unknown, t: number, p: unknown, vp: unknown) => unknown))(host, 0.5, params, { width: W, height: H });
+            if (out == null || typeof out !== "object") {
+              result.errors.push(`${cr.type} render() must return config object, got ${typeof out}`);
+            }
           } else {
             const host = makeFakeHost();
             (cr.render as ((h: unknown, t: number, p: unknown, vp: unknown) => void))(host, 0.5, params, { width: W, height: H });
