@@ -488,6 +488,17 @@ function toLegacyTimeline(resolved: ResolvedTimeline): Timeline {
       t: (c.text as string) || "",
     }));
 
+  if (srtEntries.length > 0) {
+    const dMs = computeDuration(resolved);
+    layers!.push({
+      id: "__v08-subtitles",
+      scene: "subtitleBar",
+      start: 0,
+      dur: dMs / 1000,
+      params: { srt: srtEntries },
+    });
+  }
+
   const durationMs = computeDuration(resolved);
   const tl = resolved as unknown as Timeline;
   return {
