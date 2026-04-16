@@ -1,6 +1,6 @@
 # Audio Pipeline — 语音生成状态机
 
-把 script 段落变成可播放音频 + 词级时间戳（vox TTS）。
+把 script 段落变成可播放音频 + 词级时间戳（nf-tts TTS）。
 
 ## 流程图
 
@@ -10,7 +10,7 @@
   └────┬─────┘
        ▼
   ┌──────────┐
-  │  synth   │  对每段 script-segment 跑 audio-synth（vox）
+  │  synth   │  对每段 script-segment 跑 audio-synth（nf-tts）
   │ (per seg)│  循环每段
   └────┬─────┘
        ▼
@@ -52,4 +52,4 @@
 4. 对每个 script segment N: `nextframe audio-synth <project> <episode> --segment N --voice X --backend edge`
 5. `nf-guide audio review` — 听检查
 
-**vox CLI 是内置工具**，audio-synth 内部已经接好。Agent 只决策 + 触发。
+**nf-tts CLI 是内置工具**，audio-synth 内部已经接好。Agent 只决策 + 触发。

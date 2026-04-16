@@ -15,7 +15,7 @@ nextframe audio-synth <project> <episode> --segment 3
 ## CLI 内部做什么
 
 1. 读 `pipeline.json` 拿到 `script.segments[N-1].narration`
-2. 调 `vox synth` 工具（内置）—— 用 voice + backend
+2. 调 `nf-tts synth` 工具（内置）—— 用 voice + backend
 3. 输出到 `audio/seg-N/audio.mp3` + `timeline.json`（含词级时间戳）
 4. 把结果路径回写 `pipeline.audio.segments[N-1]`
 5. 如果传了 `--voice`，更新 `pipeline.audio.voice`
@@ -49,16 +49,16 @@ nextframe audio-synth <project> <episode> --segment 3
 
 ## 谁做
 
-Code（vox + ffprobe）。
+Code（nf-tts + ffprobe）。
 
 ## 错误
 
 - `script segment N has empty narration` → 先 script-set
-- `vox not found` → 装 vox 或 set `VOX_BIN` 环境变量
+- `nf-tts not found` → 装 nf-tts 或 set `NF_TTS_BIN` 环境变量
 - 网络失败（edge backend）→ 重试
 
 ## 内置工具
 
-`vox` 是项目使用的 TTS CLI（边缘自研 + 微软 Edge / 火山引擎包装）。`audio-synth` 是 vox 的 NextFrame wrapper，加了路径管理 + pipeline.json 写入。
+`nf-tts` 是项目使用的 TTS CLI（边缘自研 + 微软 Edge / 火山引擎包装）。`audio-synth` 是 nf-tts 的 NextFrame wrapper，加了路径管理 + pipeline.json 写入。
 
-不要直接调 `vox` —— 走 `audio-synth` 才能正确落盘。
+不要直接调 `nf-tts` —— 走 `audio-synth` 才能正确落盘。

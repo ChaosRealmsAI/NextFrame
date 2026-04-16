@@ -25,7 +25,7 @@ v0.8 **不手写毫秒**。先把 TTS word timing 变成可引用的 anchors。
 
 ## 🚨 卡住不准绕
 
-`nextframe anchors from-tts` CLI 不存在 / 不吃 vox 的 `.timeline.json` 格式 / 产出格式不符预期 → **立即停下写 `BLOCKED: {具体原因}`**，让主 agent 决定修 CLI 还是修 flow，**禁止自己写 adapter 脚本糊弄过去**。绕了就导致 v1.0 那次"anchors 偷懒手写毫秒"的复盘。
+`nextframe anchors from-tts` CLI 不存在 / 不吃 nf-tts 的 `.timeline.json` 格式 / 产出格式不符预期 → **立即停下写 `BLOCKED: {具体原因}`**，让主 agent 决定修 CLI 还是修 flow，**禁止自己写 adapter 脚本糊弄过去**。绕了就导致 v1.0 那次"anchors 偷懒手写毫秒"的复盘。
 
 ## 2 · Anchor 命名约定（3 层结构）
 

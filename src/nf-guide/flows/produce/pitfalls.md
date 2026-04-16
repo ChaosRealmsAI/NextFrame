@@ -89,10 +89,10 @@
 
 ## 14. TTS 产物是 sine wave / 占位音冒充真实语音
 
-- **触发**: sonnet L1 没调 vox / vox 调用失败但没报错，`seg-*.mp3` 全是正弦波占位
+- **触发**: sonnet L1 没调 nf-tts / nf-tts 调用失败但没报错，`seg-*.mp3` 全是正弦波占位
 - **现象**: 用户听说"不是中文 是嗡嗡声"；所有 mp3 文件大小完全一致（可疑指标）
 - **根因**: flow 00a-tts 没要求真实性自检；sonnet 为了交付偷懒造假
-- **修复**: 走 `vox synth`/`vox batch` 真的合成；跑 00a-tts §"产物真实性自检"命令
+- **修复**: 走 `nf-tts synth`/`nf-tts batch` 真的合成；跑 00a-tts §"产物真实性自检"命令
 - **防复发**: 看到 8 段 mp3 大小完全相同 / volumedetect mean_volume 完全一致 → 高度怀疑占位音；TTS 产物必须有 `.timeline.json` sidecar
 
 ## 15. 自写 Node 脚本算 anchors 手写毫秒
@@ -103,18 +103,18 @@
 - **修复**: 删自写脚本；走 03-anchors §"硬规则" 的 CLI 命令；CLI 不行就 BLOCKED 上报不绕
 - **防复发**: `scripts/lint-anchors.sh` 升级检查 anchors 节点形态（待实现）
 
-## 16. vox synth 产物进子目录（-o 不当）
+## 16. nf-tts synth 产物进子目录（-o 不当）
 
-- **触发**: `vox synth -o new-01.mp3`（不 cd 到目标目录）
+- **触发**: `nf-tts synth -o new-01.mp3`（不 cd 到目标目录）
 - **现象**: 产物在 `./new-01/new-01.mp3`（额外套了一层同名子目录）
-- **根因**: vox 把 filename 当目录 prefix
-- **修复**: 先 `cd tmp/audio && vox synth -o seg-01.mp3`；filename 只写 basename
+- **根因**: nf-tts 把 filename 当目录 prefix
+- **修复**: 先 `cd tmp/audio && nf-tts synth -o seg-01.mp3`；filename 只写 basename
 
-## 17. vox batch JSON id 必须整数
+## 17. nf-tts batch JSON id 必须整数
 
 - **触发**: batch JSON 写 `{"id":"s1", ...}`（字符串）
-- **现象**: vox 报 `expected usize`
-- **根因**: vox batch id 字段是 usize 整数类型
+- **现象**: nf-tts 报 `expected usize`
+- **根因**: nf-tts batch id 字段是 usize 整数类型
 - **修复**: 改 `{"id":1, "filename":"s1.mp3"}`；id 只用 integer，语义 id 放 filename 上
 
 ## 18. build-v08 多 audio track 只用 first 段（静默降级）

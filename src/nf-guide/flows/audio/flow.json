@@ -1,7 +1,7 @@
 {
   "id": "audio",
   "name": "Audio Pipeline",
-  "description": "音频生成管线：Agent 选 voice/engine → 逐段 TTS（vox 工具）→ 校验。",
+  "description": "音频生成管线：Agent 选 voice/engine → 逐段 TTS（nf-tts 工具）→ 校验。",
   "steps": [
     {
       "id": "voice",
@@ -16,7 +16,7 @@
       "title": "逐段合成",
       "prompt": "01-synth.md",
       "gate": "all-audio-synth",
-      "description": "对每个 script segment 跑 audio-synth（CLI 调 vox）",
+      "description": "对每个 script segment 跑 audio-synth（CLI 调 nf-tts）",
       "agent_driven": false,
       "per_item": "segment"
     },

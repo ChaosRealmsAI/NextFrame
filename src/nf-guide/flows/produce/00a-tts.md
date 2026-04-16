@@ -4,16 +4,22 @@
 
 **只有当你没有现成音频 + 需要语音旁白 → 做这一步。**
 
-## ⚙️ 工具说明：vox 就是 nf-tts
+## ⚙️ 工具：nf-tts
 
-本仓 `src/nf-tts/` Cargo crate（name=`nf-tts`）编译出的 binary 装到 `~/.cargo/bin/vox`。所以 `vox` = `nf-tts`，就是系统自带的 TTS CLI，不是外部工具。
+**`nf-tts`** 是项目自带的 TTS CLI（源码 `src/nf-tts/`，独立 crate）。安装：
+
+```bash
+cd src/nf-tts && cargo build --release && cp target/release/nf-tts ~/.cargo/bin/
+```
+
+装完直接命令行调用 `nf-tts ...`。
 
 ## 产物目标
 
 这一步结束必须有：
 
 - `tmp/audio/seg-01.mp3` ... `seg-NN.mp3`（每句一段，≤ 8s）
-- `tmp/audio/seg-NN.timeline.json`（vox 产出，word-level 时间戳，格式 `{segments:[{text,start_ms,end_ms,words:[{word,start_ms,end_ms}]}]}`）
+- `tmp/audio/seg-NN.timeline.json`（nf-tts 产出，word-level 时间戳，格式 `{segments:[{text,start_ms,end_ms,words:[{word,start_ms,end_ms}]}]}`）
 
 `seg-NN.timeline.json` 是下一步 anchors 的输入。
 
@@ -74,12 +80,12 @@ else 不确定 → edge
 
 ```bash
 cd tmp/audio && \
-  vox synth -b edge -v zh-CN-YunxiNeural "第一句文案" -o seg-01.mp3
+  nf-tts synth -b edge -v zh-CN-YunxiNeural "第一句文案" -o seg-01.mp3
 # 产物: tmp/audio/seg-01.mp3 + tmp/audio/seg-01.timeline.json + tmp/audio/seg-01.srt
-# 注意: 必须 cd 到目标目录跑，否则 vox 会产到 ./seg-01/seg-01.mp3 子目录（踩过坑）
+# 注意: 必须 cd 到目标目录跑，否则 nf-tts 会产到 ./seg-01/seg-01.mp3 子目录（踩过坑）
 ```
 
-### 批量（推荐 — vox batch）
+### 批量（推荐 — nf-tts batch）
 
 准备 JSON 配置文件（`id` **必须是整数**，不是字符串，否则报 `expected usize`）：
 
@@ -92,14 +98,14 @@ cat > tmp/tts-batch.json << 'EOF'
 EOF
 
 # 必须 cd 到输出目录；用绝对路径指向 batch JSON
-cd tmp/audio && vox batch /abs/path/to/tmp/tts-batch.json
+cd tmp/audio && nf-tts batch /abs/path/to/tmp/tts-batch.json
 ```
 
 ### 生产用 volcengine（付费，音质好）
 
 ```bash
 cd tmp/audio && \
-  vox synth -b volcengine -v zh_male_taocheng_uranus_bigtts --speech-rate 8 \
+  nf-tts synth -b volcengine -v zh_male_taocheng_uranus_bigtts --speech-rate 8 \
     "文案" -o seg-01.mp3
 ```
 
