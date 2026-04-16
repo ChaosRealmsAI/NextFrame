@@ -459,16 +459,34 @@ function toLegacyTimeline(resolved: ResolvedTimeline): Timeline {
   let layerIndex = 0;
   for (const track of resolved.tracks) {
     if (track.kind !== "scene") continue;
+    const blendMode = typeof track.params?.blend_mode === "string" && track.params.blend_mode.trim().length > 0
+      ? track.params.blend_mode
+      : typeof track.blend_mode === "string" && track.blend_mode.trim().length > 0
+        ? track.blend_mode
+        : undefined;
     for (const clip of track.clips) {
       const beginMs = isFiniteNumber(clip.begin) ? clip.begin : 0;
       const endMs = isFiniteNumber(clip.end) ? clip.end : beginMs;
-      layers!.push({
+      const layer: NonNullable<Timeline["layers"]>[number] = {
         id: clip.id || `${track.id || "scene"}-${layerIndex}`,
         scene: (clip.scene as string) || "",
         start: beginMs / 1000,
         dur: (endMs - beginMs) / 1000,
         params: (clip.params as Record<string, unknown>) || {},
-      });
+      };
+      if (clip.effects && typeof clip.effects === "object") {
+        layer.effects = clip.effects as NonNullable<typeof layer.effects>;
+      }
+      if (clip.transition && typeof clip.transition === "object") {
+        layer.transition = clip.transition as NonNullable<typeof layer.transition>;
+      }
+      if (isFiniteNumber(clip.opacity)) {
+        layer.opacity = clip.opacity;
+      }
+      if (blendMode) {
+        layer.blend = blendMode;
+      }
+      layers!.push(layer);
       layerIndex++;
     }
   }
