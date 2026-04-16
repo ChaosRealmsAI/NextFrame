@@ -24,12 +24,19 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_V08_DIR = resolvePath(HERE, "../runtime-v08");
 const SIMPLE_ANCHOR_EXPR = /^\s*([A-Za-z_][A-Za-z0-9_.]*)\.(begin|end|at)\s*(?:([+-])\s*(\d+(?:\.\d+)?)\s*(s|ms))?\s*$/;
+const ANIMATION_TARGET_EXPR = /^([A-Za-z_][A-Za-z0-9_-]*)\.clips\[(\d+)\]\.params\.([A-Za-z_][A-Za-z0-9_.-]*)$/;
 const NOT_IMPL_TOKEN = ["NOT", "IMPLEMENTED"].join("_");
 
 type ResolvedClip = Clip & { begin?: number; end?: number; at?: number };
 type ResolvedTrack = Track & { clips: ResolvedClip[] };
 type ResolvedTimeline = TimelineV08 & { tracks: ResolvedTrack[] };
 type SceneModule = ReturnType<typeof collectSceneModules>[number];
+type LegacyLayer = NonNullable<Timeline["layers"]>[number];
+type AnimationTarget = { trackId: string; clipIndex: number; paramKey: string };
+type LayerTarget = {
+  params: Record<string, unknown>;
+  startMs: number;
+};
 
 function escapeInlineScript(value: string) {
   return String(value)
@@ -72,6 +79,13 @@ function normalizeIssue(
     kind,
     trackId,
   };
+}
+
+function getTrackParam(track: { params?: Record<string, unknown>; [key: string]: unknown }, field: string) {
+  if (track.params && typeof track.params === "object" && field in track.params) {
+    return track.params[field];
+  }
+  return track[field];
 }
 
 function detectRatioId(timeline: TimelineV08): string {
@@ -352,6 +366,74 @@ function computeDuration(timeline: ResolvedTimeline) {
   return max;
 }
 
+function parseAnimationTarget(target: unknown): AnimationTarget | null {
+  const match = ANIMATION_TARGET_EXPR.exec(String(target || "").trim());
+  if (!match) {
+    return null;
+  }
+  return {
+    trackId: match[1],
+    clipIndex: Number(match[2]),
+    paramKey: match[3],
+  };
+}
+
+function warnAnimationSkip(trackId: string, detail: string) {
+  process.emitWarning(`animation track "${trackId}" skipped: ${detail}`);
+}
+
+function lowerAnimationTracks(
+  resolved: ResolvedTimeline,
+  layerTargets: Map<string, LayerTarget>,
+) {
+  resolved.tracks.forEach((track, trackIndex) => {
+    if (track.kind !== "animation") return;
+
+    const animationTrackId = track.id || `track_${trackIndex}`;
+    const targetExpr = getTrackParam(track, "target");
+    const target = parseAnimationTarget(targetExpr);
+    if (!target) {
+      warnAnimationSkip(animationTrackId, `invalid target "${String(targetExpr || "")}"`);
+      return;
+    }
+
+    const targetLayer = layerTargets.get(`${target.trackId}:${target.clipIndex}`);
+    if (!targetLayer) {
+      warnAnimationSkip(animationTrackId, `target "${String(targetExpr)}" does not resolve to a scene clip`);
+      return;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(targetLayer.params, target.paramKey)) {
+      warnAnimationSkip(animationTrackId, `target param "${target.paramKey}" does not exist on "${String(targetExpr)}"`);
+      return;
+    }
+
+    const keyframes = track.clips
+      .map((clip) => {
+        if (!isFiniteNumber(clip.at)) {
+          return null;
+        }
+        const keyframe: { t: number; value: unknown; ease?: string } = {
+          t: (clip.at - targetLayer.startMs) / 1000,
+          value: clip.value,
+        };
+        if (typeof clip.ease === "string" && clip.ease.trim().length > 0) {
+          keyframe.ease = clip.ease;
+        }
+        return keyframe;
+      })
+      .filter((entry): entry is { t: number; value: unknown; ease?: string } => entry !== null)
+      .sort((left, right) => left.t - right.t);
+
+    if (keyframes.length === 0) {
+      warnAnimationSkip(animationTrackId, `no resolved keyframes found for "${String(targetExpr)}"`);
+      return;
+    }
+
+    targetLayer.params[target.paramKey] = { keyframes };
+  });
+}
+
 function buildRuntimeSources() {
   const runtimeFiles = ["clock.js", "scene-loop.js", "subtitle.js", "anim.js"];
   return runtimeFiles
@@ -457,21 +539,32 @@ ${scriptBody}
 function toLegacyTimeline(resolved: ResolvedTimeline): Timeline {
   const layers: Timeline["layers"] = [];
   let layerIndex = 0;
-  for (const track of resolved.tracks) {
-    if (track.kind !== "scene") continue;
-    for (const clip of track.clips) {
+  const layerTargets = new Map<string, LayerTarget>();
+  resolved.tracks.forEach((track, trackIndex) => {
+    if (track.kind !== "scene") return;
+    track.clips.forEach((clip, clipIndex) => {
       const beginMs = isFiniteNumber(clip.begin) ? clip.begin : 0;
       const endMs = isFiniteNumber(clip.end) ? clip.end : beginMs;
-      layers!.push({
+      const params = (clip.params && typeof clip.params === "object")
+        ? { ...(clip.params as Record<string, unknown>) }
+        : {};
+      const layer: LegacyLayer = {
         id: clip.id || `${track.id || "scene"}-${layerIndex}`,
         scene: (clip.scene as string) || "",
         start: beginMs / 1000,
         dur: (endMs - beginMs) / 1000,
-        params: (clip.params as Record<string, unknown>) || {},
+        params,
+      };
+      layers!.push(layer);
+      layerTargets.set(`${track.id || `track_${trackIndex}`}:${clipIndex}`, {
+        params,
+        startMs: beginMs,
       });
       layerIndex++;
-    }
-  }
+    });
+  });
+
+  lowerAnimationTracks(resolved, layerTargets);
 
   const firstAudio = resolved.tracks
     .filter((t) => t.kind === "audio")
