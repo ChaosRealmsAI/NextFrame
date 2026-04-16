@@ -1,16 +1,90 @@
 import popIn from "../../behaviors/entrance/popIn.js";
 import slideInUp from "../../behaviors/entrance/slideInUp.js";
 import countUp from "../../behaviors/data/countUp.js";
-import pulse from "../../behaviors/emphasis/pulse.js";
-// TODO: add richer formatting once the numeric text primitive supports locale presets
-const meta = { id: "statHero", ratio: "any", duration_hint: 3, type: "motion", category: "hero", description: "Massive count-up stat with label and trend arrow" };
-export default { ...meta,
-  render(host, t, p = {}, vp = { width: 0, height: 0 }) { const W = vp.width || 0, H = vp.height || 0, S = Math.min(W, H), c = { i: "#1a1614", w: "#da7756", m: "#f5ece0", p: "#c4895d" }, v = Number(p.value ?? 47), unit = p.unit ?? "%", label = p.label ?? "用户增长", trend = p.trend ?? "up", rot = trend === "down" ? 90 : trend === "flat" ? 0 : -90, fill = trend === "flat" ? c.p : c.w; void host; void t; return { duration: 3, size: [W, H], layers: [
-    { shape: "circle", at: [W * 0.5, H * 0.48], radius: S * 0.24, fill: c.m, opacity: 0.28, behaviors: [popIn(0, 0.55, { fromScale: 0.3, peakScale: 1.06 })] },
-    { shape: "arrow", at: [W * 0.5 - S * 0.17, H * 0.36], rotate: rot, fill, scale: S / 1200, behaviors: [popIn(0.68, 0.5, { fromScale: 0.2, peakScale: 1.18 }), pulse(1.35, 1.1, { scale: 1.07, floorOpacity: 0.96 })] },
-    { shape: "text", at: [W * 0.5, H * 0.49], prefix: "", suffix: unit, decimals: Number.isInteger(v) ? 0 : 1, fill: c.i, font: "Georgia, serif", fontSize: S * 0.24, weight: 700, behaviors: [countUp(0, 1.25, { from: 0, value: v }), popIn(0, 0.6, { fromScale: 0.72, peakScale: 1.04 })] },
-    { shape: "capsule", at: [W * 0.5, H * 0.62], width: Math.min(W * 0.34, S * 0.48), height: S * 0.06, fill: c.m, opacity: 0.9, behaviors: [slideInUp(1.05, 0.5, { distance: S * 0.025 })] },
-    { shape: "text", at: [W * 0.5, H * 0.62], text: label, fill: c.p, font: "system-ui, sans-serif", fontSize: S * 0.03, weight: 600, behaviors: [slideInUp(1.1, 0.55, { distance: S * 0.028 })] },
-  ] }; },
-  describe(t, params = {}) { return { sceneId: meta.id, phase: t < 1.2 ? "counting" : t < 2 ? "label" : "settle", visible: true, params }; },
-  sample() { return { value: 1247, unit: "", label: "新增用户", trend: "up" }; } };
+
+const meta = {
+  id: "statHero",
+  ratio: "any",
+  duration_hint: 3,
+  type: "motion",
+  category: "hero",
+  description: "Massive countUp stat with eyebrow + label + arrow (artisan rev)",
+  params: [
+    { name: "value", type: "number", default: 1247 },
+    { name: "unit", type: "string", default: "" },
+    { name: "eyebrow", type: "string", default: "本周关键指标" },
+    { name: "label", type: "string", default: "新增用户" },
+    { name: "delta", type: "string", default: "+47%" },
+    { name: "trend", type: "enum", default: "up" },
+  ],
+  examples: [{ value: 1247, eyebrow: "本周关键指标", label: "新增用户", delta: "+47%" }],
+};
+
+export default {
+  ...meta,
+  render(host, t, p = {}, vp = { width: 320, height: 240 }) {
+    const W = vp.width || 320, H = vp.height || 240, S = Math.min(W, H);
+    const cx = W * 0.5, cy = H * 0.5;
+    const palette = { ink: "#1a1614", warm: "#da7756", cream: "#f5ece0", muted: "#7a6a5e", accent: "#ff5c33" };
+    const value = Number(p.value ?? 1247);
+    const unit = p.unit ?? "";
+    const eyebrow = p.eyebrow ?? "本周关键指标";
+    const label = p.label ?? "新增用户";
+    const delta = p.delta ?? "+47%";
+    const trend = p.trend ?? "up";
+    const arrowRot = trend === "down" ? 90 : trend === "flat" ? 0 : -90;
+
+    return {
+      duration: 3, size: [W, H],
+      layers: [
+        // ── soft cream wash background block (anthropic warm)
+        { shape: "rect", at: [cx, cy], width: W, height: H, fill: palette.cream,
+          tracks: { opacity: [[0, 0], [0.4, 1, "out"]] } },
+
+        // ── eyebrow bar (small uppercase + accent dot)
+        { shape: "circle", at: [cx - S * 0.18, cy - S * 0.30], radius: S * 0.014, fill: palette.warm,
+          behaviors: [popIn(0.2, 0.4, { fromScale: 0, peakScale: 1.4 })] },
+        { shape: "text", at: [cx - S * 0.16, cy - S * 0.295], text: eyebrow,
+          fill: palette.warm, font: "system-ui, sans-serif", fontSize: S * 0.030, weight: 600,
+          behaviors: [slideInUp(0.25, 0.5, { distance: S * 0.02 })] },
+
+        // ── main stat number (massive, ink color, countUp)
+        { shape: "text", at: [cx, cy + S * 0.02], prefix: "", suffix: unit,
+          decimals: 0, fill: palette.ink,
+          font: "Inter, system-ui, sans-serif", fontSize: S * 0.32, weight: 800,
+          tracks: { fill: [[0, palette.muted], [0.7, palette.ink, "out"]] },
+          behaviors: [
+            countUp(0.45, 1.6, { from: 0, value, easing: "outCubic" }),
+            popIn(0.45, 0.5, { fromScale: 0.85, peakScale: 1.02 }),
+          ] },
+
+        // ── divider line (grows from center)
+        { shape: "rect", at: [cx, cy + S * 0.18], width: S * 0.04, height: 1,
+          fill: palette.warm, opacity: 0.6,
+          tracks: { width: [[1.7, S * 0.04], [2.0, S * 0.16, "outCubic"]] } },
+
+        // ── label below
+        { shape: "text", at: [cx, cy + S * 0.24], text: label,
+          fill: palette.muted, font: "system-ui, sans-serif", fontSize: S * 0.038, weight: 500,
+          behaviors: [slideInUp(2.0, 0.6, { distance: S * 0.025 })] },
+
+        // ── delta in bottom right corner (small, warm, with arrow)
+        { shape: "arrow", at: [W - S * 0.16, H - S * 0.10], rotate: arrowRot,
+          fill: palette.warm, scale: S / 3200,
+          behaviors: [popIn(2.3, 0.4, { fromScale: 0, peakScale: 1.3 })] },
+        { shape: "text", at: [W - S * 0.10, H - S * 0.095], text: delta,
+          fill: palette.warm, font: "system-ui, sans-serif", fontSize: S * 0.034, weight: 700,
+          behaviors: [slideInUp(2.35, 0.5, { distance: S * 0.02 })] },
+      ],
+    };
+  },
+  describe(t, params = {}) {
+    return {
+      sceneId: meta.id,
+      phase: t < 0.4 ? "intro" : t < 1.6 ? "counting" : t < 2.0 ? "delta" : "label",
+      visible: true,
+      params,
+    };
+  },
+  sample() { return meta.examples[0]; },
+};
