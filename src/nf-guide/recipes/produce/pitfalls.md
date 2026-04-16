@@ -47,3 +47,22 @@
 - **触发**: 用 `--width 1920 --height 1080` 录制后，ffprobe 看到 `3840x2160`
 - **现象**: 误以为 recorder 没按命令执行
 - **修复**: 先确认 ratio 正确；Recorder 会按页面 DPR 编码，Retina / DPR=2 下输出常见是 `viewport × 2`
+
+## 9. scene 参数名猜错 → 黑帧
+
+- **触发**: 不查 `nextframe scenes <id>` 就写 params（比如 headlineCenter 用 `title` 而不是 `text`）
+- **现象**: scene 渲染为空（黑色），但 build 不报错
+- **修复**: **每个 scene 写 params 前必须 `nextframe scenes <id>` 查参数名**
+
+## 10. DOM 型 scene 在 recorder 里黑帧
+
+- **触发**: 用了 anthropic-warm 主题的 DOM scene（statBig / goldenClose / glossaryCard / analogyCard / slotGrid）
+- **现象**: build 成功，但录制出来该场景区间全黑
+- **原因**: v0.3 runtime 的 canvas 渲染循环不触发 DOM scene 的 render
+- **修复**: 用 canvas 型 scene 替代（headlineCenter / codeTerminal / darkGradient / voidField）
+
+## 11. 没加 effects → 画面硬切不专业
+
+- **触发**: scene clip 不写 `effects.enter`
+- **现象**: 场景切换时无过渡，直接跳变
+- **修复**: 每个 scene clip 至少加 `"effects": { "enter": { "type": "fadeIn", "dur": 0.5 } }`

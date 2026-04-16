@@ -1,10 +1,18 @@
 # Step 04: 写 v0.8 Timeline JSON
 
-先看你要用的 scene 参数：
+**写 timeline 前必须查 scene 参数名**（不能猜！猜错 = 黑帧）：
 
 ```bash
 nextframe scenes <scene-id>
 ```
+
+## 哪些 scene 能用
+
+**canvas 型（recorder 录制正常）**：headlineCenter, codeTerminal, darkGradient, voidField, liquidNoise, gridPulse, spaceField, progressBar16x9, subtitleBar, screenFilm, videoClip 等。
+
+**DOM 型（anthropic-warm 主题的数据描述 scene）**：statBig, goldenClose, glossaryCard, analogyCard, slotGrid 等 — build 成功但 **recorder 录不出内容**（画面黑）。用 headlineCenter 替代。
+
+> 经验法则：`nextframe scenes <id>` 看 tech 字段。`canvas` = 安全；`dom` = recorder 可能黑帧。
 
 ## v0.8 结构
 
@@ -57,9 +65,12 @@ nextframe scenes <scene-id>
           "end": "seg0.end",
           "scene": "headlineCenter",
           "params": {
-            "title": "NextFrame v0.8",
-            "accent": "Anchors × Tracks",
-            "opacity": 0.2
+            "text": "NextFrame v0.8",
+            "sub": "Anchors × Tracks"
+          },
+          "effects": {
+            "enter": { "type": "fadeIn", "dur": 0.8 },
+            "exit": { "type": "fadeOut", "dur": 0.5 }
           }
         }
       ]
@@ -90,13 +101,33 @@ nextframe scenes <scene-id>
 }
 ```
 
+## 动效 + 转场（v0.8.1）
+
+scene clip 可以带 effects 和 transition：
+
+```json
+{
+  "effects": {
+    "enter": { "type": "fadeIn", "dur": 0.8 },
+    "exit": { "type": "fadeOut", "dur": 0.5 }
+  },
+  "transition": { "type": "fade", "dur": 0.3 }
+}
+```
+
+可用 effect types：fadeIn, fadeOut, slideUp, slideDown, slideLeft, slideRight, scaleIn, scaleOut, blurIn, blurOut, bounceIn, springIn, springOut, wipeReveal。
+
+可用 transition types：fade, dissolve, wipe。
+
 ## 写的时候记住
 
+- **参数名必须查 `nextframe scenes <id>`** — 不能猜（headlineCenter 用 `text`/`sub`，不是 `title`/`accent`）
 - 不要把 `matches` 带回来
 - 不要手写 `start/dur` 这种 v0.3 字段
 - animation `target` 先只用 `sceneTrackId.clips[N].params.field`
 - subtitle 文案放 `clip.text`
 - build 前可以引用 anchors；build 后 runtime 只吃绝对毫秒
+- **每个 scene clip 都建议加 effects.enter — 否则画面硬切不专业**
 
 ## 从 Step 03 合并 anchors
 
