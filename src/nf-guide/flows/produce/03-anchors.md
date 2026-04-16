@@ -2,11 +2,30 @@
 
 v0.8 **不手写毫秒**。先把 TTS word timing 变成可引用的 anchors。
 
-## 1 · 硬规则
+## 🛑 1 · 硬规则（违反 = 当前 flow 作废）
 
-- ❌ **禁止手写毫秒数**（ADR-017 behavior invariant）— timeline 里所有 `begin` / `end` / `at` 只引用 anchor 名字
-- ✅ **anchors 是唯一时间源**：从 TTS words 或手动对齐生成
-- ✅ runtime 只看 build 后的绝对毫秒；anchor 名字只存在 build 前
+- ❌ **禁止手写毫秒数**（ADR-017）— timeline 里所有 `begin` / `end` / `at` 只引用 anchor 名字
+- ❌ **禁止用 Node/Python 脚本自己算 anchors 塞进 timeline.v08.json**（v1.0 opus 踩过）
+- ❌ **禁止把 anchors 节点写成 `{begin:N, end:N}`**（那是 clip 字段，不是 anchor 形态）
+- ✅ **必须用 CLI**：`nextframe anchors from-tts` 或者手动写 `{at:N}` / `{src:"whisper",...}`
+- ✅ **anchors 是唯一时间源**：从 TTS 产出的 `.timeline.json` 或手动对齐生成
+- ✅ **runtime 只看 build 后的绝对毫秒；anchor 名字只存在 build 前**
+
+### anchors 节点的合法形态（白名单）
+
+```json
+{
+  "s0.begin":  { "at": 0 },
+  "s0.end":    { "src": "whisper", "path": "tmp/audio/seg-01.timeline.json", "word": -1 },
+  "s0.w0.end": { "src": "whisper", "path": "tmp/audio/seg-01.timeline.json", "word": 0 }
+}
+```
+
+**`{begin:N, end:N}` 是非法**（会被 `scripts/lint-anchors.sh` 当场 FAIL）。如果 CLI 输出了这种形态 = 命令用错了。
+
+## 🚨 卡住不准绕
+
+`nextframe anchors from-tts` CLI 不存在 / 不吃 vox 的 `.timeline.json` 格式 / 产出格式不符预期 → **立即停下写 `BLOCKED: {具体原因}`**，让主 agent 决定修 CLI 还是修 flow，**禁止自己写 adapter 脚本糊弄过去**。绕了就导致 v1.0 那次"anchors 偷懒手写毫秒"的复盘。
 
 ## 2 · Anchor 命名约定（3 层结构）
 

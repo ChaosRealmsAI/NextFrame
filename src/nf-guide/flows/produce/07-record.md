@@ -47,7 +47,41 @@ nextframe-recorder slide projects/v10-portrait/out.html \
 ## recorder 未编译？
 
 ```bash
-cargo build --release -p nf-recorder
+# 必须带 --features cli，否则报 "requires the features: cli"
+cargo build --release -p nf-recorder --bin nextframe-recorder --features cli
+```
+
+## 🚨 parallel segment 有截断风险（v1.0 踩过）
+
+默认 `--parallel 4` 可能把视频切成 4 份并行录 → concat 后时长 = N × 期望时长（v1.0 portrait 踩过：预期 64s 实际 256s）。
+
+**保守用 `--parallel 1`**（sequential），多花 2 分钟但不会出时长错配：
+
+```bash
+nextframe-recorder slide out.html --out out.mp4 \
+  --width 1080 --height 1920 --fps 30 --parallel 1
+```
+
+## 🚨 recorder probe audio 可能静默降级为静音（v1.0 踩过）
+
+recorder 通过扫 `window.__audioSrc` 或 `<audio>` tag 找 audio 文件；如果时机/路径有问题，它会打印 `warn: no audio file found, muxing silent track` 但**不报错继续录静音**。
+
+### 录完**必须**验证 mp4 audio stream 真实性
+
+```bash
+ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate,duration \
+  -of default=noprint_wrappers=1 output/xxx.mp4
+```
+
+判定：
+- `bit_rate ≈ 2000`（2 kbps 附近）→ **静音轨**，audio mux 失败
+- `bit_rate > 100000`（100+ kbps）→ 真 audio
+
+如果是静音，workaround：事后 ffmpeg mux：
+
+```bash
+ffmpeg -y -i recorded.mp4 -i real-audio.mp3 \
+  -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k final.mp4
 ```
 
 ## 验证 MP4（先粗查，细查走 Step 09）
@@ -55,7 +89,7 @@ cargo build --release -p nf-recorder
 ```bash
 ffprobe -v quiet \
   -show_entries format=duration,size,bit_rate \
-  -show_entries stream=index,codec_type,codec_name,width,height \
+  -show_entries stream=index,codec_type,codec_name,width,height,bit_rate \
   -of json output/v1.0/landscape-1920x1080-1min.mp4
 ```
 
@@ -63,6 +97,7 @@ ffprobe -v quiet \
 - 有 1 条 h264 video stream
 - 有 1 条 aac audio stream
 - `duration ≥ 60.0`
+- **audio stream bit_rate > 10000**（排除静音轨）
 
 ## 下一步
 

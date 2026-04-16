@@ -1,15 +1,40 @@
 # Step 00a · TTS 合成（voice + backend 选型）
 
-纯 TTS 视频从这起手。访谈 / 已有原声跳过。
+**TTS 可跳过**：访谈 / 已有原声 / 无声视频 / 视频本身配过音 → 直接 `nf-guide produce check`，跳到下一步，不需要产任何音频。
+
+**只有当你没有现成音频 + 需要语音旁白 → 做这一步。**
+
+## ⚙️ 工具说明：vox 就是 nf-tts
+
+本仓 `src/nf-tts/` Cargo crate（name=`nf-tts`）编译出的 binary 装到 `~/.cargo/bin/vox`。所以 `vox` = `nf-tts`，就是系统自带的 TTS CLI，不是外部工具。
 
 ## 产物目标
 
 这一步结束必须有：
 
 - `tmp/audio/seg-01.mp3` ... `seg-NN.mp3`（每句一段，≤ 8s）
-- `tmp/audio/seg-NN.words.json`（每段对应逐词时间戳）
+- `tmp/audio/seg-NN.timeline.json`（vox 产出，word-level 时间戳，格式 `{segments:[{text,start_ms,end_ms,words:[{word,start_ms,end_ms}]}]}`）
 
-`seg-NN.words.json` 是下一步 anchors 的输入。
+`seg-NN.timeline.json` 是下一步 anchors 的输入。
+
+## 🛑 产物真实性自检（强制，违反 = 当前 flow 作废）
+
+**不准用 sine wave / 占位音频冒充 TTS 产物**（v1.0 sonnet L1 踩过，用户反馈『嗡嗡声不是中文』）。
+
+完成 TTS 后每段自检：
+
+```bash
+# 真实性检查：mp3 必须有语音频谱（mean_volume ≈ -20~-30 dB 且有波动）
+for f in tmp/audio/seg-*.mp3; do
+  vol=$(ffmpeg -i "$f" -af volumedetect -vn -sn -dn -f null /dev/null 2>&1 | grep mean_volume | awk '{print $5}')
+  dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f")
+  echo "$f mean_volume=$vol dur=$dur"
+done
+# 所有段 mean_volume 在 -40~-10 dB 之间 + 时长不同（语音长度因句长自然变化）
+# 如果 8 段文件大小完全一致 / mean_volume 一致 → 可疑，多半是占位音
+```
+
+同时必须有 `.timeline.json`（word-level 时间戳），没有 = TTS 没跑成功。
 
 ## 1 · Backend 选型（2 选 1）
 
@@ -45,27 +70,40 @@ else 不确定 → edge
 
 ## 3 · 合成命令（pin 死）
 
-单句：
+### 单句（默认带 timeline.json）
 
 ```bash
-vox --backend edge --voice zh-CN-YunxiNeural \
-  --text "第一句文案" \
-  --out tmp/audio/seg-01.mp3
+cd tmp/audio && \
+  vox synth -b edge -v zh-CN-YunxiNeural "第一句文案" -o seg-01.mp3
+# 产物: tmp/audio/seg-01.mp3 + tmp/audio/seg-01.timeline.json + tmp/audio/seg-01.srt
+# 注意: 必须 cd 到目标目录跑，否则 vox 会产到 ./seg-01/seg-01.mp3 子目录（踩过坑）
 ```
 
-批量（一句一段，每段 ≤ 8s）：
+### 批量（推荐 — vox batch）
+
+准备 JSON 配置文件（`id` **必须是整数**，不是字符串，否则报 `expected usize`）：
 
 ```bash
-# 1. 拆句到 tmp/audio/script.txt（每行一句）
-# 2. 循环合成
-i=1
-while IFS= read -r line; do
-  vox --backend edge --voice zh-CN-YunxiNeural \
-    --text "$line" \
-    --out "tmp/audio/seg-$(printf %02d $i).mp3"
-  i=$((i+1))
-done < tmp/audio/script.txt
+cat > tmp/tts-batch.json << 'EOF'
+[
+  {"id":1,"text":"第一句文案","filename":"seg-01.mp3"},
+  {"id":2,"text":"第二句文案","filename":"seg-02.mp3"}
+]
+EOF
+
+# 必须 cd 到输出目录；用绝对路径指向 batch JSON
+cd tmp/audio && vox batch /abs/path/to/tmp/tts-batch.json
 ```
+
+### 生产用 volcengine（付费，音质好）
+
+```bash
+cd tmp/audio && \
+  vox synth -b volcengine -v zh_male_taocheng_uranus_bigtts --speech-rate 8 \
+    "文案" -o seg-01.mp3
+```
+
+**pin 死**：每次 TTS 必须带 `-b`（backend）+ `-v`（voice）+ `-o`（filename），不准省略。
 
 ## 4 · 逐词对齐（whisperX 或 nextframe audio-synth）
 

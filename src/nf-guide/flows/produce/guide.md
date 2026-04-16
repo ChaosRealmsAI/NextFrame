@@ -5,6 +5,14 @@
 - 时间不再手写毫秒，先生成 `anchors`
 - 画面不再写 `matches`，只写 4 类 `tracks`
 
+## ⚠️ 铁律（违反 = 本次 run 作废，不接受"差不多"）
+
+1. **必须走每一步 CLI**：每个 step 的"命令"区块的 shell 命令必须**原样执行**，禁止用 Node/Python 脚本替代。
+2. **禁止自写毫秒到 anchors**：anchors.{id} 只能是 `{at:N}` 或 `{src:"whisper",path,word/sentence}`，**禁写 `{begin:N, end:N}` 形态**（那是 clip 的字段不是 anchor）。
+3. **产物真实性自检**：TTS mp3 必须自检是否真人声（不是 sine wave 占位）；anchors 必须从 TTS words 生成；timeline 所有 begin/end/at 必须是 anchor 名字不是数字。
+4. **每步贴 stdout 证据**：每个 step 完成后贴出命令 + 产物路径 + CLI stdout，不准说"已完成"。
+5. **卡住就停 不准绕**：flow CLI 不够用 / 产物格式对不上 → **停下报 BLOCKED，不准自己写 adapter 替代**。绕流程 = 这次 run 的产物全部作废。
+
 ## 顺序
 
 `00 ratio` → `00a tts` → `01 check` → `02 scene` → `03 anchors` → `04 timeline` → `05 validate` → `06 build` → `07 record` → `08 concat` → `09 verify`

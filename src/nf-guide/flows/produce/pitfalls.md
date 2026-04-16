@@ -82,3 +82,75 @@
 - **修复**: timeline 顶层 `"version": "0.8"`（字符串，带引号），并删除所有 v0.3 `layers` / v0.6 `matches` 字段
 - **验证**: `grep -c "__SLIDE_SEGMENTS\|layers" out.html` ≥ 1 说明 v0.8 路径跑通
 - **防复发**: Step 05 validate 必跑，检查 `UNSUPPORTED_VERSION` 错误码
+
+---
+
+## v1.0 本轮新增（sonnet L1 + opus 主 agent 都踩过）
+
+## 14. TTS 产物是 sine wave / 占位音冒充真实语音
+
+- **触发**: sonnet L1 没调 vox / vox 调用失败但没报错，`seg-*.mp3` 全是正弦波占位
+- **现象**: 用户听说"不是中文 是嗡嗡声"；所有 mp3 文件大小完全一致（可疑指标）
+- **根因**: flow 00a-tts 没要求真实性自检；sonnet 为了交付偷懒造假
+- **修复**: 走 `vox synth`/`vox batch` 真的合成；跑 00a-tts §"产物真实性自检"命令
+- **防复发**: 看到 8 段 mp3 大小完全相同 / volumedetect mean_volume 完全一致 → 高度怀疑占位音；TTS 产物必须有 `.timeline.json` sidecar
+
+## 15. 自写 Node 脚本算 anchors 手写毫秒
+
+- **触发**: flow `nextframe anchors from-tts` 跑不通 / 格式不对，AI 写 tmp/rebuild-xxx.js 自己算毫秒
+- **现象**: anchors 节点形态是 `{"s1":{begin:0,end:5771}}` 而不是 `{at:N}` 或 `{src:"whisper",...}`
+- **根因**: AI 绕 flow；违反 ADR-017
+- **修复**: 删自写脚本；走 03-anchors §"硬规则" 的 CLI 命令；CLI 不行就 BLOCKED 上报不绕
+- **防复发**: `scripts/lint-anchors.sh` 升级检查 anchors 节点形态（待实现）
+
+## 16. vox synth 产物进子目录（-o 不当）
+
+- **触发**: `vox synth -o new-01.mp3`（不 cd 到目标目录）
+- **现象**: 产物在 `./new-01/new-01.mp3`（额外套了一层同名子目录）
+- **根因**: vox 把 filename 当目录 prefix
+- **修复**: 先 `cd tmp/audio && vox synth -o seg-01.mp3`；filename 只写 basename
+
+## 17. vox batch JSON id 必须整数
+
+- **触发**: batch JSON 写 `{"id":"s1", ...}`（字符串）
+- **现象**: vox 报 `expected usize`
+- **根因**: vox batch id 字段是 usize 整数类型
+- **修复**: 改 `{"id":1, "filename":"s1.mp3"}`；id 只用 integer，语义 id 放 filename 上
+
+## 18. build-v08 多 audio track 只用 first 段（静默降级）
+
+- **触发**: timeline audio track 写 8 段 audio clip（分段 s1..s8）
+- **现象**: HTML 只挂 `window.__SLIDE_SEGMENTS.audio = firstAudio.src`；后 7 段丢失
+- **根因**: build-v08 实现没做多段 audio 合成
+- **修复**: 自己 ffmpeg concat 成 full.mp3，audio track 改成一条指向 full.mp3
+- **防复发**: build-v08 应该多 audio 报错或实现 filter_complex mux（待实现）
+
+## 19. recorder probe 拿不到 audio → 静默录静音
+
+- **触发**: HTML 里 `window.__audioSrc` 明确有值，recorder 却 log "no audio file found, muxing silent track"
+- **现象**: mp4 bit_rate ≈ 2kbps（静音轨），文件没人声
+- **根因**: `query_page_audio_src` probe 时机/逻辑 bug；静默失败
+- **修复**: 事后 ffmpeg mux `-map 0:v -map 1:a` 把真 audio 塞进 mp4（workaround）
+- **防复发**: recorder probe 失败应 error exit 1 不是 warning（待实现）
+
+## 20. timeline.duration 与 anchors / audio 长度不一致
+
+- **触发**: `duration:56059` 但 `s8.end:52905`；或 duration 与 full.mp3 长度差 > 100ms
+- **现象**: build 不报错但末尾 3s 死空间 / audio 过长超出 timeline
+- **根因**: 没一致性校验
+- **修复**: 一致性校验 `duration == max(anchors.{id}.end) + tail_pad`（待实现 lint-timeline-consistency）
+
+## 21. clock 用 audio.currentTime 当时钟 → 短 audio ended 后卡死
+
+- **触发**: timeline 64s 但 audio 只 7s；audio ended 后 currentTime 冻结在 7
+- **现象**: 画面停在第 7 秒
+- **根因**: build-runtime tick() 唯一时间源是 audioEl.currentTime
+- **修复**: 已修 (commit e6dfc87) — audio ended 事件切 wallclock fallback
+- **防复发**: 对 audio 长度 < timeline duration 的情况加 build warning
+
+## 22. ffmpeg -shortest 截短视频
+
+- **触发**: recorder mux audio+video 带了 `-shortest` flag
+- **现象**: 64s 视频被 7s audio 截成 54.47s mp4
+- **根因**: 错误 flag
+- **修复**: 已修 (commit e6dfc87) — `-shortest` 删除
