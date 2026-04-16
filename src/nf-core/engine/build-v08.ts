@@ -399,7 +399,13 @@ window.__NF_V08__.scenes = window.__scenes;
 window.__NF_V08__.timeline = window.__TIMELINE__;
 window.__NF_V08__.subtitles = window.__TIMELINE_SUBTITLES__;
 window.__NF_V08__.animations = window.__TIMELINE_ANIMATIONS__;
-${buildRuntimeSources()}`);
+${buildRuntimeSources()}
+window.__onFrame = function(idx, t) {
+  var ms = typeof t === "number" ? t * 1000 : idx * (1000 / 30);
+  if (window.__NF_V08__ && typeof window.__NF_V08__.frame === "function") {
+    window.__NF_V08__.frame(ms);
+  }
+};`);
 
   return `<!DOCTYPE html>
 <html lang="en">
