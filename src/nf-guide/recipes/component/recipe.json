@@ -8,7 +8,7 @@
       "title": "选组件类型 + 视觉主体",
       "prompt": "00-pick.md",
       "gate": "component-type-chosen",
-      "description": "定 role/type（含 particle/motion）/尺寸/视觉主体模式"
+      "description": "定 role/type（含 motion）/尺寸/视觉主体模式"
     },
     {
       "id": "aesthetics",

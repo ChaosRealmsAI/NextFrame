@@ -163,7 +163,7 @@ export default {
       visible: true,
       params,
       elements: [
-        { type: "particles", count: N, palette: ["#00f0ff", "#ff2bd6", "#7c4dff", "#39ff88"] },
+        { type: "node-cloud", count: N, palette: ["#00f0ff", "#ff2bd6", "#7c4dff", "#39ff88"] },
         { type: "links", maxDistance: 110 },
       ],
       boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },

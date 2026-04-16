@@ -29,7 +29,7 @@ const REQUIRED = [
   "visual_weight","z_layer","mood","tags","complexity","performance","status","changelog",
   "render","describe","sample",
 ];
-const VALID_TYPES = new Set(["canvas", "dom", "svg", "media", "particle", "motion"]);
+const VALID_TYPES = new Set(["canvas", "dom", "svg", "media", "motion"]);
 const FRAME_PURE_T = 1.23;
 
 const HELP = `nextframe scene-smoke --ratio=<ratio> --theme=<theme> [opts]
@@ -115,10 +115,7 @@ function validateRuntimeShape(type: unknown, out: unknown, errors: string[]): ou
     errors.push(`${type} render() must return config object, got ${typeof out}`);
     return false;
   }
-  if (type === "particle") {
-    if (!out.emitter || typeof out.emitter !== "object") errors.push("particle render() must return { emitter: object }");
-    if (typeof out.render !== "function") errors.push("particle render() must return { render: function }");
-  } else if (type === "motion") {
+  if (type === "motion") {
     if (!Array.isArray(out.layers)) errors.push("motion render() must return { layers: array }");
     if (!Array.isArray(out.size) || out.size.length !== 2) errors.push("motion render() must return { size: [w, h] }");
   }
@@ -233,7 +230,7 @@ export async function run(argv: string[]): Promise<number> {
             (cr.render as ((ctx: unknown, t: number, p: unknown, vp: unknown) => void))(ctx, 0.5, params, vp);
             const png = await canvas.encode("png");
             writeFileSync(join(outDir, file.replace(".js", ".png")), png);
-          } else if (cr.type === "particle" || cr.type === "motion") {
+          } else if (cr.type === "motion") {
             const out = (cr.render as ((h: unknown, t: number, p: unknown, vp: unknown) => unknown))(makeFakeHost(), 0.5, params, vp);
             validateRuntimeShape(cr.type, out, result.errors);
           } else {
