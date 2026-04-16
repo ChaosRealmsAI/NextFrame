@@ -1,4 +1,5 @@
 import { EASE } from "./easings.js";
+import { lerpColor } from "./color.js";
 
 const meta = { name: "interp", kind: "engine", description: "Keyframe interpolation for scalar and array tracks" };
 const EPS = 1e-9;
@@ -7,6 +8,7 @@ const clone = (value) => Array.isArray(value) ? value.map(clone) : value;
 const sortFrames = (track) => track.filter((frame) => Array.isArray(frame) && frame.length >= 2).slice().sort((a, b) => num(a[0]) - num(b[0]));
 
 function lerpValue(left, right, progress) {
+  if (typeof left === "string" && typeof right === "string") return lerpColor(left, right, progress);
   if (typeof left === "number" && typeof right === "number") return left + (right - left) * progress;
   if (Array.isArray(left) && Array.isArray(right)) {
     const size = Math.max(left.length, right.length);
