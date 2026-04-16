@@ -46,11 +46,7 @@ pub(super) fn record_parallel(
     let cpus = std::thread::available_parallelism()
         .map(|value| value.get())
         .unwrap_or(4);
-    let num_procs = if requested == 0 {
-        frame_files.len().min(cpus / 2).clamp(1, 4)
-    } else {
-        requested.min(frame_files.len()).max(1)
-    };
+    let num_procs = requested.min(frame_files.len()).min(cpus).max(1);
 
     if num_procs <= 1 {
         return Err(
@@ -97,12 +93,12 @@ pub(super) fn record_parallel(
             crf: args.crf,
             dpr: args.dpr,
             jobs: args.jobs,
-            no_skip: args.no_skip,
+            skip: args.skip,
             skip_aggressive: args.skip_aggressive,
             headed: args.headed,
             width: args.width,
             height: args.height,
-            parallel: None,
+            parallel: 1,
             frame_range: None,
             render_scale: args.render_scale,
             disable_audio: args.disable_audio,
@@ -253,13 +249,13 @@ pub(super) fn record_parallel(
             height: args.height,
             dpr: args.dpr,
             target_fps: args.fps,
-            parallel: Some(actual_procs),
+            parallel: actual_procs,
             render_scale: args.render_scale,
             has_audio: audio_src.is_some(),
             video_layers_count,
             audio_src,
             crf: args.crf,
-            no_skip: args.no_skip,
+            skip: args.skip,
             skip_aggressive: args.skip_aggressive,
         },
     );

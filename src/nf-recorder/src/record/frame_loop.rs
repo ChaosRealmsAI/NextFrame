@@ -68,7 +68,7 @@ pub(super) fn record_frames(
         None => (0, total_frames),
     };
     let no_timing_data = plan.metadata.total_cues == 0 && plan.metadata.subtitles.is_empty();
-    let batch_size = if cli.no_skip || no_timing_data {
+    let batch_size = if !cli.skip || no_timing_data {
         1usize
     } else {
         5usize
@@ -79,7 +79,7 @@ pub(super) fn record_frames(
         let mut decisions = Vec::with_capacity(batch_end - frame_index);
         for fi in frame_index..batch_end {
             let mut decision = clock.next(fi);
-            if !cli.no_skip {
+            if cli.skip {
                 let prev_time_sec = if fi == 0 {
                     -1.0 / cli.fps as f64
                 } else {

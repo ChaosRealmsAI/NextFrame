@@ -70,8 +70,8 @@ pub(super) fn build_cli_args(args: &RecordArgs) -> Vec<OsString> {
         cli_args.push(OsString::from("--jobs"));
         cli_args.push(OsString::from(jobs.to_string()));
     }
-    if args.no_skip {
-        cli_args.push(OsString::from("--no-skip"));
+    if args.skip {
+        cli_args.push(OsString::from("--skip"));
     }
     if args.skip_aggressive {
         cli_args.push(OsString::from("--skip-aggressive"));
@@ -86,6 +86,8 @@ pub(super) fn build_cli_args(args: &RecordArgs) -> Vec<OsString> {
     if args.disable_audio {
         cli_args.push(OsString::from("--disable-audio"));
     }
+    cli_args.push(OsString::from("--parallel"));
+    cli_args.push(OsString::from(args.parallel.to_string()));
 
     cli_args
 }

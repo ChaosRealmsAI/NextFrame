@@ -12,7 +12,7 @@ pub struct SegmentClock {
     cue_times: Vec<f64>,
     subtitles: Vec<SubtitleCue>,
     total_cues: usize,
-    no_skip: bool,
+    skip: bool,
     transition_frames: usize,
     capture_until: usize,
     last_cue: i32,
@@ -38,7 +38,7 @@ impl SegmentClock {
         offset_sec: f64,
         total_duration_sec: f64,
         duration_sec: f64,
-        no_skip: bool,
+        skip: bool,
         skip_aggressive: bool,
     ) -> Self {
         let total_frames = ((duration_sec + 0.5) * fps as f64).ceil().max(1.0) as usize;
@@ -52,7 +52,7 @@ impl SegmentClock {
             cue_times,
             subtitles: metadata.subtitles.clone(),
             total_cues: metadata.total_cues,
-            no_skip,
+            skip,
             transition_frames: if skip_aggressive {
                 (0.3 * fps as f64).ceil() as usize
             } else {
@@ -107,7 +107,7 @@ impl SegmentClock {
         // because we can't predict visual changes from timing data alone.
         // Smart-skip hash in record.rs provides a second-pass optimization.
         let no_timing_data = self.total_cues == 0 && self.subtitles.is_empty();
-        let needs_capture = if self.no_skip || no_timing_data {
+        let needs_capture = if !self.skip || no_timing_data {
             true
         } else {
             frame_index == 0 || cue_changed || subtitle_changed || frame_index < self.capture_until

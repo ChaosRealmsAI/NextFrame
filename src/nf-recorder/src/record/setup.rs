@@ -163,7 +163,7 @@ pub(super) fn prepare_segment(
         cfg.offset_sec,
         cfg.total_duration_sec,
         effective_duration,
-        cli.no_skip,
+        cli.skip,
         cli.skip_aggressive,
     );
 

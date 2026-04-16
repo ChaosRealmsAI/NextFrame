@@ -23,12 +23,12 @@ pub struct RecordArgs {
     pub crf: u8,
     pub dpr: f64,
     pub jobs: Option<usize>,
-    pub no_skip: bool,
+    pub skip: bool,
     pub skip_aggressive: bool,
     pub headed: bool,
     pub width: f64,
     pub height: f64,
-    pub parallel: Option<usize>,
+    pub parallel: usize,
     #[serde(default)]
     pub frame_range: Option<(usize, usize)>,
     #[serde(default = "default_render_scale")]
@@ -59,7 +59,7 @@ impl From<RecordArgs> for CommonArgs {
             crf: args.crf,
             dpr: args.dpr,
             jobs: args.jobs,
-            no_skip: args.no_skip,
+            skip: args.skip,
             skip_aggressive: args.skip_aggressive,
             headed: args.headed,
             width: args.width,
@@ -79,13 +79,15 @@ pub fn record_segments(args: RecordArgs) -> Result<RecordOutput, String> {
     let frame_files = collect_frame_files(&cli)?;
     let out = absolute_path(&cli.out)?;
 
-    match cli.parallel {
-        Some(requested) if frame_files.len() == 1 => {
+    if cli.parallel > 1 {
+        if frame_files.len() == 1 {
             // Single HTML file: use intra-segment frame-slice parallelism
-            parallel::record_parallel_single(&args, &frame_files[0], &out, requested)
+            parallel::record_parallel_single(&args, &frame_files[0], &out, cli.parallel)
+        } else {
+            parallel::record_parallel(&args, &frame_files, &out, cli.parallel)
         }
-        Some(requested) => parallel::record_parallel(&args, &frame_files, &out, requested),
-        None => orchestrator::record_single(&cli, &frame_files, &out),
+    } else {
+        orchestrator::record_single(&cli, &frame_files, &out)
     }
 }
 
@@ -111,6 +113,16 @@ fn validate_args(args: &RecordArgs) -> Result<(), String> {
                 "validate the recorder arguments",
                 "`--dpr` must be greater than 0",
                 "Pass a positive scale such as `--dpr 2`.",
+            ),
+        );
+    }
+    if args.parallel == 0 {
+        return Err(
+            /* Fix: user-facing error formatted below */
+            error_with_fix(
+                "validate the recorder arguments",
+                "`--parallel` must be greater than 0",
+                "Use `--parallel 1` to disable parallel recording, or a larger value to enable it.",
             ),
         );
     }

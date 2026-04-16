@@ -64,8 +64,11 @@ use nextframe_recorder::{
   # Landscape 1080p 60fps
   recorder slide video.html --width 1920 --height 1080 --dpr 1 --fps 60 --out video.mp4
 
-  # 4K 60fps with parallel (4 processes)
-  recorder slide video.html --width 1920 --height 1080 --dpr 2 --fps 60 --parallel 4 --out video.mp4
+  # Static slides where most frames repeat: enable smart skipping
+  recorder slide slides.html --width 1920 --height 1080 --dpr 1 --fps 60 --skip --out slides.mp4
+
+  # Disable parallelism for debugging
+  recorder slide video.html --width 1920 --height 1080 --dpr 2 --fps 60 --parallel 1 --out video.mp4
 
   # Multiple HTML files → one video
   recorder slide slide1.html slide2.html --out combined.mp4
@@ -78,8 +81,8 @@ RESOLUTION CHEAT SHEET:
 SPEED (10-core M series, 60fps):
   1080p vertical  → 56 fps (faster than realtime)
   1080p landscape → 25-31 fps (near realtime)
-  4K serial       → 5-6 fps
-  4K --parallel 4 → 13 fps
+  4K --parallel 1 → 5-6 fps
+  4K default      → 13 fps
   4K --parallel 8 → 14 fps
 
 AUTO-DETECTION:
@@ -102,14 +105,21 @@ enum Command {
   Landscape 1080p 60fps:
     recorder slide video.html -o out.mp4 --width 1920 --height 1080 --dpr 1 --fps 60
 
-  4K 60fps (use --parallel for speed):
-    recorder slide video.html -o out.mp4 --width 1920 --height 1080 --dpr 2 --fps 60 --parallel 4
+  4K 60fps (parallel=4 by default):
+    recorder slide video.html -o out.mp4 --width 1920 --height 1080 --dpr 2 --fps 60
+
+  Mostly static slides (smart skipping):
+    recorder slide slides.html -o out.mp4 --width 1920 --height 1080 --dpr 1 --fps 60 --skip
+
+  Disable parallelism for debugging:
+    recorder slide video.html -o out.mp4 --parallel 1
 
 PARAMETER GUIDE:
   --fps 60      Smooth animation (recommended). Use 30 for simpler content.
   --crf 14      Visually lossless. Use 18-23 for smaller files.
   --dpr 2       Retina quality. Use 1 for 1080p, 2 for 4K.
-  --parallel 4  4x speed for single HTML. Use 2-8 based on CPU cores.
+  --skip        Smart frame skipping for mostly static content. Off by default.
+  --parallel 1  Disable parallelism. Default is 4; use 2-8 based on CPU cores.
   --headed      Debug mode: shows the recording window."#)]
     Slide(SlideArgs),
     /// Record HTML template + overlay source video into the video area
@@ -146,9 +156,9 @@ struct CommonArgs {
     #[arg(long, value_name = "N")]
     pub jobs: Option<usize>,
 
-    /// Disable frame skipping (record every frame even if unchanged)
+    /// Enable smart frame-skipping (default: off — record every frame)
     #[arg(long)]
-    pub no_skip: bool,
+    pub skip: bool,
 
     /// Use a shorter 0.3s capture window after cue/subtitle changes
     #[arg(long)]
@@ -166,9 +176,9 @@ struct CommonArgs {
     #[arg(long, value_name = "N", default_value_t = 960.0)]
     pub height: f64,
 
-    /// Parallel recording. Splits frames across N processes [recommended: 4]
-    #[arg(long, value_name = "N", default_missing_value = "4", num_args = 0..=1)]
-    pub parallel: Option<usize>,
+    /// Parallel recording. Splits frames across N processes (default: 4, set to 1 to disable)
+    #[arg(long, value_name = "N", default_value_t = 4)]
+    pub parallel: usize,
 
     /// [internal] Frame range for parallel subprocess
     #[arg(long, value_name = "START END", num_args = 2, hide = true)]
@@ -210,7 +220,7 @@ impl From<CommonArgs> for RecordArgs {
             crf: args.crf,
             dpr: args.dpr,
             jobs: args.jobs,
-            no_skip: args.no_skip,
+            skip: args.skip,
             skip_aggressive: args.skip_aggressive,
             headed: args.headed,
             width: args.width,

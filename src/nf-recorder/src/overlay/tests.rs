@@ -190,13 +190,13 @@ fn format_perf_log_line_formats_clip_mode_metrics() {
         height: 960.0,
         dpr: 2.0,
         target_fps: 30,
-        parallel: Some(4),
+        parallel: 4,
         render_scale: 0.75,
         has_audio: true,
         video_layers_count: 2,
         audio_src: Some(Path::new("/tmp/audio.m4a")),
         crf: 14,
-        no_skip: false,
+        skip: false,
         skip_aggressive: false,
     };
     let line = format_perf_log_line(
@@ -257,13 +257,13 @@ fn format_perf_log_line_handles_slide_mode_with_zero_totals() {
         height: 538.0,
         dpr: 1.0,
         target_fps: 24,
-        parallel: None,
+        parallel: 1,
         render_scale: 1.0,
         has_audio: false,
         video_layers_count: 0,
         audio_src: None,
         crf: 23,
-        no_skip: true,
+        skip: false,
         skip_aggressive: false,
     };
     let line = format_perf_log_line(
@@ -288,7 +288,7 @@ fn format_perf_log_line_handles_slide_mode_with_zero_totals() {
     assert_eq!(value["file"], "unknown");
     assert_eq!(value["html_files"], serde_json::json!([]));
     assert_eq!(value["html_duration_sec"], Value::Null);
-    assert_eq!(value["parallel"], Value::Null);
+    assert_eq!(value["parallel"], 1);
     assert_eq!(value["has_audio"], false);
     assert_eq!(value["has_video_overlay"], false);
     assert_eq!(value["video_layers_count"], 0);
