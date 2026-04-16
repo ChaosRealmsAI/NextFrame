@@ -1,17 +1,5 @@
-// TODO: compose dataMap scene layers from nf-anim behaviors and shapes
-const meta = { id: "dataMap", ratio: "any", duration_hint: 3.2, type: "motion", category: "data", description: "Data Map data scene stub" };
-export default {
-  ...meta,
-  render(host, t, params = {}, vp = { width: 0, height: 0 }) {
-    // TODO: return motion config for dataMap
-    return { duration: 3.2, size: [vp.width || 0, vp.height || 0], layers: [] };
-  },
-  describe(t, params = {}, vp = {}) {
-    // TODO: expose AI-facing description contract
-    return { sceneId: meta.id, t, params, vp };
-  },
-  sample() {
-    // TODO: return ready-to-preview params
-    return {};
-  },
-};
+import { makeDataMap } from "../sharedData.js";
+// TODO: replace the stylized world outline if the spec later ships a canonical path set
+const sample = { data: [{ label: "San Francisco", value: 82, region: "us" }, { label: "London", value: 64, region: "uk" }, { label: "Bengaluru", value: 58, region: "india" }, { label: "Tokyo", value: 71, region: "japan" }] };
+const meta = { id: "dataMap", ratio: "any", duration_hint: 3, type: "motion", category: "data", description: "World map outline with animated data pins", params: [{ name: "data", type: "array", default: sample.data, semantic: "pins as {label,value,region} or {label,value,x,y}" }, { name: "color", type: "color", default: "#da7756", semantic: "primary warm pin color" }], examples: [sample] };
+export default makeDataMap(meta, sample);

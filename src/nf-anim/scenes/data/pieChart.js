@@ -1,17 +1,5 @@
-// TODO: compose pieChart scene layers from nf-anim behaviors and shapes
-const meta = { id: "pieChart", ratio: "any", duration_hint: 3, type: "motion", category: "data", description: "Pie Chart data scene stub" };
-export default {
-  ...meta,
-  render(host, t, params = {}, vp = { width: 0, height: 0 }) {
-    // TODO: return motion config for pieChart
-    return { duration: 3, size: [vp.width || 0, vp.height || 0], layers: [] };
-  },
-  describe(t, params = {}, vp = {}) {
-    // TODO: expose AI-facing description contract
-    return { sceneId: meta.id, t, params, vp };
-  },
-  sample() {
-    // TODO: return ready-to-preview params
-    return {};
-  },
-};
+import { makePieChart } from "../sharedData.js";
+// TODO: revisit pieChart legend density if the data scene spec adds more than four slices
+const sample = { data: [{ label: "Organic", value: 46 }, { label: "Paid", value: 28 }, { label: "Partner", value: 16 }, { label: "Other", value: 10 }] };
+const meta = { id: "pieChart", ratio: "any", duration_hint: 2.8, type: "motion", category: "data", description: "Pie sectors sweep clockwise with legend reveal", params: [{ name: "data", type: "array", default: sample.data, semantic: "slice values as numbers or {label,value} objects" }, { name: "color", type: "color", default: "#da7756", semantic: "primary warm sector color" }], examples: [sample] };
+export default makePieChart(meta, sample);
