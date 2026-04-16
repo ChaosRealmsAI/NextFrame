@@ -37,6 +37,25 @@ export function buildRuntime() {
   let clockBaseTime = 0;
   let clockBaseNow = 0;
   let lastVisible = [];
+  // ISSUE-004: short audio (7s) ended → audioEl.currentTime freezes → tick nextTime stuck.
+  // On first 'ended', lock wallclock base so subsequent time advances from performance.now(),
+  // and pause audio to prevent browser auto-replay.
+  let audioEndedWallBase = -1;
+  if (audioEl) {
+    audioEl.addEventListener("ended", function () {
+      if (audioEndedWallBase >= 0) return;
+      audioEndedWallBase = performance.now() - (audioEl.currentTime || 0) * 1000;
+      try { audioEl.pause(); } catch (_e) {}
+      console.log("[nf-runtime] audio ended → wallclock fallback", { base: audioEndedWallBase, audioCT: audioEl.currentTime });
+    });
+  }
+  function getPlayTime() {
+    if (audioEndedWallBase >= 0) {
+      return clampTime((performance.now() - audioEndedWallBase) / 1000);
+    }
+    if (audioEl) return clampTime(audioEl.currentTime);
+    return clampTime(clockBaseTime + (performance.now() - clockBaseNow) / 1000);
+  }
 
   function clampTime(value) {
     if (!Number.isFinite(value)) return 0;
@@ -251,9 +270,7 @@ export function buildRuntime() {
 
   function tick() {
     if (!isPlaying) return;
-    const nextTime = audioEl
-      ? clampTime(audioEl.currentTime)
-      : clampTime(clockBaseTime + (performance.now() - clockBaseNow) / 1000);
+    const nextTime = getPlayTime();
     compose(nextTime);
     if (nextTime >= duration) {
       stopPlayback();
@@ -298,8 +315,7 @@ export function buildRuntime() {
 
   function pause() {
     if (!isPlaying) return;
-    if (audioEl) currentTime = clampTime(audioEl.currentTime);
-    else currentTime = clampTime(clockBaseTime + (performance.now() - clockBaseNow) / 1000);
+    currentTime = getPlayTime();
     stopPlayback();
     syncVideos(currentTime, false);
     compose(currentTime);
@@ -314,7 +330,11 @@ export function buildRuntime() {
     const nextTime = clampTime(time);
     currentTime = nextTime;
     syncClock(nextTime);
-    if (audioEl) audioEl.currentTime = nextTime;
+    if (audioEndedWallBase >= 0) {
+      audioEndedWallBase = performance.now() - nextTime * 1000;
+    } else if (audioEl) {
+      audioEl.currentTime = nextTime;
+    }
     return compose(nextTime);
   }
 

@@ -200,7 +200,11 @@ pub(super) fn mux_audio_track(
         "2".into(),
         "-b:a".into(),
         "192k".into(),
-        "-shortest".into(),
+        // SAFETY: don't truncate video to audio length. v0.8 pipeline writes only the first
+        // clip's src into window.__SLIDE_SEGMENTS.audio (short clip, e.g. 7s), while the full
+        // timeline video is 64s. `-shortest` caused landscape→OK, portrait→truncated-to-54s
+        // bug (ally gpt-5.4 diagnosis 2026-04-16). Audio mux for multi-clip + fade/volume
+        // happens in src/nf-cli/src/targets/ffmpeg-audio-mux.ts post-record.
         "-movflags".into(),
         "+faststart".into(),
         output_path.as_os_str().to_string_lossy().into_owned(),

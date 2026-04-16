@@ -19,6 +19,14 @@
           self._startWall = performance.now();
         }
       }, 500);
+      // ISSUE-004: short audio (e.g. 7s) ended 后 currentTime 不推进 → clock 卡。
+      // ended 时切 wallclock 从 audio 结束点继续推 timeline。
+      el.addEventListener("ended", function () {
+        if (self._wallFallback) return;
+        var elapsedMs = (Number(self.mainAudio.currentTime) || 0) * 1000;
+        self._wallFallback = true;
+        self._startWall = performance.now() - elapsedMs;
+      });
     },
     getT: function () {
       if (this._wallFallback) {

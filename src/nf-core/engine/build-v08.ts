@@ -312,6 +312,15 @@ function collectSceneBundle(timeline: ResolvedTimeline): { modules: SceneModule[
   };
 }
 
+// ISSUE-006: HTML build 到 tmp/，browser 以 tmp/ 解析相对 src → projects/ 404。
+// 策略：audio src 统一转 file:// 绝对 URL。支持 http(s)/data/file URL 原样返回、
+// 绝对 fs 路径加 file:// 前缀、相对路径按 cwd 解析（CLI 在 repo root 跑）。
+function toFileUrl(src: string): string {
+  if (/^(https?:|data:|file:\/\/)/.test(src)) return src;
+  const abs = src.startsWith("/") ? src : resolvePath(process.cwd(), src);
+  return `file://${abs}`;
+}
+
 function buildAudioMarkup(timeline: ResolvedTimeline) {
   const clips = timeline.tracks
     .filter((track) => track.kind === "audio")
@@ -322,7 +331,7 @@ function buildAudioMarkup(timeline: ResolvedTimeline) {
           id: clipIndex === 0 && trackIndex === 0 ? ' id="timeline-audio"' : "",
           trackId: track.id || `track_${trackIndex}`,
           clipIndex,
-          src: clip.src as string,
+          src: toFileUrl(clip.src as string),
         })),
     );
 
@@ -523,7 +532,7 @@ function buildDocument(timeline: ResolvedTimeline) {
     .find((clip) => typeof clip.src === "string" && clip.src.trim().length > 0);
   const durationSec = duration / 1000;
   const slideSegments = {
-    audio: typeof firstAudio?.src === "string" ? firstAudio.src : "",
+    audio: typeof firstAudio?.src === "string" ? toFileUrl(firstAudio.src) : "",
     gap: 0,
     segments: [{
       phaseId: "main",
@@ -666,7 +675,8 @@ function toLegacyTimeline(resolved: ResolvedTimeline): Timeline {
     .filter((t) => t.kind === "audio")
     .flatMap((t) => t.clips)
     .find((c) => typeof c.src === "string" && (c.src as string).trim().length > 0);
-  const audioSrc = firstAudio ? (firstAudio.src as string) : undefined;
+  // ISSUE-006: 相对路径在 tmp/ 下的 HTML 解析不到 projects/。统一转 file:// URL。
+  const audioSrc = firstAudio ? toFileUrl(firstAudio.src as string) : undefined;
 
   const srtEntries = resolved.tracks
     .filter((t) => t.kind === "subtitle")
