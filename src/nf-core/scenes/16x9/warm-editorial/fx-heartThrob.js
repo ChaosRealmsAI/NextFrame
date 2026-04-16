@@ -10,8 +10,8 @@ export default {
   role: "overlay",
   description: "爱心 pulse 循环 — scale 80%↔110% + opacity 0.6↔1 呼吸，loop 无缝，书评/情感章节用",
   duration_hint: 4,
-  type: "motion",
-  frame_pure: true,
+  type: "dom",
+  frame_pure: false,
   assets: [],
   intent: `
     warm-editorial 主题的情感强调组件。设计取舍：
@@ -44,25 +44,14 @@ export default {
   },
   enter: null,
   exit: null,
-  render(_host, _t, params, _vp) {
+  render(host, t, params, _vp) {
     const color = params.color || "#c45a3c";
     const duration = Number(params.duration) || 2;
-    return {
-      duration,
-      size: [400, 400],
-      layers: [
-        {
-          type: "shape",
-          shape: "heart",
-          at: [200, 200],
-          size: 180,
-          fill: color,
-          behavior: "pulse",
-          startAt: 0,
-          duration,
-        },
-      ],
-    };
+    const p = loop01(t, duration);
+    const breathe = 0.5 - 0.5 * Math.cos(p * Math.PI * 2);
+    const scale = 1.8 * (0.8 + 0.3 * breathe);
+    const opacity = 0.6 + 0.4 * breathe;
+    host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" style="position:absolute;inset:0;display:block"><g transform="translate(200 200) scale(${scale.toFixed(3)})" opacity="${opacity.toFixed(3)}"><path d="${HEART_PATH}" fill="${escapeAttr(color)}"/></g></svg>`;
   },
   describe(t, params, vp) {
     return { sceneId: "heartThrob", phase: "pulsing", progress: (t % 2) / 2, visible: true, params, viewport: vp };
@@ -71,3 +60,14 @@ export default {
     return { color: "#c45a3c", duration: 2 };
   },
 };
+
+const HEART_PATH = "M0,-15C0,-40 -30,-55 -55,-45C-85,-30 -90,10 -60,35C-30,55 -5,65 0,75C5,65 30,55 60,35C90,10 85,-30 55,-45C30,-55 0,-40 0,-15Z";
+
+function loop01(t, duration) {
+  const d = Math.max(0.001, Number(duration) || 1);
+  return ((t % d) + d) % d / d;
+}
+
+function escapeAttr(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}

@@ -15,7 +15,7 @@ export default {
   description: "SVG feGaussianBlur 三层辉光叠加 + feMerge 合成 — 真·霓虹管文字带 t-driven 闪烁",
   duration_hint: null,
 
-  type: "svg",
+  type: "dom",
   frame_pure: false,
   assets: [],
 

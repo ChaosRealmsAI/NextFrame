@@ -15,7 +15,7 @@ export default {
   description: "SVG turbulence baseFrequency 高频 t-driven 模拟 shader 水波扭曲 — 中心一个霓虹方块被实时折射",
   duration_hint: null,
 
-  type: "svg",
+  type: "dom",
   frame_pure: false,
   assets: [],
 

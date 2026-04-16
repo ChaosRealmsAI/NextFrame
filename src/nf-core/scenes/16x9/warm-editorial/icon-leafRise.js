@@ -10,8 +10,8 @@ export default {
   role: "overlay",
   description: "叶子从下方浮现 — rise behavior (offset y:80→0 + opacity 0→1)，outBack 有轻弹",
   duration_hint: 1,
-  type: "motion",
-  frame_pure: true,
+  type: "dom",
+  frame_pure: false,
   assets: [],
   intent: `
     warm-editorial 主题的"自然出现"装饰组件。设计取舍：
@@ -44,25 +44,13 @@ export default {
   },
   enter: null,
   exit: null,
-  render(_host, _t, params, _vp) {
+  render(host, t, params, _vp) {
     const color = params.color || "#5a8a6a";
     const duration = Number(params.duration) || 1;
-    return {
-      duration,
-      size: [400, 400],
-      layers: [
-        {
-          type: "shape",
-          shape: "leaf",
-          at: [200, 200],
-          size: 160,
-          fill: color,
-          behavior: "rise",
-          startAt: 0,
-          duration,
-        },
-      ],
-    };
+    const p = clamp01(t / duration);
+    const opacity = interpFrames([[0, 0], [0.45, 1, "out"], [1, 1, "linear"]], p);
+    const y = interpFrames([[0, 80], [1, 0, "outBack"]], p);
+    host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" style="position:absolute;inset:0;display:block"><g transform="translate(200 ${(200 + y).toFixed(3)}) scale(1.6)" opacity="${opacity.toFixed(3)}"><path d="${LEAF_PATH}" fill="${escapeAttr(color)}"/></g></svg>`;
   },
   describe(t, params, vp) {
     return { sceneId: "leafRise", phase: t < 1 ? "rising" : "settled", progress: Math.min(1, t / 1), visible: true, params, viewport: vp };
@@ -71,3 +59,37 @@ export default {
     return { color: "#5a8a6a", duration: 1 };
   },
 };
+
+const LEAF_PATH = "M-42,18C-20,-40 18,-60 58,-54C52,-16 30,20 -18,46C2,20 14,0 22,-22C4,-2 -16,12 -42,18Z";
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+}
+
+function easeOutQuad(value) {
+  const p = clamp01(value);
+  return 1 - (1 - p) * (1 - p);
+}
+
+function easeOutBack(value) {
+  const p = clamp01(value);
+  const c = 1.70158;
+  return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
+}
+
+function interpFrames(frames, p) {
+  if (p <= frames[0][0]) return frames[0][1];
+  for (let i = 0; i < frames.length - 1; i++) {
+    const [t0, v0] = frames[i];
+    const [t1, v1, ease = "out"] = frames[i + 1];
+    if (p > t1) continue;
+    const local = clamp01((p - t0) / Math.max(0.0001, t1 - t0));
+    const eased = ease === "outBack" ? easeOutBack(local) : easeOutQuad(local);
+    return v0 + (v1 - v0) * eased;
+  }
+  return frames[frames.length - 1][1];
+}
+
+function escapeAttr(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}

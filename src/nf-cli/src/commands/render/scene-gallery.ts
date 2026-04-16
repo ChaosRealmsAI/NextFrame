@@ -133,11 +133,8 @@ function buildHtml(opts: {
   .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
   .desc { font-size: 13px; margin: 0 0 16px 0; }
   .tag { font-size: 11px; padding: 2px 10px; border-radius: 10px; }
-  .tag-type-canvas { background: rgba(218,119,86,.18); color: #da7756 }
   .tag-type-dom    { background: rgba(126,198,153,.18); color: #7ec699 }
-  .tag-type-svg    { background: rgba(138,180,204,.18); color: #8ab4cc }
   .tag-type-media    { background: rgba(212,180,131,.18); color: #d4b483 }
-  .tag-type-motion   { background: rgba(255,154,184,.18); color: #ff9ab8 }
   .tag-role { background: rgba(255,255,255,.06); color: #aaa }
 </style>
 </head>
@@ -162,7 +159,6 @@ ${compositeCard}
 </section>
 
 <script type="module">
-import { renderMotion as __nfMotionRender } from '/src/nf-core/engine/runtime/motion.js';
 const DIR = ${JSON.stringify(dirUrl)};
 const VP = { width: ${W}, height: ${H} };
 const SCENES = ${JSON.stringify(opts.scenes.map(s => ({ id: s.id, filename: s.filename, type: s.type, role: s.role })))};
@@ -176,29 +172,10 @@ function scaleStages() {
   });
 }
 
-function mountCanvas(stage, c, params) {
-  const canvas = document.createElement('canvas');
-  canvas.width = VP.width;
-  canvas.height = VP.height;
-  canvas.style.cssText = 'width:100%;height:100%;display:block';
-  const ctx = canvas.getContext('2d');
-  c.render(ctx, 0.5, params, VP);
+function mountScene(stage, c, params) {
   stage.innerHTML = '';
-  stage.appendChild(canvas);
-}
-
-function mountHost(stage, c, params) {
-  stage.innerHTML = '';
-  c.render(stage, 0.5, params, VP);
-}
-
-function mountMotion(stage, c, params) {
-  // Use a smaller viewport for motion preview so shapes are visible in gallery thumbnails
-  const motionVP = { width: 400, height: 400 };
-  const config = c.render(null, 0.5, params, motionVP);
-  if (!config || !config.layers) { stage.innerHTML = '<div style="color:#e06c75;padding:24px;font:12px monospace">motion: no layers</div>'; return; }
-  stage.innerHTML = '';
-  try { __nfMotionRender(stage, 0.5, config); } catch(e) { stage.innerHTML = '<div style="color:#e06c75;padding:24px;font:12px monospace">motion render: '+e.message+'</div>'; }
+  const out = c.render(stage, 0.5, params, VP);
+  if (typeof out === 'string') stage.innerHTML = out;
 }
 
 for (const s of SCENES) {
@@ -208,9 +185,7 @@ for (const s of SCENES) {
     const mod = await import(\`\${DIR}/\${s.filename}\`);
     const c = mod.default;
     const params = c.sample();
-    if (s.type === 'canvas') mountCanvas(stage, c, params);
-    else if (s.type === 'motion') mountMotion(stage, c, params);
-    else mountHost(stage, c, params);
+    mountScene(stage, c, params);
   } catch (e) {
     stage.innerHTML = \`<div style="color:#e06c75;padding:48px;font-family:monospace">\${s.id}: \${e.message}</div>\`;
   }
@@ -238,9 +213,7 @@ if (compositeStage) {
       const mod = await import(\`\${DIR}/\${s.filename}\`);
       const c = mod.default;
       const params = c.sample();
-      if (s.type === 'canvas') mountCanvas(layer, c, params);
-      else if (s.type === 'motion') mountMotion(layer, c, params);
-      else mountHost(layer, c, params);
+      mountScene(layer, c, params);
     } catch (e) {
       console.error('composite layer failed:', s.id, e);
     }

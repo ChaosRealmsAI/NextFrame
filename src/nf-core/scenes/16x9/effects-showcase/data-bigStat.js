@@ -15,7 +15,7 @@ export default {
   description: "SVG conic 渐变圆环 + 280px serif 巨数 + 三色 RGB 色散描边 — 数据可视化电影级",
   duration_hint: null,
 
-  type: "svg",
+  type: "dom",
   frame_pure: false,
   assets: [],
 

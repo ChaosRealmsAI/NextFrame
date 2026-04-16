@@ -10,8 +10,8 @@ export default {
   role: "overlay",
   description: "闪光从画外飞入中心 — dart behavior (offset x:-220→16→0 + opacity 0→1)，带回弹",
   duration_hint: 0.9,
-  type: "motion",
-  frame_pure: true,
+  type: "dom",
+  frame_pure: false,
   assets: [],
   intent: `
     warm-editorial 主题的"引入/揭示"瞬间组件。设计取舍：
@@ -44,25 +44,13 @@ export default {
   },
   enter: null,
   exit: null,
-  render(_host, _t, params, _vp) {
+  render(host, t, params, _vp) {
     const color = params.color || "#c45a3c";
     const duration = Number(params.duration) || 0.9;
-    return {
-      duration,
-      size: [400, 400],
-      layers: [
-        {
-          type: "shape",
-          shape: "sparkle",
-          at: [200, 200],
-          size: 14,
-          fill: color,
-          behavior: "dart",
-          startAt: 0,
-          duration,
-        },
-      ],
-    };
+    const p = clamp01(t / duration);
+    const opacity = interpFrames([[0, 0], [0.18, 1, "out"], [1, 1, "linear"]], p);
+    const x = interpFrames([[0, -220], [0.72, 16, "outBack"], [1, 0, "inOut"]], p);
+    host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" style="position:absolute;inset:0;display:block"><g transform="translate(${(200 + x).toFixed(3)} 200) scale(0.14)" opacity="${opacity.toFixed(3)}"><path d="${SPARKLE_PATH}" fill="${escapeAttr(color)}"/></g></svg>`;
   },
   describe(t, params, vp) {
     return { sceneId: "sparkDart", phase: t < 0.9 ? "darting" : "landed", progress: Math.min(1, t / 0.9), visible: true, params, viewport: vp };
@@ -71,3 +59,45 @@ export default {
     return { color: "#c45a3c", duration: 0.9 };
   },
 };
+
+const SPARKLE_PATH = "M0,-18L4,-4L18,0L4,4L0,18L-4,4L-18,0L-4,-4Z";
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+}
+
+function easeOutQuad(value) {
+  const p = clamp01(value);
+  return 1 - (1 - p) * (1 - p);
+}
+
+function easeInOutQuad(value) {
+  const p = clamp01(value);
+  return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+}
+
+function easeOutBack(value) {
+  const p = clamp01(value);
+  const c = 1.70158;
+  return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
+}
+
+function interpFrames(frames, p) {
+  if (p <= frames[0][0]) return frames[0][1];
+  for (let i = 0; i < frames.length - 1; i++) {
+    const [t0, v0] = frames[i];
+    const [t1, v1, ease = "inOut"] = frames[i + 1];
+    if (p > t1) continue;
+    const local = clamp01((p - t0) / Math.max(0.0001, t1 - t0));
+    const eased = ease === "outBack" ? easeOutBack(local)
+      : ease === "out" ? easeOutQuad(local)
+      : ease === "linear" ? local
+      : easeInOutQuad(local);
+    return v0 + (v1 - v0) * eased;
+  }
+  return frames[frames.length - 1][1];
+}
+
+function escapeAttr(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}

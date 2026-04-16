@@ -10,8 +10,8 @@ export default {
   role: "overlay",
   description: "NF-Motion 翻页效果 — 矩形纸页从左向右翻转 + 阴影 + 透明度淡出",
   duration_hint: 1.2,
-  type: "motion",
-  frame_pure: true,
+  type: "dom",
+  frame_pure: false,
   assets: [],
   intent: `
     warm-editorial 主题的章节切换过渡。设计取舍：
@@ -45,29 +45,15 @@ export default {
   },
   enter: null,
   exit: null,
-  render(_host, _t, params, _vp) {
+  render(host, t, params, _vp) {
     const duration = Number(params.duration) || 1.2;
     const pageColor = params.pageColor || "#e3ddd3";
-    return {
-      duration,
-      size: [400, 400],
-      layers: [
-        {
-          type: "shape",
-          shape: "square",
-          at: [200, 200],
-          size: 300,
-          fill: pageColor,
-          stroke: "#8b6b4a",
-          strokeWidth: 1,
-          tracks: {
-            rotate: [[0, 0], [duration, -160, "outBack"]],
-            opacity: [[0, 1], [duration * 0.5, 0.4, "inOut"], [duration, 0, "out"]],
-            scale: [[0, [100, 100]], [duration, [60, 100], "inOut"]],
-          },
-        },
-      ],
-    };
+    const p = clamp01(t / duration);
+    const rotate = -160 * easeOutBack(p);
+    const opacity = interpFrames([[0, 1], [0.5, 0.4, "inOut"], [1, 0, "out"]], p);
+    const scaleX = interpFrames([[0, 1], [1, 0.6, "inOut"]], p);
+    const shadowOpacity = 0.18 * (1 - p);
+    host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" style="position:absolute;inset:0;display:block"><rect x="64" y="58" width="300" height="300" rx="16" fill="rgba(44,36,24,${shadowOpacity.toFixed(3)})"/><g transform="translate(200 200) rotate(${rotate.toFixed(3)}) scale(${scaleX.toFixed(3)} 1)" opacity="${opacity.toFixed(3)}"><rect x="-150" y="-150" width="300" height="300" rx="16" fill="${escapeAttr(pageColor)}" stroke="#8b6b4a" stroke-width="1.5"/></g></svg>`;
   },
   describe(t, params, vp) {
     return { sceneId: "pageFlip", phase: t < 1.2 ? "flipping" : "done", progress: Math.min(1, t / 1.2), visible: true, params, viewport: vp };
@@ -76,3 +62,40 @@ export default {
     return { pageColor: "#e3ddd3", duration: 1.2 };
   },
 };
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+}
+
+function easeInOutQuad(value) {
+  const p = clamp01(value);
+  return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+}
+
+function easeOutBack(value) {
+  const p = clamp01(value);
+  const c = 1.70158;
+  return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
+}
+
+function easeOutQuad(value) {
+  const p = clamp01(value);
+  return 1 - (1 - p) * (1 - p);
+}
+
+function interpFrames(frames, p) {
+  if (p <= frames[0][0]) return frames[0][1];
+  for (let i = 0; i < frames.length - 1; i++) {
+    const [t0, v0] = frames[i];
+    const [t1, v1, ease = "inOut"] = frames[i + 1];
+    if (p > t1) continue;
+    const local = clamp01((p - t0) / Math.max(0.0001, t1 - t0));
+    const eased = ease === "out" ? easeOutQuad(local) : easeInOutQuad(local);
+    return v0 + (v1 - v0) * eased;
+  }
+  return frames[frames.length - 1][1];
+}
+
+function escapeAttr(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}

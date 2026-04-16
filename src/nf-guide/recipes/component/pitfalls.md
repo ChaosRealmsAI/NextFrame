@@ -275,7 +275,7 @@ window.__hasFrameChanged = function(prevT, curT) {
 
 **根因**：历史 `buildSceneBundle` 只识别 v1/v2 scenes 的 `export const meta` + `export function render`。v3 用 `export default {...}` → `stripESM` 转成 `return {...}`，老 adapter 找不到命名的 `render`。
 
-**修复**：已合入 `build-scenes.ts` — 新 adapter 匹配 `return {...}` 用正则抓默认对象，取 `_def.render.bind(_def)` 并包 DOM-mutation 形态（type=dom/svg/media）转 string-returning（type=canvas）。
+**修复**：已合入 `build-scenes.ts` — 新 adapter 兼容两种 scene 写法：`render(host, t, params, vp)` mutate host，或 `render(t, params, vp)` 直接返回 HTML 字符串；如果 host 里有 `<canvas>`，adapter 会先序列化成图片再输出。
 
 **防复发**：每次 scene 契约改动要同步 check `buildSceneBundle` 是否兼容。
 
@@ -307,35 +307,38 @@ ffprobe -show_entries stream=codec_type,codec_name,duration /tmp/out.mp4
 
 **防复发**：`nf-guide component pick` prompt 里 type=media 分支下嵌入"必读 pitfalls.md 坑 11"链接。
 
-## 坑 19 · motion 的 viewBox 按 1920×1080 写，shape size 却只有 100，缩略图几乎看不见
-
-**症状**：gallery 列表卡和详情页缩略图里几乎什么都没有，但 describe() 说图层都在。
-
-**根因**：motion runtime 常用 `size: [400, 400]` 做预览基准；你却按 1920×1080 的大坐标系写 layers，单个 shape 只有 100，结果缩到 gallery 里像灰尘。
-
-**修复**：
-- gallery 预览先按 **400×400 VP** 心智模型设计
-- `size`、`at`、`shape size` 三者必须同一尺度
-- 真要走大画布，就把 shape size 和描边一起成比例放大
-
-**防复发**：motion 组件先在 gallery 看 1x 缩略图，再看详情页 scrub，不要只盯 describe JSON。
-
----
-
 ## 坑 20 · particle 的 render 里偷写 Math.random（历史记录，已随 particle type 移除废除）
 
 **说明**：v0.9.2 已完全移除 `particle` type，这条坑位只保留作历史记录，不再适用于现行 scene recipe。
 
 ---
 
-## 坑 21 · smoke pass 但 gallery 黑屏（v0.9 真实教训）
+## 坑 21 · scene type 过度抽象（ADR-021 教训）
+
+**症状**：为了"帮助 AI"，先造 `canvas/svg/motion/particle/shader` 多套 type，再给每套 type 配专用 contract、runtime、lint、gallery mount、preview mount。最后写一个简单组件，AI 先要做架构选择题，再要记每套签名差异，真正的画面反而写不好。
+
+**根因**：把"技术实现手段"误当成了"scene 的本体语义"。scene 真正的本体其实是：**给定 `t`，产出一段 HTML 画面**。SVG、Canvas、filter、3D、WebGL 都只是这段 HTML 里的手段，不值得升级成独立 type。
+
+**修复**：
+- 收敛到 `dom + media`
+- `dom` 覆盖所有自生成内容
+- `media` 只标记外部资源语义
+- 不再为技术细节发明 runtime type
+
+**防复发**：
+- 先问"这个画面怎么写成 HTML"，不要先问"我要不要发明一个新 type"
+- 新抽象如果会波及 `scene-new/lint/smoke/gallery/preview/build-scenes` 五处以上，默认不要做
+- ADR-021 优先级高于任何"看起来更优雅"的 engine 设计
+
+---
+
+## 坑 22 · smoke pass 但 gallery 黑屏（v0.9 真实教训）
 
 **症状**：`scene-smoke` 报 20/20 pass 全绿，但打开 gallery 整卡片黑屏或只有一点点内容，根本看不见组件。
 
-**根因**：smoke 只验证契约（字段存在 + render 不抛 + 返回值类型对），**不验证视觉效果**。motion 组件 size=[1920,1080] shape=100 在 400px 缩略图里 < 3% 面积；dom 组件用了深色背景与米白主题冲突；media 组件 src 用 `"assets/placeholder.mp4"` 这种不存在的 URL。
+**根因**：smoke 只验证契约（字段存在 + render 不抛 + 返回值类型对），**不验证视觉效果**。组件主体太小、dom 组件用了深色背景与米白主题冲突、media 组件 src 用 `"assets/placeholder.mp4"` 这种不存在的 URL，smoke 都不一定能抓出来。
 
 **修复**：
-- motion: size 必须 `[400, 400]`，不用 viewport 尺寸
 - dom: 色值 100% 从 theme.md 复制，米白主题禁暗色
 - media: sample().src 用真实可访问 URL（picsum.photos / placehold.co）
 
@@ -343,9 +346,9 @@ ffprobe -show_entries stream=codec_type,codec_name,duration /tmp/out.mp4
 
 ---
 
-## 坑 22 · 双状态机漂移（v0.9 踩过）
+## 坑 23 · 双状态机漂移（v0.9 踩过）
 
-**症状**：项目有 `nf-guide component recipe` + `.claude/skills/scene-dev/skill.md` 两套，AI 触发时用了旧的 skill（停在 4 type），写出来的组件没覆盖 motion。
+**症状**：项目有 `nf-guide component recipe` + `.claude/skills/scene-dev/skill.md` 两套，AI 触发时用了旧的 skill（停在旧 scene type 世界观），写出来的组件和现行 recipe 不一致。
 
 **根因**：两处都能触发组件开发，但只维护了一处。
 

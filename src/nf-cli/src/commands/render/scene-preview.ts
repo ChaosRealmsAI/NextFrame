@@ -150,10 +150,8 @@ function buildHtml(opts: {
 </section>
 
 <script type="module">
-import { renderMotion as __nfMotionRender } from '/src/nf-core/engine/runtime/motion.js';
 const DIR = ${JSON.stringify(dirUrl)};
 const FILENAME = ${JSON.stringify(opts.filename)};
-const TYPE = ${JSON.stringify(m.type)};
 const VP = { width: ${W}, height: ${H} };
 const DUR = ${opts.dur};
 
@@ -179,26 +177,9 @@ sampleJson.textContent = JSON.stringify(params, null, 2);
 
 function renderAt(t) {
   try {
-    if (TYPE === 'canvas') {
-      let canvas = stage.querySelector('canvas');
-      if (!canvas) {
-        canvas = document.createElement('canvas');
-        canvas.width = VP.width; canvas.height = VP.height;
-        canvas.style.cssText = 'width:100%;height:100%;display:block';
-        stage.innerHTML = ''; stage.appendChild(canvas);
-      }
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, VP.width, VP.height);
-      c.render(ctx, t, params, VP);
-    } else if (TYPE === 'motion') {
-      const config = c.render(null, t, params, VP);
-      if (!config || !config.layers) { stage.innerHTML = '<div style="color:#e06c75;padding:24px">motion: no layers</div>'; return; }
-      stage.innerHTML = '';
-      __nfMotionRender(stage, t, config);
-    } else {
-      stage.innerHTML = '';
-      c.render(stage, t, params, VP);
-    }
+    stage.innerHTML = '';
+    const out = c.render(stage, t, params, VP);
+    if (typeof out === 'string') stage.innerHTML = out;
     const d = c.describe(t, params, VP);
     describeJson.textContent = JSON.stringify(d, null, 2);
     timeDisplay.textContent = \`t=\${t.toFixed(2)}s / \${DUR.toFixed(1)}s\`;

@@ -19,7 +19,7 @@ export default {
   duration_hint: null,
 
   // ===== Render type =====
-  type: "svg",
+  type: "dom",
   frame_pure: false,
   assets: [],
 

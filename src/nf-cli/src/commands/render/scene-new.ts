@@ -16,8 +16,7 @@ const SCENES_ROOT = resolve(__HERE, "../../../../nf-core/scenes");
 const RATIOS = ["16:9", "9:16", "1:1", "4:3"] as const;
 const RATIO_DIRS: Record<string, string> = { "16:9": "16x9", "9:16": "9x16", "1:1": "1x1", "4:3": "4x3" };
 const ROLES = ["bg", "chrome", "content", "text", "overlay", "data"] as const;
-// v0.9 ADR-020: added motion (frame-pure runtime type)
-const TYPES = ["canvas", "dom", "svg", "media", "motion"] as const;
+const TYPES = ["dom", "media"] as const;
 
 const HELP = `nextframe scene-new --id=<camelCase> --role=<role> --type=<type> --ratio=<ratio> --theme=<theme> [opts]
 
@@ -25,9 +24,9 @@ Generate a new scene component scaffold that conforms to the scene v3 contract
 (11 required + 18 AI-understanding fields + render/describe/sample).
 
 Required:
-  --id          component id, camelCase, globally unique within theme (e.g. bilingualSub)
+  --id          component id, camelCase or _scratch (e.g. bilingualSub / _test93)
   --role        bg | chrome | content | text | overlay | data
-  --type        canvas | dom | svg | media | motion  — determines render() signature
+  --type        dom | media
   --ratio       16:9 | 9:16 | 1:1 | 4:3
   --theme       theme name, e.g. anthropic-warm (must have existing theme.md)
 
@@ -65,22 +64,21 @@ function scaffold(opts: {
   let renderBody: string;
   let mountComment: string;
 
-  if (type === "canvas") {
-    renderSignature = "render(ctx, _t, params, vp)";
-    mountComment = "ctx is CanvasRenderingContext2D - fillRect / fillText / arc to draw";
-    renderBody = `    const W = vp.width;
-    const H = vp.height;
-    const color = params.color || "#f5ece0";
-    const size = 48;
-
-    ctx.fillStyle = color;
-    ctx.font = \`600 \${size}px system-ui, -apple-system, "PingFang SC", sans-serif\`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(params.text || "", W * 0.5, H * 0.5);`;
-  } else if (type === "dom") {
+  if (type === "media") {
+    renderSignature = "render(host, _t, params, vp)";
+    mountComment = "host is a container HTMLElement - mount <video> / <img> / <audio>";
+    renderBody = `    host.innerHTML = \`
+      <video src="\${params.src}" style="
+        position: absolute;
+        left: 0; top: 0;
+        width: \${vp.width}px;
+        height: \${vp.height}px;
+        object-fit: cover;
+      " autoplay muted></video>
+    \`;`;
+  } else {
     renderSignature = "render(host, t, params, vp)";
-    mountComment = "host is HTMLElement. Animate by computing opacity/transform from t (NOT CSS @keyframes — compose rebuilds host each frame, CSS animations never finish). Keep frame_pure: false if render reads t.";
+    mountComment = "host is HTMLElement. Return HTML string or mutate host.innerHTML. Canvas / SVG / filter / video / script can all live inside dom scenes; keep animation t-driven (NOT CSS @keyframes).";
     renderBody = `    const color = params.color || "#f5ece0";
     const text = params.text || "";
     // t-driven enter animation (do NOT use CSS @keyframes — see pitfalls.md #1)
@@ -104,49 +102,6 @@ function scaffold(opts: {
         text-align: center;
       ">\${escapeHtml(text)}</div>
     \`;`;
-  } else if (type === "svg") {
-    renderSignature = "render(host, _t, params, vp)";
-    mountComment = "host is <svg> element - set innerHTML with SVG markup (works in jsdom and real DOM)";
-    renderBody = `    const color = params.color || "#da7756";
-    host.innerHTML = \`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 \${vp.width} \${vp.height}" style="width:100%;height:100%">
-        <circle cx="\${vp.width * 0.5}" cy="\${vp.height * 0.5}" r="100" fill="\${color}" />
-      </svg>
-    \`;`;
-  } else if (type === "media") {
-    renderSignature = "render(host, _t, params, vp)";
-    mountComment = "host is a container HTMLElement - mount <video> / <img> / <audio>";
-    renderBody = `    host.innerHTML = \`
-      <video src="\${params.src}" style="
-        position: absolute;
-        left: 0; top: 0;
-        width: \${vp.width}px;
-        height: \${vp.height}px;
-        object-fit: cover;
-      " autoplay muted></video>
-    \`;`;
-  } else {
-    // type === "motion" (NF-Motion, ADR-020)
-    renderSignature = "render(host, _t, params, _vp)";
-    mountComment = "v0.9 ADR-020: framework calls runtime/motion.js. scene returns { duration, size, layers }. Use behavior presets (impact/pulse/...) + shapes (heart/star/...) from runtime/motion.js. L7 forbids Date.now/performance.now.";
-    renderBody = `    void host;  // framework renders SVG per layers
-    const duration = params.duration ?? 2.5;
-    return {
-      duration,
-      size: [400, 400],
-      layers: [
-        {
-          type: "shape",
-          shape: "heart",
-          at: [200, 200],
-          size: 100,
-          fill: params.color ?? "#ff5889",
-          behavior: "impact",
-          startAt: 0,
-          duration: 1.5,
-        },
-      ],
-    };`;
   }
 
   const sampleDefault = type === "media"
@@ -335,7 +290,7 @@ export async function run(argv: string[]): Promise<number> {
   const force = Boolean(flags.force);
 
   const errors: string[] = [];
-  if (!/^[a-z][a-zA-Z0-9]*$/.test(id)) errors.push(`--id must be camelCase (got "${id}")`);
+  if (!/^_?[a-z][a-zA-Z0-9]*$/.test(id)) errors.push(`--id must be camelCase or _scratch (got "${id}")`);
   if (!ROLES.includes(role as typeof ROLES[number])) errors.push(`--role must be one of: ${ROLES.join(", ")}`);
   if (!TYPES.includes(type as typeof TYPES[number])) errors.push(`--type must be one of: ${TYPES.join(", ")}`);
   if (!RATIOS.includes(ratio as typeof RATIOS[number])) errors.push(`--ratio must be one of: ${RATIOS.join(", ")}`);

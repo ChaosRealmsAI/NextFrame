@@ -8,7 +8,7 @@
       "title": "选组件类型 + 视觉主体",
       "prompt": "00-pick.md",
       "gate": "component-type-chosen",
-      "description": "定 role/type（含 motion）/尺寸/视觉主体模式"
+      "description": "定 role/type（dom|media）/尺寸/视觉主体模式"
     },
     {
       "id": "aesthetics",
@@ -22,7 +22,7 @@
       "title": "实现",
       "prompt": "02-craft.md",
       "gate": "component-file-saved",
-      "description": "scene-new 生成骨架 + 填 intent + 实现 render + 接 runtime / t-driven 动画"
+      "description": "scene-new 生成骨架 + 填 intent + 实现 render + t-driven 动画"
     },
     {
       "id": "verify",

@@ -15,7 +15,7 @@ export default {
   description: "Canvas 2D RGB 通道分离 + 横向切片随机位移 + 扫描线 = VHS 故障 / 赛博 glitch 覆盖层",
   duration_hint: null,
 
-  type: "canvas",
+  type: "dom",
   frame_pure: false,
   assets: [],
 
@@ -69,10 +69,11 @@ export default {
   enter: null,
   exit: null,
 
-  render(ctx, t, params, vp) {
+  render(host, t, params, vp) {
     const W = vp.width;
     const H = vp.height;
     const intensity = Math.max(0, Math.min(1, Number(params.intensity) ?? 1.0));
+    const ctx = getCanvas2D(host, vp);
 
     ctx.clearRect(0, 0, W, H);
 
@@ -192,3 +193,12 @@ export default {
     };
   },
 };
+
+function getCanvas2D(host, vp) {
+  host.innerHTML = `<canvas width="${vp.width}" height="${vp.height}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>`;
+  const canvas = host.querySelector("canvas");
+  if (!canvas) throw new Error("Internal: glitch canvas mount failed. Fix: host must provide querySelector('canvas').");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Internal: glitch 2D context unavailable. Fix: run in a canvas-capable environment.");
+  return ctx;
+}

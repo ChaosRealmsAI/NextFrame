@@ -10,8 +10,8 @@ export default {
   role: "overlay",
   description: "左引号『 的 pop 入场 — 砖红填充大字号 serif 引号，behavior: impact 弹入",
   duration_hint: 1.5,
-  type: "motion",
-  frame_pure: true,
+  type: "dom",
+  frame_pure: false,
   assets: [],
   intent: `
     warm-editorial 主题的引文先导装饰。设计取舍：
@@ -44,25 +44,13 @@ export default {
   },
   enter: null,
   exit: null,
-  render(_host, _t, params, _vp) {
+  render(host, t, params, _vp) {
     const color = params.color || "#c45a3c";
-    const duration = Number(params.duration) || 1.5;
-    return {
-      duration,
-      size: [400, 400],
-      layers: [
-        {
-          type: "shape",
-          shape: "path",
-          at: [200, 200],
-          path: "M-80,-60 C-80,-120 -40,-140 -20,-140 L-20,-100 C-40,-100 -60,-80 -60,-60 L-20,-60 L-20,20 L-80,20 Z M40,-60 C40,-120 80,-140 100,-140 L100,-100 C80,-100 60,-80 60,-60 L100,-60 L100,20 L40,20 Z",
-          fill: color,
-          behavior: "pop",
-          startAt: 0,
-          duration: 0.9,
-        },
-      ],
-    };
+    const duration = Number(params.duration) || 0.9;
+    const p = clamp01(t / duration);
+    const opacity = interpFrames([[0, 0], [0.18, 1, "out"], [1, 1, "linear"]], p);
+    const scale = interpFrames([[0, 0.7], [0.46, 1.2, "outBack"], [0.72, 0.96, "inOut"], [1, 1, "out"]], p);
+    host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%" style="position:absolute;inset:0;display:block"><g transform="translate(200 200) scale(${scale.toFixed(3)})" opacity="${opacity.toFixed(3)}"><path d="${QUOTE_PATH}" fill="${escapeAttr(color)}"/></g></svg>`;
   },
   describe(t, params, vp) {
     return { sceneId: "quoteOpen", phase: t < 0.9 ? "popping" : "hold", progress: Math.min(1, t / 0.9), visible: true, params, viewport: vp };
@@ -71,3 +59,45 @@ export default {
     return { color: "#c45a3c", duration: 1.5 };
   },
 };
+
+const QUOTE_PATH = "M-80,-60 C-80,-120 -40,-140 -20,-140 L-20,-100 C-40,-100 -60,-80 -60,-60 L-20,-60 L-20,20 L-80,20 Z M40,-60 C40,-120 80,-140 100,-140 L100,-100 C80,-100 60,-80 60,-60 L100,-60 L100,20 L40,20 Z";
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+}
+
+function easeOutQuad(value) {
+  const p = clamp01(value);
+  return 1 - (1 - p) * (1 - p);
+}
+
+function easeInOutQuad(value) {
+  const p = clamp01(value);
+  return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+}
+
+function easeOutBack(value) {
+  const p = clamp01(value);
+  const c = 1.70158;
+  return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
+}
+
+function interpFrames(frames, p) {
+  if (p <= frames[0][0]) return frames[0][1];
+  for (let i = 0; i < frames.length - 1; i++) {
+    const [t0, v0] = frames[i];
+    const [t1, v1, ease = "inOut"] = frames[i + 1];
+    if (p > t1) continue;
+    const local = clamp01((p - t0) / Math.max(0.0001, t1 - t0));
+    const eased = ease === "outBack" ? easeOutBack(local)
+      : ease === "out" ? easeOutQuad(local)
+      : ease === "linear" ? local
+      : easeInOutQuad(local);
+    return v0 + (v1 - v0) * eased;
+  }
+  return frames[frames.length - 1][1];
+}
+
+function escapeAttr(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}

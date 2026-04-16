@@ -10,7 +10,7 @@ export default {
   role: "data",
   description: "SVG 折线图：坐标轴 + ink 折线 + ac 数据点 + 顶部标题 + 数值标签",
   duration_hint: 3,
-  type: "svg",
+  type: "dom",
   frame_pure: false,
   assets: [],
   intent: `

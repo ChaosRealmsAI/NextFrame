@@ -37,7 +37,6 @@ JS_ZONES=(
   "src/nf-core/animation/transitions"
   "src/nf-core/filters"
   "src/nf-core/runtime-v08"
-  "src/nf-core/engine/runtime"
 )
 for z in "${JS_ZONES[@]}"; do
   [ -d "$z" ] || continue
@@ -65,8 +64,7 @@ TS_ZONES=(
 )
 for z in "${TS_ZONES[@]}"; do
   [ -d "$z" ] || continue
-  # Exclude nested JS-only zones (runtime/ is browser-inline, ADR-020)
-  bad=$(find "$z" -type f -name "*.js" -not -path "src/nf-core/engine/runtime/*" 2>/dev/null)
+  bad=$(find "$z" -type f -name "*.js" 2>/dev/null)
   if [ -n "$bad" ]; then
     red "[lint-boundary] rule 3 FAIL: .js in TS-authoritative zone $z:"
     echo "$bad"

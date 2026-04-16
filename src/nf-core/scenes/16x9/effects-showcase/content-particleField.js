@@ -15,7 +15,7 @@ export default {
   description: "Canvas 2D 自写粒子系统 260 点 — 沿噪声场流动 + 近距离连线，神经网络既视感",
   duration_hint: null,
 
-  type: "canvas",
+  type: "dom",
   frame_pure: false,
   assets: [],
 
@@ -69,10 +69,11 @@ export default {
   enter: null,
   exit: null,
 
-  render(ctx, t, params, vp) {
+  render(host, t, params, vp) {
     const W = vp.width;
     const H = vp.height;
     const N = Math.max(60, Math.min(400, Math.floor(Number(params.count) || 260)));
+    const ctx = getCanvas2D(host, vp);
 
     // 入场：opacity 0→1 over 0.8s
     const ep = Math.min(t / 0.8, 1);
@@ -176,3 +177,12 @@ export default {
     };
   },
 };
+
+function getCanvas2D(host, vp) {
+  host.innerHTML = `<canvas width="${vp.width}" height="${vp.height}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>`;
+  const canvas = host.querySelector("canvas");
+  if (!canvas) throw new Error("Internal: particleField canvas mount failed. Fix: host must provide querySelector('canvas').");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Internal: particleField 2D context unavailable. Fix: run in a canvas-capable environment.");
+  return ctx;
+}

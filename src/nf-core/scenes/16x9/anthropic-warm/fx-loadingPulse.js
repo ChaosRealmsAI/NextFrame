@@ -7,8 +7,8 @@ export default {
   role: "overlay",
   description: "呼吸式加载指示 — 中心圆 pulse，scale 80%↔110% 且 opacity 同步脉动，loop 无缝",
   duration_hint: 2,
-  type: "motion",
-  frame_pure: true,
+  type: "dom",
+  frame_pure: false,
   assets: [],
   intent: `很多 loading 组件的问题不是信息不足，而是节奏太硬。这个版本只保留一个中心暖橙圆点和一圈更淡的光环，全部动作交给 motion runtime 的 pulse behavior：从 80% 慢慢鼓到 110%，再回到 80%，首尾同态，所以做 gallery loop 或录制循环都不会跳。它比转圈 spinner 更安静，适合 anthropic-warm 这种深夜书房语气，不会把观众注意力从正文里强行拽走。`,
   when_to_use: ["等待工具调用或思考中的过渡镜头", "需要一个低噪声、可无缝循环的状态提示", "想表达『还在进行，但不焦虑』的节奏"],
@@ -35,21 +35,20 @@ export default {
   },
   enter: null,
   exit: null,
-  render(host, _t, params, vp) {
+  render(host, t, params, vp) {
     void host;
     const W = vp.width;
     const H = vp.height;
     const duration = Number(params.duration) || 2;
     const cx = W * 0.5;
     const cy = H * 0.5;
-    return {
-      duration,
-      size: [W, H],
-      layers: [
-        { type: "shape", shape: "ring", at: [cx, cy], size: 120, stroke: params.halo || "rgba(218,119,86,.25)", strokeWidth: 4, behavior: "pulse", startAt: 0, duration, minScale: 88, maxScale: 118, minOpacity: 0.22, maxOpacity: 0.55 },
-        { type: "shape", shape: "circle", at: [cx, cy], size: 58, fill: params.color || "#da7756", behavior: "pulse", startAt: 0, duration, minScale: 80, maxScale: 110, minOpacity: 0.55, maxOpacity: 1 },
-      ],
-    };
+    const p = loop01(t, duration);
+    const breathe = 0.5 - 0.5 * Math.cos(p * Math.PI * 2);
+    const haloScale = 0.88 + 0.3 * breathe;
+    const haloOpacity = 0.22 + 0.33 * breathe;
+    const dotScale = 0.8 + 0.3 * breathe;
+    const dotOpacity = 0.55 + 0.45 * breathe;
+    host.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" style="position:absolute;inset:0;display:block"><circle cx="${cx}" cy="${cy}" r="${(60 * haloScale).toFixed(3)}" fill="none" stroke="${escapeAttr(params.halo || "rgba(218,119,86,.25)")}" stroke-width="4" opacity="${haloOpacity.toFixed(3)}"/><circle cx="${cx}" cy="${cy}" r="${(29 * dotScale).toFixed(3)}" fill="${escapeAttr(params.color || "#da7756")}" opacity="${dotOpacity.toFixed(3)}"/></svg>`;
   },
   describe(t, params, vp) {
     const duration = Number(params.duration) || 2;
@@ -67,3 +66,12 @@ export default {
     return { duration: 2, color: "#da7756", halo: "rgba(218,119,86,.25)" };
   },
 };
+
+function loop01(t, duration) {
+  const d = Math.max(0.001, Number(duration) || 1);
+  return ((t % d) + d) % d / d;
+}
+
+function escapeAttr(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}

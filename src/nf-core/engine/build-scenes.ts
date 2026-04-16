@@ -145,9 +145,6 @@ export function collectSceneModules(timeline: Timeline) {
  * Wrap a single scene module in an IIFE that exposes { meta, render }.
  */
 export function buildSceneBundle(scene: { id: string; filePath: string; varName: string; code: string }) {
-  // v3 flat-layout scenes use `export default { id, render(host, t, params, vp) {...} }`
-  // stripESM converts that to `return { ... }` which the IIFE returns directly.
-  // We capture the returned def object and adapt the DOM-mutation render if needed.
   const adaptedCode = scene.code.replace(
     /^return\s+(\{[\s\S]*\});\s*$/m,
     "var _def = $1;"
@@ -155,26 +152,38 @@ export function buildSceneBundle(scene: { id: string; filePath: string; varName:
   const wasAdapted = adaptedCode !== scene.code;
   const body = wasAdapted
     ? `${adaptedCode}
-// v0.9 ADR-020 dispatcher: motion types return a config object from render().
-// TODO(v0.9 implement): detect _def.type and bind to runtime/motion.js.
-// For walking phase, this type falls through to the v3 adapter below; actual dispatch
-// to runtimes happens in Step 7 when runtime files become executable.
-// Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
 var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+function _serializeHost(host) {
+  if (host && host.querySelectorAll) {
+    var canvases = host.querySelectorAll("canvas");
+    for (var i = 0; i < canvases.length; i += 1) {
+      var canvas = canvases[i];
+      if (!canvas || typeof canvas.toDataURL !== "function" || !canvas.parentNode) continue;
+      var img = document.createElement("img");
+      for (var j = 0; j < canvas.attributes.length; j += 1) {
+        var attr = canvas.attributes[j];
+        if (attr && attr.name !== "src") img.setAttribute(attr.name, attr.value);
+      }
+      img.setAttribute("src", canvas.toDataURL());
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+      canvas.parentNode.replaceChild(img, canvas);
+    }
+  }
+  return host && typeof host.outerHTML === "string" ? host.outerHTML : "";
+}
 var _adaptedRender = null;
 if (_rawRender && _rawRender.length >= 4) {
   _adaptedRender = function(t, params, vp) {
     var host = document.createElement("div");
     host.style.cssText = "position:absolute;inset:0;";
     var _out = _rawRender(host, t, params, vp);
-    // v0.9: new types return config — pack it for runtime consumption by gallery/compose.
-    if (_out && typeof _out === "object") {
-      return { __v09_type: _def && _def.type, config: _out };
-    }
-    return host.outerHTML;
+    if (typeof _out === "string") return _out;
+    return _serializeHost(host);
   };
 } else {
-  _adaptedRender = _rawRender;
+  _adaptedRender = function(t, params, vp) {
+    return _rawRender ? _rawRender(t, params, vp) : "";
+  };
 }
 return { meta: _def || null, render: _adaptedRender };`
     : `${scene.code}

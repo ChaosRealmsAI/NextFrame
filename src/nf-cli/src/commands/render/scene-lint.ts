@@ -4,7 +4,7 @@
 // AI 在 component verify 状态机里跑，作为交付前最后一道门。
 //
 // 检测规则：
-//   L1  dom/svg/media 组件 render 含 @keyframes → CSS 动画在 compose 会消失
+//   L1  dom/media 组件 render 含 @keyframes → CSS 动画在 compose 会消失
 //   L2  ASCII "..." 嵌 " → JS 语法错（字符串提前闭合）
 //   L3  frame_pure:true 但 render 实际读 t → recorder 会跳帧
 //   L4  videoOverlay:true 组件但 render 没画 black box / no absolute pos → 槽位不对
@@ -103,54 +103,15 @@ function lintFile(filePath: string, content: string, meta: Record<string, unknow
   // L5: render signature vs type
   const firstParam = sigline.match(/render\s*\(\s*([A-Za-z_]\w*)/);
   const paramName = firstParam?.[1] || "";
-  if (type === "canvas" && paramName !== "ctx") {
-    issues.push({
-      severity: "error", code: "SIG_MISMATCH", file: rel, line: sigLineNo,
-      what: `type=canvas 但 render 第 1 参叫 "${paramName}"，应为 ctx`,
-      fix: "canvas: render(ctx, t, params, vp)",
-    });
-  } else if ((type === "dom" || type === "svg" || type === "media") && paramName !== "host") {
+  if ((type === "dom" || type === "media") && paramName !== "host") {
     issues.push({
       severity: "error", code: "SIG_MISMATCH", file: rel, line: sigLineNo,
       what: `type=${type} 但 render 第 1 参叫 "${paramName}"，应为 host`,
       fix: `${type}: render(host, t, params, vp)`,
     });
-  } else if (type === "motion" && paramName !== "host") {
-    issues.push({
-      severity: "error", code: "SIG_MISMATCH", file: rel, line: sigLineNo,
-      what: `type=${type} 但 render 第 1 参叫 "${paramName}"，应为 host`,
-      fix: `${type}: render(host, t, params, vp) → returns config object (see ADR-020)`,
-    });
   }
-
-  // L7 (v0.9 ADR-020): frame-pure runtime type forbids obvious non-deterministic APIs.
-  if (type === "motion") {
-    const forbidden = [
-      [/\bsetInterval\s*\(/, "setInterval"],
-      [/\bsetTimeout\s*\(/, "setTimeout"],
-      [/\brequestAnimationFrame\s*\(/, "requestAnimationFrame"],
-    ] as const;
-    for (const [re, name] of forbidden) {
-      if (re.test(renderBody)) {
-        issues.push({
-          severity: "error", code: "L7_NONDETERMINISTIC_API", file: rel, line: sigLineNo,
-          what: `type=${type} forbids ${name}() — breaks frame-pure (ADR-020)`,
-          fix: `All time flows via render's t parameter. Let gallery/recorder drive t externally.`,
-        });
-      }
-    }
-  }
-  if (type === "motion") {
-    if (/\bDate\.now\s*\(/.test(renderBody) || /\bperformance\.now\s*\(/.test(renderBody)) {
-      issues.push({
-        severity: "error", code: "L7_WALLCLOCK_IN_MOTION", file: rel, line: sigLineNo,
-        what: `motion scene forbids Date.now/performance.now — breaks frame-pure (ADR-020)`,
-        fix: `All values must flow from interp(track, t). No reading wall clock.`,
-      });
-    }
-  }
-  // L1: @keyframes in dom/svg/media render
-  if ((type === "dom" || type === "svg" || type === "media") && /@keyframes\s+\w+/.test(renderBody)) {
+  // L1: @keyframes in dom/media render
+  if ((type === "dom" || type === "media") && /@keyframes\s+\w+/.test(renderBody)) {
     const kfLine = sigLineNo + renderBody.slice(0, renderBody.search(/@keyframes/)).split("\n").length - 1;
     issues.push({
       severity: "error", code: "CSS_KEYFRAMES_IN_RENDER", file: rel, line: kfLine,
