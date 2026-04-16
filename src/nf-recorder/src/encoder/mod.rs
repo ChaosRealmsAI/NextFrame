@@ -22,7 +22,22 @@ use pixel_buffer::create_pixel_buffer_from_cgimage;
 
 const K_CV_PIXEL_FORMAT_TYPE_32_BGRA: u32 = 0x4247_5241;
 type CVReturn = i32;
-type CVPixelBufferRef = *mut c_void;
+
+// SAFETY: Matches Apple's opaque `__CVBuffer` struct so objc2 `msg_send!` generates
+// the expected pointer encoding `^{__CVBuffer=}` rather than the bare `^v` we'd get
+// from `*mut c_void`. Runtime encoding check in AVAssetWriterInputPixelBufferAdaptor's
+// `appendPixelBuffer:withPresentationTime:` compares these strings literally.
+#[allow(non_camel_case_types)]
+#[repr(C)]
+pub struct __CVBuffer {
+    _private: [u8; 0],
+}
+// SAFETY: Emitting `^{__CVBuffer=}` matches Apple's public encoding for CVPixelBufferRef.
+unsafe impl objc2::encode::RefEncode for __CVBuffer {
+    const ENCODING_REF: objc2::encode::Encoding =
+        objc2::encode::Encoding::Pointer(&objc2::encode::Encoding::Struct("__CVBuffer", &[]));
+}
+type CVPixelBufferRef = *mut __CVBuffer;
 type CFAllocatorRef = *const c_void;
 type CFDictionaryRef = *const c_void;
 
