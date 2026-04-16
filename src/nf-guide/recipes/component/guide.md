@@ -16,7 +16,7 @@ produce/02-scene 是"怎么批量做"，本 recipe 是"怎么做好一个"。
 |------|--------|------|
 | 00-pick | 定 role/type + **视觉主体**（frame-craft 12 模式） | 脑子里 |
 | 01-aesthetics | 吸收 5 位顶级博主审美 + 动画 12 原则 | 脑子里 |
-| 02-craft | scene-new CLI 生成骨架 + 填内容 + 加 CSS 动画 | `{role}-{id}.js` |
+| 02-craft | scene-new CLI 生成骨架 + 填内容 + 接 runtime / t-driven 动画 | `{role}-{id}.js` |
 | 03-verify | smoke + gallery + checklist 三关 | 绿灯才算完 |
 
 ## 跑

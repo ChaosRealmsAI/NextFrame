@@ -6,7 +6,7 @@
 node src/nf-cli/bin/nextframe.js scene-new \
   --id=<camelCase id> \
   --role=<bg|chrome|content|text|overlay|data> \
-  --type=<canvas|dom|svg|media> \
+  --type=<canvas|dom|svg|media|shader|particle|motion> \
   --ratio=<16:9|9:16|1:1|4:3> \
   --theme=<theme> \
   --name="<显示名>" \
@@ -14,6 +14,14 @@ node src/nf-cli/bin/nextframe.js scene-new \
 ```
 
 生成 `src/nf-core/scenes/{ratio}/{theme}/{role}-{id}.js`，包含全 11 必填 + 18 AI 字段 + render/describe/sample 骨架。
+
+新 type 示例：
+
+```bash
+node src/nf-cli/bin/nextframe.js scene-new --id=auroraMesh --role=bg --type=shader --ratio=16:9 --theme=anthropic-warm --name="Aurora Mesh" --description="GPU 极光背景"
+node src/nf-cli/bin/nextframe.js scene-new --id=starfield --role=bg --type=particle --ratio=16:9 --theme=anthropic-warm --name="Starfield" --description="确定性星场"
+node src/nf-cli/bin/nextframe.js scene-new --id=heartLike --role=overlay --type=motion --ratio=16:9 --theme=anthropic-warm --name="Heart Like" --description="点赞语义动画"
+```
 
 ---
 
@@ -151,6 +159,91 @@ render(ctx, t, params, vp) {
 ### SVG / Media
 
 参考 scene-new 生成的骨架示例，改成真实内容。
+
+### Shader（GPU fragment）
+
+```js
+render(host, _t, params, _vp) {
+  void host;
+  return {
+    frag: `
+      precision highp float;
+      uniform float uT;
+      uniform vec2 uR;
+      void main() {
+        vec2 uv = gl_FragCoord.xy / uR.xy;
+        float band = 0.5 + 0.5 * sin(uT + uv.y * 8.0);
+        gl_FragColor = vec4(vec3(band), 1.0);
+      }
+    `,
+    uniforms: {
+      uHue: params.hue ?? 0.0,
+    },
+  };
+}
+```
+
+- render 返回 **`frag` 字符串**，框架自动挂 WebGL canvas、编译 shader、注入内建 `uT` / `uR`
+- 额外参数放 `uniforms`
+- 不要自己起 rAF / setTimeout，时间只从 `t` 流入 shader
+
+### Particle（确定性粒子）
+
+```js
+render(host, _t, params, _vp) {
+  void host;
+  return {
+    emitter: {
+      count: params.count ?? 220,
+      seed: params.seed ?? 42,
+      spawn: (i, emitter) => {
+        const rng = mulberry32(emitter.seed + i * 37);
+        return {
+          x: rng(),
+          y: rng(),
+          depth: rng(),
+        };
+      },
+    },
+    render: (ctx, p, t) => {
+      ctx.globalAlpha = 0.35 + p.depth * 0.45 * (0.7 + 0.3 * Math.sin(t * 2 + p.i));
+      ctx.fillRect(p.x, p.y, p.size, p.size);
+    },
+  };
+}
+```
+
+- `emitter.spawn` 用 **`mulberry32`** 的 seeded rng，禁 `Math.random`
+- `field` 可选，用来描述速度场或位置场
+- 近/中/远三层要在 spawn 或 render 里显式拉开，不要一锅粥
+
+### Motion（语义矢量动画）
+
+```js
+render(host, _t, params, _vp) {
+  void host;
+  return {
+    duration: params.duration ?? 2.2,
+    size: [400, 400],
+    layers: [
+      {
+        type: "shape",
+        shape: "heart",
+        at: [200, 200],
+        size: 100,
+        fill: params.color ?? "#ff5889",
+        behavior: "impact",
+        startAt: 0,
+        duration: 1.5,
+      },
+    ],
+  };
+}
+```
+
+- 组合方式是 **behavior 名 + shape 名 + layers**
+- 优先用 runtime 内建行为（`impact` / `pulse` / `dart` / `pop`），不要一上来手写长 track
+- `size` 直接决定 gallery 预览尺度，别乱填超大 viewBox
 
 ---
 

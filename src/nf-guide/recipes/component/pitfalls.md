@@ -306,3 +306,52 @@ ffprobe -show_entries stream=codec_type,codec_name,duration /tmp/out.mp4
 **修复**：component recipe 的 00-pick step 在"选 type=media"时**强制链接 pitfalls 坑 11**。
 
 **防复发**：`nf-guide component pick` prompt 里 type=media 分支下嵌入"必读 pitfalls.md 坑 11"链接。
+
+---
+
+## 坑 18 · shader 的 GLSL 里含反引号，gallery inline script 直接断裂
+
+**症状**：scene-gallery 打开组件详情页直接白屏，控制台报 inline script 语法错；shader 本体明明看起来没问题。
+
+**根因**：`frag: \`...\`` 里的 GLSL 又混进了反引号或没转义的模板字符串边界，gallery 把 scene 内联进 `<script>` 时整段 JS 被截断。
+
+**修复**：
+- 不要在 GLSL 里塞反引号
+- 需要长 shader 时，改成独立模块 / `<script src>` import，不要继续往 template literal 里硬塞
+
+**防复发**：shader scene 第一次进 gallery 就先开控制台看 parse error，不要等 recorder 才发现。
+
+---
+
+## 坑 19 · motion 的 viewBox 按 1920×1080 写，shape size 却只有 100，缩略图几乎看不见
+
+**症状**：gallery 列表卡和详情页缩略图里几乎什么都没有，但 describe() 说图层都在。
+
+**根因**：motion runtime 常用 `size: [400, 400]` 做预览基准；你却按 1920×1080 的大坐标系写 layers，单个 shape 只有 100，结果缩到 gallery 里像灰尘。
+
+**修复**：
+- gallery 预览先按 **400×400 VP** 心智模型设计
+- `size`、`at`、`shape size` 三者必须同一尺度
+- 真要走大画布，就把 shape size 和描边一起成比例放大
+
+**防复发**：motion 组件先在 gallery 看 1x 缩略图，再看详情页 scrub，不要只盯 describe JSON。
+
+---
+
+## 坑 20 · particle 的 render 里偷写 Math.random，L7 直接拦截
+
+**症状**：scene-lint 报 `particle scene forbids Math.random`；或者 gallery 每次刷新粒子分布都变。
+
+**根因**：粒子作者习惯性在 render/spawn 里写 `Math.random()`，破坏 frame-pure，seek 回同一时刻也回不到同一帧。
+
+**修复**：
+
+```js
+const rng = mulberry32(emitter.seed + i * 37);
+const x = rng();
+const y = rng();
+```
+
+用 `mulberry32(emitter.seed + i * 37)` 产出每个粒子的稳定随机数。
+
+**防复发**：所有 particle scene 都把随机入口收敛到 `spawn(i, emitter)`，render 只消费已经确定的粒子状态。

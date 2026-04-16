@@ -19,7 +19,7 @@
 └──────────────────────────────────────────────────────────┘
 ```
 
-### type（4 选 1 — 决定 render 签名）
+### type（7 选 1 — 决定 render 签名）
 
 | type | 何时用 | render 签名 |
 |------|--------|-------------|
@@ -27,6 +27,9 @@
 | **canvas** | 需要逐像素效果（滤镜/粒子/颗粒/noise） | `render(ctx, t, params, vp)` |
 | **svg** | 矢量图标、流程图节点连线、几何路径 | `render(host, t, params, vp)` |
 | **media** | 嵌入真实 video/img/audio | `render(host, t, params, vp)` |
+| **shader** | GPU 背景效果（流光/噪声/水波/极光） | `render(host, t, params, vp)` → `{ frag, uniforms? }` |
+| **particle** | 确定性粒子（星场/雪/火花/连线/浮尘） | `render(host, t, params, vp)` → `{ emitter, field?, render }` |
+| **motion** | 矢量语义动画（点赞/图标/涟漪/路径描边） | `render(host, t, params, vp)` → `{ duration, size, layers }` |
 
 **UI 类组件默认 DOM。** 硬塞 canvas = 中文字体方框 + 手算坐标 + 改色要重画 + 无 DOM tree 可审。
 
@@ -79,12 +82,15 @@
 **纯 DOM 文字组件 ≤ 30%**。做之前先问：
 
 1. **这组件的视觉主体能不能用 SVG 画？**（流程图/节点/轨道/图表/矢量图标 → 强制 type=svg）
-2. **能不能用 Canvas 画动态？**（粒子/星场/波形/径向渐变/滤镜 → 强制 type=canvas）
-3. **都不能，真只有文字布局？**（标题/金句/chrome → OK 用 type=dom）
+2. **能不能用 GPU shader 画？**（流光/噪声/水波/极光 → 强制 type=shader）
+3. **能不能用确定性粒子系统？**（星场/雪/爆发/连线 → 强制 type=particle）
+4. **能不能用矢量动画？**（点赞/图标弹跳/路径描边 → 强制 type=motion）
+5. **都不需要专用 runtime，但仍是逐像素 2D 效果？**（笔触/位图滤镜/手写 noise mask → type=canvas）
+6. **都不能，真只有文字布局？**（标题/金句/chrome → OK 用 type=dom）
 
 **每个主题必须至少有**：
 - ≥ 1 个 SVG 图形组件（diagram / chart / orbit / icon）
-- ≥ 1 个 Canvas 动态组件（particle / wave / brush）
+- ≥ 1 个动态图形组件（canvas / shader / particle / motion）
 
 纯 DOM 堆文字 = 主题质量不及格。详情看 §8 图 > 文铁律。
 
@@ -95,7 +101,7 @@
 ```
 组件 id:        (camelCase)
 role:          (bg/chrome/content/text/overlay/data)
-type:          (dom/canvas/svg/media)
+type:          (dom/canvas/svg/media/shader/particle/motion)
 模式:           (12 种之一)
 视觉主体:        (具体的 — "真的终端窗口带行号" / "serif 200px 数字 87")
 画面比例:        (ratio)
