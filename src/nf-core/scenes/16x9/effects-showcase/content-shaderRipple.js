@@ -170,7 +170,7 @@ export default {
       params,
       elements: [
         { type: "label", role: "kicker", value: params.label || "" },
-        { type: "shader-cube", role: "hero", filter: "ripple" },
+        { type: "ripple-cube", role: "hero", filter: "ripple" },
         { type: "rotating-frame", role: "decoration" },
       ],
       boundingBox: { x: vp.width * 0.29, y: vp.height * 0.29, w: vp.width * 0.42, h: vp.height * 0.42 },

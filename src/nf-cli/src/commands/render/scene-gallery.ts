@@ -137,7 +137,6 @@ function buildHtml(opts: {
   .tag-type-dom    { background: rgba(126,198,153,.18); color: #7ec699 }
   .tag-type-svg    { background: rgba(138,180,204,.18); color: #8ab4cc }
   .tag-type-media    { background: rgba(212,180,131,.18); color: #d4b483 }
-  .tag-type-particle { background: rgba(255,180,77,.18);  color: #ffb44d }
   .tag-type-motion   { background: rgba(255,154,184,.18); color: #ff9ab8 }
   .tag-role { background: rgba(255,255,255,.06); color: #aaa }
 </style>
@@ -193,32 +192,6 @@ function mountHost(stage, c, params) {
   c.render(stage, 0.5, params, VP);
 }
 
-function mountParticle(stage, c, params) {
-  const config = c.render(null, 0.5, params, VP);
-  if (!config || !config.emitter) { stage.innerHTML = '<div style="color:#e06c75;padding:24px;font:12px monospace">particle: no emitter</div>'; return; }
-  const canvas = document.createElement('canvas');
-  canvas.width = VP.width; canvas.height = VP.height;
-  canvas.style.cssText = 'width:100%;height:100%;display:block';
-  stage.innerHTML = ''; stage.appendChild(canvas);
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, VP.width, VP.height);
-  const count = config.emitter.count || 100;
-  const seed = config.emitter.seed || 42;
-  const spawnFn = config.emitter.spawn;
-  function mulberry32(s) { return function(){ let x=s|=0; s=s+0x6D2B79F5|0; x=Math.imul(x^x>>>15,1|x); x=x+Math.imul(x^x>>>7,61|x)^x; return((x^x>>>14)>>>0)/4294967296; }; }
-  for (let i = 0; i < count; i++) {
-    const rng = mulberry32(seed + i * 37);
-    let p;
-    if (spawnFn) { p = spawnFn(rng, i, VP); p.i = i; }
-    else { p = { i, x: rng()*VP.width, y: rng()*VP.height, depth: rng()*0.8+0.2, size: 0.75+rng()*2.25, alpha: 0.2+rng()*0.7, hue: rng()*360 }; }
-    if (config.field) { const d = config.field(p.x, p.y, 0.5); if (d) Object.assign(p, d); }
-    ctx.save();
-    if (config.render) { config.render(ctx, p, 0.5); }
-    else { ctx.globalAlpha = p.alpha||0.5; ctx.fillStyle = '#fff'; ctx.fillRect(p.x, p.y, p.size||2, p.size||2); }
-    ctx.restore();
-  }
-}
-
 function mountMotion(stage, c, params) {
   // Use a smaller viewport for motion preview so shapes are visible in gallery thumbnails
   const motionVP = { width: 400, height: 400 };
@@ -236,7 +209,6 @@ for (const s of SCENES) {
     const c = mod.default;
     const params = c.sample();
     if (s.type === 'canvas') mountCanvas(stage, c, params);
-    else if (s.type === 'particle') mountParticle(stage, c, params);
     else if (s.type === 'motion') mountMotion(stage, c, params);
     else mountHost(stage, c, params);
   } catch (e) {
@@ -267,7 +239,6 @@ if (compositeStage) {
       const c = mod.default;
       const params = c.sample();
       if (s.type === 'canvas') mountCanvas(layer, c, params);
-      else if (s.type === 'particle') mountParticle(layer, c, params);
       else if (s.type === 'motion') mountMotion(layer, c, params);
       else mountHost(layer, c, params);
     } catch (e) {

@@ -16,8 +16,8 @@ const SCENES_ROOT = resolve(__HERE, "../../../../nf-core/scenes");
 const RATIOS = ["16:9", "9:16", "1:1", "4:3"] as const;
 const RATIO_DIRS: Record<string, string> = { "16:9": "16x9", "9:16": "9x16", "1:1": "1x1", "4:3": "4x3" };
 const ROLES = ["bg", "chrome", "content", "text", "overlay", "data"] as const;
-// v0.9 ADR-020: added particle / motion (frame-pure runtime types)
-const TYPES = ["canvas", "dom", "svg", "media", "particle", "motion"] as const;
+// v0.9 ADR-020: added motion (frame-pure runtime type)
+const TYPES = ["canvas", "dom", "svg", "media", "motion"] as const;
 
 const HELP = `nextframe scene-new --id=<camelCase> --role=<role> --type=<type> --ratio=<ratio> --theme=<theme> [opts]
 
@@ -27,7 +27,7 @@ Generate a new scene component scaffold that conforms to the scene v3 contract
 Required:
   --id          component id, camelCase, globally unique within theme (e.g. bilingualSub)
   --role        bg | chrome | content | text | overlay | data
-  --type        canvas | dom | svg | media | particle | motion  — determines render() signature
+  --type        canvas | dom | svg | media | motion  — determines render() signature
   --ratio       16:9 | 9:16 | 1:1 | 4:3
   --theme       theme name, e.g. anthropic-warm (must have existing theme.md)
 
@@ -125,24 +125,6 @@ function scaffold(opts: {
         object-fit: cover;
       " autoplay muted></video>
     \`;`;
-  } else if (type === "particle") {
-    renderSignature = "render(host, _t, params, _vp)";
-    mountComment = "v0.9 ADR-020: framework mounts <canvas> (2D) + calls runtime/particle.js. scene returns { emitter, field?, render }. Must NOT call Math.random — use mulberry32(emitter.seed + i*37) from runtime.";
-    renderBody = `    void host;  // framework manages <canvas> + loop
-    return {
-      emitter: {
-        count: params.count ?? 200,
-        seed: params.seed ?? 42,
-      },
-      // Optional velocity/position field. Pure function (x,y,t) → offset.
-      // field: (x, y, t) => ({ vx: Math.sin(t * 0.3), vy: 0 }),
-      render: (ctx, p, t) => {
-        const alpha = 0.4 + p.depth * 0.6 * (0.7 + 0.3 * Math.sin(t * 2 + p.i));
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(p.x, p.y, p.size, p.size);
-      }
-    };`;
   } else {
     // type === "motion" (NF-Motion, ADR-020)
     renderSignature = "render(host, _t, params, _vp)";

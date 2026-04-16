@@ -4,14 +4,13 @@
 // runs sample()+render()+describe() for each — branches on c.type:
 //   - canvas → real canvas context + encode PNG to /tmp/scene-previews/
 //   - dom/svg/media → minimal fake HTMLElement host, verify mutation occurred
-//   - particle/motion → verify config shape; optional frame-pure proof
+//   - motion → verify config shape; optional frame-pure proof
 
 import { parseFlags } from "../_helpers/_io.js";
 import { readdirSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createCanvas } from "../../lib/canvas-factory.js";
-import { dumpState } from "../../../../nf-core/engine/runtime/particle.js";
 import { renderMotion } from "../../../../nf-core/engine/runtime/motion.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -136,13 +135,6 @@ function verifyFramePure(
   const render = scene.render as ((host: unknown, t: number, params: unknown, vp: { width: number; height: number }) => unknown);
 
   try {
-    if (type === "particle") {
-      const dumpA = stableJson(dumpState(FRAME_PURE_T, scene, params, vp));
-      const dumpB = stableJson(dumpState(FRAME_PURE_T, scene, params, vp));
-      if (dumpA !== dumpB) return { id, pass: false, diff: "dumpState mismatch across identical renders" };
-      return { id, pass: true };
-    }
-
     if (type === "motion") {
       const errorsA: string[] = [];
       const errorsB: string[] = [];
@@ -210,7 +202,7 @@ export async function run(argv: string[]): Promise<number> {
         if (cr[k] === undefined) result.missing.push(k);
       }
       if (!VALID_TYPES.has(String(cr.type))) {
-        result.errors.push(`invalid type "${cr.type}" (must be canvas|dom|svg|media|particle|motion)`);
+        result.errors.push(`invalid type "${cr.type}" (must be canvas|dom|svg|media|motion)`);
       }
       if (typeof cr.intent === "string" && cr.intent.length < 50) {
         result.errors.push(`intent too short (${cr.intent.length} chars)`);

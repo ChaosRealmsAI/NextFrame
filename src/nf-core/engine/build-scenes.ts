@@ -155,9 +155,9 @@ export function buildSceneBundle(scene: { id: string; filePath: string; varName:
   const wasAdapted = adaptedCode !== scene.code;
   const body = wasAdapted
     ? `${adaptedCode}
-// v0.9 ADR-020 dispatcher: particle/motion types return a config object from render().
-// TODO(v0.9 implement): detect _def.type and bind to runtime/{particle|motion}.js.
-// For walking phase, these types fall through to the v3 adapter below; actual dispatch
+// v0.9 ADR-020 dispatcher: motion types return a config object from render().
+// TODO(v0.9 implement): detect _def.type and bind to runtime/motion.js.
+// For walking phase, this type falls through to the v3 adapter below; actual dispatch
 // to runtimes happens in Step 7 when runtime files become executable.
 // Adapter: v3 DOM-mutation render(host, t, params, vp) → string-returning render(t, params, vp)
 var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;

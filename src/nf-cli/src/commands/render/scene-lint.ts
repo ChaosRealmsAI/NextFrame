@@ -115,7 +115,7 @@ function lintFile(filePath: string, content: string, meta: Record<string, unknow
       what: `type=${type} 但 render 第 1 参叫 "${paramName}"，应为 host`,
       fix: `${type}: render(host, t, params, vp)`,
     });
-  } else if ((type === "particle" || type === "motion") && paramName !== "host") {
+  } else if (type === "motion" && paramName !== "host") {
     issues.push({
       severity: "error", code: "SIG_MISMATCH", file: rel, line: sigLineNo,
       what: `type=${type} 但 render 第 1 参叫 "${paramName}"，应为 host`,
@@ -123,7 +123,7 @@ function lintFile(filePath: string, content: string, meta: Record<string, unknow
     });
   }
 
-  // L7 (v0.9 ADR-020): frame-pure runtime types forbid obvious non-deterministic APIs.
+  // L7 (v0.9 ADR-020): frame-pure runtime type forbids obvious non-deterministic APIs.
   if (type === "motion") {
     const forbidden = [
       [/\bsetInterval\s*\(/, "setInterval"],
@@ -149,16 +149,6 @@ function lintFile(filePath: string, content: string, meta: Record<string, unknow
       });
     }
   }
-  if (type === "particle") {
-    if (/\bMath\.random\s*\(/.test(renderBody)) {
-      issues.push({
-        severity: "error", code: "L7_MATH_RANDOM_IN_PARTICLE", file: rel, line: sigLineNo,
-        what: `particle scene forbids Math.random — breaks determinism (ADR-020)`,
-        fix: `Use mulberry32(emitter.seed + i * 37) from runtime/particle.js.`,
-      });
-    }
-  }
-
   // L1: @keyframes in dom/svg/media render
   if ((type === "dom" || type === "svg" || type === "media") && /@keyframes\s+\w+/.test(renderBody)) {
     const kfLine = sigLineNo + renderBody.slice(0, renderBody.search(/@keyframes/)).split("\n").length - 1;

@@ -6,7 +6,7 @@
 node src/nf-cli/bin/nextframe.js scene-new \
   --id=<camelCase id> \
   --role=<bg|chrome|content|text|overlay|data> \
-  --type=<canvas|dom|svg|media|particle|motion> \
+  --type=<canvas|dom|svg|media|motion> \
   --ratio=<16:9|9:16|1:1|4:3> \
   --theme=<theme> \
   --name="<显示名>" \
@@ -18,7 +18,6 @@ node src/nf-cli/bin/nextframe.js scene-new \
 新 type 示例：
 
 ```bash
-node src/nf-cli/bin/nextframe.js scene-new --id=starfield --role=bg --type=particle --ratio=16:9 --theme=anthropic-warm --name="Starfield" --description="确定性星场"
 node src/nf-cli/bin/nextframe.js scene-new --id=heartLike --role=overlay --type=motion --ratio=16:9 --theme=anthropic-warm --name="Heart Like" --description="点赞语义动画"
 ```
 
@@ -31,9 +30,8 @@ node src/nf-cli/bin/nextframe.js scene-new --id=heartLike --role=overlay --type=
 | **dom** | 色值 100% 从 theme.md 复制 hex；禁自定义色。米白主题不能用深色背景（bg 必须是 theme.bg 或 theme.bg2）。禁 `border-radius > 2px` 如主题是杂志风。**t-driven inline style 做动画，禁 @keyframes**。 |
 | **media** | `sample()` 的 src **必须是真实可访问 URL**（如 `https://picsum.photos/1920/1080` / `https://placehold.co/1920x1080/e3ddd3/2c2418?text=Photo`），禁用 `"assets/placeholder.mp4"` 这种假 URL。 |
 | **motion** | **size 用 [400, 400]，不用 [W, H]**。shape at=[200, 200] 居中。这样 gallery 400px 缩略图里 shape 占比 ≥ 25%，能看清。viewport 是 gallery 外层控制，motion 内部坐标系独立。 |
-| **particle** | 必须 depth 分层（3 层 near/mid/far，size 和 alpha 跟 depth 走）；色温梯度（近暖远冷或相反）；alpha 由 `sin(t * phase)` 呼吸。count 30-200 按密度需要。 |
 | **svg** | `viewBox` 用 `0 0 1920 1080` 跟 vp 一致，内部坐标直接用 px。禁 CSS 动画，t-driven `stroke-dashoffset`。 |
-| **canvas** | 真的需要逐像素才用。否则能用 particle/motion/dom/svg 就换。 |
+| **canvas** | 真的需要逐像素才用。否则能用 motion/dom/svg 就换。 |
 
 ---
 

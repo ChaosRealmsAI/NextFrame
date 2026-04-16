@@ -322,23 +322,9 @@ ffprobe -show_entries stream=codec_type,codec_name,duration /tmp/out.mp4
 
 ---
 
-## 坑 20 · particle 的 render 里偷写 Math.random，L7 直接拦截
+## 坑 20 · particle 的 render 里偷写 Math.random（历史记录，已随 particle type 移除废除）
 
-**症状**：scene-lint 报 `particle scene forbids Math.random`；或者 gallery 每次刷新粒子分布都变。
-
-**根因**：粒子作者习惯性在 render/spawn 里写 `Math.random()`，破坏 frame-pure，seek 回同一时刻也回不到同一帧。
-
-**修复**：
-
-```js
-const rng = mulberry32(emitter.seed + i * 37);
-const x = rng();
-const y = rng();
-```
-
-用 `mulberry32(emitter.seed + i * 37)` 产出每个粒子的稳定随机数。
-
-**防复发**：所有 particle scene 都把随机入口收敛到 `spawn(i, emitter)`，render 只消费已经确定的粒子状态。
+**说明**：v0.9.2 已完全移除 `particle` type，这条坑位只保留作历史记录，不再适用于现行 scene recipe。
 
 ---
 
@@ -359,7 +345,7 @@ const y = rng();
 
 ## 坑 22 · 双状态机漂移（v0.9 踩过）
 
-**症状**：项目有 `nf-guide component recipe` + `.claude/skills/scene-dev/skill.md` 两套，AI 触发时用了旧的 skill（停在 4 type），写出来的组件没覆盖 particle/motion。
+**症状**：项目有 `nf-guide component recipe` + `.claude/skills/scene-dev/skill.md` 两套，AI 触发时用了旧的 skill（停在 4 type），写出来的组件没覆盖 motion。
 
 **根因**：两处都能触发组件开发，但只维护了一处。
 

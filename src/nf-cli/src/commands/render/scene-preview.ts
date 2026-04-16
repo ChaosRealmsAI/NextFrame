@@ -177,8 +177,6 @@ const c = mod.default;
 const params = c.sample();
 sampleJson.textContent = JSON.stringify(params, null, 2);
 
-function mulberry32(s) { return function(){ let x=s|=0; s=s+0x6D2B79F5|0; x=Math.imul(x^x>>>15,1|x); x=x+Math.imul(x^x>>>7,61|x)^x; return((x^x>>>14)>>>0)/4294967296; }; }
-
 function renderAt(t) {
   try {
     if (TYPE === 'canvas') {
@@ -192,32 +190,6 @@ function renderAt(t) {
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, VP.width, VP.height);
       c.render(ctx, t, params, VP);
-    } else if (TYPE === 'particle') {
-      let canvas = stage.querySelector('canvas');
-      if (!canvas) {
-        canvas = document.createElement('canvas');
-        canvas.width = VP.width; canvas.height = VP.height;
-        canvas.style.cssText = 'width:100%;height:100%;display:block';
-        stage.innerHTML = ''; stage.appendChild(canvas);
-      }
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, VP.width, VP.height);
-      const config = c.render(null, t, params, VP);
-      if (!config || !config.emitter) return;
-      const count = config.emitter.count || 100;
-      const seed = config.emitter.seed || 42;
-      const spawnFn = config.emitter.spawn;
-      for (let i = 0; i < count; i++) {
-        const rng = mulberry32(seed + i * 37);
-        let p;
-        if (spawnFn) { p = spawnFn(rng, i, VP); p.i = i; }
-        else { p = { i, x: rng()*VP.width, y: rng()*VP.height, depth: rng()*0.8+0.2, size: 0.75+rng()*2.25, alpha: 0.2+rng()*0.7, hue: rng()*360 }; }
-        if (config.field) { const d = config.field(p.x, p.y, t); if (d) Object.assign(p, d); }
-        ctx.save();
-        if (config.render) config.render(ctx, p, t);
-        else { ctx.globalAlpha = p.alpha||0.5; ctx.fillStyle='#fff'; ctx.fillRect(p.x,p.y,p.size||2,p.size||2); }
-        ctx.restore();
-      }
     } else if (TYPE === 'motion') {
       const config = c.render(null, t, params, VP);
       if (!config || !config.layers) { stage.innerHTML = '<div style="color:#e06c75;padding:24px">motion: no layers</div>'; return; }

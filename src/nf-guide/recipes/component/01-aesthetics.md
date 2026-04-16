@@ -377,8 +377,7 @@ const breathe = 1.0 + 0.03 * Math.sin(t * Math.PI);
 | **画笔笔触 / 手绘** | `stroke` + `lineCap='round'` | DOM 不能自由绘制 |
 | **像素滤镜** | `getImageData` 操作 | 只有 canvas 能做 |
 
-**必用 Canvas 的 3 种组件**：
-- `particle-*`（粒子 / 星场 / 火花）
+**必用 Canvas 的 2 种组件**：
 - `wave-*`（波形 / 脉冲 / 音频可视化）
 - `brush-*`（手绘 / 书法 / 水墨）
 
@@ -386,11 +385,9 @@ const breathe = 1.0 + 0.03 * Math.sin(t * Math.PI);
 
 | type | 必须做到 | 禁止偷懒 |
 |------|---------|---------|
-| **particle** | 至少做出 **near/mid/far 深度分层** + **色温梯度** + **呼吸透明度**，让近景更亮更大更快，远景更冷更淡更慢 | 全部粒子同大小、同颜色、同透明度 |
 | **motion** | 优先拼 **behavior 预设 + shape 库 + layers**，让 impact/pulse/dart 这类语义先成立 | 上来手写一长串 keyframe tracks，最后节奏生硬 |
 
 补充要求：
-- **particle**：深度至少三层，不然缩略图看起来就是一层死点阵。
 - **motion**：只有 behavior 真覆盖不了的局部属性，才补少量显式 track。
 
 ### 8.5 持续动画（idle motion）铁律
