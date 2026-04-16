@@ -67,6 +67,35 @@ node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme>
 - `particle` → 看 Canvas 2D 粒子分层、密度、呼吸是否成立
 - `motion` → 看 SVG 图层、behavior 节奏、shape 尺度是否成立
 
+### 3.5 · gallery 截图像素门禁（硬关卡 · 强制）
+
+**smoke pass ≠ 视觉 OK**。必须用 playwright 截图+像素检测确认真的有内容。
+
+```bash
+# 1. 启动 gallery 后台
+node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme> --no-open &
+
+# 2. playwright full-page 截图
+npx playwright screenshot --full-page --wait-for-timeout 6000 \
+  http://localhost:8765/gallery-<ratio-dir>-<theme>.html tmp/gallery-check.png
+
+# 3. Read 截图 + 肉眼/像素检查每个组件卡片
+```
+
+**硬指标**：
+- 每个组件卡片非黑像素 ≥ 30%（Read 后用眼看，或脚本算）
+- 组件视觉主体能一眼识别（心就是心 / 数字就是数字 / 图就是图）
+- 配色与 theme.md 一致（米白主题组件不能黑底）
+
+**不过 = 重写。** 不是补丁。
+
+### 3.6 · 详情页 scrub 门禁
+
+每个新 type 组件点进详情页后，拖 scrubber 从 t=0 → t=end：
+- 画面每个时刻都有非黑内容（不能中间黑一截）
+- 动画有明显变化（静帧 = 废）
+- 回拖到同一 t 画面完全一致（frame-pure 视觉验证）
+
 **失败情况**：
 - 画面空白 → innerHTML 没设或 CSS 把内容藏到画布外
 - 动画不动 → 没有真正读 `t`，或新 type 没按 contract 返回 runtime config
@@ -116,7 +145,9 @@ node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme>
 ### 契约
 
 - [ ] smoke test 通过（`scene-smoke --ratio --theme`）？
-- [ ] gallery 看到预期效果？
+- [ ] **gallery 截图 playwright + 非黑像素 ≥ 30%**（强制 · §3.5）？
+- [ ] **详情页 scrub 每时刻都有画面**（强制 · §3.6）？
+- [ ] gallery 配色与 theme.md 一致？
 - [ ] 11 必填 + 18 AI 理解字段全齐？
 - [ ] TODO 注释块已删，status 从 experimental 改为 stable？
 

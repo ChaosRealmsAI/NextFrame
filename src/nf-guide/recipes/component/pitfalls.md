@@ -355,3 +355,30 @@ const y = rng();
 用 `mulberry32(emitter.seed + i * 37)` 产出每个粒子的稳定随机数。
 
 **防复发**：所有 particle scene 都把随机入口收敛到 `spawn(i, emitter)`，render 只消费已经确定的粒子状态。
+
+---
+
+## 坑 21 · smoke pass 但 gallery 黑屏（v0.9 真实教训）
+
+**症状**：`scene-smoke` 报 20/20 pass 全绿，但打开 gallery 整卡片黑屏或只有一点点内容，根本看不见组件。
+
+**根因**：smoke 只验证契约（字段存在 + render 不抛 + 返回值类型对），**不验证视觉效果**。motion 组件 size=[1920,1080] shape=100 在 400px 缩略图里 < 3% 面积；dom 组件用了深色背景与米白主题冲突；media 组件 src 用 `"assets/placeholder.mp4"` 这种不存在的 URL。
+
+**修复**：
+- motion: size 必须 `[400, 400]`，不用 viewport 尺寸
+- dom: 色值 100% 从 theme.md 复制，米白主题禁暗色
+- media: sample().src 用真实可访问 URL（picsum.photos / placehold.co）
+
+**防复发**：03-verify §3.5 加硬关卡 — playwright 截图 + 非黑像素 ≥ 30%。不过 = 重写。smoke 只是入门，gallery 截图过了才算完成。
+
+---
+
+## 坑 22 · 双状态机漂移（v0.9 踩过）
+
+**症状**：项目有 `nf-guide component recipe` + `.claude/skills/scene-dev/skill.md` 两套，AI 触发时用了旧的 skill（停在 4 type），写出来的组件没覆盖 shader/particle/motion。
+
+**根因**：两处都能触发组件开发，但只维护了一处。
+
+**修复**：删除 scene-dev skill，nf-guide 是唯一入口（ADR-008 更新指向 nf-guide）。
+
+**防复发**：任何新状态机/recipe 必须先查 nf-guide，不建平行目录。CLAUDE.md `src/nf-guide/` 已写"nf-guide is sole state-machine truth"。
