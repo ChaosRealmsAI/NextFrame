@@ -91,12 +91,22 @@ function combineValue(left, right, mode) {
   return clone(right);
 }
 
+function identityValue(value, mode) {
+  if (Array.isArray(value)) return value.map((entry) => identityValue(entry, mode));
+  return mode === "add" ? 0 : 1;
+}
+
 function sampleComposite(spec, t, clamp, mode) {
+  const range = boundsFor(spec);
+  if (!range) return null;
+  if (!clamp && (t < range.start || t > range.end)) return null;
+  const time = clamp ? Math.max(range.start, Math.min(range.end, t)) : t;
   let value = null;
   for (const track of spec.tracks || []) {
-    const next = sampleSpec(track, t, clamp);
-    if (next === null) continue;
-    value = value === null ? clone(next) : combineValue(value, next, mode);
+    const next = sampleSpec(track, time, false);
+    const current = next === null ? identityValue(sampleSpec(track, time, true), mode) : next;
+    if (current === null) continue;
+    value = value === null ? clone(current) : combineValue(value, current, mode);
   }
   return value;
 }
