@@ -346,6 +346,43 @@ ffprobe -show_entries stream=codec_type,codec_name,duration /tmp/out.mp4
 
 ---
 
+## 坑 24 · CSS @keyframes 在 build+record 里每帧都重播（ADR-021 再次确认）
+
+**症状**：gallery 看着动画正常，但录出来的 mp4 里对应 layer 每一秒都是 `opacity:0` 的初始帧，完全看不见。
+
+**根因**：build-v08 + runtime-v08 走 compose loop，每帧都 **重新 `render(t, params, vp) → string`** 然后把字符串灌回 stage。新 DOM 意味着 CSS animation 每帧都重置从 0 开始 — 拿到的永远是第 0 关键帧。
+
+**修复**：render 里**只写 t-driven inline style**，不写 `@keyframes` / `animation:` / `transition:`。
+
+```js
+// ❌ 反例
+return `<style>@keyframes fade { from { opacity:0 } to { opacity:1 } }
+  .card { animation: fade 0.6s }</style><div class="card">...</div>`;
+
+// ✅ 正确
+const k = Math.min(t / 0.6, 1);
+return `<div style="opacity:${k};...">...</div>`;
+```
+
+**防复发**：scene-lint L1（CSS @keyframes 出现在 render 返回字符串里 → 直接 fail）。
+
+---
+
+## 坑 25 · scene type 白名单只 dom|media（ADR-021）
+
+**症状**：组件写了 `type: "canvas"` / `"svg"` / `"motion"` / `"shader"` / `"particle"`，scene-smoke 或 build-v08 报 `UNSUPPORTED_SCENE_TYPE`，整个 build 终止。
+
+**根因**：v0.9.3 ADR-021 收敛 scene type 只剩 `dom` / `media`。canvas / svg / motion 全部合并到 dom（内部 HTML 想怎么写就怎么写）。白名单硬 enforcement：
+- scene-lint L7
+- build-v08.ts validateSceneIds
+- scene-new CLI 只接 `--type=dom|media`
+
+**修复**：改 `type` 字段 ∈ {dom, media}。不动 render body — canvas/svg 都继续在 dom 的 return HTML 里写。
+
+**防复发**：CLI --type 枚举 / build-v08 白名单 / scene-lint L7 三处门禁，违反 = 立即 BLOCKED。
+
+---
+
 ## 坑 23 · 双状态机漂移（v0.9 踩过）
 
 **症状**：项目有 `nf-guide component recipe` + `.claude/skills/scene-dev/skill.md` 两套，AI 触发时用了旧的 skill（停在旧 scene type 世界观），写出来的组件和现行 recipe 不一致。

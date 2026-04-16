@@ -7,7 +7,7 @@
 
 ## 顺序
 
-`00 ratio` → `00a tts` → `01 check` → `02 scene` → `03 anchors` → `04 timeline` → `05 validate` → `06 build` → `07 record` → `08 concat`
+`00 ratio` → `00a tts` → `01 check` → `02 scene` → `03 anchors` → `04 timeline` → `05 validate` → `06 build` → `07 record` → `08 concat` → `09 verify`
 
 ## 流程图
 
@@ -30,6 +30,8 @@ build
 record
   ↓
 concat（可选）
+  ↓
+verify（硬指标 + LLM 判帧）
 ```
 
 ## 步骤一览
@@ -46,6 +48,7 @@ concat（可选）
 | `build` | `nf-guide produce build` | `out.html` |
 | `record` | `nf-guide produce record` | `demo.mp4` |
 | `concat` | `nf-guide produce concat` | `episode.mp4` |
+| `verify` | `nf-guide produce verify` | `verify-report.md` |
 
 ## 记忆法
 

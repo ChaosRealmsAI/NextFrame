@@ -1,203 +1,149 @@
-# Step 2 · 实现（CLI 生成 + 填内容 + 加动画）
+# Step 2 · 实现（CLI 生成骨架 · render 签名 pin 死）
 
-## 1 · 生成骨架（CLI，不手写）
+## 1 · render 签名（ADR-021 冻结）
+
+**只有一个签名**：
+
+```js
+render(t, params, vp) { return "<div>...</div>"; }
+```
+
+- `t` — layer-local 秒数（0 = 组件进入那一刻）
+- `params` — scene clip 的 params
+- `vp` — `{ width, height }` viewport 像素
+- 返回 — 非空 HTML string，至少含 1 个标签
+
+**禁 `render(host, ...)`**（旧签名）/ **禁 `render(ctx, ...)`**（canvas 旧写法）。
+
+## 2 · CLI 生成骨架（不要手写）
 
 ```bash
 node src/nf-cli/bin/nextframe.js scene-new \
-  --id=<camelCase id> \
+  --id=<camelCaseId> \
   --role=<bg|chrome|content|text|overlay|data> \
   --type=<dom|media> \
-  --ratio=<16:9|9:16|1:1|4:3> \
-  --theme=<theme> \
+  --ratio=<16:9|9:16> \
+  --theme=<theme-name> \
   --name="<显示名>" \
   --description="<一句话用途>"
 ```
 
-生成 `src/nf-core/scenes/{ratio}/{theme}/{role}-{id}.js`，包含全 11 必填 + 18 AI 字段 + render/describe/sample 骨架。
+生成 `src/nf-core/scenes/{ratio}/{theme}/{role}-{id}.js`，含 11 必填 + 18 AI 字段 + render/describe/sample 骨架。**type 只能 `dom` / `media`**。
 
-示例：
+## 3 · 起点模板（复制改，不从零写）
 
 ```bash
-node src/nf-cli/bin/nextframe.js scene-new --id=heartLike --role=overlay --type=dom --ratio=16:9 --theme=anthropic-warm --name="Heart Like" --description="点赞反馈 SVG 动效"
+# dom
+cp src/nf-core/scenes/_examples/scene-dom-card.js \
+   src/nf-core/scenes/<ratio>/<theme>/<role>-<id>.js
+# media
+cp src/nf-core/scenes/_examples/scene-media-video.js \
+   src/nf-core/scenes/<ratio>/<theme>/<role>-<id>.js
 ```
 
-### 1.5 · 每种 type 的强约束
+然后改 id / name / theme / render / sample。
 
-**先读 theme.md**：color hex / font / grid 全部从那里复制，**禁止自己造色**。
+## 4 · frame-pure 硬检查
 
-| type | 硬约束 |
-|------|--------|
-| **dom** | 所有自生成内容都放这里。色值 100% 从 theme.md 复制 hex。动画必须 t-driven，禁 `@keyframes`。内部可以自由写 `<svg>` / `<canvas>` / `<video>` / `<script>`。 |
-| **media** | `sample().src` 必须是真实可访问 URL 或真实资源路径，禁 `"assets/placeholder.mp4"` 这种假值。只在组件真的依赖外部资源时用。 |
+```js
+// ❌ 全禁（让同 t 不同输出）
+Date.now()  performance.now()  Math.random()
+setInterval(...)  setTimeout(...)  requestAnimationFrame(...)
 
----
+// ✅ 用传入的 t 算
+const phase = Math.sin(t * Math.PI * 2 / 3);   // 3s 周期呼吸
+const counter = Math.floor(t * 30);             // t 驱动计数
+```
 
-## 2 · 填 18 AI 理解字段（按重要度）
+`frame_pure` 字段：读 t → `false`（每帧必录）；不读 → `true`（recorder 可跳帧）。
 
-### 最重要
+## 5 · CSS 约束
 
-**`intent`** — ≥ 50 字真实推理，不套话：
+- ❌ **禁 CSS `@keyframes`** — compose 每帧重建 DOM，动画永远停在 t=0
+- ❌ **禁 `animation:` / `transition:` 做入场**
+- ✅ **必须 t-driven inline style**：在 render 里用 t 算 opacity / transform 数值
+
+```js
+render(t, params, vp) {
+  const k = Math.min(t / 0.6, 1);
+  const eased = 1 - Math.pow(1 - k, 3);
+  return `<div style="
+    opacity:${eased};transform:translateY(${(1-eased)*20}px);
+    background:#0a1628;color:#f5f2e8;padding:64px;
+  ">${params.text}</div>`;
+}
+```
+
+## 6 · dom 内部随便写
+
+dom 不限制 HTML 内部结构 — SVG / `<canvas>` + inline script / CSS conic-gradient / filter / 3D transform 都可以。关键：都得是 t-driven，别用 `@keyframes`。
+
+```js
+// SVG stroke-dash
+return `<svg viewBox="0 0 ${vp.width} ${vp.height}">
+  <path d="..." stroke-dashoffset="${620*(1-t/1.8)}"/></svg>`;
+
+// CSS conic-gradient 跟 t 转
+return `<div style="background:conic-gradient(from ${t*60}deg,#ff6b35,#0a1628);"></div>`;
+```
+
+## 7 · media 特殊规则
+
+```js
+export default {
+  type: "media",
+  videoOverlay: true,   // recorder 识别视频覆盖层
+  render(t, params, vp) {
+    return `<video src="${params.src}" autoplay muted playsinline
+      style="width:100%;height:100%;object-fit:cover;"></video>`;
+  },
+  sample() { return { src: "./real-clip.mp4" }; },  // 必须真实路径
+};
+```
+
+视频覆盖坐标见 pitfalls 坑 11。
+
+## 8 · 18 AI 字段（intent ≥ 50 字真实推理）
 
 ```js
 intent: `
-  访谈类视频的核心字幕组件。设计取舍：
-  1. 中文在英文下方 — 目标观众优先听英文，中文辅助。
-  2. 中文字号 0.7 倍 — 测试出的"看清但不抢戏"平衡点。
-  3. 用 PingFang SC 不思源 — macOS 自带零依赖。
-  4. 位置 y=0.78~0.82 — 避开人脸三分线和底部进度条。
-  5. 不做花字 — 访谈严肃，花字破坏沉浸感。
+  开场 hook 组件。设计取舍：
+  1. serif 200px 大数字 — 对标 3Blue1Brown，一眼记住。
+  2. 数字上方留白 40%，视觉重心压到下三分之二。
+  3. counter 动画 1.2s easeOut cubic — 有冲击感不拖。
+  4. 只用 --bg + --ac 两色，不让辅助色抢戏。
 `,
+requires: [], pairs_well_with: [], conflicts_with: [], alternatives: [],
+visual_weight: "heavy", z_layer: "foreground", mood: ["calm"],
 ```
 
-**`when_to_use` / `when_not_to_use`** 要写具体场景，不写套话。
-
-### 配伍字段
+## 9 · sample / describe 速查
 
 ```js
-requires: ["bg-gradient", "content-video"],
-pairs_well_with: ["chrome-header", "overlay-progress"],
-conflicts_with: ["text-singleSub", "text-anchoredSub"],
-alternatives: ["text-singleSub", "text-kineticSub"],
-```
+sample() { return { title: "NextFrame", subtitle: "JSON → MP4" }; }  // 禁 Lorem ipsum
 
-### 视觉权重
-
-```js
-visual_weight: "heavy",
-z_layer: "foreground",
-mood: ["calm", "professional"],
-```
-
----
-
-## 3 · 实现 render
-
-### DOM 组件（主力）
-
-```js
-render(host, t, params, vp) {
-  const fadeDur = 0.6;
-  const p = Math.min(Math.max(t / fadeDur, 0), 1);
-  const eased = 1 - Math.pow(1 - p, 3);
-
-  host.innerHTML = `
-    <div style="
-      position:absolute;
-      left:50%;
-      top:50%;
-      width:${vp.width * 0.6}px;
-      padding:56px 64px;
-      transform:translate(-50%, calc(-50% + ${20 * (1 - eased)}px));
-      opacity:${eased};
-    ">
-      <svg viewBox="0 0 400 400" width="240" height="240">...</svg>
-      <div>${escapeHtml(params.text || "")}</div>
-    </div>
-  `;
-}
-```
-
-**关键点**：
-- 动画走 t-driven，不用 CSS `@keyframes`
-- 读了 `t` 就必须 `frame_pure: false`
-- 内部写 `<svg>` / `<canvas>` / `<video>` 都算 `dom`
-- 允许返回 HTML 字符串，也允许 mutate host
-
-### 在 dom 里写 Canvas
-
-```js
-render(host, t, params, vp) {
-  host.innerHTML = `<canvas width="${vp.width}" height="${vp.height}" style="position:absolute;inset:0;width:100%;height:100%"></canvas>`;
-  const canvas = host.querySelector("canvas");
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, vp.width, vp.height);
-  // t-driven draw
-}
-```
-
-### 在 dom 里写 SVG
-
-```js
-render(host, t, params, vp) {
-  const dash = 620 * (1 - Math.min(t / 1.8, 1));
-  host.innerHTML = `
-    <svg viewBox="0 0 ${vp.width} ${vp.height}" width="100%" height="100%">
-      <path d="..." stroke-dasharray="620" stroke-dashoffset="${dash}"/>
-    </svg>
-  `;
-}
-```
-
-### Media 组件
-
-```js
-render(host, _t, params, vp) {
-  host.innerHTML = `
-    <video src="${params.src}" style="
-      position:absolute;
-      left:0;top:0;
-      width:${vp.width}px;
-      height:${vp.height}px;
-      object-fit:cover;
-    " autoplay muted></video>
-  `;
-}
-```
-
----
-
-## 4 · sample() 用真实业务内容
-
-从 script.md 摘真实台词，不要 Lorem ipsum：
-
-```js
-sample() {
-  return {
-    label: "类比",
-    text: "你对我说「帮我写个天气工具」—— 你以为我收到的就这一句话？",
-  };
-}
-```
-
----
-
-## 5 · describe() 返回结构化状态
-
-让 AI 不看像素就知道画面在演什么：
-
-```js
 describe(t, params, vp) {
   return {
-    sceneId: "analogyCard",
-    phase: t < 0.7 ? "enter" : "show",
-    progress: Math.min(t / 0.7, 1),
-    visible: true,
-    params,
-    elements: [
-      { type: "card", role: "primary" },
-      { type: "label", role: "eyebrow", value: params.label || "" },
-    ],
+    sceneId: "heroTitle", phase: t < 0.6 ? "enter" : "show",
+    progress: Math.min(t/0.6, 1), visible: true, params,
+    elements: [{ type: "title", role: "headline", value: params.title }],
     boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
   };
 }
 ```
 
----
+## 10 · 硬检查清单（写完必看）
 
-## 6 · JS 工具函数就地写在文件底部
-
-```js
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-```
-
-easing / svg path / canvas mount helper 都就地写，不要把 scene 变成跨模块依赖网。
+- [ ] render 签名 = `render(t, params, vp)` 返回 string
+- [ ] 返回非空 string 且 ≥ 1 个 HTML 标签
+- [ ] hex / 字号 / 字体全从 theme.md 拷贝（零 import）
+- [ ] type ∈ {dom, media}
+- [ ] 读 t → `frame_pure: false`
+- [ ] 无 `Date.now` / `Math.random` / `setInterval` / `requestAnimationFrame`
+- [ ] 无 CSS `@keyframes` / `animation:` / `transition:`
+- [ ] intent ≥ 50 字
+- [ ] sample() 真实业务内容
 
 ## 下一步
 
-实现完 → `cargo run -p nf-guide -- component verify`
+`cargo run -p nf-guide -- component verify`

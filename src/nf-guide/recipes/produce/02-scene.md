@@ -1,216 +1,137 @@
-# Step 2: 做组件
+# Step 02 · 做组件（批量流程 · 契约总览）
 
-> **做单个高质量组件**：走专用 recipe `nf-guide -- component`（4 步：pick → aesthetics → craft → verify，带审美/动画/视觉主体规范）。
-> **本页只讲批量流程 + 契约总览**。
+> **做单个高质量组件**：走专用 recipe `cargo run -p nf-guide -- component`（4 步：pick → aesthetics → craft → verify）。
+> 本页只讲批量流程 + 契约总览。
 
-```bash
-cargo run -p nf-guide -- component              # 打造单组件的完整状态机
-cargo run -p nf-guide -- component pick         # 选 role/type/视觉主体
-cargo run -p nf-guide -- component aesthetics   # 吸收 5 位顶级创作者 DNA
-cargo run -p nf-guide -- component craft        # CLI 生成 + 填内容 + CSS 动画
-cargo run -p nf-guide -- component verify       # smoke + gallery + checklist 13 项
+## 1 · type 只有两种（ADR-021，不再讨论）
+
+```
+需要挂真实外部 <video> / <img> / <audio>? → media
+else → dom（默认，覆盖一切）
 ```
 
-> **完整规范见**: `spec/standards/project/scene/scene-component-system.html`
+| type | render 签名 | 用途 |
+|------|-------------|------|
+| **dom** | `render(t, params, vp) → string` | 卡片 / 标题 / 大数字 / 图表 / SVG / canvas / filter / 背景 |
+| **media** | `render(t, params, vp) → string` 内含 `<video>` / `<img>` / `<audio>` | 真实外部资源 |
 
-## 2.0a 前置检查：theme.md 存在吗？
+**禁其他 type**（canvas / svg / motion / shader / particle）— build-v08 会拒绝报 `UNSUPPORTED_SCENE_TYPE`。
+
+**需要的 scene 不存在？** → 必须回 component recipe 造：
 
 ```bash
-ls src/nf-core/scenes/{ratio-dir}/{theme}/theme.md
+cargo run -p nf-guide -- component
 ```
 
-- ✅ 存在 → 继续往下
-- ❌ 不存在 → **先跑 design recipe 出 theme.md**：
-  ```bash
-  cargo run -p nf-guide -- design        # 3 步: brief → tokens → write
-  ```
-  没有 theme.md 就开始写组件 = 设计语言靠猜 = 后续组件不一致。
-
-## 2.0 起手原则（必须先过脑子）
+## 2 · 起手原则（必先过脑）
 
 1. **一个组件 = 一个 .js 文件**，路径：`src/nf-core/scenes/{ratio}/{theme}/{role}-{name}.js`
-2. **零 import** — 颜色/坐标/工具函数全在文件里写死或内联
-3. **default export 一个对象** — 含 11 必填 + 18 AI 理解字段 + render/describe/sample 三函数
-4. **文件本身就是文档** — 未来 AI 看一眼就能用、改、抄，不用读 README
+2. **零 import** — 颜色 / 坐标 / 工具全在文件里写死
+3. **default export 一个对象** — 含 11 必填 + 18 AI 字段 + render/describe/sample
+4. **文件本身就是文档** — 未来 AI 看一眼就能用
 
-## 2.1 决定 type（最关键的一步，选错全错）
+## 3 · 起点模板（复制 `_examples/`）
 
+```bash
+ls src/nf-core/scenes/_examples/
+# scene-dom-card.js      ← dom 起点
+# scene-media-video.js   ← media 起点
+
+cp src/nf-core/scenes/_examples/scene-dom-card.js \
+   src/nf-core/scenes/<ratio>/<theme>/<role>-<id>.js
 ```
-需要嵌入真实视频/图/音频？      → media
-是矢量图标 / 几何箭头？         → svg
-是 UI 布局（卡片/列表/标签/聊天）? → dom（默认！）
-是逐像素效果（grain/blur/粒子）? → canvas
-不确定？                         → 先 dom，扛不住再升级
-```
 
-| type | render 签名 | 最常见用途 |
-|------|-------------|-----------|
-| **dom** | `render(host, _t, params, vp)` mutate host | 卡片 / 列表 / 标签 / 聊天 / 标题 / 代码块 |
-| **svg** | `render(host, _t, params, vp)` 追加 SVG 子元素 | 流程图箭头 / 矢量图标 |
-| **canvas** | `render(ctx, _t, params, vp)` ctx.fillXxx | 滤镜 / 粒子 / 真实视频帧合成 |
-| **media** | `render(host, _t, params, vp)` 挂 video/img | B-roll / 封面图 |
+**别从 0 写 — 这两个样例是契约正确的最小起点**。
 
-**反模式警告**：把 UI 类组件硬塞 canvas → 中文字体方框 + 布局靠手算 + 改字号要重画。
-
-## 2.2 读 theme.md 拿设计语言
-
-每个 theme 都有 `theme.md`，**纯文档，AI 读、代码不 import**：
+## 4 · 读 theme.md 拿设计语言
 
 ```bash
 cat src/nf-core/scenes/{ratio}/{theme}/theme.md
 ```
 
-里面有：配色 hex / 字体 / 字号阶梯 / 网格坐标 / 气质描述 / 图层顺序。
+有：配色 hex / 字体 / 字号阶梯 / 网格坐标 / 气质。**所有值复制粘贴到组件里写死**，改 theme 用 sed 批改。
 
-**所有值复制粘贴到组件里，写死。改 theme 用 sed 批量改，不抽 token。**
-
-## 2.3 CLI 生成骨架（不要手抄模板）
-
-用 `nextframe scene-new` 一条命令生成完整骨架：
+## 5 · CLI 生成骨架
 
 ```bash
 node src/nf-cli/bin/nextframe.js scene-new \
-  --id=chapterMark \
-  --role=overlay \
-  --type=dom \
-  --ratio=16:9 \
-  --theme=anthropic-warm \
-  --name="章节标记" \
-  --description="左上角章节编号 + 标题"
+  --id=<camelCaseId> \
+  --role=<bg|chrome|content|text|overlay|data> \
+  --type=<dom|media> \
+  --ratio=<16:9|9:16> \
+  --theme=<theme> \
+  --name="<显示名>" \
+  --description="<一句话用途>"
 ```
 
 CLI 会：
-- 按 `type` 生成正确的 render 签名（canvas → `(ctx,...)`, dom/svg/media → `(host,...)`）
-- 内置所有 11 必填 + 18 AI 理解字段 + describe + sample
-- 内置型适配的 render 示例代码（能直接跑，不是空函数）
-- 内置注释说明每个字段干嘛
-- 自动校验 id 是 camelCase、role/type/ratio 在枚举内、theme 目录存在
-- 输出文件路径 `{ratio}/{theme}/{role}-{id}.js`
+- 生成正确的 render 签名 `(t, params, vp) → string`
+- 内置 11 必填 + 18 AI 字段 + describe + sample
+- 内置 t-driven 示例 render body（能直接跑）
+- 自动校验 id camelCase / role / type 在枚举内 / theme 目录存在
+- type 只接受 `dom` 或 `media`
 
-**生成后要做的**（文件里有 TODO 清单提醒）：
-
-1. 填 `intent`（≥ 50 字真实推理，不是套话）
-2. 填 `when_to_use` / `when_not_to_use` / `limitations` 具体内容
-3. 调 `params` schema 匹配你真实要的入参
-4. 改 `render()` body（骨架是可跑示例，但不是你的最终视觉）
-5. 改 `sample()` 返回真实业务内容
-6. `status` 从 `experimental` 改成 `stable`
-
-**别干的事**：
-- ❌ 别手写 file from scratch — 一定用 CLI 生成骨架
-- ❌ 别复制已有组件改 — 容易漏字段
-- ❌ 别直接提交含 TODO 的文件 — TODO 全填完再提交
-
-## 2.4 11 必填字段速查
+## 6 · 11 必填 + 18 AI 字段速查
 
 ```
-身份: id / name / version
-归属: ratio / theme / role        ← role: bg|chrome|content|text|overlay|data
-语义: description / duration_hint
-渲染: type / frame_pure / assets
-契约: params
+11 必填:  id / name / version / ratio / theme / role / description /
+         duration_hint / type / frame_pure / assets + params
+18 AI 字段:
+  意图(6): intent / when_to_use / when_not_to_use / limitations / inspired_by / used_in
+  配伍(4): requires / pairs_well_with / conflicts_with / alternatives
+  权重(3): visual_weight / z_layer / mood
+  索引(5): tags / complexity / performance / status / changelog
 ```
 
-## 2.5 18 AI 理解字段速查
+**intent 必须 ≥ 50 字真实推理**。
 
-```
-理解意图（6）: intent / when_to_use / when_not_to_use / limitations / inspired_by / used_in
-配伍关系（4）: requires / pairs_well_with / conflicts_with / alternatives
-视觉权重（3）: visual_weight / z_layer / mood
-索引工程（5）: tags / complexity / performance / status / changelog
-```
-
-**`intent` 必须 ≥ 50 字真实推理**（为什么要这个组件、设计取舍、视觉哲学），不能写"This is a foo"。
-
-## 2.6 写 render 的硬规则
+## 7 · render 硬规则（table）
 
 | # | 规则 | 反例 |
 |---|------|------|
-| 1 | 用 `viewport.width / height`，不硬编码 1920/1080 | `ctx.fillText(t, 540, 1500)` |
-| 2 | 颜色 hex 直接写，不 import token | `import { TOKENS }` |
-| 3 | frame_pure: 同 t 同 params → 同画面 | `Date.now()` / `Math.random()` |
-| 4 | 不 import 任何东西 | `import { utils }` |
-| 5 | 系统字体（PingFang SC / Hiragino / Songti / SF Mono），不外部下载 | google fonts CDN |
-| 6 | 文件 ≤ 500 行 | — |
-| 7 | 未用的参数加 `_` 前缀（`_t`），躲 TS strict | `function (ctx, t, ...) {}` |
+| 1 | render 签名 `(t, params, vp) → string` | `(host, t, ...)` / `(ctx, ...)` |
+| 2 | 返回非空 string + ≥ 1 个 HTML 标签 | return "" / return undefined |
+| 3 | 用 `vp.width / vp.height`，不硬编码 1920/1080 | `font-size: 48px` 不缩放 |
+| 4 | 颜色 hex 直接写，不 import | `import { TOKENS }` |
+| 5 | frame_pure: 同 t 同 params 同输出 | `Date.now()` / `Math.random()` |
+| 6 | 无 CSS `@keyframes` / `animation:` / `transition:` | 会被 compose 每帧重置 |
+| 7 | 系统字体 | google fonts CDN |
+| 8 | 文件 ≤ 500 行 | — |
 
-## 2.7 写 describe 的目的
-
-让 AI **不用看像素**就知道组件当前在演什么：
-
-```javascript
-describe(_t, params, vp) {
-  return {
-    sceneId: "...",
-    phase: "enter" | "hold" | "exit" | "hidden",
-    progress: 0..1,
-    visible: true,
-    params,
-    elements: [{ type, role, value, ... }],   // 当前画面上的逻辑元素
-    boundingBox: { x, y, w, h },
-  };
-}
-```
-
-debug / 自验 / AI 回看时神器。
-
-## 2.8 写 sample 的目的
-
-返回**能直接跑**的参数样例。最好用真实业务内容（从 script.md 摘）。
-
-```javascript
-sample() {
-  return { title: "...", subtitle: "..." };
-}
-```
-
-CLI 三层披露（L2）输出 sample 时直接复用。
-
-## 2.9 写完后自验（强制 4 步）
+## 8 · 写完自验（强制 4 步）
 
 ```bash
 # 1. 语法
 node --check src/nf-core/scenes/{ratio}/{theme}/{role}-{name}.js
 
-# 2. 加载（出现在列表）
-node src/nf-cli/bin/nextframe.js scenes | grep {id}
+# 2. 出现在列表
+node src/nf-cli/bin/nextframe.js scenes --theme={theme} | grep {id}
 
-# 3. smoke test（30 字段 + render+describe+sample 不抛）
-# 自动按 c.type 分派：canvas → 画 PNG；dom/svg/media → fake host 验证 mutation
-node src/nf-cli/bin/nextframe.js scene-smoke --ratio=16:9 --theme={theme}
+# 3. smoke（type 白名单 + render 不抛 + intent 够）
+node src/nf-cli/bin/nextframe.js scene-smoke --theme={theme} --json
 
-# 4. 真实视觉（批量预览 + 浏览器渲染 dom/svg/media）
-node src/nf-cli/bin/nextframe.js scene-gallery --ratio=16:9 --theme={theme}
-# 自动生成 gallery-16x9-{theme}.html + 内置 http server 8765 + 开浏览器
-# AI 可 curl 取页面源码或让用户人眼看
+# 4. gallery 真实视觉
+node src/nf-cli/bin/nextframe.js scene-gallery --theme={theme}
 ```
 
-任一不过 → 改 → 重跑，循环到全过。
+任一不过 → 改 → 重跑。
 
-**canvas 组件**：smoke test 直接输出 PNG，AI 用 Read 工具看图自查。
-**dom/svg/media 组件**：smoke test 只验证 render 有输出（host 被 mutate），真实视觉在 step 05 build 阶段验证。
-
-## 2.10 检查清单（checklist）
+## 9 · Checklist
 
 - [ ] 文件路径正确 `scenes/{ratio}/{theme}/{role}-{name}.js`
 - [ ] default export 对象
-- [ ] 11 必填字段全有
-- [ ] 18 AI 理解字段全有，intent ≥ 50 字真实推理
-- [ ] type 选对（UI → dom，不要默认 canvas）
-- [ ] render 签名与 type 匹配
-- [ ] 零 `import` 关键字
-- [ ] 颜色/坐标/字体写死，不 import token
-- [ ] frame_pure: 无 Date.now / Math.random
+- [ ] 11 必填 + 18 AI 字段全
+- [ ] intent ≥ 50 字真实推理
+- [ ] type ∈ {dom, media}
+- [ ] render 签名 `(t, params, vp) → string`
+- [ ] 零 `import`
+- [ ] 颜色 / 坐标 / 字体写死
+- [ ] 无 `Date.now` / `Math.random`
+- [ ] 无 CSS `@keyframes`
 - [ ] viewport-relative 坐标
-- [ ] sample() 用真实业务内容
-- [ ] node --check 通过
-- [ ] nextframe scenes 列表能看到
-- [ ] smoke + composite 视觉自查通过
+- [ ] sample() 真实业务内容
+- [ ] smoke + gallery 过
 
 ## 下一步
 
-全部组件验证通过后：
-
-```bash
-nf-guide produce anchors
-```
+所有 scene 过 → `cargo run -p nf-guide -- produce anchors`

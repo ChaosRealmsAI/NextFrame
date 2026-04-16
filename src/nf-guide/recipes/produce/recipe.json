@@ -1,16 +1,16 @@
 {
   "id": "produce",
   "name": "Video Production",
-  "description": "v0.8 anchors × tracks 生产流程：TTS/anchors → timeline → build HTML → recorder MP4",
+  "description": "v0.8 anchors × tracks 生产流程：ratio → TTS → scene → anchors → timeline → build → record → verify",
   "steps": [
     {
       "id": "ratio",
-      "title": "定比例",
+      "title": "定比例 + 推荐 theme",
       "prompt": "00-ratio.md"
     },
     {
       "id": "tts",
-      "title": "TTS 生成（可选起点）",
+      "title": "TTS 合成（voice + backend 选型）",
       "prompt": "00a-tts.md"
     },
     {
@@ -52,6 +52,11 @@
       "id": "concat",
       "title": "多段拼接（可选）",
       "prompt": "08-concat.md"
+    },
+    {
+      "id": "verify",
+      "title": "质量门禁（硬指标 + LLM 判帧）",
+      "prompt": "09-verify.md"
     }
   ]
 }

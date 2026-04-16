@@ -1,41 +1,54 @@
-# Step 06: Build HTML
+# Step 06 · Build HTML
 
-## 命令
-
-```bash
-nextframe build timeline.json --out out.html
-```
-
-## 产物检查
+## 命令（pin 死）
 
 ```bash
-ls -lh out.html
-grep -c "TIMELINE" out.html
-grep -c "SCENES" out.html
+node src/nf-cli/bin/nextframe.js build \
+  projects/v10-landscape/timeline.v08.json \
+  --out projects/v10-landscape/out.html
 ```
 
-至少确认：
+竖屏同理，换 `v10-portrait`。
 
-- 产出了单文件 `out.html`
-- HTML 里有 `TIMELINE` 和 `SCENES`
+## 产物硬检查
+
+```bash
+ls -lh projects/v10-landscape/out.html
+# 预期：> 50KB（含 scene bundle + 运行时 + timeline）
+
+grep -c "__SLIDE_SEGMENTS\|layers" projects/v10-landscape/out.html
+# 预期：≥ 1（说明 anchors 已成功展开为 layers / segments）
+
+grep -c "SCENES\s*=" projects/v10-landscape/out.html
+# 预期：≥ 1（scene bundle 已注入）
+```
+
+如果 `__SLIDE_SEGMENTS` / `layers` grep 计数 = 0 → **anchors 没展开**，build 静默失败 → 回 Step 05 查错误。
 
 ## 这一步实际发生什么
 
-v0.8 builder 内部做了**降级**：
+v0.8 builder 内部降级：
 
-1. 把 anchors 展开成绝对毫秒
-2. **v0.8 tracks → v0.3 layers[]**（复用 v0.3 runtime，保证 recorder 兼容）
+1. anchors 展开为绝对毫秒
+2. v0.8 tracks → v0.3 layers[]（复用 v0.3 runtime，保证 recorder 兼容）
 3. scene clips → layers（保留 effects/transition/opacity）
-4. subtitle clips → 自动注入一个 `subtitleBar` layer（SRT 格式）
-5. animation clips → 注入到目标 layer 的 params 里作为 keyframes
-6. audio → `__SLIDE_SEGMENTS.audio`（recorder 读取）
+4. subtitle clips → 自动注入一个 subtitle layer
+5. animation clips → 注入到目标 layer 的 params 作为 keyframes
+6. audio → `__SLIDE_SEGMENTS.audio`（recorder 读）
 
-> 关键理解：v0.8 是**写的格式**（anchors × tracks），v0.3 是**跑的格式**（layers）。builder 负责翻译。
+> 关键理解：**v0.8 是"写格式"**（anchors × tracks），**v0.3 是"跑格式"**（layers），builder 是唯一桥。
 
-如果失败，先回 Step 05 看具体错误码。常见原因：anchor 名拼错、scene id 不存在（用 `nextframe scenes` 查）。
+## 常见错误 → 修法
+
+| 错误 | 修法 |
+|------|------|
+| `UNSUPPORTED_SCENE_TYPE: scene xxx has type=canvas` | scene 有非法 type，回 component recipe 改 `type: dom` |
+| `scene id not found: xxx` | scene 文件没注册 / scene id 拼错，跑 `nextframe scenes` 查 |
+| `MISSING_ANCHOR: s0.begin` | anchors.json 没对应字段，回 Step 03 |
+| build 成功但 grep `__SLIDE_SEGMENTS` = 0 | timeline 缺 `"version": "0.8"`，被当 legacy | 
 
 ## 下一步
 
 ```bash
-nf-guide produce record
+cargo run -p nf-guide -- produce record
 ```

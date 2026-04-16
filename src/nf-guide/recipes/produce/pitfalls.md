@@ -66,3 +66,19 @@
 - **触发**: scene clip 不写 `effects.enter`
 - **现象**: 场景切换时无过渡，直接跳变
 - **修复**: 每个 scene clip 至少加 `"effects": { "enter": { "type": "fadeIn", "dur": 0.5 } }`
+
+## 12. scene type 只能 dom|media（ADR-021）
+
+- **触发**: scene 文件写了 `type: "canvas"` / `"svg"` / `"motion"` / `"shader"` / `"particle"`
+- **现象**: build-v08 报 `UNSUPPORTED_SCENE_TYPE`，整条 build 终止
+- **修复**: 改 `type: "dom"`（或 `"media"` 如果挂外部资源）。**render body 不用动** — canvas/svg 都继续在 dom 的 return HTML 里写。
+- **防复发**: build-v08 validateSceneIds + scene-lint L7 + scene-new CLI --type 枚举，三处白名单门禁。
+
+## 13. v0.8 timeline 缺 `version: "0.8"` → 走 legacy → anchors 不解析
+
+- **触发**: timeline 顶层漏写 `"version": "0.8"`，或写成数字 `0.8`（不是字符串）
+- **现象**: build 不报错，但 grep `__SLIDE_SEGMENTS` 或 `layers` 为空；recorder 录出来全黑 / 长度对不上
+- **根因**: `render` CLI 走 `detectFormat` 路由（ADR-022）— 缺 `"version": "0.8"` 会 fallback 到 v0.3 legacy path，anchors 字段被忽略
+- **修复**: timeline 顶层 `"version": "0.8"`（字符串，带引号），并删除所有 v0.3 `layers` / v0.6 `matches` 字段
+- **验证**: `grep -c "__SLIDE_SEGMENTS\|layers" out.html` ≥ 1 说明 v0.8 路径跑通
+- **防复发**: Step 05 validate 必跑，检查 `UNSUPPORTED_VERSION` 错误码

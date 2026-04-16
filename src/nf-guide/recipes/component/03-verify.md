@@ -1,4 +1,4 @@
-# Step 3 · 自检（lint + smoke + gallery + checklist 四关）
+# Step 3 · 自检（lint · smoke · gallery · checklist）
 
 ## 1 · scene-lint（AST 扫 6 种硬错）
 
@@ -6,141 +6,126 @@
 node src/nf-cli/bin/nextframe.js scene-lint --ratio=<ratio> --theme=<theme>
 ```
 
-检查：
-- **L1** CSS `@keyframes` 在 render 里
+扫：
+- **L1** CSS `@keyframes` 出现在 render 字符串里（硬禁）
 - **L2** 语法错
-- **L3** `frame_pure:true` 但读 `t`
-- **L4** `videoOverlay:true` 缺黑框
-- **L5** render 签名与 type 不匹配
-- **L6** `intent < 50` 字
+- **L3** `frame_pure:true` 但 render 读了 `t`
+- **L4** `videoOverlay:true` 缺黑框占位
+- **L5** render 签名和 type 不匹配（必须 `(t, params, vp)`）
+- **L6** `intent` < 50 字
+- **L7** type 不在白名单 `{dom, media}`（BLOCKED）
 
 **必须 0 error 才能进下一步。**
 
----
-
-## 2 · smoke test（30 字段 + render 不抛）
+## 2 · smoke test（字段齐 + render 不抛）
 
 ```bash
-node src/nf-cli/bin/nextframe.js scene-smoke --ratio=<ratio> --theme=<theme>
+node src/nf-cli/bin/nextframe.js scene-smoke --theme=<theme> --json
 ```
 
-期望：你的组件出现在列表里且标 `✓`。
+期望：你的组件在列表里标 `pass: true`。
 
-最常见失败：
-- `missing: intent` → 把意图写到 50+ 字
+常见失败：
+- `missing: intent` → intent 补到 ≥ 50 字真实推理
 - `render() threw: xxx` → render 里用了未定义变量
-- `render(host) did not mutate host or return HTML` → 忘了 `host.innerHTML = ...` 或 `return "..."`
-- `invalid type "html"` → type 只能是 `dom|media`
-
----
+- `render returned empty string` → 忘了 return
+- `invalid type "html"` → type 只能 `dom | media`
+- `frame_pure violation` → frame_pure 字段和 render 读 t 行为不一致
 
 ## 3 · gallery 真实视觉（浏览器）
 
 ```bash
-node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme>
+node src/nf-cli/bin/nextframe.js scene-gallery --theme=<theme>
 ```
 
-自动开浏览器，点你的组件卡 → 单组件详情页：
+自动开浏览器，点你的组件卡：
 - 按 **Play** 看动画
-- 拖 **scrubber** 看任意 `t`
+- 拖 **scrubber** 看任意 t
 - 右侧看 `describe()` 实时 JSON
-- 对照 `intent` 里写的"应该看到什么"是不是真的看到
+- 对照 `intent` 写的"应该看到什么"
 
-现在的查看方式只有两类：
-- `dom` → 看 HTML/SVG/Canvas/滤镜/脚本组合后的真实画面
-- `media` → 看资源占位、裁切、黑框、src 是否成立
+### 3.1 · 截图像素门禁（硬关卡）
 
-### 3.5 · gallery 截图像素门禁（硬关卡）
-
-**smoke pass ≠ 视觉 OK**。必须截图确认真的有内容。
+**smoke PASS ≠ 视觉 OK**。必须截图确认真的有内容。
 
 ```bash
-node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme> --no-open &
-
+node src/nf-cli/bin/nextframe.js scene-gallery --theme=<theme> --no-open &
 npx playwright screenshot --full-page --wait-for-timeout 6000 \
-  http://localhost:8765/gallery-<ratio-dir>-<theme>.html tmp/gallery-check.png
+  http://localhost:8765/gallery-<ratio-dir>-<theme>.html \
+  tmp/gallery-check.png
 ```
 
-硬指标：
+截图人眼看：
 - 每个组件卡片非黑像素 ≥ 30%
-- 视觉主体能一眼识别
-- 配色与 `theme.md` 一致
+- 视觉主体一眼能认出
+- 配色和 theme.md 一致
 
-### 3.6 · 详情页 scrub 门禁
+### 3.2 · scrub 门禁
 
-拖 scrubber 从 `t=0 → t=end`：
-- 每个时刻都有非黑内容
-- 动画有明显变化
-- 回拖到同一 `t` 时画面一致
+从 `t=0 → t=end` 拖 scrubber：
+- 每一时刻都有非黑内容
+- 动画有明显变化（不是每帧一样）
+- 回拖到同一 t 时画面一致（frame-pure）
 
 常见失败：
-- 画面空白 → innerHTML 没设，或内容飞出画布
-- 动画不动 → 没真正读 `t`
-- Canvas 变空 → 只序列化了 `<canvas>` 标签，没在真实 DOM 上重画
-- 中文方框 → 改用系统字体
+- 画面空白 → return 没给内容，或 CSS 定位把内容推出画外
+- 动画不动 → 没真正读 t
+- scrub 重播 → 用了 `@keyframes`（回 Step 2 改 t-driven）
+- 中文方框 → 字体 fallback 没加 `'PingFang SC'`
 
----
+## 4 · 人眼 3 项检查（硬规则）
 
-## 4 · Checklist 13 项
+看 gallery 里的组件，人眼判：
+
+1. **字号可读** — 1920×1080 下主信息 ≥ 28px，手机端（等比换算）主字 ≥ 42px
+2. **留白合理** — 70% 画面空，内容 ≤ 40% 面积
+3. **动画 t 驱动** — scrub 时画面平滑变化，不突变
+
+**如果自动 smoke PASS 但人眼看着错了**（配色崩 / 动画不对 / 视觉主体缺失）→ **BLOCKED，报 opus**，不要硬着头皮走下一步。
+
+## 5 · Checklist（不过关 = 重做）
 
 ### 视觉主体
-
-- [ ] 有视觉主体
-- [ ] 视觉主体占画面 ≥ 40%
-- [ ] 不是"标题 + 副标 + bullet list"纯文字
-- [ ] 使用了 12 模式之一
+- [ ] 有视觉主体（12 模式之一）
+- [ ] 占画面 ≥ 40%
+- [ ] 不是 "标题 + 副标 + bullet list" 纯文字
 
 ### 内容
-
 - [ ] 单张截图能看懂
-- [ ] 一个焦点，不塞 5 件事
-- [ ] `sample()` 用真实业务内容
+- [ ] 一个焦点不塞 5 件事
+- [ ] `sample()` 真实业务内容
 - [ ] `intent` ≥ 50 字真实推理
 
 ### 视觉
-
-- [ ] 70% 以上画面是空的
+- [ ] 70% 画面空
 - [ ] padding 达标
-- [ ] 字号只从 7 级里挑
-- [ ] 字体分工正确
+- [ ] 字号从 theme.md 4 级里挑
+- [ ] 字体 3 族分工正确
 - [ ] 只用 1 个主强调色
 
 ### 动画
-
-- [ ] 入场动画走 easeOut / cubic-bezier
-- [ ] 没有 `linear` easing（除进度条）
+- [ ] 入场 cubic-bezier（非 linear）
 - [ ] 多元素 stagger 120-180ms
-- [ ] 不会静止 > 3 秒
-- [ ] 如果读 `t`，`frame_pure: false`
+- [ ] 不静止 > 3s
+- [ ] 读 t → `frame_pure: false`
 
 ### 契约
-
-- [ ] smoke pass
-- [ ] gallery 截图过
-- [ ] 详情页 scrub 过
-- [ ] 11 必填 + 18 AI 字段齐
-
----
-
-## 5 · 红旗（立刻重做）
-
-- ❌ 一帧只有标题+副标+bullet
-- ❌ 纯文字页没有视觉主体
-- ❌ 编造 artifact
-- ❌ 硬编码跑偏的颜色
-- ❌ 动画在 scrub 时重播或消失
-
----
+- [ ] type ∈ {dom, media}
+- [ ] render 签名 `(t, params, vp) → string`
+- [ ] 无 `@keyframes` / `Date.now` / `Math.random`
+- [ ] scene-lint 0 error
+- [ ] scene-smoke pass
+- [ ] gallery 截图非黑像素 ≥ 30%
 
 ## 6 · 完成 = 4 条全绿
 
 ```
 ✓ scene-lint 0 errors
 ✓ scene-smoke pass
-✓ gallery 看到预期效果
-✓ checklist 过关
+✓ gallery 截图过（非黑像素 ≥ 30%）
+✓ 人眼 3 项过
 ```
 
 ## 下一步
 
-全绿 → 回到 `nf-guide -- produce` 继续做 timeline + build + record
+全绿 → 回 `cargo run -p nf-guide -- produce` 继续 timeline + build + record
