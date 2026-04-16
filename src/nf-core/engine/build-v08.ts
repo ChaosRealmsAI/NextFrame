@@ -7,10 +7,11 @@ import { Fillers } from "../anchors/fillers/index.js";
 import { parse } from "../anchors/parser.js";
 import { resolve } from "../anchors/resolver.js";
 import { validateAnchors } from "../anchors/validator.js";
-import { getKind, validateClipForKind, validateTrackForKind } from "../kinds/index.js";
+import { getKind, listKinds, validateClipForKind, validateTrackForKind } from "../kinds/index.js";
 import type { Clip, Track } from "../kinds/types.js";
 import type { Issue, AnchorDict } from "../anchors/types.js";
 import type { Timeline, TimelineV08 } from "../types.js";
+import { getScene } from "../scenes/index.js";
 import {
   buildSceneBundle,
   buildSharedPreamble,
@@ -39,7 +40,7 @@ function escapeInlineScript(value: string) {
 }
 
 function createCodeError(code: string, message: string, extras: Record<string, unknown> = {}) {
-  const error = new Error(`${code}: ${message}`) as Error & {
+  const error = new Error(message) as Error & {
     code?: string;
     issues?: Issue[];
     field?: string;
@@ -182,7 +183,10 @@ function resolveAndValidateTracks(timeline: TimelineV08): ResolvedTrack[] {
       throw createCodeError(
         "UNSUPPORTED_KIND",
         `track "${trackId}" uses unsupported kind "${track.kind}"`,
-        { field: `tracks[${trackIndex}].kind` },
+        {
+          field: `tracks[${trackIndex}].kind`,
+          fix: `Use one of: ${listKinds().join(", ")}.`,
+        },
       );
     }
 
@@ -215,7 +219,11 @@ function resolveAndValidateTracks(timeline: TimelineV08): ResolvedTrack[] {
       }
       if ("at" in clip || track.kind === "animation") {
         const at = resolveTimeRef(timeline.anchors || {}, clip.at, (timeline as Timeline).fps);
-        if (at !== undefined) resolvedClip.at = at;
+        if (at !== undefined) {
+          resolvedClip.at = at;
+          resolvedClip.begin = at;
+          resolvedClip.end = at;
+        }
       }
       return resolvedClip;
     });
@@ -232,6 +240,27 @@ function resolveAndValidateTracks(timeline: TimelineV08): ResolvedTrack[] {
   }
 
   return resolvedTracks;
+}
+
+async function validateSceneIds(timeline: ResolvedTimeline) {
+  const sceneIds = Array.from(new Set(
+    timeline.tracks
+      .filter((track) => track.kind === "scene")
+      .flatMap((track) => track.clips)
+      .map((clip) => clip.scene)
+      .filter((sceneId): sceneId is string => typeof sceneId === "string" && sceneId.trim().length > 0),
+  ));
+
+  for (const sceneId of sceneIds) {
+    const scene = await getScene(sceneId);
+    if (!scene) {
+      throw createCodeError(
+        "SCENE_NOT_FOUND",
+        `scene "${sceneId}" is not registered for build`,
+        { fix: `Pick a valid scene id from \`nextframe scenes\` or correct "${sceneId}".` },
+      );
+    }
+  }
 }
 
 function collectSceneBundle(timeline: ResolvedTimeline): { modules: SceneModule[]; bundle: string; map: string } {
@@ -406,6 +435,7 @@ export async function buildV08(timeline: TimelineV08, outPath: string): Promise<
     ...timeline,
     tracks: resolveAndValidateTracks(timeline),
   };
+  await validateSceneIds(resolvedTimeline);
 
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, buildDocument(resolvedTimeline), "utf8");

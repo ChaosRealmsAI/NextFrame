@@ -1,4 +1,5 @@
 // nextframe build <timeline.json> [-o <output.html> | --output=<output.html>]
+import { unlink } from 'node:fs/promises';
 import { parseFlags, loadTimeline, emit } from '../_helpers/_io.js';
 import { resolveTimeline, timelineUsage } from '../_helpers/_resolve.js';
 import { detectFormat, validateTimelineV3 } from '../_helpers/_timeline-validate.js';
@@ -55,12 +56,18 @@ export async function run(argv: string[]) {
       emit({ ok: true, value: { path: outPath } }, flags);
       return 0;
     } catch (error) {
+      const builderError = error as Error & { code?: string; fix?: string };
+      try {
+        await unlink(outPath);
+      } catch {
+        // Ignore cleanup failures for missing or locked outputs.
+      }
       emit({
         ok: false,
         error: {
-          code: 'BUILD_FAIL',
-          message: `Internal: ${(error as Error).message}`,
-          fix: 'use an empty v0.8 timeline until Phase 5 fills the builder stubs',
+          code: builderError.code || 'BUILD_FAIL',
+          message: builderError.message || 'v0.8 build failed',
+          fix: builderError.fix || 'Check the v0.8 timeline data and retry.',
         },
       }, flags);
       return 2;
