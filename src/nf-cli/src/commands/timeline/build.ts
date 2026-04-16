@@ -60,7 +60,7 @@ export async function run(argv: string[]) {
         error: {
           code: 'BUILD_FAIL',
           message: `Internal: ${(error as Error).message}`,
-          fix: 'use an empty v0.8 timeline until Phase 5 fills the builder stubs',
+          fix: 'Fix the reported anchor or kind-schema error, then rerun nextframe validate before build.',
         },
       }, flags);
       return 2;

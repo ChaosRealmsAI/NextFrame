@@ -17,10 +17,10 @@ export type AnchorDict = Record<string, AnchorEntry>;
 export type AnchorRef = string;
 
 export type ExprAst =
-  | { type: "anchor_ref"; ref: AnchorRef; point: "at" | "begin" | "end" }
+  | { type: "anchor_ref"; ref: AnchorRef }
   | {
       type: "offset";
-      expr: { type: "anchor_ref"; ref: AnchorRef; point: "at" | "begin" | "end" };
+      expr: { type: "anchor_ref"; ref: AnchorRef };
       op: "+" | "-";
       value: number;
       unit: "s" | "ms";

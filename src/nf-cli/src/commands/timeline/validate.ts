@@ -2,7 +2,7 @@
 // Auto-detects v0.1 (tracks/clips) vs v0.3 (layers[]) format.
 import { parseFlags, loadTimeline, emit } from "../_helpers/_io.js";
 import { resolveTimeline, timelineDir, timelineUsage } from "../_helpers/_resolve.js";
-import { detectFormat, validateTimelineLegacy, validateTimelineV3 } from "../_helpers/_timeline-validate.js";
+import { detectFormat, validateTimelineLegacy, validateTimelineV3, validateTimelineV08 } from "../_helpers/_timeline-validate.js";
 
 type TimelineCommandResult = {
   ok: boolean;
@@ -47,12 +47,7 @@ export async function run(argv: string[]) {
     } else if (fmt === "v0.3") {
       fmtResult = await validateTimelineV3(tl);
     } else if (fmt === "v0.8") {
-      fmtResult = {
-        ok: false,
-        errors: [{ code: "NOT_IMPLEMENTED", message: "v0.8 timeline validation is not implemented in the walking skeleton" }],
-        warnings: [],
-        hints: [],
-      };
+      fmtResult = validateTimelineV08(tl);
     } else {
       fmtResult = {
         ok: false,
