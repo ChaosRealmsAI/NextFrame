@@ -1,5 +1,6 @@
 import { interp } from "./interp.js";
 import { expandLayer } from "./expand.js";
+import { wrapFilters } from "./wrap.js";
 import { SHAPES } from "../shapes/index.js";
 import { attrs } from "../shapes/shared.js";
 
@@ -41,13 +42,28 @@ function layerState(layer, t) {
   return { at, rotate, scaleX, scaleY, opacity, tracks };
 }
 
+function rendered(svg = "", defs = []) {
+  return { svg, defs };
+}
+
+function mergeRendered(parts) {
+  const defs = new Set();
+  const svg = [];
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.svg) svg.push(part.svg);
+    for (const def of part.defs || []) if (def) defs.add(def);
+  }
+  return rendered(svg.join(""), [...defs]);
+}
+
 function renderLayers(items, t, motion) {
   const out = [];
   for (const item of items || []) for (const layer of expandLayer(item || {})) {
     const state = layerState(layer, t);
     if (state.opacity > 0) out.push(renderShape(layer, state, t, motion));
   }
-  return out.join("");
+  return mergeRendered(out);
 }
 
 function renderShape(layer, state, t, motion) {
@@ -69,22 +85,25 @@ function renderShape(layer, state, t, motion) {
     height: heightTrack ?? layer.height,
   };
   const fallback = d ? `<path${attrs({ d, fill: resolvedLayer.fill ?? "#000000", stroke: resolvedLayer.stroke, "stroke-width": resolvedLayer.stroke ? layer.strokeWidth ?? 1 : null, "vector-effect": "non-scaling-stroke" })}/>` : "";
-  const ctx = motion.renderChildren ? motion : { ...motion, renderChildren: (items) => renderLayers(items, t, motion) };
+  const ctx = motion.renderChildren ? motion : { ...motion, renderChildren: (items) => {
+    const child = renderLayers(items, t, motion);
+    return child.defs.length ? `<defs>${child.defs.join("")}</defs>${child.svg}` : child.svg;
+  } };
   resolvedLayer.motion = ctx;
   const body = typeof shape === "function" ? shape(resolvedLayer) : fallback;
-  if (!body) return "";
+  if (!body) return rendered();
   const transform = `translate(${state.at[0].toFixed(3)} ${state.at[1].toFixed(3)}) rotate(${state.rotate.toFixed(3)}) scale(${state.scaleX.toFixed(3)} ${state.scaleY.toFixed(3)})`;
-  return `<g${layer.id ? ` data-layer="${esc(layer.id)}"` : ""} transform="${transform}" opacity="${state.opacity.toFixed(3)}">${body}</g>`;
+  const inner = `<g${layer.id ? ` data-layer="${esc(layer.id)}"` : ""} transform="${transform}" opacity="${state.opacity.toFixed(3)}">${body}</g>`;
+  return layer.wrap ? wrapFilters(inner, layer.wrap) : rendered(inner);
 }
 
 export function renderMotion(host = null, t = 0, motion = {}) {
   const size = Array.isArray(motion.size) ? motion.size : [motion.width, motion.height];
   const width = Math.max(1, num(size[0], num(host && host.width, 1920)));
   const height = Math.max(1, num(size[1], num(host && host.height, 1080)));
-  const layers = [];
-  for (const layer of motion.layers || []) layers.push(...expandLayer(layer));
-  const body = renderLayers(layers, num(t), motion);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${body}</svg>`;
+  const body = renderLayers(motion.layers || [], num(t), motion);
+  const defs = body.defs.length ? `<defs>${body.defs.join("")}</defs>` : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${defs}${body.svg}</svg>`;
 }
 
 export { meta };
