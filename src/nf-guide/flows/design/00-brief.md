@@ -4,7 +4,7 @@
 
 ## 必填 8 项
 
-1. **主题名**（kebab-case）例: `anthropic-warm` / `interview-dark` / `cyberpunk-neon`
+1. **主题名**（kebab-case）例: `blueprint-cinema` / `mobile-vertical` / `cyberpunk-neon`
 2. **ratio** 9:16 / 16:9 / 1:1 / 4:3 — 决定坐标系
 3. **目标受众** — "程序员 + AI 从业者" / "30+ 白领女性" / "00 后游戏玩家"
 4. **视频类型** — 访谈 / 讲解 / vlog / 产品演示 / 数据报告

@@ -197,7 +197,7 @@ src/nf-core/scenes/{ratio}/{theme}/theme.md
 
 Pure documentation. AI reads it before writing components. **Code does NOT import theme.md** — colors / fonts / grid are written directly into each component file (single source of truth = the component file itself).
 
-Themes shipped: `9x16/interview-dark`, `16x9/lecture-light`, `16x9/anthropic-warm`.
+Themes shipped: `16x9/blueprint-cinema`, `9x16/mobile-vertical`.
 
 ## Key Paths
 
