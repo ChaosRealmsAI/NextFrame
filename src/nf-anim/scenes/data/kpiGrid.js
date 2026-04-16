@@ -1,17 +1,5 @@
-// TODO: compose kpiGrid scene layers from nf-anim behaviors and shapes
-const meta = { id: "kpiGrid", ratio: "any", duration_hint: 3, type: "motion", category: "data", description: "Kpi Grid data scene stub" };
-export default {
-  ...meta,
-  render(host, t, params = {}, vp = { width: 0, height: 0 }) {
-    // TODO: return motion config for kpiGrid
-    return { duration: 3, size: [vp.width || 0, vp.height || 0], layers: [] };
-  },
-  describe(t, params = {}, vp = {}) {
-    // TODO: expose AI-facing description contract
-    return { sceneId: meta.id, t, params, vp };
-  },
-  sample() {
-    // TODO: return ready-to-preview params
-    return {};
-  },
-};
+import { makeKpiGrid } from "../sharedData.js";
+// TODO: add optional secondary sparkline treatment if KPI card content expands later
+const sample = { data: [{ label: "ARR", value: 128, suffix: "M" }, { label: "Margin", value: 32, suffix: "%" }, { label: "CAC Payback", value: 11, suffix: "m" }, { label: "Retention", value: 91, suffix: "%" }] };
+const meta = { id: "kpiGrid", ratio: "any", duration_hint: 2.8, type: "motion", category: "data", description: "Four-up KPI card grid with staggered reveal", params: [{ name: "data", type: "array", default: sample.data, semantic: "up to four stat-card objects with label and value" }, { name: "color", type: "color", default: "#da7756", semantic: "primary warm card accent color" }], examples: [sample] };
+export default makeKpiGrid(meta, sample);

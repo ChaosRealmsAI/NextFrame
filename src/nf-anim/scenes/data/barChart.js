@@ -1,17 +1,5 @@
-// TODO: compose barChart scene layers from nf-anim behaviors and shapes
-const meta = { id: "barChart", ratio: "any", duration_hint: 3.2, type: "motion", category: "data", description: "Bar Chart data scene stub" };
-export default {
-  ...meta,
-  render(host, t, params = {}, vp = { width: 0, height: 0 }) {
-    // TODO: return motion config for barChart
-    return { duration: 3.2, size: [vp.width || 0, vp.height || 0], layers: [] };
-  },
-  describe(t, params = {}, vp = {}) {
-    // TODO: expose AI-facing description contract
-    return { sceneId: meta.id, t, params, vp };
-  },
-  sample() {
-    // TODO: return ready-to-preview params
-    return {};
-  },
-};
+import { makeBarChart } from "../sharedData.js";
+// TODO: expand barChart styling once per-axis labels or legends are standardized
+const sample = { data: [{ label: "Shader", value: 88 }, { label: "Motion", value: 62 }, { label: "Particle", value: 34 }, { label: "UX", value: 76 }] };
+const meta = { id: "barChart", ratio: "any", duration_hint: 2.8, type: "motion", category: "data", description: "Bar chart with stagger entrance and categorical labels", params: [{ name: "data", type: "array", default: sample.data, semantic: "array of {label,value} objects or numeric values" }, { name: "color", type: "color", default: "#da7756", semantic: "primary warm bar color" }], examples: [sample] };
+export default makeBarChart(meta, sample);
