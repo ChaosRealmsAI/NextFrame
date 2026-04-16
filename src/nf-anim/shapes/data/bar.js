@@ -1,8 +1,9 @@
-// TODO: implement normalized SVG geometry for bar
-const meta = { name: "bar", category: "data", description: "Bar data shape stub", params: [{ name: "fill", type: "color", default: "#da7756", semantic: "fill color" }] };
+import { attrs, num } from "../shared.js";
+// TODO: tune normalized SVG geometry for bar if spec shifts
+const meta = { name: "bar", category: "data", description: "Single bar centered at the origin", params: [{ name: "width", type: "number", default: 48, semantic: "bar width in px" }, { name: "height", type: "number", default: 100, semantic: "bar height in px" }, { name: "radius", type: "number", default: 8, semantic: "corner radius in px" }, { name: "fill", type: "color", default: "#da7756", semantic: "fill or gradient ref" }, { name: "stroke", type: "color", default: null, semantic: "optional stroke color" }, { name: "strokeWidth", type: "number", default: 0, semantic: "stroke width in px" }] };
 function bar(layer = {}) {
-  // TODO: return SVG string for bar
-  return `<path d="" fill="${layer.fill || "#da7756"}" />`;
+  const width = Math.max(1, num(layer.width, 48)); const height = Math.max(1, num(layer.height, 100)); const radius = Math.max(0, num(layer.radius, 8)); const fill = layer.fill ?? "#da7756"; const stroke = layer.stroke; const strokeWidth = layer.strokeWidth ?? 0;
+  return `<rect${attrs({ x: -width / 2, y: -height / 2, width, height, rx: radius, ry: radius, fill, stroke, "stroke-width": stroke ? strokeWidth : null })}/>`;
 }
 bar.meta = meta;
 export default bar;
