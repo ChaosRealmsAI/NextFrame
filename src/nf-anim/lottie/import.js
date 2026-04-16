@@ -43,7 +43,13 @@ const rect = ([w, h], [x, y], r = 0) => {
     rr = l + w,
     b = t + h;
   return rx
-    ? `M ${l + rx},${t} H ${rr - rx} Q ${rr},${t} ${rr},${t + rx} V ${b - rx} Q ${rr},${b} ${rr - rx},${b} H ${l + rx} Q ${l},${b} ${l},${b - rx} V ${t + rx} Q ${l},${t} ${l + rx},${t} Z`
+    ? [
+        `M ${l + rx},${t} H ${rr - rx}`,
+        `Q ${rr},${t} ${rr},${t + rx} V ${b - rx}`,
+        `Q ${rr},${b} ${rr - rx},${b} H ${l + rx}`,
+        `Q ${l},${b} ${l},${b - rx} V ${t + rx}`,
+        `Q ${l},${t} ${l + rx},${t} Z`,
+      ].join(" ")
     : `M ${l},${t} H ${rr} V ${b} H ${l} Z`;
 };
 function track(prop, ip, fr, map = (v) => v) {

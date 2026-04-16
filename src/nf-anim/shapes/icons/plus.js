@@ -29,7 +29,13 @@ function plus(layer = {}) {
   const fill = layer.fill ?? "#da7756";
   const stroke = layer.stroke;
   const strokeWidth = layer.strokeWidth ?? 0;
-  return `<polygon${attrs({ points: "-14,-50 14,-50 14,-14 50,-14 50,14 14,14 14,50 -14,50 -14,14 -50,14 -50,-14 -14,-14", fill, stroke, "stroke-width": stroke ? strokeWidth : null })}/>`;
+  const points = "-14,-50 14,-50 14,-14 50,-14 50,14 14,14 14,50 -14,50 -14,14 -50,14 -50,-14 -14,-14";
+  return `<polygon${attrs({
+    points,
+    fill,
+    stroke,
+    "stroke-width": stroke ? strokeWidth : null,
+  })}/>`;
 }
 plus.meta = meta;
 export default plus;

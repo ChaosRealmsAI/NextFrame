@@ -29,7 +29,13 @@ function cross(layer = {}) {
   const fill = layer.fill ?? "#da7756";
   const stroke = layer.stroke;
   const strokeWidth = layer.strokeWidth ?? 0;
-  return `<polygon${attrs({ points: "-42,-28 -28,-42 0,-14 28,-42 42,-28 14,0 42,28 28,42 0,14 -28,42 -42,28 -14,0", fill, stroke, "stroke-width": stroke ? strokeWidth : null })}/>`;
+  const points = "-42,-28 -28,-42 0,-14 28,-42 42,-28 14,0 42,28 28,42 0,14 -28,42 -42,28 -14,0";
+  return `<polygon${attrs({
+    points,
+    fill,
+    stroke,
+    "stroke-width": stroke ? strokeWidth : null,
+  })}/>`;
 }
 cross.meta = meta;
 export default cross;
