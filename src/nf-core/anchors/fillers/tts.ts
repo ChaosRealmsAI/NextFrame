@@ -3,15 +3,20 @@ import { readFile } from "node:fs/promises";
 import type { AnchorDict } from "../types.js";
 
 interface TtsWord {
-  w: string;
-  s: number;
-  e: number;
+  w?: string;
+  word?: string;
+  s?: number;
+  e?: number;
+  start_ms?: number;
+  end_ms?: number;
 }
 
 interface TtsSegment {
-  id: string;
-  startMs: number;
-  endMs: number;
+  id?: string;
+  startMs?: number;
+  endMs?: number;
+  start_ms?: number;
+  end_ms?: number;
   words?: TtsWord[];
 }
 
@@ -30,6 +35,12 @@ function finiteMs(value: unknown, field: string) {
   return value;
 }
 
+// nf-tts outputs snake_case; legacy payloads use camelCase. Accept either.
+function pickMs(camel: unknown, snake: unknown, field: string) {
+  const value = typeof camel === "number" ? camel : snake;
+  return finiteMs(value, field);
+}
+
 export default async function ttsFiller(
   input: string,
   opts: { includeWords?: boolean } = {},
@@ -42,24 +53,30 @@ export default async function ttsFiller(
 
   const dict: AnchorDict = {};
   payload.segments.forEach((segment, segmentIndex) => {
-    if (!segment || typeof segment.id !== "string" || !segment.id.trim()) {
-      fail("BAD_TTS_PAYLOAD", `segments[${segmentIndex}].id must be a non-empty string`);
+    if (!segment) {
+      fail("BAD_TTS_PAYLOAD", `segments[${segmentIndex}] is null/undefined`);
     }
 
-    const startMs = finiteMs(segment.startMs, `segments[${segmentIndex}].startMs`);
-    const endMs = finiteMs(segment.endMs, `segments[${segmentIndex}].endMs`);
-    dict[`${segment.id}.begin`] = { at: startMs };
-    dict[`${segment.id}.end`] = { at: endMs };
+    // id optional — nf-tts outputs lack id; fall back to deterministic s{index}.
+    const segId = (typeof segment.id === "string" && segment.id.trim())
+      ? segment.id.trim()
+      : `s${segmentIndex}`;
+
+    const startMs = pickMs(segment.startMs, segment.start_ms, `segments[${segmentIndex}].start(Ms|_ms)`);
+    const endMs = pickMs(segment.endMs, segment.end_ms, `segments[${segmentIndex}].end(Ms|_ms)`);
+    dict[`${segId}.begin`] = { at: startMs };
+    dict[`${segId}.end`] = { at: endMs };
 
     if (!includeWords || !Array.isArray(segment.words)) {
       return;
     }
 
     segment.words.forEach((word, wordIndex) => {
-      const begin = finiteMs(word?.s, `segments[${segmentIndex}].words[${wordIndex}].s`);
-      const end = finiteMs(word?.e, `segments[${segmentIndex}].words[${wordIndex}].e`);
-      dict[`${segment.id}.w${wordIndex}.begin`] = { at: begin, label: word?.w };
-      dict[`${segment.id}.w${wordIndex}.end`] = { at: end, label: word?.w };
+      const begin = pickMs(word?.s, word?.start_ms, `segments[${segmentIndex}].words[${wordIndex}].(s|start_ms)`);
+      const end = pickMs(word?.e, word?.end_ms, `segments[${segmentIndex}].words[${wordIndex}].(e|end_ms)`);
+      const label = word?.w ?? word?.word;
+      dict[`${segId}.w${wordIndex}.begin`] = { at: begin, label };
+      dict[`${segId}.w${wordIndex}.end`] = { at: end, label };
     });
   });
 

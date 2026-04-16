@@ -93,9 +93,15 @@ async function buildAnchorsFromSnakeCasePayload(input: string) {
 
   const dict: Record<string, { at: number; label?: string }> = {};
   payload.segments.forEach((segment, segmentIndex) => {
-    if (!segment || typeof segment.id !== "string" || !segment.id.trim()) {
-      fail("BAD_TTS_PAYLOAD", `segments[${segmentIndex}].id must be a non-empty string`);
+    if (!segment) {
+      fail("BAD_TTS_PAYLOAD", `segments[${segmentIndex}] is null/undefined`);
     }
+
+    // id is optional — nf-tts outputs only {text, start_ms, end_ms, words} without id.
+    // fall back to deterministic s{index} id so anchors are stable across runs.
+    const segId = (typeof segment.id === "string" && segment.id.trim())
+      ? segment.id.trim()
+      : `s${segmentIndex}`;
 
     const startMs = coerceMs(
       segment.startMs,
@@ -109,8 +115,8 @@ async function buildAnchorsFromSnakeCasePayload(input: string) {
       `segments[${segmentIndex}].endMs`,
       `segments[${segmentIndex}].end_ms`,
     );
-    dict[`${segment.id}.begin`] = { at: startMs };
-    dict[`${segment.id}.end`] = { at: endMs };
+    dict[`${segId}.begin`] = { at: startMs };
+    dict[`${segId}.end`] = { at: endMs };
 
     if (!Array.isArray(segment.words)) {
       return;
@@ -130,8 +136,8 @@ async function buildAnchorsFromSnakeCasePayload(input: string) {
         `segments[${segmentIndex}].words[${wordIndex}].end_ms`,
       );
       const label = typeof word?.w === "string" ? word.w : word?.word;
-      dict[`${segment.id}.w${wordIndex}.begin`] = { at: begin, label };
-      dict[`${segment.id}.w${wordIndex}.end`] = { at: end, label };
+      dict[`${segId}.w${wordIndex}.begin`] = { at: begin, label };
+      dict[`${segId}.w${wordIndex}.end`] = { at: end, label };
     });
   });
 
