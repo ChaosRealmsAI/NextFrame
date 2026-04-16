@@ -1,0 +1,82 @@
+{
+  "version": "0.8",
+  "anchors": {
+    "seg0.begin": {
+      "at": 0
+    },
+    "seg0.end": {
+      "at": 5000
+    },
+    "seg0.sub.begin": {
+      "at": 1000
+    },
+    "seg0.sub.end": {
+      "at": 3200
+    }
+  },
+  "tracks": [
+    {
+      "id": "audio-main",
+      "kind": "audio",
+      "clips": [
+        {
+          "id": "audio-0",
+          "begin": "seg0.begin",
+          "end": "seg0.end",
+          "src": "v08-smoke.mp3"
+        }
+      ]
+    },
+    {
+      "id": "scene-main",
+      "kind": "scene",
+      "clips": [
+        {
+          "id": "scene-0",
+          "begin": "seg0.begin",
+          "end": "seg0.end",
+          "scene": "headlineCenter",
+          "params": {
+            "text": "NextFrame <span style='color:#da7756'>v0.8</span>",
+            "color": "#f5ece0",
+            "fontSize": 42,
+            "y": 0,
+            "enterDelay": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "subtitle-main",
+      "kind": "subtitle",
+      "clips": [
+        {
+          "id": "sub-0",
+          "begin": "seg0.sub.begin",
+          "end": "seg0.sub.end",
+          "text": "Anchors 负责时间，tracks 负责内容。"
+        }
+      ]
+    },
+    {
+      "id": "anim-main",
+      "kind": "animation",
+      "target": "scene-main.clips[0].params.fontSize",
+      "clips": [
+        {
+          "at": "seg0.begin",
+          "value": 42
+        },
+        {
+          "at": "seg0.sub.begin",
+          "value": 68,
+          "ease": "cubic-bezier(0.16,1,0.3,1)"
+        },
+        {
+          "at": "seg0.end",
+          "value": 56
+        }
+      ]
+    }
+  ]
+}

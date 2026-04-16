@@ -212,5 +212,5 @@ node src/nf-cli/bin/nextframe.js scene-gallery --ratio=16:9 --theme={theme}
 全部组件验证通过后：
 
 ```bash
-nf-guide produce timeline   # 进入 step 03，写 timeline JSON
+nf-guide produce anchors
 ```

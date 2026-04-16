@@ -88,12 +88,22 @@ pub fn get_step_content(
         let entry = recipe
             .steps
             .iter()
-            .find(|entry| entry.id == step)
+            .find(|entry| step_matches(entry, step))
             .ok_or_else(|| format!("unknown step \"{step}\" in pipeline \"{pipeline}\""))?;
         recipes_dir.as_ref().join(pipeline).join(&entry.prompt)
     };
 
     fs::read_to_string(&path).map_err(|error| format!("failed to read {}: {error}", path.display()))
+}
+
+fn step_matches(entry: &Step, query: &str) -> bool {
+    entry.id == query
+        || prompt_stem(&entry.prompt) == query
+        || entry.prompt == query
+}
+
+fn prompt_stem(prompt: &str) -> &str {
+    prompt.strip_suffix(".md").unwrap_or(prompt)
 }
 
 #[cfg(test)]
@@ -188,6 +198,13 @@ mod tests {
         let result = get_step_content(&dir, "alpha", "no-such-step");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("unknown step"));
+    }
+
+    #[test]
+    fn get_step_content_accepts_prompt_stem_alias() {
+        let dir = make_test_recipes();
+        let body = get_step_content(&dir, "alpha", "01-one").unwrap();
+        assert_eq!(body, "Step One body");
     }
 
     #[test]
