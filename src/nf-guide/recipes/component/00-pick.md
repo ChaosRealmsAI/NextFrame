@@ -19,7 +19,7 @@
 └──────────────────────────────────────────────────────────┘
 ```
 
-### type（7 选 1 — 决定 render 签名）
+### type（6 选 1 — 决定 render 签名）
 
 | type | 何时用 | render 签名 |
 |------|--------|-------------|
@@ -27,27 +27,14 @@
 | **canvas** | 需要逐像素效果（滤镜/粒子/颗粒/noise） | `render(ctx, t, params, vp)` |
 | **svg** | 矢量图标、流程图节点连线、几何路径 | `render(host, t, params, vp)` |
 | **media** | 嵌入真实 video/img/audio | `render(host, t, params, vp)` |
-| **shader** | GPU 背景效果（流光/噪声/水波/极光） | `render(host, t, params, vp)` → `{ frag, uniforms? }` |
 | **particle** | 确定性粒子（星场/雪/火花/连线/浮尘） | `render(host, t, params, vp)` → `{ emitter, field?, render }` |
 | **motion** | 矢量语义动画（点赞/图标/涟漪/路径描边） | `render(host, t, params, vp)` → `{ duration, size, layers }` |
 
 **UI 类组件默认 DOM。** 硬塞 canvas = 中文字体方框 + 手算坐标 + 改色要重画 + 无 DOM tree 可审。
 
-### 7 种 type 的设计选型指南（视频 + 技术结合思考）
+### 6 种 type 的设计选型指南（视频 + 技术结合思考）
 
 **核心原则：每种 type 有最适合的视觉场景。选错 type = 事倍功半。**
-
-#### shader — 画面底层质感（z-layer: background / overlay）
-
-| 最佳场景 | 为什么用 shader | 质量标准 |
-|---------|----------------|---------|
-| 流光渐变背景 | GPU 并行逐像素，CSS gradient 做不到的流动感 | 渐变过渡丝滑、无色带 |
-| 柏林噪声/有机纹理 | fbm + simplex 叠加出自然感 | 层次 ≥ 3（base + detail + micro）|
-| 水波/极光/能量场 | 三角函数 + noise 组合出复杂运动 | 多波源叠加、不能只有一个 sin |
-| 全屏滤镜（颗粒/晕影/色差） | 后处理叠加在任何画面上 | 颗粒感 subtle 不抢眼、晕影自然 |
-| 程序化背景替代静态图 | 零资源依赖 + 无限分辨率 | 看不出是"计算机生成的" |
-
-**amateur 陷阱**：一行 `sin(uv.x * 3.0 + uT)` 了事 → 专业做法：从 Shadertoy 扒 30+ 行成熟 shader 重写。GLSL ≥ 20 行才能出好效果。
 
 #### particle — 画面氛围层（z-layer: background / overlay）
 
@@ -93,7 +80,7 @@
 | 手绘风笔触 | bezierCurveTo + 压感 | 粗细变化、末端收尖 |
 | 热力图/场可视化 | ImageData 逐像素 | 色彩映射连续、无色带 |
 
-**注意**：大部分"以前用 canvas 的场景"现在有更好的选择 — 粒子用 particle type、noise 用 shader type、图标用 motion type。canvas 只在"真的需要逐像素控制且不是 shader/particle/motion 能覆盖的"时才用。
+**注意**：大部分"以前用 canvas 的场景"现在有更好的选择 — 粒子用 particle type、图标用 motion type。canvas 只在"真的需要逐像素控制且不是 particle/motion/svg 能覆盖的"时才用。
 
 #### svg — 矢量图形（z-layer: content / data）
 
@@ -117,17 +104,14 @@
 
 ```
 z-order 从下到上:
-  1. shader bg     — 流光/噪声/渐变（GPU 底层质感）
-  2. media bg      — 真实视频/照片底图（可选）
-  3. particle bg   — 星场/雪花/漂浮光点（氛围层）
-  4. dom content   — 卡片/代码/文字（信息主体）
-  5. svg content   — 图表/流程图（数据可视化）
-  6. motion overlay — 图标弹跳/路径描边（交互反馈）
-  7. particle fx   — 火花/爆发（瞬间强调）
-  8. shader fx     — 全屏滤镜（颗粒+晕影收尾）
+  1. particle bg    — 星场/雪花/漂浮光点（氛围层）
+  2. dom content    — 卡片/代码/文字（信息主体）
+  3. svg content    — 图表/流程图（数据可视化）
+  4. motion overlay — 图标弹跳/路径描边（交互反馈）
+  5. particle fx    — 火花/爆发（瞬间强调）
 ```
 
-**一个好的 slide = bg(shader/particle) + content(dom/svg) + overlay(motion/particle/shader)**。三层叠加出深度感。只有一层 = 平面感强、业余。
+**一个好的 slide = bg(particle) + content(dom/svg) + overlay(motion/particle)**。三层叠加出深度感。只有一层 = 平面感强、业余。
 
 ---
 
@@ -178,15 +162,14 @@ z-order 从下到上:
 **纯 DOM 文字组件 ≤ 30%**。做之前先问：
 
 1. **这组件的视觉主体能不能用 SVG 画？**（流程图/节点/轨道/图表/矢量图标 → 强制 type=svg）
-2. **能不能用 GPU shader 画？**（流光/噪声/水波/极光 → 强制 type=shader）
-3. **能不能用确定性粒子系统？**（星场/雪/爆发/连线 → 强制 type=particle）
-4. **能不能用矢量动画？**（点赞/图标弹跳/路径描边 → 强制 type=motion）
-5. **都不需要专用 runtime，但仍是逐像素 2D 效果？**（笔触/位图滤镜/手写 noise mask → type=canvas）
-6. **都不能，真只有文字布局？**（标题/金句/chrome → OK 用 type=dom）
+2. **能不能用确定性粒子系统？**（星场/雪/爆发/连线 → 强制 type=particle）
+3. **能不能用矢量动画？**（点赞/图标弹跳/路径描边 → 强制 type=motion）
+4. **都不需要专用 runtime，但仍是逐像素 2D 效果？**（笔触/位图滤镜/手写 noise mask → type=canvas）
+5. **都不能，真只有文字布局？**（标题/金句/chrome → OK 用 type=dom）
 
 **每个主题必须至少有**：
 - ≥ 1 个 SVG 图形组件（diagram / chart / orbit / icon）
-- ≥ 1 个动态图形组件（canvas / shader / particle / motion）
+- ≥ 1 个动态图形组件（canvas / particle / motion）
 
 纯 DOM 堆文字 = 主题质量不及格。详情看 §8 图 > 文铁律。
 
@@ -197,7 +180,7 @@ z-order 从下到上:
 ```
 组件 id:        (camelCase)
 role:          (bg/chrome/content/text/overlay/data)
-type:          (dom/canvas/svg/media/shader/particle/motion)
+type:          (dom/canvas/svg/media/particle/motion)
 模式:           (12 种之一)
 视觉主体:        (具体的 — "真的终端窗口带行号" / "serif 200px 数字 87")
 画面比例:        (ratio)

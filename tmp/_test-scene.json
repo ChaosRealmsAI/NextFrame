@@ -1,0 +1,1 @@
+{"version":"0.8","width":1920,"height":1080,"fps":30,"ratio":"16:9","anchors":{"s":{"begin":0,"end":3000}},"tracks":[{"id":"test","kind":"scene","clips":[{"begin":"s.begin","end":"s.end","scene":"headlineCenter","params":{}}]}]}

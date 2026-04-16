@@ -1,0 +1,146 @@
+{
+  "version": "0.8",
+  "anchors": {
+    "seg0.begin": { "at": 0 },
+    "seg0.s1.begin": { "at": 0 },
+    "seg0.s1.end": { "at": 6000 },
+    "seg0.s2.begin": { "at": 6000 },
+    "seg0.s2.end": { "at": 12000 },
+    "seg0.s3.begin": { "at": 12000 },
+    "seg0.s3.end": { "at": 18000 },
+    "seg0.end": { "at": 19500 },
+    "seg0.sub1.begin": { "at": 500 },
+    "seg0.sub1.end": { "at": 5500 },
+    "seg0.sub2.begin": { "at": 6500 },
+    "seg0.sub2.end": { "at": 11500 },
+    "seg0.sub3.begin": { "at": 12500 },
+    "seg0.sub3.end": { "at": 17500 }
+  },
+  "tracks": [
+    {
+      "id": "audio-main",
+      "kind": "audio",
+      "clips": [
+        {
+          "id": "audio-0",
+          "begin": "seg0.begin",
+          "end": "seg0.end",
+          "src": "./sonnet-voice.mp3"
+        }
+      ]
+    },
+    {
+      "id": "bg-track",
+      "kind": "scene",
+      "clips": [
+        {
+          "id": "bg-0",
+          "begin": "seg0.begin",
+          "end": "seg0.end",
+          "scene": "darkGradient",
+          "params": {
+            "bg": "#1a1510",
+            "glowColor": "rgba(218,119,86,0.20)",
+            "glowX": 52,
+            "glowY": 34,
+            "glowSize": 60
+          },
+          "effects": {
+            "enter": { "type": "fadeIn", "dur": 1.0 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "scene-main",
+      "kind": "scene",
+      "clips": [
+        {
+          "id": "scene-0",
+          "begin": "seg0.s1.begin",
+          "end": "seg0.s1.end",
+          "scene": "headlineCenter",
+          "params": {
+            "text": "NextFrame <span style='color:#da7756'>v0.8</span>",
+            "color": "#f5ece0",
+            "fontSize": 56,
+            "enterDelay": 0.2
+          },
+          "effects": {
+            "enter": { "type": "fadeIn", "dur": 0.8 },
+            "exit": { "type": "fadeOut", "dur": 0.5 }
+          }
+        },
+        {
+          "id": "scene-1",
+          "begin": "seg0.s2.begin",
+          "end": "seg0.s2.end",
+          "scene": "headlineCenter",
+          "params": {
+            "text": "<span style='color:#da7756'>Anchors</span> × Tracks",
+            "color": "#f5ece0",
+            "fontSize": 52,
+            "enterDelay": 0.1
+          },
+          "effects": {
+            "enter": { "type": "slideUp", "dur": 0.7 },
+            "exit": { "type": "fadeOut", "dur": 0.5 }
+          }
+        },
+        {
+          "id": "scene-2",
+          "begin": "seg0.s3.begin",
+          "end": "seg0.s3.end",
+          "scene": "codeTerminal",
+          "params": {
+            "title": "timeline.json — v0.8 结构",
+            "lines": [
+              "{ \"version\": \"0.8\",",
+              "  \"anchors\": {",
+              "    \"seg0.begin\": { \"at\": 0 },",
+              "    \"seg0.end\":   { \"at\": 19500 }",
+              "  },",
+              "  \"tracks\": [",
+              "    { \"kind\": \"audio\",    ... },",
+              "    { \"kind\": \"scene\",    ... },",
+              "    { \"kind\": \"subtitle\", ... }",
+              "  ]",
+              "}"
+            ],
+            "fontSize": 24,
+            "enterStagger": 0.1,
+            "enterDur": 0.3
+          },
+          "effects": {
+            "enter": { "type": "fadeIn", "dur": 0.8 },
+            "exit": { "type": "fadeOut", "dur": 0.4 }
+          }
+        }
+      ]
+    },
+    {
+      "id": "subtitle-main",
+      "kind": "subtitle",
+      "clips": [
+        {
+          "id": "sub-0",
+          "begin": "seg0.sub1.begin",
+          "end": "seg0.sub1.end",
+          "text": "很多剪辑软件都有一个老问题"
+        },
+        {
+          "id": "sub-1",
+          "begin": "seg0.sub2.begin",
+          "end": "seg0.sub2.end",
+          "text": "你在编辑器里看到的画面，和导出成 MP4 的画面，对不上"
+        },
+        {
+          "id": "sub-2",
+          "begin": "seg0.sub3.begin",
+          "end": "seg0.sub3.end",
+          "text": "字体变了、间距错了、动画时机差一帧 — 我们要解决的就是这个"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAF Paint Probe</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+  body {
+    display: grid;
+    place-items: center;
+    background: #400;
+    color: #fff;
+    font: 700 120px/1 monospace;
+  }
+  #label { text-align: center; }
+</style>
+</head>
+<body>
+<div id="label">sync</div>
+<script>
+  window.__duration = 1;
+  const label = document.getElementById("label");
+
+  function setStage(color, text) {
+    document.body.style.background = color;
+    label.textContent = text;
+  }
+
+  window.__onFrame = function(state) {
+    const time = state && typeof state.time === "number" ? state.time.toFixed(3) : "0.000";
+    setStage("#7f1d1d", "sync " + time);
+    requestAnimationFrame(() => {
+      setStage("#166534", "raf1 " + time);
+      requestAnimationFrame(() => {
+        setStage("#1d4ed8", "raf2 " + time);
+      });
+    });
+    return "ok";
+  };
+</script>
+</body>
+</html>

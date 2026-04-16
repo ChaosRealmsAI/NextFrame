@@ -13,7 +13,7 @@ node src/nf-cli/bin/nextframe.js scene-lint --ratio=<ratio> --theme=<theme>
 - **L4** videoOverlay:true 缺黑框（pit 11）
 - **L5** render 签名与 type 不匹配
 - **L6** intent < 50 字
-- **L7** frame-pure runtime 违规：`shader` 禁 `requestAnimationFrame` / `setTimeout` / `setInterval`，`particle` 禁 `Math.random`，`motion` 禁 `Date.now` / `performance.now`
+- **L7** frame-pure runtime 违规：`particle` 禁 `Math.random`，`motion` 禁 `requestAnimationFrame` / `setTimeout` / `setInterval` / `Date.now` / `performance.now`
 
 出 error → 改完重跑。出 warning → 看情况决定修不修。
 
@@ -31,7 +31,7 @@ node src/nf-cli/bin/nextframe.js scene-smoke --ratio=<ratio> --theme=<theme>
 - `missing: intent` → 填真实意图 50+ 字
 - `render() threw: xxx` → render 里调用了未定义变量
 - `render(host) did not mutate host` → forgot to set innerHTML or appendChild
-- `invalid type "html"` → type 必须是 canvas|dom|svg|media|shader|particle|motion
+- `invalid type "html"` → type 必须是 canvas|dom|svg|media|particle|motion
 
 ### 2.5 · frame-pure 复验（新 type 必看）
 
@@ -42,7 +42,6 @@ node src/nf-cli/bin/nextframe.js scene-smoke --ratio=<ratio> --theme=<theme> --v
 ```
 
 它的语义是：**同一 `(t, params)` 连跑两次 render，输出必须一致**。
-- `shader` 看像素或 readPixels hash
 - `particle` 看粒子状态序列化
 - `motion` 看 SVG 序列化
 
@@ -63,7 +62,6 @@ node src/nf-cli/bin/nextframe.js scene-gallery --ratio=<ratio> --theme=<theme>
 - 对照 intent 里写的"应该看到什么"是不是真的看到
 
 新 type 的查看方式：
-- `shader` → 看 WebGL canvas 是否真在出 GPU 背景，不是空白 `<div>`
 - `particle` → 看 Canvas 2D 粒子分层、密度、呼吸是否成立
 - `motion` → 看 SVG 图层、behavior 节奏、shape 尺度是否成立
 
@@ -99,7 +97,6 @@ npx playwright screenshot --full-page --wait-for-timeout 6000 \
 **失败情况**：
 - 画面空白 → innerHTML 没设或 CSS 把内容藏到画布外
 - 动画不动 → 没有真正读 `t`，或新 type 没按 contract 返回 runtime config
-- shader 直接报错 → GLSL 语法错 / inline 字符串断裂（见 pitfalls 18）
 - motion 缩略图几乎看不见 → `size/viewBox` 和实际 shape 尺度不成比例（见 pitfalls 19）
 - particle 每次刷新都长得不一样 → render 里偷用了 `Math.random`（见 pitfalls 20）
 - 中文方框 → 改用系统字体 `'PingFang SC'` / `'Noto Serif SC'`

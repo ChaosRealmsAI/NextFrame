@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Shader · 短视频背景</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#000}canvas{display:block;width:100%;height:100%}</style>
+</head><body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl');
+
+// 竖屏 9:16
+canvas.width = 1080;
+canvas.height = 1920;
+
+const vert = `attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}`;
+
+// ── 核心：fragment shader ──
+// 暖色流动极光 + 噪声纹理 + 暗角 — 适合短视频知识讲解类背景
+const frag = `
+precision highp float;
+uniform float uT;
+uniform vec2 uR;
+
+// simplex-ish noise
+vec3 mod289(vec3 x){return x-floor(x/289.)*289.;}
+vec2 mod289(vec2 x){return x-floor(x/289.)*289.;}
+vec3 permute(vec3 x){return mod289((x*34.+1.)*x);}
+float snoise(vec2 v){
+  const vec4 C=vec4(.211324865,.366025404,-.577350269,.024390244);
+  vec2 i=floor(v+dot(v,C.yy)),x0=v-i+dot(i,C.xx);
+  vec2 i1=x0.x>x0.y?vec2(1,0):vec2(0,1);
+  vec4 x12=x0.xyxy+C.xxzz;x12.xy-=i1;
+  i=mod289(i);
+  vec3 p=permute(permute(i.y+vec3(0,i1.y,1.))+i.x+vec3(0,i1.x,1.));
+  vec3 m=max(.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.);
+  m=m*m;m=m*m;
+  vec3 x=2.*fract(p*C.www)-1.,h=abs(x)-.5,a0=x-floor(x+.5);
+  m*=1.79284291400159-.85373472095314*(a0*a0+h*h);
+  vec3 g;g.x=a0.x*x0.x+h.x*x0.y;g.yz=a0.yz*x12.xz+h.yz*x12.yw;
+  return 130.*dot(m,g);
+}
+
+void main(){
+  vec2 uv=gl_FragCoord.xy/uR;
+  float t=uT*.25;
+
+  // 多层噪声叠加 — 流动感
+  float n1=snoise(uv*2.+vec2(t*.7,t*.5))*.5+.5;
+  float n2=snoise(uv*4.+vec2(-t*.4,t*.8))*.5+.5;
+  float n3=snoise(uv*1.2+vec2(t*.2,-t*.3))*.5+.5;
+
+  // 暖色调色盘：深紫 → 暖橙 → 粉 → 深蓝
+  vec3 c1=vec3(.08,.04,.18);  // 深紫
+  vec3 c2=vec3(.85,.35,.15);  // 暖橙
+  vec3 c3=vec3(.75,.20,.45);  // 玫红
+  vec3 c4=vec3(.05,.08,.22);  // 深蓝
+
+  vec3 col=mix(c1,c2,n1);
+  col=mix(col,c3,n2*.5);
+  col=mix(col,c4,1.-uv.y*.7);
+
+  // 细腻噪声纹理（模拟胶片颗粒）
+  float grain=snoise(gl_FragCoord.xy*.8+t*100.)*.04;
+  col+=grain;
+
+  // 中间亮边缘暗（暗角）
+  float vig=1.-smoothstep(.3,.95,length((uv-.5)*vec2(1.,uR.y/uR.x)*1.6));
+  col*=vig*.85+.15;
+
+  // 微弱光斑
+  float spot=smoothstep(.45,.0,length(uv-vec2(.5+sin(t*1.3)*.15,.35+cos(t)*.1)));
+  col+=vec3(.12,.06,.02)*spot;
+
+  gl_FragColor=vec4(col,1.);
+}
+`;
+
+// ── WebGL boilerplate ──
+const vs = gl.createShader(gl.VERTEX_SHADER);
+gl.shaderSource(vs, vert); gl.compileShader(vs);
+const fs = gl.createShader(gl.FRAGMENT_SHADER);
+gl.shaderSource(fs, frag); gl.compileShader(fs);
+if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+  document.body.style.color='red';
+  document.body.textContent = gl.getShaderInfoLog(fs);
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+gl.linkProgram(prog); gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+const p = gl.getAttribLocation(prog, 'p');
+gl.enableVertexAttribArray(p);
+gl.vertexAttribPointer(p, 2, gl.FLOAT, false, 0, 0);
+
+const uT = gl.getUniformLocation(prog, 'uT');
+const uR = gl.getUniformLocation(prog, 'uR');
+
+function render(time) {
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.uniform1f(uT, time * .001);
+  gl.uniform2f(uR, canvas.width, canvas.height);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+</script>
+</body></html>

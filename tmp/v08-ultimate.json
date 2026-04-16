@@ -1,0 +1,101 @@
+{
+  "version": "0.8",
+  "width": 1920, "height": 1080, "fps": 30, "ratio": "16:9",
+  "background": "#0a0806",
+  "anchors": {
+    "s1": { "begin": 0,     "end": 3500  },
+    "s2": { "begin": 3500,  "end": 7000  },
+    "s3": { "begin": 7000,  "end": 11000 },
+    "s4": { "begin": 11000, "end": 14000 },
+    "s5": { "begin": 14000, "end": 16700 }
+  },
+  "tracks": [
+    {
+      "id": "voice", "kind": "audio",
+      "clips": [{ "begin": "s1.begin", "end": "s5.end", "src": "demo-voice.mp3" }]
+    },
+    {
+      "id": "bg", "kind": "scene",
+      "clips": [
+        { "begin": "s1.begin", "end": "s3.begin", "scene": "darkGradient", "params": {} },
+        { "begin": "s3.begin", "end": "s5.end", "scene": "voidField", "params": {} }
+      ]
+    },
+    {
+      "id": "content", "kind": "scene",
+      "clips": [
+        {
+          "begin": "s1.begin", "end": "s1.end",
+          "scene": "headlineCenter",
+          "params": { "text": "NextFrame v0.8", "sub": "全维度展示" },
+          "effects": { "enter": { "type": "fadeIn", "dur": 0.8 }, "exit": { "type": "fadeOut", "dur": 0.5 } }
+        },
+        {
+          "begin": "s2.begin", "end": "s2.end",
+          "scene": "codeTerminal",
+          "params": {
+            "title": "v0.8 数据结构",
+            "lines": [
+              "anchors: { s1: {begin:0, end:3500} }",
+              "tracks: [",
+              "  { kind:'scene', effects:{enter:'fadeIn'} },",
+              "  { kind:'subtitle', text:'...' },",
+              "  { kind:'animation', target:'...' },",
+              "]"
+            ]
+          },
+          "effects": { "enter": { "type": "slideUp", "dur": 0.6 }, "exit": { "type": "fadeOut", "dur": 0.4 } }
+        },
+        {
+          "begin": "s3.begin", "end": "s3.end",
+          "scene": "headlineCenter",
+          "params": { "text": "动效 + 转场 + 关键帧", "sub": "全部通过 v0.8 JSON 定义" },
+          "effects": { "enter": { "type": "scaleIn", "dur": 0.6 }, "exit": { "type": "blurOut", "dur": 0.5 } },
+          "transition": { "type": "fade", "dur": 0.3 }
+        },
+        {
+          "begin": "s4.begin", "end": "s4.end",
+          "scene": "headlineCenter",
+          "params": { "text": "44 Scene 组件", "sub": "背景·文字·数据·代码·特效·覆盖层" },
+          "effects": { "enter": { "type": "fadeIn", "dur": 0.5 } }
+        },
+        {
+          "begin": "s5.begin", "end": "s5.end",
+          "scene": "headlineCenter",
+          "params": { "text": "时间是引用 不是值", "sub": "ADR-017 · Anchors × Tracks" },
+          "effects": { "enter": { "type": "fadeIn", "dur": 0.8 }, "exit": { "type": "fadeOut", "dur": 1.0 } }
+        }
+      ]
+    },
+    {
+      "id": "overlay", "kind": "scene",
+      "clips": [
+        { "begin": "s1.begin", "end": "s5.end", "scene": "screenFilm", "params": {}, "opacity": 0.4 }
+      ]
+    },
+    {
+      "id": "subs", "kind": "subtitle",
+      "clips": [
+        { "begin": "s1.begin", "end": "s1.end", "text": "NextFrame v0.8 — Anchors 乘 Tracks 全维度展示" },
+        { "begin": "s2.begin", "end": "s2.end", "text": "JSON 定义：场景 + 字幕 + 语音 + 动效 + 转场 + 关键帧" },
+        { "begin": "s3.begin", "end": "s3.end", "text": "动效淡入淡出 + 转场渐变 + 关键帧动画 — 全部 v0.8 JSON 驱动" },
+        { "begin": "s4.begin", "end": "s4.end", "text": "44 个内置组件全部兼容 v0.8 格式 一条 JSON 搞定" },
+        { "begin": "s5.begin", "end": "s5.end", "text": "时间是引用 不是值 — NextFrame v0.8 设计原则" }
+      ]
+    },
+    {
+      "id": "progress", "kind": "scene",
+      "clips": [
+        { "begin": "s1.begin", "end": "s5.end", "scene": "progressBar16x9", "params": {} }
+      ]
+    },
+    {
+      "id": "title-anim", "kind": "animation",
+      "target": "content.clips[0].params.fontSize",
+      "clips": [
+        { "at": "s1.begin", "value": 36, "ease": "linear" },
+        { "at": "s1.end", "value": 48, "ease": "cubic-bezier(0.16,1,0.3,1)" }
+      ]
+    }
+  ]
+}

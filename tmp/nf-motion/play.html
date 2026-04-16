@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="UTF-8">
+<title>NF-Motion POC · 对比 Lottie V4</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#0a0a10;color:#e8e8f0;font-family:-apple-system,'SF Pro Display',sans-serif;min-height:100vh}
+  .head{padding:28px 40px 12px;border-bottom:1px solid #1a1a24}
+  .head h1{margin:0;font-size:20px;font-weight:500;letter-spacing:2px}
+  .head p{margin:6px 0 0;color:#7a7a8c;font-size:12px;letter-spacing:.5px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:28px 40px}
+  .card{background:#13131c;border:1px solid #23232f;border-radius:14px;padding:20px}
+  .card h2{margin:0 0 4px;font-size:13px;font-weight:600;color:#a090ff;letter-spacing:2px}
+  .card .sub{margin:0 0 14px;font-size:11px;color:#6a6a82;line-height:1.6}
+  .stage{width:100%;aspect-ratio:1;background:#f6f6f8;border-radius:10px;overflow:hidden;position:relative}
+  .controls{padding:0 40px 32px}
+  .scrub{display:flex;gap:16px;align-items:center;background:#13131c;padding:16px 20px;border-radius:10px;border:1px solid #23232f}
+  .scrub input[type=range]{flex:1}
+  .scrub button{background:#3a3a5a;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;letter-spacing:1px}
+  .scrub button:hover{background:#4a4a7a}
+  .scrub .t{font-family:'SF Mono',monospace;color:#a090ff;font-size:12px;min-width:72px}
+  .notes{padding:16px 40px 40px;color:#5a5a72;font-size:12px;line-height:2}
+  .notes b{color:#a090ff;font-weight:500}
+  .notes code{background:#13131c;padding:2px 6px;border-radius:4px;color:#c0a8ff;font-size:11px}
+  pre{background:#0d0d14;padding:16px;border-radius:8px;font-size:10px;color:#6af;overflow:auto;max-height:240px;line-height:1.5}
+</style>
+</head><body>
+
+<div class="head">
+  <h1>NF-MOTION POC · 语义驱动 · frame-pure</h1>
+  <p>用我们自己的 50 行引擎复刻 Lottie V4 — 对比看 JSON 简化程度</p>
+</div>
+
+<div class="row">
+  <div class="card">
+    <h2>NF-MOTION · 我们的</h2>
+    <p class="sub">schema 3 个 layer · <b>ripple/burst</b> 是一等公民 · <code>behavior:"impact"</code> 自动生成物理对的 squash/stretch</p>
+    <div class="stage" id="nfStage"></div>
+  </div>
+  <div class="card">
+    <h2>源 JSON · 仅 22 行</h2>
+    <p class="sub">语义：说"想表达什么"，不说"bezier 怎么算"</p>
+    <pre id="src"></pre>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="scrub">
+    <button id="play">▶ 播放</button>
+    <button id="pause">⏸ 暂停</button>
+    <input id="t" type="range" min="0" max="2.5" step="0.01" value="0">
+    <span class="t" id="tLabel">t = 0.00s</span>
+  </div>
+</div>
+
+<div class="notes">
+  <b>和 Lottie V4 对比：</b><br>
+  · Lottie JSON：<code>anim-v4.json</code> = <b>340 行</b>（含 8 个粒子 layer + 所有 bezier + 关键帧全展开）<br>
+  · NF-Motion：<code>heart-like.json</code> = <b>22 行</b>（ripple/burst 是类型，behavior 是预设，引擎展开）<br>
+  · <b>frame-pure 验证</b>：拖动进度条到任意 t — 每个 t 渲染结果完全确定，录制帧不会偏移<br>
+  · <b>AI 友好度</b>：AI 写 NF-Motion 不用算 bezier、不用手算 squash 方向 — 说 <code>"impact"</code> 就够
+</div>
+
+<script type="module">
+import { render } from './engine.js';
+
+const motion = await fetch('heart-like.json').then(r => r.json());
+document.getElementById('src').textContent = JSON.stringify(motion, null, 2);
+
+const host = document.getElementById('nfStage');
+const slider = document.getElementById('t');
+const label = document.getElementById('tLabel');
+
+function draw(t) {
+  render(host, t, motion);
+  label.textContent = 't = ' + t.toFixed(2) + 's';
+}
+
+slider.oninput = () => { stop(); draw(parseFloat(slider.value)); };
+
+let raf = null, start = 0;
+function play() {
+  stop();
+  start = performance.now() - parseFloat(slider.value) * 1000;
+  const loop = (now) => {
+    let t = (now - start) / 1000;
+    if (t > motion.duration) { start = now; t = 0; }
+    slider.value = t;
+    draw(t);
+    raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+}
+function stop() { if (raf) cancelAnimationFrame(raf); raf = null; }
+
+document.getElementById('play').onclick = play;
+document.getElementById('pause').onclick = stop;
+
+draw(0);
+play();
+</script>
+</body></html>

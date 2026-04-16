@@ -115,7 +115,7 @@ function lintFile(filePath: string, content: string, meta: Record<string, unknow
       what: `type=${type} 但 render 第 1 参叫 "${paramName}"，应为 host`,
       fix: `${type}: render(host, t, params, vp)`,
     });
-  } else if ((type === "shader" || type === "particle" || type === "motion") && paramName !== "host") {
+  } else if ((type === "particle" || type === "motion") && paramName !== "host") {
     issues.push({
       severity: "error", code: "SIG_MISMATCH", file: rel, line: sigLineNo,
       what: `type=${type} 但 render 第 1 参叫 "${paramName}"，应为 host`,
@@ -124,7 +124,7 @@ function lintFile(filePath: string, content: string, meta: Record<string, unknow
   }
 
   // L7 (v0.9 ADR-020): frame-pure runtime types forbid obvious non-deterministic APIs.
-  if (type === "shader" || type === "motion") {
+  if (type === "motion") {
     const forbidden = [
       [/\bsetInterval\s*\(/, "setInterval"],
       [/\bsetTimeout\s*\(/, "setTimeout"],

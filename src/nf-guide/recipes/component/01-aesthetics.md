@@ -386,12 +386,10 @@ const breathe = 1.0 + 0.03 * Math.sin(t * Math.PI);
 
 | type | 必须做到 | 禁止偷懒 |
 |------|---------|---------|
-| **shader** | GLSL **至少 20 行**，要有层次、扰动、节奏；优先从成熟 Shadertoy 思路拆结构后重写成 NextFrame fragment | 只写一个 `sin()` + 纯色渐变就交差 |
 | **particle** | 至少做出 **near/mid/far 深度分层** + **色温梯度** + **呼吸透明度**，让近景更亮更大更快，远景更冷更淡更慢 | 全部粒子同大小、同颜色、同透明度 |
 | **motion** | 优先拼 **behavior 预设 + shape 库 + layers**，让 impact/pulse/dart 这类语义先成立 | 上来手写一长串 keyframe tracks，最后节奏生硬 |
 
 补充要求：
-- **shader**：先找成熟视觉母体，再改 uniforms、色板、节奏。不要临场瞎搓 12 行伪 GLSL。
 - **particle**：深度至少三层，不然缩略图看起来就是一层死点阵。
 - **motion**：只有 behavior 真覆盖不了的局部属性，才补少量显式 track。
 

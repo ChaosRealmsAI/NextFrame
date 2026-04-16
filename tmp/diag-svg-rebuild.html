@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SVG Rebuild Probe</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #05060a; }
+  #stage-shell { position: fixed; inset: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  #stage { position: absolute; inset: 0; }
+  #hud {
+    position: absolute;
+    left: 64px;
+    top: 48px;
+    color: rgba(255,255,255,0.8);
+    font: 700 42px/1.2 monospace;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+<div id="stage-shell">
+  <div id="stage"></div>
+  <div id="hud"></div>
+</div>
+<script>
+  window.__duration = 4;
+
+  const shell = document.getElementById("stage-shell");
+  const stage = document.getElementById("stage");
+  const hud = document.getElementById("hud");
+
+  function applyScale() {
+    const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) || 1;
+    shell.style.transform = "scale(" + scale + ")";
+  }
+
+  function draw(t) {
+    const freq = 0.055 + 0.022 * Math.sin((t / 2.4) * Math.PI * 2);
+    const dispScale = 20 + 10 * Math.sin((t / 3.1) * Math.PI * 2);
+    const seed = Math.floor(t * 12) % 200;
+    const rot = (t * 34) % 360;
+    stage.innerHTML = `
+      <svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="cube" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00f0ff"/>
+            <stop offset="50%" stop-color="#7c4dff"/>
+            <stop offset="100%" stop-color="#ff2bd6"/>
+          </linearGradient>
+          <filter id="ripple" x="-20%" y="-20%" width="140%" height="140%" filterUnits="userSpaceOnUse">
+            <feTurbulence type="turbulence" baseFrequency="${freq.toFixed(5)}" numOctaves="2" seed="${seed}" result="n"/>
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="${dispScale.toFixed(2)}" xChannelSelector="R" yChannelSelector="G"/>
+          </filter>
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="20"/>
+          </filter>
+        </defs>
+        <rect width="1920" height="1080" fill="#05060a"/>
+        <rect x="650" y="230" width="620" height="620" fill="url(#cube)" opacity="0.45" filter="url(#glow)"/>
+        <g transform="rotate(${rot.toFixed(2)} 960 540)">
+          <rect x="618" y="198" width="684" height="684" fill="none" stroke="#00f0ff" stroke-opacity="0.35" stroke-width="2" stroke-dasharray="12 18"/>
+        </g>
+        <g filter="url(#ripple)">
+          <rect x="650" y="230" width="620" height="620" fill="url(#cube)" rx="10"/>
+        </g>
+      </svg>
+    `;
+    hud.textContent = "svg-rebuild t=" + t.toFixed(3) + " seed=" + seed;
+  }
+
+  window.__onFrame = function(state) {
+    draw(Math.max(0, Math.min(window.__duration, Number(state && state.time) || 0)));
+    void stage.offsetHeight;
+    return "ok";
+  };
+
+  applyScale();
+  window.addEventListener("resize", applyScale);
+  draw(0);
+</script>
+</body>
+</html>

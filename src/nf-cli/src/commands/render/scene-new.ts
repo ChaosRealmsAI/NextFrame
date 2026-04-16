@@ -16,8 +16,8 @@ const SCENES_ROOT = resolve(__HERE, "../../../../nf-core/scenes");
 const RATIOS = ["16:9", "9:16", "1:1", "4:3"] as const;
 const RATIO_DIRS: Record<string, string> = { "16:9": "16x9", "9:16": "9x16", "1:1": "1x1", "4:3": "4x3" };
 const ROLES = ["bg", "chrome", "content", "text", "overlay", "data"] as const;
-// v0.9 ADR-020: added shader / particle / motion (frame-pure runtime types)
-const TYPES = ["canvas", "dom", "svg", "media", "shader", "particle", "motion"] as const;
+// v0.9 ADR-020: added particle / motion (frame-pure runtime types)
+const TYPES = ["canvas", "dom", "svg", "media", "particle", "motion"] as const;
 
 const HELP = `nextframe scene-new --id=<camelCase> --role=<role> --type=<type> --ratio=<ratio> --theme=<theme> [opts]
 
@@ -27,7 +27,7 @@ Generate a new scene component scaffold that conforms to the scene v3 contract
 Required:
   --id          component id, camelCase, globally unique within theme (e.g. bilingualSub)
   --role        bg | chrome | content | text | overlay | data
-  --type        canvas | dom | svg | media  — determines render() signature
+  --type        canvas | dom | svg | media | particle | motion  — determines render() signature
   --ratio       16:9 | 9:16 | 1:1 | 4:3
   --theme       theme name, e.g. anthropic-warm (must have existing theme.md)
 
@@ -125,28 +125,6 @@ function scaffold(opts: {
         object-fit: cover;
       " autoplay muted></video>
     \`;`;
-  } else if (type === "shader") {
-    renderSignature = "render(host, _t, params, _vp)";
-    mountComment = "v0.9 ADR-020: framework mounts <canvas> + compiles program; scene returns { frag, uniforms? }. t flows via auto-injected uT uniform. L7 forbids setInterval/setTimeout/requestAnimationFrame in this render.";
-    renderBody = `    void host;  // framework manages <canvas> mount
-    return {
-      // Fragment shader source. Reads built-in uniforms uT (time) and uR (viewport).
-      // Add extra uniforms in \`uniforms\` object below and reference them here.
-      frag: \`
-        precision highp float;
-        uniform float uT;
-        uniform vec2 uR;
-        uniform float uHue;
-        void main() {
-          vec2 uv = gl_FragCoord.xy / uR.xy;
-          float v = 0.5 + 0.5 * sin(uT + uv.x * 6.283 + uHue);
-          gl_FragColor = vec4(v, v * 0.5, 1.0 - v, 1.0);
-        }
-      \`,
-      uniforms: {
-        uHue: params.hue ?? 0.0,
-      }
-    };`;
   } else if (type === "particle") {
     renderSignature = "render(host, _t, params, _vp)";
     mountComment = "v0.9 ADR-020: framework mounts <canvas> (2D) + calls runtime/particle.js. scene returns { emitter, field?, render }. Must NOT call Math.random — use mulberry32(emitter.seed + i*37) from runtime.";

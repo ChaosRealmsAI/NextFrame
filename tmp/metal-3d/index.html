@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Metal 3D · Chrome Knot v2</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#08080c}
+  canvas{display:block;width:100%;height:100%}
+  #status{position:fixed;top:12px;left:12px;color:#666;font:12px monospace}
+</style>
+</head><body>
+<div id="status">loading Three.js...</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+
+const $ = s => document.getElementById(s);
+const W = window.innerWidth, H = window.innerHeight;
+
+// ── renderer ──
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+$('status').textContent = 'building scene...';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a10);
+
+const camera = new THREE.PerspectiveCamera(32, W / H, 0.1, 100);
+camera.position.set(0, 0.5, 7);
+camera.lookAt(0, 0, 0);
+
+// ── 用程序化 CubeRenderTarget 做高质量 studio HDRI ──
+const cubeRT = new THREE.WebGLCubeRenderTarget(512);
+const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRT);
+
+const studioScene = new THREE.Scene();
+studioScene.background = new THREE.Color(0x040408);
+
+// 主光（大面积柔白 — 产生宽高光带）
+addLight(studioScene, 0xffeedd, 1.8, [0, 8, -4], [16, 6]);
+// 侧面暖光（橙色反射）
+addLight(studioScene, 0xff9944, 1.2, [-6, 2, 4], [5, 8]);
+// 对侧冷光（蓝色反射）
+addLight(studioScene, 0x4488ff, 0.9, [7, 0, 3], [6, 10]);
+// 底部反射（微弱暖色地面反光）
+addLight(studioScene, 0x332211, 0.4, [0, -6, 0], [20, 20]);
+// 顶部 rim light（勾勒轮廓的细白线）
+addLight(studioScene, 0xffffff, 2.5, [0, 6, 6], [14, 1.5]);
+// 背后 kick light
+addLight(studioScene, 0x6688cc, 0.7, [3, 3, -8], [8, 4]);
+
+function addLight(s, color, intensity, pos, size) {
+  const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+  mat.color.multiplyScalar(intensity);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size[0], size[1]), mat);
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  mesh.lookAt(0, 0, 0);
+  s.add(mesh);
+}
+
+cubeCamera.position.set(0, 0, 0);
+cubeCamera.update(renderer, studioScene);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envMap = pmrem.fromCubemap(cubeRT.texture).texture;
+scene.environment = envMap;
+
+$('status').textContent = 'building geometry...';
+
+// ── 金属材质 ──
+const metalMat = new THREE.MeshPhysicalMaterial({
+  color: 0xd0d0d4,
+  metalness: 1.0,
+  roughness: 0.15,
+  clearcoat: 0.6,
+  clearcoatRoughness: 0.08,
+  envMap: envMap,
+  envMapIntensity: 1.6,
+  reflectivity: 1.0,
+  ior: 2.5,
+});
+
+// ── 几何体：扁椭圆环链 ──
+const group = new THREE.Group();
+
+function capsuleLoop(rx, ry, tubeR) {
+  const n = 160;
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    // 用超椭圆 squircle 做圆角方形环
+    const exp = 2.8;
+    const ca = Math.sign(Math.cos(a)) * Math.pow(Math.abs(Math.cos(a)), 2 / exp);
+    const sa = Math.sign(Math.sin(a)) * Math.pow(Math.abs(Math.sin(a)), 2 / exp);
+    pts.push(new THREE.Vector3(ca * rx, sa * ry, 0));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts, true);
+  return new THREE.TubeGeometry(curve, n, tubeR, 32, true);
+}
+
+// 左环
+const m1 = new THREE.Mesh(capsuleLoop(1.2, 0.8, 0.2), metalMat);
+m1.position.x = -1.15;
+m1.rotation.z = 0.2;
+m1.rotation.y = 0.1;
+group.add(m1);
+
+// 中环
+const m2 = new THREE.Mesh(capsuleLoop(1.2, 0.8, 0.2), metalMat);
+m2.position.y = -0.15;
+m2.position.z = 0.2;
+m2.rotation.z = -0.15;
+group.add(m2);
+
+// 右环
+const m3 = new THREE.Mesh(capsuleLoop(1.2, 0.8, 0.2), metalMat);
+m3.position.x = 1.15;
+m3.rotation.z = 0.2;
+m3.rotation.y = -0.1;
+group.add(m3);
+
+group.rotation.x = 0.35;
+group.rotation.y = -0.25;
+scene.add(group);
+
+// ── 后处理 ──
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.2, 0.6, 0.9);
+composer.addPass(bloom);
+const smaa = new SMAAPass(W, H);
+composer.addPass(smaa);
+
+$('status').textContent = '';
+
+// ── 动画 ──
+function animate(time) {
+  requestAnimationFrame(animate);
+  const t = time * 0.001;
+  group.rotation.y = -0.25 + Math.sin(t * 0.35) * 0.3;
+  group.rotation.x = 0.35 + Math.cos(t * 0.25) * 0.12;
+  composer.render();
+}
+animate(0);
+
+window.addEventListener('resize', () => {
+  const w = innerWidth, h = innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+});
+</script>
+</body></html>

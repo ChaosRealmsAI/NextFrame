@@ -1,0 +1,109 @@
+{
+  "version": "0.8",
+  "width": 1920, "height": 1080, "fps": 30, "ratio": "16:9",
+  "background": "#050510",
+  "anchors": {
+    "s1": { "begin": 0,     "end": 3000  },
+    "s2": { "begin": 3000,  "end": 6000  },
+    "s3": { "begin": 6000,  "end": 9000  },
+    "s4": { "begin": 9000,  "end": 12000 },
+    "s5": { "begin": 12000, "end": 15000 },
+    "s6": { "begin": 15000, "end": 16700 }
+  },
+  "tracks": [
+    {
+      "id": "voice", "kind": "audio",
+      "clips": [{ "begin": "s1.begin", "end": "s6.end", "src": "demo-voice.mp3" }]
+    },
+    {
+      "id": "bg", "kind": "scene",
+      "clips": [
+        { "begin": "s1.begin", "end": "s3.end", "scene": "voidField", "params": {} },
+        { "begin": "s3.begin", "end": "s6.end", "scene": "liquidNoise", "params": {} }
+      ]
+    },
+    {
+      "id": "content", "kind": "scene",
+      "clips": [
+        {
+          "begin": "s1.begin", "end": "s1.end",
+          "scene": "neonGlow",
+          "params": { "text": "NEXTFRAME" },
+          "effects": { "enter": { "type": "fadeIn", "dur": 1.0 }, "exit": { "type": "fadeOut", "dur": 0.5 } }
+        },
+        {
+          "begin": "s2.begin", "end": "s2.end",
+          "scene": "particleField",
+          "params": { "count": 300 },
+          "effects": { "enter": { "type": "fadeIn", "dur": 0.6 }, "exit": { "type": "fadeOut", "dur": 0.5 } }
+        },
+        {
+          "begin": "s3.begin", "end": "s3.end",
+          "scene": "shaderRipple",
+          "params": { "label": "ANCHOR://RESOLVE" },
+          "effects": { "enter": { "type": "scaleIn", "dur": 0.5 }, "exit": { "type": "blurOut", "dur": 0.5 } }
+        },
+        {
+          "begin": "s4.begin", "end": "s4.end",
+          "scene": "orbitDiagram",
+          "params": {
+            "center": "Engine",
+            "centerColor": "#da7756",
+            "orbits": [
+              { "name": "Anchors", "radius": 0.22, "period": 6, "color": "#3ddc97" },
+              { "name": "Tracks",  "radius": 0.34, "period": 10, "color": "#b967ff" },
+              { "name": "Scenes",  "radius": 0.46, "period": 16, "color": "#5fb5ff" }
+            ]
+          },
+          "effects": { "enter": { "type": "fadeIn", "dur": 0.8 } }
+        },
+        {
+          "begin": "s5.begin", "end": "s5.end",
+          "scene": "bigStat",
+          "params": { "value": 49 },
+          "effects": { "enter": { "type": "scaleIn", "dur": 0.6 }, "exit": { "type": "fadeOut", "dur": 0.5 } }
+        },
+        {
+          "begin": "s6.begin", "end": "s6.end",
+          "scene": "aweQuote",
+          "params": { "quote": "时间是引用，不是值", "source": "ADR-017", "accent": "#3ddc97" },
+          "effects": { "enter": { "type": "fadeIn", "dur": 1.0 } }
+        }
+      ]
+    },
+    {
+      "id": "glitch-fx", "kind": "scene",
+      "clips": [
+        {
+          "begin": "s3.begin", "end": "s3.end",
+          "scene": "glitch",
+          "params": { "intensity": 0.6 },
+          "opacity": 0.3
+        }
+      ]
+    },
+    {
+      "id": "film", "kind": "scene",
+      "clips": [
+        { "begin": "s1.begin", "end": "s6.end", "scene": "screenFilm", "params": {}, "opacity": 0.3 }
+      ]
+    },
+    {
+      "id": "subs", "kind": "subtitle",
+      "clips": [
+        { "begin": "s1.begin", "end": "s1.end", "text": "霓虹管文字 — SVG 三层辉光 + 闪烁动画" },
+        { "begin": "s2.begin", "end": "s2.end", "text": "260 粒子沿噪声场流动 + 近距连线 神经网络既视感" },
+        { "begin": "s3.begin", "end": "s3.end", "text": "Shader 水波扭曲 + Glitch RGB 通道分离" },
+        { "begin": "s4.begin", "end": "s4.end", "text": "天体轨道图 — SVG 描边 draw-in + 公转动画" },
+        { "begin": "s5.begin", "end": "s5.end", "text": "SVG 渐变圆环 + 280px 巨数 + RGB 色散描边" },
+        { "begin": "s6.begin", "end": "s6.end", "text": "v0.8 — 全部由一条 JSON 驱动" }
+      ]
+    },
+    {
+      "id": "progress", "kind": "scene",
+      "clips": [
+        { "begin": "s1.begin", "end": "s6.end", "scene": "progressBar16x9", "params": {} }
+      ]
+    }
+  ]
+}

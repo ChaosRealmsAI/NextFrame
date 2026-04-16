@@ -4,7 +4,7 @@
 // runs sample()+render()+describe() for each — branches on c.type:
 //   - canvas → real canvas context + encode PNG to /tmp/scene-previews/
 //   - dom/svg/media → minimal fake HTMLElement host, verify mutation occurred
-//   - shader/particle/motion → verify config shape; optional frame-pure proof
+//   - particle/motion → verify config shape; optional frame-pure proof
 
 import { parseFlags } from "../_helpers/_io.js";
 import { readdirSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
@@ -30,7 +30,7 @@ const REQUIRED = [
   "visual_weight","z_layer","mood","tags","complexity","performance","status","changelog",
   "render","describe","sample",
 ];
-const VALID_TYPES = new Set(["canvas", "dom", "svg", "media", "shader", "particle", "motion"]);
+const VALID_TYPES = new Set(["canvas", "dom", "svg", "media", "particle", "motion"]);
 const FRAME_PURE_T = 1.23;
 
 const HELP = `nextframe scene-smoke --ratio=<ratio> --theme=<theme> [opts]
@@ -116,9 +116,7 @@ function validateRuntimeShape(type: unknown, out: unknown, errors: string[]): ou
     errors.push(`${type} render() must return config object, got ${typeof out}`);
     return false;
   }
-  if (type === "shader") {
-    if (typeof out.frag !== "string") errors.push("shader render() must return { frag: string }");
-  } else if (type === "particle") {
+  if (type === "particle") {
     if (!out.emitter || typeof out.emitter !== "object") errors.push("particle render() must return { emitter: object }");
     if (typeof out.render !== "function") errors.push("particle render() must return { render: function }");
   } else if (type === "motion") {
@@ -138,21 +136,6 @@ function verifyFramePure(
   const render = scene.render as ((host: unknown, t: number, params: unknown, vp: { width: number; height: number }) => unknown);
 
   try {
-    if (type === "shader") {
-      const errorsA: string[] = [];
-      const errorsB: string[] = [];
-      const outA = render(makeFakeHost(), FRAME_PURE_T, params, vp);
-      const outB = render(makeFakeHost(), FRAME_PURE_T, params, vp);
-      if (!validateRuntimeShape(type, outA, errorsA) || !validateRuntimeShape(type, outB, errorsB) || errorsA.length || errorsB.length) {
-        return { id, pass: false, diff: [...errorsA, ...errorsB].join("; ") || "invalid shader config" };
-      }
-      if (outA.frag !== outB.frag) return { id, pass: false, diff: "frag mismatch across identical renders" };
-      if (stableJson(outA.uniforms ?? null) !== stableJson(outB.uniforms ?? null)) {
-        return { id, pass: false, diff: "uniforms mismatch across identical renders" };
-      }
-      return { id, pass: true };
-    }
-
     if (type === "particle") {
       const dumpA = stableJson(dumpState(FRAME_PURE_T, scene, params, vp));
       const dumpB = stableJson(dumpState(FRAME_PURE_T, scene, params, vp));
@@ -227,7 +210,7 @@ export async function run(argv: string[]): Promise<number> {
         if (cr[k] === undefined) result.missing.push(k);
       }
       if (!VALID_TYPES.has(String(cr.type))) {
-        result.errors.push(`invalid type "${cr.type}" (must be canvas|dom|svg|media|shader|particle|motion)`);
+        result.errors.push(`invalid type "${cr.type}" (must be canvas|dom|svg|media|particle|motion)`);
       }
       if (typeof cr.intent === "string" && cr.intent.length < 50) {
         result.errors.push(`intent too short (${cr.intent.length} chars)`);
@@ -258,7 +241,7 @@ export async function run(argv: string[]): Promise<number> {
             (cr.render as ((ctx: unknown, t: number, p: unknown, vp: unknown) => void))(ctx, 0.5, params, vp);
             const png = await canvas.encode("png");
             writeFileSync(join(outDir, file.replace(".js", ".png")), png);
-          } else if (cr.type === "shader" || cr.type === "particle" || cr.type === "motion") {
+          } else if (cr.type === "particle" || cr.type === "motion") {
             const out = (cr.render as ((h: unknown, t: number, p: unknown, vp: unknown) => unknown))(makeFakeHost(), 0.5, params, vp);
             validateRuntimeShape(cr.type, out, result.errors);
           } else {
