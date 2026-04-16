@@ -17,8 +17,10 @@ const meta = {
   type: "motion",
   category: "hero",
   description: "Hypnotic 10s shape morph parade: circle→heart→star→hexagon→drop→circle with synced color + gradient + glow",
-  params: [],
-  examples: [{}],
+  params: [
+    { name: "duration", type: "number", default: 10, description: "Total parade length in seconds; morphs distribute evenly across the 6 shape phases" },
+  ],
+  examples: [{ duration: 10 }],
 };
 
 export default {
