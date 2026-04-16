@@ -44,7 +44,8 @@ function layerState(layer, t) {
 function renderShape(layer, state, t, motion) {
   const shapeName = layer.shape || (layer.type === "shape" ? "circle" : layer.type);
   const shape = SHAPES[shapeName];
-  const fallback = layer.path ? `<path${attrs({ d: layer.path, fill: layer.fill ?? "#000000", stroke: layer.stroke, "stroke-width": layer.stroke ? layer.strokeWidth ?? 1 : null, "vector-effect": "non-scaling-stroke" })}/>` : "";
+  const d = shapeName === "path" ? resolveTrack(state.tracks, "d", t) || layer.path : layer.path;
+  const fallback = d ? `<path${attrs({ d, fill: layer.fill ?? "#000000", stroke: layer.stroke, "stroke-width": layer.stroke ? layer.strokeWidth ?? 1 : null, "vector-effect": "non-scaling-stroke" })}/>` : "";
   const body = typeof shape === "function" ? shape({ ...layer, t, motion, tracks: state.tracks, opacity: state.opacity }) : fallback;
   if (!body) return "";
   const transform = `translate(${state.at[0].toFixed(3)} ${state.at[1].toFixed(3)}) rotate(${state.rotate.toFixed(3)}) scale(${state.scaleX.toFixed(3)} ${state.scaleY.toFixed(3)})`;

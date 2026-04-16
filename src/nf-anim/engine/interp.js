@@ -1,15 +1,22 @@
 import { EASE } from "./easings.js";
 import { lerpColor } from "./color.js";
+import { lerpPath, parsePath } from "./path.js";
 
 const meta = { name: "interp", kind: "engine", description: "Keyframe interpolation for scalar and array tracks" };
 const EPS = 1e-9;
+const PATH_RE = /^\s*[Mm](?:[\s,]|[-+.\d])/;
+// WeakMap cannot key primitive strings; cache exact string values instead.
+const PATH_CACHE = new Map();
 const num = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
 const clone = (value) => Array.isArray(value) ? value.map(clone) : value;
 const sortFrames = (track) => track.filter((frame) => Array.isArray(frame) && frame.length >= 2).slice().sort((a, b) => num(a[0]) - num(b[0]));
+const isPath = (value) => typeof value === "string" && PATH_RE.test(value);
+const parsedPath = (value) => PATH_CACHE.get(value) || PATH_CACHE.set(value, parsePath(value)).get(value);
 
 function lerpValue(left, right, progress) {
   if (typeof left === "string" && typeof right === "string") return lerpColor(left, right, progress);
   if (typeof left === "number" && typeof right === "number") return left + (right - left) * progress;
+  if (isPath(left) && isPath(right)) return lerpPath(parsedPath(left), parsedPath(right), progress, left, right);
   if (Array.isArray(left) && Array.isArray(right)) {
     const size = Math.max(left.length, right.length);
     const out = new Array(size);
