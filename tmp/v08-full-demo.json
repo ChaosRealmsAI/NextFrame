@@ -1,0 +1,137 @@
+{
+  "version": "0.8",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "ratio": "16:9",
+  "anchors": {
+    "s1": { "begin": 0, "end": 2500 },
+    "s2": { "begin": 2500, "end": 5000 },
+    "s3": { "begin": 5000, "end": 7500 }
+  },
+  "tracks": [
+    {
+      "id": "audio-main",
+      "kind": "audio",
+      "clips": [
+        {
+          "id": "audio-0",
+          "begin": "s1.begin",
+          "end": "s3.end",
+          "src": "fixtures/audio/demo-bed.mp3",
+          "volume": 0.6
+        }
+      ]
+    },
+    {
+      "id": "bg",
+      "kind": "scene",
+      "clips": [
+        {
+          "id": "bg-0",
+          "begin": "s1.begin",
+          "end": "s3.end",
+          "scene": "darkGradient",
+          "params": {}
+        }
+      ]
+    },
+    {
+      "id": "scene-main",
+      "kind": "scene",
+      "clips": [
+        {
+          "id": "scene-1",
+          "begin": "s1.begin",
+          "end": "s1.end",
+          "scene": "headlineCenter",
+          "params": {
+            "text": "NextFrame v0.8",
+            "fontSize": 42,
+            "color": "#f5ece0"
+          }
+        },
+        {
+          "id": "scene-2",
+          "begin": "s2.begin",
+          "end": "s2.end",
+          "scene": "headlineCenter",
+          "params": {
+            "text": "Lowering keeps scene + subtitle + audio",
+            "fontSize": 38,
+            "color": "#da7756"
+          }
+        },
+        {
+          "id": "scene-3",
+          "begin": "s3.begin",
+          "end": "s3.end",
+          "scene": "headlineCenter",
+          "params": {
+            "text": "Legacy builder still renders",
+            "fontSize": 40,
+            "color": "#8ab4cc"
+          }
+        }
+      ]
+    },
+    {
+      "id": "progress",
+      "kind": "scene",
+      "clips": [
+        {
+          "id": "progress-0",
+          "begin": "s1.begin",
+          "end": "s3.end",
+          "scene": "progressBar16x9",
+          "params": {
+            "progress": 0.5,
+            "height": 4,
+            "y": 32
+          }
+        }
+      ]
+    },
+    {
+      "id": "subtitle-main",
+      "kind": "subtitle",
+      "clips": [
+        {
+          "id": "sub-1",
+          "begin": "s1.begin",
+          "end": "s1.end",
+          "text": "NextFrame v0.8"
+        },
+        {
+          "id": "sub-2",
+          "begin": "s2.begin",
+          "end": "s2.end",
+          "text": "Lowering keeps scene + subtitle + audio"
+        },
+        {
+          "id": "sub-3",
+          "begin": "s3.begin",
+          "end": "s3.end",
+          "text": "Legacy builder still renders"
+        }
+      ]
+    },
+    {
+      "id": "titleAnim",
+      "kind": "animation",
+      "target": "scene-main.clips[0].params.fontSize",
+      "clips": [
+        {
+          "at": "s1.begin",
+          "value": 42,
+          "ease": "linear"
+        },
+        {
+          "at": "s1.end",
+          "value": 56,
+          "ease": "easeOutCubic"
+        }
+      ]
+    }
+  ]
+}
