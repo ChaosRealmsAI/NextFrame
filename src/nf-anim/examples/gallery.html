@@ -1,8 +1,23 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8" /><title>nf-anim gallery</title></head>
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>nf-anim gallery</title>
+  <style>body{margin:0;font:15px/1.4 ui-sans-serif,system-ui;background:linear-gradient(180deg,#fff7ed,#fffbeb 40%,#f8fafc);color:#0f172a}header{padding:24px 28px 8px}h1,p{margin:0}p{max-width:72ch;color:#475569}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:20px 28px 32px}.card{background:rgba(255,255,255,.72);border:1px solid #fed7aa;border-radius:22px;overflow:hidden;box-shadow:0 16px 48px rgba(15,23,42,.08);backdrop-filter:blur(12px)}.meta{padding:12px 14px}.meta strong{display:block}.meta span{display:block;color:#64748b;font-size:12px}.meta small{display:block;color:#475569;margin-top:4px}.frame{display:block;width:100%;aspect-ratio:16/12;border:0;background:#fff}.pill{display:inline-block;margin-top:10px;padding:4px 9px;border-radius:999px;background:#fff7ed;color:#c2410c;font-size:12px}</style>
+</head>
 <body>
-  <!-- TODO: iframe all behaviors, shapes, and scenes -->
-  <main>nf-anim gallery stub</main>
+  <header><h1>nf-anim Gallery</h1><p>Scrollable registry preview for all behaviors, shapes, and scenes. Each card is a live iframe backed by the same sample generator used by the CLI.</p><span class="pill" id="summary">Loading…</span></header>
+  <main class="grid" id="grid"></main>
+  <script type="module">
+    import { listCatalog } from "../catalog.js";
+    const order = [["behavior", "Behaviors"], ["shape", "Shapes"], ["scene", "Scenes"]], grid = document.querySelector("#grid"), summary = document.querySelector("#summary");
+    const entries = order.flatMap(([kind, label]) => listCatalog(kind).map((entry) => ({ ...entry, kind, label })));
+    summary.textContent = `${entries.filter((e) => e.kind === "behavior").length} behaviors · ${entries.filter((e) => e.kind === "shape").length} shapes · ${entries.filter((e) => e.kind === "scene").length} scenes`;
+    for (const entry of entries) {
+      const card = document.createElement("article");
+      card.className = "card";
+      card.innerHTML = `<iframe class="frame" loading="lazy" src="./playground.html?kind=${encodeURIComponent(entry.kind)}&id=${encodeURIComponent(entry.id)}"></iframe><div class="meta"><strong>${entry.name || entry.id}</strong><span>${entry.label} · ${entry.category}</span><small>${entry.description}</small></div>`;
+      grid.appendChild(card);
+    }
+  </script>
 </body>
 </html>
