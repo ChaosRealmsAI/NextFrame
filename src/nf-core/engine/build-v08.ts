@@ -276,7 +276,8 @@ async function validateSceneIds(timeline: ResolvedTimeline) {
         { fix: `Pick a valid scene id from \`nextframe scenes\` or correct "${sceneId}".` },
       );
     }
-    const sceneType = (scene as { type?: unknown }).type;
+    const sceneAny = scene as { type?: unknown; META?: { type?: unknown } };
+    const sceneType = sceneAny.META?.type ?? sceneAny.type;
     if (typeof sceneType !== "string" || !ALLOWED_SCENE_TYPES.has(sceneType)) {
       throw createCodeError(
         "UNSUPPORTED_SCENE_TYPE",
