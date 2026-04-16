@@ -1,6 +1,7 @@
 import { interp } from "./interp.js";
 import { expandLayer } from "./expand.js";
 import { gradientRef, parseGradient } from "./gradient.js";
+import { wrapFilters } from "./wrap.js";
 import { SHAPES } from "../shapes/index.js";
 import { attrs } from "../shapes/shared.js";
 
@@ -63,7 +64,6 @@ function renderShape(layer, state, t, motion, defs) {
   const shapeName = layer.shape || (layer.type === "shape" ? "circle" : layer.type);
   const shape = SHAPES[shapeName];
   const d = shapeName === "path" ? resolveTrack(state.tracks, "d", t) || layer.path : layer.path;
-  // resolve string-valued tracks (color/path/etc.) so shape function sees animated values
   const fillTrack = resolveTrack(state.tracks, "fill", t);
   const strokeTrack = resolveTrack(state.tracks, "stroke", t);
   const radiusTrack = resolveTrack(state.tracks, "radius", t);
@@ -83,7 +83,12 @@ function renderShape(layer, state, t, motion, defs) {
   const body = typeof shape === "function" ? shape(resolvedLayer) : fallback;
   if (!body) return "";
   const transform = `translate(${state.at[0].toFixed(3)} ${state.at[1].toFixed(3)}) rotate(${state.rotate.toFixed(3)}) scale(${state.scaleX.toFixed(3)} ${state.scaleY.toFixed(3)})`;
-  return `<g${layer.id ? ` data-layer="${esc(layer.id)}"` : ""} transform="${transform}" opacity="${state.opacity.toFixed(3)}">${body}</g>`;
+  const inner = `<g${layer.id ? ` data-layer="${esc(layer.id)}"` : ""} transform="${transform}" opacity="${state.opacity.toFixed(3)}">${body}</g>`;
+  if (!layer.wrap) return inner;
+  // wrapFilters returns { svg, defs[] }; merge its defs into our Map
+  const wrapped = wrapFilters(inner, layer.wrap);
+  if (wrapped && wrapped.defs) for (const def of wrapped.defs) if (def) defs.set(def, def);
+  return wrapped && wrapped.svg ? wrapped.svg : inner;
 }
 
 export function renderMotion(host = null, t = 0, motion = {}) {
@@ -91,7 +96,7 @@ export function renderMotion(host = null, t = 0, motion = {}) {
   const width = Math.max(1, num(size[0], num(host && host.width, 1920)));
   const height = Math.max(1, num(size[1], num(host && host.height, 1080)));
   const defs = new Map();
-  const body = renderLayers(motion.layers, num(t), motion, defs);
+  const body = renderLayers(motion.layers || [], num(t), motion, defs);
   const defsXml = defs.size ? `<defs>${Array.from(defs.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([, xml]) => xml).join("")}</defs>` : "";
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${defsXml}${body}</svg>`;
 }
