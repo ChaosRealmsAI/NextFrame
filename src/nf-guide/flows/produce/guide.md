@@ -13,6 +13,26 @@
 4. **每步贴 stdout 证据**：每个 step 完成后贴出命令 + 产物路径 + CLI stdout，不准说"已完成"。
 5. **卡住就停 不准绕**：flow CLI 不够用 / 产物格式对不上 → **停下报 BLOCKED，不准自己写 adapter 替代**。绕流程 = 这次 run 的产物全部作废。
 
+## 🧭 新 AI 起手（必读）
+
+你是刚进来的 AI。按这个顺序：
+
+1. **读这份 guide.md 全部**（特别是上面的铁律）
+2. **记录入仓**：决定 project 目录（如 `projects/{your-name}/`），准备 `run.log`（在项目目录内，不写 tmp/）
+3. **从 `ratio` 起步**，每步跑 `cargo run -p nf-guide -- produce {step}` 读 prompt → 原样执行命令 → 产物 + stdout append 到 `run.log`
+4. **遇阻**：step CLI 不够用 / 产物格式对不上 → `run.log` 追加 `BLOCKED_AT: {step}\nREASON: {一句话}\nCLI_OUTPUT: {最后 20 行}`，停止执行，交主 agent 决策
+5. **每步日志格式**（照抄）：
+
+   ```
+   ## {YYYY-MM-DD HH:MM} · {step}
+   CMD: {实际执行的 shell}
+   OUT: {stdout 最后 20 行}
+   ARTIFACT: {产物路径}
+   STATUS: done | blocked
+   ```
+
+6. **绝不**在 `src/` 改代码；**绝不**在 `tmp/` 写"方案 / 笔记"—— 那些是一次性的，不沉淀
+
 ## 顺序
 
 `00 ratio` → `00a tts` → `01 check` → `02 scene` → `03 anchors` → `04 timeline` → `05 validate` → `06 build` → `07 record` → `08 concat` → `09 verify`
