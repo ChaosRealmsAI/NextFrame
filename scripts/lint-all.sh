@@ -54,6 +54,9 @@ echo "=== 8. TODO/FIXME ==="
 TODO_COUNT=$(grep -rn -P '//\s*(TODO|FIXME|HACK|XXX)\b|/\*\s*(TODO|FIXME|HACK|XXX)\b' "${LINT_DIRS[@]}" --include='*.rs' --include='*.js' 2>/dev/null | grep -v '/target/' | grep -v '/node_modules/' | wc -l | tr -d ' ')
 if [ "$TODO_COUNT" -gt 0 ]; then echo "FAIL: $TODO_COUNT TODO/FIXME found"; FAIL=1; else echo "PASS"; fi
 
+echo "→ Linting nf-anim..."
+bash scripts/lint-nf-anim.sh || exit 1
+
 echo "=== 9. scene cross-import ==="
 CROSS=$(grep -rn "from.*modules/" src/nf-core/scenes/ --include='*.js' 2>/dev/null || true)
 if [ -n "$CROSS" ]; then echo "FAIL: scenes import modules:" && echo "$CROSS"; FAIL=1; else echo "PASS"; fi
