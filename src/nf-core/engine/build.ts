@@ -126,11 +126,14 @@ ${buildRuntime()}`);
   body { position: relative; }
   #stage-shell { position: fixed; width: ${width}px; height: ${height}px; transform-origin: 0 0; }
   #stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: ${background}; box-shadow: 0 24px 100px rgba(0, 0, 0, 0.35); }
+  /* Controls hidden by default so recorder/MP4 output never includes the playback bar.
+     Preview use cases that want the scrubber can override via inline style or URL toggle. */
   #controls {
     position: fixed; left: 0; right: 0; bottom: 0; height: 56px; z-index: 9999;
-    display: flex; align-items: center; gap: 14px; padding: 0 20px;
+    display: none; align-items: center; gap: 14px; padding: 0 20px;
     background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
   }
+  #controls[data-show="1"] { display: flex; }
   #playBtn {
     height: 34px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer;
     background: #f4efe8; color: #111; font: 600 13px/1 system-ui, -apple-system, sans-serif;

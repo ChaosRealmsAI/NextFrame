@@ -8,11 +8,25 @@ export type CliFlags = Record<string, string | boolean>;
 export function parseFlags(argv: string[]): { positional: string[]; flags: CliFlags } {
   const positional: string[] = [];
   const flags: CliFlags = {};
-  for (const arg of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
     if (arg.startsWith("--")) {
       const eq = arg.indexOf("=");
-      if (eq > 0) flags[arg.slice(2, eq)] = arg.slice(eq + 1);
-      else flags[arg.slice(2)] = true;
+      if (eq > 0) {
+        flags[arg.slice(2, eq)] = arg.slice(eq + 1);
+        continue;
+      }
+      const key = arg.slice(2);
+      const next = argv[i + 1];
+      // POSIX-style `--flag value`: if next token exists and isn't another flag,
+      // consume it as the value. Otherwise treat the flag as boolean-true.
+      // This keeps `--json` / `--quiet` working while unblocking `--fps 30`.
+      if (typeof next === "string" && !next.startsWith("--")) {
+        flags[key] = next;
+        i += 1;
+      } else {
+        flags[key] = true;
+      }
     } else {
       positional.push(arg);
     }

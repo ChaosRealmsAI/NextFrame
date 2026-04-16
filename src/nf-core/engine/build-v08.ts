@@ -570,8 +570,6 @@ window.__onFrame = function(state) {
     nf.subtitle.override = state.subtitle;
   }
   if (typeof nf.frame === "function") nf.frame(ms);
-  var bar = document.getElementById("nf-progress");
-  if (bar) bar.style.width = (state.progress || 0) + "%";
 };
 (function() {
   var nf = window.__NF_V08__;
@@ -603,7 +601,6 @@ window.__onFrame = function(state) {
 </head>
 <body>
 <div id="stage-shell"><div id="stage"></div></div>
-<div id="nf-progress" style="position:fixed;bottom:0;left:0;height:4px;background:rgba(218,119,86,0.8);width:0%;z-index:9999;transition:none;"></div>
 ${buildAudioMarkup(timeline)}
 <script>
 ${scriptBody}

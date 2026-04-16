@@ -42,6 +42,11 @@ function warnRecorderFallback(binary: string) {
 }
 
 async function runRecorder(binary: string, htmlFile: string, outputPath: string, opts: { fps: number; crf: number; dpr: number; width: number; height: number }) {
+  // --parallel 1: v1.0 workaround. Parallel frame-slice mode has two known bugs:
+  //   1. Short clips (< 10s): concurrent WKWebView startup yields 1x1 captures.
+  //   2. Any length: child processes each record the full range instead of their
+  //      assigned frame-range, concat reports duration = slices * expected.
+  // Track in memory as ISSUE-007; revisit once link is green.
   const args = [
     "slide",
     htmlFile,
@@ -51,6 +56,7 @@ async function runRecorder(binary: string, htmlFile: string, outputPath: string,
     "--dpr", String(opts.dpr),
     "--width", String(opts.width),
     "--height", String(opts.height),
+    "--parallel", "1",
   ];
 
   let child;
