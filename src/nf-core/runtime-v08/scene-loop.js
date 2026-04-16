@@ -35,7 +35,7 @@
   }
 
   function getApp(vp) {
-    let app = document.getElementById("app");
+    let app = document.getElementById("stage");
     if (!app) {
       app = document.createElement("div");
       app.id = "app";
@@ -49,7 +49,7 @@
   }
 
   function getSceneDef(sceneId) {
-    const registry = window.__SCENES__;
+    const registry = window.__scenes;
     if (!registry || !sceneId) return null;
     return registry[sceneId] || registry["scene-" + sceneId] || null;
   }
@@ -102,7 +102,7 @@
     canvases: {},
     tick: function (t) {
       const timeline = getTimeline();
-      const registry = window.__SCENES__;
+      const registry = window.__scenes;
       if (!timeline || !registry) return;
 
       this.tracks = timeline.tracks.filter(function (track) {

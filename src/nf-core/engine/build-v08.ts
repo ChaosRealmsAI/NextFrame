@@ -387,7 +387,7 @@ window.__TIMELINE_ANIMATIONS__ = ${JSON.stringify(animations, null, 2)};
 window.__SLIDE_SEGMENTS = ${JSON.stringify(slideSegments, null, 2)};
 function getDuration() { return ${duration}; }
 window.getDuration = getDuration;
-window.frame_pure = true;
+window.frame_pure = false;
 window.__NF_V08__ = window.__NF_V08__ || {};
 ${buildSharedPreamble()}
 ${readLegacyBundleSource()}
@@ -400,12 +400,25 @@ window.__NF_V08__.timeline = window.__TIMELINE__;
 window.__NF_V08__.subtitles = window.__TIMELINE_SUBTITLES__;
 window.__NF_V08__.animations = window.__TIMELINE_ANIMATIONS__;
 ${buildRuntimeSources()}
-window.__onFrame = function(idx, t) {
-  var ms = typeof t === "number" ? t * 1000 : idx * (1000 / 30);
+window.__onFrame = function(state) {
+  var sec = typeof state === "object" && state !== null ? state.time : (typeof state === "number" ? state : 0);
+  var ms = (typeof sec === "number" && isFinite(sec)) ? sec * 1000 : 0;
   if (window.__NF_V08__ && typeof window.__NF_V08__.frame === "function") {
     window.__NF_V08__.frame(ms);
   }
-};`);
+};
+(function() {
+  var nf = window.__NF_V08__;
+  if (!nf || !nf.clock) return;
+  var audioEls = document.querySelectorAll("audio[data-track-id]");
+  if (audioEls.length > 0) nf.clock.attachAudio(audioEls[0]);
+  function tick() {
+    if (nf.frame) nf.frame(nf.clock.getT());
+    requestAnimationFrame(tick);
+  }
+  if (document.readyState === "complete") { tick(); }
+  else { window.addEventListener("load", tick); }
+})();`);
 
   return `<!DOCTYPE html>
 <html lang="en">

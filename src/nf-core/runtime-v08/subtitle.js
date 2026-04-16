@@ -44,7 +44,7 @@
       "pointer-events:none",
       "z-index:9999",
     ].join(";");
-    const app = document.getElementById("app") || document.body;
+    const app = document.getElementById("stage") || document.body;
     app.appendChild(node);
     return node;
   }
