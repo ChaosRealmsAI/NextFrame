@@ -2,6 +2,7 @@ import { interp } from "./interp.js";
 import { expandLayer } from "./expand.js";
 import { gradientRef, parseGradient } from "./gradient.js";
 import { wrapFilters } from "./wrap.js";
+import { parseMask, maskRef } from "./mask.js";
 import { SHAPES } from "../shapes/index.js";
 import { attrs } from "../shapes/shared.js";
 
@@ -82,10 +83,11 @@ function renderShape(layer, state, t, motion, defs) {
   resolvedLayer.motion = ctx;
   const body = typeof shape === "function" ? shape(resolvedLayer) : fallback;
   if (!body) return "";
+  const mask = layer.mask ? parseMask(layer.mask, t) : null;
+  if (mask?.id && mask.defsXml) defs.set(mask.id, mask.defsXml);
   const transform = `translate(${state.at[0].toFixed(3)} ${state.at[1].toFixed(3)}) rotate(${state.rotate.toFixed(3)}) scale(${state.scaleX.toFixed(3)} ${state.scaleY.toFixed(3)})`;
-  const inner = `<g${layer.id ? ` data-layer="${esc(layer.id)}"` : ""} transform="${transform}" opacity="${state.opacity.toFixed(3)}">${body}</g>`;
+  const inner = `<g${layer.id ? ` data-layer="${esc(layer.id)}"` : ""} transform="${transform}" opacity="${state.opacity.toFixed(3)}"${attrs({ mask: maskRef(mask?.id) })}>${body}</g>`;
   if (!layer.wrap) return inner;
-  // wrapFilters returns { svg, defs[] }; merge its defs into our Map
   const wrapped = wrapFilters(inner, layer.wrap);
   if (wrapped && wrapped.defs) for (const def of wrapped.defs) if (def) defs.set(def, def);
   return wrapped && wrapped.svg ? wrapped.svg : inner;

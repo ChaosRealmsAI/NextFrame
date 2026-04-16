@@ -1,10 +1,11 @@
 import { interp } from "./interp.js";
 import { EASE } from "./easings.js";
 import { stagger, loop, yoyo } from "./scheduler.js";
+import { parseMask, maskRef } from "./mask.js";
 import { renderMotion } from "./render.js";
 import { parseGradient, gradientRef } from "./gradient.js";
 import { expandLayer } from "./expand.js";
 const meta = { name: "engine", kind: "engine", description: "nf-anim engine registry" };
-const ENGINE = { interp, EASE, stagger, loop, yoyo, renderMotion, parseGradient, gradientRef, expandLayer };
+const ENGINE = { interp, EASE, stagger, loop, yoyo, parseMask, maskRef, parseGradient, gradientRef, renderMotion, expandLayer };
 export { meta };
 export default ENGINE;
