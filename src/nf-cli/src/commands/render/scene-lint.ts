@@ -123,8 +123,7 @@ function lintFile(filePath: string, content: string, meta: Record<string, unknow
     });
   }
 
-  // L7 (v0.9 ADR-020): frame-pure runtime types forbid non-deterministic APIs
-  // TODO(v0.9 implement): finer AST matching; current regex catches obvious cases only.
+  // L7 (v0.9 ADR-020): frame-pure runtime types forbid obvious non-deterministic APIs.
   if (type === "shader" || type === "motion") {
     const forbidden = [
       [/\bsetInterval\s*\(/, "setInterval"],
