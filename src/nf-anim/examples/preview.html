@@ -8,8 +8,9 @@ html,body{margin:0;height:100%;background:#fff7ed;font:11px/1.3 ui-sans-serif,sy
 .wrap{height:100%;display:flex;flex-direction:column}
 .stage{flex:1;display:grid;place-items:center;padding:6px;background:linear-gradient(180deg,#fffbeb,#fff7ed)}
 .stage svg{max-width:100%;max-height:100%;display:block}
-.bar{flex:0 0 auto;background:rgba(255,255,255,.85);border-top:1px solid #fed7aa;padding:5px 10px;display:flex;justify-content:space-between;font-size:10px;color:#7c2d12}
+.bar{flex:0 0 auto;background:rgba(255,255,255,.85);border-top:1px solid #fed7aa;padding:5px 10px;display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:10px;color:#7c2d12}
 .bar b{color:#0f172a;font-weight:600}
+.scrub{width:160px;accent-color:#ea580c}
 .err{color:#b91c1c;padding:8px;font-family:monospace;font-size:10px}
 </style>
 </head>
@@ -18,6 +19,7 @@ html,body{margin:0;height:100%;background:#fff7ed;font:11px/1.3 ui-sans-serif,sy
   <div class="stage" id="stage"></div>
   <div class="bar">
     <span><b id="title">…</b> · <span id="kind">—</span></span>
+    <span><input class="scrub" id="scrub" type="range" min="0" max="1000" value="0"></span>
     <span><span id="t">0.00</span>s / <span id="dur">—</span>s</span>
   </div>
 </div>
@@ -32,38 +34,26 @@ const titleEl = document.querySelector("#title");
 const kindEl = document.querySelector("#kind");
 const tEl = document.querySelector("#t");
 const durEl = document.querySelector("#dur");
+const scrubEl = document.querySelector("#scrub");
 
 try {
   const sample = sampleFor(kind, id);
   if (!sample) throw new Error(`no sample for ${kind}/${id}`);
   const motion = sample.motion || sample;
   const dur = motion.duration || 1;
+  const renderAt = (t) => {
+    tEl.textContent = t.toFixed(2);
+    try {
+      stage.innerHTML = renderMotion(null, t, motion);
+    } catch (e) {
+      stage.innerHTML = `<div class="err">${e.message}</div>`;
+    }
+  };
   titleEl.textContent = sample.name || sample.id || id;
   kindEl.textContent = kind;
   durEl.textContent = dur.toFixed(2);
-
-  const fps = 30;
-  const total = Math.max(2, Math.floor(dur * fps));
-  let frame = 0;
-  let paused = false;
-  function tick() {
-    if (!paused) {
-      const t = (frame / total) * dur;
-      tEl.textContent = t.toFixed(2);
-      try {
-        stage.innerHTML = renderMotion(null, t, motion);
-      } catch (e) {
-        stage.innerHTML = `<div class="err">${e.message}</div>`;
-      }
-      frame = (frame + 1) % (total + 1);
-    }
-    requestAnimationFrame(tick);
-  }
-  tick();
-
-  // pause on hover so user can inspect
-  document.body.addEventListener("mouseenter", () => paused = true);
-  document.body.addEventListener("mouseleave", () => paused = false);
+  scrubEl.addEventListener("input", () => renderAt((Number(scrubEl.value) / 1000) * dur));
+  renderAt(0);
 } catch (e) {
   stage.innerHTML = `<div class="err">${e.message}</div>`;
 }
