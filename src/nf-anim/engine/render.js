@@ -1,6 +1,7 @@
 import { interp } from "./interp.js";
 import { expandLayer } from "./expand.js";
 import { SHAPES } from "../shapes/index.js";
+import { attrs } from "../shapes/shared.js";
 
 const meta = { name: "renderMotion", kind: "engine", description: "Pure SVG renderer for motion configs" };
 const num = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
@@ -43,8 +44,8 @@ function layerState(layer, t) {
 function renderShape(layer, state, t, motion) {
   const shapeName = layer.shape || (layer.type === "shape" ? "circle" : layer.type);
   const shape = SHAPES[shapeName];
-  if (typeof shape !== "function") return "";
-  const body = shape({ ...layer, t, motion, tracks: state.tracks, opacity: state.opacity });
+  const fallback = layer.path ? `<path${attrs({ d: layer.path, fill: layer.fill ?? "#000000", stroke: layer.stroke, "stroke-width": layer.stroke ? layer.strokeWidth ?? 1 : null, "vector-effect": "non-scaling-stroke" })}/>` : "";
+  const body = typeof shape === "function" ? shape({ ...layer, t, motion, tracks: state.tracks, opacity: state.opacity }) : fallback;
   if (!body) return "";
   const transform = `translate(${state.at[0].toFixed(3)} ${state.at[1].toFixed(3)}) rotate(${state.rotate.toFixed(3)}) scale(${state.scaleX.toFixed(3)} ${state.scaleY.toFixed(3)})`;
   return `<g${layer.id ? ` data-layer="${esc(layer.id)}"` : ""} transform="${transform}" opacity="${state.opacity.toFixed(3)}">${body}</g>`;
