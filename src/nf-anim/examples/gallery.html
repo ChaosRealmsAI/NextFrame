@@ -15,7 +15,7 @@
     for (const entry of entries) {
       const card = document.createElement("article");
       card.className = "card";
-      card.innerHTML = `<iframe class="frame" loading="lazy" src="./playground.html?kind=${encodeURIComponent(entry.kind)}&id=${encodeURIComponent(entry.id)}"></iframe><div class="meta"><strong>${entry.name || entry.id}</strong><span>${entry.label} · ${entry.category}</span><small>${entry.description}</small></div>`;
+      card.innerHTML = `<iframe class="frame" loading="lazy" src="./preview.html?kind=${encodeURIComponent(entry.kind)}&id=${encodeURIComponent(entry.id)}"></iframe><div class="meta"><strong>${entry.name || entry.id}</strong><span>${entry.label} · ${entry.category}</span><small>${entry.description || ''}</small></div>`;
       grid.appendChild(card);
     }
   </script>
