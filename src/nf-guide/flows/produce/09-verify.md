@@ -4,13 +4,23 @@ v1.0 的终局检查。**任何一项失败 = BLOCKED，视频不发布，回去
 
 ## 1 · 硬指标门禁（ffprobe，必过）
 
-### 1.1 时长 ≥ 60s
+### 1.1 时长 ≥ 60s（实测 ffprobe，不信任 sonnet 自报）
 
 ```bash
 ffprobe -v quiet -show_entries format=duration \
   -of default=nw=1:nk=1 \
   output/v1.0/landscape-1920x1080-1min.mp4
 # 输出必须 ≥ 60.0
+```
+
+**硬规则**: ffprobe 实测 duration 必须 ≥ 60s。**不信任 sonnet 自报的 duration**（已见 sonnet 报 59.5s 实际 50.47s 的案例）。
+
+**timeline anchors 必须 ≥ 60000ms**（最大 anchor.end 至少 60000）。若 8 clip × 7.5s = 60s 刚好临界，强烈建议 8 × 8s = 64s **给 recorder 边界余量**。
+
+```bash
+# 验证 timeline 配置是否足够
+python3 -c "import json; t=json.load(open('projects/v10-landscape/timeline.v08.json')); print('max anchor:', max([(a.get('end',a.get('at',0)) if isinstance(a,dict) else 0) for a in t['anchors'].values()]), 'ms')"
+# 应 ≥ 60000
 ```
 
 ### 1.2 视频 + 音频流
