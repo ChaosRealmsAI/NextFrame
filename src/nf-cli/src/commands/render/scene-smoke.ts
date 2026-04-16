@@ -184,6 +184,41 @@ export async function run(argv: string[]): Promise<number> {
         }
       }
 
+      // T0_OPACITY_LOW gate: DOM scenes must be visible at t=0. Observers should not
+      // stare at a blank slot waiting for opacity to fade in. Require at least one
+      // element with opacity >= 0.7 at t=0.
+      //
+      // Scene contract has two signature forms in the wild:
+      //   - new: render(t, params, vp) -> string | host mutation   (length = 3)
+      //   - legacy: render(host, t, params, vp) -> string | host mutation (length = 4)
+      // We dispatch on render.length so t=0 is actually delivered as time, not mis-mapped.
+      if (sampleOk && String(cr.type) === "dom") {
+        try {
+          const host0 = makeFakeHost(vp);
+          const renderFn = cr.render as ((...a: unknown[]) => unknown);
+          const out0 = renderFn.length >= 4
+            ? renderFn(host0, 0, params, vp)
+            : renderFn(0, params, vp);
+          const html0 = typeof out0 === "string" ? out0 : host0._html;
+          if (typeof html0 === "string" && html0.length > 0) {
+            const matches = [...html0.matchAll(/opacity\s*:\s*([0-9]*\.?[0-9]+)/g)];
+            if (matches.length > 0) {
+              const opacities = matches.map(m => parseFloat(m[1])).filter(n => Number.isFinite(n));
+              if (opacities.length > 0) {
+                const maxOpacity = Math.max(...opacities);
+                if (maxOpacity < 0.7) {
+                  result.errors.push(`T0_OPACITY_LOW: render(t=0) max opacity=${maxOpacity.toFixed(3)} < 0.7 — main element invisible at start; observers see blank for first seconds. Fix: opacity >= 0.9 at t=0 + subtle scale/translate for entrance (not opacity fade from 0).`);
+                }
+              }
+            }
+            // If no opacity declarations at all, default is 1.0 (visible) — pass.
+          }
+        } catch {
+          // render(0) may throw for scenes relying on non-zero t; don't double-report
+          // (render(0.5) error above already captured the class of failure).
+        }
+      }
+
       if (result.missing.length || result.errors.length) result.status = "fail";
     } catch (error) {
       result.status = "fail";

@@ -1,22 +1,22 @@
 // scenes/16x9/blueprint-cinema/content-cliDemo.js
-// F6: 终端窗口 + 进度条
+// F6: CLI demo — glass terminal + gradient progress + syntax highlight + grain
 export default {
   id: "cliDemo",
   name: "CLI Demo",
-  version: "1.0.0",
+  version: "1.1.0",
   ratio: "16:9",
   theme: "blueprint-cinema",
   role: "content",
   type: "dom",
-  frame_pure: true,
+  frame_pure: false,
   assets: [],
-  description: "终端窗口展示CLI命令和进度条，模拟渲染过程",
+  description: "macOS 风格 glass terminal + syntax highlight 命令 + gradient 进度条 + grain",
   duration_hint: 8,
-  intent: "用真实终端UI展示一行命令产出MP4的过程。命令逐字出现（0-1.5s），回车后进度条从0到100%（2-7s），最后显示成功消息。制造代码美感和成就感。",
+  intent: "iTerm2 风格终端做玻璃感：backdrop-filter + 多层 shadow。命令行逐字打出带 caret blink，进度条 gradient fill 从蓝到橙加 glow。输出行 stagger 出现，最后成功行橙红带 checkmark glow。背景 subtle radial mesh。",
   when_to_use: ["展示CLI使用方式","展示自动化能力"],
   when_not_to_use: ["不是技术受众时"],
   limitations: ["命令不超过60字符"],
-  inspired_by: "Fireship终端演示 + iTerm2美学",
+  inspired_by: "Warp terminal + Fireship tutorials + Vercel deploy logs",
   used_in: [],
   requires: [],
   pairs_well_with: ["timelineDiagram"],
@@ -24,12 +24,15 @@ export default {
   alternatives: [],
   visual_weight: "heavy",
   z_layer: "mid",
-  mood: ["professional", "intense"],
+  mood: ["professional", "intense", "cinematic"],
   tags: ["cli", "terminal", "demo", "progress", "content", "blueprint-cinema"],
   complexity: "medium",
-  performance: { cost: "low", notes: "pure dom" },
+  performance: { cost: "medium", notes: "backdrop glass + gradient" },
   status: "stable",
-  changelog: [{ version: "1.0.0", date: "2026-04-16", change: "initial" }],
+  changelog: [
+    { version: "1.0.0", date: "2026-04-16", change: "initial" },
+    { version: "1.1.0", date: "2026-04-16", change: "awwwards upgrade: glass terminal + gradient progress + syntax highlight" },
+  ],
   params: {
     command: { type: "string", default: "nextframe render timeline.json output.mp4", semantic: "CLI命令" },
     title: { type: "string", default: "一行命令，产出 MP4", semantic: "标题" },
@@ -40,67 +43,80 @@ export default {
   render(t, params, vp) {
     const W = vp.width, H = vp.height;
     const eo = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
-    const kTitle = eo(t / 0.6);
-    const kWindow = eo((t - 0.3) / 0.5);
+    const entry = (d = 0, dur = 0.2) => 0.9 + 0.1 * eo(Math.max(0, (t - d) / dur));
+    const ty = (d = 0, dur = 0.2) => 4 * (1 - eo(Math.max(0, (t - d) / dur)));
+    const kTitle = entry(0, 0.2), kWindow = entry(0.1, 0.25);
     const command = params.command || "nextframe render timeline.json output.mp4";
     const title = params.title || "一行命令，产出 MP4";
 
-    // Typewriter: 0.5 to 2.0s
-    const typeProgress = Math.min(1, Math.max(0, (t - 0.5) / 1.5));
+    const typeProgress = Math.min(1, Math.max(0, (t - 0.15) / 0.9));
     const typedChars = Math.floor(typeProgress * command.length);
     const typedCmd = command.slice(0, typedChars);
-    const cursor = t < 2.0 && Math.floor(t * 2) % 2 === 0 ? '█' : (t < 2.0 ? '' : '');
-
-    // Progress bar: 2.2 to 7.0s
-    const progT = Math.min(1, Math.max(0, (t - 2.2) / 4.8));
-    // Eased progress (fast at start, slow near end for realism)
+    const caret = Math.floor(t * 2) % 2 === 0 ? '▎' : ' ';
+    const progT = Math.min(1, Math.max(0, (t - 1.2) / 4.0));
     const progPct = Math.round(eo(progT) * 100);
-    const progBarW = progPct;
-    const showProgress = t > 2.2;
-    const done = t > 7.2;
+    const showProgress = t > 1.2;
 
-    // Processing lines appear step by step
     const procLines = [
-      { text: "→ Loading timeline...", at: 2.2 },
-      { text: "→ Building HTML bundle...", at: 2.8 },
-      { text: "→ Recording frames (1920×1080)...", at: 3.5 },
-      { text: "→ Encoding H.264 + AAC...", at: 5.5 },
-      { text: "✓ Output: output/v1.0/landscape-1920x1080-1min.mp4", at: 7.2, color: "#ff6b35" },
+      { text: "→ Loading timeline...",                       at: 1.2, color: "#8b92a5" },
+      { text: "→ Building HTML bundle...",                   at: 1.7, color: "#8b92a5" },
+      { text: "→ Recording frames (1920×1080)...",           at: 2.4, color: "#58a6ff" },
+      { text: "→ Encoding H.264 + AAC...",                   at: 4.0, color: "#58a6ff" },
+      { text: "✓ Output: output/v1.0/landscape-1920x1080-1min.mp4", at: 5.5, color: "#ff6b35" },
     ];
-    const procHtml = procLines
-      .filter(pl => t > pl.at)
-      .map(pl => {
-        const op = eo((t - pl.at) / 0.3);
-        return `<div style="opacity:${op};color:${pl.color || '#8b92a5'};margin-top:${H*0.008}px;">${pl.text}</div>`;
-      }).join('');
+    const procHtml = procLines.filter(pl => t > pl.at).map(pl => {
+      const op = eo(Math.min(1, (t - pl.at) / 0.25));
+      const glow = pl.color === "#ff6b35" ? `text-shadow:0 0 16px ${pl.color}80;` : '';
+      return `<div style="opacity:${op};color:${pl.color};margin-top:${H*0.01}px;${glow}">${pl.text}</div>`;
+    }).join('');
+
+    // syntax-highlighted command: cmd cyan, args orange
+    const cmdParts = typedCmd.split(' ');
+    const cmdHtml = cmdParts.map((p, i) => {
+      if (i === 0) return `<span style="color:#58a6ff;">${p}</span>`;
+      if (i === 1) return `<span style="color:#7dd3fc;">${p}</span>`;
+      return `<span style="color:#ff6b35;">${p}</span>`;
+    }).join(' ');
+
+    const grain = `<svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.1;mix-blend-mode:overlay;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"><filter id="n6"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="19"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0"/></filter><rect width="100%" height="100%" filter="url(#n6)"/></svg>`;
+    const borderPulse = 0.3 + 0.15 * Math.sin(t * 1.4);
 
     return `
-      <div style="position:absolute;inset:0;background:#0a1628;padding:${H*0.07}px ${W*0.08}px;">
-        <div style="opacity:${kTitle};transform:translateY(${(1-kTitle)*16}px);
-          font:600 ${Math.round(W*0.025)}px/1.3 Inter,'PingFang SC',system-ui,sans-serif;
-          color:#f5f2e8;margin-bottom:${H*0.04}px;">${title}</div>
-        <div style="opacity:${kWindow};background:#1a1a2e;border:1px solid rgba(88,166,255,0.2);border-radius:8px;overflow:hidden;">
-          <div style="background:#2a2a3e;padding:${H*0.012}px ${W*0.015}px;display:flex;align-items:center;gap:6px;">
-            <div style="width:12px;height:12px;border-radius:50%;background:#ff5f57;"></div>
-            <div style="width:12px;height:12px;border-radius:50%;background:#ffbd2e;"></div>
-            <div style="width:12px;height:12px;border-radius:50%;background:#28c840;"></div>
-            <div style="margin-left:auto;font:400 ${Math.round(W*0.011)}px/1 monospace;color:#8b92a5;">nextframe</div>
+      <div style="position:absolute;inset:0;background:
+        radial-gradient(ellipse 70% 50% at 50% 50%,rgba(88,166,255,0.1),transparent 65%),
+        linear-gradient(180deg,#0a1628,#06101f);overflow:hidden;padding:${H*0.07}px ${W*0.08}px;">
+        <div style="opacity:${kTitle};transform:translateY(${ty(0,0.2)}px);
+          font:600 ${Math.round(W*0.026)}px/1.3 Inter,'PingFang SC',system-ui,sans-serif;
+          color:#f5f2e8;margin-bottom:${H*0.045}px;letter-spacing:-0.01em;text-shadow:0 2px 16px rgba(0,0,0,0.5);">${title}</div>
+        <div style="opacity:${kWindow};position:relative;
+          background:linear-gradient(180deg,rgba(20,28,48,0.85),rgba(10,15,30,0.9));
+          border:1px solid rgba(88,166,255,${borderPulse});border-radius:14px;overflow:hidden;
+          backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);
+          box-shadow:0 2px 0 rgba(255,255,255,0.08) inset,0 32px 64px -16px rgba(88,166,255,0.3),0 60px 120px -40px rgba(0,0,0,0.8);">
+          <div style="background:linear-gradient(180deg,rgba(42,42,62,0.9),rgba(32,32,52,0.85));padding:${H*0.014}px ${W*0.018}px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(245,242,232,0.05);">
+            <div style="width:13px;height:13px;border-radius:50%;background:#ff5f57;box-shadow:0 0 8px rgba(255,95,87,0.5);"></div>
+            <div style="width:13px;height:13px;border-radius:50%;background:#ffbd2e;box-shadow:0 0 8px rgba(255,189,46,0.5);"></div>
+            <div style="width:13px;height:13px;border-radius:50%;background:#28c840;box-shadow:0 0 8px rgba(40,200,64,0.5);"></div>
+            <div style="margin-left:auto;font:500 ${Math.round(W*0.012)}px/1 'JetBrains Mono',monospace;color:#8b92a5;letter-spacing:0.1em;">nextframe · zsh</div>
           </div>
-          <div style="padding:${H*0.03}px ${W*0.02}px;font:400 ${Math.round(W*0.015)}px/1.6 'JetBrains Mono','SF Mono',Menlo,monospace;">
-            <div style="color:#8b92a5;">$ <span style="color:#f5f2e8;">${typedCmd}</span><span style="color:#ff6b35;">${cursor}</span></div>
+          <div style="padding:${H*0.035}px ${W*0.022}px;font:500 ${Math.round(W*0.016)}px/1.7 'JetBrains Mono','SF Mono',Menlo,monospace;">
+            <div><span style="color:#28c840;">➜</span> <span style="color:#8b92a5;">~/project</span> ${cmdHtml}<span style="color:#ff6b35;">${caret}</span></div>
             ${procHtml}
             ${showProgress ? `
-              <div style="margin-top:${H*0.02}px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-                  <span style="color:#58a6ff;">Rendering</span>
-                  <span style="color:#f5f2e8;">${progPct}%</span>
+              <div style="margin-top:${H*0.025}px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                  <span style="color:#58a6ff;letter-spacing:0.05em;">Rendering</span>
+                  <span style="color:#f5f2e8;font-weight:600;">${progPct}%</span>
                 </div>
-                <div style="background:rgba(88,166,255,0.15);border-radius:4px;height:8px;">
-                  <div style="background:linear-gradient(90deg,#58a6ff,#ff6b35);width:${progBarW}%;height:100%;border-radius:4px;"></div>
+                <div style="background:rgba(88,166,255,0.12);border-radius:6px;height:10px;position:relative;overflow:hidden;
+                  box-shadow:0 2px 8px rgba(0,0,0,0.4) inset;">
+                  <div style="background:linear-gradient(90deg,#58a6ff 0%,#7dd3fc 40%,#ff6b35 100%);width:${progPct}%;height:100%;border-radius:6px;
+                    box-shadow:0 0 16px rgba(255,107,53,0.6),0 2px 0 rgba(255,255,255,0.2) inset;"></div>
                 </div>
               </div>` : ''}
           </div>
         </div>
+        ${grain}
       </div>`;
   },
 
@@ -118,9 +134,6 @@ export default {
   },
 
   sample() {
-    return {
-      command: "nextframe render timeline.json output.mp4",
-      title: "一行命令，产出 MP4",
-    };
+    return { command: "nextframe render timeline.json output.mp4", title: "一行命令，产出 MP4" };
   },
 };

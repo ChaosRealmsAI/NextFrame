@@ -11,6 +11,24 @@ export default {
   assets: [],
   description: "竖屏 CTA：品牌 Logo 顶部 + QR 码居中 + URL 底部",
   duration_hint: 7,
+  intent: "竖屏结尾三段式：品牌名顶、QR 中、CTA 底。QR 持续细微呼吸，CTA 按钮脉冲 glow，引导观众扫码行动。",
+  when_to_use: ["视频结尾 CTA","引流到链接"],
+  when_not_to_use: ["开头或中段"],
+  limitations: ["URL 不超过 50 字符"],
+  inspired_by: "抖音结尾订阅页",
+  used_in: [],
+  requires: [],
+  pairs_well_with: ["dualOutputV"],
+  conflicts_with: [],
+  alternatives: [],
+  visual_weight: "heavy",
+  z_layer: "mid",
+  mood: ["professional", "calm"],
+  tags: ["cta", "qr", "ending", "content", "mobile-vertical"],
+  complexity: "simple",
+  performance: { cost: "low", notes: "pure dom" },
+  status: "stable",
+  changelog: [{ version: "1.0.0", date: "2026-04-16", change: "initial" }],
   params: {
     brand:   { type: "string", default: "NextFrame",                  semantic: "品牌名" },
     cta:     { type: "string", default: "立即体验",                   semantic: "CTA 文字" },
@@ -25,9 +43,11 @@ export default {
     const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
     const easeOut = (x) => 1 - Math.pow(1 - x, 3);
-    const k0 = easeOut(clamp(t / 0.4, 0, 1));
-    const k1 = easeOut(clamp((t - 0.2) / 0.5, 0, 1));
-    const k2 = easeOut(clamp((t - 0.5) / 0.4, 0, 1));
+    const entry = (delay = 0, dur = 0.2) => 0.9 + 0.1 * easeOut(clamp((t - delay) / dur, 0, 1));
+    const ty = (delay = 0, dur = 0.2) => 8 * (1 - easeOut(clamp((t - delay) / dur, 0, 1)));
+    const k0 = entry(0, 0.2);
+    const k1 = entry(0.1, 0.2);
+    const k2 = entry(0.25, 0.2);
     const ac = params.acColor || "#2563eb";
     const qrLines = (params.qrText || "").split("\\n");
     // QR placeholder using a grid of squares
@@ -39,14 +59,20 @@ export default {
         return `<div style="width:28px;height:28px;background:${filled?"#1f2937":"transparent"};border-radius:3px;"></div>`;
       }).join("")}</div>`
     ).join("");
+    // persistent glow + CTA button pulse
+    const glowPulse = 0.5 + 0.5 * Math.sin(t * 1.3);
+    const ctaBreathe = 1 + 0.015 * Math.sin(t * 1.8);
+    const qrBreathe = 1 + 0.01 * Math.sin(t * 1.1);
     return `
       <div style="position:absolute;inset:0;background:#fff;
                   display:flex;flex-direction:column;align-items:center;padding:220px 64px 240px;">
         <div style="font:900 100px/1.1 Inter,'PingFang SC',sans-serif;color:${ac};
-                    margin-bottom:16px;opacity:${k0};letter-spacing:-2px;">${esc(params.brand || "")}</div>
+                    margin-bottom:16px;opacity:${k0};letter-spacing:-2px;
+                    transform:translateY(${ty(0,0.2)}px);
+                    text-shadow:0 0 ${30+20*glowPulse}px rgba(37,99,235,${0.2+0.3*glowPulse});">${esc(params.brand || "")}</div>
         <div style="font:400 44px/1.4 Inter,'PingFang SC',sans-serif;color:#6b7280;
-                    margin-bottom:80px;opacity:${k0};">AI 视频引擎</div>
-        <div style="opacity:${k1};transform:scale(${0.7+k1*0.3});
+                    margin-bottom:80px;opacity:${entry(0.05,0.2)};transform:translateY(${ty(0.05,0.2)}px);">AI 视频引擎</div>
+        <div style="opacity:${k1};transform:scale(${qrBreathe * (0.96 + 0.04*easeOut(clamp((t-0.1)/0.2,0,1)))});
                     background:#f8f9fa;border-radius:24px;padding:40px;margin-bottom:48px;
                     border:3px solid #e5e7eb;">
           <div style="margin-bottom:24px;">${qrGrid}</div>
@@ -54,10 +80,12 @@ export default {
             ${qrLines.map(l => `<div style="font:600 36px/1.4 Inter,'PingFang SC',sans-serif;color:#1f2937;">${esc(l)}</div>`).join("")}
           </div>
         </div>
-        <div style="background:${ac};border-radius:16px;padding:24px 60px;margin-bottom:32px;opacity:${k2};">
+        <div style="background:${ac};border-radius:16px;padding:24px 60px;margin-bottom:32px;opacity:${k2};
+                    transform:scale(${ctaBreathe});
+                    box-shadow:0 0 ${15+20*glowPulse}px rgba(37,99,235,${0.3+0.3*glowPulse});">
           <div style="font:700 52px/1.2 Inter,'PingFang SC',sans-serif;color:#fff;">${esc(params.cta || "")}</div>
         </div>
-        <div style="font:400 36px/1.4 'Courier New',monospace;color:#6b7280;opacity:${k2};">${esc(params.url || "")}</div>
+        <div style="font:400 36px/1.4 'Courier New',monospace;color:#6b7280;opacity:${entry(0.3,0.2)};">${esc(params.url || "")}</div>
       </div>`;
   },
   describe(t, params, vp) {
