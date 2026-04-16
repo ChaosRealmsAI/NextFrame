@@ -69,6 +69,7 @@
 
   const Subtitle = {
     tracks: [],
+    override: null,
     render: function (t) {
       const timeline = getTimeline();
       if (!timeline) return;
@@ -79,15 +80,22 @@
 
       const container = ensureContainer();
       const rows = [];
-      for (let trackIndex = 0; trackIndex < this.tracks.length; trackIndex++) {
-        const track = this.tracks[trackIndex];
-        for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex++) {
-          const clip = track.clips[clipIndex];
-          if (!activeAt(clip, t)) continue;
-          const text = textForClip(clip);
-          if (!text) continue;
-          rows.push({ text: text, style: rowStyle(track, clip) });
-          break;
+
+      if (typeof this.override === "string" && this.override.length > 0) {
+        var track0 = this.tracks[0] || {};
+        rows.push({ text: this.override, style: rowStyle(track0, {}) });
+        this.override = null;
+      } else {
+        for (var trackIndex = 0; trackIndex < this.tracks.length; trackIndex++) {
+          var track = this.tracks[trackIndex];
+          for (var clipIndex = 0; clipIndex < track.clips.length; clipIndex++) {
+            var clip = track.clips[clipIndex];
+            if (!activeAt(clip, t)) continue;
+            var text = textForClip(clip);
+            if (!text) continue;
+            rows.push({ text: text, style: rowStyle(track, clip) });
+            break;
+          }
         }
       }
 

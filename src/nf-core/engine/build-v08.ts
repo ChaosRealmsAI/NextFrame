@@ -371,13 +371,14 @@ function buildDocument(timeline: ResolvedTimeline) {
     .filter((track) => track.kind === "audio")
     .flatMap((track) => track.clips)
     .find((clip) => typeof clip.src === "string" && clip.src.trim().length > 0);
+  const durationSec = duration / 1000;
   const slideSegments = {
     audio: typeof firstAudio?.src === "string" ? firstAudio.src : "",
     gap: 0,
     segments: [{
       phaseId: "main",
-      duration,
-      srt: subtitles.map((cue) => ({ s: cue.begin, e: cue.end, t: cue.text })),
+      duration: durationSec,
+      srt: subtitles.map((cue) => ({ s: cue.begin / 1000, e: cue.end / 1000, t: cue.text })),
     }],
   };
 
@@ -385,9 +386,9 @@ function buildDocument(timeline: ResolvedTimeline) {
 window.__TIMELINE_SUBTITLES__ = ${JSON.stringify(subtitles, null, 2)};
 window.__TIMELINE_ANIMATIONS__ = ${JSON.stringify(animations, null, 2)};
 window.__SLIDE_SEGMENTS = ${JSON.stringify(slideSegments, null, 2)};
-function getDuration() { return ${duration}; }
+function getDuration() { return ${durationSec}; }
 window.getDuration = getDuration;
-window.frame_pure = false;
+window.frame_pure = true;
 window.__NF_V08__ = window.__NF_V08__ || {};
 ${buildSharedPreamble()}
 ${readLegacyBundleSource()}
@@ -401,11 +402,17 @@ window.__NF_V08__.subtitles = window.__TIMELINE_SUBTITLES__;
 window.__NF_V08__.animations = window.__TIMELINE_ANIMATIONS__;
 ${buildRuntimeSources()}
 window.__onFrame = function(state) {
-  var sec = typeof state === "object" && state !== null ? state.time : (typeof state === "number" ? state : 0);
-  var ms = (typeof sec === "number" && isFinite(sec)) ? sec * 1000 : 0;
-  if (window.__NF_V08__ && typeof window.__NF_V08__.frame === "function") {
-    window.__NF_V08__.frame(ms);
+  if (!state || typeof state !== "object") return;
+  var sec = typeof state.time === "number" ? state.time : 0;
+  var ms = isFinite(sec) ? sec * 1000 : 0;
+  var nf = window.__NF_V08__;
+  if (!nf) return;
+  if (typeof state.subtitle === "string" && nf.subtitle) {
+    nf.subtitle.override = state.subtitle;
   }
+  if (typeof nf.frame === "function") nf.frame(ms);
+  var bar = document.getElementById("nf-progress");
+  if (bar) bar.style.width = (state.progress || 0) + "%";
 };
 (function() {
   var nf = window.__NF_V08__;
@@ -437,6 +444,7 @@ window.__onFrame = function(state) {
 </head>
 <body>
 <div id="stage-shell"><div id="stage"></div></div>
+<div id="nf-progress" style="position:fixed;bottom:0;left:0;height:4px;background:rgba(218,119,86,0.8);width:0%;z-index:9999;transition:none;"></div>
 ${buildAudioMarkup(timeline)}
 <script>
 ${scriptBody}
@@ -444,6 +452,55 @@ ${scriptBody}
 </body>
 </html>
 `;
+}
+
+function toLegacyTimeline(resolved: ResolvedTimeline): Timeline {
+  const layers: Timeline["layers"] = [];
+  let layerIndex = 0;
+  for (const track of resolved.tracks) {
+    if (track.kind !== "scene") continue;
+    for (const clip of track.clips) {
+      const beginMs = isFiniteNumber(clip.begin) ? clip.begin : 0;
+      const endMs = isFiniteNumber(clip.end) ? clip.end : beginMs;
+      layers!.push({
+        id: clip.id || `${track.id || "scene"}-${layerIndex}`,
+        scene: (clip.scene as string) || "",
+        start: beginMs / 1000,
+        dur: (endMs - beginMs) / 1000,
+        params: (clip.params as Record<string, unknown>) || {},
+      });
+      layerIndex++;
+    }
+  }
+
+  const firstAudio = resolved.tracks
+    .filter((t) => t.kind === "audio")
+    .flatMap((t) => t.clips)
+    .find((c) => typeof c.src === "string" && (c.src as string).trim().length > 0);
+  const audioSrc = firstAudio ? (firstAudio.src as string) : undefined;
+
+  const srtEntries = resolved.tracks
+    .filter((t) => t.kind === "subtitle")
+    .flatMap((t) => t.clips)
+    .map((c) => ({
+      s: isFiniteNumber(c.begin) ? (c.begin as number) / 1000 : 0,
+      e: isFiniteNumber(c.end) ? (c.end as number) / 1000 : 0,
+      t: (c.text as string) || "",
+    }));
+
+  const durationMs = computeDuration(resolved);
+  const tl = resolved as unknown as Timeline;
+  return {
+    version: "0.3",
+    width: Number(tl.width || 1920),
+    height: Number(tl.height || 1080),
+    fps: Number(tl.fps || 30),
+    duration: durationMs / 1000,
+    ratio: detectRatioId(resolved),
+    background: String(tl.background || "#05050c"),
+    audio: audioSrc ? { src: audioSrc, srt: srtEntries } as unknown as Timeline["audio"] : undefined,
+    layers,
+  };
 }
 
 export async function buildV08(timeline: TimelineV08, outPath: string): Promise<void> {
@@ -456,6 +513,13 @@ export async function buildV08(timeline: TimelineV08, outPath: string): Promise<
   };
   await validateSceneIds(resolvedTimeline);
 
-  await mkdir(dirname(outPath), { recursive: true });
-  await writeFile(outPath, buildDocument(resolvedTimeline), "utf8");
+  const legacy = toLegacyTimeline(resolvedTimeline);
+  const { buildHTML } = await import("./build.js");
+  const result = buildHTML(legacy, outPath);
+  if (!result.ok) {
+    throw createCodeError(
+      result.error?.code || "BUILD_FAIL",
+      result.error?.message || "v0.3 builder failed",
+    );
+  }
 }

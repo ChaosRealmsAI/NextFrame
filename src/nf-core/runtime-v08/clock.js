@@ -6,14 +6,26 @@
     mainAudio: null,
     _running: false,
     _tMs: 0,
+    _startWall: 0,
+    _wallFallback: false,
     attachAudio: function (el) {
       if (!el) return;
       this.mainAudio = el;
       this.source = "audio";
+      var self = this;
+      setTimeout(function () {
+        if (self.mainAudio && (self.mainAudio.paused || self.mainAudio.currentTime < 0.01)) {
+          self._wallFallback = true;
+          self._startWall = performance.now();
+        }
+      }, 500);
     },
     getT: function () {
+      if (this._wallFallback) {
+        return performance.now() - this._startWall;
+      }
       if (this.source === "audio" && this.mainAudio) {
-        const currentTime = Number(this.mainAudio.currentTime);
+        var currentTime = Number(this.mainAudio.currentTime);
         return Number.isFinite(currentTime) ? currentTime * 1000 : 0;
       }
       return this._tMs;
