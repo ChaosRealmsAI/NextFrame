@@ -256,6 +256,8 @@ function resolveAndValidateTracks(timeline: TimelineV08): ResolvedTrack[] {
   return resolvedTracks;
 }
 
+const ALLOWED_SCENE_TYPES = new Set(["dom", "media"]);
+
 async function validateSceneIds(timeline: ResolvedTimeline) {
   const sceneIds = Array.from(new Set(
     timeline.tracks
@@ -272,6 +274,17 @@ async function validateSceneIds(timeline: ResolvedTimeline) {
         "SCENE_NOT_FOUND",
         `scene "${sceneId}" is not registered for build`,
         { fix: `Pick a valid scene id from \`nextframe scenes\` or correct "${sceneId}".` },
+      );
+    }
+    const sceneType = (scene as { type?: unknown }).type;
+    if (typeof sceneType !== "string" || !ALLOWED_SCENE_TYPES.has(sceneType)) {
+      throw createCodeError(
+        "UNSUPPORTED_SCENE_TYPE",
+        `scene "${sceneId}" has type=${JSON.stringify(sceneType)}, must be "dom" or "media"`,
+        {
+          field: `scene.${sceneId}.type`,
+          fix: `v0.9.3 scene contract accepts only type="dom" (self-generated HTML) or type="media" (external src). Update the scene definition.`,
+        },
       );
     }
   }
@@ -317,6 +330,60 @@ function buildAudioMarkup(timeline: ResolvedTimeline) {
     .map((clip) =>
       `<audio${clip.id} preload="auto" data-track-id="${clip.trackId}" data-clip-index="${clip.clipIndex}" src="${clip.src}"></audio>`)
     .join("\n");
+}
+
+export interface AudioMetaClip {
+  trackId: string;
+  clipIndex: number;
+  src: string;
+  beginMs: number;
+  endMs: number;
+  srcInMs: number;
+  srcOutMs: number | null;
+  fadeInMs: number;
+  fadeOutMs: number;
+  volume: number;
+  pan: number;
+}
+
+function pickNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function pickOptionalNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+export function collectAudioMeta(timeline: ResolvedTimeline): AudioMetaClip[] {
+  const result: AudioMetaClip[] = [];
+  timeline.tracks.forEach((track, trackIndex) => {
+    if (track.kind !== "audio") return;
+    const trackVolume = pickNumber(getTrackParam(track, "volume"), 1);
+    const trackPan = pickNumber(getTrackParam(track, "pan"), 0);
+    const trackMute = getTrackParam(track, "mute") === true;
+    if (trackMute) return;
+    const trackId = track.id || `track_${trackIndex}`;
+    track.clips.forEach((clip, clipIndex) => {
+      if (typeof clip.src !== "string" || clip.src.trim().length === 0) return;
+      const beginMs = pickNumber(clip.begin, 0);
+      const endMs = pickNumber(clip.end, beginMs);
+      const clipVolume = pickNumber(clip.volume, 1);
+      result.push({
+        trackId,
+        clipIndex,
+        src: clip.src as string,
+        beginMs,
+        endMs,
+        srcInMs: pickNumber(clip.src_in, 0),
+        srcOutMs: pickOptionalNumber(clip.src_out),
+        fadeInMs: pickNumber(clip.fade_in, 0),
+        fadeOutMs: pickNumber(clip.fade_out, 0),
+        volume: clipVolume * trackVolume,
+        pan: trackPan,
+      });
+    });
+  });
+  return result;
 }
 
 function collectSubtitleData(timeline: ResolvedTimeline) {
@@ -654,4 +721,12 @@ export async function buildV08(timeline: TimelineV08, outPath: string): Promise<
       result.error?.message || "v0.3 builder failed",
     );
   }
+
+  // Sidecar audiometa.json — render pipeline (recorder.ts) reads this post-record
+  // to drive ffmpeg filter_complex (atrim/afade/volume/pan). Empty array still written
+  // so render can deterministically skip the mux step when tracks are absent.
+  const audioMeta = collectAudioMeta(resolvedTimeline);
+  const sidecarPath = `${outPath}.audiometa.json`;
+  await mkdir(dirname(sidecarPath), { recursive: true });
+  await writeFile(sidecarPath, JSON.stringify(audioMeta, null, 2) + "\n", "utf8");
 }

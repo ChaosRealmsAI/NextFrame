@@ -8,6 +8,7 @@ import { configureProjectCacheEnv, resolveTimeline, timelineDir, timelineUsage }
 import { exportMP4, muxMP4Audio } from "../../targets/ffmpeg-mp4.js";
 import { exportRecorder, exportRecorderHtml } from "../../targets/recorder.js";
 import { exportBrowser } from "../../targets/browser.js";
+import { muxAudioTracksToMp4, readAudioMeta } from "../../targets/ffmpeg-audio-mux.js";
 import { detectFormat, validateTimelineLegacy, validateTimelineV08, validateTimelineV3 } from "../_helpers/_timeline-validate.js";
 import { buildV08 } from "../../../../nf-core/engine/build-v08.js";
 import type { TimelineV08 } from "../../../../nf-core/types.js";
@@ -104,7 +105,7 @@ async function renderV08({
   opts: RenderOpts;
   flags: Record<string, string | boolean>;
 }): Promise<{ result: Record<string, unknown>; htmlPath: string }> {
-  const v = validateTimelineV08(timeline);
+  const v = validateTimelineV08(timeline as unknown as Record<string, unknown>);
   if (!v.ok && v.errors.length > 0) {
     return {
       result: { ok: false, error: v.errors[0] },
@@ -134,7 +135,7 @@ async function renderV08({
     };
   }
 
-  const tl = timeline as Record<string, unknown>;
+  const tl = timeline as unknown as Record<string, unknown>;
   const width = opts.width ?? Number(tl.width) ?? 1920;
   const height = opts.height ?? Number(tl.height) ?? 1080;
   const fps = opts.fps ?? Number(tl.fps) ?? 30;
@@ -144,7 +145,14 @@ async function renderV08({
     process.stderr.write(`v0.8 pipeline: ${htmlPath}\n`);
   }
 
-  const videoTarget = audioPath ? makeTempVideoPath(outPath) : outPath;
+  // Read audio sidecar emitted by buildV08 — empty array means no audio tracks.
+  const audioMeta = await readAudioMeta(`${htmlPath}.audiometa.json`);
+  const hasAudioTracks = Array.isArray(audioMeta) && audioMeta.length > 0;
+
+  // If any post-processing step exists (audio-track mux OR --audio mux), the recorder
+  // writes to a temp mp4 so the next step can transmux into the user's final outPath.
+  const needsPostProcess = hasAudioTracks || !!audioPath;
+  const videoTarget = needsPostProcess ? makeTempVideoPath(outPath) : outPath;
   const recorded = await exportRecorderHtml(htmlPath, videoTarget, {
     fps,
     crf: opts.crf,
@@ -157,19 +165,40 @@ async function renderV08({
     return { result: recorded, htmlPath };
   }
 
-  if (audioPath) {
-    const muxed = await muxMP4Audio(videoTarget, audioPath, outPath) as Record<string, unknown>;
+  // Step 1: mux timeline audio tracks with fade / volume / pan / src_in / src_out.
+  let currentVideoPath = videoTarget;
+  let trackMuxTemp: string | null = null;
+  if (hasAudioTracks && audioMeta) {
+    const trackMuxOut = audioPath ? makeTempVideoPath(outPath) : outPath;
+    trackMuxTemp = audioPath ? trackMuxOut : null;
+    const muxed = await muxAudioTracksToMp4(videoTarget, audioMeta, trackMuxOut) as Record<string, unknown>;
     if (!muxed.ok) {
       return { result: muxed, htmlPath };
     }
     try { unlinkSync(videoTarget); } catch { /* best-effort cleanup */ }
+    currentVideoPath = trackMuxOut;
+  }
+
+  // Step 2: legacy --audio external mux on top.
+  if (audioPath) {
+    const muxed = await muxMP4Audio(currentVideoPath, audioPath, outPath) as Record<string, unknown>;
+    if (!muxed.ok) {
+      return { result: muxed, htmlPath };
+    }
+    try { unlinkSync(currentVideoPath); } catch { /* best-effort cleanup */ }
+    if (trackMuxTemp && trackMuxTemp !== currentVideoPath) {
+      try { unlinkSync(trackMuxTemp); } catch { /* best-effort cleanup */ }
+    }
     return {
       result: { ok: true, value: { ...(recorded.value as Record<string, unknown>), outputPath: outPath, audioPath } },
       htmlPath,
     };
   }
 
-  return { result: recorded, htmlPath };
+  return {
+    result: { ok: true, value: { ...(recorded.value as Record<string, unknown>), outputPath: outPath } },
+    htmlPath,
+  };
 }
 
 function parseCrfFlag(raw: unknown) {
@@ -257,7 +286,7 @@ export async function run(argv: string[]) {
       if (flags.width) renderOpts.width = Number(flags.width);
       if (flags.height) renderOpts.height = Number(flags.height);
       const { result: r08, htmlPath: tmpHtml } = await renderV08({
-        timeline: timeline as TimelineV08,
+        timeline: timeline as unknown as TimelineV08,
         timelineJsonPath: resolved.jsonPath,
         outPath,
         audioPath,

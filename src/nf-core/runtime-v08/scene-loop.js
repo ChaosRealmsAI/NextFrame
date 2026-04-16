@@ -54,18 +54,10 @@
     return registry[sceneId] || registry["scene-" + sceneId] || null;
   }
 
-  function sceneMode(sceneDef) {
-    const meta = sceneDef && (sceneDef.meta || sceneDef.META) || {};
-    const tech = sceneDef && sceneDef.type || meta.type || meta.tech;
-    return tech === "canvas" ? "canvas" : "dom";
-  }
-
   function ensureSurface(key, zIndex, vp) {
     const app = getApp(vp);
-    let entry = SceneLoop.canvases[key];
+    let entry = SceneLoop.surfaces[key];
     if (entry) {
-      if (entry.canvas.width !== vp.width) entry.canvas.width = vp.width;
-      if (entry.canvas.height !== vp.height) entry.canvas.height = vp.height;
       entry.wrapper.style.zIndex = String(zIndex);
       return entry;
     }
@@ -75,31 +67,23 @@
     wrapper.style.cssText = "position:absolute;inset:0;display:none;";
     wrapper.style.zIndex = String(zIndex);
 
-    const canvas = document.createElement("canvas");
-    canvas.width = vp.width;
-    canvas.height = vp.height;
-    canvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%;";
-
     const host = document.createElement("div");
     host.style.cssText = "position:absolute;inset:0;";
 
-    wrapper.appendChild(canvas);
     wrapper.appendChild(host);
     app.appendChild(wrapper);
 
     entry = {
       wrapper: wrapper,
-      canvas: canvas,
       host: host,
-      ctx: canvas.getContext("2d"),
     };
-    SceneLoop.canvases[key] = entry;
+    SceneLoop.surfaces[key] = entry;
     return entry;
   }
 
   const SceneLoop = {
     tracks: [],
-    canvases: {},
+    surfaces: {},
     tick: function (t) {
       const timeline = getTimeline();
       const registry = window.__scenes;
@@ -131,31 +115,14 @@
           const localT = Math.max(0, t - bounds.begin);
           const params = clip.params && typeof clip.params === "object" ? clip.params : {};
 
-          if (sceneMode(sceneDef) === "canvas") {
-            if (surface.ctx) {
-              surface.canvas.style.display = "block";
-              surface.host.style.display = "none";
-              surface.host.innerHTML = "";
-              surface.ctx.clearRect(0, 0, vp.width, vp.height);
-              sceneDef.render(surface.ctx, localT, params, vp);
-            }
-            continue;
-          }
-
-          surface.canvas.style.display = "none";
-          surface.host.style.display = "block";
-          if (sceneDef.render.length >= 4) {
-            sceneDef.render(surface.host, localT, params, vp);
-            continue;
-          }
           const html = sceneDef.render(localT, params, vp);
           surface.host.innerHTML = typeof html === "string" ? html : "";
         }
       }
 
-      for (const key in this.canvases) {
+      for (const key in this.surfaces) {
         if (!active[key]) {
-          this.canvases[key].wrapper.style.display = "none";
+          this.surfaces[key].wrapper.style.display = "none";
         }
       }
     },
