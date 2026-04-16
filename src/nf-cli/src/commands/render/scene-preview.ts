@@ -150,10 +150,12 @@ function buildHtml(opts: {
 </section>
 
 <script type="module">
+import { renderMotion as __nfMotionRender } from '/src/nf-core/engine/runtime/motion.js';
 const DIR = ${JSON.stringify(dirUrl)};
 const FILENAME = ${JSON.stringify(opts.filename)};
 const TYPE = ${JSON.stringify(m.type)};
 const VP = { width: ${W}, height: ${H} };
+const MOTION_VP = { width: 400, height: 400 };
 const DUR = ${opts.dur};
 
 const stage = document.getElementById('stage');
@@ -176,21 +178,86 @@ const c = mod.default;
 const params = c.sample();
 sampleJson.textContent = JSON.stringify(params, null, 2);
 
+let _shaderCtx = null;
+function mulberry32(s) { return function(){ let x=s|=0; s=s+0x6D2B79F5|0; x=Math.imul(x^x>>>15,1|x); x=x+Math.imul(x^x>>>7,61|x)^x; return((x^x>>>14)>>>0)/4294967296; }; }
+
 function renderAt(t) {
   try {
     if (TYPE === 'canvas') {
       let canvas = stage.querySelector('canvas');
       if (!canvas) {
         canvas = document.createElement('canvas');
-        canvas.width = VP.width;
-        canvas.height = VP.height;
+        canvas.width = VP.width; canvas.height = VP.height;
         canvas.style.cssText = 'width:100%;height:100%;display:block';
-        stage.innerHTML = '';
-        stage.appendChild(canvas);
+        stage.innerHTML = ''; stage.appendChild(canvas);
       }
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, VP.width, VP.height);
       c.render(ctx, t, params, VP);
+    } else if (TYPE === 'shader') {
+      const config = c.render(null, t, params, VP);
+      if (!config || !config.frag) { stage.innerHTML = '<div style="color:#e06c75;padding:24px">shader: no frag</div>'; return; }
+      if (!_shaderCtx) {
+        let canvas = document.createElement('canvas');
+        canvas.width = VP.width; canvas.height = VP.height;
+        canvas.style.cssText = 'width:100%;height:100%;display:block';
+        stage.innerHTML = ''; stage.appendChild(canvas);
+        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
+        if (!gl) { stage.innerHTML += '<div style="color:#e06c75;padding:24px">WebGL unavailable</div>'; return; }
+        const VERT = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }';
+        function compile(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+        const prog = gl.createProgram();
+        gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+        gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, config.frag));
+        gl.linkProgram(prog); gl.useProgram(prog);
+        const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+        const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+        _shaderCtx = { gl, uT: gl.getUniformLocation(prog, 'uT'), uR: gl.getUniformLocation(prog, 'uR'), uniforms: config.uniforms || {} };
+        for (const [k] of Object.entries(_shaderCtx.uniforms)) { _shaderCtx['u_'+k] = gl.getUniformLocation(prog, k); }
+      }
+      const { gl, uT, uR } = _shaderCtx;
+      gl.viewport(0, 0, VP.width, VP.height);
+      if (uT) gl.uniform1f(uT, t);
+      if (uR) gl.uniform2f(uR, VP.width, VP.height);
+      const freshConfig = c.render(null, t, params, VP);
+      if (freshConfig && freshConfig.uniforms) {
+        for (const [k, v] of Object.entries(freshConfig.uniforms)) {
+          const loc = _shaderCtx['u_'+k]; if (loc) gl.uniform1f(loc, Number(v));
+        }
+      }
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    } else if (TYPE === 'particle') {
+      let canvas = stage.querySelector('canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.width = VP.width; canvas.height = VP.height;
+        canvas.style.cssText = 'width:100%;height:100%;display:block';
+        stage.innerHTML = ''; stage.appendChild(canvas);
+      }
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, VP.width, VP.height);
+      const config = c.render(null, t, params, VP);
+      if (!config || !config.emitter) return;
+      const count = config.emitter.count || 100;
+      const seed = config.emitter.seed || 42;
+      const spawnFn = config.emitter.spawn;
+      for (let i = 0; i < count; i++) {
+        const rng = mulberry32(seed + i * 37);
+        let p;
+        if (spawnFn) { p = spawnFn(rng, i, VP); p.i = i; }
+        else { p = { i, x: rng()*VP.width, y: rng()*VP.height, depth: rng()*0.8+0.2, size: 0.75+rng()*2.25, alpha: 0.2+rng()*0.7, hue: rng()*360 }; }
+        if (config.field) { const d = config.field(p.x, p.y, t); if (d) Object.assign(p, d); }
+        ctx.save();
+        if (config.render) config.render(ctx, p, t);
+        else { ctx.globalAlpha = p.alpha||0.5; ctx.fillStyle='#fff'; ctx.fillRect(p.x,p.y,p.size||2,p.size||2); }
+        ctx.restore();
+      }
+    } else if (TYPE === 'motion') {
+      const config = c.render(null, t, params, MOTION_VP);
+      if (!config || !config.layers) { stage.innerHTML = '<div style="color:#e06c75;padding:24px">motion: no layers</div>'; return; }
+      stage.innerHTML = '';
+      __nfMotionRender(stage, t, config);
     } else {
       stage.innerHTML = '';
       c.render(stage, t, params, VP);

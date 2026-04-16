@@ -387,6 +387,13 @@ export async function run(argv: string[]): Promise<number> {
   process.stdout.write(`✓ gallery written: ${outPath}\n`);
   process.stdout.write(`  ${scenes.length} scenes (${scenes.map(s => s.id).join(", ")})\n`);
 
+  // Generate detail pages for each scene so gallery links work
+  const { run: runPreview } = await import("./scene-preview.js") as { run: (args: string[]) => Promise<number> };
+  for (const s of scenes) {
+    await runPreview([`--id=${s.id}`, `--ratio=${ratio}`, `--theme=${theme}`, "--no-server", "--no-open"]);
+  }
+  process.stdout.write(`✓ ${scenes.length} detail pages generated\n`);
+
   if (noServer) return 0;
 
   try {
