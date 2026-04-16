@@ -5,6 +5,10 @@ import { resolve as resolvePath, isAbsolute } from "node:path";
 import { guarded } from "./guard.js";
 import { resolveTimeline as resolveLegacyTimeline } from "./legacy-timeline.js";
 import { getREGISTRY } from "./scene-registry.js";
+import { parse as parseAnchorExpr } from "../../../nf-core/anchors/parser.js";
+import { resolve as resolveAnchorRef } from "../../../nf-core/anchors/resolver.js";
+import { validateAnchors } from "../../../nf-core/anchors/validator.js";
+import { getKind } from "../../../nf-core/kinds/index.js";
 import { EFFECT_IDS } from "../../../nf-core/animation/effects/index.js";
 import { FILTER_IDS } from "../../../nf-core/filters/index.js";
 import { TRANSITION_IDS } from "../../../nf-core/animation/transitions/index.js";
@@ -61,6 +65,131 @@ export function detectFormat(timeline: LooseTimeline) {
   if (Array.isArray(timeline?.tracks) && (timeline as { anchors?: unknown })?.anchors) return "v0.8";
   if (Array.isArray(timeline?.tracks)) return "v0.1";
   return "unknown";
+}
+
+function addAnchorRefIssue(
+  errors: ValidationDiagnostic[],
+  code: string,
+  message: string,
+  field: string,
+  hint?: string,
+) {
+  errors.push({ code, message, ref: field, hint });
+}
+
+function validateAnchorExpr(
+  anchors: Record<string, unknown>,
+  expr: unknown,
+  field: string,
+  errors: ValidationDiagnostic[],
+) {
+  if (typeof expr !== "string" || expr.trim().length === 0) {
+    addAnchorRefIssue(errors, "BAD_ANCHOR_EXPR", `${field} must be a non-empty anchor expression string`, field);
+    return null;
+  }
+  try {
+    parseAnchorExpr(expr);
+    return resolveAnchorRef(anchors as Record<string, { at?: number; begin?: number; end?: number }>, expr);
+  } catch (error) {
+    const message = (error as Error).message || String(error);
+    const code = message.startsWith("MISSING_ANCHOR") || message.startsWith("MISSING_ANCHOR_POINT")
+      ? "MISSING_ANCHOR"
+      : "BAD_ANCHOR_EXPR";
+    addAnchorRefIssue(errors, code, message, field, "Use id.begin|at|end with optional ± offset in s/ms.");
+    return null;
+  }
+}
+
+export function validateTimelineV08(timeline: LooseTimeline) {
+  const errors: ValidationDiagnostic[] = [];
+  const warnings: ValidationDiagnostic[] = [];
+  const hints: ValidationDiagnostic[] = [];
+
+  if (timeline.version !== "0.8") {
+    errors.push({ code: "BAD_VERSION", message: 'v0.8 timeline must set version to "0.8"' });
+  }
+  if (!timeline.anchors || typeof timeline.anchors !== "object" || Array.isArray(timeline.anchors)) {
+    errors.push({ code: "MISSING_FIELD", message: "anchors object is required" });
+  }
+  if (!Array.isArray(timeline.tracks)) {
+    errors.push({ code: "MISSING_FIELD", message: "tracks[] is required" });
+  }
+  if (errors.length > 0) return { ok: false, errors, warnings, hints };
+
+  const anchorCheck = validateAnchors(timeline.anchors as Record<string, { at?: number; begin?: number; end?: number }>);
+  for (const issue of anchorCheck.issues) {
+    errors.push({ code: issue.code, message: issue.message, ref: issue.field, hint: issue.fix });
+  }
+
+  const trackIds = new Set<string>();
+  for (let trackIndex = 0; trackIndex < timeline.tracks!.length; trackIndex++) {
+    const track = timeline.tracks![trackIndex];
+    const trackRef = `tracks[${trackIndex}]`;
+    if (!track || typeof track !== "object") {
+      errors.push({ code: "BAD_TRACK", message: `${trackRef} must be an object`, ref: trackRef });
+      continue;
+    }
+
+    if (typeof track.id === "string" && track.id) {
+      if (trackIds.has(track.id)) {
+        errors.push({ code: "DUPLICATE_ID", message: `duplicate track id "${track.id}"`, ref: `${trackRef}.id` });
+      }
+      trackIds.add(track.id);
+    }
+
+    const schema = typeof track.kind === "string" ? getKind(track.kind) : null;
+    if (!schema) {
+      errors.push({ code: "UNKNOWN_KIND", message: `${trackRef} uses unknown kind "${String(track.kind || "")}"`, ref: `${trackRef}.kind` });
+      continue;
+    }
+
+    const trackValidation = schema.validateTrack(track as never);
+    if (!trackValidation.ok) {
+      for (const issue of trackValidation.issues) {
+        errors.push({ code: issue.code, message: issue.message, ref: `${trackRef}.${issue.field || ""}`.replace(/\.$/, "") });
+      }
+    }
+
+    if (schema.kind === "animation") {
+      const target = String(track.target || "");
+      if (!/^([^.]+)\.clips\[(\d+)\]\.params\.([A-Za-z0-9_$]+)$/.test(target)) {
+        errors.push({
+          code: "KIND_SCHEMA_VIOLATION",
+          message: `${trackRef}.target must match sceneTrackId.clips[N].params.fieldName`,
+          ref: `${trackRef}.target`,
+        });
+      }
+    }
+
+    const clips = Array.isArray(track.clips) ? track.clips : [];
+    for (let clipIndex = 0; clipIndex < clips.length; clipIndex++) {
+      const clip = clips[clipIndex];
+      const clipRef = `${trackRef}.clips[${clipIndex}]`;
+      const clipValidation = schema.validateClip(clip as never);
+      if (!clipValidation.ok) {
+        for (const issue of clipValidation.issues) {
+          errors.push({ code: issue.code, message: issue.message, ref: `${clipRef}.${issue.field || ""}`.replace(/\.$/, "") });
+        }
+      }
+
+      if (schema.kind === "animation") {
+        validateAnchorExpr(timeline.anchors as Record<string, unknown>, clip.at, `${clipRef}.at`, errors);
+        continue;
+      }
+
+      const begin = validateAnchorExpr(timeline.anchors as Record<string, unknown>, clip.begin, `${clipRef}.begin`, errors);
+      const end = validateAnchorExpr(timeline.anchors as Record<string, unknown>, clip.end, `${clipRef}.end`, errors);
+      if (begin !== null && end !== null && begin >= end) {
+        errors.push({
+          code: "BAD_CLIP_RANGE",
+          message: `${clipRef} must resolve to begin < end`,
+          ref: clipRef,
+        });
+      }
+    }
+  }
+
+  return { ok: errors.length === 0, errors, warnings, hints };
 }
 
 /**

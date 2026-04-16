@@ -43,18 +43,21 @@ export const COMMAND_SPECS = Object.fromEntries([
     nextframe build <timeline.json> [--output=out.html] [-o out.html] [--json]`, `<project> <episode> <segment> build a segment from the project hierarchy
     <timeline.json> build a direct timeline file
     --output=PATH or -o PATH write HTML to a custom path
-    --json emit structured result data`, `The v0.3 layers[] path and the empty v0.8 skeleton path are supported.
+    --json emit structured result data`, `The v0.3 layers[] path and the v0.8 anchors/tracks path are supported.
     Legacy v0.1 and removed v0.6 timelines are rejected by build.`),
   command("anchors", "Dispatch v0.8 anchor bookkeeping subcommands.", `nextframe anchors <subcommand>
     nextframe anchors <subcommand> --help`, `Subcommands: from-tts, list, validate
-    Run nextframe anchors <subcommand> --help for subcommand-specific params and examples`, `Walking skeleton only: subcommands are registered but not implemented yet.`),
-  command("anchors from-tts", "Stub v0.8 anchor generation from TTS word timing.", `nextframe anchors from-tts <words.json> [--out=anchors.json] [--json]`, `<words.json> TTS timing payload
+    Run nextframe anchors <subcommand> --help for subcommand-specific params and examples`, `Use from-tts to generate predictable anchor ids from word timing.
+    Use validate before build if you edited anchors by hand.`),
+  command("anchors from-tts", "Generate v0.8 anchors from TTS word timing.", `nextframe anchors from-tts <words.json> [--out=anchors.json] [--json]`, `<words.json> TTS timing payload
     --out=PATH optional output path
-    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
-  command("anchors list", "Stub v0.8 anchor inspection command.", `nextframe anchors list <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
-    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
-  command("anchors validate", "Stub v0.8 anchor validation command.", `nextframe anchors validate <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
-    --json emit structured output when implemented`, `Walking skeleton only: prints NOT_IMPLEMENTED and exits non-zero.`),
+    --json emit structured output`, `Segment timing must include start/end fields in ms or seconds.
+    Output anchor ids are deterministic: segN.begin/end and segN.wK.begin/end.`),
+  command("anchors list", "List anchor ids found in a v0.8 timeline.", `nextframe anchors list <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --json emit structured output`, `Use this to inspect real anchor names before wiring clip begin/end or animation at fields.`),
+  command("anchors validate", "Validate the anchors object inside a v0.8 timeline.", `nextframe anchors validate <timeline.json> [--json]`, `<timeline.json> direct path to a v0.8 timeline
+    --json emit structured output`, `Checks anchor object shape and begin/end ranges.
+    Run full nextframe validate as the final contract check.`),
   command("tracks", "Dispatch v0.8 track bookkeeping subcommands.", `nextframe tracks <subcommand>
     nextframe tracks <subcommand> --help`, `Subcommands: add, list
     Run nextframe tracks <subcommand> --help for subcommand-specific params and examples`, `Walking skeleton only: subcommands are registered but not implemented yet.`),

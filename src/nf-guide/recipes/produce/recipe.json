@@ -1,73 +1,57 @@
 {
   "id": "produce",
   "name": "Video Production",
-  "description": "从素材到最终 MP4 的完整视频生产管线",
+  "description": "v0.8 anchors × tracks 生产流程：TTS/anchors → timeline → build HTML → recorder MP4",
   "steps": [
     {
       "id": "ratio",
       "title": "定比例",
-      "prompt": "00-ratio.md",
-      "gate": "ratio-set",
-      "description": "确定视频比例，驱动后续全部决策"
+      "prompt": "00-ratio.md"
     },
     {
       "id": "tts",
-      "title": "TTS 生成（Type C 起点，可跳过）",
-      "prompt": "00a-tts.md",
-      "gate": "tts-ready",
-      "description": "Type C 纯 TTS 视频：nf-tts synth 产出 mp3 + char-level timeline.json",
-      "optional": true
+      "title": "TTS 生成（可选起点）",
+      "prompt": "00a-tts.md"
     },
     {
       "id": "check",
       "title": "确认素材 + 检查组件",
-      "prompt": "01-check.md",
-      "gate": "materials-and-scenes-ready",
-      "description": "确认输入素材存在，检查该 ratio 下组件是否齐全"
+      "prompt": "01-check.md"
     },
     {
       "id": "scene",
       "title": "做组件 + 单独验证",
-      "prompt": "02-scene.md",
-      "gate": "scenes-verified",
-      "description": "创建缺失的 scene 组件，逐个 preview 截图验证",
-      "skip_if": "scenes-ready"
+      "prompt": "02-scene.md"
+    },
+    {
+      "id": "anchors",
+      "title": "生成 Anchors",
+      "prompt": "03-anchors.md"
     },
     {
       "id": "timeline",
-      "title": "写 Timeline JSON",
-      "prompt": "03-timeline.md",
-      "gate": "timeline-written",
-      "description": "组装时间轴，字幕数据直接拷贝不转换"
+      "title": "写 v0.8 Timeline",
+      "prompt": "04-timeline.md"
     },
     {
       "id": "validate",
-      "title": "参数门禁",
-      "prompt": "04-validate.md",
-      "gate": "validate-pass",
-      "description": "nextframe validate 检查参数类型、范围、格式"
+      "title": "Validate",
+      "prompt": "05-validate.md"
     },
     {
       "id": "build",
-      "title": "Build + 截图审查",
-      "prompt": "05-build.md",
-      "gate": "build-verified",
-      "description": "生成 HTML，自动截图 3 帧，AI 读图确认布局"
+      "title": "Build HTML",
+      "prompt": "06-build.md"
     },
     {
       "id": "record",
       "title": "录制 MP4",
-      "prompt": "06-record.md",
-      "gate": "record-pass",
-      "description": "recorder 逐帧捕获 + 视频叠加 + 音频合成"
+      "prompt": "07-record.md"
     },
     {
       "id": "concat",
-      "title": "多段拼接",
-      "prompt": "07-concat.md",
-      "gate": "concat-done",
-      "description": "多个 clip + bridge 拼成完整一期",
-      "optional": true
+      "title": "多段拼接（可选）",
+      "prompt": "08-concat.md"
     }
   ]
 }

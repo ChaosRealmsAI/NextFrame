@@ -1,49 +1,45 @@
-# Step 0a: TTS 生成（Type C 起点）
+# Step 00a: TTS 生成（可选起点）
 
-**仅 Type C（纯 TTS 视频）需要这一步**。Type A（访谈切片）跳过，用 clip 原声。
+纯 TTS 视频从这里起手。访谈 / 已有原声 clip 可以跳过。
 
-## 单段合成
+## 目标
 
-```bash
-nf-tts synth "你的中文旁白文本，写得自然一点。" \
-  -d ./audio -o narration \
-  -b edge           # edge = 免费，调试用；production 用 volcengine
-```
+这一步结束时，你手里必须有两样东西：
 
-产出：
-- `audio/narration/narration`（mp3 文件，OS file 看是 audio/mpeg）
-- `audio/narration/narration.timeline.json`（char 级时间戳，v0.6 必需）
-- `audio/narration/narration.srt`（标准字幕，v0.6 不用，留给其他工具）
+- `seg0.mp3` 或等价音频文件
+- `seg0.words.json`
 
-**注意**：mp3 输出是无扩展名文件，要手动改名：
-```bash
-mv audio/narration/narration audio/narration/narration.mp3
-```
+`seg0.words.json` 是下一步 `nextframe anchors from-tts` 的输入，不再走 v0.6 matches。
 
-## 多段合成（长视频）
-
-见 `nf-guide audio` recipe — 按 script.json 的 segment 逐段合成，最后 `nf-tts concat` 拼接。
-
-## voice 选择
+## 推荐命令
 
 ```bash
-nf-tts voices              # 列出所有
-nf-tts preview <voice-id>  # 试听
+nextframe audio-synth <project> <episode> --segment=1 --json
 ```
 
-推荐：
-- edge: `zh-CN-XiaoxiaoNeural`（女声）、`zh-CN-YunxiNeural`（男声）
-- volcengine: 见 `nf-tts voices --backend volcengine`
-
-## 验证 timeline.json 合法
+读返回 JSON，记下 TTS 产物路径。把 word timing JSON 整理成后续步骤统一使用的名字：
 
 ```bash
-python3 -c "import json; d=json.load(open('audio/narration/narration.timeline.json')); print(f'{len(d[\"segments\"])} segs, {sum(len(s[\"words\"]) for s in d[\"segments\"])} words')"
+cp <returned-timeline-json> ./seg0.words.json
+cp <returned-mp3> ./seg0.mp3
 ```
 
-至少 1 segment + 每 segment ≥1 word，才能进 Step 3。
+如果你的本地 CLI 已经支持直接输出 `seg0.words.json`，直接用它，不必再复制。
+
+## 验证 words 文件
+
+```bash
+node -e "const d=require('./seg0.words.json'); const segs=Array.isArray(d.segments)?d.segments:[]; const words=segs.flatMap(s=>Array.isArray(s.words)?s.words:[]); console.log({segments:segs.length, words:words.length});"
+```
+
+要求：
+
+- 至少 1 个 segment
+- 至少 1 个 word
+- word 里带起止时间字段
 
 ## 下一步
 
-→ Step 1: check（素材+组件齐全）
-或直接 → Step 3: timeline（用 `nextframe match from-tts` 一键起手）
+```bash
+nf-guide produce anchors
+```

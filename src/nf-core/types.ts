@@ -11,6 +11,11 @@ export interface TimelineV08 {
   version: "0.8";
   anchors: V08AnchorDict;
   tracks: Array<V08Track<V08Kind>>;
+  ratio?: string;
+  width?: number;
+  height?: number;
+  fps?: number;
+  duration?: number;
   media?: Record<string, unknown>;
 }
 

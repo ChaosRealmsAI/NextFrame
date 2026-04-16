@@ -1,0 +1,42 @@
+{
+  "segments": [
+    {
+      "id": "seg0",
+      "text": "Anchors are timing. Tracks are content.",
+      "start_ms": 0,
+      "end_ms": 5000,
+      "words": [
+        {
+          "word": "Anchors",
+          "start_ms": 0,
+          "end_ms": 700
+        },
+        {
+          "word": "are",
+          "start_ms": 700,
+          "end_ms": 1100
+        },
+        {
+          "word": "timing.",
+          "start_ms": 1100,
+          "end_ms": 1900
+        },
+        {
+          "word": "Tracks",
+          "start_ms": 2200,
+          "end_ms": 3000
+        },
+        {
+          "word": "are",
+          "start_ms": 3000,
+          "end_ms": 3400
+        },
+        {
+          "word": "content.",
+          "start_ms": 3400,
+          "end_ms": 5000
+        }
+      ]
+    }
+  ]
+}
