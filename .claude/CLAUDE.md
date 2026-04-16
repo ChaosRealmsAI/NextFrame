@@ -152,38 +152,38 @@ Key methods for AI verification:
 - `spec/standards/project/scene/scene-component-system.html` — scene 组件级 20 条硬规则（改 scene loader / CLI / 契约时读）
 - `spec/standards/project/video-production.md` — episode 级红线（改 build / record / publish pipeline 时读）
 - `spec/standards/general/verify-contract.md` — 所有 `--json` 验证 CLI 必须遵守的输出契约（实现新 CLI 时读）
-- `spec/reference/` — 叙事方法 / 爆款案例（不服务产品代码，由 `nf-guide` recipes 引用给用户侧 AI）
+- `spec/reference/` — 叙事方法 / 爆款案例（不服务产品代码，由 `nf-guide` flows 引用给用户侧 AI）
 
 ## nf-guide is the SOLE state-machine truth (mandatory)
 
 **Any AI doing scene / timeline / video work — `nf-guide` is the entry point. No exceptions.**
 
-`src/nf-guide/` (Rust crate) reads markdown recipes from `src/nf-guide/recipes/{recipe}/`. Each recipe is a state machine of step-by-step prompts.
+`src/nf-guide/` (Rust crate) reads markdown flows from `src/nf-guide/flows/{flow}/`. Each flow is a state machine of step-by-step prompts. (v1.0 术语统一：原 `recipe` / `recipes/` 已重命名为 `flow` / `flows/`。)
 
 ### Progressive disclosure (3 levels — AI 自己按需展开)
 
 ```bash
-# L1 列表 — 有哪些菜谱
+# L1 列表 — 有哪些流程 (flows)
 cargo run -p nf-guide
 
-# L2 流程 — 看一个菜谱的整体步骤
-cargo run -p nf-guide -- {recipe}
+# L2 流程 — 看一个 flow 的整体步骤
+cargo run -p nf-guide -- {flow}
 
 # L3 步骤 — 看某一步的完整 prompt
-cargo run -p nf-guide -- {recipe} {step}
+cargo run -p nf-guide -- {flow} {step}
 ```
 
-**这份 CLAUDE.md 不展开 recipe 内容**。recipes 会随产品演进不断增加（新主题、新输出格式、新 pipeline），写死在 CLAUDE.md 里就成了滞后的副本。**AI 用 CLI 现取现读**，永远是最新的。
+**这份 CLAUDE.md 不展开 flow 内容**。flows 会随产品演进不断增加（新主题、新输出格式、新 pipeline），写死在 CLAUDE.md 里就成了滞后的副本。**AI 用 CLI 现取现读**，永远是最新的。
 
 ### Maintenance rule (CRITICAL for future-AI usability)
 
-**Every time you change scene contract / CLI command / pipeline behavior, update the matching recipe step.** Stale prompts = future AI follows wrong instructions = product breaks invisibly.
+**Every time you change scene contract / CLI command / pipeline behavior, update the matching flow step.** Stale prompts = future AI follows wrong instructions = product breaks invisibly.
 
 - Changed `nextframe scenes` output? Update the relevant step (run `nf-guide` to find it).
 - Added a new ratio / theme? Update the discovery / check steps.
 - New verification command? Update the verify section of the relevant step.
-- Found a new pitfall? Append to the recipe's `pitfalls.md`.
-- 加了新 recipe？放进 `src/nf-guide/recipes/{name}/` — L1 自动发现。
+- Found a new pitfall? Append to the flow's `pitfalls.md`.
+- 加了新 flow？放进 `src/nf-guide/flows/{name}/` — L1 自动发现。
 
 **Don't write parallel state machines elsewhere** (e.g., `src/nf-cli/src/commands/render/states/` was deleted — it was a duplicate that drifted). nf-guide is the only state machine.
 
@@ -204,7 +204,7 @@ Themes shipped: `9x16/interview-dark`, `16x9/lecture-light`, `16x9/anthropic-war
 - Engine core: `src/nf-core/engine/` (timeline, build, validate, keyframes)
 - Animation: `src/nf-core/animation/` (effects/ + transitions/)
 - Scene components: `src/nf-core/scenes/{ratio}/{theme}/{role}-{name}.js` (single-file self-contained, see scene v3 spec)
-- Scene state-machine prompts: `src/nf-guide/recipes/` (Rust binary `nf-guide` is the only entry point)
+- Scene state-machine prompts: `src/nf-guide/flows/` (Rust binary `nf-guide` is the only entry point; directory formerly `recipes/`)
 - Design system: `src/nf-core/scenes/shared/design.js` (TOKENS, GRID, TYPE, utilities)
 - Pipeline recipes: `src/nf-cli/src/commands/pipeline/recipes/` (state machine prompts)
 - CLI commands: `src/nf-cli/src/commands/` (timeline/, render/, project/, pipeline/, app/)

@@ -1,4 +1,4 @@
-//! Loads pipeline recipe metadata and markdown content from the filesystem.
+//! Loads pipeline flow metadata and markdown content from the filesystem.
 
 use serde::Deserialize;
 use std::env;
@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Deserialize)]
-pub struct Recipe {
+pub struct Flow {
     pub id: String,
     pub name: String,
     pub description: String,
@@ -21,22 +21,26 @@ pub struct Step {
     pub prompt: String,
 }
 
-pub fn default_recipes_dir() -> PathBuf {
-    // 1. Honor explicit env override
+pub fn default_flows_dir() -> PathBuf {
+    // 1. Honor explicit env override (new name first, legacy name as fallback)
+    if let Some(path) = env::var_os("NF_GUIDE_FLOWS") {
+        return PathBuf::from(path);
+    }
     if let Some(path) = env::var_os("NF_GUIDE_RECIPES") {
+        // Legacy env var — still honored. Formerly known as recipes.
         return PathBuf::from(path);
     }
 
     // 2. Try CARGO_MANIFEST_DIR-relative (works when run via cargo or from the binary placed under target/)
-    let manifest_relative = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("recipes");
+    let manifest_relative = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("flows");
     if manifest_relative.is_dir() {
         return manifest_relative;
     }
 
-    // 3. Walk up from the current executable to find src/nf-guide/recipes (works when binary is shipped)
+    // 3. Walk up from the current executable to find src/nf-guide/flows (works when binary is shipped)
     if let Ok(exe) = env::current_exe() {
         for ancestor in exe.ancestors() {
-            let candidate = ancestor.join("src/nf-guide/recipes");
+            let candidate = ancestor.join("src/nf-guide/flows");
             if candidate.is_dir() {
                 return candidate;
             }
@@ -44,32 +48,32 @@ pub fn default_recipes_dir() -> PathBuf {
     }
 
     // 4. Last resort: cwd-relative (legacy behavior)
-    PathBuf::from("./src/nf-guide/recipes")
+    PathBuf::from("./src/nf-guide/flows")
 }
 
-pub fn discover_recipes(recipes_dir: impl AsRef<Path>) -> Result<Vec<(String, String)>, String> {
-    let mut recipes = Vec::new();
-    let entries = fs::read_dir(recipes_dir.as_ref()).map_err(|error| {
-        format!("failed to read recipes dir: {error}. Fix: set NF_GUIDE_RECIPES or run from the repo root")
+pub fn discover_flows(flows_dir: impl AsRef<Path>) -> Result<Vec<(String, String)>, String> {
+    let mut flows = Vec::new();
+    let entries = fs::read_dir(flows_dir.as_ref()).map_err(|error| {
+        format!("failed to read flows dir: {error}. Fix: set NF_GUIDE_FLOWS or run from the repo root")
     })?;
 
     for entry in entries {
-        let entry = entry.map_err(|error| format!("failed to read recipes dir entry: {error}"))?;
+        let entry = entry.map_err(|error| format!("failed to read flows dir entry: {error}"))?;
         let path = entry.path();
-        if !path.is_dir() || !path.join("recipe.json").is_file() {
+        if !path.is_dir() || !path.join("flow.json").is_file() {
             continue;
         }
 
-        let recipe = load_recipe(recipes_dir.as_ref(), &entry.file_name().to_string_lossy())?;
-        recipes.push((recipe.id, recipe.description));
+        let flow = load_flow(flows_dir.as_ref(), &entry.file_name().to_string_lossy())?;
+        flows.push((flow.id, flow.description));
     }
 
-    recipes.sort_by(|left, right| left.0.cmp(&right.0));
-    Ok(recipes)
+    flows.sort_by(|left, right| left.0.cmp(&right.0));
+    Ok(flows)
 }
 
-pub fn load_recipe(recipes_dir: impl AsRef<Path>, pipeline: &str) -> Result<Recipe, String> {
-    let path = recipes_dir.as_ref().join(pipeline).join("recipe.json");
+pub fn load_flow(flows_dir: impl AsRef<Path>, pipeline: &str) -> Result<Flow, String> {
+    let path = flows_dir.as_ref().join(pipeline).join("flow.json");
     let json = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
     serde_json::from_str(&json)
@@ -77,20 +81,20 @@ pub fn load_recipe(recipes_dir: impl AsRef<Path>, pipeline: &str) -> Result<Reci
 }
 
 pub fn get_step_content(
-    recipes_dir: impl AsRef<Path>,
+    flows_dir: impl AsRef<Path>,
     pipeline: &str,
     step: &str,
 ) -> Result<String, String> {
     let path = if step == "pitfalls" {
-        recipes_dir.as_ref().join(pipeline).join("pitfalls.md")
+        flows_dir.as_ref().join(pipeline).join("pitfalls.md")
     } else {
-        let recipe = load_recipe(recipes_dir.as_ref(), pipeline)?;
-        let entry = recipe
+        let flow = load_flow(flows_dir.as_ref(), pipeline)?;
+        let entry = flow
             .steps
             .iter()
             .find(|entry| step_matches(entry, step))
-            .ok_or_else(|| format!("unknown step \"{step}\" in pipeline \"{pipeline}\""))?;
-        recipes_dir.as_ref().join(pipeline).join(&entry.prompt)
+            .ok_or_else(|| format!("unknown step \"{step}\" in flow \"{pipeline}\""))?;
+        flows_dir.as_ref().join(pipeline).join(&entry.prompt)
     };
 
     fs::read_to_string(&path).map_err(|error| format!("failed to read {}: {error}", path.display()))
@@ -116,7 +120,7 @@ mod tests {
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn make_test_recipes() -> PathBuf {
+    fn make_test_flows() -> PathBuf {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -125,7 +129,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(dir.join("alpha")).unwrap();
         fs::write(
-            dir.join("alpha/recipe.json"),
+            dir.join("alpha/flow.json"),
             r#"{"id":"alpha","name":"Alpha","description":"first","steps":[{"id":"one","title":"Step One","prompt":"01-one.md"}]}"#,
         )
         .unwrap();
@@ -135,66 +139,66 @@ mod tests {
 
         fs::create_dir_all(dir.join("beta")).unwrap();
         fs::write(
-            dir.join("beta/recipe.json"),
+            dir.join("beta/flow.json"),
             r#"{"id":"beta","name":"Beta","description":"second","steps":[]}"#,
         )
         .unwrap();
-        // Skip a directory without recipe.json — must be ignored
-        fs::create_dir_all(dir.join("gamma_no_recipe")).unwrap();
+        // Skip a directory without flow.json — must be ignored
+        fs::create_dir_all(dir.join("gamma_no_flow")).unwrap();
         dir
     }
 
     #[test]
-    fn discover_returns_only_dirs_with_recipe_json() {
-        let dir = make_test_recipes();
-        let recipes = discover_recipes(&dir).unwrap();
-        assert_eq!(recipes.len(), 2);
-        let ids: Vec<&str> = recipes.iter().map(|(id, _)| id.as_str()).collect();
+    fn discover_returns_only_dirs_with_flow_json() {
+        let dir = make_test_flows();
+        let flows = discover_flows(&dir).unwrap();
+        assert_eq!(flows.len(), 2);
+        let ids: Vec<&str> = flows.iter().map(|(id, _)| id.as_str()).collect();
         assert_eq!(ids, vec!["alpha", "beta"]);
     }
 
     #[test]
     fn discover_sorts_alphabetically() {
-        let dir = make_test_recipes();
-        let recipes = discover_recipes(&dir).unwrap();
-        assert_eq!(recipes[0].0, "alpha");
-        assert_eq!(recipes[1].0, "beta");
+        let dir = make_test_flows();
+        let flows = discover_flows(&dir).unwrap();
+        assert_eq!(flows[0].0, "alpha");
+        assert_eq!(flows[1].0, "beta");
     }
 
     #[test]
-    fn load_recipe_parses_steps() {
-        let dir = make_test_recipes();
-        let recipe = load_recipe(&dir, "alpha").unwrap();
-        assert_eq!(recipe.id, "alpha");
-        assert_eq!(recipe.steps.len(), 1);
-        assert_eq!(recipe.steps[0].id, "one");
-        assert_eq!(recipe.steps[0].prompt, "01-one.md");
+    fn load_flow_parses_steps() {
+        let dir = make_test_flows();
+        let flow = load_flow(&dir, "alpha").unwrap();
+        assert_eq!(flow.id, "alpha");
+        assert_eq!(flow.steps.len(), 1);
+        assert_eq!(flow.steps[0].id, "one");
+        assert_eq!(flow.steps[0].prompt, "01-one.md");
     }
 
     #[test]
-    fn load_recipe_missing_returns_error() {
-        let dir = make_test_recipes();
-        let result = load_recipe(&dir, "no-such-pipeline");
+    fn load_flow_missing_returns_error() {
+        let dir = make_test_flows();
+        let result = load_flow(&dir, "no-such-pipeline");
         assert!(result.is_err());
     }
 
     #[test]
     fn get_step_content_known_step() {
-        let dir = make_test_recipes();
+        let dir = make_test_flows();
         let body = get_step_content(&dir, "alpha", "one").unwrap();
         assert_eq!(body, "Step One body");
     }
 
     #[test]
     fn get_step_content_pitfalls_special_case() {
-        let dir = make_test_recipes();
+        let dir = make_test_flows();
         let body = get_step_content(&dir, "alpha", "pitfalls").unwrap();
         assert_eq!(body, "Known pitfalls");
     }
 
     #[test]
     fn get_step_content_unknown_step_returns_error() {
-        let dir = make_test_recipes();
+        let dir = make_test_flows();
         let result = get_step_content(&dir, "alpha", "no-such-step");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("unknown step"));
@@ -202,21 +206,21 @@ mod tests {
 
     #[test]
     fn get_step_content_accepts_prompt_stem_alias() {
-        let dir = make_test_recipes();
+        let dir = make_test_flows();
         let body = get_step_content(&dir, "alpha", "01-one").unwrap();
         assert_eq!(body, "Step One body");
     }
 
     #[test]
-    fn default_recipes_dir_honors_env_override() {
+    fn default_flows_dir_honors_env_override() {
         // SAFETY: tests run sequentially within this module — set+unset is acceptable
         unsafe {
-            env::set_var("NF_GUIDE_RECIPES", "/tmp/custom-recipes");
+            env::set_var("NF_GUIDE_FLOWS", "/tmp/custom-flows");
         }
-        let dir = default_recipes_dir();
-        assert_eq!(dir, PathBuf::from("/tmp/custom-recipes"));
+        let dir = default_flows_dir();
+        assert_eq!(dir, PathBuf::from("/tmp/custom-flows"));
         unsafe {
-            env::remove_var("NF_GUIDE_RECIPES");
+            env::remove_var("NF_GUIDE_FLOWS");
         }
     }
 }
