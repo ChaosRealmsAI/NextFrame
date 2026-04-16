@@ -1,8 +1,8 @@
-// TODO: implement per entrance behavior spec for unfold
-const meta = { name: "unfold", category: "entrance", description: "Unfold entrance behavior stub", default_duration: 0.8, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.8, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.8 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("unfold", "entrance", "Vertical unfold from the top edge", 0.8, [p("fromScaleY", "number", 0.05, "starting vertical scale before the panel unfolds")]);
 function unfold(startAt = 0, duration = 0.8, opts = {}) {
-  // TODO: return semantic tracks for unfold
-  return { tracks: {}, startAt, duration, opts };
+  const fromScaleY = opts.fromScaleY ?? 0.05;
+  return { tracks: { opacity: [[startAt, 0], [at(startAt, duration * 0.5), 1, "out"]], scaleY: [[startAt, fromScaleY], [at(startAt, duration), 1, "out"]] } };
 }
 unfold.meta = meta;
 export default unfold;

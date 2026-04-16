@@ -1,8 +1,8 @@
-// TODO: implement per emphasis behavior spec for bounce
-const meta = { name: "bounce", category: "emphasis", description: "Bounce emphasis behavior stub", default_duration: 1, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 1, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 1 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("bounce", "emphasis", "Lift-and-settle bounce emphasis", 1, [p("height", "number", 22, "peak upward travel in px during the first bounce")], { height: 22 });
 function bounce(startAt = 0, duration = 1, opts = {}) {
-  // TODO: return semantic tracks for bounce
-  return { tracks: {}, startAt, duration, opts };
+  const height = opts.height ?? 22;
+  return { tracks: { y: [[startAt, 0], [at(startAt, duration, 0.25), -height], [at(startAt, duration, 0.5), 0], [at(startAt, duration, 0.72), -height * 0.38], [at(startAt, duration), 0, "inOut"]] } };
 }
 bounce.meta = meta;
 export default bounce;

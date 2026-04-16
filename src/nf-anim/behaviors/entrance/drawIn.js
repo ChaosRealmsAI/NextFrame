@@ -1,8 +1,8 @@
-// TODO: implement per entrance behavior spec for drawIn
-const meta = { name: "drawIn", category: "entrance", description: "Draw In entrance behavior stub", default_duration: 0.9, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.9, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.9 }] };
+import { at, metaOf } from "../shared.js";
+const meta = metaOf("drawIn", "entrance", "Stroke/path reveal from 0% to 100%", 0.9);
 function drawIn(startAt = 0, duration = 0.9, opts = {}) {
-  // TODO: return semantic tracks for drawIn
-  return { tracks: {}, startAt, duration, opts };
+  void opts;
+  return { tracks: { strokeProgress: [[startAt, 0], [at(startAt, duration), 1, "out"]], opacity: [[startAt, 0.35], [at(startAt, duration * 0.2), 1, "out"]] } };
 }
 drawIn.meta = meta;
 export default drawIn;

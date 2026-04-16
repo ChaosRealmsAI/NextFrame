@@ -1,8 +1,9 @@
-// TODO: implement per continuous behavior spec for float
-const meta = { name: "float", category: "continuous", description: "Float continuous behavior stub", default_duration: 4, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 4, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 4 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("float", "continuous", "Soft hover loop with tiny tilt", 4, [p("y", "number", 16, "maximum vertical float offset in px"), p("tilt", "number", 2, "maximum rotation in degrees during the float cycle")], { y: 16, tilt: 2 });
 function float(startAt = 0, duration = 4, opts = {}) {
-  // TODO: return semantic tracks for float
-  return { tracks: {}, startAt, duration, opts };
+  const y = opts.y ?? 16;
+  const tilt = opts.tilt ?? 2;
+  return { tracks: { y: [[startAt, 0], [at(startAt, duration, 0.25), -y], [at(startAt, duration, 0.5), 0], [at(startAt, duration, 0.75), y * 0.35], [at(startAt, duration), 0, "linear"]], rotate: [[startAt, 0], [at(startAt, duration, 0.25), tilt], [at(startAt, duration, 0.5), 0], [at(startAt, duration, 0.75), -tilt], [at(startAt, duration), 0, "linear"]] } };
 }
 float.meta = meta;
 export default float;

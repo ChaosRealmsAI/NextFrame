@@ -1,8 +1,9 @@
-// TODO: implement per exit behavior spec for slideOut
-const meta = { name: "slideOut", category: "exit", description: "Slide Out exit behavior stub", default_duration: 0.6, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.6, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.6 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("slideOut", "exit", "Directional slide-away with fade", 0.6, [p("distance", "number", 64, "travel distance in px during the exit"), p("direction", "number", 1, "horizontal direction multiplier where 1 slides right and -1 slides left")]);
 function slideOut(startAt = 0, duration = 0.6, opts = {}) {
-  // TODO: return semantic tracks for slideOut
-  return { tracks: {}, startAt, duration, opts };
+  const distance = opts.distance ?? 64;
+  const direction = opts.direction ?? 1;
+  return { tracks: { opacity: [[startAt, 1], [at(startAt, duration), 0, "in"]], x: [[startAt, 0], [at(startAt, duration), distance * direction, "in"]] } };
 }
 slideOut.meta = meta;
 export default slideOut;

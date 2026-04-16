@@ -1,8 +1,8 @@
-// TODO: implement per emphasis behavior spec for heartbeat
-const meta = { name: "heartbeat", category: "emphasis", description: "Heartbeat emphasis behavior stub", default_duration: 1.2, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 1.2, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 1.2 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("heartbeat", "emphasis", "Double-beat scale throb", 1.2, [p("beatScale", "number", 1.16, "largest scale reached on the second beat")], { beatScale: 1.16 });
 function heartbeat(startAt = 0, duration = 1.2, opts = {}) {
-  // TODO: return semantic tracks for heartbeat
-  return { tracks: {}, startAt, duration, opts };
+  const beatScale = opts.beatScale ?? 1.16;
+  return { tracks: { scale: [[startAt, 1], [at(startAt, duration, 0.2), beatScale * 0.92], [at(startAt, duration, 0.34), 1], [at(startAt, duration, 0.52), beatScale], [at(startAt, duration), 1, "inOut"]] } };
 }
 heartbeat.meta = meta;
 export default heartbeat;

@@ -1,8 +1,8 @@
-// TODO: implement per data behavior spec for lineDraw
-const meta = { name: "lineDraw", category: "data", description: "Line Draw data behavior stub", default_duration: 1.5, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 1.5, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 1.5 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("lineDraw", "data", "Progressive line-series reveal based on point data", 1.5, [p("data", "array", [18, 42, 35, 64], "ordered point values used to determine line complexity and reveal count")], { data: [18, 42, 35, 64] });
 function lineDraw(startAt = 0, duration = 1.5, opts = {}) {
-  // TODO: return semantic tracks for lineDraw
-  return { tracks: {}, startAt, duration, opts };
+  const data = Array.isArray(opts.data) && opts.data.length ? opts.data : [18, 42, 35, 64];
+  return { tracks: { pathProgress: [[startAt, 0], [at(startAt, duration), 1, "out"]], pointCount: [[startAt, 0], [at(startAt, duration), data.length, "out"]] } };
 }
 lineDraw.meta = meta;
 export default lineDraw;

@@ -1,8 +1,9 @@
-// TODO: implement per continuous behavior spec for sway
-const meta = { name: "sway", category: "continuous", description: "Sway continuous behavior stub", default_duration: 3, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 3, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 3 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("sway", "continuous", "Side-to-side sway loop", 3, [p("angle", "number", 6, "maximum sway rotation in degrees"), p("shift", "number", 10, "matching horizontal sway offset in px")], { angle: 6, shift: 10 });
 function sway(startAt = 0, duration = 3, opts = {}) {
-  // TODO: return semantic tracks for sway
-  return { tracks: {}, startAt, duration, opts };
+  const angle = opts.angle ?? 6;
+  const shift = opts.shift ?? 10;
+  return { tracks: { rotate: [[startAt, 0], [at(startAt, duration, 0.25), angle], [at(startAt, duration, 0.5), 0], [at(startAt, duration, 0.75), -angle], [at(startAt, duration), 0, "linear"]], x: [[startAt, 0], [at(startAt, duration, 0.25), shift], [at(startAt, duration, 0.5), 0], [at(startAt, duration, 0.75), -shift], [at(startAt, duration), 0, "linear"]] } };
 }
 sway.meta = meta;
 export default sway;

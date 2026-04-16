@@ -1,8 +1,8 @@
-// TODO: implement per entrance behavior spec for slideInLeft
-const meta = { name: "slideInLeft", category: "entrance", description: "Slide In Left entrance behavior stub", default_duration: 0.7, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.7, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.7 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("slideInLeft", "entrance", "Left-to-center slide with fade", 0.7, [p("distance", "number", 60, "left offset in px before the slide settles")]);
 function slideInLeft(startAt = 0, duration = 0.7, opts = {}) {
-  // TODO: return semantic tracks for slideInLeft
-  return { tracks: {}, startAt, duration, opts };
+  const distance = opts.distance ?? 60;
+  return { tracks: { opacity: [[startAt, 0], [at(startAt, duration), 1, "out"]], x: [[startAt, -distance], [at(startAt, duration), 0, "out"]] } };
 }
 slideInLeft.meta = meta;
 export default slideInLeft;

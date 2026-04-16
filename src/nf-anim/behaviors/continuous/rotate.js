@@ -1,8 +1,8 @@
-// TODO: implement per continuous behavior spec for rotate
-const meta = { name: "rotate", category: "continuous", description: "Rotate continuous behavior stub", default_duration: 4, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 4, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 4 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("rotate", "continuous", "Loop-safe quarter-turn cycle", 4, [p("angle", "number", 360, "total angular travel across the loop before returning to the start value")], { angle: 360 });
 function rotate(startAt = 0, duration = 4, opts = {}) {
-  // TODO: return semantic tracks for rotate
-  return { tracks: {}, startAt, duration, opts };
+  const angle = opts.angle ?? 360;
+  return { tracks: { rotate: [[startAt, 0], [at(startAt, duration, 0.25), angle * 0.25], [at(startAt, duration, 0.5), angle * 0.5], [at(startAt, duration, 0.75), angle * 0.75], [at(startAt, duration), 0, "linear"]] } };
 }
 rotate.meta = meta;
 export default rotate;

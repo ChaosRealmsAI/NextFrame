@@ -1,8 +1,8 @@
-// TODO: implement per entrance behavior spec for blurIn
-const meta = { name: "blurIn", category: "entrance", description: "Blur In entrance behavior stub", default_duration: 0.7, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.7, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.7 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("blurIn", "entrance", "Blur-to-sharp entrance", 0.7, [p("blur", "number", 18, "starting blur radius in px before the image resolves")]);
 function blurIn(startAt = 0, duration = 0.7, opts = {}) {
-  // TODO: return semantic tracks for blurIn
-  return { tracks: {}, startAt, duration, opts };
+  const blur = opts.blur ?? 18;
+  return { tracks: { opacity: [[startAt, 0], [at(startAt, duration), 1, "out"]], blur: [[startAt, blur], [at(startAt, duration), 0, "out"]] } };
 }
 blurIn.meta = meta;
 export default blurIn;
