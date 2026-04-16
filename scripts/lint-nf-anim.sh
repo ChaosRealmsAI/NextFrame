@@ -144,13 +144,29 @@ for (const file of behaviorFiles) {
     addViolation("L2", "BEHAVIOR-SIG", `${relPath}:${firstMatchLine(content, /function\s+/)} signature must match function NAME(startAt = 0, duration = ?, opts = {})`);
   }
 
-  const behaviorMeta = /const\s+meta\s*=\s*\{[\s\S]*?\bname\s*:[\s\S]*?\bcategory\s*:[\s\S]*?\bdescription\s*:[\s\S]*?\bdefault_duration\s*:[\s\S]*?\bparams\s*:/;
-  if (!behaviorMeta.test(content)) {
-    addViolation("L2", "BEHAVIOR-SIG", `${relPath}:${firstMatchLine(content, /meta/)} missing meta const with {name, category, description, default_duration, params}`);
+  const m = mod.default && mod.default.meta;
+  const required = ["name", "category", "description", "default_duration", "params"];
+  if (!m || typeof m !== "object") {
+    addViolation("L2", "BEHAVIOR-SIG", `${relPath}:1 default export must have a .meta object`);
+  } else {
+    const missing = required.filter(k => !(k in m));
+    if (missing.length) {
+      addViolation("L2", "BEHAVIOR-SIG", `${relPath}:1 meta missing fields: ${missing.join(", ")}`);
+    }
   }
 
-  if (!/\breturn\s*\{\s*tracks\s*:/.test(content)) {
-    addViolation("L2", "BEHAVIOR-SIG", `${relPath}:${firstMatchLine(content, /\breturn\b/)} return shape must include { tracks: {...} }`);
+  // sanity: behavior(0, 1, {}) must return { tracks: {...} } OR { expand: "name", ... } for layer-type descriptors
+  try {
+    const out = mod.default(0, 1, {});
+    const validShape = out && typeof out === "object" && (
+      (out.tracks && typeof out.tracks === "object") ||
+      (typeof out.expand === "string")
+    );
+    if (!validShape) {
+      addViolation("L2", "BEHAVIOR-SIG", `${relPath}:1 return must be { tracks: {...} } or { expand: "name", ... } (got ${typeof out === "object" ? Object.keys(out || {}).join(",") : typeof out})`);
+    }
+  } catch (e) {
+    addViolation("L2", "BEHAVIOR-SIG", `${relPath}:1 behavior call threw: ${e.message}`);
   }
 }
 
@@ -176,9 +192,15 @@ for (const file of shapeFiles) {
     addViolation("L3", "SHAPE-SIG", `${relPath}:${firstMatchLine(content, /function\s+/)} signature must match function NAME(layer = {})`);
   }
 
-  const shapeMeta = /const\s+meta\s*=\s*\{[\s\S]*?\bname\s*:[\s\S]*?\bcategory\s*:[\s\S]*?\bdescription\s*:[\s\S]*?\bparams\s*:/;
-  if (!shapeMeta.test(content)) {
-    addViolation("L3", "SHAPE-SIG", `${relPath}:${firstMatchLine(content, /meta/)} missing meta const with {name, category, description, params}`);
+  const sm = mod.default && mod.default.meta;
+  const sreq = ["name", "category", "description", "params"];
+  if (!sm || typeof sm !== "object") {
+    addViolation("L3", "SHAPE-SIG", `${relPath}:1 default export must have a .meta object`);
+  } else {
+    const smissing = sreq.filter(k => !(k in sm));
+    if (smissing.length) {
+      addViolation("L3", "SHAPE-SIG", `${relPath}:1 meta missing fields: ${smissing.join(", ")}`);
+    }
   }
 
   try {
