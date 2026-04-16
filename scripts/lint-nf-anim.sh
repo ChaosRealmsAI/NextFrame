@@ -114,9 +114,13 @@ for (const file of moduleFiles) {
   const relPath = rel(file);
   const content = read(file);
   const isTestFile = relPath.startsWith("src/nf-anim/tests/");
+  // examples/ are preview HTML/JS that drive the engine for human/AI inspection — they MAY use rAF / performance.now
+  // (the engine itself stays frame-pure; examples are clients of the engine)
+  const isExampleFile = relPath.startsWith("src/nf-anim/examples/");
 
   for (const rule of framePureRules) {
     if (isTestFile && rule.token === "performance.now") continue;
+    if (isExampleFile) continue;
     for (const match of content.matchAll(rule.pattern)) {
       addViolation("L1", "FRAME-PURE", `${relPath}:${lineNumber(content, match.index)} uses ${rule.token} — ${rule.hint}`);
     }
