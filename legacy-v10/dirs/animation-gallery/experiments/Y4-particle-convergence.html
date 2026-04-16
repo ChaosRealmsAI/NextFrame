@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Y4 · Particle Convergence — a kinetic love note</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #050612; color: #e8ecff;
+    font: 12px/1.45 "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+    overflow: hidden; letter-spacing: 0.02em; }
+
+  .stage-wrap {
+    position: fixed; inset: 0; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at center, #0b0d24 0%, #04040d 60%, #000 100%);
+  }
+
+  .stage {
+    position: relative; width: 1920px; height: 1080px;
+    transform-origin: center center;
+    box-shadow: 0 40px 140px rgba(255, 80, 140, 0.08),
+                0 0 0 1px rgba(255,255,255,0.04);
+    border-radius: 10px; overflow: hidden;
+    background: #000;
+  }
+
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #glCanvas     { z-index: 0; }
+  #trailCanvas  { z-index: 1; }
+  #mainCanvas   { z-index: 2; }
+
+  .hud {
+    position: absolute; z-index: 10;
+    font-size: 11px; color: rgba(232, 236, 255, 0.55);
+    text-transform: uppercase; letter-spacing: 0.18em;
+  }
+  .hud.tl { top: 28px; left: 32px; }
+  .hud.tr { top: 28px; right: 32px; text-align: right; }
+  .hud .big { display: block; font-size: 13px; color: #fff; letter-spacing: 0.28em; }
+  .hud .dim { color: rgba(232, 236, 255, 0.35); }
+
+  .vignette {
+    position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      rgba(0,0,0,0) 40%,
+      rgba(0,0,0,0.35) 80%,
+      rgba(0,0,0,0.7) 100%);
+  }
+
+  /* Timeline UI */
+  .cue-row {
+    position: fixed; left: 24px; right: 24px; bottom: 82px; height: 24px;
+    z-index: 100; pointer-events: none;
+  }
+  .cue-mark {
+    position: absolute; top: 8px; width: 2px; height: 14px;
+    background: rgba(255, 120, 170, 0.55);
+    box-shadow: 0 0 6px rgba(255, 120, 170, 0.6);
+  }
+  .cue-mark .lbl {
+    position: absolute; left: 6px; top: -4px;
+    font-size: 10px; color: rgba(255, 210, 225, 0.72);
+    white-space: nowrap; letter-spacing: 0.12em; text-transform: uppercase;
+  }
+
+  .tl-ui {
+    position: fixed; left: 24px; right: 24px; bottom: 24px; height: 52px;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 20px;
+    background: rgba(10, 12, 28, 0.78);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    backdrop-filter: blur(14px);
+    z-index: 100;
+  }
+  .tl-ui button {
+    width: 36px; height: 32px; border-radius: 6px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff; cursor: pointer;
+    font-size: 14px;
+    transition: background 0.12s ease;
+  }
+  .tl-ui button:hover { background: rgba(255, 120, 170, 0.18); border-color: rgba(255, 120, 170, 0.4); }
+  .tl-ui .time {
+    font-size: 12px; color: rgba(255,255,255,0.75);
+    letter-spacing: 0.1em; min-width: 130px;
+  }
+  .tl-ui input[type=range] {
+    flex: 1;
+    -webkit-appearance: none; appearance: none;
+    height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px;
+  }
+  .tl-ui input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #ff7eae;
+    box-shadow: 0 0 14px rgba(255, 126, 174, 0.85);
+    cursor: pointer;
+  }
+
+  .sig {
+    position: fixed; right: 28px; top: 14px; z-index: 200;
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+  }
+  .sig b { color: #ff7eae; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="sig"><b>Y4</b> · particle convergence · kai chen</div>
+
+<div class="stage-wrap">
+  <div class="stage" id="stage">
+    <canvas id="glCanvas"    width="1920" height="1080"></canvas>
+    <canvas id="trailCanvas" width="1920" height="1080"></canvas>
+    <canvas id="mainCanvas"  width="1920" height="1080"></canvas>
+    <div class="vignette"></div>
+
+    <div class="hud tl">
+      <span class="big">PARTICLE<br>CONVERGENCE</span>
+      <span class="dim">study Y4 · 10s loop · 3000 seeds</span>
+    </div>
+    <div class="hud tr">
+      <span class="big">A KINETIC<br>LOVE NOTE</span>
+      <span class="dim">canvas2d · webgl · glyph sampling</span>
+    </div>
+  </div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 10.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <span class="time" id="frameLabel" style="min-width:100px;text-align:right">frame 0 / 300</span>
+</div>
+
+<script>
+/* ============================================================
+ *  Y4 · particle convergence
+ *  frame-pure: every particle p(id, t) = (x, y, r, a, color)
+ *  layers: webgl nebula · trail canvas · main canvas
+ * ============================================================ */
+
+const W = 1920, H = 1080;
+const CX = W * 0.5, CY = H * 0.5;
+
+const DURATION = 10.0;
+const FPS = 30;
+
+/* ---------- stage scale to viewport ---------- */
+function fitStage() {
+  const stage = document.getElementById('stage');
+  const pad = 160;
+  const sw = window.innerWidth - 48;
+  const sh = window.innerHeight - pad;
+  const s = Math.min(sw / W, sh / H, 1);
+  stage.style.transform = `scale(${s})`;
+}
+window.addEventListener('resize', fitStage);
+fitStage();
+
+/* ---------- math helpers ---------- */
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn  = x => x * x * x;
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+const springOut = x => { const c = clamp01(x); return c===0||c===1 ? c : 1 - Math.exp(-6*c)*Math.cos(9*c); };
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+/* seeded pseudo-random — deterministic given an id */
+function hash1(n) {
+  let x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+function hash2(n, k) {
+  let x = Math.sin(n * 91.345 + k * 47.853 + 0.931) * 31517.192;
+  return x - Math.floor(x);
+}
+
+/* ============================================================
+ *  HEART GLYPH SAMPLING
+ *  sample two heart shapes (small, large) into target points
+ * ============================================================ */
+function sampleHeart(scale, cx, cy, nTargets) {
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const ctx = off.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  // parametric heart: 16*sin^3(t), 13cos t - 5cos 2t - 2cos 3t - cos 4t
+  const steps = 400;
+  const s = scale;
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    const x = 16 * Math.pow(Math.sin(a), 3);
+    const y = -(13 * Math.cos(a) - 5 * Math.cos(2*a) - 2 * Math.cos(3*a) - Math.cos(4*a));
+    const px = cx + x * s;
+    const py = cy + y * s;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  // sample pixels
+  const img = ctx.getImageData(0, 0, W, H).data;
+  const pts = [];
+  // step size for sampling grid — tuned so we collect more than nTargets points
+  const step = Math.max(3, Math.floor(Math.sqrt((W * H) / (nTargets * 2.8))));
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      const idx = (y * W + x) * 4;
+      if (img[idx + 3] > 200) {
+        // jitter to break the grid
+        const jx = (hash1(x * 31 + y * 7) - 0.5) * step;
+        const jy = (hash2(x * 13, y * 17) - 0.5) * step;
+        pts.push([x + jx, y + jy]);
+      }
+    }
+  }
+  // shuffle deterministically
+  for (let i = pts.length - 1; i > 0; i--) {
+    const j = Math.floor(hash1(i * 1.17) * (i + 1));
+    const t = pts[i]; pts[i] = pts[j]; pts[j] = t;
+  }
+  return pts;
+}
+
+const N = 3200;
+
+// heart 1 — smaller, cooler (crimson/magenta)
+const HEART1 = sampleHeart(14, CX, CY, N);
+// heart 2 — larger, warmer, fuller (pink → gold)
+const HEART2 = sampleHeart(22, CX, CY - 20, N);
+
+/* ============================================================
+ *  PARTICLE SEEDS — deterministic spawn positions on 4 edges
+ *  each seed has: edge home (hx, hy), color bias, size bias, phase
+ * ============================================================ */
+const SEEDS = [];
+for (let i = 0; i < N; i++) {
+  const r1 = hash1(i + 1);
+  const r2 = hash2(i + 1, 3.7);
+  const r3 = hash1(i * 0.73 + 13.1);
+  const r4 = hash2(i * 1.9, 91.2);
+
+  // pick an edge (0=top,1=right,2=bottom,3=left)
+  const edge = Math.floor(r1 * 4);
+  let hx, hy;
+  const m = 60; // margin outside visible for nicer drift
+  if (edge === 0) { hx = -m + r2 * (W + 2*m); hy = -m + r3 * 180; }
+  else if (edge === 1) { hx = W + m - r3 * 180; hy = -m + r2 * (H + 2*m); }
+  else if (edge === 2) { hx = -m + r2 * (W + 2*m); hy = H + m - r3 * 180; }
+  else                 { hx = -m + r3 * 180; hy = -m + r2 * (H + 2*m); }
+
+  // target indices into heart arrays
+  const t1 = HEART1[i % HEART1.length];
+  const t2 = HEART2[i % HEART2.length];
+
+  SEEDS.push({
+    id: i,
+    hx, hy,
+    // drift params for ambient star-sea
+    driftAmp: 20 + r4 * 50,
+    driftPhase: r1 * Math.PI * 2,
+    driftRate: 0.5 + r2 * 0.8,
+    // target 1 (small heart)
+    t1x: t1[0], t1y: t1[1],
+    // target 2 (large heart)
+    t2x: t2[0], t2y: t2[1],
+    // burst direction & speed for scatter
+    burstAng: r1 * Math.PI * 2,
+    burstSpd: 220 + r3 * 680,
+    // visual
+    baseSize: 0.7 + r4 * 1.9,
+    hueBias: r3,   // 0..1
+    twinkle: 2.2 + r2 * 4.5,
+    twinklePhase: r1 * Math.PI * 2,
+    // per-particle delay within a convergence wave (0..0.35s)
+    delay1: r2 * 0.35,
+    delay2: r4 * 0.35,
+  });
+}
+
+/* ============================================================
+ *  TIMELINE — 10s loop
+ *  0.0 - 1.2  : star sea drift (ambient)
+ *  1.2 - 2.7  : wave 1 — particles pull to small heart
+ *  2.7 - 3.9  : heart 1 pulse ×2
+ *  3.9 - 4.4  : burst outward (fireworks)
+ *  4.4 - 5.9  : wave 2 — pull to bigger, warmer heart
+ *  5.9 - 7.7  : heart 2 pulse ×3 (crescendo, pink → gold)
+ *  7.7 - 8.3  : big burst with afterglow
+ *  8.3 - 10.0 : particles drift back to edge home, star sea returns
+ * ============================================================ */
+const CUES = [
+  { t: 0.0,  label: 'drift' },
+  { t: 1.2,  label: 'pull 1' },
+  { t: 2.7,  label: 'pulse ×2' },
+  { t: 3.9,  label: 'burst' },
+  { t: 4.4,  label: 'pull 2' },
+  { t: 5.9,  label: 'pulse ×3' },
+  { t: 7.7,  label: 'big burst' },
+  { t: 8.3,  label: 'return' },
+];
+
+/* ============================================================
+ *  WEBGL NEBULA BACKGROUND
+ * ============================================================ */
+const gl = document.getElementById('glCanvas').getContext('webgl', { antialias: true, premultipliedAlpha: false });
+let glProg = null, glTimeLoc = null, glResLoc = null, glPhaseLoc = null;
+if (gl) {
+  const vs = `
+    attribute vec2 p;
+    void main() { gl_Position = vec4(p, 0.0, 1.0); }
+  `;
+  const fs = `
+    precision highp float;
+    uniform float u_time;
+    uniform vec2  u_res;
+    uniform float u_phase; // 0..1 cool→warm
+    // hash + noise
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+    float noise(vec2 p){
+      vec2 i = floor(p), f = fract(p);
+      float a = hash(i);
+      float b = hash(i+vec2(1.,0.));
+      float c = hash(i+vec2(0.,1.));
+      float d = hash(i+vec2(1.,1.));
+      vec2 u = f*f*(3.0-2.0*f);
+      return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+    }
+    float fbm(vec2 p){
+      float v = 0.0; float a = 0.5;
+      for (int i = 0; i < 5; i++) { v += a*noise(p); p *= 2.03; a *= 0.5; }
+      return v;
+    }
+    void main() {
+      vec2 uv = gl_FragCoord.xy / u_res.xy;
+      vec2 st = (gl_FragCoord.xy - 0.5*u_res) / u_res.y;
+      // soft nebula field — slow rotation in time
+      float t = u_time * 0.07;
+      vec2 q = st * 1.3 + vec2(sin(t)*0.3, cos(t*0.7)*0.3);
+      float n = fbm(q + fbm(q + t));
+      // radial dim toward edges
+      float r = length(st);
+      float dim = smoothstep(1.2, 0.0, r);
+      // cool palette (deep indigo) → warm palette (rose/gold) driven by u_phase
+      vec3 cool = vec3(0.04, 0.06, 0.20) * 1.2 + vec3(0.10, 0.08, 0.38) * n * 0.6;
+      vec3 warm = vec3(0.22, 0.07, 0.18) + vec3(0.55, 0.18, 0.22) * n * 0.45;
+      vec3 col  = mix(cool, warm, smoothstep(0.0, 1.0, u_phase));
+      // star sparkles
+      float star = pow(noise(gl_FragCoord.xy * 0.9 + t*90.0), 28.0) * 0.9;
+      col += vec3(star) * (0.5 + 0.5 * u_phase);
+      // vignette
+      col *= mix(0.5, 1.0, dim);
+      // deep base
+      col += vec3(0.005, 0.008, 0.02);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `;
+  function compile(src, type) {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src); gl.compileShader(sh);
+    return sh;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(vs, gl.VERTEX_SHADER));
+  gl.attachShader(prog, compile(fs, gl.FRAGMENT_SHADER));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const quad = new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  glProg = prog;
+  glTimeLoc = gl.getUniformLocation(prog, 'u_time');
+  glResLoc  = gl.getUniformLocation(prog, 'u_res');
+  glPhaseLoc= gl.getUniformLocation(prog, 'u_phase');
+  gl.viewport(0, 0, W, H);
+}
+
+function renderGL(t) {
+  if (!gl) return;
+  // phase: cool during 0..4, warm during 4..8, cool during 8..10
+  let phase = 0;
+  if (t < 4.0) phase = kern(t, 1.0, 3.0, easeInOut) * 0.45;
+  else if (t < 7.7) phase = 0.45 + kern(t, 4.0, 3.7, easeInOut) * 0.55;
+  else phase = 1.0 - kern(t, 7.7, 2.3, easeInOut) * 1.0;
+
+  gl.useProgram(glProg);
+  gl.uniform1f(glTimeLoc, t);
+  gl.uniform2f(glResLoc, W, H);
+  gl.uniform1f(glPhaseLoc, phase);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+
+/* ============================================================
+ *  CANVAS PARTICLES
+ * ============================================================ */
+const trailCanvas = document.getElementById('trailCanvas');
+const trailCtx = trailCanvas.getContext('2d');
+const mainCanvas = document.getElementById('mainCanvas');
+const mainCtx = mainCanvas.getContext('2d');
+
+/* pure function: where is particle i at time t? */
+function particleAt(seed, t) {
+  const { hx, hy, driftAmp, driftPhase, driftRate,
+          t1x, t1y, t2x, t2y,
+          burstAng, burstSpd,
+          baseSize, hueBias, twinkle, twinklePhase,
+          delay1, delay2 } = seed;
+
+  // ambient drift home position (slow, varies in time)
+  const dx = hx + Math.sin(t * driftRate + driftPhase) * driftAmp * 0.4;
+  const dy = hy + Math.cos(t * driftRate * 0.8 + driftPhase * 1.3) * driftAmp * 0.4;
+
+  // cached small heart target + large heart target
+  const s1x = t1x, s1y = t1y;
+  const s2x = t2x, s2y = t2y;
+
+  // phase envelopes (non-accumulating — each computed from t)
+  // pull 1: from drift → heart1 during 1.2..2.7
+  const k_pull1   = kern(t, 1.2 + delay1, 1.4 - delay1, easeInOut);
+  // pulse 1 active during 2.7..3.9 (heart present + beating)
+  const k_heart1  = k_pull1; // held after pull completes
+  // burst 1 at 3.9..4.4 (scatter outward)
+  const k_burst1  = kern(t, 3.9, 0.5, easeOut);
+  // during burst+wave2, we blend from heart1 → scatter → heart2
+  // pull 2: from scatter → heart2 during 4.4..5.9
+  const k_pull2   = kern(t, 4.4 + delay2, 1.5 - delay2, easeInOut);
+  // big burst at 7.7..8.3
+  const k_burst2  = kern(t, 7.7, 0.55, easeOut);
+  // return to drift at 8.3..10.0
+  const k_return  = kern(t, 8.3, 1.7, easeInOut);
+
+  // pulse offsets — heart1 pulses ×2 during 2.7..3.9
+  let pulse1 = 0;
+  if (t >= 2.7 && t < 3.9) {
+    const p = (t - 2.7) / (3.9 - 2.7); // 0..1
+    // two beats — each beat: quick expand/contract
+    const b = Math.sin(p * Math.PI * 4);            // 2 pulses
+    const env = Math.max(0, Math.sin(p * Math.PI)); // envelope
+    pulse1 = b * env * 0.08;
+  }
+  // pulse offsets — heart2 pulses ×3 during 5.9..7.7 with crescendo
+  let pulse2 = 0;
+  if (t >= 5.9 && t < 7.7) {
+    const p = (t - 5.9) / (7.7 - 5.9);
+    const b = Math.sin(p * Math.PI * 6);            // 3 pulses
+    const env = 0.4 + p * 0.9;                      // grows
+    pulse2 = b * env * 0.12;
+  }
+
+  /* --------- composite position --------- */
+  // we build in stages:
+  // stage A: drift (0..1.2)                      → (dx, dy)
+  // stage B: pull to heart1 (1.2..3.9)           → mix drift ↔ heart1
+  // stage C: burst1 outward (3.9..4.4)           → heart1 + burstVec * k_burst1
+  // stage D: pull to heart2 (4.4..5.9)           → mix burst result ↔ heart2
+  // stage E: hold heart2 + pulse (5.9..7.7)
+  // stage F: big burst (7.7..8.3)
+  // stage G: return (8.3..10)                    → mix burst2 → drift
+
+  let x, y;
+
+  // base: drift
+  x = dx; y = dy;
+
+  if (t < 3.9) {
+    // blend to heart1
+    // apply pulse scale around CX,CY
+    const sx = CX + (s1x - CX) * (1 + pulse1);
+    const sy = CY + (s1y - CY) * (1 + pulse1);
+    x = lerp(dx, sx, k_pull1);
+    y = lerp(dy, sy, k_pull1);
+  } else if (t < 4.4) {
+    // burst1: from heart1 position radiating out
+    const sx = CX + (s1x - CX) * (1 + 0);
+    const sy = CY + (s1y - CY) * (1 + 0);
+    const dist = k_burst1 * burstSpd * 0.9;
+    const ang  = Math.atan2(sy - CY, sx - CX) + (hash1(seed.id + 5) - 0.5) * 0.6;
+    x = sx + Math.cos(ang) * dist;
+    y = sy + Math.sin(ang) * dist;
+  } else if (t < 5.9) {
+    // start point: burst end position (approximate with heart1 + full burst)
+    const sx0 = CX + (s1x - CX);
+    const sy0 = CY + (s1y - CY);
+    const ang = Math.atan2(sy0 - CY, sx0 - CX) + (hash1(seed.id + 5) - 0.5) * 0.6;
+    const bx = sx0 + Math.cos(ang) * burstSpd * 0.9 * 0.5; // lingering
+    const by = sy0 + Math.sin(ang) * burstSpd * 0.9 * 0.5;
+    const tx = CX + (s2x - CX) * (1 + pulse2);
+    const ty = (CY - 20) + (s2y - (CY - 20)) * (1 + pulse2);
+    x = lerp(bx, tx, k_pull2);
+    y = lerp(by, ty, k_pull2);
+  } else if (t < 7.7) {
+    // heart2 hold + pulse
+    x = CX + (s2x - CX) * (1 + pulse2);
+    y = (CY - 20) + (s2y - (CY - 20)) * (1 + pulse2);
+  } else if (t < 8.3) {
+    // big burst
+    const sx = CX + (s2x - CX);
+    const sy = (CY - 20) + (s2y - (CY - 20));
+    const dist = k_burst2 * burstSpd * 1.5;
+    const ang  = Math.atan2(sy - CY, sx - CX) + (hash1(seed.id + 9) - 0.5) * 0.5;
+    x = sx + Math.cos(ang) * dist;
+    y = sy + Math.sin(ang) * dist;
+  } else {
+    // return to drift
+    const sx = CX + (s2x - CX);
+    const sy = (CY - 20) + (s2y - (CY - 20));
+    const ang = Math.atan2(sy - CY, sx - CX) + (hash1(seed.id + 9) - 0.5) * 0.5;
+    const bx = sx + Math.cos(ang) * burstSpd * 1.5;
+    const by = sy + Math.sin(ang) * burstSpd * 1.5;
+    x = lerp(bx, dx, k_return);
+    y = lerp(by, dy, k_return);
+  }
+
+  /* ---- size & alpha ---- */
+  // twinkle
+  const tw = 0.7 + 0.3 * Math.sin(t * twinkle + twinklePhase);
+
+  // size — grows during heart states, huge at burst starts
+  let sizeBoost = 1.0;
+  if (t >= 2.7 && t < 3.9) sizeBoost = 1.0 + Math.max(0, Math.sin((t - 2.7) / 1.2 * Math.PI)) * 0.6;
+  if (t >= 5.9 && t < 7.7) sizeBoost = 1.0 + Math.max(0, Math.sin((t - 5.9) / 1.8 * Math.PI)) * 1.1;
+  if (t >= 3.9 && t < 4.1) sizeBoost *= 1.8;
+  if (t >= 7.7 && t < 7.9) sizeBoost *= 2.3;
+
+  const size = baseSize * sizeBoost * tw;
+
+  // alpha — fade in during pull phases, bright at heart, fade during burst tail, fade returning
+  let alpha = 0.5 + 0.4 * tw;
+  if (t < 1.2) alpha *= 0.35 + 0.2 * Math.sin(t * 2 + twinklePhase);
+  if (t >= 1.2 && t < 2.7) alpha *= lerp(0.55, 1.0, k_pull1);
+  if (t >= 2.7 && t < 3.9) alpha *= 1.0;
+  if (t >= 3.9 && t < 4.4) alpha *= (1.0 - k_burst1 * 0.6);
+  if (t >= 4.4 && t < 5.9) alpha *= lerp(0.5, 1.0, k_pull2);
+  if (t >= 5.9 && t < 7.7) alpha *= 1.0;
+  if (t >= 7.7 && t < 8.3) alpha *= (1.0 - k_burst2 * 0.5);
+  if (t >= 8.3) alpha *= lerp(0.9, 0.35, k_return);
+
+  /* ---- color — cool pink/magenta early, warm rose→gold in wave 2 ---- */
+  // hue scale: 320° (magenta) → 340° (rose) → 30° (gold)
+  let hue, sat, light;
+  if (t < 4.0) {
+    // cool: 320 → 340 based on convergence
+    hue = lerp(310, 345, k_pull1) + hueBias * 12;
+    sat = 85 + hueBias * 10;
+    light = 62 + hueBias * 8;
+  } else if (t < 7.7) {
+    // warm crescendo: 340 → 30 (rose → gold)
+    const p = clamp01((t - 4.4) / (7.7 - 4.4));
+    hue = lerp(340, 40, easeInOut(p)) + hueBias * 18 - 9;
+    sat = 88 + hueBias * 10;
+    light = 60 + easeInOut(p) * 10 + hueBias * 6;
+  } else {
+    // fade back to cool
+    const p = clamp01((t - 7.7) / 2.3);
+    hue = lerp(40, 320, easeInOut(p));
+    sat = 80 - p * 30;
+    light = 60 - p * 20;
+  }
+
+  return { x, y, size, alpha, hue, sat, light };
+}
+
+/* ============================================================
+ *  RENDER
+ * ============================================================ */
+function render(t) {
+  renderGL(t);
+
+  /* trail layer — low-alpha clear each frame */
+  // Each time t is (re)set we only have a single "frame" to draw, but the trail
+  // buffer persists across frames. For scrub safety we compute a trail strength
+  // that depends on t — resetting on burst moments.
+  const trailFade = (t < 3.9) ? 0.15 : (t < 4.6) ? 0.35 : (t < 7.7) ? 0.14 : (t < 8.4) ? 0.42 : 0.22;
+  trailCtx.globalCompositeOperation = 'destination-out';
+  trailCtx.fillStyle = `rgba(0,0,0,${trailFade})`;
+  trailCtx.fillRect(0, 0, W, H);
+  trailCtx.globalCompositeOperation = 'lighter';
+
+  // clear main layer fully
+  mainCtx.clearRect(0, 0, W, H);
+  mainCtx.globalCompositeOperation = 'lighter';
+
+  // draw all particles
+  for (let i = 0; i < N; i++) {
+    const seed = SEEDS[i];
+    const p = particleAt(seed, t);
+    if (p.alpha <= 0.005) continue;
+
+    // trail — previous "virtual" positions (t - 0.04 and t - 0.08)
+    // since this is frame-pure we just re-sample seed at t-dt
+    for (let k = 1; k <= 2; k++) {
+      const pp = particleAt(seed, Math.max(0, t - k * 0.045));
+      const a = p.alpha * (0.35 / k);
+      if (a < 0.01) continue;
+      trailCtx.fillStyle = `hsla(${pp.hue}, ${pp.sat}%, ${pp.light}%, ${a})`;
+      trailCtx.beginPath();
+      trailCtx.arc(pp.x, pp.y, Math.max(0.3, p.size * 0.7), 0, Math.PI * 2);
+      trailCtx.fill();
+    }
+
+    // main glowing dot
+    const grad = mainCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 3.2);
+    grad.addColorStop(0,   `hsla(${p.hue}, ${p.sat}%, ${Math.min(92, p.light + 22)}%, ${p.alpha})`);
+    grad.addColorStop(0.45,`hsla(${p.hue}, ${p.sat}%, ${p.light}%, ${p.alpha * 0.5})`);
+    grad.addColorStop(1,   `hsla(${p.hue}, ${p.sat}%, ${p.light}%, 0)`);
+    mainCtx.fillStyle = grad;
+    mainCtx.beginPath();
+    mainCtx.arc(p.x, p.y, p.size * 3.2, 0, Math.PI * 2);
+    mainCtx.fill();
+
+    // crisp core
+    mainCtx.fillStyle = `hsla(${p.hue}, ${p.sat}%, 94%, ${p.alpha * 0.9})`;
+    mainCtx.beginPath();
+    mainCtx.arc(p.x, p.y, Math.max(0.4, p.size * 0.6), 0, Math.PI * 2);
+    mainCtx.fill();
+  }
+
+  // heart halo flash on pulse peaks (extra drama)
+  function haloIf(active, cx, cy, size, hue) {
+    if (!active) return;
+    const g = mainCtx.createRadialGradient(cx, cy, 0, cx, cy, size);
+    g.addColorStop(0,   `hsla(${hue}, 90%, 75%, 0)`);
+    g.addColorStop(0.55,`hsla(${hue}, 95%, 70%, 0.08)`);
+    g.addColorStop(1,   `hsla(${hue}, 95%, 60%, 0)`);
+    mainCtx.fillStyle = g;
+    mainCtx.beginPath();
+    mainCtx.arc(cx, cy, size, 0, Math.PI * 2);
+    mainCtx.fill();
+  }
+  if (t >= 2.7 && t < 3.9) {
+    const p = (t - 2.7) / 1.2;
+    const pulse = Math.max(0, Math.sin(p * Math.PI * 4) * Math.sin(p * Math.PI));
+    haloIf(pulse > 0.3, CX, CY, 260 + pulse * 120, 330);
+  }
+  if (t >= 5.9 && t < 7.7) {
+    const p = (t - 5.9) / 1.8;
+    const pulse = Math.max(0, Math.sin(p * Math.PI * 6) * (0.4 + p * 0.9));
+    haloIf(pulse > 0.3, CX, CY - 20, 380 + pulse * 180, lerp(340, 40, p));
+  }
+  // big burst flash
+  if (t >= 7.7 && t < 7.95) {
+    const k = 1 - (t - 7.7) / 0.25;
+    const g = mainCtx.createRadialGradient(CX, CY - 20, 0, CX, CY - 20, 700);
+    g.addColorStop(0,  `hsla(35, 100%, 80%, ${0.22 * k})`);
+    g.addColorStop(0.5,`hsla(10, 100%, 65%, ${0.12 * k})`);
+    g.addColorStop(1,  `hsla(10, 100%, 60%, 0)`);
+    mainCtx.fillStyle = g;
+    mainCtx.fillRect(0, 0, W, H);
+  }
+}
+
+/* ============================================================
+ *  TIMELINE CONTROLLER (template)
+ * ============================================================ */
+const scrubber = document.getElementById('scrubber');
+const playBtn  = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel  = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+
+let currentT = 0, playing = true, lastFrame = performance.now();
+
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) {
+      // loop seam — clear trail canvas so we don't carry across
+      trailCtx.clearRect(0, 0, W, H);
+      next = 0;
+    }
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+
+scrubber.addEventListener('input', () => {
+  playing = false; playBtn.textContent = '▶';
+  // clear trail on scrub so we don't see residue of unrelated frames
+  trailCtx.clearRect(0, 0, W, H);
+  setTime(scrubber.value / 1000 * DURATION);
+});
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+resetBtn.addEventListener('click', () => {
+  trailCtx.clearRect(0, 0, W, H);
+  setTime(0);
+});
+
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl'; lbl.textContent = cue.label;
+  m.appendChild(lbl); cueRow.appendChild(m);
+});
+
+setTime(0);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Y3 — Geometric Swiss · Like</title>
+<style>
+  :root{
+    --paper:#f2ede2;
+    --ink:#0a0a0a;
+    --red:#d84226;
+    --yellow:#f2dd4c;
+    --rule:#1a1a1a;
+    --mute:#9a9487;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;background:#111;overflow:hidden;font-family:"Helvetica Neue","Inter","Arial",sans-serif;-webkit-font-smoothing:antialiased}
+  .stage{
+    position:relative;width:1920px;height:1080px;
+    background:var(--paper);
+    transform-origin:top left;
+    overflow:hidden;
+  }
+  /* scale to fit viewport */
+  .wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  .stage-scale{transform-origin:center center}
+
+  /* === editorial frame === */
+  .frame{position:absolute;inset:48px;border:1px solid var(--ink);pointer-events:none}
+  .tick-tl,.tick-tr,.tick-bl,.tick-br{position:absolute;width:18px;height:18px;border:1px solid var(--ink);background:var(--paper)}
+  .tick-tl{left:-9px;top:-9px}
+  .tick-tr{right:-9px;top:-9px}
+  .tick-bl{left:-9px;bottom:-9px}
+  .tick-br{right:-9px;bottom:-9px}
+
+  .masthead{
+    position:absolute;top:72px;left:96px;right:96px;
+    display:flex;align-items:flex-end;justify-content:space-between;
+    color:var(--ink);
+    font-family:"JetBrains Mono","IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-feature-settings:"tnum" 1,"zero" 1;
+  }
+  .masthead .l1{font-size:12px;letter-spacing:.34em;text-transform:uppercase}
+  .masthead .l2{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--mute)}
+  .masthead .mid{text-align:center}
+  .masthead .mid .big{font-family:"Helvetica Neue","Inter",sans-serif;font-weight:800;font-size:14px;letter-spacing:.5em;text-transform:uppercase}
+
+  .footer-meta{
+    position:absolute;left:96px;right:96px;bottom:72px;
+    display:flex;justify-content:space-between;align-items:flex-end;
+    color:var(--ink);
+    font-family:"JetBrains Mono","IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-feature-settings:"tnum" 1;
+  }
+  .footer-meta .blk{font-size:11px;letter-spacing:.2em;text-transform:uppercase;line-height:1.6;color:var(--ink)}
+  .footer-meta .blk b{display:block;font-weight:700;color:var(--ink)}
+  .footer-meta .blk span{color:var(--mute)}
+
+  /* center stage box */
+  .canvas-wrap{position:absolute;inset:0}
+  svg.scene{position:absolute;inset:0;width:100%;height:100%;display:block}
+  canvas.grid{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none;opacity:.8}
+
+  /* big counter */
+  .counter{
+    position:absolute;left:50%;top:50%;
+    transform:translate(-50%,-50%);
+    font-family:"Helvetica Neue","Inter",sans-serif;
+    font-weight:800;letter-spacing:-.04em;
+    color:var(--ink);
+    pointer-events:none;
+    line-height:.85;
+    font-feature-settings:"tnum" 1;
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+    will-change:transform,opacity;
+  }
+  .counter .plus{color:var(--red)}
+  .kern-label{
+    position:absolute;left:50%;top:50%;
+    transform:translate(-50%,-50%);
+    font-family:"JetBrains Mono","IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-size:13px;letter-spacing:.38em;text-transform:uppercase;color:var(--ink);
+    pointer-events:none;
+    will-change:transform,opacity;
+  }
+
+  /* serial label bottom */
+  .serial{
+    position:absolute;left:50%;bottom:130px;transform:translateX(-50%);
+    font-family:"JetBrains Mono","IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-size:12px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink);
+    display:flex;gap:24px;align-items:center;
+  }
+  .serial .dot{width:6px;height:6px;background:var(--red);border-radius:50%}
+
+  /* red stamp */
+  .stamp{
+    position:absolute;right:120px;top:50%;
+    transform:translateY(-50%) rotate(-8deg);
+    color:var(--red);
+    border:2px solid var(--red);
+    padding:14px 22px 10px;
+    font-family:"Helvetica Neue","Inter",sans-serif;font-weight:800;
+    font-size:18px;letter-spacing:.35em;text-transform:uppercase;
+    pointer-events:none;
+    will-change:transform,opacity;
+  }
+  .stamp .num{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;letter-spacing:.2em;display:block;margin-top:4px;color:var(--red)}
+
+  /* corner marks */
+  .cmark{position:absolute;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink)}
+  .cmark.tl{top:96px;left:120px}
+  .cmark.tr{top:96px;right:120px;text-align:right}
+
+  /* ===== bottom timeline UI ===== */
+  .tl-ui{
+    position:fixed;left:0;right:0;bottom:0;
+    display:flex;gap:14px;align-items:center;
+    padding:14px 22px;z-index:10;
+    background:rgba(10,10,10,.92);
+    border-top:1px solid #2a2a2a;
+    font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:12px;color:#ddd;
+  }
+  .tl-ui button{
+    background:#1c1c1c;color:#f2ede2;border:1px solid #3a3a3a;
+    padding:8px 14px;border-radius:4px;cursor:pointer;font-family:inherit;font-size:13px;
+  }
+  .tl-ui button:hover{background:#262626;border-color:#d84226}
+  .tl-ui .time{font-variant-numeric:tabular-nums;color:#f2ede2;min-width:160px}
+  .tl-ui input[type=range]{flex:1;accent-color:#d84226;height:4px}
+  .cue-row{
+    position:fixed;left:22px;right:22px;bottom:60px;height:22px;pointer-events:none;z-index:10;
+  }
+  .cue-mark{position:absolute;top:0;width:1px;height:8px;background:#d84226}
+  .cue-mark .lbl{
+    position:absolute;top:10px;left:-1px;transform:translateX(-50%);
+    font-family:"JetBrains Mono",ui-monospace,monospace;font-size:9px;color:#d84226;
+    letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage-scale" id="stageScale">
+    <div class="stage" id="stage">
+
+      <canvas class="grid" id="grid" width="1920" height="1080"></canvas>
+
+      <div class="frame">
+        <div class="tick-tl"></div><div class="tick-tr"></div>
+        <div class="tick-bl"></div><div class="tick-br"></div>
+      </div>
+
+      <div class="masthead">
+        <div>
+          <div class="l1">No. 042 · Swiss Series</div>
+          <div class="l2">Geometric Composition · Brockmann Tribute</div>
+        </div>
+        <div class="mid">
+          <div class="big">The Like, Reconstructed</div>
+        </div>
+        <div style="text-align:right">
+          <div class="l1">MMXXVI</div>
+          <div class="l2">1920 × 1080 · 30fps</div>
+        </div>
+      </div>
+
+      <div class="cmark tl">▌ FIG. 01<br><span style="color:var(--mute)">primitive · 48</span></div>
+      <div class="cmark tr">TYPE ▐<br><span style="color:var(--mute)">helvetica · mono</span></div>
+
+      <svg class="scene" id="scene" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet"></svg>
+
+      <div class="counter" id="counter">
+        <span class="plus">+</span><span id="counterNum">1</span>
+      </div>
+
+      <div class="kern-label" id="kernLabel" style="opacity:0">LIKED · N° 042</div>
+
+      <div class="stamp" id="stamp" style="opacity:0">
+        APPROVED
+        <span class="num">N° 0042 · 04·17·26</span>
+      </div>
+
+      <div class="serial" id="serial" style="opacity:0">
+        <span class="dot"></span>
+        <span>System Confirmed</span>
+        <span style="color:var(--mute)">·</span>
+        <span id="serialNum">042 / 300</span>
+      </div>
+
+      <div class="footer-meta">
+        <div class="blk"><b>Subject</b><span>Social Affirmation Glyph</span></div>
+        <div class="blk" style="text-align:center"><b>Method</b><span>Geometric Decomposition</span></div>
+        <div class="blk" style="text-align:right"><b>Duration</b><span>10.00s · loop</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 10.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+</div>
+
+<script>
+/* ============================================================
+   Y3 · GEOMETRIC SWISS — Like Animation
+   Pure primitives compose → explode → grid rearrange → recompose
+   Single setTime(t) driver. No CSS anim. No random per-frame.
+   ============================================================ */
+
+const DURATION = 10.0;
+const FPS = 30;
+const W = 1920, H = 1080;
+const CX = W/2, CY = H/2;
+
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn  = x => x*x*x;
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+const springOut = x => { const c = clamp01(x); return c===0||c===1 ? c : 1 - Math.exp(-6*c)*Math.cos(9*c); };
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+/* deterministic pseudo-random per index */
+function hash(i, s=0){
+  let x = Math.sin((i+1) * 127.1 + s*311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* ============================================================
+   HEART GEOMETRY — classic cardioid-ish parametric
+   We sample N points along the heart outline + some interior
+   Each point = one primitive.
+   ============================================================ */
+function heartPoint(u){
+  // u in [0,1], heart param t in [0, 2π]
+  const t = u * Math.PI * 2;
+  const x = 16 * Math.pow(Math.sin(t), 3);
+  const y = -(13*Math.cos(t) - 5*Math.cos(2*t) - 2*Math.cos(3*t) - Math.cos(4*t));
+  return { x, y };
+}
+
+/* ============================================================
+   PRIMITIVES  —  48 geometric elements that compose the heart
+   Types: circle, square, triangle, line, arc, ring, dot
+   Each has: home position (on heart), size, shape, color
+   ============================================================ */
+const PALETTE = {
+  ink:   '#0a0a0a',
+  red:   '#d84226',
+  yellow:'#f2dd4c',
+  paper: '#f2ede2',
+  rule:  '#1a1a1a',
+  mute:  '#9a9487'
+};
+
+const PRIM_COUNT = 54;
+const PRIMS = [];
+const SCALE_SMALL = 11;  // heart 1 (small opening)
+const SCALE_BIG   = 17;  // heart 2 (reconstruction, bigger)
+
+for (let i=0; i<PRIM_COUNT; i++){
+  const u = i / PRIM_COUNT;
+  const p = heartPoint(u);
+  // mostly outline points; some interior
+  const interior = i % 5 === 4; // ~20% interior
+  const radial = interior ? 0.45 + hash(i,1)*0.4 : 1.0;
+
+  const homeS = { x: CX + p.x * SCALE_SMALL * radial, y: CY + p.y * SCALE_SMALL * radial };
+  const homeB = { x: CX + p.x * SCALE_BIG   * radial, y: CY + p.y * SCALE_BIG   * radial };
+
+  // shape distribution
+  const r = hash(i, 7);
+  let shape;
+  if (r < 0.34) shape = 'circle';
+  else if (r < 0.58) shape = 'square';
+  else if (r < 0.74) shape = 'triangle';
+  else if (r < 0.86) shape = 'line';
+  else if (r < 0.94) shape = 'ring';
+  else shape = 'arc';
+
+  // size varies, big on outline key points, small interior
+  const baseSize = interior ? 6 + hash(i,3)*8 : 10 + hash(i,4)*18;
+
+  // color: mostly ink, a few red accents, one or two yellow
+  const cr = hash(i, 11);
+  let color;
+  if (cr < 0.78) color = PALETTE.ink;
+  else if (cr < 0.93) color = PALETTE.red;
+  else color = PALETTE.yellow;
+
+  // rotation base
+  const rot0 = hash(i, 13) * 360;
+
+  // explosion vector — radial outward + tangential swirl + per-axis grid drift
+  const angle = Math.atan2(homeS.y - CY, homeS.x - CX);
+  const explodeDist = 340 + hash(i, 17) * 520;
+  const swirl = (hash(i,19) - 0.5) * 1.4;
+  const ex = Math.cos(angle + swirl) * explodeDist + (hash(i,21)-0.5)*180;
+  const ey = Math.sin(angle + swirl) * explodeDist + (hash(i,23)-0.5)*120;
+
+  // grid-snap target (Swiss rearrange): snap to a 12-col × 7-row grid in explode area
+  const col = Math.floor(hash(i, 29) * 12);
+  const row = Math.floor(hash(i, 31) * 7);
+  const gx = 180 + col * ((W-360)/11);
+  const gy = 180 + row * ((H-360)/6);
+
+  PRIMS.push({
+    i,
+    shape,
+    color,
+    baseSize,
+    homeS, homeB,
+    ex: CX + ex, ey: CY + ey,
+    gx, gy,
+    rot0,
+    spinSpeed: (hash(i,37)-0.5)*4, // radians per second equivalent
+    delayOut: hash(i,41) * 0.25,   // staggered explosion
+    delayIn:  hash(i,43) * 0.35,   // staggered return
+    interior,
+  });
+}
+
+/* ============================================================
+   CUES — timeline landmarks
+   ============================================================ */
+const CUES = [
+  { t: 0.00, label: 'compose' },
+  { t: 1.10, label: 'pulse' },
+  { t: 2.30, label: 'tap' },
+  { t: 2.60, label: 'burst' },
+  { t: 4.40, label: 'grid' },
+  { t: 5.60, label: 'reflow' },
+  { t: 6.80, label: 'reform' },
+  { t: 8.20, label: 'stamp' },
+  { t: 9.40, label: 'hold' },
+];
+
+/* ============================================================
+   GRID CANVAS — static swiss grid + corner ticks
+   Drawn once (actually we redraw every frame cheaply; it's small)
+   ============================================================ */
+const gridCv = document.getElementById('grid');
+const gctx = gridCv.getContext('2d');
+
+function drawGrid(t){
+  const ctx = gctx;
+  ctx.clearRect(0,0,W,H);
+
+  // subtle baseline grid — columns
+  ctx.save();
+  ctx.strokeStyle = 'rgba(10,10,10,0.06)';
+  ctx.lineWidth = 1;
+  const cols = 12;
+  const marginX = 180;
+  const colW = (W - marginX*2) / cols;
+  for (let c=0; c<=cols; c++){
+    const x = marginX + c*colW;
+    ctx.beginPath();
+    ctx.moveTo(x, 160); ctx.lineTo(x, H-160);
+    ctx.stroke();
+  }
+  // rows
+  const rows = 7;
+  const marginY = 180;
+  const rowH = (H - marginY*2) / rows;
+  for (let r=0; r<=rows; r++){
+    const y = marginY + r*rowH;
+    ctx.beginPath();
+    ctx.moveTo(180, y); ctx.lineTo(W-180, y);
+    ctx.stroke();
+  }
+
+  // grid emphasis during "grid" phase
+  const gridHi = kern(t, 4.0, 1.0, easeOut) * (1 - kern(t, 6.8, 0.6, easeOut));
+  if (gridHi > 0.01){
+    ctx.strokeStyle = `rgba(216,66,38,${0.22*gridHi})`;
+    ctx.lineWidth = 1;
+    for (let c=0; c<=cols; c++){
+      const x = marginX + c*colW;
+      ctx.beginPath();
+      ctx.moveTo(x, 160); ctx.lineTo(x, H-160);
+      ctx.stroke();
+    }
+    for (let r=0; r<=rows; r++){
+      const y = marginY + r*rowH;
+      ctx.beginPath();
+      ctx.moveTo(180, y); ctx.lineTo(W-180, y);
+      ctx.stroke();
+    }
+    // corner crosses on grid intersections
+    ctx.fillStyle = `rgba(216,66,38,${0.6*gridHi})`;
+    for (let c=0; c<=cols; c+=3){
+      for (let r=0; r<=rows; r+=2){
+        const x = marginX + c*colW;
+        const y = marginY + r*rowH;
+        ctx.fillRect(x-2, y-2, 4, 4);
+      }
+    }
+  }
+
+  // central alignment cross — subtle always
+  ctx.strokeStyle = 'rgba(10,10,10,0.10)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(CX, 160); ctx.lineTo(CX, H-160);
+  ctx.moveTo(180, CY); ctx.lineTo(W-180, CY);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/* ============================================================
+   SVG BUILD
+   ============================================================ */
+const svg = document.getElementById('scene');
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+// large red circle backdrop (burst disk) — toggles in burst phase
+const burstDisk = document.createElementNS(SVGNS,'circle');
+burstDisk.setAttribute('cx', CX);
+burstDisk.setAttribute('cy', CY);
+burstDisk.setAttribute('r', 0);
+burstDisk.setAttribute('fill', PALETTE.red);
+burstDisk.setAttribute('opacity', 0);
+svg.appendChild(burstDisk);
+
+// rule lines — 4 crossing rules snap in during tap
+const rules = [];
+for (let k=0; k<4; k++){
+  const l = document.createElementNS(SVGNS,'line');
+  l.setAttribute('stroke', PALETTE.ink);
+  l.setAttribute('stroke-width', 1.2);
+  l.setAttribute('opacity', 0);
+  svg.appendChild(l);
+  rules.push(l);
+}
+
+// primitive nodes
+const nodes = PRIMS.map(p => {
+  let el;
+  if (p.shape === 'circle'){
+    el = document.createElementNS(SVGNS,'circle');
+    el.setAttribute('r', p.baseSize*0.5);
+    el.setAttribute('fill', p.color);
+  } else if (p.shape === 'square'){
+    el = document.createElementNS(SVGNS,'rect');
+    el.setAttribute('width', p.baseSize);
+    el.setAttribute('height', p.baseSize);
+    el.setAttribute('x', -p.baseSize/2);
+    el.setAttribute('y', -p.baseSize/2);
+    el.setAttribute('fill', p.color);
+  } else if (p.shape === 'triangle'){
+    el = document.createElementNS(SVGNS,'polygon');
+    const s = p.baseSize;
+    const pts = `0,${-s*0.6} ${s*0.55},${s*0.45} ${-s*0.55},${s*0.45}`;
+    el.setAttribute('points', pts);
+    el.setAttribute('fill', p.color);
+  } else if (p.shape === 'line'){
+    el = document.createElementNS(SVGNS,'line');
+    el.setAttribute('x1', -p.baseSize*0.7);
+    el.setAttribute('y1', 0);
+    el.setAttribute('x2', p.baseSize*0.7);
+    el.setAttribute('y2', 0);
+    el.setAttribute('stroke', p.color);
+    el.setAttribute('stroke-width', 2);
+    el.setAttribute('stroke-linecap', 'square');
+  } else if (p.shape === 'ring'){
+    el = document.createElementNS(SVGNS,'circle');
+    el.setAttribute('r', p.baseSize*0.55);
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke', p.color);
+    el.setAttribute('stroke-width', 2);
+  } else if (p.shape === 'arc'){
+    el = document.createElementNS(SVGNS,'path');
+    const r = p.baseSize*0.65;
+    // quarter arc
+    el.setAttribute('d', `M ${-r} 0 A ${r} ${r} 0 0 1 0 ${-r}`);
+    el.setAttribute('fill', 'none');
+    el.setAttribute('stroke', p.color);
+    el.setAttribute('stroke-width', 2);
+    el.setAttribute('stroke-linecap', 'square');
+  }
+  el.setAttribute('vector-effect', 'non-scaling-stroke');
+  svg.appendChild(el);
+  return el;
+});
+
+// orbital outer dots (16 tiny marks) — appear on burst for extra Swiss texture
+const orbits = [];
+for (let k=0; k<16; k++){
+  const d = document.createElementNS(SVGNS,'rect');
+  d.setAttribute('width', 4);
+  d.setAttribute('height', 4);
+  d.setAttribute('x', -2);
+  d.setAttribute('y', -2);
+  d.setAttribute('fill', PALETTE.ink);
+  d.setAttribute('opacity', 0);
+  svg.appendChild(d);
+  orbits.push(d);
+}
+
+// big red outline heart (appears at reform phase as final structural stroke)
+const outlineHeart = document.createElementNS(SVGNS,'path');
+{
+  // build smooth heart path at SCALE_BIG
+  const N = 140;
+  let d = '';
+  for (let i=0; i<=N; i++){
+    const u = i / N;
+    const p = heartPoint(u);
+    const x = CX + p.x * SCALE_BIG;
+    const y = CY + p.y * SCALE_BIG;
+    d += (i === 0 ? 'M ' : 'L ') + x.toFixed(2) + ' ' + y.toFixed(2) + ' ';
+  }
+  d += 'Z';
+  outlineHeart.setAttribute('d', d);
+  outlineHeart.setAttribute('fill','none');
+  outlineHeart.setAttribute('stroke', PALETTE.red);
+  outlineHeart.setAttribute('stroke-width', 3);
+  outlineHeart.setAttribute('stroke-linejoin', 'miter');
+  outlineHeart.setAttribute('stroke-miterlimit', 4);
+  outlineHeart.setAttribute('opacity', 0);
+}
+svg.appendChild(outlineHeart);
+
+/* ============================================================
+   LAYOUT HELPERS FOR PRIMITIVES
+   ============================================================ */
+
+function primPose(p, t){
+  /* Returns { x, y, s, rot, op } for primitive p at time t.
+     Phases:
+       0.0 – 1.1  compose (heart small, gentle sway)
+       1.1 – 2.3  pulse   (small breathing, pre-tap tension)
+       2.3 – 2.6  tap     (snap compress)
+       2.6 – 4.4  burst   (fly to explode positions)
+       4.4 – 5.6  grid    (snap to grid rearrangement)
+       5.6 – 6.8  reflow  (slide toward big heart home)
+       6.8 – 8.2  reform  (settle into big heart)
+       8.2 – 9.4  stamp   (hold + stamp lands)
+       9.4 – 10.0 hold + reset tail
+  */
+
+  // compose sway
+  const sway = Math.sin(t*1.6 + p.i*0.37)*2.2;
+
+  // pulse breathing scale
+  const pulseBeat = kern(t, 1.1, 0.5, easeInOut) * (1 - kern(t, 1.9, 0.4, easeOut));
+  const breathe = 1 + pulseBeat*0.08 + Math.sin(t*5 + p.i*0.21)*0.02*kern(t,1.1,1.2,easeOut);
+
+  // tap compress (brief scale down, shake)
+  const tapK = kern(t, 2.30, 0.25, easeOut) * (1 - kern(t, 2.55, 0.08, easeOut));
+  const compress = 1 - tapK*0.18;
+
+  // burst progress per-primitive with stagger
+  const burstStart = 2.60 + p.delayOut;
+  const burstK = kern(t, burstStart, 1.1, easeOut);
+
+  // grid phase — from explode pos to grid pos
+  const gridStart = 4.40 + p.delayOut*0.6;
+  const gridK = kern(t, gridStart, 0.9, easeInOut);
+
+  // reflow — from grid pos to big-heart home
+  const reflowStart = 5.60 + p.delayIn*0.4;
+  const reflowK = kern(t, reflowStart, 1.0, easeInOut);
+
+  // reform — small settle into big heart with spring
+  const reformStart = 6.80 + p.delayIn*0.3;
+  const reformK = kern(t, reformStart, 1.1, springOut);
+
+  // home small with sway (compose/pulse)
+  const baseX = p.homeS.x + sway*0.6*(p.interior?0.3:1);
+  const baseY = p.homeS.y + Math.cos(t*1.3 + p.i*0.29)*1.4;
+
+  // piecewise blend
+  let x, y;
+  // Phase A (0 .. burstStart): baseX/baseY with compress near tap
+  // Phase B burst: baseX -> ex,ey
+  // Phase C grid: ex,ey -> gx,gy
+  // Phase D reflow: gx,gy -> homeB
+  // Phase E reform: slight overshoot into homeB
+  if (t < burstStart){
+    x = baseX;
+    y = baseY;
+  } else if (t < gridStart){
+    x = lerp(baseX, p.ex, burstK);
+    y = lerp(baseY, p.ey, burstK);
+  } else if (t < reflowStart){
+    x = lerp(p.ex, p.gx, gridK);
+    y = lerp(p.ey, p.gy, gridK);
+  } else if (t < reformStart){
+    x = lerp(p.gx, p.homeB.x, reflowK);
+    y = lerp(p.gy, p.homeB.y, reflowK);
+  } else {
+    // reform with slight radial overshoot at start
+    const ang = Math.atan2(p.homeB.y - CY, p.homeB.x - CX);
+    const overshoot = (1 - reformK) * 22 * (1 - kern(t, reformStart+0.6, 0.5, easeOut));
+    x = p.homeB.x + Math.cos(ang) * overshoot;
+    y = p.homeB.y + Math.sin(ang) * overshoot;
+  }
+
+  // scale
+  let s = 1;
+  if (t < 2.30) s = breathe * 1.0;
+  else if (t < 2.60) s = compress;
+  else if (t < 4.40){
+    // grow a touch as it flies
+    s = lerp(1.0, 1.15, burstK);
+  } else if (t < 5.60){
+    // in grid, scale to a uniform baseline
+    s = lerp(1.15, 0.9, gridK);
+  } else if (t < 6.80){
+    s = lerp(0.9, 1.0, reflowK);
+  } else {
+    s = 1.0 + (1-reformK)*0.15;
+  }
+
+  // rotation
+  let rot = p.rot0;
+  if (t >= 2.6 && t < 4.4){
+    rot = p.rot0 + p.spinSpeed * 80 * burstK;
+  } else if (t < 5.6){
+    // snap rotation to 0 / 90 / 45 grid-aligned during Swiss grid
+    const snap = Math.round((p.rot0 + p.spinSpeed*80) / 45) * 45;
+    rot = lerp(p.rot0 + p.spinSpeed*80, snap, gridK);
+  } else if (t < 6.8){
+    const snap = Math.round((p.rot0 + p.spinSpeed*80) / 45) * 45;
+    rot = lerp(snap, 0, reflowK);
+  } else {
+    rot = lerp(0, 0, 1);
+  }
+
+  // opacity — fades briefly during grid snap to emphasize geometry reset
+  let op = 1;
+  if (t > 4.4 && t < 5.2){
+    op = lerp(1, 0.85, kern(t, 4.4, 0.8, easeOut));
+  } else if (t > 5.2 && t < 5.8){
+    op = lerp(0.85, 1, kern(t, 5.2, 0.6, easeOut));
+  }
+
+  return { x, y, s, rot, op };
+}
+
+/* ============================================================
+   DOM REFS for overlay
+   ============================================================ */
+const counterEl = document.getElementById('counter');
+const counterNumEl = document.getElementById('counterNum');
+const kernLabelEl = document.getElementById('kernLabel');
+const stampEl = document.getElementById('stamp');
+const serialEl = document.getElementById('serial');
+const serialNumEl = document.getElementById('serialNum');
+
+function setTransform(el, tx, ty, s=1, rot=0){
+  el.setAttribute('transform', `translate(${tx.toFixed(2)},${ty.toFixed(2)}) rotate(${rot.toFixed(2)}) scale(${s.toFixed(3)})`);
+}
+
+/* ============================================================
+   MAIN RENDER
+   ============================================================ */
+function render(t){
+
+  drawGrid(t);
+
+  /* --- burst disk --- */
+  // expand quickly right at tap, fade during burst
+  const diskK = kern(t, 2.55, 0.55, easeOut) * (1 - kern(t, 3.60, 1.0, easeOut));
+  const diskR = lerp(0, 540, kern(t, 2.55, 0.7, easeOut));
+  const diskOp = 0.18 * diskK;
+  burstDisk.setAttribute('r', diskR.toFixed(1));
+  burstDisk.setAttribute('opacity', diskOp.toFixed(3));
+
+  /* --- rule lines: 4 crossing alignment lines snap in at tap, hold through grid --- */
+  const rulesK = kern(t, 2.55, 0.45, easeOut) * (1 - kern(t, 6.6, 0.7, easeOut));
+  const rulesOp = 0.85 * rulesK;
+  const rulesExt = lerp(0, 1, kern(t, 2.55, 0.7, easeOut));
+  // horizontal through center
+  rules[0].setAttribute('x1', CX - 900*rulesExt); rules[0].setAttribute('y1', CY);
+  rules[0].setAttribute('x2', CX + 900*rulesExt); rules[0].setAttribute('y2', CY);
+  // vertical through center
+  rules[1].setAttribute('x1', CX); rules[1].setAttribute('y1', CY - 500*rulesExt);
+  rules[1].setAttribute('x2', CX); rules[1].setAttribute('y2', CY + 500*rulesExt);
+  // diagonal  ↘
+  rules[2].setAttribute('x1', CX - 640*rulesExt); rules[2].setAttribute('y1', CY - 360*rulesExt);
+  rules[2].setAttribute('x2', CX + 640*rulesExt); rules[2].setAttribute('y2', CY + 360*rulesExt);
+  // diagonal  ↗
+  rules[3].setAttribute('x1', CX - 640*rulesExt); rules[3].setAttribute('y1', CY + 360*rulesExt);
+  rules[3].setAttribute('x2', CX + 640*rulesExt); rules[3].setAttribute('y2', CY - 360*rulesExt);
+  for (let k=0; k<4; k++){
+    rules[k].setAttribute('opacity', rulesOp.toFixed(3));
+    rules[k].setAttribute('stroke', k===2||k===3 ? PALETTE.red : PALETTE.ink);
+    rules[k].setAttribute('stroke-dasharray', k>=2 ? '6 6' : '');
+  }
+
+  /* --- primitives --- */
+  for (let k=0; k<PRIMS.length; k++){
+    const p = PRIMS[k];
+    const pose = primPose(p, t);
+    const el = nodes[k];
+    setTransform(el, pose.x, pose.y, pose.s, pose.rot);
+    el.setAttribute('opacity', pose.op.toFixed(3));
+  }
+
+  /* --- orbital tiny marks during burst --- */
+  const orbOp = kern(t, 2.70, 0.6, easeOut) * (1 - kern(t, 5.2, 0.8, easeOut));
+  for (let k=0; k<orbits.length; k++){
+    const ang = (k/orbits.length)*Math.PI*2;
+    const r0 = 260, r1 = 460;
+    const rr = lerp(r0, r1, kern(t, 2.7, 1.4, easeOut));
+    const ox = CX + Math.cos(ang + t*0.2) * rr;
+    const oy = CY + Math.sin(ang + t*0.2) * rr * 0.55;
+    orbits[k].setAttribute('x', (ox-2).toFixed(2));
+    orbits[k].setAttribute('y', (oy-2).toFixed(2));
+    orbits[k].setAttribute('opacity', (orbOp*0.9).toFixed(3));
+    // a couple of them red
+    orbits[k].setAttribute('fill', (k%5===0) ? PALETTE.red : PALETTE.ink);
+  }
+
+  /* --- big outline heart during reform/hold --- */
+  const outK = kern(t, 6.80, 0.9, easeOut) * (1 - kern(t, 9.6, 0.4, easeOut));
+  outlineHeart.setAttribute('opacity', (outK*0.9).toFixed(3));
+  // stroke-dasharray grow for draw-on effect
+  const outP = kern(t, 6.80, 1.1, easeOut);
+  const totalLen = 1100;
+  outlineHeart.setAttribute('stroke-dasharray', `${totalLen*outP} ${totalLen}`);
+
+  /* --- counter +N appearing at tap, floating up & fading --- */
+  const counterK = kern(t, 2.35, 0.25, easeOut) * (1 - kern(t, 4.2, 0.8, easeOut));
+  const counterScale = lerp(0.4, 1.0, kern(t, 2.35, 0.45, springOut));
+  const counterY = -lerp(0, 60, kern(t, 2.8, 1.4, easeOut));
+  const counterFont = 280; // px
+  counterEl.style.fontSize = counterFont + 'px';
+  counterEl.style.opacity = counterK.toFixed(3);
+  counterEl.style.transform = `translate(-50%, calc(-50% + ${counterY.toFixed(1)}px)) scale(${counterScale.toFixed(3)})`;
+  // count number ticks: 041 → 042 at tap
+  counterNumEl.textContent = (t < 2.45) ? '1' : '1';
+
+  /* --- kern label (mono) appears at reform, typographic anchor --- */
+  const klK = kern(t, 7.1, 0.6, easeOut) * (1 - kern(t, 9.5, 0.3, easeOut));
+  const klY = lerp(260, 260, 1);
+  const klLetterspacing = lerp(0.05, 0.38, kern(t, 7.1, 1.2, easeOut));
+  kernLabelEl.style.opacity = klK.toFixed(3);
+  kernLabelEl.style.transform = `translate(-50%, ${klY}px)`;
+  kernLabelEl.style.letterSpacing = klLetterspacing.toFixed(3) + 'em';
+
+  /* --- stamp: lands hard at 8.2 with subtle judder --- */
+  const stK = kern(t, 8.20, 0.22, easeOut);
+  const stJ = (1 - kern(t, 8.42, 0.25, easeOut)) * Math.sin(t*60)*1.2;
+  const stOp = stK * (1 - kern(t, 9.6, 0.3, easeOut));
+  const stScale = lerp(1.6, 1.0, kern(t, 8.20, 0.28, springOut));
+  stampEl.style.opacity = stOp.toFixed(3);
+  stampEl.style.transform = `translateY(-50%) translateY(${stJ.toFixed(2)}px) rotate(-8deg) scale(${stScale.toFixed(3)})`;
+
+  /* --- serial / system confirmed bottom --- */
+  const srK = kern(t, 7.6, 0.5, easeOut) * (1 - kern(t, 9.6, 0.3, easeOut));
+  serialEl.style.opacity = srK.toFixed(3);
+  // count animates from 041 → 042 during tap+grid
+  const nTick = Math.floor(lerp(41, 42, clamp01((t-2.3)/1.5)));
+  serialNumEl.textContent = String(nTick).padStart(3,'0') + ' / 300';
+
+  // reset-wink: at 9.7+ everything begins to settle to loop; no explicit fade to avoid pop
+}
+
+/* ============================================================
+   SCALE STAGE TO FIT
+   ============================================================ */
+function fit(){
+  const el = document.getElementById('stageScale');
+  const vw = window.innerWidth;
+  const vh = window.innerHeight - 80; // timeline bar
+  const s = Math.min(vw / W, vh / H);
+  el.style.transform = `scale(${s})`;
+}
+window.addEventListener('resize', fit);
+fit();
+
+/* ============================================================
+   TIMELINE UI
+   ============================================================ */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+let currentT = 0, playing = true, lastFrame = performance.now();
+
+function setTime(t){
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+function loop(){
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing){
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+scrubber.addEventListener('input', () => {
+  playing = false; playBtn.textContent = '▶';
+  setTime(scrubber.value / 1000 * DURATION);
+});
+playBtn.addEventListener('click', () => {
+  playing = !playing; playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+resetBtn.addEventListener('click', () => setTime(0));
+
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl'; lbl.textContent = cue.label;
+  m.appendChild(lbl); cueRow.appendChild(m);
+});
+
+setTime(0);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

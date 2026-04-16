@@ -1,0 +1,448 @@
+<!--
+  D · Geometric Morph — SVG path morph, frame-pure, scrubbable
+  Techniques:
+    - SVG path interpolation between primitives (circle/square/triangle/star/infinity)
+    - Equal-count point normalization for clean morph
+    - Accent-color sweep (gradient fill switching with t)
+    - Trailing echo (multiple offset copies fading)
+    - Axis rulers + number stamps
+    - Minimal editorial composition
+  Duration: 14s. Time source: setTime(t). No CSS animations.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>D · Geometric Morph</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100vh;background:#f4f1e8;overflow:hidden;
+    font-family:-apple-system,"SF Pro Display","Inter",system-ui,sans-serif;
+    color:#1a1613;-webkit-font-smoothing:antialiased}
+  svg.layer{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+  canvas{position:fixed;inset:0;width:100%;height:100%}
+  #shader{z-index:0}
+
+  .hud{position:fixed;z-index:6;font-size:10px;letter-spacing:.42em;
+    text-transform:uppercase;color:rgba(26,22,19,.55);font-weight:500;opacity:0;
+    font-family:"JetBrains Mono","SF Mono",Menlo,monospace}
+  .hud.tl{top:36px;left:44px}
+  .hud.tr{top:36px;right:44px;text-align:right;line-height:1.9}
+  .hud.bl{bottom:64px;left:44px;line-height:1.9}
+  .hud.br{bottom:64px;right:44px;text-align:right;line-height:1.9}
+
+  .vert{position:fixed;top:50%;z-index:4;writing-mode:vertical-rl;
+    text-orientation:mixed;font-size:9px;letter-spacing:.42em;text-transform:uppercase;
+    color:rgba(26,22,19,.4);line-height:2;opacity:0}
+  .vert.l{left:44px;transform:translateY(-50%) rotate(180deg)}
+  .vert.r{right:44px;transform:translateY(-50%)}
+
+  .phase-name{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:5;
+    font-size:13px;letter-spacing:.5em;text-transform:uppercase;font-weight:500;
+    color:rgba(26,22,19,.85);opacity:0;
+    display:flex;align-items:center;gap:18px}
+  .phase-name::before,.phase-name::after{content:'';display:block;width:52px;height:1px;
+    background:#d4452a}
+  .phase-name .n{color:#d4452a;font-weight:800;font-family:"JetBrains Mono",monospace}
+
+  .big-label{position:fixed;left:50%;bottom:16%;transform:translateX(-50%);z-index:5;
+    font-size:clamp(40px,5.5vw,76px);font-weight:200;letter-spacing:-.025em;
+    color:#1a1613;opacity:0;pointer-events:none;text-align:center;line-height:1}
+  .big-label em{font-style:normal;color:#d4452a;font-weight:800;font-style:italic}
+
+  .stage{position:fixed;inset:0;z-index:3;display:grid;place-items:center;pointer-events:none}
+  .shape-host{width:min(500px,50vw);aspect-ratio:1/1;position:relative}
+  .shape-host svg{width:100%;height:100%;overflow:visible}
+
+  .num-stamp{position:fixed;font-family:"JetBrains Mono",monospace;
+    font-size:11px;letter-spacing:.3em;text-transform:uppercase;
+    color:rgba(26,22,19,.45);opacity:0;z-index:5}
+  .num-stamp.n1{top:15%;left:10%}
+  .num-stamp.n2{bottom:18%;right:10%;text-align:right}
+
+  /* accent divider */
+  .accent{position:fixed;left:50%;top:50%;height:1px;width:0;
+    transform:translate(-50%,-50%);background:#d4452a;z-index:1;
+    box-shadow:0 0 8px rgba(212,69,42,.5)}
+
+  /* timeline ui */
+  .tl-ui{position:fixed;left:0;right:0;bottom:0;z-index:100;
+    padding:14px 24px;background:linear-gradient(180deg,transparent,rgba(26,22,19,.85));
+    display:flex;align-items:center;gap:16px;
+    font-family:"SF Mono",Menlo,monospace;font-size:11px;color:rgba(255,255,255,.85)}
+  .tl-ui button{background:transparent;border:1px solid rgba(255,255,255,.4);
+    color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;
+    font-size:14px;display:grid;place-items:center;transition:all .2s}
+  .tl-ui button:hover{background:rgba(255,255,255,.1)}
+  .tl-ui .time{font-variant-numeric:tabular-nums;min-width:150px;letter-spacing:.05em}
+  .tl-ui input[type=range]{flex:1;accent-color:#d4452a;height:3px}
+  .cue-row{position:absolute;left:24px;right:24px;bottom:40px;height:14px;pointer-events:none}
+  .cue-mark{position:absolute;width:2px;height:10px;background:rgba(212,69,42,.6);
+    border-radius:1px;transform:translateX(-1px)}
+  .cue-mark .lbl{position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+    font-size:8px;letter-spacing:.2em;color:rgba(255,255,255,.75);
+    text-transform:uppercase;white-space:nowrap;font-weight:700}
+</style>
+</head>
+<body>
+
+<canvas id="shader"></canvas>
+
+<div class="accent" id="accent"></div>
+
+<div class="hud tl">D · Geometric Morph</div>
+<div class="hud tr">Vol. 04<br>/ one function, many forms</div>
+<div class="hud bl">Nextframe Labs<br>Experiment N° 004</div>
+<div class="hud br">frame-pure · scrubbable<br>14.0s</div>
+
+<div class="vert l">Circle · Square · Triangle · Star · Loop</div>
+<div class="vert r">Path interpolation experiment</div>
+
+<div class="num-stamp n1" id="stamp1">/ 00.01 — forms</div>
+<div class="num-stamp n2" id="stamp2">N = 64 points · morphed</div>
+
+<div class="phase-name" id="phaseName"><span class="n" id="phaseN">01</span> <span id="phaseLabel">CIRCLE</span></div>
+
+<div class="big-label" id="bigLabel">Every <em>shape</em><br>is a variation.</div>
+
+<div class="stage">
+  <div class="shape-host">
+    <svg viewBox="-1 -1 2 2">
+      <defs>
+        <linearGradient id="shapeGrad" x1="0" y1="-1" x2="0" y2="1">
+          <stop offset="0" stop-color="#1a1613"/>
+          <stop offset="1" stop-color="#2d251f"/>
+        </linearGradient>
+        <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="0.03"/>
+          <feOffset dx="0" dy="0.02"/>
+          <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+          <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <!-- echo paths (trail) -->
+      <path id="echo3" fill="none" stroke="#d4452a" stroke-width="0.008" opacity="0.1"/>
+      <path id="echo2" fill="none" stroke="#d4452a" stroke-width="0.008" opacity="0.18"/>
+      <path id="echo1" fill="none" stroke="#d4452a" stroke-width="0.008" opacity="0.28"/>
+      <!-- main shape -->
+      <path id="mainPath" fill="url(#shapeGrad)" stroke="#1a1613" stroke-width="0.012"
+            stroke-linejoin="round" filter="url(#softShadow)"/>
+      <!-- accent stroke overlay -->
+      <path id="accentPath" fill="none" stroke="#d4452a" stroke-width="0.014"
+            stroke-linejoin="round" opacity="0"/>
+      <!-- center dot -->
+      <circle id="centerDot" cx="0" cy="0" r="0.02" fill="#d4452a" opacity="0"/>
+    </svg>
+  </div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 14.00s</span>
+  <input type="range" id="scrubber" min="0" max="1400" value="0" step="1">
+  <span class="time" id="frameLabel" style="min-width:100px;text-align:right">frame 0 / 420</span>
+</div>
+
+<script>
+const DURATION = 14.0;
+const FPS = 30;
+const N = 64; // points per shape
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+const CUES = [
+  { t: 0.2, label: 'Appear' },
+  { t: 2.2, label: 'Square' },
+  { t: 4.4, label: 'Triangle' },
+  { t: 6.6, label: 'Star' },
+  { t: 8.8, label: 'Infinity' },
+  { t: 11.0, label: 'Circle' },
+  { t: 13.0, label: 'Final' },
+];
+
+/* ---- Shape generators: each returns an array of [x,y] length N ---- */
+function shapeCircle() {
+  const pts = [];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    pts.push([Math.cos(a) * 0.7, Math.sin(a) * 0.7]);
+  }
+  return pts;
+}
+function shapeSquare() {
+  const pts = [];
+  const side = N / 4;
+  const s = 0.62;
+  for (let i = 0; i < N; i++) {
+    const edge = Math.floor(i / side);
+    const p = (i % side) / side;
+    let x, y;
+    if (edge === 0) { x = -s + 2*s*p; y = -s; }
+    else if (edge === 1) { x = s; y = -s + 2*s*p; }
+    else if (edge === 2) { x = s - 2*s*p; y = s; }
+    else { x = -s; y = s - 2*s*p; }
+    pts.push([x, y]);
+  }
+  // rotate so start aligns with circle start (right)
+  return pts;
+}
+function shapeTriangle() {
+  const pts = [];
+  const side = N / 3;
+  const r = 0.78;
+  for (let i = 0; i < N; i++) {
+    const edge = Math.floor(i / side);
+    const p = (i % side) / side;
+    const a0 = -Math.PI/2 + edge * Math.PI * 2/3;
+    const a1 = -Math.PI/2 + (edge + 1) * Math.PI * 2/3;
+    const x0 = Math.cos(a0) * r, y0 = Math.sin(a0) * r;
+    const x1 = Math.cos(a1) * r, y1 = Math.sin(a1) * r;
+    pts.push([lerp(x0, x1, p), lerp(y0, y1, p)]);
+  }
+  return pts;
+}
+function shapeStar() {
+  const pts = [];
+  const arms = 5;
+  const rOut = 0.78, rIn = 0.32;
+  // 2 * arms edges, each with N / (2*arms) points
+  const edges = arms * 2;
+  const per = N / edges;
+  for (let i = 0; i < N; i++) {
+    const edge = Math.floor(i / per);
+    const p = (i % per) / per;
+    const a0 = -Math.PI/2 + (edge / edges) * Math.PI * 2;
+    const a1 = -Math.PI/2 + ((edge + 1) / edges) * Math.PI * 2;
+    const r0 = edge % 2 === 0 ? rOut : rIn;
+    const r1 = edge % 2 === 0 ? rIn : rOut;
+    const x0 = Math.cos(a0) * r0, y0 = Math.sin(a0) * r0;
+    const x1 = Math.cos(a1) * r1, y1 = Math.sin(a1) * r1;
+    pts.push([lerp(x0, x1, p), lerp(y0, y1, p)]);
+  }
+  return pts;
+}
+function shapeInfinity() {
+  const pts = [];
+  // lemniscate (∞): r² = cos(2θ)
+  // parametric: x = a*cos(θ) / (1+sin²(θ)), y = a*sin(θ)cos(θ) / (1+sin²(θ))
+  for (let i = 0; i < N; i++) {
+    const theta = (i / N) * Math.PI * 2;
+    const a = 0.82;
+    const s = Math.sin(theta), c = Math.cos(theta);
+    const denom = 1 + s*s;
+    pts.push([a * c / denom, a * s * c / denom]);
+  }
+  return pts;
+}
+
+const SHAPES = {
+  CIRCLE: shapeCircle(),
+  SQUARE: shapeSquare(),
+  TRIANGLE: shapeTriangle(),
+  STAR: shapeStar(),
+  INFINITY: shapeInfinity(),
+};
+
+const SEQUENCE = [
+  { at: 0.5,  hold: 1.2, from: 'CIRCLE',   to: 'CIRCLE',   label: 'CIRCLE',   n: '01' },
+  { at: 1.7,  hold: 0.8, from: 'CIRCLE',   to: 'SQUARE',   label: 'SQUARE',   n: '02' },
+  { at: 2.5,  hold: 1.2, from: 'SQUARE',   to: 'SQUARE',   label: 'SQUARE',   n: '02' },
+  { at: 3.7,  hold: 0.8, from: 'SQUARE',   to: 'TRIANGLE', label: 'TRIANGLE', n: '03' },
+  { at: 4.5,  hold: 1.2, from: 'TRIANGLE', to: 'TRIANGLE', label: 'TRIANGLE', n: '03' },
+  { at: 5.7,  hold: 0.8, from: 'TRIANGLE', to: 'STAR',     label: 'STAR',     n: '04' },
+  { at: 6.5,  hold: 1.2, from: 'STAR',     to: 'STAR',     label: 'STAR',     n: '04' },
+  { at: 7.7,  hold: 0.8, from: 'STAR',     to: 'INFINITY', label: 'INFINITY', n: '05' },
+  { at: 8.5,  hold: 1.3, from: 'INFINITY', to: 'INFINITY', label: 'INFINITY', n: '05' },
+  { at: 9.8,  hold: 0.8, from: 'INFINITY', to: 'CIRCLE',   label: 'CIRCLE',   n: '01' },
+  { at: 10.6, hold: 3.4, from: 'CIRCLE',   to: 'CIRCLE',   label: 'CIRCLE',   n: '01' },
+];
+
+function currentSegment(t) {
+  let seg = SEQUENCE[0];
+  for (const s of SEQUENCE) { if (t >= s.at) seg = s; else break; }
+  return seg;
+}
+
+/* path from point list */
+function pathFromPoints(pts) {
+  return 'M ' + pts.map(p => `${p[0].toFixed(4)},${p[1].toFixed(4)}`).join(' L ') + ' Z';
+}
+
+/* morph-lerp two shapes */
+function morphPoints(a, b, p) {
+  const out = [];
+  for (let i = 0; i < N; i++) {
+    out.push([lerp(a[i][0], b[i][0], p), lerp(a[i][1], b[i][1], p)]);
+  }
+  return out;
+}
+
+function pointsAt(t) {
+  const seg = currentSegment(t);
+  const local = t - seg.at;
+  const p = clamp01(local / seg.hold);
+  const ease = easeInOut(p);
+  return morphPoints(SHAPES[seg.from], SHAPES[seg.to], ease);
+}
+
+const mainPath = document.getElementById('mainPath');
+const accentPath = document.getElementById('accentPath');
+const echo1 = document.getElementById('echo1');
+const echo2 = document.getElementById('echo2');
+const echo3 = document.getElementById('echo3');
+const centerDot = document.getElementById('centerDot');
+const phaseName = document.getElementById('phaseName');
+const phaseN = document.getElementById('phaseN');
+const phaseLabel = document.getElementById('phaseLabel');
+const bigLabel = document.getElementById('bigLabel');
+const accent = document.getElementById('accent');
+const stamps = [document.getElementById('stamp1'), document.getElementById('stamp2')];
+
+function render(t) {
+  /* HUD */
+  document.querySelectorAll('.hud').forEach((el, i) => {
+    el.style.opacity = kern(t, 0.15 + i * 0.08, 1.4);
+  });
+  document.querySelectorAll('.vert').forEach((el, i) => {
+    el.style.opacity = kern(t, 1.8 + i * 0.15, 1.2);
+  });
+  stamps.forEach((el, i) => {
+    el.style.opacity = kern(t, 2.2 + i * 0.2, 1.2);
+  });
+
+  /* accent divider */
+  const accP = kern(t, 0.4, 2.0, easeOut);
+  accent.style.width = (accP * 62) + '%';
+
+  /* main shape */
+  const pts = pointsAt(t);
+  mainPath.setAttribute('d', pathFromPoints(pts));
+  const appearP = kern(t, 0.5, 1.2, easeOut);
+  mainPath.setAttribute('opacity', appearP);
+
+  /* echo trail — delayed copies with scaled offset */
+  const e1 = pointsAt(Math.max(0, t - 0.14));
+  const e2 = pointsAt(Math.max(0, t - 0.28));
+  const e3 = pointsAt(Math.max(0, t - 0.42));
+  echo1.setAttribute('d', pathFromPoints(e1.map(p => [p[0]*1.02, p[1]*1.02])));
+  echo2.setAttribute('d', pathFromPoints(e2.map(p => [p[0]*1.04, p[1]*1.04])));
+  echo3.setAttribute('d', pathFromPoints(e3.map(p => [p[0]*1.06, p[1]*1.06])));
+
+  /* accent stroke overlay — flash during morph transitions */
+  const seg = currentSegment(t);
+  const local = t - seg.at;
+  const morphing = seg.from !== seg.to;
+  let accentOp = 0;
+  if (morphing) {
+    const p = clamp01(local / seg.hold);
+    accentOp = Math.sin(p * Math.PI) * 0.9;
+    accentPath.setAttribute('d', pathFromPoints(pts));
+  } else {
+    // gentle pulse on hold
+    accentOp = 0.25 + Math.sin(t * 1.8) * 0.08;
+    accentPath.setAttribute('d', pathFromPoints(pts));
+  }
+  accentPath.setAttribute('opacity', accentOp * appearP);
+
+  /* center dot */
+  centerDot.setAttribute('opacity', appearP * 0.85);
+
+  /* phase label */
+  phaseName.style.opacity = kern(t, 1.0, 1.0);
+  phaseN.textContent = seg.n;
+  phaseLabel.textContent = seg.label;
+
+  /* big label */
+  bigLabel.style.opacity = kern(t, 11.3, 1.5);
+
+  /* shader bg */
+  renderShader(t);
+}
+
+/* shader */
+let shaderCtx = null;
+function initShader() {
+  const c = document.getElementById('shader');
+  const gl = c.getContext('webgl');
+  if (!gl) return null;
+  const r = () => {
+    const d = Math.min(devicePixelRatio || 1, 2);
+    c.width = innerWidth * d; c.height = innerHeight * d;
+    gl.viewport(0, 0, c.width, c.height);
+  };
+  r(); addEventListener('resize', r);
+  const V = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+  const F = `precision highp float;uniform vec2 u_res;uniform float u_t;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);float a=hash(i),b=hash(i+vec2(1,0)),c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));vec2 u=f*f*(3.-2.*f);return mix(a,b,u.x)+(c-a)*u.y*(1.-u.x)+(d-b)*u.x*u.y;}
+void main(){
+  vec2 uv=(gl_FragCoord.xy/u_res);
+  // subtle paper-like warm gradient
+  vec3 col=vec3(.955,.945,.91);
+  col=mix(col,vec3(.88,.85,.78),length(uv-vec2(.5))*.8);
+  // grain
+  float g=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233))+u_t)*43758.5453);
+  col-=(g)*.025;
+  gl_FragColor=vec4(col,1.);
+}`;
+  const sh=(t,s)=>{const x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);return x};
+  const P=gl.createProgram();gl.attachShader(P,sh(gl.VERTEX_SHADER,V));gl.attachShader(P,sh(gl.FRAGMENT_SHADER,F));gl.linkProgram(P);gl.useProgram(P);
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const L=gl.getAttribLocation(P,'p');gl.enableVertexAttribArray(L);gl.vertexAttribPointer(L,2,gl.FLOAT,false,0,0);
+  return { gl, uR: gl.getUniformLocation(P,'u_res'), uT: gl.getUniformLocation(P,'u_t'), canvas: c };
+}
+function renderShader(t) {
+  if (!shaderCtx) return;
+  const { gl, uR, uT, canvas } = shaderCtx;
+  gl.uniform2f(uR, canvas.width, canvas.height);
+  gl.uniform1f(uT, t);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+shaderCtx = initShader();
+
+/* timeline controller */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+let currentT = 0, playing = true, lastFrame = performance.now();
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1400);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+scrubber.addEventListener('input', () => { playing = false; playBtn.textContent = '▶'; setTime(scrubber.value / 1400 * DURATION); });
+playBtn.addEventListener('click', () => { playing = !playing; playBtn.textContent = playing ? '⏸' : '▶'; lastFrame = performance.now(); });
+resetBtn.addEventListener('click', () => setTime(0));
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl'; lbl.textContent = cue.label;
+  m.appendChild(lbl); cueRow.appendChild(m);
+});
+setTime(0); requestAnimationFrame(loop);
+</script>
+</body>
+</html>

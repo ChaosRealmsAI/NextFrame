@@ -1,0 +1,718 @@
+<!--
+  X · Curated — frame-pure, scrubbable
+  "The Ripple of Being Seen" — 不做爆心，做情感物理化：
+    触点涟漪 → 心浮起 → 化成 +1 → 飞入计数器 → 全屏暖意脉动
+
+  吸收实验教训：
+    - H4 独特角度（拒绝俗套爆开）
+    - H5 产品化场景（video card mockup）
+    - H3 4 层技术分层
+    - H2 情感克制（文字不喧宾夺主）
+    - 避免 H1 信息堆砌
+
+  4 层：WebGL（背景温度 envelope）· Canvas（种子化星尘 + 浮上心 trail）·
+        SVG（视频卡 / 接触涟漪 / 爱心 path / 数字粒子轨迹）· DOM（mini UI / 计数翻动）
+
+  Duration: 12s. Time source: setTime(t).
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>X · Curated · The Ripple of Being Seen</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100vh;background:#0a0611;overflow:hidden;
+    font-family:-apple-system,"SF Pro Display","Inter",system-ui,sans-serif;
+    color:#fff;-webkit-font-smoothing:antialiased}
+  canvas{position:fixed;inset:0;width:100%;height:100%}
+  #shader{z-index:0}
+  #stars {z-index:1}
+  #hearts{z-index:3}
+  svg.layer{position:fixed;inset:0;width:100%;height:100%;z-index:10;pointer-events:none}
+
+  /* HUD */
+  .hud{position:fixed;z-index:7;font-size:10px;letter-spacing:.42em;
+    text-transform:uppercase;color:rgba(220,200,255,.55);font-weight:500;opacity:0;
+    font-family:"JetBrains Mono","SF Mono",Menlo,monospace}
+  .hud.tl{top:36px;left:44px;display:flex;align-items:center;gap:10px}
+  .hud.tl::before{content:'';width:7px;height:7px;border-radius:50%;
+    background:#ff6aa0;box-shadow:0 0 10px #ff6aa0,0 0 24px rgba(255,106,160,.7)}
+  .hud.tr{top:36px;right:44px;text-align:right;line-height:1.9}
+  .hud.bl{bottom:64px;left:44px;line-height:1.9}
+  .hud.br{bottom:64px;right:44px;text-align:right;line-height:1.9}
+
+  /* ---- Video card (center product mockup) ---- */
+  .card{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5;
+    width:420px;padding:18px 18px 14px;border-radius:22px;
+    background:rgba(25,20,45,.72);border:1px solid rgba(255,255,255,.08);
+    backdrop-filter:blur(26px) saturate(140%);
+    box-shadow:0 40px 120px rgba(0,0,0,.55),
+               0 0 0 1px rgba(255,255,255,.04),
+               0 0 60px rgba(255,100,160,.0);
+    opacity:0;will-change:transform,box-shadow}
+  .card .header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .card .avatar{width:38px;height:38px;border-radius:50%;
+    background:linear-gradient(135deg,#ff6aa0,#a66eff);
+    display:grid;place-items:center;font-size:14px;font-weight:600;
+    color:#fff;letter-spacing:-.02em;
+    box-shadow:0 0 0 2px rgba(255,106,160,.25)}
+  .card .meta{flex:1}
+  .card .name{font-size:13px;font-weight:600;letter-spacing:-.005em;color:#fff}
+  .card .time{font-size:11px;color:rgba(220,200,255,.5);margin-top:2px;
+    font-family:"JetBrains Mono",monospace;letter-spacing:.1em}
+  .card .content{width:100%;aspect-ratio:4/5;border-radius:14px;position:relative;
+    background:linear-gradient(150deg,rgba(255,150,180,.22),rgba(170,120,255,.18),rgba(255,200,140,.15));
+    overflow:hidden}
+  .card .content::before{content:'';position:absolute;inset:0;
+    background:radial-gradient(circle at 40% 30%,rgba(255,200,160,.35),transparent 60%),
+               radial-gradient(circle at 70% 80%,rgba(200,160,255,.3),transparent 60%);
+    filter:blur(20px)}
+  .card .cap{margin-top:12px;font-size:12px;color:rgba(230,215,255,.72);
+    font-weight:300;line-height:1.4}
+  .card .cap b{font-weight:500;color:#fff}
+  .card .actions{display:flex;gap:18px;margin-top:14px;padding-top:12px;
+    border-top:1px solid rgba(255,255,255,.06);font-size:12px;color:rgba(220,200,255,.6);
+    font-family:"JetBrains Mono",monospace;letter-spacing:.1em}
+  .card .actions .item{display:flex;align-items:center;gap:6px}
+  .card .actions .heart-icon{width:14px;height:14px;display:inline-block;
+    position:relative;will-change:transform}
+  .card .actions .count{font-variant-numeric:tabular-nums;min-width:40px;
+    display:inline-flex;align-items:center;gap:1px}
+  .card .actions .count .digit{display:inline-block;position:relative;
+    height:1em;overflow:hidden;vertical-align:baseline}
+  .card .actions .count .digit-reel{display:flex;flex-direction:column;
+    will-change:transform}
+  .card .actions .count .digit-reel span{display:block;height:1em;line-height:1}
+
+  /* Touch cursor */
+  .cursor{position:fixed;width:40px;height:40px;border-radius:50%;z-index:6;
+    left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;
+    opacity:0}
+  .cursor::before,.cursor::after{content:'';position:absolute;inset:0;
+    border-radius:50%;border:1.5px solid rgba(255,255,255,.55)}
+  .cursor::after{animation:none}
+
+  /* Flying +1 DOM */
+  .plus{position:fixed;left:50%;top:50%;z-index:8;
+    font-size:22px;font-weight:600;letter-spacing:.02em;
+    color:#ff9eb8;text-shadow:0 0 14px rgba(255,100,160,.8),
+                              0 0 28px rgba(255,100,160,.45);
+    font-variant-numeric:tabular-nums;pointer-events:none;opacity:0;
+    will-change:transform}
+
+  /* Narrative text */
+  .narr{position:fixed;left:50%;bottom:13%;transform:translate(-50%,0);z-index:8;
+    font-size:14px;letter-spacing:.38em;text-transform:uppercase;font-weight:500;
+    color:rgba(255,210,225,.82);text-align:center;
+    opacity:0;max-width:600px;
+    text-shadow:0 0 20px rgba(0,0,0,.6)}
+
+  /* side hints (vertical) */
+  .side{position:fixed;top:50%;transform:translateY(-50%);z-index:4;
+    writing-mode:vertical-rl;text-orientation:mixed;font-size:9px;letter-spacing:.42em;
+    text-transform:uppercase;color:rgba(220,200,255,.32);line-height:2;opacity:0;
+    font-family:"JetBrains Mono",monospace}
+  .side.l{left:44px;transform:translateY(-50%) rotate(180deg)}
+  .side.r{right:44px}
+
+  /* ---- Timeline UI ---- */
+  .cue-row{position:absolute;left:24px;right:24px;bottom:40px;height:14px;pointer-events:none}
+  .cue-mark{position:absolute;width:2px;height:10px;background:rgba(255,106,160,.6);
+    border-radius:1px;transform:translateX(-1px)}
+  .cue-mark .lbl{position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+    font-size:8px;letter-spacing:.2em;color:rgba(255,106,160,.8);
+    text-transform:uppercase;white-space:nowrap;font-weight:700}
+  .tl-ui{position:fixed;left:0;right:0;bottom:0;z-index:100;
+    padding:14px 24px;background:linear-gradient(180deg,transparent,rgba(10,6,17,.92));
+    display:flex;align-items:center;gap:16px;
+    font-family:"SF Mono",Menlo,monospace;font-size:11px;color:rgba(255,255,255,.85)}
+  .tl-ui button{background:transparent;border:1px solid rgba(255,255,255,.3);
+    color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;
+    font-size:14px;display:grid;place-items:center;transition:all .2s}
+  .tl-ui button:hover{background:rgba(255,255,255,.1)}
+  .tl-ui .time{font-variant-numeric:tabular-nums;min-width:150px;letter-spacing:.05em}
+  .tl-ui input[type=range]{flex:1;accent-color:#ff6aa0;height:3px}
+</style>
+</head>
+<body>
+
+<canvas id="shader"></canvas>
+<canvas id="stars"></canvas>
+<canvas id="hearts"></canvas>
+
+<!-- SVG: ripples + floating heart + tracer paths -->
+<svg class="layer" id="svgLayer" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="heartGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb5d0"/>
+      <stop offset="0.6" stop-color="#ff6aa0"/>
+      <stop offset="1" stop-color="#c23a6e"/>
+    </linearGradient>
+    <radialGradient id="focusGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="rgba(255,150,180,0.45)"/>
+      <stop offset="1" stop-color="rgba(255,150,180,0)"/>
+    </radialGradient>
+  </defs>
+  <!-- Contact ripples (3 concentric) -->
+  <g id="ripples" transform="translate(960, 540)"></g>
+  <!-- Rising heart (single, will morph into number) -->
+  <g id="risingHeartGroup" transform="translate(960, 540)" opacity="0">
+    <path id="risingHeart"
+      d="M0,-12 C-10,-28 -32,-20 -32,-2 C-32,18 -8,32 0,44 C8,32 32,18 32,-2 C32,-20 10,-28 0,-12 Z"
+      fill="url(#heartGrad)" stroke="none" filter="url(#glow)"/>
+  </g>
+  <!-- Tracer arc (from heart to counter) -->
+  <path id="tracer" fill="none" stroke="#ff9eb8" stroke-width="1.5"
+    stroke-linecap="round" opacity="0"
+    filter="url(#glow)"/>
+  <!-- Focus halo around card (activates when seen) -->
+  <circle id="focusHalo" cx="960" cy="540" r="300"
+    fill="url(#focusGlow)" opacity="0"/>
+</svg>
+
+<div class="hud tl">Ripple · live</div>
+<div class="hud tr">X · curated<br>/ the ripple of being seen</div>
+<div class="hud bl">Nextframe Lab<br>Experiment N° 008</div>
+<div class="hud br">frame-pure · scrubbable<br>12.0s</div>
+
+<div class="side l">felt · not clicked</div>
+<div class="side r">seen · acknowledged · remembered</div>
+
+<!-- Video card mockup -->
+<div class="card" id="card">
+  <div class="header">
+    <div class="avatar">M</div>
+    <div class="meta">
+      <div class="name">mira · <span style="color:rgba(220,200,255,.5);font-weight:400">@mira_studio</span></div>
+      <div class="time">2 hours ago · golden hour</div>
+    </div>
+  </div>
+  <div class="content"></div>
+  <div class="cap">A silent <b>golden hour</b> — the light folded quietly into everything.</div>
+  <div class="actions">
+    <div class="item"><span class="heart-icon" id="heartIcon">
+      <svg width="14" height="14" viewBox="-32 -34 64 80">
+        <path d="M0,-12 C-10,-28 -32,-20 -32,-2 C-32,18 -8,32 0,44 C8,32 32,18 32,-2 C32,-20 10,-28 0,-12 Z"
+          fill="none" stroke="rgba(220,200,255,0.6)" stroke-width="4" id="heartIconPath"/>
+      </svg>
+    </span><span class="count" id="likeCount"></span></div>
+    <div class="item">💬 <span class="count" style="min-width:30px">128</span></div>
+    <div class="item">↗ <span class="count" style="min-width:30px">42</span></div>
+  </div>
+</div>
+
+<!-- Touch cursor -->
+<div class="cursor" id="cursor"></div>
+
+<!-- Flying +1 -->
+<div class="plus" id="plus1">+1</div>
+
+<!-- Narrative -->
+<div class="narr" id="narr"></div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 12.00s</span>
+  <input type="range" id="scrubber" min="0" max="1200" value="0">
+  <span class="time" id="frameLabel" style="min-width:100px;text-align:right">frame 0 / 360</span>
+</div>
+
+<script>
+/* ================== Timeline core ================== */
+const DURATION = 12.0;
+const FPS = 30;
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeOut5 = x => 1 - Math.pow(1 - x, 5);
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+const springOut = x => { const c = clamp01(x); return c===0||c===1 ? c : 1 - Math.exp(-6*c)*Math.cos(9*c); };
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+const osc = (t, period) => Math.sin(t / period * Math.PI * 2);
+const bump = (t, peak, width) => { const d = (t - peak) / width; return Math.exp(-d*d*2.2); };
+
+const CUES = [
+  { t: 0.4,  label: 'Card' },
+  { t: 1.2,  label: 'Cursor' },
+  { t: 2.0,  label: 'Tap 1' },
+  { t: 2.3,  label: 'Tap 2' },
+  { t: 3.0,  label: 'Rise' },
+  { t: 4.4,  label: 'Become +1' },
+  { t: 5.2,  label: 'Fly' },
+  { t: 6.0,  label: 'Land' },
+  { t: 7.5,  label: 'Resonate' },
+  { t: 9.5,  label: 'Narrative' },
+];
+
+/* ================== DOM refs ================== */
+const card = document.getElementById('card');
+const cursor = document.getElementById('cursor');
+const plus1 = document.getElementById('plus1');
+const narr = document.getElementById('narr');
+const ripplesG = document.getElementById('ripples');
+const risingGroup = document.getElementById('risingHeartGroup');
+const risingHeart = document.getElementById('risingHeart');
+const tracer = document.getElementById('tracer');
+const focusHalo = document.getElementById('focusHalo');
+const heartIconPath = document.getElementById('heartIconPath');
+const likeCount = document.getElementById('likeCount');
+
+/* digit reels (3 digits, base 284 → 285 → 286 in phases) */
+const BASE = 1283;
+(function buildDigits() {
+  // use up to 4 digits
+  for (let i = 0; i < 4; i++) {
+    const d = document.createElement('span');
+    d.className = 'digit';
+    d.style.width = '0.6em';
+    d.style.height = '1em';
+    d.style.position = 'relative';
+    d.style.overflow = 'hidden';
+    d.style.display = 'inline-block';
+    const reel = document.createElement('span');
+    reel.className = 'digit-reel';
+    reel.style.position = 'absolute';
+    reel.style.top = '0';
+    reel.style.left = '0';
+    reel.style.willChange = 'transform';
+    // 10 digits
+    for (let k = 0; k < 10; k++) {
+      const s = document.createElement('span');
+      s.textContent = k;
+      reel.appendChild(s);
+    }
+    d.appendChild(reel);
+    likeCount.appendChild(d);
+  }
+})();
+const reelEls = [...likeCount.querySelectorAll('.digit-reel')];
+
+function setDigitValue(val) {
+  // val can be float for smooth rotation
+  const str = Math.floor(val).toString().padStart(4, '0');
+  // per-digit fractional for smooth reel
+  for (let i = 0; i < 4; i++) {
+    const place = Math.pow(10, 3 - i);
+    const digitFloat = (val / place) % 10;
+    const targetDigit = digitFloat < 0 ? 0 : digitFloat;
+    // reel translate
+    const el = reelEls[i];
+    // Use fractional digit only if this digit is changing (last one mostly)
+    // For simplicity use floor with optional smooth on last digit
+    if (i === 3) {
+      el.style.transform = `translateY(-${(targetDigit % 10) * 100}%)`;
+    } else {
+      el.style.transform = `translateY(-${(Math.floor(targetDigit) % 10) * 100}%)`;
+    }
+  }
+}
+
+/* ================== Canvas setup ================== */
+const starsC = document.getElementById('stars');
+const heartsC = document.getElementById('hearts');
+const starsCtx = starsC.getContext('2d');
+const heartsCtx = heartsC.getContext('2d');
+let W = 0, H = 0, dpr = 1;
+
+function resizeCanvases() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  [starsC, heartsC].forEach(c => {
+    c.width = W * dpr; c.height = H * dpr;
+    c.style.width = W + 'px'; c.style.height = H + 'px';
+    c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  });
+}
+resizeCanvases(); addEventListener('resize', resizeCanvases);
+
+/* seeded RNG */
+function rng(seed) {
+  let s = seed;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return s / 2147483647;
+  };
+}
+
+/* ================== Star dust (ambient) ================== */
+const DUST = [];
+(function initDust() {
+  const r = rng(42);
+  for (let i = 0; i < 100; i++) {
+    DUST.push({
+      x: r(), y: r(),
+      r: 0.3 + r() * 1.2,
+      phase: r() * Math.PI * 2,
+      speed: 0.02 + r() * 0.04,
+      vx: (r() - 0.5) * 0.0003,
+      vy: (r() - 0.5) * 0.0003 - 0.0001,
+    });
+  }
+})();
+
+function renderDust(t, heat) {
+  starsCtx.clearRect(0, 0, W, H);
+  for (const p of DUST) {
+    // position wraps
+    const x = ((p.x + p.vx * t * 60) % 1 + 1) % 1 * W;
+    const y = ((p.y + p.vy * t * 60) % 1 + 1) % 1 * H;
+    const a = 0.22 + 0.45 * (0.5 + 0.5 * Math.sin(p.phase + t * p.speed * 3));
+    const heated = a * (1 + heat * 0.4);
+    starsCtx.fillStyle = `rgba(255,220,240,${heated})`;
+    starsCtx.beginPath();
+    starsCtx.arc(x, y, p.r, 0, 6.2832);
+    starsCtx.fill();
+    // bloom
+    const g = starsCtx.createRadialGradient(x, y, 0, x, y, p.r * 5);
+    g.addColorStop(0, `rgba(255,180,210,${heated * 0.25})`);
+    g.addColorStop(1, 'rgba(255,180,210,0)');
+    starsCtx.fillStyle = g;
+    starsCtx.beginPath();
+    starsCtx.arc(x, y, p.r * 5, 0, 6.2832);
+    starsCtx.fill();
+  }
+}
+
+/* ================== Floating mini hearts (from t>5) ================== */
+const FLOAT_HEARTS = [];
+(function initFloatHearts() {
+  const r = rng(1337);
+  for (let i = 0; i < 14; i++) {
+    FLOAT_HEARTS.push({
+      xSeed: r(),
+      delay: i * 0.22 + r() * 0.18,
+      hSeed: r(),
+      sizeK: 0.55 + r() * 0.9,
+      hueK: r(), // 0 = pink, 1 = peach-gold
+    });
+  }
+})();
+
+function drawMiniHeart(ctx, x, y, size, alpha, hue) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 32, size / 32);
+  ctx.beginPath();
+  ctx.moveTo(0, -12);
+  ctx.bezierCurveTo(-10, -28, -32, -20, -32, -2);
+  ctx.bezierCurveTo(-32, 18, -8, 32, 0, 44);
+  ctx.bezierCurveTo(8, 32, 32, 18, 32, -2);
+  ctx.bezierCurveTo(32, -20, 10, -28, 0, -12);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, -24, 0, 44);
+  if (hue < 0.5) {
+    grad.addColorStop(0, `rgba(255,200,220,${alpha})`);
+    grad.addColorStop(1, `rgba(255,90,150,${alpha})`);
+  } else {
+    grad.addColorStop(0, `rgba(255,220,190,${alpha})`);
+    grad.addColorStop(1, `rgba(255,140,100,${alpha})`);
+  }
+  ctx.fillStyle = grad;
+  ctx.fill();
+  // glow
+  ctx.shadowColor = `rgba(255,150,180,${alpha * 0.8})`;
+  ctx.shadowBlur = 12;
+  ctx.fill();
+  ctx.restore();
+}
+
+function renderFloatHearts(t) {
+  heartsCtx.clearRect(0, 0, W, H);
+  // mini hearts rise between t=5.5 to t=11
+  const windowStart = 5.5, windowEnd = 11.5;
+  if (t < windowStart || t > windowEnd + 1) return;
+  const centerX = W / 2, centerY = H / 2;
+  FLOAT_HEARTS.forEach(h => {
+    const localT = t - windowStart - h.delay;
+    if (localT < 0 || localT > 4.5) return;
+    const p = clamp01(localT / 4.5);
+    // start near card (centerY), rise upward
+    const startX = centerX + (h.xSeed - 0.5) * 120;
+    const endY = centerY - 280 - h.hSeed * 180;
+    const x = startX + Math.sin(localT * 1.5 + h.delay * 3) * 20;
+    const y = lerp(centerY + 80, endY, easeOut(p));
+    // alpha rise then fade
+    let a;
+    if (p < 0.2) a = p / 0.2 * 0.85;
+    else if (p < 0.7) a = 0.85;
+    else a = 0.85 * (1 - (p - 0.7) / 0.3);
+    const size = h.sizeK * (1 + p * 0.2) * 14;
+    drawMiniHeart(heartsCtx, x, y, size, a * 0.9, h.hueK);
+  });
+}
+
+/* ================== Main render ================== */
+function render(t) {
+  /* HUD fade-in (subtle stagger) */
+  document.querySelectorAll('.hud').forEach((el, i) => {
+    el.style.opacity = kern(t, 0.2 + i * 0.1, 1.4);
+  });
+  document.querySelectorAll('.side').forEach((el, i) => {
+    el.style.opacity = kern(t, 2.0 + i * 0.2, 1.4);
+  });
+
+  /* card entrance */
+  const cardP = kern(t, 0.4, 1.2, springOut);
+  card.style.opacity = cardP;
+  // subtle card breathing + glow beat on tap
+  const cardGlow = bump(t, 2.2, 0.5) * 0.8 +
+                   bump(t, 6.0, 1.0) * 0.5 +
+                   bump(t, 8.5, 1.3) * 0.3;
+  const cardScale = lerp(0.92, 1, cardP) * (1 + cardGlow * 0.015);
+  card.style.transform = `translate(-50%, -50%) scale(${cardScale})`;
+  card.style.boxShadow = `0 40px 120px rgba(0,0,0,.55),
+                          0 0 0 1px rgba(255,255,255,.04),
+                          0 0 ${60 + cardGlow * 60}px rgba(255,100,160,${cardGlow * 0.35})`;
+
+  /* cursor approach (t=1.2 → 2.0) */
+  const cursorApproachP = kern(t, 1.2, 0.8);
+  const cursorOpOut = kern(t, 3.0, 1.0); // fades after second tap
+  const cursorOp = cursorApproachP * (1 - cursorOpOut);
+  cursor.style.opacity = cursorOp;
+  if (cursorOp > 0.01) {
+    // arrive above card center, slight down-motion
+    const startX = W / 2 + 200, startY = H / 2 - 100;
+    const endX = W / 2, endY = H / 2 + 30;
+    const x = lerp(startX, endX, easeOut(cursorApproachP));
+    const y = lerp(startY, endY, easeOut(cursorApproachP));
+    // shrink slightly during tap
+    const tapShrink = bump(t, 2.0, 0.15) + bump(t, 2.3, 0.15);
+    const scale = (1 - tapShrink * 0.25);
+    cursor.style.left = x + 'px';
+    cursor.style.top = y + 'px';
+    cursor.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  }
+
+  /* Ripples — two taps, 3 rings each */
+  ripplesG.innerHTML = '';
+  const tapTimes = [2.0, 2.3];
+  tapTimes.forEach(tap => {
+    for (let i = 0; i < 3; i++) {
+      const localT = t - tap - i * 0.12;
+      if (localT < 0 || localT > 1.4) continue;
+      const p = localT / 1.4;
+      const r = lerp(20, 320, easeOut(p));
+      const alpha = lerp(0.95, 0, p);
+      const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ring.setAttribute('cx', 0);
+      ring.setAttribute('cy', 0);
+      ring.setAttribute('r', r);
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', `rgba(255,150,190,${alpha})`);
+      ring.setAttribute('stroke-width', lerp(3.5, 1.0, p));
+      ring.setAttribute('filter', 'url(#glow)');
+      ripplesG.appendChild(ring);
+    }
+  });
+
+  /* Heart icon in card (color / scale) — activates after tap */
+  const heartActivate = kern(t, 2.25, 0.6, springOut);
+  const heartScale = 1 + bump(t, 2.4, 0.3) * 0.3;
+  const heartColor = lerp(0, 1, heartActivate);
+  heartIconPath.setAttribute('fill',
+    `rgba(${lerp(220, 255, heartColor)},${lerp(200, 106, heartColor)},${lerp(255, 160, heartColor)},${lerp(0.6, 1, heartColor)})`);
+  heartIconPath.setAttribute('stroke-opacity', 1 - heartActivate);
+  // heart icon scale pulse
+  const heartIconEl = document.getElementById('heartIcon');
+  heartIconEl.style.transform = `scale(${heartScale})`;
+
+  /* Rising heart: emerge at t=3.0, rise + grow + fade into +1 at t=4.4 */
+  const riseStart = 3.0, riseEnd = 4.4;
+  if (t >= riseStart - 0.1 && t <= riseEnd + 0.2) {
+    const p = clamp01((t - riseStart) / (riseEnd - riseStart));
+    risingGroup.setAttribute('opacity', Math.min(1, p * 4) * (1 - Math.max(0, p - 0.85) * 6));
+    // rise from card center upward past card edge into open space
+    const y = 540 - easeOut(p) * 360;
+    const scale = lerp(0.4, 1.5, easeOut(p));
+    risingGroup.setAttribute('transform', `translate(960, ${y}) scale(${scale})`);
+  } else {
+    risingGroup.setAttribute('opacity', 0);
+  }
+
+  /* +1 label: flies from where heart faded → to counter */
+  const flyStart = 4.4, flyEnd = 6.0;
+  // counter position in screen px (it's inside the card's .actions, first .item)
+  const cardRect = card.getBoundingClientRect();
+  const counterX = cardRect.left + 28; // approx first action item
+  const counterY = cardRect.bottom - 28;
+  if (t >= flyStart - 0.1 && t <= flyEnd + 0.3) {
+    const p = clamp01((t - flyStart) / (flyEnd - flyStart));
+    const startX = W / 2;
+    const startY = H / 2 - 200 * easeOut(clamp01((4.4 - 3.0) / 1.4)); // where heart was
+    // arc path with parabolic midpoint raised
+    const x = lerp(startX, counterX, easeInOut(p));
+    const baseY = lerp(startY, counterY, easeInOut(p));
+    const arc = -Math.sin(p * Math.PI) * 80;
+    const y = baseY + arc;
+    const scale = lerp(1.2, 0.7, p);
+    const opacity = p < 0.15 ? p / 0.15 : p > 0.85 ? (1 - p) / 0.15 : 1;
+    plus1.style.opacity = opacity;
+    plus1.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    plus1.style.left = x + 'px';
+    plus1.style.top = y + 'px';
+  } else {
+    plus1.style.opacity = 0;
+  }
+
+  /* Tracer arc (faint path) during fly */
+  if (t >= flyStart - 0.1 && t <= flyEnd + 0.3) {
+    const p = clamp01((t - flyStart) / (flyEnd - flyStart));
+    // build path (quadratic)
+    const sx = 960, sy = 340; // approx rising heart end
+    // convert counter screen px → svg viewBox (1920x1080 mapped)
+    const vx = counterX / W * 1920;
+    const vy = counterY / H * 1080;
+    const mx = (sx + vx) / 2;
+    const my = Math.min(sy, vy) - 100;
+    // animate dash
+    const d = `M ${sx},${sy} Q ${mx},${my} ${vx},${vy}`;
+    tracer.setAttribute('d', d);
+    const pathLen = 520;
+    tracer.style.strokeDasharray = pathLen;
+    tracer.style.strokeDashoffset = pathLen * (1 - p);
+    tracer.setAttribute('opacity', Math.min(1, p * 3) * (1 - Math.max(0, p - 0.75) * 4) * 0.7);
+  } else {
+    tracer.setAttribute('opacity', 0);
+  }
+
+  /* Counter value — animates from BASE → BASE+1 landing at fly end */
+  let counterVal = BASE;
+  const counterTransP = clamp01((t - flyEnd) / 0.6);
+  if (t >= flyEnd) counterVal = BASE + easeOut(counterTransP);
+  setDigitValue(counterVal);
+
+  /* Focus halo — lights when "seen" (tap to end) */
+  const haloP = Math.max(
+    bump(t, 6.2, 1.4) * 1.0,
+    bump(t, 8.5, 1.8) * 0.7
+  );
+  focusHalo.setAttribute('opacity', haloP * 0.8);
+  focusHalo.setAttribute('r', 300 + haloP * 120);
+
+  /* floating mini hearts */
+  renderFloatHearts(t);
+
+  /* narrative text */
+  let narrText = '', narrOp = 0;
+  if (t > 6.5 && t < 9.2) {
+    narrOp = Math.min(kern(t, 6.5, 1.0), 1 - kern(t, 8.3, 0.9));
+    narrText = '— seen by someone who noticed —';
+  } else if (t >= 9.5 && t < 11.8) {
+    narrOp = Math.min(kern(t, 9.5, 1.0), 1 - kern(t, 11.0, 0.8));
+    narrText = 'felt · not clicked';
+  }
+  narr.textContent = narrText;
+  narr.style.opacity = narrOp;
+
+  /* shader (background warmth envelope) */
+  renderShader(t);
+
+  /* star dust heat */
+  const heat = Math.max(
+    bump(t, 2.2, 1.0) * 0.6,
+    bump(t, 6.0, 1.5) * 0.8,
+    bump(t, 8.5, 2.0) * 0.9,
+    bump(t, 11.0, 1.2) * 0.5
+  );
+  renderDust(t, heat);
+}
+
+/* ================== Shader (subtle warmth + vignette) ================== */
+let shaderCtx = null;
+function initShader() {
+  const c = document.getElementById('shader');
+  const gl = c.getContext('webgl');
+  if (!gl) return null;
+  const r = () => {
+    const d = Math.min(devicePixelRatio || 1, 1.5);
+    c.width = innerWidth * d; c.height = innerHeight * d;
+    gl.viewport(0, 0, c.width, c.height);
+  };
+  r(); addEventListener('resize', r);
+  const V = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+  const F = `precision highp float;uniform vec2 u_res;uniform float u_t;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);float a=hash(i),b=hash(i+vec2(1,0)),c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));vec2 u=f*f*(3.-2.*f);return mix(a,b,u.x)+(c-a)*u.y*(1.-u.x)+(d-b)*u.x*u.y;}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*vnoise(p);p*=2.02;a*=.5;}return v;}
+void main(){
+  vec2 uv=(gl_FragCoord.xy/u_res)*2.-1.;uv.x*=u_res.x/u_res.y;
+  float t=u_t*.05;
+  float n=fbm(uv*1.1+vec2(t,-t*.5));
+  // deep purple base
+  vec3 col=vec3(.04,.03,.09);
+  col=mix(col,vec3(.11,.05,.15),smoothstep(.2,.7,n)*.8);
+  // warm envelope: peaks around tap (2s) + resonance (6s, 8.5s)
+  float e1 = exp(-pow((u_t-2.2)/1.0, 2.0));
+  float e2 = exp(-pow((u_t-6.0)/1.5, 2.0));
+  float e3 = exp(-pow((u_t-8.5)/2.0, 2.0));
+  float heat = e1*0.5 + e2*0.7 + e3*0.5;
+  // warm glow from center
+  float d = length(uv * vec2(.7,1.));
+  float warm = exp(-d*1.5) * heat;
+  col += vec3(1.0,.45,.55)*warm*.45;
+  // vignette
+  col*=1.-smoothstep(.25,1.25,d)*.6;
+  // grain
+  float g=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233))+u_t)*43758.5453);
+  col+=(g-.5)*.015;
+  gl_FragColor=vec4(col,1.);
+}`;
+  const sh=(t,s)=>{const x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(x));return x};
+  const P=gl.createProgram();gl.attachShader(P,sh(gl.VERTEX_SHADER,V));gl.attachShader(P,sh(gl.FRAGMENT_SHADER,F));gl.linkProgram(P);gl.useProgram(P);
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const L=gl.getAttribLocation(P,'p');gl.enableVertexAttribArray(L);gl.vertexAttribPointer(L,2,gl.FLOAT,false,0,0);
+  return { gl, uR: gl.getUniformLocation(P,'u_res'), uT: gl.getUniformLocation(P,'u_t'), canvas: c };
+}
+function renderShader(t) {
+  if (!shaderCtx) return;
+  const { gl, uR, uT, canvas } = shaderCtx;
+  gl.uniform2f(uR, canvas.width, canvas.height);
+  gl.uniform1f(uT, t);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+shaderCtx = initShader();
+
+/* ================== Timeline controller ================== */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+let currentT = 0, playing = true, lastFrame = performance.now();
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1200);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) { let next = currentT + dt; if (next >= DURATION) next = 0; setTime(next); }
+  requestAnimationFrame(loop);
+}
+scrubber.addEventListener('input', () => { playing = false; playBtn.textContent = '▶'; setTime(scrubber.value / 1200 * DURATION); });
+playBtn.addEventListener('click', () => { playing = !playing; playBtn.textContent = playing ? '⏸' : '▶'; lastFrame = performance.now(); });
+resetBtn.addEventListener('click', () => setTime(0));
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl'; lbl.textContent = cue.label;
+  m.appendChild(lbl); cueRow.appendChild(m);
+});
+setTime(0); requestAnimationFrame(loop);
+</script>
+</body>
+</html>

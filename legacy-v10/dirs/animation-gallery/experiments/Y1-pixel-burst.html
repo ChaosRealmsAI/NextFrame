@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Y1 — Pixel Burst</title>
+<style>
+  :root {
+    --bg: #07030d;
+    --ink: #ffeadf;
+    --hot: #ff2b54;
+    --amber: #ff8b29;
+    --gold: #ffd24a;
+    --pink: #ff6fb3;
+    --violet: #2a1047;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #000; color: var(--ink); font-family: 'SF Mono', 'JetBrains Mono', Menlo, monospace; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .stage {
+    position: relative;
+    width: 1920px; height: 1080px;
+    transform-origin: center center;
+    transform: scale(var(--fit, 1));
+    background: #000;
+    overflow: hidden;
+    box-shadow: 0 60px 160px rgba(0,0,0,.8);
+  }
+
+  canvas, .layer { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #bg   { z-index: 1; }
+  #main { z-index: 2; }
+  #fx   { z-index: 3; mix-blend-mode: screen; }
+
+  /* DOM overlay — LED counter + combo tag */
+  .overlay {
+    position: absolute; z-index: 4; inset: 0; pointer-events: none;
+  }
+  .counter {
+    position: absolute;
+    left: 84px; top: 80px;
+    display: flex; align-items: baseline; gap: 18px;
+    font-weight: 800;
+    color: var(--ink);
+    text-shadow:
+      0 0 14px rgba(255,60,110,.35),
+      0 0 36px rgba(255,60,110,.2);
+    letter-spacing: .02em;
+  }
+  .counter .num {
+    font-size: 148px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    background:
+      linear-gradient(180deg, #fff 0%, #ffe7dc 40%, #ff8da9 70%, #ff2b54 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 22px rgba(255,45,90,.5));
+  }
+  .counter .tag {
+    font-size: 22px;
+    color: #ff9fb0;
+    opacity: .7;
+    letter-spacing: .3em;
+  }
+
+  .combo {
+    position: absolute;
+    right: 110px; top: 120px;
+    transform-origin: 100% 50%;
+    font-weight: 900;
+    letter-spacing: .08em;
+    font-size: 92px;
+    color: #fff;
+    padding: 10px 28px 12px;
+    background: linear-gradient(90deg, #ff2b54 0%, #ff8b29 50%, #ffd24a 100%);
+    clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+    text-shadow: 0 4px 0 rgba(0,0,0,.25);
+    box-shadow: 0 0 60px rgba(255,80,100,.6);
+    will-change: transform, opacity;
+  }
+  .meter {
+    position: absolute;
+    right: 110px; top: 240px;
+    width: 380px; height: 22px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.12);
+    overflow: hidden;
+  }
+  .meter .fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff2b54, #ff8b29, #ffd24a, #ffffff);
+    box-shadow: 0 0 40px rgba(255,140,60,.7);
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+  .meter .ticks {
+    position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(90deg,
+      transparent 0 24px,
+      rgba(0,0,0,.45) 24px 26px);
+  }
+
+  .cornerTag {
+    position: absolute;
+    color: rgba(255,180,180,.25);
+    font-size: 18px;
+    letter-spacing: .4em;
+  }
+  .cornerTag.tl { left: 88px; top: 52px; }
+  .cornerTag.br { right: 88px; bottom: 52px; }
+  .cornerTag.tr { right: 88px; top: 52px; }
+  .cornerTag.bl { left: 88px; bottom: 52px; }
+
+  /* timeline UI */
+  .cue-row {
+    position: fixed; left: 24px; right: 24px; bottom: 64px;
+    height: 18px; pointer-events: none;
+    z-index: 20;
+  }
+  .cue-mark {
+    position: absolute; top: 0; width: 2px; height: 10px;
+    background: rgba(255,90,120,.7);
+  }
+  .cue-mark .lbl {
+    position: absolute; top: 12px; left: 4px;
+    font-size: 10px; letter-spacing: .15em; color: rgba(255,200,200,.55);
+    white-space: nowrap;
+  }
+  .tl-ui {
+    position: fixed; left: 24px; right: 24px; bottom: 20px;
+    height: 36px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 14px;
+    background: rgba(20,5,25,.85);
+    border: 1px solid rgba(255,90,120,.25);
+    border-radius: 6px;
+    font-family: 'SF Mono', Menlo, monospace;
+    color: #ffd1dd;
+    z-index: 21;
+  }
+  .tl-ui button {
+    background: rgba(255,60,100,.18);
+    border: 1px solid rgba(255,60,100,.45);
+    color: #ffe0e9;
+    font-size: 14px;
+    padding: 4px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .tl-ui button:hover { background: rgba(255,60,100,.32); }
+  .tl-ui input[type=range] { flex: 1; accent-color: #ff3a66; }
+  .tl-ui .time { font-size: 12px; color: #ffbbc7; min-width: 140px; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="bg"   width="1920" height="1080"></canvas>
+  <canvas id="main" width="1920" height="1080"></canvas>
+  <canvas id="fx"   width="1920" height="1080"></canvas>
+
+  <div class="overlay">
+    <div class="cornerTag tl">CH — 01 // LIVE</div>
+    <div class="cornerTag tr">PIXEL BURST / LED-MX</div>
+    <div class="cornerTag bl">◎ REC  ·  60Hz</div>
+    <div class="cornerTag br">SIGNAL OK</div>
+
+    <div class="counter">
+      <div class="num" id="countNum">0</div>
+      <div class="tag">REACTIONS</div>
+    </div>
+
+    <div class="combo" id="combo" style="opacity:0">×12 COMBO</div>
+
+    <div class="meter"><div class="fill" id="meterFill"></div><div class="ticks"></div></div>
+  </div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 10.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <span class="time" id="frameLabel" style="min-width:120px;text-align:right">frame 0 / 300</span>
+</div>
+
+<script>
+/* ============================================================
+   Y1 — PIXEL BURST
+   一颗由 LED 像素 tile 拼接的心。脉动 → 爆发 → 四散 → 重聚。
+   3 layers:
+     bg   : WebGL — scanline + grid + vignette + CRT curvature + glitch
+     main : Canvas 2D — LED pixel heart (tiles)
+     fx   : Canvas 2D — sparks / shockwave / flash
+   DOM  : counter + combo + meter + corner tags
+   ============================================================ */
+
+const DURATION = 10.0;
+const FPS = 30;
+
+/* ---------- math utils ---------- */
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const clamp01 = t => clamp(t, 0, 1);
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut  = x => 1 - Math.pow(1 - x, 3);
+const easeOut5 = x => 1 - Math.pow(1 - x, 5);
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+const springOut = x => { const c = clamp01(x); return c===0||c===1 ? c : 1 - Math.exp(-6*c)*Math.cos(9*c); };
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t*t*(3-2*t); };
+
+/* ---------- seeded rng ---------- */
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ============================================================
+   HEART SHAPE → TILES
+   Build a low-res heart grid (~16 columns wide).
+   Each filled cell becomes a tile with a persistent id.
+   ============================================================ */
+
+const GRID_W = 19;          // columns
+const GRID_H = 17;           // rows
+const CELL = 46;             // px per tile
+const GAP = 6;               // gap between tiles
+const HEART_CX = 960;
+const HEART_CY = 540;
+
+// analytic heart — f(x,y) = (x^2 + y^2 - 1)^3 - x^2 * y^3 <= 0
+function heartInside(gx, gy) {
+  // normalize to -1.35..1.35, y flipped
+  const x = (gx - (GRID_W - 1) / 2) / ((GRID_W - 1) / 2) * 1.25;
+  const y = -((gy - (GRID_H - 1) / 2) / ((GRID_H - 1) / 2)) * 1.25 + 0.18;
+  const v = Math.pow(x*x + y*y - 1, 3) - x*x * y*y*y;
+  return v <= 0;
+}
+
+const TILES = (() => {
+  const out = [];
+  const rng = mulberry32(7);
+  for (let gy = 0; gy < GRID_H; gy++) {
+    for (let gx = 0; gx < GRID_W; gx++) {
+      if (!heartInside(gx, gy)) continue;
+      // distance from centerline (for radial animations)
+      const nx = (gx - (GRID_W - 1) / 2);
+      const ny = (gy - (GRID_H - 1) / 2);
+      const r  = Math.hypot(nx, ny);
+      const ang = Math.atan2(ny, nx);
+      out.push({
+        id: out.length,
+        gx, gy,
+        r,
+        ang,
+        // base pixel position (center of tile)
+        px0: HEART_CX + nx * (CELL + GAP),
+        py0: HEART_CY + ny * (CELL + GAP) - 30,   // slight vertical lift
+        rngA: rng(),
+        rngB: rng(),
+        rngC: rng(),
+        rngD: rng(),
+      });
+    }
+  }
+  return out;
+})();
+
+const TILE_COUNT = TILES.length;   // ~110
+
+// secondary (larger) heart at end — same shape, bigger cell
+const BIG_CELL = 72;
+const BIG_GAP  = 8;
+
+/* ============================================================
+   BG — WebGL : scanlines + grid + vignette + curvature + glitch
+   ============================================================ */
+
+const bgCanvas = document.getElementById('bg');
+const gl = bgCanvas.getContext('webgl', { premultipliedAlpha: false, antialias: false });
+
+function compile(src, type) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.warn(gl.getShaderInfoLog(s));
+  }
+  return s;
+}
+const vert = `
+attribute vec2 p;
+varying vec2 v;
+void main(){ v = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }
+`;
+const frag = `
+precision highp float;
+varying vec2 v;
+uniform float uT;
+uniform vec2  uRes;
+uniform float uBeat;   // 0..1 pulse
+uniform float uBurst;  // 0..1 burst glow
+uniform float uGlitch; // 0..1 glitch gate
+
+float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
+
+void main(){
+  vec2 uv = v;
+  // CRT curvature
+  vec2 cc = uv - 0.5;
+  float d2 = dot(cc, cc);
+  cc *= 1.0 + d2 * 0.18;
+  uv = cc + 0.5;
+
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+
+  // base color — deep violet → near-black, radial
+  float r = length(uv - vec2(0.5));
+  vec3 base = mix(vec3(0.11, 0.03, 0.19), vec3(0.01, 0.0, 0.04), smoothstep(0.15, 0.95, r));
+
+  // hot glow from center, driven by uBurst
+  float glow = exp(-r * (3.5 - uBurst * 2.2));
+  vec3 hot = mix(vec3(1.0, 0.18, 0.35), vec3(1.0, 0.6, 0.15), uBurst);
+  base += hot * glow * (0.28 + uBurst * 0.55 + uBeat * 0.18);
+
+  // grid — fine LED grid
+  vec2 g = uv * vec2(160.0, 90.0);
+  vec2 gf = fract(g);
+  float grid = step(0.92, gf.x) + step(0.92, gf.y);
+  base += vec3(0.6, 0.1, 0.22) * grid * 0.05;
+
+  // scanlines
+  float sc = sin(uv.y * uRes.y * 1.8 + uT * 4.0) * 0.5 + 0.5;
+  base *= (0.85 + 0.15 * sc);
+
+  // horizontal noise bands — subtle
+  float band = hash(vec2(floor(uv.y*240.0), floor(uT*3.0)));
+  base += vec3(0.2, 0.04, 0.08) * step(0.985, band) * 0.4;
+
+  // glitch — rare horizontal tear on burst
+  if (uGlitch > 0.01) {
+    float row = floor(uv.y * 240.0);
+    float r2 = hash(vec2(row, floor(uT*30.0)));
+    if (r2 > 0.88) {
+      float shift = (r2 - 0.88) * uGlitch * 0.08;
+      vec2 uv2 = uv + vec2(shift, 0.0);
+      float glow2 = exp(-length(uv2-0.5)*3.2);
+      base += hot * glow2 * uGlitch * 0.4;
+    }
+  }
+
+  // vignette
+  base *= smoothstep(1.15, 0.35, r);
+
+  // chromatic aberration trace
+  float ca = sin(uv.y * 900.0) * 0.002 * uBurst;
+  base.r *= 1.0 + ca;
+  base.b *= 1.0 - ca;
+
+  gl_FragColor = vec4(base, 1.0);
+}
+`;
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(vert, gl.VERTEX_SHADER));
+gl.attachShader(prog, compile(frag, gl.FRAGMENT_SHADER));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+const pLoc = gl.getAttribLocation(prog, 'p');
+gl.enableVertexAttribArray(pLoc);
+gl.vertexAttribPointer(pLoc, 2, gl.FLOAT, false, 0, 0);
+
+const uT      = gl.getUniformLocation(prog, 'uT');
+const uRes    = gl.getUniformLocation(prog, 'uRes');
+const uBeat   = gl.getUniformLocation(prog, 'uBeat');
+const uBurst  = gl.getUniformLocation(prog, 'uBurst');
+const uGlitch = gl.getUniformLocation(prog, 'uGlitch');
+
+gl.viewport(0, 0, bgCanvas.width, bgCanvas.height);
+
+function renderBG(t, beat, burst, glitch) {
+  gl.uniform1f(uT, t);
+  gl.uniform2f(uRes, bgCanvas.width, bgCanvas.height);
+  gl.uniform1f(uBeat, beat);
+  gl.uniform1f(uBurst, burst);
+  gl.uniform1f(uGlitch, glitch);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+
+/* ============================================================
+   MAIN — Canvas 2D : LED tile heart
+   ============================================================ */
+
+const mainCanvas = document.getElementById('main');
+const mctx = mainCanvas.getContext('2d');
+
+// tile palette — LED saturated
+const PAL = [
+  '#ff2b54', // hot red
+  '#ff4d74', // pink-red
+  '#ff6fb3', // pink
+  '#ff8b29', // orange
+  '#ffd24a', // gold
+  '#ffffff', // white flash
+];
+
+function tileColor(tile, t, stage) {
+  // base = hot red on outer ring, pink/white at core
+  const coreMix = clamp01(1 - tile.r / 7);
+  let c;
+  if (stage === 'idle') {
+    // subtle variation
+    const k = (tile.rngA + Math.sin(t * 1.6 + tile.rngB * 6) * 0.1);
+    if (k < 0.3) c = PAL[0];
+    else if (k < 0.6) c = PAL[1];
+    else c = PAL[2];
+    if (coreMix > 0.75 && tile.rngC > 0.6) c = PAL[2];
+  } else if (stage === 'burst') {
+    const idx = Math.floor(lerp(3, 5, tile.rngA));
+    c = PAL[idx];
+  } else if (stage === 'reform') {
+    const k = (tile.rngA + Math.cos(t * 3 + tile.rngC * 8) * 0.15);
+    if (k < 0.25) c = PAL[5];
+    else if (k < 0.55) c = PAL[2];
+    else if (k < 0.8) c = PAL[3];
+    else c = PAL[0];
+  } else {
+    c = PAL[0];
+  }
+  return c;
+}
+
+function drawTile(ctx, x, y, size, rot, color, glow, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  // shadow glow
+  if (glow > 0.01) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 24 * glow;
+  }
+  ctx.fillStyle = color;
+  ctx.fillRect(-size/2, -size/2, size, size);
+  // inner highlight
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillRect(-size/2 + 4, -size/2 + 4, size - 8, 3);
+  // dark gutter line — to suggest LED gap
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-size/2 + 0.5, -size/2 + 0.5, size - 1, size - 1);
+  ctx.restore();
+}
+
+/* ============================================================
+   TILE POSITION FUNCTION
+   Given global t and tile, produce (x, y, rot, scale, alpha, color-stage).
+   Timeline (10s loop):
+     0.0 - 2.0  idle pulse (breathing heart, coverage building)
+     2.0 - 3.0  pre-charge wobble
+     3.0 - 3.35 EXPLODE — all tiles fly out
+     3.35 - 5.5 tiles tumble in space
+     5.5 - 7.5  tiles reconverge into LARGER heart
+     7.5 - 9.5  larger heart glows / soft ambient drift
+     9.5 - 10.0 fade back to tiny idle heart
+   ============================================================ */
+
+function tileAt(t, tile) {
+  const px0 = tile.px0;
+  const py0 = tile.py0;
+
+  // ---- stage gating ----
+  const idle   = clamp01((2.0 - t) / 0.4);             // 0..2.0 full, fades 1.6..2.0
+  const charge = smoothstep(2.0, 3.0, t) * smoothstep(3.3, 2.95, t);
+  const expl   = clamp01((t - 3.0) / 0.35);            // 3..3.35 ramp
+  const flight = smoothstep(3.2, 5.4, t) * smoothstep(5.7, 5.4, t);
+  const reform = smoothstep(5.5, 7.5, t);
+  const big    = smoothstep(7.2, 7.6, t) * smoothstep(9.8, 9.2, t);
+  const calm   = smoothstep(9.5, 10.0, t);
+
+  // ---- idle breathing pulse ----
+  const beat = Math.sin(t * Math.PI * 2 * 1.4);        // 1.4 Hz
+  const pulseScale = 1 + beat * 0.06;
+  let x = px0;
+  let y = py0;
+  let rot = 0;
+  let scale = pulseScale;
+  let alpha = 1;
+
+  // wobble — per-tile phase offset
+  const phase = tile.rngA * 6.28 + tile.r * 0.4;
+  x += Math.cos(t * 2 + phase) * 1.2 * (1 - reform);
+  y += Math.sin(t * 2.3 + phase) * 1.2 * (1 - reform);
+
+  // ---- pre-charge rattle ----
+  if (charge > 0.01) {
+    const rk = (tile.rngB - 0.5) * 16 * charge;
+    const ry = (tile.rngC - 0.5) * 16 * charge;
+    x += rk;
+    y += ry;
+    rot += (tile.rngD - 0.5) * 0.18 * charge;
+    scale *= 1 + charge * 0.08;
+  }
+
+  // ---- EXPLODE + flight ----
+  if (t >= 3.0 && t < 5.7) {
+    const tt = t - 3.0;                                // 0..2.7
+    const ease = easeOut5(clamp01(tt / 1.8));          // main push
+    const dir = tile.ang + (tile.rngD - 0.5) * 0.6;
+    // radial launch speed based on rng + r
+    const speed = lerp(620, 1480, tile.rngA) * (0.6 + tile.r * 0.08);
+    const dist = ease * speed;
+    x = px0 + Math.cos(dir) * dist;
+    y = py0 + Math.sin(dir) * dist;
+    // gravity tug
+    y += tt * tt * 42 * (0.4 + tile.rngB * 0.9);
+    // spin
+    rot = (tile.rngC - 0.5) * 14 * ease;
+    // scale — some grow, some shrink
+    const growK = lerp(0.3, 2.4, tile.rngA);
+    scale = lerp(1, growK, ease) * (1 + Math.sin(tt * 6 + tile.rngB * 6) * 0.08);
+    // alpha — fade as they fall off after 5.0
+    alpha = 1 - smoothstep(5.0, 5.7, t);
+  }
+
+  // ---- REFORM into bigger heart ----
+  if (t >= 5.3 && t < 9.8) {
+    const tt = (t - 5.3) / 2.2;                       // 0..1 in 2.2s
+    const r = easeInOut(clamp01(tt));
+    // target: bigger heart position
+    const nx = (tile.gx - (GRID_W - 1) / 2);
+    const ny = (tile.gy - (GRID_H - 1) / 2);
+    const tx = HEART_CX + nx * (BIG_CELL + BIG_GAP);
+    const ty = HEART_CY + ny * (BIG_CELL + BIG_GAP) - 40;
+
+    // source: a far-off point, unique per tile
+    const srcAng = tile.ang + tile.rngA * 3;
+    const srcR = 1400 + tile.rngB * 800;
+    const sx = HEART_CX + Math.cos(srcAng) * srcR;
+    const sy = HEART_CY + Math.sin(srcAng) * srcR - 200 + tile.rngC * 400;
+
+    x = lerp(sx, tx, r);
+    y = lerp(sy, ty, r);
+
+    // settle wobble after arriving
+    if (tt > 1) {
+      const settle = clamp01((t - 7.5) * 2);
+      const damp = Math.exp(-(t - 7.5) * 3);
+      x += Math.sin((t - 7.5) * 14 + tile.rngA * 6) * 6 * damp;
+      y += Math.cos((t - 7.5) * 14 + tile.rngB * 6) * 6 * damp;
+    }
+
+    // breath pulse during big heart
+    const bigBeat = Math.sin((t - 7.5) * Math.PI * 2 * 1.1);
+    scale = 1 + bigBeat * 0.05 * big;
+    rot = (tile.rngD - 0.5) * 0.04 * (1 - clamp01(tt));
+    alpha = clamp01(tt * 2);
+  }
+
+  // ---- return to small heart at tail ----
+  if (t >= 9.2) {
+    const tt = smoothstep(9.2, 10.0, t);
+    // ease scale back to 1
+    const nx = (tile.gx - (GRID_W - 1) / 2);
+    const ny = (tile.gy - (GRID_H - 1) / 2);
+    const txBig = HEART_CX + nx * (BIG_CELL + BIG_GAP);
+    const tyBig = HEART_CY + ny * (BIG_CELL + BIG_GAP) - 40;
+    const txSmall = HEART_CX + nx * (CELL + GAP);
+    const tySmall = HEART_CY + ny * (CELL + GAP) - 30;
+    x = lerp(txBig, txSmall, tt);
+    y = lerp(tyBig, tySmall, tt);
+    scale = lerp(1, 1, tt);
+    alpha = 1;
+  }
+
+  // stage label for color
+  let stage = 'idle';
+  if (t >= 2.9 && t < 5.7) stage = 'burst';
+  else if (t >= 5.3 && t < 9.2) stage = 'reform';
+
+  // size
+  let size = (t >= 5.5 && t < 9.2) ? BIG_CELL : CELL;
+  if (t >= 9.2) size = lerp(BIG_CELL, CELL, smoothstep(9.2, 10.0, t));
+
+  return { x, y, rot, scale, size, alpha, stage };
+}
+
+/* ============================================================
+   FX — flash, shockwave, sparks
+   ============================================================ */
+
+const fxCanvas = document.getElementById('fx');
+const fctx = fxCanvas.getContext('2d');
+
+const SPARK_COUNT = 160;
+const SPARKS = (() => {
+  const rng = mulberry32(91);
+  const arr = [];
+  for (let i = 0; i < SPARK_COUNT; i++) {
+    arr.push({
+      id: i,
+      a: rng() * Math.PI * 2,
+      speed: lerp(300, 1600, rng()),
+      rngA: rng(),
+      rngB: rng(),
+      rngC: rng(),
+    });
+  }
+  return arr;
+})();
+
+function renderFX(t) {
+  fctx.clearRect(0, 0, 1920, 1080);
+
+  // burst flash — white sheet at t=3
+  const flash = Math.max(
+    kern(t, 3.0, 0.25, easeOut5) * (1 - kern(t, 3.1, 0.4, easeOut)),
+    0
+  );
+  if (flash > 0.01) {
+    fctx.fillStyle = `rgba(255, 220, 180, ${flash * 0.85})`;
+    fctx.fillRect(0, 0, 1920, 1080);
+  }
+
+  // shockwave ring
+  const wave = kern(t, 3.05, 0.9, easeOut5);
+  if (wave > 0.01 && wave < 1) {
+    const R = lerp(40, 900, wave);
+    fctx.save();
+    fctx.globalCompositeOperation = 'screen';
+    fctx.lineWidth = lerp(30, 2, wave);
+    fctx.strokeStyle = `rgba(255, 120, 60, ${(1 - wave) * 0.9})`;
+    fctx.beginPath();
+    fctx.arc(HEART_CX, HEART_CY - 30, R, 0, Math.PI * 2);
+    fctx.stroke();
+    // inner ring
+    fctx.lineWidth = lerp(14, 1, wave);
+    fctx.strokeStyle = `rgba(255, 220, 120, ${(1 - wave) * 0.8})`;
+    fctx.beginPath();
+    fctx.arc(HEART_CX, HEART_CY - 30, R * 0.82, 0, Math.PI * 2);
+    fctx.stroke();
+    fctx.restore();
+  }
+
+  // sparks — fire from 3.0, live ~1.5s
+  const sparkLife = clamp01((t - 3.0) / 1.6);
+  if (sparkLife > 0 && t < 5.5) {
+    fctx.save();
+    fctx.globalCompositeOperation = 'screen';
+    SPARKS.forEach(s => {
+      const age = (t - 3.0 - s.rngA * 0.15);
+      if (age < 0 || age > 1.6) return;
+      const k = age / 1.6;
+      const r = easeOut(k) * s.speed;
+      const x = HEART_CX + Math.cos(s.a) * r;
+      const y = HEART_CY - 30 + Math.sin(s.a) * r + k * k * 80;
+      const alpha = (1 - k) * (1 - k);
+      const size = lerp(6, 1, k) * (1 + s.rngB * 1.2);
+      const hue = lerp(18, 55, s.rngC);
+      fctx.fillStyle = `hsla(${hue}, 100%, ${lerp(70, 50, k)}%, ${alpha})`;
+      fctx.fillRect(x - size/2, y - size/2, size, size);
+    });
+    fctx.restore();
+  }
+
+  // second wave on reform (7.2s gentle halo)
+  const halo = kern(t, 7.3, 1.2, easeOut);
+  if (halo > 0.01 && halo < 1) {
+    fctx.save();
+    fctx.globalCompositeOperation = 'screen';
+    fctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
+      const R = lerp(160, 620, halo) + i * 40;
+      fctx.strokeStyle = `rgba(255, 100, 140, ${(1 - halo) * 0.3})`;
+      fctx.beginPath();
+      fctx.arc(HEART_CX, HEART_CY - 40, R, 0, Math.PI * 2);
+      fctx.stroke();
+    }
+    fctx.restore();
+  }
+
+  // idle ambient particles — always on, soft
+  fctx.save();
+  fctx.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 40; i++) {
+    const rng = mulberry32(i + 500);
+    const a = rng() * Math.PI * 2;
+    const r = rng() * 520 + 160;
+    const drift = Math.sin(t * 0.6 + i) * 30;
+    const x = HEART_CX + Math.cos(a) * r + drift;
+    const y = HEART_CY - 30 + Math.sin(a) * r * 0.7 + Math.cos(t * 0.8 + i) * 20;
+    const twk = 0.5 + 0.5 * Math.sin(t * 3 + i * 1.3);
+    fctx.fillStyle = `rgba(255, 160, 200, ${0.05 + 0.08 * twk})`;
+    fctx.fillRect(x, y, 2, 2);
+  }
+  fctx.restore();
+}
+
+/* ============================================================
+   MAIN renderer
+   ============================================================ */
+
+function drawHeartTiles(t) {
+  mctx.clearRect(0, 0, 1920, 1080);
+
+  // glow pass (composite screen) — bigger soft squares
+  mctx.save();
+  mctx.globalCompositeOperation = 'lighter';
+  for (const tile of TILES) {
+    const s = tileAt(t, tile);
+    if (s.alpha < 0.02) continue;
+    const color = tileColor(tile, t, s.stage);
+    mctx.globalAlpha = s.alpha * 0.35;
+    mctx.fillStyle = color;
+    const sz = s.size * s.scale * 1.6;
+    mctx.fillRect(s.x - sz/2, s.y - sz/2, sz, sz);
+  }
+  mctx.restore();
+
+  // sharp tile pass
+  for (const tile of TILES) {
+    const s = tileAt(t, tile);
+    if (s.alpha < 0.02) continue;
+    const color = tileColor(tile, t, s.stage);
+    const glow = (s.stage === 'burst' ? 1 : s.stage === 'reform' ? 0.6 : 0.3);
+    drawTile(mctx, s.x, s.y, s.size * s.scale, s.rot, color, glow, s.alpha);
+  }
+}
+
+/* ============================================================
+   DOM overlay — counter / combo / meter
+   ============================================================ */
+
+const countNum = document.getElementById('countNum');
+const combo = document.getElementById('combo');
+const meterFill = document.getElementById('meterFill');
+
+function renderOverlay(t) {
+  // counter — ticks up hard at burst, then climbs during reform
+  let n;
+  if (t < 3.0) n = Math.floor(lerp(847, 1000, easeOut(clamp01(t / 3.0))));
+  else if (t < 5.5) {
+    // hard jump: 1000 → 8421
+    const k = easeOut5(clamp01((t - 3.0) / 0.6));
+    n = Math.floor(lerp(1000, 8421, k));
+    if (t > 3.6) n = Math.floor(lerp(8421, 9999, easeOut(clamp01((t - 3.6) / 1.9))));
+  } else if (t < 9.2) {
+    const k = easeInOut(clamp01((t - 5.5) / 3.7));
+    n = Math.floor(lerp(9999, 42_318, k));
+  } else {
+    n = 42_318;
+  }
+  countNum.textContent = n.toLocaleString();
+
+  // combo tag — appears at burst, spring in, hold, fade
+  const cin = kern(t, 3.05, 0.35, springOut);
+  const cout = kern(t, 6.0, 1.2, easeOut);
+  const cAlpha = clamp01(cin - cout);
+  const cScale = lerp(0.2, 1, cin) * (1 - cout * 0.15);
+  const cRot = lerp(-0.12, 0.02, springOut(cin));
+  combo.style.opacity = cAlpha.toFixed(3);
+  combo.style.transform = `scale(${cScale.toFixed(3)}) rotate(${cRot.toFixed(3)}rad)`;
+
+  // update combo text at 3 milestones
+  if (t < 3.3) combo.textContent = '×12 COMBO';
+  else if (t < 4.5) combo.textContent = '×48 BURST';
+  else combo.textContent = 'MAX ♥';
+
+  // meter — fills during burst, overflows at reform
+  let m;
+  if (t < 3.0) m = lerp(0.22, 0.38, t / 3.0);
+  else if (t < 3.8) m = lerp(0.38, 1.0, easeOut5(clamp01((t - 3.0) / 0.8)));
+  else if (t < 7.5) m = 1.0;
+  else if (t < 9.5) m = lerp(1.0, 0.7, easeInOut((t - 7.5) / 2.0));
+  else m = 0.22;
+  meterFill.style.transform = `scaleX(${m.toFixed(4)})`;
+}
+
+/* ============================================================
+   SIGNALS used by BG shader
+   ============================================================ */
+function signals(t) {
+  // beat — 1.4Hz always
+  const beat = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * 1.4);
+  // burst — 0..1 spike near t=3, sustained during reform
+  let burst = 0;
+  burst = Math.max(burst, kern(t, 2.9, 0.5, easeOut5) * (1 - kern(t, 3.4, 2.0, easeOut)));
+  burst = Math.max(burst, 0.35 * kern(t, 5.6, 1.6, easeOut) * (1 - kern(t, 8.5, 1.4, easeOut)));
+  // glitch — only around burst and briefly at reform peak
+  let glitch = 0;
+  glitch = Math.max(glitch, kern(t, 2.85, 0.15) * (1 - kern(t, 3.0, 0.5)));
+  glitch = Math.max(glitch, kern(t, 3.0, 0.05) * (1 - kern(t, 3.25, 0.4)));
+  glitch = Math.max(glitch, kern(t, 7.1, 0.08) * (1 - kern(t, 7.25, 0.25)));
+  return { beat, burst, glitch };
+}
+
+/* ============================================================
+   MAIN render
+   ============================================================ */
+function render(t) {
+  const sig = signals(t);
+  renderBG(t, sig.beat, sig.burst, sig.glitch);
+  drawHeartTiles(t);
+  renderFX(t);
+  renderOverlay(t);
+}
+
+/* ============================================================
+   TIMELINE CONTROLLER
+   ============================================================ */
+
+const CUES = [
+  { t: 0.0,  label: 'IDLE' },
+  { t: 2.0,  label: 'CHARGE' },
+  { t: 3.0,  label: '💥 BURST' },
+  { t: 5.5,  label: 'REFORM' },
+  { t: 7.5,  label: 'BIG HEART' },
+  { t: 9.5,  label: 'LOOP' },
+];
+
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+let currentT = 0, playing = true, lastFrame = performance.now();
+
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+
+scrubber.addEventListener('input', () => {
+  playing = false;
+  playBtn.textContent = '▶';
+  setTime(scrubber.value / 1000 * DURATION);
+});
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+resetBtn.addEventListener('click', () => setTime(0));
+
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl';
+  lbl.textContent = cue.label;
+  m.appendChild(lbl);
+  cueRow.appendChild(m);
+});
+
+/* ============================================================
+   STAGE FIT — scale 1920x1080 into viewport
+   ============================================================ */
+function fitStage() {
+  const stage = document.getElementById('stage');
+  const vw = window.innerWidth;
+  const vh = window.innerHeight - 130;
+  const s = Math.min(vw / 1920, vh / 1080);
+  stage.style.setProperty('--fit', s.toString());
+  stage.style.marginBottom = '110px';
+}
+window.addEventListener('resize', fitStage);
+fitStage();
+
+setTime(0);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

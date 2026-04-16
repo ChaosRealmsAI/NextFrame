@@ -1,0 +1,2260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NextFrame Build</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #05050c; color: #f4efe8; font-family: system-ui, -apple-system, sans-serif; }
+  body { position: relative; }
+  #stage-shell { position: fixed; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  #stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #05050c; box-shadow: 0 24px 100px rgba(0, 0, 0, 0.35); }
+  /* Controls hidden by default so recorder/MP4 output never includes the playback bar.
+     Preview use cases that want the scrubber can override via inline style or URL toggle. */
+  #controls {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 56px; z-index: 9999;
+    display: none; align-items: center; gap: 14px; padding: 0 20px;
+    background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
+  }
+  #controls[data-show="1"] { display: flex; }
+  #playBtn {
+    height: 34px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer;
+    background: #f4efe8; color: #111; font: 600 13px/1 system-ui, -apple-system, sans-serif;
+  }
+  #scrubber { flex: 1; min-width: 160px; }
+  #timeInfo, #phaseInfo { font: 500 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  #phaseInfo { opacity: 0.78; }
+</style>
+</head>
+<body>
+<div id="stage-shell"><div id="stage"></div></div>
+<div id="controls">
+  <button id="playBtn" type="button">Play</button>
+  <input type="range" id="scrubber" min="0" max="10000" value="0">
+  <span id="timeInfo">0.00s / 0.00s</span>
+  <span id="phaseInfo">Phase: idle</span>
+</div>
+<audio id="timeline-audio" preload="auto"></audio>
+<script>
+window.__SLIDE_SEGMENTS = { audio: "file:///Users/Zhuanz/bigbang/NextFrame/projects/v10-landscape/audio/seg-01.mp3", gap: 0, segments: [{ phaseId: "main", duration: 64, srt: [{ s: 0, e: 64, t: "" }] }] };
+const SRT = [];
+const TIMELINE = {
+  "version": "0.3",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 64,
+  "ratio": "16:9",
+  "background": "#05050c",
+  "audio": {
+    "src": "file:///Users/Zhuanz/bigbang/NextFrame/projects/v10-landscape/audio/seg-01.mp3",
+    "srt": []
+  },
+  "layers": [
+    {
+      "id": "scene-track-0",
+      "scene": "questionHook",
+      "start": 0,
+      "dur": 8,
+      "params": {
+        "question": "想做视频，但 AI 不会？",
+        "pain1": "不知道该讲什么顺序",
+        "pain2": "做完效果不够专业",
+        "pain3": "每次都要重新发明轮子"
+      }
+    },
+    {
+      "id": "scene-track-1",
+      "scene": "brandTitle",
+      "start": 8,
+      "dur": 8,
+      "params": {
+        "brand": "NextFrame",
+        "tagline": "JSON 进来，MP4 出去",
+        "sub": "AI 视频引擎 · 开源 · 可编程"
+      }
+    },
+    {
+      "id": "scene-track-2",
+      "scene": "jsonShowcase",
+      "start": 16,
+      "dur": 8,
+      "params": {
+        "title": "Timeline 描述视频结构"
+      }
+    },
+    {
+      "id": "scene-track-3",
+      "scene": "sceneGrid",
+      "start": 24,
+      "dur": 8,
+      "params": {
+        "title": "Scene 是组件 — 一个函数返回 HTML"
+      }
+    },
+    {
+      "id": "scene-track-4",
+      "scene": "timelineDiagram",
+      "start": 32,
+      "dur": 8,
+      "params": {
+        "title": "Anchors 让时间用名字说话"
+      }
+    },
+    {
+      "id": "scene-track-5",
+      "scene": "cliDemo",
+      "start": 40,
+      "dur": 8,
+      "params": {
+        "command": "nextframe render timeline.json output.mp4",
+        "title": "一行命令，产出 MP4"
+      }
+    },
+    {
+      "id": "scene-track-6",
+      "scene": "dualOutput",
+      "start": 48,
+      "dur": 8,
+      "params": {
+        "title": "横屏竖屏，同一叙事，两套适配"
+      }
+    },
+    {
+      "id": "scene-track-7",
+      "scene": "ctaQR",
+      "start": 56,
+      "dur": 8,
+      "params": {
+        "brand": "NextFrame",
+        "url": "github.com/anthropics/nextframe",
+        "cta": "开源 · 欢迎玩起来"
+      }
+    }
+  ],
+  "_audioSrc": "file:///Users/Zhuanz/bigbang/NextFrame/projects/v10-landscape/audio/seg-01.mp3"
+};
+// Shared scene utilities (design tokens, helpers)
+// no shared/design.js
+// Legacy 16:9 scene bundle compatibility
+"use strict";
+// @ts-nocheck
+window.__scenes = {};
+const TOKENS = { interview: { bg: "#111111", gold: "#e8c47a", warm: "#da7756", text: "#ffffff", textDim: "rgba(255,255,255,0.7)", textFaint: "rgba(255,255,255,0.3)", blue: "#7ec8e3", tagBg: "rgba(126,200,227,0.06)", tagBorder: "rgba(126,200,227,0.15)", tagText: "#7ec8e3", decoLine: "rgba(232,196,122,0.12)", decoLineDiamond: "rgba(232,196,122,0.2)", gridDot: "rgba(232,196,122,0.08)", glowTop: "rgba(232,196,122,0.03)", glowBottom: "rgba(232,196,122,0.02)", vignette: "rgba(17,17,17,0.5)", }, lecture: { bg: "#1a1510", codeBg: "#1e1e2e", accent: "#da7756", gold: "#d4b483", text: "#f5ece0", green: "#7ec699", comment: "#6a6a7a", red: "#e06c75", }, };
+const GRID = { sidePad: 80, header: { top: 0, height: 260 }, decoLine1: 258, video: { top: 276, height: 538, left: 80, right: 80 }, decoLine2: 820, subs: { top: 830, left: 140, right: 140, height: 340 }, timeInfo: 1186, topic: { top: 1224, height: 256 }, progress: 1496, decoLine3: 1580, brand: 1590, teamLine: 1760, };
+const TYPE = { seriesName: { size: 44, weight: 800, spacing: "0.06em", font: "'PingFang SC','Noto Sans SC',Inter,system-ui,sans-serif" }, title: { size: 60, weight: 700, spacing: "-0.01em", lineHeight: 1.2, font: "'PingFang SC','Noto Sans SC',Inter,system-ui,sans-serif" }, cnSub: { size: 52, weight: 700, lineHeight: 1.3, font: "-apple-system,'PingFang SC','Microsoft YaHei',system-ui,sans-serif" }, enSub: { size: 22, weight: 400, lineHeight: 1.6, font: "-apple-system,'PingFang SC',system-ui,sans-serif" }, topicLabel: { size: 20, weight: 600, spacing: "0.1em", font: "'PingFang SC','Noto Sans SC',sans-serif" }, topicText: { size: 24, weight: 500, lineHeight: 1.65, font: "'PingFang SC','Noto Sans SC',sans-serif" }, tag: { size: 22, weight: 500, spacing: "0.03em", font: "'SF Mono','JetBrains Mono',monospace" }, timeInfo: { size: 22, weight: 500, spacing: "0.05em", font: "'SF Mono','JetBrains Mono',monospace" }, brand: { size: 40, weight: 900, spacing: "0.2em", font: "'Iowan Old Style','Songti SC','Playfair Display',Georgia,serif" }, teamLine: { size: 20, weight: 500, spacing: "0.03em", font: "'SF Mono','JetBrains Mono',monospace" }, clipLabel: { size: 14, weight: 500, spacing: "0.08em", font: "'SF Mono','JetBrains Mono',monospace" }, };
+function findActiveSub(segments, t) { if (!Array.isArray(segments))
+    return null; for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    if (t >= seg.s && t < seg.e) {
+        const cnArr = Array.isArray(seg.cn) ? seg.cn : [];
+        for (let j = 0; j < cnArr.length; j++) {
+            const c = cnArr[j];
+            if (t >= c.s && t < c.e) {
+                return { en: seg.en || "", cn: c.text || "", speaker: seg.speaker || "" };
+            }
+        }
+        return { en: seg.en || "", cn: "", speaker: seg.speaker || "" };
+    }
+} return null; }
+function esc(value) { return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function escAttr(value) { return esc(value).replace(/'/g, "&#39;"); }
+function clamp01(value) { return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0)); }
+function easeOutCubic(value) { const p = clamp01(value); return 1 - Math.pow(1 - p, 3); }
+function scaleW(vp, px) { return Math.round((vp.width * px) / 1080); }
+function scaleH(vp, px) { return Math.round((vp.height * px) / 1920); }
+function sw16(vp, px) { return Math.round((vp.width * px) / 1920); }
+function sh16(vp, px) { return Math.round((vp.height * px) / 1080); }
+function fadeIn(t, delay, duration) { const d = Number.isFinite(delay) ? delay : 0; const dur = Number.isFinite(duration) ? duration : 0.45; return easeOutCubic((t - d) / Math.max(dur, 0.001)); }
+function decoLine(vp, y) { const left = scaleW(vp, GRID.sidePad); const lineY = scaleH(vp, y); const dSize = scaleW(vp, 10); return `<div style="position:absolute;left:${left}px;right:${left}px;top:${lineY}px;height:1px;background:linear-gradient(90deg,transparent,${TOKENS.interview.decoLine} 20%,${TOKENS.interview.decoLine} 80%,transparent);pointer-events:none">` + `<div style="position:absolute;left:0;top:${-dSize / 2}px;width:${dSize}px;height:${dSize}px;border:1px solid ${TOKENS.interview.decoLineDiamond};transform:rotate(45deg);background:${TOKENS.interview.bg}"></div>` + `<div style="position:absolute;right:0;top:${-dSize / 2}px;width:${dSize}px;height:${dSize}px;border:1px solid ${TOKENS.interview.decoLineDiamond};transform:rotate(45deg);background:${TOKENS.interview.bg}"></div>` + `</div>`; }
+(function () { const meta = { id: "codeTerminal", version: 1, ratio: "16:9", category: "browser", label: "Code Terminal", description: "代码块展示，带行号和语法高亮色彩。支持逐行淡入动画，适合讲解配置/代码。", tech: "dom", duration_hint: 10, loopable: false, z_hint: "middle", tags: ["代码", "code", "terminal", "highlight", "配置"], mood: ["technical", "focused"], theme: ["tech", "education"], default_theme: "anthropic-warm", themes: { "anthropic-warm": { bg:TOKENS.lecture.codeBg, border: "rgba(218,119,86,0.25)", lineNumColor: "#6b5d52", codeColor:TOKENS.lecture.text, commentColor:TOKENS.lecture.green, keywordColor:TOKENS.lecture.accent, stringColor:TOKENS.lecture.gold, numberColor: "#8ab4cc" }, "dark-pro": { bg: "#0d1117", border: "rgba(138,180,204,0.20)", lineNumColor: "#4a5568", codeColor: "#e2e8f0", commentColor:TOKENS.lecture.green, keywordColor: "#8ab4cc", stringColor:TOKENS.lecture.gold, numberColor:TOKENS.lecture.accent }, }, params: { lines: { type: "array", required: true, default: [], label: "代码行", semantic: "array of strings, each is one line. Use special prefixes: '//' for comment style, 'k:' for keyword", group: "content" }, title: { type: "string", default: "", label: "标题（可选）", group: "content" }, enterStagger: { type: "number", default: 0.15, label: "逐行延迟(s)", group: "animation", range: [0, 1], step: 0.05 }, enterDur: { type: "number", default: 0.3, label: "每行淡入时长(s)", group: "animation", range: [0.1, 1], step: 0.05 }, bg: { type: "color", default:TOKENS.lecture.codeBg, label: "背景色", group: "color" }, border: { type: "color", default: "rgba(218,119,86,0.25)", label: "边框色", group: "color" }, lineNumColor: { type: "color", default: "#6b5d52", label: "行号颜色", group: "color" }, codeColor: { type: "color", default:TOKENS.lecture.text, label: "代码颜色", group: "color" }, commentColor: { type: "color", default:TOKENS.lecture.green, label: "注释颜色", group: "color" }, keywordColor: { type: "color", default:TOKENS.lecture.accent, label: "关键字颜色", group: "color" }, stringColor: { type: "color", default:TOKENS.lecture.gold, label: "字符串颜色", group: "color" }, numberColor: { type: "color", default: "#8ab4cc", label: "数字颜色", group: "color" }, fontSize: { type: "number", default: 28, label: "字号(px)", group: "style", range: [14, 48], step: 2 }, x: { type: "number", default: 0, label: "X 偏移(px, 0=居中)", group: "style", range: [0, 1920], step: 10 }, y: { type: "number", default: 0, label: "Y 偏移(px, 0=居中)", group: "style", range: [0, 1080], step: 10 }, maxWidth: { type: "number", default: 1400, label: "最大宽度(px)", group: "style", range: [400, 1800], step: 50 }, }, ai: { when: "展示代码片段、配置文件、JSON 时使用。逐行淡入适合讲解节奏。", how: "lines 是字符串数组，每个元素一行。特殊前缀：'// ' 开头自动变注释色，字符串自动染色，关键字自动高亮。", example: { lines: ["// ~/.claude/settings.json", "{", '  "hooks": {', '    "PreToolUse": [', '      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "guard.sh" }] }', "    ]", "  }", "}",], enterStagger: 0.2, }, avoid: "代码行不要超过 20 行，否则字号要相应减小。不要用 tab 缩进（用空格）。", pairs_with: ["subtitleBar", "progressBar16x9", "darkGradient"], }, }; function colorize(line, p) { if (!line)
+    return "<br>"; const trimmed = line.trimStart(); if (trimmed.startsWith("//") || trimmed.startsWith("#")) {
+    return '<span style="color:' + p.commentColor + '">' + esc(line) + '</span>';
+} let result = ""; const KEYWORDS = ["const", "let", "var", "function", "return", "if", "else", "for", "while", "import", "export", "from", "true", "false", "null", "undefined"]; const KEYWORD_RE = new RegExp("\\b(" + KEYWORDS.join("|") + ")\\b", "g"); let i = 0; const chars = line; const segments = []; let cur = ""; while (i < chars.length) {
+    const ch = chars[i];
+    if (ch === '"' || ch === "'") {
+        if (cur) {
+            segments.push({ type: "code", text: cur });
+            cur = "";
+        }
+        let str = ch;
+        i++;
+        while (i < chars.length && chars[i] !== ch) {
+            if (chars[i] === "\\" && i + 1 < chars.length) {
+                str += chars[i] + chars[i + 1];
+                i += 2;
+                continue;
+            }
+            str += chars[i++];
+        }
+        str += (chars[i] || "");
+        i++;
+        segments.push({ type: "string", text: str });
+    }
+    else {
+        cur += ch;
+        i++;
+    }
+} if (cur)
+    segments.push({ type: "code", text: cur }); for (const seg of segments) {
+    if (seg.type === "string") {
+        result += '<span style="color:' + p.stringColor + '">' + esc(seg.text) + '</span>';
+    }
+    else {
+        let codeHtml = esc(seg.text);
+        codeHtml = codeHtml.replace(/\b(\d+\.?\d*)\b/g, '<span style="color:' + p.numberColor + '">$1</span>');
+        codeHtml = codeHtml.replace(new RegExp("\\b(" + KEYWORDS.join("|") + ")\\b", "g"), '<span style="color:' + p.keywordColor + '">$1</span>');
+        codeHtml = codeHtml.replace(/&quot;([^&]+)&quot;\s*:/g, '<span style="color:' + p.keywordColor + '">&quot;$1&quot;</span>:');
+        result += codeHtml;
+    }
+} return result; } function render(t, params, vp) { const p = {}; for (const k in meta.params)
+    p[k] = params[k] !== undefined ? params[k] : meta.params[k].default; const lines = Array.isArray(p.lines) ? p.lines : []; const fs = Number(p.fontSize); const lineH = Math.round(fs * 1.7); const padV = 36; const padH = 48; const lineNumW = 52; const blockH = lines.length * lineH + padV * 2 + (p.title ? lineH + 16 : 0); const blockW = Math.min(Number(p.maxWidth), vp.width - 120); const cx = Number(p.x) > 0 ? Number(p.x) : (vp.width - blockW) / 2; const cy = Number(p.y) > 0 ? Number(p.y) : (vp.height - blockH) / 2; let html = '<div style="position:absolute;left:' + cx + 'px;top:' + cy + 'px;width:' + blockW + 'px;min-height:' + blockH + 'px;' + 'background:' + p.bg + ';border:1px solid ' + p.border + ';border-radius:10px;overflow:hidden">'; const titleOp = easeOutCubic(t / (Number(p.enterDur) || 0.3)); const titleOpClamped = Math.max(0, Math.min(1, titleOp)); const dotSize = Math.round(fs * 0.4); const dotGap = Math.round(fs * 0.28); html += '<div style="display:flex;align-items:center;padding:' + Math.round(padV * 0.4) + 'px ' + padH + 'px;opacity:' + titleOpClamped + '">' + '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#ff5f57;margin-right:' + dotGap + 'px"></span>' + '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#febc2e;margin-right:' + dotGap + 'px"></span>' + '<span style="display:inline-block;width:' + dotSize + 'px;height:' + dotSize + 'px;border-radius:50%;background:#28c840;margin-right:' + Math.round(padH * 0.5) + 'px"></span>' + (p.title ? '<span style="font:500 ' + (fs - 6) + 'px system-ui,sans-serif;color:' + p.lineNumColor + '">' + esc(p.title) + '</span>' : '') + '</div>'; const globalOp = Math.max(0, Math.min(1, easeOutCubic(t / Math.max(Number(p.enterDur) || 0.3, 0.01)))); const codeLines = []; for (let idx = 0; idx < lines.length; idx++) {
+    const num = String(idx + 1).padStart(3, ' ');
+    const numHtml = '<span style="color:' + p.lineNumColor + '">' + num + '</span>  ';
+    codeLines.push(numHtml + colorize(lines[idx], p));
+} html += '<pre style="margin:0;padding:' + padV + 'px ' + padH + 'px;font:400 ' + fs + 'px \'SF Mono\',Menlo,monospace;color:' + p.codeColor + ';line-height:' + lineH + 'px;white-space:pre;tab-size:2;opacity:' + globalOp + '">' + codeLines.join('\n') + '</pre></div>'; return html; } function screenshots() { return [{ t: 0, label: "初始（无内容）" }, { t: 1.5, label: "逐行出现中" }, { t: 5, label: "全部显示" },]; } function lint(params, vp) { const errors = []; if (!Array.isArray(params.lines))
+    errors.push("lines 必须是数组。Fix: 传入字符串数组"); if (Array.isArray(params.lines) && params.lines.length === 0)
+    errors.push("lines 为空，代码块不会显示。Fix: 至少传入一行"); if (params.lines && params.lines.length > 25)
+    errors.push("lines 超过 25 行，建议减小 fontSize 或拆图。"); return { ok: errors.length === 0, errors }; } window.__scenes["codeTerminal"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { const meta = { id: "darkGradient", version: 1, ratio: "16:9", category: "backgrounds", label: "Dark Gradient", description: "深色暖棕背景，带极轻微的径向光晕。适合讲解、课程和访谈类视频，不会像极光背景那样抢戏。", tech: "dom", duration_hint: 30, loopable: true, z_hint: "bottom", tags: ["background", "dark", "gradient", "lecture", "subtle"], mood: ["calm", "focused", "professional"], theme: ["education", "lecture", "interview"], default_theme: "warm-lecture", themes: { "warm-lecture": { bg: "#1a1510", glowColor: "rgba(218,119,86,0.16)", glowX: 52, glowY: 34, glowSize: 54 }, "charcoal-focus": { bg: "#121214", glowColor: "rgba(138,180,204,0.12)", glowX: 50, glowY: 30, glowSize: 48 }, "espresso-soft": { bg: "#18110d", glowColor: "rgba(212,180,131,0.12)", glowX: 48, glowY: 28, glowSize: 44 }, }, params: { bg: { type: "color", default: "#1a1510", label: "背景色", semantic: "base background color covering the full viewport", group: "color" }, glowColor: { type: "color", default: "rgba(218,119,86,0.16)", label: "光晕色", semantic: "color used in the subtle radial glow overlay", group: "color" }, glowX: { type: "number", default: 52, label: "光晕 X(%)", semantic: "horizontal glow anchor in percent of viewport width", group: "layout", range: [0, 100], step: 1 }, glowY: { type: "number", default: 34, label: "光晕 Y(%)", semantic: "vertical glow anchor in percent of viewport height", group: "layout", range: [0, 100], step: 1 }, glowSize: { type: "number", default: 54, label: "光晕尺寸(%)", semantic: "radial glow falloff size in percent, larger values spread the glow wider", group: "style", range: [10, 120], step: 1 }, }, ai: { when: "做课程讲解、lecture video、访谈说明等需要克制背景的时候使用。", how: "放在最底层作为全屏背景。只调 bg 和 glowColor 就能快速换气质；glowX/glowY 控制光斑落点。", example: { bg: "#1a1510", glowColor: "rgba(218,119,86,0.16)", glowX: 52, glowY: 34, glowSize: 54 }, theme_guide: { "warm-lecture": "默认暖棕 lecture 背景", "charcoal-focus": "偏冷深灰，适合科技内容", "espresso-soft": "更柔和的棕黑" }, avoid: "不要再叠加其他背景 scene；glowSize 太大或 glowColor 太亮会让文字对比变差。", pairs_with: ["videoClip", "slideChrome", "subtitleBar"], }, }; function render(t, params, vp) { const bg = params.bg || "#1a1510"; const glowColor = params.glowColor || "rgba(218,119,86,0.16)"; const glowX = Number.isFinite(params.glowX) ? params.glowX : 52; const glowY = Number.isFinite(params.glowY) ? params.glowY : 34; const glowSize = Number.isFinite(params.glowSize) ? params.glowSize : 54; const glow = `radial-gradient(circle at ${glowX}% ${glowY}%, ${glowColor} 0%, transparent ${glowSize}%)`; const vignette = "linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.4) 100%)"; return `<div style="position:absolute;left:0;top:0;width:${vp.width}px;height:${vp.height}px;overflow:hidden;background:${bg}"> <div style="position:absolute;inset:0;background:${glow}"></div> <div style="position:absolute;inset:0;background:${vignette}"></div> </div>`; } function screenshots() { return [{ t: 0, label: "默认背景" }, { t: 8, label: "中段静帧" }, { t: 20, label: "长期保持" },]; } function lint(params, vp) { const errors = []; if (!params.bg)
+    errors.push("bg 不能为空。Fix: 传入背景色"); if (!params.glowColor)
+    errors.push("glowColor 不能为空。Fix: 传入光晕色"); if (params.glowX < 0 || params.glowX > 100)
+    errors.push("glowX 超出范围 [0, 100]。Fix: 设为 0–100"); if (params.glowY < 0 || params.glowY > 100)
+    errors.push("glowY 超出范围 [0, 100]。Fix: 设为 0–100"); if (params.glowSize < 10 || params.glowSize > 120)
+    errors.push("glowSize 超出范围 [10, 120]。Fix: 设为 10–120"); return { ok: errors.length === 0, errors }; } window.__scenes["darkGradient"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { const meta = { id: "headlineCenter", version: 1, ratio: "16:9", category: "typography", label: "Headline Center", description: "全屏居中大标题，支持内联 HTML 变色。只做标题。", tech: "dom", duration_hint: 10, loopable: false, z_hint: "middle", tags: ["标题", "headline", "居中", "大字"], mood: ["impactful", "dramatic"], theme: ["tech", "education", "presentation"], default_theme: "anthropic-warm", themes: { "anthropic-warm": { color: "#f5ece0", fontSize: 42 }, "large": { color: "#f5ece0", fontSize: 56 }, "subtle": { color: "rgba(245,236,224,.75)", fontSize: 36 }, }, params: { text: { type: "string", required: true, default: "给 AI 安了一个<span style='color:#da7756'>安检员</span>", label: "标题文字", semantic: "supports inline HTML like <span style='color:#da7756'>重点</span>", group: "content" }, color: { type: "color", default: "#f5ece0", label: "文字色", semantic: "headline text color", group: "color" }, fontSize: { type: "number", default: 42, label: "字号(px)", semantic: "font size", group: "style", range: [24, 72], step: 2 }, y: { type: "number", default: 0, label: "Y偏移(px, 0=居中)", semantic: "vertical offset", group: "style", range: [0, 1080], step: 10 }, enterDelay: { type: "number", default: 0, label: "出现延迟(s)", semantic: "fade-in delay", group: "animation", range: [0, 10], step: 0.1 }, }, ai: { when: "全屏居中一句大标题。phase 开头的主题句。", how: "text 支持 HTML 变色。搭配 flowDiagram 放下方。", example: { text: '给 AI 安了一个<span style="color:#da7756">安检员</span>' }, theme_guide: { "anthropic-warm": "暖色", "large": "大字", "subtle": "淡化" }, avoid: "不用于多行文字（用 titleCard）。", pairs_with: ["flowDiagram", "quoteBlock", "auroraGradient"], }, }; function ease3(p) { return 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3); } function fadeIn(t, start, dur) { return ease3((t - start) / dur); } function render(t, params, vp) { const p = {}; for (const k in meta.params)
+    p[k] = params[k] !== undefined ? params[k] : meta.params[k].default; const op = fadeIn(t, p.enterDelay || 0, 0.7); const fs = p.fontSize || 42; const color = p.color || "#f5ece0"; const maxWidth = Math.max(320, vp.width - 120); const posStyle = Number(p.y) > 0 ? "position:absolute;left:60px;right:60px;top:" + p.y + "px;text-align:center;max-width:" + maxWidth + "px;margin:0 auto" : "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 60px"; return '<div style="' + posStyle + '">' + '<div style="font:700 ' + fs + 'px Georgia,\'Noto Serif SC\',serif;color:' + color + ';text-align:center;line-height:1.3;opacity:' + op + ';max-width:' + maxWidth + 'px">' + (p.text || '') + '</div>' + '</div>'; } function screenshots() { return [{ t: 0, label: "透明" }, { t: 0.5, label: "淡入" }, { t: 2, label: "显示" }]; } function lint(params, vp) { const errors = []; if (!params.text)
+    errors.push("text 不能为空。Fix: 传入标题文字"); return { ok: errors.length === 0, errors: errors }; } window.__scenes["headlineCenter"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { const meta = { id: "progressBar16x9", version: 1, ratio: "16:9", category: "overlays", label: "Progress Bar", description: "底部细进度条。调用方每帧传入 progress(0-1)，无动画逻辑，视觉即时更新。", tech: "dom", duration_hint: 0, loopable: true, z_hint: "top", tags: ["进度条", "progress", "bar", "overlay", "底部"], mood: ["neutral"], theme: ["tech", "education", "vlog"], default_theme: "anthropic-warm", themes: { "anthropic-warm": { color: "#da7756", trackColor: "rgba(245,236,224,.08)" }, "dark-minimal": { color: "#8ab4cc", trackColor: "rgba(255,255,255,.08)" }, "signal-green": { color: "#7ec699", trackColor: "rgba(126,198,153,.18)" } }, params: { progress: { type: "number", required: true, default: 0.35, label: "进度 0-1", semantic: "current progress fraction, 0=empty 1=full", group: "content", range: [0, 1], step: 0.01 }, color: { type: "color", default: "#da7756", label: "进度条颜色", group: "color" }, trackColor: { type: "color", default: "rgba(245,236,224,.08)", label: "轨道颜色", group: "color" }, height: { type: "number", default: 4, label: "高度(px)", group: "style", range: [1, 20], step: 1 }, y: { type: "number", default: 50, label: "距底部(px)", group: "style", range: [0, 200], step: 5 }, borderRadius: { type: "number", default: 2, label: "圆角(px)", group: "style", range: [0, 10], step: 1 } }, ai: { when: "显示视频整体播放进度或章节进度。调用方计算 progress = currentTime / totalDuration 传入。", how: "progress 是 0-1 的小数。0 = 空，1 = 满。每帧由调用方更新，组件本身无时间逻辑。", example: { progress: 0.35, color: "#da7756", height: 4, y: 50 }, theme_guide: { "anthropic-warm": "橙色进度条 + 极淡轨道", "dark-minimal": "蓝色极简", "signal-green": "绿色强调" }, avoid: "height > 8 会显得突兀，建议 3-6px。不要用于倒计时（那是调用方的逻辑）。", pairs_with: ["subtitleBar", "slideChrome", "auroraGradient"] } }; function render(t, params, vp) { const p = {}; for (const k in meta.params)
+    p[k] = params[k] !== undefined ? params[k] : meta.params[k].default; const progress = Math.max(0, Math.min(1, Number(p.progress) || 0)); const h = p.height; const r = p.borderRadius; const y = p.y; const fillW = (progress * 100).toFixed(3) + '%'; return '<div style="position:absolute;bottom:' + y + 'px;left:0;right:0;width:' + vp.width + 'px;height:' + h + 'px;border-radius:' + r + 'px;background:' + p.trackColor + ';overflow:hidden">' + '<div style="height:100%;width:' + fillW + ';background:' + p.color + ';border-radius:' + r + 'px"></div>' + '</div>'; } function screenshots() { return [{ t: 0, label: "进度 0%（调用方传 progress:0）" }, { t: 0, label: "进度 35%（调用方传 progress:0.35）" }, { t: 0, label: "进度 100%（调用方传 progress:1）" }]; } function lint(params, vp) { const errors = []; if (params.progress === undefined || params.progress === null)
+    errors.push("progress 不能为空。Fix: 传入 0-1 之间的小数"); if (params.progress !== undefined && (params.progress < 0 || params.progress > 1))
+    errors.push("progress 必须在 0-1 之间。Fix: 当前值 " + params.progress + " 超出范围"); return { ok: errors.length === 0, errors: errors }; } window.__scenes["progressBar16x9"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { const meta = { id: "subtitleBar", version: 1, ratio: "16:9", category: "overlays", label: "Subtitle Bar", description: "底部字幕条。传入 srt 数组 [{s,e,t}]，按时间显示当前字幕文字。", tech: "dom", duration_hint: 30, loopable: true, z_hint: "top", tags: ["字幕", "subtitle", "srt", "overlay", "底部"], mood: ["neutral"], theme: ["education", "lecture", "vlog"], default_theme: "anthropic-warm", themes: { "anthropic-warm": { bgColor: "rgba(26,21,16,0.82)", textColor:TOKENS.lecture.text, accentColor:TOKENS.lecture.accent }, "dark-minimal": { bgColor: "rgba(0,0,0,0.72)", textColor: "#ffffff", accentColor: "#8ab4cc" }, "warm-gold": { bgColor: "rgba(26,21,16,0.85)", textColor:TOKENS.lecture.gold, accentColor:TOKENS.lecture.accent }, }, params: { srt: { type: "array", required: true, default: [], label: "字幕数组", semantic: "array of {s,e,t} objects: s=start(s), e=end(s), t=text", group: "content" }, bgColor: { type: "color", default: "rgba(26,21,16,0.82)", label: "背景色", group: "color" }, textColor: { type: "color", default:TOKENS.lecture.text, label: "文字色", group: "color" }, accentColor: { type: "color", default:TOKENS.lecture.accent, label: "强调色", group: "color" }, fontSize: { type: "number", default: 32, label: "字号(px)", group: "style", range: [18, 54], step: 2 }, y: { type: "number", default: 60, label: "距底部(px)", group: "style", range: [0, 300], step: 4 }, }, ai: { when: "需要字幕时使用。srt 数组由 TTS 生成或手写。", how: "srt 是 [{s:0, e:3, t:'文字'}] 数组。组件按绝对时间查找当前字幕（t 是 layer.start 起的相对时间）。", example: { srt: [{ s: 0, e: 5, t: "Hook：AI 的安检员" }, { s: 5, e: 10, t: "每次 AI 动手前先检查" }] }, avoid: "srt 时间段不要重叠；文字太长超出屏幕宽度时会自动换行。", pairs_with: ["progressBar16x9", "darkGradient"], }, }; function render(t, params, vp) { const p = {}; for (const k in meta.params)
+    p[k] = params[k] !== undefined ? params[k] : meta.params[k].default; const srt = Array.isArray(p.srt) ? p.srt : []; const entry = srt.find((e) => t >= Number(e.s || 0) && t < Number(e.e || 0)); const text = entry ? String(entry.t || "") : ""; if (!text)
+    return ""; const fs = p.fontSize || 32; const y = p.y || 60; const maxW = vp.width - 160; return '<div style="position:absolute;left:0;right:0;bottom:' + y + 'px;display:flex;justify-content:center;align-items:flex-end;padding:0 80px">' + '<div style="background:' + p.bgColor + ';color:' + p.textColor + ';font:500 ' + fs + 'px system-ui,sans-serif;' + 'padding:10px 28px;border-radius:6px;max-width:' + maxW + 'px;text-align:center;line-height:1.5;' + 'border-bottom:2px solid ' + p.accentColor + '">' + text + '</div>' + '</div>'; } function screenshots() { return [{ t: 1, label: "第一条字幕" }, { t: 6, label: "第二条字幕" }, { t: 20, label: "无字幕（空白）" },]; } function lint(params, vp) { const errors = []; if (!Array.isArray(params.srt))
+    errors.push("srt 必须是数组。Fix: 传入 [{s,e,t}] 数组"); if (Array.isArray(params.srt) && params.srt.length === 0)
+    errors.push("srt 数组为空，字幕不会显示。Fix: 至少传入一条字幕"); return { ok: errors.length === 0, errors }; } window.__scenes["subtitleBar"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+(function () { function escAttr(value) { return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); } const meta = { id: "videoClip", version: 1, ratio: "16:9", category: "media", label: "Video Clip", description: "嵌入真实视频文件（MP4），支持定位和圆角。用于访谈片段、B-roll 等需要播放原始视频的场景。", tech: "video", duration_hint: 0, loopable: false, z_hint: "middle", tags: ["video", "clip", "media", "b-roll", "interview"], mood: ["neutral", "cinematic", "documentary"], theme: ["education", "presentation", "interview"], default_theme: "full-bleed", themes: { "full-bleed": { x: 0, y: 0, width: 1920, height: 1080, borderRadius: 0, objectFit: "cover" }, "inset-rounded": { x: 120, y: 90, width: 1680, height: 900, borderRadius: 28, objectFit: "cover" }, "contain-frame": { x: 160, y: 80, width: 1600, height: 920, borderRadius: 20, objectFit: "contain" }, }, params: { src: { type: "string", required: true, default: "https://example.com/sample.mp4", label: "视频地址", semantic: "absolute local path or remote URL pointing to an mp4 file", group: "content" }, x: { type: "number", default: 0, label: "X 偏移(px)", semantic: "left offset from viewport origin", group: "layout", range: [0, 1920], step: 10 }, y: { type: "number", default: 0, label: "Y 偏移(px)", semantic: "top offset from viewport origin", group: "layout", range: [0, 1080], step: 10 }, width: { type: "number", default: 1920, label: "宽度(px)", semantic: "video width in pixels; default matches full viewport width in 16:9", group: "layout", range: [80, 1920], step: 10 }, height: { type: "number", default: 0, label: "高度(px)", semantic: "video height in pixels; 0 keeps the source aspect ratio automatically", group: "layout", range: [0, 1080], step: 10 }, borderRadius: { type: "number", default: 0, label: "圆角(px)", semantic: "corner radius applied to the video element", group: "style", range: [0, 120], step: 2 }, objectFit: { type: "enum", default: "cover", options: ["cover", "contain"], label: "填充模式", semantic: "cover fills the box, contain keeps the full frame visible", group: "style" }, }, ai: { when: "需要直接播放真实视频素材时使用，比如采访切片、讲解里的 B-roll、录屏片段。", how: "传入 src 指向 mp4 文件。height=0 时按素材原始比例自动算高；若同时给 width 和 height，则用 objectFit 控制裁切或留边。", example: { src: "/Users/demo/assets/interview.mp4", x: 120, y: 90, width: 1680, height: 900, borderRadius: 28, objectFit: "cover" }, theme_guide: { "full-bleed": "全屏铺满", "inset-rounded": "留安全边距和圆角", "contain-frame": "完整显示视频内容" }, avoid: "不要传空 src；objectFit=contain 时如果盒子比例和视频不一致会出现留边，这是预期行为。", pairs_with: ["darkGradient", "slideChrome", "subtitleBar"], }, }; function render(t, params, vp) { const src = params.src || ""; const x = Number.isFinite(params.x) ? params.x : 0; const y = Number.isFinite(params.y) ? params.y : 0; const width = Number.isFinite(params.width) && params.width > 0 ? params.width : vp.width; const height = Number.isFinite(params.height) && params.height > 0 ? params.height : 0; const borderRadius = Number.isFinite(params.borderRadius) ? Math.max(0, params.borderRadius) : 0; const objectFit = params.objectFit === "contain" ? "contain" : "cover"; const currentTime = Math.max(0, Number.isFinite(t) ? t : 0); const sizeStyle = height > 0 ? `width:${width}px;height:${height}px;object-fit:${objectFit};` : `width:${width}px;height:auto;max-height:${Math.max(0, vp.height - y)}px;`; return `<div style="position:absolute;left:0;top:0;width:${vp.width}px;height:${vp.height}px;overflow:hidden"> <video data-nf-persist="vc-${src.replace(/[^a-zA-Z0-9]/g, "").slice(-20)}" data-nf-time="${currentTime}" src="${escAttr(src)}" playsinline preload="auto" style="position:absolute;left:${x}px;top:${y}px;${sizeStyle}display:block;background:#000;border-radius:${borderRadius}px"></video> </div>`; } function screenshots() { return [{ t: 0, label: "片头帧" }, { t: 2, label: "中段画面" }, { t: 6, label: "后段画面" },]; } function lint(params, vp) { const errors = []; if (!params.src || typeof params.src !== "string" || params.src.trim() === "") {
+    errors.push("src 不能为空。Fix: 传入 mp4 的绝对路径或 URL");
+} if (params.width !== undefined && params.width <= 0) {
+    errors.push("width 必须大于 0。Fix: 设为正数宽度");
+} if (params.height !== undefined && params.height < 0) {
+    errors.push("height 不能小于 0。Fix: 设为 0 或正数");
+} if (params.borderRadius !== undefined && (params.borderRadius < 0 || params.borderRadius > 120)) {
+    errors.push("borderRadius 超出范围 [0, 120]。Fix: 设为 0–120");
+} if (!["cover", "contain"].includes(params.objectFit)) {
+    errors.push(`objectFit 无效值 "${params.objectFit}"。Fix: 只能是 "cover" 或 "contain"`);
+} if ((params.x || 0) >= vp.width) {
+    errors.push(`x=${params.x} 已超出画面宽度。Fix: 把 x 调整到 ${vp.width} 以内`);
+} if ((params.y || 0) >= vp.height) {
+    errors.push(`y=${params.y} 已超出画面高度。Fix: 把 y 调整到 ${vp.height} 以内`);
+} return { ok: errors.length === 0, errors }; } window.__scenes["videoClip"] = { meta: typeof meta !== "undefined" ? meta : null, render: typeof render === "function" ? render : null, screenshots: typeof screenshots === "function" ? screenshots : null, lint: typeof lint === "function" ? lint : null, }; })();
+// Animation effects
+// Animation effects bundle
+(function(){
+function normalizeTime(v){var n=Number.isFinite(v)?v:0;return Math.min(1,Math.max(0,n));}
+function bounce(t){var p=normalizeTime(t);var n=7.5625;var d=2.75;if(p<1/d)return n*p*p;if(p<2/d){p-=1.5/d;return n*p*p+0.75;}if(p<2.5/d){p-=2.25/d;return n*p*p+0.9375;}p-=2.625/d;return n*p*p+0.984375;}
+// Shared animation utilities — CSS property parsing, clamping, and interpolation helpers
+const CSS_PROP_CACHE = new Map();
+
+function clamp(value, min, max) {
+  const number = Number.isFinite(value) ? value : min;
+  return Math.min(max, Math.max(min, number));
+}
+
+function clamp01(value) {
+  return clamp(value, 0, 1);
+}
+
+function round(value, precision = 4) {
+  const factor = 10 ** precision;
+  return Math.round((Number.isFinite(value) ? value : 0) * factor) / factor;
+}
+
+function percent(value) {
+  return `${round(value, 4)}%`;
+}
+
+function px(value) {
+  return `${round(value, 4)}px`;
+}
+
+function joinTransforms(...parts) {
+  const filtered = parts.flat().filter(Boolean);
+  return filtered.length > 0 ? filtered.join(" ") : "none";
+}
+
+function inset(top, right, bottom, left) {
+  return `inset(${percent(top)} ${percent(right)} ${percent(bottom)} ${percent(left)})`;
+}
+
+function circle(radiusPercent, x = "50%", y = "50%") {
+  return `circle(${percent(radiusPercent)} at ${x} ${y})`;
+}
+
+function toCssPropertyName(name) {
+  if (CSS_PROP_CACHE.has(name)) {
+    return CSS_PROP_CACHE.get(name);
+  }
+  const cssName = name.startsWith("--")
+    ? name
+    : name.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+  CSS_PROP_CACHE.set(name, cssName);
+  return cssName;
+}
+
+function normalizeStyle(style = {}) {
+  const out = {};
+  for (const [key, value] of Object.entries(style)) {
+    if (value === undefined || value === null || value === "") continue;
+    if (key === "opacity") {
+      out.opacity = round(clamp01(value), 4);
+      continue;
+    }
+    out[key] = typeof value === "number" ? round(value, 4) : value;
+  }
+  return out;
+}
+
+function serializeStyle(style = {}) {
+  const normalized = normalizeStyle(style);
+  return Object.entries(normalized)
+    .map(([key, value]) => `${toCssPropertyName(key)}:${value}`)
+    .join(";");
+}
+// Pure CSS fade-in.
+function fadeIn(progress) {
+  return { opacity: clamp01(progress) };
+}
+// Pure CSS fade-out.
+function fadeOut(progress) {
+  return { opacity: 1 - clamp01(progress) };
+}
+// Slides content upward into place while fading it in.
+function slideUp(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: (p),
+    transform: joinTransforms(`translate3d(0, ${px(distance * (1 - p))}, 0)`),
+  };
+}
+// Slides content downward while fading it out.
+function slideDown(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: 1 - p,
+    transform: joinTransforms(`translate3d(0, ${px(distance * p)}, 0)`),
+  };
+}
+// Slides content in from the left while fading it up.
+function slideLeft(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: (p),
+    transform: joinTransforms(`translate3d(${px(-distance * (1 - p))}, 0, 0)`),
+  };
+}
+// Slides content in from the right while fading it up.
+function slideRight(progress, opts = {}) {
+  const p = clamp01(progress);
+  const distance = opts.distance ?? 40;
+  return {
+    opacity: (p),
+    transform: joinTransforms(`translate3d(${px(distance * (1 - p))}, 0, 0)`),
+  };
+}
+// Grows content from a smaller scale while fading in.
+function scaleIn(progress) {
+  const p = clamp01(progress);
+  const scale = 0.6 + p * 0.4;
+  return {
+    opacity: (p),
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+// Shrinks content down while fading it out.
+function scaleOut(progress) {
+  const p = clamp01(progress);
+  const scale = 1 - p * 0.4;
+  return {
+    opacity: 1 - p,
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+// Springy overshoot entrance tuned for DOM/SVG.
+function springIn(progress) {
+  const p = clamp01(progress);
+  const spring = 1 - Math.exp(-6 * p) * Math.cos(p * Math.PI * 4) * (1 - p);
+  const scale = 0.5 + spring * 0.5;
+  return {
+    opacity:Math.min(1, p * 1.6),
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+// Springy exit with a subtle overshoot before settling out.
+function springOut(progress) {
+  const p = clamp01(progress);
+  const spring = 1 - Math.exp(-6 * p) * Math.cos(p * Math.PI * 4) * (1 - p);
+  const scale = 1.05 - spring * 0.45;
+  return {
+    opacity: 1 - p,
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+// Resolves from a soft blur to crisp content.
+function blurIn(progress, opts = {}) {
+  const p = clamp01(progress);
+  const maxBlur = opts.blur ?? 20;
+  const blur = maxBlur * (1 - p);
+  return {
+    opacity: (p),
+    filter: (blur > 0.01 ? `blur(${px(blur)})` : "none"),
+  };
+}
+// Blurs content away while fading it out.
+function blurOut(progress, opts = {}) {
+  const p = clamp01(progress);
+  const maxBlur = opts.blur ?? 20;
+  const blur = maxBlur * p;
+  return {
+    opacity: 1 - p,
+    filter: (blur > 0.01 ? `blur(${px(blur)})` : "none"),
+  };
+}
+// Reveals content from left to right with a clip mask.
+function wipeReveal(progress) {
+  const p = clamp01(progress);
+  return {
+    opacity: 1,
+    clipPath: inset(0, (1 - p) * 100, 0, 0),
+  };
+}
+// Bounce-in entrance with an elastic scale.
+function bounceIn(progress) {
+  const p = clamp01(progress);
+  const bounceProgress = bounce(p);
+  const scale = 0.35 + bounceProgress * 0.65;
+  return {
+    opacity:Math.min(1, p * 1.5),
+    transform: joinTransforms(`scale(${round(scale)})`),
+    transformOrigin: "50% 50%",
+  };
+}
+var __NF_EFX={fadeIn,fadeOut,slideUp,slideDown,slideLeft,slideRight,scaleIn,scaleOut,springIn,springOut,blurIn,blurOut,wipeReveal,bounceIn};
+window.__nfEffect=function(name,progress,opts){var fn=__NF_EFX[name];if(!fn)return"";return serializeStyle(fn(clamp01(progress),opts||{}));};
+})();
+// questionHook (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/blueprint-cinema/content-questionHook.js)
+const questionHook = (function(){
+// scenes/16x9/blueprint-cinema/content-questionHook.js
+// F1: 红问号 + 3 痛点卡 — awwwards 级：radial mesh bg + glass cards + grain + halo
+var _def = {
+  id: "questionHook",
+  name: "Question Hook",
+  version: "1.1.0",
+  ratio: "16:9",
+  theme: "blueprint-cinema",
+  role: "content",
+  type: "dom",
+  frame_pure: false,
+  assets: [],
+  description: "开场红问号大字配3个痛点卡片，radial mesh 背景 + 玻璃质感卡片 + grain",
+  duration_hint: 8,
+  intent: "awwwards 级视觉：深蓝 radial mesh 背景打底，橙色 blur halo 包裹问号制造 glow，3 张痛点卡使用 backdrop-filter glass + 3 层 shadow depth。问号 hue-rotate 微呼吸，grain SVG noise 叠在顶层制造胶片质感。",
+  when_to_use: ["视频开头，快速建立共鸣","展示问题清单场景"],
+  when_not_to_use: ["内容详解阶段（用jsonShowcase代替）"],
+  limitations: ["卡片文字不超过12字/条"],
+  inspired_by: "Stripe gradient mesh + Linear glassmorphism + Arc blob halo",
+  used_in: [],
+  requires: [],
+  pairs_well_with: ["brandTitle"],
+  conflicts_with: [],
+  alternatives: [],
+  visual_weight: "heavy",
+  z_layer: "mid",
+  mood: ["intense", "serious", "cinematic"],
+  tags: ["hook", "problem", "question", "content", "blueprint-cinema"],
+  complexity: "medium",
+  performance: { cost: "medium", notes: "backdrop-filter + SVG grain" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-16", change: "initial" },
+    { version: "1.1.0", date: "2026-04-16", change: "awwwards-level visual upgrade: mesh bg + glass cards + halo + grain" },
+  ],
+  params: {
+    question: { type: "string", default: "想做视频，但 AI 不会？", semantic: "大问号标题" },
+    pain1: { type: "string", default: "不知道该讲什么顺序", semantic: "痛点1" },
+    pain2: { type: "string", default: "做完效果不够专业", semantic: "痛点2" },
+    pain3: { type: "string", default: "每次都要重新发明轮子", semantic: "痛点3" },
+  },
+  enter: null,
+  exit: null,
+
+  render(t, params, vp) {
+    const W = vp.width, H = vp.height;
+    const eo = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const entry = (d = 0, dur = 0.2) => 0.9 + 0.1 * eo(Math.max(0, (t - d) / dur));
+    const ty = (d = 0, dur = 0.2) => 4 * (1 - eo(Math.max(0, (t - d) / dur)));
+    const q = entry(0, 0.25), c1 = entry(0.12, 0.2), c2 = entry(0.24, 0.2), c3 = entry(0.36, 0.2);
+    const breathe = 1 + 0.012 * Math.sin(t * Math.PI * 0.7);
+    const hue = Math.sin(t * 0.8) * 8;
+    const haloScale = 1 + 0.08 * Math.sin(t * 1.1);
+    const haloOp = 0.55 + 0.2 * Math.sin(t * 1.3);
+    const question = params.question || "想做视频，但 AI 不会？";
+    const pains = [params.pain1 || "不知道该讲什么顺序", params.pain2 || "做完效果不够专业", params.pain3 || "每次都要重新发明轮子"];
+    const opacities = [c1, c2, c3];
+
+    const grain = `<svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.18;mix-blend-mode:overlay;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"><filter id="n1"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.6 0"/></filter><rect width="100%" height="100%" filter="url(#n1)"/></svg>`;
+
+    const cardsHtml = pains.map((text, i) => `<div style="opacity:${opacities[i]};transform:translateY(${ty(0.12 + i*0.12, 0.2)}px);
+      background:linear-gradient(135deg,rgba(255,107,53,0.14),rgba(88,166,255,0.06));
+      border:1px solid rgba(255,107,53,0.32);border-radius:14px;
+      padding:${H*0.028}px ${W*0.028}px;margin-bottom:${H*0.02}px;
+      backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+      box-shadow:0 2px 0 rgba(255,255,255,0.06) inset,0 24px 48px -16px rgba(255,107,53,0.28),0 48px 96px -32px rgba(0,0,0,0.5);
+      font:500 ${Math.round(W*0.019)}px/1.4 Inter,'PingFang SC',system-ui,sans-serif;
+      color:#f5f2e8;letter-spacing:0.2px;display:flex;align-items:center;gap:${W*0.012}px;">
+      <span style="width:8px;height:8px;border-radius:50%;background:#ff6b35;box-shadow:0 0 16px #ff6b35,0 0 32px rgba(255,107,53,0.6);flex-shrink:0;"></span>${text}</div>`).join('');
+
+    return `
+      <div style="position:absolute;inset:0;background:
+        radial-gradient(ellipse 70% 55% at 22% 50%,rgba(255,107,53,0.22),transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 40%,rgba(88,166,255,0.14),transparent 65%),
+        radial-gradient(ellipse 100% 100% at 50% 100%,#06101f,#0a1628 40%,#0a1628);overflow:hidden;">
+        <div style="position:absolute;left:${W*0.08}px;top:50%;transform:translateY(-50%) scale(${haloScale});
+          width:${H*0.7}px;height:${H*0.7}px;border-radius:50%;
+          background:radial-gradient(circle,rgba(255,107,53,0.5),rgba(255,107,53,0.1) 50%,transparent 70%);
+          filter:blur(40px) hue-rotate(${hue}deg);opacity:${haloOp};pointer-events:none;"></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;padding:0 ${W*0.08}px;">
+          <div style="display:flex;align-items:center;gap:${W*0.06}px;width:100%;">
+            <div style="opacity:${q};transform:scale(${breathe});flex-shrink:0;position:relative;
+              font:800 ${Math.round(H*0.5)}px/1 Inter,system-ui,sans-serif;
+              color:#ff6b35;letter-spacing:-0.04em;
+              text-shadow:0 0 ${60 + 30*Math.sin(t*1.2)}px rgba(255,107,53,0.8),0 0 120px rgba(255,107,53,0.4),0 8px 40px rgba(0,0,0,0.6);
+              filter:hue-rotate(${hue}deg);">?</div>
+            <div style="flex:1;">
+              <div style="opacity:${q};transform:translateY(${ty(0, 0.2)}px);
+                font:700 ${Math.round(W*0.034)}px/1.15 Inter,'PingFang SC',system-ui,sans-serif;
+                color:#f5f2e8;margin-bottom:${H*0.045}px;letter-spacing:-0.5px;
+                text-shadow:0 2px 20px rgba(0,0,0,0.5);">${question}</div>
+              ${cardsHtml}
+            </div>
+          </div>
+        </div>
+        ${grain}
+      </div>`;
+  },
+
+  describe(t, params, vp) {
+    return {
+      sceneId: "questionHook", phase: t < 0.7 ? "enter" : "show",
+      progress: Math.min(1, t / 0.7), visible: true, params,
+      elements: [
+        { type: "headline", role: "question", value: params.question || "" },
+        { type: "card", role: "pain1", value: params.pain1 || "" },
+        { type: "card", role: "pain2", value: params.pain2 || "" },
+        { type: "card", role: "pain3", value: params.pain3 || "" },
+      ],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
+
+  sample() {
+    return {
+      question: "想做视频，但 AI 不会？",
+      pain1: "不知道该讲什么顺序",
+      pain2: "做完效果不够专业",
+      pain3: "每次都要重新发明轮子",
+    };
+  },
+};
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+function _serializeHost(host) {
+  if (host && host.querySelectorAll) {
+    var canvases = host.querySelectorAll("canvas");
+    for (var i = 0; i < canvases.length; i += 1) {
+      var canvas = canvases[i];
+      if (!canvas || typeof canvas.toDataURL !== "function" || !canvas.parentNode) continue;
+      var img = document.createElement("img");
+      for (var j = 0; j < canvas.attributes.length; j += 1) {
+        var attr = canvas.attributes[j];
+        if (attr && attr.name !== "src") img.setAttribute(attr.name, attr.value);
+      }
+      img.setAttribute("src", canvas.toDataURL());
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+      canvas.parentNode.replaceChild(img, canvas);
+    }
+  }
+  return host && typeof host.outerHTML === "string" ? host.outerHTML : "";
+}
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    var _out = _rawRender(host, t, params, vp);
+    if (typeof _out === "string") return _out;
+    return _serializeHost(host);
+  };
+} else {
+  _adaptedRender = function(t, params, vp) {
+    return _rawRender ? _rawRender(t, params, vp) : "";
+  };
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// brandTitle (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/blueprint-cinema/content-brandTitle.js)
+const brandTitle = (function(){
+// scenes/16x9/blueprint-cinema/content-brandTitle.js
+// F2: NextFrame hero — mesh bg + multi-halo blob + grain + cinematic title
+var _def = {
+  id: "brandTitle",
+  name: "Brand Title",
+  version: "1.1.0",
+  ratio: "16:9",
+  theme: "blueprint-cinema",
+  role: "content",
+  type: "dom",
+  frame_pure: false,
+  assets: [],
+  description: "产品大标题 hero：conic mesh 背景 + 橙蓝双色 blob halo + grain texture + gradient fill text",
+  duration_hint: 8,
+  intent: "hero 级品牌 reveal。conic-gradient mesh + 2 个 blur blob（橙红左下、蓝色右上）制造 depth，主标题用 linear-gradient text fill + 多层 drop-shadow。letter-spacing -0.04em 收紧字距，副标题细字距 +0.2em 制造现代感。微 hue-rotate 呼吸让画面活。",
+  when_to_use: ["产品介绍第一帧","品牌reveal时刻"],
+  when_not_to_use: ["中间过渡场景"],
+  limitations: ["品牌名不超过16字"],
+  inspired_by: "Apple发布会 + Stripe首屏 mesh + Arc Browser blob halo",
+  used_in: [],
+  requires: [],
+  pairs_well_with: ["questionHook"],
+  conflicts_with: [],
+  alternatives: [],
+  visual_weight: "heavy",
+  z_layer: "mid",
+  mood: ["professional", "intense", "cinematic"],
+  tags: ["brand", "title", "hero", "content", "blueprint-cinema"],
+  complexity: "medium",
+  performance: { cost: "medium", notes: "conic mesh + blur blobs + grain" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-16", change: "initial" },
+    { version: "1.1.0", date: "2026-04-16", change: "awwwards visual upgrade: mesh + halo + gradient text + grain" },
+  ],
+  params: {
+    brand: { type: "string", default: "NextFrame", semantic: "品牌名" },
+    tagline: { type: "string", default: "JSON 进来，MP4 出去", semantic: "副标题" },
+    sub: { type: "string", default: "AI 视频引擎 · 开源 · 可编程", semantic: "说明文字" },
+  },
+  enter: null,
+  exit: null,
+
+  render(t, params, vp) {
+    const W = vp.width, H = vp.height;
+    const eo = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const entry = (d = 0, dur = 0.2) => 0.9 + 0.1 * eo(Math.max(0, (t - d) / dur));
+    const ty = (d = 0, dur = 0.2) => 4 * (1 - eo(Math.max(0, (t - d) / dur)));
+    const k1 = entry(0, 0.3), k2 = entry(0.15, 0.22), k3 = entry(0.3, 0.22);
+    const pulse = 0.5 + 0.5 * Math.sin(t * 1.1);
+    const breathe = 1 + 0.01 * Math.sin(t * Math.PI * 0.6);
+    const hue = 6 * Math.sin(t * 0.7);
+    const blob1Rot = t * 4;
+    const blob2Rot = -t * 3;
+    const brand = params.brand || "NextFrame";
+    const tagline = params.tagline || "JSON 进来，MP4 出去";
+    const sub = params.sub || "AI 视频引擎 · 开源 · 可编程";
+
+    const grain = `<svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.15;mix-blend-mode:overlay;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"><filter id="n2"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0"/></filter><rect width="100%" height="100%" filter="url(#n2)"/></svg>`;
+
+    return `
+      <div style="position:absolute;inset:0;background:
+        radial-gradient(ellipse 90% 70% at 50% 50%,rgba(255,107,53,0.08),transparent 65%),
+        conic-gradient(from ${t*8}deg at 50% 50%,#0a1628,#0f1d3a,#0a1628,#071322,#0a1628);
+        overflow:hidden;">
+        <div style="position:absolute;left:-10%;bottom:-15%;width:65%;height:75%;border-radius:50%;
+          background:radial-gradient(circle,rgba(255,107,53,0.7),rgba(255,107,53,0.15) 45%,transparent 70%);
+          filter:blur(60px) hue-rotate(${hue}deg);transform:rotate(${blob1Rot}deg);opacity:${0.6+0.15*pulse};"></div>
+        <div style="position:absolute;right:-12%;top:-18%;width:55%;height:70%;border-radius:50%;
+          background:radial-gradient(circle,rgba(88,166,255,0.55),rgba(88,166,255,0.1) 45%,transparent 70%);
+          filter:blur(70px) hue-rotate(${-hue}deg);transform:rotate(${blob2Rot}deg);opacity:${0.5+0.2*pulse};"></div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+          <div style="opacity:${k1};transform:scale(${breathe * (0.985 + 0.015*eo(Math.min(1,t/0.3)))});position:relative;">
+            <div style="font:800 ${Math.round(W*0.085)}px/1.05 Inter,'PingFang SC',system-ui,sans-serif;
+              letter-spacing:-0.045em;
+              background:linear-gradient(135deg,#ff8a5c 0%,#ff6b35 50%,#ff5519 100%);
+              -webkit-background-clip:text;background-clip:text;color:transparent;
+              filter:drop-shadow(0 0 ${40+30*pulse}px rgba(255,107,53,${0.55+0.25*pulse})) drop-shadow(0 8px 24px rgba(0,0,0,0.6));">${brand}</div>
+          </div>
+          <div style="opacity:${k2};transform:translateY(${ty(0.15,0.22)}px);margin-top:${H*0.035}px;">
+            <div style="font:600 ${Math.round(W*0.032)}px/1.2 Inter,'PingFang SC',system-ui,sans-serif;
+              color:#f5f2e8;letter-spacing:-0.01em;text-shadow:0 2px 24px rgba(0,0,0,0.5);">${tagline}</div>
+          </div>
+          <div style="opacity:${k3};transform:translateY(${ty(0.3,0.22)}px);margin-top:${H*0.028}px;">
+            <div style="font:400 ${Math.round(W*0.017)}px/1.4 Inter,'PingFang SC',system-ui,sans-serif;
+              color:#8b92a5;letter-spacing:0.22em;text-transform:uppercase;">${sub}</div>
+          </div>
+          <div style="opacity:${k3};margin-top:${H*0.05}px;width:${W*0.06}px;height:1px;
+            background:linear-gradient(90deg,transparent,rgba(255,107,53,0.8),transparent);"></div>
+        </div>
+        ${grain}
+      </div>`;
+  },
+
+  describe(t, params, vp) {
+    return {
+      sceneId: "brandTitle", phase: t < 1 ? "enter" : "show",
+      progress: Math.min(1, t / 1.0), visible: true, params,
+      elements: [
+        { type: "headline", role: "brand", value: params.brand || "" },
+        { type: "subtitle", role: "tagline", value: params.tagline || "" },
+      ],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
+
+  sample() {
+    return { brand: "NextFrame", tagline: "JSON 进来，MP4 出去", sub: "AI 视频引擎 · 开源 · 可编程" };
+  },
+};
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+function _serializeHost(host) {
+  if (host && host.querySelectorAll) {
+    var canvases = host.querySelectorAll("canvas");
+    for (var i = 0; i < canvases.length; i += 1) {
+      var canvas = canvases[i];
+      if (!canvas || typeof canvas.toDataURL !== "function" || !canvas.parentNode) continue;
+      var img = document.createElement("img");
+      for (var j = 0; j < canvas.attributes.length; j += 1) {
+        var attr = canvas.attributes[j];
+        if (attr && attr.name !== "src") img.setAttribute(attr.name, attr.value);
+      }
+      img.setAttribute("src", canvas.toDataURL());
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+      canvas.parentNode.replaceChild(img, canvas);
+    }
+  }
+  return host && typeof host.outerHTML === "string" ? host.outerHTML : "";
+}
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    var _out = _rawRender(host, t, params, vp);
+    if (typeof _out === "string") return _out;
+    return _serializeHost(host);
+  };
+} else {
+  _adaptedRender = function(t, params, vp) {
+    return _rawRender ? _rawRender(t, params, vp) : "";
+  };
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// jsonShowcase (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/blueprint-cinema/content-jsonShowcase.js)
+const jsonShowcase = (function(){
+// scenes/16x9/blueprint-cinema/content-jsonShowcase.js
+// F3: JSON→HTML — glass code panel + gradient arrow + depth-shadowed preview
+var _def = {
+  id: "jsonShowcase",
+  name: "JSON Showcase",
+  version: "1.1.0",
+  ratio: "16:9",
+  theme: "blueprint-cinema",
+  role: "content",
+  type: "dom",
+  frame_pure: false,
+  assets: [],
+  description: "左 glass code panel + 中间 gradient 箭头 + 右 depth-shadow 渲染 mock，展示 JSON→HTML",
+  duration_hint: 8,
+  intent: "Fireship 级代码演示。左侧 JSON 用 glass backdrop + syntax highlight + 逐行 stagger，右侧 mock preview 带多层 shadow depth 和微旋转的 gradient 色块。中间箭头用 gradient fill + glow trail。背景 radial mesh 打底。",
+  when_to_use: ["展示数据到可视化的转换过程"],
+  when_not_to_use: ["纯文字场景"],
+  limitations: ["代码示例不超过8行"],
+  inspired_by: "Stripe docs + Vercel code blocks + Fireship demo",
+  used_in: [],
+  requires: [],
+  pairs_well_with: ["timelineDiagram"],
+  conflicts_with: [],
+  alternatives: [],
+  visual_weight: "heavy",
+  z_layer: "mid",
+  mood: ["professional", "serious", "cinematic"],
+  tags: ["code", "json", "demo", "content", "blueprint-cinema"],
+  complexity: "medium",
+  performance: { cost: "medium", notes: "backdrop-filter + multi-layer shadows" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-16", change: "initial" },
+    { version: "1.1.0", date: "2026-04-16", change: "awwwards upgrade: glass + gradient arrow + depth preview" },
+  ],
+  params: {
+    title: { type: "string", default: "Timeline 描述视频结构", semantic: "标题" },
+  },
+  enter: null,
+  exit: null,
+
+  render(t, params, vp) {
+    const W = vp.width, H = vp.height;
+    const eo = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const entry = (d = 0, dur = 0.2) => 0.9 + 0.1 * eo(Math.max(0, (t - d) / dur));
+    const ty = (d = 0, dur = 0.2) => 4 * (1 - eo(Math.max(0, (t - d) / dur)));
+    const kTitle = entry(0, 0.2), kLeft = entry(0.12, 0.22), kArrow = entry(0.24, 0.2), kRight = entry(0.3, 0.22);
+    const lines = ['{', '  "version": "0.8",', '  "width": 1920,', '  "anchors": {', '    "s1.begin": {"at": 0}', '  },', '  "tracks": [...]', '}'];
+    const codeHtml = lines.map((l, i) => {
+      const op = entry(0.12 + i * 0.05, 0.15);
+      let color = '#f5f2e8';
+      if (l.includes('"version"') || l.includes('"width"')) color = '#58a6ff';
+      else if (l.includes('"anchors"') || l.includes('"tracks"')) color = '#ff6b35';
+      else if (l.includes('0') && l.includes(':')) color = '#8b92a5';
+      return `<div style="opacity:${op};color:${color};white-space:pre;letter-spacing:0.02em;">${l}</div>`;
+    }).join('');
+    const pulse = 0.5 + 0.5 * Math.sin(t * 1.2);
+    const arrowShift = eo(Math.min(1, (t - 0.24) / 0.3)) * 6;
+    const previewRot = 2 * Math.sin(t * 0.5);
+    const hue = 10 * Math.sin(t * 0.9);
+    const title = params.title || "Timeline 描述视频结构";
+
+    const grain = `<svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.12;mix-blend-mode:overlay;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"><filter id="n3"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="11"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0"/></filter><rect width="100%" height="100%" filter="url(#n3)"/></svg>`;
+
+    return `
+      <div style="position:absolute;inset:0;background:
+        radial-gradient(ellipse 60% 50% at 20% 50%,rgba(88,166,255,0.14),transparent 65%),
+        radial-gradient(ellipse 60% 50% at 80% 50%,rgba(255,107,53,0.16),transparent 65%),
+        linear-gradient(180deg,#0a1628,#06101f);overflow:hidden;padding:${H*0.07}px ${W*0.05}px ${H*0.05}px;">
+        <div style="opacity:${kTitle};transform:translateY(${ty(0,0.2)}px);
+          font:600 ${Math.round(W*0.024)}px/1.3 Inter,'PingFang SC',system-ui,sans-serif;
+          color:#f5f2e8;margin-bottom:${H*0.045}px;letter-spacing:-0.01em;
+          text-shadow:0 2px 16px rgba(0,0,0,0.5);">${title}</div>
+        <div style="display:flex;align-items:center;gap:${W*0.03}px;height:${H*0.62}px;position:relative;z-index:2;">
+          <div style="opacity:${kLeft};flex:1;position:relative;
+            background:linear-gradient(135deg,rgba(88,166,255,0.12),rgba(10,22,40,0.6));
+            border:1px solid rgba(88,166,255,0.28);border-radius:14px;padding:${H*0.035}px ${W*0.025}px;
+            backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+            font:500 ${Math.round(W*0.015)}px/1.9 'JetBrains Mono','SF Mono',Menlo,monospace;
+            box-shadow:0 2px 0 rgba(255,255,255,0.06) inset,0 32px 64px -24px rgba(88,166,255,0.25),0 48px 96px -32px rgba(0,0,0,0.6);
+            overflow:hidden;">
+            <div style="position:absolute;top:14px;left:14px;display:flex;gap:6px;">
+              <div style="width:10px;height:10px;border-radius:50%;background:#ff5f57;"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:#ffbd2e;"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:#28c840;"></div>
+            </div>
+            <div style="margin-top:${H*0.025}px;">${codeHtml}</div>
+          </div>
+          <div style="opacity:${kArrow};flex-shrink:0;text-align:center;transform:translateX(${arrowShift}px);">
+            <div style="position:relative;width:${W*0.07}px;height:4px;
+              background:linear-gradient(90deg,rgba(88,166,255,0.5),#ff6b35);border-radius:2px;
+              box-shadow:0 0 24px rgba(255,107,53,0.6),0 0 48px rgba(255,107,53,0.3);"></div>
+            <div style="position:absolute;transform:translate(${W*0.065}px,-9px);width:0;height:0;
+              border-left:14px solid #ff6b35;border-top:10px solid transparent;border-bottom:10px solid transparent;
+              filter:drop-shadow(0 0 12px rgba(255,107,53,0.8));"></div>
+            <div style="font:500 ${Math.round(W*0.012)}px/1.3 'JetBrains Mono',monospace;color:#8b92a5;margin-top:14px;letter-spacing:0.15em;text-transform:uppercase;">render</div>
+          </div>
+          <div style="opacity:${kRight};flex:1;position:relative;transform:rotate(${previewRot*0.3}deg);
+            background:linear-gradient(145deg,rgba(255,107,53,${0.18+0.05*pulse}),rgba(88,166,255,0.08));
+            border:1px solid rgba(255,107,53,${0.3+0.12*pulse});border-radius:14px;padding:${H*0.04}px;
+            backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            box-shadow:0 2px 0 rgba(255,255,255,0.08) inset,0 40px 80px -24px rgba(255,107,53,0.35),0 60px 120px -40px rgba(0,0,0,0.7);">
+            <div style="width:82%;height:${H*0.16}px;border-radius:10px;margin-bottom:${H*0.03}px;
+              background:conic-gradient(from ${t*20}deg,#ff6b35,#58a6ff,#ff6b35);
+              filter:blur(0.5px) hue-rotate(${hue}deg);
+              box-shadow:0 8px 32px -8px rgba(255,107,53,0.5),0 2px 0 rgba(255,255,255,0.1) inset;"></div>
+            <div style="width:65%;height:${H*0.028}px;background:linear-gradient(90deg,rgba(245,242,232,0.35),rgba(245,242,232,0.15));border-radius:4px;margin-bottom:${H*0.018}px;"></div>
+            <div style="width:82%;height:${H*0.022}px;background:linear-gradient(90deg,rgba(139,146,165,0.4),rgba(139,146,165,0.15));border-radius:4px;"></div>
+            <div style="margin-top:${H*0.035}px;font:500 ${Math.round(W*0.013)}px/1.3 Inter,system-ui,sans-serif;color:#8b92a5;letter-spacing:0.15em;text-transform:uppercase;">HTML 输出</div>
+          </div>
+        </div>
+        ${grain}
+      </div>`;
+  },
+
+  describe(t, params, vp) {
+    return {
+      sceneId: "jsonShowcase", phase: t < 1 ? "enter" : "show",
+      progress: Math.min(1, t / 1.0), visible: true, params,
+      elements: [
+        { type: "code", role: "input", value: "timeline json" },
+        { type: "preview", role: "output", value: "rendered html" },
+      ],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
+
+  sample() {
+    return { title: "Timeline 描述视频结构" };
+  },
+};
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+function _serializeHost(host) {
+  if (host && host.querySelectorAll) {
+    var canvases = host.querySelectorAll("canvas");
+    for (var i = 0; i < canvases.length; i += 1) {
+      var canvas = canvases[i];
+      if (!canvas || typeof canvas.toDataURL !== "function" || !canvas.parentNode) continue;
+      var img = document.createElement("img");
+      for (var j = 0; j < canvas.attributes.length; j += 1) {
+        var attr = canvas.attributes[j];
+        if (attr && attr.name !== "src") img.setAttribute(attr.name, attr.value);
+      }
+      img.setAttribute("src", canvas.toDataURL());
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+      canvas.parentNode.replaceChild(img, canvas);
+    }
+  }
+  return host && typeof host.outerHTML === "string" ? host.outerHTML : "";
+}
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    var _out = _rawRender(host, t, params, vp);
+    if (typeof _out === "string") return _out;
+    return _serializeHost(host);
+  };
+} else {
+  _adaptedRender = function(t, params, vp) {
+    return _rawRender ? _rawRender(t, params, vp) : "";
+  };
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// sceneGrid (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/blueprint-cinema/content-sceneGrid.js)
+const sceneGrid = (function(){
+// scenes/16x9/blueprint-cinema/content-sceneGrid.js
+// F4: 6 scene 缩略网格 — each cell unique gradient + glass + breathe
+var _def = {
+  id: "sceneGrid",
+  name: "Scene Grid",
+  version: "1.1.0",
+  ratio: "16:9",
+  theme: "blueprint-cinema",
+  role: "content",
+  type: "dom",
+  frame_pure: false,
+  assets: [],
+  description: "2×3 网格，每格独特 gradient + glass + depth shadow + hover-like breathe",
+  duration_hint: 8,
+  intent: "展示组件库视觉多样性。6 格每一个有专属 gradient（橙/蓝/青/紫/金/灰）+ backdrop-filter glass + 3 层阴影 depth。每格按 0.08s stagger 入场，入场后 hue-rotate 微呼吸。背景 subtle mesh + grain。",
+  when_to_use: ["展示组件库/功能丰富度"],
+  when_not_to_use: ["需要深度讲解单个功能时"],
+  limitations: ["固定6个格子"],
+  inspired_by: "Linear features grid + Vercel templates + Awwwards cards",
+  used_in: [],
+  requires: [],
+  pairs_well_with: ["jsonShowcase"],
+  conflicts_with: [],
+  alternatives: [],
+  visual_weight: "medium",
+  z_layer: "mid",
+  mood: ["professional", "calm", "cinematic"],
+  tags: ["grid", "scenes", "gallery", "content", "blueprint-cinema"],
+  complexity: "medium",
+  performance: { cost: "medium", notes: "per-cell backdrop + gradient" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-16", change: "initial" },
+    { version: "1.1.0", date: "2026-04-16", change: "awwwards upgrade: unique gradient per cell + glass + depth" },
+  ],
+  params: {
+    title: { type: "string", default: "Scene 是组件 — 一个函数返回 HTML", semantic: "标题" },
+  },
+  enter: null,
+  exit: null,
+
+  render(t, params, vp) {
+    const W = vp.width, H = vp.height;
+    const eo = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const entry = (d = 0, dur = 0.2) => 0.9 + 0.1 * eo(Math.max(0, (t - d) / dur));
+    const ty = (d = 0, dur = 0.2) => 4 * (1 - eo(Math.max(0, (t - d) / dur)));
+    const kTitle = entry(0, 0.2);
+    const cells = [
+      { label: "bg-grid",     icon: "◱", c1: "#58a6ff", c2: "#1e3a5f", accent: "#58a6ff" },
+      { label: "content-hook",icon: "?", c1: "#ff6b35", c2: "#5a1a08", accent: "#ff6b35" },
+      { label: "content-title",icon:"A", c1: "#f5f2e8", c2: "#4a4438", accent: "#f5f2e8" },
+      { label: "content-code",icon: "{ }",c1: "#7dd3fc", c2: "#0c4a6e", accent: "#7dd3fc" },
+      { label: "content-chart",icon:"◥", c1: "#fbbf24", c2: "#78350f", accent: "#fbbf24" },
+      { label: "chrome-bar",  icon: "═", c1: "#8b92a5", c2: "#2a3040", accent: "#8b92a5" },
+    ];
+    const cellW = Math.round(W * 0.26);
+    const cellH = Math.round(H * 0.3);
+    const cellsHtml = cells.map((c, i) => {
+      const delay = 0.1 + i * 0.08;
+      const k = entry(delay, 0.2);
+      const yOff = ty(delay, 0.2);
+      const breathe = 1 + 0.015 * Math.sin(t * 1.2 + i * 0.9);
+      const hue = 4 * Math.sin(t * 0.8 + i * 0.5);
+      const glowOp = 0.25 + 0.12 * Math.sin(t * 1.4 + i * 0.7);
+      return `
+        <div style="opacity:${k};transform:translateY(${yOff}px) scale(${breathe});filter:hue-rotate(${hue}deg);
+          width:${cellW}px;height:${cellH}px;position:relative;
+          background:linear-gradient(135deg,${c.c2}40,${c.c2}18);
+          border:1px solid ${c.accent}3a;border-radius:16px;margin:${H*0.012}px ${W*0.009}px;
+          backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);
+          box-shadow:0 2px 0 rgba(255,255,255,0.06) inset,0 24px 48px -16px ${c.accent}${Math.round(glowOp*100).toString(16).padStart(2,'0')},0 40px 80px -32px rgba(0,0,0,0.6);
+          overflow:hidden;">
+          <div style="position:absolute;top:-30%;left:-20%;width:90%;height:90%;border-radius:50%;
+            background:radial-gradient(circle,${c.c1}60,transparent 65%);filter:blur(30px);opacity:${0.5+0.2*Math.sin(t*1.1+i)};"></div>
+          <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:${H*0.02}px;">
+            <div style="font:700 ${Math.round(H*0.075)}px/1 'JetBrains Mono',monospace;color:${c.accent};margin-bottom:${H*0.018}px;
+              text-shadow:0 0 32px ${c.accent},0 0 64px ${c.accent}40;letter-spacing:-0.04em;">${c.icon}</div>
+            <div style="font:500 ${Math.round(W*0.013)}px/1.3 'JetBrains Mono','SF Mono',monospace;color:#f5f2e8;letter-spacing:0.04em;">${c.label}</div>
+            <div style="margin-top:${H*0.01}px;width:${cellW*0.3}px;height:1px;background:linear-gradient(90deg,transparent,${c.accent}80,transparent);"></div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const grain = `<svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.12;mix-blend-mode:overlay;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"><filter id="n4"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="13"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0"/></filter><rect width="100%" height="100%" filter="url(#n4)"/></svg>`;
+
+    const title = params.title || "Scene 是组件 — 一个函数返回 HTML";
+    return `
+      <div style="position:absolute;inset:0;background:
+        radial-gradient(ellipse 70% 50% at 50% 0%,rgba(88,166,255,0.12),transparent 60%),
+        radial-gradient(ellipse 70% 50% at 50% 100%,rgba(255,107,53,0.12),transparent 60%),
+        linear-gradient(180deg,#0a1628,#06101f);overflow:hidden;padding:${H*0.07}px ${W*0.05}px;">
+        <div style="opacity:${kTitle};transform:translateY(${ty(0,0.2)}px);
+          font:600 ${Math.round(W*0.024)}px/1.3 Inter,'PingFang SC',system-ui,sans-serif;
+          color:#f5f2e8;margin-bottom:${H*0.04}px;letter-spacing:-0.01em;text-shadow:0 2px 16px rgba(0,0,0,0.5);">${title}</div>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;position:relative;z-index:2;">${cellsHtml}</div>
+        ${grain}
+      </div>`;
+  },
+
+  describe(t, params, vp) {
+    return {
+      sceneId: "sceneGrid", phase: t < 1 ? "enter" : "show",
+      progress: Math.min(1, t / 1.0), visible: true, params,
+      elements: [{ type: "grid", role: "scene-gallery", value: "6 scene thumbnails" }],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
+
+  sample() {
+    return { title: "Scene 是组件 — 一个函数返回 HTML" };
+  },
+};
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+function _serializeHost(host) {
+  if (host && host.querySelectorAll) {
+    var canvases = host.querySelectorAll("canvas");
+    for (var i = 0; i < canvases.length; i += 1) {
+      var canvas = canvases[i];
+      if (!canvas || typeof canvas.toDataURL !== "function" || !canvas.parentNode) continue;
+      var img = document.createElement("img");
+      for (var j = 0; j < canvas.attributes.length; j += 1) {
+        var attr = canvas.attributes[j];
+        if (attr && attr.name !== "src") img.setAttribute(attr.name, attr.value);
+      }
+      img.setAttribute("src", canvas.toDataURL());
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+      canvas.parentNode.replaceChild(img, canvas);
+    }
+  }
+  return host && typeof host.outerHTML === "string" ? host.outerHTML : "";
+}
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    var _out = _rawRender(host, t, params, vp);
+    if (typeof _out === "string") return _out;
+    return _serializeHost(host);
+  };
+} else {
+  _adaptedRender = function(t, params, vp) {
+    return _rawRender ? _rawRender(t, params, vp) : "";
+  };
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// timelineDiagram (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/blueprint-cinema/content-timelineDiagram.js)
+const timelineDiagram = (function(){
+// scenes/16x9/blueprint-cinema/content-timelineDiagram.js
+// F5: timeline 4 track — gradient clips + glowing anchors + sweeping playhead
+var _def = {
+  id: "timelineDiagram",
+  name: "Timeline Diagram",
+  version: "1.1.0",
+  ratio: "16:9",
+  theme: "blueprint-cinema",
+  role: "content",
+  type: "dom",
+  frame_pure: false,
+  assets: [],
+  description: "4 轨时间轴：gradient clip + glow 锚点 + cinematic sweeping playhead + grain",
+  duration_hint: 8,
+  intent: "可视化 anchors+tracks。每条 track 用专属 gradient + depth shadow。anchors 竖线用 glow pulse 强调节点。playhead 白色 + 前后 gradient trail 扫过。4 轨 stagger 入场，背景 subtle mesh。",
+  when_to_use: ["解释timeline数据模型","展示多轨道编辑概念"],
+  when_not_to_use: ["纯展示场景"],
+  limitations: ["固定4条轨道"],
+  inspired_by: "Figma timeline + Descript editor + DaVinci Resolve",
+  used_in: [],
+  requires: [],
+  pairs_well_with: ["jsonShowcase", "cliDemo"],
+  conflicts_with: [],
+  alternatives: [],
+  visual_weight: "heavy",
+  z_layer: "mid",
+  mood: ["professional", "serious", "cinematic"],
+  tags: ["timeline", "anchors", "tracks", "diagram", "content", "blueprint-cinema"],
+  complexity: "medium",
+  performance: { cost: "medium", notes: "gradient clips + glow pulses" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-16", change: "initial" },
+    { version: "1.1.0", date: "2026-04-16", change: "awwwards upgrade: gradient tracks + glowing anchors + sweeping playhead" },
+  ],
+  params: {
+    title: { type: "string", default: "Anchors 让时间用名字说话", semantic: "标题" },
+  },
+  enter: null,
+  exit: null,
+
+  render(t, params, vp) {
+    const W = vp.width, H = vp.height;
+    const eo = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const entry = (d = 0, dur = 0.2) => 0.9 + 0.1 * eo(Math.max(0, (t - d) / dur));
+    const ty = (d = 0, dur = 0.2) => 4 * (1 - eo(Math.max(0, (t - d) / dur)));
+    const kTitle = entry(0, 0.2);
+    const tracks = [
+      { label: "scene",    c1: "#58a6ff", c2: "#1e3a5f", clips: [{x:0.05,w:0.25},{x:0.32,w:0.25},{x:0.62,w:0.30}] },
+      { label: "audio",    c1: "#ff6b35", c2: "#5a1a08", clips: [{x:0.05,w:0.55},{x:0.65,w:0.28}] },
+      { label: "subtitle", c1: "#a0a8bb", c2: "#2a3040", clips: [{x:0.05,w:0.18},{x:0.28,w:0.18},{x:0.52,w:0.18},{x:0.75,w:0.18}] },
+      { label: "overlay",  c1: "#fbbf24", c2: "#78350f", clips: [{x:0.10,w:0.12},{x:0.60,w:0.12}] },
+    ];
+    const anchors = [0.05, 0.32, 0.57, 0.62, 0.93];
+    const timelineW = W * 0.82;
+    const timelineX = W * 0.09;
+    const trackH = H * 0.09;
+    const trackGap = H * 0.025;
+    const trackStartY = H * 0.28;
+    const playheadProg = ((t * 0.15) % 1);
+    const playheadX = timelineX + timelineW * (0.05 + playheadProg * 0.88);
+
+    const tracksHtml = tracks.map((tr, i) => {
+      const delay = 0.08 + i * 0.09;
+      const k = entry(delay, 0.22);
+      const y = trackStartY + i * (trackH + trackGap);
+      const trackBg = `<div style="position:absolute;left:${timelineX}px;top:${y}px;width:${timelineW}px;height:${trackH}px;
+        background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
+        border:1px solid rgba(245,242,232,0.06);border-radius:6px;opacity:${k};"></div>`;
+      const clipsHtml = tr.clips.map((cl, ci) => {
+        const cx = timelineX + cl.x * timelineW;
+        const cw = cl.w * timelineW;
+        const clipPulse = 0.85 + 0.15 * Math.sin(t * 1.2 + i * 0.6 + ci * 0.4);
+        return `<div style="position:absolute;left:${cx}px;top:${y}px;width:${cw}px;height:${trackH}px;
+          background:linear-gradient(135deg,${tr.c1}${Math.round(clipPulse*70).toString(16).padStart(2,'0')},${tr.c2}cc);
+          border:1px solid ${tr.c1}99;border-radius:6px;opacity:${k};
+          box-shadow:0 2px 0 rgba(255,255,255,0.08) inset,0 8px 24px -8px ${tr.c1}80,0 16px 40px -16px rgba(0,0,0,0.5);"></div>`;
+      }).join('');
+      return `
+        ${trackBg}
+        <div style="position:absolute;left:${timelineX - W*0.07}px;top:${y + trackH*0.3}px;opacity:${k};
+          font:500 ${Math.round(W*0.014)}px/1 'JetBrains Mono',monospace;color:${tr.c1};letter-spacing:0.05em;
+          text-shadow:0 0 12px ${tr.c1}80;">${tr.label}</div>
+        ${clipsHtml}`;
+    }).join('');
+
+    const anchorsHtml = anchors.map((ax, i) => {
+      const delay = 0.4 + i * 0.06;
+      const k = entry(delay, 0.18);
+      const x = timelineX + ax * timelineW;
+      const pulse = 0.5 + 0.35 * Math.sin(t * 1.8 + i * 0.9);
+      const totalH = tracks.length * (trackH + trackGap) + H * 0.05;
+      return `
+        <div style="position:absolute;left:${x-1}px;top:${trackStartY - H*0.04}px;width:2px;height:${totalH}px;
+          background:linear-gradient(180deg,transparent,#ff6b35,#ff6b35,transparent);
+          opacity:${k * (0.6 + 0.25 * pulse)};box-shadow:0 0 ${8+8*pulse}px #ff6b35;"></div>
+        <div style="position:absolute;left:${x-6}px;top:${trackStartY - H*0.055}px;width:14px;height:14px;border-radius:50%;
+          background:radial-gradient(circle,#ff6b35,rgba(255,107,53,0.3));
+          opacity:${k * (0.7 + 0.2 * pulse)};box-shadow:0 0 ${12+10*pulse}px #ff6b35,0 0 24px rgba(255,107,53,0.5);"></div>`;
+    }).join('');
+
+    const totalH = tracks.length * (trackH + trackGap) + H * 0.07;
+    const playheadHtml = `
+      <div style="position:absolute;left:${playheadX-30}px;top:${trackStartY - H*0.06}px;width:60px;height:${totalH}px;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,0.12),transparent);pointer-events:none;"></div>
+      <div style="position:absolute;left:${playheadX-1}px;top:${trackStartY - H*0.06}px;width:2px;height:${totalH}px;
+        background:linear-gradient(180deg,transparent,#fff,#fff,transparent);opacity:0.92;
+        box-shadow:0 0 16px rgba(255,255,255,0.8);"></div>
+      <div style="position:absolute;left:${playheadX-7}px;top:${trackStartY - H*0.075}px;width:16px;height:16px;
+        background:#fff;transform:rotate(45deg);opacity:0.95;
+        box-shadow:0 0 16px rgba(255,255,255,0.8);"></div>`;
+
+    const grain = `<svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.1;mix-blend-mode:overlay;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"><filter id="n5"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" seed="17"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0"/></filter><rect width="100%" height="100%" filter="url(#n5)"/></svg>`;
+
+    const title = params.title || "Anchors 让时间用名字说话";
+    return `
+      <div style="position:absolute;inset:0;background:
+        radial-gradient(ellipse 80% 40% at 50% 40%,rgba(88,166,255,0.1),transparent 70%),
+        linear-gradient(180deg,#0a1628,#06101f);overflow:hidden;">
+        <div style="position:absolute;top:${H*0.07}px;left:${W*0.09}px;right:${W*0.05}px;">
+          <div style="opacity:${kTitle};transform:translateY(${ty(0,0.2)}px);
+            font:600 ${Math.round(W*0.024)}px/1.3 Inter,'PingFang SC',system-ui,sans-serif;color:#f5f2e8;letter-spacing:-0.01em;text-shadow:0 2px 16px rgba(0,0,0,0.5);">${title}</div>
+        </div>
+        ${tracksHtml}
+        ${anchorsHtml}
+        ${playheadHtml}
+        ${grain}
+      </div>`;
+  },
+
+  describe(t, params, vp) {
+    return {
+      sceneId: "timelineDiagram", phase: t < 1 ? "enter" : "show",
+      progress: Math.min(1, t / 1.0), visible: true, params,
+      elements: [{ type: "diagram", role: "timeline", value: "4 tracks + anchors" }],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
+
+  sample() {
+    return { title: "Anchors 让时间用名字说话" };
+  },
+};
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+function _serializeHost(host) {
+  if (host && host.querySelectorAll) {
+    var canvases = host.querySelectorAll("canvas");
+    for (var i = 0; i < canvases.length; i += 1) {
+      var canvas = canvases[i];
+      if (!canvas || typeof canvas.toDataURL !== "function" || !canvas.parentNode) continue;
+      var img = document.createElement("img");
+      for (var j = 0; j < canvas.attributes.length; j += 1) {
+        var attr = canvas.attributes[j];
+        if (attr && attr.name !== "src") img.setAttribute(attr.name, attr.value);
+      }
+      img.setAttribute("src", canvas.toDataURL());
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+      canvas.parentNode.replaceChild(img, canvas);
+    }
+  }
+  return host && typeof host.outerHTML === "string" ? host.outerHTML : "";
+}
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    var _out = _rawRender(host, t, params, vp);
+    if (typeof _out === "string") return _out;
+    return _serializeHost(host);
+  };
+} else {
+  _adaptedRender = function(t, params, vp) {
+    return _rawRender ? _rawRender(t, params, vp) : "";
+  };
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// cliDemo (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/blueprint-cinema/content-cliDemo.js)
+const cliDemo = (function(){
+// scenes/16x9/blueprint-cinema/content-cliDemo.js
+// F6: CLI demo — glass terminal + gradient progress + syntax highlight + grain
+var _def = {
+  id: "cliDemo",
+  name: "CLI Demo",
+  version: "1.1.0",
+  ratio: "16:9",
+  theme: "blueprint-cinema",
+  role: "content",
+  type: "dom",
+  frame_pure: false,
+  assets: [],
+  description: "macOS 风格 glass terminal + syntax highlight 命令 + gradient 进度条 + grain",
+  duration_hint: 8,
+  intent: "iTerm2 风格终端做玻璃感：backdrop-filter + 多层 shadow。命令行逐字打出带 caret blink，进度条 gradient fill 从蓝到橙加 glow。输出行 stagger 出现，最后成功行橙红带 checkmark glow。背景 subtle radial mesh。",
+  when_to_use: ["展示CLI使用方式","展示自动化能力"],
+  when_not_to_use: ["不是技术受众时"],
+  limitations: ["命令不超过60字符"],
+  inspired_by: "Warp terminal + Fireship tutorials + Vercel deploy logs",
+  used_in: [],
+  requires: [],
+  pairs_well_with: ["timelineDiagram"],
+  conflicts_with: [],
+  alternatives: [],
+  visual_weight: "heavy",
+  z_layer: "mid",
+  mood: ["professional", "intense", "cinematic"],
+  tags: ["cli", "terminal", "demo", "progress", "content", "blueprint-cinema"],
+  complexity: "medium",
+  performance: { cost: "medium", notes: "backdrop glass + gradient" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-16", change: "initial" },
+    { version: "1.1.0", date: "2026-04-16", change: "awwwards upgrade: glass terminal + gradient progress + syntax highlight" },
+  ],
+  params: {
+    command: { type: "string", default: "nextframe render timeline.json output.mp4", semantic: "CLI命令" },
+    title: { type: "string", default: "一行命令，产出 MP4", semantic: "标题" },
+  },
+  enter: null,
+  exit: null,
+
+  render(t, params, vp) {
+    const W = vp.width, H = vp.height;
+    const eo = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const entry = (d = 0, dur = 0.2) => 0.9 + 0.1 * eo(Math.max(0, (t - d) / dur));
+    const ty = (d = 0, dur = 0.2) => 4 * (1 - eo(Math.max(0, (t - d) / dur)));
+    const kTitle = entry(0, 0.2), kWindow = entry(0.1, 0.25);
+    const command = params.command || "nextframe render timeline.json output.mp4";
+    const title = params.title || "一行命令，产出 MP4";
+
+    const typeProgress = Math.min(1, Math.max(0, (t - 0.15) / 0.9));
+    const typedChars = Math.floor(typeProgress * command.length);
+    const typedCmd = command.slice(0, typedChars);
+    const caret = Math.floor(t * 2) % 2 === 0 ? '▎' : ' ';
+    const progT = Math.min(1, Math.max(0, (t - 1.2) / 4.0));
+    const progPct = Math.round(eo(progT) * 100);
+    const showProgress = t > 1.2;
+
+    const procLines = [
+      { text: "→ Loading timeline...",                       at: 1.2, color: "#8b92a5" },
+      { text: "→ Building HTML bundle...",                   at: 1.7, color: "#8b92a5" },
+      { text: "→ Recording frames (1920×1080)...",           at: 2.4, color: "#58a6ff" },
+      { text: "→ Encoding H.264 + AAC...",                   at: 4.0, color: "#58a6ff" },
+      { text: "✓ Output: output/v1.0/landscape-1920x1080-1min.mp4", at: 5.5, color: "#ff6b35" },
+    ];
+    const procHtml = procLines.filter(pl => t > pl.at).map(pl => {
+      const op = eo(Math.min(1, (t - pl.at) / 0.25));
+      const glow = pl.color === "#ff6b35" ? `text-shadow:0 0 16px ${pl.color}80;` : '';
+      return `<div style="opacity:${op};color:${pl.color};margin-top:${H*0.01}px;${glow}">${pl.text}</div>`;
+    }).join('');
+
+    // syntax-highlighted command: cmd cyan, args orange
+    const cmdParts = typedCmd.split(' ');
+    const cmdHtml = cmdParts.map((p, i) => {
+      if (i === 0) return `<span style="color:#58a6ff;">${p}</span>`;
+      if (i === 1) return `<span style="color:#7dd3fc;">${p}</span>`;
+      return `<span style="color:#ff6b35;">${p}</span>`;
+    }).join(' ');
+
+    const grain = `<svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.1;mix-blend-mode:overlay;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"><filter id="n6"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="19"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0"/></filter><rect width="100%" height="100%" filter="url(#n6)"/></svg>`;
+    const borderPulse = 0.3 + 0.15 * Math.sin(t * 1.4);
+
+    return `
+      <div style="position:absolute;inset:0;background:
+        radial-gradient(ellipse 70% 50% at 50% 50%,rgba(88,166,255,0.1),transparent 65%),
+        linear-gradient(180deg,#0a1628,#06101f);overflow:hidden;padding:${H*0.07}px ${W*0.08}px;">
+        <div style="opacity:${kTitle};transform:translateY(${ty(0,0.2)}px);
+          font:600 ${Math.round(W*0.026)}px/1.3 Inter,'PingFang SC',system-ui,sans-serif;
+          color:#f5f2e8;margin-bottom:${H*0.045}px;letter-spacing:-0.01em;text-shadow:0 2px 16px rgba(0,0,0,0.5);">${title}</div>
+        <div style="opacity:${kWindow};position:relative;
+          background:linear-gradient(180deg,rgba(20,28,48,0.85),rgba(10,15,30,0.9));
+          border:1px solid rgba(88,166,255,${borderPulse});border-radius:14px;overflow:hidden;
+          backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);
+          box-shadow:0 2px 0 rgba(255,255,255,0.08) inset,0 32px 64px -16px rgba(88,166,255,0.3),0 60px 120px -40px rgba(0,0,0,0.8);">
+          <div style="background:linear-gradient(180deg,rgba(42,42,62,0.9),rgba(32,32,52,0.85));padding:${H*0.014}px ${W*0.018}px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(245,242,232,0.05);">
+            <div style="width:13px;height:13px;border-radius:50%;background:#ff5f57;box-shadow:0 0 8px rgba(255,95,87,0.5);"></div>
+            <div style="width:13px;height:13px;border-radius:50%;background:#ffbd2e;box-shadow:0 0 8px rgba(255,189,46,0.5);"></div>
+            <div style="width:13px;height:13px;border-radius:50%;background:#28c840;box-shadow:0 0 8px rgba(40,200,64,0.5);"></div>
+            <div style="margin-left:auto;font:500 ${Math.round(W*0.012)}px/1 'JetBrains Mono',monospace;color:#8b92a5;letter-spacing:0.1em;">nextframe · zsh</div>
+          </div>
+          <div style="padding:${H*0.035}px ${W*0.022}px;font:500 ${Math.round(W*0.016)}px/1.7 'JetBrains Mono','SF Mono',Menlo,monospace;">
+            <div><span style="color:#28c840;">➜</span> <span style="color:#8b92a5;">~/project</span> ${cmdHtml}<span style="color:#ff6b35;">${caret}</span></div>
+            ${procHtml}
+            ${showProgress ? `
+              <div style="margin-top:${H*0.025}px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                  <span style="color:#58a6ff;letter-spacing:0.05em;">Rendering</span>
+                  <span style="color:#f5f2e8;font-weight:600;">${progPct}%</span>
+                </div>
+                <div style="background:rgba(88,166,255,0.12);border-radius:6px;height:10px;position:relative;overflow:hidden;
+                  box-shadow:0 2px 8px rgba(0,0,0,0.4) inset;">
+                  <div style="background:linear-gradient(90deg,#58a6ff 0%,#7dd3fc 40%,#ff6b35 100%);width:${progPct}%;height:100%;border-radius:6px;
+                    box-shadow:0 0 16px rgba(255,107,53,0.6),0 2px 0 rgba(255,255,255,0.2) inset;"></div>
+                </div>
+              </div>` : ''}
+          </div>
+        </div>
+        ${grain}
+      </div>`;
+  },
+
+  describe(t, params, vp) {
+    const progT = Math.min(1, Math.max(0, (t - 2.2) / 4.8));
+    return {
+      sceneId: "cliDemo", phase: t < 1 ? "enter" : "show",
+      progress: Math.min(1, t / 1.0), visible: true, params,
+      elements: [
+        { type: "terminal", role: "cli", value: params.command || "" },
+        { type: "progressbar", role: "render-progress", value: Math.round(progT * 100) },
+      ],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
+
+  sample() {
+    return { command: "nextframe render timeline.json output.mp4", title: "一行命令，产出 MP4" };
+  },
+};
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+function _serializeHost(host) {
+  if (host && host.querySelectorAll) {
+    var canvases = host.querySelectorAll("canvas");
+    for (var i = 0; i < canvases.length; i += 1) {
+      var canvas = canvases[i];
+      if (!canvas || typeof canvas.toDataURL !== "function" || !canvas.parentNode) continue;
+      var img = document.createElement("img");
+      for (var j = 0; j < canvas.attributes.length; j += 1) {
+        var attr = canvas.attributes[j];
+        if (attr && attr.name !== "src") img.setAttribute(attr.name, attr.value);
+      }
+      img.setAttribute("src", canvas.toDataURL());
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+      canvas.parentNode.replaceChild(img, canvas);
+    }
+  }
+  return host && typeof host.outerHTML === "string" ? host.outerHTML : "";
+}
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    var _out = _rawRender(host, t, params, vp);
+    if (typeof _out === "string") return _out;
+    return _serializeHost(host);
+  };
+} else {
+  _adaptedRender = function(t, params, vp) {
+    return _rawRender ? _rawRender(t, params, vp) : "";
+  };
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// dualOutput (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/blueprint-cinema/content-dualOutput.js)
+const dualOutput = (function(){
+// scenes/16x9/blueprint-cinema/content-dualOutput.js
+// F7: landscape+portrait 双屏 — device mock + depth shadow + glow play + gradient arrow
+var _def = {
+  id: "dualOutput",
+  name: "Dual Output",
+  version: "1.1.0",
+  ratio: "16:9",
+  theme: "blueprint-cinema",
+  role: "content",
+  type: "dom",
+  frame_pure: false,
+  assets: [],
+  description: "横屏+竖屏 device mock 并排：conic gradient preview + multi-shadow depth + glowing play + gradient arrow",
+  duration_hint: 8,
+  intent: "设备级 mock：两个屏幕用 conic-gradient + hue-rotate 循环动制造『正在播放』错觉，多层 box-shadow 做 device depth。橙色 play 按钮 radial glow 呼吸。中间双向箭头 gradient+blur trail 连接。grain 统一质感。",
+  when_to_use: ["展示多格式输出能力"],
+  when_not_to_use: ["只有单一输出格式时"],
+  limitations: ["固定横屏+竖屏两种"],
+  inspired_by: "Apple device mockup + Framer design kit + Vercel preview",
+  used_in: [],
+  requires: [],
+  pairs_well_with: ["cliDemo"],
+  conflicts_with: [],
+  alternatives: [],
+  visual_weight: "medium",
+  z_layer: "mid",
+  mood: ["professional", "calm", "cinematic"],
+  tags: ["output", "landscape", "portrait", "dual", "content", "blueprint-cinema"],
+  complexity: "medium",
+  performance: { cost: "medium", notes: "conic gradient + deep shadows" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-16", change: "initial" },
+    { version: "1.1.0", date: "2026-04-16", change: "awwwards upgrade: device depth + glow play + gradient arrow" },
+  ],
+  params: {
+    title: { type: "string", default: "横屏竖屏，同一叙事，两套适配", semantic: "标题" },
+  },
+  enter: null,
+  exit: null,
+
+  render(t, params, vp) {
+    const W = vp.width, H = vp.height;
+    const eo = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const entry = (d = 0, dur = 0.2) => 0.9 + 0.1 * eo(Math.max(0, (t - d) / dur));
+    const ty = (d = 0, dur = 0.2) => 4 * (1 - eo(Math.max(0, (t - d) / dur)));
+    const kTitle = entry(0, 0.2), kLeft = entry(0.12, 0.22), kArrow = entry(0.24, 0.2), kRight = entry(0.32, 0.22), kPlay = entry(0.42, 0.22);
+    const arrowPulse = 1 + 0.1 * Math.sin(t * 1.8);
+    const playBreathe = 1 + 0.08 * Math.sin(t * 1.5);
+    const playGlow = 0.6 + 0.3 * Math.sin(t * 1.6);
+    const hueL = t * 18;
+    const hueP = -t * 14;
+    const title = params.title || "横屏竖屏，同一叙事，两套适配";
+
+    const lsW = Math.round(W * 0.33);
+    const lsH = Math.round(lsW * 9 / 16);
+    const ptW = Math.round(H * 0.42 * 9 / 16);
+    const ptH = Math.round(H * 0.42);
+
+    function playBtn(op, scale) {
+      return `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(${scale});opacity:${op};
+        width:60px;height:60px;border-radius:50%;
+        background:radial-gradient(circle,#ff8a5c,#ff6b35 60%,#d94b1a);
+        display:flex;align-items:center;justify-content:center;
+        font-size:22px;color:#fff;
+        box-shadow:0 0 ${24+16*playGlow}px rgba(255,107,53,${0.7+0.3*playGlow}),0 0 ${60+30*playGlow}px rgba(255,107,53,0.5),0 2px 0 rgba(255,255,255,0.3) inset,0 10px 24px rgba(0,0,0,0.5);">▶</div>`;
+    }
+
+    const grain = `<svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.1;mix-blend-mode:overlay;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"><filter id="n7"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="23"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0"/></filter><rect width="100%" height="100%" filter="url(#n7)"/></svg>`;
+
+    return `
+      <div style="position:absolute;inset:0;background:
+        radial-gradient(ellipse 60% 50% at 30% 50%,rgba(88,166,255,0.14),transparent 65%),
+        radial-gradient(ellipse 60% 50% at 70% 50%,rgba(255,107,53,0.14),transparent 65%),
+        linear-gradient(180deg,#0a1628,#06101f);overflow:hidden;
+        display:flex;flex-direction:column;align-items:center;padding-top:${H*0.07}px;">
+        <div style="opacity:${kTitle};transform:translateY(${ty(0,0.2)}px);
+          font:600 ${Math.round(W*0.024)}px/1.3 Inter,'PingFang SC',system-ui,sans-serif;
+          color:#f5f2e8;margin-bottom:${H*0.055}px;letter-spacing:-0.01em;text-shadow:0 2px 16px rgba(0,0,0,0.5);">${title}</div>
+        <div style="display:flex;align-items:center;gap:${W*0.045}px;position:relative;z-index:2;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:${H*0.02}px;opacity:${kLeft};transform:translateY(${ty(0.12,0.22)}px);">
+            <div style="position:relative;width:${lsW}px;height:${lsH}px;border-radius:12px;overflow:hidden;
+              background:conic-gradient(from ${hueL}deg at 50% 50%,#0a2040,#1a3060,#2a4580,#1a3060,#0a2040);
+              border:2px solid rgba(88,166,255,0.45);
+              box-shadow:0 2px 0 rgba(255,255,255,0.1) inset,0 40px 80px -16px rgba(88,166,255,0.3),0 60px 120px -32px rgba(0,0,0,0.7),0 0 0 8px rgba(245,242,232,0.04);">
+              <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;filter:blur(1px);">
+                <div style="width:55%;height:35%;background:linear-gradient(135deg,rgba(88,166,255,0.4),rgba(255,107,53,0.25));border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+              </div>
+              ${playBtn(kPlay, playBreathe)}
+            </div>
+            <div style="font:500 ${Math.round(W*0.014)}px/1.3 'JetBrains Mono',monospace;color:#8b92a5;letter-spacing:0.1em;">1920 × 1080 · 16:9</div>
+          </div>
+          <div style="opacity:${kArrow};text-align:center;">
+            <div style="position:relative;width:${W*0.05}px;height:${H*0.02}px;display:flex;align-items:center;justify-content:center;transform:scale(${arrowPulse});">
+              <div style="width:100%;height:3px;background:linear-gradient(90deg,#58a6ff,#ff6b35,#58a6ff);border-radius:2px;box-shadow:0 0 16px rgba(255,107,53,0.6);"></div>
+              <div style="position:absolute;left:-4px;width:0;height:0;border-right:10px solid #58a6ff;border-top:7px solid transparent;border-bottom:7px solid transparent;filter:drop-shadow(0 0 8px rgba(88,166,255,0.8));"></div>
+              <div style="position:absolute;right:-4px;width:0;height:0;border-left:10px solid #ff6b35;border-top:7px solid transparent;border-bottom:7px solid transparent;filter:drop-shadow(0 0 8px rgba(255,107,53,0.8));"></div>
+            </div>
+            <div style="font:500 ${Math.round(W*0.012)}px/1.3 'JetBrains Mono',monospace;color:#f5f2e8;margin-top:10px;letter-spacing:0.15em;text-transform:uppercase;">同一 JSON</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:${H*0.02}px;opacity:${kRight};transform:translateY(${ty(0.32,0.22)}px);">
+            <div style="position:relative;width:${ptW}px;height:${ptH}px;border-radius:14px;overflow:hidden;
+              background:conic-gradient(from ${hueP}deg at 50% 50%,#200a40,#401060,#603080,#401060,#200a40);
+              border:2px solid rgba(255,107,53,0.45);
+              box-shadow:0 2px 0 rgba(255,255,255,0.1) inset,0 40px 80px -16px rgba(255,107,53,0.3),0 60px 120px -32px rgba(0,0,0,0.7),0 0 0 8px rgba(245,242,232,0.04);">
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;filter:blur(1px);">
+                <div style="width:65%;height:18%;background:linear-gradient(135deg,rgba(255,107,53,0.35),rgba(88,166,255,0.2));border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.4);"></div>
+                <div style="width:45%;height:10%;background:rgba(139,146,165,0.25);border-radius:4px;"></div>
+              </div>
+              ${playBtn(kPlay, playBreathe)}
+            </div>
+            <div style="font:500 ${Math.round(W*0.014)}px/1.3 'JetBrains Mono',monospace;color:#8b92a5;letter-spacing:0.1em;">1080 × 1920 · 9:16</div>
+          </div>
+        </div>
+        ${grain}
+      </div>`;
+  },
+
+  describe(t, params, vp) {
+    return {
+      sceneId: "dualOutput", phase: t < 1 ? "enter" : "show",
+      progress: Math.min(1, t / 1.0), visible: true, params,
+      elements: [
+        { type: "preview", role: "landscape", value: "1920x1080" },
+        { type: "preview", role: "portrait", value: "1080x1920" },
+      ],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
+
+  sample() { return { title: "横屏竖屏，同一叙事，两套适配" }; },
+};
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+function _serializeHost(host) {
+  if (host && host.querySelectorAll) {
+    var canvases = host.querySelectorAll("canvas");
+    for (var i = 0; i < canvases.length; i += 1) {
+      var canvas = canvases[i];
+      if (!canvas || typeof canvas.toDataURL !== "function" || !canvas.parentNode) continue;
+      var img = document.createElement("img");
+      for (var j = 0; j < canvas.attributes.length; j += 1) {
+        var attr = canvas.attributes[j];
+        if (attr && attr.name !== "src") img.setAttribute(attr.name, attr.value);
+      }
+      img.setAttribute("src", canvas.toDataURL());
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+      canvas.parentNode.replaceChild(img, canvas);
+    }
+  }
+  return host && typeof host.outerHTML === "string" ? host.outerHTML : "";
+}
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    var _out = _rawRender(host, t, params, vp);
+    if (typeof _out === "string") return _out;
+    return _serializeHost(host);
+  };
+} else {
+  _adaptedRender = function(t, params, vp) {
+    return _rawRender ? _rawRender(t, params, vp) : "";
+  };
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+
+// ctaQR (/Users/Zhuanz/bigbang/NextFrame/src/nf-core/scenes/16x9/blueprint-cinema/content-ctaQR.js)
+const ctaQR = (function(){
+// scenes/16x9/blueprint-cinema/content-ctaQR.js
+// F8: CTA — hero brand + glowing QR + brand halo + grain
+var _def = {
+  id: "ctaQR",
+  name: "CTA QR",
+  version: "1.1.0",
+  ratio: "16:9",
+  theme: "blueprint-cinema",
+  role: "content",
+  type: "dom",
+  frame_pure: false,
+  assets: [],
+  description: "结尾 CTA：gradient text 品牌 + glowing QR + brand halo + grain",
+  duration_hint: 8,
+  intent: "结尾 hero CTA。品牌名用 gradient text fill + drop-shadow glow。URL 用等宽字体 + cyan glow pulse。QR 放在白色 glass card，外围光晕呼吸。背景橙色 blob halo + 蓝色 blob + conic mesh，grain 统一质感。",
+  when_to_use: ["视频结尾CTA","引流到项目链接"],
+  when_not_to_use: ["开头或中段"],
+  limitations: ["URL不超过50字符"],
+  inspired_by: "Apple 发布会结尾 + Kurzgesagt订阅页 + Vercel CTA",
+  used_in: [],
+  requires: [],
+  pairs_well_with: ["dualOutput"],
+  conflicts_with: [],
+  alternatives: [],
+  visual_weight: "heavy",
+  z_layer: "mid",
+  mood: ["professional", "calm", "cinematic"],
+  tags: ["cta", "qr", "github", "ending", "content", "blueprint-cinema"],
+  complexity: "medium",
+  performance: { cost: "medium", notes: "blob halo + drop-shadow + grain" },
+  status: "stable",
+  changelog: [
+    { version: "1.0.0", date: "2026-04-16", change: "initial" },
+    { version: "1.1.0", date: "2026-04-16", change: "awwwards upgrade: gradient text + glowing QR + brand halo" },
+  ],
+  params: {
+    brand: { type: "string", default: "NextFrame", semantic: "品牌名" },
+    url: { type: "string", default: "github.com/anthropics/nextframe", semantic: "GitHub URL" },
+    cta: { type: "string", default: "开源 · 欢迎玩起来", semantic: "行动号召语" },
+  },
+  enter: null,
+  exit: null,
+
+  render(t, params, vp) {
+    const W = vp.width, H = vp.height;
+    const eo = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+    const entry = (d = 0, dur = 0.2) => 0.9 + 0.1 * eo(Math.max(0, (t - d) / dur));
+    const ty = (d = 0, dur = 0.2) => 4 * (1 - eo(Math.max(0, (t - d) / dur)));
+    const k1 = entry(0, 0.28), k2 = entry(0.15, 0.22), k3 = entry(0.28, 0.22), k4 = entry(0.4, 0.22);
+    const pulse = 0.5 + 0.5 * Math.sin(t * 1.4);
+    const breathe = 1 + 0.012 * Math.sin(t * Math.PI * 0.7);
+    const qrGlow = 0.6 + 0.3 * Math.sin(t * 1.3);
+    const hue = 6 * Math.sin(t * 0.8);
+    const brand = params.brand || "NextFrame";
+    const url = params.url || "github.com/anthropics/nextframe";
+    const cta = params.cta || "开源 · 欢迎玩起来";
+
+    const qrSize = Math.round(H * 0.32);
+    const qrCells = 11;
+    const cellS = Math.round(qrSize / qrCells);
+    // deterministic QR-ish pattern (121 cells)
+    const pattern = [1,1,1,1,1,0,1,0,1,1,1, 1,0,0,0,1,0,1,0,0,0,1, 1,0,1,1,1,0,1,0,1,1,1,
+                     1,0,1,0,1,0,0,0,1,1,0, 1,0,1,1,1,0,1,0,0,1,0, 1,1,1,1,1,0,1,1,1,0,1,
+                     0,0,0,0,0,0,1,0,0,1,1, 1,1,1,0,1,0,1,1,1,0,0, 0,1,0,1,0,0,1,0,0,1,1,
+                     1,0,1,1,1,0,1,0,1,0,0, 1,1,0,0,1,0,0,1,1,0,1];
+    const qrHtml = pattern.slice(0, qrCells * qrCells).map((on, i) => {
+      const r = Math.floor(i / qrCells), c = i % qrCells;
+      return `<div style="position:absolute;left:${c*cellS}px;top:${r*cellS}px;width:${cellS-1}px;height:${cellS-1}px;background:${on?'#0a1628':'transparent'};border-radius:1px;"></div>`;
+    }).join('');
+
+    const grain = `<svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.12;mix-blend-mode:overlay;pointer-events:none;" xmlns="http://www.w3.org/2000/svg"><filter id="n8"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="29"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0"/></filter><rect width="100%" height="100%" filter="url(#n8)"/></svg>`;
+
+    return `
+      <div style="position:absolute;inset:0;background:
+        radial-gradient(ellipse 60% 55% at 30% 55%,rgba(255,107,53,0.2),transparent 65%),
+        radial-gradient(ellipse 50% 50% at 75% 45%,rgba(88,166,255,0.16),transparent 65%),
+        conic-gradient(from ${t*6}deg at 50% 50%,#0a1628,#0f1d3a,#0a1628,#06101f,#0a1628);
+        overflow:hidden;">
+        <div style="position:absolute;left:-10%;bottom:-20%;width:60%;height:70%;border-radius:50%;
+          background:radial-gradient(circle,rgba(255,107,53,0.55),rgba(255,107,53,0.1) 50%,transparent 70%);
+          filter:blur(70px) hue-rotate(${hue}deg);opacity:${0.55+0.2*pulse};transform:rotate(${t*3}deg);"></div>
+        <div style="position:absolute;right:-8%;top:-15%;width:50%;height:60%;border-radius:50%;
+          background:radial-gradient(circle,rgba(88,166,255,0.45),transparent 70%);
+          filter:blur(60px);opacity:${0.4+0.2*pulse};transform:rotate(${-t*2}deg);"></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+          <div style="display:flex;align-items:center;gap:${W*0.08}px;position:relative;z-index:2;">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:flex-start;">
+              <div style="opacity:${k1};transform:scale(${breathe * (0.985 + 0.015*eo(Math.min(1,t/0.28)))});margin-bottom:${H*0.028}px;">
+                <div style="font:800 ${Math.round(W*0.075)}px/1.05 Inter,'PingFang SC',system-ui,sans-serif;
+                  letter-spacing:-0.045em;
+                  background:linear-gradient(135deg,#ff8a5c 0%,#ff6b35 50%,#ff5519 100%);
+                  -webkit-background-clip:text;background-clip:text;color:transparent;
+                  filter:drop-shadow(0 0 ${40+25*pulse}px rgba(255,107,53,${0.5+0.25*pulse})) drop-shadow(0 8px 24px rgba(0,0,0,0.5));">${brand}</div>
+              </div>
+              <div style="opacity:${k2};transform:translateY(${ty(0.15,0.22)}px);margin-bottom:${H*0.025}px;">
+                <div style="font:600 ${Math.round(W*0.024)}px/1.2 Inter,'PingFang SC',system-ui,sans-serif;color:#f5f2e8;letter-spacing:-0.01em;text-shadow:0 2px 16px rgba(0,0,0,0.5);">${cta}</div>
+              </div>
+              <div style="opacity:${k3};transform:translateY(${ty(0.28,0.22)}px);
+                font:500 ${Math.round(W*0.019)}px/1.4 'JetBrains Mono','SF Mono',monospace;
+                color:#7dd3fc;letter-spacing:0.02em;
+                text-shadow:0 0 ${20+15*pulse}px rgba(125,211,252,${0.5+0.3*pulse}),0 0 40px rgba(88,166,255,0.4);">
+                ${url}
+              </div>
+              <div style="opacity:${k4};margin-top:${H*0.035}px;transform:translateY(${ty(0.4,0.22)}px);display:flex;align-items:center;gap:12px;">
+                <div style="width:${W*0.04}px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,107,53,0.8));"></div>
+                <div style="font:400 ${Math.round(W*0.014)}px/1.4 Inter,system-ui,sans-serif;color:#8b92a5;letter-spacing:0.2em;text-transform:uppercase;">AI 视频引擎 · 开源</div>
+              </div>
+            </div>
+            <div style="opacity:${k4};flex-shrink:0;transform:scale(${1 + 0.02*Math.sin(t*1.4)});">
+              <div style="position:relative;width:${qrSize}px;height:${qrSize}px;
+                background:#f5f2e8;border-radius:14px;padding:14px;
+                box-shadow:0 0 ${40+30*qrGlow}px rgba(255,107,53,${0.4+0.2*qrGlow}),0 0 80px rgba(255,107,53,0.3),0 40px 80px -16px rgba(0,0,0,0.6),0 2px 0 rgba(255,255,255,0.5) inset;">
+                <div style="position:relative;width:100%;height:100%;">
+                  ${qrHtml}
+                </div>
+              </div>
+              <div style="font:500 ${Math.round(W*0.013)}px/1.3 'JetBrains Mono',monospace;color:#f5f2e8;text-align:center;margin-top:14px;letter-spacing:0.25em;text-transform:uppercase;text-shadow:0 0 12px rgba(255,107,53,0.4);">扫码访问</div>
+            </div>
+          </div>
+        </div>
+        ${grain}
+      </div>`;
+  },
+
+  describe(t, params, vp) {
+    return {
+      sceneId: "ctaQR", phase: t < 1 ? "enter" : "show",
+      progress: Math.min(1, t / 1.0), visible: true, params,
+      elements: [
+        { type: "headline", role: "brand", value: params.brand || "" },
+        { type: "url", role: "cta-link", value: params.url || "" },
+        { type: "qr", role: "scan-target", value: params.url || "" },
+      ],
+      boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
+    };
+  },
+
+  sample() {
+    return { brand: "NextFrame", url: "github.com/anthropics/nextframe", cta: "开源 · 欢迎玩起来" };
+  },
+};
+var _rawRender = _def && typeof _def.render === "function" ? _def.render.bind(_def) : null;
+function _serializeHost(host) {
+  if (host && host.querySelectorAll) {
+    var canvases = host.querySelectorAll("canvas");
+    for (var i = 0; i < canvases.length; i += 1) {
+      var canvas = canvases[i];
+      if (!canvas || typeof canvas.toDataURL !== "function" || !canvas.parentNode) continue;
+      var img = document.createElement("img");
+      for (var j = 0; j < canvas.attributes.length; j += 1) {
+        var attr = canvas.attributes[j];
+        if (attr && attr.name !== "src") img.setAttribute(attr.name, attr.value);
+      }
+      img.setAttribute("src", canvas.toDataURL());
+      if (!img.getAttribute("alt")) img.setAttribute("alt", "");
+      canvas.parentNode.replaceChild(img, canvas);
+    }
+  }
+  return host && typeof host.outerHTML === "string" ? host.outerHTML : "";
+}
+var _adaptedRender = null;
+if (_rawRender && _rawRender.length >= 4) {
+  _adaptedRender = function(t, params, vp) {
+    var host = document.createElement("div");
+    host.style.cssText = "position:absolute;inset:0;";
+    var _out = _rawRender(host, t, params, vp);
+    if (typeof _out === "string") return _out;
+    return _serializeHost(host);
+  };
+} else {
+  _adaptedRender = function(t, params, vp) {
+    return _rawRender ? _rawRender(t, params, vp) : "";
+  };
+}
+return { meta: _def || null, render: _adaptedRender };
+})();
+const SCENES = Object.assign({}, window.__scenes || {}, {
+"questionHook": questionHook,
+"brandTitle": brandTitle,
+"jsonShowcase": jsonShowcase,
+"sceneGrid": sceneGrid,
+"timelineDiagram": timelineDiagram,
+"cliDemo": cliDemo,
+"dualOutput": dualOutput,
+"ctaQR": ctaQR
+});
+(() => {
+  const stageShell = document.getElementById("stage-shell");
+  const stage = document.getElementById("stage");
+  const controls = document.getElementById("controls");
+  const playBtn = document.getElementById("playBtn");
+  const scrubber = document.getElementById("scrubber");
+  const timeInfo = document.getElementById("timeInfo");
+  const phaseInfo = document.getElementById("phaseInfo");
+  const audioEl = document.getElementById("timeline-audio");
+  const timeline = TIMELINE || {};
+  const fps = Number(timeline.fps || 30);
+  const duration = Math.max(0, Number(timeline.duration || 0));
+  const viewport = {
+    width: Number(timeline.width || 1920),
+    height: Number(timeline.height || 1080),
+  };
+  const layers = Array.isArray(timeline.layers) ? timeline.layers : [];
+  if (audioEl && timeline.audio) {
+    const _audioSrc = typeof timeline.audio === "object" ? (timeline.audio.src || "") : String(timeline.audio);
+    if (_audioSrc) { audioEl.src = _audioSrc; window.__audioSrc = _audioSrc; }
+  }
+  let currentTime = 0;
+  let rafId = 0;
+  let isPlaying = false;
+  let recorderMode = false;
+  let dragActive = false;
+  let clockBaseTime = 0;
+  let clockBaseNow = 0;
+  let lastVisible = [];
+  // ISSUE-004: short audio (7s) ended → audioEl.currentTime freezes → tick nextTime stuck.
+  // On first 'ended', lock wallclock base so subsequent time advances from performance.now(),
+  // and pause audio to prevent browser auto-replay.
+  let audioEndedWallBase = -1;
+  if (audioEl) {
+    audioEl.addEventListener("ended", function () {
+      if (audioEndedWallBase >= 0) return;
+      audioEndedWallBase = performance.now() - (audioEl.currentTime || 0) * 1000;
+      try { audioEl.pause(); } catch (_e) {}
+      console.log("[nf-runtime] audio ended → wallclock fallback", { base: audioEndedWallBase, audioCT: audioEl.currentTime });
+    });
+  }
+  function getPlayTime() {
+    if (audioEndedWallBase >= 0) {
+      return clampTime((performance.now() - audioEndedWallBase) / 1000);
+    }
+    if (audioEl) return clampTime(audioEl.currentTime);
+    return clampTime(clockBaseTime + (performance.now() - clockBaseNow) / 1000);
+  }
+
+  function clampTime(value) {
+    if (!Number.isFinite(value)) return 0;
+    if (value < 0) return 0;
+    if (value > duration) return duration;
+    return value;
+  }
+
+  function formatTime(value) {
+    return clampTime(value).toFixed(2) + "s";
+  }
+
+  function applyScale() {
+    const controlsH = controls && window.getComputedStyle(controls).display !== "none"
+      ? Math.max(0, controls.offsetHeight || 56)
+      : 0;
+    const availW = window.innerWidth;
+    const availH = window.innerHeight - controlsH;
+    const scale = Math.min(availW / viewport.width, availH / viewport.height);
+    const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+    const scaledW = viewport.width * safeScale;
+    const scaledH = viewport.height * safeScale;
+    stageShell.style.transform = "scale(" + safeScale + ")";
+    stageShell.style.left = Math.round((availW - scaledW) / 2) + "px";
+    stageShell.style.top = Math.round((availH - scaledH) / 2) + "px";
+  }
+
+  function replayInlineScripts(root) {
+    const scripts = root.querySelectorAll("script");
+    scripts.forEach((oldScript) => {
+      const newScript = document.createElement("script");
+      for (const attr of oldScript.attributes) {
+        newScript.setAttribute(attr.name, attr.value);
+      }
+      newScript.textContent = oldScript.textContent;
+      oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+  }
+
+  function renderSceneError(layer, message) {
+    return '<div style="position:absolute;inset:24px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,120,120,.35);background:rgba(20,0,0,.4);color:#ffb4b4;font:600 18px monospace">' +
+      message + " (" + String(layer.scene || "unknown") + ")</div>";
+  }
+
+  // Auto-generate SRT from timeline.audio.sentences (if audio-synth was used)
+  const _autoSrt = (function() {
+    const audio = timeline.audio;
+    if (!audio || typeof audio === "string") return null;
+    // audio can be {src:"path", sentences:[{text,start,end,words}]} from pipeline
+    const sentences = audio.sentences || (audio.segments && audio.segments.flatMap(function(seg) { return seg.sentences || []; }));
+    if (!Array.isArray(sentences) || sentences.length === 0) return null;
+    return sentences.map(function(s) { return { s: Number(s.start || 0), e: Number(s.end || 0), t: String(s.text || "") }; }).filter(function(e) { return e.t; });
+  })();
+
+  function resolveSceneParams(scene, rawParams, layerDataSource) {
+    const input = rawParams && typeof rawParams === "object" ? rawParams : {};
+    const meta = scene && scene.meta && typeof scene.meta === "object" ? scene.meta : {};
+    const paramsMeta = meta.params && typeof meta.params === "object" ? meta.params : {};
+    const defaults = {};
+    for (const [key, spec] of Object.entries(paramsMeta)) {
+      if (spec && Object.prototype.hasOwnProperty.call(spec, "default")) {
+        defaults[key] = spec.default;
+      }
+    }
+    const themes = meta.themes && typeof meta.themes === "object" ? meta.themes : {};
+    const themeKey = input.theme || meta.default_theme;
+    const themeValues = themeKey && themes[themeKey] && typeof themes[themeKey] === "object"
+      ? themes[themeKey]
+      : {};
+    const merged = { ...defaults, ...themeValues, ...input };
+    // Auto-inject SRT if layer has dataSource:"audio" and scene has srt param
+    if (layerDataSource === "audio" && _autoSrt && !merged.srt) {
+      merged.srt = _autoSrt;
+    }
+    // Auto-inject progress for progressBar scenes
+    if (layerDataSource === "progress" || (meta.id && meta.id.toLowerCase().indexOf("progress") >= 0)) {
+      // progress is handled per-frame in compose, not here
+    }
+    return merged;
+  }
+
+  function getPhaseLabel(visible) {
+    const active = visible[visible.length - 1];
+    if (!active) return "idle";
+    const meta = active.scene && active.scene.meta ? active.scene.meta : {};
+    const label = meta.label || active.layer.scene || "scene";
+    const layerId = active.layer.id || active.layer.scene || "layer";
+    return layerId + " · " + label;
+  }
+
+  function updateControls(time, visible) {
+    const activeVisible = visible && visible.length ? visible : lastVisible;
+    if (!dragActive) {
+      scrubber.value = duration > 0
+        ? String(Math.round((clampTime(time) / duration) * 10000))
+        : "0";
+    }
+    timeInfo.textContent = formatTime(time) + " / " + formatTime(duration);
+    phaseInfo.textContent = "Phase: " + getPhaseLabel(activeVisible);
+    playBtn.textContent = isPlaying ? "Pause" : "Play";
+    if (window.parent !== window) {
+      window.parent.postMessage({type:"nf-state", currentTime: clampTime(time), duration: duration, isPlaying: isPlaying}, "*");
+    }
+  }
+
+  function compose(time) {
+    const t = clampTime(time);
+    currentTime = t;
+    const visible = [];
+    const html = [];
+    for (let index = 0; index < layers.length; index += 1) {
+      const layer = layers[index];
+      const start = Number(layer.start || 0);
+      const dur = Number(layer.dur || 0);
+      if (t < start || t >= start + dur) continue;
+      const scene = SCENES[layer.scene];
+      let inner = "";
+      if (!scene || typeof scene.render !== "function") {
+        inner = renderSceneError(layer, "Missing scene renderer");
+      } else {
+        try {
+          inner = scene.render(t - start, resolveSceneParams(scene, layer.params, layer.dataSource), viewport);
+        } catch (err) {
+          inner = renderSceneError(layer, String(err && err.message ? err.message : err));
+        }
+      }
+      // Compute enter/exit effect CSS if layer has animation specs
+      var fxStyle = "";
+      if (typeof window.__nfEffect === "function") {
+        var localT = t - start;
+        var enterSpec = layer.enter;
+        var exitSpec = layer.exit;
+        if (enterSpec && enterSpec.effect && localT < (enterSpec.dur || 0.5)) {
+          var eProg = localT / (enterSpec.dur || 0.5);
+          fxStyle = window.__nfEffect(enterSpec.effect, eProg, enterSpec);
+        } else if (exitSpec && exitSpec.effect && localT > dur - (exitSpec.dur || 0.5)) {
+          var xProg = (localT - (dur - (exitSpec.dur || 0.5))) / (exitSpec.dur || 0.5);
+          fxStyle = window.__nfEffect(exitSpec.effect, xProg, exitSpec);
+        }
+      }
+      visible.push({ layer, scene });
+      html.push(
+        '<div class="nf-layer" data-layer-id="' + String(layer.id || layer.scene || index) + '"' +
+        ' style="position:absolute;inset:0;pointer-events:none;z-index:' + index + ';' + fxStyle + '">' +
+        inner +
+        "</div>"
+      );
+    }
+    // Persistent video elements: don't destroy & recreate, just update currentTime
+    const existingVideos = {};
+    stage.querySelectorAll("video[data-nf-persist]").forEach(function(v) {
+      existingVideos[v.getAttribute("data-nf-persist")] = v.parentElement.parentElement;
+    });
+
+    // Build new DOM, but reuse persistent video layers
+    const frag = document.createElement("div");
+    frag.innerHTML = html.join("");
+    const newChildren = Array.from(frag.children);
+
+    // Check which layers have persistent video
+    const usedPersist = new Set();
+    for (const child of newChildren) {
+      const vid = child.querySelector("video[data-nf-persist]");
+      if (vid) {
+        const key = vid.getAttribute("data-nf-persist");
+        if (existingVideos[key]) {
+          // Reuse existing layer — just update currentTime
+          const existingLayer = existingVideos[key];
+          const existingVid = existingLayer.querySelector("video[data-nf-persist]");
+          const newTime = parseFloat(vid.getAttribute("data-nf-time") || "0");
+          if (existingVid && Math.abs(existingVid.currentTime - newTime) > 0.1) {
+            existingVid.currentTime = newTime;
+          }
+          existingLayer.style.zIndex = child.style.zIndex;
+          usedPersist.add(key);
+        }
+      }
+    }
+
+    // Remove layers that are no longer visible (but keep persistent ones that are still active)
+    Array.from(stage.children).forEach(function(child) {
+      const vid = child.querySelector("video[data-nf-persist]");
+      if (vid && usedPersist.has(vid.getAttribute("data-nf-persist"))) return; // keep
+      child.remove();
+    });
+
+    // Add new layers (skip ones already persisted)
+    for (const child of newChildren) {
+      const vid = child.querySelector("video[data-nf-persist]");
+      if (vid && existingVideos[vid.getAttribute("data-nf-persist")]) continue; // already in DOM
+      stage.appendChild(child);
+    }
+
+    replayInlineScripts(stage);
+    lastVisible = visible;
+    updateControls(t, visible);
+    return { time: t, visible };
+  }
+
+  function syncClock(time) {
+    clockBaseTime = clampTime(time);
+    clockBaseNow = performance.now();
+  }
+
+  function stopPlayback() {
+    isPlaying = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+    if (audioEl) audioEl.pause();
+    updateControls(currentTime, []);
+  }
+
+  function tick() {
+    if (!isPlaying) return;
+    const nextTime = getPlayTime();
+    compose(nextTime);
+    if (nextTime >= duration) {
+      stopPlayback();
+      compose(duration);
+      return;
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  // Sync all persistent video elements
+  function syncVideos(t, playing) {
+    stage.querySelectorAll("video[data-nf-persist]").forEach(function(v) {
+      if (playing && v.paused) v.play().catch(function(){});
+      if (!playing && !v.paused) v.pause();
+      // Only seek if drift > 0.3s
+      if (Math.abs(v.currentTime - t) > 0.3) v.currentTime = t;
+    });
+  }
+
+  function play() {
+    if (isPlaying || duration <= 0 || recorderMode) return;
+    if (currentTime >= duration) {
+      currentTime = 0;
+      if (audioEl) audioEl.currentTime = 0;
+    }
+    isPlaying = true;
+    syncClock(currentTime);
+    if (audioEl) {
+      audioEl.currentTime = currentTime;
+      const playPromise = audioEl.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => {
+          stopPlayback();
+          compose(currentTime);
+        });
+      }
+    }
+    syncVideos(currentTime, true);
+    updateControls(currentTime, []);
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function pause() {
+    if (!isPlaying) return;
+    currentTime = getPlayTime();
+    stopPlayback();
+    syncVideos(currentTime, false);
+    compose(currentTime);
+  }
+
+  function togglePlayback() {
+    if (isPlaying) pause();
+    else play();
+  }
+
+  function seek(time) {
+    const nextTime = clampTime(time);
+    currentTime = nextTime;
+    syncClock(nextTime);
+    if (audioEndedWallBase >= 0) {
+      audioEndedWallBase = performance.now() - nextTime * 1000;
+    } else if (audioEl) {
+      audioEl.currentTime = nextTime;
+    }
+    return compose(nextTime);
+  }
+
+  function scrubberTime() {
+    return duration <= 0
+      ? 0
+      : (Number(scrubber.value || 0) / 10000) * duration;
+  }
+
+  function extractTime(data) {
+    if (typeof data === "number") return clampTime(data);
+    if (data && Number.isFinite(data.time)) return clampTime(Number(data.time));
+    if (data && Number.isFinite(data.t)) return clampTime(Number(data.t));
+    if (data && Number.isFinite(data.currentTime)) return clampTime(Number(data.currentTime));
+    return currentTime;
+  }
+
+  function enableRecorderMode() {
+    if (recorderMode) return;
+    recorderMode = true;
+    stopPlayback();
+    controls.style.display = "none";
+    applyScale();
+  }
+
+  window.__onFrame = function(data) {
+    enableRecorderMode();
+    const result = seek(extractTime(data));
+    // Force layout flush + paint for WKWebView recorder
+    void stage.offsetHeight;
+    void stage.getBoundingClientRect();
+    return result;
+  };
+
+  playBtn.addEventListener("click", () => togglePlayback());
+  scrubber.addEventListener("pointerdown", () => { dragActive = true; });
+  scrubber.addEventListener("pointerup", () => { dragActive = false; });
+  scrubber.addEventListener("input", () => {
+    if (isPlaying) pause();
+    seek(scrubberTime());
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.code !== "Space") return;
+    const tag = event.target && event.target.tagName ? event.target.tagName : "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    event.preventDefault();
+    togglePlayback();
+  });
+  window.addEventListener("resize", applyScale);
+
+  if (audioEl) {
+    audioEl.addEventListener("ended", () => {
+      currentTime = duration;
+      stopPlayback();
+      compose(duration);
+    });
+  }
+
+  // Iframe embedding mode — use setInterval instead of rAF (rAF may not fire in WKWebView iframes)
+  const _iframeMode = (window.parent !== window);
+  let _intervalId = 0;
+  if (_iframeMode) {
+    controls.style.display = "none";
+    // Override play to use setInterval instead of rAF
+    const _origPlay = play;
+    play = function() {
+      _origPlay();
+      if (isPlaying && !_intervalId) {
+        _intervalId = setInterval(function() {
+          if (!isPlaying) { clearInterval(_intervalId); _intervalId = 0; return; }
+          tick(performance.now());
+        }, 33); // ~30fps
+      }
+    };
+    const _origPause = pause;
+    pause = function() {
+      _origPause();
+      if (_intervalId) { clearInterval(_intervalId); _intervalId = 0; }
+    };
+    window.addEventListener("message", function(event) {
+      const d = event.data;
+      if (!d || d.type !== "nf-cmd") return;
+      if (d.action === "play") play();
+      else if (d.action === "pause") pause();
+      else if (d.action === "toggle") togglePlayback();
+      else if (d.action === "seek" && typeof d.time === "number") seek(d.time);
+    });
+  }
+
+  applyScale();
+  // Support #t=N in URL to start at a specific time
+  const hashTime = parseFloat((location.hash.match(/t=([\d.]+)/) || [])[1]);
+  const initTime = isFinite(hashTime) ? hashTime : 0;
+  compose(initTime);
+  // Expose controls for external access (iframe parent, console, AppleScript)
+  window.__nfSeek = seek;
+  window.__nfPlay = play;
+  window.__nfPause = stopPlayback;
+  window.__nfToggle = togglePlayback;
+  window.__nfState = function() { return { currentTime: currentTime, duration: duration, isPlaying: isPlaying }; };
+  window.__nfPlay = play;
+  window.__nfPause = pause;
+
+  // Recorder protocol: lets nf-recorder decide whether to capture a frame.
+  // Returns true when any layer enters/exits between prevT and curT, OR when any
+  // currently-active layer has frame_pure:false (t-driven animation). For
+  // frame_pure components that don't read t, layer boundaries are the only
+  // thing that can change — recorder can safely skip identical frames.
+  // ENTER_ANIMATION_WINDOW: CSS @keyframes animations in scene DOM typically run
+  // 0.5-0.8s. We report true for the first 1.0s after any layer's start so
+  // recorder captures the animation unfolding instead of just t=0 opacity:0.
+  var ENTER_ANIMATION_WINDOW = 1.0;
+  window.__hasFrameChanged = function(prevT, curT) {
+    for (var i = 0; i < layers.length; i += 1) {
+      var L = layers[i];
+      var start = Number(L.start || 0);
+      var dur = Number(L.dur || 0);
+      var end = start + dur;
+      var prevActive = prevT >= start && prevT < end;
+      var curActive = curT >= start && curT < end;
+      if (prevActive !== curActive) return true;
+      if (curActive) {
+        // In enter animation window — capture every frame so CSS animation shows.
+        var sinceStart = curT - start;
+        if (sinceStart >= 0 && sinceStart < ENTER_ANIMATION_WINDOW) return true;
+        var scene = SCENES[L.scene];
+        if (scene && scene.meta && scene.meta.frame_pure === false) return true;
+      }
+    }
+    return false;
+  };
+})();
+</script>
+</body>
+</html>

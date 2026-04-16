@@ -1,0 +1,339 @@
+<!--
+  E · Fluid & God Rays — WebGL shader showcase, frame-pure, scrubbable
+  Techniques:
+    - Multi-octave fbm with domain warp (viscous flowing ink)
+    - God rays / volumetric light shafts (directional noise sampling)
+    - Bokeh light blobs (multiple radial spots + motion)
+    - Atmospheric haze layer
+    - Color envelope (dark teal → gold dawn → deep purple)
+    - Accent text fades + ruler marks
+  Duration: 14s. Time source: setTime(t). No CSS animations.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>E · Fluid & God Rays</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100vh;background:#03060a;overflow:hidden;
+    font-family:-apple-system,"SF Pro Display","Inter",system-ui,sans-serif;
+    color:#fff;-webkit-font-smoothing:antialiased}
+  canvas{position:fixed;inset:0;width:100%;height:100%}
+  #shader{z-index:0}
+
+  .hud{position:fixed;z-index:6;font-size:10px;letter-spacing:.42em;
+    text-transform:uppercase;color:rgba(255,225,180,.65);font-weight:500;opacity:0;
+    font-family:"JetBrains Mono","SF Mono",Menlo,monospace}
+  .hud.tl{top:36px;left:44px}
+  .hud.tr{top:36px;right:44px;text-align:right;line-height:1.9}
+  .hud.bl{bottom:64px;left:44px;line-height:1.9}
+  .hud.br{bottom:64px;right:44px;text-align:right;line-height:1.9}
+
+  .title-block{position:fixed;left:50%;top:54%;transform:translate(-50%,-50%);z-index:5;
+    text-align:center;pointer-events:none;max-width:80%}
+  .overline{font-size:12px;letter-spacing:.5em;text-transform:uppercase;
+    font-weight:500;color:rgba(255,220,180,.9);opacity:0;margin-bottom:26px}
+  .overline::before,.overline::after{content:'';display:inline-block;width:40px;
+    height:1px;background:rgba(255,220,180,.6);vertical-align:middle;margin:0 14px}
+  .title-block h1{font-size:clamp(54px,7.2vw,120px);font-weight:200;letter-spacing:-.03em;
+    line-height:.98;
+    background:linear-gradient(180deg,#ffeedf 0%,#ffcba0 50%,#d97a5a 100%);
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;color:transparent;
+    filter:drop-shadow(0 6px 40px rgba(255,160,110,.35));opacity:0}
+  .title-block .sub{margin-top:22px;font-size:clamp(14px,1.3vw,18px);font-weight:300;
+    letter-spacing:.15em;color:rgba(255,235,210,.75);opacity:0}
+  .title-block .sub .word{display:inline-block;opacity:0}
+
+  .corner-badge{position:fixed;top:50%;transform:translateY(-50%);z-index:4;
+    writing-mode:vertical-rl;text-orientation:mixed;font-size:10px;
+    letter-spacing:.4em;text-transform:uppercase;color:rgba(255,220,180,.4);
+    line-height:2;opacity:0}
+  .corner-badge.l{left:44px;transform:translateY(-50%) rotate(180deg)}
+  .corner-badge.r{right:44px}
+
+  /* accent stripe */
+  .stripe{position:fixed;left:50%;top:21%;height:1px;width:0;
+    transform:translateX(-50%);z-index:3;
+    background:linear-gradient(90deg,transparent,rgba(255,220,180,.65),transparent);
+    box-shadow:0 0 8px rgba(255,200,140,.4)}
+
+  /* timeline ui */
+  .tl-ui{position:fixed;left:0;right:0;bottom:0;z-index:100;
+    padding:14px 24px;background:linear-gradient(180deg,transparent,rgba(3,6,10,.92));
+    display:flex;align-items:center;gap:16px;
+    font-family:"SF Mono",Menlo,monospace;font-size:11px;color:rgba(255,255,255,.85)}
+  .tl-ui button{background:transparent;border:1px solid rgba(255,255,255,.3);
+    color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;
+    font-size:14px;display:grid;place-items:center;transition:all .2s}
+  .tl-ui button:hover{background:rgba(255,255,255,.1)}
+  .tl-ui .time{font-variant-numeric:tabular-nums;min-width:150px;letter-spacing:.05em}
+  .tl-ui input[type=range]{flex:1;accent-color:#ffcba0;height:3px}
+  .cue-row{position:absolute;left:24px;right:24px;bottom:40px;height:14px;pointer-events:none}
+  .cue-mark{position:absolute;width:2px;height:10px;background:rgba(255,203,160,.6);
+    border-radius:1px;transform:translateX(-1px)}
+  .cue-mark .lbl{position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+    font-size:8px;letter-spacing:.2em;color:rgba(255,203,160,.8);
+    text-transform:uppercase;white-space:nowrap;font-weight:700}
+</style>
+</head>
+<body>
+
+<canvas id="shader"></canvas>
+
+<div class="hud tl">E · Fluid & God Rays</div>
+<div class="hud tr">Vol. 05<br>/ light, form, dissolve</div>
+<div class="hud bl">Nextframe Labs<br>Experiment N° 005</div>
+<div class="hud br">frame-pure · scrubbable<br>14.0s</div>
+
+<div class="corner-badge l">Shader · noise · domain warp · rays</div>
+<div class="corner-badge r">Where light becomes matter</div>
+
+<div class="stripe" id="stripe"></div>
+
+<div class="title-block">
+  <div class="overline">Light &amp; Liquid</div>
+  <h1 id="title">A silent<br>atmosphere.</h1>
+  <div class="sub" id="sub"></div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 14.00s</span>
+  <input type="range" id="scrubber" min="0" max="1400" value="0" step="1">
+  <span class="time" id="frameLabel" style="min-width:100px;text-align:right">frame 0 / 420</span>
+</div>
+
+<script>
+const DURATION = 14.0;
+const FPS = 30;
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+const CUES = [
+  { t: 0.5, label: 'Fluid' },
+  { t: 1.8, label: 'Rays' },
+  { t: 3.5, label: 'Title' },
+  { t: 6.0, label: 'Haze' },
+  { t: 9.5, label: 'Dawn' },
+  { t: 12.0, label: 'Settle' },
+];
+
+/* ---- DOM refs ---- */
+const title = document.getElementById('title');
+const overline = document.querySelector('.overline');
+const sub = document.getElementById('sub');
+const stripe = document.getElementById('stripe');
+
+const words = [];
+'A rendering made entirely of light and noise.'.split(' ').forEach(w => {
+  const s = document.createElement('span');
+  s.className = 'word';
+  s.textContent = w + '\u00A0';
+  sub.appendChild(s);
+  words.push(s);
+});
+
+function render(t) {
+  document.querySelectorAll('.hud').forEach((el, i) => {
+    el.style.opacity = kern(t, 0.15 + i * 0.08, 1.4);
+  });
+  document.querySelectorAll('.corner-badge').forEach((el, i) => {
+    el.style.opacity = kern(t, 2.0 + i * 0.15, 1.4);
+  });
+  stripe.style.width = (kern(t, 0.6, 2.0, easeOut) * 60) + '%';
+  overline.style.opacity = kern(t, 3.2, 1.4);
+  overline.style.transform = `translateY(${(1 - kern(t, 3.2, 1.4)) * 14}px)`;
+
+  /* title mask reveal */
+  const titleP = kern(t, 3.5, 1.6);
+  title.style.opacity = titleP;
+  title.style.transform = `translateY(${(1 - titleP) * 20}px)`;
+
+  /* subtitle word stagger */
+  words.forEach((w, i) => {
+    const p = kern(t, 5.0 + i * 0.09, 1.1);
+    w.style.opacity = p;
+    w.style.transform = `translateY(${(1 - p) * 8}px)`;
+    w.style.filter = `blur(${(1 - p) * 4}px)`;
+  });
+
+  renderShader(t);
+}
+
+/* ---- Fluid + god rays shader ---- */
+let shaderCtx = null;
+function initShader() {
+  const c = document.getElementById('shader');
+  const gl = c.getContext('webgl', { antialias: false });
+  if (!gl) return null;
+  const r = () => {
+    // cap DPR low — shader is heavy, favor smooth playback
+    const d = Math.min(devicePixelRatio || 1, 1.0);
+    c.width = innerWidth * d; c.height = innerHeight * d;
+    gl.viewport(0, 0, c.width, c.height);
+  };
+  r(); addEventListener('resize', r);
+  const V = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+  const F = `precision highp float;uniform vec2 u_res;uniform float u_t;
+
+vec3 mod289(vec3 x){return x-floor(x*(1./289.))*289.;}
+vec4 mod289(vec4 x){return x-floor(x*(1./289.))*289.;}
+vec4 permute(vec4 x){return mod289(((x*34.)+1.)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-.85373472095314*r;}
+float snoise(vec3 v){const vec2 C=vec2(1./6.,1./3.);const vec4 D=vec4(0.,.5,1.,2.);
+  vec3 i=floor(v+dot(v,C.yyy));vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz);vec3 l=1.-g;
+  vec3 i1=min(g.xyz,l.zxy);vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx;vec3 x2=x0-i2+C.yyy;vec3 x3=x0-D.yyy;
+  i=mod289(i);vec4 p=permute(permute(permute(i.z+vec4(0.,i1.z,i2.z,1.))+i.y+vec4(0.,i1.y,i2.y,1.))+i.x+vec4(0.,i1.x,i2.x,1.));
+  float n_=.142857142857;vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.*floor(p*ns.z*ns.z);vec4 x_=floor(j*ns.z);vec4 y_=floor(j-7.*x_);
+  vec4 x=x_*ns.x+ns.yyyy;vec4 y=y_*ns.x+ns.yyyy;
+  vec4 h=1.-abs(x)-abs(y);vec4 b0=vec4(x.xy,y.xy);vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.+1.;vec4 s1=floor(b1)*2.+1.;vec4 sh=-step(h,vec4(0.));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x);vec3 p1=vec3(a0.zw,h.y);vec3 p2=vec3(a1.xy,h.z);vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.);m=m*m;
+  return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));}
+
+float fbm(vec3 p){float v=0.,a=.55;for(int i=0;i<4;i++){v+=a*snoise(p);p*=2.02;a*=.5;}return v;}
+// cheap 2-octave version for god-ray inner loops
+float fbm2(vec3 p){return snoise(p)*.65 + snoise(p*2.1)*.35;}
+
+vec3 palette(float k, float warmShift){
+  // cold deep → teal → gold → warm amber
+  vec3 c1 = vec3(.02,.04,.10);
+  vec3 c2 = vec3(.05,.18,.28);
+  vec3 c3 = vec3(.22,.42,.48);
+  vec3 c4 = vec3(.72,.50,.28);
+  vec3 c5 = vec3(.95,.75,.42);
+  float k2 = clamp(k,0.,1.);
+  vec3 col = mix(c1,c2,smoothstep(0.,.25,k2));
+  col = mix(col,c3,smoothstep(.2,.55,k2));
+  col = mix(col,c4,smoothstep(.5,.8,k2));
+  col = mix(col,c5,smoothstep(.78,1.,k2));
+  // warm-shift env boosts all toward amber
+  col = mix(col, col * vec3(1.3,1.1,0.9), warmShift * 0.6);
+  return col;
+}
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy/u_res)*2.-1.;
+  uv.x *= u_res.x/u_res.y;
+
+  float t = u_t * 0.08;
+
+  // domain warp
+  vec3 q = vec3(uv*1.1, t);
+  q.x += fbm(vec3(uv*1.6 + vec2(t*.8,0.), t*.5)) * .55;
+  q.y += fbm(vec3(uv*1.6 - vec2(0., t*.9), t*.5)) * .55;
+  float n = fbm(q);
+
+  float warmShift = smoothstep(6.0, 11.0, u_t) * (1.0 - smoothstep(12.0, 14.0, u_t));
+
+  float density = smoothstep(-.5, .9, n);
+  vec3 col = palette(density, warmShift);
+
+  /* --- God rays (cheap fbm2, 10 steps) --- */
+  vec2 rayOrigin = vec2(0.15, 0.9);
+  vec2 dir = normalize(uv - rayOrigin);
+  float rayStrength = 0.;
+  const int STEPS = 10;
+  for (int i = 0; i < STEPS; i++) {
+    float s = float(i) / float(STEPS);
+    vec2 p = mix(uv, rayOrigin, s);
+    float density = fbm2(vec3(p * 2.2, t * 0.6));
+    float cone = smoothstep(.85, 1.0, dot(normalize(p - rayOrigin), dir));
+    rayStrength += smoothstep(.3, .9, density) * (1.0 - s) * cone * .18;
+  }
+  col += vec3(1.0, .75, .45) * rayStrength * (0.6 + warmShift);
+
+  /* --- Secondary cool rays (6 steps, cheap) --- */
+  vec2 rayOrigin2 = vec2(1.2, 0.2);
+  vec2 dir2 = normalize(uv - rayOrigin2);
+  float ray2 = 0.;
+  for (int i = 0; i < 6; i++) {
+    float s = float(i)/6.0;
+    vec2 p = mix(uv, rayOrigin2, s);
+    float d = fbm2(vec3(p*2.0 + 20., t*.45));
+    float cone = smoothstep(.88, 1.0, dot(normalize(p - rayOrigin2), dir2));
+    ray2 += smoothstep(.4, .9, d) * (1.0 - s) * cone * .15;
+  }
+  col += vec3(.6, .75, 1.0) * ray2 * 0.4;
+
+  /* --- Bokeh blobs --- */
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    vec2 bp = vec2(sin(t * .7 + fi*2.0) * .6, cos(t * .55 + fi*1.3) * .4 + fi * 0.1);
+    float d = length(uv - bp);
+    col += vec3(1.0, .85, .55) * exp(-d * 5.0) * 0.14 * (1.0 - smoothstep(5.0, 12.0, u_t));
+  }
+
+  /* --- Vignette --- */
+  float d = length(uv * vec2(.65, 1.));
+  col *= 1.0 - smoothstep(.35, 1.35, d) * .55;
+
+  /* --- Film grain --- */
+  float g = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)) + u_t) * 43758.5453);
+  col += (g - 0.5) * 0.025;
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+  const sh=(t,s)=>{const x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);if(!gl.getShaderParameter(x,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(x));return x};
+  const P=gl.createProgram();gl.attachShader(P,sh(gl.VERTEX_SHADER,V));gl.attachShader(P,sh(gl.FRAGMENT_SHADER,F));gl.linkProgram(P);gl.useProgram(P);
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const L=gl.getAttribLocation(P,'p');gl.enableVertexAttribArray(L);gl.vertexAttribPointer(L,2,gl.FLOAT,false,0,0);
+  return { gl, uR: gl.getUniformLocation(P,'u_res'), uT: gl.getUniformLocation(P,'u_t'), canvas: c };
+}
+function renderShader(t) {
+  if (!shaderCtx) return;
+  const { gl, uR, uT, canvas } = shaderCtx;
+  gl.uniform2f(uR, canvas.width, canvas.height);
+  gl.uniform1f(uT, t);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+shaderCtx = initShader();
+
+/* timeline */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+let currentT = 0, playing = true, lastFrame = performance.now();
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1400);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) { let next = currentT + dt; if (next >= DURATION) next = 0; setTime(next); }
+  requestAnimationFrame(loop);
+}
+scrubber.addEventListener('input', () => { playing = false; playBtn.textContent = '▶'; setTime(scrubber.value / 1400 * DURATION); });
+playBtn.addEventListener('click', () => { playing = !playing; playBtn.textContent = playing ? '⏸' : '▶'; lastFrame = performance.now(); });
+resetBtn.addEventListener('click', () => setTime(0));
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl'; lbl.textContent = cue.label;
+  m.appendChild(lbl); cueRow.appendChild(m);
+});
+setTime(0); requestAnimationFrame(loop);
+</script>
+</body>
+</html>

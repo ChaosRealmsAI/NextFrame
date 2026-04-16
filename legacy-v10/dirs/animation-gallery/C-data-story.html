@@ -1,0 +1,490 @@
+<!--
+  C · Data Story — SVG-heavy, frame-pure, scrubbable
+  Techniques:
+    - SVG line chart (stroke-dashoffset draw)
+    - SVG bar chart (scaleY stagger + shimmer)
+    - SVG pie chart (stroke-dasharray fill)
+    - SVG grid lines (expanded from center)
+    - Number count-up with easing
+    - KPI cards slide-in + value animation
+    - Gradient text + status indicators
+    - Background shader (subtle fbm)
+  Duration: 14s. Time source: setTime(t). No CSS animations.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>C · Data Story</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100vh;background:#050814;overflow:hidden;
+    font-family:-apple-system,"SF Pro Display","Inter",system-ui,sans-serif;
+    color:#e8edff;-webkit-font-smoothing:antialiased}
+  canvas{position:fixed;inset:0;width:100%;height:100%}
+  #shader{z-index:0}
+  svg.layer{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+
+  .hud{position:fixed;z-index:6;font-size:10px;letter-spacing:.4em;
+    text-transform:uppercase;color:rgba(200,215,255,.6);font-weight:500;opacity:0;
+    font-family:"JetBrains Mono","SF Mono",Menlo,monospace}
+  .hud.tl{top:36px;left:44px;display:flex;align-items:center;gap:10px}
+  .hud.tl::before{content:'';width:8px;height:8px;border-radius:50%;background:#ff4b7a;
+    box-shadow:0 0 12px #ff4b7a}
+  .hud.tr{top:36px;right:44px;text-align:right;line-height:1.9}
+  .hud.bl{bottom:64px;left:44px;line-height:1.9}
+  .hud.br{bottom:64px;right:44px;text-align:right;line-height:1.9}
+
+  .title{position:fixed;left:50%;top:11%;transform:translateX(-50%);z-index:5;
+    text-align:center;pointer-events:none}
+  .title h1{font-size:clamp(36px,4.5vw,58px);font-weight:200;letter-spacing:-.02em;
+    background:linear-gradient(90deg,#fff 0%,#c8d4ff 60%,#ff8fb6 100%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 2px 16px rgba(255,143,182,.25));line-height:1}
+  .title .sub{margin-top:12px;font-size:13px;letter-spacing:.3em;
+    text-transform:uppercase;color:rgba(200,215,255,.6);font-weight:500}
+
+  /* dashboard cards */
+  .card{position:fixed;padding:22px 24px;border-radius:16px;z-index:4;
+    background:rgba(15,20,40,.7);border:1px solid rgba(255,255,255,.07);
+    backdrop-filter:blur(22px) saturate(140%);
+    box-shadow:0 30px 80px rgba(0,0,0,.5);opacity:0;will-change:transform}
+  .card .lab{font-size:10px;letter-spacing:.32em;text-transform:uppercase;
+    color:rgba(200,215,255,.5);font-weight:600;margin-bottom:10px}
+  .card .big{font-size:40px;font-weight:200;letter-spacing:-.025em;color:#fff;
+    font-variant-numeric:tabular-nums;line-height:1}
+  .card .big .unit{font-size:18px;color:rgba(255,255,255,.55);margin-left:3px}
+  .card .delta{margin-top:8px;font-size:12px;display:flex;align-items:center;gap:6px}
+  .card .delta.up{color:#49e7a0}
+  .card .delta.down{color:#ff6a87}
+
+  /* positions */
+  .c-revenue { top: 26%; left: 5.5%;  width: 260px;}
+  .c-users   { top: 26%; left: 22.5%; width: 260px;}
+  .c-growth  { top: 26%; right: 22.5%; width: 260px;}
+  .c-churn   { top: 26%; right: 5.5%;  width: 260px;}
+
+  .chart-box{position:fixed;padding:22px 26px;border-radius:18px;z-index:4;
+    background:rgba(15,20,40,.72);border:1px solid rgba(255,255,255,.07);
+    backdrop-filter:blur(22px);box-shadow:0 40px 100px rgba(0,0,0,.6);opacity:0}
+  .chart-box .lab{font-size:10px;letter-spacing:.32em;text-transform:uppercase;
+    color:rgba(200,215,255,.55);margin-bottom:18px;display:flex;
+    justify-content:space-between;align-items:center}
+  .chart-box .lab .pill{background:rgba(255,75,122,.15);color:#ff8fb6;
+    padding:2px 10px;border-radius:100px;font-size:9px;letter-spacing:.16em}
+  .chart-box svg{display:block}
+
+  .c-line  { left: 5.5%;  top: 46%; width: 51%; height: 40%; }
+  .c-bar   { right: 5.5%; top: 46%; width: 38%; height: 40%; }
+
+  .subtitle{position:fixed;left:50%;bottom:13%;transform:translateX(-50%);z-index:5;
+    font-size:15px;color:rgba(200,215,255,.7);letter-spacing:.05em;
+    text-align:center;opacity:0;max-width:600px;font-weight:300}
+
+  /* timeline ui */
+  .tl-ui{position:fixed;left:0;right:0;bottom:0;z-index:100;
+    padding:14px 24px;background:linear-gradient(180deg,transparent,rgba(3,5,18,.92));
+    display:flex;align-items:center;gap:16px;
+    font-family:"SF Mono",Menlo,monospace;font-size:11px;color:rgba(255,255,255,.85)}
+  .tl-ui button{background:transparent;border:1px solid rgba(255,255,255,.3);
+    color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;
+    font-size:14px;display:grid;place-items:center;transition:all .2s}
+  .tl-ui button:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.6)}
+  .tl-ui .time{font-variant-numeric:tabular-nums;min-width:150px;letter-spacing:.05em}
+  .tl-ui input[type=range]{flex:1;accent-color:#ff8fb6;height:3px}
+  .cue-row{position:absolute;left:24px;right:24px;bottom:40px;height:14px;pointer-events:none}
+  .cue-mark{position:absolute;width:2px;height:10px;background:rgba(255,143,182,.6);
+    border-radius:1px;transform:translateX(-1px)}
+  .cue-mark .lbl{position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+    font-size:8px;letter-spacing:.2em;color:rgba(255,143,182,.75);
+    text-transform:uppercase;white-space:nowrap;font-weight:700}
+</style>
+</head>
+<body>
+
+<canvas id="shader"></canvas>
+
+<svg class="layer" id="gridSvg" viewBox="0 0 1920 1080" preserveAspectRatio="none">
+  <!-- grid lines injected -->
+</svg>
+
+<div class="hud tl">Live · realtime</div>
+<div class="hud tr">Quarterly Pulse<br>Q4 · 2026</div>
+<div class="hud bl">Nextframe Labs<br>Experiment N° 003</div>
+<div class="hud br">frame-pure · scrubbable<br>14.0s</div>
+
+<div class="title">
+  <h1>Quarterly Pulse</h1>
+  <div class="sub">Data · velocity · signal — 2026 Q4</div>
+</div>
+
+<div class="card c-revenue">
+  <div class="lab">Revenue</div>
+  <div class="big">$<span id="n-rev">0.00</span><span class="unit">M</span></div>
+  <div class="delta up">▲ <span>+24.6%</span></div>
+</div>
+<div class="card c-users">
+  <div class="lab">Active users</div>
+  <div class="big"><span id="n-usr">0</span><span class="unit">k</span></div>
+  <div class="delta up">▲ <span>+12.8%</span></div>
+</div>
+<div class="card c-growth">
+  <div class="lab">Growth index</div>
+  <div class="big"><span id="n-grw">0</span><span class="unit">%</span></div>
+  <div class="delta up">▲ <span>+3.2 pts</span></div>
+</div>
+<div class="card c-churn">
+  <div class="lab">Churn</div>
+  <div class="big"><span id="n-chu">0.00</span><span class="unit">%</span></div>
+  <div class="delta down">▼ <span>-0.4 pts</span></div>
+</div>
+
+<div class="chart-box c-line">
+  <div class="lab"><span>Revenue trajectory · 12 months</span><span class="pill">PROJECTION</span></div>
+  <svg viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" style="width:100%;height:calc(100% - 50px)">
+    <defs>
+      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ff8fb6" stop-opacity=".35"/>
+        <stop offset="1" stop-color="#ff8fb6" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <g id="lineAxis"></g>
+    <path id="areaPath" fill="url(#areaGrad)" opacity="0"/>
+    <path id="linePath" fill="none" stroke="#ff8fb6" stroke-width="2.5"
+      stroke-linecap="round" stroke-linejoin="round"
+      style="filter:drop-shadow(0 0 8px rgba(255,143,182,.7))"/>
+    <g id="lineDots"></g>
+  </svg>
+</div>
+
+<div class="chart-box c-bar">
+  <div class="lab"><span>Segment share</span><span class="pill">UPDATED</span></div>
+  <svg viewBox="0 0 400 320" preserveAspectRatio="xMidYMid meet" style="width:100%;height:calc(100% - 50px)">
+    <g id="barGroup"></g>
+  </svg>
+</div>
+
+<div class="subtitle" id="subtitle">Numbers tell us when; stories tell us why.</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 14.00s</span>
+  <input type="range" id="scrubber" min="0" max="1400" value="0" step="1">
+  <span class="time" id="frameLabel" style="min-width:100px;text-align:right">frame 0 / 420</span>
+</div>
+
+<script>
+const DURATION = 14.0;
+const FPS = 30;
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeOut5 = x => 1 - Math.pow(1 - x, 5);
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+const CUES = [
+  { t: 0.4, label: 'Grid' },
+  { t: 1.2, label: 'Title' },
+  { t: 2.0, label: 'Cards' },
+  { t: 3.2, label: 'Chart' },
+  { t: 4.2, label: 'Bars' },
+  { t: 6.0, label: 'Counts' },
+  { t: 9.5, label: 'Final' },
+];
+
+/* ---- Line chart data (revenue over 12 months) ---- */
+const LINE_DATA = [42, 48, 44, 52, 58, 55, 63, 71, 78, 82, 91, 104];
+
+/* ---- Bar chart data ---- */
+const BAR_DATA = [
+  { lab: 'Pro',     val: 0.42, col: '#ff8fb6' },
+  { lab: 'Team',    val: 0.28, col: '#b4a3ff' },
+  { lab: 'Ent.',    val: 0.18, col: '#7dd3c0' },
+  { lab: 'Free',    val: 0.12, col: '#ffcf6a' },
+];
+
+/* Build line chart static elements */
+const linePath = document.getElementById('linePath');
+const areaPath = document.getElementById('areaPath');
+const lineAxis = document.getElementById('lineAxis');
+const lineDots = document.getElementById('lineDots');
+
+const chartW = 760, chartH = 260, chartX = 20, chartY = 30;
+const maxVal = Math.max(...LINE_DATA) * 1.15;
+function xyAt(i) {
+  const x = chartX + (i / (LINE_DATA.length - 1)) * chartW;
+  const y = chartY + chartH - (LINE_DATA[i] / maxVal) * chartH;
+  return [x, y];
+}
+const pts = LINE_DATA.map((_, i) => xyAt(i));
+const d = 'M ' + pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' L ');
+linePath.setAttribute('d', d);
+const lineLen = linePath.getTotalLength();
+linePath.style.strokeDasharray = lineLen;
+areaPath.setAttribute('d', d + ` L ${pts[pts.length-1][0]},${chartY + chartH} L ${pts[0][0]},${chartY + chartH} Z`);
+// axis gridlines
+for (let i = 0; i <= 4; i++) {
+  const y = chartY + (i / 4) * chartH;
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  el.setAttribute('x1', chartX); el.setAttribute('x2', chartX + chartW);
+  el.setAttribute('y1', y); el.setAttribute('y2', y);
+  el.setAttribute('stroke', 'rgba(200,215,255,0.08)');
+  el.setAttribute('stroke-width', '1');
+  lineAxis.appendChild(el);
+}
+// month labels
+const months = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+months.forEach((m, i) => {
+  const [x] = xyAt(i);
+  const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  t.setAttribute('x', x); t.setAttribute('y', chartY + chartH + 22);
+  t.setAttribute('fill', 'rgba(200,215,255,0.45)');
+  t.setAttribute('font-size', '10');
+  t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('font-family', 'SF Mono, Menlo, monospace');
+  t.textContent = m;
+  lineAxis.appendChild(t);
+});
+// dots (added later)
+pts.forEach(([x, y], i) => {
+  const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  c.setAttribute('cx', x); c.setAttribute('cy', y);
+  c.setAttribute('r', i === pts.length - 1 ? 6 : 3);
+  c.setAttribute('fill', i === pts.length - 1 ? '#ff8fb6' : 'rgba(255,143,182,0.9)');
+  c.setAttribute('opacity', '0');
+  c.setAttribute('data-idx', i);
+  c.style.filter = 'drop-shadow(0 0 6px rgba(255,143,182,0.8))';
+  lineDots.appendChild(c);
+});
+
+/* bars */
+const barGroup = document.getElementById('barGroup');
+const barW = 56, barGap = 24;
+const totalW = BAR_DATA.length * (barW + barGap) - barGap;
+const barStartX = (400 - totalW) / 2;
+BAR_DATA.forEach((d, i) => {
+  const x = barStartX + i * (barW + barGap);
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('transform', `translate(${x}, 30)`);
+  const rectBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rectBg.setAttribute('width', barW); rectBg.setAttribute('height', 240);
+  rectBg.setAttribute('rx', 6); rectBg.setAttribute('fill', 'rgba(255,255,255,0.04)');
+  g.appendChild(rectBg);
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('class', 'bar-fill');
+  rect.setAttribute('width', barW); rect.setAttribute('rx', 6);
+  rect.setAttribute('fill', d.col);
+  rect.style.filter = `drop-shadow(0 0 14px ${d.col}aa)`;
+  rect.setAttribute('data-idx', i);
+  g.appendChild(rect);
+  const lab = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  lab.setAttribute('x', barW / 2); lab.setAttribute('y', 290);
+  lab.setAttribute('fill', 'rgba(200,215,255,0.65)');
+  lab.setAttribute('font-size', '12');
+  lab.setAttribute('text-anchor', 'middle');
+  lab.setAttribute('font-weight', '500');
+  lab.setAttribute('letter-spacing', '.08em');
+  lab.textContent = d.lab;
+  g.appendChild(lab);
+  const val = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  val.setAttribute('x', barW / 2); val.setAttribute('y', -10);
+  val.setAttribute('fill', '#fff');
+  val.setAttribute('font-size', '14');
+  val.setAttribute('text-anchor', 'middle');
+  val.setAttribute('font-weight', '600');
+  val.setAttribute('font-variant-numeric', 'tabular-nums');
+  val.setAttribute('class', 'bar-val');
+  val.textContent = '0%';
+  g.appendChild(val);
+  barGroup.appendChild(g);
+});
+
+/* grid lines in the full-screen SVG */
+const gridSvg = document.getElementById('gridSvg');
+for (let i = 1; i < 12; i++) {
+  const x = (i / 12) * 1920;
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  el.setAttribute('x1', x); el.setAttribute('x2', x);
+  el.setAttribute('y1', 0); el.setAttribute('y2', 1080);
+  el.setAttribute('stroke', 'rgba(200,215,255,0.05)');
+  el.setAttribute('stroke-dasharray', '2 8');
+  el.setAttribute('data-vg', i);
+  gridSvg.appendChild(el);
+}
+
+/* ---- Card references ---- */
+const cards = document.querySelectorAll('.card');
+const chartLine = document.querySelector('.c-line');
+const chartBar = document.querySelector('.c-bar');
+const title = document.querySelector('.title');
+const subtitle = document.getElementById('subtitle');
+
+function render(t) {
+  /* HUD */
+  document.querySelectorAll('.hud').forEach((el, i) => {
+    el.style.opacity = kern(t, 0.15 + i * 0.08, 1.4);
+  });
+
+  /* title */
+  const titleP = kern(t, 1.2, 1.4, easeOut);
+  title.style.opacity = titleP;
+  title.style.transform = `translateX(-50%) translateY(${(1-titleP) * 14}px)`;
+
+  /* grid vertical lines — staggered appearance */
+  document.querySelectorAll('[data-vg]').forEach((el, i) => {
+    const p = kern(t, 0.4 + i * 0.04, 1.5, easeOut);
+    el.setAttribute('opacity', p);
+  });
+
+  /* cards slide in (left to right) */
+  cards.forEach((card, i) => {
+    const p = kern(t, 2.0 + i * 0.15, 1.3, easeOut);
+    card.style.opacity = p;
+    card.style.transform = `translateY(${(1-p) * 30}px)`;
+  });
+
+  /* card numbers */
+  setNum('n-rev', kern(t, 2.5, 2.5, easeOut) * 12.84, 2);
+  setNum('n-usr', kern(t, 2.7, 2.5, easeOut) * 38.2, 1);
+  setNum('n-grw', Math.round(kern(t, 2.9, 2.5, easeOut) * 87), 0);
+  setNum('n-chu', kern(t, 3.1, 2.5, easeOut) * 2.16, 2);
+
+  /* chart boxes fade in */
+  const cLineP = kern(t, 3.2, 1.2, easeOut);
+  chartLine.style.opacity = cLineP;
+  chartLine.style.transform = `translateY(${(1-cLineP) * 18}px)`;
+  const cBarP = kern(t, 3.6, 1.2, easeOut);
+  chartBar.style.opacity = cBarP;
+  chartBar.style.transform = `translateY(${(1-cBarP) * 18}px)`;
+
+  /* line path draw */
+  const drawP = kern(t, 4.2, 2.5, easeOut5);
+  linePath.style.strokeDashoffset = lineLen * (1 - drawP);
+  areaPath.setAttribute('opacity', kern(t, 5.8, 1.2) * 0.9);
+
+  /* line dots */
+  document.querySelectorAll('#lineDots circle').forEach((c, i) => {
+    const p = kern(t, 4.2 + (i / LINE_DATA.length) * 2.2, 0.3);
+    c.setAttribute('opacity', p);
+  });
+
+  /* bars grow */
+  document.querySelectorAll('.bar-fill').forEach((rect, i) => {
+    const d = BAR_DATA[i];
+    const p = kern(t, 4.3 + i * 0.12, 1.0, easeOut);
+    const h = 240 * d.val * p;
+    rect.setAttribute('y', 240 - h);
+    rect.setAttribute('height', h);
+  });
+  document.querySelectorAll('.bar-val').forEach((tx, i) => {
+    const d = BAR_DATA[i];
+    const p = kern(t, 4.3 + i * 0.12, 1.0, easeOut);
+    const opa = kern(t, 4.7 + i * 0.12, 0.8);
+    tx.setAttribute('opacity', opa);
+    tx.textContent = Math.round(d.val * p * 100) + '%';
+  });
+
+  /* subtitle */
+  let subP = 0;
+  if (t > 9.5 && t < 13.5) {
+    subP = Math.min(kern(t, 9.5, 1.2), 1 - kern(t, 12.5, 1.0));
+  }
+  subtitle.style.opacity = subP;
+
+  /* shader */
+  renderShader(t);
+}
+
+function setNum(id, val, dec) {
+  document.getElementById(id).textContent = val.toFixed(dec);
+}
+
+/* shader */
+let shaderCtx = null;
+function initShader() {
+  const c = document.getElementById('shader');
+  const gl = c.getContext('webgl');
+  if (!gl) return null;
+  const r = () => {
+    const d = Math.min(devicePixelRatio || 1, 2);
+    c.width = innerWidth * d; c.height = innerHeight * d;
+    gl.viewport(0, 0, c.width, c.height);
+  };
+  r(); addEventListener('resize', r);
+  const V = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
+  const F = `precision highp float;uniform vec2 u_res;uniform float u_t;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);float a=hash(i),b=hash(i+vec2(1,0)),c=hash(i+vec2(0,1)),d=hash(i+vec2(1,1));vec2 u=f*f*(3.-2.*f);return mix(a,b,u.x)+(c-a)*u.y*(1.-u.x)+(d-b)*u.x*u.y;}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<4;i++){v+=a*vnoise(p);p*=2.02;a*=.5;}return v;}
+void main(){
+  vec2 uv=(gl_FragCoord.xy/u_res)*2.-1.;uv.x*=u_res.x/u_res.y;
+  float t=u_t*.05;
+  float n=fbm(uv*1.1+vec2(t,-t*.6));
+  vec3 deep=vec3(.01,.02,.06);
+  vec3 pink=vec3(.15,.04,.10);
+  vec3 col=mix(deep,pink,smoothstep(.3,.8,n)*.35);
+  float d=length(uv*vec2(.7,1.));
+  col*=1.-smoothstep(.3,1.3,d)*.5;
+  float g=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233))+u_t)*43758.5453);
+  col+=(g-.5)*.012;
+  gl_FragColor=vec4(col,1.);
+}`;
+  const sh=(t,s)=>{const x=gl.createShader(t);gl.shaderSource(x,s);gl.compileShader(x);return x};
+  const P=gl.createProgram();gl.attachShader(P,sh(gl.VERTEX_SHADER,V));gl.attachShader(P,sh(gl.FRAGMENT_SHADER,F));gl.linkProgram(P);gl.useProgram(P);
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+  const L=gl.getAttribLocation(P,'p');gl.enableVertexAttribArray(L);gl.vertexAttribPointer(L,2,gl.FLOAT,false,0,0);
+  return { gl, uR: gl.getUniformLocation(P,'u_res'), uT: gl.getUniformLocation(P,'u_t'), canvas: c };
+}
+function renderShader(t) {
+  if (!shaderCtx) return;
+  const { gl, uR, uT, canvas } = shaderCtx;
+  gl.uniform2f(uR, canvas.width, canvas.height);
+  gl.uniform1f(uT, t);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+shaderCtx = initShader();
+
+/* timeline controller */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+let currentT = 0, playing = true, lastFrame = performance.now();
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1400);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+scrubber.addEventListener('input', () => { playing = false; playBtn.textContent = '▶'; setTime(scrubber.value / 1400 * DURATION); });
+playBtn.addEventListener('click', () => { playing = !playing; playBtn.textContent = playing ? '⏸' : '▶'; lastFrame = performance.now(); });
+resetBtn.addEventListener('click', () => setTime(0));
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl'; lbl.textContent = cue.label;
+  m.appendChild(lbl); cueRow.appendChild(m);
+});
+setTime(0); requestAnimationFrame(loop);
+</script>
+</body>
+</html>
