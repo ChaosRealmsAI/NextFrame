@@ -1,8 +1,7 @@
-// TODO: implement per effects behavior spec for ripple
-const meta = { name: "ripple", category: "effects", description: "Ripple effects behavior stub", default_duration: 0.9, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.9, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.9 }] };
+import { metaOf, p } from "../shared.js";
+const meta = metaOf("ripple", "effects", "Descriptor for engine-expanded ripple layers", 0.9, [p("color", "string", "#ff9ab8", "stroke or fill color used by the spawned ripple rings"), p("maxRadius", "number", 200, "largest radius reached by the outer ripple ring in px")], { color: "#ff9ab8", maxRadius: 200 });
 function ripple(startAt = 0, duration = 0.9, opts = {}) {
-  // TODO: return semantic tracks for ripple
-  return { tracks: {}, startAt, duration, opts };
+  return { expand: "ripple", startAt, duration, color: opts.color ?? "#ff9ab8", maxRadius: opts.maxRadius ?? 200 };
 }
 ripple.meta = meta;
 export default ripple;

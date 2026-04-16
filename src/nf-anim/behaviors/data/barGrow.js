@@ -1,8 +1,9 @@
-// TODO: implement per data behavior spec for barGrow
-const meta = { name: "barGrow", category: "data", description: "Bar Grow data behavior stub", default_duration: 1, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 1, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 1 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("barGrow", "data", "Bar width growth toward a percentage", 1, [p("percent", "number", 88, "target width percentage reached by the end of the animation"), p("from", "number", 0, "starting width percentage before growth begins")], { percent: 88, from: 0 });
 function barGrow(startAt = 0, duration = 1, opts = {}) {
-  // TODO: return semantic tracks for barGrow
-  return { tracks: {}, startAt, duration, opts };
+  const percent = opts.percent ?? 88;
+  const from = opts.from ?? 0;
+  return { tracks: { widthPercent: [[startAt, from], [at(startAt, duration), percent, "out"]], opacity: [[startAt, 0.35], [at(startAt, duration * 0.2), 1, "out"]] } };
 }
 barGrow.meta = meta;
 export default barGrow;

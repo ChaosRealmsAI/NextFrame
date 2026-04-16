@@ -8,9 +8,6 @@ import pieFill from "./pieFill.js";
 import chartReveal from "./chartReveal.js";
 const meta = { name: "data", kind: "behaviors", description: "data behaviors registry" };
 export const DATA_BEHAVIORS = { countUp, barGrow, lineDraw, nodeReveal, arrowFlow, mapPin, pieFill, chartReveal };
-export function listBehaviors() {
-  // TODO: return richer registry metadata
-  return Object.values(DATA_BEHAVIORS).map((entry) => entry.meta || entry);
-}
+export function listBehaviors() { return Object.values(DATA_BEHAVIORS).map((entry) => entry.meta || entry); }
 export { meta };
 export default DATA_BEHAVIORS;

@@ -1,8 +1,8 @@
-// TODO: implement per exit behavior spec for blurOut
-const meta = { name: "blurOut", category: "exit", description: "Blur Out exit behavior stub", default_duration: 0.7, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.7, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.7 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("blurOut", "exit", "Sharp-to-blurred fade out", 0.7, [p("blur", "number", 18, "ending blur radius in px when the element leaves")], { blur: 18 });
 function blurOut(startAt = 0, duration = 0.7, opts = {}) {
-  // TODO: return semantic tracks for blurOut
-  return { tracks: {}, startAt, duration, opts };
+  const blur = opts.blur ?? 18;
+  return { tracks: { opacity: [[startAt, 1], [at(startAt, duration), 0, "in"]], blur: [[startAt, 0], [at(startAt, duration), blur, "in"]] } };
 }
 blurOut.meta = meta;
 export default blurOut;

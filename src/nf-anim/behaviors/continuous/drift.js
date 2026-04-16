@@ -1,8 +1,9 @@
-// TODO: implement per continuous behavior spec for drift
-const meta = { name: "drift", category: "continuous", description: "Drift continuous behavior stub", default_duration: 6, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 6, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 6 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("drift", "continuous", "Slow figure-eight-like drift loop", 6, [p("x", "number", 28, "maximum horizontal drift in px"), p("y", "number", 18, "maximum vertical drift in px")], { x: 28, y: 18 });
 function drift(startAt = 0, duration = 6, opts = {}) {
-  // TODO: return semantic tracks for drift
-  return { tracks: {}, startAt, duration, opts };
+  const x = opts.x ?? 28;
+  const y = opts.y ?? 18;
+  return { tracks: { x: [[startAt, 0], [at(startAt, duration, 0.25), x], [at(startAt, duration, 0.5), 0], [at(startAt, duration, 0.75), -x], [at(startAt, duration), 0, "linear"]], y: [[startAt, 0], [at(startAt, duration, 0.25), -y], [at(startAt, duration, 0.5), 0], [at(startAt, duration, 0.75), y], [at(startAt, duration), 0, "linear"]] } };
 }
 drift.meta = meta;
 export default drift;

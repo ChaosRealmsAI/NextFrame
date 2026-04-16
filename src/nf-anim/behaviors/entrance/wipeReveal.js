@@ -1,8 +1,8 @@
-// TODO: implement per entrance behavior spec for wipeReveal
-const meta = { name: "wipeReveal", category: "entrance", description: "Wipe Reveal entrance behavior stub", default_duration: 0.8, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.8, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.8 }] };
+import { at, metaOf } from "../shared.js";
+const meta = metaOf("wipeReveal", "entrance", "Left-to-right clip reveal", 0.8);
 function wipeReveal(startAt = 0, duration = 0.8, opts = {}) {
-  // TODO: return semantic tracks for wipeReveal
-  return { tracks: {}, startAt, duration, opts };
+  void opts;
+  return { tracks: { clipRight: [[startAt, 100], [at(startAt, duration), 0, "out"]], opacity: [[startAt, 1], [at(startAt, duration), 1, "out"]] } };
 }
 wipeReveal.meta = meta;
 export default wipeReveal;

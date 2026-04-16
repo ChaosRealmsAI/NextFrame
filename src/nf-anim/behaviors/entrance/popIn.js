@@ -1,8 +1,9 @@
-// TODO: implement per entrance behavior spec for popIn
-const meta = { name: "popIn", category: "entrance", description: "Pop In entrance behavior stub", default_duration: 0.5, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.5, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.5 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("popIn", "entrance", "Quick punchy scale entrance", 0.5, [p("fromScale", "number", 0.5, "small starting scale before the pop"), p("peakScale", "number", 1.08, "peak scale reached before settling")]);
 function popIn(startAt = 0, duration = 0.5, opts = {}) {
-  // TODO: return semantic tracks for popIn
-  return { tracks: {}, startAt, duration, opts };
+  const fromScale = opts.fromScale ?? 0.5;
+  const peakScale = opts.peakScale ?? 1.08;
+  return { tracks: { opacity: [[startAt, 0], [at(startAt, duration * 0.35), 1, "out"]], scale: [[startAt, fromScale], [at(startAt, duration, 0.55), peakScale, "out"], [at(startAt, duration), 1, "inOut"]] } };
 }
 popIn.meta = meta;
 export default popIn;

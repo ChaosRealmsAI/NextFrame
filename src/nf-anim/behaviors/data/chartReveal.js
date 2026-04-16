@@ -1,8 +1,8 @@
-// TODO: implement per data behavior spec for chartReveal
-const meta = { name: "chartReveal", category: "data", description: "Chart Reveal data behavior stub", default_duration: 1.6, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 1.6, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 1.6 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("chartReveal", "data", "Axes then series reveal driven by dataset length", 1.6, [p("data", "array", [12, 26, 18, 34, 41], "ordered values used to determine chart complexity and reveal count")], { data: [12, 26, 18, 34, 41] });
 function chartReveal(startAt = 0, duration = 1.6, opts = {}) {
-  // TODO: return semantic tracks for chartReveal
-  return { tracks: {}, startAt, duration, opts };
+  const data = Array.isArray(opts.data) && opts.data.length ? opts.data : [12, 26, 18, 34, 41];
+  return { tracks: { axisOpacity: [[startAt, 0], [at(startAt, duration, 0.25), 1, "out"]], pathProgress: [[startAt, 0], [at(startAt, duration), 1, "out"]], pointCount: [[startAt, 0], [at(startAt, duration), data.length, "out"]] } };
 }
 chartReveal.meta = meta;
 export default chartReveal;

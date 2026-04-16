@@ -1,8 +1,8 @@
-// TODO: implement per entrance behavior spec for fadeIn
-const meta = { name: "fadeIn", category: "entrance", description: "Fade In entrance behavior stub", default_duration: 0.6, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.6, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.6 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("fadeIn", "entrance", "Linear opacity 0→1 entrance", 0.6, [p("from", "number", 0, "starting opacity before reveal")]);
 function fadeIn(startAt = 0, duration = 0.6, opts = {}) {
-  // TODO: return semantic tracks for fadeIn
-  return { tracks: {}, startAt, duration, opts };
+  const from = opts.from ?? 0;
+  return { tracks: { opacity: [[startAt, from], [at(startAt, duration), 1, "out"]] } };
 }
 fadeIn.meta = meta;
 export default fadeIn;

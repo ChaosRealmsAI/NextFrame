@@ -1,8 +1,8 @@
-// TODO: implement per emphasis behavior spec for shake
-const meta = { name: "shake", category: "emphasis", description: "Shake emphasis behavior stub", default_duration: 0.6, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.6, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.6 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("shake", "emphasis", "Fast horizontal attention shake", 0.6, [p("distance", "number", 18, "maximum horizontal shake distance in px")], { distance: 18 });
 function shake(startAt = 0, duration = 0.6, opts = {}) {
-  // TODO: return semantic tracks for shake
-  return { tracks: {}, startAt, duration, opts };
+  const distance = opts.distance ?? 18;
+  return { tracks: { x: [[startAt, 0], [at(startAt, duration, 0.18), -distance], [at(startAt, duration, 0.36), distance], [at(startAt, duration, 0.54), -distance * 0.6], [at(startAt, duration, 0.72), distance * 0.35], [at(startAt, duration), 0, "inOut"]] } };
 }
 shake.meta = meta;
 export default shake;

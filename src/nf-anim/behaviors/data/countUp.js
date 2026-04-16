@@ -1,8 +1,9 @@
-// TODO: implement per data behavior spec for countUp
-const meta = { name: "countUp", category: "data", description: "Count Up data behavior stub", default_duration: 1.5, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 1.5, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 1.5 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("countUp", "data", "Animated numeric count toward a target value", 1.5, [p("value", "number", 1247, "target number reached by the end of the count"), p("from", "number", 0, "starting number before counting begins")], { value: 1247, from: 0 });
 function countUp(startAt = 0, duration = 1.5, opts = {}) {
-  // TODO: return semantic tracks for countUp
-  return { tracks: {}, startAt, duration, opts };
+  const value = opts.value ?? 1247;
+  const from = opts.from ?? 0;
+  return { tracks: { number: [[startAt, from], [at(startAt, duration), value, "out"]], opacity: [[startAt, 0.4], [at(startAt, duration * 0.15), 1, "out"]] } };
 }
 countUp.meta = meta;
 export default countUp;

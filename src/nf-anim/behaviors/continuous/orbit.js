@@ -1,8 +1,8 @@
-// TODO: implement per continuous behavior spec for orbit
-const meta = { name: "orbit", category: "continuous", description: "Orbit continuous behavior stub", default_duration: 5, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 5, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 5 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("orbit", "continuous", "Circular orbit loop around an anchor point", 5, [p("radius", "number", 24, "orbit radius in px from the anchor point")], { radius: 24 });
 function orbit(startAt = 0, duration = 5, opts = {}) {
-  // TODO: return semantic tracks for orbit
-  return { tracks: {}, startAt, duration, opts };
+  const radius = opts.radius ?? 24;
+  return { tracks: { x: [[startAt, 0], [at(startAt, duration, 0.25), radius], [at(startAt, duration, 0.5), 0], [at(startAt, duration, 0.75), -radius], [at(startAt, duration), 0, "linear"]], y: [[startAt, -radius], [at(startAt, duration, 0.25), 0], [at(startAt, duration, 0.5), radius], [at(startAt, duration, 0.75), 0], [at(startAt, duration), -radius, "linear"]] } };
 }
 orbit.meta = meta;
 export default orbit;

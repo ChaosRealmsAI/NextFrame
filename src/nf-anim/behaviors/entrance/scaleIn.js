@@ -1,8 +1,8 @@
-// TODO: implement per entrance behavior spec for scaleIn
-const meta = { name: "scaleIn", category: "entrance", description: "Scale In entrance behavior stub", default_duration: 0.6, params: [{ name: "startAt", type: "number", default: 0, semantic: "when behavior starts (sec)" }, { name: "duration", type: "number", default: 0.6, semantic: "how long the behavior runs (sec)" }], examples: [{ startAt: 0, duration: 0.6 }] };
+import { at, metaOf, p } from "../shared.js";
+const meta = metaOf("scaleIn", "entrance", "Uniform scale-up reveal", 0.6, [p("fromScale", "number", 0.6, "starting scale factor before settling to full size")]);
 function scaleIn(startAt = 0, duration = 0.6, opts = {}) {
-  // TODO: return semantic tracks for scaleIn
-  return { tracks: {}, startAt, duration, opts };
+  const fromScale = opts.fromScale ?? 0.6;
+  return { tracks: { opacity: [[startAt, 0], [at(startAt, duration * 0.7), 1, "out"]], scale: [[startAt, fromScale], [at(startAt, duration), 1, "out"]] } };
 }
 scaleIn.meta = meta;
 export default scaleIn;
