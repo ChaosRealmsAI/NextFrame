@@ -4,213 +4,98 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is NextFrame
 
-AI 视频引擎 — 把结构化信息变成视频。输入是 JSON，输出是可播放的 HTML 或 MP4。不限于自媒体，任何需要"让信息更容易理解"的场景都是它的用武之地：教育、产品演示、数据报告、内部培训、开源项目介绍。
+AI 视频引擎 — 把结构化信息变成视频。输入是 JSON，输出是可播放的 HTML 或 4K MP4。不限于自媒体，任何需要"让信息更容易理解"的场景都是它的用武之地：教育、产品演示、数据报告、内部培训、开源项目介绍。
 
-技术栈：JSON timeline → 多层 HTML（scene 组件渲染）→ 浏览器播放 → WKWebView 并行录制 → MP4。核心原则：一个视觉元素 = 一个 layer。Frame-pure 渲染：任意时刻 t 可独立计算 f(t) → frame。
+技术栈：JSON timeline → 组件化多轨道渲染 → WKWebView 播放/编辑/录制三合一 → VideoToolbox 硬编码 4K MP4。核心原则：**Track = Component，AI 可写**；**getStateAt(t) 纯函数**；**一个 WebView 三种模式**（播放/编辑/录制）。
+
+## v2.0 重构进行中（当前状态）
+
+- **旧 src/ 已归档到 `legacy-v08/`**（不编译，保留参考）。这一版里只读不改。
+- **新 src/ 是空骨架**，按 7 核心 crate 规划逐步填入：
+  `nf-core-app` / `nf-core-engine` / `nf-tracks` / `nf-runtime` / `nf-shell-mac` / `nf-recorder` / `nf-cli`。
+- **所有 lint 脚本与 `Cargo.toml` workspace 目前为空壳**，新 crate 加入后再启用。
+- **外围工具层（nf-tts / nf-source / nf-guide / nf-publish / nf-bridge）不在 v2.0 范围**。
+- 详细架构见 `spec/cockpit-app/module-understand/ultimate-architecture.html`。
 
 ## Build & Test
 
 ```bash
-cargo check --workspace          # Rust compilation check (11 crates)
-cargo test --workspace           # Rust tests
-cargo clippy --workspace -- -D warnings  # Clippy with zero warnings
-bash scripts/lint-all.sh         # Full 10-gate lint (check + test + clippy + file size + JS lint)
+# v2.0 重构期间：workspace 暂为空，lint 脚本全部返回 0，仅作为骨架就位后的入口。
+cargo check --workspace          # 当前无 member
+bash scripts/lint-all.sh         # 当前 exit 0
 ```
 
-Single crate test: `cargo test -p nf-bridge`
+新 crate 就位后，恢复：
+- `cargo check --workspace` / `cargo test --workspace` / `cargo clippy --workspace -- -D warnings`
+- `bash scripts/lint-all.sh` 按新骨架重建
 
-## CLI (primary interface)
+## 写代码前（强制）
 
-```bash
-node src/nf-cli/bin/nextframe.js --help      # Full usage guide (workflow, timeline format, layers, animations)
-node src/nf-cli/bin/nextframe.js scenes      # List all 40+ scene components with metadata
-node src/nf-cli/bin/nextframe.js scenes <id> # Inspect one component (params, types, ranges, defaults)
-node src/nf-cli/bin/nextframe.js validate <timeline.json>  # 6 gates + overlap check
-node src/nf-cli/bin/nextframe.js build <timeline.json>     # → single-file HTML
-node src/nf-cli/bin/nextframe.js preview <timeline.json>   # Screenshots at key times
-```
+1. 先读 roadmap：`cat spec/cockpit-app/roadmap.json` → 确认当前版本阶段（v2.0 应在 prototype/spec/architecture）
+2. 再读架构文档：`spec/cockpit-app/module-understand/ultimate-architecture.html`（v2.0 的北极星）
+3. 读 ADR（如有）：`spec/cockpit-app/data/dev/adrs.json`
+4. 没走完 prototype → spec → architecture → poc → walking → lint 骨架 6 步，**不写产品代码**。
 
-Recording (separate binary): `nextframe-recorder slide <html> --out <mp4> --width 1920 --height 1080 --fps 30 --parallel 8`
+## v2.0 五条公理（北极星）
 
-## Architecture (two languages, clear boundary)
+1. **Anchor Timeline** — JSON 里用命名锚点 + 表达式 + 引用，避免硬编码毫秒数。
+2. **Source/Resolved 两层** — 源文件存 Source，运行时派生 Resolved。
+3. **`app.getStateAt(t)` 纯函数** — 任意时刻画面/字幕/选中/数据可独立计算。音频例外：预渲染素材引用。
+4. **一个 WebView 三模式** — play（RAF 自驱）/ edit（冻结 t + 写回）/ record（Rust 驱动截帧）。
+5. **Track = Component** — AI 可写；ABI 稳定、机器可验；单文件 `.js`，纯 `render(t, keyframes, viewport)`。
 
-**JS side:**
-- `src/nf-core/` — engine core (timeline, animation, scenes, filters). Scene components are pure functions: `(ctx, t, params) → canvas draws`.
-- `src/nf-cli/` — thin CLI shell (commands only, imports from nf-core)
-- `src/nf-runtime/` — browser runtime (web-v2/)
+## v2.0 新 src/ 模块（规划）
 
-**Rust side:**
-- `src/nf-shell-mac/` — macOS desktop shell (objc2 + AppKit + WebKit)
-- `src/nf-bridge/` — JSON IPC for project, timeline, storage, export
-- `src/nf-recorder/` — WKWebView parallel recording → VideoToolbox → MP4
-- `src/nf-tts/` — TTS CLI (Edge + Volcengine backends)
-- `src/nf-publish/` — multi-platform publisher (WKWebView tabs)
-- `src/nf-source/` — source pipeline: download → transcribe → align → cut
+| Crate | 语言 | 职责 |
+|------|------|------|
+| `nf-core-app` | JS | 引擎心脏，`getStateAt(t)` 纯函数 |
+| `nf-core-engine` | TS | Source → Resolved 编译 + bundle |
+| `nf-tracks` | JS | 组件库 + Track ABI + 用户热加载 (`user/`) |
+| `nf-runtime` | JS | 浏览器运行时（一个 WebView 三模式） |
+| `nf-shell-mac` | Rust | macOS 原生壳（objc2 + AppKit + WKWebView），4 面板桌面 |
+| `nf-recorder` | Rust | WKWebView 截帧 → VideoToolbox → 4K MP4 |
+| `nf-cli` | Rust | 最小 CLI（build / record / validate） |
 
-**Data flow**: CLI writes JSON timeline → nf-core build bundles into HTML → recorder opens HTML in WKWebView → captures frames → VideoToolbox encodes MP4.
+**桌面 4 面板**：顶部操作栏 / 左预览 / 右参数面板 / **底部图形化多轨时间线（拖拽）**。
 
-## Before You Write Code (mandatory)
+## JSON viewport 一对一
 
-1. **Read the relevant standard**: `cat spec/standards/00-index.md` → find the standard for your task → read it
-2. **Read the ADR**: `cat spec/cockpit-app/data/dev/adrs.json` → check if there's a locked decision about what you're changing
-3. **Read the BDD**: if working on a feature module, `cat spec/cockpit-app/bdd/{module}/bdd.json` → know the expected behavior
-4. **Read the crate CLAUDE.md**: `cat src/nf-xxx/CLAUDE.md` → know the local rules
+源 JSON 顶层固定 `viewport: { ratio, w, h }`。**一个 JSON = 一个比例**，不在 UI 切换。
 
-**Skipping these = writing code that may violate locked design decisions. If you don't find a relevant standard, say so — don't guess.**
+## Track ABI（AI 可写组件契约）
 
-## AI Self-Verification (use these, don't use screencapture)
+- 单文件 `.js`，零外部 import
+- 纯函数 `render(t, keyframes, viewport) → { dom?, audio? }`
+- 必有 `describe()` 返回参数 schema（机器可验）
+- 必有 `sample()` 返回典型用例
+- 热加载目录：`src/nf-tracks/user/{category}/{name}.js`
 
-The desktop app has built-in AI operation interfaces. **Always use these instead of external tools like screencapture or AppleScript.**
+## Core Rules（延续）
 
-### Screenshot (product-internal, pixel-perfect)
+- Rust：禁 `unwrap`/`expect`/`panic`（workspace lints deny）。FFI 需 `#[allow(...)]` + 注释。
+- 所有浏览器 ↔ 原生走**同一**的 IPC 通道；不另起平行路径。
+- 产品源文件 ≤ 500 行，测试 ≤ 800 行。
+- JS 禁 `var`，只用 `const`/`let`；运行时禁 `console.log`。
+- 禁 `TODO`/`FIXME`/`HACK`/`XXX` 留存在产品代码。
 
-```bash
-# Quick screenshot of current state
-cargo run -p nf-shell-mac -- --screenshot
-# → saves to tmp/nf-screenshot.png (项目根 tmp/), then Read to inspect
+## AI 自验证（产品内建，不靠外部权限）
 
-# Full verification: auto-navigate all pages, screenshot each
-cargo run -p nf-shell-mac -- --verify
-# → tmp/nf-verify-home.png, nf-verify-editor.png, nf-verify-pipeline.png, etc.
-
-# Custom script: navigate + screenshot at specific points
-cargo run -p nf-shell-mac -- --eval-script my-test.js
-# Script can call: __screenshot("tmp/my-check.png")
-```
-
-### Diagnose (JS functions, call via --eval-script)
-
-```js
-__nfDiagnose()         // App state: current view, project, episode, active tab, modals, actions
-__nfEditorDiagnose()   // Editor state: scene count, engine loaded, timeline, tracks, playback
-```
-
-### Bridge IPC (45+ methods via bridgeCall)
-
-Key methods for AI verification:
-- `preview.bundle({ timeline })` — generate scene bundle for preview
-- `preview.frame({ timelinePath, t })` — render frame at time t
-- `compose.generate({ timelinePath })` — build HTML from timeline
-- `timeline.load/save` — read/write timeline JSON
-- `project.list/create`, `episode.list/create`, `segment.list`
-- `fs.read/write/listDir` — filesystem operations
-
-## TypeScript / JavaScript Boundary (mandatory — enforced by `scripts/lint-boundary.sh`)
-
-**Rule**: 谁直接吃这份代码，决定语言。WKWebView `<script>` 直载 + stripESM inline + OS exec → JS。只被 Node `import` → TS。
-
-### JS-only zones (必须是合法 JS，禁写 .ts)
-
-| 路径 | 为什么 |
-|------|--------|
-| `src/nf-runtime/web/src/**` | WKWebView `<script src="*.js">` 直接加载 |
-| `src/nf-core/scenes/**` | stripESM 内联进 HTML |
-| `src/nf-core/animation/effects/**` | browser-inline |
-| `src/nf-core/animation/transitions/**` | browser-inline |
-| `src/nf-core/animation/shared.js`, `canvasCompat.js` | browser-inline |
-| `src/nf-core/filters/**` | browser-inline |
-| `src/nf-cli/bin/nextframe.js` | package.json bin，OS 直接 exec |
-| `src/nf-cli/preview/app.js` | preview HTML 直接加载 |
-
-### TS-authoritative zones (必须 .ts，禁同名 .js)
-
-| 路径 | 为什么 |
-|------|--------|
-| `src/nf-cli/src/**` | Node CLI 内部，通过 `tsx` 运行 |
-| `src/nf-cli/test/**` | Node 测试，tsx 跑 |
-| `src/nf-core/engine/**` | Node 构建逻辑 |
-| `src/nf-core/animation/apply.ts` | 仅 Node 侧调用，不 inline |
-
-### CLI 运行机制（重要）
-
-`bin/nextframe.js` 是一层 shim，spawn `tsx` 执行 `src/nf-cli/src/index.ts`。**不需要任何构建步骤**；改 .ts 立即生效。
-
-### 双份禁令（硬约束）
-
-同名 `.ts` + `.js` 永不共存。`scripts/lint-boundary.sh` 在 pre-commit 和 `lint-all.sh` 里跑 4 条规则：
-1. 任何 src/ 下同 stem 的 .ts/.js 对 → FAIL
-2. JS-only 区出现 .ts（非 .d.ts）→ FAIL
-3. TS-only 区出现 .js → FAIL
-4. index.html `<script src=>` 引用的文件不存在 → FAIL
-
-违反 = commit 直接拒。2026-04 一次 TS 迁移就是缺这个 lint 才出事。
-
-## Core Rules
-
-- Do not add `unwrap`/`expect`/`panic`; workspace lints deny them. Use `#[allow(...)]` with comment on specific FFI functions only.
-- Route all browser/native behavior through `nf-bridge`; no parallel IPC paths.
-- Check scene contracts with `nextframe scenes <id>` before guessing timeline params.
-- Prod files ≤ 500 lines, test files ≤ 800 lines.
-- No `var` in JS (const/let only), no `console.log` in runtime code.
-- No TODO/FIXME/HACK/XXX in production code.
-- Scenes must not cross-import from modules/ directory.
-
-## Product-dev specs (what to read when touching product code)
-
-**本节仅为开发产品代码时的参考契约**。视频生产/脚本/组件打造等操作类流程走 `nf-guide` 状态机，不在这里引导。
-
-- `spec/standards/project/scene/scene-component-system.html` — scene 组件级 20 条硬规则（改 scene loader / CLI / 契约时读）
-- `spec/standards/project/video-production.md` — episode 级红线（改 build / record / publish pipeline 时读）
-- `spec/standards/general/verify-contract.md` — 所有 `--json` 验证 CLI 必须遵守的输出契约（实现新 CLI 时读）
-- `spec/reference/` — 叙事方法 / 爆款案例（不服务产品代码，由 `nf-guide` flows 引用给用户侧 AI）
-
-## nf-guide is the SOLE state-machine truth (mandatory)
-
-**Any AI doing scene / timeline / video work — `nf-guide` is the entry point. No exceptions.**
-
-`src/nf-guide/` (Rust crate) reads markdown flows from `src/nf-guide/flows/{flow}/`. Each flow is a state machine of step-by-step prompts. (v1.0 术语统一：原 `recipe` / `recipes/` 已重命名为 `flow` / `flows/`。)
-
-### Progressive disclosure (3 levels — AI 自己按需展开)
-
-```bash
-# L1 列表 — 有哪些流程 (flows)
-cargo run -p nf-guide
-
-# L2 流程 — 看一个 flow 的整体步骤
-cargo run -p nf-guide -- {flow}
-
-# L3 步骤 — 看某一步的完整 prompt
-cargo run -p nf-guide -- {flow} {step}
-```
-
-**这份 CLAUDE.md 不展开 flow 内容**。flows 会随产品演进不断增加（新主题、新输出格式、新 pipeline），写死在 CLAUDE.md 里就成了滞后的副本。**AI 用 CLI 现取现读**，永远是最新的。
-
-### Maintenance rule (CRITICAL for future-AI usability)
-
-**Every time you change scene contract / CLI command / pipeline behavior, update the matching flow step.** Stale prompts = future AI follows wrong instructions = product breaks invisibly.
-
-- Changed `nextframe scenes` output? Update the relevant step (run `nf-guide` to find it).
-- Added a new ratio / theme? Update the discovery / check steps.
-- New verification command? Update the verify section of the relevant step.
-- Found a new pitfall? Append to the flow's `pitfalls.md`.
-- 加了新 flow？放进 `src/nf-guide/flows/{name}/` — L1 自动发现。
-
-**Don't write parallel state machines elsewhere** (e.g., `src/nf-cli/src/commands/render/states/` was deleted — it was a duplicate that drifted). nf-guide is the only state machine.
-
-### Design system per theme
-
-Each scene theme has its own `theme.md` next to the components:
-
-```
-src/nf-core/scenes/{ratio}/{theme}/theme.md
-```
-
-Pure documentation. AI reads it before writing components. **Code does NOT import theme.md** — colors / fonts / grid are written directly into each component file (single source of truth = the component file itself).
-
-Themes shipped: `16x9/blueprint-cinema`, `9x16/mobile-vertical`.
+- 截图：`cargo run -p nf-shell-mac -- --screenshot` → 写 `tmp/nf-screenshot.png`（新 shell 落地后启用）
+- 查状态：`--eval-script` + 内建 `__nfDiagnose()` / `__nfEditorDiagnose()`
+- 日志：关键路径结构化日志，AI `grep` 定位
 
 ## Key Paths
 
-- Engine core: `src/nf-core/engine/` (timeline, build, validate, keyframes)
-- Animation: `src/nf-core/animation/` (effects/ + transitions/)
-- Scene components: `src/nf-core/scenes/{ratio}/{theme}/{role}-{name}.js` (single-file self-contained, see scene v3 spec)
-- Scene state-machine prompts: `src/nf-guide/flows/` (Rust binary `nf-guide` is the only entry point; directory formerly `recipes/`)
-- Design system: `src/nf-core/scenes/shared/design.js` (TOKENS, GRID, TYPE, utilities)
-- Pipeline recipes: `src/nf-cli/src/commands/pipeline/recipes/` (state machine prompts)
-- CLI commands: `src/nf-cli/src/commands/` (timeline/, render/, project/, pipeline/, app/)
-- Source pipeline: `src/nf-source/` (core/, download/, transcribe/, align/, cut/, source/)
-- IPC dispatch: `src/nf-bridge/src/lib.rs` → `dispatch` / `dispatch_inner`
-- Standards: `spec/standards/00-index.md`
-- ADRs: `spec/cockpit-app/data/dev/adrs.json` (5 decisions)
-- Competitor research: `spec/cockpit-app/analysis/competitors/` (11 dimensions, 300+ tools)
-- Vision & analysis: `spec/cockpit-app/analysis/`
+- **旧归档（只读参考）**：`legacy-v08/`（v0.8~v1.0 的完整 src，含 11 crates + scene 系统 + anchors + wysiwyg 等）
+- **新 src/ 骨架**：规划见 `spec/cockpit-app/module-understand/ultimate-architecture.html`
+- **架构北极星**：`spec/cockpit-app/module-understand/ultimate-architecture.html`
+- **roadmap**：`spec/cockpit-app/roadmap.json`
+- **ADRs**：`spec/cockpit-app/data/dev/adrs.json`
+- **Standards**：`spec/standards/00-index.md`
+- **BDD**：`spec/cockpit-app/bdd/`
+- **竞品研究**：`spec/cockpit-app/analysis/competitors/`
+
+## 跨会话通讯
+
+见 `~/.claude/rules/project-brain.md`（读写闭环）和 `rules/commit-format.md`（提交格式）。
+新会话先读 git log / ADR / roadmap / ultimate-architecture.html，做完必须写回。

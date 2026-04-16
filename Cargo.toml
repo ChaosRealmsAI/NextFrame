@@ -1,21 +1,7 @@
 [workspace]
-members = [
-    "src/nf-shell-mac",
-    "src/nf-bridge",
-    "src/nf-recorder",
-    # nf-tts has been extracted to tmp/extracted/nf-tts for review.
-    # Keep src/nf-tts in-tree for now because some code still reads scripts from that path.
-    # "src/nf-tts",
-    "src/nf-publish",
-    "src/nf-source/core",
-    "src/nf-source/download",
-    "src/nf-source/transcribe",
-    "src/nf-source/align",
-    "src/nf-source/cut",
-    "src/nf-source/source",
-    "src/nf-guide",
-    "src/nf-wysiwyg",
-]
+# v2.0 rebuild in progress — new crates will be added under src/ as skeleton is filled.
+# Old crates are archived in legacy-v08/ (not compiled, kept for reference only).
+members = []
 resolver = "2"
 
 [workspace.package]
