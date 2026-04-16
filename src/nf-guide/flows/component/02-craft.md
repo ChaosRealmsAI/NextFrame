@@ -59,9 +59,8 @@ const counter = Math.floor(t * 30);             // t 驱动计数
 
 ## 5 · CSS 约束
 
-- ❌ **禁 CSS `@keyframes`** — compose 每帧重建 DOM，动画永远停在 t=0
-- ❌ **禁 `animation:` / `transition:` 做入场**
-- ✅ **必须 t-driven inline style**：在 render 里用 t 算 opacity / transform 数值
+❌ 禁 CSS `@keyframes` / `animation:` / `transition:` 做入场（compose 每帧重建 DOM，动画永远停在 t=0）
+✅ 必须 t-driven inline style：在 render 里用 t 算 opacity / transform 数值
 
 ```js
 render(t, params, vp) {
@@ -76,13 +75,11 @@ render(t, params, vp) {
 
 ## 6 · dom 内部随便写
 
-dom 不限制 HTML 内部结构 — SVG / `<canvas>` + inline script / CSS conic-gradient / filter / 3D transform 都可以。关键：都得是 t-driven，别用 `@keyframes`。
+dom 不限制 HTML 内部结构 — SVG / `<canvas>` + inline script / CSS conic-gradient / filter / 3D transform 都行。关键：都得是 t-driven，别用 `@keyframes`。
 
 ```js
 // SVG stroke-dash
-return `<svg viewBox="0 0 ${vp.width} ${vp.height}">
-  <path d="..." stroke-dashoffset="${620*(1-t/1.8)}"/></svg>`;
-
+return `<svg viewBox="0 0 ${vp.width} ${vp.height}"><path d="..." stroke-dashoffset="${620*(1-t/1.8)}"/></svg>`;
 // CSS conic-gradient 跟 t 转
 return `<div style="background:conic-gradient(from ${t*60}deg,#ff6b35,#0a1628);"></div>`;
 ```
@@ -91,12 +88,8 @@ return `<div style="background:conic-gradient(from ${t*60}deg,#ff6b35,#0a1628);"
 
 ```js
 export default {
-  type: "media",
-  videoOverlay: true,   // recorder 识别视频覆盖层
-  render(t, params, vp) {
-    return `<video src="${params.src}" autoplay muted playsinline
-      style="width:100%;height:100%;object-fit:cover;"></video>`;
-  },
+  type: "media", videoOverlay: true,   // recorder 识别视频覆盖层
+  render(t, params, vp) { return `<video src="${params.src}" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>`; },
   sample() { return { src: "./real-clip.mp4" }; },  // 必须真实路径
 };
 ```
@@ -106,43 +99,51 @@ export default {
 ## 8 · 18 AI 字段（intent ≥ 50 字真实推理）
 
 ```js
-intent: `
-  开场 hook 组件。设计取舍：
-  1. serif 200px 大数字 — 对标 3Blue1Brown，一眼记住。
-  2. 数字上方留白 40%，视觉重心压到下三分之二。
-  3. counter 动画 1.2s easeOut cubic — 有冲击感不拖。
-  4. 只用 --bg + --ac 两色，不让辅助色抢戏。
-`,
+intent: `开场 hook。serif 200px 对标 3Blue1Brown；数字上方留白 40%；counter 1.2s easeOut 有冲击不拖；只用 --bg + --ac 两色。`,
 requires: [], pairs_well_with: [], conflicts_with: [], alternatives: [],
 visual_weight: "heavy", z_layer: "foreground", mood: ["calm"],
 ```
 
-## 9 · sample / describe 速查
+## 9 · sample / describe
 
 ```js
 sample() { return { title: "NextFrame", subtitle: "JSON → MP4" }; }  // 禁 Lorem ipsum
-
-describe(t, params, vp) {
-  return {
-    sceneId: "heroTitle", phase: t < 0.6 ? "enter" : "show",
-    progress: Math.min(t/0.6, 1), visible: true, params,
-    elements: [{ type: "title", role: "headline", value: params.title }],
-    boundingBox: { x: 0, y: 0, w: vp.width, h: vp.height },
-  };
-}
+describe(t, params, vp) { return { sceneId: "heroTitle", phase: t<0.6?"enter":"show",
+  progress: Math.min(t/0.6,1), visible: true, params,
+  elements: [{type:"title",role:"headline",value:params.title}],
+  boundingBox: {x:0,y:0,w:vp.width,h:vp.height} }; }
 ```
 
 ## 10 · 硬检查清单（写完必看）
 
-- [ ] render 签名 = `render(t, params, vp)` 返回 string
-- [ ] 返回非空 string 且 ≥ 1 个 HTML 标签
-- [ ] hex / 字号 / 字体全从 theme.md 拷贝（零 import）
-- [ ] type ∈ {dom, media}
-- [ ] 读 t → `frame_pure: false`
-- [ ] 无 `Date.now` / `Math.random` / `setInterval` / `requestAnimationFrame`
+- [ ] render 签名 = `render(t, params, vp)` 返回 string 且 ≥ 1 个 HTML 标签
+- [ ] hex / 字号 / 字体全从 theme.md 拷贝（零 import），type ∈ {dom, media}
+- [ ] 读 t → `frame_pure: false`；无 `Date.now` / `Math.random` / `setInterval` / `requestAnimationFrame`
 - [ ] 无 CSS `@keyframes` / `animation:` / `transition:`
-- [ ] intent ≥ 50 字
-- [ ] sample() 真实业务内容
+- [ ] intent ≥ 50 字；sample() 真实业务内容
+
+## 11 · 反例 vs 正例（视觉质量对照）
+
+### 对照 1: 动画曲线
+❌ `transform: translateY(${t*100}px)` — 线性，像电子闹钟跳字
+✅ `transform: translateY(${easeOutExpo(t)*100}px)` — 物理感，专业级
+其中 `easeOutExpo = t === 1 ? 1 : 1 - Math.pow(2, -10 * t)`
+
+### 对照 2: 淡入
+❌ opacity 0 → 1 直接渐变（0.3s 内）
+✅ opacity 0 → 0.4 → 1 分两段（前 0.2s 快，后 0.3s 慢）
+
+### 对照 3: 字号
+❌ `font-size: 24px`（16:9 下太小，观众看不清）
+✅ `font-size: clamp(48px, 4vw, 72px)`（响应式 + 最小保底）
+
+### 对照 4: 配色
+❌ 纯黑 `#000` + 纯白 `#fff`（刺眼，廉价感）
+✅ 近黑 `#0a0a0a` + 近白 `#f5f5f5`（眼睛舒服，专业）
+
+### 对照 5: 留白
+❌ 画面塞满 5 句文字，撑到 95% 屏幕
+✅ 一个主标题占 30% 屏幕，周围 40% 留白（Apple Keynote 规律）
 
 ## 下一步
 

@@ -1,17 +1,31 @@
 # Step 1 · 审美约束（读 theme.md · 不 import · 不自编色）
 
-## 0 · 硬前置：必须先读 theme.md
+## 0 · 先过审美 checklist（强制，不可跳）
+
+写 scene 前先读：
+
+```bash
+cat spec/cockpit-app/references/aesthetics/08-checklist.md
+```
+
+**15 条硬规则**（摘 5 条最容易漏的，全部见 checklist）：
+1. ❓这个 scene 每 2.5-3s 至少有一次视觉变化？（Fireship / 抖音算法 / Kurzgesagt 共同规律 — 大脑 2.5s 多巴胺阈值）
+2. ❓主文字 ≥ 48px（16:9）/ ≥ 60px（9:16）？
+3. ❓配色来自 theme.md 的 5 色内，没额外引入？
+4. ❓动画用 cubic-bezier / easeInOutExpo，不用 linear？
+5. ❓避开 Arial/Times（default 字体审美杀伤），中文用鸿蒙/思源，英文用 Inter/Söhne？
+
+**写完 render 后必须再过一遍 checklist**，任何 ❌ → 回去改。完整 15 条 + 5 条 bonus → `flows/shared/aesthetics-quick-ref.md`。
+
+---
+
+## 0.5 · 硬前置：必须先读 theme.md
 
 ```bash
 cat src/nf-core/scenes/{ratio-dir}/{theme}/theme.md
 ```
 
-**没读 theme.md 就写组件 = 垃圾**。取色 / 字号 / 字体 / 网格必须完全来自这份文档。
-
-- ❌ 禁止 `import { TOKENS }` — theme.md 没给代码 import 的，只给 AI 读
-- ❌ 禁止自己造色（看着"好像差不多"随手选 hex）
-- ❌ 禁止自造字号（"这里我觉得 32 合适" — 不行）
-- ✅ 唯一合规做法：**从 theme.md 拷贝 hex / px 到组件文件里写死**
+取色 / 字号 / 字体 / 网格必须完全来自这份文档。禁 `import { TOKENS }`（theme.md 不给代码 import，只给 AI 读）。禁自造色 / 自造字号。**唯一合规**：从 theme.md 拷贝 hex / px 到组件文件里写死。
 
 ---
 
@@ -19,12 +33,9 @@ cat src/nf-core/scenes/{ratio-dir}/{theme}/theme.md
 
 | 创作者 | 学什么 | 用在 |
 |--------|--------|------|
-| 小Lin说 | 高密度信息卡片 | content |
-| Kurzgesagt | 扁平矢量 / 电影配色 | bg / 插画 |
-| Vox | 数据动画 / 手绘质感 | data |
-| 3Blue1Brown | 概念动画化 | metric 大数字 |
-| Fireship | 100 秒密度 / 一句话 | 金句 |
-| StatQuest | BAM 时刻 / 情绪锚点 | walkthrough |
+| 小Lin说 / Fireship | 信息密度 / 一句话 | content / 金句 |
+| Kurzgesagt / Vox | 扁平矢量 / 数据动画 | bg / data |
+| 3Blue1Brown / StatQuest | 概念动画 / 情绪锚点 | metric / walkthrough |
 
 问自己 "这组件像哪位"，没答案 → 回 step 0。
 
@@ -107,14 +118,11 @@ E 底部留白 80px      ← 不放内容
 | 规则 | 做法 |
 |------|------|
 | **Easing** | 唯一 `cubic-bezier(0.16, 1, 0.3, 1)` / `cubic-bezier(0.4, 0, 0.2, 1)`，禁 linear（进度条除外） |
-| **Stagger** | 多元素递进 120-180ms 间隔 |
+| **Stagger / 时长** | 递进 120-180ms；进场 0.5-0.8s / 退场 0.3-0.5s / 切场 0.6-1.0s |
 | **只两种属性** | `opacity` + `transform`（translateY / scale），禁 left/top/width |
-| **时长** | 进场 0.5-0.8s / 退场 0.3-0.5s / 场景切 0.6-1.0s |
 | **呼吸感** | 静态元素加 2-4s 微脉冲（opacity 0.7↔1.0 / scale 0.98↔1.02） |
 
-入场 verb：`fadeUp` / `stagger` / `clipReveal` / `counter` / `drawLine` / `blurClear`。
-
-**禁**：`box-shadow` / `rotate` / `skew` / `bounce` / 3+ 同时动 / 静止 > 3s / CSS `@keyframes` 做入场（见 pitfalls 坑 1）。
+入场 verb：`fadeUp` / `stagger` / `clipReveal` / `counter` / `drawLine` / `blurClear`。**禁**：`box-shadow` / `rotate` / `skew` / `bounce` / 3+ 同时动 / 静止 > 3s / CSS `@keyframes` 做入场（见 pitfalls 坑 1）。
 
 ### ✅ 正确做法：t-driven
 
@@ -132,16 +140,9 @@ render(t, params, vp) {
 
 ## 6 · 图 > 文 铁律
 
-**每个组件必须图文并茂**。纯文字组件 = 失败。
+**每个组件必须图文并茂**。纯文字 = 失败。自测：把文字全 hide，剩的还能撑起一屏 → ✅；只剩空白 → ❌ 重做。
 
-自测：把组件所有文字 hide 掉（dom 里删 text node），剩下的：
-- 还能撑起一屏 → ✅
-- 只剩空白 / 几个小方块 → ❌ 重做
-
-一个主题 6-10 个组件里：
-- ≥ 50% 有图形主体
-- ≥ 20% 带持续动态（idle motion）
-- ≤ 30% 纯文字（金句 / 大标题）
+主题 6-10 个组件里：≥ 50% 有图形主体 / ≥ 20% 带 idle motion / ≤ 30% 纯文字。
 
 ## 下一步
 

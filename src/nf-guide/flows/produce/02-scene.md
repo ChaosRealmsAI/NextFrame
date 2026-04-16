@@ -116,7 +116,17 @@ node src/nf-cli/bin/nextframe.js scene-gallery --theme={theme}
 
 任一不过 → 改 → 重跑。
 
-## 9 · Checklist
+## 9 · 审美自检（scene 产出前过）
+
+每个 produce 步骤用到的 scene，必须过这 3 关：
+
+1. **节奏关**: 这个 scene 10s 内是否有 3-4 次视觉变化？（避免静态屏）
+2. **层次关**: 是否有"视觉主体"（占 30%+），其他元素配角？
+3. **情绪关**: scene 情绪是否和 script 那一段情绪匹配？（紧张/激动/平静对应不同动效）
+
+全过 ✅ 再进下一步 scene；任何 ❌ → 回 component flow 改。详见 `spec/cockpit-app/references/aesthetics/03-landscape-explainer.md`（16:9）或 `04-vertical-mobile.md`（9:16），快速版 `flows/shared/aesthetics-quick-ref.md`。
+
+## 10 · Checklist
 
 - [ ] 文件路径正确 `scenes/{ratio}/{theme}/{role}-{name}.js`
 - [ ] default export 对象

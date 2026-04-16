@@ -62,3 +62,7 @@ verify（硬指标 + LLM 判帧）
 ```bash
 nf-guide produce pitfalls
 ```
+
+## 附录：审美参考
+
+2 分钟过一遍审美 15 条硬规则 → 读 `flows/shared/aesthetics-quick-ref.md`。完整 9 篇论证 → `spec/cockpit-app/references/aesthetics/`。

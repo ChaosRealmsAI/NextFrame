@@ -41,3 +41,7 @@ cargo run -p nf-guide -- component verify
 8. **hex/字号/坐标写死**在组件文件里（零 import），从 theme.md 复制。
 
 完成标准：smoke pass + gallery 里能看到动画 + checklist 13 项全绿。
+
+## 附录：审美参考
+
+2 分钟过一遍审美 15 条硬规则 → 读 `flows/shared/aesthetics-quick-ref.md`。完整 9 篇论证 → `spec/cockpit-app/references/aesthetics/`。
