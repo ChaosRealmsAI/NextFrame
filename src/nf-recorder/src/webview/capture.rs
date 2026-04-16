@@ -6,7 +6,7 @@ use crate::plan::VideoLayerInfo;
 use crate::progress::{PROGRESS_CANDIDATE_SELECTORS, ProgressRect};
 use crate::{error_with_fix, internal_error_with_fix};
 use block2::RcBlock;
-use objc2::MainThreadMarker;
+use objc2::{MainThreadMarker, class};
 use objc2::msg_send;
 use objc2::rc::{Retained, autoreleasepool};
 use objc2::runtime::AnyObject;
@@ -459,6 +459,98 @@ impl WebViewHost {
             )
         })?
     }
+
+    #[allow(dead_code)]
+    pub(super) fn eval_string_async(&self, script: &str) -> Result<Option<String>, String> {
+        let slot: EvalResultSlot = Rc::new(RefCell::new(None));
+        let slot_clone = slot.clone();
+        let block = RcBlock::new(move |value: *mut AnyObject, error: *mut NSError| {
+            autoreleasepool(|_| {
+                // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
+                let result = if let Some(error) = unsafe { error.as_ref() } {
+                    // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
+                    // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
+                    // SAFETY: WebKit passes either null or a valid `NSError *` for the callback duration.
+                    if is_unsupported_js_result(error) {
+                        Ok(None)
+                    } else {
+                        Err(
+                            /* Fix: user-facing error formatted below */
+                            error_with_fix(
+                                "evaluate JavaScript in the page (async)",
+                                format!(
+                                    "{} (domain={}, code={})",
+                                    error.localizedDescription(),
+                                    error.domain(),
+                                    error.code()
+                                ),
+                                "Check the page script and retry after the page finishes loading.",
+                            ),
+                        )
+                    }
+                } else if value.is_null() {
+                    Ok(None)
+                } else {
+                    // SAFETY: a non-null success value is a live Objective-C object that responds to `description`.
+                    let description: Retained<NSString> = unsafe { msg_send![value, description] }; // SAFETY: a non-null success value is a live Objective-C object that responds to `description`.
+                    Ok(Some(description.to_string()))
+                };
+                *slot_clone.borrow_mut() = Some(result);
+            });
+        });
+
+        let function_body = NSString::from_str(script);
+        // `objc2-web-kit` exposes `WKContentWorld`, but this crate doesn't enable that feature,
+        // so fetch the page world via Objective-C runtime and keep it retained for the call.
+        let content_world = unsafe {
+            let world: *mut AnyObject = msg_send![class!(WKContentWorld), pageWorld];
+            Retained::retain(world)
+        }
+        .ok_or_else(|| {
+            internal_error_with_fix(
+                "evaluate JavaScript in the page (async)",
+                "WKContentWorld.pageWorld returned nil",
+                "Retry the recording job after the page finishes loading.",
+            )
+        })?;
+
+        // SAFETY: `self.web_view`, `function_body`, `content_world`, and `block` are live main-thread Objective-C objects.
+        unsafe {
+            // SAFETY: `self.web_view`, `function_body`, `content_world`, and `block` are live main-thread Objective-C objects.
+            // SAFETY: `self.web_view`, `function_body`, `content_world`, and `block` are live main-thread Objective-C objects.
+            // SAFETY: `self.web_view`, `function_body`, `content_world`, and `block` are live main-thread Objective-C objects.
+            let _: () = msg_send![
+                &*self.web_view,
+                callAsyncJavaScript: &*function_body,
+                arguments: std::ptr::null::<AnyObject>(),
+                inFrame: std::ptr::null::<AnyObject>(),
+                inContentWorld: &*content_world,
+                completionHandler: Some(&*block)
+            ];
+        }
+
+        let started = Instant::now();
+        while slot.borrow().is_none() {
+            if started.elapsed() > Duration::from_secs(30) {
+                return Err(
+                    /* Fix: user-facing error formatted below */
+                    error_with_fix(
+                        "evaluate JavaScript in the page (async)",
+                        "WebKit did not finish callAsyncJavaScript within 30 seconds",
+                        "Retry after the page finishes loading or simplify the injected script.",
+                    ),
+                );
+            }
+            pump_main_run_loop(Duration::from_millis(10));
+        }
+        slot.borrow_mut().take().ok_or_else(|| {
+            internal_error_with_fix(
+                "evaluate JavaScript in the page (async)",
+                "callAsyncJavaScript completed without a result",
+                "Retry the recording job after the page finishes loading.",
+            )
+        })?
+    }
 }
 
 fn is_unsupported_js_result(error: &NSError) -> bool {
@@ -467,4 +559,13 @@ fn is_unsupported_js_result(error: &NSError) -> bool {
             .localizedDescription()
             .to_string()
             .contains("unsupported type")
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn eval_string_async_signature_compiles() {
+        fn _assert<F: Fn(&super::WebViewHost, &str) -> Result<Option<String>, String>>(_: F) {}
+        _assert(|h, s| h.eval_string_async(s));
+    }
 }

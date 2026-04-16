@@ -31,10 +31,14 @@ impl WebViewHost {
                 "Retry after removing unsupported subtitle data or control characters from the page input.",
             )
         })?;
-        let titles_json =
-            serde_json::to_string(state.segment_titles).unwrap_or_else(|_| "[]".to_owned());
-        let durations_json =
-            serde_json::to_string(state.segment_durations).unwrap_or_else(|_| "[]".to_owned());
+        let titles_json = match serde_json::to_string(state.segment_titles) {
+            Ok(value) => value,
+            Err(_) => "[]".to_owned(),
+        };
+        let durations_json = match serde_json::to_string(state.segment_durations) {
+            Ok(value) => value,
+            Err(_) => "[]".to_owned(),
+        };
         let video_time_sec = state.video_time_sec;
         let progress_pct = state.progress_pct;
         let cue_index = state.cue_index;
@@ -42,25 +46,26 @@ impl WebViewHost {
         let total_segments = state.total_segments;
         let script = format!(
             r#"
-            (() => {{
-              if (typeof window.__onFrame === 'function') {{
-                window.__onFrame({{
-                  time: {video_time_sec:.6},
-                  progress: {progress_pct:.6},
-                  cue: {cue_index},
-                  subtitle: {subtitle_json},
-                  segment: {segment_index},
-                  totalSegments: {total_segments},
-                  segmentTitles: {titles_json},
-                  segmentDurations: {durations_json}
-                }});
-                return 'ok';
-              }}
+            if (typeof window.__onFrame !== 'function') {{
               return 'no __onFrame';
-            }})()
+            }}
+            const result = window.__onFrame({{
+              time: {video_time_sec:.6},
+              progress: {progress_pct:.6},
+              cue: {cue_index},
+              subtitle: {subtitle_json},
+              segment: {segment_index},
+              totalSegments: {total_segments},
+              segmentTitles: {titles_json},
+              segmentDurations: {durations_json}
+            }});
+            if (result && typeof result.then === 'function') {{
+              await result;
+            }}
+            return 'ok';
             "#
         );
-        let result = self.eval_string(&script)?;
+        let result = self.eval_string_async(&script)?;
         if result.as_deref() == Some("no __onFrame") {
             return Err(
                 /* Fix: user-facing error formatted below */
@@ -71,10 +76,6 @@ impl WebViewHost {
                 ),
             );
         }
-        // 200ms flush: WKWebView needs time to execute JS compose(), run layout,
-        // paint, and composite layers. Even 50ms was insufficient for complex SVG
-        // flow diagrams and multi-element scenes. 200ms ensures reliable capture.
-        // Recording speed drops to ~5fps but correctness > speed.
-        self.flush_render(Duration::from_millis(200))
+        self.flush_render(Duration::from_millis(50))
     }
 }
