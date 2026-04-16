@@ -10,6 +10,9 @@
 
 ## 15 条硬规则（每条一行）
 
+### 质感（awwwards 级 · 第 0 条，最先查）
+0. 每个 scene 至少 2 条：mesh 背景 / glass backdrop-filter / blur halo / 多层 shadow / SVG grain / t-driven 周期动画 / gradient text。纯色块 + 单层 shadow + 无 texture = low，回去改。详见 `component/02-craft.md §12`。
+
 ### 节奏 · 运动
 1. 每 3s 内至少一次视觉变化（抖音/Fireship/Kurzgesagt 共同规律）
 2. 动画用 cubic-bezier / spring，禁 linear（旋转 / 进度条除外）

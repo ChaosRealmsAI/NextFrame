@@ -15,6 +15,28 @@ render(t, params, vp) { return "<div>...</div>"; }
 
 **禁 `render(host, ...)`**（旧签名）/ **禁 `render(ctx, ...)`**（canvas 旧写法）。
 
+### ⚠️ 铁律：render(t=0) 必须"已经在"（v1.0 L1 发现的 #1 卡感根因）
+
+**禁止从 opacity=0 淡入超过 0.3s**。sonnet L1 第一轮 16 个 scene 全部犯这错：render(0) 返回 opacity≈0 的 HTML，观众看前 1-3 秒完全空白 → 整个视频像每段都"黑屏→闪现→黑屏→闪现"。
+
+**正确做法**：
+
+```js
+// ❌ 错：前 1s opacity 0→1 淡入（观众看到 1s 黑屏）
+const opacity = Math.min(1, t / 1.0);
+
+// ✅ 对：t=0 已经 opacity=0.9+，可选细节 t=0→0.3s 做微缩放/微透明
+const mainOpacity = 1;                              // 主元素立即显示
+const bloomOpacity = Math.min(1, t / 0.3);          // 辅助光晕 0.3s 淡入
+const scale = 0.98 + 0.02 * Math.min(1, t / 0.3);   // 0.3s 从 0.98 → 1.0（微妙）
+```
+
+**render(0) 自检**：
+- 主文字 / 主图案必须在 t=0 **立即可见**（opacity ≥ 0.9）
+- 动画在 0.3s 内完成"入场"，剩余时间是 **hold state**（稳定显示）
+- 入场后的 "visual variation"（每 2.5-3s 规则）是**元素切换或位移**，不是"继续淡入"
+- 除非 scene 是专门的 "enter" 转场（`role: "overlay"` 且 `duration_hint: 0.5`），否则不能有超过 0.5s 的入场动画
+
 ## 2 · CLI 生成骨架（不要手写）
 
 ```bash
@@ -144,6 +166,30 @@ describe(t, params, vp) { return { sceneId: "heroTitle", phase: t<0.6?"enter":"s
 ### 对照 5: 留白
 ❌ 画面塞满 5 句文字，撑到 95% 屏幕
 ✅ 一个主标题占 30% 屏幕，周围 40% 留白（Apple Keynote 规律）
+
+## 12 · 视觉质感硬规则（awwwards 级）
+
+sonnet L1 v1.0 踩过的坑：只用 opacity + translateY 做入场 → 画面 low，用户反馈「这么 low 没有设计感」。每个 scene **必须至少用 2 条**以下技术：
+
+| 技术 | 代码示例 |
+|------|---------|
+| 背景 mesh（radial / conic 多层叠） | `background: radial-gradient(ellipse 70% 55% at 22% 50%,rgba(255,107,53,0.22),transparent 60%),conic-gradient(...)` |
+| backdrop-filter glass（card 层） | `backdrop-filter:blur(20px) saturate(180%)` |
+| filter blur halo（装饰 blob） | `filter:blur(40px) hue-rotate(${hue}deg)` 配 `radial-gradient` |
+| 多层 box-shadow depth（≥3 层） | `box-shadow:0 2px 0 rgba(255,255,255,0.06) inset,0 24px 48px -16px rgba(...,0.3),0 48px 96px -32px rgba(0,0,0,0.5)` |
+| SVG feTurbulence noise grain | `<svg><filter><feTurbulence baseFrequency="0.9"/><feColorMatrix .../></filter><rect filter="url(#n)"/></svg>` 叠 `mix-blend-mode:overlay` |
+| t-driven 周期动画 | `filter:hue-rotate(${Math.sin(t*0.8)*8}deg)` / `transform:rotate(${t*4}deg)` / `opacity:${0.5+0.3*Math.sin(t*1.5)}` |
+| gradient text fill | `background:linear-gradient(...);background-clip:text;color:transparent;filter:drop-shadow(0 0 40px rgba(...))` |
+
+**参考**：Stripe / Linear / Arc / Vercel / Awwwards Site of the Day 2024。
+
+**禁止**：
+- 纯色块背景（bg: #0a1628 单色 → 补 radial/conic mesh）
+- 单层 shadow（box-shadow 只写 1 行 → 补 inset + 中层 + 远层 3 层）
+- 无 grain/texture 的平面卡片（扁平感 = low）
+- 入场之后完全静止（必须有 hue-rotate / breathe / blob 旋转持续动）
+
+示例（v1.0 upgrade 参考）：`src/nf-core/scenes/16x9/blueprint-cinema/content-questionHook.js`（mesh + halo + glass + grain + hue-rotate）。
 
 ## 下一步
 
