@@ -67,6 +67,27 @@ export async function main() {
     process.exit(0);
   }
 
+  if (argv[0] === "anchors" && argv[1] === "from-tts") {
+    if (argv[2] === "--help" || argv[2] === "-h") {
+      const help = renderCommandHelp("anchors from-tts");
+      if (help) {
+        process.stdout.write(help);
+        process.exit(0);
+      }
+    }
+
+    try {
+      const mod = await import("./lib/v08-from-tts.js");
+      const code = await mod.runAnchorsFromTts(argv.slice(2));
+      process.exit(typeof code === "number" ? code : 0);
+    } catch (error) {
+      const detail = (error as Error)?.stack || (error as Error)?.message || String(error);
+      process.stderr.write(`failed to load or run "anchors from-tts": ${detail}\n`);
+      process.stderr.write(`Fix: ${defaultFixSuggestion()}\n`);
+      process.exit(2);
+    }
+  }
+
   const subcommand = argv[0];
   const loader = SUBCOMMANDS[subcommand as keyof typeof SUBCOMMANDS];
   if (!loader) {
