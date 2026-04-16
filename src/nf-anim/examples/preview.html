@@ -54,7 +54,15 @@ try {
     }
   }
   scrubEl.addEventListener("input", () => renderAt(scrubEl.value));
-  renderAt(scrubEl.value);
+  // honor ?t= query for static screenshots (seconds)
+  const tParam = qs.get("t");
+  if (tParam !== null) {
+    const initial = Math.max(0, Math.min(dur, parseFloat(tParam)));
+    scrubEl.value = String(Math.round((initial / dur) * 1000));
+    renderAt(scrubEl.value);
+  } else {
+    renderAt(scrubEl.value);
+  }
 } catch (e) {
   stage.innerHTML = `<div class="err">${e.message}</div>`;
 }

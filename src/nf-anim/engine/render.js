@@ -54,9 +54,24 @@ function renderShape(layer, state, t, motion) {
   const shapeName = layer.shape || (layer.type === "shape" ? "circle" : layer.type);
   const shape = SHAPES[shapeName];
   const d = shapeName === "path" ? resolveTrack(state.tracks, "d", t) || layer.path : layer.path;
-  const fallback = d ? `<path${attrs({ d, fill: layer.fill ?? "#000000", stroke: layer.stroke, "stroke-width": layer.stroke ? layer.strokeWidth ?? 1 : null, "vector-effect": "non-scaling-stroke" })}/>` : "";
+  // resolve string-valued tracks (color/path/etc.) so shape function sees animated values
+  const fillTrack = resolveTrack(state.tracks, "fill", t);
+  const strokeTrack = resolveTrack(state.tracks, "stroke", t);
+  const radiusTrack = resolveTrack(state.tracks, "radius", t);
+  const widthTrack = resolveTrack(state.tracks, "width", t);
+  const heightTrack = resolveTrack(state.tracks, "height", t);
+  const resolvedLayer = {
+    ...layer, t, motion: undefined, tracks: state.tracks, opacity: state.opacity,
+    fill: fillTrack ?? layer.fill,
+    stroke: strokeTrack ?? layer.stroke,
+    radius: radiusTrack ?? layer.radius,
+    width: widthTrack ?? layer.width,
+    height: heightTrack ?? layer.height,
+  };
+  const fallback = d ? `<path${attrs({ d, fill: resolvedLayer.fill ?? "#000000", stroke: resolvedLayer.stroke, "stroke-width": resolvedLayer.stroke ? layer.strokeWidth ?? 1 : null, "vector-effect": "non-scaling-stroke" })}/>` : "";
   const ctx = motion.renderChildren ? motion : { ...motion, renderChildren: (items) => renderLayers(items, t, motion) };
-  const body = typeof shape === "function" ? shape({ ...layer, t, motion: ctx, tracks: state.tracks, opacity: state.opacity }) : fallback;
+  resolvedLayer.motion = ctx;
+  const body = typeof shape === "function" ? shape(resolvedLayer) : fallback;
   if (!body) return "";
   const transform = `translate(${state.at[0].toFixed(3)} ${state.at[1].toFixed(3)}) rotate(${state.rotate.toFixed(3)}) scale(${state.scaleX.toFixed(3)} ${state.scaleY.toFixed(3)})`;
   return `<g${layer.id ? ` data-layer="${esc(layer.id)}"` : ""} transform="${transform}" opacity="${state.opacity.toFixed(3)}">${body}</g>`;
