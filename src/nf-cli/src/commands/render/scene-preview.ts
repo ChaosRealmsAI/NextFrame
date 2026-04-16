@@ -155,7 +155,6 @@ const DIR = ${JSON.stringify(dirUrl)};
 const FILENAME = ${JSON.stringify(opts.filename)};
 const TYPE = ${JSON.stringify(m.type)};
 const VP = { width: ${W}, height: ${H} };
-const MOTION_VP = { width: 400, height: 400 };
 const DUR = ${opts.dur};
 
 const stage = document.getElementById('stage');
@@ -180,6 +179,17 @@ sampleJson.textContent = JSON.stringify(params, null, 2);
 
 let _shaderCtx = null;
 function mulberry32(s) { return function(){ let x=s|=0; s=s+0x6D2B79F5|0; x=Math.imul(x^x>>>15,1|x); x=x+Math.imul(x^x>>>7,61|x)^x; return((x^x>>>14)>>>0)/4294967296; }; }
+function applyUniform(gl, u, v) {
+  if (Array.isArray(v)) {
+    const data = new Float32Array(v.map(Number));
+    if (v.length === 2) gl.uniform2fv(u, data);
+    else if (v.length === 3) gl.uniform3fv(u, data);
+    else if (v.length === 4) gl.uniform4fv(u, data);
+    else gl.uniform1fv(u, data);
+    return;
+  }
+  gl.uniform1f(u, Number(v));
+}
 
 function renderAt(t) {
   try {
@@ -223,7 +233,7 @@ function renderAt(t) {
       const freshConfig = c.render(null, t, params, VP);
       if (freshConfig && freshConfig.uniforms) {
         for (const [k, v] of Object.entries(freshConfig.uniforms)) {
-          const loc = _shaderCtx['u_'+k]; if (loc) gl.uniform1f(loc, Number(v));
+          const loc = _shaderCtx['u_'+k]; if (loc) applyUniform(gl, loc, v);
         }
       }
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -254,7 +264,7 @@ function renderAt(t) {
         ctx.restore();
       }
     } else if (TYPE === 'motion') {
-      const config = c.render(null, t, params, MOTION_VP);
+      const config = c.render(null, t, params, VP);
       if (!config || !config.layers) { stage.innerHTML = '<div style="color:#e06c75;padding:24px">motion: no layers</div>'; return; }
       stage.innerHTML = '';
       __nfMotionRender(stage, t, config);

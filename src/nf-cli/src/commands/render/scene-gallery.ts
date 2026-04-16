@@ -194,6 +194,18 @@ function mountHost(stage, c, params) {
   c.render(stage, 0.5, params, VP);
 }
 
+function applyUniform(gl, u, v) {
+  if (Array.isArray(v)) {
+    const data = new Float32Array(v.map(Number));
+    if (v.length === 2) gl.uniform2fv(u, data);
+    else if (v.length === 3) gl.uniform3fv(u, data);
+    else if (v.length === 4) gl.uniform4fv(u, data);
+    else gl.uniform1fv(u, data);
+    return;
+  }
+  gl.uniform1f(u, Number(v));
+}
+
 function mountShader(stage, c, params) {
   const config = c.render(null, 0.5, params, VP);
   if (!config || !config.frag) { stage.innerHTML = '<div style="color:#e06c75;padding:24px;font:12px monospace">shader: no frag</div>'; return; }
@@ -217,7 +229,7 @@ function mountShader(stage, c, params) {
   gl.viewport(0, 0, VP.width, VP.height);
   const uT = gl.getUniformLocation(prog, 'uT'); if (uT) gl.uniform1f(uT, 0.5);
   const uR = gl.getUniformLocation(prog, 'uR'); if (uR) gl.uniform2f(uR, VP.width, VP.height);
-  if (config.uniforms) { for (const [k, v] of Object.entries(config.uniforms)) { const u = gl.getUniformLocation(prog, k); if (u) gl.uniform1f(u, Number(v)); } }
+  if (config.uniforms) { for (const [k, v] of Object.entries(config.uniforms)) { const u = gl.getUniformLocation(prog, k); if (u) applyUniform(gl, u, v); } }
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 }
 
@@ -288,19 +300,18 @@ if (compositeStage) {
     layers.push(s);
   }
   for (const s of layers) {
-    const layer = document.createElement(s.type === 'canvas' ? 'canvas' : 'div');
+    const layer = document.createElement('div');
     layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
-    if (s.type === 'canvas') {
-      layer.width = VP.width;
-      layer.height = VP.height;
-    }
     compositeStage.appendChild(layer);
     try {
       const mod = await import(\`\${DIR}/\${s.filename}\`);
       const c = mod.default;
       const params = c.sample();
-      if (s.type === 'canvas') c.render(layer.getContext('2d'), 0.5, params, VP);
-      else c.render(layer, 0.5, params, VP);
+      if (s.type === 'canvas') mountCanvas(layer, c, params);
+      else if (s.type === 'shader') mountShader(layer, c, params);
+      else if (s.type === 'particle') mountParticle(layer, c, params);
+      else if (s.type === 'motion') mountMotion(layer, c, params);
+      else mountHost(layer, c, params);
     } catch (e) {
       console.error('composite layer failed:', s.id, e);
     }
