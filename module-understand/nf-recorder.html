@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>录制器 · nf-recorder</title>
+<style>
+  :root {
+    --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #222; --border: #333;
+    --text: #f0f0f0; --text2: #999; --text3: #666;
+    --accent: #ff6b35; --accent2: #ff8f5e;
+    --green: #4ade80; --blue: #60a5fa; --yellow: #fbbf24; --purple: #a78bfa; --red: #f87171;
+    --radius: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "SF Pro Display", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+
+  /* === Hero === */
+  .hero {
+    background: linear-gradient(135deg, #1a0a00 0%, #0f0f0f 50%, #000a1a 100%);
+    padding: 80px 60px 60px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; top: 0; right: 0;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(255,107,53,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-badge { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; opacity: 0.8; }
+  .hero h1 { font-size: 48px; font-weight: 800; letter-spacing: -1px; margin-bottom: 16px; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero .tagline { font-size: 22px; color: var(--text2); font-weight: 400; max-width: 700px; }
+
+  /* === Content wrapper === */
+  .content { max-width: 1100px; margin: 0 auto; padding: 0 60px; }
+
+  /* === Section === */
+  section { padding: 64px 0; }
+  section + section { border-top: 1px solid #1f1f1f; }
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+  .section-title { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .section-desc { font-size: 16px; color: var(--text2); margin-bottom: 40px; max-width: 700px; }
+
+  /* === Analogy Card (hero below) === */
+  .analogy {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+    margin: 40px 60px 0;
+    display: flex; gap: 40px; align-items: center;
+  }
+  .analogy-icon { font-size: 64px; flex-shrink: 0; }
+  .analogy-text h3 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .analogy-text p { font-size: 15px; color: var(--text2); }
+  .analogy-text p strong { color: var(--text); }
+
+  /* === IO Visual === */
+  .io-visual {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0;
+    align-items: center;
+    margin-bottom: 40px;
+  }
+  .io-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    position: relative;
+  }
+  .io-box.input { border-color: var(--blue); }
+  .io-box.output { border-color: var(--green); }
+  .io-label {
+    position: absolute; top: -12px; left: 24px;
+    font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    padding: 2px 12px;
+    border-radius: 100px;
+  }
+  .io-label.input { background: var(--blue); color: #000; }
+  .io-label.output { background: var(--green); color: #000; }
+  .io-box .big { font-size: 40px; text-align: center; margin-bottom: 12px; }
+  .io-box h4 { font-size: 16px; margin-bottom: 8px; text-align: center; }
+  .io-box p { font-size: 14px; color: var(--text2); text-align: center; }
+  .io-arrow {
+    display: flex; flex-direction: column; align-items: center; padding: 0 24px;
+  }
+  .io-arrow .arrow-line {
+    width: 80px; height: 2px;
+    background: linear-gradient(90deg, var(--blue), var(--accent), var(--green));
+    position: relative;
+  }
+  .io-arrow .arrow-line::after {
+    content: '▶'; position: absolute; right: -14px; top: -10px;
+    color: var(--green); font-size: 14px;
+  }
+  .io-arrow .arrow-label {
+    font-size: 12px; color: var(--accent); font-weight: 600; margin-top: 8px;
+    white-space: nowrap;
+  }
+
+  /* === Factory Steps === */
+  .factory {
+    position: relative;
+    margin-bottom: 40px;
+  }
+  .factory-line {
+    position: absolute; left: 39px; top: 0; bottom: 0;
+    width: 2px; background: linear-gradient(to bottom, var(--accent), var(--purple));
+    z-index: 0;
+  }
+  .factory-step {
+    display: flex; gap: 24px; align-items: flex-start;
+    padding: 20px 0;
+    position: relative; z-index: 1;
+  }
+  .factory-dot {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+    background: var(--surface); border: 2px solid var(--border);
+  }
+  .factory-dot.key { border-color: var(--accent); box-shadow: 0 0 20px rgba(255,107,53,0.2); }
+  .factory-body { flex: 1; }
+  .factory-body h4 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .factory-body p { font-size: 14px; color: var(--text2); }
+  .factory-body .note {
+    display: inline-block; font-size: 12px; color: var(--accent); margin-top: 6px;
+    padding: 2px 10px; background: rgba(255,107,53,0.1); border-radius: 100px;
+  }
+
+  /* === Concept Cards === */
+  .concepts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+  .concept-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    transition: border-color 0.2s;
+  }
+  .concept-card:hover { border-color: var(--accent); }
+  .concept-card .icon { font-size: 32px; margin-bottom: 12px; }
+  .concept-card h4 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .concept-card p { font-size: 14px; color: var(--text2); }
+  .concept-card p strong { color: var(--text); }
+
+  /* === Rooms (sub-modules) === */
+  .rooms { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 40px; }
+  .room {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    cursor: default;
+    transition: all 0.2s;
+  }
+  .room:hover { border-color: var(--text3); transform: translateY(-2px); }
+  .room .room-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .room .room-icon { font-size: 24px; }
+  .room .room-name { font-size: 15px; font-weight: 700; }
+  .room .room-role { font-size: 14px; color: var(--text2); margin-bottom: 10px; }
+  .room .room-detail { font-size: 13px; color: var(--text3); border-top: 1px solid var(--border); padding-top: 10px; }
+  .room.wide { grid-column: span 2; }
+
+  /* === Speed Chart === */
+  .speed-chart { margin-bottom: 40px; }
+  .speed-row {
+    display: grid; grid-template-columns: 200px 1fr 80px;
+    align-items: center; gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #1f1f1f;
+  }
+  .speed-row:first-child { border-top: 1px solid #1f1f1f; }
+  .speed-label { font-size: 14px; }
+  .speed-bar-wrap { height: 24px; background: var(--surface); border-radius: 12px; overflow: hidden; }
+  .speed-bar {
+    height: 100%; border-radius: 12px;
+    display: flex; align-items: center; padding-left: 12px;
+    font-size: 12px; font-weight: 700; color: #000;
+    transition: width 0.8s ease;
+  }
+  .speed-val { font-size: 14px; font-weight: 700; text-align: right; }
+
+  /* === Dep visual === */
+  .dep-visual { margin-bottom: 40px; }
+  .dep-section { margin-bottom: 24px; }
+  .dep-section h4 { font-size: 14px; color: var(--text2); margin-bottom: 12px; }
+  .dep-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .dep-tag {
+    font-size: 13px; padding: 6px 14px; border-radius: 100px;
+    background: var(--surface); border: 1px solid var(--border);
+  }
+  .dep-tag.macos { border-color: var(--accent); color: var(--accent); }
+  .dep-tag.rust { border-color: var(--yellow); color: var(--yellow); }
+  .dep-tag.ext { border-color: var(--purple); color: var(--purple); }
+
+  /* === Isolation callout === */
+  .callout {
+    background: linear-gradient(135deg, rgba(255,107,53,0.05), rgba(96,165,250,0.05));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    display: flex; gap: 20px; align-items: center;
+    margin-bottom: 40px;
+  }
+  .callout .callout-icon { font-size: 48px; flex-shrink: 0; }
+  .callout h4 { font-size: 16px; margin-bottom: 6px; }
+  .callout p { font-size: 14px; color: var(--text2); }
+
+  /* === Footer === */
+  .footer {
+    text-align: center; padding: 40px 60px;
+    border-top: 1px solid #1f1f1f;
+    color: var(--text3); font-size: 13px;
+  }
+
+  /* === Responsive === */
+  @media (max-width: 768px) {
+    .hero { padding: 40px 24px 40px; }
+    .hero h1 { font-size: 32px; }
+    .content { padding: 0 24px; }
+    .analogy { margin: 24px 24px 0; flex-direction: column; text-align: center; }
+    .io-visual { grid-template-columns: 1fr; }
+    .io-arrow { transform: rotate(90deg); padding: 16px 0; }
+    .concepts, .rooms { grid-template-columns: 1fr; }
+    .room.wide { grid-column: span 1; }
+    .speed-row { grid-template-columns: 1fr; gap: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== HERO ==================== -->
+<div class="hero">
+  <div style="max-width: 1100px; margin: 0 auto;">
+    <div class="hero-badge">NextFrame 模块总览 #01</div>
+    <h1>录制器 <em>nf-recorder</em></h1>
+    <p class="tagline">把一个网页变成一个视频文件。<br>不是录屏，是逐帧拍照再装订成册。</p>
+  </div>
+</div>
+
+<div class="analogy">
+  <div class="analogy-icon">📷</div>
+  <div class="analogy-text">
+    <h3>想象一个超高速照相机</h3>
+    <p>
+      你有一个 HTML 网页，里面有动画、有文字、有特效。普通做法是播放这个网页然后录屏——但录屏会丢帧、画质差。
+      <br><br>
+      recorder 的做法不同：它在内存里打开一个<strong>看不见的浏览器</strong>，然后像定格动画一样——
+      <strong>"时间暂停 → 拍一张照 → 时间走一格 → 再拍一张"</strong>，如此重复几百上千次，最后把所有照片合成视频。
+      <br><br>
+      所以不管动画多复杂，每一帧都是完美的。就像用相机一张张拍，而不是用手机屏幕录制。
+    </p>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- ==================== 输入输出 ==================== -->
+<section>
+  <div class="section-label">这个模块做什么</div>
+  <div class="section-title">一进一出，非常纯粹</div>
+  <div class="section-desc">recorder 是一个独立的转换器。不管 HTML 从哪来、谁生成的，只要给它一个网页，它就给你一个视频。</div>
+
+  <div class="io-visual">
+    <div class="io-box input">
+      <div class="io-label input">输入</div>
+      <div class="big">🌐</div>
+      <h4>HTML 文件</h4>
+      <p>一个自包含的网页文件<br>里面有引擎代码，能在任意时刻渲染画面<br>可能还带音频路径、视频图层信息</p>
+    </div>
+    <div class="io-arrow">
+      <div class="arrow-line"></div>
+      <div class="arrow-label">nf-recorder</div>
+    </div>
+    <div class="io-box output">
+      <div class="io-label output">输出</div>
+      <div class="big">🎬</div>
+      <h4>MP4 视频</h4>
+      <p>H.264 编码的标准视频文件<br>音画已合并，可直接上传各平台<br>附带性能日志（录了几帧、多快、多大）</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 流水线 ==================== -->
+<section>
+  <div class="section-label">怎么做到的</div>
+  <div class="section-title">7 步流水线</div>
+  <div class="section-desc">从拿到 HTML 到输出 MP4，中间经过 7 个工序。橙色高亮的是核心步骤。</div>
+
+  <div class="factory">
+    <div class="factory-line"></div>
+
+    <div class="factory-step">
+      <div class="factory-dot">📋</div>
+      <div class="factory-body">
+        <h4>1. 收集文件</h4>
+        <p>找到要录制的 HTML 文件。可以给一个文件，也可以给一个文件夹（里面的 HTML 按顺序录制后拼成一个视频）。</p>
+      </div>
+    </div>
+
+    <div class="factory-step">
+      <div class="factory-dot">🔍</div>
+      <div class="factory-body">
+        <h4>2. 读取信息</h4>
+        <p>打开 HTML 文件，从里面提取关键信息：这个视频多长？有没有配音？有没有字幕？有没有需要叠加的真人视频？这些信息都嵌在 HTML 的代码里。</p>
+      </div>
+    </div>
+
+    <div class="factory-step">
+      <div class="factory-dot">🧮</div>
+      <div class="factory-body">
+        <h4>3. 制定拍摄计划</h4>
+        <p>根据视频时长和帧率，算出一共需要拍多少张照片、每张照片对应哪个时间点。比如一个 10 秒 60fps 的视频 = 600 张照片。</p>
+      </div>
+    </div>
+
+    <div class="factory-step">
+      <div class="factory-dot key">🖥️</div>
+      <div class="factory-body">
+        <h4>4. 打开隐形浏览器</h4>
+        <p>在内存里创建一个<strong>看不见的 Safari 浏览器窗口</strong>（藏在屏幕外面），把 HTML 加载进去。这个浏览器是真的——能跑 JS、能渲染 CSS、能画 Canvas，和你在 Safari 里打开完全一样。</p>
+        <div class="note">用的是 macOS 自带的 WKWebView（Safari 内核）</div>
+      </div>
+    </div>
+
+    <div class="factory-step">
+      <div class="factory-dot key">📸</div>
+      <div class="factory-body">
+        <h4>5. 逐帧拍照（核心）</h4>
+        <p>
+          这是最关键的一步。循环几百上千次，每次做同样的事：
+          <br>① 告诉页面"<strong>现在是第 N 帧</strong>"（页面收到后会把动画、文字、特效都更新到这个时间点）
+          <br>② 等页面渲染完
+          <br>③ <strong>从显卡直接读取画面像素</strong>（不是截屏，是读 GPU 的渲染结果）
+          <br>④ 把这张图交给编码器
+        </p>
+        <div class="note">优先用 CALayer.render（GPU直读），黑屏则自动换 takeSnapshot</div>
+      </div>
+    </div>
+
+    <div class="factory-step">
+      <div class="factory-dot key">⚡</div>
+      <div class="factory-body">
+        <h4>6. 实时编码</h4>
+        <p>每拍完一张照片，立刻用 Mac 的<strong>硬件视频编码芯片</strong>把它压缩成 H.264 格式写入文件。不用等全拍完再编码，边拍边压，速度更快。</p>
+        <div class="note">用的是 Apple VideoToolbox 硬件加速</div>
+      </div>
+    </div>
+
+    <div class="factory-step">
+      <div class="factory-dot">🎵</div>
+      <div class="factory-body">
+        <h4>7. 合并收尾</h4>
+        <p>把配音音频合进视频、把多段视频拼接成一个文件、如果有真人视频图层就叠加上去。最终产出一个完整的 MP4 文件。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 设计决策 ==================== -->
+<section>
+  <div class="section-label">设计决策</div>
+  <div class="section-title">为什么这么做</div>
+  <div class="section-desc">recorder 有几个关键的设计选择，理解了这些就理解了它为什么长这样。</div>
+
+  <div class="concepts">
+    <div class="concept-card">
+      <div class="icon">⏸️</div>
+      <h4>时间由我控制</h4>
+      <p>
+        不是"播放视频然后录屏"，而是<strong>录制器控制时间的流逝</strong>。
+        它说"现在是 0.5 秒"，页面就渲染 0.5 秒的画面。
+        好处：不管动画多复杂，永远不丢帧，每帧都完美。
+        代价：不能录实时内容（比如摄像头），只能录预设好的动画。
+      </p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🧠</div>
+      <h4>聪明地偷懒</h4>
+      <p>
+        如果一段时间内画面没变化（比如一段文字静止 3 秒），就<strong>不重新拍照</strong>，直接复用上一张。
+        它分析字幕切换点来判断"什么时候画面会变"。
+        一个 60 秒的视频，可能只需要真正拍 200 张而不是 1800 张。
+      </p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🏭</div>
+      <h4>多条生产线</h4>
+      <p>
+        把视频切成几段，每段用一个独立的浏览器录制，最后拼起来。
+        比如 4 段并行，速度提升约 3-4 倍。
+        特别适合录制 4K 这种比较慢的场景。
+      </p>
+    </div>
+    <div class="concept-card">
+      <div class="icon">🔌</div>
+      <h4>完全独立</h4>
+      <p>
+        recorder 不知道也不关心 HTML 是怎么生成的。
+        它只认一个约定：<strong>HTML 里要有 engine.duration（视频多长）和 __onFrame（接收时间信号）</strong>。
+        满足这两点，任何 HTML 都能录。
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 内部房间 ==================== -->
+<section>
+  <div class="section-label">内部结构</div>
+  <div class="section-title">10 个"房间"，各司其职</div>
+  <div class="section-desc">recorder 像一座小工厂，有 10 个功能区。每个区负责一件事，互不干扰。</div>
+
+  <div class="rooms">
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">🚪</span>
+        <span class="room-name">api/ — 总入口</span>
+      </div>
+      <div class="room-role">所有录制任务从这里开始。它决定走哪条路线：一台机器从头录到尾（串行），还是开多台机器各录一段（并行）。</div>
+      <div class="room-detail">串行由 orchestrator.rs 执行，并行由 parallel/ 目录管理（拆帧 → 多进程 → 拼接）</div>
+    </div>
+
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">🖥️</span>
+        <span class="room-name">webview/ — 隐形浏览器</span>
+      </div>
+      <div class="room-role">创建和管理那个看不见的浏览器。负责加载页面、等待渲染完成、截图。是整个 recorder 最核心的部分。</div>
+      <div class="room-detail">5 个文件：创建窗口 / 截图(两种方式) / 页面导航 / 注入帧状态 / 离屏管理</div>
+    </div>
+
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">🔄</span>
+        <span class="room-name">record/ — 录制循环</span>
+      </div>
+      <div class="room-role">一段视频的完整生命周期：准备（导航到页面、初始化编码器）→ 逐帧循环（截图+编码 × N 次）→ 收尾（关编码器、合音频）。</div>
+      <div class="room-detail">frame_loop.rs 是那个"拍一张、走一格"的核心循环</div>
+    </div>
+
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">💿</span>
+        <span class="room-name">encoder/ — 视频编码</span>
+      </div>
+      <div class="room-role">把每张截图压缩成视频流，写入 MP4 文件。用 Mac 芯片的硬件加速，比软件编码快很多。</div>
+      <div class="room-detail">pipeline.rs 管编码写入 / pixel_buffer.rs 管格式转换 / ffmpeg.rs 管音频合并和拼接</div>
+    </div>
+
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">📖</span>
+        <span class="room-name">parser/ — 信息提取</span>
+      </div>
+      <div class="room-role">从 HTML 源码里读取录制所需信息：视频多长？配音文件在哪？有几条字幕？有哪些视频图层？</div>
+      <div class="room-detail">用正则表达式从 JS 代码里提取变量值（duration、audioSrc、subtitles 等）</div>
+    </div>
+
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">📐</span>
+        <span class="room-name">plan.rs — 拍摄计划</span>
+      </div>
+      <div class="room-role">收集所有要录的 HTML 文件，算出每段视频的时长和帧数，生成一份完整的"拍摄计划书"。</div>
+      <div class="room-detail">如果有音频，以音频时长为准；没有就用字幕时长；都没有就默认 10 秒</div>
+    </div>
+
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">⏱️</span>
+        <span class="room-name">clock.rs — 帧时钟</span>
+      </div>
+      <div class="room-role">决定第 N 帧对应几秒、这一帧需不需要真的拍照。"聪明偷懒"的核心逻辑就在这里。</div>
+      <div class="room-detail">分析字幕切换时间点 → 在静止区间自动复用上一帧 → 大幅减少实际截图次数</div>
+    </div>
+
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">📷</span>
+        <span class="room-name">capture.rs — 截图工具</span>
+      </div>
+      <div class="room-role">底层图像处理。把浏览器渲染的画面转成标准图片格式，并且检测"是不是拍到了黑屏"。</div>
+      <div class="room-detail">黑帧检测用 16×16 网格采样，发现黑屏会自动重试最多 3 次</div>
+    </div>
+
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">🌐</span>
+        <span class="room-name">server/ — 本地服务器</span>
+      </div>
+      <div class="room-role">起一个临时的本地网站服务器。因为浏览器有安全限制，直接打开本地文件会受限，通过 HTTP 服务就没这个问题。</div>
+      <div class="room-detail">录制开始时自动启动，录制结束后关闭。如果启动失败会降级到 file:// 模式</div>
+    </div>
+
+    <div class="room">
+      <div class="room-header">
+        <span class="room-icon">🎞️</span>
+        <span class="room-name">overlay/ — 叠加与日志</span>
+      </div>
+      <div class="room-role">两件事：① 把真人视频叠加到录制结果的指定区域。② 记录性能数据（录了多快、文件多大、用了什么编码器）。</div>
+      <div class="room-detail">视频叠加用 FFmpeg overlay 滤镜，支持精确定位 x/y/w/h</div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 速度 ==================== -->
+<section>
+  <div class="section-label">性能</div>
+  <div class="section-title">录制有多快</div>
+  <div class="section-desc">在 M 系列 Mac 上 60fps 的实测数据。fps 越高 = 越快，超过 60 意味着比实时还快。</div>
+
+  <div class="speed-chart">
+    <div class="speed-row">
+      <div class="speed-label">竖屏 1080p</div>
+      <div class="speed-bar-wrap"><div class="speed-bar" style="width: 93%; background: linear-gradient(90deg, var(--green), #22c55e);">56 fps — 比实时还快</div></div>
+      <div class="speed-val" style="color: var(--green);">56 fps</div>
+    </div>
+    <div class="speed-row">
+      <div class="speed-label">横屏 1080p</div>
+      <div class="speed-bar-wrap"><div class="speed-bar" style="width: 52%; background: linear-gradient(90deg, var(--blue), #3b82f6);">25-31 fps</div></div>
+      <div class="speed-val" style="color: var(--blue);">28 fps</div>
+    </div>
+    <div class="speed-row">
+      <div class="speed-label">4K 串行</div>
+      <div class="speed-bar-wrap"><div class="speed-bar" style="width: 10%; background: linear-gradient(90deg, var(--yellow), #f59e0b);"></div></div>
+      <div class="speed-val" style="color: var(--yellow);">6 fps</div>
+    </div>
+    <div class="speed-row">
+      <div class="speed-label">4K × 4 并行</div>
+      <div class="speed-bar-wrap"><div class="speed-bar" style="width: 22%; background: linear-gradient(90deg, var(--accent), var(--accent2));">13 fps</div></div>
+      <div class="speed-val" style="color: var(--accent);">13 fps</div>
+    </div>
+    <div class="speed-row">
+      <div class="speed-label">4K × 8 并行</div>
+      <div class="speed-bar-wrap"><div class="speed-bar" style="width: 23%; background: linear-gradient(90deg, var(--accent), var(--accent2));">14 fps</div></div>
+      <div class="speed-val" style="color: var(--accent);">14 fps</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-icon">💡</div>
+    <div>
+      <h4>为什么竖屏比横屏快？</h4>
+      <p>竖屏用 --dpr 2 渲染 540×960 再放大到 1080×1920，实际截图面积小。横屏 1920×1080 直接渲染，面积更大。截图面积 = 速度瓶颈。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 依赖 ==================== -->
+<section>
+  <div class="section-label">关系</div>
+  <div class="section-title">谁用它、它用谁</div>
+
+  <div class="dep-visual">
+    <div class="dep-section">
+      <h4>📥 谁调用 recorder</h4>
+      <div class="dep-tags">
+        <span class="dep-tag rust">nf-bridge（桌面应用点"导出"按钮）</span>
+        <span class="dep-tag">命令行直接运行 nextframe-recorder</span>
+      </div>
+    </div>
+
+    <div class="dep-section">
+      <h4>📦 recorder 依赖的 macOS 能力</h4>
+      <div class="dep-tags">
+        <span class="dep-tag macos">WKWebView — Safari 浏览器引擎</span>
+        <span class="dep-tag macos">VideoToolbox — 硬件视频编码</span>
+        <span class="dep-tag macos">CoreGraphics — 图像处理</span>
+        <span class="dep-tag macos">AppKit — 窗口管理</span>
+        <span class="dep-tag macos">AVFoundation — 媒体框架</span>
+      </div>
+    </div>
+
+    <div class="dep-section">
+      <h4>🔧 recorder 依赖的 Rust 库</h4>
+      <div class="dep-tags">
+        <span class="dep-tag rust">objc2 — Rust 调 macOS 原生 API 的桥梁</span>
+        <span class="dep-tag rust">serde — 数据序列化</span>
+        <span class="dep-tag rust">clap — 命令行参数解析</span>
+      </div>
+    </div>
+
+    <div class="dep-section">
+      <h4>🔗 外部工具</h4>
+      <div class="dep-tags">
+        <span class="dep-tag ext">FFmpeg — 音频合并、片段拼接（需要系统安装）</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-icon">🧩</div>
+    <div>
+      <h4>recorder 是完全独立的</h4>
+      <p>它不依赖 nf-core（引擎）、不依赖 nf-cli（命令行）、不依赖任何 JS 代码。只要给它一个 HTML 文件，不管这个 HTML 是我们的引擎生成的、还是手写的、还是别的工具生成的——只要满足约定（有 duration + __onFrame），它就能录。这种独立性是刻意设计的。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 规模 ==================== -->
+<section>
+  <div class="section-label">规模</div>
+  <div class="section-title">这个模块有多大</div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px;">
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; text-align: center;">
+      <div style="font-size: 32px; font-weight: 800; color: var(--accent);">~30</div>
+      <div style="font-size: 13px; color: var(--text2);">源文件</div>
+    </div>
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; text-align: center;">
+      <div style="font-size: 32px; font-weight: 800; color: var(--blue);">~160 KB</div>
+      <div style="font-size: 13px; color: var(--text2);">总代码量</div>
+    </div>
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; text-align: center;">
+      <div style="font-size: 32px; font-weight: 800; color: var(--green);">10</div>
+      <div style="font-size: 13px; color: var(--text2);">子模块</div>
+    </div>
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; text-align: center;">
+      <div style="font-size: 32px; font-weight: 800; color: var(--yellow);">Rust</div>
+      <div style="font-size: 13px; color: var(--text2);">纯 Rust，零 JS</div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<div class="footer">
+  src/nf-recorder/ · 2026-04-16 · NextFrame 模块总览系列
+</div>
+
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextFrame 模块总览</title>
+<style>
+  :root {
+    --bg: #0f0f0f; --surface: #1a1a1a; --border: #333;
+    --text: #f0f0f0; --text2: #999; --text3: #666;
+    --accent: #ff6b35; --accent2: #ff8f5e;
+    --green: #4ade80; --blue: #60a5fa; --yellow: #fbbf24; --purple: #a78bfa;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "SF Pro Display", system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+
+  .hero {
+    background: linear-gradient(135deg, #1a0a00 0%, #0f0f0f 50%, #000a1a 100%);
+    padding: 80px 60px 60px;
+    border-bottom: 1px solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(255,107,53,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero h1 { font-size: 48px; font-weight: 800; letter-spacing: -1px; margin-bottom: 12px; max-width: 1100px; margin-left: auto; margin-right: auto; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { font-size: 18px; color: var(--text2); max-width: 1100px; margin: 0 auto; }
+
+  .content { max-width: 1100px; margin: 0 auto; padding: 60px 60px; }
+
+  .stats { display: flex; gap: 24px; margin-bottom: 48px; flex-wrap: wrap; }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 28px; flex: 1; min-width: 140px; text-align: center;
+  }
+  .stat .num { font-size: 28px; font-weight: 800; }
+  .stat .label { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+  .section-title { font-size: 24px; font-weight: 700; margin-bottom: 32px; }
+
+  .module-list { display: grid; gap: 16px; }
+
+  .module-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 28px 32px;
+    display: grid; grid-template-columns: auto 1fr auto;
+    gap: 20px; align-items: center;
+    text-decoration: none; color: inherit;
+    transition: all 0.2s;
+  }
+  .module-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .module-card .icon { font-size: 36px; }
+  .module-card .info h3 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .module-card .info h3 code { font-weight: 400; color: var(--text2); font-size: 14px; margin-left: 8px; }
+  .module-card .info p { font-size: 14px; color: var(--text2); }
+  .module-card .meta { text-align: right; }
+  .module-card .meta .lang { font-size: 12px; padding: 3px 10px; border-radius: 100px; border: 1px solid var(--border); }
+  .module-card .meta .lang.rust { border-color: var(--yellow); color: var(--yellow); }
+  .module-card .meta .lang.js { border-color: var(--blue); color: var(--blue); }
+  .module-card .meta .lang.ts { border-color: var(--purple); color: var(--purple); }
+  .module-card .meta .lang.mixed { border-color: var(--green); color: var(--green); }
+  .module-card .meta .date { font-size: 11px; color: var(--text3); margin-top: 6px; }
+
+  .module-card.todo { opacity: 0.4; pointer-events: none; }
+  .module-card.todo:hover { transform: none; border-color: var(--border); }
+
+  .group-title { font-size: 14px; font-weight: 600; color: var(--text3); margin: 32px 0 12px; padding-left: 4px; letter-spacing: 1px; text-transform: uppercase; }
+  .group-title:first-of-type { margin-top: 0; }
+
+  .footer { text-align: center; padding: 40px; color: var(--text3); font-size: 13px; border-top: 1px solid #1f1f1f; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1><em>NextFrame</em> 模块总览</h1>
+  <p>每个模块一个页面，用比喻和图解讲清楚它做什么、怎么做、为什么这么设计。给产品经理看的。</p>
+</div>
+
+<div class="content">
+
+  <div class="stats">
+    <div class="stat"><div class="num" style="color: var(--accent);">13</div><div class="label">Rust Crate</div></div>
+    <div class="stat"><div class="num" style="color: var(--blue);">3</div><div class="label">JS/TS 模块</div></div>
+    <div class="stat"><div class="num" style="color: var(--green);">1 / 16</div><div class="label">已完成 / 总模块</div></div>
+    <div class="stat"><div class="num" style="color: var(--yellow);">v0.9</div><div class="label">当前版本</div></div>
+  </div>
+
+  <div class="section-label">模块文档</div>
+  <div class="section-title">点击进入每个模块的详细讲解</div>
+
+  <!-- ===== 核心引擎 ===== -->
+  <div class="group-title">核心引擎</div>
+  <div class="module-list">
+    <a class="module-card todo" href="#">
+      <div class="icon">⚙️</div>
+      <div class="info">
+        <h3>引擎核心 <code>nf-core</code></h3>
+        <p>Timeline 验证、构建、渲染。JSON → 单文件 HTML 的核心管线。</p>
+      </div>
+      <div class="meta"><span class="lang mixed">JS + TS</span><div class="date">待编写</div></div>
+    </a>
+    <a class="module-card todo" href="#">
+      <div class="icon">🎨</div>
+      <div class="info">
+        <h3>Scene 组件 <code>nf-core/scenes</code></h3>
+        <p>44 个可视化组件。每个都是纯函数：给时间 t → 画出画面。</p>
+      </div>
+      <div class="meta"><span class="lang js">JS</span><div class="date">待编写</div></div>
+    </a>
+    <a class="module-card todo" href="#">
+      <div class="icon">✨</div>
+      <div class="info">
+        <h3>动画系统 <code>nf-core/animation</code></h3>
+        <p>31 个动画效果 + 14 个转场。淡入、弹跳、滑动、溶解……</p>
+      </div>
+      <div class="meta"><span class="lang js">JS</span><div class="date">待编写</div></div>
+    </a>
+  </div>
+
+  <!-- ===== 桌面应用 ===== -->
+  <div class="group-title">桌面应用</div>
+  <div class="module-list">
+    <a class="module-card todo" href="#">
+      <div class="icon">🖥️</div>
+      <div class="info">
+        <h3>桌面壳 <code>nf-shell-mac</code></h3>
+        <p>macOS 原生窗口。用 Safari 引擎跑 UI，Rust 管后台。</p>
+      </div>
+      <div class="meta"><span class="lang rust">Rust</span><div class="date">待编写</div></div>
+    </a>
+    <a class="module-card todo" href="#">
+      <div class="icon">🔌</div>
+      <div class="info">
+        <h3>通信中枢 <code>nf-bridge</code></h3>
+        <p>前后端唯一通道。45+ 个 JSON 方法，管项目/时间线/存储/导出。</p>
+      </div>
+      <div class="meta"><span class="lang rust">Rust</span><div class="date">待编写</div></div>
+    </a>
+    <a class="module-card todo" href="#">
+      <div class="icon">🌐</div>
+      <div class="info">
+        <h3>浏览器 UI <code>nf-runtime</code></h3>
+        <p>编辑器界面。零框架 JS，在 WebView 里跑。</p>
+      </div>
+      <div class="meta"><span class="lang js">JS</span><div class="date">待编写</div></div>
+    </a>
+  </div>
+
+  <!-- ===== 录制与输出 ===== -->
+  <div class="group-title">录制与输出</div>
+  <div class="module-list">
+    <a class="module-card" href="nf-recorder.html">
+      <div class="icon">📸</div>
+      <div class="info">
+        <h3>录制器 <code>nf-recorder</code></h3>
+        <p>把网页变成视频。在内存里开隐形浏览器，逐帧拍照，硬件编码成 MP4。</p>
+      </div>
+      <div class="meta"><span class="lang rust">Rust</span><div class="date">2026-04-16</div></div>
+    </a>
+    <a class="module-card todo" href="#">
+      <div class="icon">📤</div>
+      <div class="info">
+        <h3>发布器 <code>nf-publish</code></h3>
+        <p>多平台一键发布。用 WebView 自动操作各创作者平台。</p>
+      </div>
+      <div class="meta"><span class="lang rust">Rust</span><div class="date">待编写</div></div>
+    </a>
+  </div>
+
+  <!-- ===== 语音 ===== -->
+  <div class="group-title">语音</div>
+  <div class="module-list">
+    <a class="module-card todo" href="#">
+      <div class="icon">🗣️</div>
+      <div class="info">
+        <h3>语音合成 <code>nf-tts</code></h3>
+        <p>文字变声音。Edge + 火山引擎双后端，支持对齐和字幕生成。</p>
+      </div>
+      <div class="meta"><span class="lang rust">Rust</span><div class="date">待编写</div></div>
+    </a>
+  </div>
+
+  <!-- ===== 素材管线 ===== -->
+  <div class="group-title">素材管线</div>
+  <div class="module-list">
+    <a class="module-card todo" href="#">
+      <div class="icon">📥</div>
+      <div class="info">
+        <h3>素材处理 <code>nf-source</code></h3>
+        <p>视频素材全流程：下载 → 转写 → 对齐 → 裁剪。6 个子模块协作。</p>
+      </div>
+      <div class="meta"><span class="lang rust">Rust</span><div class="date">待编写</div></div>
+    </a>
+  </div>
+
+  <!-- ===== 工具层 ===== -->
+  <div class="group-title">工具层</div>
+  <div class="module-list">
+    <a class="module-card todo" href="#">
+      <div class="icon">🧰</div>
+      <div class="info">
+        <h3>命令行 <code>nf-cli</code></h3>
+        <p>60+ 命令。AI 和人类操作产品的主要入口。</p>
+      </div>
+      <div class="meta"><span class="lang ts">TS</span><div class="date">待编写</div></div>
+    </a>
+    <a class="module-card todo" href="#">
+      <div class="icon">📖</div>
+      <div class="info">
+        <h3>导航系统 <code>nf-guide</code></h3>
+        <p>21 个 recipe 状态机。AI 做视频时的步骤导航。</p>
+      </div>
+      <div class="meta"><span class="lang rust">Rust</span><div class="date">待编写</div></div>
+    </a>
+    <a class="module-card todo" href="#">
+      <div class="icon">✏️</div>
+      <div class="info">
+        <h3>可视化编辑 <code>nf-wysiwyg</code></h3>
+        <p>实验性所见即所得编辑器。DOM 快照 + 编辑操作。</p>
+      </div>
+      <div class="meta"><span class="lang rust">Rust</span><div class="date">待编写</div></div>
+    </a>
+  </div>
+
+</div>
+
+<div class="footer">
+  NextFrame 模块总览 · module-understand/ · 产品经理工作台
+</div>
+
+</body>
+</html>
