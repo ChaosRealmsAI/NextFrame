@@ -41,12 +41,22 @@ function layerState(layer, t) {
   return { at, rotate, scaleX, scaleY, opacity, tracks };
 }
 
+function renderLayers(items, t, motion) {
+  const out = [];
+  for (const item of items || []) for (const layer of expandLayer(item || {})) {
+    const state = layerState(layer, t);
+    if (state.opacity > 0) out.push(renderShape(layer, state, t, motion));
+  }
+  return out.join("");
+}
+
 function renderShape(layer, state, t, motion) {
   const shapeName = layer.shape || (layer.type === "shape" ? "circle" : layer.type);
   const shape = SHAPES[shapeName];
   const d = shapeName === "path" ? resolveTrack(state.tracks, "d", t) || layer.path : layer.path;
   const fallback = d ? `<path${attrs({ d, fill: layer.fill ?? "#000000", stroke: layer.stroke, "stroke-width": layer.stroke ? layer.strokeWidth ?? 1 : null, "vector-effect": "non-scaling-stroke" })}/>` : "";
-  const body = typeof shape === "function" ? shape({ ...layer, t, motion, tracks: state.tracks, opacity: state.opacity }) : fallback;
+  const ctx = motion.renderChildren ? motion : { ...motion, renderChildren: (items) => renderLayers(items, t, motion) };
+  const body = typeof shape === "function" ? shape({ ...layer, t, motion: ctx, tracks: state.tracks, opacity: state.opacity }) : fallback;
   if (!body) return "";
   const transform = `translate(${state.at[0].toFixed(3)} ${state.at[1].toFixed(3)}) rotate(${state.rotate.toFixed(3)}) scale(${state.scaleX.toFixed(3)} ${state.scaleY.toFixed(3)})`;
   return `<g${layer.id ? ` data-layer="${esc(layer.id)}"` : ""} transform="${transform}" opacity="${state.opacity.toFixed(3)}">${body}</g>`;
@@ -58,11 +68,7 @@ export function renderMotion(host = null, t = 0, motion = {}) {
   const height = Math.max(1, num(size[1], num(host && host.height, 1080)));
   const layers = [];
   for (const layer of motion.layers || []) layers.push(...expandLayer(layer));
-  const body = layers.map((layer) => {
-    const state = layerState(layer, num(t));
-    if (state.opacity <= 0) return "";
-    return renderShape(layer, state, num(t), motion);
-  }).join("");
+  const body = renderLayers(layers, num(t), motion);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${body}</svg>`;
 }
 
