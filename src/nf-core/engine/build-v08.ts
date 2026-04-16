@@ -561,7 +561,18 @@ function toLegacyTimeline(resolved: ResolvedTimeline): Timeline {
         params,
       };
       if (clip.effects && typeof clip.effects === "object") {
+        const fx = clip.effects as { enter?: Record<string, unknown>; exit?: Record<string, unknown> };
         layer.effects = clip.effects as NonNullable<typeof layer.effects>;
+        // Runtime (build-runtime.ts) reads layer.enter/layer.exit with .effect field.
+        // Lower the v0.8 nested {effects:{enter:{type,dur}}} to flat {enter:{effect,dur}}.
+        if (fx.enter && typeof fx.enter === "object") {
+          const { type, ...rest } = fx.enter;
+          (layer as Record<string, unknown>).enter = { effect: type, ...rest };
+        }
+        if (fx.exit && typeof fx.exit === "object") {
+          const { type, ...rest } = fx.exit;
+          (layer as Record<string, unknown>).exit = { effect: type, ...rest };
+        }
       }
       if (clip.transition && typeof clip.transition === "object") {
         layer.transition = clip.transition as NonNullable<typeof layer.transition>;
