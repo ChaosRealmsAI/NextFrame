@@ -172,3 +172,61 @@ async function exportViaFfmpegFallback(timeline: unknown, outputPath: string, op
   const { fps, crf, width, height, onProgress } = opts;
   return exportMP4(timeline, outputPath, { fps, crf, width, height, onProgress });
 }
+
+interface ExportRecorderHtmlOpts {
+  fps?: number;
+  crf?: number;
+  width?: number;
+  height?: number;
+  dpr?: number;
+  duration?: number;
+  recorderPath?: string;
+}
+
+/**
+ * Record a pre-built HTML file directly to MP4 via the Rust recorder CLI.
+ *
+ * Used by v0.8 render pipeline: buildV08 produces a self-contained HTML with its own
+ * runtime/timeline; the recorder only needs to open it and capture frames. We do not
+ * fall back to ffmpeg here because the HTML is v0.8-specific and ffmpeg's renderer
+ * only speaks the legacy canvas API.
+ */
+export async function exportRecorderHtml(htmlPath: string, outputPath: string, opts: ExportRecorderHtmlOpts = {}) {
+  const fps = opts.fps && opts.fps > 0 ? opts.fps : 30;
+  const width = opts.width && opts.width > 0 ? opts.width : 1920;
+  const height = opts.height && opts.height > 0 ? opts.height : 1080;
+  const dpr = Number.isFinite(opts.dpr) && (opts.dpr ?? 0) > 0 ? (opts.dpr ?? 1) : 1;
+  const duration = opts.duration ?? 0;
+  const totalFrames = Math.round(duration * fps);
+  const crf = normalizeCrf(opts.crf);
+  if (crf === null) {
+    return guarded("exportRecorderHtml", { ok: false, error: { code: "BAD_CRF", hint: "0..51" } });
+  }
+
+  const binary = recorderBinary(opts);
+  if (!isRecorderAvailable(binary)) {
+    return guarded("exportRecorderHtml", {
+      ok: false,
+      error: {
+        code: "RECORDER_NOT_FOUND",
+        message: `${binary} not found in PATH`,
+        hint: "build with `cargo build -p nf-recorder` or pass --recorder-path",
+      },
+    });
+  }
+
+  const recorded = await runRecorder(binary, htmlPath, outputPath, { fps, crf, dpr, width, height });
+  if (!recorded.ok) return guarded("exportRecorderHtml", recorded);
+
+  return guarded("exportRecorderHtml", {
+    ok: true,
+    value: {
+      outputPath,
+      width,
+      height,
+      fps,
+      duration,
+      framesRendered: totalFrames,
+    },
+  });
+}
