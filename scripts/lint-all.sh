@@ -67,6 +67,15 @@ bash scripts/lint-boundary.sh || FAIL=1
 echo "=== 10b. v0.8 anchor refs (no literal ms) ==="
 bash scripts/lint-anchors.sh || FAIL=1
 
+echo "=== 10c. scene type whitelist (dom|media only, ADR-021) ==="
+bash scripts/lint-scene-type.sh || FAIL=1
+
+echo "=== 10d. scene render arity (t, params, vp) ==="
+bash scripts/lint-scene-render-arity.sh || FAIL=1
+
+echo "=== 10e. scene _examples structure ==="
+bash scripts/lint-scene-exclude-examples.sh || FAIL=1
+
 echo "=== 11. Cargo.toml deny rules ==="
 for RULE in unwrap_used expect_used panic unreachable todo wildcard_imports; do
   if ! grep -q "$RULE.*deny" Cargo.toml 2>/dev/null; then
