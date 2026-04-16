@@ -1,7 +1,11 @@
 [workspace]
-# v2.0 rebuild in progress — new crates will be added under src/ as skeleton is filled.
-# Old crates are archived in legacy-v08/ (not compiled, kept for reference only).
-members = []
+# v2.0 rebuild. Legacy crates archived in legacy-v08/ (not compiled, reference only).
+# New crates are minimal skeletons — implementations will be filled in phase by phase.
+members = [
+    "src/nf-shell-mac",
+    "src/nf-recorder",
+    "src/nf-cli",
+]
 resolver = "2"
 
 [workspace.package]
