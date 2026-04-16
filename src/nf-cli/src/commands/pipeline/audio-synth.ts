@@ -95,9 +95,9 @@ export async function run(argv: string[]) {
     emit({
       ok: false,
       error: {
-        code: "VOX_NOT_FOUND",
+        code: "NF_TTS_NOT_FOUND",
         message: (err as Error).message,
-        fix: "install vox and make sure it is available on PATH, then retry",
+        fix: "install nf-tts and make sure it is available on PATH, then retry",
       },
     }, flags);
     return 2;
@@ -123,7 +123,7 @@ export async function run(argv: string[]) {
       error: {
         code: "AUDIO_SYNTH_FAILED",
         message: formatExecError(err),
-        fix: "verify vox works from the shell with the same text, then retry",
+        fix: "verify nf-tts works from the shell with the same text, then retry",
       },
     }, flags);
     return 2;
@@ -140,8 +140,8 @@ export async function run(argv: string[]) {
       ok: false,
       error: {
         code: "AUDIO_SYNTH_OUTPUT_MISSING",
-        message: `vox completed but expected outputs were not found under ${artifactDir}`,
-        fix: "verify vox subtitle generation is enabled and retry",
+        message: `nf-tts completed but expected outputs were not found under ${artifactDir}`,
+        fix: "verify nf-tts subtitle generation is enabled and retry",
       },
     }, flags);
     return 2;
@@ -210,9 +210,9 @@ function buildSynthArgs(text: string, outputDir: string, stem: string, voice: st
 }
 
 function resolveVoxPath() {
-  const output = execFileSync("which", ["vox"], { encoding: "utf8", stdio: "pipe" }).trim();
+  const output = execFileSync("which", ["nf-tts"], { encoding: "utf8", stdio: "pipe" }).trim();
   if (!output) {
-    throw new Error("vox binary not found on PATH");
+    throw new Error("nf-tts binary not found on PATH");
   }
   return output;
 }

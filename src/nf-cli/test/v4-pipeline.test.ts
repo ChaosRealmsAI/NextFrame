@@ -111,7 +111,7 @@ test("v4-pipeline commands manage pipeline.json and keep project state isolated"
   }
 });
 
-test("audio-synth generates vox artifacts and registers generated audio metadata", () => {
+test("audio-synth generates nf-tts artifacts and registers generated audio metadata", () => {
   const root = mkdtempSync(join(tmpdir(), "nextframe-v4-audio-synth-"));
   const fakeBinDir = join(root, "bin");
   try {
@@ -161,7 +161,7 @@ test("audio-synth generates vox artifacts and registers generated audio metadata
 });
 
 function writeFakeVox(binDir: string) {
-  const script = join(binDir, "vox");
+  const script = join(binDir, "nf-tts");
   writeFileSync(script, `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");

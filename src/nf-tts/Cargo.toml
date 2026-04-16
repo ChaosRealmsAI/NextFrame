@@ -10,8 +10,13 @@ keywords = ["tts", "cli", "speech", "audio", "edge"]
 categories = ["command-line-utilities", "multimedia::audio"]
 rust-version = "1.75"
 
-[lints]
-workspace = true
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unreachable = "deny"
+todo = "deny"
+wildcard_imports = "deny"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -29,3 +34,10 @@ futures = "0.3"
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
 dirs = "6"
+
+[[bin]]
+name = "nf-tts"
+path = "src/main.rs"
+
+[workspace]
+

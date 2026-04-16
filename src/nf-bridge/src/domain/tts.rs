@@ -1,5 +1,5 @@
 //! Audio synthesis bridge — spawn `nextframe audio-synth` CLI.
-//! No direct vox dependency. nextframe CLI handles TTS + alignment internally.
+//! No direct nf-tts dependency. nextframe CLI handles TTS + alignment internally.
 use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;
@@ -135,7 +135,7 @@ fn find_first_file(dir: &PathBuf, suffix: &str) -> Option<PathBuf> {
             return Some(entry.path());
         }
     }
-    // Check subdirectories (vox outputs to <stem>/<stem>.mp3)
+    // Check subdirectories (nf-tts outputs to <stem>/<stem>.mp3)
     let Ok(entries) = fs::read_dir(dir) else {
         return None;
     };

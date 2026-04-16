@@ -223,9 +223,9 @@ export const COMMAND_SPECS = Object.fromEntries([
     --json emit structured JSON`, `When --segment is omitted, the full audio stage is returned.`),
   command("audio-synth", "Generate TTS audio plus subtitles for one script segment and register the result.", `nextframe audio-synth <project> <episode> --segment=N [--voice=NAME] [--backend=edge|volcengine] [--root=PATH] [--json]`, `--segment=N required 1-based script segment index
     --voice=NAME optional TTS voice override; also stored on pipeline.audio.voice
-    --backend=edge|volcengine optional vox backend override
+    --backend=edge|volcengine optional nf-tts backend override
     --root=PATH projects root, default ~/NextFrame/projects
-    --json emit the synthesized artifact paths and duration`, `Requires the vox binary to be installed and available on PATH.
+    --json emit the synthesized artifact paths and duration`, `Requires the nf-tts binary to be installed and available on PATH.
     The selected script segment must already contain narration text.`),
   command("atom-add", "Add one pipeline atom of type component, video, or image.", `nextframe atom-add <project> <episode> --type=component|video|image --name=TEXT [--scene=ID] [--segment=N] [--params=JSON] [--file=PATH] [--duration=N] [--root=PATH] [--json]`, `--type=component|video|image required atom type
     --name=TEXT required human-readable atom name
