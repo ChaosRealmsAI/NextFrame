@@ -136,7 +136,10 @@ function buildHtml(opts: {
   .tag-type-canvas { background: rgba(218,119,86,.18); color: #da7756 }
   .tag-type-dom    { background: rgba(126,198,153,.18); color: #7ec699 }
   .tag-type-svg    { background: rgba(138,180,204,.18); color: #8ab4cc }
-  .tag-type-media  { background: rgba(212,180,131,.18); color: #d4b483 }
+  .tag-type-media    { background: rgba(212,180,131,.18); color: #d4b483 }
+  .tag-type-shader   { background: rgba(110,170,255,.18); color: #6eaaff }
+  .tag-type-particle { background: rgba(255,180,77,.18);  color: #ffb44d }
+  .tag-type-motion   { background: rgba(255,154,184,.18); color: #ff9ab8 }
   .tag-role { background: rgba(255,255,255,.06); color: #aaa }
 </style>
 </head>
@@ -161,6 +164,7 @@ ${compositeCard}
 </section>
 
 <script type="module">
+import { renderMotion as __nfMotionRender } from '/src/nf-core/engine/runtime/motion.js';
 const DIR = ${JSON.stringify(dirUrl)};
 const VP = { width: ${W}, height: ${H} };
 const SCENES = ${JSON.stringify(opts.scenes.map(s => ({ id: s.id, filename: s.filename, type: s.type, role: s.role })))};
@@ -190,6 +194,68 @@ function mountHost(stage, c, params) {
   c.render(stage, 0.5, params, VP);
 }
 
+function mountShader(stage, c, params) {
+  const config = c.render(null, 0.5, params, VP);
+  if (!config || !config.frag) { stage.innerHTML = '<div style="color:#e06c75;padding:24px;font:12px monospace">shader: no frag</div>'; return; }
+  const canvas = document.createElement('canvas');
+  canvas.width = VP.width; canvas.height = VP.height;
+  canvas.style.cssText = 'width:100%;height:100%;display:block';
+  stage.innerHTML = ''; stage.appendChild(canvas);
+  const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
+  if (!gl) { stage.innerHTML += '<div style="color:#e06c75;padding:24px;font:12px monospace">WebGL unavailable</div>'; return; }
+  const VERT = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }';
+  function compile(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));} return s; }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, config.frag));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { stage.innerHTML += '<div style="color:#e06c75;padding:24px;font:12px monospace">shader link: '+gl.getProgramInfoLog(prog)+'</div>'; return; }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.viewport(0, 0, VP.width, VP.height);
+  const uT = gl.getUniformLocation(prog, 'uT'); if (uT) gl.uniform1f(uT, 0.5);
+  const uR = gl.getUniformLocation(prog, 'uR'); if (uR) gl.uniform2f(uR, VP.width, VP.height);
+  if (config.uniforms) { for (const [k, v] of Object.entries(config.uniforms)) { const u = gl.getUniformLocation(prog, k); if (u) gl.uniform1f(u, Number(v)); } }
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function mountParticle(stage, c, params) {
+  const config = c.render(null, 0.5, params, VP);
+  if (!config || !config.emitter) { stage.innerHTML = '<div style="color:#e06c75;padding:24px;font:12px monospace">particle: no emitter</div>'; return; }
+  const canvas = document.createElement('canvas');
+  canvas.width = VP.width; canvas.height = VP.height;
+  canvas.style.cssText = 'width:100%;height:100%;display:block';
+  stage.innerHTML = ''; stage.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, VP.width, VP.height);
+  const count = config.emitter.count || 100;
+  const seed = config.emitter.seed || 42;
+  const spawnFn = config.emitter.spawn;
+  function mulberry32(s) { return function(){ let x=s|=0; s=s+0x6D2B79F5|0; x=Math.imul(x^x>>>15,1|x); x=x+Math.imul(x^x>>>7,61|x)^x; return((x^x>>>14)>>>0)/4294967296; }; }
+  for (let i = 0; i < count; i++) {
+    const rng = mulberry32(seed + i * 37);
+    let p;
+    if (spawnFn) { p = spawnFn(rng, i, VP); p.i = i; }
+    else { p = { i, x: rng()*VP.width, y: rng()*VP.height, depth: rng()*0.8+0.2, size: 0.75+rng()*2.25, alpha: 0.2+rng()*0.7, hue: rng()*360 }; }
+    if (config.field) { const d = config.field(p.x, p.y, 0.5); if (d) Object.assign(p, d); }
+    ctx.save();
+    if (config.render) { config.render(ctx, p, 0.5); }
+    else { ctx.globalAlpha = p.alpha||0.5; ctx.fillStyle = '#fff'; ctx.fillRect(p.x, p.y, p.size||2, p.size||2); }
+    ctx.restore();
+  }
+}
+
+function mountMotion(stage, c, params) {
+  // Use a smaller viewport for motion preview so shapes are visible in gallery thumbnails
+  const motionVP = { width: 400, height: 400 };
+  const config = c.render(null, 0.5, params, motionVP);
+  if (!config || !config.layers) { stage.innerHTML = '<div style="color:#e06c75;padding:24px;font:12px monospace">motion: no layers</div>'; return; }
+  stage.innerHTML = '';
+  try { __nfMotionRender(stage, 0.5, config); } catch(e) { stage.innerHTML = '<div style="color:#e06c75;padding:24px;font:12px monospace">motion render: '+e.message+'</div>'; }
+}
+
 for (const s of SCENES) {
   const stage = document.getElementById('scene-' + s.id);
   if (!stage) continue;
@@ -198,9 +264,12 @@ for (const s of SCENES) {
     const c = mod.default;
     const params = c.sample();
     if (s.type === 'canvas') mountCanvas(stage, c, params);
+    else if (s.type === 'shader') mountShader(stage, c, params);
+    else if (s.type === 'particle') mountParticle(stage, c, params);
+    else if (s.type === 'motion') mountMotion(stage, c, params);
     else mountHost(stage, c, params);
   } catch (e) {
-    stage.innerHTML = \`<div style="color:#e06c75;padding:48px;font-family:monospace">\${s.id} 加载失败: \${e.message}</div>\`;
+    stage.innerHTML = \`<div style="color:#e06c75;padding:48px;font-family:monospace">\${s.id}: \${e.message}</div>\`;
   }
 }
 
