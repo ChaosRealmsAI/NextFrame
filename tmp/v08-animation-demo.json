@@ -5,9 +5,9 @@
   "fps": 30,
   "ratio": "16:9",
   "anchors": {
-    "intro": { "begin": 0, "end": 4000 },
-    "outro": { "begin": 4000, "end": 8000 },
-    "grow": { "at": 2400 }
+    "act1": { "begin": 0, "end": 3000 },
+    "act2": { "begin": 3000, "end": 6000 },
+    "fadeIn": { "at": 2000 }
   },
   "tracks": [
     {
@@ -16,8 +16,8 @@
       "clips": [
         {
           "id": "audio-0",
-          "begin": "intro.begin",
-          "end": "outro.end",
+          "begin": "act1.begin",
+          "end": "act2.end",
           "src": "v08-smoke.mp3"
         }
       ]
@@ -28,37 +28,39 @@
       "clips": [
         {
           "id": "bg-0",
-          "begin": "intro.begin",
-          "end": "outro.end",
+          "begin": "act1.begin",
+          "end": "act2.end",
           "scene": "darkGradient",
           "params": {}
         }
       ]
     },
     {
-      "id": "headline",
+      "id": "title",
       "kind": "scene",
       "clips": [
         {
-          "id": "headline-0",
-          "begin": "intro.begin",
-          "end": "intro.end",
+          "id": "title-0",
+          "begin": "act1.begin",
+          "end": "act1.end",
           "scene": "headlineCenter",
           "params": {
-            "text": "NextFrame <span style='color:#da7756'>v0.8.1</span>",
+            "text": "Animation tracks now lower into <span style='color:#da7756'>legacy keyframes</span>",
             "color": "#f5ece0",
-            "fontSize": 42
+            "fontSize": 42,
+            "opacity": 0
           }
         },
         {
-          "id": "headline-1",
-          "begin": "outro.begin",
-          "end": "outro.end",
+          "id": "title-1",
+          "begin": "act2.begin",
+          "end": "act2.end",
           "scene": "headlineCenter",
           "params": {
-            "text": "Legacy lowering keeps <span style='color:#da7756'>animations</span>",
+            "text": "The target layer keeps its <span style='color:#da7756'>params</span>",
             "color": "#f5ece0",
-            "fontSize": 46
+            "fontSize": 42,
+            "opacity": 1
           }
         }
       ]
@@ -69,13 +71,13 @@
       "clips": [
         {
           "id": "progress-0",
-          "begin": "intro.begin",
-          "end": "outro.end",
+          "begin": "act1.begin",
+          "end": "act2.end",
           "scene": "progressBar16x9",
           "params": {
-            "progress": 0.8,
+            "progress": 0.62,
             "color": "#da7756",
-            "y": 24
+            "y": 28
           }
         }
       ]
@@ -86,36 +88,31 @@
       "clips": [
         {
           "id": "sub-0",
-          "begin": "intro.begin",
-          "end": "intro.end",
-          "text": "Animation tracks lower into legacy keyframe params."
+          "begin": "act1.begin",
+          "end": "act1.end",
+          "text": "Lower animation keyframes into the target layer."
         },
         {
           "id": "sub-1",
-          "begin": "outro.begin",
-          "end": "outro.end",
-          "text": "The regression demo still builds through the v0.3 path."
+          "begin": "act2.begin",
+          "end": "act2.end",
+          "text": "Legacy v0.3 HTML still receives keyframes."
         }
       ]
     },
     {
-      "id": "headline-grow",
+      "id": "title-opacity",
       "kind": "animation",
-      "target": "headline.clips[0].params.fontSize",
+      "target": "title.clips[0].params.opacity",
       "clips": [
         {
-          "at": "intro.begin",
-          "value": 42,
-          "ease": "linear"
-        },
-        {
-          "at": "grow.at",
-          "value": 54,
+          "at": "act1.begin",
+          "value": 0,
           "ease": "cubic-bezier(0.16,1,0.3,1)"
         },
         {
-          "at": "intro.end",
-          "value": 48
+          "at": "fadeIn.at",
+          "value": 1
         }
       ]
     }
