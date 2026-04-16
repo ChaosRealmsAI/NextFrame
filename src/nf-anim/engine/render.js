@@ -1,5 +1,6 @@
 import { interp } from "./interp.js";
 import { expandLayer } from "./expand.js";
+import { gradientRef, parseGradient } from "./gradient.js";
 import { SHAPES } from "../shapes/index.js";
 import { attrs } from "../shapes/shared.js";
 
@@ -41,16 +42,24 @@ function layerState(layer, t) {
   return { at, rotate, scaleX, scaleY, opacity, tracks };
 }
 
-function renderLayers(items, t, motion) {
+function resolveFill(fill, t, defs) {
+  if (!fill || typeof fill !== "object" || Array.isArray(fill)) return fill;
+  const gradient = parseGradient(fill, t);
+  if (!gradient) return fill;
+  defs.set(gradient.id, gradient.defsXml);
+  return gradientRef(gradient.id);
+}
+
+function renderLayers(items, t, motion, defs) {
   const out = [];
   for (const item of items || []) for (const layer of expandLayer(item || {})) {
     const state = layerState(layer, t);
-    if (state.opacity > 0) out.push(renderShape(layer, state, t, motion));
+    if (state.opacity > 0) out.push(renderShape(layer, state, t, motion, defs));
   }
   return out.join("");
 }
 
-function renderShape(layer, state, t, motion) {
+function renderShape(layer, state, t, motion, defs) {
   const shapeName = layer.shape || (layer.type === "shape" ? "circle" : layer.type);
   const shape = SHAPES[shapeName];
   const d = shapeName === "path" ? resolveTrack(state.tracks, "d", t) || layer.path : layer.path;
@@ -62,14 +71,14 @@ function renderShape(layer, state, t, motion) {
   const heightTrack = resolveTrack(state.tracks, "height", t);
   const resolvedLayer = {
     ...layer, t, motion: undefined, tracks: state.tracks, opacity: state.opacity,
-    fill: fillTrack ?? layer.fill,
+    fill: resolveFill(fillTrack ?? layer.fill, t, defs),
     stroke: strokeTrack ?? layer.stroke,
     radius: radiusTrack ?? layer.radius,
     width: widthTrack ?? layer.width,
     height: heightTrack ?? layer.height,
   };
   const fallback = d ? `<path${attrs({ d, fill: resolvedLayer.fill ?? "#000000", stroke: resolvedLayer.stroke, "stroke-width": resolvedLayer.stroke ? layer.strokeWidth ?? 1 : null, "vector-effect": "non-scaling-stroke" })}/>` : "";
-  const ctx = motion.renderChildren ? motion : { ...motion, renderChildren: (items) => renderLayers(items, t, motion) };
+  const ctx = motion.renderChildren ? motion : { ...motion, renderChildren: (items) => renderLayers(items, t, motion, defs) };
   resolvedLayer.motion = ctx;
   const body = typeof shape === "function" ? shape(resolvedLayer) : fallback;
   if (!body) return "";
@@ -81,10 +90,10 @@ export function renderMotion(host = null, t = 0, motion = {}) {
   const size = Array.isArray(motion.size) ? motion.size : [motion.width, motion.height];
   const width = Math.max(1, num(size[0], num(host && host.width, 1920)));
   const height = Math.max(1, num(size[1], num(host && host.height, 1080)));
-  const layers = [];
-  for (const layer of motion.layers || []) layers.push(...expandLayer(layer));
-  const body = renderLayers(layers, num(t), motion);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${body}</svg>`;
+  const defs = new Map();
+  const body = renderLayers(motion.layers, num(t), motion, defs);
+  const defsXml = defs.size ? `<defs>${Array.from(defs.entries()).sort(([left], [right]) => left.localeCompare(right)).map(([, xml]) => xml).join("")}</defs>` : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${defsXml}${body}</svg>`;
 }
 
 export { meta };
