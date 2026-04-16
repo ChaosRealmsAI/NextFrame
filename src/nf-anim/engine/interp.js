@@ -2,6 +2,7 @@ import { EASE } from "./easings.js";
 
 const meta = { name: "interp", kind: "engine", description: "Keyframe interpolation for scalar and array tracks" };
 const EPS = 1e-9;
+const COMPOSITE = { stack: true, add: true, mul: true };
 const num = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
 const clone = (value) => Array.isArray(value) ? value.map(clone) : value;
 const sortFrames = (track) => track.filter((frame) => Array.isArray(frame) && frame.length >= 2).slice().sort((a, b) => num(a[0]) - num(b[0]));
@@ -24,10 +25,10 @@ function lerpValue(left, right, progress) {
 function boundsFor(spec) {
   const frames = Array.isArray(spec) ? sortFrames(spec) : Array.isArray(spec && spec.keyframes) ? sortFrames(spec.keyframes) : null;
   if (frames && frames.length) return { start: num(frames[0][0]), end: num(frames[frames.length - 1][0]), frames };
-  if (spec && typeof spec === "object" && spec.mode === "stack" && Array.isArray(spec.tracks)) {
+  if (spec && typeof spec === "object" && COMPOSITE[spec.mode] && Array.isArray(spec.tracks)) {
     const ranges = spec.tracks.map(boundsFor).filter(Boolean);
     if (!ranges.length) return null;
-    return { start: ranges[0].start, end: ranges[ranges.length - 1].end };
+    return { start: Math.min(...ranges.map((range) => range.start)), end: Math.max(...ranges.map((range) => range.end)) };
   }
   if (spec && typeof spec === "object" && (spec.mode === "loop" || spec.mode === "yoyo")) {
     const inner = boundsFor(spec.track);
@@ -77,6 +78,29 @@ function sampleFrames(frames, t, clamp) {
   return lerpValue(left[1], right[1], progress);
 }
 
+function combineValue(left, right, mode) {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    const a = Array.isArray(left) ? left : [left];
+    const b = Array.isArray(right) ? right : [right];
+    const size = Math.max(a.length, b.length);
+    const out = new Array(size);
+    for (let i = 0; i < size; i++) out[i] = combineValue(Array.isArray(left) ? a[Math.min(i, a.length - 1)] : left, Array.isArray(right) ? b[Math.min(i, b.length - 1)] : right, mode);
+    return out;
+  }
+  if (typeof left === "number" && typeof right === "number") return mode === "add" ? left + right : left * right;
+  return clone(right);
+}
+
+function sampleComposite(spec, t, clamp, mode) {
+  let value = null;
+  for (const track of spec.tracks || []) {
+    const next = sampleSpec(track, t, clamp);
+    if (next === null) continue;
+    value = value === null ? clone(next) : combineValue(value, next, mode);
+  }
+  return value;
+}
+
 function sampleSpec(spec, t, clamp) {
   if (Array.isArray(spec) || Array.isArray(spec && spec.keyframes)) return sampleFrames(sortFrames(Array.isArray(spec) ? spec : spec.keyframes), t, clamp);
   if (!spec || typeof spec !== "object") return null;
@@ -87,6 +111,7 @@ function sampleSpec(spec, t, clamp) {
     }
     return spec.tracks.length ? sampleSpec(spec.tracks[0], t, clamp) : null;
   }
+  if ((spec.mode === "add" || spec.mode === "mul") && Array.isArray(spec.tracks)) return sampleComposite(spec, t, clamp, spec.mode);
   if (spec.mode === "loop" || spec.mode === "yoyo") {
     const inner = boundsFor(spec.track);
     if (!inner) return null;

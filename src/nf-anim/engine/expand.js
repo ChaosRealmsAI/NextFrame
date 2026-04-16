@@ -1,6 +1,7 @@
 import { mulberry32 } from "./scheduler.js";
 
 const meta = { name: "expandLayer", kind: "engine", description: "Expand composite layers into renderable leaves" };
+const MERGE_POLICY = { offset: "add", translate: "add", x: "add", y: "add", rotate: "add", dasharray: "add", dashoffset: "add", scale: "mul", scaleX: "mul", scaleY: "mul", opacity: "mul" };
 const isObject = (value) => value && typeof value === "object";
 const num = (value, fallback = 0) => Number.isFinite(value) ? value : fallback;
 const clone = (value) => Array.isArray(value) ? value.map(clone) : isObject(value) ? { ...value } : value;
@@ -14,12 +15,13 @@ function shiftTrack(track, offset) {
   return clone(track);
 }
 
-function stackTrack(left, right) {
+function mergeTrack(left, right, mode = "replace") {
   if (!left) return right;
   if (!right) return left;
-  const tracks = left.mode === "stack" ? left.tracks.slice() : [left];
+  const kind = mode === "replace" ? "stack" : mode;
+  const tracks = left.mode === kind ? left.tracks.slice() : [left];
   tracks.push(right);
-  return { mode: "stack", tracks };
+  return { mode: kind, tracks };
 }
 
 function flatten(items, out = []) {
@@ -31,16 +33,23 @@ function flatten(items, out = []) {
   return out;
 }
 
+function mergeInto(target, tracks, offset = 0, mode = null) {
+  const source = isObject(tracks) ? tracks : {};
+  for (const [key, value] of Object.entries(source)) {
+    const next = shiftTrack(value, offset);
+    target[key] = mergeTrack(target[key], next, mode || MERGE_POLICY[key] || "replace");
+  }
+  return target;
+}
+
+function composeTracks(...groups) {
+  return groups.reduce((merged, tracks) => mergeInto(merged, tracks), {});
+}
+
 function mergeTracks(layer) {
   const merged = {};
-  const baseTracks = isObject(layer.tracks) ? layer.tracks : {};
-  for (const key of Object.keys(baseTracks)) merged[key] = clone(baseTracks[key]);
-  for (const behavior of flatten(layer.behaviors || [])) {
-    const offset = num(behavior.startAt);
-    const tracks = isObject(behavior.tracks) ? behavior.tracks : {};
-    for (const [key, value] of Object.entries(tracks)) merged[key] = stackTrack(merged[key], shiftTrack(value, offset));
-  }
-  return merged;
+  for (const behavior of flatten(layer.behaviors || [])) mergeInto(merged, behavior && behavior.tracks, num(behavior && behavior.startAt));
+  return mergeInto(merged, layer.tracks, 0, "replace");
 }
 
 function leafLayer(layer, overrides = {}) {
@@ -63,7 +72,7 @@ function rippleLayers(layer, tracks) {
       scale: [[start, baseScale], [start + duration, maxScale, "outCirc"]],
       opacity: [[start, opacity], [start + duration, 0, "outExpo"]],
     };
-    return { ...base, id: `${layer.id || "ripple"}:${index}`, tracks: mergeTracks({ tracks, behaviors: [{ tracks: effectTracks }] }) };
+    return { ...base, id: `${layer.id || "ripple"}:${index}`, tracks: composeTracks(tracks, effectTracks) };
   });
 }
 
@@ -85,7 +94,7 @@ function burstLayers(layer, tracks) {
       scale: [[start, 0.2], [mid, 1.1, "outBack"], [start + duration, 0.35, "outCirc"]],
       opacity: [[start, num(layer.opacity, 1)], [start + duration, 0, "outExpo"]],
     };
-    return { ...base, id: `${layer.id || "burst"}:${index}`, tracks: mergeTracks({ tracks, behaviors: [{ tracks: effectTracks }] }) };
+    return { ...base, id: `${layer.id || "burst"}:${index}`, tracks: composeTracks(tracks, effectTracks) };
   });
 }
 
@@ -96,4 +105,4 @@ export function expandLayer(layer = {}) {
   return [{ ...leafLayer(layer), tracks }];
 }
 
-export { meta };
+export { meta, MERGE_POLICY };
