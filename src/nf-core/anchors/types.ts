@@ -3,25 +3,28 @@ export interface Issue {
   message: string;
   field?: string;
   fix?: string;
+  severity?: "error" | "warning" | "info";
 }
 
+export type AnchorPoint = "at" | "begin" | "end";
+export type AnchorValue = number | string;
+
 export interface AnchorEntry {
-  at?: number;
-  begin?: number;
-  end?: number;
+  at?: AnchorValue;
+  begin?: AnchorValue;
+  end?: AnchorValue;
   label?: string;
   filler?: string;
+  expr?: string;
+  source?: string;
+  words?: Array<Record<string, unknown>>;
 }
 
 export type AnchorDict = Record<string, AnchorEntry>;
 export type AnchorRef = string;
 
 export type ExprAst =
-  | { type: "anchor_ref"; ref: AnchorRef; point: "at" | "begin" | "end" }
-  | {
-      type: "offset";
-      expr: { type: "anchor_ref"; ref: AnchorRef; point: "at" | "begin" | "end" };
-      op: "+" | "-";
-      value: number;
-      unit: "s" | "ms";
-    };
+  | { kind: "ref"; id: AnchorRef; point: AnchorPoint }
+  | { kind: "offset"; base: ExprAst; deltaMs: number };
+
+export type RefExprAst = Extract<ExprAst, { kind: "ref" }>;
