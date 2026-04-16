@@ -1,0 +1,10 @@
+import ENGINE from "./engine/index.js";
+import { BEHAVIORS, listBehaviors } from "./behaviors/index.js";
+import { SHAPES, listShapes } from "./shapes/index.js";
+import { SCENES, listScenes } from "./scenes/index.js";
+const version = "0.1.0";
+const engine = ENGINE;
+const behaviors = { registry: BEHAVIORS, list: listBehaviors };
+const shapes = { registry: SHAPES, list: listShapes };
+const scenes = { registry: SCENES, list: listScenes };
+export { engine, behaviors, shapes, scenes, version };
