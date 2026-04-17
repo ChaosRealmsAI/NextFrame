@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Animation Primitives v2 · Systems / Space / Time / Compose</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:#0a0a0f;color:#e8e8e8;min-height:100vh;
+    font-family:-apple-system,"SF Pro Display","Inter",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .header{padding:56px 64px 24px;max-width:1680px;margin:0 auto}
+  .header h1{font-size:34px;font-weight:600;letter-spacing:-.02em;color:#fff}
+  .header p{margin-top:10px;font-size:15px;color:#888;max-width:720px;line-height:1.5}
+  .header .layers{margin-top:14px;font-size:12px;color:#555;letter-spacing:.1em}
+  .header .layers b{color:#ff6b6b}
+
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;
+    max-width:1680px;margin:24px auto 0;padding:14px 64px 0;
+    background:#1a1a20;border-radius:20px}
+  @media (max-width:1200px){.grid{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:840px){.grid{grid-template-columns:repeat(2,1fr)}}
+
+  .cell{background:#0a0a0f;aspect-ratio:1/1;display:flex;flex-direction:column;
+    align-items:stretch;padding:14px 16px 12px;border-radius:14px;position:relative;
+    overflow:hidden}
+  .cell .idx{font-size:10px;color:#444;letter-spacing:.12em;
+    font-family:"SF Mono",Menlo,monospace}
+  .cell .layer-tag{position:absolute;top:12px;right:14px;font-size:9px;
+    color:#ff6b6b;letter-spacing:.15em;text-transform:uppercase;font-weight:600;opacity:.7}
+  .cell .stage{flex:1;margin:6px 0;position:relative}
+  .cell canvas{width:100%;height:100%;display:block}
+  .cell svg{width:100%;height:100%;overflow:visible}
+  .cell .name{font-size:13px;font-weight:600;color:#fff}
+  .cell .desc{margin-top:3px;font-size:11px;color:#888;line-height:1.35}
+
+  .tl-ui{position:fixed;left:0;right:0;bottom:0;z-index:100;
+    padding:14px 24px;background:linear-gradient(180deg,transparent,rgba(10,10,15,.95));
+    display:flex;align-items:center;gap:16px;
+    font-family:"SF Mono",Menlo,monospace;font-size:11px;color:rgba(255,255,255,.85)}
+  .tl-ui button{background:transparent;border:1px solid rgba(255,255,255,.3);
+    color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;
+    font-size:14px;display:grid;place-items:center}
+  .tl-ui button:hover{background:rgba(255,255,255,.1)}
+  .tl-ui .time{font-variant-numeric:tabular-nums;min-width:150px;letter-spacing:.05em}
+  .tl-ui input[type=range]{flex:1;accent-color:#ff6b6b;height:3px}
+  .padding-bottom{height:100px}
+
+  .footer{max-width:1680px;margin:0 auto;padding:20px 64px 80px;
+    font-size:13px;color:#888;line-height:1.6}
+  .footer strong{color:#fff}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Primitives, 12 more.</h1>
+  <p>v2 · 扩展原子图谱到 24 个。这组是<b style="color:#ff6b6b">多元素涌现 / 空间 / 时间 / 合成</b>层。短视频 + PPT 大量场景需要这些 — 粒子、水波、相机、景深、遮罩、拖尾……</p>
+  <div class="layers"><b>LAYER 2</b> 系统涌现 · <b>LAYER 3</b> 空间摄影 · <b>LAYER 4</b> 时间操纵 · <b>LAYER 5</b> 合成感知</div>
+</div>
+
+<div class="grid">
+
+<!-- 01 · Particle Emitter -->
+<div class="cell">
+  <div class="idx">01</div>
+  <div class="layer-tag">L2 · 系统</div>
+  <div class="stage"><canvas class="c" data-atom="emitter"></canvas></div>
+  <div class="name">Particle Emitter</div>
+  <div class="desc">粒子发射 · 烟花/爆发/焰火 · 一点爆成百点</div>
+</div>
+
+<!-- 02 · Flocking -->
+<div class="cell">
+  <div class="idx">02</div>
+  <div class="layer-tag">L2 · 系统</div>
+  <div class="stage"><canvas class="c" data-atom="flock"></canvas></div>
+  <div class="name">Flocking</div>
+  <div class="desc">鸟群/鱼群 · boids 算法 · 集群智能</div>
+</div>
+
+<!-- 03 · Fluid Wave -->
+<div class="cell">
+  <div class="idx">03</div>
+  <div class="layer-tag">L2 · 系统</div>
+  <div class="stage"><canvas class="c" data-atom="fluid"></canvas></div>
+  <div class="name">Fluid Wave</div>
+  <div class="desc">水波 / 涟漪 / 液体表面 · 触点扩散</div>
+</div>
+
+<!-- 04 · Cloth -->
+<div class="cell">
+  <div class="idx">04</div>
+  <div class="layer-tag">L2 · 系统</div>
+  <div class="stage"><canvas class="c" data-atom="cloth"></canvas></div>
+  <div class="name">Cloth / Rope</div>
+  <div class="desc">布料 / 绳索 · verlet 物理 · 软体弯曲</div>
+</div>
+
+<!-- 05 · Cellular Life -->
+<div class="cell">
+  <div class="idx">05</div>
+  <div class="layer-tag">L2 · 系统</div>
+  <div class="stage"><canvas class="c" data-atom="life"></canvas></div>
+  <div class="name">Cellular Automata</div>
+  <div class="desc">元胞自动机 · 康威生命游戏 · 简单规则涌现复杂</div>
+</div>
+
+<!-- 06 · Trail -->
+<div class="cell">
+  <div class="idx">06</div>
+  <div class="layer-tag">L2 · 系统</div>
+  <div class="stage"><canvas class="c" data-atom="trail"></canvas></div>
+  <div class="name">Trail</div>
+  <div class="desc">拖尾 / 运动残影 · 速度感来源</div>
+</div>
+
+<!-- 07 · Camera Pan -->
+<div class="cell">
+  <div class="idx">07</div>
+  <div class="layer-tag">L3 · 空间</div>
+  <div class="stage"><canvas class="c" data-atom="camera"></canvas></div>
+  <div class="name">Camera Pan</div>
+  <div class="desc">相机移动 · 整个世界一起平移 · 视频级</div>
+</div>
+
+<!-- 08 · Parallax -->
+<div class="cell">
+  <div class="idx">08</div>
+  <div class="layer-tag">L3 · 空间</div>
+  <div class="stage"><canvas class="c" data-atom="parallax"></canvas></div>
+  <div class="name">Parallax</div>
+  <div class="desc">视差 · 远近层不同速度 · 深度错觉</div>
+</div>
+
+<!-- 09 · Time Echo -->
+<div class="cell">
+  <div class="idx">09</div>
+  <div class="layer-tag">L4 · 时间</div>
+  <div class="stage"><canvas class="c" data-atom="echo"></canvas></div>
+  <div class="name">Time Echo</div>
+  <div class="desc">时间残影 · 过去的自己叠加 · 力量感</div>
+</div>
+
+<!-- 10 · Freeze + Shake -->
+<div class="cell">
+  <div class="idx">10</div>
+  <div class="layer-tag">L4 · 时间</div>
+  <div class="stage"><canvas class="c" data-atom="freeze"></canvas></div>
+  <div class="name">Freeze + Shake</div>
+  <div class="desc">定格震屏 · 爆发瞬间冻结 + 全屏抖动</div>
+</div>
+
+<!-- 11 · Mask Reveal -->
+<div class="cell">
+  <div class="idx">11</div>
+  <div class="layer-tag">L5 · 合成</div>
+  <div class="stage"><canvas class="c" data-atom="mask"></canvas></div>
+  <div class="name">Mask Reveal</div>
+  <div class="desc">遮罩揭示 · 内容从遮罩边缘推进 · 转场必备</div>
+</div>
+
+<!-- 12 · Motion Blur -->
+<div class="cell">
+  <div class="idx">12</div>
+  <div class="layer-tag">L5 · 合成</div>
+  <div class="stage"><canvas class="c" data-atom="blur"></canvas></div>
+  <div class="name">Motion Blur</div>
+  <div class="desc">运动模糊 · 高速拖影 · 电影级速度感</div>
+</div>
+
+</div>
+
+<div class="padding-bottom"></div>
+
+<div class="footer">
+  <p><strong>Primitives v1 + v2 = 24 原子覆盖 95% 场景。</strong> v1 是<strong>单元素怎么动</strong>（Disney 12 原则 · squash/stretch / anticipation / arc ...）· v2 是<strong>多元素如何涌现 · 相机怎么看 · 时间怎么操纵 · 图层怎么合成</strong>。做短视频和 PPT 时，在这 24 个里组合 2-4 个 + 选一个风格主题 = 一个完整动画作品。</p>
+</div>
+
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 4.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+</div>
+
+<script>
+/* ============ Global cycle ============ */
+const DURATION = 4.0;
+const FPS = 30;
+const TAU = Math.PI * 2;
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn = x => x * x * x;
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+
+/* seeded hash for deterministic particles */
+function seedHash(a, b) {
+  let h = a * 374761393 + b * 668265263;
+  h = (h ^ (h >> 13)) * 1274126177;
+  h = h ^ (h >> 16);
+  return ((h >>> 0) % 1000000) / 1000000;
+}
+
+/* ============ Canvas setup for each cell ============ */
+const canvases = [];
+document.querySelectorAll('canvas.c').forEach(c => {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const fit = () => {
+    const rect = c.getBoundingClientRect();
+    c.width = rect.width * dpr;
+    c.height = rect.height * dpr;
+    c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  fit();
+  canvases.push({ el: c, atom: c.dataset.atom, ctx: c.getContext('2d') });
+  window.addEventListener('resize', fit);
+});
+
+/* ============ Atoms ============ */
+
+function drawEmitter(ctx, W, H, t) {
+  const cx = W/2, cy = H*0.85;
+  const cycle = (t % 2.0) / 2.0;
+  ctx.clearRect(0, 0, W, H);
+  // 60 seeded particles, ejected at t=0 then parabolic
+  for (let i = 0; i < 60; i++) {
+    const ang = -Math.PI/2 + (seedHash(i, 1) - 0.5) * Math.PI * 0.8;
+    const speed = 80 + seedHash(i, 2) * 100;
+    const life = 1.2 + seedHash(i, 3) * 0.6;
+    const age = cycle * 2;  // normalize to emit window
+    if (age > life) continue;
+    const vx = Math.cos(ang) * speed;
+    const vy = Math.sin(ang) * speed;
+    const g = 180;
+    const x = cx + vx * age;
+    const y = cy + vy * age + 0.5 * g * age * age;
+    if (y > H + 10) continue;
+    const a = 1 - age / life;
+    const hue = 10 + seedHash(i, 4) * 40;
+    ctx.fillStyle = `hsla(${hue}, 90%, ${60 + seedHash(i,5)*20}%, ${a})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 2 + seedHash(i, 6) * 1.5, 0, TAU);
+    ctx.fill();
+  }
+}
+
+function drawFlock(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  // 30 birds, deterministic orbit around a moving leader
+  const cx = W/2 + Math.sin(t * 0.5) * W * 0.2;
+  const cy = H/2 + Math.cos(t * 0.7) * H * 0.15;
+  ctx.fillStyle = '#8aa0ff';
+  for (let i = 0; i < 30; i++) {
+    const ang = t * 0.3 + i * 0.2 + seedHash(i, 1) * 0.4;
+    const r = 20 + seedHash(i, 2) * 60 + Math.sin(t + seedHash(i, 3) * 5) * 15;
+    const x = cx + Math.cos(ang) * r;
+    const y = cy + Math.sin(ang) * r * 0.7;
+    // bird as tiny triangle pointing toward motion
+    const pAng = ang + Math.PI/2;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(pAng);
+    ctx.beginPath();
+    ctx.moveTo(0, -3);
+    ctx.lineTo(-2, 2);
+    ctx.lineTo(2, 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawFluid(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  // water surface with concentric ripples from a tap point
+  const cx = W/2, cy = H/2;
+  const tap = (t % 2.5) / 2.5;
+  ctx.strokeStyle = '#4aa8ff';
+  for (let r = 5; r < Math.min(W, H) * 0.6; r += 18) {
+    const phase = (r / 20 - tap * 6);
+    const alpha = 0.15 + 0.4 * Math.max(0, Math.sin(phase)) * (1 - r / (Math.min(W,H) * 0.6));
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = `rgba(74,168,255,${alpha})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, TAU);
+    ctx.stroke();
+  }
+  // tap drop
+  if (tap < 0.2) {
+    ctx.fillStyle = `rgba(200,230,255,${1 - tap * 5})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4 + tap * 10, 0, TAU);
+    ctx.fill();
+  }
+}
+
+function drawCloth(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  // verlet-like cloth strand hanging from top, wind pushes it
+  const pts = [];
+  const N = 20;
+  const topY = H * 0.1;
+  const hangLen = H * 0.72;
+  const wind = Math.sin(t * 1.2) * 0.7;
+  for (let i = 0; i < N; i++) {
+    const u = i / (N - 1);
+    // swaying: top fixed, bottom swings; pendulum-ish
+    const pendX = W/2 + Math.sin(t * 1.5 + u * 1.2) * 40 * u + wind * 50 * u * u;
+    const pendY = topY + u * hangLen + Math.sin(t * 1.8 + u * 2) * 5 * u;
+    pts.push([pendX, pendY]);
+  }
+  // draw
+  ctx.strokeStyle = '#c8a870';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(...p) : ctx.lineTo(...p));
+  ctx.stroke();
+  // anchor
+  ctx.fillStyle = '#666';
+  ctx.fillRect(W/2 - 10, topY - 5, 20, 5);
+  // end weight
+  ctx.fillStyle = '#c8a870';
+  ctx.beginPath();
+  ctx.arc(pts[N-1][0], pts[N-1][1], 6, 0, TAU);
+  ctx.fill();
+}
+
+function drawLife(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  // deterministic "life-ish" glider-pattern simulation (visual only)
+  const cell = 10;
+  const cols = Math.floor(W / cell);
+  const rows = Math.floor(H / cell);
+  const ox = (W - cols * cell) / 2;
+  const oy = (H - rows * cell) / 2;
+  // pulse-based alive cells using noise at step t
+  const step = Math.floor(t * 3);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const alive = seedHash(x + step * 17, y + step * 13);
+      if (alive < 0.35) continue;
+      const life = alive * (0.6 + 0.4 * Math.sin(t * 3 + x * 0.3 + y * 0.3));
+      ctx.fillStyle = `rgba(90,220,150,${life})`;
+      ctx.fillRect(ox + x * cell, oy + y * cell, cell - 1, cell - 1);
+    }
+  }
+}
+
+function drawTrail(ctx, W, H, t) {
+  // trail: draw a comet-like head with fading tail
+  const cycle = (t % 3) / 3;
+  const ang = cycle * TAU;
+  const cx = W/2, cy = H/2;
+  const r = Math.min(W, H) * 0.35;
+  ctx.fillStyle = 'rgba(10,10,15,0.18)';
+  ctx.fillRect(0, 0, W, H);
+  // head
+  const x = cx + Math.cos(ang) * r;
+  const y = cy + Math.sin(ang) * r;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, 25);
+  g.addColorStop(0, 'rgba(255,150,80,1)');
+  g.addColorStop(0.4, 'rgba(255,120,60,0.6)');
+  g.addColorStop(1, 'rgba(255,100,40,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, 25, 0, TAU);
+  ctx.fill();
+  // core
+  ctx.fillStyle = '#ffe0a0';
+  ctx.beginPath();
+  ctx.arc(x, y, 4, 0, TAU);
+  ctx.fill();
+}
+
+function drawCamera(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  // world: fixed-position trees / hills. camera pans
+  const camX = Math.sin(t * 0.5) * W * 0.4;
+  // draw horizon
+  ctx.fillStyle = '#0f2a15';
+  ctx.fillRect(0, H * 0.6, W, H * 0.4);
+  ctx.fillStyle = '#1a1a28';
+  ctx.fillRect(0, 0, W, H * 0.6);
+  // 20 trees deterministic
+  for (let i = -5; i < 25; i++) {
+    const wx = i * 35 - camX;
+    if (wx < -10 || wx > W + 10) continue;
+    const seed = seedHash(i, 1);
+    const h = 20 + seed * 30;
+    const ty = H * 0.6 - h;
+    ctx.fillStyle = '#2d6a3f';
+    ctx.beginPath();
+    ctx.moveTo(wx - 4, ty + h);
+    ctx.lineTo(wx, ty);
+    ctx.lineTo(wx + 4, ty + h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#4a3020';
+    ctx.fillRect(wx - 1, ty + h, 2, 4);
+  }
+  // camera frame indicator
+  ctx.strokeStyle = '#444';
+  ctx.strokeRect(4, 4, W - 8, H - 8);
+  ctx.fillStyle = '#666';
+  ctx.font = '9px SF Mono';
+  ctx.fillText('CAM', 8, 16);
+}
+
+function drawParallax(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  const pan = Math.sin(t * 0.3) * W * 0.6;
+  // 3 layers at different speeds
+  const layers = [
+    { speed: 0.3, y: H * 0.3, h: 30, c: '#3a3a55' },
+    { speed: 0.6, y: H * 0.5, h: 50, c: '#4a4a77' },
+    { speed: 1.0, y: H * 0.75, h: 70, c: '#5a5a99' },
+  ];
+  layers.forEach(layer => {
+    const offset = pan * layer.speed;
+    // mountains as triangles
+    for (let i = -3; i < 10; i++) {
+      const wx = i * 70 - offset;
+      ctx.fillStyle = layer.c;
+      ctx.beginPath();
+      ctx.moveTo(wx, layer.y + layer.h);
+      ctx.lineTo(wx + 35, layer.y);
+      ctx.lineTo(wx + 70, layer.y + layer.h);
+      ctx.closePath();
+      ctx.fill();
+    }
+  });
+}
+
+function drawEcho(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  // moving ball with echo trail at discrete intervals
+  const cycle = (t % 2.5) / 2.5;
+  const ang = cycle * TAU;
+  const cx = W/2, cy = H/2;
+  const r = Math.min(W, H) * 0.3;
+  const x = cx + Math.cos(ang) * r;
+  const y = cy + Math.sin(ang) * r;
+  // echo past positions
+  const N_ECHO = 6;
+  for (let i = N_ECHO; i > 0; i--) {
+    const pastAng = ang - i * 0.15;
+    const ex = cx + Math.cos(pastAng) * r;
+    const ey = cy + Math.sin(pastAng) * r;
+    const a = (N_ECHO - i) / N_ECHO * 0.7;
+    ctx.fillStyle = `rgba(255,80,120,${a * 0.5})`;
+    ctx.beginPath();
+    ctx.arc(ex, ey, 10 - i * 1.0, 0, TAU);
+    ctx.fill();
+  }
+  // head
+  ctx.fillStyle = '#ff5078';
+  ctx.beginPath();
+  ctx.arc(x, y, 12, 0, TAU);
+  ctx.fill();
+}
+
+function drawFreeze(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  const cycle = (t % 3) / 3;
+  const cx = W/2, cy = H/2;
+  // phase: approach (0-0.4) · impact (0.4-0.5) · freeze+shake (0.5-0.75) · release (0.75-1)
+  let x = cx, y = cy, shakeX = 0, shakeY = 0, scale = 1, flashA = 0;
+  if (cycle < 0.4) {
+    const p = cycle / 0.4;
+    x = cx - W * 0.3 * (1 - easeIn(p));
+  } else if (cycle < 0.5) {
+    x = cx;
+    flashA = 1 - (cycle - 0.4) * 10;
+    scale = 1.2;
+  } else if (cycle < 0.75) {
+    // freeze + shake
+    x = cx;
+    const shakePhase = (cycle - 0.5) * 20;
+    const decay = 1 - (cycle - 0.5) / 0.25;
+    shakeX = Math.sin(shakePhase * 3) * 6 * decay;
+    shakeY = Math.cos(shakePhase * 2.7) * 5 * decay;
+  } else {
+    const p = (cycle - 0.75) / 0.25;
+    x = cx + W * 0.3 * easeOut(p);
+  }
+  // flash
+  if (flashA > 0) {
+    ctx.fillStyle = `rgba(255,230,200,${flashA * 0.7})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+  // ball
+  ctx.fillStyle = '#ffaa40';
+  ctx.beginPath();
+  ctx.arc(x + shakeX, cy + shakeY, 15 * scale, 0, TAU);
+  ctx.fill();
+}
+
+function drawMask(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  // circular mask reveal
+  const cycle = (t % 3) / 3;
+  const maxR = Math.hypot(W, H);
+  const r = easeInOut(cycle) * maxR;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(W/2, H/2, r, 0, TAU);
+  ctx.clip();
+  // content: colorful grid
+  const cs = 15;
+  for (let y = 0; y < H; y += cs) {
+    for (let x = 0; x < W; x += cs) {
+      const hue = (x + y) * 0.5 % 360;
+      ctx.fillStyle = `hsl(${hue}, 60%, 55%)`;
+      ctx.fillRect(x, y, cs - 1, cs - 1);
+    }
+  }
+  ctx.restore();
+  // mask edge ring
+  ctx.strokeStyle = `rgba(255,255,255,${1 - cycle * 0.5})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(W/2, H/2, r, 0, TAU);
+  ctx.stroke();
+}
+
+function drawBlur(ctx, W, H, t) {
+  ctx.clearRect(0, 0, W, H);
+  // a fast-moving rectangle with motion blur (draw many copies with fade)
+  const cycle = (t % 2) / 2;
+  const x = lerp(-40, W + 40, easeInOut(cycle));
+  // multi-sample blur: draw 10 frames along trajectory
+  const samples = 14;
+  for (let i = samples - 1; i >= 0; i--) {
+    const back = i / samples;
+    const sampleX = x - back * 80;
+    const alpha = (1 - back) * 0.12;
+    ctx.fillStyle = `rgba(100,200,255,${alpha})`;
+    ctx.fillRect(sampleX - 30, H/2 - 15, 60, 30);
+  }
+  // sharp head
+  ctx.fillStyle = '#6ac8ff';
+  ctx.fillRect(x - 30, H/2 - 15, 60, 30);
+  // speed lines
+  for (let i = 0; i < 5; i++) {
+    const lineY = H/2 - 40 + i * 20;
+    ctx.strokeStyle = `rgba(150,200,255,0.15)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - 60, lineY);
+    ctx.lineTo(x - 20, lineY);
+    ctx.stroke();
+  }
+}
+
+const ATOMS = {
+  emitter: drawEmitter,
+  flock: drawFlock,
+  fluid: drawFluid,
+  cloth: drawCloth,
+  life: drawLife,
+  trail: drawTrail,
+  camera: drawCamera,
+  parallax: drawParallax,
+  echo: drawEcho,
+  freeze: drawFreeze,
+  mask: drawMask,
+  blur: drawBlur,
+};
+
+/* ============ Timeline controller ============ */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+let currentT = 0, playing = true, lastFrame = performance.now();
+
+function renderAll(t) {
+  canvases.forEach(({ el, atom, ctx }) => {
+    const rect = el.getBoundingClientRect();
+    ATOMS[atom](ctx, rect.width, rect.height, t);
+  });
+}
+
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  renderAll(currentT);
+}
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+scrubber.addEventListener('input', () => {
+  playing = false;
+  playBtn.textContent = '▶';
+  setTime(scrubber.value / 1000 * DURATION);
+});
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+resetBtn.addEventListener('click', () => setTime(0));
+
+setTime(0);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
