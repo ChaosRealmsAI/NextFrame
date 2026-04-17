@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>US National Debt Clock — NextFrame Sample 01</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #05080c;
+    overflow: hidden;
+    font-family: 'PingFang SC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: #f2f3f5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #stage-wrap {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #05080c;
+  }
+
+  #stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    transform-origin: center center;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 45%,
+        #162030 0%,
+        #10171f 40%,
+        #0a0e14 75%,
+        #05080c 100%);
+    overflow: hidden;
+    box-shadow: 0 0 120px rgba(0, 0, 0, 0.6);
+  }
+
+  /* fine grid backdrop */
+  #stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(212, 168, 69, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(212, 168, 69, 0.035) 1px, transparent 1px);
+    background-size: 80px 80px;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+
+  /* vignette */
+  #stage::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% 50%,
+        transparent 45%,
+        rgba(0, 0, 0, 0.45) 100%);
+    pointer-events: none;
+  }
+
+  #grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.28;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* --- TOP HEADER --- */
+  .header {
+    position: absolute;
+    top: 96px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    z-index: 10;
+  }
+  .header .zh {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 44px;
+    font-weight: 400;
+    letter-spacing: 8px;
+    color: #f2f3f5;
+  }
+  .header .en {
+    margin-top: 18px;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: #6a7380;
+  }
+  .header .rule {
+    width: 120px;
+    height: 1px;
+    background: #d4a845;
+    margin: 28px auto 0;
+    transform-origin: center;
+  }
+
+  /* --- CORE NUMBER --- */
+  .number-block {
+    position: absolute;
+    top: 340px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    z-index: 10;
+  }
+  .number {
+    font-family: 'SF Mono', 'Menlo', 'Monaco', 'Helvetica Neue', monospace;
+    font-size: 200px;
+    font-weight: 600;
+    letter-spacing: -3px;
+    color: #d4a845;
+    line-height: 1;
+    text-shadow: 0 0 60px rgba(212, 168, 69, 0.18);
+    font-variant-numeric: tabular-nums;
+  }
+  .per {
+    margin-top: 36px;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-style: italic;
+    font-size: 36px;
+    color: #f2f3f5;
+    letter-spacing: 2px;
+  }
+  .per .accent {
+    color: #d4a845;
+    font-style: normal;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-weight: 400;
+  }
+  .caption {
+    margin-top: 22px;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 20px;
+    color: #8a93a0;
+    letter-spacing: 1px;
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* --- BAR CHART --- */
+  .chart {
+    position: absolute;
+    right: 140px;
+    bottom: 140px;
+    width: 640px;
+    height: 280px;
+    z-index: 10;
+  }
+  .chart-title {
+    position: absolute;
+    left: 0;
+    top: -52px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 12px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #6a7380;
+  }
+  .chart-title .accent {
+    color: #d4a845;
+  }
+  .bars {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 4px;
+    border-bottom: 1px solid rgba(212, 168, 69, 0.35);
+  }
+  .bar-col {
+    position: relative;
+    width: 86px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .bar {
+    width: 100%;
+    background: linear-gradient(180deg, #e4bc63 0%, #d4a845 55%, #8e6d23 100%);
+    height: 0px;
+    box-shadow:
+      0 0 18px rgba(212, 168, 69, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    position: relative;
+  }
+  .bar .value {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 13px;
+    color: #d4a845;
+    opacity: 0;
+  }
+  .bar-col .label {
+    position: absolute;
+    top: calc(100% + 14px);
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #6a7380;
+    text-transform: uppercase;
+    opacity: 0;
+  }
+
+  /* --- LEFT SIDE METADATA --- */
+  .side-meta {
+    position: absolute;
+    left: 140px;
+    bottom: 180px;
+    z-index: 10;
+    opacity: 0;
+  }
+  .side-meta .tag {
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: #6a7380;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .side-meta .num {
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 28px;
+    color: #f2f3f5;
+    letter-spacing: 1px;
+  }
+  .side-meta .sub {
+    margin-top: 6px;
+    font-family: 'Georgia', serif;
+    font-size: 14px;
+    color: #6a7380;
+    font-style: italic;
+  }
+
+  /* --- TICKER TOP-RIGHT --- */
+  .ticker {
+    position: absolute;
+    top: 60px;
+    right: 140px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 10;
+    opacity: 0.8;
+  }
+  .ticker .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #d4a845;
+    box-shadow: 0 0 12px #d4a845;
+  }
+  .ticker .txt {
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: #6a7380;
+    text-transform: uppercase;
+  }
+
+  /* --- BOTTOM SOURCE --- */
+  .source {
+    position: absolute;
+    bottom: 48px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 12px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: #6a7380;
+    z-index: 10;
+    opacity: 0;
+  }
+  .source .sep {
+    color: #d4a845;
+    margin: 0 12px;
+  }
+
+  /* --- CONTROLS --- */
+  #controls {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 60px;
+    background: rgba(5, 8, 12, 0.92);
+    border-top: 1px solid rgba(212, 168, 69, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 24px;
+    z-index: 9999;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    color: #d4a845;
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+  #btn-play {
+    background: #d4a845;
+    border: none;
+    color: #05080c;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 11px;
+    padding: 8px 16px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  #btn-play:hover {
+    background: #e4bc63;
+  }
+  #scrubber {
+    flex: 1;
+    accent-color: #d4a845;
+  }
+  #hud {
+    min-width: 220px;
+    text-align: right;
+    color: #8a93a0;
+  }
+</style>
+</head>
+<body>
+<div id="stage-wrap">
+  <div id="stage">
+    <!-- header -->
+    <div class="header">
+      <div class="zh" id="header-zh">美国国债时钟</div>
+      <div class="en" id="header-en">US National Debt Clock</div>
+      <div class="rule" id="header-rule"></div>
+    </div>
+
+    <!-- ticker -->
+    <div class="ticker" id="ticker">
+      <div class="dot"></div>
+      <div class="txt">LIVE · FY 2026 Q1</div>
+    </div>
+
+    <!-- core number -->
+    <div class="number-block">
+      <div class="number" id="number">$0</div>
+      <div class="per" id="per"><span class="accent">per</span> minute</div>
+      <div class="caption" id="caption">Every minute, America borrows 3 million dollars to stay afloat</div>
+    </div>
+
+    <!-- side metadata -->
+    <div class="side-meta" id="side-meta">
+      <div class="tag">Δ Per Hour</div>
+      <div class="num">$180,000,000</div>
+      <div class="sub">roughly one Gulfstream G700</div>
+    </div>
+
+    <!-- chart -->
+    <div class="chart">
+      <div class="chart-title" id="chart-title">GDP <span class="accent">&mdash;</span> TOP 5 · USD Trillion</div>
+      <div class="bars" id="bars"></div>
+    </div>
+
+    <!-- source -->
+    <div class="source" id="source">
+      Source: U.S. Treasury <span class="sep">&middot;</span> 2026.03
+    </div>
+
+    <!-- grain overlay -->
+    <svg id="grain" width="100%" height="100%" preserveAspectRatio="none">
+      <filter id="n">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/>
+        <feColorMatrix values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0"/>
+      </filter>
+      <rect width="100%" height="100%" filter="url(#n)"/>
+    </svg>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="btn-play">PAUSE</button>
+  <input id="scrubber" type="range" min="0" max="10" step="0.01" value="0">
+  <div id="hud">t=0.00s frame=0</div>
+</div>
+
+<script>
+  'use strict';
+
+  /* ---------- math helpers ---------- */
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const clamp01 = (x) => clamp(x, 0, 1);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
+  const easeOutQuint = (x) => 1 - Math.pow(1 - x, 5);
+  const easeOutBack = (x) => {
+    const c1 = 1.70158, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+  };
+  // critically-damped-ish spring solved analytically for impulse
+  const springOut = (x) => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    return 1 - Math.exp(-6 * x) * Math.cos(x * 7.5);
+  };
+  const norm = (t, a, b) => clamp01((t - a) / (b - a));
+
+  /* ---------- state ---------- */
+  const state = { t: 0, playing: true };
+
+  /* ---------- DOM refs ---------- */
+  const stage = document.getElementById('stage');
+  const headerZh = document.getElementById('header-zh');
+  const headerEn = document.getElementById('header-en');
+  const headerRule = document.getElementById('header-rule');
+  const ticker = document.getElementById('ticker');
+  const numberEl = document.getElementById('number');
+  const perEl = document.getElementById('per');
+  const captionEl = document.getElementById('caption');
+  const sideMetaEl = document.getElementById('side-meta');
+  const chartTitleEl = document.getElementById('chart-title');
+  const sourceEl = document.getElementById('source');
+  const barsRoot = document.getElementById('bars');
+  const btnPlay = document.getElementById('btn-play');
+  const scrubber = document.getElementById('scrubber');
+  const hud = document.getElementById('hud');
+
+  /* ---------- chart data ---------- */
+  const CHART_MAX_PX = 260;
+  const GDP_MAX = 30; // trillion USD, normalization
+  const countries = [
+    { label: 'US',  value: 27.0 },
+    { label: 'CN',  value: 18.5 },
+    { label: 'JP',  value: 4.2  },
+    { label: 'DE',  value: 4.4  },
+    { label: 'UK',  value: 3.3  }
+  ];
+  const bars = countries.map((c) => {
+    const col = document.createElement('div');
+    col.className = 'bar-col';
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    const val = document.createElement('div');
+    val.className = 'value';
+    val.textContent = '$' + c.value.toFixed(1) + 'T';
+    bar.appendChild(val);
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = c.label;
+    col.appendChild(bar);
+    col.appendChild(label);
+    barsRoot.appendChild(col);
+    return { col, bar, val, label, targetH: (c.value / GDP_MAX) * CHART_MAX_PX };
+  });
+
+  /* ---------- responsive scale ---------- */
+  function fit() {
+    const s = Math.min(window.innerWidth / 1920, (window.innerHeight - 60) / 1080);
+    stage.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* ---------- render(t) ---------- */
+  function renderFrame(t) {
+    // 0.0-0.3  blank
+    // 0.3-1.3  header zh (en delayed 0.15s)
+    const zhP = easeOutCubic(norm(t, 0.30, 1.10));
+    headerZh.style.opacity = zhP;
+    headerZh.style.transform = 'translateY(' + lerp(20, 0, zhP) + 'px)';
+
+    const enP = easeOutCubic(norm(t, 0.45, 1.30));
+    headerEn.style.opacity = enP;
+    headerEn.style.transform = 'translateY(' + lerp(20, 0, enP) + 'px)';
+
+    const ruleP = easeOutCubic(norm(t, 0.60, 1.30));
+    headerRule.style.opacity = ruleP;
+    headerRule.style.transform = 'scaleX(' + ruleP + ')';
+
+    // ticker follows header
+    const tickerP = easeOutCubic(norm(t, 0.50, 1.20));
+    ticker.style.opacity = 0.8 * tickerP;
+
+    // 1.3-4.3 number countUp — mild ease-out so midpoint ≈ 45%
+    const nRaw = norm(t, 1.30, 4.30);
+    const nP = 1 - Math.pow(1 - nRaw, 1.35);
+    const value = nP * 3_000_000;
+    numberEl.textContent = '$' + Math.round(value).toLocaleString('en-US');
+    // pop-in on first frame of countUp
+    const numFadeIn = easeOutCubic(norm(t, 1.30, 1.55));
+    numberEl.style.opacity = numFadeIn;
+    numberEl.style.transform = 'scale(' + lerp(0.96, 1, numFadeIn) + ')';
+
+    // 4.3-5.3 per minute + caption slide in from right
+    const perP = easeOutBack(norm(t, 4.30, 5.20));
+    perEl.style.opacity = clamp01(perP);
+    perEl.style.transform = 'translateX(' + lerp(-40, 0, clamp01(perP)) + 'px)';
+
+    const capP = easeOutCubic(norm(t, 4.55, 5.30));
+    captionEl.style.opacity = capP * 0.95;
+    captionEl.style.transform = 'translateX(' + lerp(-30, 0, capP) + 'px)';
+
+    // side-meta fade (piggy-back on caption)
+    const sideP = easeOutCubic(norm(t, 4.70, 5.50));
+    sideMetaEl.style.opacity = sideP;
+    sideMetaEl.style.transform = 'translateY(' + lerp(12, 0, sideP) + 'px)';
+
+    // chart title
+    const chartTP = easeOutCubic(norm(t, 5.00, 5.70));
+    chartTitleEl.style.opacity = chartTP;
+
+    // 5.3-8.8 bars stagger
+    bars.forEach((b, i) => {
+      const start = 5.30 + i * 0.35;
+      const raw = norm(t, start, start + 1.20);
+      const p = springOut(raw);
+      b.bar.style.height = (p * b.targetH) + 'px';
+      // value + label fade after bar almost done
+      const tailP = easeOutCubic(norm(t, start + 0.80, start + 1.30));
+      b.val.style.opacity = tailP;
+      b.label.style.opacity = tailP;
+    });
+
+    // 8.8-10 source + caption tail emphasis
+    const srcP = easeOutCubic(norm(t, 8.80, 9.80));
+    sourceEl.style.opacity = srcP * 0.9;
+
+    // HUD
+    hud.textContent = 't=' + t.toFixed(2) + 's frame=' + Math.round(t * 60);
+  }
+
+  function setTime(t) {
+    state.t = t;
+    scrubber.value = t.toFixed(2);
+    renderFrame(t);
+  }
+
+  /* ---------- play loop ---------- */
+  let lastRaf = null;
+  function tick(ts) {
+    if (state.playing) {
+      if (lastRaf !== null) {
+        const dt = (ts - lastRaf) / 1000;
+        let nextT = state.t + dt;
+        if (nextT > 10) nextT = 0;
+        setTime(nextT);
+      }
+      lastRaf = ts;
+    } else {
+      lastRaf = null;
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  /* ---------- controls ---------- */
+  btnPlay.addEventListener('click', () => {
+    state.playing = !state.playing;
+    btnPlay.textContent = state.playing ? 'PAUSE' : 'PLAY';
+  });
+  scrubber.addEventListener('input', (e) => {
+    state.playing = false;
+    btnPlay.textContent = 'PLAY';
+    setTime(parseFloat(e.target.value));
+  });
+
+  /* ---------- URL ?t=N static frame ---------- */
+  const tParam = new URL(location.href).searchParams.get('t');
+  if (tParam !== null) {
+    const initialT = parseFloat(tParam);
+    if (!Number.isNaN(initialT)) {
+      state.playing = false;
+      btnPlay.textContent = 'PLAY';
+      setTime(initialT);
+    } else {
+      setTime(0);
+    }
+  } else {
+    setTime(0);
+  }
+</script>
+</body>
+</html>

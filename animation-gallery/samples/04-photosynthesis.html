@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Photosynthesis — NextFrame Sample 04</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #e8e0cf; color: #2a3a32;
+    font-family: 'PingFang SC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #stage-wrap {
+    position: fixed; inset: 0; background: #e8e0cf;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #stage {
+    position: relative; width: 1920px; height: 1080px;
+    transform-origin: center center; overflow: hidden;
+    background: radial-gradient(ellipse 85% 70% at 50% 48%,
+      #fcf7eb 0%, #f7f2e8 40%, #efe8d6 80%, #e8e0cf 100%);
+    box-shadow: 0 0 80px rgba(0, 0, 0, 0.25);
+  }
+  #grain {
+    position: absolute; inset: 0; opacity: 0.22;
+    mix-blend-mode: multiply; pointer-events: none; z-index: 60;
+  }
+  #stage::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 95% 80% at 50% 50%,
+      transparent 55%, rgba(120, 100, 70, 0.14) 100%);
+    pointer-events: none; z-index: 55;
+  }
+
+  .title {
+    position: absolute; top: 82px; left: 0; right: 0;
+    text-align: center; z-index: 20;
+  }
+  .title .zh {
+    font-family: 'PingFang SC', sans-serif;
+    font-size: 56px; font-weight: 600; letter-spacing: 14px; color: #2a3a32;
+  }
+  .title .en {
+    margin-top: 14px; font-family: 'Optima', 'Futura', sans-serif;
+    font-size: 22px; letter-spacing: 10px; color: #8a8066;
+    text-transform: uppercase;
+  }
+  .title .rule {
+    width: 90px; height: 2px; background: #3ea467; border-radius: 2px;
+    margin: 22px auto 0; transform-origin: center;
+  }
+
+  .icon {
+    position: absolute; left: 0; top: 0;
+    transform-origin: center center;
+    will-change: transform, opacity;
+    pointer-events: none; z-index: 10;
+  }
+  .icon .label {
+    position: absolute; left: 50%; top: 100%;
+    transform: translate(-50%, 12px);
+    text-align: center; white-space: nowrap;
+  }
+  .icon .label .zh {
+    display: block; font-family: 'PingFang SC', sans-serif;
+    font-size: 22px; font-weight: 600; letter-spacing: 4px; color: #2a3a32;
+  }
+  .icon .label .en {
+    display: block; margin-top: 4px;
+    font-family: 'Optima', 'Futura', sans-serif;
+    font-size: 13px; letter-spacing: 3px; color: #8a8066;
+    text-transform: uppercase;
+  }
+
+  #leaf {
+    position: absolute; left: 840px; top: 420px;
+    width: 240px; height: 240px;
+    transform-origin: center center;
+    z-index: 12; will-change: transform;
+  }
+
+  .formula {
+    position: absolute; left: 0; right: 0; top: 880px;
+    text-align: center; z-index: 20;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+    font-size: 34px; font-weight: 500; letter-spacing: 2px; color: #2a3a32;
+  }
+  .formula .ch {
+    display: inline-block; opacity: 0;
+    transform: translateY(6px); will-change: opacity, transform;
+  }
+  .formula .ch.arrow { color: #3ea467; margin: 0 10px; }
+  .formula .ch.plus  { color: #8a8066; margin: 0 6px; }
+  .formula .sub      { font-size: 22px; vertical-align: sub; }
+  .formula .num      { color: #b57a3a; }
+
+  .anno {
+    position: absolute; opacity: 0; z-index: 25;
+    font-family: 'Optima', 'Futura', sans-serif;
+    font-size: 15px; letter-spacing: 3px; color: #8a8066;
+    text-transform: uppercase;
+  }
+  .anno .zh {
+    display: block; margin-bottom: 4px;
+    font-family: 'PingFang SC', sans-serif;
+    font-size: 16px; letter-spacing: 4px; color: #3a4a42;
+  }
+  .anno .bar {
+    display: inline-block; width: 40px; height: 1px;
+    background: #3ea467; vertical-align: middle; margin-right: 8px;
+  }
+
+  #controls {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    height: 60px; display: flex; align-items: center; gap: 16px;
+    padding: 0 24px; z-index: 9999;
+    background: rgba(40, 48, 40, 0.92);
+    border-top: 1px solid rgba(62, 164, 103, 0.3);
+    font-family: 'SF Mono', 'Menlo', monospace;
+    color: #c8d8c0; font-size: 12px; letter-spacing: 2px;
+  }
+  #btn-play {
+    background: #3ea467; border: none; color: #0e1a14;
+    font: inherit; font-weight: 700; font-size: 11px;
+    padding: 8px 16px; letter-spacing: 2px;
+    text-transform: uppercase; cursor: pointer;
+  }
+  #btn-play:hover { background: #52bf7c; }
+  #scrubber { flex: 1; accent-color: #3ea467; }
+  #hud { min-width: 240px; text-align: right; color: #8a9a8a; }
+</style>
+</head>
+<body>
+<div id="stage-wrap">
+  <div id="stage">
+    <div class="title">
+      <div class="zh" id="title-zh">光合作用</div>
+      <div class="en" id="title-en">Photosynthesis</div>
+      <div class="rule" id="title-rule"></div>
+    </div>
+
+    <!-- central leaf -->
+    <svg id="leaf" viewBox="-120 -120 240 240">
+      <defs>
+        <radialGradient id="leafGrad" cx="35%" cy="35%" r="70%">
+          <stop offset="0%" stop-color="#7fd49a"/>
+          <stop offset="45%" stop-color="#3ea467"/>
+          <stop offset="100%" stop-color="#1d6c40"/>
+        </radialGradient>
+        <radialGradient id="leafShadow" cx="50%" cy="60%" r="60%">
+          <stop offset="0%" stop-color="rgba(20,50,30,0.35)"/>
+          <stop offset="100%" stop-color="rgba(20,50,30,0)"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="6" cy="80" rx="80" ry="14" fill="url(#leafShadow)"/>
+      <path d="M 0 -100 C 70 -70, 90 -10, 60 70 C 30 95, -30 95, -60 70 C -90 -10, -70 -70, 0 -100 Z"
+            fill="url(#leafGrad)" stroke="#1d6c40" stroke-width="2"/>
+      <path d="M 0 -90 Q 2 0, 0 80" stroke="#235b34" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <path d="M 0 -55 Q 25 -40, 45 -20" stroke="#235b34" stroke-width="1.5" fill="none" opacity="0.7"/>
+      <path d="M 0 -55 Q -25 -40, -45 -20" stroke="#235b34" stroke-width="1.5" fill="none" opacity="0.7"/>
+      <path d="M 0 -10 Q 28 5, 50 20" stroke="#235b34" stroke-width="1.5" fill="none" opacity="0.7"/>
+      <path d="M 0 -10 Q -28 5, -50 20" stroke="#235b34" stroke-width="1.5" fill="none" opacity="0.7"/>
+      <path d="M 0 35 Q 22 50, 38 60" stroke="#235b34" stroke-width="1.5" fill="none" opacity="0.7"/>
+      <path d="M 0 35 Q -22 50, -38 60" stroke="#235b34" stroke-width="1.5" fill="none" opacity="0.7"/>
+      <path d="M -30 -70 Q -50 -40, -40 -10"
+            stroke="rgba(255,255,255,0.35)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    </svg>
+
+    <!-- flash ring -->
+    <svg style="position:absolute;left:0;top:0;width:1920px;height:1080px;pointer-events:none;z-index:11">
+      <circle id="flash-ring"   cx="960" cy="540" r="120" fill="none" stroke="#fff8e0" stroke-width="4" opacity="0"/>
+      <circle id="flash-ring-2" cx="960" cy="540" r="120" fill="none" stroke="#f4c430" stroke-width="2" opacity="0"/>
+    </svg>
+
+    <!-- INPUTS -->
+    <div class="icon" id="icon-sun" data-home-x="360" data-home-y="540">
+      <svg width="160" height="160" viewBox="-80 -80 160 160">
+        <defs>
+          <radialGradient id="sunGrad" cx="30%" cy="30%" r="75%">
+            <stop offset="0%" stop-color="#fff2b0"/>
+            <stop offset="60%" stop-color="#f4c430"/>
+            <stop offset="100%" stop-color="#b87d08"/>
+          </radialGradient>
+          <radialGradient id="sunShadow" cx="50%" cy="60%" r="60%">
+            <stop offset="0%" stop-color="rgba(120,80,0,0.25)"/>
+            <stop offset="100%" stop-color="rgba(120,80,0,0)"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="0" cy="52" rx="44" ry="7" fill="url(#sunShadow)"/>
+        <g stroke="#f4c430" stroke-width="5" stroke-linecap="round">
+          <line x1="0" y1="-68" x2="0" y2="-50"/><line x1="0" y1="50" x2="0" y2="68"/>
+          <line x1="-68" y1="0" x2="-50" y2="0"/><line x1="50" y1="0" x2="68" y2="0"/>
+          <line x1="-48" y1="-48" x2="-36" y2="-36"/><line x1="36" y1="36" x2="48" y2="48"/>
+          <line x1="-48" y1="48" x2="-36" y2="36"/><line x1="36" y1="-36" x2="48" y2="-48"/>
+        </g>
+        <circle cx="0" cy="0" r="38" fill="url(#sunGrad)" stroke="#c68a12" stroke-width="1.5"/>
+      </svg>
+      <div class="label"><span class="zh">太阳</span><span class="en">Sunlight</span></div>
+    </div>
+
+    <div class="icon" id="icon-water" data-home-x="540" data-home-y="260">
+      <svg width="120" height="150" viewBox="-60 -80 120 150">
+        <defs>
+          <radialGradient id="waterGrad" cx="35%" cy="30%" r="75%">
+            <stop offset="0%" stop-color="#aee3f5"/>
+            <stop offset="55%" stop-color="#4da8d4"/>
+            <stop offset="100%" stop-color="#1e6a94"/>
+          </radialGradient>
+          <radialGradient id="waterShadow" cx="50%" cy="60%" r="60%">
+            <stop offset="0%" stop-color="rgba(20,60,90,0.28)"/>
+            <stop offset="100%" stop-color="rgba(20,60,90,0)"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="0" cy="60" rx="36" ry="6" fill="url(#waterShadow)"/>
+        <path d="M 0 -70 C 38 -20, 46 20, 32 46 C 18 62, -18 62, -32 46 C -46 20, -38 -20, 0 -70 Z"
+              fill="url(#waterGrad)" stroke="#1e6a94" stroke-width="2"/>
+        <ellipse cx="-14" cy="-20" rx="10" ry="20" fill="rgba(255,255,255,0.55)" transform="rotate(-18 -14 -20)"/>
+      </svg>
+      <div class="label"><span class="zh">水　H₂O</span><span class="en">Water</span></div>
+    </div>
+
+    <div class="icon" id="icon-co2" data-home-x="540" data-home-y="820">
+      <svg width="180" height="120" viewBox="-90 -60 180 120">
+        <defs>
+          <radialGradient id="cloudGrad" cx="35%" cy="30%" r="75%">
+            <stop offset="0%" stop-color="#e3e8ec"/>
+            <stop offset="60%" stop-color="#9aa5ad"/>
+            <stop offset="100%" stop-color="#5e6b74"/>
+          </radialGradient>
+          <radialGradient id="cloudShadow" cx="50%" cy="60%" r="60%">
+            <stop offset="0%" stop-color="rgba(50,60,70,0.25)"/>
+            <stop offset="100%" stop-color="rgba(50,60,70,0)"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="0" cy="48" rx="60" ry="7" fill="url(#cloudShadow)"/>
+        <circle cx="-40" cy="10" r="28" fill="url(#cloudGrad)" stroke="#5e6b74" stroke-width="1.5"/>
+        <circle cx="-10" cy="-18" r="34" fill="url(#cloudGrad)" stroke="#5e6b74" stroke-width="1.5"/>
+        <circle cx="28" cy="-10" r="30" fill="url(#cloudGrad)" stroke="#5e6b74" stroke-width="1.5"/>
+        <circle cx="48" cy="18" r="22" fill="url(#cloudGrad)" stroke="#5e6b74" stroke-width="1.5"/>
+        <text x="0" y="14" font-family="Optima, Futura, sans-serif" font-size="26" font-weight="700"
+              text-anchor="middle" fill="#3a4048">CO₂</text>
+      </svg>
+      <div class="label"><span class="zh">二氧化碳</span><span class="en">Carbon Dioxide</span></div>
+    </div>
+
+    <!-- OUTPUTS -->
+    <div class="icon" id="icon-glucose" data-dest-x="420" data-dest-y="-220">
+      <svg width="140" height="140" viewBox="-70 -70 140 140">
+        <defs>
+          <radialGradient id="sugarGrad" cx="35%" cy="30%" r="75%">
+            <stop offset="0%" stop-color="#e5c28a"/>
+            <stop offset="55%" stop-color="#b57a3a"/>
+            <stop offset="100%" stop-color="#6d4214"/>
+          </radialGradient>
+          <radialGradient id="sugarShadow" cx="50%" cy="60%" r="60%">
+            <stop offset="0%" stop-color="rgba(90,55,10,0.25)"/>
+            <stop offset="100%" stop-color="rgba(90,55,10,0)"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="0" cy="52" rx="38" ry="6" fill="url(#sugarShadow)"/>
+        <polygon points="0,-48 42,-24 42,24 0,48 -42,24 -42,-24"
+                 fill="url(#sugarGrad)" stroke="#6d4214" stroke-width="2"/>
+        <polygon points="0,-30 26,-15 26,15 0,30 -26,15 -26,-15"
+                 fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5"/>
+        <text x="0" y="6" font-family="SF Mono, Menlo, monospace" font-size="13" font-weight="700"
+              text-anchor="middle" fill="#fff6e0">C₆H₁₂O₆</text>
+      </svg>
+      <div class="label"><span class="zh">葡萄糖</span><span class="en">Glucose</span></div>
+    </div>
+
+    <div class="icon" id="icon-o2" data-dest-x="420" data-dest-y="220">
+      <svg width="160" height="100" viewBox="-80 -50 160 100">
+        <defs>
+          <radialGradient id="oxyGrad" cx="35%" cy="30%" r="70%">
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="55%" stop-color="#e8f0f4"/>
+            <stop offset="100%" stop-color="#9cb2be"/>
+          </radialGradient>
+          <radialGradient id="oxyShadow" cx="50%" cy="60%" r="60%">
+            <stop offset="0%" stop-color="rgba(60,80,100,0.22)"/>
+            <stop offset="100%" stop-color="rgba(60,80,100,0)"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="0" cy="42" rx="52" ry="6" fill="url(#oxyShadow)"/>
+        <line x1="-28" y1="0" x2="28" y2="0" stroke="#7d8e98" stroke-width="4"/>
+        <circle cx="-34" cy="0" r="26" fill="url(#oxyGrad)" stroke="#7d8e98" stroke-width="1.8"/>
+        <circle cx="34" cy="0" r="26" fill="url(#oxyGrad)" stroke="#7d8e98" stroke-width="1.8"/>
+        <text x="-34" y="5" font-family="Optima, Futura, sans-serif" font-size="18" font-weight="700"
+              text-anchor="middle" fill="#3a4048">O</text>
+        <text x="34" y="5" font-family="Optima, Futura, sans-serif" font-size="18" font-weight="700"
+              text-anchor="middle" fill="#3a4048">O</text>
+      </svg>
+      <div class="label"><span class="zh">氧气　O₂</span><span class="en">Oxygen</span></div>
+    </div>
+
+    <!-- FORMULA -->
+    <div class="formula" id="formula">
+      <span class="ch num">6</span><span class="ch">C</span><span class="ch">O</span><span class="ch sub">2</span>
+      <span class="ch plus">+</span>
+      <span class="ch num">6</span><span class="ch">H</span><span class="ch sub">2</span><span class="ch">O</span>
+      <span class="ch plus">+</span>
+      <span class="ch">光</span><span class="ch">能</span>
+      <span class="ch arrow">→</span>
+      <span class="ch">C</span><span class="ch sub">6</span><span class="ch">H</span><span class="ch sub">12</span><span class="ch">O</span><span class="ch sub">6</span>
+      <span class="ch plus">+</span>
+      <span class="ch num">6</span><span class="ch">O</span><span class="ch sub">2</span>
+    </div>
+
+    <!-- annotations -->
+    <div class="anno" id="anno-sun" style="left:180px; top:700px;">
+      <span class="zh"><span class="bar"></span>阳光 · 能量源</span>
+      <span>ENERGY INPUT</span>
+    </div>
+    <div class="anno" id="anno-leaf" style="left:840px; top:710px; text-align:center;">
+      <span class="zh"><span class="bar"></span>叶片 · 工厂</span>
+      <span>CHLOROPLAST FACTORY</span>
+    </div>
+    <div class="anno" id="anno-out" style="right:180px; top:700px; text-align:right;">
+      <span class="zh"><span class="bar"></span>糖 + O₂ · 产物</span>
+      <span>PRODUCTS</span>
+    </div>
+
+    <!-- grain -->
+    <svg id="grain" width="100%" height="100%" preserveAspectRatio="none">
+      <filter id="nf-grain">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch" seed="7"/>
+        <feColorMatrix values="0 0 0 0 0.6  0 0 0 0 0.55  0 0 0 0 0.4  0 0 0 0.55 0"/>
+      </filter>
+      <rect width="100%" height="100%" filter="url(#nf-grain)"/>
+    </svg>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="btn-play">PAUSE</button>
+  <input id="scrubber" type="range" min="0" max="10" step="0.01" value="0">
+  <div id="hud">t=0.00s frame=0</div>
+</div>
+
+<script>
+  'use strict';
+
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const clamp01 = (x) => clamp(x, 0, 1);
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
+  const easeInCubic = (x) => x * x * x;
+  const norm = (t, a, b) => clamp01((t - a) / (b - a));
+  function spring(t, stiffness) {
+    if (t <= 0) return 0;
+    if (t >= 1.5) return 1;
+    const s = stiffness || 0.5;
+    return 1 - Math.pow(2, -9 * t) * Math.cos(t * Math.PI * 3.6 * s);
+  }
+
+  const state = { t: 0, playing: true };
+
+  const stage = document.getElementById('stage');
+  const titleZh = document.getElementById('title-zh');
+  const titleEn = document.getElementById('title-en');
+  const titleRule = document.getElementById('title-rule');
+  const leaf = document.getElementById('leaf');
+  const flashRing = document.getElementById('flash-ring');
+  const flashRing2 = document.getElementById('flash-ring-2');
+  const btnPlay = document.getElementById('btn-play');
+  const scrubber = document.getElementById('scrubber');
+  const hud = document.getElementById('hud');
+
+  const iconSun = document.getElementById('icon-sun');
+  const iconWater = document.getElementById('icon-water');
+  const iconCo2 = document.getElementById('icon-co2');
+  const inputs = [iconSun, iconWater, iconCo2];
+
+  const iconGlucose = document.getElementById('icon-glucose');
+  const iconO2 = document.getElementById('icon-o2');
+  const outputs = [iconGlucose, iconO2];
+
+  const formulaChars = Array.from(document.querySelectorAll('#formula .ch'));
+  const annos = [
+    document.getElementById('anno-sun'),
+    document.getElementById('anno-leaf'),
+    document.getElementById('anno-out')
+  ];
+
+  const LEAF_X = 960;
+  const LEAF_Y = 540;
+
+  const INPUT_SIZE = {
+    'icon-sun':   { w: 160, h: 160 },
+    'icon-water': { w: 120, h: 150 },
+    'icon-co2':   { w: 180, h: 120 }
+  };
+  const OUTPUT_SIZE = {
+    'icon-glucose': { w: 140, h: 140 },
+    'icon-o2':      { w: 160, h: 100 }
+  };
+
+  inputs.forEach((el) => {
+    const size = INPUT_SIZE[el.id];
+    el.dataset.cx = el.dataset.homeX;
+    el.dataset.cy = el.dataset.homeY;
+    el.dataset.w = size.w;
+    el.dataset.h = size.h;
+  });
+  outputs.forEach((el) => {
+    const size = OUTPUT_SIZE[el.id];
+    el.dataset.w = size.w;
+    el.dataset.h = size.h;
+  });
+
+  function fit() {
+    const s = Math.min(window.innerWidth / 1920, (window.innerHeight - 60) / 1080);
+    stage.style.transform = 'scale(' + s + ')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  function renderFrame(t) {
+    /* TITLE 0.0-0.8 */
+    const titleA = easeOutCubic(norm(t, 0.0, 0.8));
+    titleZh.style.opacity = titleA;
+    titleZh.style.transform = 'translateY(' + lerp(16, 0, titleA) + 'px)';
+    const titleEnA = easeOutCubic(norm(t, 0.15, 0.9));
+    titleEn.style.opacity = titleEnA;
+    titleEn.style.transform = 'translateY(' + lerp(16, 0, titleEnA) + 'px)';
+    const ruleA = easeOutCubic(norm(t, 0.35, 1.0));
+    titleRule.style.opacity = ruleA;
+    titleRule.style.transform = 'scaleX(' + ruleA + ')';
+
+    /* LEAF appear 0.8-1.3; pulse 5.0-5.8 */
+    const leafApp = spring(t - 0.8, 0.5);
+    let leafScale = Math.min(leafApp, 1);
+    const flashLocal = t - 5.0;
+    if (flashLocal >= 0 && flashLocal <= 0.8) {
+      const pulse = Math.sin((flashLocal / 0.8) * Math.PI);
+      leafScale = 1 + pulse * 0.2;
+      flashRing.style.opacity = pulse * 0.9;
+      flashRing.setAttribute('r', (120 + pulse * 180).toFixed(1));
+      flashRing.setAttribute('stroke-width', (3 + pulse * 4).toFixed(1));
+      flashRing2.style.opacity = pulse * 0.7;
+      flashRing2.setAttribute('r', (120 + pulse * 260).toFixed(1));
+      flashRing2.setAttribute('stroke-width', (2 + pulse * 3).toFixed(1));
+    } else {
+      flashRing.style.opacity = 0;
+      flashRing2.style.opacity = 0;
+    }
+    leaf.style.opacity = clamp01(leafApp);
+    leaf.style.transform = 'scale(' + leafScale.toFixed(4) + ')';
+
+    /* INPUTS appear 1.3-3.3 stagger, fly to leaf 3.3-5.0 */
+    inputs.forEach((el, i) => {
+      const appearStart = 1.3 + i * 0.4;
+      const flyStart = 3.3;
+      const flyEnd = 5.0;
+      const w = parseFloat(el.dataset.w);
+      const h = parseFloat(el.dataset.h);
+      const cx = parseFloat(el.dataset.cx);
+      const cy = parseFloat(el.dataset.cy);
+      if (t < flyStart) {
+        const appA = spring(t - appearStart, 0.5);
+        const scale = Math.min(appA, 1);
+        const fade = clamp01((t - appearStart) / 0.35);
+        el.style.opacity = fade;
+        el.style.transform =
+          'translate(' + (cx - w / 2).toFixed(2) + 'px, ' + (cy - h / 2).toFixed(2) + 'px) ' +
+          'scale(' + scale.toFixed(4) + ')';
+      } else {
+        const flyP = clamp01((t - flyStart) / (flyEnd - flyStart));
+        const flyE = easeInCubic(flyP);
+        const curX = lerp(cx, LEAF_X, flyE);
+        const curY = lerp(cy, LEAF_Y, flyE);
+        const scale = lerp(1, 0.35, flyE);
+        el.style.opacity = 1 - flyE * 0.92;
+        el.style.transform =
+          'translate(' + (curX - w / 2).toFixed(2) + 'px, ' + (curY - h / 2).toFixed(2) + 'px) ' +
+          'scale(' + scale.toFixed(4) + ')';
+      }
+    });
+
+    /* OUTPUTS fly out 5.8-7.5 */
+    outputs.forEach((el, i) => {
+      const start = 5.8 + i * 0.2;
+      const w = parseFloat(el.dataset.w);
+      const h = parseFloat(el.dataset.h);
+      const destX = parseFloat(el.dataset.destX);
+      const destY = parseFloat(el.dataset.destY);
+      if (t < start) {
+        el.style.opacity = 0;
+        el.style.transform =
+          'translate(' + (LEAF_X - w / 2).toFixed(2) + 'px, ' +
+          (LEAF_Y - h / 2).toFixed(2) + 'px) scale(0.4)';
+        return;
+      }
+      const local = t - start;
+      const flyP = clamp01(spring(local, 0.6));
+      const fadeA = clamp01(local / 0.4);
+      const scale = lerp(0.4, 1.0, clamp01(local / 0.8));
+      const curX = LEAF_X + destX * flyP;
+      const curY = LEAF_Y + destY * flyP;
+      el.style.opacity = fadeA;
+      el.style.transform =
+        'translate(' + (curX - w / 2).toFixed(2) + 'px, ' + (curY - h / 2).toFixed(2) + 'px) ' +
+        'scale(' + scale.toFixed(4) + ')';
+    });
+
+    /* FORMULA 7.5-9.0 stagger */
+    formulaChars.forEach((el, i) => {
+      const start = 7.5 + i * 0.05;
+      const a = easeOutCubic(norm(t, start, start + 0.3));
+      el.style.opacity = a;
+      el.style.transform = 'translateY(' + lerp(6, 0, a) + 'px)';
+    });
+
+    /* ANNOTATIONS 9.0-10.0 stagger */
+    annos.forEach((el, i) => {
+      const start = 9.0 + i * 0.2;
+      const a = easeOutCubic(norm(t, start, start + 0.5));
+      el.style.opacity = a * 0.95;
+    });
+
+    hud.textContent = 't=' + t.toFixed(2) + 's frame=' + Math.round(t * 60);
+  }
+
+  function setTime(t) {
+    state.t = t;
+    scrubber.value = t.toFixed(2);
+    renderFrame(t);
+  }
+
+  let lastRaf = null;
+  function tick(ts) {
+    if (state.playing) {
+      if (lastRaf !== null) {
+        const dt = (ts - lastRaf) / 1000;
+        let nextT = state.t + dt;
+        if (nextT > 10) nextT = 0;
+        setTime(nextT);
+      }
+      lastRaf = ts;
+    } else {
+      lastRaf = null;
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  btnPlay.addEventListener('click', () => {
+    state.playing = !state.playing;
+    btnPlay.textContent = state.playing ? 'PAUSE' : 'PLAY';
+  });
+  scrubber.addEventListener('input', (e) => {
+    state.playing = false;
+    btnPlay.textContent = 'PLAY';
+    setTime(parseFloat(e.target.value));
+  });
+
+  const tParam = new URL(location.href).searchParams.get('t');
+  if (tParam !== null) {
+    const initialT = parseFloat(tParam);
+    if (!Number.isNaN(initialT)) {
+      state.playing = false;
+      btnPlay.textContent = 'PLAY';
+      setTime(initialT);
+    } else {
+      setTime(0);
+    }
+  } else {
+    setTime(0);
+  }
+</script>
+</body>
+</html>

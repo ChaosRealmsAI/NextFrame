@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Why is the sky blue? · Rayleigh Scattering</title>
+<style>
+  :root {
+    --bg0: #0c0d26;
+    --bg1: #1a1b3a;
+    --ink: #f4f2e8;
+    --ink-dim: #a0a3c8;
+    --sky: #4da8ff;
+    --sun: #ffd84a;
+    --warm: #ff6b5a;
+    --atmo: #6fb8ff;
+    --serif: Georgia, 'Times New Roman', serif;
+    --mono: 'SF Mono', Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; color: var(--ink); font-family: var(--sans); }
+  .stage-wrap {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+  }
+  .stage {
+    position: relative;
+    width: 1920px; height: 1080px;
+    transform-origin: center center;
+    background:
+      radial-gradient(ellipse 60% 50% at 30% 30%, #262a5a 0%, transparent 55%),
+      radial-gradient(ellipse 80% 70% at 70% 80%, #1e1640 0%, transparent 60%),
+      linear-gradient(180deg, var(--bg1) 0%, var(--bg0) 100%);
+    overflow: hidden;
+  }
+  /* Subtle star specks */
+  .stars {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(1.5px 1.5px at 14% 12%, rgba(255,255,255,.35), transparent 60%),
+      radial-gradient(1px 1px at 22% 30%, rgba(255,255,255,.28), transparent 60%),
+      radial-gradient(1.5px 1.5px at 44% 18%, rgba(255,255,255,.22), transparent 60%),
+      radial-gradient(1px 1px at 62% 8%, rgba(255,255,255,.30), transparent 60%),
+      radial-gradient(1.5px 1.5px at 78% 22%, rgba(255,255,255,.25), transparent 60%),
+      radial-gradient(1px 1px at 88% 40%, rgba(255,255,255,.20), transparent 60%),
+      radial-gradient(1px 1px at 10% 62%, rgba(255,255,255,.18), transparent 60%),
+      radial-gradient(1.5px 1.5px at 92% 70%, rgba(255,255,255,.20), transparent 60%);
+    pointer-events: none;
+  }
+
+  /* Sun */
+  .sun {
+    position: absolute;
+    left: 180px; top: 100px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #fff6c8 0%, var(--sun) 40%, #e8a622 75%, rgba(232,166,34,0) 100%);
+    box-shadow:
+      0 0 40px rgba(255, 216, 74, 0.6),
+      0 0 100px rgba(255, 216, 74, 0.35),
+      0 0 180px rgba(255, 216, 74, 0.2);
+    transform-origin: center center;
+    will-change: transform, opacity;
+  }
+  .sun-ring {
+    position: absolute;
+    left: 180px; top: 100px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(255, 216, 74, 0.35);
+    pointer-events: none;
+  }
+
+  /* Central text */
+  .title, .subtitle {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    will-change: transform, opacity;
+    pointer-events: none;
+  }
+  .title {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 108px;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    text-shadow: 0 2px 40px rgba(77, 168, 255, 0.3);
+    top: calc(50% - 10px);
+  }
+  .title em {
+    font-style: italic;
+    color: var(--sky);
+    font-weight: 600;
+  }
+  .subtitle {
+    top: calc(50% + 110px);
+    font-family: var(--mono);
+    font-size: 30px;
+    letter-spacing: 0.18em;
+    color: var(--ink-dim);
+    text-transform: none;
+  }
+  .subtitle .cn {
+    font-family: var(--serif);
+    font-style: italic;
+    letter-spacing: 0.08em;
+    color: var(--sky);
+    margin-left: 18px;
+  }
+
+  /* Observer label */
+  .obs-label {
+    position: absolute;
+    left: 1380px; top: 870px;
+    font-family: var(--mono);
+    font-size: 20px;
+    color: var(--ink-dim);
+    letter-spacing: 0.15em;
+    will-change: opacity;
+  }
+
+  /* HUD + controls */
+  .controls {
+    position: fixed;
+    left: 50%; bottom: 24px;
+    transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px;
+    background: rgba(12, 13, 38, 0.72);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px;
+    padding: 10px 18px;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 13px;
+    z-index: 10;
+  }
+  .controls button {
+    background: rgba(77,168,255,0.15);
+    border: 1px solid rgba(77,168,255,0.35);
+    color: var(--sky);
+    width: 42px; height: 34px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 14px;
+  }
+  .controls button:hover { background: rgba(77,168,255,0.28); }
+  .controls input[type=range] {
+    width: 360px; accent-color: var(--sky);
+  }
+  .hud {
+    min-width: 110px; text-align: right;
+    color: var(--ink-dim);
+  }
+  .tag {
+    position: fixed; left: 20px; top: 20px; z-index: 10;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--ink-dim); letter-spacing: 0.15em;
+    background: rgba(12,13,38,0.55);
+    padding: 6px 12px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* Stroke draw-on prep */
+  svg .draw { stroke-dasharray: var(--len, 1000); stroke-dashoffset: var(--len, 1000); }
+</style>
+</head>
+<body>
+<div class="tag">NextFrame · Sample 03 · Rayleigh Scattering</div>
+
+<div class="stage-wrap">
+  <div class="stage" id="stage">
+    <div class="stars"></div>
+    <div class="sun" id="sun"></div>
+    <div class="sun-ring" id="sunRing"></div>
+
+    <svg id="svg" width="1920" height="1080" viewBox="0 0 1920 1080"
+         style="position:absolute; inset:0; overflow:visible;">
+      <defs>
+        <linearGradient id="rayGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#fff6c8" stop-opacity="0.95"/>
+          <stop offset="60%" stop-color="#ffe89a" stop-opacity="0.7"/>
+          <stop offset="100%" stop-color="#fff6c8" stop-opacity="0.15"/>
+        </linearGradient>
+        <linearGradient id="warmGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ffb090" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#ff6b5a" stop-opacity="0.25"/>
+        </linearGradient>
+        <radialGradient id="particleGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#bfe0ff" stop-opacity="1"/>
+          <stop offset="60%" stop-color="#4da8ff" stop-opacity="0.85"/>
+          <stop offset="100%" stop-color="#4da8ff" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="2.2" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- Atmosphere belt -->
+      <path id="atmo" class="draw"
+            d="M 160 520 Q 900 360 1760 540"
+            fill="none"
+            stroke="#6fb8ff"
+            stroke-width="3"
+            stroke-linecap="round"
+            opacity="0.85"
+            filter="url(#softGlow)"
+            style="--len: 1780"/>
+      <path id="atmoShadow"
+            d="M 160 540 Q 900 380 1760 560"
+            fill="none"
+            stroke="#2c4d8a"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            opacity="0"/>
+
+      <!-- White rays (5) -->
+      <g id="rays" stroke-linecap="round" fill="none" filter="url(#softGlow)"></g>
+
+      <!-- Warm rays (2) passing through -->
+      <g id="warmRays" stroke-linecap="round" fill="none"></g>
+
+      <!-- Scatter origin marker -->
+      <circle id="scatterMark" cx="900" cy="420" r="6"
+              fill="#fff6c8" opacity="0" filter="url(#softGlow)"/>
+
+      <!-- Blue particles -->
+      <g id="particles"></g>
+
+      <!-- Observer -->
+      <g id="observer" opacity="0">
+        <!-- shoulders / body -->
+        <path d="M 1420 1080 Q 1420 920 1500 890 Q 1560 880 1580 890 Q 1660 920 1660 1080 Z"
+              fill="#0c0d26" stroke="#4da8ff" stroke-width="2.5"/>
+        <!-- neck -->
+        <path d="M 1510 890 L 1510 855 L 1570 855 L 1570 890 Z"
+              fill="#0c0d26" stroke="#4da8ff" stroke-width="2"/>
+        <!-- head -->
+        <ellipse cx="1540" cy="805" rx="48" ry="56"
+                 fill="#0c0d26" stroke="#4da8ff" stroke-width="2.5"/>
+        <!-- hair tuft -->
+        <path d="M 1498 768 Q 1520 748 1548 754 Q 1578 758 1585 778"
+              fill="none" stroke="#4da8ff" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- eye dot -->
+        <circle cx="1555" cy="805" r="2.5" fill="#4da8ff"/>
+        <!-- sight line dashed -->
+        <line id="sightLine" x1="1515" y1="798" x2="1080" y2="500"
+              stroke="#4da8ff" stroke-width="1.5" stroke-dasharray="6 8" opacity="0.55"/>
+      </g>
+
+      <!-- Observer's canopy particles -->
+      <g id="canopy"></g>
+    </svg>
+
+    <div class="obs-label" id="obsLabel">observer</div>
+
+    <div class="title" id="title">Why is the sky <em>blue</em>?</div>
+    <div class="subtitle" id="subtitle">
+      Rayleigh Scattering<span class="cn">瑞利散射</span>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="btn">Pause</button>
+  <input id="scrub" type="range" min="0" max="10" step="0.01" value="0" />
+  <div class="hud" id="hud">t=0.00s</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const DUR = 10.0;
+  const SUN = { x: 260, y: 180 };
+  const SCATTER = { x: 900, y: 420 };
+
+  // ---------- math ----------
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  const easeInOut = t => t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t+2, 2)/2;
+  // Spring-ish pop: overshoots then settles
+  function spring(tRaw, dur = 0.8, overshoot = 1.18) {
+    const p = clamp(tRaw / dur, 0, 1);
+    if (p >= 1) return 1;
+    const decay = Math.exp(-3.2 * p);
+    const wave = Math.sin(p * Math.PI * 2.1) * decay * (overshoot - 1);
+    return easeOut(p) + wave;
+  }
+  function hashSeed(i) {
+    const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  // ---------- build rays ----------
+  const raysG = document.getElementById('rays');
+  const rayCount = 5;
+  const rayDir = { x: 1200 - SUN.x, y: 700 - SUN.y }; // target direction
+  const rayMag = Math.hypot(rayDir.x, rayDir.y);
+  const rayUnit = { x: rayDir.x / rayMag, y: rayDir.y / rayMag };
+  const rayPerp = { x: -rayUnit.y, y: rayUnit.x };
+  const rayLen = [];
+  const rayEls = [];
+  for (let i = 0; i < rayCount; i++) {
+    // Offset perpendicular by 30px steps, center around 0
+    const off = (i - (rayCount - 1) / 2) * 30;
+    const ox = SUN.x + rayPerp.x * off + rayUnit.x * 70; // start slightly outside sun
+    const oy = SUN.y + rayPerp.y * off + rayUnit.y * 70;
+    const ex = SUN.x + rayPerp.x * off + rayUnit.x * rayMag;
+    const ey = SUN.y + rayPerp.y * off + rayUnit.y * rayMag;
+    const len = Math.hypot(ex - ox, ey - oy);
+    rayLen.push(len);
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', ox.toFixed(1));
+    line.setAttribute('y1', oy.toFixed(1));
+    line.setAttribute('x2', ex.toFixed(1));
+    line.setAttribute('y2', ey.toFixed(1));
+    line.setAttribute('stroke', 'url(#rayGrad)');
+    line.setAttribute('stroke-width', i === 2 ? 3.2 : 2.2);
+    line.setAttribute('stroke-dasharray', len);
+    line.setAttribute('stroke-dashoffset', len);
+    line.setAttribute('opacity', 0.9);
+    raysG.appendChild(line);
+    rayEls.push(line);
+  }
+
+  // ---------- warm rays (pass-through long waves) ----------
+  const warmG = document.getElementById('warmRays');
+  const warmEls = [];
+  const warmLen = [];
+  const warmDefs = [
+    { x1: SCATTER.x - 20, y1: SCATTER.y + 10, x2: 1700, y2: 1000 },
+    { x1: SCATTER.x + 10, y1: SCATTER.y + 25, x2: 1820, y2: 920 }
+  ];
+  warmDefs.forEach((d, i) => {
+    const len = Math.hypot(d.x2 - d.x1, d.y2 - d.y1);
+    warmLen.push(len);
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', d.x1);
+    line.setAttribute('y1', d.y1);
+    line.setAttribute('x2', d.x2);
+    line.setAttribute('y2', d.y2);
+    line.setAttribute('stroke', 'url(#warmGrad)');
+    line.setAttribute('stroke-width', i === 0 ? 2.8 : 2.2);
+    line.setAttribute('stroke-linecap', 'round');
+    line.setAttribute('stroke-dasharray', len);
+    line.setAttribute('stroke-dashoffset', len);
+    line.setAttribute('opacity', 0);
+    warmG.appendChild(line);
+    warmEls.push(line);
+  });
+
+  // ---------- scatter particles ----------
+  const particlesG = document.getElementById('particles');
+  const particleCount = 36;
+  const particleEls = [];
+  for (let i = 0; i < particleCount; i++) {
+    const seed = hashSeed(i);
+    const r = 4 + hashSeed(i + 101) * 6; // 4 - 10
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', 0);
+    c.setAttribute('cy', 0);
+    c.setAttribute('r', r.toFixed(2));
+    c.setAttribute('fill', 'url(#particleGrad)');
+    c.setAttribute('opacity', 0);
+    c.setAttribute('filter', 'url(#softGlow)');
+    c.style.transformOrigin = '0 0';
+    particlesG.appendChild(c);
+    particleEls.push({ el: c, seed, r });
+  }
+
+  // ---------- canopy particles (over observer's head) ----------
+  const canopyG = document.getElementById('canopy');
+  const canopyCount = 14;
+  const canopyEls = [];
+  for (let i = 0; i < canopyCount; i++) {
+    const seed = hashSeed(i + 300);
+    const r = 3 + hashSeed(i + 501) * 4;
+    // spread horizontally over head, lifted above
+    const x = 1430 + seed * 230;           // 1430 .. 1660
+    const y = 700 - hashSeed(i + 701) * 60; // 640 .. 700
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', x.toFixed(1));
+    c.setAttribute('cy', y.toFixed(1));
+    c.setAttribute('r', r.toFixed(2));
+    c.setAttribute('fill', 'url(#particleGrad)');
+    c.setAttribute('opacity', 0);
+    c.setAttribute('filter', 'url(#softGlow)');
+    canopyG.appendChild(c);
+    canopyEls.push({ el: c, seed, baseX: x, baseY: y });
+  }
+
+  // ---------- element refs ----------
+  const sun = document.getElementById('sun');
+  const sunRing = document.getElementById('sunRing');
+  const atmo = document.getElementById('atmo');
+  const atmoShadow = document.getElementById('atmoShadow');
+  const scatterMark = document.getElementById('scatterMark');
+  const observer = document.getElementById('observer');
+  const sightLine = document.getElementById('sightLine');
+  const obsLabel = document.getElementById('obsLabel');
+  const title = document.getElementById('title');
+  const subtitle = document.getElementById('subtitle');
+  const hud = document.getElementById('hud');
+  const scrub = document.getElementById('scrub');
+  const btn = document.getElementById('btn');
+  const stageWrap = document.querySelector('.stage-wrap');
+  const stage = document.getElementById('stage');
+
+  const ATMO_LEN = 1780;
+
+  // ---------- state ----------
+  const state = { t: 0, playing: true, last: 0 };
+
+  // Query string override for screenshot tooling
+  const params = new URLSearchParams(location.search);
+  const qT = parseFloat(params.get('t'));
+  if (!Number.isNaN(qT)) {
+    state.t = clamp(qT, 0, DUR);
+    state.playing = false;
+    btn.textContent = 'Play';
+  }
+
+  // ---------- scale to viewport ----------
+  function fit() {
+    const sx = window.innerWidth / 1920;
+    const sy = window.innerHeight / 1080;
+    const s = Math.min(sx, sy);
+    stage.style.transform = `scale(${s})`;
+  }
+  window.addEventListener('resize', fit);
+  fit();
+
+  // ---------- render (frame-pure) ----------
+  function renderFrame(t) {
+    // --- Sun (0 - 0.8s) ---
+    const sunA = spring(t, 0.8, 1.22);
+    const sunOp = clamp(t / 0.6, 0, 1);
+    sun.style.opacity = sunOp;
+    sun.style.transform = `scale(${sunA})`;
+    sunRing.style.opacity = clamp((t - 0.3) / 0.6, 0, 1) * 0.6;
+    sunRing.style.transform = `scale(${lerp(0.6, 1.3, clamp((t-0.3)/1.2, 0, 1))})`;
+
+    // --- White rays draw-on (0.8 - 2.0s) ---
+    rayEls.forEach((el, i) => {
+      const start = 0.8 + i * 0.08;
+      const p = clamp((t - start) / 1.15, 0, 1);
+      const eased = easeOut(p);
+      el.setAttribute('stroke-dashoffset', ((1 - eased) * rayLen[i]).toFixed(1));
+      // Dim rays slightly after scattering begins (hint: they get "absorbed")
+      const fade = clamp(1 - (t - 3.0) / 2.5, 0.25, 1);
+      el.setAttribute('opacity', (0.95 * (p > 0 ? 1 : 0) * fade).toFixed(3));
+    });
+
+    // --- Atmosphere belt (2.0 - 3.2s) ---
+    const atmoP = clamp((t - 2.0) / 1.2, 0, 1);
+    const atmoE = easeInOut(atmoP);
+    atmo.setAttribute('stroke-dashoffset', ((1 - atmoE) * ATMO_LEN).toFixed(1));
+    atmoShadow.setAttribute('opacity', (atmoE * 0.35).toFixed(3));
+
+    // scatter marker pulse (3.0 onward)
+    const markP = clamp((t - 3.0) / 0.4, 0, 1);
+    scatterMark.setAttribute('opacity', (markP * (1 - clamp((t - 3.4) / 0.8, 0, 1)) * 0.9).toFixed(3));
+    scatterMark.setAttribute('r', (6 + markP * 14).toFixed(2));
+
+    // --- Blue particles explode (3.0 - 5.5s) ---
+    particleEls.forEach((p, i) => {
+      const start = 3.0 + (i / particleCount) * 1.0;
+      const localT = t - start;
+      if (localT < 0) {
+        p.el.setAttribute('opacity', 0);
+        return;
+      }
+      const life = clamp(localT / 2.2, 0, 1);
+      const eased = easeOut(life);
+      const angle = p.seed * Math.PI * 2;
+      // Bias upward-ish: gravity-free but elliptical
+      const dist = eased * (110 + hashSeed(i + 7) * 80);
+      const cx = SCATTER.x + Math.cos(angle) * dist;
+      const cy = SCATTER.y + Math.sin(angle) * dist * 0.72 - eased * 25;
+      const scale = 1 - life * 0.35;
+      const op = (1 - life) * 0.92;
+      p.el.setAttribute('cx', cx.toFixed(1));
+      p.el.setAttribute('cy', cy.toFixed(1));
+      p.el.setAttribute('opacity', op.toFixed(3));
+      p.el.setAttribute('transform', `scale(${scale.toFixed(3)})`);
+      // svg scale via transform-origin quirk: use matrix-ish by adjusting r instead
+      // (kept attribute scale via transform; browsers handle it)
+    });
+
+    // --- Warm rays (3.5 - 5.5s) ---
+    warmEls.forEach((el, i) => {
+      const start = 3.5 + i * 0.25;
+      const p = clamp((t - start) / 1.4, 0, 1);
+      const eased = easeOut(p);
+      el.setAttribute('stroke-dashoffset', ((1 - eased) * warmLen[i]).toFixed(1));
+      el.setAttribute('opacity', clamp(p * 1.2, 0, 0.92).toFixed(3));
+    });
+
+    // --- Observer (5.5 - 7.0s) ---
+    const obsP = clamp((t - 5.5) / 1.2, 0, 1);
+    const obsE = easeOut(obsP);
+    observer.setAttribute('opacity', obsE.toFixed(3));
+    sightLine.setAttribute('opacity', (clamp((t - 6.0) / 0.8, 0, 1) * 0.55).toFixed(3));
+    obsLabel.style.opacity = clamp((t - 6.2) / 0.8, 0, 1).toFixed(3);
+
+    // --- Canopy particles (6.0 - 10s), gentle drift ---
+    canopyEls.forEach((p, i) => {
+      const start = 6.0 + p.seed * 0.8;
+      const localT = t - start;
+      if (localT < 0) {
+        p.el.setAttribute('opacity', 0);
+        return;
+      }
+      const fadeIn = clamp(localT / 0.9, 0, 1);
+      // gentle orbit-ish bobbing, frame-pure from seed
+      const bobAmp = 8 + hashSeed(i + 900) * 6;
+      const phase = p.seed * Math.PI * 2;
+      const oscT = localT; // continuous param
+      const dy = Math.sin(oscT * 1.6 + phase) * bobAmp;
+      const dx = Math.cos(oscT * 1.1 + phase) * (bobAmp * 0.6);
+      p.el.setAttribute('cx', (p.baseX + dx).toFixed(1));
+      p.el.setAttribute('cy', (p.baseY + dy).toFixed(1));
+      p.el.setAttribute('opacity', (fadeIn * 0.85).toFixed(3));
+    });
+
+    // --- Title (7.0 - 8.5s) ---
+    const titleP = clamp((t - 7.0) / 1.2, 0, 1);
+    const titleSpring = spring(t - 7.0, 1.0, 1.12);
+    const titleScale = t < 7.0 ? 0.9 : (0.9 + titleSpring * 0.1);
+    title.style.opacity = titleP.toFixed(3);
+    title.style.transform = `translate(-50%, -50%) scale(${titleScale.toFixed(3)})`;
+
+    // --- Subtitle (8.5 - 10s) ---
+    const subP = clamp((t - 8.5) / 1.2, 0, 1);
+    const subE = easeOut(subP);
+    subtitle.style.opacity = subE.toFixed(3);
+    subtitle.style.transform = `translate(-50%, -50%) translateY(${(1 - subE) * 14}px)`;
+
+    // HUD + scrubber sync
+    hud.textContent = `t=${t.toFixed(2)}s`;
+    if (document.activeElement !== scrub) scrub.value = t.toFixed(2);
+  }
+
+  // ---------- tick ----------
+  function tick(now) {
+    if (!state.last) state.last = now;
+    const dt = (now - state.last) / 1000;
+    state.last = now;
+    if (state.playing) {
+      state.t += dt;
+      if (state.t >= DUR) state.t = 0;
+    }
+    renderFrame(state.t);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ---------- controls ----------
+  btn.addEventListener('click', () => {
+    state.playing = !state.playing;
+    btn.textContent = state.playing ? 'Pause' : 'Play';
+  });
+  scrub.addEventListener('input', (e) => {
+    state.t = parseFloat(e.target.value);
+    state.playing = false;
+    btn.textContent = 'Play';
+    renderFrame(state.t);
+  });
+
+  // Expose for AI inspection / screenshot tools
+  window.__sky = {
+    seek(t) { state.t = clamp(t, 0, DUR); state.playing = false; renderFrame(state.t); },
+    state
+  };
+
+  // Initial paint
+  renderFrame(state.t);
+})();
+</script>
+</body>
+</html>

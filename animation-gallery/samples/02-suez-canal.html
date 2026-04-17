@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>苏伊士运河 / Suez Canal — 12s</title>
+<style>
+  :root {
+    --paper: #f5ead8;
+    --paper-shade: #ebdcc0;
+    --land: #d4b68a;
+    --land-shade: #b8986a;
+    --land-hi: #e4ca9f;
+    --sea-med: #4a8ba8;
+    --sea-red: #2d5a7a;
+    --canal: #ffffff;
+    --ship: #1a2530;
+    --accent: #c95d3a;
+    --ink: #2b2118;
+    --ink-soft: #6b5a48;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #1a1612;
+    font-family: 'PingFang SC', 'Helvetica Neue', system-ui, sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+  }
+  .viewport {
+    position: relative;
+    width: 100vw; height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .frame {
+    position: relative;
+    width: 1920px; height: 1080px;
+    transform-origin: center center;
+    transform: scale(var(--fit, 1));
+    background: var(--paper);
+    overflow: hidden;
+  }
+  /* paper texture */
+  .frame::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.5) 0%, transparent 55%),
+      radial-gradient(ellipse at 70% 80%, rgba(120,90,50,0.08) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .frame::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(120,90,50,0.022) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(90deg, rgba(120,90,50,0.018) 0 1px, transparent 1px 3px);
+    pointer-events: none;
+    z-index: 2;
+    mix-blend-mode: multiply;
+  }
+
+  .stage {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    transform-origin: 52% 50%;
+  }
+
+  /* title */
+  .title-block {
+    position: absolute;
+    left: 96px; top: 72px;
+    z-index: 10;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .title-zh {
+    font-size: 54px;
+    font-weight: 500;
+    letter-spacing: 8px;
+    color: var(--ink);
+    font-family: 'PingFang SC', system-ui, sans-serif;
+  }
+  .title-en {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-style: italic;
+    font-size: 24px;
+    color: var(--ink-soft);
+    letter-spacing: 3px;
+    margin-top: 2px;
+  }
+  .title-rule {
+    width: 64px; height: 2px;
+    background: var(--accent);
+    margin-top: 14px;
+  }
+
+  .chapter {
+    position: absolute;
+    right: 104px; top: 88px;
+    z-index: 10;
+    font-family: Georgia, serif;
+    text-align: right;
+  }
+  .chapter-num {
+    font-size: 14px;
+    letter-spacing: 6px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .chapter-label {
+    font-size: 13px;
+    letter-spacing: 4px;
+    color: var(--ink-soft);
+    margin-top: 4px;
+  }
+
+  /* compass */
+  .compass {
+    position: absolute;
+    left: 104px; bottom: 220px;
+    z-index: 10;
+    width: 64px; height: 64px;
+    border: 1.5px solid var(--ink-soft);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(245,234,216,0.4);
+  }
+  .compass::before {
+    content: '';
+    position: absolute;
+    width: 2px; height: 40px;
+    background: linear-gradient(to bottom, var(--accent) 0 50%, var(--ink) 50% 100%);
+    top: 12px;
+  }
+  .compass-n {
+    position: absolute;
+    top: -22px; left: 50%; transform: translateX(-50%);
+    font-family: Georgia, serif;
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* data panel on right */
+  .data-panel {
+    position: absolute;
+    right: 104px; top: 50%; transform: translateY(-50%);
+    z-index: 10;
+    display: flex; flex-direction: column; gap: 44px;
+    width: 340px;
+  }
+  .data-row {
+    display: flex; flex-direction: column; gap: 6px;
+    opacity: 0;
+    transform: translateY(14px);
+    border-left: 2px solid var(--accent);
+    padding-left: 20px;
+  }
+  .data-num {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 64px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--accent);
+    letter-spacing: -1px;
+  }
+  .data-unit {
+    font-family: Georgia, serif;
+    font-size: 18px;
+    color: var(--ink-soft);
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+  .data-label {
+    font-size: 18px;
+    color: var(--ink);
+    letter-spacing: 4px;
+    margin-top: 6px;
+  }
+
+  /* footer source */
+  .source {
+    position: absolute;
+    left: 96px; bottom: 56px;
+    z-index: 10;
+    font-family: Georgia, serif;
+    font-size: 13px;
+    color: var(--ink-soft);
+    letter-spacing: 3px;
+    opacity: 0;
+  }
+  .source::before {
+    content: '■ ';
+    color: var(--accent);
+    margin-right: 6px;
+  }
+
+  /* city labels */
+  .city {
+    position: absolute;
+    z-index: 8;
+    opacity: 0;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .city-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2.5px solid var(--ink);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  .city-label {
+    font-size: 20px;
+    color: var(--ink);
+    letter-spacing: 3px;
+    font-weight: 500;
+    background: rgba(245,234,216,0.75);
+    padding: 3px 10px;
+    border-radius: 2px;
+  }
+  .city-en {
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--ink-soft);
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+  .city .col { display: flex; flex-direction: column; }
+
+  /* sea label */
+  .sea-label {
+    position: absolute;
+    z-index: 7;
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-size: 28px;
+    letter-spacing: 8px;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    pointer-events: none;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+
+  /* ship */
+  .ship {
+    position: absolute;
+    z-index: 9;
+    left: 0; top: 0;
+    width: 44px; height: 44px;
+    pointer-events: none;
+    opacity: 0;
+    will-change: transform;
+  }
+
+  /* hud + controls */
+  .hud {
+    position: fixed;
+    left: 16px; top: 16px;
+    z-index: 100;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 12px;
+    color: #f5ead8;
+    background: rgba(0,0,0,0.55);
+    padding: 5px 10px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+  }
+  .controls {
+    position: fixed;
+    left: 50%; bottom: 20px;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 18px;
+    background: rgba(0,0,0,0.65);
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+  }
+  .btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: #f5ead8;
+    border: none;
+    color: #1a1612;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scrubber {
+    width: 300px;
+    accent-color: #c95d3a;
+  }
+  .tlabel {
+    font-family: 'SF Mono', monospace;
+    font-size: 11px;
+    color: #f5ead8;
+    min-width: 78px;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+
+  /* canal glow */
+  .canal-glow {
+    filter: drop-shadow(0 0 6px rgba(255,255,255,0.85));
+  }
+</style>
+</head>
+<body>
+<div class="viewport">
+  <div class="frame" id="frame">
+    <div class="stage" id="stage">
+
+      <!-- Map SVG (full 1920x1080) -->
+      <svg width="1920" height="1080" viewBox="0 0 1920 1080"
+           style="position:absolute;inset:0;z-index:4;" preserveAspectRatio="none">
+        <defs>
+          <!-- sea gradients -->
+          <linearGradient id="seaMed" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3d7b98"/>
+            <stop offset="100%" stop-color="#5a9bb6"/>
+          </linearGradient>
+          <linearGradient id="seaRed" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2d5a7a"/>
+            <stop offset="100%" stop-color="#1f4560"/>
+          </linearGradient>
+          <linearGradient id="landGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#e4ca9f"/>
+            <stop offset="55%" stop-color="#d4b68a"/>
+            <stop offset="100%" stop-color="#b8986a"/>
+          </linearGradient>
+          <!-- dune shade -->
+          <radialGradient id="dune1" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="rgba(180,150,100,0.32)"/>
+            <stop offset="100%" stop-color="rgba(180,150,100,0)"/>
+          </radialGradient>
+        </defs>
+
+        <!-- Mediterranean sea band -->
+        <rect x="0" y="0" width="1920" height="290" fill="url(#seaMed)"/>
+        <!-- ripple lines (med) -->
+        <g stroke="rgba(255,255,255,0.18)" stroke-width="1" fill="none">
+          <path d="M 0 90 Q 320 78 640 90 T 1280 90 T 1920 90"/>
+          <path d="M 0 150 Q 280 140 560 150 T 1120 150 T 1680 150 T 1920 150"/>
+          <path d="M 0 210 Q 340 200 680 210 T 1360 210 T 1920 210"/>
+          <path d="M 0 250 Q 260 240 520 250 T 1040 250 T 1560 250 T 1920 250"/>
+        </g>
+
+        <!-- Egypt landmass -->
+        <!-- top coastline (irregular) -->
+        <path d="M 0 290
+                 L 180 285 L 360 292 L 520 280
+                 L 720 272 L 880 278 L 980 270
+                 Q 1000 266 1020 272
+                 L 1160 284 L 1320 278 L 1500 288
+                 L 1700 282 L 1920 286 L 1920 820
+                 L 1820 824 L 1640 820 L 1480 828
+                 L 1320 820 L 1180 826 L 1080 820
+                 Q 1040 820 1020 820
+                 L 900 826 L 740 820 L 580 828
+                 L 400 822 L 200 828 L 0 822 Z"
+              fill="url(#landGrad)"/>
+
+        <!-- dune shadows -->
+        <ellipse cx="340" cy="460" rx="320" ry="90" fill="url(#dune1)"/>
+        <ellipse cx="1400" cy="620" rx="400" ry="120" fill="url(#dune1)"/>
+        <ellipse cx="720" cy="720" rx="280" ry="80" fill="url(#dune1)"/>
+        <ellipse cx="1680" cy="420" rx="260" ry="70" fill="url(#dune1)"/>
+
+        <!-- subtle ridge strokes -->
+        <g stroke="rgba(120,90,50,0.22)" stroke-width="1.2" fill="none">
+          <path d="M 140 380 Q 320 368 500 392 T 760 400"/>
+          <path d="M 900 560 Q 1060 548 1240 570 T 1580 586"/>
+          <path d="M 260 680 Q 440 670 620 690 T 920 694"/>
+          <path d="M 1260 750 Q 1440 740 1620 764 T 1860 760"/>
+        </g>
+
+        <!-- Nile hint (thin western river) -->
+        <path d="M 820 296 Q 820 400 830 520 Q 838 640 850 760 L 860 820"
+              stroke="rgba(74,139,168,0.45)" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+        <!-- Red Sea band -->
+        <rect x="0" y="820" width="1920" height="260" fill="url(#seaRed)"/>
+        <g stroke="rgba(255,255,255,0.14)" stroke-width="1" fill="none">
+          <path d="M 0 880 Q 300 870 600 880 T 1200 880 T 1800 880 T 1920 880"/>
+          <path d="M 0 940 Q 260 930 520 940 T 1040 940 T 1560 940 T 1920 940"/>
+          <path d="M 0 1000 Q 320 988 640 1000 T 1280 1000 T 1920 1000"/>
+        </g>
+
+        <!-- Suez canal path (animated draw-on) -->
+        <!-- Path goes from (1000, 285) to (1050, 820), with a slight bend near Cairo area -->
+        <path id="canal-shadow"
+              d="M 1000 285 L 998 360 Q 994 430 982 500 Q 972 560 976 620 Q 982 700 1012 760 L 1050 820"
+              stroke="rgba(0,0,0,0.18)"
+              stroke-width="8" fill="none"
+              stroke-linecap="round"
+              pathLength="1000"
+              stroke-dasharray="1000"
+              stroke-dashoffset="1000"/>
+        <path id="canal"
+              class="canal-glow"
+              d="M 1000 285 L 998 360 Q 994 430 982 500 Q 972 560 976 620 Q 982 700 1012 760 L 1050 820"
+              stroke="#ffffff"
+              stroke-width="4" fill="none"
+              stroke-linecap="round"
+              pathLength="1000"
+              stroke-dasharray="1000"
+              stroke-dashoffset="1000"/>
+
+        <!-- sea labels (as SVG text so they sit in the SVG layer) -->
+        <text x="960" y="160" text-anchor="middle"
+              font-family="Georgia, serif" font-style="italic"
+              font-size="32" letter-spacing="10"
+              fill="rgba(255,255,255,0.6)">MEDITERRANEAN</text>
+        <text x="1740" y="970" text-anchor="end"
+              font-family="Georgia, serif" font-style="italic"
+              font-size="28" letter-spacing="8"
+              fill="rgba(255,255,255,0.55)">RED SEA</text>
+        <text x="200" y="580" text-anchor="start"
+              font-family="Georgia, serif" font-style="italic"
+              font-size="26" letter-spacing="8"
+              fill="rgba(120,90,50,0.5)">EGYPT</text>
+
+        <!-- canal endpoint markers -->
+        <circle cx="1000" cy="285" r="5" fill="#c95d3a" stroke="#2b2118" stroke-width="1.5"/>
+        <circle cx="1050" cy="820" r="5" fill="#c95d3a" stroke="#2b2118" stroke-width="1.5"/>
+      </svg>
+
+      <!-- cities (HTML layer above SVG) -->
+      <div class="city" id="city-0" style="left: 620px; top: 215px;">
+        <div class="city-dot"></div>
+        <div class="col">
+          <div class="city-label">亚历山大</div>
+          <div class="city-en">Alexandria</div>
+        </div>
+      </div>
+      <div class="city" id="city-1" style="left: 620px; top: 500px;">
+        <div class="city-dot"></div>
+        <div class="col">
+          <div class="city-label">开罗</div>
+          <div class="city-en">Cairo · 开罗</div>
+        </div>
+      </div>
+      <div class="city" id="city-2" style="left: 1080px; top: 788px;">
+        <div class="city-dot"></div>
+        <div class="col">
+          <div class="city-label">苏伊士</div>
+          <div class="city-en">Suez</div>
+        </div>
+      </div>
+
+      <!-- ship -->
+      <svg class="ship" id="ship" viewBox="0 0 44 44">
+        <defs>
+          <filter id="shipShadow" x="-40%" y="-40%" width="180%" height="180%">
+            <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.35"/>
+          </filter>
+        </defs>
+        <g filter="url(#shipShadow)" transform="translate(22 22)">
+          <!-- hull -->
+          <path d="M -14 4 L 14 4 L 11 10 L -11 10 Z" fill="#1a2530"/>
+          <!-- deck -->
+          <rect x="-11" y="-2" width="22" height="6" fill="#2a3a4a"/>
+          <!-- containers -->
+          <rect x="-9" y="-6" width="6" height="4" fill="#c95d3a"/>
+          <rect x="-2" y="-6" width="6" height="4" fill="#4a8ba8"/>
+          <rect x="5" y="-6" width="5" height="4" fill="#c95d3a"/>
+          <!-- bridge -->
+          <rect x="6" y="-10" width="4" height="4" fill="#f5ead8"/>
+          <!-- wake -->
+          <path d="M -16 7 Q -20 5 -22 7" stroke="#ffffff" stroke-width="1.2" fill="none" opacity="0.7"/>
+        </g>
+      </svg>
+
+    </div>
+
+    <!-- UI layer -->
+    <div class="title-block" id="title-block">
+      <div class="title-zh">苏伊士运河</div>
+      <div class="title-en">Suez Canal — a sea-made crossroads</div>
+      <div class="title-rule"></div>
+    </div>
+
+    <div class="chapter" id="chapter">
+      <div class="chapter-num">CH · 02</div>
+      <div class="chapter-label">GEOGRAPHY / 地理</div>
+    </div>
+
+    <div class="compass" id="compass">
+      <span class="compass-n">N</span>
+    </div>
+
+    <div class="data-panel">
+      <div class="data-row" id="data-0">
+        <div>
+          <span class="data-num">1869</span>
+          <div class="data-unit">YEAR OPENED</div>
+        </div>
+        <div class="data-label">1869 年正式通航</div>
+      </div>
+      <div class="data-row" id="data-1">
+        <div>
+          <span class="data-num">12<span style="font-size:36px;">%</span></span>
+          <div class="data-unit">OF GLOBAL TRADE</div>
+        </div>
+        <div class="data-label">承担全球 12% 海运贸易</div>
+      </div>
+      <div class="data-row" id="data-2">
+        <div>
+          <span class="data-num">18,000<span style="font-size:36px;">+</span></span>
+          <div class="data-unit">SHIPS / YEAR</div>
+        </div>
+        <div class="data-label">年均 18,000 余艘船通过</div>
+      </div>
+    </div>
+
+    <div class="source" id="source">SOURCE · SCA 2023 / UNCTAD · 示意图非真实地理</div>
+  </div>
+</div>
+
+<div class="hud" id="hud">t=0.00s</div>
+<div class="controls">
+  <button class="btn" id="playBtn" aria-label="Play/Pause">❚❚</button>
+  <input class="scrubber" id="scrub" type="range" min="0" max="12" step="0.01" value="0" />
+  <div class="tlabel" id="tlabel">0.00 / 12.00</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const DURATION = 12;
+
+  const state = { t: 0, playing: true };
+
+  // fit stage to viewport
+  const frame = document.getElementById('frame');
+  const fit = () => {
+    const sx = window.innerWidth / 1920;
+    const sy = window.innerHeight / 1080;
+    const s = Math.min(sx, sy);
+    frame.style.setProperty('--fit', s);
+  };
+  fit();
+  window.addEventListener('resize', fit);
+
+  const stage = document.getElementById('stage');
+  const titleBlock = document.getElementById('title-block');
+  const chapter = document.getElementById('chapter');
+  const compass = document.getElementById('compass');
+  const canal = document.getElementById('canal');
+  const canalShadow = document.getElementById('canal-shadow');
+  const cities = [0, 1, 2].map(i => document.getElementById('city-' + i));
+  const datas = [0, 1, 2].map(i => document.getElementById('data-' + i));
+  const source = document.getElementById('source');
+  const ship = document.getElementById('ship');
+  const hud = document.getElementById('hud');
+  const scrub = document.getElementById('scrub');
+  const tlabel = document.getElementById('tlabel');
+  const playBtn = document.getElementById('playBtn');
+
+  // pathLength is explicitly 1000
+  const CANAL_LENGTH = 1000;
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+  const easeInOut = (t) => t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+
+  // canal point lookup — use actual path geometry
+  const canalTotal = canal.getTotalLength();
+
+  function renderFrame(t) {
+    // Ken Burns: scale 1.0 → 1.03 over 0..12
+    const kb = easeOutCubic(clamp(t / 12, 0, 1));
+    stage.style.transform = `scale(${1 + 0.03 * kb})`;
+
+    // Title (0-1s fade in + slight up)
+    const titleA = easeOutCubic(clamp(t / 1.0, 0, 1));
+    titleBlock.style.opacity = titleA;
+    titleBlock.style.transform = `translateY(${(1 - titleA) * 12}px)`;
+
+    // chapter label (0.3 - 1.3)
+    const chA = easeOutCubic(clamp((t - 0.3) / 1.0, 0, 1));
+    chapter.style.opacity = chA;
+    chapter.style.transform = `translateY(${(1 - chA) * 10}px)`;
+
+    // compass fade in 0.6-1.6
+    const cpA = easeOutCubic(clamp((t - 0.6) / 1.0, 0, 1));
+    compass.style.opacity = cpA * 0.9;
+    compass.style.transform = `scale(${0.8 + 0.2 * cpA})`;
+
+    // Canal draw-on 1-3s
+    const drawProg = easeInOut(clamp((t - 1) / 2, 0, 1));
+    const offset = (1 - drawProg) * CANAL_LENGTH;
+    canal.setAttribute('stroke-dashoffset', offset);
+    canalShadow.setAttribute('stroke-dashoffset', offset);
+
+    // Cities 3-5s stagger
+    cities.forEach((el, i) => {
+      const start = 3 + i * 0.4;
+      const a = easeOutCubic(clamp((t - start) / 0.6, 0, 1));
+      el.style.opacity = a;
+      el.style.transform = `translateY(${(1 - a) * 10}px)`;
+    });
+
+    // Ship 5-8.5s along path (slower start so t=8 lands around canal middle-south)
+    if (t >= 5 && t <= 8.5) {
+      ship.style.opacity = 1;
+      const rawSp = clamp((t - 5) / 3.5, 0, 1);
+      // ease-in-cubic: starts slow, ends fast — keeps ship nearer middle at t=8
+      const sp = rawSp * rawSp * rawSp;
+      const len = sp * canalTotal;
+      const pt = canal.getPointAtLength(len);
+      // tangent for heading
+      const pt2 = canal.getPointAtLength(Math.min(canalTotal, len + 1));
+      const ang = Math.atan2(pt2.y - pt.y, pt2.x - pt.x) * 180 / Math.PI;
+      // slight sway
+      const sway = Math.sin(t * 3.2) * 1.5;
+      // ship is 44x44; center it on the path
+      ship.style.transform =
+        `translate(${pt.x - 22}px, ${pt.y - 22}px) rotate(${ang - 90 + sway}deg)`;
+    } else if (t < 5) {
+      ship.style.opacity = 0;
+      // park it at the start so seek before 5s is stable
+      const pt = canal.getPointAtLength(0);
+      ship.style.transform = `translate(${pt.x - 22}px, ${pt.y - 22}px) rotate(0deg)`;
+    } else {
+      // after 8.5s: leave ship at end of canal, fade slowly
+      const pt = canal.getPointAtLength(canalTotal);
+      const fade = 1 - clamp((t - 8.5) / 1.5, 0, 1) * 0.45;
+      ship.style.opacity = fade;
+      ship.style.transform = `translate(${pt.x - 22}px, ${pt.y - 22}px) rotate(0deg)`;
+    }
+
+    // Data 8.5-11 stagger
+    datas.forEach((el, i) => {
+      const start = 8.5 + i * 0.55;
+      const a = easeOutCubic(clamp((t - start) / 0.7, 0, 1));
+      el.style.opacity = a;
+      el.style.transform = `translateY(${(1 - a) * 14}px)`;
+    });
+
+    // Source 11-12s
+    const srcA = easeOutCubic(clamp((t - 11) / 1.0, 0, 1));
+    source.style.opacity = srcA;
+    source.style.transform = `translateY(${(1 - srcA) * 6}px)`;
+
+    // HUD + scrubber
+    hud.textContent = `t=${t.toFixed(2)}s`;
+    scrub.value = t;
+    tlabel.textContent = `${t.toFixed(2)} / ${DURATION.toFixed(2)}`;
+  }
+
+  function setTime(t) {
+    state.t = t;
+    renderFrame(t);
+  }
+
+  let lastRaf = null;
+  function tick(ts) {
+    if (state.playing) {
+      if (lastRaf !== null) {
+        const dt = (ts - lastRaf) / 1000;
+        let nextT = state.t + dt;
+        if (nextT > DURATION) nextT = 0;
+        setTime(nextT);
+      }
+      lastRaf = ts;
+    } else {
+      lastRaf = null;
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // controls
+  playBtn.addEventListener('click', () => {
+    state.playing = !state.playing;
+    playBtn.textContent = state.playing ? '❚❚' : '▶';
+    if (!state.playing) lastRaf = null;
+  });
+  scrub.addEventListener('input', (e) => {
+    state.playing = false;
+    playBtn.textContent = '▶';
+    lastRaf = null;
+    setTime(parseFloat(e.target.value));
+  });
+
+  // initial t from URL
+  const initialT = parseFloat(new URL(location.href).searchParams.get('t') || '0');
+  if (initialT > 0) {
+    state.playing = false;
+    playBtn.textContent = '▶';
+    setTime(initialT);
+  } else {
+    setTime(0);
+  }
+})();
+</script>
+</body>
+</html>
