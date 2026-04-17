@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>"SUCCESS" · Off-White</title>
+<style>
+  :root {
+    --paper: #ffffff;
+    --paper-tint: #f5f5f5;
+    --ink: #000000;
+    --ink-soft: #1a1a1a;
+    --ink-300: #bdbdbd;
+    --ink-100: #e6e6e6;
+    --industrial: #ff7300;     /* Off-White signature orange */
+    --industrial-soft: #ffe0c2;
+    --hi-vis: #ddff00;         /* optional fluorescent */
+    --stamp: #d62828;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--paper);
+    font-family: "Helvetica Neue", "Helvetica", "Arial Black", Arial, sans-serif;
+    color: var(--ink);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .stage { position: fixed; inset: 0; display: grid; place-items: center; }
+
+  .scene {
+    position: relative;
+    width: 1920px; height: 1080px;
+    background: var(--paper);
+    transform-origin: center;
+    overflow: hidden;
+  }
+  @media (max-aspect-ratio: 16/9) { .scene { transform: scale(calc(100vw / 1920)); } }
+  @media (min-aspect-ratio: 16/9) { .scene { transform: scale(calc(100vh / 1080)); } }
+
+  /* ---------- Grid / Registration marks (施工感) ---------- */
+
+  .grid-frame {
+    position: absolute;
+    left: 80px; top: 80px; right: 80px; bottom: 80px;
+    border: 1px solid var(--ink-100);
+    pointer-events: none;
+  }
+
+  .corner {
+    position: absolute;
+    width: 28px; height: 28px;
+    border: 2px solid var(--ink);
+  }
+  .corner.tl { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+  .corner.tr { top: -1px; right: -1px; border-left: none; border-bottom: none; }
+  .corner.bl { bottom: -1px; left: -1px; border-right: none; border-top: none; }
+  .corner.br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+  /* ---------- Top meta bar ---------- */
+
+  .meta-top {
+    position: absolute;
+    top: 100px; left: 100px; right: 100px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    font-family: "Helvetica Neue", "Arial", sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .meta-top .left, .meta-top .right { display: flex; flex-direction: column; gap: 6px; }
+  .meta-top .right { text-align: right; align-items: flex-end; }
+  .meta-top .dim { color: var(--ink-300); font-weight: 500; }
+  .meta-top .orange { color: var(--industrial); }
+
+  /* ---------- Main typography block ---------- */
+
+  .main-wrap {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 1720px;
+    text-align: center;
+  }
+
+  .quote {
+    font-family: "Helvetica Neue", "Arial Black", sans-serif;
+    font-weight: 900;
+    font-size: 240px;
+    line-height: 0.9;
+    letter-spacing: -0.045em;
+    color: var(--ink);
+    white-space: nowrap;
+    display: inline-block;
+    transform-origin: center;
+  }
+  .quote .qm {
+    color: var(--ink);
+    display: inline-block;
+    transform-origin: center;
+  }
+  .quote .word {
+    display: inline-block;
+    overflow: visible;
+    position: relative;
+  }
+  .quote .letter {
+    display: inline-block;
+    transform-origin: 50% 100%;
+  }
+
+  /* Check mark — small, beside, NOT the hero */
+  .tick {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(620px, -50%);
+    width: 110px; height: 110px;
+  }
+
+  /* Ruler ticks under main word — ISO施工感 */
+  .ruler {
+    position: absolute;
+    left: 50%; top: calc(50% + 160px);
+    transform: translateX(-50%);
+    width: 1200px; height: 48px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    font-family: "Helvetica Neue", sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    color: var(--ink);
+  }
+  .ruler .seg { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ruler .tick-line { width: 1px; height: 18px; background: var(--ink); }
+  .ruler .tick-line.long { height: 28px; background: var(--industrial); }
+
+  /* Orange subhead */
+  .subhead {
+    position: absolute;
+    left: 50%; top: calc(50% + 250px);
+    transform: translateX(-50%);
+    font-family: "Helvetica Neue", sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--industrial);
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 18px;
+  }
+  .subhead .bar {
+    display: inline-block;
+    width: 80px; height: 2px;
+    background: var(--industrial);
+  }
+
+  /* ---------- Left side rail — "WAITING" / status strip ---------- */
+
+  .rail-left {
+    position: absolute;
+    left: 130px; top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+    transform-origin: left center;
+    font-family: "Helvetica Neue", sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .rail-right {
+    position: absolute;
+    right: 100px; top: 50%;
+    transform: translateY(-50%) rotate(90deg);
+    transform-origin: right center;
+    font-family: "Helvetica Neue", sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--industrial);
+    white-space: nowrap;
+  }
+
+  /* ---------- Bottom meta / version tag ---------- */
+
+  .meta-bot {
+    position: absolute;
+    left: 100px; right: 100px; bottom: 100px;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    font-family: "Helvetica Neue", sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .meta-bot .left, .meta-bot .right { display: flex; flex-direction: column; gap: 6px; }
+  .meta-bot .right { text-align: right; align-items: flex-end; }
+  .meta-bot .big-num {
+    font-size: 72px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .meta-bot .dim { color: var(--ink-300); font-weight: 500; }
+  .meta-bot .orange-box {
+    display: inline-block;
+    background: var(--industrial);
+    color: var(--paper);
+    padding: 6px 14px 5px;
+    letter-spacing: 0.24em;
+  }
+
+  /* ---------- Caption stamp ("FOR DISPLAY PURPOSES ONLY") ---------- */
+
+  .stamp {
+    position: absolute;
+    top: 180px; left: 100px;
+    font-family: "Helvetica Neue", sans-serif;
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--industrial);
+    padding: 6px 10px;
+    border: 2px solid var(--industrial);
+    transform-origin: left top;
+  }
+
+  /* ---------- Scrubber UI ---------- */
+
+  .tl-ui {
+    position: fixed;
+    left: 16px; right: 16px; bottom: 14px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid var(--ink-100);
+    border-radius: 8px;
+    z-index: 20;
+    font-family: "Helvetica Neue", monospace;
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .tl-ui button {
+    background: var(--ink); color: var(--paper);
+    border: none; border-radius: 4px;
+    width: 28px; height: 28px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tl-ui .time { font-variant-numeric: tabular-nums; min-width: 110px; }
+  .tl-ui input[type=range] { flex: 1; accent-color: var(--industrial); }
+
+  .cue-row {
+    position: fixed;
+    left: 16px; right: 16px; bottom: 54px;
+    height: 22px;
+    z-index: 20;
+    pointer-events: none;
+  }
+  .cue-mark {
+    position: absolute;
+    top: 10px;
+    width: 2px; height: 10px;
+    background: var(--industrial);
+    transform: translateX(-1px);
+  }
+  .cue-mark .lbl {
+    position: absolute;
+    left: 6px; top: -10px;
+    font-family: "Helvetica Neue", sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="scene" id="scene">
+
+    <!-- Registration / frame -->
+    <div class="grid-frame">
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+    </div>
+
+    <!-- Top meta bar -->
+    <div class="meta-top">
+      <div class="left">
+        <div>"NEXTFRAME" <span class="dim">/ ATOM.SUCCESS</span></div>
+        <div class="dim">c/o OFF—WHITE™ TRIBUTE</div>
+      </div>
+      <div class="right">
+        <div class="orange">"INDUSTRIAL"</div>
+        <div class="dim">04 / 17 / 2026</div>
+      </div>
+    </div>
+
+    <!-- Corner stamp -->
+    <div class="stamp" id="stamp">"FOR DISPLAY PURPOSES ONLY"</div>
+
+    <!-- Vertical rails -->
+    <div class="rail-left" id="railLeft">— "WAITING..." —</div>
+    <div class="rail-right" id="railRight">— RUN NO. 0421 —</div>
+
+    <!-- Main typography -->
+    <div class="main-wrap" id="mainWrap">
+      <div class="quote" id="quote">
+        <span class="qm" id="qmL">"</span><span class="word" id="word"></span><span class="qm" id="qmR">"</span>
+      </div>
+
+      <svg class="tick" id="tickSvg" viewBox="0 0 110 110">
+        <path id="tickPath"
+              d="M 18 58 L 46 84 L 92 28"
+              fill="none"
+              stroke="#ff7300"
+              stroke-width="14"
+              stroke-linecap="square"
+              stroke-linejoin="miter"
+              stroke-dasharray="130"
+              stroke-dashoffset="130" />
+      </svg>
+
+      <!-- Ruler ticks -->
+      <div class="ruler" id="ruler"></div>
+
+      <!-- Orange subhead -->
+      <div class="subhead" id="subhead">
+        <span class="bar"></span>
+        <span>— "FOR DESIGN PURPOSES ONLY" —</span>
+        <span class="bar"></span>
+      </div>
+    </div>
+
+    <!-- Bottom meta -->
+    <div class="meta-bot">
+      <div class="left">
+        <div class="big-num" id="botBigNum">00</div>
+        <div class="dim">FRAME / <span id="botFrame">000</span></div>
+      </div>
+      <div class="right">
+        <div><span class="orange-box" id="doneStamp">DONE</span></div>
+        <div class="dim">NO. 04.17.2026—0421</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 10.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+</div>
+
+<script>
+  // ---------- Timeline constants ----------
+  const DURATION = 10.0;
+  const FPS = 30;
+
+  const clamp01 = t => Math.max(0, Math.min(1, t));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+
+  function spring(t, k = 220, d = 16, mass = 1) {
+    if (t <= 0) return 0;
+    const wn = Math.sqrt(k / mass);
+    const zeta = d / (2 * Math.sqrt(k * mass));
+    if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+    }
+    return 1 - (1 + wn * t) * Math.exp(-wn * t);
+  }
+  const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+  // ---------- Cues ----------
+  const CUES = [
+    { t: 0.00, label: 'IDLE' },
+    { t: 1.00, label: '"COMPLETE"' },
+    { t: 1.30, label: 'RULER' },
+    { t: 1.50, label: 'TICK ✓' },
+    { t: 1.70, label: 'SUBHEAD' },
+    { t: 2.50, label: 'STAMP' },
+    { t: 3.00, label: 'HOLD' },
+    { t: 9.00, label: 'OUT' },
+  ];
+
+  // ---------- Build letters ----------
+  const WORD = 'COMPLETE';
+  const wordEl = document.getElementById('word');
+  WORD.split('').forEach(ch => {
+    const s = document.createElement('span');
+    s.className = 'letter';
+    s.textContent = ch;
+    wordEl.appendChild(s);
+  });
+  const letterEls = Array.from(wordEl.querySelectorAll('.letter'));
+
+  // ---------- Build ruler ----------
+  const rulerEl = document.getElementById('ruler');
+  const RULER_SEGS = 13; // 0..12
+  for (let i = 0; i < RULER_SEGS; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'seg';
+    const line = document.createElement('div');
+    line.className = 'tick-line' + (i % 4 === 0 ? ' long' : '');
+    const num = document.createElement('div');
+    num.textContent = (i % 4 === 0) ? String(i).padStart(2, '0') : '';
+    num.style.minHeight = '14px';
+    seg.appendChild(line);
+    seg.appendChild(num);
+    rulerEl.appendChild(seg);
+  }
+  const rulerSegs = Array.from(rulerEl.querySelectorAll('.seg'));
+
+  // ---------- Cached refs ----------
+  const quoteEl   = document.getElementById('quote');
+  const qmL       = document.getElementById('qmL');
+  const qmR       = document.getElementById('qmR');
+  const tickSvg   = document.getElementById('tickSvg');
+  const tickPath  = document.getElementById('tickPath');
+  const subheadEl = document.getElementById('subhead');
+  const stampEl   = document.getElementById('stamp');
+  const railLeft  = document.getElementById('railLeft');
+  const railRight = document.getElementById('railRight');
+  const doneStamp = document.getElementById('doneStamp');
+  const botBigNum = document.getElementById('botBigNum');
+  const botFrame  = document.getElementById('botFrame');
+
+  // ---------- Render ----------
+  function render(t) {
+    // ---- Phase 0 :: 0.00 – 1.00 :: idle, paper + rails ----
+    // Rails: hi-vis in-frame slide on first 0.6s
+    const railIn = kern(t, 0.10, 0.60);
+    railLeft.style.opacity  = (0.25 + 0.75 * railIn).toFixed(3);
+    railRight.style.opacity = (0.25 + 0.75 * railIn).toFixed(3);
+    railLeft.style.transform  = `translateY(-50%) translateX(${lerp(-40, 0, railIn)}px) rotate(-90deg)`;
+    railRight.style.transform = `translateY(-50%) translateX(${lerp(40, 0, railIn)}px) rotate(90deg)`;
+
+    // Stamp (corner "FOR DISPLAY PURPOSES ONLY") — slight rotate-in
+    const stampIn = kern(t, 0.20, 0.50);
+    const stampRot = lerp(-14, -4, stampIn);
+    stampEl.style.opacity = stampIn.toFixed(3);
+    stampEl.style.transform = `rotate(${stampRot}deg) scale(${lerp(0.92, 1.0, stampIn)})`;
+
+    // ---- Phase 1 :: 1.00 – 1.40 :: "COMPLETE" slides in from left ----
+    // Each letter springs in with stagger
+    const wordProgress = kern(t, 1.00, 0.35);
+    letterEls.forEach((el, i) => {
+      const lt = t - 1.00 - i * 0.035;
+      const s = spring(Math.max(0, lt), 240, 16); // 0..~1
+      const y = lerp(120, 0, Math.min(1, s));
+      const op = clamp01(lt / 0.08);
+      el.style.transform = `translateY(${y}px)`;
+      el.style.opacity = op.toFixed(3);
+    });
+    // Quote marks — flank in slightly earlier
+    const qmS = spring(Math.max(0, t - 0.85), 200, 14);
+    const qmOpacity = clamp01((t - 0.85) / 0.15);
+    qmL.style.opacity = qmR.style.opacity = qmOpacity.toFixed(3);
+    qmL.style.transform = `translateX(${lerp(-80, 0, Math.min(1, qmS))}px)`;
+    qmR.style.transform = `translateX(${lerp(80, 0, Math.min(1, qmS))}px)`;
+
+    // ---- Phase 2 :: 1.30 – 1.70 :: ruler expands left-to-right ----
+    const rulerP = kern(t, 1.30, 0.45, easeOut);
+    rulerSegs.forEach((seg, i) => {
+      const frac = i / (rulerSegs.length - 1);
+      const local = clamp01((rulerP - frac * 0.85) * 3.0); // staggered reveal
+      seg.style.opacity = local.toFixed(3);
+      seg.style.transform = `translateY(${lerp(10, 0, local)}px)`;
+    });
+
+    // ---- Phase 3 :: 1.50 – 2.00 :: tick ✓ draws (stroke-dashoffset) ----
+    const tickP = kern(t, 1.50, 0.50, easeOut);
+    const dashLen = 130;
+    tickPath.setAttribute('stroke-dashoffset', String(dashLen * (1 - tickP)));
+    // small pop at tickP > 0.9
+    const tickPop = kern(t, 1.90, 0.30, easeOut);
+    const tickScale = 1 + 0.08 * Math.sin(tickPop * Math.PI);
+    tickSvg.style.transform = `translate(620px, -50%) scale(${tickScale.toFixed(3)})`;
+    tickSvg.style.opacity = clamp01(tickP * 2).toFixed(3);
+
+    // ---- Phase 4 :: 1.70 – 2.20 :: subhead rises from bottom ----
+    const subP = spring(Math.max(0, t - 1.70), 200, 18);
+    const subY = lerp(40, 0, Math.min(1, subP));
+    const subO = clamp01((t - 1.70) / 0.25);
+    subheadEl.style.transform = `translateX(-50%) translateY(${subY}px)`;
+    subheadEl.style.opacity = subO.toFixed(3);
+
+    // ---- Phase 5 :: 2.50 – 3.00 :: DONE box + bottom counter lock in ----
+    const doneP = spring(Math.max(0, t - 2.50), 260, 15);
+    const doneScale = lerp(0.6, 1.0, Math.min(1, doneP));
+    doneStamp.style.display = 'inline-block';
+    doneStamp.style.transform = `scale(${doneScale.toFixed(3)})`;
+    doneStamp.style.opacity = clamp01((t - 2.50) / 0.2).toFixed(3);
+
+    // Bottom big number — counts 00 -> 21 over 2.2..3.0s
+    const numP = kern(t, 2.20, 0.80, easeOut);
+    const numVal = Math.round(lerp(0, 21, numP));
+    botBigNum.textContent = String(numVal).padStart(2, '0');
+    botFrame.textContent = String(Math.round(t * FPS)).padStart(3, '0');
+
+    // ---- Phase 6 :: 3.00 – 8.50 :: HOLD + micro letter-spacing breathing ----
+    // The typography "breathes" subtly — a Virgil pass
+    const holdT = clamp01((t - 3.00) / 5.50);
+    const breath = Math.sin(holdT * Math.PI * 2.0) * 0.5 + 0.5; // 0..1
+    const ls = lerp(-0.04, -0.028, breath); // em
+    quoteEl.style.letterSpacing = ls.toFixed(4) + 'em';
+    // faint scale pulse on tick to stay alive
+    const pulseAlive = 1 + 0.015 * Math.sin((t - 3.0) * Math.PI * 1.2);
+    if (t >= 3.0 && t < 8.8) {
+      tickSvg.style.transform = `translate(620px, -50%) scale(${pulseAlive.toFixed(3)})`;
+    }
+
+    // ---- Phase 7 :: 8.80 – 10.00 :: outro — quote marks drift, tick holds, everything fades ----
+    const outP = kern(t, 8.80, 1.20, easeInOut);
+    const outOp = 1 - outP;
+    // letters drift up slightly
+    letterEls.forEach((el, i) => {
+      if (t >= 8.80) {
+        const localOut = clamp01((t - 8.80 - (letterEls.length - 1 - i) * 0.03) / 0.9);
+        const y = lerp(0, -80, localOut);
+        el.style.transform = `translateY(${y}px)`;
+        el.style.opacity = (1 - localOut).toFixed(3);
+      }
+    });
+    // quotes split outward
+    if (t >= 8.80) {
+      qmL.style.transform = `translateX(${lerp(0, -120, outP)}px)`;
+      qmR.style.transform = `translateX(${lerp(0, 120, outP)}px)`;
+      qmL.style.opacity = qmR.style.opacity = outOp.toFixed(3);
+    }
+    // subhead / ruler / tick / rails / stamp fade
+    if (t >= 8.80) {
+      const fade = outOp.toFixed(3);
+      subheadEl.style.opacity = fade;
+      tickSvg.style.opacity = fade;
+      rulerSegs.forEach(s => s.style.opacity = fade);
+      railLeft.style.opacity = fade;
+      railRight.style.opacity = fade;
+      stampEl.style.opacity = fade;
+      doneStamp.style.opacity = fade;
+      botBigNum.style.opacity = fade;
+    } else {
+      botBigNum.style.opacity = '1';
+    }
+  }
+
+  // ---------- Scrubber wiring ----------
+  const scrubber   = document.getElementById('scrubber');
+  const playBtn    = document.getElementById('playBtn');
+  const resetBtn   = document.getElementById('resetBtn');
+  const timeLabel  = document.getElementById('timeLabel');
+  const frameLabel = document.getElementById('frameLabel');
+  const cueRow     = document.getElementById('cueRow');
+
+  let currentT = 0, playing = true, lastFrame = performance.now();
+
+  function setTime(t) {
+    currentT = Math.max(0, Math.min(DURATION, t));
+    scrubber.value = Math.round(currentT / DURATION * 1000);
+    timeLabel.textContent  = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+    frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+    render(currentT);
+  }
+
+  function loop() {
+    const now = performance.now();
+    const dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (playing) {
+      let next = currentT + dt;
+      if (next >= DURATION) next = 0;
+      setTime(next);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  scrubber.addEventListener('input', () => {
+    playing = false;
+    playBtn.textContent = '▶';
+    setTime(scrubber.value / 1000 * DURATION);
+  });
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    lastFrame = performance.now();
+  });
+  resetBtn.addEventListener('click', () => setTime(0));
+
+  CUES.forEach(cue => {
+    const m = document.createElement('div');
+    m.className = 'cue-mark';
+    m.style.left = (cue.t / DURATION * 100) + '%';
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl';
+    lbl.textContent = cue.label;
+    m.appendChild(lbl);
+    cueRow.appendChild(m);
+  });
+
+  setTime(0);
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>
