@@ -175,10 +175,35 @@
     <div class="caption">Double tap to like</div>
 
     <div class="hero">
-      <svg class="particles-svg" id="particles" width="800" height="600" viewBox="-400 -300 800 600"></svg>
+      <svg class="particles-svg" id="particles" width="800" height="600" viewBox="-400 -300 800 600">
+        <defs>
+          <radialGradient id="miniHeartVolume" cx="0.35" cy="0.3" r="0.75">
+            <stop offset="0%" stop-color="#ff8a7a"/>
+            <stop offset="45%" stop-color="#ff3b30"/>
+            <stop offset="100%" stop-color="#b01b14"/>
+          </radialGradient>
+          <filter id="miniHeartShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#ff3b30" flood-opacity="0.32"/>
+          </filter>
+        </defs>
+      </svg>
       <svg class="heart-svg" id="heart" width="420" height="380" viewBox="-210 -190 420 380">
-        <!-- heart path is drawn dynamically to allow fill/stroke control -->
-        <path id="heartPath" d="" />
+        <defs>
+          <!-- #08 radial gradient — soft volume -->
+          <radialGradient id="heartVolume" cx="0.35" cy="0.3" r="0.75">
+            <stop offset="0%" stop-color="#ff8a7a"/>
+            <stop offset="45%" stop-color="#ff3b30"/>
+            <stop offset="100%" stop-color="#b01b14"/>
+          </radialGradient>
+          <!-- soft drop shadow -->
+          <filter id="heartShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#ff3b30" flood-opacity="0.28"/>
+            <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.06"/>
+          </filter>
+        </defs>
+        <!-- base path with volumetric radial fill + drop shadow -->
+        <path id="heartPath" d="" filter="url(#heartShadow)"/>
+        <!-- outline ring (visible only in idle state, fades with fill) -->
         <path id="heartRing" d="" fill="none" />
       </svg>
     </div>
@@ -392,12 +417,13 @@
     return { g, c, seed };
   });
 
-  // prebuild mini-heart bursts (small hearts that float up)
+  // prebuild mini-heart bursts (small hearts with volumetric gradient)
   const miniHeartEls = miniHeartSeeds.map((seed, i) => {
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     p.setAttribute('d', heartPath(seed.size));
-    p.setAttribute('fill', '#ff6b6b');
+    p.setAttribute('fill', 'url(#miniHeartVolume)');
+    p.setAttribute('filter', 'url(#miniHeartShadow)');
     g.appendChild(p);
     particlesSvg.appendChild(g);
     return { g, p, seed };
@@ -437,12 +463,18 @@
     heartPathEl.setAttribute('transform', `scale(${s}) rotate(${rot.toFixed(3)})`);
     heartRingEl.setAttribute('transform', `scale(${s}) rotate(${rot.toFixed(3)})`);
 
-    // fill color: gray outline -> red fill
-    // at f=0: fill none, stroke gray
-    // at f=1: fill red, stroke none
+    // fill color: gray outline -> red volumetric gradient fill
+    // at f=0: transparent (show outline only)
+    // at f=1: full volumetric gradient + drop-shadow
     const fillAlpha = f;
-    const fillColor = `rgba(255, 59, 48, ${fillAlpha})`;
-    heartPathEl.setAttribute('fill', fillColor);
+    if (fillAlpha < 0.01) {
+      heartPathEl.setAttribute('fill', 'transparent');
+      heartPathEl.removeAttribute('filter');
+    } else {
+      heartPathEl.setAttribute('fill', 'url(#heartVolume)');
+      heartPathEl.setAttribute('fill-opacity', fillAlpha);
+      heartPathEl.setAttribute('filter', 'url(#heartShadow)');
+    }
     // stroke: gray only when not fully filled, fades out
     const strokeAlpha = (1 - f) * 0.85;
     heartRingEl.setAttribute('stroke', `rgba(170,170,175, ${strokeAlpha})`);
