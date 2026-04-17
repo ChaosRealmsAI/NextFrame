@@ -34,8 +34,9 @@ fn build_command_creates_bundle_from_clean_checkout_paths() {
         Ok(html) => html,
         Err(err) => panic_test(&format!("read {}: {err}", output.display())),
     };
-    assert!(html.contains("NextFrame bundle (walking stub)"));
+    assert!(html.contains("NextFrame bundle"));
     assert!(html.contains("nf-resolved"));
+    assert!(html.contains("__nfResolved"));
 }
 
 fn temp_output_path() -> Result<PathBuf, String> {

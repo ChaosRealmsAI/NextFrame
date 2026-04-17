@@ -1,24 +1,31 @@
-// nf-core-engine — Source → Resolved compiler + bundler. Walking stub.
-// Real impl: parser → anchor resolver → expr eval → topo sort → bundler → writeBack.
+// nf-core-engine — Source → Resolved compiler + bundler (TS, ADR-025).
+// Pipeline: parse → resolve anchors (expr + topo) → bundle tracks into HTML.
 
 import { parseSource } from "./parser.js";
-import { resolveAnchors } from "./anchor.js";
-import { bundle } from "./bundler.js";
+import { resolveAnchors, type ResolvedBundle } from "./anchor.js";
+import { bundle, type BundleOptions } from "./bundler.js";
 
 export interface BundleResult {
   html: string;
   bytes: number;
   warnings: string[];
+  resolved: ResolvedBundle;
 }
 
-export function compile(source: string): BundleResult {
+export function compile(source: string, options: BundleOptions = {}): BundleResult {
   const ast = parseSource(source);
   const resolved = resolveAnchors(ast);
-  const html = bundle(resolved);
-  return { html, bytes: html.length, warnings: [] };
+  const html = bundle(resolved, options);
+  return { html, bytes: html.length, warnings: [], resolved };
 }
 
-export { parseSource } from "./parser.js";
+export { parseSource, ParseError } from "./parser.js";
+export type { SourceAst, Viewport, AnchorExprNode } from "./parser.js";
 export { resolveAnchors } from "./anchor.js";
+export type { ResolvedBundle } from "./anchor.js";
 export { bundle } from "./bundler.js";
+export type { BundleOptions } from "./bundler.js";
 export { writeBack } from "./writeback.js";
+export type { WriteBackResult } from "./writeback.js";
+export { evalExpr, parseExpr, collectDeps, ExprError } from "./expr.js";
+export { topoSort, CyclicAnchors, UnknownRef } from "./topo.js";
