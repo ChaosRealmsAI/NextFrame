@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Success · TikTok</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #000000;
+    overflow: hidden;
+    font-family: 'SF Pro Display', 'Pretendard', 'Helvetica Neue', Arial, sans-serif;
+    color: #fff;
+  }
+  #stage {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; }
+
+  /* Flash overlay */
+  #flash {
+    position: fixed; inset: 0;
+    background: #fff;
+    pointer-events: none;
+    opacity: 0;
+    mix-blend-mode: screen;
+    z-index: 5;
+  }
+
+  /* ===== Scrubber UI (shared pattern) ===== */
+  .cue-row {
+    position: fixed;
+    left: 0; right: 0; bottom: 74px;
+    height: 22px;
+    pointer-events: none;
+    z-index: 20;
+  }
+  .cue-mark {
+    position: absolute;
+    top: 0; width: 2px; height: 22px;
+    background: linear-gradient(180deg, #fe2c55, #25f4ee);
+    opacity: 0.75;
+    transform: translateX(-1px);
+  }
+  .cue-mark .lbl {
+    position: absolute;
+    bottom: 22px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    font-weight: 800;
+    color: #fff;
+    background: rgba(254, 44, 85, 0.85);
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .tl-ui {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 58px;
+    background: rgba(0,0,0,0.88);
+    border-top: 1px solid rgba(254, 44, 85, 0.5);
+    display: flex; align-items: center;
+    gap: 14px; padding: 0 20px;
+    z-index: 30;
+    backdrop-filter: blur(8px);
+  }
+  .tl-ui button {
+    width: 40px; height: 34px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #fe2c55, #25f4ee);
+    color: #000;
+    border: 0;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  .tl-ui button:hover { transform: scale(1.05); }
+  .tl-ui .time {
+    font-size: 12px;
+    color: #fff;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+    min-width: 120px;
+  }
+  .tl-ui input[type=range] {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    background: linear-gradient(90deg, #fe2c55, #25f4ee);
+    border-radius: 3px;
+    outline: none;
+  }
+  .tl-ui input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2px solid #fe2c55;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(254, 44, 85, 0.8);
+  }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="c"></canvas>
+  </div>
+  <div id="flash"></div>
+
+  <div class="cue-row" id="cueRow"></div>
+  <div class="tl-ui">
+    <button id="playBtn">⏸</button>
+    <button id="resetBtn">↺</button>
+    <span class="time" id="timeLabel">0.00 / 10.00s</span>
+    <input type="range" id="scrubber" min="0" max="1000" value="0">
+    <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+  </div>
+
+<script>
+/* ================================================================
+   TikTok-style Success ✓ — 10s loop, frame-pure
+   ================================================================ */
+
+const DURATION = 10.0;
+const FPS = 30;
+
+// ---------- Math helpers ----------
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn  = x => x * x * x;
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+
+function spring(t, k = 300, d = 12, mass = 1) {
+  if (t <= 0) return 0;
+  const wn = Math.sqrt(k / mass);
+  const zeta = d / (2 * Math.sqrt(k * mass));
+  if (zeta < 1) {
+    const wd = wn * Math.sqrt(1 - zeta * zeta);
+    return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+  }
+  return 1 - (1 + wn * t) * Math.exp(-wn * t);
+}
+
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+// ---------- Canvas setup ----------
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { alpha: false });
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+let W = 0, H = 0;
+
+function resize() {
+  const rect = document.getElementById('stage').getBoundingClientRect();
+  W = rect.width; H = rect.height;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ---------- Deterministic PRNG ----------
+function prng(seed) {
+  let s = seed | 0;
+  return function () {
+    s = (s * 1664525 + 1013904223) | 0;
+    return ((s >>> 0) & 0xffffff) / 0xffffff;
+  };
+}
+
+// ---------- Palette ----------
+const PINK = '#fe2c55';
+const CYAN = '#25f4ee';
+const WHITE = '#ffffff';
+
+// ---------- Particles (precomputed deterministic) ----------
+function makeBurst(seed, count, speedMin, speedMax, sizeMin, sizeMax) {
+  const rand = prng(seed);
+  const arr = [];
+  for (let i = 0; i < count; i++) {
+    const angle = rand() * Math.PI * 2;
+    const speed = lerp(speedMin, speedMax, rand());
+    const size  = lerp(sizeMin, sizeMax, rand());
+    const isPink = rand() < 0.5;
+    const life = lerp(0.9, 1.6, rand());
+    const spin = (rand() - 0.5) * 8;
+    arr.push({ angle, speed, size, isPink, life, spin, seed: rand() });
+  }
+  return arr;
+}
+
+const BURST_1 = makeBurst(1337, 120, 420, 1100, 3, 10);
+const BURST_2 = makeBurst(9001, 50, 260, 700, 2, 7);
+const BURST_3 = makeBurst(7777, 70, 380, 950, 3, 9);
+
+// Floating ambient particles (always on after 1.3s)
+const AMBIENT = (() => {
+  const rand = prng(42);
+  const arr = [];
+  for (let i = 0; i < 40; i++) {
+    arr.push({
+      x: rand(), y: rand(),
+      r: lerp(1.2, 3.2, rand()),
+      isPink: rand() < 0.5,
+      phase: rand() * Math.PI * 2,
+      speed: lerp(0.3, 0.8, rand()),
+      drift: lerp(20, 60, rand()),
+    });
+  }
+  return arr;
+})();
+
+// ---------- Cue points (beat map) ----------
+const CUES = [
+  { t: 0.00, label: 'idle' },
+  { t: 1.00, label: 'flash' },
+  { t: 1.10, label: 'check' },
+  { t: 1.30, label: 'burst 1' },
+  { t: 1.50, label: 'emoji' },
+  { t: 1.80, label: 'DONE!' },
+  { t: 2.50, label: 'burst 2' },
+  { t: 5.00, label: 'pulse' },
+  { t: 6.50, label: 'flash 2' },
+  { t: 7.00, label: 'SLAY!' },
+  { t: 8.00, label: 'burst 3' },
+];
+
+// ---------- Utility draws ----------
+function drawCheck(cx, cy, size, progress, strokeColor, lineWidth) {
+  // check path: from (-0.4, 0.0) -> (-0.1, 0.35) -> (0.45, -0.3) scaled by size
+  const p1 = { x: cx + size * -0.40, y: cy + size *  0.00 };
+  const p2 = { x: cx + size * -0.10, y: cy + size *  0.35 };
+  const p3 = { x: cx + size *  0.45, y: cy + size * -0.30 };
+  // total length weighting: segment1 ≈ 0.45 * size, segment2 ≈ 0.85 * size
+  const L1 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+  const L2 = Math.hypot(p3.x - p2.x, p3.y - p2.y);
+  const T  = L1 + L2;
+  const r  = clamp01(progress);
+  const cover = r * T;
+
+  ctx.save();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  if (cover <= L1) {
+    const k = cover / L1;
+    ctx.lineTo(lerp(p1.x, p2.x, k), lerp(p1.y, p2.y, k));
+  } else {
+    ctx.lineTo(p2.x, p2.y);
+    const k = (cover - L1) / L2;
+    ctx.lineTo(lerp(p2.x, p3.x, k), lerp(p2.y, p3.y, k));
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRing(cx, cy, radius, color, lineWidth, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTextRGBSplit(text, cx, cy, fontPx, weight, splitAmount, italic) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${italic ? 'italic ' : ''}${weight} ${fontPx}px "SF Pro Display","Pretendard","Helvetica Neue",Arial,sans-serif`;
+  // Pink left, Cyan right, White middle - classic chromatic aberration
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = PINK;
+  ctx.fillText(text, cx - splitAmount, cy);
+  ctx.fillStyle = CYAN;
+  ctx.fillText(text, cx + splitAmount, cy);
+  ctx.fillStyle = WHITE;
+  ctx.fillText(text, cx, cy);
+  ctx.restore();
+}
+
+function drawTextSolid(text, cx, cy, fontPx, weight, color, italic) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${italic ? 'italic ' : ''}${weight} ${fontPx}px "SF Pro Display","Pretendard","Helvetica Neue",Arial,sans-serif`;
+  ctx.fillStyle = color;
+  ctx.fillText(text, cx, cy);
+  ctx.restore();
+}
+
+// ---------- Flash overlay ----------
+const flashEl = document.getElementById('flash');
+
+// ---------- Main render ----------
+function render(t) {
+  // Clear to black
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  const cx = W / 2;
+  const cy = H / 2 - 20;
+  const baseSize = Math.min(W, H) * 0.18;
+
+  // ----- 0..1.0s: idle ring with breathing -----
+  // pulsing alpha ring (heartbeat)
+  const heartbeat = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * 1.2); // 1.2 Hz
+  const idleAlpha = t < 1.0
+    ? lerp(0.35, 0.7, heartbeat)
+    : Math.max(0, 0.6 - (t - 1.0) * 4); // fade idle out quickly
+  const idleRadius = baseSize * (1.0 + 0.035 * Math.sin(t * Math.PI * 2 * 1.2));
+  if (idleAlpha > 0.01) {
+    drawRing(cx, cy, idleRadius, '#666', 6, idleAlpha);
+  }
+
+  // ----- 1.0s: screen flash (50ms) -----
+  // plus second flash at 6.5s
+  let flashA = 0;
+  flashA = Math.max(flashA, 1 - clamp01((t - 1.00) / 0.12));
+  flashA = t < 1.00 ? 0 : flashA;
+  flashA = Math.max(flashA, (t >= 6.50 && t < 6.62) ? (1 - (t - 6.50) / 0.12) : 0);
+  flashEl.style.opacity = flashA.toFixed(3);
+
+  // ----- 1.1s+ : gradient ring appears + check draws -----
+  const ringK = spring(Math.max(0, t - 1.10), 300, 12);
+  const ringAlpha = clamp01((t - 1.05) / 0.12);
+  const ringRadius = baseSize * (0.6 + 0.4 * ringK);
+  if (ringAlpha > 0.01) {
+    // gradient via two overlapping arcs (pink top-left, cyan bottom-right)
+    ctx.save();
+    ctx.globalAlpha = ringAlpha;
+    const grad = ctx.createLinearGradient(cx - ringRadius, cy - ringRadius, cx + ringRadius, cy + ringRadius);
+    grad.addColorStop(0, PINK);
+    grad.addColorStop(1, CYAN);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // glow
+    ctx.globalCompositeOperation = 'screen';
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 22;
+    ctx.globalAlpha = ringAlpha * 0.35;
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Pulses at 5s and 8s — ring expands and fades
+  function ringPulse(startT, maxScale) {
+    const p = (t - startT) / 0.6;
+    if (p < 0 || p > 1) return;
+    const k = easeOut(p);
+    const r = baseSize * (1.0 + (maxScale - 1.0) * k);
+    const a = (1 - p) * 0.7;
+    ctx.save();
+    ctx.globalAlpha = a;
+    const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    g.addColorStop(0, PINK); g.addColorStop(1, CYAN);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ringPulse(5.00, 1.8);
+  ringPulse(8.00, 2.1);
+
+  // check draw starts ~1.15s over ~0.25s
+  const checkP = kern(t, 1.15, 0.28, easeOut);
+  if (checkP > 0 && ringAlpha > 0.5) {
+    // chromatic split during draw peak
+    const splitK = Math.sin(clamp01((t - 1.15) / 0.3) * Math.PI) * 6;
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    drawCheck(cx - splitK, cy, baseSize * 0.85, checkP, PINK, 12);
+    drawCheck(cx + splitK, cy, baseSize * 0.85, checkP, CYAN, 12);
+    ctx.restore();
+    drawCheck(cx, cy, baseSize * 0.85, checkP, WHITE, 10);
+  }
+
+  // ----- 1.30s: Burst 1 (120 particles) -----
+  function drawBurst(startT, burst, maxRadius, life) {
+    const p = (t - startT) / life;
+    if (p < 0 || p > 1.2) return;
+    const k = easeOut(clamp01(p));
+    burst.forEach(ptc => {
+      const dist = ptc.speed * life * k;
+      if (dist > maxRadius) return;
+      const x = cx + Math.cos(ptc.angle) * dist;
+      const y = cy + Math.sin(ptc.angle) * dist;
+      const alpha = Math.max(0, 1 - p / ptc.life);
+      if (alpha <= 0) return;
+      const color = ptc.isPink ? PINK : CYAN;
+      // trail (motion streak)
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.6;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = ptc.size * 0.8;
+      ctx.lineCap = 'round';
+      const tx = cx + Math.cos(ptc.angle) * Math.max(0, dist - 30);
+      const ty = cy + Math.sin(ptc.angle) * Math.max(0, dist - 30);
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.restore();
+      // dot
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, ptc.size, 0, Math.PI * 2);
+      ctx.fill();
+      // glow
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = alpha * 0.5;
+      ctx.beginPath();
+      ctx.arc(x, y, ptc.size * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  drawBurst(1.30, BURST_1, Math.max(W, H), 1.4);
+  drawBurst(2.50, BURST_2, Math.max(W, H) * 0.7, 1.0);
+  drawBurst(8.00, BURST_3, Math.max(W, H), 1.3);
+
+  // Ambient floaters (after 1.3s until end)
+  if (t > 1.3) {
+    const af = clamp01((t - 1.3) / 0.5) * clamp01((DURATION - t) / 0.5);
+    AMBIENT.forEach(p => {
+      const yy = ((p.y + (t - 1.3) * p.speed * 0.02) % 1) * H;
+      const xx = p.x * W + Math.sin(t * 0.7 + p.phase) * p.drift;
+      ctx.save();
+      ctx.globalAlpha = 0.55 * af * (0.6 + 0.4 * Math.sin(t * 2 + p.phase));
+      ctx.fillStyle = p.isPink ? PINK : CYAN;
+      ctx.beginPath();
+      ctx.arc(xx, yy, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 0.25 * af;
+      ctx.beginPath();
+      ctx.arc(xx, yy, p.r * 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  // ----- 1.5s: Emojis pop out (5 emoji) -----
+  const EMOJIS = [
+    { char: '🔥', ang: -Math.PI / 2,            dist: 180 },
+    { char: '💯', ang: -Math.PI / 2 - 1.1,      dist: 210 },
+    { char: '⚡', ang: -Math.PI / 2 + 1.1,      dist: 210 },
+    { char: '✨', ang: -Math.PI / 2 - 2.1,      dist: 160 },
+    { char: '🎯', ang: -Math.PI / 2 + 2.1,      dist: 160 },
+  ];
+  EMOJIS.forEach((e, i) => {
+    const local = t - (1.50 + i * 0.05);
+    if (local < 0) return;
+    const s = spring(local, 320, 11);
+    const d = e.dist * s;
+    const x = cx + Math.cos(e.ang) * d;
+    const y = cy + Math.sin(e.ang) * d - 20;
+    const alpha = clamp01(local / 0.1) * Math.max(0, 1 - Math.max(0, (t - 4.5)) * 0.4);
+    const scale = lerp(0.4, 1.0, Math.min(1, s)) * (1 + 0.08 * Math.sin(t * 4 + i));
+    if (alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = `${Math.round(64 * scale)}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(e.char, x, y);
+    ctx.restore();
+  });
+
+  // ----- 1.8s: "DONE ✓" big italic text from bottom, spring shake -----
+  const doneLocal = t - 1.80;
+  if (doneLocal > 0 && doneLocal < 5.0) {
+    const sp = spring(doneLocal, 280, 11);
+    const yOffset = lerp(180, 0, Math.min(1.2, sp));
+    const overshoot = Math.sin(doneLocal * 18) * Math.exp(-doneLocal * 5) * 8;
+    const alpha = clamp01(doneLocal / 0.08) * (doneLocal < 4.2 ? 1 : clamp01((5.0 - doneLocal) / 0.8));
+    const scale = 0.9 + 0.15 * Math.min(1, sp);
+    const textY = cy + baseSize * 1.6 + yOffset + overshoot;
+    const fontPx = Math.round(Math.min(W, H) * 0.15 * scale);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // RGB split intensity high at impact, decays
+    const split = Math.max(2, 14 * Math.exp(-doneLocal * 2.5));
+    drawTextRGBSplit('DONE!', cx, textY, fontPx, 900, split, true);
+    // underline flicker
+    if (doneLocal > 0.2) {
+      ctx.save();
+      ctx.globalAlpha = alpha * (0.6 + 0.4 * Math.sin(t * 10));
+      const g = ctx.createLinearGradient(cx - fontPx * 1.3, 0, cx + fontPx * 1.3, 0);
+      g.addColorStop(0, PINK); g.addColorStop(1, CYAN);
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(cx - fontPx * 1.2, textY + fontPx * 0.55);
+      ctx.lineTo(cx + fontPx * 1.2, textY + fontPx * 0.55);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // ----- 7.0s: "SLAY!" text bursts in with ✨ -----
+  const slayLocal = t - 7.00;
+  if (slayLocal > 0 && slayLocal < 2.5) {
+    const sp = spring(slayLocal, 320, 10);
+    const scale = lerp(0.2, 1.0, Math.min(1.1, sp));
+    const wobble = Math.sin(slayLocal * 16) * Math.exp(-slayLocal * 4) * 10;
+    const alpha = clamp01(slayLocal / 0.08) * (slayLocal < 2.0 ? 1 : clamp01((2.5 - slayLocal) / 0.5));
+    const fontPx = Math.round(Math.min(W, H) * 0.18 * scale);
+    const split = Math.max(2, 18 * Math.exp(-slayLocal * 2));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    drawTextRGBSplit('✨ SLAY ✨', cx, cy, fontPx, 900, split, true);
+    ctx.restore();
+    // rotating ring
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.translate(cx, cy);
+    ctx.rotate(slayLocal * 2.5);
+    const g = ctx.createLinearGradient(-200, 0, 200, 0);
+    g.addColorStop(0, PINK); g.addColorStop(0.5, WHITE); g.addColorStop(1, CYAN);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([12, 18]);
+    ctx.beginPath();
+    ctx.arc(0, 0, baseSize * (1.8 + 0.15 * Math.sin(slayLocal * 5)), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    // little wobble applied to whole canvas would be nice, but keep frame-pure
+  }
+
+  // ----- Bottom hashtag / hype text (subtle, always after 2s) -----
+  if (t > 2.0 && t < 9.5) {
+    const a = clamp01((t - 2.0) / 0.3) * clamp01((9.5 - t) / 0.3);
+    const bump = 1 + 0.04 * Math.sin(t * 3);
+    ctx.save();
+    ctx.globalAlpha = a * 0.85;
+    const fontPx = Math.round(Math.min(W, H) * 0.035 * bump);
+    drawTextSolid('#SUCCESS #NEXTFRAME #fyp', cx, H - 120, fontPx, 800, '#888', true);
+    ctx.restore();
+  }
+}
+
+// ---------- Scrubber wiring (shared pattern) ----------
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+
+let currentT = 0, playing = true, lastFrame = performance.now();
+
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+
+scrubber.addEventListener('input', () => {
+  playing = false;
+  playBtn.textContent = '▶';
+  setTime(scrubber.value / 1000 * DURATION);
+});
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+resetBtn.addEventListener('click', () => setTime(0));
+
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl';
+  lbl.textContent = cue.label;
+  m.appendChild(lbl);
+  cueRow.appendChild(m);
+});
+
+setTime(0);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
