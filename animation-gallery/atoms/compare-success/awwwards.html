@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>UNLOCKED — Cinematic Success Atom</title>
+<style>
+  :root {
+    --bg-0: #05050a;
+    --bg-1: #0a0612;
+    --bg-2: #1a0a2e;
+    --gold-1: #ffe27a;
+    --gold-2: #ffd54a;
+    --gold-3: #ff9a2b;
+    --ember:  #ff5a1f;
+    --ink:    #f5f2e8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #000;
+    color: var(--ink);
+    font-family: "Inter", "SF Pro Display", -apple-system, system-ui, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* stage — 1920x1080 locked */
+  .stage {
+    position: absolute; left: 50%; top: calc(50% - 40px);
+    transform: translate(-50%, -50%);
+    width: 1920px; height: 1080px;
+    background: radial-gradient(ellipse at 50% 55%, #1a0a2e 0%, #0a0612 45%, #05050a 80%);
+    overflow: hidden;
+    box-shadow: 0 40px 120px rgba(0,0,0,0.7);
+  }
+  /* layered canvases */
+  .stage canvas, .stage .dom {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+  }
+  .dom { pointer-events: none; }
+
+  /* grain */
+  .grain {
+    position: absolute; inset: 0;
+    opacity: 0.08;
+    mix-blend-mode: overlay;
+    background-image:
+      radial-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
+      radial-gradient(rgba(255,255,255,0.3) 1px, transparent 1px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 2px;
+  }
+
+  /* word layer — extra bold display type, positioned BELOW the disc as the hero element */
+  .word-wrap {
+    position: absolute;
+    left: 0; right: 0;
+    top: 62%;
+    display: flex; justify-content: center; align-items: center;
+    will-change: transform, opacity;
+    filter: drop-shadow(0 10px 50px rgba(255, 180, 60, 0.35));
+    mix-blend-mode: normal;
+    z-index: 10;
+  }
+  .word {
+    font-family: "Helvetica Neue", "Arial Black", "Inter", "SF Pro Display", sans-serif;
+    font-weight: 900;
+    font-size: 220px;
+    letter-spacing: -0.055em;
+    line-height: 0.9;
+    white-space: nowrap;
+    position: relative;
+    /* solid gold for reliability; each char gets its own gradient via JS span gradient if desired */
+    color: #ffd54a;
+    text-shadow:
+      0 0 20px rgba(255, 200, 80, 0.55),
+      0 8px 30px rgba(180, 80, 20, 0.45),
+      0 2px 0 rgba(120, 50, 10, 0.35);
+  }
+  .word-row {
+    display: flex; gap: 0.01em;
+    white-space: nowrap;
+  }
+  .char {
+    display: inline-block;
+    will-change: transform, opacity;
+    transform-origin: 50% 100%;
+  }
+
+  /* kicker above — floats above disc */
+  .kicker {
+    position: absolute;
+    left: 0; right: 0; top: 22%;
+    text-align: center;
+    font-family: "Helvetica Neue", "Inter", sans-serif;
+    font-weight: 500;
+    font-size: 24px;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    color: rgba(255, 226, 122, 0.9);
+    text-shadow: 0 0 20px rgba(255, 180, 60, 0.6);
+    will-change: opacity, transform;
+    z-index: 10;
+  }
+
+  /* sub line below word */
+  .sub {
+    position: absolute;
+    left: 0; right: 0; top: 82%;
+    text-align: center;
+    font-family: "Georgia", "Times New Roman", serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 34px;
+    color: rgba(245, 242, 232, 0.82);
+    letter-spacing: 0.01em;
+    will-change: opacity, transform;
+    z-index: 10;
+  }
+
+  /* rank / id small tag */
+  .id-tag {
+    position: absolute;
+    left: 50%; top: 91%;
+    transform: translateX(-50%);
+    font-family: "SF Mono", "Menlo", "Courier New", monospace;
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    color: rgba(255, 226, 122, 0.55);
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 226, 122, 0.22);
+    padding: 7px 16px;
+    border-radius: 2px;
+    will-change: opacity;
+    z-index: 10;
+  }
+
+  /* flash overlay */
+  .flash {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 50% 40%,
+      rgba(255, 250, 230, 0.95) 0%,
+      rgba(255, 210, 120, 0.55) 20%,
+      rgba(255, 150, 60, 0.1) 45%,
+      transparent 70%);
+    mix-blend-mode: screen;
+    will-change: opacity;
+    pointer-events: none;
+    z-index: 11;
+  }
+  /* vignette */
+  .vignette {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 55%,
+      transparent 45%,
+      rgba(0,0,0,0.45) 82%,
+      rgba(0,0,0,0.8) 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ---- bottom scrubber UI ---- */
+  .cue-row {
+    position: fixed; left: 40px; right: 40px; bottom: 64px;
+    height: 20px;
+  }
+  .cue-mark {
+    position: absolute;
+    width: 1px; height: 10px;
+    background: rgba(255, 226, 122, 0.55);
+    top: 5px;
+  }
+  .cue-mark .lbl {
+    position: absolute;
+    top: -22px; left: 50%;
+    transform: translateX(-50%);
+    font-family: "JetBrains Mono", "SF Mono", monospace;
+    font-size: 9px;
+    color: rgba(255, 226, 122, 0.6);
+    white-space: nowrap;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .tl-ui {
+    position: fixed; left: 40px; right: 40px; bottom: 20px;
+    display: flex; align-items: center; gap: 14px;
+    font-family: "JetBrains Mono", "SF Mono", monospace;
+    font-size: 12px;
+    color: #c8c2b0;
+  }
+  .tl-ui button {
+    background: rgba(20, 14, 30, 0.7);
+    color: var(--gold-1);
+    border: 1px solid rgba(255, 226, 122, 0.3);
+    padding: 6px 12px;
+    font-family: inherit; font-size: 13px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.15s;
+  }
+  .tl-ui button:hover { background: rgba(40, 28, 60, 0.8); }
+  .tl-ui .time { min-width: 140px; color: var(--gold-1); }
+  .tl-ui #scrubber {
+    flex: 1;
+    height: 3px;
+    background: rgba(255,255,255,0.12);
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none; border-radius: 2px; cursor: pointer;
+  }
+  .tl-ui #scrubber::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: linear-gradient(180deg, #fff8d8, #ffb347);
+    border: 1px solid rgba(0,0,0,0.35);
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(255,180,60,0.6);
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <canvas id="bg"></canvas>         <!-- nebula + streaks -->
+  <canvas id="rays"></canvas>       <!-- light beams radiating -->
+  <canvas id="disk"></canvas>       <!-- central burst disc + check -->
+  <canvas id="particles"></canvas>  <!-- gold embers -->
+  <canvas id="rings"></canvas>      <!-- expanding rings -->
+
+  <div class="dom">
+    <div class="kicker" id="kicker">Achievement&nbsp;&nbsp;·&nbsp;&nbsp;Tier&nbsp;VII</div>
+    <div class="word-wrap" id="wordWrap">
+      <div class="word">
+        <div class="word-row" id="wordRow"></div>
+      </div>
+    </div>
+    <div class="sub" id="sub">the final gate yields — a new horizon opens</div>
+    <div class="id-tag" id="idTag">No. 0421 &nbsp;·&nbsp; 2026.04.17</div>
+    <div class="flash" id="flash" style="opacity:0"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+  </div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button><button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 10.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <span class="time" id="frameLabel" style="min-width:100px;text-align:right">frame 0 / 300</span>
+</div>
+
+<script>
+/* =======================================================================
+ * Cinematic Success — frame-pure atom.
+ * All visuals derive from setTime(t). No CSS animation / transition.
+ * ======================================================================= */
+
+const DURATION = 10.0;
+const FPS = 30;
+
+/* ---------- math ---------- */
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn = x => x * x * x;
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+const easeOutExpo = x => x >= 1 ? 1 : 1 - Math.pow(2, -10 * x);
+const easeOutBack = (x, s=1.70158) => 1 + (s+1) * Math.pow(x-1, 3) + s * Math.pow(x-1, 2);
+
+function spring(t, k = 180, d = 10, mass = 1.2) {
+  if (t <= 0) return 0;
+  const wn = Math.sqrt(k / mass);
+  const zeta = d / (2 * Math.sqrt(k * mass));
+  if (zeta < 1) {
+    const wd = wn * Math.sqrt(1 - zeta * zeta);
+    return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+  }
+  return 1 - (1 + wn * t) * Math.exp(-wn * t);
+}
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+/* seeded rng so particles are deterministic each frame */
+function hash(i) {
+  let x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* ---------- stage / canvases ---------- */
+const stage = document.getElementById('stage');
+const W = 1920, H = 1080;
+function setupCanvas(id) {
+  const c = document.getElementById(id);
+  c.width = W; c.height = H;
+  return c.getContext('2d');
+}
+const bgCtx = setupCanvas('bg');
+const raysCtx = setupCanvas('rays');
+const diskCtx = setupCanvas('disk');
+const particlesCtx = setupCanvas('particles');
+const ringsCtx = setupCanvas('rings');
+
+/* stage center — disc sits in upper half so big WORD has room below */
+const STAGE_CX = W * 0.5;
+const STAGE_CY = H * 0.40;
+
+const wordRow = document.getElementById('wordRow');
+const wordWrap = document.getElementById('wordWrap');
+const kicker = document.getElementById('kicker');
+const sub = document.getElementById('sub');
+const idTag = document.getElementById('idTag');
+const flash = document.getElementById('flash');
+
+/* Build the display word per-char so we can stagger */
+const WORD = 'UNLOCKED';
+const charEls = [];
+for (let i = 0; i < WORD.length; i++) {
+  const span = document.createElement('span');
+  span.className = 'char';
+  span.textContent = WORD[i];
+  wordRow.appendChild(span);
+  charEls.push(span);
+}
+
+/* ---------- particles (gold embers) ---------- */
+const PARTICLE_COUNT = 140;
+const particles = [];
+for (let i = 0; i < PARTICLE_COUNT; i++) {
+  const theta = (i / PARTICLE_COUNT) * Math.PI * 2 + hash(i) * 0.6;
+  const speed = 520 + hash(i + 101) * 520; // px/s radial
+  const size  = 1.5 + hash(i + 202) * 4.5;
+  const life  = 2.0 + hash(i + 303) * 1.8; // seconds visible
+  const drift = (hash(i + 404) - 0.5) * 0.8; // sideways curl
+  const gravity = 120 + hash(i + 505) * 80;  // fall after launch
+  const hue = hash(i + 606);
+  particles.push({ theta, speed, size, life, drift, gravity, hue });
+}
+
+/* streak particles (horizontal film streaks for cinematic feel) */
+const STREAK_COUNT = 14;
+const streaks = [];
+for (let i = 0; i < STREAK_COUNT; i++) {
+  streaks.push({
+    y: 0.12 + hash(i * 7.7) * 0.76,
+    speed: 240 + hash(i * 3.3) * 320,
+    len: 180 + hash(i * 1.1) * 320,
+    alpha: 0.06 + hash(i * 5.5) * 0.08,
+    phase: hash(i * 9.9),
+  });
+}
+
+/* ---------- cues ---------- */
+const CUES = [
+  { t: 0.00, label: 'stage' },
+  { t: 1.00, label: 'ignite' },
+  { t: 1.20, label: 'check' },
+  { t: 1.50, label: 'embers' },
+  { t: 1.80, label: 'word' },
+  { t: 2.50, label: 'flash' },
+  { t: 3.00, label: 'settle' },
+  { t: 6.50, label: 'hold' },
+  { t: 9.00, label: 'fade' },
+];
+
+/* =======================================================================
+ * RENDER  (pure function of t)
+ * ======================================================================= */
+function render(t) {
+  /* ============ BG — nebula breathing, streaks drifting ============ */
+  bgCtx.clearRect(0, 0, W, H);
+  // base radial is in CSS; we overlay subtle moving color clouds
+  const breath = 0.5 + 0.5 * Math.sin(t * 0.55);
+  const cx = STAGE_CX, cy = STAGE_CY;
+
+  // soft purple-gold cloud
+  {
+    const g = bgCtx.createRadialGradient(
+      cx + Math.sin(t * 0.3) * 60,
+      cy + Math.cos(t * 0.27) * 40,
+      40,
+      cx, cy, 900);
+    g.addColorStop(0, `rgba(80, 40, 110, ${0.32 + breath * 0.12})`);
+    g.addColorStop(0.5, `rgba(40, 20, 60, ${0.18})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    bgCtx.fillStyle = g;
+    bgCtx.fillRect(0, 0, W, H);
+  }
+  // deep gold rim glow (appears after ignite)
+  const igniteK = clamp01((t - 0.8) / 0.6);
+  if (igniteK > 0) {
+    const g = bgCtx.createRadialGradient(cx, cy, 180, cx, cy, 760);
+    g.addColorStop(0, `rgba(255, 180, 70, ${0.22 * igniteK})`);
+    g.addColorStop(0.5, `rgba(255, 100, 40, ${0.1 * igniteK})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    bgCtx.fillStyle = g;
+    bgCtx.fillRect(0, 0, W, H);
+  }
+
+  // subtle horizontal streaks (cinematic film vibe)
+  bgCtx.globalCompositeOperation = 'screen';
+  for (const s of streaks) {
+    const x = ((t * s.speed + s.phase * W) % (W + s.len + 200)) - s.len - 100;
+    const y = s.y * H;
+    const a = s.alpha * (0.5 + 0.5 * Math.sin(t * 0.8 + s.phase * 6.28));
+    const grad = bgCtx.createLinearGradient(x, y, x + s.len, y);
+    grad.addColorStop(0, 'rgba(255, 220, 140, 0)');
+    grad.addColorStop(0.5, `rgba(255, 220, 140, ${a})`);
+    grad.addColorStop(1, 'rgba(255, 220, 140, 0)');
+    bgCtx.fillStyle = grad;
+    bgCtx.fillRect(x, y - 0.6, s.len, 1.2);
+  }
+  bgCtx.globalCompositeOperation = 'source-over';
+
+  // stars (few, bright)
+  for (let i = 0; i < 60; i++) {
+    const sx = hash(i * 1.17) * W;
+    const sy = hash(i * 2.31) * H;
+    const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(t * 2 + i));
+    const sz = 0.6 + hash(i * 3.73) * 1.4;
+    bgCtx.fillStyle = `rgba(255, 240, 200, ${0.22 * twinkle})`;
+    bgCtx.fillRect(sx, sy, sz, sz);
+  }
+
+  /* ============ RAYS — radial light beams from center ============ */
+  raysCtx.clearRect(0, 0, W, H);
+  const raysK = kern(t, 0.95, 0.4);
+  const raysSettle = 1 - kern(t, 2.5, 2.0, easeInOut); // fade after peak
+  const raysAlpha = raysK * (0.25 + 0.75 * raysSettle);
+  if (raysAlpha > 0.005) {
+    raysCtx.save();
+    raysCtx.translate(cx, cy);
+    raysCtx.globalCompositeOperation = 'screen';
+    const N_RAYS = 36;
+    const baseRot = t * 0.08;
+    for (let i = 0; i < N_RAYS; i++) {
+      const ang = (i / N_RAYS) * Math.PI * 2 + baseRot;
+      const lenVar = 380 + hash(i * 1.7) * 280;
+      const widthVar = 6 + hash(i * 3.3) * 14;
+      const g = raysCtx.createLinearGradient(0, 0,
+        Math.cos(ang) * lenVar,
+        Math.sin(ang) * lenVar);
+      g.addColorStop(0, `rgba(255, 230, 140, ${0.55 * raysAlpha})`);
+      g.addColorStop(0.35, `rgba(255, 170, 70, ${0.22 * raysAlpha})`);
+      g.addColorStop(1, 'rgba(255, 120, 40, 0)');
+      raysCtx.fillStyle = g;
+      raysCtx.beginPath();
+      raysCtx.moveTo(0, 0);
+      raysCtx.lineTo(Math.cos(ang - 0.004 * widthVar) * lenVar, Math.sin(ang - 0.004 * widthVar) * lenVar);
+      raysCtx.lineTo(Math.cos(ang + 0.004 * widthVar) * lenVar, Math.sin(ang + 0.004 * widthVar) * lenVar);
+      raysCtx.closePath();
+      raysCtx.fill();
+    }
+    raysCtx.restore();
+  }
+
+  /* ============ DISC + CHECK MARK ============ */
+  diskCtx.clearRect(0, 0, W, H);
+  // disc grows with spring at 1.0s
+  const discSprT = Math.max(0, t - 1.00);
+  const discS = spring(discSprT * 2.4, 180, 10, 1.2);
+  const discR = clamp(discS, 0, 1.15) * 170;
+  const discFade = 1 - kern(t, 6.5, 3.5, easeInOut); // hold then fade late
+  const discAlpha = clamp01(kern(t, 1.0, 0.2)) * (0.55 * discFade + 0.45);
+  if (discR > 1) {
+    diskCtx.save();
+    diskCtx.translate(cx, cy);
+    // outer hot halo
+    {
+      const g = diskCtx.createRadialGradient(0, 0, discR * 0.3, 0, 0, discR * 1.9);
+      g.addColorStop(0, `rgba(255, 245, 190, ${0.75 * discAlpha})`);
+      g.addColorStop(0.4, `rgba(255, 180, 80, ${0.35 * discAlpha})`);
+      g.addColorStop(1, 'rgba(255, 90, 30, 0)');
+      diskCtx.fillStyle = g;
+      diskCtx.beginPath(); diskCtx.arc(0, 0, discR * 1.9, 0, Math.PI * 2); diskCtx.fill();
+    }
+    // molten core
+    {
+      const g = diskCtx.createRadialGradient(0, -discR * 0.25, 4, 0, 0, discR);
+      g.addColorStop(0, `rgba(255, 250, 230, ${1.0 * discAlpha})`);
+      g.addColorStop(0.55, `rgba(255, 200, 90, ${0.9 * discAlpha})`);
+      g.addColorStop(1, `rgba(220, 90, 20, ${0.8 * discAlpha})`);
+      diskCtx.fillStyle = g;
+      diskCtx.beginPath(); diskCtx.arc(0, 0, discR, 0, Math.PI * 2); diskCtx.fill();
+    }
+    // rim
+    diskCtx.lineWidth = 2;
+    diskCtx.strokeStyle = `rgba(255, 235, 180, ${0.85 * discAlpha})`;
+    diskCtx.beginPath(); diskCtx.arc(0, 0, discR, 0, Math.PI * 2); diskCtx.stroke();
+
+    // ---- check mark ----
+    // draws from t=1.15 over 0.55s
+    const chkP = kern(t, 1.15, 0.55, easeOutExpo);
+    if (chkP > 0) {
+      // checkmark geometry in disc space: two segments
+      const pts = [
+        { x: -0.42, y: 0.02 },  // start
+        { x: -0.08, y: 0.36 },  // elbow
+        { x:  0.48, y: -0.32 }, // tip
+      ];
+      const scl = discR;
+      const seg1Len = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const seg2Len = Math.hypot(pts[2].x - pts[1].x, pts[2].y - pts[1].y);
+      const total = seg1Len + seg2Len;
+      const drawn = chkP * total;
+      diskCtx.save();
+      diskCtx.scale(scl, scl);
+      diskCtx.lineCap = 'round';
+      diskCtx.lineJoin = 'round';
+      diskCtx.lineWidth = 0.09;
+      // drop shadow under stroke
+      diskCtx.strokeStyle = 'rgba(60, 20, 0, 0.45)';
+      diskCtx.beginPath();
+      diskCtx.moveTo(pts[0].x, pts[0].y);
+      if (drawn <= seg1Len) {
+        const k = drawn / seg1Len;
+        diskCtx.lineTo(lerp(pts[0].x, pts[1].x, k), lerp(pts[0].y, pts[1].y, k));
+      } else {
+        diskCtx.lineTo(pts[1].x, pts[1].y);
+        const k = (drawn - seg1Len) / seg2Len;
+        diskCtx.lineTo(lerp(pts[1].x, pts[2].x, k), lerp(pts[1].y, pts[2].y, k));
+      }
+      diskCtx.stroke();
+      // main stroke
+      diskCtx.strokeStyle = '#2a1000';
+      diskCtx.lineWidth = 0.075;
+      diskCtx.beginPath();
+      diskCtx.moveTo(pts[0].x, pts[0].y);
+      if (drawn <= seg1Len) {
+        const k = drawn / seg1Len;
+        diskCtx.lineTo(lerp(pts[0].x, pts[1].x, k), lerp(pts[0].y, pts[1].y, k));
+      } else {
+        diskCtx.lineTo(pts[1].x, pts[1].y);
+        const k = (drawn - seg1Len) / seg2Len;
+        diskCtx.lineTo(lerp(pts[1].x, pts[2].x, k), lerp(pts[1].y, pts[2].y, k));
+      }
+      diskCtx.stroke();
+      diskCtx.restore();
+    }
+    diskCtx.restore();
+  }
+
+  /* ============ RINGS — shockwaves ============ */
+  ringsCtx.clearRect(0, 0, W, H);
+  ringsCtx.save();
+  ringsCtx.translate(cx, cy);
+  ringsCtx.globalCompositeOperation = 'screen';
+  // three rings staggered
+  const ringStarts = [1.05, 1.25, 1.55];
+  for (let i = 0; i < ringStarts.length; i++) {
+    const rp = kern(t, ringStarts[i], 1.8, easeOutExpo);
+    if (rp > 0 && rp < 1) {
+      const rad = 30 + rp * 780;
+      const alpha = (1 - rp) * 0.75;
+      ringsCtx.lineWidth = (1 - rp) * 6 + 0.4;
+      ringsCtx.strokeStyle = `rgba(255, 220, 130, ${alpha})`;
+      ringsCtx.beginPath();
+      ringsCtx.arc(0, 0, rad, 0, Math.PI * 2);
+      ringsCtx.stroke();
+      // inner accent
+      ringsCtx.lineWidth = 0.8;
+      ringsCtx.strokeStyle = `rgba(255, 170, 80, ${alpha * 0.6})`;
+      ringsCtx.beginPath();
+      ringsCtx.arc(0, 0, rad * 0.94, 0, Math.PI * 2);
+      ringsCtx.stroke();
+    }
+  }
+  ringsCtx.restore();
+
+  /* ============ PARTICLES ============ */
+  particlesCtx.clearRect(0, 0, W, H);
+  particlesCtx.save();
+  particlesCtx.translate(cx, cy);
+  particlesCtx.globalCompositeOperation = 'screen';
+  const pStart = 1.35;
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    const dt = t - pStart - hash(i + 777) * 0.15;
+    if (dt <= 0) continue;
+    if (dt > p.life + 1.0) continue;
+    const lifeK = clamp01(dt / p.life);
+    // radial explosion + drift + gravity
+    const eased = easeOutExpo(lifeK);
+    const r = p.speed * eased * 0.65 + 16;
+    const drift = p.drift * dt * 60;
+    const gy = 0.5 * p.gravity * Math.max(0, dt - 0.4) * Math.max(0, dt - 0.4);
+    const x = Math.cos(p.theta) * r + drift;
+    const y = Math.sin(p.theta) * r + gy;
+    // alpha: bright early, fade late
+    let alpha = 1;
+    if (lifeK < 0.1) alpha = lifeK / 0.1;
+    else alpha = 1 - (lifeK - 0.1) / 0.9;
+    alpha = Math.max(0, alpha);
+    // color — gold to ember based on hue
+    const r1 = lerp(255, 255, p.hue);
+    const g1 = lerp(220, 150, p.hue);
+    const b1 = lerp(120, 40, p.hue);
+    const sz = p.size * (1 - 0.4 * lifeK);
+    // glow
+    const gg = particlesCtx.createRadialGradient(x, y, 0, x, y, sz * 6);
+    gg.addColorStop(0, `rgba(${r1}, ${g1}, ${b1}, ${0.9 * alpha})`);
+    gg.addColorStop(0.4, `rgba(${r1}, ${g1}, ${b1}, ${0.25 * alpha})`);
+    gg.addColorStop(1, `rgba(${r1}, ${g1}, ${b1}, 0)`);
+    particlesCtx.fillStyle = gg;
+    particlesCtx.beginPath(); particlesCtx.arc(x, y, sz * 6, 0, Math.PI * 2); particlesCtx.fill();
+    // core spark
+    particlesCtx.fillStyle = `rgba(255, 250, 220, ${alpha})`;
+    particlesCtx.beginPath(); particlesCtx.arc(x, y, sz * 0.55, 0, Math.PI * 2); particlesCtx.fill();
+  }
+  particlesCtx.restore();
+
+  /* ============ DOM — kicker ============ */
+  {
+    const inK = kern(t, 0.3, 0.7, easeOut);
+    const outK = kern(t, 9.0, 0.9, easeInOut);
+    const opacity = inK * (1 - outK);
+    const ty = lerp(24, 0, inK);
+    const letterSpread = lerp(0.8, 0.5, inK);
+    kicker.style.opacity = opacity.toFixed(3);
+    kicker.style.transform = `translateY(${ty.toFixed(2)}px)`;
+    kicker.style.letterSpacing = letterSpread.toFixed(3) + 'em';
+  }
+
+  /* ============ DOM — word "UNLOCKED" per-char ============ */
+  {
+    const wordStart = 1.75;
+    const stagger = 0.045;
+    for (let i = 0; i < charEls.length; i++) {
+      const ct = t - wordStart - i * stagger;
+      const sprK = spring(Math.max(0, ct) * 2.0, 180, 10, 1.2);
+      const inAlpha = clamp01(ct / 0.18);
+      const ty = lerp(160, 0, clamp01(sprK));
+      const scale = lerp(0.82, 1.0, clamp01(sprK));
+      const blur = lerp(12, 0, inAlpha);
+      // late fade
+      const outK = kern(t, 9.0, 0.9, easeInOut);
+      charEls[i].style.opacity = (inAlpha * (1 - outK)).toFixed(3);
+      charEls[i].style.transform = `translateY(${ty.toFixed(2)}px) scale(${scale.toFixed(3)})`;
+      charEls[i].style.filter = `blur(${blur.toFixed(2)}px)`;
+    }
+    // entire word: camera push-in subtle
+    const pushK = kern(t, 2.0, 4.0, easeInOut);
+    const wrapScale = lerp(0.985, 1.035, pushK);
+    const wrapY = lerp(0, -10, pushK);
+    wordWrap.style.transform = `translateY(${wrapY.toFixed(2)}px) scale(${wrapScale.toFixed(3)})`;
+    // subtle breathing after settle
+    const breathA = 0.85 + 0.15 * Math.sin((t - 3) * 1.4);
+    const afterSettle = kern(t, 3.0, 0.5);
+    const baseDropShadow = afterSettle * breathA;
+    wordWrap.style.filter = `drop-shadow(0 10px 50px rgba(255, 180, 60, ${(0.25 + 0.3 * baseDropShadow).toFixed(3)}))`;
+  }
+
+  /* ============ DOM — sub (serif italic) ============ */
+  {
+    const inK = kern(t, 2.8, 0.9, easeOut);
+    const outK = kern(t, 8.8, 0.9, easeInOut);
+    const opacity = inK * (1 - outK) * 0.95;
+    const ty = lerp(14, 0, inK);
+    sub.style.opacity = opacity.toFixed(3);
+    sub.style.transform = `translateY(${ty.toFixed(2)}px)`;
+  }
+
+  /* ============ DOM — id tag ============ */
+  {
+    const inK = kern(t, 3.4, 0.7, easeOut);
+    const outK = kern(t, 8.6, 0.9, easeInOut);
+    const opacity = inK * (1 - outK) * 0.85;
+    idTag.style.opacity = opacity.toFixed(3);
+  }
+
+  /* ============ FLASH (full-screen burst at 2.3s) ============ */
+  {
+    // two flash pulses: big one at 2.3s, tiny at 1.2s (check)
+    const a = Math.max(
+      0,
+      0.95 * Math.pow(Math.max(0, 1 - Math.abs(t - 2.35) / 0.28), 2),
+    );
+    const b = Math.max(
+      0,
+      0.4 * Math.pow(Math.max(0, 1 - Math.abs(t - 1.2) / 0.2), 2),
+    );
+    flash.style.opacity = Math.min(1, a + b).toFixed(3);
+  }
+}
+
+/* =======================================================================
+ * TIMELINE UI wiring
+ * ======================================================================= */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+
+let currentT = 0, playing = true, lastFrame = performance.now();
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+scrubber.addEventListener('input', () => {
+  playing = false; playBtn.textContent = '▶';
+  setTime(scrubber.value / 1000 * DURATION);
+});
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+resetBtn.addEventListener('click', () => setTime(0));
+
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl'; lbl.textContent = cue.label;
+  m.appendChild(lbl); cueRow.appendChild(m);
+});
+
+setTime(0);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
