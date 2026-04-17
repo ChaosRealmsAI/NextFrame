@@ -1,0 +1,10 @@
+{
+  "text": "Hello, NextFrame",
+  "x": 0.5,
+  "y": 0.5,
+  "fontSize": 72,
+  "color": "#ffcc00",
+  "fontFamily": "system-ui",
+  "align": "center",
+  "opacity": 1
+}

@@ -1,11 +1,25 @@
 {
   "name": "nf-tracks",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "abi/index.js",
   "exports": {
     ".": "./abi/index.js",
-    "./official/*": "./official/*"
+    "./official/*": "./official/*",
+    "./loader": "./user/loader.js",
+    "./scanner": "./scripts/check-abi.mjs",
+    "./validator": "./scripts/validate-props.mjs"
+  },
+  "scripts": {
+    "test": "node --test tests/*.mjs",
+    "lint": "node scripts/lint-all.mjs",
+    "build": "echo 'nf-tracks: no build step (single-file tracks)'"
+  },
+  "dependencies": {
+    "acorn": "^8.14.0",
+    "acorn-walk": "^8.3.4",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
   }
 }

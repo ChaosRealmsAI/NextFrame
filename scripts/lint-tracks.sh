@@ -9,7 +9,8 @@ violations_tmp="$(mktemp)"
 trap 'rm -f "$files_tmp" "$violations_tmp"' EXIT
 
 find src/nf-tracks/official src/nf-tracks/user \
-  -type f -name '*.js' | sort > "$files_tmp"
+  -type f -name '*.js' \
+  -not -name 'loader.js' | sort > "$files_tmp"
 
 scanned=0
 status=0

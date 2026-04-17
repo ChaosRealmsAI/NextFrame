@@ -1,35 +1,33 @@
-// Official Track: text. Single file, zero imports, pure render.
+// Official Track: image. Single file, zero imports, pure render.
 
 export function describe() {
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
-    title: "nf-track-text",
+    title: "nf-track-image",
     type: "object",
     additionalProperties: false,
-    required: ["text"],
+    required: ["src"],
     properties: {
-      text: { type: "string", maxLength: 500 },
-      x: { type: "number", minimum: 0, maximum: 1, default: 0.5 },
-      y: { type: "number", minimum: 0, maximum: 1, default: 0.5 },
-      fontSize: { type: "number", minimum: 8, maximum: 512, default: 48 },
-      color: { type: "string", pattern: "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$", default: "#ffffff" },
-      fontFamily: { type: "string", default: "system-ui" },
-      align: { type: "string", enum: ["left", "center", "right"], default: "center" },
+      src: { type: "string", minLength: 1 },
+      x: { type: "number", minimum: 0, maximum: 1, default: 0 },
+      y: { type: "number", minimum: 0, maximum: 1, default: 0 },
+      w: { type: "number", minimum: 0, maximum: 1, default: 1 },
+      h: { type: "number", minimum: 0, maximum: 1, default: 1 },
       opacity: { type: "number", minimum: 0, maximum: 1, default: 1 },
+      fit: { type: "string", enum: ["contain", "cover", "fill"], default: "cover" },
     },
   };
 }
 
 export function sample() {
   return {
-    text: "Hello, NextFrame",
-    x: 0.5,
-    y: 0.5,
-    fontSize: 64,
-    color: "#ffffff",
-    fontFamily: "system-ui",
-    align: "center",
+    src: "https://example.com/sample.png",
+    x: 0.1,
+    y: 0.1,
+    w: 0.8,
+    h: 0.8,
     opacity: 1,
+    fit: "cover",
   };
 }
 
@@ -54,7 +52,7 @@ function pickProps(t, keyframes) {
   const span = (hi.t ?? 1) - (lo.t ?? 0);
   const u = span <= 0 ? 0 : Math.max(0, Math.min(1, (t - (lo.t ?? 0)) / span));
   const out = { ...base, ...lo };
-  for (const key of ["x", "y", "fontSize", "opacity"]) {
+  for (const key of ["x", "y", "w", "h", "opacity"]) {
     if (typeof lo[key] === "number" && typeof hi[key] === "number") {
       out[key] = lerp(lo[key], hi[key], u);
     }
@@ -66,17 +64,15 @@ export function render(t, keyframes, viewport) {
   const props = pickProps(t, keyframes);
   const vw = viewport?.w ?? 1920;
   const vh = viewport?.h ?? 1080;
-  const el = globalThis.document.createElement("div");
-  el.textContent = String(props.text ?? "");
+  const el = globalThis.document.createElement("img");
+  el.setAttribute("src", String(props.src ?? ""));
   const style = el.style;
   style.position = "absolute";
   style.left = `${props.x * vw}px`;
   style.top = `${props.y * vh}px`;
-  style.fontSize = `${props.fontSize}px`;
-  style.color = props.color;
-  style.fontFamily = props.fontFamily;
-  style.textAlign = props.align;
+  style.width = `${props.w * vw}px`;
+  style.height = `${props.h * vh}px`;
   style.opacity = String(props.opacity);
-  style.transform = props.align === "center" ? "translate(-50%, -50%)" : "translate(0, -50%)";
+  style.objectFit = props.fit;
   return { dom: el };
 }

@@ -1,35 +1,37 @@
-// Official Track: text. Single file, zero imports, pure render.
+// Official Track: video. Single file, zero imports, pure render.
+// Critical: the <video> element carries data-nf-persist="1" so the
+// framework's re-render does not destroy it (cf. build.js innerHTML replace).
 
 export function describe() {
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
-    title: "nf-track-text",
+    title: "nf-track-video",
     type: "object",
     additionalProperties: false,
-    required: ["text"],
+    required: ["src"],
     properties: {
-      text: { type: "string", maxLength: 500 },
-      x: { type: "number", minimum: 0, maximum: 1, default: 0.5 },
-      y: { type: "number", minimum: 0, maximum: 1, default: 0.5 },
-      fontSize: { type: "number", minimum: 8, maximum: 512, default: 48 },
-      color: { type: "string", pattern: "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$", default: "#ffffff" },
-      fontFamily: { type: "string", default: "system-ui" },
-      align: { type: "string", enum: ["left", "center", "right"], default: "center" },
+      src: { type: "string", minLength: 1 },
+      x: { type: "number", minimum: 0, maximum: 1, default: 0 },
+      y: { type: "number", minimum: 0, maximum: 1, default: 0 },
+      w: { type: "number", minimum: 0, maximum: 1, default: 1 },
+      h: { type: "number", minimum: 0, maximum: 1, default: 1 },
       opacity: { type: "number", minimum: 0, maximum: 1, default: 1 },
+      loop: { type: "boolean", default: false },
+      mute: { type: "boolean", default: true },
     },
   };
 }
 
 export function sample() {
   return {
-    text: "Hello, NextFrame",
-    x: 0.5,
-    y: 0.5,
-    fontSize: 64,
-    color: "#ffffff",
-    fontFamily: "system-ui",
-    align: "center",
+    src: "https://example.com/sample.mp4",
+    x: 0,
+    y: 0,
+    w: 1,
+    h: 1,
     opacity: 1,
+    loop: true,
+    mute: true,
   };
 }
 
@@ -54,7 +56,7 @@ function pickProps(t, keyframes) {
   const span = (hi.t ?? 1) - (lo.t ?? 0);
   const u = span <= 0 ? 0 : Math.max(0, Math.min(1, (t - (lo.t ?? 0)) / span));
   const out = { ...base, ...lo };
-  for (const key of ["x", "y", "fontSize", "opacity"]) {
+  for (const key of ["x", "y", "w", "h", "opacity"]) {
     if (typeof lo[key] === "number" && typeof hi[key] === "number") {
       out[key] = lerp(lo[key], hi[key], u);
     }
@@ -66,17 +68,21 @@ export function render(t, keyframes, viewport) {
   const props = pickProps(t, keyframes);
   const vw = viewport?.w ?? 1920;
   const vh = viewport?.h ?? 1080;
-  const el = globalThis.document.createElement("div");
-  el.textContent = String(props.text ?? "");
+  const el = globalThis.document.createElement("video");
+  el.setAttribute("src", String(props.src ?? ""));
+  el.setAttribute("data-nf-persist", "1");
+  el.setAttribute("playsinline", "1");
+  if (props.loop) el.setAttribute("loop", "1");
+  if (props.mute) el.setAttribute("muted", "1");
+  el.muted = !!props.mute;
+  el.loop = !!props.loop;
   const style = el.style;
   style.position = "absolute";
   style.left = `${props.x * vw}px`;
   style.top = `${props.y * vh}px`;
-  style.fontSize = `${props.fontSize}px`;
-  style.color = props.color;
-  style.fontFamily = props.fontFamily;
-  style.textAlign = props.align;
+  style.width = `${props.w * vw}px`;
+  style.height = `${props.h * vh}px`;
   style.opacity = String(props.opacity);
-  style.transform = props.align === "center" ? "translate(-50%, -50%)" : "translate(0, -50%)";
-  return { dom: el };
+  style.objectFit = "cover";
+  return { dom: el, audio: { ref: el, volume: props.mute ? 0 : 1 } };
 }
