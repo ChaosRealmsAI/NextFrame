@@ -370,6 +370,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nf-core-app"
+version = "0.1.0"
+
+[[package]]
+name = "nf-core-engine"
+version = "0.1.0"
+
+[[package]]
 name = "nf-recorder"
 version = "0.1.0"
 dependencies = [
@@ -377,6 +385,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "nf-runtime"
+version = "0.1.0"
 
 [[package]]
 name = "nf-shell-mac"
@@ -394,6 +406,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "nf-tracks"
+version = "0.1.0"
 
 [[package]]
 name = "notify"

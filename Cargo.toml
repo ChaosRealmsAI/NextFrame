@@ -2,9 +2,13 @@
 # v2.0 rebuild. Legacy crates archived in legacy-v08/ (not compiled, reference only).
 # New crates are minimal skeletons — implementations will be filled in phase by phase.
 members = [
+    "src/nf-core-app",
+    "src/nf-core-engine",
     "src/nf-shell-mac",
     "src/nf-recorder",
     "src/nf-cli",
+    "src/nf-runtime",
+    "src/nf-tracks",
 ]
 resolver = "2"
 
