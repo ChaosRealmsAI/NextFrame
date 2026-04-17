@@ -94,12 +94,16 @@ pub(crate) fn assert_dependency_graph_is_dag_and_matches_adr(
     }
 
     let expected: BTreeMap<&str, BTreeSet<&str>> = [
+        ("nf-core-app", BTreeSet::new()),
+        ("nf-core-engine", BTreeSet::new()),
         (
             "nf-cli",
             ["nf-shell-mac", "nf-recorder"].iter().copied().collect(),
         ),
         ("nf-shell-mac", ["nf-recorder"].iter().copied().collect()),
         ("nf-recorder", BTreeSet::new()),
+        ("nf-runtime", BTreeSet::new()),
+        ("nf-tracks", BTreeSet::new()),
     ]
     .into_iter()
     .collect();

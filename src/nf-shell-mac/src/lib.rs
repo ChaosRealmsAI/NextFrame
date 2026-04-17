@@ -1,18 +1,18 @@
-//! nf-shell-mac — macOS native shell (walking skeleton).
-//!
-//! Hosts the 4-panel desktop (toolbar / preview WKWebView / params / timeline)
-//! and bridges source.json ↔ engine ↔ runtime. Only the shell writes source.json.
+//! nf-shell-mac — macOS native shell.
 
+pub mod bindings;
 pub mod bridge;
 pub mod panels;
+pub mod screenshot;
 pub mod source_file;
-#[allow(dead_code)]
 pub mod window;
+
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// Runtime mode the shell is driving. Non-exhaustive so future modes don't break callers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum RuntimeMode {
     Play,
@@ -23,43 +23,27 @@ pub enum RuntimeMode {
 pub trait ShellController {
     fn run(&mut self) -> anyhow::Result<()>;
     fn current_mode(&self) -> RuntimeMode;
+    fn load_source(&mut self, path: PathBuf) -> anyhow::Result<()>;
+    fn screenshot(&self) -> anyhow::Result<Vec<u8>>;
 }
 
-/// IPC bridge between Rust shell and the WKWebView runtime.
 pub trait Bridge {
     fn send(&self, msg: BridgeMessage) -> anyhow::Result<BridgeReply>;
+    fn on_message(&self, handler: Box<dyn Fn(BridgeMessage) + Send>);
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BridgeMessage {
     pub kind: String,
+    #[serde(default)]
     pub payload: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BridgeReply {
     pub ok: bool,
+    #[serde(default)]
     pub payload: serde_json::Value,
-}
-
-pub struct StubShell {
-    mode: RuntimeMode,
-}
-
-impl StubShell {
-    pub fn new(mode: RuntimeMode) -> Self {
-        Self { mode }
-    }
-}
-
-impl ShellController for StubShell {
-    fn run(&mut self) -> anyhow::Result<()> {
-        Err(anyhow::anyhow!("walking stub: shell run not implemented"))
-    }
-
-    fn current_mode(&self) -> RuntimeMode {
-        self.mode
-    }
 }
 
 pub fn version() -> &'static str {
