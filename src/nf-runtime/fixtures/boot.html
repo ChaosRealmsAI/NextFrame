@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>nf-runtime boot</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #111; color: #eee; font: 12px system-ui; }
+  #nf-root { width: 1920px; height: 1080px; transform-origin: top left; }
+</style>
+</head>
+<body>
+<div id="nf-root"></div>
+<script type="module">
+  // Minimal hand-wired mocks so this page can be opened in a regular browser
+  // for visual debugging without the real engine/tracks bundle.
+  globalThis.__nfResolved = {
+    viewport: { ratio: "16:9", w: 1920, h: 1080 },
+    tracks: [
+      {
+        id: "label",
+        component: "label",
+        keyframes: [{ t: 0, text: "NextFrame v2.0" }],
+        props: { color: "#fff", size: 96 }
+      }
+    ]
+  };
+  globalThis.__nfTracks = {
+    label: {
+      render(t, kfs, viewport) {
+        const el = document.createElement("div");
+        el.style.position = "absolute";
+        el.style.left = "80px";
+        el.style.top = "80px";
+        el.style.color = "#fff";
+        el.style.font = `${kfs[0]?.size ?? 48}px system-ui`;
+        el.textContent = `${kfs[0]?.text ?? ""}  t=${t.toFixed(2)}`;
+        return { dom: el };
+      }
+    }
+  };
+  // Use the default engine/track-host shims from runtime.
+  const rt = await import("../src/runtime.js");
+  rt.start({ mode: "play", mount: document.getElementById("nf-root") });
+  // Expose hooks for manual debugging.
+  window.__debug = rt;
+</script>
+</body>
+</html>
