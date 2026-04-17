@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bookmark · Motion-First · Spring Physics</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #fafafa;
+    color: #111;
+    font-family: -apple-system, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .stage {
+    position: relative;
+    width: 1920px; height: 1080px;
+    transform-origin: top left;
+    background: #fafafa;
+    overflow: hidden;
+  }
+  /* very subtle grid — almost invisible */
+  .grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(0,0,0,0.015) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0,0,0,0.015) 1px, transparent 1px);
+    background-size: 120px 120px;
+    pointer-events: none;
+  }
+
+  /* hero */
+  .hero {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 900px; height: 700px;
+    pointer-events: none;
+  }
+  svg.bookmark-svg {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    overflow: visible;
+  }
+  svg.particles-svg {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    overflow: visible;
+  }
+
+  /* counter — minimal */
+  .counter {
+    position: absolute;
+    left: 50%; top: calc(50% + 260px);
+    transform: translate(-50%, 0);
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #111;
+    font-feature-settings: "tnum" 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .counter .plus {
+    position: absolute;
+    left: 50%;
+    top: -60px;
+    transform: translate(-50%, 0);
+    font-size: 42px;
+    font-weight: 600;
+    color: #ff9500;
+    letter-spacing: -0.01em;
+  }
+
+  /* caption — single tiny label */
+  .caption {
+    position: absolute;
+    left: 50%;
+    top: 160px;
+    transform: translate(-50%, 0);
+    font-size: 13px;
+    font-weight: 500;
+    color: #aaa;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  /* timeline UI */
+  .tl-ui {
+    position: absolute;
+    left: 40px; right: 40px; bottom: 40px;
+    height: 52px;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 26px;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    font-size: 13px; color: #222;
+    z-index: 10;
+  }
+  .tl-ui button {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.1);
+    background: #fff;
+    color: #111;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .tl-ui button:hover { background: #f3f3f3; }
+  .tl-ui .time {
+    min-width: 110px;
+    font-variant-numeric: tabular-nums;
+    color: #555;
+    font-weight: 500;
+  }
+  .tl-ui input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(0,0,0,0.08);
+    border-radius: 2px;
+    outline: none;
+  }
+  .tl-ui input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #ff9500;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .cue-row {
+    position: absolute;
+    left: 60px; right: 60px; bottom: 100px;
+    height: 22px;
+    pointer-events: none;
+    z-index: 9;
+  }
+  .cue-mark {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 12px;
+    background: rgba(0,0,0,0.2);
+    transform: translateX(-0.5px);
+  }
+  .cue-mark .lbl {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #999;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="grid-bg"></div>
+
+    <div class="caption">Tap to save</div>
+
+    <div class="hero">
+      <svg class="particles-svg" id="particles" width="900" height="700" viewBox="-450 -350 900 700">
+        <defs>
+          <radialGradient id="miniStarVolume" cx="0.35" cy="0.3" r="0.75">
+            <stop offset="0%" stop-color="#ffd58a"/>
+            <stop offset="45%" stop-color="#ff9500"/>
+            <stop offset="100%" stop-color="#b86a00"/>
+          </radialGradient>
+          <filter id="miniStarShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#ff9500" flood-opacity="0.32"/>
+          </filter>
+        </defs>
+      </svg>
+      <svg class="bookmark-svg" id="bookmark" width="420" height="520" viewBox="-210 -260 420 520">
+        <defs>
+          <!-- radial gradient: top-left highlight -> orange body -> darker bottom-right -->
+          <radialGradient id="bookmarkVolume" cx="0.35" cy="0.3" r="0.8">
+            <stop offset="0%"  stop-color="#ffc069"/>  <!-- highlight -->
+            <stop offset="45%" stop-color="#ff9500"/>  <!-- core orange -->
+            <stop offset="100%" stop-color="#b86a00"/> <!-- shadow -->
+          </radialGradient>
+          <!-- two-layer soft shadow -->
+          <filter id="bookmarkShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#ff9500" flood-opacity="0.30"/>
+            <feDropShadow dx="0" dy="5"  stdDeviation="5"  flood-color="#000000" flood-opacity="0.07"/>
+          </filter>
+        </defs>
+        <!-- filled bookmark (visible when fill > 0) -->
+        <path id="bookmarkPath" d="" filter="url(#bookmarkShadow)"/>
+        <!-- outline ring (visible in idle state, fades when filled) -->
+        <path id="bookmarkRing" d="" fill="none"/>
+      </svg>
+    </div>
+
+    <div class="counter" id="counter">
+      <span class="plus" id="plusOne">Saved</span>
+      <span id="countVal">0</span>
+    </div>
+
+    <div class="cue-row" id="cueRow"></div>
+    <div class="tl-ui">
+      <button id="playBtn" title="Play/Pause">⏸</button>
+      <button id="resetBtn" title="Reset">↺</button>
+      <span class="time" id="timeLabel">0.00 / 10.00s</span>
+      <input type="range" id="scrubber" min="0" max="1000" value="0">
+      <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ---------- helpers ----------
+  const DURATION = 10.0;
+  const FPS = 30;
+  const clamp01 = t => Math.max(0, Math.min(1, t));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const easeIn = x => x * x * x;
+  const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+  const easeOutQuint = x => 1 - Math.pow(1 - x, 5);
+
+  // parametric spring
+  function spring(t, k = 260, d = 14, mass = 1) {
+    if (t <= 0) return 0;
+    const wn = Math.sqrt(k / mass);
+    const zeta = d / (2 * Math.sqrt(k * mass));
+    if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+    }
+    return 1 - (1 + wn * t) * Math.exp(-wn * t);
+  }
+
+  // seeded rng
+  function mulberry32(a) {
+    return function() {
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const rng = mulberry32(17);
+  // 14 sparkle particles around the bookmark
+  const particleSeeds = Array.from({length: 14}, () => {
+    const a = rng() * Math.PI * 2;
+    return {
+      angle: a,
+      dist: 180 + rng() * 120,
+      size: 0.8 + rng() * 0.9,
+      rot: (rng() - 0.5) * 1.4,
+      kind: rng() > 0.6 ? 'star' : 'dot',    // mix of tiny stars + dots
+    };
+  });
+  // 5 floating mini-stars that rise from the bookmark
+  const miniStarSeeds = Array.from({length: 5}, (_, i) => ({
+    angle: -Math.PI / 2 + (rng() - 0.5) * 1.2,  // roughly upward spread
+    dist: 140 + rng() * 100,
+    size: 10 + rng() * 8,
+    drift: (rng() - 0.5) * 80,
+    delay: i * 0.05,
+  }));
+
+  // ---------- bookmark path generation ----------
+  // classic bookmark: top rectangle, bottom V-cut (notch).
+  // size = half width; geometry spans y ∈ [-h/2 .. h/2], x ∈ [-w/2 .. w/2]
+  // Recenter so (0,0) is the visual center of the shape.
+  function bookmarkPath(w = 120, h = 180, notch = 30, r = 18) {
+    // recenter: geometric center = 0
+    // top-left corner (rounded), top-right, right edge down, bottom-right,
+    // V-notch inward up, bottom-left, left edge up, back to top-left.
+    const hx = w / 2, hy = h / 2;
+    // we'll build a clean path with rounded top corners
+    return [
+      // start at top-left (after corner radius)
+      `M ${-hx + r} ${-hy}`,
+      // top edge to top-right minus radius
+      `L ${ hx - r} ${-hy}`,
+      // top-right rounded corner
+      `Q ${ hx} ${-hy}, ${ hx} ${-hy + r}`,
+      // right edge down to bottom-right
+      `L ${ hx} ${ hy}`,
+      // V-notch up toward center
+      `L ${ 0  } ${ hy - notch}`,
+      // V-notch down to bottom-left
+      `L ${-hx} ${ hy}`,
+      // left edge up to top-left minus radius
+      `L ${-hx} ${-hy + r}`,
+      // top-left rounded corner
+      `Q ${-hx} ${-hy}, ${-hx + r} ${-hy}`,
+      'Z'
+    ].join(' ');
+  }
+
+  // 5-point star path, centered at (0,0), radius r
+  function starPath(r) {
+    const pts = [];
+    for (let i = 0; i < 10; i++) {
+      const ang = -Math.PI / 2 + i * Math.PI / 5;
+      const rad = (i % 2 === 0) ? r : r * 0.42;
+      pts.push([Math.cos(ang) * rad, Math.sin(ang) * rad]);
+    }
+    return 'M ' + pts.map(p => `${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join(' L ') + ' Z';
+  }
+
+  // ---------- rhythm: single tap, anticipate + burst + settle ----------
+  // 10s loop: idle intro → anticipate → burst → burst peak → settle → hold → fade to idle reset
+  const TAP = {
+    ant:     2.20,   // anticipation start (slight compress)
+    burst:   2.38,   // burst — scale starts rising + fill begins soon after
+    fillAt:  2.42,   // fill kicks in 40ms after burst (detail offset ≈ 40ms)
+    stagger: 2.46,   // particle stagger start (≈ 80ms after burst)
+    peakAt:  2.54,   // visual peak (~160ms after burst — spring overshoot)
+    settleAt: 2.95,  // settle into 1.05 scale
+    holdTo:  8.30,   // stays "saved" for a long time
+    plusAt:  2.70,   // +Saved label pops
+  };
+
+  // idle breathing parameters
+  function idleBreathe(t) {
+    return 1.0 + 0.012 * Math.sin(t * 0.9 * Math.PI * 2 * 0.5);
+  }
+
+  // scale(t): overall bookmark scale
+  function bookmarkScale(t) {
+    const breathe = idleBreathe(t);
+
+    // 1) before ant → idle breathe
+    if (t < TAP.ant) return breathe;
+
+    // 2) anticipation: 1.0 → 0.92
+    if (t >= TAP.ant && t < TAP.burst) {
+      const u = clamp01((t - TAP.ant) / (TAP.burst - TAP.ant));
+      const comp = lerp(1.0, 0.92, easeIn(u));
+      return comp;
+    }
+
+    // 3) burst spring: from 0.92 overshoot up past 1.30 then settle toward 1.05
+    if (t >= TAP.burst && t < TAP.settleAt) {
+      const local = t - TAP.burst;
+      // spring k=260 d=14 — strong overshoot
+      const sv = spring(local * 3.2, 260, 14);
+      // target = 1.30 (overshoot peaks ~1.35 because spring overshoots 1)
+      const raw = 0.92 + (1.30 - 0.92) * sv;
+      // gently ease down to 1.05 by settleAt
+      const settleU = clamp01((t - TAP.peakAt) / (TAP.settleAt - TAP.peakAt));
+      const settled = lerp(raw, 1.05, easeOut(settleU) * 0.55);
+      return settled;
+    }
+
+    // 4) hold: 1.05 slowly → 1.0 + breathe
+    if (t >= TAP.settleAt && t < TAP.holdTo) {
+      const u = clamp01((t - TAP.settleAt) / 0.8);
+      return lerp(1.05, 1.0, easeOut(u)) + (breathe - 1.0) * u;
+    }
+
+    // 5) fade-out reset: stays filled but bookmark subtly pulses once at t=9.0
+    if (t >= TAP.holdTo && t < 9.0) {
+      // small anticipate for final pulse
+      const u = clamp01((t - TAP.holdTo) / (9.0 - TAP.holdTo));
+      return lerp(1.0, 0.96, easeIn(u)) * breathe;
+    }
+    if (t >= 9.0 && t < 9.6) {
+      const local = t - 9.0;
+      const sv = spring(local * 4, 220, 16);
+      return 0.96 + (1.10 - 0.96) * sv * 0.9;
+    }
+    // 6) return to idle smoothly
+    if (t >= 9.6) {
+      const u = clamp01((t - 9.6) / 0.4);
+      return lerp(1.10, 1.0, easeOut(u)) * breathe;
+    }
+    return breathe;
+  }
+
+  // fill(t): 0 = outline, 1 = fully filled orange
+  function bookmarkFill(t) {
+    if (t < TAP.fillAt) return 0;
+    // fill ramps in over ~220ms (detail offset — later than scale burst)
+    const u = clamp01((t - TAP.fillAt) / 0.22);
+    return easeOut(u);
+  }
+
+  // outline stroke alpha (fades when fill comes in)
+  function outlineAlpha(t) {
+    const f = bookmarkFill(t);
+    return (1 - f) * 0.75;
+  }
+
+  // counter integer
+  function counterValue(t) {
+    if (t >= TAP.plusAt && t < 9.6) return 1;
+    return 0;
+  }
+
+  // "Saved" label pop state
+  function plusState(t) {
+    // appear at TAP.plusAt, hold for ~5s, fade out around 8.6
+    if (t < TAP.plusAt - 0.1) return { op: 0, ty: -30, sc: 0.8 };
+    if (t < TAP.plusAt + 0.6) {
+      const local = Math.max(0, t - TAP.plusAt);
+      const sv = spring(local * 5, 240, 14);
+      const ty = lerp(-30, 0, clamp01(sv));
+      const sc = lerp(0.8, 1.0, clamp01(sv));
+      const op = clamp01((t - (TAP.plusAt - 0.05)) * 10);
+      return { op, ty, sc };
+    }
+    if (t < 8.5) return { op: 1, ty: 0, sc: 1 };
+    if (t < 8.9) {
+      const u = clamp01((t - 8.5) / 0.4);
+      return { op: 1 - u, ty: -8 * u, sc: 1 };
+    }
+    return { op: 0, ty: 0, sc: 1 };
+  }
+
+  // ---------- SVG setup ----------
+  const bookmarkPathEl = document.getElementById('bookmarkPath');
+  const bookmarkRingEl = document.getElementById('bookmarkRing');
+  const BM_W = 150, BM_H = 220, BM_NOTCH = 38, BM_R = 18;
+  const PATH_D = bookmarkPath(BM_W, BM_H, BM_NOTCH, BM_R);
+  bookmarkPathEl.setAttribute('d', PATH_D);
+  bookmarkRingEl.setAttribute('d', PATH_D);
+
+  const particlesSvg = document.getElementById('particles');
+
+  // sparkle particles — mix of star + dot
+  const particleEls = particleSeeds.map((seed, i) => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    let el;
+    if (seed.kind === 'star') {
+      el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      el.setAttribute('d', starPath(5 * seed.size));
+      el.setAttribute('fill', i % 3 === 0 ? '#ffb347' : '#ff9500');
+    } else {
+      el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      el.setAttribute('r', 3.5 * seed.size);
+      el.setAttribute('fill', i % 2 === 0 ? '#ffc069' : '#ff9500');
+    }
+    g.appendChild(el);
+    particlesSvg.appendChild(g);
+    return { g, el, seed };
+  });
+
+  // mini rising stars (with volumetric gradient)
+  const miniStarEls = miniStarSeeds.map((seed, i) => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', starPath(seed.size));
+    p.setAttribute('fill', 'url(#miniStarVolume)');
+    p.setAttribute('filter', 'url(#miniStarShadow)');
+    g.appendChild(p);
+    particlesSvg.appendChild(g);
+    return { g, p, seed };
+  });
+
+  // shockwave ring
+  const shockwave = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  shockwave.setAttribute('cx', 0); shockwave.setAttribute('cy', 0);
+  shockwave.setAttribute('r', 0);
+  shockwave.setAttribute('fill', 'none');
+  shockwave.setAttribute('stroke', '#ff9500');
+  shockwave.setAttribute('stroke-width', 2);
+  shockwave.setAttribute('opacity', 0);
+  particlesSvg.appendChild(shockwave);
+
+  // ---------- render (frame-pure) ----------
+  const counterEl = document.getElementById('countVal');
+  const plusEl = document.getElementById('plusOne');
+
+  function render(t) {
+    const s = bookmarkScale(t);
+    const f = bookmarkFill(t);
+    const outAlpha = outlineAlpha(t);
+
+    // subtle rotational wobble on burst
+    let wobble = 0;
+    if (t >= TAP.burst && t < TAP.settleAt) {
+      const local = t - TAP.burst;
+      const decay = Math.exp(-local * 4);
+      wobble = Math.sin(local * 24) * 2.5 * decay;
+    }
+    // final pulse wobble
+    if (t >= 9.0 && t < 9.6) {
+      const local = t - 9.0;
+      const decay = Math.exp(-local * 5);
+      wobble += Math.sin(local * 20) * 1.2 * decay;
+    }
+
+    bookmarkPathEl.setAttribute('transform', `scale(${s.toFixed(4)}) rotate(${wobble.toFixed(3)})`);
+    bookmarkRingEl.setAttribute('transform', `scale(${s.toFixed(4)}) rotate(${wobble.toFixed(3)})`);
+
+    // fill
+    if (f < 0.01) {
+      bookmarkPathEl.setAttribute('fill', 'transparent');
+      bookmarkPathEl.removeAttribute('filter');
+    } else {
+      bookmarkPathEl.setAttribute('fill', 'url(#bookmarkVolume)');
+      bookmarkPathEl.setAttribute('fill-opacity', f.toFixed(3));
+      bookmarkPathEl.setAttribute('filter', 'url(#bookmarkShadow)');
+    }
+
+    // outline stroke
+    bookmarkRingEl.setAttribute('stroke', `rgba(160,160,165, ${outAlpha.toFixed(3)})`);
+    bookmarkRingEl.setAttribute('stroke-width', 4);
+    bookmarkRingEl.setAttribute('stroke-linejoin', 'round');
+    bookmarkRingEl.setAttribute('fill', 'transparent');
+
+    // particles — fire once, staggered 25ms from TAP.stagger
+    const burstActive = (t >= TAP.stagger && t < TAP.stagger + 1.2);
+    particleEls.forEach((p, i) => {
+      if (!burstActive) { p.g.setAttribute('opacity', 0); return; }
+      const startT = TAP.stagger + i * 0.025;
+      const local = t - startT;
+      if (local < 0) { p.g.setAttribute('opacity', 0); return; }
+      const life = 0.9;
+      const u = clamp01(local / life);
+      if (u >= 1) { p.g.setAttribute('opacity', 0); return; }
+      // spring-driven outward travel (gentler k=140 d=18)
+      const dist = spring(u * 1.5, 140, 18) * p.seed.dist;
+      const x = Math.cos(p.seed.angle) * dist;
+      const y = Math.sin(p.seed.angle) * dist - u * 20; // slight upward drift
+      // scale down + rotate + fade
+      const sc = (1 - easeIn(u) * 0.5);
+      const rot = p.seed.rot * 360 * u;
+      const op = (1 - easeIn(u));
+      p.g.setAttribute('transform', `translate(${x.toFixed(2)}, ${y.toFixed(2)}) scale(${sc.toFixed(3)}) rotate(${rot.toFixed(1)})`);
+      p.g.setAttribute('opacity', op.toFixed(3));
+    });
+
+    // rising mini stars — appear with the burst, drift upward + fade
+    miniStarEls.forEach((mh, i) => {
+      const startT = TAP.burst + 0.04 + mh.seed.delay;
+      const life = 1.4;
+      const local = t - startT;
+      if (local < 0 || local >= life) { mh.g.setAttribute('opacity', 0); return; }
+      const u = clamp01(local / life);
+      const risen = easeOut(u) * mh.seed.dist;
+      const x = Math.cos(mh.seed.angle) * risen * 0.6 + mh.seed.drift * u;
+      const y = Math.sin(mh.seed.angle) * risen;
+      const sc = spring(u * 2.2, 200, 16);
+      const rot = (u * 180) * (i % 2 === 0 ? 1 : -1);
+      const op = (1 - easeIn(u)) * 0.9;
+      mh.g.setAttribute('transform',
+        `translate(${x.toFixed(2)}, ${y.toFixed(2)}) scale(${(sc * 0.95).toFixed(3)}) rotate(${rot.toFixed(1)})`);
+      mh.g.setAttribute('opacity', op.toFixed(3));
+    });
+
+    // shockwave — short-lived ring at burst moment
+    if (t >= TAP.burst && t < TAP.burst + 0.55) {
+      const local = t - TAP.burst;
+      const u = clamp01(local / 0.5);
+      const r = easeOutQuint(u) * 240;
+      const op = (1 - u) * 0.42;
+      shockwave.setAttribute('r', r.toFixed(2));
+      shockwave.setAttribute('opacity', op.toFixed(3));
+      shockwave.setAttribute('stroke-width', (2.4 - u * 2).toFixed(2));
+    } else {
+      shockwave.setAttribute('opacity', 0);
+    }
+
+    // counter + "Saved" label
+    counterEl.textContent = counterValue(t);
+    const pz = plusState(t);
+    plusEl.style.opacity = pz.op.toFixed(3);
+    plusEl.style.transform = `translate(-50%, ${pz.ty.toFixed(2)}px) scale(${pz.sc.toFixed(3)})`;
+  }
+
+  // ---------- cues ----------
+  const CUES = [
+    { t: 0.0,  label: 'idle' },
+    { t: 2.20, label: 'anticipate' },
+    { t: 2.38, label: 'tap' },
+    { t: 2.46, label: 'particles' },
+    { t: 2.95, label: 'settle' },
+    { t: 9.00, label: 'pulse' },
+  ];
+
+  // ---------- UI wiring ----------
+  const scrubber = document.getElementById('scrubber');
+  const playBtn  = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const timeLabel  = document.getElementById('timeLabel');
+  const frameLabel = document.getElementById('frameLabel');
+  const cueRow     = document.getElementById('cueRow');
+
+  let currentT = 0;
+  let playing = true;
+  let lastFrame = performance.now();
+
+  function setTime(t) {
+    currentT = Math.max(0, Math.min(DURATION, t));
+    scrubber.value = Math.round(currentT / DURATION * 1000);
+    timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+    frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+    render(currentT);
+  }
+  function loop() {
+    const now = performance.now();
+    const dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (playing) {
+      let next = currentT + dt;
+      if (next >= DURATION) next = 0;
+      setTime(next);
+    }
+    requestAnimationFrame(loop);
+  }
+  scrubber.addEventListener('input', () => {
+    playing = false;
+    playBtn.textContent = '▶';
+    setTime(scrubber.value / 1000 * DURATION);
+  });
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    lastFrame = performance.now();
+  });
+  resetBtn.addEventListener('click', () => setTime(0));
+
+  CUES.forEach(cue => {
+    const m = document.createElement('div');
+    m.className = 'cue-mark';
+    m.style.left = (cue.t / DURATION * 100) + '%';
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl'; lbl.textContent = cue.label;
+    m.appendChild(lbl);
+    cueRow.appendChild(m);
+  });
+
+  // fit stage
+  function fit() {
+    const stage = document.getElementById('stage');
+    const sx = window.innerWidth / 1920;
+    const sy = window.innerHeight / 1080;
+    const s = Math.min(sx, sy);
+    stage.style.transform = `scale(${s})`;
+    stage.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px';
+    stage.style.top  = ((window.innerHeight - 1080 * s) / 2) + 'px';
+    stage.style.position = 'absolute';
+  }
+  fit();
+  window.addEventListener('resize', fit);
+
+  setTime(0);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
