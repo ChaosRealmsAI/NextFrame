@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>霍尔木兹海峡 · nfa benchmark</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #000;
+    min-height: 100vh;
+    overflow: hidden;
+    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+
+  .stage {
+    width: 1920px; height: 1080px;
+    position: relative;
+    background: radial-gradient(ellipse at 58% 58%, #142a30 0%, #0a1b1f 55%, #040c0e 100%);
+    overflow: hidden;
+    transform-origin: center;
+    transform: scale(min(calc(100vw / 1920), calc(100vh / 1080)));
+  }
+
+  .grain {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.55 0 0 0 0 0.62 0 0 0 0 0.66 0 0 0 0.09 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    opacity: 0.4; mix-blend-mode: overlay;
+    z-index: 6;
+  }
+
+  .map { position: absolute; inset: 0; z-index: 2; }
+
+  /* 浮雕：land 底+land 顶两层 */
+  .land-base { fill: #1a2a31; }
+  .land-top  { fill: #2d434c; }
+  .land-hi   { fill: #3c5762; opacity: 0.55; }
+  .coast     { fill: none; stroke: #4a6672; stroke-width: 2; opacity: 0.25; }
+
+  /* Title */
+  .title-block {
+    position: absolute;
+    top: 90px; left: 150px;
+    z-index: 15;
+    max-width: 1340px;
+  }
+  .t-cn {
+    font-size: 64px; font-weight: 700;
+    color: #f1f3f4;
+    line-height: 1.1;
+    letter-spacing: 2px;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.55);
+  }
+  .t-en {
+    font-family: 'Optima', 'Palatino', 'Baskerville', 'Georgia', serif;
+    font-size: 44px; font-weight: 300;
+    color: rgba(235, 238, 240, 0.3);
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+    white-space: nowrap;
+  }
+  .t-source {
+    margin-top: 14px;
+    font-size: 20px;
+    color: rgba(255, 255, 255, 0.58);
+    letter-spacing: 1px;
+  }
+
+  /* 国家 label */
+  .country {
+    position: absolute;
+    right: 80px; top: 420px;
+    z-index: 12;
+    text-align: center;
+    color: #8aa4a8;
+  }
+  .c-cn {
+    font-size: 196px; font-weight: 700;
+    letter-spacing: 30px;
+    line-height: 1;
+    text-shadow: 0 8px 28px rgba(0,0,0,0.5);
+    padding-right: 30px;
+  }
+  .c-en {
+    font-family: 'Optima', 'Georgia', serif;
+    font-size: 48px;
+    letter-spacing: 10px;
+    margin-top: 14px;
+    opacity: 0.85;
+    padding-right: 30px;
+  }
+
+  /* 字幕 */
+  .sub {
+    position: absolute;
+    bottom: 80px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 18;
+    font-size: 68px;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: 10px;
+    text-shadow:
+      4px 0 0 #000, -4px 0 0 #000, 0 4px 0 #000, 0 -4px 0 #000,
+      4px 4px 0 #000, -4px -4px 0 #000, 4px -4px 0 #000, -4px 4px 0 #000,
+      0 10px 18px rgba(0,0,0,0.75);
+  }
+
+  /* Bili logo */
+  .bili {
+    position: absolute;
+    top: 45px; right: 60px;
+    z-index: 20;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .bili .tag { font-size: 30px; color: #fefefe; font-weight: 500; letter-spacing: 1px; }
+  .bili .logo {
+    font-family: 'Comic Sans MS', 'Helvetica', sans-serif;
+    font-size: 30px; font-weight: 900;
+    color: #fb7299;
+    background: #fefefe;
+    padding: 2px 16px;
+    border-radius: 22px;
+    letter-spacing: -1px;
+  }
+
+  /* UP 头像 */
+  .uploader {
+    position: absolute;
+    right: 90px; bottom: 80px;
+    z-index: 20;
+    width: 170px; height: 170px;
+    border-radius: 50%;
+    border: 4px solid #ffffff;
+    box-shadow: 0 10px 32px rgba(0,0,0,0.7);
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 50% 118%, #e8e8e8 0%, #e8e8e8 32%, transparent 34%),
+      radial-gradient(circle at 50% 22%, #3a1a12 0%, #3a1a12 38%, transparent 40%),
+      radial-gradient(ellipse at 50% 70%, #f4d1bd 0%, #d2a082 62%, #9c6a52 95%);
+  }
+  .uploader::before {
+    content: ''; position: absolute;
+    left: 31%; top: 44%;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #1e1008;
+    box-shadow: 62px 0 0 #1e1008;
+  }
+  .uploader::after {
+    content: ''; position: absolute;
+    left: 50%; top: 66%;
+    transform: translateX(-50%);
+    width: 24px; height: 6px; border-radius: 3px;
+    background: #8a3820;
+  }
+  .tv-badge {
+    position: absolute;
+    right: 60px; bottom: 78px;
+    z-index: 21;
+    width: 48px; height: 32px;
+    background: #fb7299;
+    border-radius: 6px;
+    border: 3px solid #fefefe;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  }
+  .tv-badge::before {
+    content: ''; position: absolute;
+    inset: 5px 8px;
+    background: #fefefe;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+
+    <!-- 地图层 -->
+    <svg class="map" viewBox="0 0 1920 1080" preserveAspectRatio="none">
+      <defs>
+        <!-- 浮雕 filter -->
+        <filter id="land-shadow" x="-10%" y="-10%" width="120%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+          <feOffset dx="0" dy="10" result="blurred"/>
+          <feFlood flood-color="#04090b" flood-opacity="0.85"/>
+          <feComposite in2="blurred" operator="in"/>
+          <feMerge>
+            <feMergeNode/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+
+        <!-- 海水渐变 -->
+        <radialGradient id="sea-glow" cx="48%" cy="58%" r="45%">
+          <stop offset="0%" stop-color="#1e3d46" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#0a1b1f" stop-opacity="0"/>
+        </radialGradient>
+
+        <!-- 弯曲文字路径 -->
+        <path id="p-en" d="M 620,780 Q 990,605 1400,410" fill="none"/>
+        <path id="p-cn" d="M 760,920 Q 1100,720 1480,490" fill="none"/>
+
+        <!-- 货轮 -->
+        <g id="ship">
+          <path d="M -115,-30 L 85,-30 L 122,0 L 85,30 L -115,30 Z" fill="#0f181d"/>
+          <rect x="-106" y="-24" width="188" height="48" fill="#4a5962"/>
+          <g fill="#262f37" stroke="#5c6a76" stroke-width="0.5">
+            <rect x="-100" y="-20" width="22" height="12"/>
+            <rect x="-75" y="-20" width="22" height="12"/>
+            <rect x="-50" y="-20" width="22" height="12"/>
+            <rect x="-25" y="-20" width="22" height="12"/>
+            <rect x="0" y="-20" width="22" height="12"/>
+            <rect x="25" y="-20" width="22" height="12"/>
+            <rect x="50" y="-20" width="22" height="12"/>
+            <rect x="-100" y="-6" width="22" height="12"/>
+            <rect x="-75" y="-6" width="22" height="12"/>
+            <rect x="-50" y="-6" width="22" height="12"/>
+            <rect x="-25" y="-6" width="22" height="12"/>
+            <rect x="0" y="-6" width="22" height="12"/>
+            <rect x="25" y="-6" width="22" height="12"/>
+            <rect x="50" y="-6" width="22" height="12"/>
+            <rect x="-100" y="8" width="22" height="12"/>
+            <rect x="-75" y="8" width="22" height="12"/>
+            <rect x="-50" y="8" width="22" height="12"/>
+            <rect x="-25" y="8" width="22" height="12"/>
+            <rect x="0" y="8" width="22" height="12"/>
+            <rect x="25" y="8" width="22" height="12"/>
+            <rect x="50" y="8" width="22" height="12"/>
+          </g>
+          <rect x="-110" y="-15" width="9" height="30" fill="#8a9aa8"/>
+          <rect x="-110" y="-15" width="9" height="6" fill="#bcc8d2"/>
+        </g>
+
+        <!-- 红十字 -->
+        <g id="cross">
+          <rect x="-22" y="-7" width="44" height="14" rx="1.5" fill="#e84458"/>
+          <rect x="-7" y="-22" width="14" height="44" rx="1.5" fill="#e84458"/>
+          <rect x="-22" y="-7" width="44" height="3" rx="1.5" fill="#ff6b7c" opacity="0.7"/>
+          <rect x="-7" y="-22" width="3" height="44" rx="1.5" fill="#ff6b7c" opacity="0.7"/>
+        </g>
+      </defs>
+
+      <!-- 海水中部高光 -->
+      <rect x="0" y="0" width="1920" height="1080" fill="url(#sea-glow)"/>
+
+      <!-- 伊朗（上方大陆，占比大）-->
+      <g filter="url(#land-shadow)">
+        <path class="land-base" d="
+          M 0,0 L 1920,0 L 1920,350
+          C 1810,380 1670,410 1530,425
+          C 1380,438 1220,395 1080,380
+          C 920,365 770,420 640,432
+          C 500,442 370,410 240,402
+          C 130,400 50,418 0,390 Z"/>
+        <!-- musandam 半岛（下方 + 东北钩子）-->
+        <path class="land-base" d="
+          M 0,1080 L 0,760
+          C 160,720 320,720 490,755
+          C 640,785 760,835 865,905
+          C 760,860 690,795 680,720
+          C 685,670 730,648 790,672
+          C 862,705 905,780 922,855
+          C 935,915 912,965 870,995
+          L 980,1080 Z"/>
+      </g>
+
+      <!-- 伊朗陆地高光 -->
+      <path class="land-top" d="
+        M 0,0 L 1920,0 L 1920,300
+        C 1800,325 1670,360 1530,370
+        C 1380,380 1220,345 1080,330
+        C 920,320 770,375 640,385
+        C 500,395 370,365 240,358
+        C 130,355 50,370 0,345 Z" opacity="0.75"/>
+
+      <path class="land-hi" d="
+        M 0,20 C 300,10 700,40 1100,25
+        C 1450,10 1700,35 1920,18 L 1920,220
+        C 1700,238 1400,212 1100,222
+        C 750,238 400,214 0,228 Z"/>
+
+      <!-- musandam 陆地高光 -->
+      <path class="land-top" d="
+        M 0,1080 L 0,790
+        C 150,760 320,760 485,795
+        C 620,820 735,860 830,920
+        C 750,885 690,830 688,762
+        C 695,720 732,702 780,720
+        C 845,750 885,815 898,875
+        C 908,925 890,965 855,990
+        L 970,1080 Z" opacity="0.7"/>
+
+      <path class="land-hi" d="
+        M 100,1060 C 250,1030 400,1020 550,1030
+        C 680,1040 790,1055 870,1075 L 870,1080 L 100,1080 Z"/>
+
+      <!-- 海峡中的岛 -->
+      <g filter="url(#land-shadow)">
+        <ellipse class="land-base" cx="1040" cy="470" rx="38" ry="20"/>
+        <ellipse class="land-base" cx="830" cy="555" rx="48" ry="25"/>
+        <ellipse class="land-base" cx="1260" cy="410" rx="22" ry="13"/>
+        <circle class="land-base" cx="1380" cy="555" r="15"/>
+        <circle class="land-base" cx="710" cy="640" r="16"/>
+        <circle class="land-base" cx="935" cy="650" r="10"/>
+      </g>
+      <ellipse class="land-top" cx="1040" cy="465" rx="32" ry="16" opacity="0.7"/>
+      <ellipse class="land-top" cx="830" cy="548" rx="42" ry="20" opacity="0.7"/>
+
+      <!-- 海岸线描边（微弱） -->
+      <path class="coast" d="
+        M 0,390 C 130,400 240,402 370,410 C 500,442 640,432 770,420 C 920,365 1080,380 1220,395 C 1380,438 1530,425 1670,410 C 1810,380 1920,350 1920,350"/>
+
+      <!-- 弯曲文字 -->
+      <text font-family="Georgia, 'Times New Roman', serif"
+            font-size="46" letter-spacing="16"
+            fill="#a0b8bc" opacity="0.5">
+        <textPath href="#p-en" startOffset="3%">S t r a i t   o f   H o r m u z</textPath>
+      </text>
+
+      <text font-family="'PingFang SC', 'Microsoft YaHei', sans-serif"
+            font-weight="800" font-size="148" letter-spacing="14"
+            fill="#3d5a65" opacity="0.88">
+        <textPath href="#p-cn" startOffset="0%">霍尔木兹海峡</textPath>
+      </text>
+
+      <!-- 红十字 stagger -->
+      <g filter="drop-shadow(0 3px 6px rgba(0,0,0,0.55))">
+        <use href="#cross" transform="translate(640,720) rotate(-22)"/>
+        <use href="#cross" transform="translate(715,672) rotate(-24)"/>
+        <use href="#cross" transform="translate(792,624) rotate(-26)"/>
+        <use href="#cross" transform="translate(870,578) rotate(-28)"/>
+        <use href="#cross" transform="translate(952,534) rotate(-30)"/>
+        <use href="#cross" transform="translate(1038,492) rotate(-32)"/>
+        <use href="#cross" transform="translate(1126,452) rotate(-34)"/>
+        <use href="#cross" transform="translate(1215,412) rotate(-36)"/>
+      </g>
+
+      <!-- 货轮 3 艘 -->
+      <g filter="drop-shadow(0 10px 16px rgba(0,0,0,0.6))">
+        <use href="#ship" transform="translate(340,740) rotate(24)"/>
+        <use href="#ship" transform="translate(245,870) rotate(20)"/>
+        <use href="#ship" transform="translate(175,995) rotate(16)"/>
+      </g>
+    </svg>
+
+    <!-- 噪点 -->
+    <div class="grain"></div>
+
+    <!-- 标题 -->
+    <div class="title-block">
+      <div class="t-cn">伊朗称将攻击任何试图通过霍尔木兹海峡的船只</div>
+      <div class="t-en">Iran says will attack any ship trying to pass through Strait of Hormuz</div>
+      <div class="t-source">据通讯社报道　发布日期：2026年3月2日</div>
+    </div>
+
+    <!-- 国家 -->
+    <div class="country">
+      <div class="c-cn">伊朗</div>
+      <div class="c-en">Iran</div>
+    </div>
+
+    <!-- bili logo -->
+    <div class="bili">
+      <span class="tag">小Lin说</span>
+      <span class="logo">bilibili</span>
+    </div>
+
+    <!-- 字幕 -->
+    <div class="sub">堵死了运不出来</div>
+
+    <!-- UP 主 -->
+    <div class="tv-badge"></div>
+    <div class="uploader"></div>
+
+  </div>
+</body>
+</html>
