@@ -1,15 +1,9 @@
 [workspace]
-# v2.0 rebuild. Legacy crates archived in legacy-v08/ (not compiled, reference only).
-# New crates are minimal skeletons — implementations will be filled in phase by phase.
-members = [
-    "src/nf-core-app",
-    "src/nf-core-engine",
-    "src/nf-shell-mac",
-    "src/nf-recorder",
-    "src/nf-cli",
-    "src/nf-runtime",
-    "src/nf-tracks",
-]
+# Empty workspace — project reset at v0.x-final (2026-04-17).
+# Previous src/ (7 crate) archived to archive/v0.x-src-final.tar.gz (local only, .gitignored).
+# Previous spec/ archived to archive/v0.x-spec-full.tar.gz (local) + github.com/ChaosRealmsAI/NextFrame-spec.
+# Next version v1.0 will add members here.
+members = []
 resolver = "2"
 
 [workspace.package]
