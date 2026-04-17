@@ -1,26 +1,25 @@
 use std::ffi::c_void;
 use std::ptr::NonNull;
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_core_foundation::{CFBoolean, CFDictionary, CFNumber, CFRetained, CFType};
 use objc2_core_video::{
-    CVPixelBuffer, CVPixelBufferGetIOSurface, CVPixelBufferGetPixelFormatType, CVPixelBufferPool,
-    kCVPixelBufferIOSurfacePropertiesKey, kCVPixelBufferMetalCompatibilityKey,
-    kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey, kCVPixelBufferHeightKey,
-    kCVPixelFormatType_32BGRA, kCVPixelFormatType_ARGB2101010LEPacked,
+    kCVPixelBufferHeightKey, kCVPixelBufferIOSurfacePropertiesKey,
+    kCVPixelBufferMetalCompatibilityKey, kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey,
+    kCVPixelFormatType_32BGRA, kCVPixelFormatType_ARGB2101010LEPacked, CVPixelBuffer,
+    CVPixelBufferGetIOSurface, CVPixelBufferGetPixelFormatType, CVPixelBufferPool,
 };
-use objc2_foundation::{NSString, ns_string};
+use objc2_foundation::{ns_string, NSString};
 use objc2_metal::{
     MTLBlendFactor, MTLBlendOperation, MTLCommandBuffer, MTLCommandBufferStatus, MTLCommandEncoder,
     MTLCommandQueue, MTLCompileOptions, MTLDataType, MTLDevice, MTLFunctionConstantValues,
-    MTLGPUFamily, MTLLoadAction, MTLLibrary, MTLPipelineOption, MTLPrimitiveType,
-    MTLRenderCommandEncoder, MTLRenderPassDescriptor, MTLRenderPipelineColorAttachmentDescriptorArray,
-    MTLRenderPipelineDescriptor, MTLRenderPipelineState, MTLSize, MTLStoreAction, MTLTexture,
-    MTLTextureUsage,
+    MTLGPUFamily, MTLLibrary, MTLLoadAction, MTLPipelineOption, MTLPixelFormat, MTLPrimitiveType,
+    MTLRenderCommandEncoder, MTLRenderPassDescriptor,
+    MTLRenderPipelineColorAttachmentDescriptorArray, MTLRenderPipelineDescriptor,
+    MTLRenderPipelineState, MTLSize, MTLStoreAction, MTLTexture, MTLTextureUsage,
     MTLTileRenderPipelineColorAttachmentDescriptorArray, MTLTileRenderPipelineDescriptor,
-    MTLPixelFormat,
 };
 
 use crate::io_surface_alias::MetalAliasContext;
@@ -81,7 +80,10 @@ impl MetalCompositor {
         self.composite_layers(&[source_pixel_buffer])
     }
 
-    pub fn composite_layers(&self, source_pixel_buffers: &[&CVPixelBuffer]) -> Result<CompositedFrame> {
+    pub fn composite_layers(
+        &self,
+        source_pixel_buffers: &[&CVPixelBuffer],
+    ) -> Result<CompositedFrame> {
         if source_pixel_buffers.is_empty() {
             bail!("compositor requires at least one source layer");
         }
@@ -127,7 +129,9 @@ impl MetalCompositor {
         command_buffer.commit();
         command_buffer.waitUntilCompleted();
         check_command_buffer(command_buffer.as_ref())?;
-        Ok(CompositedFrame { pixel_buffer: output })
+        Ok(CompositedFrame {
+            pixel_buffer: output,
+        })
     }
 
     fn alias_source_texture(
@@ -148,7 +152,9 @@ impl MetalCompositor {
     }
 }
 
-fn compile_library(alias: &MetalAliasContext) -> Result<Retained<ProtocolObject<dyn objc2_metal::MTLLibrary>>> {
+fn compile_library(
+    alias: &MetalAliasContext,
+) -> Result<Retained<ProtocolObject<dyn objc2_metal::MTLLibrary>>> {
     let source = NSString::from_str(COMPOSITE_SHADER_SRC);
     let options = MTLCompileOptions::new();
     alias
@@ -164,7 +170,8 @@ fn build_tile_pipeline(
     layers: usize,
 ) -> Result<Retained<ProtocolObject<dyn MTLRenderPipelineState>>> {
     let constants = MTLFunctionConstantValues::new();
-    let mut layer_count = u16::try_from(layers).context("layer count exceeds tile constant range")?;
+    let mut layer_count =
+        u16::try_from(layers).context("layer count exceeds tile constant range")?;
     // SAFETY: The function constant points to a live stack value for the duration of specialization.
     unsafe {
         constants.setConstantValue_type_atIndex(
@@ -186,7 +193,8 @@ fn build_tile_pipeline(
     }
     desc.setThreadgroupSizeMatchesTileSize(true);
     desc.setLabel(Some(ns_string!("nf-recorder.tile")));
-    let colors: Retained<MTLTileRenderPipelineColorAttachmentDescriptorArray> = desc.colorAttachments();
+    let colors: Retained<MTLTileRenderPipelineColorAttachmentDescriptorArray> =
+        desc.colorAttachments();
     // SAFETY: Color attachment slot 0 exists on a newly created descriptor array.
     let color0 = unsafe { colors.objectAtIndexedSubscript(0) };
     color0.setPixelFormat(MTLPixelFormat::BGR10A2Unorm);
@@ -333,8 +341,9 @@ fn create_output_pool(width: usize, height: usize) -> Result<CFRetained<CVPixelB
     );
     let mut raw = std::ptr::null_mut();
     // SAFETY: CoreVideo initializes the pool in the provided out pointer.
-    let status =
-        unsafe { CVPixelBufferPool::create(None, None, Some(attrs.as_ref()), NonNull::from(&mut raw)) };
+    let status = unsafe {
+        CVPixelBufferPool::create(None, None, Some(attrs.as_ref()), NonNull::from(&mut raw))
+    };
     cvt(status, "CVPixelBufferPoolCreate")?;
     let raw = NonNull::new(raw).context("CVPixelBufferPoolCreate returned null")?;
     // SAFETY: CoreVideo returns a retained pool.
@@ -344,7 +353,8 @@ fn create_output_pool(width: usize, height: usize) -> Result<CFRetained<CVPixelB
 fn create_pool_pixel_buffer(pool: &CVPixelBufferPool) -> Result<CFRetained<CVPixelBuffer>> {
     let mut raw = std::ptr::null_mut();
     // SAFETY: CoreVideo stores a retained pixel buffer in the provided out pointer.
-    let status = unsafe { CVPixelBufferPool::create_pixel_buffer(None, pool, NonNull::from(&mut raw)) };
+    let status =
+        unsafe { CVPixelBufferPool::create_pixel_buffer(None, pool, NonNull::from(&mut raw)) };
     cvt(status, "CVPixelBufferPoolCreatePixelBuffer")?;
     let raw = NonNull::new(raw).context("CVPixelBufferPoolCreatePixelBuffer returned null")?;
     // SAFETY: The out pointer owns a +1 retained pixel buffer.

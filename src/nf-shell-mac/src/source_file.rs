@@ -3,8 +3,8 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -39,7 +39,9 @@ impl SourceWatcher {
         let watch_dir = canonical_target
             .parent()
             .map(Path::to_path_buf)
-            .ok_or_else(|| anyhow::anyhow!("source path has no parent: {}", canonical_target.display()))?;
+            .ok_or_else(|| {
+                anyhow::anyhow!("source path has no parent: {}", canonical_target.display())
+            })?;
 
         let (event_tx, event_rx) = mpsc::channel();
         let mut watcher = RecommendedWatcher::new(
@@ -78,9 +80,7 @@ impl SourceWatcher {
                 .join()
                 .map_err(|_| anyhow::anyhow!("source watcher worker panicked"))?;
         }
-        self.watcher
-            .unwatch(&self.watch_dir)
-            .ok();
+        self.watcher.unwatch(&self.watch_dir).ok();
         Ok(())
     }
 }
@@ -135,7 +135,9 @@ fn worker_loop<F>(
 
         match recv_event(&event_rx, &stop_rx) {
             EventOutcome::Stop => break,
-            EventOutcome::Event(Some(event)) if event_mentions_target(&event, &canonical_target) => {
+            EventOutcome::Event(Some(event))
+                if event_mentions_target(&event, &canonical_target) =>
+            {
                 debounce_burst(&event_rx, &stop_rx, &canonical_target, debounce);
                 callback();
             }
@@ -144,10 +146,7 @@ fn worker_loop<F>(
     }
 }
 
-fn recv_event(
-    event_rx: &Receiver<notify::Result<Event>>,
-    stop_rx: &Receiver<()>,
-) -> EventOutcome {
+fn recv_event(event_rx: &Receiver<notify::Result<Event>>, stop_rx: &Receiver<()>) -> EventOutcome {
     loop {
         if stop_rx.try_recv().is_ok() {
             return EventOutcome::Stop;

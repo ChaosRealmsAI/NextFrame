@@ -3,9 +3,7 @@ use std::ptr::NonNull;
 use std::time::Duration;
 
 use objc2::rc::Retained;
-use objc2_foundation::{
-    NSData, NSDate, NSDefaultRunLoopMode, NSRunLoop, NSString, NSURL,
-};
+use objc2_foundation::{NSData, NSDate, NSDefaultRunLoopMode, NSRunLoop, NSString, NSURL};
 
 pub fn nsdata_to_vec(data: &NSData) -> Vec<u8> {
     let len = data.length();

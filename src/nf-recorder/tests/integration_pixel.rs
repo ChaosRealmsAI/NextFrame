@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde_json::Value;
 
 #[test]
@@ -56,10 +56,7 @@ fn poc_recorder_binary_writes_pixel_verified_mp4() -> Result<()> {
     if avg.len() != 3 {
         bail!("center_avg_rgb should contain 3 channels");
     }
-    let max_channel = avg
-        .iter()
-        .filter_map(Value::as_f64)
-        .fold(0.0_f64, f64::max);
+    let max_channel = avg.iter().filter_map(Value::as_f64).fold(0.0_f64, f64::max);
     if max_channel <= 80.0 {
         bail!("center region stayed too dark: {avg:?}");
     }

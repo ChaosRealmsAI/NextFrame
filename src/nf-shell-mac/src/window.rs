@@ -8,10 +8,10 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
+use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSWindow,
     NSWindowButton, NSWindowDelegate, NSWindowStyleMask, NSWindowTitleVisibility,
@@ -27,7 +27,7 @@ use crate::bridge::WebViewBridge;
 use crate::panels::{self, PanelViews};
 use crate::screenshot::{capture_window_png, preview_center_has_nonwhite_pixels};
 use crate::source_file::SourceWatcher;
-use crate::{RuntimeMode, version};
+use crate::{version, RuntimeMode};
 
 const DEFAULT_SOURCE: &str = "spec/fixtures/sample.json";
 const AUTOMATION_DELAY: Duration = Duration::from_secs(2);
@@ -200,7 +200,11 @@ pub fn run_shell(options: ShellOptions) -> Result<()> {
     app.activateIgnoringOtherApps(true);
 
     let (compile_tx, compile_rx) = mpsc::channel();
-    let watcher = install_source_watcher(&options.source_path, bundle_path.clone(), compile_tx.clone())?;
+    let watcher = install_source_watcher(
+        &options.source_path,
+        bundle_path.clone(),
+        compile_tx.clone(),
+    )?;
 
     let state = Rc::new(RefCell::new(ShellState {
         bundle_path: bundle_path.clone(),
@@ -327,7 +331,11 @@ fn build_window(
         config.setWebsiteDataStore(&store);
     }
     let web_view = unsafe {
-        WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), panels.preview_host.bounds(), &config)
+        WKWebView::initWithFrame_configuration(
+            WKWebView::alloc(mtm),
+            panels.preview_host.bounds(),
+            &config,
+        )
     };
     web_view.setTranslatesAutoresizingMaskIntoConstraints(false);
     panels.preview_host.addSubview(web_view.as_ref());
@@ -423,11 +431,10 @@ fn build_bundle(source_path: &Path, bundle_path: &Path) -> Result<()> {
 
 fn load_bundle_file(web_view: &WKWebView, bundle_path: &Path) -> Result<()> {
     let file_url = nsurl_from_path(bundle_path);
-    let root_url = nsurl_from_path(
-        bundle_path
-            .parent()
-            .ok_or_else(|| anyhow::anyhow!("bundle path has no parent: {}", bundle_path.display()))?,
-    );
+    let root_url =
+        nsurl_from_path(bundle_path.parent().ok_or_else(|| {
+            anyhow::anyhow!("bundle path has no parent: {}", bundle_path.display())
+        })?);
     let navigation = unsafe { web_view.loadFileURL_allowingReadAccessToURL(&file_url, &root_url) };
     if navigation.is_none() {
         bail!("WKWebView refused to load {}", bundle_path.display());

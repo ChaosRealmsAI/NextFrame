@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use nf_shell_mac::window::{ShellOptions, run_shell};
+use nf_shell_mac::window::{run_shell, ShellOptions};
 
 #[derive(Debug, Parser)]
 #[command(name = "nf-shell-mac", version, about = "NextFrame macOS shell")]

@@ -4,12 +4,12 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
 use dispatch2::{DispatchQueue, DispatchRetained};
-use objc2::{AnyThread, DefinedClass};
 use objc2::rc::Retained;
 use objc2::runtime::{NSObject, ProtocolObject};
-use objc2::{MainThreadMarker, define_class, msg_send};
+use objc2::{define_class, msg_send, MainThreadMarker};
+use objc2::{AnyThread, DefinedClass};
 use objc2_app_kit::NSWindow;
 use objc2_core_foundation::CFRetained;
 use objc2_core_media::{CMSampleBuffer, CMTime};
@@ -104,8 +104,8 @@ pub struct CaptureSession {
 
 impl CaptureSession {
     pub fn new(window: &NSWindow, width: usize, height: usize, fps: u32) -> Result<Self> {
-        let _mtm =
-            MainThreadMarker::new().context("ScreenCaptureKit setup must run on the main thread")?;
+        let _mtm = MainThreadMarker::new()
+            .context("ScreenCaptureKit setup must run on the main thread")?;
         let sc_window = find_window(window.windowNumber() as u32)?;
         // SAFETY: `sc_window` is a live single-window capture target enumerated from SCShareableContent.
         let filter = unsafe {
@@ -183,7 +183,8 @@ impl CaptureSession {
         });
         // SAFETY: The completion block remains alive until the API invokes it synchronously/asynchronously.
         unsafe {
-            self.stream.startCaptureWithCompletionHandler(Some(&completion));
+            self.stream
+                .startCaptureWithCompletionHandler(Some(&completion));
         }
         let deadline = Instant::now() + Duration::from_secs(10);
         while !finished.get() && Instant::now() < deadline {
@@ -257,7 +258,8 @@ impl Drop for CaptureSession {
 
 pub fn sample_pixel_buffer(sample: &CMSampleBuffer) -> Result<&CVPixelBuffer> {
     // SAFETY: Screen sample buffers carry an image buffer for screen frames; we validate presence.
-    let image_buffer = unsafe { sample.image_buffer() }.context("capture sample missing image buffer")?;
+    let image_buffer =
+        unsafe { sample.image_buffer() }.context("capture sample missing image buffer")?;
     // SAFETY: The CVImageBuffer returned by SCStream is a CVPixelBuffer-backed object.
     Ok(unsafe { &*(CFRetained::as_ptr(&image_buffer).as_ptr() as *const CVPixelBuffer) })
 }

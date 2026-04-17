@@ -1,7 +1,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use objc2::rc::Retained;
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
+use objc2::{define_class, msg_send, DefinedClass, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSBezierPath, NSColor, NSEvent, NSFont, NSLayoutConstraint, NSTextAlignment, NSTextField,
     NSView,
@@ -186,7 +186,9 @@ pub fn install(content_view: &NSView, mtm: MainThreadMarker) -> Result<PanelView
         title_bar
             .topAnchor()
             .constraintEqualToAnchor(&content_view.topAnchor()),
-        title_bar.heightAnchor().constraintEqualToConstant(TITLE_BAR_HEIGHT),
+        title_bar
+            .heightAnchor()
+            .constraintEqualToConstant(TITLE_BAR_HEIGHT),
         timeline
             .leadingAnchor()
             .constraintEqualToAnchor(&content_view.leadingAnchor()),
@@ -236,13 +238,7 @@ pub fn install(content_view: &NSView, mtm: MainThreadMarker) -> Result<PanelView
 
 fn install_title_contents(title_bar: &NSView, mtm: MainThreadMarker) {
     let brand = make_label(mtm, "NextFrame", 13.0, true, [0.96, 0.97, 0.99, 1.0]);
-    let file_hint = make_label(
-        mtm,
-        "Play Shell",
-        11.0,
-        false,
-        [0.62, 0.65, 0.74, 1.0],
-    );
+    let file_hint = make_label(mtm, "Play Shell", 11.0, false, [0.62, 0.65, 0.74, 1.0]);
     let action = make_pill(mtm, "Export");
 
     let title_subviews: [&NSView; 3] = [brand.as_ref(), file_hint.as_ref(), action.as_ref()];
@@ -342,7 +338,13 @@ fn install_params_contents(panel: &NSView, mtm: MainThreadMarker) {
 
 fn install_timeline_contents(panel: &NSView, mtm: MainThreadMarker) {
     let title = make_label(mtm, "Timeline", 14.0, true, [0.90, 0.97, 0.93, 1.0]);
-    let ruler = make_label(mtm, "0s      2s      4s      6s", 11.0, false, [0.65, 0.82, 0.73, 1.0]);
+    let ruler = make_label(
+        mtm,
+        "0s      2s      4s      6s",
+        11.0,
+        false,
+        [0.65, 0.82, 0.73, 1.0],
+    );
     let tracks = [
         "T  title                [========        ]",
         "A  voice                [==============  ]",

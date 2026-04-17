@@ -1,6 +1,6 @@
 use anyhow::Result;
 use nf_recorder::io_surface_alias::{
-    MetalAliasContext, create_bgra_surface, fill_test_surface, resident_bytes,
+    create_bgra_surface, fill_test_surface, resident_bytes, MetalAliasContext,
 };
 use objc2_metal::MTLPixelFormat;
 

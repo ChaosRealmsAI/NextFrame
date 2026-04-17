@@ -2,7 +2,7 @@ use std::hint::spin_loop;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{anyhow, bail, Result};
 use crossbeam::queue::ArrayQueue;
 
 const SPIN_THRESHOLD: Duration = Duration::from_micros(250);

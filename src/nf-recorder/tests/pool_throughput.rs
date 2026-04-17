@@ -1,11 +1,11 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use crossbeam::queue::ArrayQueue;
-use nf_recorder::frame_pool::{FramePool, sleep_then_spin_until};
+use nf_recorder::frame_pool::{sleep_then_spin_until, FramePool};
 
 #[derive(Clone)]
 struct DummySurface {

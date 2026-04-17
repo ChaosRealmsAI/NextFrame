@@ -3,16 +3,16 @@ use std::path::Path;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
+use objc2::{define_class, msg_send, DefinedClass, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSWindow,
     NSWindowCollectionBehavior, NSWindowStyleMask,
 };
 use objc2_foundation::{
-    NSDate, NSError, NSDefaultRunLoopMode, NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSSize,
+    NSDate, NSDefaultRunLoopMode, NSError, NSObjectProtocol, NSPoint, NSRect, NSRunLoop, NSSize,
     NSString, NSURL,
 };
 use objc2_web_kit::{
@@ -93,7 +93,8 @@ pub struct Worker {
 
 impl Worker {
     pub fn new(bundle_path: &Path, width: usize, height: usize, fps: u32) -> Result<Self> {
-        let mtm = MainThreadMarker::new().context("WKWebView creation must run on the main thread")?;
+        let mtm =
+            MainThreadMarker::new().context("WKWebView creation must run on the main thread")?;
         let app = NSApplication::sharedApplication(mtm);
         app.setActivationPolicy(NSApplicationActivationPolicy::Prohibited);
         app.finishLaunching();
@@ -115,9 +116,9 @@ impl Worker {
         configure_window(&recorder_window, frame, true);
         recorder_window.setAlphaValue(1.0);
         recorder_window.setOpaque(true);
-        recorder_window.setBackgroundColor(Some(
-            &NSColor::colorWithSRGBRed_green_blue_alpha(1.0, 1.0, 1.0, 1.0),
-        ));
+        recorder_window.setBackgroundColor(Some(&NSColor::colorWithSRGBRed_green_blue_alpha(
+            1.0, 1.0, 1.0, 1.0,
+        )));
 
         // SAFETY: Creating a non-persistent WKWebView configuration on the main thread is valid.
         let config = unsafe { WKWebViewConfiguration::new(mtm) };
@@ -148,8 +149,9 @@ impl Worker {
         }
 
         // SAFETY: Creating the WKWebView with the window-sized frame is valid on the main thread.
-        let recorder_web_view =
-            unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), frame, &config) };
+        let recorder_web_view = unsafe {
+            WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), frame, &config)
+        };
         recorder_web_view.setFrame(frame);
         recorder_window.setContentView(Some(&recorder_web_view));
         load_bundle(&recorder_web_view, bundle_path)?;
@@ -358,9 +360,9 @@ fn configure_window(window: &NSWindow, frame: NSRect, white_background: bool) {
             | NSWindowCollectionBehavior::IgnoresCycle,
     );
     if white_background {
-        window.setBackgroundColor(Some(
-            &NSColor::colorWithSRGBRed_green_blue_alpha(1.0, 1.0, 1.0, 1.0),
-        ));
+        window.setBackgroundColor(Some(&NSColor::colorWithSRGBRed_green_blue_alpha(
+            1.0, 1.0, 1.0, 1.0,
+        )));
     }
 }
 
@@ -378,9 +380,9 @@ fn build_overlay_window(mtm: MainThreadMarker, frame: NSRect) -> Result<Retained
     configure_window(&overlay, frame, false);
     overlay.setOpaque(true);
     overlay.setAlphaValue(1.0);
-    overlay.setBackgroundColor(Some(
-        &NSColor::colorWithSRGBRed_green_blue_alpha(0.0, 0.0, 0.0, 1.0),
-    ));
+    overlay.setBackgroundColor(Some(&NSColor::colorWithSRGBRed_green_blue_alpha(
+        0.0, 0.0, 0.0, 1.0,
+    )));
     overlay.makeKeyAndOrderFront(None);
     Ok(overlay)
 }

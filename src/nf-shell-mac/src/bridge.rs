@@ -6,10 +6,10 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
+use objc2::{define_class, msg_send, DefinedClass, MainThreadMarker, MainThreadOnly};
 use objc2_foundation::{NSError, NSObjectProtocol, NSString};
 use objc2_web_kit::{
     WKContentWorld, WKScriptMessage, WKScriptMessageHandlerWithReply, WKUserContentController,
@@ -60,9 +60,10 @@ define_class!(
             reply_handler: &block2::DynBlock<dyn Fn(*mut AnyObject, *mut NSString)>,
         ) {
             let reply = handle_incoming_message(&self.ivars().shared, message);
-            let reply_text = NSString::from_str(&serde_json::to_string(&reply).unwrap_or_else(|_| {
-                String::from(r#"{"ok":false,"payload":{"error":"serialize-reply"}}"#)
-            }));
+            let reply_text =
+                NSString::from_str(&serde_json::to_string(&reply).unwrap_or_else(|_| {
+                    String::from(r#"{"ok":false,"payload":{"error":"serialize-reply"}}"#)
+                }));
             let reply_ptr = Retained::as_ptr(&reply_text).cast::<AnyObject>().cast_mut();
             reply_handler.call((reply_ptr, std::ptr::null_mut()));
         }
@@ -127,10 +128,7 @@ impl WebViewBridge {
     }
 
     pub fn is_ready(&self) -> bool {
-        self.shared
-            .lock()
-            .map(|state| state.ready)
-            .unwrap_or(false)
+        self.shared.lock().map(|state| state.ready).unwrap_or(false)
     }
 
     pub fn set_mode(&self, mode: RuntimeMode) -> Result<()> {
@@ -167,20 +165,21 @@ impl WebViewBridge {
         let done_ref = Rc::clone(&done);
         let value_ref = Rc::clone(&value);
         let error_ref = Rc::clone(&error_text);
-        let completion = block2::RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
-            if let Some(error) = unsafe { error.as_ref() } {
-                *error_ref.borrow_mut() = Some(error.localizedDescription().to_string());
-            } else if let Some(result) = unsafe { result.as_ref() } {
-                if let Some(text) = result.downcast_ref::<NSString>() {
-                    *value_ref.borrow_mut() = Some(text.to_string());
+        let completion =
+            block2::RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
+                if let Some(error) = unsafe { error.as_ref() } {
+                    *error_ref.borrow_mut() = Some(error.localizedDescription().to_string());
+                } else if let Some(result) = unsafe { result.as_ref() } {
+                    if let Some(text) = result.downcast_ref::<NSString>() {
+                        *value_ref.borrow_mut() = Some(text.to_string());
+                    } else {
+                        *value_ref.borrow_mut() = Some(String::from("null"));
+                    }
                 } else {
                     *value_ref.borrow_mut() = Some(String::from("null"));
                 }
-            } else {
-                *value_ref.borrow_mut() = Some(String::from("null"));
-            }
-            done_ref.set(true);
-        });
+                done_ref.set(true);
+            });
 
         // SAFETY: Script and completion block remain alive until the completion runs.
         unsafe {

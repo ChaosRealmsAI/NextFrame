@@ -2,7 +2,7 @@ use std::fs;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use nf_recorder::compositor::MetalCompositor;
 use nf_recorder::encoder::Encoder;
 use nf_recorder::muxer::FragmentedMp4Writer;
@@ -56,7 +56,10 @@ fn encode_smoke_outputs_hevc_main10_fragmented_mp4() -> Result<()> {
         .output()
         .context("run ffprobe")?;
     if !ffprobe.status.success() {
-        bail!("ffprobe failed: {}", String::from_utf8_lossy(&ffprobe.stderr));
+        bail!(
+            "ffprobe failed: {}",
+            String::from_utf8_lossy(&ffprobe.stderr)
+        );
     }
     let stdout = String::from_utf8(ffprobe.stdout)?;
     assert!(stdout.contains("codec_name=hevc"), "{stdout}");

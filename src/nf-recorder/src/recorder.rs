@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
 use crossbeam::channel;
 use crossbeam::queue::ArrayQueue;
 use objc2_core_foundation::CFRetained;
@@ -14,7 +14,7 @@ use objc2_core_video::CVPixelBuffer;
 use crate::capture::retain_sample_pixel_buffer;
 use crate::compositor::MetalCompositor;
 use crate::encoder::Encoder;
-use crate::frame_pool::{FramePool, sleep_then_spin_until};
+use crate::frame_pool::{sleep_then_spin_until, FramePool};
 use crate::muxer::FragmentedMp4Writer;
 use crate::progress::ProgressState;
 use crate::worker::Worker;
@@ -131,23 +131,15 @@ impl Recorder for PipelineRecorder {
             .collect::<Result<Vec<_>>>()?;
         let frame_pool = FramePool::new(
             (0..pool_size)
-                .map(|slot| {
-                    Arc::new(FramePermit {
-                        _slot_index: slot,
-                    })
-                })
+                .map(|slot| Arc::new(FramePermit { _slot_index: slot }))
                 .collect(),
         )?;
         let worker_queues = (0..worker_count)
             .map(|_| Arc::new(ArrayQueue::new(pool_size)))
             .collect::<Vec<_>>();
         let (encoder_tx, encoder_rx) = channel::unbounded::<EncoderMessage>();
-        let compositor_threads = spawn_compositor_threads(
-            worker_queues.clone(),
-            encoder_tx.clone(),
-            width,
-            height,
-        );
+        let compositor_threads =
+            spawn_compositor_threads(worker_queues.clone(), encoder_tx.clone(), width, height);
         let encoder_thread = spawn_encoder_thread(
             encoder_rx,
             EncoderThreadConfig {
@@ -333,7 +325,8 @@ fn drain_encoder_ready_frames(
     fps: u32,
 ) -> Result<()> {
     while let Some(packet) = pending.remove(next_frame) {
-        let frame_index = u32::try_from(*next_frame).context("frame index exceeds encoder range")?;
+        let frame_index =
+            u32::try_from(*next_frame).context("frame index exceeds encoder range")?;
         let encoded = encoder.encode_frame(frame_index, packet.pixel_buffer.as_ref())?;
         if muxer.is_none() {
             *muxer = Some(FragmentedMp4Writer::new(
@@ -358,7 +351,10 @@ fn drain_encoder_ready_frames(
     Ok(())
 }
 
-fn acquire_permit(frame_pool: &FramePool<FramePermit>, progress: &ProgressState) -> Result<Arc<FramePermit>> {
+fn acquire_permit(
+    frame_pool: &FramePool<FramePermit>,
+    progress: &ProgressState,
+) -> Result<Arc<FramePermit>> {
     loop {
         if let Some(permit) = frame_pool.acquire() {
             return Ok(permit);

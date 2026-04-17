@@ -1,10 +1,10 @@
 use std::fs;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use nf_shell_mac::source_file::{SourceWatcher, write_atomic};
+use nf_shell_mac::source_file::{write_atomic, SourceWatcher};
 
 #[test]
 fn watcher_single_flight_dedupes_rapid_atomic_renames() {

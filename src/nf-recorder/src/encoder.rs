@@ -4,27 +4,25 @@ use std::ptr::NonNull;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
 use mp4_atom::{Atom, Decode, Header, Hev1};
 use objc2_core_foundation::{
     CFBoolean, CFData, CFDictionary, CFNumber, CFRetained, CFString, CFType,
 };
 use objc2_core_media::{
-    CMBlockBuffer, CMSampleBuffer, CMTime, CMVideoFormatDescription,
-    CMVideoFormatDescriptionCopyAsBigEndianImageDescriptionBlockBuffer, kCMTimeInvalid,
-    kCMVideoCodecType_HEVC,
+    kCMTimeInvalid, kCMVideoCodecType_HEVC, CMBlockBuffer, CMSampleBuffer, CMTime,
+    CMVideoFormatDescription, CMVideoFormatDescriptionCopyAsBigEndianImageDescriptionBlockBuffer,
 };
 use objc2_core_video::{
-    CVAttachmentMode, CVBuffer, CVImageBuffer, CVPixelBuffer,
-    kCVImageBufferColorPrimaries_ITU_R_2020, kCVImageBufferColorPrimariesKey,
+    kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_2020,
     kCVImageBufferContentLightLevelInfoKey, kCVImageBufferMasteringDisplayColorVolumeKey,
-    kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ, kCVImageBufferTransferFunctionKey,
-    kCVImageBufferYCbCrMatrix_ITU_R_2020, kCVImageBufferYCbCrMatrixKey,
+    kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ,
+    kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_2020,
     kCVPixelBufferIOSurfacePropertiesKey, kCVPixelBufferMetalCompatibilityKey,
-    kCVPixelBufferPixelFormatTypeKey, kCVPixelFormatType_ARGB2101010LEPacked,
+    kCVPixelBufferPixelFormatTypeKey, kCVPixelFormatType_ARGB2101010LEPacked, CVAttachmentMode,
+    CVBuffer, CVImageBuffer, CVPixelBuffer,
 };
 use objc2_video_toolbox::{
-    VTCompressionSession, VTEncodeInfoFlags, VTSession, VTSessionSetProperty,
     kVTCompressionPropertyKey_AllowFrameReordering, kVTCompressionPropertyKey_ColorPrimaries,
     kVTCompressionPropertyKey_ContentLightLevelInfo, kVTCompressionPropertyKey_ExpectedFrameRate,
     kVTCompressionPropertyKey_HDRMetadataInsertionMode,
@@ -34,11 +32,12 @@ use objc2_video_toolbox::{
     kVTCompressionPropertyKey_TransferFunction, kVTCompressionPropertyKey_YCbCrMatrix,
     kVTHDRMetadataInsertionMode_Auto, kVTProfileLevel_HEVC_Main10_AutoLevel,
     kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder,
-    kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder,
+    kVTVideoEncoderSpecification_RequireHardwareAcceleratedVideoEncoder, VTCompressionSession,
+    VTEncodeInfoFlags, VTSession, VTSessionSetProperty,
 };
 
 use crate::sei_injector::{
-    HDR10_CONTENT_LIGHT_BYTES, HDR10_MASTERING_DISPLAY_BYTES, prepend_hdr10_prefix_sei,
+    prepend_hdr10_prefix_sei, HDR10_CONTENT_LIGHT_BYTES, HDR10_MASTERING_DISPLAY_BYTES,
 };
 
 pub struct EncodedSample {
@@ -136,7 +135,11 @@ impl Encoder {
         Ok(encoder)
     }
 
-    pub fn encode_frame(&mut self, frame_index: u32, pixel_buffer: &CVPixelBuffer) -> Result<EncodedSample> {
+    pub fn encode_frame(
+        &mut self,
+        frame_index: u32,
+        pixel_buffer: &CVPixelBuffer,
+    ) -> Result<EncodedSample> {
         self.attach_color_metadata(pixel_buffer)?;
         let pts = unsafe { CMTime::new(frame_index as i64, self.fps as i32) };
         let duration = unsafe { CMTime::new(1, self.fps as i32) };
@@ -379,8 +382,8 @@ fn collect_encoded_sample(
         .ok_or_else(|| "missing format description".to_string())?;
     // SAFETY: HEVC video samples use CMVideoFormatDescription at this pointer.
     let video_format = unsafe { &*((&*format as *const _) as *const CMVideoFormatDescription) };
-    let sample_entry = copy_sample_entry(video_format)
-        .map_err(|error: anyhow::Error| error.to_string())?;
+    let sample_entry =
+        copy_sample_entry(video_format).map_err(|error: anyhow::Error| error.to_string())?;
 
     let pts = unsafe { sample.presentation_time_stamp() };
     let duration = unsafe { sample.duration() };

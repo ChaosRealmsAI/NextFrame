@@ -6,15 +6,15 @@ use std::mem;
 use std::ptr;
 use std::slice;
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{anyhow, bail, Context, Result};
 use objc2::runtime::ProtocolObject;
 use objc2_core_foundation::{
-    CFDictionary, CFRetained, CFNumber, CFNumberType, kCFTypeDictionaryKeyCallBacks,
-    kCFTypeDictionaryValueCallBacks,
+    kCFTypeDictionaryKeyCallBacks, kCFTypeDictionaryValueCallBacks, CFDictionary, CFNumber,
+    CFNumberType, CFRetained,
 };
 use objc2_io_surface::{
-    IOSurfaceLockOptions, IOSurfaceRef, kIOSurfaceBytesPerElement, kIOSurfaceHeight,
-    kIOSurfacePixelFormat, kIOSurfaceWidth,
+    kIOSurfaceBytesPerElement, kIOSurfaceHeight, kIOSurfacePixelFormat, kIOSurfaceWidth,
+    IOSurfaceLockOptions, IOSurfaceRef,
 };
 use objc2_metal::{
     MTLBlitCommandEncoder, MTLBuffer, MTLCommandBuffer, MTLCommandBufferStatus, MTLCommandEncoder,
@@ -116,8 +116,9 @@ impl MetalAliasContext {
         command_buffer.waitUntilCompleted();
         check_command_buffer(command_buffer.as_ref())?;
         // SAFETY: The shared buffer contents are valid for `readback_len` bytes after completion.
-        let bgra =
-            unsafe { slice::from_raw_parts(readback.contents().cast::<u8>().as_ptr(), readback_len) };
+        let bgra = unsafe {
+            slice::from_raw_parts(readback.contents().cast::<u8>().as_ptr(), readback_len)
+        };
         Ok(bgra_to_rgba(bgra))
     }
 }
@@ -139,8 +140,7 @@ pub fn create_bgra_surface(width: usize, height: usize) -> Result<CFRetained<IOS
         // SAFETY: These IOSurface property keys are valid process-global constants.
         unsafe { kIOSurfacePixelFormat } as *const _ as *const c_void,
     ];
-    let mut values =
-        numbers.map(|value| CFRetained::as_ptr(&value).as_ptr() as *const c_void);
+    let mut values = numbers.map(|value| CFRetained::as_ptr(&value).as_ptr() as *const c_void);
     // SAFETY: CFDictionaryCreate copies the key/value pointers for the lifetime of the returned dictionary.
     let props = unsafe {
         CFDictionary::new(
@@ -213,8 +213,14 @@ pub fn resident_bytes() -> Result<u64> {
 
 fn cf_u32(value: u32) -> Result<CFRetained<CFNumber>> {
     // SAFETY: CFNumberCreate copies the input integer bits into a new CFNumber.
-    unsafe { CFNumber::new(None, CFNumberType::SInt32Type, (&value as *const u32).cast()) }
-        .context("CFNumberCreate failed")
+    unsafe {
+        CFNumber::new(
+            None,
+            CFNumberType::SInt32Type,
+            (&value as *const u32).cast(),
+        )
+    }
+    .context("CFNumberCreate failed")
 }
 
 fn check_command_buffer(command_buffer: &ProtocolObject<dyn MTLCommandBuffer>) -> Result<()> {

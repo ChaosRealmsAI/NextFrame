@@ -1,7 +1,7 @@
 use anyhow::Result;
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2_app_kit::{NSBitmapImageRep, NSBitmapImageFileType, NSColor, NSView, NSWindow};
+use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSColor, NSView, NSWindow};
 use objc2_foundation::NSDictionary;
 
 use crate::bindings::nsdata_to_vec;
@@ -50,10 +50,9 @@ fn capture_view_bitmap(view: &NSView) -> Result<Retained<NSBitmapImageRep>> {
 fn png_bytes_from_bitmap(bitmap: &NSBitmapImageRep) -> Result<Vec<u8>> {
     let props = NSDictionary::<objc2_app_kit::NSBitmapImageRepPropertyKey, AnyObject>::new();
     // SAFETY: Empty properties dictionary is valid for PNG output.
-    let data = unsafe {
-        bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, &props)
-    }
-    .ok_or_else(|| anyhow::anyhow!("failed to encode bitmap as PNG"))?;
+    let data =
+        unsafe { bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, &props) }
+            .ok_or_else(|| anyhow::anyhow!("failed to encode bitmap as PNG"))?;
     Ok(nsdata_to_vec(&data))
 }
 

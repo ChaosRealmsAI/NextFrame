@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use nf_recorder::{PipelineRecorder, RecordSpec, Recorder};
 use serde_json::json;
 
@@ -159,7 +159,10 @@ fn ffprobe_stream(path: &PathBuf) -> Result<serde_json::Value> {
         .output()
         .with_context(|| format!("run ffprobe on {}", path.display()))?;
     if !output.status.success() {
-        bail!("ffprobe failed: {}", String::from_utf8_lossy(&output.stderr));
+        bail!(
+            "ffprobe failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
     Ok(serde_json::from_slice(&output.stdout)?)
 }
@@ -170,15 +173,7 @@ fn extract_rgb_frame(path: &PathBuf, frame_number: u32, size: (u32, u32)) -> Res
         .args(["-v", "error", "-i"])
         .arg(path)
         .args([
-            "-vf",
-            &filter,
-            "-vframes",
-            "1",
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "rgb24",
-            "-",
+            "-vf", &filter, "-vframes", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
         ])
         .output()
         .with_context(|| format!("run ffmpeg on {}", path.display()))?;
@@ -234,7 +229,12 @@ fn diff_ratio(a: &[u8], b: &[u8]) -> Result<f64> {
     }
     let mut changed = 0usize;
     for (pa, pb) in a.chunks_exact(3).zip(b.chunks_exact(3)) {
-        if pa[0].abs_diff(pb[0]).max(pa[1].abs_diff(pb[1])).max(pa[2].abs_diff(pb[2])) > 16 {
+        if pa[0]
+            .abs_diff(pb[0])
+            .max(pa[1].abs_diff(pb[1]))
+            .max(pa[2].abs_diff(pb[2]))
+            > 16
+        {
             changed += 1;
         }
     }

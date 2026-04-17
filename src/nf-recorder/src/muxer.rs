@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use mp4_atom::{
     Dinf, Dref, Ftyp, Hdlr, Hev1, Matrix, Mdhd, Mdia, Mfhd, Minf, Moof, Moov, Mvex, Mvhd, Stbl,
     Stsc, Stsd, Stsz, Stts, Tfdt, Tfhd, Traf, Trak, Trex, Trun, TrunEntry, Url, Vmhd, WriteTo,
@@ -246,7 +246,9 @@ fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
     let slice = bytes
         .get(offset..offset + 4)
         .context("u32 read outside encoded atom buffer")?;
-    Ok(u32::from_be_bytes(slice.try_into().context("invalid u32 slice")?))
+    Ok(u32::from_be_bytes(
+        slice.try_into().context("invalid u32 slice")?,
+    ))
 }
 
 fn write_u32(bytes: &mut [u8], offset: usize, value: u32) -> Result<()> {
@@ -280,5 +282,9 @@ fn identity_matrix() -> Matrix {
 }
 
 fn sample_flags(is_sync: bool) -> u32 {
-    if is_sync { 0x0200_0000 } else { 0x0101_0000 }
+    if is_sync {
+        0x0200_0000
+    } else {
+        0x0101_0000
+    }
 }
