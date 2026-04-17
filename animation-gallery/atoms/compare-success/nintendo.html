@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Success · Nintendo Switch</title>
+<style>
+  :root {
+    /* Nintendo palette — 马里奥红 / 路易吉绿 / 皮卡丘黄 / 任天堂蓝 */
+    --bg-white: #ffffff;
+    --bg-mint: #f0faf5;
+    --bg-sky: #5dace5;
+    --mario-red: #e60012;
+    --luigi-green: #00a652;
+    --luigi-green-dark: #008740;
+    --pika-yellow: #ffcb05;
+    --pika-orange: #f6a623;
+    --nintendo-blue: #003da5;
+    --coin-gold: #ffd93d;
+
+    --ink-900: #1a1a1a;
+    --ink-700: #3a3a3a;
+    --ink-400: #8a8a8a;
+    --ink-200: #d4d4d4;
+
+    /* 底部时间轴 — 延续 Apple 底座纪律但换 Nintendo 视觉 */
+    --tl-bg: rgba(255, 255, 255, 0.94);
+    --tl-border: rgba(0, 166, 82, 0.28);
+    --tl-ink: #3a3a3a;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    /* 活泼底：纯白 + 轻薄荷径向光晕 + 顶部一抹天蓝（低饱和，避免喧宾夺主） */
+    background:
+      radial-gradient(1200px 800px at 50% 40%, rgba(0, 166, 82, 0.06), transparent 60%),
+      radial-gradient(900px 700px at 20% 85%, rgba(255, 203, 5, 0.07), transparent 55%),
+      radial-gradient(900px 700px at 85% 15%, rgba(93, 172, 229, 0.08), transparent 55%),
+      linear-gradient(180deg, #ffffff 0%, #f7fcf9 100%);
+    font-family: "Varela Round", "Nunito", "Quicksand", "PingFang SC", "Hiragino Sans", -apple-system, system-ui, sans-serif;
+    color: var(--ink-900);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.005em;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .scene {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    transform-origin: center center;
+  }
+
+  /* 背景得分闪屏 — 脉冲色块 */
+  .flash-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(900px 600px at 50% 50%, rgba(0, 166, 82, 0.22), transparent 65%);
+    opacity: 0;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+
+  /* 居中舞台 */
+  .hero {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 560px;
+    height: 560px;
+    transform: translate(-50%, -54%);
+  }
+
+  .hero svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* +1 COIN 得分文字 */
+  .coin-pop {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -420px);
+    font-weight: 900;
+    font-size: 84px;
+    letter-spacing: 0.02em;
+    color: var(--pika-yellow);
+    -webkit-text-stroke: 5px var(--ink-900);
+    paint-order: stroke fill;
+    text-shadow: 0 6px 0 var(--ink-900), 0 10px 30px rgba(0, 0, 0, 0.2);
+    white-space: nowrap;
+    will-change: transform, opacity;
+    opacity: 0;
+  }
+
+  /* 主文字 GREAT! */
+  .great-text {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, 220px);
+    font-weight: 900;
+    font-size: 120px;
+    letter-spacing: 0.01em;
+    color: var(--mario-red);
+    -webkit-text-stroke: 6px var(--ink-900);
+    paint-order: stroke fill;
+    text-align: center;
+    white-space: nowrap;
+    will-change: transform, opacity;
+    opacity: 0;
+    text-shadow: 0 8px 0 var(--ink-900), 0 14px 0 rgba(0, 0, 0, 0.15);
+  }
+
+  .great-text .smile {
+    display: inline-block;
+    margin-left: 18px;
+    vertical-align: -6px;
+    -webkit-text-stroke: 0;
+    text-shadow: none;
+  }
+
+  /* 副文字 */
+  .sub {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, 380px);
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: 0.04em;
+    color: var(--luigi-green-dark);
+    text-align: center;
+    white-space: nowrap;
+    opacity: 0;
+    text-transform: uppercase;
+  }
+
+  /* 第二次连击 +1 COIN */
+  .coin-combo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -420px);
+    font-weight: 900;
+    font-size: 64px;
+    letter-spacing: 0.02em;
+    color: var(--pika-yellow);
+    -webkit-text-stroke: 4px var(--ink-900);
+    paint-order: stroke fill;
+    text-shadow: 0 5px 0 var(--ink-900);
+    white-space: nowrap;
+    opacity: 0;
+  }
+
+  /* 星星爆发层 */
+  .star-layer {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -54%);
+    width: 900px;
+    height: 900px;
+    pointer-events: none;
+  }
+
+  /* 云朵漂浮层 */
+  .cloud-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .cloud-layer .cloud {
+    position: absolute;
+    font-size: 100px;
+    opacity: 0.5;
+    filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.08));
+  }
+
+  /* ============== 底部时间轴 ============== */
+  .tl-wrap {
+    position: fixed;
+    left: 24px;
+    right: 24px;
+    bottom: 20px;
+    z-index: 50;
+  }
+
+  .cue-row {
+    position: relative;
+    height: 22px;
+    margin-bottom: 6px;
+  }
+
+  .cue-mark {
+    position: absolute;
+    top: 0;
+    width: 3px;
+    height: 14px;
+    background: var(--luigi-green);
+    border-radius: 2px;
+    opacity: 0.7;
+  }
+
+  .cue-mark .lbl {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--luigi-green-dark);
+    opacity: 0.95;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .tl-ui {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 18px;
+    background: var(--tl-bg);
+    border: 3px solid var(--ink-900);
+    border-radius: 18px;
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    box-shadow: 0 6px 0 var(--ink-900), 0 10px 28px rgba(0, 0, 0, 0.15);
+  }
+
+  .tl-ui button {
+    appearance: none;
+    border: 3px solid var(--ink-900);
+    background: linear-gradient(180deg, #ffffff, #f4fff9);
+    color: var(--ink-900);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 3px 0 var(--ink-900);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .tl-ui button:hover {
+    transform: translateY(-1px);
+    background: linear-gradient(180deg, #f4fff9, #d6f5e4);
+  }
+  .tl-ui button:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 var(--ink-900);
+  }
+
+  .tl-ui .time {
+    color: var(--tl-ink);
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    min-width: 110px;
+  }
+
+  .tl-ui input[type="range"] {
+    appearance: none;
+    flex: 1;
+    height: 6px;
+    background: linear-gradient(90deg,
+      var(--mario-red),
+      var(--pika-yellow),
+      var(--luigi-green),
+      var(--nintendo-blue));
+    border-radius: 4px;
+    outline: none;
+    border: 2px solid var(--ink-900);
+  }
+
+  .tl-ui input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--pika-yellow);
+    border: 3px solid var(--ink-900);
+    box-shadow: 0 3px 0 var(--ink-900);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="scene" id="scene">
+
+    <!-- 背景 flash -->
+    <div class="flash-bg" id="flashBg"></div>
+
+    <!-- 云朵漂浮（远景装饰） -->
+    <div class="cloud-layer" id="cloudLayer">
+      <div class="cloud" id="cloud1" style="left: 12%; top: 18%;">☁️</div>
+      <div class="cloud" id="cloud2" style="left: 78%; top: 22%;">☁️</div>
+      <div class="cloud" id="cloud3" style="left: 8%; top: 68%; font-size: 80px;">☁️</div>
+      <div class="cloud" id="cloud4" style="left: 82%; top: 72%; font-size: 80px;">☁️</div>
+    </div>
+
+    <!-- 星星爆发层（前景） -->
+    <div class="star-layer" id="starLayer">
+      <svg width="900" height="900" viewBox="-450 -450 900 900" style="position:absolute;inset:0;overflow:visible">
+        <defs>
+          <!-- 五角星路径 -->
+          <symbol id="star" viewBox="-50 -50 100 100">
+            <path d="M 0,-46 L 14,-14 L 46,-14 L 20,8 L 30,42 L 0,22 L -30,42 L -20,8 L -46,-14 L -14,-14 Z"
+                  fill="#ffcb05" stroke="#1a1a1a" stroke-width="5" stroke-linejoin="round"/>
+          </symbol>
+          <symbol id="starPink" viewBox="-50 -50 100 100">
+            <path d="M 0,-46 L 14,-14 L 46,-14 L 20,8 L 30,42 L 0,22 L -30,42 L -20,8 L -46,-14 L -14,-14 Z"
+                  fill="#ff6fa8" stroke="#1a1a1a" stroke-width="5" stroke-linejoin="round"/>
+          </symbol>
+          <symbol id="starBlue" viewBox="-50 -50 100 100">
+            <path d="M 0,-46 L 14,-14 L 46,-14 L 20,8 L 30,42 L 0,22 L -30,42 L -20,8 L -46,-14 L -14,-14 Z"
+                  fill="#5dace5" stroke="#1a1a1a" stroke-width="5" stroke-linejoin="round"/>
+          </symbol>
+        </defs>
+        <g id="starGroup"></g>
+      </svg>
+    </div>
+
+    <!-- 主勾容器 -->
+    <div class="hero">
+      <svg id="heroSvg" viewBox="-280 -280 560 560" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <!-- Nintendo signature 路易吉绿径向渐变（有体积感的按钮） -->
+          <radialGradient id="greenBtn" cx="35%" cy="30%" r="70%">
+            <stop offset="0%"  stop-color="#39d072"/>
+            <stop offset="60%" stop-color="#00a652"/>
+            <stop offset="100%" stop-color="#008740"/>
+          </radialGradient>
+          <radialGradient id="yellowBtn" cx="35%" cy="30%" r="70%">
+            <stop offset="0%"  stop-color="#fff08c"/>
+            <stop offset="60%" stop-color="#ffcb05"/>
+            <stop offset="100%" stop-color="#e0a800"/>
+          </radialGradient>
+          <!-- 高光 -->
+          <radialGradient id="btnHighlight" cx="35%" cy="25%" r="50%">
+            <stop offset="0%"  stop-color="rgba(255,255,255,0.95)"/>
+            <stop offset="60%" stop-color="rgba(255,255,255,0)"/>
+          </radialGradient>
+          <!-- 黑色卡通描边阴影 -->
+          <filter id="cartoonShadow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+            <feOffset dx="0" dy="10" result="off"/>
+            <feFlood flood-color="#1a1a1a" flood-opacity="0.35"/>
+            <feComposite in2="off" operator="in"/>
+            <feMerge>
+              <feMergeNode/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        <!-- idle: 空心问号圆（? 块感） -->
+        <g id="idleGroup">
+          <circle id="idleCircle" cx="0" cy="0" r="180"
+                  fill="#fff9d6" stroke="#1a1a1a" stroke-width="6"
+                  stroke-dasharray="12 10" opacity="0"/>
+          <text id="idleQmark" x="0" y="30" text-anchor="middle"
+                font-family="Varela Round, Nunito, sans-serif" font-size="220" font-weight="900"
+                fill="#e0a800" stroke="#1a1a1a" stroke-width="6" paint-order="stroke fill"
+                opacity="0">?</text>
+        </g>
+
+        <!-- PING! 绿色按钮（主体） -->
+        <g id="btnGroup" style="opacity:0">
+          <!-- 按钮底座阴影 -->
+          <ellipse cx="0" cy="195" rx="175" ry="18" fill="#1a1a1a" opacity="0.18"/>
+          <!-- 主圆 -->
+          <circle id="btnMain" cx="0" cy="0" r="190"
+                  fill="url(#greenBtn)" stroke="#1a1a1a" stroke-width="7"/>
+          <!-- 高光 -->
+          <ellipse id="btnGloss" cx="-50" cy="-70" rx="90" ry="55"
+                   fill="url(#btnHighlight)" opacity="0.85"/>
+          <!-- 勾勾路径 -->
+          <path id="checkPath"
+                d="M -85,5 L -25,65 L 90,-55"
+                fill="none"
+                stroke="#ffffff"
+                stroke-width="28"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-dasharray="300"
+                stroke-dashoffset="300"
+                filter="drop-shadow(0 4px 0 rgba(0,0,0,0.25))"/>
+        </g>
+
+        <!-- PING 爆发环（从中心向外扩散） -->
+        <circle id="pingRing" cx="0" cy="0" r="0"
+                fill="none" stroke="#ffcb05" stroke-width="8" opacity="0"/>
+        <circle id="pingRing2" cx="0" cy="0" r="0"
+                fill="none" stroke="#00a652" stroke-width="6" opacity="0"/>
+      </svg>
+    </div>
+
+    <!-- +1 COIN 得分 -->
+    <div class="coin-pop" id="coinPop">+1 COIN</div>
+
+    <!-- GREAT! 主文字 -->
+    <div class="great-text" id="greatText">GREAT!<span class="smile">🌟</span></div>
+
+    <!-- 副文字 -->
+    <div class="sub" id="subText">Stage Clear · Press A to Continue</div>
+
+    <!-- 第二次连击 -->
+    <div class="coin-combo" id="coinCombo">+1 COIN</div>
+
+  </div>
+</div>
+
+<!-- 时间轴 UI -->
+<div class="tl-wrap">
+  <div class="cue-row" id="cueRow"></div>
+  <div class="tl-ui">
+    <button id="playBtn">⏸</button>
+    <button id="resetBtn">↺</button>
+    <span class="time" id="timeLabel">0.00 / 10.00s</span>
+    <input type="range" id="scrubber" min="0" max="1000" value="0">
+    <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ============= 时间基础 =============
+  const DURATION = 10.0;
+  const FPS = 30;
+  const clamp01 = t => Math.max(0, Math.min(1, t));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const easeIn = x => x * x * x;
+  const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+
+  // Nintendo spring — 大 overshoot 的橡皮球感
+  function spring(t, k = 200, d = 10, mass = 1) {
+    if (t <= 0) return 0;
+    const wn = Math.sqrt(k / mass);
+    const zeta = d / (2 * Math.sqrt(k * mass));
+    if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+    }
+    return 1 - (1 + wn * t) * Math.exp(-wn * t);
+  }
+
+  // 局部窗口 ease：在 [s, s+d] 上把 easeOut 映射到 0..1
+  const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+  // ============= Cue 事件表（至少 6 个） =============
+  const CUES = [
+    { t: 0.0,  label: 'IDLE ?' },
+    { t: 1.5,  label: 'ANTICIPATE' },
+    { t: 1.7,  label: 'PING!' },
+    { t: 1.9,  label: '+1 COIN' },
+    { t: 2.2,  label: 'GREAT!' },
+    { t: 3.2,  label: 'SETTLE' },
+    { t: 7.0,  label: 'COMBO' },
+    { t: 9.3,  label: 'LOOP' }
+  ];
+
+  // ============= 星星爆发粒子（7 颗） =============
+  // 每颗：角度、半径、类型、旋转速度
+  const STAR_COUNT = 7;
+  const STARS = [];
+  const STAR_COLORS = ['star', 'starPink', 'starBlue', 'star', 'starPink', 'star', 'starBlue'];
+  for (let i = 0; i < STAR_COUNT; i++) {
+    const angle = -Math.PI / 2 + (i / STAR_COUNT) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
+    const maxR = 280 + Math.random() * 80;
+    const size = 42 + Math.random() * 22;
+    const spin = (Math.random() < 0.5 ? -1 : 1) * (360 + Math.random() * 360); // deg/10s
+    const delay = i * 0.03;
+    const type = STAR_COLORS[i % STAR_COLORS.length];
+    STARS.push({ angle, maxR, size, spin, delay, type });
+  }
+
+  // 预建星星 SVG 节点
+  const starGroup = document.getElementById('starGroup');
+  const starNodes = STARS.map((s, i) => {
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#' + s.type);
+    use.setAttribute('width', s.size);
+    use.setAttribute('height', s.size);
+    use.setAttribute('x', -s.size / 2);
+    use.setAttribute('y', -s.size / 2);
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.appendChild(use);
+    g.setAttribute('transform', 'translate(0,0) rotate(0) scale(0)');
+    g.style.opacity = '0';
+    starGroup.appendChild(g);
+    return g;
+  });
+
+  // ============= DOM 引用 =============
+  const flashBg    = document.getElementById('flashBg');
+  const idleGroup  = document.getElementById('idleGroup');
+  const idleCircle = document.getElementById('idleCircle');
+  const idleQmark  = document.getElementById('idleQmark');
+  const btnGroup   = document.getElementById('btnGroup');
+  const btnMain    = document.getElementById('btnMain');
+  const btnGloss   = document.getElementById('btnGloss');
+  const checkPath  = document.getElementById('checkPath');
+  const pingRing   = document.getElementById('pingRing');
+  const pingRing2  = document.getElementById('pingRing2');
+  const coinPop    = document.getElementById('coinPop');
+  const greatText  = document.getElementById('greatText');
+  const subText    = document.getElementById('subText');
+  const coinCombo  = document.getElementById('coinCombo');
+  const cloud1     = document.getElementById('cloud1');
+  const cloud2     = document.getElementById('cloud2');
+  const cloud3     = document.getElementById('cloud3');
+  const cloud4     = document.getElementById('cloud4');
+
+  const heroWrap   = document.querySelector('.hero');
+
+  // ============= 纯函数渲染 =============
+  function render(t) {
+    // ----- 云朵漂浮（全片） -----
+    const cloudDrift = Math.sin(t * 0.35) * 14;
+    const cloudDrift2 = Math.cos(t * 0.42) * 12;
+    cloud1.style.transform = `translateX(${cloudDrift}px) translateY(${Math.sin(t * 0.6) * 6}px)`;
+    cloud2.style.transform = `translateX(${-cloudDrift}px) translateY(${Math.cos(t * 0.6) * 6}px)`;
+    cloud3.style.transform = `translateX(${cloudDrift2}px) translateY(${Math.sin(t * 0.5 + 1) * 5}px)`;
+    cloud4.style.transform = `translateX(${-cloudDrift2}px) translateY(${Math.cos(t * 0.5 + 1) * 5}px)`;
+
+    // ----- Stage 1: IDLE (0 - 1.5s) — 空心问号圆 -----
+    // 入场淡入 0-0.4s
+    const idleIn = kern(t, 0.0, 0.4);
+    // 退场 1.5 - 1.7s（压缩并消失）
+    const idleOut = kern(t, 1.5, 0.2, easeIn);
+    const idleAlpha = idleIn * (1 - idleOut);
+    // 问号浮动
+    const qmBob = Math.sin(t * 3) * 8;
+    const qmScale = 1 + Math.sin(t * 4) * 0.04;
+    idleCircle.style.opacity = String(idleAlpha);
+    // 虚线转动
+    idleCircle.setAttribute('stroke-dashoffset', String(-t * 20));
+    // 压缩（anticipation）
+    const antiScale = 1 - kern(t, 1.5, 0.2, easeIn) * 0.18;
+    idleCircle.setAttribute('transform', `scale(${antiScale})`);
+
+    idleQmark.style.opacity = String(idleAlpha);
+    idleQmark.setAttribute('transform', `translate(0 ${qmBob}) scale(${qmScale * antiScale})`);
+
+    // ----- Stage 2: Anticipation flash 背景 (1.5 - 1.7s) -----
+    const antiFlash = kern(t, 1.5, 0.18, easeOut) * (1 - kern(t, 1.68, 0.6));
+    // ----- Stage 3: PING 爆发闪屏 (1.7 - 2.4s) -----
+    const pingFlash = kern(t, 1.7, 0.15, easeOut) * (1 - kern(t, 1.85, 0.7));
+    flashBg.style.opacity = String(antiFlash * 0.4 + pingFlash * 1.0);
+
+    // ----- Stage 4: 绿色按钮主体 (1.7s 起) -----
+    // 弹出：spring k=220, d=9（明显 overshoot）
+    const btnPop = t < 1.7 ? 0 : spring(t - 1.7, 220, 9);
+    // idle 前不可见
+    const btnAlpha = t < 1.7 ? 0 : 1;
+    btnGroup.style.opacity = String(btnAlpha);
+    // hold 期间轻微呼吸 + 小颤动（像在笑）
+    let btnBreath = 0;
+    if (t > 2.6 && t < 9.5) {
+      btnBreath = Math.sin((t - 2.6) * 2.2) * 0.025;
+    }
+    // combo 时小跳
+    const comboPulse = t < 7.0 ? 0 : spring(t - 7.0, 260, 12) * 0.12 * (1 - kern(t, 7.3, 0.8));
+    const btnScale = btnPop * (1 + btnBreath + comboPulse);
+    btnGroup.setAttribute('transform', `scale(${btnScale})`);
+
+    // ----- Stage 5: 勾勾描画 (1.8 - 2.1s) -----
+    // 勾路径长度约 300
+    const checkDraw = kern(t, 1.82, 0.32, easeOut);
+    // overshoot：先画满再轻微回弹
+    const checkOvershoot = t < 2.05 ? 0 : Math.sin((t - 2.05) * 18) * Math.exp(-(t - 2.05) * 8) * 6;
+    checkPath.setAttribute('stroke-dashoffset', String(300 - 300 * checkDraw));
+    // 勾轻微呼吸
+    const checkStrokeW = 28 + Math.sin((t - 2.1) * 4) * 1.2 * (t > 2.1 ? 1 : 0) + checkOvershoot;
+    checkPath.setAttribute('stroke-width', String(Math.max(24, checkStrokeW)));
+
+    // ----- Stage 6: PING 环扩散 (1.7 - 2.5s) -----
+    const ring1 = kern(t, 1.7, 0.55, easeOut);
+    const ring2 = kern(t, 1.78, 0.6, easeOut);
+    pingRing.setAttribute('r',  String(50 + ring1 * 360));
+    pingRing.setAttribute('stroke-width', String(Math.max(0.5, 14 - ring1 * 12)));
+    pingRing.style.opacity = String((1 - ring1) * 0.9);
+    pingRing2.setAttribute('r', String(40 + ring2 * 420));
+    pingRing2.setAttribute('stroke-width', String(Math.max(0.5, 10 - ring2 * 9)));
+    pingRing2.style.opacity = String((1 - ring2) * 0.7);
+
+    // Combo 环
+    if (t > 7.0) {
+      const cr = kern(t, 7.0, 0.55, easeOut);
+      const cr2 = kern(t, 7.05, 0.6, easeOut);
+      const comboOpacity1 = (1 - cr) * 0.7;
+      const comboOpacity2 = (1 - cr2) * 0.55;
+      if (comboOpacity1 > parseFloat(pingRing.style.opacity || 0)) {
+        pingRing.setAttribute('r', String(50 + cr * 300));
+        pingRing.style.opacity = String(comboOpacity1);
+      }
+      if (comboOpacity2 > parseFloat(pingRing2.style.opacity || 0)) {
+        pingRing2.setAttribute('r', String(40 + cr2 * 340));
+        pingRing2.style.opacity = String(comboOpacity2);
+      }
+    }
+
+    // ----- Stage 7: 星星爆发 (1.7s 起) + combo (7.0s) -----
+    starNodes.forEach((node, i) => {
+      const s = STARS[i];
+      // 爆 1
+      const p1 = kern(t, 1.7 + s.delay, 0.7, easeOut);
+      // 爆 1 fade out 3.5 - 5.0s
+      const fade1 = kern(t, 3.5, 1.5);
+      // 爆 2（combo）
+      const p2 = kern(t, 7.0 + s.delay, 0.7, easeOut);
+      const fade2 = kern(t, 8.5, 1.2);
+
+      let r = 0, scale = 0, alpha = 0, rot = 0;
+
+      if (t >= 1.7 + s.delay && t < 7.0) {
+        r = p1 * s.maxR;
+        // 星星先放大 overshoot 再略缩
+        const scaleBurst = t < 2.1 ? spring(t - (1.7 + s.delay), 260, 10) : 1;
+        // 飞行阶段再慢慢缩小
+        const flyShrink = 1 - fade1 * 0.5;
+        scale = scaleBurst * flyShrink;
+        alpha = (1 - fade1);
+        // 持续旋转
+        rot = (t - 1.7) * s.spin / 10;
+      } else if (t >= 7.0 + s.delay) {
+        r = p2 * s.maxR * 0.85;
+        const scaleBurst = t < 7.4 ? spring(t - (7.0 + s.delay), 260, 10) : 1;
+        const flyShrink = 1 - fade2 * 0.5;
+        scale = scaleBurst * flyShrink * 0.85;
+        alpha = (1 - fade2) * 0.95;
+        rot = (t - 7.0) * s.spin / 10;
+      }
+
+      if (alpha <= 0 || scale <= 0) {
+        node.style.opacity = '0';
+      } else {
+        const x = Math.cos(s.angle) * r;
+        const y = Math.sin(s.angle) * r;
+        node.setAttribute('transform', `translate(${x} ${y}) rotate(${rot}) scale(${scale})`);
+        node.style.opacity = String(alpha);
+      }
+    });
+
+    // ----- Stage 8: +1 COIN 得分 (1.9 - 2.4s pop，之后飞上飞出) -----
+    // pop 入场
+    const coinIn = t < 1.9 ? 0 : spring(t - 1.9, 260, 11);
+    // 上浮 & 淡出
+    const coinFly = kern(t, 2.5, 1.0, easeOut);
+    const coinAlpha = coinIn * (1 - coinFly);
+    const coinY = -420 - coinFly * 140;
+    coinPop.style.opacity = String(coinAlpha);
+    coinPop.style.transform = `translate(-50%, ${coinY}px) scale(${0.3 + coinIn * 0.9})`;
+
+    // ----- Stage 9: GREAT! 主文字 (2.2s 起) -----
+    const greatIn = t < 2.2 ? 0 : spring(t - 2.2, 180, 9);
+    // 左右摇晃（笑脸感）
+    const wobble = t < 2.2 ? 0 : Math.sin((t - 2.2) * 10) * Math.exp(-(t - 2.2) * 4) * 5;
+    // 持续轻微律动
+    const greatBreath = t > 3.2 && t < 9.5 ? Math.sin((t - 3.2) * 2.5) * 0.025 : 0;
+    const greatScale = greatIn * (1 + greatBreath);
+    const greatY = 220 + (1 - greatIn) * 100;
+    // 退场（loop 前）9.5 - 10s
+    const greatOut = kern(t, 9.5, 0.5, easeIn);
+    greatText.style.opacity = String(greatIn * (1 - greatOut));
+    greatText.style.transform = `translate(-50%, ${greatY}px) scale(${greatScale * (1 - greatOut * 0.3)}) rotate(${wobble}deg)`;
+
+    // ----- Stage 10: 副文字 (2.8s 起) -----
+    const subIn = kern(t, 2.8, 0.5, easeOut);
+    const subOut = kern(t, 9.5, 0.5, easeIn);
+    subText.style.opacity = String(subIn * (1 - subOut));
+    subText.style.transform = `translate(-50%, ${380 + (1 - subIn) * 30}px)`;
+
+    // ----- Stage 11: 连击 +1 COIN (7.0 - 8.3s) -----
+    const comboIn = t < 7.0 ? 0 : spring(t - 7.0, 280, 12);
+    const comboFly = kern(t, 7.6, 1.0, easeOut);
+    const comboAlpha = comboIn * (1 - comboFly);
+    const comboY = -420 - comboFly * 160;
+    coinCombo.style.opacity = String(comboAlpha);
+    coinCombo.style.transform = `translate(-50%, ${comboY}px) scale(${0.3 + comboIn * 0.85})`;
+
+    // ----- Stage 12: hero 整体 anticipation 压缩 (1.5 - 1.7s) -----
+    const heroSquish = 1 - kern(t, 1.5, 0.2, easeIn) * 0.12 + kern(t, 1.7, 0.15, easeOut) * 0.12;
+    heroWrap.style.transform = `translate(-50%, -54%) scale(${heroSquish})`;
+  }
+
+  // ============= 时间轴 UI =============
+  const scrubber  = document.getElementById('scrubber');
+  const playBtn   = document.getElementById('playBtn');
+  const resetBtn  = document.getElementById('resetBtn');
+  const timeLabel = document.getElementById('timeLabel');
+  const frameLabel= document.getElementById('frameLabel');
+  const cueRow    = document.getElementById('cueRow');
+
+  let currentT = 0;
+  let playing = true;
+  let lastFrame = performance.now();
+
+  function setTime(t) {
+    currentT = Math.max(0, Math.min(DURATION, t));
+    scrubber.value = Math.round(currentT / DURATION * 1000);
+    timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+    frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+    render(currentT);
+  }
+
+  function loop() {
+    const now = performance.now();
+    const dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (playing) {
+      let next = currentT + dt;
+      if (next >= DURATION) next = 0;
+      setTime(next);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  scrubber.addEventListener('input', () => {
+    playing = false;
+    playBtn.textContent = '▶';
+    setTime(scrubber.value / 1000 * DURATION);
+  });
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    lastFrame = performance.now();
+  });
+  resetBtn.addEventListener('click', () => setTime(0));
+
+  // cue 标记
+  CUES.forEach(cue => {
+    const m = document.createElement('div');
+    m.className = 'cue-mark';
+    m.style.left = (cue.t / DURATION * 100) + '%';
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl';
+    lbl.textContent = cue.label;
+    m.appendChild(lbl);
+    cueRow.appendChild(m);
+  });
+
+  // ============= 自适应缩放（保证 1920×1080 舞台在任何视口都可见） =============
+  function fitStage() {
+    const scene = document.getElementById('scene');
+    const margin = 80; // 给时间轴留空间
+    const vw = window.innerWidth;
+    const vh = window.innerHeight - margin;
+    const s = Math.min(vw / 1920, vh / 1080);
+    scene.style.transform = `scale(${s})`;
+  }
+  window.addEventListener('resize', fitStage);
+  fitStage();
+
+  setTime(0);
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
