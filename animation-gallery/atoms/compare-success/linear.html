@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Success · Linear</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --ink-900: #0b0b0c;
+    --ink-600: #666666;
+    --ink-300: #bbbbbb;
+    --ink-100: #ebebec;
+    --ink-050: #f4f4f5;
+    --linear-green: #26b765;
+    --linear-green-soft: #e7f6ee;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    font-family: "Inter", -apple-system, system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11", "tnum";
+    color: var(--ink-900);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.005em;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .scene {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    background: var(--bg);
+    transform-origin: center;
+    overflow: hidden;
+  }
+
+  /* viewport-based scale so 1920x1080 always fits */
+  @media (max-aspect-ratio: 16/9) {
+    .scene { transform: scale(calc(100vw / 1920)); }
+  }
+  @media (min-aspect-ratio: 16/9) {
+    .scene { transform: scale(calc(100vh / 1080)); }
+  }
+
+  .center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .ring-wrap {
+    position: relative;
+    width: 96px;
+    height: 96px;
+  }
+
+  .ring {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .label {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--ink-900);
+    white-space: nowrap;
+  }
+
+  .label .muted {
+    color: var(--ink-600);
+    font-weight: 400;
+    margin-left: 10px;
+  }
+
+  /* Timeline UI */
+  .cue-row {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 58px;
+    height: 18px;
+    pointer-events: none;
+    z-index: 9;
+  }
+  .cue-mark {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 8px;
+    background: var(--ink-300);
+  }
+  .cue-mark .lbl {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-600);
+    white-space: nowrap;
+    font-feature-settings: "ss01";
+  }
+
+  .tl-ui {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 0;
+    height: 48px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--ink-100);
+    z-index: 10;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--ink-900);
+  }
+  .tl-ui button {
+    height: 26px;
+    min-width: 26px;
+    padding: 0 8px;
+    background: transparent;
+    border: 1px solid var(--ink-100);
+    border-radius: 5px;
+    color: var(--ink-900);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tl-ui button:hover { background: var(--ink-050); }
+  .tl-ui .time { color: var(--ink-600); font-variant-numeric: tabular-nums; min-width: 124px; }
+  .tl-ui input[type=range] {
+    flex: 1;
+    height: 2px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--ink-100);
+    outline: none;
+  }
+  .tl-ui input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--ink-900);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="scene">
+    <div class="center">
+      <div class="ring-wrap">
+        <!-- ring + check, redrawn each frame -->
+        <svg id="ring" class="ring" viewBox="0 0 96 96" width="96" height="96">
+          <!-- idle ring (stroke) -->
+          <circle id="ringIdle" cx="48" cy="48" r="22"
+                  fill="none" stroke="var(--ink-300)" stroke-width="1.5"/>
+          <!-- filled disc (appears on complete) -->
+          <circle id="ringFill" cx="48" cy="48" r="22"
+                  fill="var(--linear-green)" opacity="0"/>
+          <!-- idle check (gray, inside empty circle) -->
+          <path id="checkIdle"
+                d="M38 48 L45 55 L58 41"
+                fill="none"
+                stroke="var(--ink-300)"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"/>
+          <!-- final check (white, drawn on top of filled disc) -->
+          <path id="checkFinal"
+                d="M38 48 L45 55 L58 41"
+                fill="none"
+                stroke="#ffffff"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-dasharray="40"
+                stroke-dashoffset="40"/>
+        </svg>
+      </div>
+      <div class="label" id="label">
+        <span id="labelText">Archive</span><span class="muted" id="labelMuted">⌘⏎</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 10.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+</div>
+
+<script>
+(() => {
+  const DURATION = 10.0;
+  const FPS = 30;
+
+  const clamp01 = t => Math.max(0, Math.min(1, t));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const easeInOut = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+
+  // high-damping spring (Linear): nearly no overshoot
+  function spring(t, k = 400, d = 30, mass = 1) {
+    if (t <= 0) return 0;
+    const wn = Math.sqrt(k / mass);
+    const zeta = d / (2 * Math.sqrt(k * mass));
+    if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+    }
+    return 1 - (1 + wn * t) * Math.exp(-wn * t);
+  }
+  const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+  // --- Timing (all main actions <= 250ms) ---
+  const T_TRIGGER  = 2.00;  // moment of completion
+  const T_FILL     = T_TRIGGER + 0.00; // ring fill starts immediately (150ms)
+  const T_CHECK    = T_TRIGGER + 0.08; // check stroke starts 80ms later (200ms) — detail offset
+  const T_LABEL    = T_TRIGGER + 0.03; // label switches 30ms after trigger
+
+  const CUES = [
+    { t: 0.00, label: 'idle' },
+    { t: 2.00, label: 'trigger' },
+    { t: 2.15, label: 'fill' },
+    { t: 2.35, label: 'check' },
+    { t: 3.00, label: 'settle' },
+  ];
+
+  const ringIdle = document.getElementById('ringIdle');
+  const ringFill = document.getElementById('ringFill');
+  const checkIdle = document.getElementById('checkIdle');
+  const checkFinal = document.getElementById('checkFinal');
+  const label = document.getElementById('label');
+  const labelText = document.getElementById('labelText');
+  const labelMuted = document.getElementById('labelMuted');
+  const scene = document.querySelector('.scene');
+
+  const CHECK_LEN = 40; // approximate path length for dasharray
+
+  function render(t) {
+    // --- Phase 1: idle (0 -> trigger) ---
+    const isIdle = t < T_TRIGGER;
+
+    // --- Ring fill (150ms spring, k=400 d=30) ---
+    const fillDt = Math.max(0, t - T_FILL);
+    const fillP = spring(fillDt * 6.67, 400, 30); // scale dt so 150ms feels right: 0.15 * 6.67 ≈ 1.0
+    // (above: spring() domain ~0..~1 in "spring seconds"; we just map)
+    // For a quicker feel we use a clamped spring output
+    const fillProgress = clamp01(fillP);
+
+    // ring idle is visible until fillProgress > 0
+    ringIdle.setAttribute('opacity', (1 - Math.min(1, fillProgress * 1.1)).toFixed(3));
+    // filled disc scales up from 0.6 to 1.0 with spring-like drive
+    const discScale = lerp(0.6, 1.0, fillProgress);
+    ringFill.setAttribute('opacity', fillProgress.toFixed(3));
+    ringFill.setAttribute('transform', `translate(48 48) scale(${discScale.toFixed(3)}) translate(-48 -48)`);
+
+    // --- Check stroke (200ms, stroke-dashoffset from 40 -> 0, easeOut) ---
+    // idle check visible before trigger, then cross-fades out by fill
+    const idleCheckOp = clamp01(1 - fillProgress * 1.4);
+    checkIdle.setAttribute('opacity', idleCheckOp.toFixed(3));
+
+    const checkProg = kern(t, T_CHECK, 0.20, easeOut); // 200ms
+    const dashOff = (1 - checkProg) * CHECK_LEN;
+    checkFinal.setAttribute('stroke-dashoffset', dashOff.toFixed(2));
+    // final check visible only while fill is on
+    const finalCheckOp = clamp01(fillProgress * 1.2);
+    checkFinal.setAttribute('opacity', finalCheckOp.toFixed(3));
+
+    // --- Label swap (instant at T_LABEL, Linear style, no slide) ---
+    const afterLabel = t >= T_LABEL;
+    if (afterLabel) {
+      labelText.textContent = 'Archived';
+      labelMuted.textContent = '1 item';
+    } else {
+      labelText.textContent = 'Archive';
+      labelMuted.textContent = '⌘⏎';
+    }
+    // label opacity micro-breath after settle (±3%, very slow, only during hold)
+    let labelOp = 1.0;
+    if (t > 3.5) {
+      const breath = Math.sin((t - 3.5) * Math.PI * 0.4); // 0.2 Hz very slow
+      labelOp = 1.0 + breath * 0.03; // ±3%
+    }
+    label.style.opacity = labelOp.toFixed(3);
+
+    // --- Loop reset smoothing: last 0.2s before DURATION, fade cleanly back ---
+    // (not visible because we snap to 0; keep frame-pure)
+    if (t < 0.02 || t > DURATION - 0.02) {
+      // allow t=0 state to reset label
+      if (t < 0.02) {
+        labelText.textContent = 'Archive';
+        labelMuted.textContent = '⌘⏎';
+      }
+    }
+
+    // --- Background: pure white, nothing else. Keep Linear-clean. ---
+    scene.style.background = '#ffffff';
+  }
+
+  // --- Timeline controller ---
+  const scrubber = document.getElementById('scrubber');
+  const playBtn = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const timeLabel = document.getElementById('timeLabel');
+  const frameLabel = document.getElementById('frameLabel');
+  const cueRow = document.getElementById('cueRow');
+
+  let currentT = 0, playing = true, lastFrame = performance.now();
+
+  function setTime(t) {
+    currentT = Math.max(0, Math.min(DURATION, t));
+    scrubber.value = Math.round(currentT / DURATION * 1000);
+    timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+    frameLabel.textContent = 'frame ' + Math.round(currentT * FPS) + ' / ' + Math.round(DURATION * FPS);
+    render(currentT);
+  }
+
+  function loop() {
+    const now = performance.now();
+    const dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (playing) {
+      let next = currentT + dt;
+      if (next >= DURATION) next = 0;
+      setTime(next);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  scrubber.addEventListener('input', () => {
+    playing = false;
+    playBtn.textContent = '▶';
+    setTime(scrubber.value / 1000 * DURATION);
+  });
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    lastFrame = performance.now();
+  });
+  resetBtn.addEventListener('click', () => setTime(0));
+
+  CUES.forEach(cue => {
+    const m = document.createElement('div');
+    m.className = 'cue-mark';
+    m.style.left = (cue.t / DURATION * 100) + '%';
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl';
+    lbl.textContent = cue.label;
+    m.appendChild(lbl);
+    cueRow.appendChild(m);
+  });
+
+  setTime(0);
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
