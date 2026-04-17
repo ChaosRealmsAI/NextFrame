@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, initial-scale=1" />
+<title>Coast Draw-on POC — Persian Gulf / Strait of Hormuz / Arabian Sea</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #05070d;
+    color: #dbe6f2;
+    font-family: 'PingFang SC', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    overflow: hidden;
+  }
+  #stage {
+    position: relative;
+    width: 1920px;
+    height: 1020px; /* 1080 - 60 (control bar) */
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 1400px 900px at 55% 55%,
+        rgba(29, 58, 107, 0.0) 0%,
+        rgba(5, 10, 22, 0.55) 70%,
+        rgba(2, 4, 10, 0.92) 100%),
+      linear-gradient(155deg, #0a1833 0%, #12284f 45%, #1d3a6b 100%);
+  }
+  /* vignette */
+  #stage::after {
+    content: '';
+    position: absolute; inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse 1600px 1000px at 50% 50%,
+      rgba(0,0,0,0) 55%, rgba(0,0,0,0.55) 100%);
+  }
+  #mapSvg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 1920px;
+    height: 1020px;
+    display: block;
+  }
+  .label {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    color: rgba(200, 220, 240, 0.9);
+    text-shadow: 0 2px 12px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.7);
+    letter-spacing: 0.04em;
+    line-height: 1.05;
+    transform: translateY(12px);
+    will-change: opacity, transform;
+  }
+  .label .zh {
+    font-family: 'PingFang SC', 'Helvetica Neue', sans-serif;
+    font-weight: 500;
+  }
+  .label .en {
+    font-family: Georgia, 'Optima', 'Times New Roman', serif;
+    font-size: 28px;
+    opacity: 0.7;
+    margin-top: 10px;
+    letter-spacing: 0.08em;
+  }
+  .label.big  .zh { font-size: 64px; }
+  .label.mid  .zh { font-size: 48px; }
+
+  /* bottom control bar */
+  #controls {
+    position: absolute;
+    left: 0; bottom: 0;
+    width: 1920px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    background: rgba(4, 8, 16, 0.92);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    color: #b8c8dc;
+    gap: 16px;
+  }
+  #playBtn {
+    width: 80px;
+    height: 36px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #e6eef8;
+    font-family: inherit;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 120ms ease;
+  }
+  #playBtn:hover { background: rgba(255,255,255,0.14); }
+  #scrubber {
+    flex: 1;
+    height: 4px;
+    accent-color: #7aa8e6;
+    cursor: pointer;
+  }
+  #hud {
+    font-size: 14px;
+    min-width: 240px;
+    text-align: right;
+    color: #9cb0c8;
+    letter-spacing: 0.05em;
+  }
+
+  /* subtle film grain overlay (SVG turbulence) */
+  #grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.18;
+    mix-blend-mode: overlay;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <!-- film grain overlay via svg turbulence -->
+  <svg id="grain" width="1920" height="1020" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" seed="7"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.78  0 0 0 0 0.82  0 0 0 0 0.9  0 0 0 0.35 0"/>
+    </filter>
+    <rect width="100%" height="100%" filter="url(#noise)"/>
+  </svg>
+
+  <!-- main map svg: terrain + coastlines -->
+  <svg id="mapSvg" viewBox="0 0 1920 1020" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <!-- Persian Gulf (upper water, lighter) -->
+      <linearGradient id="gulfWater" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"  stop-color="#122f5c"/>
+        <stop offset="100%" stop-color="#1a3e75"/>
+      </linearGradient>
+      <!-- Arabian Sea (lower water, deeper) -->
+      <linearGradient id="seaWater" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"  stop-color="#0d2246"/>
+        <stop offset="100%" stop-color="#081633"/>
+      </linearGradient>
+      <!-- Land fill: desert brown -->
+      <linearGradient id="landFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"  stop-color="#4a3622"/>
+        <stop offset="60%" stop-color="#3a2918"/>
+        <stop offset="100%" stop-color="#251a10"/>
+      </linearGradient>
+      <!-- Land grain (contour / mountain-like dark striations) -->
+      <filter id="landTex" x="0" y="0" width="100%" height="100%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012 0.04" numOctaves="3" seed="3" result="t"/>
+        <feColorMatrix in="t" type="matrix"
+          values="0 0 0 0 0.22
+                  0 0 0 0 0.16
+                  0 0 0 0 0.08
+                  0 0 0 0.55 0"/>
+      </filter>
+      <!-- coastline glow -->
+      <filter id="coastGlow" x="-10%" y="-10%" width="120%" height="120%">
+        <feGaussianBlur stdDeviation="3.2" result="b"/>
+        <feMerge>
+          <feMergeNode in="b"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+    </defs>
+
+    <!-- Water base: split in two regions (gulf on top-left, sea on bottom-right) -->
+    <rect x="0" y="0" width="1920" height="1020" fill="url(#seaWater)"/>
+
+    <!-- Persian Gulf water body (above upper coastline) -->
+    <path d="
+      M 0,0
+      L 1920,0
+      L 1920,635
+      L 1680,615 L 1430,585 L 1260,540 L 1170,505 L 1080,485
+      L 990,460 L 790,425 L 520,395 L 250,380 L 0,420
+      Z
+    " fill="url(#gulfWater)" opacity="0.85"/>
+
+    <!-- Upper land body (Iran side, above the upper coastline) -->
+    <path id="landUpper" d="
+      M 0,0
+      L 1920,0
+      L 1920,-20
+      L 0,-20
+      Z
+    " fill="none"/>
+
+    <!-- Above-coast land (Iran plateau hint): thin strip at very top, earthy -->
+    <!-- The upper coastline runs roughly y=400-640. We want land ABOVE the viewport top? No —
+         we want land between the top edge and upper coastline. But the stated region is ocean above?
+         Actually, per-brief the upper coastline represents Iranian south coast — so land is NORTH (above) the coast.
+         We'll fill ABOVE the upper path with desert brown. -->
+    <path d="
+      M 0,0
+      L 1920,0
+      L 1920,635
+      L 1680,615 L 1430,585 L 1260,540 L 1170,505 L 1080,485
+      L 990,460 L 790,425 L 520,395 L 250,380 L 0,420
+      Z
+    " fill="url(#landFill)" opacity="0.0"/>
+    <!-- Above fill is effectively invisible; real land for the Iranian north side goes here: -->
+    <path d="
+      M 0,0
+      L 1920,0
+      L 1920,635
+      L 1680,615 L 1430,585 L 1260,540 L 1170,505 L 1080,485
+      L 990,460 L 790,425 L 520,395 L 250,380 L 0,420
+      Z
+    " fill="#2a1d11" opacity="0"/>
+    <!-- Proper Iran land: everything NORTH of upper coastline -->
+    <path d="
+      M 0,0
+      L 1920,0
+      L 1920,0
+      L 0,0
+      Z" fill="none"/>
+
+    <!-- The actual Iranian landmass: fill the region ABOVE the upper path.
+         Since we fill with y<path, path goes: (0,0) → (1920,0) → (1920,635) →... → (0,420) → close -->
+    <path d="
+      M 0,-10
+      L 1920,-10
+      L 1920,635
+      L 1680,615 L 1430,585 L 1260,540 L 1170,505 L 1080,485
+      L 990,460 L 790,425 L 520,395 L 250,380 L 0,420
+      Z
+    " fill="url(#landFill)"/>
+    <!-- texture overlay on that land -->
+    <path d="
+      M 0,-10
+      L 1920,-10
+      L 1920,635
+      L 1680,615 L 1430,585 L 1260,540 L 1170,505 L 1080,485
+      L 990,460 L 790,425 L 520,395 L 250,380 L 0,420
+      Z
+    " fill="black" filter="url(#landTex)" opacity="0.55"/>
+
+    <!-- Mountain-range hint strokes (soft curves on Iranian land) -->
+    <g stroke="#1b1209" stroke-width="1.2" fill="none" opacity="0.55">
+      <path d="M 60,140 Q 300,100 580,160 T 1100,140 T 1700,180"/>
+      <path d="M 120,210 Q 360,170 640,230 T 1160,220 T 1780,260"/>
+      <path d="M 200,290 Q 440,260 720,310 T 1220,300 T 1820,340"/>
+    </g>
+
+    <!-- Arabian Peninsula landmass: everything BELOW the lower coastline -->
+    <path d="
+      M 0,560
+      L 220,520 L 420,495 L 620,520 L 810,570 L 960,620
+      L 1040,640 L 1100,610 L 1140,550 L 1170,510
+      L 1200,540 L 1240,580 L 1280,640
+      L 1260,720 L 1330,780 L 1500,830 L 1720,870 L 1920,905
+      L 1920,1030
+      L 0,1030
+      Z
+    " fill="url(#landFill)"/>
+    <!-- texture overlay -->
+    <path d="
+      M 0,560
+      L 220,520 L 420,495 L 620,520 L 810,570 L 960,620
+      L 1040,640 L 1100,610 L 1140,550 L 1170,510
+      L 1200,540 L 1240,580 L 1280,640
+      L 1260,720 L 1330,780 L 1500,830 L 1720,870 L 1920,905
+      L 1920,1030
+      L 0,1030
+      Z
+    " fill="black" filter="url(#landTex)" opacity="0.6"/>
+
+    <!-- Mountain / dune hints on Arabian peninsula -->
+    <g stroke="#1b1209" stroke-width="1.2" fill="none" opacity="0.5">
+      <path d="M 40,720 Q 300,690 560,740 T 1040,760 T 1600,810"/>
+      <path d="M 80,820 Q 320,800 600,830 T 1080,850 T 1680,900"/>
+      <path d="M 140,920 Q 360,900 640,920 T 1140,940 T 1780,970"/>
+    </g>
+
+    <!-- Gulf water highlight (subtle shimmer bands) -->
+    <g stroke="rgba(255,255,255,0.04)" stroke-width="1" fill="none">
+      <path d="M 60,500 Q 480,490 900,510 T 1620,560"/>
+      <path d="M 100,540 Q 520,530 940,550 T 1660,600"/>
+    </g>
+
+    <!-- === Coastlines (animated draw-on) === -->
+    <g filter="url(#coastGlow)">
+      <path id="coastUpper"
+        d="M 0,420
+           L 250,380 L 520,395 L 790,425 L 990,460 L 1080,485
+           L 1170,505 L 1260,540 L 1430,585 L 1680,615 L 1920,635"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="3"
+        stroke-linejoin="round"
+        stroke-linecap="round" />
+
+      <path id="coastLower"
+        d="M 0,560
+           L 220,520 L 420,495 L 620,520 L 810,570 L 960,620
+           L 1040,640 L 1100,610 L 1140,550 L 1170,510
+           L 1200,540 L 1240,580 L 1280,640
+           L 1260,720 L 1330,780 L 1500,830 L 1720,870 L 1920,905"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="3"
+        stroke-linejoin="round"
+        stroke-linecap="round" />
+    </g>
+  </svg>
+
+  <!-- geographic labels -->
+  <div class="label big" id="labPersianGulf" style="top: 200px; left: 400px;">
+    <div class="zh">波斯湾</div>
+    <div class="en">PERSIAN GULF</div>
+  </div>
+  <div class="label mid" id="labHormuz" style="top: 480px; left: 780px;">
+    <div class="zh">霍尔木兹海峡</div>
+    <div class="en">STRAIT OF HORMUZ</div>
+  </div>
+  <div class="label big" id="labArabianSea" style="top: 720px; left: 1450px;">
+    <div class="zh">阿拉伯海</div>
+    <div class="en">ARABIAN SEA</div>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="playBtn" type="button">Pause</button>
+  <input id="scrubber" type="range" min="0" max="5" step="0.01" value="0" />
+  <div id="hud">t=0.00s  frame=0</div>
+</div>
+
+<script>
+'use strict';
+
+// ---------- Constants ----------
+const DURATION = 5.0;          // total loop duration (s)
+const DRAW_DURATION = 3.0;     // draw-on finishes at t=3s
+const COAST_LOWER_DELAY = 0.2; // lower coast starts 0.2s after upper
+const LABEL_START = 1.2;       // first label begins fading in
+const LABEL_STAGGER = 0.5;
+const LABEL_DUR = 0.6;
+
+// ---------- DOM ----------
+const coastUpper = document.getElementById('coastUpper');
+const coastLower = document.getElementById('coastLower');
+const playBtn    = document.getElementById('playBtn');
+const scrubber   = document.getElementById('scrubber');
+const hud        = document.getElementById('hud');
+
+const labels = [
+  document.getElementById('labPersianGulf'),
+  document.getElementById('labHormuz'),
+  document.getElementById('labArabianSea')
+];
+
+// ---------- Path length setup ----------
+const lenUpper = coastUpper.getTotalLength();
+const lenLower = coastLower.getTotalLength();
+
+coastUpper.setAttribute('stroke-dasharray',  lenUpper);
+coastUpper.setAttribute('stroke-dashoffset', lenUpper);
+coastLower.setAttribute('stroke-dasharray',  lenLower);
+coastLower.setAttribute('stroke-dashoffset', lenLower);
+
+// ---------- State ----------
+const state = { t: 0, playing: true };
+
+// Parse ?t= query for static-frame mode (used for playwright screenshot verification)
+const initialT = (() => {
+  const raw = new URL(location.href).searchParams.get('t');
+  if (raw === null) return null;
+  const v = parseFloat(raw);
+  if (!Number.isFinite(v)) return null;
+  return Math.max(0, Math.min(DURATION, v));
+})();
+
+// ---------- Easing ----------
+function easeOutCubic(x) {
+  return 1 - Math.pow(1 - x, 3);
+}
+function clamp01(x) {
+  if (x < 0) return 0;
+  if (x > 1) return 1;
+  return x;
+}
+
+// ---------- Pure renderer: t -> all visuals ----------
+function renderFrame(t) {
+  // --- Coastlines draw-on ---
+  // Upper: 0 .. DRAW_DURATION
+  const pu = clamp01(t / DRAW_DURATION);
+  const puEased = easeOutCubic(pu);
+  coastUpper.setAttribute('stroke-dashoffset', (1 - puEased) * lenUpper);
+
+  // Lower: starts COAST_LOWER_DELAY later, same duration
+  const pl = clamp01((t - COAST_LOWER_DELAY) / DRAW_DURATION);
+  const plEased = easeOutCubic(pl);
+  coastLower.setAttribute('stroke-dashoffset', (1 - plEased) * lenLower);
+
+  // --- Labels fade-in (staggered) ---
+  for (let i = 0; i < labels.length; i++) {
+    const start = LABEL_START + i * LABEL_STAGGER;
+    const raw = (t - start) / LABEL_DUR;
+    const alpha = clamp01(raw);
+    const eased = easeOutCubic(alpha);
+    labels[i].style.opacity = eased.toFixed(3);
+    const ty = (1 - eased) * 12;
+    labels[i].style.transform = `translateY(${ty.toFixed(2)}px)`;
+  }
+
+  // --- HUD ---
+  const frame = Math.round(t * 60);
+  hud.textContent = `t=${t.toFixed(2)}s  frame=${frame}`;
+}
+
+// ---------- Time control ----------
+function setTime(t) {
+  let nt = t;
+  if (nt < 0) nt = 0;
+  if (nt > DURATION) nt = DURATION;
+  state.t = nt;
+  scrubber.value = String(nt);
+  renderFrame(nt);
+}
+
+function setPlaying(p) {
+  state.playing = p;
+  playBtn.textContent = p ? 'Pause' : 'Play';
+}
+
+// ---------- RAF loop: only advances time, NEVER mutates visuals directly ----------
+let lastRaf = null;
+function tick(ts) {
+  if (state.playing) {
+    if (lastRaf !== null) {
+      const dt = (ts - lastRaf) / 1000;
+      let nextT = state.t + dt;
+      if (nextT > DURATION) nextT = 0; // loop
+      setTime(nextT);
+    }
+    lastRaf = ts;
+  } else {
+    lastRaf = null;
+  }
+  requestAnimationFrame(tick);
+}
+
+// ---------- Controls ----------
+playBtn.addEventListener('click', () => {
+  setPlaying(!state.playing);
+});
+
+scrubber.addEventListener('input', (e) => {
+  // Dragging => pause and jump
+  setPlaying(false);
+  const v = parseFloat(e.target.value);
+  if (Number.isFinite(v)) setTime(v);
+});
+
+// ---------- Boot ----------
+if (initialT !== null) {
+  setPlaying(false);
+  setTime(initialT);
+} else {
+  setTime(0);
+}
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
