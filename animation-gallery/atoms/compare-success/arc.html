@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Success · Arc</title>
+<style>
+  :root {
+    /* Arc palette — 浅色活泼底 + signature 紫粉蓝暖金 */
+    --bg-cream: #faf7f5;
+    --bg-lavender: #f3f0ff;
+    --bg-peach: #fff5f0;
+    --arc-purple: #9f7aea;
+    --arc-pink: #ed64a6;
+    --arc-blue: #4299e1;
+    --arc-gold: #f6ad55;
+    --arc-mint: #68d391;
+
+    --ink-900: #2d2545;
+    --ink-700: #5a5272;
+    --ink-400: #a89eb8;
+    --ink-200: #e4dff0;
+    --ink-100: #f1edfa;
+
+    /* 底部时间轴（沿用 Apple 底座 §6 纪律，视觉偏 Arc 暖） */
+    --tl-bg: rgba(250, 247, 245, 0.92);
+    --tl-border: rgba(159, 122, 234, 0.18);
+    --tl-ink: #5a5272;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    /* 活泼底：奶白 → 浅薰衣草 → 浅蜜桃 的柔和径向渐变 */
+    background:
+      radial-gradient(1100px 800px at 28% 22%, rgba(159,122,234,0.10), transparent 60%),
+      radial-gradient(900px 700px at 78% 78%, rgba(237,100,166,0.08), transparent 55%),
+      radial-gradient(700px 600px at 88% 16%, rgba(246,173,85,0.08), transparent 60%),
+      linear-gradient(135deg, #fff5f0 0%, #faf7f5 40%, #f3f0ff 100%);
+    font-family: "Manrope", "SF Pro Rounded", "Avenir Next Rounded", -apple-system, system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11", "tnum";
+    color: var(--ink-900);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.005em;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .scene {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    transform-origin: center center;
+  }
+
+  /* 居中舞台 — 主体约 30% 屏幕 */
+  .hero {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 520px;
+    height: 520px;
+    transform: translate(-50%, -58%);
+  }
+
+  .hero svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* 副文字 */
+  .caption {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, 220px);
+    font-weight: 700;
+    font-size: 64px;
+    letter-spacing: -0.02em;
+    color: var(--ink-900);
+    text-align: center;
+    white-space: nowrap;
+    will-change: transform, opacity;
+  }
+
+  .caption .emoji {
+    display: inline-block;
+    margin-left: 12px;
+    transform-origin: 50% 70%;
+  }
+
+  .sub {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, 310px);
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: 0.01em;
+    color: var(--ink-700);
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* confetti 小球容器 */
+  .confetti-layer {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -58%);
+    width: 800px;
+    height: 800px;
+    pointer-events: none;
+  }
+
+  /* ============== 底部时间轴（Apple Design §6 纪律继承） ============== */
+  .tl-wrap {
+    position: fixed;
+    left: 24px;
+    right: 24px;
+    bottom: 20px;
+    z-index: 50;
+  }
+
+  .cue-row {
+    position: relative;
+    height: 22px;
+    margin-bottom: 6px;
+  }
+
+  .cue-mark {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 14px;
+    background: var(--arc-purple);
+    border-radius: 2px;
+    opacity: 0.55;
+  }
+
+  .cue-mark .lbl {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--arc-purple);
+    opacity: 0.85;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+
+  .tl-ui {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 18px;
+    background: var(--tl-bg);
+    border: 1px solid var(--tl-border);
+    border-radius: 14px;
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+    box-shadow: 0 8px 32px rgba(159, 122, 234, 0.14);
+  }
+
+  .tl-ui button {
+    appearance: none;
+    border: 1px solid rgba(159, 122, 234, 0.25);
+    background: linear-gradient(180deg, #ffffff, #f3f0ff);
+    color: var(--ink-900);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 2px 8px rgba(159, 122, 234, 0.15);
+    transition: transform 0.12s ease;
+  }
+  .tl-ui button:hover {
+    transform: translateY(-1px);
+  }
+
+  .tl-ui .time {
+    color: var(--tl-ink);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    min-width: 110px;
+  }
+
+  .tl-ui input[type="range"] {
+    appearance: none;
+    flex: 1;
+    height: 4px;
+    background: linear-gradient(90deg,
+      rgba(159, 122, 234, 0.22),
+      rgba(237, 100, 166, 0.22),
+      rgba(66, 153, 225, 0.22));
+    border-radius: 4px;
+    outline: none;
+  }
+
+  .tl-ui input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #9f7aea, #ed64a6);
+    box-shadow: 0 2px 8px rgba(159, 122, 234, 0.5);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="scene" id="scene">
+
+    <!-- 主勾容器 -->
+    <div class="hero">
+      <svg id="heroSvg" viewBox="-260 -260 520 520" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <!-- Arc signature 多色流体渐变（填充） -->
+          <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stop-color="#9f7aea"/>
+            <stop offset="50%"  stop-color="#ed64a6"/>
+            <stop offset="100%" stop-color="#4299e1"/>
+          </linearGradient>
+          <linearGradient id="arcGradSoft" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stop-color="#c4a3f5"/>
+            <stop offset="50%"  stop-color="#f4a3c3"/>
+            <stop offset="100%" stop-color="#7cb9ec"/>
+          </linearGradient>
+          <!-- 勾的彩色 trail（绘制时的亮色） -->
+          <linearGradient id="checkGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+            <stop offset="0%"   stop-color="#ffffff"/>
+            <stop offset="60%"  stop-color="#fff5f0"/>
+            <stop offset="100%" stop-color="#ffffff"/>
+          </linearGradient>
+          <!-- trail 光迹（打在彩圆上的高光） -->
+          <radialGradient id="highlight" cx="35%" cy="30%" r="55%">
+            <stop offset="0%"  stop-color="rgba(255,255,255,0.8)"/>
+            <stop offset="60%" stop-color="rgba(255,255,255,0)"/>
+          </radialGradient>
+
+          <!-- 柔和彩色阴影（drop-shadow） -->
+          <filter id="arcShadow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
+            <feOffset dx="0" dy="14" result="off"/>
+            <feFlood flood-color="#9f7aea" flood-opacity="0.38"/>
+            <feComposite in2="off" operator="in"/>
+            <feMerge>
+              <feMergeNode/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+
+          <!-- 空心圈的虚线样式用 inline 属性处理 -->
+        </defs>
+
+        <!-- 最远层：外圈柔光脉冲（idle 时轻微浮动） -->
+        <circle id="auraOuter" cx="0" cy="0" r="180"
+                fill="none"
+                stroke="url(#arcGradSoft)"
+                stroke-width="2"
+                opacity="0"
+                stroke-dasharray="6 8"/>
+
+        <!-- idle 空心圈（橡皮） -->
+        <circle id="idleRing" cx="0" cy="0" r="150"
+                fill="none"
+                stroke="url(#arcGradSoft)"
+                stroke-width="6"
+                stroke-linecap="round"
+                opacity="1"/>
+
+        <!-- 主体彩圆（触发后出现） -->
+        <g id="mainBlob" opacity="0" filter="url(#arcShadow)">
+          <!-- 主圆 -->
+          <circle id="mainCircle" cx="0" cy="0" r="150" fill="url(#arcGrad)"/>
+          <!-- 内部高光（拟态） -->
+          <ellipse id="mainHighlight" cx="-42" cy="-55" rx="78" ry="48" fill="url(#highlight)" opacity="0.85"/>
+          <!-- 底部阴影带（拟态厚度） -->
+          <ellipse id="mainShade" cx="0" cy="70" rx="120" ry="50" fill="rgba(45,37,69,0.08)"/>
+        </g>
+
+        <!-- 勾 — 用 path + stroke-dashoffset 橡皮感绘制 -->
+        <g id="checkGroup" opacity="0">
+          <!-- trail 残影层（稍粗、半透明、落后一点） -->
+          <path id="checkTrail"
+                d="M -60 5 L -15 55 L 65 -40"
+                fill="none"
+                stroke="url(#arcGradSoft)"
+                stroke-width="20"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                opacity="0"/>
+          <!-- 主勾（白色橡皮） -->
+          <path id="checkPath"
+                d="M -60 5 L -15 55 L 65 -40"
+                fill="none"
+                stroke="url(#checkGrad)"
+                stroke-width="22"
+                stroke-linecap="round"
+                stroke-linejoin="round"/>
+        </g>
+
+        <!-- confetti 小球 — 5 颗拟态彩球 -->
+        <g id="confettiGroup"></g>
+      </svg>
+    </div>
+
+    <!-- 文字 -->
+    <div class="caption" id="caption" style="opacity:0">
+      <span id="captionWord">Saved</span><span id="captionBang">!</span>
+      <span class="emoji" id="captionEmoji" style="opacity:0"></span>
+    </div>
+    <div class="sub" id="sub" style="opacity:0">Your note is safe · tap to open</div>
+
+  </div>
+</div>
+
+<!-- ============== 底部时间轴 ============== -->
+<div class="tl-wrap">
+  <div class="cue-row" id="cueRow"></div>
+  <div class="tl-ui">
+    <button id="playBtn" title="play/pause">⏸</button>
+    <button id="resetBtn" title="reset">↺</button>
+    <span class="time" id="timeLabel">0.00 / 10.00s</span>
+    <input type="range" id="scrubber" min="0" max="1000" value="0">
+    <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // =============== 常量 ===============
+  const DURATION = 10.0;
+  const FPS = 30;
+
+  // =============== 数学工具 ===============
+  const clamp01 = t => Math.max(0, Math.min(1, t));
+  const clamp = (t, lo, hi) => Math.max(lo, Math.min(hi, t));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+  const easeOutBack = (x, s = 1.7) => 1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2);
+  const easeOutQuint = x => 1 - Math.pow(1 - x, 5);
+
+  // SwiftUI-spring — Arc 用弹性大的
+  function spring(t, k = 220, d = 14, mass = 1) {
+    if (t <= 0) return 0;
+    const wn = Math.sqrt(k / mass);
+    const zeta = d / (2 * Math.sqrt(k * mass));
+    if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+    }
+    return 1 - (1 + wn * t) * Math.exp(-wn * t);
+  }
+
+  // kernel：某段区间 [s, s+d) 内的进度，外面 clamp
+  const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+  // =============== Cue 表（与时间线标记对齐） ===============
+  const CUES = [
+    { t: 0.0, label: 'idle' },
+    { t: 2.0, label: 'squish' },
+    { t: 2.2, label: 'fill' },
+    { t: 2.4, label: 'draw' },
+    { t: 2.7, label: 'overshoot' },
+    { t: 2.9, label: 'confetti' },
+    { t: 3.2, label: 'Saved!' },
+    { t: 5.0, label: 'breathe' },
+    { t: 8.5, label: 'pulse' }
+  ];
+
+  // =============== 元素引用 ===============
+  const $ = id => document.getElementById(id);
+  const scene = $('scene');
+  const auraOuter = $('auraOuter');
+  const idleRing = $('idleRing');
+  const mainBlob = $('mainBlob');
+  const mainCircle = $('mainCircle');
+  const mainHighlight = $('mainHighlight');
+  const mainShade = $('mainShade');
+  const checkGroup = $('checkGroup');
+  const checkPath = $('checkPath');
+  const checkTrail = $('checkTrail');
+  const confettiGroup = $('confettiGroup');
+  const caption = $('caption');
+  const captionEmoji = $('captionEmoji');
+  const sub = $('sub');
+
+  // =============== 勾的几何（用于 dash 动画） ===============
+  // path d="M -60 5 L -15 55 L 65 -40"
+  // 两段：A(-60,5)→B(-15,55)，B(-15,55)→C(65,-40)
+  const segA_len = Math.hypot(-15 - (-60), 55 - 5); // ≈ 67.08
+  const segB_len = Math.hypot(65 - (-15), -40 - 55); // ≈ 124.10
+  const CHECK_LEN = segA_len + segB_len;
+
+  // =============== confetti 数据 — 5 颗球（Arc 四色 + 一颗 mint） ===============
+  const CONFETTI = [
+    { color: '#9f7aea', r: 10, angle: -60,  dist: 240, spinEnd: 720,  delay: 0.00, gravity: 90 },
+    { color: '#ed64a6', r: 8,  angle: -20,  dist: 210, spinEnd: -540, delay: 0.04, gravity: 110 },
+    { color: '#4299e1', r: 11, angle: 30,   dist: 260, spinEnd: 620,  delay: 0.02, gravity: 100 },
+    { color: '#f6ad55', r: 9,  angle: 90,   dist: 200, spinEnd: -480, delay: 0.08, gravity: 140 },
+    { color: '#68d391', r: 7,  angle: -150, dist: 230, spinEnd: 680,  delay: 0.06, gravity: 80 }
+  ];
+
+  // 初始化 confetti SVG 节点
+  const confettiEls = CONFETTI.map((c, i) => {
+    // 一个小球 + 内部高光（拟态）
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('opacity', '0');
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('cx', '0'); circle.setAttribute('cy', '0');
+    circle.setAttribute('r', c.r);
+    circle.setAttribute('fill', c.color);
+    circle.setAttribute('filter', 'url(#arcShadow)');
+    const hi = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    hi.setAttribute('cx', -c.r * 0.35); hi.setAttribute('cy', -c.r * 0.4);
+    hi.setAttribute('r', c.r * 0.38);
+    hi.setAttribute('fill', 'rgba(255,255,255,0.75)');
+    g.appendChild(circle);
+    g.appendChild(hi);
+    confettiGroup.appendChild(g);
+    return g;
+  });
+
+  // =============== 核心渲染函数 — 纯 f(t) ===============
+  function render(t) {
+
+    // -------- 0. idle 空心圈（0–2s） --------
+    // 从 t=0 浮动（呼吸），在 1.9s 开始被"压扁"吸收，2.05s 消失
+    // 呼吸：周期 2.2s，幅度微小
+    const breatheIdle = Math.sin(t * Math.PI * 2 / 2.2) * 0.02;
+    let idleScale = 1 + breatheIdle;
+    let idleOpacity = 1;
+
+    // 触发时刻 2.0s — 橡皮压入（压扁再弹开）
+    if (t >= 1.95 && t < 2.2) {
+      const k = kern(t, 1.95, 0.2, easeOut);
+      // 先压扁（0.95 → 0.78），opacity 快速消失
+      idleScale = 1 - 0.22 * k;
+      idleOpacity = 1 - k;
+    } else if (t >= 2.2) {
+      idleScale = 0;
+      idleOpacity = 0;
+    }
+    idleRing.setAttribute('transform', `scale(${idleScale})`);
+    idleRing.setAttribute('opacity', idleOpacity);
+
+    // 外圈虚线光环（触发时反方向绽开一下，作为小惊喜）
+    const auraK = spring(Math.max(0, t - 2.0), 180, 16);
+    const auraFade = t < 2.0 ? 0 : (t < 3.0 ? 1 : 1 - kern(t, 3.0, 0.8));
+    const auraScale = t < 2.0 ? 0.8 : lerp(1, 1.35, clamp01(auraK)) + Math.sin(t * 1.4) * 0.01;
+    auraOuter.setAttribute('opacity', (auraFade * 0.55).toFixed(3));
+    auraOuter.setAttribute('transform', `scale(${auraScale.toFixed(4)}) rotate(${(t * 18).toFixed(2)})`);
+
+    // -------- 1. 主彩圆（2.0s 开始出现，拟态填充） --------
+    // 2.0 squish-in：先极扁再弹回
+    let blobOpacity = 0;
+    let blobSX = 1, blobSY = 1;
+
+    if (t >= 2.0) {
+      blobOpacity = clamp01((t - 2.0) / 0.15);
+      // 压扁：2.0–2.15 极扁（sy=0.3, sx=1.25），然后 spring 回 1
+      const squishPhase = kern(t, 2.0, 0.18, easeOutQuint);
+      const springPhase = spring(Math.max(0, t - 2.18), 260, 15);
+      const peakSX = lerp(1.25, 1.0, springPhase);
+      const peakSY = lerp(0.30, 1.0, springPhase);
+      if (t < 2.18) {
+        blobSX = lerp(1.0, 1.25, squishPhase);
+        blobSY = lerp(1.0, 0.30, squishPhase);
+      } else {
+        blobSX = peakSX;
+        blobSY = peakSY;
+      }
+    }
+
+    // 5s+ 满意呼吸（好像在笑）—— 周期 2.4s，幅度 ±2%
+    if (t >= 4.2) {
+      const breathe = Math.sin((t - 4.2) * Math.PI * 2 / 2.4) * 0.018;
+      blobSX *= 1 + breathe;
+      blobSY *= 1 - breathe * 0.7;
+    }
+
+    // 8.5s 微脉冲（loop 收尾，像一个"完成"眨眼）
+    if (t >= 8.5 && t < 9.3) {
+      const pulse = Math.sin(kern(t, 8.5, 0.8) * Math.PI) * 0.06;
+      blobSX *= 1 + pulse;
+      blobSY *= 1 + pulse;
+    }
+
+    mainBlob.setAttribute('opacity', blobOpacity.toFixed(3));
+    mainBlob.setAttribute('transform', `scale(${blobSX.toFixed(4)}, ${blobSY.toFixed(4)})`);
+
+    // 拟态高光微动（让球显得"活着"）
+    if (t >= 2.0) {
+      const hx = -42 + Math.sin(t * 0.9) * 4;
+      const hy = -55 + Math.cos(t * 0.7) * 3;
+      mainHighlight.setAttribute('cx', hx.toFixed(2));
+      mainHighlight.setAttribute('cy', hy.toFixed(2));
+    }
+
+    // -------- 2. 勾 — 橡皮感绘制（2.35s 起） --------
+    // 用 dash 偏移画出：2.35 → 2.70，带呼吸粗细
+    let checkOpacity = 0;
+    let dashOffset = CHECK_LEN;
+    let checkWidth = 22;
+    let trailOpacity = 0;
+    let trailWidth = 20;
+    let trailDash = CHECK_LEN;
+
+    if (t >= 2.35) {
+      checkOpacity = 1;
+      const drawK = kern(t, 2.35, 0.35, easeOutQuint);
+      dashOffset = CHECK_LEN * (1 - drawK);
+      // 橡皮呼吸：粗细在 18–26 间波动（模拟笔压）
+      const pulse = Math.sin(drawK * Math.PI * 2.2) * 4;
+      checkWidth = 22 + pulse * (1 - drawK) * 0.8;
+
+      // trail（彩色光迹）— 落后 0.05s，更柔
+      const trailK = kern(t, 2.40, 0.38, easeOutQuint);
+      trailDash = CHECK_LEN * (1 - trailK);
+      trailWidth = 30 * (1 - trailK) + 14;
+      trailOpacity = 0.55 * (1 - drawK * 0.7);
+    }
+
+    // 2.7 画完后，勾整体 spring overshoot（1.25 → 1.0）
+    let checkScale = 1;
+    if (t >= 2.70) {
+      const os = spring(t - 2.70, 240, 13);
+      checkScale = lerp(1.25, 1.0, os);
+    } else if (t >= 2.35) {
+      // 绘制时微微被 blob 挤扁再回弹
+      checkScale = 0.95 + kern(t, 2.35, 0.35, easeOut) * 0.05;
+    }
+
+    // 呼吸（5s+ 跟 blob 同步微 wobble）
+    if (t >= 4.2 && t < 8.5) {
+      checkScale *= 1 + Math.sin((t - 4.2) * Math.PI * 2 / 2.4) * 0.01;
+    }
+
+    checkGroup.setAttribute('opacity', checkOpacity);
+    checkGroup.setAttribute('transform', `scale(${checkScale.toFixed(4)})`);
+
+    checkPath.setAttribute('stroke-dasharray', `${CHECK_LEN} ${CHECK_LEN}`);
+    checkPath.setAttribute('stroke-dashoffset', dashOffset.toFixed(2));
+    checkPath.setAttribute('stroke-width', checkWidth.toFixed(2));
+
+    checkTrail.setAttribute('stroke-dasharray', `${CHECK_LEN} ${CHECK_LEN}`);
+    checkTrail.setAttribute('stroke-dashoffset', trailDash.toFixed(2));
+    checkTrail.setAttribute('stroke-width', trailWidth.toFixed(2));
+    checkTrail.setAttribute('opacity', trailOpacity.toFixed(3));
+
+    // -------- 3. confetti 小球爆出（2.85s 起） --------
+    confettiEls.forEach((el, i) => {
+      const c = CONFETTI[i];
+      const tt = t - 2.85 - c.delay;
+      if (tt <= 0) {
+        el.setAttribute('opacity', 0);
+        return;
+      }
+      // 飞出轨迹：spring 到 dist，y 加 gravity * tt^2
+      const flyK = spring(tt, 160, 20);
+      const rad = c.angle * Math.PI / 180;
+      const x = Math.cos(rad) * c.dist * flyK;
+      const y = Math.sin(rad) * c.dist * flyK + c.gravity * tt * tt * 0.6;
+      const rot = c.spinEnd * easeOut(clamp01(tt / 1.0));
+      // 生命周期：0→0.15s fade-in，0.8–1.4s fade-out
+      let op = 1;
+      if (tt < 0.12) op = tt / 0.12;
+      else if (tt > 0.9) op = Math.max(0, 1 - (tt - 0.9) / 0.7);
+      // 个体呼吸（小弹跳）
+      const bounceScale = 1 + Math.sin(tt * 9 + i) * 0.12 * (tt < 0.8 ? 1 : 0);
+      el.setAttribute('opacity', op.toFixed(3));
+      el.setAttribute('transform',
+        `translate(${x.toFixed(2)}, ${y.toFixed(2)}) rotate(${rot.toFixed(1)}) scale(${bounceScale.toFixed(3)})`);
+    });
+
+    // -------- 4. 文字弹入 + 摇晃（3.0s 起） --------
+    // "Saved!" spring 弹入 + 小角度晃
+    if (t < 3.0) {
+      caption.style.opacity = 0;
+    } else {
+      const capK = spring(t - 3.0, 230, 14);
+      const tx = 0;
+      const ty = 220 + lerp(30, 0, clamp01(capK));
+      const scale = lerp(0.6, 1.0, clamp01(capK));
+      // 摇晃：入场后 0.1s 起，幅度 ±3deg，阻尼衰减 0.8s
+      const wobT = Math.max(0, t - 3.15);
+      const wobAmp = Math.exp(-wobT * 2.5);
+      const wob = Math.sin(wobT * 12) * 3 * wobAmp;
+      caption.style.opacity = clamp01(capK * 1.2);
+      caption.style.transform =
+        `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(${scale.toFixed(3)}) rotate(${wob.toFixed(2)}deg)`;
+    }
+
+    // emoji（✨）随主体呼吸 5s+ 出现
+    if (t < 3.4) {
+      captionEmoji.style.opacity = 0;
+      captionEmoji.textContent = '';
+    } else {
+      const ek = spring(t - 3.4, 260, 13);
+      captionEmoji.style.opacity = clamp01(ek);
+      captionEmoji.textContent = '✨';
+      const ewob = Math.sin((t - 3.4) * 6) * 8 * Math.exp(-(t - 3.4) * 0.4);
+      captionEmoji.style.transform = `rotate(${ewob.toFixed(2)}deg) scale(${lerp(0.5, 1.0, clamp01(ek)).toFixed(3)})`;
+    }
+
+    // 副文字淡入 3.5s
+    if (t < 3.5) {
+      sub.style.opacity = 0;
+    } else {
+      const sk = kern(t, 3.5, 0.5, easeOutQuint);
+      sub.style.opacity = sk.toFixed(3);
+      sub.style.transform = `translate(-50%, calc(-50% + ${310 - (1 - sk) * 16}px))`;
+    }
+  }
+
+  // =============== 时间轴控制器 ===============
+  const scrubber = document.getElementById('scrubber');
+  const playBtn = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const timeLabel = document.getElementById('timeLabel');
+  const frameLabel = document.getElementById('frameLabel');
+  const cueRow = document.getElementById('cueRow');
+
+  let currentT = 0;
+  let playing = true;
+  let lastFrame = performance.now();
+
+  function setTime(t) {
+    currentT = Math.max(0, Math.min(DURATION, t));
+    scrubber.value = Math.round(currentT / DURATION * 1000);
+    timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+    frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+    render(currentT);
+  }
+
+  function loop() {
+    const now = performance.now();
+    const dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (playing) {
+      let next = currentT + dt;
+      if (next >= DURATION) next = 0;
+      setTime(next);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  scrubber.addEventListener('input', () => {
+    playing = false;
+    playBtn.textContent = '▶';
+    setTime(scrubber.value / 1000 * DURATION);
+  });
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    lastFrame = performance.now();
+  });
+  resetBtn.addEventListener('click', () => setTime(0));
+
+  // Cue marks
+  CUES.forEach(cue => {
+    const m = document.createElement('div');
+    m.className = 'cue-mark';
+    m.style.left = (cue.t / DURATION * 100) + '%';
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl';
+    lbl.textContent = cue.label;
+    m.appendChild(lbl);
+    cueRow.appendChild(m);
+  });
+
+  // 启动
+  setTime(0);
+  requestAnimationFrame(loop);
+
+  // 页面适配（1920 不变，做 scale-to-fit）
+  function fitStage() {
+    const sx = window.innerWidth / 1920;
+    const sy = (window.innerHeight - 110) / 1080;
+    const s = Math.min(sx, sy);
+    scene.style.transform = `scale(${s})`;
+  }
+  window.addEventListener('resize', fitStage);
+  fitStage();
+
+})();
+</script>
+
+</body>
+</html>
