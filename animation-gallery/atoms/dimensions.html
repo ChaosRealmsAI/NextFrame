@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Animation · 5 Dimensions</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:#fafafa;color:#1a1a1a;min-height:100vh;
+    font-family:-apple-system,"SF Pro Display","Inter",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  body{padding-bottom:120px}
+
+  /* ===== Header ===== */
+  .hero{padding:64px 64px 32px;max-width:1680px;margin:0 auto}
+  .hero h1{font-size:48px;font-weight:600;letter-spacing:-.03em;line-height:1}
+  .hero h1 .accent{color:#ff3b30}
+  .hero p{margin-top:14px;font-size:17px;color:#666;max-width:720px;line-height:1.55}
+
+  .formula{display:flex;align-items:center;gap:20px;margin-top:40px;flex-wrap:wrap}
+  .formula .eq{font-size:16px;color:#666;font-family:"SF Mono",Menlo,monospace}
+  .formula .dim{padding:10px 16px;border-radius:100px;font-size:13px;font-weight:600;
+    display:inline-flex;align-items:center;gap:6px;letter-spacing:.02em}
+  .formula .dim .dot{width:8px;height:8px;border-radius:50%}
+  .dim.what  { background:#fff2e8; color:#c23400 } .dim.what .dot  { background:#ff6a00 }
+  .dim.look  { background:#ece8ff; color:#3020a0 } .dim.look .dot  { background:#6040ff }
+  .dim.how   { background:#e8ffe8; color:#0a6530 } .dim.how .dot   { background:#26b765 }
+  .dim.why   { background:#ffe8ee; color:#a00035 } .dim.why .dot   { background:#ff3b63 }
+  .dim.when  { background:#e0f4ff; color:#0068a0 } .dim.when .dot  { background:#0a84ff }
+
+  /* ===== Section ===== */
+  section{max-width:1680px;margin:48px auto;padding:0 64px}
+  .sec-head{display:flex;align-items:baseline;gap:18px;margin-bottom:28px;
+    padding-bottom:16px;border-bottom:1px solid #e8e8e8}
+  .sec-head .badge{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;
+    letter-spacing:.12em}
+  .sec-head h2{font-size:30px;font-weight:600;letter-spacing:-.02em}
+  .sec-head .q{font-size:14px;color:#888;font-family:"SF Mono",Menlo,monospace}
+
+  .subsec{margin-top:40px}
+  .subsec h3{font-size:15px;font-weight:600;margin-bottom:16px;color:#1a1a1a;
+    display:flex;align-items:center;gap:10px}
+  .subsec h3::before{content:'';width:3px;height:14px;background:#1a1a1a;border-radius:2px}
+  .subsec p.note{font-size:13px;color:#888;margin-bottom:16px;max-width:720px;line-height:1.5}
+
+  /* Horizontal atom row */
+  .atoms{display:flex;flex-wrap:wrap;gap:8px}
+  .atom{background:#fff;border:1px solid #e8e8e8;border-radius:14px;
+    padding:14px;display:flex;flex-direction:column;align-items:center;
+    min-width:110px;position:relative}
+  .atom .vis{width:76px;height:76px;display:grid;place-items:center;margin-bottom:10px}
+  .atom svg{width:100%;height:100%;overflow:visible}
+  .atom .lbl{font-size:11px;font-weight:500;color:#1a1a1a;text-align:center}
+  .atom .sub{font-size:9px;color:#aaa;margin-top:2px;font-family:"SF Mono",Menlo,monospace}
+
+  /* Color swatches */
+  .palette-row{display:flex;flex-wrap:wrap;gap:12px}
+  .pal{background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:12px;
+    min-width:180px}
+  .pal .name{font-size:12px;font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between}
+  .pal .name span:last-child{color:#aaa;font-weight:400;font-family:"SF Mono",Menlo,monospace;font-size:10px}
+  .pal .chips{display:flex;gap:4px;height:32px;border-radius:6px;overflow:hidden}
+  .pal .chips span{flex:1}
+
+  /* Why/when card */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media (max-width:1100px){.cards{grid-template-columns:repeat(2,1fr)}}
+  .card{background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:18px;
+    display:flex;flex-direction:column;gap:12px;min-height:160px;position:relative}
+  .card .hd{display:flex;align-items:center;gap:10px}
+  .card .hd .icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex-shrink:0}
+  .card .hd .title{font-size:14px;font-weight:600}
+  .card .desc{font-size:12px;color:#888;line-height:1.45}
+  .card .eg{margin-top:auto;font-size:10px;color:#aaa;letter-spacing:.05em;
+    border-top:1px dashed #e8e8e8;padding-top:10px;font-family:"SF Mono",Menlo,monospace}
+
+  /* HOW shortcut block */
+  .how-block{background:#fff;border:1px solid #e8e8e8;border-radius:14px;padding:24px;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media (max-width:900px){.how-block{grid-template-columns:1fr}}
+  .how-block a{text-decoration:none;color:inherit;background:#fafafa;
+    border-radius:10px;padding:16px;border:1px solid #eee;transition:all .2s}
+  .how-block a:hover{background:#f3f3f3;transform:translateY(-2px)}
+  .how-block .ver{font-size:11px;color:#666;letter-spacing:.12em;font-weight:700;
+    font-family:"SF Mono",Menlo,monospace}
+  .how-block .ver-title{font-size:14px;font-weight:600;margin-top:6px}
+  .how-block .ver-desc{font-size:11px;color:#888;margin-top:8px;line-height:1.4}
+
+  /* Apple breakdown footer */
+  .breakdown{margin-top:64px;max-width:1680px;margin-left:auto;margin-right:auto;
+    padding:40px 64px;background:#1a1a1a;color:#fafafa;border-radius:24px;margin-bottom:64px}
+  .breakdown h2{font-size:26px;font-weight:500;letter-spacing:-.02em}
+  .breakdown p.lead{margin-top:10px;font-size:14px;color:#888;max-width:640px;line-height:1.5}
+  .br-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:28px}
+  @media (max-width:1100px){.br-grid{grid-template-columns:repeat(2,1fr)}}
+  .br-cell{background:#222;border-radius:14px;padding:18px}
+  .br-cell .d{font-size:11px;letter-spacing:.18em;font-weight:700}
+  .br-cell .what-d{color:#ff8050}
+  .br-cell .look-d{color:#8a70ff}
+  .br-cell .how-d{color:#5fd089}
+  .br-cell .why-d{color:#ff6b88}
+  .br-cell .when-d{color:#50a8ff}
+  .br-cell .content{font-size:12px;color:#ddd;margin-top:10px;line-height:1.5}
+
+  /* Why mini-demo circles */
+  .why-demo{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;
+    background:#fafafa;font-size:18px}
+</style>
+</head>
+<body>
+
+<!-- ============ Hero ============ -->
+<div class="hero">
+  <h1>Animation = <span class="accent">5 dimensions.</span></h1>
+  <p>36 个运动原子只是 <b>HOW</b>（怎么动）。一个完整动画 = <b>WHAT × LOOK × HOW × WHY × WHEN</b> — 五个正交维度的组合。这一页把 5 维每一个拆成原子，讲清楚 + 可视化。</p>
+
+  <div class="formula">
+    <span class="dim what"><span class="dot"></span>WHAT · 画什么</span>
+    <span class="eq">×</span>
+    <span class="dim look"><span class="dot"></span>LOOK · 长啥样</span>
+    <span class="eq">×</span>
+    <span class="dim how"><span class="dot"></span>HOW · 怎么动</span>
+    <span class="eq">×</span>
+    <span class="dim why"><span class="dot"></span>WHY · 为啥动</span>
+    <span class="eq">×</span>
+    <span class="dim when"><span class="dot"></span>WHEN · 何时动</span>
+  </div>
+</div>
+
+<!-- ============ Section 1 · WHAT ============ -->
+<section>
+  <div class="sec-head" style="border-bottom-color:#ff6a00">
+    <span class="badge" style="background:#fff2e8;color:#c23400">01 · WHAT</span>
+    <h2>画什么 · 内容原子</h2>
+    <span class="q">the content atoms — shapes, type, icons, numbers</span>
+  </div>
+
+  <div class="subsec">
+    <h3>基础形状（10 个）</h3>
+    <p class="note">任何图形动画的起点。组合这 10 个能搭出 80% 的视觉元素。</p>
+    <div class="atoms">
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><circle r="26" fill="#1a1a1a"/></svg></div><div class="lbl">Circle</div><div class="sub">r</div></div>
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><rect x="-24" y="-24" width="48" height="48" rx="4" fill="#1a1a1a"/></svg></div><div class="lbl">Square</div><div class="sub">w h</div></div>
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><polygon points="0,-25 25,22 -25,22" fill="#1a1a1a"/></svg></div><div class="lbl">Triangle</div><div class="sub">3p</div></div>
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><polygon points="0,-26 26,0 0,26 -26,0" fill="#1a1a1a"/></svg></div><div class="lbl">Diamond</div><div class="sub">4p</div></div>
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><polygon points="0,-26 7,-8 26,-8 12,4 17,22 0,12 -17,22 -12,4 -26,-8 -7,-8" fill="#1a1a1a"/></svg></div><div class="lbl">Star</div><div class="sub">5-point</div></div>
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><path d="M0,-8 C-8,-24 -28,-18 -28,-2 C-28,16 -6,26 0,32 C6,26 28,16 28,-2 C28,-18 8,-24 0,-8 Z" fill="#ff3b30"/></svg></div><div class="lbl">Heart</div><div class="sub">bezier</div></div>
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><polygon points="-22,-13 22,-13 26,0 22,13 -22,13 -26,0" fill="#1a1a1a"/></svg></div><div class="lbl">Hexagon</div><div class="sub">6-side</div></div>
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><path d="M -22,0 L 16,0 M 10,-8 L 20,0 L 10,8" stroke="#1a1a1a" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="lbl">Arrow</div><div class="sub">directional</div></div>
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><path d="M 0,-20 L 0,20 M -20,0 L 20,0" stroke="#1a1a1a" stroke-width="5" stroke-linecap="round"/></svg></div><div class="lbl">Plus</div><div class="sub">additive</div></div>
+      <div class="atom"><div class="vis"><svg viewBox="-30 -30 60 60"><path d="M -18,0 L -6,14 L 20,-14" stroke="#26b765" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="lbl">Check</div><div class="sub">confirm</div></div>
+    </div>
+  </div>
+
+  <div class="subsec">
+    <h3>字体类型（6 个，每个字体代表一种声音）</h3>
+    <p class="note">字体 = 品牌的"嗓音"。同一句话换字体就换了身份。</p>
+    <div class="atoms">
+      <div class="atom"><div class="vis" style="font-size:32px;font-family:Inter,system-ui;font-weight:600;color:#1a1a1a;letter-spacing:-.02em">Aa</div><div class="lbl">Sans</div><div class="sub">Inter · Linear</div></div>
+      <div class="atom"><div class="vis" style="font-size:34px;font-family:Georgia,serif;font-style:italic;color:#1a1a1a">Aa</div><div class="lbl">Serif</div><div class="sub">Tiempos · Claude</div></div>
+      <div class="atom"><div class="vis" style='font-size:30px;font-family:"SF Mono",Menlo,monospace;color:#1a1a1a'>Aa</div><div class="lbl">Mono</div><div class="sub">SF Mono</div></div>
+      <div class="atom"><div class="vis" style="font-size:32px;font-family:Varela Round,system-ui;font-weight:700;color:#1a1a1a">Aa</div><div class="lbl">Rounded</div><div class="sub">Varela · Arc</div></div>
+      <div class="atom"><div class="vis" style="font-size:36px;font-family:'Helvetica Neue',system-ui;font-weight:900;font-style:italic;color:#1a1a1a;letter-spacing:-.04em">Aa</div><div class="lbl">Display</div><div class="sub">Heavy italic</div></div>
+      <div class="atom"><div class="vis" style="font-size:36px;font-family:Caveat,cursive;color:#1a1a1a">Aa</div><div class="lbl">Handwrit.</div><div class="sub">Caveat</div></div>
+    </div>
+  </div>
+
+  <div class="subsec">
+    <h3>图标族（按目的分组）</h3>
+    <p class="note">图标不是"装饰"，是"谓词" — 表达某种动作/状态/类别。按用途分族才好找。</p>
+    <div class="atoms">
+      <div class="atom"><div class="vis" style="font-size:30px">▶⏸↺↗</div><div class="lbl">Action</div><div class="sub">play/pause/reset</div></div>
+      <div class="atom"><div class="vis" style="font-size:30px">✓✗⚠ⓘ</div><div class="lbl">State</div><div class="sub">ok/fail/warn/info</div></div>
+      <div class="atom"><div class="vis" style="font-size:28px">🎵📷🎬🎨</div><div class="lbl">Media</div><div class="sub">audio/photo/video</div></div>
+      <div class="atom"><div class="vis" style="font-size:26px">♥💬↗⭐</div><div class="lbl">Social</div><div class="sub">like/reply/share</div></div>
+      <div class="atom"><div class="vis" style="font-size:26px">📊📈📉🔢</div><div class="lbl">Data</div><div class="sub">chart/trend/num</div></div>
+      <div class="atom"><div class="vis" style="font-size:28px">🔥✨💯⚡</div><div class="lbl">Emphasis</div><div class="sub">hype/spark/wow</div></div>
+    </div>
+  </div>
+
+  <div class="subsec">
+    <h3>数字风格（同一串数字，4 种表达）</h3>
+    <div class="atoms">
+      <div class="atom"><div class="vis" style='font-size:20px;font-family:"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums'>123.45</div><div class="lbl">Tabular</div><div class="sub">固定宽</div></div>
+      <div class="atom"><div class="vis" style="font-size:24px;font-family:Inter;font-weight:800;letter-spacing:-.03em">123.45</div><div class="lbl">Display</div><div class="sub">粗 + 负字距</div></div>
+      <div class="atom"><div class="vis" style="font-size:24px;font-family:Caveat;color:#1a1a1a">123.45</div><div class="lbl">Handwrit.</div><div class="sub">手写感</div></div>
+      <div class="atom"><div class="vis" style="font-family:monospace;font-size:20px;color:#26b765;background:#0a1a0a;padding:4px 8px;border-radius:4px;letter-spacing:.1em">123.45</div><div class="lbl">LED</div><div class="sub">七段码感</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Section 2 · LOOK ============ -->
+<section>
+  <div class="sec-head" style="border-bottom-color:#6040ff">
+    <span class="badge" style="background:#ece8ff;color:#3020a0">02 · LOOK</span>
+    <h2>长啥样 · 视觉原子</h2>
+    <span class="q">the visual atoms — color, material, shadow, texture</span>
+  </div>
+
+  <div class="subsec">
+    <h3>调色板（10 种风格对应的色系）</h3>
+    <div class="palette-row">
+      <div class="pal"><div class="name"><span>Apple</span><span>warm</span></div>
+        <div class="chips"><span style="background:#fafafa"></span><span style="background:#1a1a1a"></span><span style="background:#ff3b30"></span></div></div>
+      <div class="pal"><div class="name"><span>Linear</span><span>cool</span></div>
+        <div class="chips"><span style="background:#fff"></span><span style="background:#1a1a1a"></span><span style="background:#5e6ad2"></span><span style="background:#26b765"></span></div></div>
+      <div class="pal"><div class="name"><span>Claude</span><span>warm paper</span></div>
+        <div class="chips"><span style="background:#faf9f5"></span><span style="background:#1a1a1a"></span><span style="background:#d97757"></span></div></div>
+      <div class="pal"><div class="name"><span>Arc</span><span>fluid</span></div>
+        <div class="chips"><span style="background:#faf7f5"></span><span style="background:#9f7aea"></span><span style="background:#ed64a6"></span><span style="background:#4299e1"></span></div></div>
+      <div class="pal"><div class="name"><span>TikTok</span><span>neon</span></div>
+        <div class="chips"><span style="background:#000"></span><span style="background:#fe2c55"></span><span style="background:#25f4ee"></span></div></div>
+      <div class="pal"><div class="name"><span>Nintendo</span><span>playful</span></div>
+        <div class="chips"><span style="background:#fff"></span><span style="background:#e60012"></span><span style="background:#00a652"></span><span style="background:#ffcb05"></span><span style="background:#003da5"></span></div></div>
+      <div class="pal"><div class="name"><span>Off-White</span><span>industrial</span></div>
+        <div class="chips"><span style="background:#fff"></span><span style="background:#000"></span><span style="background:#ff7300"></span></div></div>
+      <div class="pal"><div class="name"><span>Risograph</span><span>print ink</span></div>
+        <div class="chips"><span style="background:#f7f3e9"></span><span style="background:#ff6680"></span><span style="background:#0aa8a8"></span></div></div>
+      <div class="pal"><div class="name"><span>Cyberpunk</span><span>neon vhs</span></div>
+        <div class="chips"><span style="background:#0a0418"></span><span style="background:#00ffff"></span><span style="background:#ff0099"></span><span style="background:#ffff00"></span></div></div>
+      <div class="pal"><div class="name"><span>Cinematic3D</span><span>metal</span></div>
+        <div class="chips"><span style="background:#000"></span><span style="background:#c0c4cc"></span><span style="background:#ffd89b"></span></div></div>
+    </div>
+  </div>
+
+  <div class="subsec">
+    <h3>材质（同一颗心，7 种质感）</h3>
+    <p class="note">材质 = 决定"3D 感"的关键。AI 做复杂材质容易糊，推荐从扁平到 2.5D radial-gradient 为止。</p>
+    <div class="atoms" id="materialRow">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <div class="subsec">
+    <h3>阴影（同一个方块，6 种阴影）</h3>
+    <div class="atoms" id="shadowRow">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <div class="subsec">
+    <h3>纹理（背景质感对比）</h3>
+    <div class="atoms" id="textureRow">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</section>
+
+<!-- ============ Section 3 · HOW ============ -->
+<section>
+  <div class="sec-head" style="border-bottom-color:#26b765">
+    <span class="badge" style="background:#e8ffe8;color:#0a6530">03 · HOW</span>
+    <h2>怎么动 · 运动原子</h2>
+    <span class="q">the motion atoms — already done in primitives v1/v2/v3</span>
+  </div>
+
+  <p style="font-size:14px;color:#666;margin-bottom:20px">36 个运动原子分三册已完成。点击跳转：</p>
+
+  <div class="how-block">
+    <a href="primitives.html">
+      <div class="ver">V1 · L1</div>
+      <div class="ver-title">单元素运动（Disney 12）</div>
+      <div class="ver-desc">Squash · Anticipation · Arc · Timing · Exaggeration · Staging · Stagger · Morph · Elasticity · Collision · Follow · SlowInOut</div>
+    </a>
+    <a href="primitives-v2.html">
+      <div class="ver">V2 · L2-5</div>
+      <div class="ver-title">系统 / 空间 / 时间 / 合成</div>
+      <div class="ver-desc">Emitter · Flock · Fluid · Cloth · Cellular · Trail · Camera · Parallax · Echo · Freeze · Mask · Blur</div>
+    </a>
+    <a href="primitives-v3.html">
+      <div class="ver">V3 · 光学/生物/数据</div>
+      <div class="ver-title">光学 · 感知 · 生物 · 数据</div>
+      <div class="ver-desc">DoF · Bloom · Chromatic · Grain · Reverse · Beat · Blend · ColorPop · Gestalt · Breathe · Blink · DataMorph</div>
+    </a>
+  </div>
+</section>
+
+<!-- ============ Section 4 · WHY ============ -->
+<section>
+  <div class="sec-head" style="border-bottom-color:#ff3b63">
+    <span class="badge" style="background:#ffe8ee;color:#a00035">04 · WHY</span>
+    <h2>为啥动 · 意图原子</h2>
+    <span class="q">the intent atoms — what purpose does this animation serve</span>
+  </div>
+
+  <p style="font-size:14px;color:#666;margin-bottom:20px">每个动画都在"说一句话"。6 种主要意图：</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#e8ffe8"><div class="why-demo" style="background:transparent;color:#26b765">✓</div></div>
+        <div class="title">反馈 Feedback</div>
+      </div>
+      <div class="desc">告诉用户"这件事成了/失败了/进行中"。确认类是最高频的意图，占 UI 动画的 60%。</div>
+      <div class="eg">✓ success · ✗ error · ⟳ progress</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#fff2e8"><div class="why-demo" style="background:transparent;color:#ff6a00">↗</div></div>
+        <div class="title">引导 Guide</div>
+      </div>
+      <div class="desc">告诉用户"接下来看这里/做这个"。用注意力 hack 把用户带到该去的地方。</div>
+      <div class="eg">脉冲高亮 · 箭头指向 · 光圈聚焦</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#ffe8ee"><div class="why-demo" style="background:transparent;color:#ff3b63">♥</div></div>
+        <div class="title">情感 Emotion</div>
+      </div>
+      <div class="desc">让用户"感受到"某种情绪。庆祝 / 温暖 / 紧张 / 宁静 / 威严。非理性但极高效。</div>
+      <div class="eg">庆祝粒子 · 慢呼吸 · 震屏</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#ece8ff"><div class="why-demo" style="background:transparent;color:#6040ff">✦</div></div>
+        <div class="title">品牌 Brand</div>
+      </div>
+      <div class="desc">让用户记住"这是 XX 的动画"。签名式动效 — 看到就知道是哪家。</div>
+      <div class="eg">Arc Q 弹 · Linear 瞬时 · TikTok 爆发</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#e0f4ff"><div class="why-demo" style="background:transparent;color:#0a84ff">📊</div></div>
+        <div class="title">信息 Information</div>
+      </div>
+      <div class="desc">让"数据变化"可见。数字跳动、图表形变、进度推进 — 把抽象变具象。</div>
+      <div class="eg">CountUp · Data Morph · Progress Ring</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#fff"><div class="why-demo" style="background:transparent;color:#1a1a1a">📖</div></div>
+        <div class="title">叙事 Story</div>
+      </div>
+      <div class="desc">"先告诉你 A · 然后 B · 最后 C"。有起承转合。短视频 / PPT 的灵魂。</div>
+      <div class="eg">Hero → Peak → Resolve</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Section 5 · WHEN ============ -->
+<section>
+  <div class="sec-head" style="border-bottom-color:#0a84ff">
+    <span class="badge" style="background:#e0f4ff;color:#0068a0">05 · WHEN</span>
+    <h2>何时动 · 时机原子</h2>
+    <span class="q">the timing atoms — the phase of lifecycle</span>
+  </div>
+
+  <p style="font-size:14px;color:#666;margin-bottom:20px">同样一个"动作"，用在不同时机 = 不同动画。6 种主要时机：</p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#fff2e8;font-size:18px">🚀</div>
+        <div class="title">Hero · 开场</div>
+      </div>
+      <div class="desc">首次登场。发布会标题 / 页面首屏 / 视频开头。剧场感 · 时长可长 · 占屏可大。</div>
+      <div class="eg">Apple event / Awwwards SOTD · 2-3s</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#e8ffe8;font-size:18px">💬</div>
+        <div class="title">Feedback · 反馈</div>
+      </div>
+      <div class="desc">响应用户操作。点赞 / 保存 / 错误 / 提交。**必须快** · 50-500ms · 别抢戏。</div>
+      <div class="eg">Linear 200ms · Apple 500ms</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#ece8ff;font-size:18px">↔</div>
+        <div class="title">Transition · 过渡</div>
+      </div>
+      <div class="desc">场景切换。页面跳转 / 模态弹出 / 标签页切换。维持连续感 · 不要"瞬切"或"慢吞吞"。</div>
+      <div class="eg">300-600ms fade+slide · 无中间态</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#e0f4ff;font-size:18px">🫁</div>
+        <div class="title">Idle · 持续</div>
+      </div>
+      <div class="desc">待机状态。等待时的呼吸 / loading 的旋转 / 背景粒子漂浮。幅度极小但不停。</div>
+      <div class="eg">Breathing scale ±1% · Spinner</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#ffe8ee;font-size:18px">👆</div>
+        <div class="title">Interact · 交互</div>
+      </div>
+      <div class="desc">悬停 / 按下 / 拖拽过程中。表达"可以操作"和"正在操作"。</div>
+      <div class="eg">Hover scale 1.02 · Press 0.95</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <div class="icon" style="background:#1a1a1a;color:#ffcb05;font-size:16px">🌙</div>
+        <div class="title">Outro · 收尾</div>
+      </div>
+      <div class="desc">离场。关闭 / 删除 / 完结。对称于 Hero。好的收尾让作品有"呼出"感。</div>
+      <div class="eg">Fade+shrink · 或 drift-away</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ Breakdown · Apple Like v4 ============ -->
+<div class="breakdown">
+  <h2>拆解 Apple-Like v4 · 看 5 维同时到位</h2>
+  <p class="lead">一个"好动画"不是某一维做得好 — 是五维都选对了。这就是为什么 subagent 单看一两维容易翻车。</p>
+  <div class="br-grid">
+    <div class="br-cell"><div class="d what-d">WHAT</div><div class="content">爱心 SVG + "+1" 数字 + 小爱心粒子</div></div>
+    <div class="br-cell"><div class="d look-d">LOOK</div><div class="content">白底 + Apple Red radial gradient + 柔红 shadow + SF Pro 负字距</div></div>
+    <div class="br-cell"><div class="d how-d">HOW</div><div class="content">Spring k=260/d=14 + Anticipation + Stagger 粒子 + Arc 轨迹</div></div>
+    <div class="br-cell"><div class="d why-d">WHY</div><div class="content">反馈（确认点赞）+ 情感（被看到的激励）</div></div>
+    <div class="br-cell"><div class="d when-d">WHEN</div><div class="content">用户双击瞬间触发 · 完整弧 3s · loop</div></div>
+  </div>
+  <p style="margin-top:28px;font-size:13px;color:#888;line-height:1.5">换任意一维 = 新作品。比如 LOOK 从 Apple 换成 Arc（紫粉蓝） = Arc 版 Like。HOW 从 spring 换成 linear = Linear 版 Like。全部 5 维同时换品牌 DNA = 风格切换（就是 compare-success/ 里 10 个）。</p>
+</div>
+
+</body>
+<script>
+/* Material row — same heart, 7 looks */
+const materials = [
+  { name: 'Flat', sub: '纯色填充', svg: '<path d="M0,-10 C-8,-24 -28,-18 -28,-2 C-28,14 -6,24 0,30 C6,24 28,14 28,-2 C28,-18 8,-24 0,-10 Z" fill="#ff3b30"/>' },
+  { name: 'Linear', sub: '线性渐变', svg: '<defs><linearGradient id="l1" x1="0" y1="-1" x2="0" y2="1"><stop offset="0" stop-color="#ff8a7a"/><stop offset="1" stop-color="#b01b14"/></linearGradient></defs><path d="M0,-10 C-8,-24 -28,-18 -28,-2 C-28,14 -6,24 0,30 C6,24 28,14 28,-2 C28,-18 8,-24 0,-10 Z" fill="url(#l1)"/>' },
+  { name: 'Radial', sub: '2.5D 体积 (★)', svg: '<defs><radialGradient id="r1" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stop-color="#ff8a7a"/><stop offset="0.45" stop-color="#ff3b30"/><stop offset="1" stop-color="#b01b14"/></radialGradient></defs><path d="M0,-10 C-8,-24 -28,-18 -28,-2 C-28,14 -6,24 0,30 C6,24 28,14 28,-2 C28,-18 8,-24 0,-10 Z" fill="url(#r1)"/>' },
+  { name: 'Stroke', sub: '描边', svg: '<path d="M0,-10 C-8,-24 -28,-18 -28,-2 C-28,14 -6,24 0,30 C6,24 28,14 28,-2 C28,-18 8,-24 0,-10 Z" fill="none" stroke="#1a1a1a" stroke-width="3"/>' },
+  { name: 'Glossy', sub: '扁平 + 高光', svg: '<path d="M0,-10 C-8,-24 -28,-18 -28,-2 C-28,14 -6,24 0,30 C6,24 28,14 28,-2 C28,-18 8,-24 0,-10 Z" fill="#ff3b30"/><path d="M-17,-15 C-21,-19 -14,-22 -8,-18 C-13,-15 -17,-12 -17,-10 Z" fill="rgba(255,255,255,0.4)"/>' },
+  { name: 'Pixel', sub: '像素化', svg: '' /* rendered by JS */ },
+  { name: 'Chrome', sub: '金属', svg: '<defs><linearGradient id="ch1" x1="0" y1="-1" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="0.3" stop-color="#b8bcc6"/><stop offset="0.6" stop-color="#5a5e68"/><stop offset="1" stop-color="#c8ccd6"/></linearGradient></defs><path d="M0,-10 C-8,-24 -28,-18 -28,-2 C-28,14 -6,24 0,30 C6,24 28,14 28,-2 C28,-18 8,-24 0,-10 Z" fill="url(#ch1)"/>' },
+];
+const mr = document.getElementById('materialRow');
+materials.forEach((m, i) => {
+  const d = document.createElement('div');
+  d.className = 'atom';
+  const svgInner = m.svg || renderPixelHeart();
+  d.innerHTML = `<div class="vis"><svg viewBox="-34 -34 68 68">${svgInner}</svg></div><div class="lbl">${m.name}</div><div class="sub">${m.sub}</div>`;
+  mr.appendChild(d);
+});
+function renderPixelHeart() {
+  const grid = ['..XX..XX..','.XXXXXXXX.','XXXXXXXXXX','XXXXXXXXXX','XXXXXXXXXX','.XXXXXXXX.','..XXXXXX..','...XXXX...','....XX....'];
+  const cell = 6, off = -30;
+  let out = '';
+  for (let y = 0; y < grid.length; y++)
+    for (let x = 0; x < grid[y].length; x++)
+      if (grid[y][x] === 'X')
+        out += `<rect x="${off + x * cell}" y="${off + y * cell}" width="${cell - .8}" height="${cell - .8}" fill="#ff3b30"/>`;
+  return out;
+}
+
+/* Shadow row */
+const shadows = [
+  { n: 'None', s: '' },
+  { n: 'Hard', s: '4px 4px 0 #000' },
+  { n: 'Soft', s: '0 4px 8px rgba(0,0,0,.18)' },
+  { n: 'Large', s: '0 12px 32px rgba(0,0,0,.2)' },
+  { n: 'Colored', s: '0 8px 24px rgba(255,59,48,.35)' },
+  { n: 'Double', s: '0 12px 28px rgba(0,0,0,.15), 0 4px 8px rgba(0,0,0,.10)' },
+];
+const sr = document.getElementById('shadowRow');
+shadows.forEach(s => {
+  const d = document.createElement('div');
+  d.className = 'atom';
+  d.innerHTML = `<div class="vis"><div style="width:42px;height:42px;border-radius:10px;background:#ff3b30;box-shadow:${s.s}"></div></div><div class="lbl">${s.n}</div><div class="sub">shadow</div>`;
+  sr.appendChild(d);
+});
+
+/* Texture row */
+const tr = document.getElementById('textureRow');
+const textures = [
+  { n: 'Clean', bg: '#fff', extra: '' },
+  { n: 'Paper', bg: '#f7f3e9', extra: `background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence baseFrequency='.9'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='.15'/></svg>")` },
+  { n: 'Grain', bg: '#1a1a1a', extra: `background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60'><filter id='n'><feTurbulence baseFrequency='.9'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='.3'/></svg>")` },
+  { n: 'Dots', bg: '#fff', extra: 'background-image:radial-gradient(#ccc 1px, transparent 1.5px);background-size:8px 8px' },
+  { n: 'Grid', bg: '#fff', extra: 'background-image:linear-gradient(#e8e8e8 1px, transparent 1px),linear-gradient(90deg, #e8e8e8 1px, transparent 1px);background-size:14px 14px' },
+  { n: 'Scanline', bg: '#000', extra: 'background-image:repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,255,.15) 2px, rgba(0,255,255,.15) 3px)' },
+];
+textures.forEach(t => {
+  const d = document.createElement('div');
+  d.className = 'atom';
+  d.innerHTML = `<div class="vis" style="background:${t.bg};${t.extra};border-radius:10px;border:1px solid #e8e8e8"></div><div class="lbl">${t.n}</div><div class="sub">texture</div>`;
+  tr.appendChild(d);
+});
+</script>
+</html>
