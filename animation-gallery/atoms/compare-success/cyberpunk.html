@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Success · Cyberpunk / Synthwave</title>
+<style>
+  :root {
+    /* Synthwave palette — 深紫黑地平线 + 霓虹三基色 */
+    --bg-deep:       #0a0418;   /* 顶部深紫黑 */
+    --bg-horizon:    #1a0830;   /* 底部地平线 */
+    --bg-glow:       #2a0a50;   /* 地平线霓虹光晕 */
+
+    --neon-cyan:     #00ffff;   /* 霓虹青 */
+    --neon-cyan-dim: #0088aa;
+    --neon-magenta:  #ff0099;   /* 霓虹品红 */
+    --neon-magenta-dim: #aa0066;
+    --neon-yellow:   #ffff00;   /* 霓虹黄 */
+    --neon-purple:   #b344ff;
+
+    --grid-line:     rgba(255, 0, 153, 0.35);  /* Magenta 网格 */
+    --grid-line-far: rgba(0, 255, 255, 0.25);  /* Cyan 远景线 */
+
+    --ink-dim:       #446677;
+    --ink-hud:       #88ddee;
+
+    /* 时间轴 — 沿用 frame-pure 底座，换成 synthwave 皮肤 */
+    --tl-bg:         rgba(10, 4, 24, 0.72);
+    --tl-border:     rgba(0, 255, 255, 0.35);
+    --tl-ink:        #88ddee;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background:
+      /* 地平线光晕 */
+      radial-gradient(1800px 600px at 50% 75%, rgba(255, 0, 153, 0.35), transparent 60%),
+      radial-gradient(1400px 500px at 50% 72%, rgba(0, 255, 255, 0.22), transparent 70%),
+      /* 主渐变：顶部深紫黑 → 底部紫 */
+      linear-gradient(180deg, var(--bg-deep) 0%, var(--bg-deep) 45%, var(--bg-horizon) 80%, var(--bg-glow) 100%);
+    color: var(--ink-hud);
+    overflow: hidden;
+    font-family: "VT323", "Share Tech Mono", "Orbitron", "JetBrains Mono", "Courier New", monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .scene {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    transform-origin: center center;
+  }
+
+  /* ============== 透视网格（Tron / Synthwave 地板） ============== */
+  .grid-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .grid-svg {
+    position: absolute;
+    left: 0;
+    top: 55%;          /* 地平线位置 */
+    width: 100%;
+    height: 45%;
+    display: block;
+  }
+
+  /* 地平线上方：远景星点 + 太阳 */
+  .horizon-sun {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    width: 380px;
+    height: 380px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  /* ============== 中心主体：方框 + pixel check ============== */
+  .center {
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    transform: translate(-50%, -50%);
+    width: 360px;
+    height: 360px;
+    pointer-events: none;
+  }
+
+  .frame-box {
+    position: absolute;
+    inset: 0;
+    border: 4px solid var(--neon-cyan);
+    box-shadow:
+      0 0 0 2px rgba(0, 255, 255, 0.35),
+      0 0 24px rgba(0, 255, 255, 0.6),
+      0 0 60px rgba(0, 255, 255, 0.35),
+      inset 0 0 24px rgba(0, 255, 255, 0.15);
+    background: rgba(0, 255, 255, 0.0);
+    will-change: background, box-shadow, transform, filter;
+  }
+
+  .frame-corner {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--neon-magenta);
+    filter: drop-shadow(0 0 6px rgba(255, 0, 153, 0.9));
+  }
+  .frame-corner.tl { left: -10px; top: -10px; border-right: none; border-bottom: none; }
+  .frame-corner.tr { right: -10px; top: -10px; border-left: none; border-bottom: none; }
+  .frame-corner.bl { left: -10px; bottom: -10px; border-right: none; border-top: none; }
+  .frame-corner.br { right: -10px; bottom: -10px; border-left: none; border-top: none; }
+
+  /* Pixel check — 8-bit SVG */
+  .pixel-check {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 260px;
+    height: 260px;
+  }
+
+  /* ============== 文字层：ACCESS GRANTED + 状态 ============== */
+  .text-layer {
+    position: absolute;
+    left: 50%;
+    top: 72%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    width: 900px;
+  }
+
+  .access-text {
+    font-family: "Orbitron", "Share Tech Mono", "Courier New", monospace;
+    font-weight: 900;
+    font-size: 64px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--neon-cyan);
+    text-shadow:
+      0 0 8px rgba(0, 255, 255, 0.95),
+      0 0 22px rgba(0, 255, 255, 0.7),
+      0 0 48px rgba(0, 255, 255, 0.45),
+      0 0 96px rgba(0, 255, 255, 0.3);
+    will-change: opacity, transform, color;
+  }
+
+  .sys-text {
+    margin-top: 14px;
+    font-family: "Share Tech Mono", "Courier New", monospace;
+    font-size: 26px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--neon-magenta);
+    text-shadow:
+      0 0 6px rgba(255, 0, 153, 0.9),
+      0 0 18px rgba(255, 0, 153, 0.55);
+    will-change: opacity, transform;
+  }
+
+  .id-text {
+    margin-top: 8px;
+    font-family: "Share Tech Mono", "Courier New", monospace;
+    font-size: 18px;
+    letter-spacing: 0.4em;
+    color: var(--neon-yellow);
+    opacity: 0.82;
+    text-shadow: 0 0 6px rgba(255, 255, 0, 0.65);
+    will-change: opacity, content;
+  }
+
+  /* ============== 波纹层（主体外扩散霓虹环） ============== */
+  .ripple-layer {
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    transform: translate(-50%, -50%);
+    width: 1200px;
+    height: 1200px;
+    pointer-events: none;
+  }
+  .ripple {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    border-radius: 50%;
+    border: 3px solid;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    will-change: width, height, opacity, border-color;
+  }
+
+  /* ============== Glitch 层：RGB split + 撕裂条 ============== */
+  .glitch-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    mix-blend-mode: screen;
+  }
+
+  .glitch-rgb {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    will-change: opacity, transform;
+    pointer-events: none;
+  }
+  .glitch-rgb .ch {
+    position: absolute;
+    font-family: "Orbitron", "Share Tech Mono", monospace;
+    font-weight: 900;
+    font-size: 64px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    mix-blend-mode: screen;
+  }
+  .glitch-rgb .ch.r { color: rgba(255, 0, 80, 0.85); }
+  .glitch-rgb .ch.g { color: rgba(0, 255, 120, 0.75); }
+  .glitch-rgb .ch.b { color: rgba(80, 160, 255, 0.9); }
+
+  .tear {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(90deg,
+      rgba(0, 255, 255, 0),
+      rgba(0, 255, 255, 0.5) 20%,
+      rgba(255, 0, 153, 0.7) 50%,
+      rgba(255, 255, 0, 0.4) 80%,
+      rgba(0, 255, 255, 0));
+    mix-blend-mode: screen;
+    pointer-events: none;
+    filter: blur(0.5px);
+    will-change: opacity, transform, height, top;
+  }
+
+  /* ============== Scanlines + CRT vignette ============== */
+  .scanlines {
+    position: absolute;
+    inset: -2px;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.0) 0px,
+      rgba(0, 0, 0, 0.0) 2px,
+      rgba(0, 0, 0, 0.22) 3px,
+      rgba(0, 0, 0, 0.22) 4px
+    );
+    mix-blend-mode: multiply;
+    z-index: 40;
+    opacity: 0.6;
+  }
+
+  .scan-bar {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 140px;
+    background: linear-gradient(180deg,
+      rgba(0, 255, 255, 0) 0%,
+      rgba(0, 255, 255, 0.08) 40%,
+      rgba(255, 0, 153, 0.12) 50%,
+      rgba(0, 255, 255, 0.08) 60%,
+      rgba(0, 255, 255, 0) 100%);
+    mix-blend-mode: screen;
+    pointer-events: none;
+    z-index: 41;
+    will-change: top, opacity;
+  }
+
+  .vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.5) 100%);
+    z-index: 42;
+  }
+
+  .crt-flicker {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.04);
+    mix-blend-mode: screen;
+    z-index: 43;
+    opacity: 0;
+    will-change: opacity;
+  }
+
+  /* ============== 时间轴 ============== */
+  .tl-wrap {
+    position: fixed;
+    left: 24px;
+    right: 24px;
+    bottom: 20px;
+    z-index: 100;
+  }
+
+  .cue-row {
+    position: relative;
+    height: 22px;
+    margin-bottom: 6px;
+  }
+
+  .cue-mark {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 14px;
+    background: var(--neon-cyan);
+    box-shadow: 0 0 6px rgba(0, 255, 255, 0.85);
+    opacity: 0.85;
+  }
+
+  .cue-mark .lbl {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 4px rgba(0, 255, 255, 0.7);
+    white-space: nowrap;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-family: "Share Tech Mono", "Courier New", monospace;
+  }
+
+  .tl-ui {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    background: var(--tl-bg);
+    border: 1px solid var(--tl-border);
+    border-radius: 6px;
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    box-shadow:
+      0 0 18px rgba(0, 255, 255, 0.25),
+      inset 0 0 18px rgba(0, 255, 255, 0.05);
+  }
+
+  .tl-ui button {
+    appearance: none;
+    border: 1px solid var(--tl-border);
+    background: linear-gradient(180deg, rgba(0, 255, 255, 0.08), rgba(0, 255, 255, 0.02));
+    color: var(--neon-cyan);
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    text-shadow: 0 0 6px rgba(0, 255, 255, 0.9);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.25);
+    transition: transform 0.1s ease, background 0.12s ease;
+  }
+  .tl-ui button:hover {
+    background: linear-gradient(180deg, rgba(0, 255, 255, 0.18), rgba(0, 255, 255, 0.06));
+  }
+  .tl-ui button:active { transform: scale(0.96); }
+
+  .tl-ui .time {
+    color: var(--tl-ink);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+    font-family: "Share Tech Mono", "Courier New", monospace;
+    text-shadow: 0 0 4px rgba(136, 221, 238, 0.6);
+  }
+
+  .tl-ui input[type="range"] {
+    appearance: none;
+    flex: 1;
+    height: 4px;
+    background: linear-gradient(90deg,
+      var(--neon-cyan),
+      var(--neon-magenta),
+      var(--neon-yellow));
+    border-radius: 2px;
+    outline: none;
+    border: none;
+    box-shadow: 0 0 8px rgba(255, 0, 153, 0.4);
+  }
+
+  .tl-ui input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--neon-cyan);
+    border: 2px solid var(--bg-deep);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.9);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="scene" id="scene">
+
+    <!-- 透视网格地板 -->
+    <div class="grid-layer">
+      <svg class="grid-svg" id="gridSvg" viewBox="0 0 1920 486" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="gridFade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stop-color="#ff0099" stop-opacity="0.05"/>
+            <stop offset="20%" stop-color="#ff0099" stop-opacity="0.55"/>
+            <stop offset="100%" stop-color="#00ffff" stop-opacity="0.85"/>
+          </linearGradient>
+        </defs>
+        <!-- 水平线（向远处收紧） -->
+        <g id="gridH" stroke="url(#gridFade)" stroke-width="2" fill="none"></g>
+        <!-- 消失点透视放射线 -->
+        <g id="gridV" stroke="url(#gridFade)" stroke-width="2" fill="none"></g>
+      </svg>
+
+      <!-- 地平线 synthwave sun（分段横线的霓虹太阳） -->
+      <svg class="horizon-sun" id="horizonSun" viewBox="-100 -100 200 200">
+        <defs>
+          <linearGradient id="sunGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stop-color="#ffff00"/>
+            <stop offset="50%" stop-color="#ff0099"/>
+            <stop offset="100%" stop-color="#b344ff"/>
+          </linearGradient>
+          <filter id="sunGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4"/>
+          </filter>
+        </defs>
+        <!-- 被水平条切开的霓虹圆 -->
+        <g filter="url(#sunGlow)">
+          <circle cx="0" cy="0" r="90" fill="url(#sunGrad)"/>
+        </g>
+        <!-- 切条 — 覆盖 4 条黑条制造复古感 -->
+        <rect x="-100" y="40" width="200" height="8" fill="#0a0418"/>
+        <rect x="-100" y="58" width="200" height="6" fill="#0a0418"/>
+        <rect x="-100" y="74" width="200" height="5" fill="#0a0418"/>
+        <rect x="-100" y="86" width="200" height="4" fill="#0a0418"/>
+      </svg>
+    </div>
+
+    <!-- 波纹扩散 -->
+    <div class="ripple-layer" id="rippleLayer">
+      <div class="ripple" id="ripple1"></div>
+      <div class="ripple" id="ripple2"></div>
+      <div class="ripple" id="ripple3"></div>
+    </div>
+
+    <!-- 中心主体 -->
+    <div class="center" id="center">
+      <div class="frame-box" id="frameBox"></div>
+      <div class="frame-corner tl" id="cornerTL"></div>
+      <div class="frame-corner tr" id="cornerTR"></div>
+      <div class="frame-corner bl" id="cornerBL"></div>
+      <div class="frame-corner br" id="cornerBR"></div>
+
+      <!-- Pixel check (8-bit) — 用 SVG 格子一格一格点亮 -->
+      <svg class="pixel-check" id="pixelCheck" viewBox="0 0 13 13">
+        <!-- 每格 1 单位。check 形状: 左下对角 + 右上对角 -->
+        <!-- 格子将由 JS 生成 <rect id="px-i">；此处预定义 22 个 -->
+        <defs>
+          <filter id="pxGlow" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="0.35"/>
+            <feMerge>
+              <feMergeNode/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        <g id="pxGroup" filter="url(#pxGlow)"></g>
+      </svg>
+    </div>
+
+    <!-- 文字 -->
+    <div class="text-layer" id="textLayer">
+      <div class="access-text" id="accessText" style="opacity:0">ACCESS GRANTED</div>
+      <div class="sys-text" id="sysText" style="opacity:0">&gt; SYSTEM: OK &lt;</div>
+      <div class="id-text" id="idText" style="opacity:0">⌐◨-◨ ID 0xNF-2049</div>
+    </div>
+
+    <!-- Glitch RGB split 三层副本（文字） -->
+    <div class="glitch-layer" id="glitchLayer">
+      <div class="glitch-rgb" id="glitchRGB" style="opacity:0">
+        <div class="ch r" id="glR">ACCESS GRANTED</div>
+        <div class="ch g" id="glG">ACCESS GRANTED</div>
+        <div class="ch b" id="glB">ACCESS GRANTED</div>
+      </div>
+      <!-- 撕裂条 × 3 -->
+      <div class="tear" id="tear1" style="opacity:0"></div>
+      <div class="tear" id="tear2" style="opacity:0"></div>
+      <div class="tear" id="tear3" style="opacity:0"></div>
+    </div>
+
+    <!-- 扫描条 -->
+    <div class="scan-bar" id="scanBar"></div>
+    <!-- 全屏扫描线 -->
+    <div class="scanlines" id="scanlines"></div>
+    <!-- CRT 小闪 -->
+    <div class="crt-flicker" id="crtFlicker"></div>
+    <!-- Vignette -->
+    <div class="vignette"></div>
+  </div>
+</div>
+
+<!-- 时间轴 -->
+<div class="tl-wrap">
+  <div class="cue-row" id="cueRow"></div>
+  <div class="tl-ui">
+    <button id="playBtn">⏸</button>
+    <button id="resetBtn">↺</button>
+    <span class="time" id="timeLabel">0.00 / 10.00s</span>
+    <input type="range" id="scrubber" min="0" max="1000" value="0">
+    <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+  </div>
+</div>
+
+<script>
+/* ====================================================================
+   CYBERPUNK / SYNTHWAVE SUCCESS ATOM — Frame-pure render(t), 10s loop
+   ==================================================================== */
+
+const DURATION = 10.0;
+const FPS = 30;
+
+/* ---------- 数学工具 ---------- */
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+function spring(t, k = 280, d = 14, mass = 1) {
+  if (t <= 0) return 0;
+  const wn = Math.sqrt(k / mass);
+  const zeta = d / (2 * Math.sqrt(k * mass));
+  if (zeta < 1) {
+    const wd = wn * Math.sqrt(1 - zeta * zeta);
+    return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+  }
+  return 1 - (1 + wn * t) * Math.exp(-wn * t);
+}
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+/* 确定性伪随机（种子化，不破坏 frame-pure） */
+function hash(n) {
+  let x = Math.sin(n * 9301 + 49297) * 233280;
+  return x - Math.floor(x);
+}
+
+/* ---------- 时间节拍 CUES ---------- */
+const CUES = [
+  { t: 0.0, label: 'IDLE' },
+  { t: 1.0, label: 'GLITCH·1' },
+  { t: 1.2, label: 'FRAME·FILL' },
+  { t: 1.5, label: 'PX·CHECK' },
+  { t: 2.0, label: 'ACCESS' },
+  { t: 2.4, label: 'RIPPLE' },
+  { t: 3.2, label: 'GLITCH·2' },
+  { t: 3.8, label: 'SYSTEM·OK' },
+  { t: 5.5, label: 'MICRO·GL' },
+  { t: 7.5, label: 'MICRO·GL' },
+  { t: 9.3, label: 'GLITCH·3' },
+  { t: 9.8, label: 'LOOP' },
+];
+
+/* ---------- Pixel Check 坐标（13×13 网格，从左下到中到右上绘 ✓） ---------- */
+/* 经典 8-bit check mark — 先左下→中底，再中底→右上 */
+const CHECK_PIXELS = [
+  // 左臂（下行到拐角）order 0..6
+  { x: 2, y: 6 },
+  { x: 2, y: 7 },
+  { x: 3, y: 7 },
+  { x: 3, y: 8 },
+  { x: 4, y: 8 },
+  { x: 4, y: 9 },
+  { x: 5, y: 9 },
+  // 拐角
+  { x: 5, y: 10 },
+  { x: 6, y: 10 },
+  // 右臂（上行）
+  { x: 6, y: 9 },
+  { x: 7, y: 9 },
+  { x: 7, y: 8 },
+  { x: 8, y: 8 },
+  { x: 8, y: 7 },
+  { x: 9, y: 7 },
+  { x: 9, y: 6 },
+  { x: 10, y: 6 },
+  { x: 10, y: 5 },
+  { x: 11, y: 5 },
+  { x: 11, y: 4 },
+  { x: 12, y: 4 },
+  { x: 12, y: 3 },
+];
+
+/* 生成 pixelCheck 的 rect 节点 */
+(function buildPixelCheck() {
+  const group = document.getElementById('pxGroup');
+  CHECK_PIXELS.forEach((p, i) => {
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    r.setAttribute('id', 'px' + i);
+    r.setAttribute('x', p.x);
+    r.setAttribute('y', p.y);
+    r.setAttribute('width', 1);
+    r.setAttribute('height', 1);
+    r.setAttribute('fill', '#00ffff');
+    r.setAttribute('opacity', '0');
+    group.appendChild(r);
+  });
+})();
+
+/* ---------- 构建透视网格（SVG 水平线 + 消失点放射线） ---------- */
+(function buildGrid() {
+  const h = document.getElementById('gridH');
+  const v = document.getElementById('gridV');
+  const W = 1920, H = 486;
+  const vpX = W / 2, vpY = 0; // 消失点在 grid-svg 顶部中心（对应场景地平线）
+  // 水平线：越靠下间距越大（透视）
+  const rows = 14;
+  for (let i = 0; i <= rows; i++) {
+    const tt = i / rows;
+    // ease: 越靠近地平线间距越近
+    const y = H * Math.pow(tt, 2.2);
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', 0);
+    line.setAttribute('y1', y);
+    line.setAttribute('x2', W);
+    line.setAttribute('y2', y);
+    line.setAttribute('data-row', i);
+    line.setAttribute('stroke-opacity', (0.2 + tt * 0.7).toFixed(2));
+    h.appendChild(line);
+  }
+  // 消失点放射线（每侧 12 条）
+  const cols = 24;
+  for (let i = 0; i <= cols; i++) {
+    const tt = i / cols;
+    const bx = lerp(-W * 0.8, W * 1.8, tt); // 底部宽铺开（超出屏幕两侧）
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', vpX);
+    line.setAttribute('y1', vpY);
+    line.setAttribute('x2', bx);
+    line.setAttribute('y2', H);
+    line.setAttribute('stroke-opacity', '0.45');
+    line.setAttribute('data-col', i);
+    v.appendChild(line);
+  }
+})();
+
+/* ---------- DOM refs ---------- */
+const $ = id => document.getElementById(id);
+const center       = $('center');
+const frameBox     = $('frameBox');
+const horizonSun   = $('horizonSun');
+const gridSvg      = $('gridSvg');
+const gridH        = $('gridH');
+const gridV        = $('gridV');
+const accessText   = $('accessText');
+const sysText      = $('sysText');
+const idText       = $('idText');
+const glitchRGB    = $('glitchRGB');
+const glR          = $('glR');
+const glG          = $('glG');
+const glB          = $('glB');
+const tear1        = $('tear1');
+const tear2        = $('tear2');
+const tear3        = $('tear3');
+const scanBar      = $('scanBar');
+const crtFlicker   = $('crtFlicker');
+const ripple1      = $('ripple1');
+const ripple2      = $('ripple2');
+const ripple3      = $('ripple3');
+const cornerTL     = $('cornerTL');
+const cornerTR     = $('cornerTR');
+const cornerBL     = $('cornerBL');
+const cornerBR     = $('cornerBR');
+const pxRects      = CHECK_PIXELS.map((_, i) => $('px' + i));
+
+/* ---------- Glitch 窗函数：在 t ∈ [s, s+d] 给 1，否则 0，带极短 ramp ---------- */
+function pulse(t, s, d) {
+  if (t < s || t > s + d) return 0;
+  const phase = (t - s) / d;
+  // 极短 ramp (头尾 10%) 保证 crispness
+  if (phase < 0.1) return phase / 0.1;
+  if (phase > 0.9) return (1 - phase) / 0.1;
+  return 1;
+}
+
+/* Glitch 事件窗（3 次大 glitch + 2 次 micro） */
+const GLITCH_EVENTS = [
+  { t: 1.0,  d: 0.12, intensity: 1.0 },   // 主 glitch 1 — 系统震荡
+  { t: 3.2,  d: 0.14, intensity: 0.9 },   // 主 glitch 2 — RGB split
+  { t: 5.5,  d: 0.08, intensity: 0.5 },   // micro
+  { t: 7.5,  d: 0.08, intensity: 0.55 },  // micro
+  { t: 9.3,  d: 0.18, intensity: 1.0 },   // 主 glitch 3 — 收尾
+];
+
+function glitchAt(t) {
+  let maxI = 0;
+  for (const g of GLITCH_EVENTS) {
+    const p = pulse(t, g.t, g.d);
+    if (p > 0) maxI = Math.max(maxI, p * g.intensity);
+  }
+  return maxI;
+}
+
+/* ---------- Render（唯一入口） ---------- */
+function render(t) {
+  /* =========== 0) 扫描条持续向下滚动（VHS 质感，2.5s 一轮） =========== */
+  const scanCycle = 2.5;
+  const scanPhase = (t % scanCycle) / scanCycle;
+  scanBar.style.top = (scanPhase * 1120 - 140) + 'px';
+  scanBar.style.opacity = (0.55 + Math.sin(t * 2.1) * 0.1).toFixed(3);
+
+  /* =========== 1) CRT flicker（旧灯管闪烁，确定性伪随机） =========== */
+  const flick = hash(Math.floor(t * 12));
+  crtFlicker.style.opacity = (flick < 0.88 ? 0 : (flick - 0.88) * 3).toFixed(3);
+
+  /* =========== 2) Glitch 强度（全局） =========== */
+  const gI = glitchAt(t);  // 0..1
+  // Scene 整体在主 glitch 时横向撕裂抖动
+  const sceneShakeX = gI > 0.15 ? (hash(Math.floor(t * 180)) - 0.5) * 40 * gI : 0;
+  const sceneShakeY = gI > 0.15 ? (hash(Math.floor(t * 200) + 9) - 0.5) * 12 * gI : 0;
+  // 不动 .scene 的尺寸，只偏移 center 层避开网格扭曲
+  center.style.transform = `translate(calc(-50% + ${sceneShakeX}px), calc(-50% + ${sceneShakeY}px))`;
+
+  /* =========== 3) 透视网格 — 向远处推送（向消失点收） =========== */
+  // 模拟"往里飞"的推镜：y 轴偏移做无限滚动 + 整体微脉冲
+  const pushCycle = 3.2;
+  const pushT = (t % pushCycle) / pushCycle;
+  // 让水平线在 y 方向滚动一行（rows 间距递增所以用百分比）
+  // 直接用 CSS translateY 微动（视觉上最后一行移出 + 第一行移入）
+  gridSvg.style.transform = `translateY(${(-pushT * 34).toFixed(2)}px) scaleY(${1 + 0.015 * Math.sin(t * 1.3)})`;
+  // 整体颜色在 glitch 时偏红/洋红
+  gridSvg.style.filter = gI > 0.3
+    ? `hue-rotate(${(gI * 80).toFixed(1)}deg) saturate(1.5) brightness(${1 + gI * 0.25})`
+    : 'none';
+
+  /* =========== 4) 太阳（地平线）呼吸 =========== */
+  const sunScale = 1 + Math.sin(t * 1.6) * 0.03 + (gI > 0.3 ? gI * 0.05 : 0);
+  const sunHue = gI > 0.5 ? (gI * 60) : 0;
+  horizonSun.style.transform = `translate(-50%, -50%) scale(${sunScale.toFixed(3)})`;
+  horizonSun.style.filter = `hue-rotate(${sunHue.toFixed(1)}deg)`;
+
+  /* =========== 5) 方框：灯管 flicker 入场 → 填充 → 常驻呼吸 =========== */
+  // 入场 flicker：0.0~0.9s 之间做 5 次 flicker 才稳定
+  let boxOpacity = 1;
+  if (t < 0.9) {
+    const flickSeq = [0.05, 0.18, 0.32, 0.5, 0.72]; // 5 次 flicker 峰
+    let on = 0;
+    for (const pt of flickSeq) {
+      if (t >= pt - 0.03 && t <= pt + 0.08) on = 1;
+    }
+    // 0.8s 后完全稳定
+    if (t > 0.8) on = 1;
+    boxOpacity = on;
+  }
+
+  // 方框填充进度（1.2s 开始填 cyan）
+  const fillP = kern(t, 1.2, 0.35, easeOut);
+  // 呼吸
+  const boxBreath = 1 + Math.sin(t * 1.8) * 0.008;
+  // 主 glitch 时方框抖颜色
+  const boxScale = boxBreath + (gI > 0.3 ? (hash(Math.floor(t * 150) + 2) - 0.5) * 0.05 * gI : 0);
+  frameBox.style.opacity = boxOpacity;
+  frameBox.style.transform = `scale(${boxScale.toFixed(4)})`;
+  frameBox.style.background = `rgba(0, 255, 255, ${(fillP * 0.12).toFixed(3)})`;
+  frameBox.style.boxShadow = `
+    0 0 0 2px rgba(0, 255, 255, ${0.35 + fillP * 0.15}),
+    0 0 ${24 + fillP * 18}px rgba(0, 255, 255, ${0.6 + fillP * 0.2}),
+    0 0 ${60 + fillP * 40}px rgba(0, 255, 255, ${0.35 + fillP * 0.25}),
+    inset 0 0 ${24 + fillP * 32}px rgba(0, 255, 255, ${0.15 + fillP * 0.35})
+  `;
+
+  // 4 个角标在 flicker 阶段一起闪，glitch 时偏移
+  const cornerOp = boxOpacity;
+  const cornerJit = gI > 0.3 ? (hash(Math.floor(t * 160) + 3) - 0.5) * 16 * gI : 0;
+  [cornerTL, cornerTR, cornerBL, cornerBR].forEach((c, i) => {
+    c.style.opacity = cornerOp;
+    const jx = gI > 0.3 ? (hash(Math.floor(t * 160) + 10 + i) - 0.5) * 20 * gI : 0;
+    const jy = gI > 0.3 ? (hash(Math.floor(t * 160) + 20 + i) - 0.5) * 10 * gI : 0;
+    c.style.transform = `translate(${jx.toFixed(1)}px, ${jy.toFixed(1)}px)`;
+  });
+
+  /* =========== 6) Pixel Check — 逐格点亮（1.5~2.1s） =========== */
+  const pxStart = 1.5;
+  const pxDur = 0.6;  // 22 格在 0.6s 内点完
+  const pxT = (t - pxStart) / pxDur;
+  pxRects.forEach((rect, i) => {
+    if (!rect) return;
+    const pxKern = clamp01(pxT - (i / CHECK_PIXELS.length) * 0.95);
+    // 每格 80ms spring-like 出场
+    const op = easeOut(pxKern);
+    // 微微的进场 scale
+    rect.setAttribute('opacity', op.toFixed(3));
+    // 最终状态后，做颜色脉冲（cyan ↔ 白）
+    if (t > 2.2) {
+      const beat = Math.sin(t * 3.6 + i * 0.3) * 0.5 + 0.5;
+      const hex = beat > 0.8 ? '#ffffff' : '#00ffff';
+      rect.setAttribute('fill', hex);
+    } else {
+      rect.setAttribute('fill', '#00ffff');
+    }
+  });
+
+  /* =========== 7) ACCESS GRANTED 文字 — 灯管 flicker 入场 =========== */
+  const accStart = 1.9;
+  let accOp = 0;
+  if (t >= accStart) {
+    const flickSeq2 = [1.95, 2.02, 2.12, 2.22];
+    let on = 0;
+    for (const pt of flickSeq2) {
+      if (t >= pt - 0.03 && t <= pt + 0.07) on = 1;
+    }
+    if (t > 2.3) on = 1;
+    accOp = on;
+  }
+  // 主 glitch 2（t≈3.2）时 ACCESS 文字被 RGB split
+  if (gI > 0.4 && t > accStart) {
+    accessText.style.opacity = (accOp * (1 - gI * 0.6)).toFixed(3);
+    glitchRGB.style.opacity = gI.toFixed(3);
+    const jx = (hash(Math.floor(t * 180) + 7) - 0.5) * 20 * gI;
+    glR.style.transform = `translate(${(-10 - 8 * gI + jx).toFixed(1)}px, 0px)`;
+    glG.style.transform = `translate(${(jx * 0.3).toFixed(1)}px, ${(jx * 0.2).toFixed(1)}px)`;
+    glB.style.transform = `translate(${(10 + 8 * gI + jx).toFixed(1)}px, 0px)`;
+  } else {
+    accessText.style.opacity = accOp.toFixed(3);
+    glitchRGB.style.opacity = 0;
+  }
+  // ACCESS 呼吸
+  const accBreath = 1 + Math.sin(t * 2.4) * 0.01;
+  accessText.style.transform = `scale(${accBreath.toFixed(4)})`;
+
+  /* =========== 8) SYSTEM: OK 文字（3.8s 出现，带 typing 感） =========== */
+  const sysStart = 3.8;
+  let sysOp = 0;
+  if (t >= sysStart) {
+    // 4 次 flicker
+    const flickSeq3 = [3.82, 3.9, 3.98, 4.08];
+    let on = 0;
+    for (const pt of flickSeq3) {
+      if (t >= pt - 0.02 && t <= pt + 0.06) on = 1;
+    }
+    if (t > 4.15) on = 1;
+    sysOp = on;
+  }
+  sysText.style.opacity = sysOp.toFixed(3);
+
+  /* =========== 9) ID 号码（4.3s 出现，还带随机乱码前 200ms） =========== */
+  const idStart = 4.3;
+  let idOp = 0;
+  if (t >= idStart) {
+    idOp = kern(t, idStart, 0.25);
+    // 200ms 的乱码然后定格
+    if (t < idStart + 0.25) {
+      const garbled = '⌐◨-◨ ID 0x';
+      let suffix = '';
+      for (let i = 0; i < 7; i++) {
+        const hh = Math.floor(hash(Math.floor(t * 30) + i * 7) * 16);
+        suffix += hh.toString(16).toUpperCase();
+      }
+      idText.textContent = garbled + suffix;
+    } else {
+      idText.textContent = '⌐◨-◨ ID 0xNF-2049';
+    }
+  }
+  // 最终 glitch 时 ID 也乱码
+  if (t > 9.2 && t < 9.7) {
+    const g = 'ID 0x';
+    let suffix = '';
+    for (let i = 0; i < 7; i++) {
+      const hh = Math.floor(hash(Math.floor(t * 40) + i * 11) * 16);
+      suffix += hh.toString(16).toUpperCase();
+    }
+    idText.textContent = '⌐◨-◨ ' + g + suffix;
+  }
+  idText.style.opacity = idOp.toFixed(3);
+
+  /* =========== 10) Ripple — 2.4s 起，cyan / magenta 交替 × 3 =========== */
+  const rippleData = [
+    { el: ripple1, start: 2.4, color: '#00ffff' },
+    { el: ripple2, start: 2.7, color: '#ff0099' },
+    { el: ripple3, start: 3.0, color: '#00ffff' },
+  ];
+  rippleData.forEach(r => {
+    const rt = t - r.start;
+    if (rt < 0 || rt > 1.4) {
+      r.el.style.opacity = 0;
+      return;
+    }
+    const p = clamp01(rt / 1.4);
+    const size = lerp(280, 1100, easeOut(p));
+    r.el.style.width = size + 'px';
+    r.el.style.height = size + 'px';
+    r.el.style.borderColor = r.color;
+    r.el.style.boxShadow = `0 0 30px ${r.color}`;
+    r.el.style.opacity = (1 - p).toFixed(3);
+  });
+
+  /* =========== 11) 撕裂条 — 在 glitch 事件期随机出现 =========== */
+  function updateTear(tearEl, offset, seed) {
+    if (gI < 0.3) {
+      tearEl.style.opacity = 0;
+      return;
+    }
+    const frame = Math.floor(t * 60) + seed;
+    const yTop = hash(frame) * 1080;
+    const h = 8 + hash(frame + 1) * 24;
+    const op = gI * (0.5 + hash(frame + 2) * 0.5);
+    tearEl.style.top = yTop + 'px';
+    tearEl.style.height = h + 'px';
+    tearEl.style.opacity = op.toFixed(3);
+    tearEl.style.transform = `translateX(${((hash(frame + 3) - 0.5) * 30 * gI).toFixed(1)}px)`;
+  }
+  updateTear(tear1, 0, 17);
+  updateTear(tear2, 1, 53);
+  updateTear(tear3, 2, 91);
+}
+
+/* =========== 时间控制器（沿用模板） =========== */
+const scrubber   = document.getElementById('scrubber');
+const playBtn    = document.getElementById('playBtn');
+const resetBtn   = document.getElementById('resetBtn');
+const timeLabel  = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow     = document.getElementById('cueRow');
+
+let currentT = 0;
+let playing = true;
+let lastFrame = performance.now();
+
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+
+scrubber.addEventListener('input', () => {
+  playing = false;
+  playBtn.textContent = '▶';
+  setTime(scrubber.value / 1000 * DURATION);
+});
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+resetBtn.addEventListener('click', () => setTime(0));
+
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl';
+  lbl.textContent = cue.label;
+  m.appendChild(lbl);
+  cueRow.appendChild(m);
+});
+
+setTime(0);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
