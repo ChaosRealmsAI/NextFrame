@@ -1,0 +1,100 @@
+{
+  "version": "v2.0",
+  "phase": "walking-skeleton",
+  "rustWorkspace": [
+    {
+      "name": "nf-shell-mac",
+      "path": "src/nf-shell-mac",
+      "role": "macOS native shell — 4-panel desktop, owns source.json writes",
+      "modules": ["lib", "window", "panels", "bridge", "source_file"],
+      "dependsOn": ["nf-recorder"],
+      "status": "skeleton"
+    },
+    {
+      "name": "nf-recorder",
+      "path": "src/nf-recorder",
+      "role": "hidden WKWebView → IOSurface → Metal → VTCompressionSession HEVC HDR10 → fragmented MP4",
+      "modules": [
+        "lib",
+        "worker",
+        "capture",
+        "compositor",
+        "encoder",
+        "sei_injector",
+        "muxer",
+        "frame_pool"
+      ],
+      "dependsOn": [],
+      "status": "skeleton"
+    },
+    {
+      "name": "nf-cli",
+      "path": "src/nf-cli",
+      "role": "JSON-only CLI — build / record / validate / ai-ops",
+      "modules": ["main", "commands::build", "commands::record", "commands::validate", "commands::ai_ops"],
+      "dependsOn": ["nf-shell-mac", "nf-recorder"],
+      "status": "skeleton"
+    }
+  ],
+  "jsPackages": [
+    {
+      "name": "nf-core-app",
+      "path": "src/nf-core-app",
+      "role": "engine heart — pure getStateAt(t) contract",
+      "files": ["src/app.js", "src/state.js", "src/track-host.js"],
+      "status": "skeleton"
+    },
+    {
+      "name": "nf-core-engine",
+      "path": "src/nf-core-engine",
+      "role": "Source → Resolved compiler + bundler + write-back (TypeScript)",
+      "files": [
+        "src/index.ts",
+        "src/parser.ts",
+        "src/anchor.ts",
+        "src/expr.ts",
+        "src/topo.ts",
+        "src/bundler.ts",
+        "src/writeback.ts",
+        "src/cli.ts"
+      ],
+      "buildTool": "esbuild",
+      "status": "skeleton"
+    },
+    {
+      "name": "nf-tracks",
+      "path": "src/nf-tracks",
+      "role": "Track ABI + official components + user hot-load directory",
+      "files": [
+        "abi/index.js",
+        "official/text.js",
+        "official/shape.js",
+        "scripts/check-abi.mjs",
+        "user/"
+      ],
+      "status": "skeleton"
+    },
+    {
+      "name": "nf-runtime",
+      "path": "src/nf-runtime",
+      "role": "browser runtime — one WebView, three modes (play/edit/record)",
+      "files": [
+        "src/runtime.js",
+        "src/modes/play.js",
+        "src/modes/edit.js",
+        "src/modes/record.js",
+        "src/bridge.js"
+      ],
+      "status": "skeleton"
+    }
+  ],
+  "invariants": {
+    "singleWriter": "only nf-shell-mac writes source.json; nf-core-engine writes resolved bundle; runtime/recorder are read-only",
+    "dependencyDirection": "nf-cli → {nf-shell-mac, nf-recorder}; nf-shell-mac → nf-recorder; no reverse edges",
+    "cliOutput": "all nf binary output is JSON — never free-form text",
+    "trackAbi": "Track modules export describe/sample/render; zero external imports"
+  },
+  "fixtures": {
+    "sample": "spec/fixtures/sample.json"
+  }
+}

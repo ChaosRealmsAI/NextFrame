@@ -1,0 +1,14 @@
+{
+  "name": "nf-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/runtime.js",
+  "exports": {
+    ".": "./src/runtime.js",
+    "./modes/play": "./src/modes/play.js",
+    "./modes/edit": "./src/modes/edit.js",
+    "./modes/record": "./src/modes/record.js",
+    "./bridge": "./src/bridge.js"
+  }
+}

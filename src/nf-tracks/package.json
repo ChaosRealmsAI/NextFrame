@@ -1,0 +1,11 @@
+{
+  "name": "nf-tracks",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "abi/index.js",
+  "exports": {
+    ".": "./abi/index.js",
+    "./official/*": "./official/*"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "viewport": { "ratio": "16:9", "w": 1920, "h": 1080 },
+  "anchors": {
+    "t_intro": 0,
+    "t_body": 2
+  },
+  "tracks": [
+    {
+      "kind": "text",
+      "id": "t1",
+      "keyframes": [
+        { "t": "t_intro", "content": "Hello, NextFrame", "x": 0.5, "y": 0.5, "fontSize": 64, "color": "#ffffff" }
+      ]
+    }
+  ]
+}

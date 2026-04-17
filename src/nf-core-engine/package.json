@@ -1,0 +1,18 @@
+{
+  "name": "nf-core-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "nf-core-engine": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js && esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js",
+    "test": "node --test test/*.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0"
+  }
+}

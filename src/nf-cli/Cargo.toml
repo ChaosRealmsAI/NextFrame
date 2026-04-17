@@ -7,5 +7,14 @@ edition = "2021"
 name = "nf"
 path = "src/main.rs"
 
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+uuid = { version = "1", features = ["v4"] }
+nf-shell-mac = { path = "../nf-shell-mac" }
+nf-recorder = { path = "../nf-recorder" }
+
 [lints]
 workspace = true

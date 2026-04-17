@@ -2,6 +2,9 @@
 target/
 node_modules/
 *.log
+out/
+src/nf-core-engine/dist/
+src/nf-core-engine/package-lock.json
 
 # Private / internal
 spec/
