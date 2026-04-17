@@ -12,8 +12,17 @@ poc/
 projects/
 .autopilot/
 .ally/
+.cache/
 .worktrees/
 .worktrees-*.md
+
+# Local archive (history snapshots, tar.gz)
+# Persistence is user's responsibility (Time Machine / iCloud / rsync)
+archive/
+
+# Legacy (moved to archive/ as of v2.1-cleanup 2026-04-17)
+legacy-v08/
+legacy-v10/
 
 # Secrets / env
 .env

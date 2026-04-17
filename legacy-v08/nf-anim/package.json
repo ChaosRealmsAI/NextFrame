@@ -1,9 +1,0 @@
-{
-  "name": "nf-anim",
-  "version": "1.0.0",
-  "description": "NextFrame nf-anim walking skeleton",
-  "type": "module",
-  "bin": { "nf-anim": "cli/bin.js" },
-  "main": "index.js",
-  "dependencies": {}
-}
