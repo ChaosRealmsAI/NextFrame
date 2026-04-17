@@ -262,6 +262,12 @@ pub fn sample_pixel_buffer(sample: &CMSampleBuffer) -> Result<&CVPixelBuffer> {
     Ok(unsafe { &*(CFRetained::as_ptr(&image_buffer).as_ptr() as *const CVPixelBuffer) })
 }
 
+pub fn retain_sample_pixel_buffer(sample: &CMSampleBuffer) -> Result<CFRetained<CVPixelBuffer>> {
+    let pixel_buffer = sample_pixel_buffer(sample)?;
+    // SAFETY: The sample buffer owns a live CVPixelBuffer; retaining it gives the recorder an owned reference.
+    Ok(unsafe { CFRetained::retain(NonNull::from(pixel_buffer)) })
+}
+
 fn find_window(window_id: u32) -> Result<Retained<SCWindow>> {
     let ready = Rc::new(Cell::new(false));
     let found = Rc::new(RefCell::new(None::<Retained<SCWindow>>));

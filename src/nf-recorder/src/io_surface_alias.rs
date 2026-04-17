@@ -19,7 +19,7 @@ use objc2_io_surface::{
 use objc2_metal::{
     MTLBlitCommandEncoder, MTLBuffer, MTLCommandBuffer, MTLCommandBufferStatus, MTLCommandEncoder,
     MTLCommandQueue, MTLCreateSystemDefaultDevice, MTLDevice, MTLPixelFormat, MTLResourceOptions,
-    MTLSize, MTLStorageMode, MTLTexture, MTLTextureDescriptor,
+    MTLSize, MTLStorageMode, MTLTexture, MTLTextureDescriptor, MTLTextureUsage,
 };
 
 const BGRA_FOURCC: u32 = u32::from_be_bytes(*b"BGRA");
@@ -45,6 +45,23 @@ impl MetalAliasContext {
         width: usize,
         height: usize,
     ) -> Result<objc2::rc::Retained<ProtocolObject<dyn MTLTexture>>> {
+        self.alias_texture_with_usage(
+            surface,
+            pixel_format,
+            width,
+            height,
+            MTLTextureUsage::ShaderRead,
+        )
+    }
+
+    pub fn alias_texture_with_usage(
+        &self,
+        surface: &IOSurfaceRef,
+        pixel_format: MTLPixelFormat,
+        width: usize,
+        height: usize,
+        usage: MTLTextureUsage,
+    ) -> Result<objc2::rc::Retained<ProtocolObject<dyn MTLTexture>>> {
         // SAFETY: Creating a descriptor is safe; the caller provides the intended Metal view of the IOSurface.
         let desc = unsafe {
             MTLTextureDescriptor::texture2DDescriptorWithPixelFormat_width_height_mipmapped(
@@ -55,6 +72,7 @@ impl MetalAliasContext {
             )
         };
         desc.setStorageMode(MTLStorageMode::Shared);
+        desc.setUsage(usage);
         self.device
             .newTextureWithDescriptor_iosurface_plane(&desc, surface, 0)
             .context("Metal failed to alias IOSurface as a texture")

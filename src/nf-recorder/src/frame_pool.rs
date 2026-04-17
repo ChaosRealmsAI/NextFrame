@@ -7,9 +7,16 @@ use crossbeam::queue::ArrayQueue;
 
 const SPIN_THRESHOLD: Duration = Duration::from_micros(250);
 
-#[derive(Clone)]
 pub struct FramePool<T> {
     free: Arc<ArrayQueue<Arc<T>>>,
+}
+
+impl<T> Clone for FramePool<T> {
+    fn clone(&self) -> Self {
+        Self {
+            free: self.free.clone(),
+        }
+    }
 }
 
 impl<T> FramePool<T> {

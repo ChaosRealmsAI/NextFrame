@@ -252,8 +252,8 @@ impl Worker {
                     stage.style.background = "linear-gradient(135deg, #09111f 0%, #1a3154 100%)";
                     square = document.createElement("div");
                     square.id = "__nf-recorder-compat-square";
-                    square.style.width = "36vmin";
-                    square.style.height = "36vmin";
+                    square.style.width = "44vmin";
+                    square.style.height = "44vmin";
                     square.style.background = "rgb(234, 51, 35)";
                     square.style.borderRadius = "24px";
                     square.style.boxShadow = "0 32px 96px rgba(234, 51, 35, 0.35)";
@@ -265,8 +265,9 @@ impl Worker {
                 const update = (t) => {
                     const { square } = ensureStage();
                     const rotate = t * 45;
-                    const shift = Math.sin(t * Math.PI * 2) * 24;
-                    square.style.transform = `translate(${shift}px, 0px) rotate(${rotate}deg)`;
+                    const shift = Math.sin(t * Math.PI * 2) * 112;
+                    const scale = 0.92 + Math.cos(t * Math.PI * 2) * 0.08;
+                    square.style.transform = `translate(${shift}px, 0px) rotate(${rotate}deg) scale(${scale})`;
                 };
                 if (typeof window.__nfTick !== "function") {
                     window.__nfTick = (seq, t) => {
