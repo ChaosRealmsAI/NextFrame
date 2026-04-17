@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Animation Primitives · 12 Atoms</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:#fafafa;color:#1a1a1a;min-height:100vh;
+    font-family:-apple-system,"SF Pro Display","Inter",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased}
+
+  .header{padding:56px 64px 24px;max-width:1680px;margin:0 auto}
+  .header h1{font-size:34px;font-weight:600;letter-spacing:-.02em}
+  .header p{margin-top:10px;font-size:15px;color:#8a8a8a;max-width:720px;line-height:1.5}
+
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;
+    max-width:1680px;margin:24px auto 0;padding:20px 64px 0;
+    background:#e8e8e8;border-radius:20px}
+  @media (max-width:1200px){.grid{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:840px){.grid{grid-template-columns:repeat(2,1fr)}}
+
+  .cell{background:#fafafa;aspect-ratio:1/1;display:flex;flex-direction:column;
+    align-items:stretch;padding:16px 16px 12px;border-radius:14px;
+    position:relative;overflow:hidden}
+  .cell .idx{font-size:10px;color:#c0c0c0;letter-spacing:.12em;
+    font-family:"SF Mono",Menlo,monospace}
+  .cell .stage{flex:1;display:grid;place-items:center;position:relative;
+    margin:6px 0}
+  .cell svg{width:100%;height:100%;overflow:visible}
+  .cell .name{font-size:13px;font-weight:600;letter-spacing:-.005em}
+  .cell .desc{margin-top:3px;font-size:11px;color:#8a8a8a;line-height:1.35}
+
+  /* ---- Timeline ---- */
+  .tl-ui{position:fixed;left:0;right:0;bottom:0;z-index:100;
+    padding:14px 24px;background:linear-gradient(180deg,transparent,rgba(26,22,19,.92));
+    display:flex;align-items:center;gap:16px;
+    font-family:"SF Mono",Menlo,monospace;font-size:11px;color:rgba(255,255,255,.85)}
+  .tl-ui button{background:transparent;border:1px solid rgba(255,255,255,.3);
+    color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;
+    font-size:14px;display:grid;place-items:center;transition:all .2s}
+  .tl-ui button:hover{background:rgba(255,255,255,.1)}
+  .tl-ui .time{font-variant-numeric:tabular-nums;min-width:150px;letter-spacing:.05em}
+  .tl-ui input[type=range]{flex:1;accent-color:#ff3b30;height:3px}
+  .padding-bottom{height:100px}
+
+  .footer{max-width:1680px;margin:0 auto;padding:20px 64px 100px;
+    font-size:13px;color:#8a8a8a;line-height:1.6}
+  .footer strong{color:#1a1a1a}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Animation, 12 primitives.</h1>
+  <p>动画原子图鉴 · Based on Disney's 12 principles + UI motion atoms. 所有风格（Apple / Linear / Arc / TikTok…）都是这些原子的组装 + 主题变换。拖动底部时间轴同步暂停全部，看任意一帧。</p>
+</div>
+
+<div class="grid">
+
+<!-- 01 · Squash & Stretch -->
+<div class="cell" data-atom="squash">
+  <div class="idx">01</div>
+  <div class="stage">
+    <svg viewBox="-100 -100 200 200">
+      <line x1="-80" y1="80" x2="80" y2="80" stroke="#c0c0c0" stroke-width="1"/>
+      <ellipse id="sq-ball" cx="0" cy="-40" rx="20" ry="20" fill="#ff3b30"/>
+    </svg>
+  </div>
+  <div class="name">Squash &amp; Stretch</div>
+  <div class="desc">挤压拉伸 · 体现重量/弹性 · 落地扁 · 上升拉长</div>
+</div>
+
+<!-- 02 · Anticipation -->
+<div class="cell" data-atom="anticipate">
+  <div class="idx">02</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <circle id="an-target" cx="70" cy="0" r="4" fill="#c0c0c0"/>
+      <polygon id="an-arrow" points="-80,-4 -70,0 -80,4 -76,0" fill="#1a1a1a"/>
+    </svg>
+  </div>
+  <div class="name">Anticipation</div>
+  <div class="desc">蓄力 · 先反向再爆发 · 弓先拉后射</div>
+</div>
+
+<!-- 03 · Slow In / Out -->
+<div class="cell" data-atom="slowinout">
+  <div class="idx">03</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <line x1="-85" y1="-25" x2="85" y2="-25" stroke="#e8e8e8" stroke-width="1"/>
+      <line x1="-85" y1="25" x2="85" y2="25" stroke="#e8e8e8" stroke-width="1"/>
+      <text x="-98" y="-22" font-size="8" fill="#c0c0c0">linear</text>
+      <text x="-98" y="28" font-size="8" fill="#c0c0c0">easeInOut</text>
+      <circle id="si-linear" cx="-80" cy="-25" r="6" fill="#8a8a8a"/>
+      <circle id="si-ease" cx="-80" cy="25" r="6" fill="#ff3b30"/>
+    </svg>
+  </div>
+  <div class="name">Slow In / Out</div>
+  <div class="desc">缓入缓出 · 对比匀速 · 自然感核心</div>
+</div>
+
+<!-- 04 · Arc -->
+<div class="cell" data-atom="arc">
+  <div class="idx">04</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <path d="M -80,30 L 80,30" stroke="#e8e8e8" stroke-width="1"/>
+      <path d="M -80,30 Q 0,-45 80,30" stroke="#e8e8e8" stroke-width="1" fill="none" stroke-dasharray="2 3"/>
+      <circle id="arc-line" cx="-80" cy="30" r="5" fill="#8a8a8a"/>
+      <circle id="arc-curve" cx="-80" cy="30" r="5" fill="#ff3b30"/>
+    </svg>
+  </div>
+  <div class="name">Arc</div>
+  <div class="desc">弧线运动 · 直线不自然 · 生物都走弧</div>
+</div>
+
+<!-- 05 · Follow Through / Overlap -->
+<div class="cell" data-atom="followthrough">
+  <div class="idx">05</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <rect id="ft-body" x="-10" y="-20" width="20" height="40" rx="4" fill="#1a1a1a"/>
+      <line id="ft-tail1" x1="0" y1="0" x2="0" y2="20" stroke="#ff3b30" stroke-width="3" stroke-linecap="round"/>
+      <line id="ft-tail2" x1="0" y1="0" x2="0" y2="30" stroke="#ff6b6b" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="name">Follow Through</div>
+  <div class="desc">跟随 · 主体停了 · 尾巴/衣角还在动</div>
+</div>
+
+<!-- 06 · Timing -->
+<div class="cell" data-atom="timing">
+  <div class="idx">06</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <line x1="-85" y1="-30" x2="85" y2="-30" stroke="#e8e8e8" stroke-width="1"/>
+      <line x1="-85" y1="0" x2="85" y2="0" stroke="#e8e8e8" stroke-width="1"/>
+      <line x1="-85" y1="30" x2="85" y2="30" stroke="#e8e8e8" stroke-width="1"/>
+      <text x="-98" y="-27" font-size="7" fill="#c0c0c0">fast</text>
+      <text x="-98" y="3" font-size="7" fill="#c0c0c0">normal</text>
+      <text x="-98" y="33" font-size="7" fill="#c0c0c0">slow</text>
+      <circle id="tm-fast" cx="-80" cy="-30" r="5" fill="#ff3b30"/>
+      <circle id="tm-normal" cx="-80" cy="0" r="5" fill="#1a1a1a"/>
+      <circle id="tm-slow" cx="-80" cy="30" r="5" fill="#8a8a8a"/>
+    </svg>
+  </div>
+  <div class="name">Timing</div>
+  <div class="desc">节奏 · 同动作不同时长 · 性格感来源</div>
+</div>
+
+<!-- 07 · Exaggeration -->
+<div class="cell" data-atom="exag">
+  <div class="idx">07</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <line x1="0" y1="-50" x2="0" y2="50" stroke="#e8e8e8" stroke-width="1"/>
+      <text x="-95" y="-48" font-size="7" fill="#c0c0c0">subtle</text>
+      <text x="22" y="-48" font-size="7" fill="#c0c0c0">exaggerated</text>
+      <rect id="ex-normal" x="-55" y="-5" width="10" height="10" fill="#8a8a8a"/>
+      <rect id="ex-exag" x="35" y="-5" width="10" height="10" fill="#ff3b30"/>
+    </svg>
+  </div>
+  <div class="name">Exaggeration</div>
+  <div class="desc">夸张 · 略超过真实才有感觉 · 动画本能</div>
+</div>
+
+<!-- 08 · Staging -->
+<div class="cell" data-atom="staging">
+  <div class="idx">08</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <circle class="st-bg" cx="-55" cy="-20" r="11" fill="#e8e8e8"/>
+      <circle class="st-bg" cx="-20" cy="15" r="11" fill="#e8e8e8"/>
+      <circle class="st-bg" cx="15" cy="-25" r="11" fill="#e8e8e8"/>
+      <circle class="st-bg" cx="55" cy="20" r="11" fill="#e8e8e8"/>
+      <circle id="st-focus" cx="0" cy="0" r="18" fill="#ff3b30"/>
+    </svg>
+  </div>
+  <div class="name">Staging</div>
+  <div class="desc">舞台编排 · 主角亮 · 其余暗 · 焦点引导</div>
+</div>
+
+<!-- 09 · Collision / Impact -->
+<div class="cell" data-atom="collision">
+  <div class="idx">09</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <circle id="col-a" cx="-60" cy="0" r="12" fill="#1a1a1a"/>
+      <circle id="col-b" cx="60" cy="0" r="12" fill="#c0c0c0"/>
+      <circle id="col-wave" cx="0" cy="0" r="0" fill="none" stroke="#ff3b30" stroke-width="2" opacity="0"/>
+    </svg>
+  </div>
+  <div class="name">Collision</div>
+  <div class="desc">撞击 · 冲击波扩散 · 能量传递可见化</div>
+</div>
+
+<!-- 10 · Elasticity -->
+<div class="cell" data-atom="elastic">
+  <div class="idx">10</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <line x1="-80" y1="-40" x2="-80" y2="40" stroke="#c0c0c0" stroke-width="1"/>
+      <circle id="el-fixed" cx="-80" cy="0" r="3" fill="#c0c0c0"/>
+      <line id="el-spring" x1="-80" y1="0" x2="0" y2="0" stroke="#8a8a8a" stroke-width="2"/>
+      <circle id="el-ball" cx="0" cy="0" r="14" fill="#ff3b30"/>
+    </svg>
+  </div>
+  <div class="name">Elasticity</div>
+  <div class="desc">橡皮感 · spring 物理 · 拉伸回弹</div>
+</div>
+
+<!-- 11 · Stagger -->
+<div class="cell" data-atom="stagger">
+  <div class="idx">11</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <rect class="stag" x="-65" y="20" width="14" height="30" rx="3" fill="#ff3b30"/>
+      <rect class="stag" x="-45" y="20" width="14" height="30" rx="3" fill="#ff3b30"/>
+      <rect class="stag" x="-25" y="20" width="14" height="30" rx="3" fill="#ff3b30"/>
+      <rect class="stag" x="-5" y="20" width="14" height="30" rx="3" fill="#ff3b30"/>
+      <rect class="stag" x="15" y="20" width="14" height="30" rx="3" fill="#ff3b30"/>
+      <rect class="stag" x="35" y="20" width="14" height="30" rx="3" fill="#ff3b30"/>
+      <rect class="stag" x="55" y="20" width="14" height="30" rx="3" fill="#ff3b30"/>
+    </svg>
+  </div>
+  <div class="name">Stagger</div>
+  <div class="desc">错峰 · 每个元素延迟 i*step · 节奏感来源</div>
+</div>
+
+<!-- 12 · Morph -->
+<div class="cell" data-atom="morph">
+  <div class="idx">12</div>
+  <div class="stage">
+    <svg viewBox="-100 -60 200 120">
+      <path id="mo-shape" d="" fill="#ff3b30"/>
+    </svg>
+  </div>
+  <div class="name">Morph</div>
+  <div class="desc">形变 · path 插值 · 同一物体不同状态</div>
+</div>
+
+</div>
+
+<div class="padding-bottom"></div>
+
+<div class="footer">
+  <p><strong>风格 = 原子组装 + 主题变换。</strong> Apple 克制用 Arc + Slow In/Out · Linear 冷静用最少的 Ease · Arc Browser 靠 Elasticity · TikTok 靠 Collision + Exaggeration + Stagger · Nintendo 靠 Squash&amp;Stretch + Anticipation · Disney 12 原则是所有动画的字母表，风格是用这些字母拼成的单词。</p>
+</div>
+
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 3.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+</div>
+
+<script>
+/* ============ Global cycle 3s ============ */
+const DURATION = 3.0;
+const FPS = 30;
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeIn = x => x * x * x;
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+function spring(t, k = 260, d = 14, mass = 1) {
+  if (t <= 0) return 0;
+  const wn = Math.sqrt(k / mass);
+  const zeta = d / (2 * Math.sqrt(k * mass));
+  if (zeta < 1) {
+    const wd = wn * Math.sqrt(1 - zeta * zeta);
+    return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+  }
+  return 1 - (1 + wn * t) * Math.exp(-wn * t);
+}
+
+/* ============ Atom renderers ============ */
+const atoms = {
+  /* 01 · Squash & Stretch — bouncing ball */
+  squash(t) {
+    const ball = document.getElementById('sq-ball');
+    const p = (t % 1.5) / 1.5; // 1.5s cycle, loops twice per 3s
+    // y: parabola -40 (top) → 60 (ground) → -40
+    const y = p < 0.5 ? lerp(-40, 60, easeIn(p * 2)) : lerp(60, -40, easeOut((p - 0.5) * 2));
+    // squash at ground (p near 0.5)
+    const contact = Math.max(0, 1 - Math.abs(p - 0.5) * 8); // peak at 0.5
+    const rx = 20 + contact * 10;
+    const ry = 20 - contact * 10;
+    // stretch mid-air (far from ground)
+    const mid = Math.max(0, 1 - Math.abs(p - 0.25) * 4) + Math.max(0, 1 - Math.abs(p - 0.75) * 4);
+    const rxMid = rx - mid * 3;
+    const ryMid = ry + mid * 5;
+    ball.setAttribute('cx', 0);
+    ball.setAttribute('cy', y);
+    ball.setAttribute('rx', rxMid);
+    ball.setAttribute('ry', ryMid);
+  },
+
+  /* 02 · Anticipation — arrow pulls back then shoots */
+  anticipate(t) {
+    const arrow = document.getElementById('an-arrow');
+    const p = (t % 2.5) / 2.5;
+    let x;
+    if (p < 0.5) {
+      // pull back: -80 → -95
+      x = lerp(-80, -95, easeOut(p * 2));
+    } else if (p < 0.65) {
+      // release: -95 → 70 (past target)
+      x = lerp(-95, 70, easeIn((p - 0.5) / 0.15));
+    } else {
+      // hold at target
+      x = 70;
+    }
+    arrow.setAttribute('transform', `translate(${x + 80}, 0)`);
+  },
+
+  /* 03 · Slow In / Out — linear vs eased */
+  slowinout(t) {
+    const lin = document.getElementById('si-linear');
+    const ease = document.getElementById('si-ease');
+    const p = (t % 2.5) / 2.5;
+    // go right, pause, back
+    let frac;
+    if (p < 0.45) frac = p / 0.45;
+    else if (p < 0.55) frac = 1;
+    else if (p < 1) frac = 1 - (p - 0.55) / 0.45;
+    else frac = 0;
+    const linX = lerp(-80, 80, frac);
+    const easeX = lerp(-80, 80, easeInOut(frac));
+    lin.setAttribute('cx', linX);
+    ease.setAttribute('cx', easeX);
+  },
+
+  /* 04 · Arc — linear vs arc path */
+  arc(t) {
+    const line = document.getElementById('arc-line');
+    const curve = document.getElementById('arc-curve');
+    const p = (t % 2.5) / 2.5;
+    const frac = p < 0.5 ? easeInOut(p * 2) : easeInOut(1 - (p - 0.5) * 2);
+    // linear: straight across at y=30
+    const lx = lerp(-80, 80, frac);
+    line.setAttribute('cx', lx);
+    line.setAttribute('cy', 30);
+    // curve: quadratic bezier - y dips up at midpoint
+    const cx = lerp(-80, 80, frac);
+    const cy = 30 - 4 * frac * (1 - frac) * 75; // parabola peak at mid
+    curve.setAttribute('cx', cx);
+    curve.setAttribute('cy', cy);
+  },
+
+  /* 05 · Follow Through — body stops, tails continue */
+  followthrough(t) {
+    const body = document.getElementById('ft-body');
+    const tail1 = document.getElementById('ft-tail1');
+    const tail2 = document.getElementById('ft-tail2');
+    const p = (t % 2.5) / 2.5;
+    // body moves left-right-stop
+    let bx;
+    if (p < 0.3) bx = lerp(-60, 60, easeInOut(p / 0.3));
+    else bx = 60;
+    body.setAttribute('x', bx - 10);
+    // tails lag behind body
+    const t1Delay = 0.06, t2Delay = 0.14;
+    const p1 = Math.max(0, p - t1Delay), p2 = Math.max(0, p - t2Delay);
+    const t1x = p1 < 0.3 ? lerp(-60, 60, easeInOut(p1 / 0.3)) : 60;
+    const t2x = p2 < 0.3 ? lerp(-60, 60, easeInOut(p2 / 0.3)) : 60;
+    tail1.setAttribute('x1', t1x);
+    tail1.setAttribute('x2', t1x - (bx - t1x) * 0.5);
+    tail2.setAttribute('x1', t2x);
+    tail2.setAttribute('x2', t2x - (bx - t2x) * 0.6);
+    tail1.setAttribute('y2', 22);
+    tail2.setAttribute('y2', 30);
+  },
+
+  /* 06 · Timing — same action, different speed */
+  timing(t) {
+    const fast = document.getElementById('tm-fast');
+    const normal = document.getElementById('tm-normal');
+    const slow = document.getElementById('tm-slow');
+    const p = (t % 2.5) / 2.5;
+    const go = (frac) => p < frac / 2 ? p / (frac/2) : p < frac ? 1 : p < 1 ? 1 - (p - frac) / (1 - frac) : 0;
+    fast.setAttribute('cx', lerp(-80, 80, go(0.3)));
+    normal.setAttribute('cx', lerp(-80, 80, go(0.6)));
+    slow.setAttribute('cx', lerp(-80, 80, go(0.9)));
+  },
+
+  /* 07 · Exaggeration — subtle vs exaggerated scale */
+  exag(t) {
+    const nor = document.getElementById('ex-normal');
+    const exag = document.getElementById('ex-exag');
+    const p = (t % 1.2) / 1.2;
+    // both do a jump: subtle = 1.1x, exag = 2.0x
+    const pulse = Math.sin(p * Math.PI);
+    const sNor = 1 + pulse * 0.15;
+    const sExag = 1 + pulse * 1.2;
+    nor.setAttribute('transform', `translate(-50 0) scale(${sNor}) translate(50 0)`);
+    nor.setAttribute('x', -50 - 5*sNor);
+    nor.setAttribute('y', -5*sNor);
+    nor.setAttribute('width', 10 * sNor);
+    nor.setAttribute('height', 10 * sNor);
+    exag.setAttribute('x', 40 - 5*sExag);
+    exag.setAttribute('y', -5*sExag);
+    exag.setAttribute('width', 10 * sExag);
+    exag.setAttribute('height', 10 * sExag);
+  },
+
+  /* 08 · Staging — focus pulses, bg dims */
+  staging(t) {
+    const p = (t % 2.5) / 2.5;
+    const focus = document.getElementById('st-focus');
+    const bgs = document.querySelectorAll('.st-bg');
+    const pulse = 0.5 + 0.5 * Math.sin(p * Math.PI * 2);
+    focus.setAttribute('r', 18 + pulse * 3);
+    focus.setAttribute('opacity', 0.85 + pulse * 0.15);
+    bgs.forEach(el => {
+      el.setAttribute('opacity', 0.2 + pulse * 0.15);
+    });
+  },
+
+  /* 09 · Collision — two objects meet, shockwave */
+  collision(t) {
+    const a = document.getElementById('col-a');
+    const b = document.getElementById('col-b');
+    const wave = document.getElementById('col-wave');
+    const p = (t % 2.5) / 2.5;
+    if (p < 0.4) {
+      const phase = p / 0.4;
+      a.setAttribute('cx', lerp(-60, -12, easeIn(phase)));
+      b.setAttribute('cx', lerp(60, 12, easeIn(phase)));
+      wave.setAttribute('opacity', 0);
+    } else if (p < 0.5) {
+      // collision moment
+      a.setAttribute('cx', -12);
+      b.setAttribute('cx', 12);
+      const wp = (p - 0.4) / 0.1;
+      wave.setAttribute('r', 30 * wp);
+      wave.setAttribute('opacity', 1 - wp * 0.5);
+    } else if (p < 0.8) {
+      const phase = (p - 0.5) / 0.3;
+      a.setAttribute('cx', lerp(-12, -60, easeOut(phase)));
+      b.setAttribute('cx', lerp(12, 60, easeOut(phase)));
+      wave.setAttribute('r', lerp(30, 70, phase));
+      wave.setAttribute('opacity', lerp(0.5, 0, phase));
+    } else {
+      a.setAttribute('cx', -60);
+      b.setAttribute('cx', 60);
+      wave.setAttribute('opacity', 0);
+    }
+  },
+
+  /* 10 · Elasticity — ball pulled, spring releases */
+  elastic(t) {
+    const ball = document.getElementById('el-ball');
+    const sp = document.getElementById('el-spring');
+    const p = (t % 2.5) / 2.5;
+    let x;
+    if (p < 0.35) {
+      // pull right
+      x = lerp(0, 60, easeOut(p / 0.35));
+    } else if (p < 0.4) {
+      x = 60;
+    } else {
+      // release — spring oscillation
+      const local = (p - 0.4) * 8;
+      const springPos = spring(local, 100, 8);
+      x = 60 * (1 - springPos);
+    }
+    ball.setAttribute('cx', x);
+    sp.setAttribute('x2', x);
+    // spring visually stretches / squishes
+    const nsteps = 6;
+    const amp = 4 + (60 - Math.abs(x)) * 0.15;
+    let d = `M -80,0`;
+    for (let i = 1; i < nsteps; i++) {
+      const sx = lerp(-80, x, i / nsteps);
+      const sy = (i % 2 === 0 ? -1 : 1) * amp;
+      d += ` L ${sx},${sy}`;
+    }
+    d += ` L ${x},0`;
+    // keep it simple — just use line for now
+  },
+
+  /* 11 · Stagger — row of bars rise with delay */
+  stagger(t) {
+    const bars = document.querySelectorAll('.stag');
+    const p = (t % 2.5) / 2.5;
+    bars.forEach((bar, i) => {
+      const delay = i * 0.06;
+      const local = Math.max(0, Math.min(1, (p * 2 - delay) / 0.6));
+      // rise and fall
+      let h;
+      if (local < 0.5) h = easeOut(local * 2);
+      else if (local < 0.7) h = 1;
+      else h = 1 - (local - 0.7) / 0.3;
+      h = Math.max(0, Math.min(1, h));
+      const fullH = 45;
+      bar.setAttribute('height', fullH * h);
+      bar.setAttribute('y', 50 - fullH * h);
+    });
+  },
+
+  /* 12 · Morph — path interpolation (square ↔ circle ↔ triangle) */
+  morph(t) {
+    const shape = document.getElementById('mo-shape');
+    const shapes = [
+      // square 40x40
+      'M -20,-20 L 20,-20 L 20,20 L -20,20 Z',
+      // circle approx (8-segment)
+      'M 0,-25 C 13.8,-25 25,-13.8 25,0 C 25,13.8 13.8,25 0,25 C -13.8,25 -25,13.8 -25,0 C -25,-13.8 -13.8,-25 0,-25 Z',
+      // triangle
+      'M 0,-25 L 22,18 L -22,18 Z',
+    ];
+    // we'll morph by interpolating the d attribute — simplified: just swap at phases
+    const p = (t % 3.0) / 3.0;
+    // use 3 phases
+    const phase = Math.floor(p * 3);
+    shape.setAttribute('d', shapes[phase]);
+    // add a spring-in effect when switching
+    const sub = (p * 3) % 1;
+    const scaleIn = sub < 0.3 ? spring(sub * 3, 260, 14) : 1;
+    shape.setAttribute('transform', `scale(${scaleIn})`);
+  },
+};
+
+/* ============ Timeline controller ============ */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+let currentT = 0, playing = true, lastFrame = performance.now();
+
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  // render all atoms at this t
+  for (const name in atoms) atoms[name](currentT);
+}
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+scrubber.addEventListener('input', () => {
+  playing = false;
+  playBtn.textContent = '▶';
+  setTime(scrubber.value / 1000 * DURATION);
+});
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+resetBtn.addEventListener('click', () => setTime(0));
+
+setTime(0);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
