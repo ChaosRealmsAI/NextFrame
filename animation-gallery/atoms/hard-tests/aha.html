@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aha Moment · 灵感诞生的一瞬间</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:#0b0f1a;color:#e8eef6;width:100%;height:100%;overflow:hidden;
+    font-family:-apple-system,"SF Pro Display","Inter",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .stage{position:fixed;inset:0;width:100%;height:100%}
+  canvas#bg{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  /* ---- timeline ui ---- */
+  .cue-row{position:fixed;left:0;right:0;bottom:76px;height:22px;pointer-events:none;z-index:99}
+  .cue-mark{position:absolute;top:0;width:1px;height:12px;background:rgba(255,255,255,.35);
+    transform:translateX(-.5px)}
+  .cue-mark .lbl{position:absolute;top:14px;left:50%;transform:translateX(-50%);
+    font-size:9px;color:rgba(255,255,255,.55);white-space:nowrap;
+    font-family:"SF Mono",Menlo,monospace;letter-spacing:.04em}
+
+  .tl-ui{position:fixed;left:0;right:0;bottom:0;z-index:100;
+    padding:14px 24px;background:linear-gradient(180deg,transparent,rgba(5,7,12,.95));
+    display:flex;align-items:center;gap:16px;
+    font-family:"SF Mono",Menlo,monospace;font-size:11px;color:rgba(255,255,255,.85)}
+  .tl-ui button{background:transparent;border:1px solid rgba(255,255,255,.3);
+    color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;
+    font-size:14px;display:grid;place-items:center;transition:all .2s}
+  .tl-ui button:hover{background:rgba(255,255,255,.1)}
+  .tl-ui .time{font-variant-numeric:tabular-nums;min-width:120px;letter-spacing:.05em}
+  .tl-ui input[type=range]{flex:1;accent-color:#ffcc4a;height:3px}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <canvas id="bg"></canvas>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 10.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <span class="time" id="frameLabel" style="min-width:100px;text-align:right">frame 0 / 300</span>
+</div>
+
+<script>
+/* ============================================================
+   Aha Moment — 10s frame-pure render
+   隐喻：灵感 = 两个远距离概念被一道金色连线瞬间连接 (Koestler bisociation)
+   4 阶段：Chaos → Gathering → Aha! → Clarity
+   ============================================================ */
+
+const DURATION = 10.0;
+const FPS = 30;
+const TAU = Math.PI * 2;
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut  = x => 1 - Math.pow(1 - x, 3);
+const easeIn   = x => x * x * x;
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+const easeOutQuint = x => 1 - Math.pow(1 - x, 5);
+
+function spring(t, k = 220, d = 14, mass = 1) {
+  if (t <= 0) return 0;
+  const wn = Math.sqrt(k / mass);
+  const zeta = d / (2 * Math.sqrt(k * mass));
+  if (zeta < 1) {
+    const wd = wn * Math.sqrt(1 - zeta * zeta);
+    return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+  }
+  return 1 - (1 + wn * t) * Math.exp(-wn * t);
+}
+
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+/* deterministic hash */
+function hash(a, b = 0) {
+  let h = a * 374761393 + b * 668265263;
+  h = (h ^ (h >> 13)) * 1274126177;
+  h = h ^ (h >> 16);
+  return ((h >>> 0) % 1000000) / 1000000;
+}
+
+/* ============================================================
+   Scene constants
+   ============================================================ */
+
+// key moments
+const T_CHAOS_END    = 3.0;
+const T_GATHER_END   = 5.15;  // 收缩最低点
+const T_AHA_FLASH    = 5.40;  // 白闪瞬间
+const T_AHA_CONNECT  = 5.45;  // 金线拉通
+const T_AHA_END      = 6.30;
+const T_CLARITY_END  = 10.0;
+
+const CUES = [
+  { t: 0.0,  label: 'chaos' },
+  { t: 3.0,  label: 'gather' },
+  { t: 5.15, label: 'silence' },
+  { t: 5.40, label: 'AHA!' },
+  { t: 6.30, label: 'clarity' },
+  { t: 8.5,  label: 'breathe' },
+];
+
+/* 7 thought-nodes: fixed final positions (normalized, will map to canvas) */
+/* purposely 2 nodes far apart get connected at aha moment */
+const NODES = [
+  // [xN, yN, radius, hueFinal]  — xN,yN in -1..1 (center 0,0)
+  { xN: -0.62, yN: -0.18, r: 22, isAnchorA: true  }, // 左远端 (concept A)
+  { xN:  0.60, yN:  0.22, r: 22, isAnchorB: true  }, // 右远端 (concept B)  ← 被金线连接
+  { xN: -0.18, yN: -0.42, r: 14 },
+  { xN:  0.25, yN: -0.28, r: 14 },
+  { xN: -0.08, yN:  0.30, r: 13 },
+  { xN:  0.32, yN:  0.48, r: 13 },
+  { xN: -0.40, yN:  0.40, r: 13 },
+];
+
+/* pre-existing (gray) edges — not involving the aha pair */
+const BASE_EDGES = [
+  [2, 3], [2, 4], [3, 4], [4, 5], [5, 6], [2, 6], [0, 2], [1, 3],
+];
+
+// chaos particle count
+const N_CHAOS = 720;
+// extra chaos-only particles (frantic buzzing, go away at gather)
+const N_BUZZ = 180;
+// spark count along golden line
+const N_SPARK = 60;
+
+/* ============================================================
+   Canvas setup — 1920x1080 logical, dpr-aware
+   ============================================================ */
+
+const LOGICAL_W = 1920;
+const LOGICAL_H = 1080;
+
+const bg = document.getElementById('bg');
+const ctx = bg.getContext('2d');
+
+function fitCanvas() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const rect = bg.getBoundingClientRect();
+  bg.width  = rect.width  * dpr;
+  bg.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+fitCanvas();
+window.addEventListener('resize', fitCanvas);
+
+/* viewport → logical transform
+   we design for 1920x1080 aspect; letterbox if needed */
+function getViewport() {
+  const rect = bg.getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  // use contain-fit so 16:9 stays 16:9
+  const scale = Math.min(W / LOGICAL_W, H / LOGICAL_H);
+  const vw = LOGICAL_W * scale, vh = LOGICAL_H * scale;
+  return {
+    W, H,
+    scale,
+    ox: (W - vw) / 2,
+    oy: (H - vh) / 2,
+    vw, vh,
+    cx: W / 2,
+    cy: H / 2,
+  };
+}
+
+/* node position at time t (normalized coords → canvas coords) */
+function nodePos(i, t, vp) {
+  const n = NODES[i];
+  // at aha, nodes slightly drift inward to meet the line. tiny breathing in clarity.
+  const cx = vp.cx + n.xN * vp.vw * 0.42;
+  const cy = vp.cy + n.yN * vp.vh * 0.42;
+  // breathing in clarity
+  let breath = 0;
+  if (t > T_AHA_END) {
+    const bt = (t - T_AHA_END);
+    breath = Math.sin(bt * 1.4 + i * 0.7) * 3;
+  }
+  return { x: cx, y: cy + breath };
+}
+
+/* ============================================================
+   Render phases
+   ============================================================ */
+
+function drawBackground(t, vp) {
+  const { W, H } = vp;
+  // phase-based background color
+  // chaos/gather: deep blue. aha flash: bright. clarity: warmer dim.
+  let r = 11, g = 15, b = 26;  // #0b0f1a
+  if (t > T_AHA_END) {
+    const p = easeOut(clamp01((t - T_AHA_END) / 1.2));
+    // toward slightly warmer & lighter
+    r = lerp(11, 28, p);
+    g = lerp(15, 26, p);
+    b = lerp(26, 40, p);
+  }
+  ctx.fillStyle = `rgb(${r|0},${g|0},${b|0})`;
+  ctx.fillRect(0, 0, W, H);
+
+  // starfield — extremely faint dots, constant
+  const starN = 220;
+  for (let i = 0; i < starN; i++) {
+    const sx = hash(i, 11) * W;
+    const sy = hash(i, 12) * H;
+    const sr = 0.4 + hash(i, 13) * 0.8;
+    const base = 0.08 + hash(i, 14) * 0.12;
+    // subtle twinkle
+    const tw = 0.5 + 0.5 * Math.sin(t * 0.7 + i * 0.13);
+    ctx.fillStyle = `rgba(255,255,255,${base * (0.55 + tw * 0.45)})`;
+    ctx.beginPath();
+    ctx.arc(sx, sy, sr, 0, TAU);
+    ctx.fill();
+  }
+
+  // aha flash overlay — fast flash + slow warm afterglow
+  if (t >= T_AHA_FLASH - 0.1 && t < T_AHA_FLASH + 1.8) {
+    const dt = t - T_AHA_FLASH;
+    if (dt < 0) {
+      // pre-anticipation darkening
+      const p = Math.abs(dt) / 0.1;
+      ctx.fillStyle = `rgba(0,0,0,${0.35 * (1 - p)})`;
+      ctx.fillRect(0, 0, W, H);
+    } else if (dt < 0.18) {
+      // white flash
+      const p = dt / 0.18;
+      const a = (1 - p) * 0.92;
+      ctx.fillStyle = `rgba(255,248,230,${a})`;
+      ctx.fillRect(0, 0, W, H);
+    } else if (dt < 1.8) {
+      // warm golden vignette afterglow
+      const p = (dt - 0.18) / 1.62;
+      const a = (1 - p) * 0.35;
+      const g = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.75);
+      g.addColorStop(0, `rgba(255,204,74,${a * 0.9})`);
+      g.addColorStop(0.4, `rgba(255,140,60,${a * 0.5})`);
+      g.addColorStop(1, `rgba(255,100,40,0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+}
+
+/* Chaos particle cloud — random drift during chaos,
+   gets sucked toward closest node during gather,
+   then aligned to grid during clarity */
+function drawParticles(t, vp) {
+  const { W, H, cx, cy, vw, vh } = vp;
+
+  for (let i = 0; i < N_CHAOS; i++) {
+    // deterministic home position (random scatter across full canvas)
+    const homeX = hash(i, 1) * W;
+    const homeY = hash(i, 2) * H;
+
+    // drift velocity
+    const vx = (hash(i, 3) - 0.5) * 60;
+    const vy = (hash(i, 4) - 0.5) * 60;
+
+    // chaos position: home + drift (looping with sine so it doesn't drift off)
+    const driftX = Math.sin(t * 0.6 + i * 0.11) * 30 + vx * 0.3;
+    const driftY = Math.cos(t * 0.5 + i * 0.13) * 30 + vy * 0.3;
+    let x = homeX + driftX;
+    let y = homeY + driftY;
+
+    // target node to gather to (nearest)
+    const nodeIdx = i % NODES.length;
+    const np = nodePos(nodeIdx, t, vp);
+    // radius around node for gathering orbit
+    const ang = hash(i, 7) * TAU + t * (0.4 + hash(i, 8) * 0.4);
+    const orbitR = 18 + hash(i, 9) * 40;
+    const gx = np.x + Math.cos(ang) * orbitR;
+    const gy = np.y + Math.sin(ang) * orbitR;
+
+    // phase blend
+    let px = x, py = y, a = 0.35, sz = 1.0 + hash(i, 5) * 1.2;
+    let color = `rgba(210,220,240,${a * 0.8})`;
+
+    if (t < T_CHAOS_END) {
+      // full chaos — louder, faster jitter
+      const jitterX = Math.sin(t * 3.2 + i * 0.47) * 12 + Math.cos(t * 5.1 + i * 0.31) * 7;
+      const jitterY = Math.cos(t * 2.8 + i * 0.53) * 10 + Math.sin(t * 4.7 + i * 0.29) * 6;
+      px = x + jitterX;
+      py = y + jitterY;
+      a = 0.42 + hash(i, 16) * 0.35;
+      sz *= 1 + 0.3 * Math.sin(t * 4 + i);
+      // cool-blue tinted chaos
+      const hh = 200 + hash(i, 17) * 40;
+      color = `hsla(${hh}, 35%, 78%, ${a})`;
+    } else if (t < T_GATHER_END) {
+      // blend chaos → gather
+      const p = clamp01((t - T_CHAOS_END) / (T_GATHER_END - T_CHAOS_END));
+      const pe = easeInOut(p);
+      px = lerp(x, gx, pe);
+      py = lerp(y, gy, pe);
+      a = lerp(0.32, 0.55, pe);
+      // small particles fade slightly toward nodes
+    } else if (t < T_AHA_FLASH) {
+      // silence: collapse into nodes (anticipation)
+      const p = clamp01((t - T_GATHER_END) / (T_AHA_FLASH - T_GATHER_END));
+      // collapse toward node center
+      const pe = easeIn(p);
+      const tx = lerp(gx, np.x, pe);
+      const ty = lerp(gy, np.y, pe);
+      px = tx; py = ty;
+      a = lerp(0.55, 0.15, pe);  // dim as they collapse
+      sz *= 1 - 0.4 * pe;
+    } else if (t < T_AHA_END) {
+      // explosion outward from nodes during aha
+      const p = clamp01((t - T_AHA_FLASH) / (T_AHA_END - T_AHA_FLASH));
+      const pe = easeOut(p);
+      // blast out from node
+      const dirA = hash(i, 20) * TAU;
+      const blastR = 80 + hash(i, 21) * 220;
+      const ex = np.x + Math.cos(dirA) * blastR * pe;
+      const ey = np.y + Math.sin(dirA) * blastR * pe;
+      px = ex; py = ey;
+      a = lerp(0.85, 0.3, pe);
+      // warm color during aha
+      const hue = 38 + hash(i, 22) * 18;
+      const light = 62 + hash(i, 23) * 15;
+      color = `hsla(${hue}, 95%, ${light}%, ${a})`;
+      sz *= lerp(1.4, 0.7, pe);
+    } else {
+      // clarity: align to grid — orderly constellation
+      const p = clamp01((t - T_AHA_END) / 1.4);
+      const pe = easeOutQuint(p);
+      // grid pos
+      const gridCols = 26, gridRows = 15;
+      const gxIdx = i % gridCols;
+      const gyIdx = Math.floor(i / gridCols) % gridRows;
+      const gridX = vp.cx - vp.vw * 0.4 + (gxIdx / (gridCols - 1)) * vp.vw * 0.8;
+      const gridY = vp.cy - vp.vh * 0.36 + (gyIdx / (gridRows - 1)) * vp.vh * 0.72;
+      // add gentle breathing wave
+      const wave = Math.sin(t * 1.2 + gxIdx * 0.35 + gyIdx * 0.3) * 4;
+      // blend from blasted position to grid
+      const dirA = hash(i, 20) * TAU;
+      const blastR = 80 + hash(i, 21) * 220;
+      const fromX = np.x + Math.cos(dirA) * blastR;
+      const fromY = np.y + Math.sin(dirA) * blastR;
+      px = lerp(fromX, gridX + wave, pe);
+      py = lerp(fromY, gridY, pe);
+      // subset of particles stay near nodes as "constellation dots"
+      const isBright = hash(i, 30) > 0.82;
+      a = lerp(0.25, isBright ? 0.75 : 0.32, pe);
+      // color transitions from warm to cool-white
+      const warmA = 1 - pe;
+      const hue = lerp(40, 210, pe);
+      const sat = lerp(90, 20, pe);
+      const lgt = lerp(65, 78, pe);
+      color = `hsla(${hue}, ${sat}%, ${lgt}%, ${a})`;
+      sz *= lerp(1.0, isBright ? 1.3 : 0.7, pe);
+    }
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(px, py, sz, 0, TAU);
+    ctx.fill();
+  }
+}
+
+/* existing gray edges — only visible during gather (they hint at existing thought map) */
+function drawBaseEdges(t, vp) {
+  if (t < T_CHAOS_END - 0.3) return;
+  // fade in during gather, fade out during aha flash (to make golden line stand out)
+  let a;
+  if (t < T_GATHER_END) {
+    a = kern(t, T_CHAOS_END - 0.3, 1.6) * 0.35;
+  } else if (t < T_AHA_FLASH) {
+    a = 0.35 * (1 - kern(t, T_GATHER_END, T_AHA_FLASH - T_GATHER_END));
+  } else if (t < T_AHA_END + 0.5) {
+    a = 0;
+  } else {
+    // clarity — gentle re-emergence in cool color
+    a = kern(t, T_AHA_END + 0.5, 1.2) * 0.22;
+  }
+  if (a <= 0.01) return;
+
+  ctx.lineWidth = 1;
+  BASE_EDGES.forEach(([ia, ib]) => {
+    const A = nodePos(ia, t, vp);
+    const B = nodePos(ib, t, vp);
+    // clarity uses cool-white, otherwise faint blue
+    const color = t > T_AHA_END
+      ? `rgba(200,220,240,${a})`
+      : `rgba(120,150,200,${a})`;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y);
+    ctx.lineTo(B.x, B.y);
+    ctx.stroke();
+  });
+}
+
+/* The 7 thought nodes. Glow strength varies by phase. Anchor nodes (A,B) pulse during gather. */
+function drawNodes(t, vp) {
+  NODES.forEach((n, i) => {
+    const p = nodePos(i, t, vp);
+    const isAnchor = n.isAnchorA || n.isAnchorB;
+
+    // radius pulse & intensity
+    let r = n.r, a = 0.5, coreHue = 215, coreSat = 28, coreLgt = 92;
+
+    if (t < T_CHAOS_END) {
+      a = 0.35;
+      r = n.r * 0.85;
+    } else if (t < T_GATHER_END) {
+      const p2 = clamp01((t - T_CHAOS_END) / (T_GATHER_END - T_CHAOS_END));
+      a = lerp(0.35, 0.85, p2);
+      r = n.r * lerp(0.85, 1.0, p2);
+      // anchors gently pulse to signal "these are the two"
+      if (isAnchor) {
+        const beat = Math.sin((t - T_CHAOS_END) * 4.5) * 0.5 + 0.5;
+        r *= 1 + 0.12 * beat * p2;
+      }
+    } else if (t < T_AHA_FLASH) {
+      // silence: anchors inhale, others fade
+      const p2 = clamp01((t - T_GATHER_END) / (T_AHA_FLASH - T_GATHER_END));
+      if (isAnchor) {
+        r = n.r * lerp(1.0, 0.7, p2);
+        a = lerp(0.85, 1.0, p2);
+        coreSat = lerp(28, 90, p2);
+        coreHue = lerp(215, 48, p2);
+        coreLgt = lerp(92, 75, p2);
+      } else {
+        r = n.r * lerp(1.0, 0.6, p2);
+        a = lerp(0.85, 0.35, p2);
+      }
+    } else if (t < T_AHA_END) {
+      // aha: anchors explode bright gold with spring
+      const local = t - T_AHA_FLASH;
+      const sp = spring(local, 320, 10);
+      if (isAnchor) {
+        r = n.r * (0.7 + sp * 0.9);  // from 0.7 → ~1.6
+        a = 1.0;
+        coreHue = 45; coreSat = 95; coreLgt = 75;
+      } else {
+        r = n.r * (0.6 + sp * 0.5);
+        a = 0.7;
+        coreHue = 40; coreSat = 70; coreLgt = 70;
+      }
+    } else {
+      // clarity: all nodes settled, gentle breathing
+      const p2 = clamp01((t - T_AHA_END) / 1.2);
+      const sp = spring(p2, 120, 20);
+      if (isAnchor) {
+        r = n.r * lerp(1.6, 1.15, sp);
+        coreHue = lerp(45, 32, sp); coreSat = 85; coreLgt = 72;
+      } else {
+        r = n.r * lerp(1.1, 1.0, sp);
+        coreHue = lerp(40, 210, sp); coreSat = lerp(60, 22, sp); coreLgt = lerp(70, 85, sp);
+      }
+      a = 0.85;
+      // breathing
+      const breath = 0.5 + 0.5 * Math.sin((t - T_AHA_END) * 1.6 + i * 0.6);
+      r *= 1 + 0.04 * breath;
+    }
+
+    // outer glow
+    const glowR = r * 3.2;
+    const gg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+    gg.addColorStop(0, `hsla(${coreHue}, ${coreSat}%, ${coreLgt}%, ${a * 0.55})`);
+    gg.addColorStop(0.35, `hsla(${coreHue}, ${coreSat}%, ${coreLgt}%, ${a * 0.18})`);
+    gg.addColorStop(1, `hsla(${coreHue}, ${coreSat}%, ${coreLgt}%, 0)`);
+    ctx.fillStyle = gg;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, glowR, 0, TAU);
+    ctx.fill();
+
+    // core with radial gradient (2.5D)
+    const cg = ctx.createRadialGradient(p.x - r*0.3, p.y - r*0.3, 0, p.x, p.y, r);
+    cg.addColorStop(0, `hsla(${coreHue}, ${coreSat}%, ${Math.min(99, coreLgt + 12)}%, ${a})`);
+    cg.addColorStop(0.6, `hsla(${coreHue}, ${coreSat}%, ${coreLgt}%, ${a})`);
+    cg.addColorStop(1, `hsla(${coreHue}, ${coreSat}%, ${Math.max(20, coreLgt - 25)}%, ${a})`);
+    ctx.fillStyle = cg;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, TAU);
+    ctx.fill();
+  });
+}
+
+/* The golden line — the Aha moment itself */
+function drawGoldenLine(t, vp) {
+  if (t < T_AHA_FLASH - 0.05) return;
+
+  const A = nodePos(0, t, vp);
+  const B = nodePos(1, t, vp);
+
+  // line growth phase
+  const growStart = T_AHA_FLASH;
+  const growDur = 0.35;
+  const p = clamp01((t - growStart) / growDur);
+  const pe = easeOutQuint(p);
+
+  // line extends from A toward B
+  const dx = B.x - A.x, dy = B.y - A.y;
+  const endX = A.x + dx * pe;
+  const endY = A.y + dy * pe;
+
+  // thickness & alpha
+  let lw, coreA, haloA;
+  if (t < T_AHA_END) {
+    // fresh + bright
+    const local = clamp01((t - T_AHA_FLASH) / (T_AHA_END - T_AHA_FLASH));
+    lw = lerp(9, 5, local);
+    coreA = 1;
+    haloA = lerp(1.0, 0.7, local);
+  } else {
+    // clarity: gentle persistent warmth
+    const local = clamp01((t - T_AHA_END) / (T_CLARITY_END - T_AHA_END));
+    lw = lerp(5, 2.2, local);
+    coreA = lerp(1.0, 0.55, local);
+    haloA = lerp(0.7, 0.18, local);
+    // breathing
+    const breath = 0.5 + 0.5 * Math.sin((t - T_AHA_END) * 1.8);
+    lw *= 1 + breath * 0.08;
+  }
+
+  // outer halo (wide, blurred via multiple passes)
+  ctx.lineCap = 'round';
+  for (let pass = 0; pass < 4; pass++) {
+    const mult = [8, 5, 3, 1.5][pass];
+    const alph = [0.18, 0.28, 0.5, 0.95][pass] * haloA;
+    const grad = ctx.createLinearGradient(A.x, A.y, endX, endY);
+    grad.addColorStop(0,   `rgba(255,200,80,${alph})`);
+    grad.addColorStop(0.5, `rgba(255,220,110,${alph})`);
+    grad.addColorStop(1,   `rgba(255,180,60,${alph})`);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = lw * mult;
+    ctx.beginPath();
+    ctx.moveTo(A.x, A.y);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+  }
+  // hot core
+  ctx.strokeStyle = `rgba(255,250,220,${coreA})`;
+  ctx.lineWidth = lw * 0.5;
+  ctx.beginPath();
+  ctx.moveTo(A.x, A.y);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  // sparks along the line during growth + shortly after
+  if (t < T_AHA_FLASH + 0.8) {
+    for (let i = 0; i < N_SPARK; i++) {
+      const u = hash(i, 40);  // 0..1 along line
+      if (u > pe) continue;  // spark hasn't been reached yet
+      const age = t - (T_AHA_FLASH + u * growDur);
+      if (age < 0 || age > 0.5) continue;
+      const ageP = age / 0.5;
+      const sx = A.x + dx * u;
+      const sy = A.y + dy * u;
+      const offAng = hash(i, 41) * TAU;
+      const offR = ageP * (18 + hash(i, 42) * 40);
+      const px = sx + Math.cos(offAng) * offR;
+      const py = sy + Math.sin(offAng) * offR;
+      const a = (1 - ageP) * 0.9;
+      const r = (1 - ageP * 0.5) * (1.5 + hash(i, 43) * 2);
+      ctx.fillStyle = `hsla(${42 + hash(i,44)*18}, 100%, ${72 + hash(i,45)*15}%, ${a})`;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, TAU);
+      ctx.fill();
+    }
+  }
+}
+
+/* Shockwave rings — emitted from the midpoint of the golden line at connection moment */
+function drawShockwave(t, vp) {
+  if (t < T_AHA_FLASH) return;
+  if (t > T_AHA_FLASH + 1.6) return;
+
+  const A = nodePos(0, t, vp);
+  const B = nodePos(1, t, vp);
+  const mx = (A.x + B.x) / 2;
+  const my = (A.y + B.y) / 2;
+
+  // 3 waves, staggered
+  for (let w = 0; w < 3; w++) {
+    const start = T_AHA_FLASH + w * 0.12;
+    const age = t - start;
+    if (age < 0 || age > 1.4) continue;
+    const p = age / 1.4;
+    const r = easeOutQuint(p) * Math.hypot(vp.vw, vp.vh) * 0.55;
+    const a = (1 - p) * (w === 0 ? 0.9 : 0.5);
+    // outer
+    ctx.strokeStyle = `rgba(255,210,100,${a * 0.6})`;
+    ctx.lineWidth = lerp(6, 1, p);
+    ctx.beginPath();
+    ctx.arc(mx, my, r, 0, TAU);
+    ctx.stroke();
+    // inner bright
+    ctx.strokeStyle = `rgba(255,245,200,${a * 0.3})`;
+    ctx.lineWidth = lerp(2.5, 0.5, p);
+    ctx.beginPath();
+    ctx.arc(mx, my, r * 0.96, 0, TAU);
+    ctx.stroke();
+  }
+}
+
+/* Buzz layer — fast streaks during chaos = racing thoughts
+   Fades out as we enter gather */
+function drawBuzz(t, vp) {
+  // only active during chaos & early gather
+  let amp;
+  if (t < T_CHAOS_END) amp = 1.0;
+  else if (t < T_CHAOS_END + 0.8) amp = 1 - kern(t, T_CHAOS_END, 0.8);
+  else return;
+  if (amp <= 0.01) return;
+
+  const { W, H } = vp;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < N_BUZZ; i++) {
+    const sx = hash(i, 80) * W;
+    const sy = hash(i, 81) * H;
+    const ang = hash(i, 82) * TAU;
+    const speed = 80 + hash(i, 83) * 160;
+    // streak position wraps around
+    const wrap = 200;
+    const progress = ((t * speed + hash(i, 84) * wrap) % wrap) / wrap;
+    const travel = progress * 400;
+    const px = sx + Math.cos(ang) * travel;
+    const py = sy + Math.sin(ang) * travel;
+    // streak length
+    const len = 18 + hash(i, 85) * 14;
+    const ex = px - Math.cos(ang) * len;
+    const ey = py - Math.sin(ang) * len;
+    // fade toward lifetime end
+    const life = 1 - Math.abs(progress * 2 - 1);
+    const a = 0.35 * amp * life * (0.6 + hash(i, 86) * 0.4);
+    const hh = 200 + hash(i, 87) * 30;
+    ctx.strokeStyle = `hsla(${hh}, 55%, 82%, ${a})`;
+    ctx.lineWidth = 1.2 + hash(i, 88) * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+  }
+}
+
+/* small floating "question marks" (abstract symbols) in chaos — to signal "looking for something" */
+/* done with dot-motifs rather than glyphs to avoid emoji cliché */
+function drawChaosMotifs(t, vp) {
+  if (t > T_CHAOS_END + 0.8) return;
+  const a = t < T_CHAOS_END
+    ? 0.25
+    : 0.25 * (1 - kern(t, T_CHAOS_END, 0.8));
+  if (a <= 0.01) return;
+
+  // 12 small "?'-esque" 3-dot patterns drifting
+  for (let i = 0; i < 12; i++) {
+    const baseX = hash(i, 70) * vp.W;
+    const baseY = hash(i, 71) * vp.H;
+    const dx = Math.sin(t * 0.4 + i * 0.7) * 40;
+    const dy = Math.cos(t * 0.35 + i * 0.8) * 30;
+    const x = baseX + dx;
+    const y = baseY + dy;
+    const rot = hash(i, 72) * TAU + t * 0.2;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    // 3 dots: two small + one large
+    ctx.fillStyle = `rgba(180,200,230,${a})`;
+    ctx.beginPath(); ctx.arc(-6, 0, 1.2, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc( 0, 0, 1.5, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc( 6, -2, 2.0, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* ============================================================
+   Master render — frame pure f(t)
+   ============================================================ */
+function render(t) {
+  const vp = getViewport();
+  drawBackground(t, vp);
+  drawBuzz(t, vp);
+  drawChaosMotifs(t, vp);
+  drawParticles(t, vp);
+  drawBaseEdges(t, vp);
+  drawShockwave(t, vp);
+  drawGoldenLine(t, vp);
+  drawNodes(t, vp);
+}
+
+/* ============================================================
+   Timeline controller
+   ============================================================ */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+
+let currentT = 0, playing = true, lastFrame = performance.now();
+
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+
+scrubber.addEventListener('input', () => {
+  playing = false;
+  playBtn.textContent = '▶';
+  setTime(scrubber.value / 1000 * DURATION);
+});
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+resetBtn.addEventListener('click', () => setTime(0));
+
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl';
+  lbl.textContent = cue.label;
+  m.appendChild(lbl);
+  cueRow.appendChild(m);
+});
+
+setTime(0);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
