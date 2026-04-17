@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Success · Cinematic 3D Metal</title>
+<style>
+  :root {
+    --bg-0: #000000;
+    --bg-1: #05060a;
+    --bg-2: #0a0c14;
+    --bg-rim: #0e1220;
+    --metal-core:   #c0c4cc;
+    --metal-hi:     #f2f4f8;
+    --metal-lo:     #5a5e68;
+    --metal-deep:   #2a2d35;
+    --warm-hi:      #ffd89b;
+    --warm-hi-2:    #ffb066;
+    --ink:          #e8ecf2;
+    --ink-mute:     #7a808c;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: #000;
+    color: var(--ink);
+    font-family: "Inter", "SF Pro Display", -apple-system, system-ui, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.005em;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(ellipse at 50% 56%, #0e1220 0%, #05060a 38%, #000 78%);
+  }
+
+  .scene {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: center;
+  }
+  @media (max-aspect-ratio: 16/9) {
+    .scene { transform: scale(calc(100vw / 1920)); }
+  }
+  @media (min-aspect-ratio: 16/9) {
+    .scene { transform: scale(calc(100vh / 1080)); }
+  }
+
+  /* layered canvases / wrappers, absolutely positioned */
+  .layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* star dust */
+  #stars { z-index: 1; }
+
+  /* vignette - soft inner edge darkening */
+  .vignette {
+    z-index: 2;
+    background:
+      radial-gradient(ellipse at 50% 56%, transparent 0%, transparent 45%, rgba(0,0,0,0.55) 85%, rgba(0,0,0,0.9) 100%);
+    mix-blend-mode: multiply;
+  }
+
+  /* ground reflection layer (scaled flipped copy of checkmark) */
+  #groundLayer {
+    z-index: 3;
+    display: grid;
+    place-items: center;
+  }
+  .ground {
+    position: absolute;
+    left: 50%;
+    top: 66%;
+    width: 900px;
+    height: 280px;
+    transform: translate(-50%, 0);
+    opacity: 0;
+    filter: blur(14px);
+    mix-blend-mode: screen;
+  }
+
+  /* floor light bleed under the mark */
+  .floor-bleed {
+    z-index: 3;
+    position: absolute;
+    left: 50%;
+    top: 66%;
+    width: 1200px;
+    height: 320px;
+    transform: translate(-50%, -30%);
+    background: radial-gradient(ellipse at 50% 45%, rgba(255,216,155,0.18) 0%, rgba(255,216,155,0.06) 30%, transparent 70%);
+    opacity: 0;
+    mix-blend-mode: screen;
+    filter: blur(20px);
+  }
+
+  /* main check 3D wrapper */
+  #checkWrap {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 760px;
+    height: 760px;
+    transform: translate(-50%, -54%);
+    display: grid;
+    place-items: center;
+    z-index: 5;
+    perspective: 1800px;
+    perspective-origin: 50% 40%;
+  }
+  #checkInner {
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    will-change: transform, opacity;
+  }
+  #checkSvg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    will-change: transform, filter;
+    filter:
+      drop-shadow(0 24px 60px rgba(0,0,0,0.85))
+      drop-shadow(0 8px 18px rgba(255,216,155,0.08));
+  }
+
+  /* specular sweep — a soft diagonal highlight that passes across the metal */
+  #sheenLayer {
+    z-index: 6;
+  }
+
+  /* glow bloom around the check */
+  #bloomLayer {
+    position: absolute;
+    left: 50%;
+    top: 48%;
+    width: 1100px;
+    height: 1100px;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, rgba(255,216,155,0.12) 0%, rgba(255,216,155,0.04) 30%, transparent 60%);
+    opacity: 0;
+    mix-blend-mode: screen;
+    filter: blur(8px);
+  }
+
+  /* grain */
+  .grain {
+    z-index: 7;
+    opacity: 0.055;
+    mix-blend-mode: overlay;
+    background-image:
+      radial-gradient(rgba(255,255,255,0.6) 1px, transparent 1px),
+      radial-gradient(rgba(255,255,255,0.4) 1px, transparent 1px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 2px;
+  }
+
+  /* Timeline UI */
+  .cue-row {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 58px;
+    height: 18px;
+    pointer-events: none;
+    z-index: 20;
+  }
+  .cue-mark {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 8px;
+    background: rgba(255,255,255,0.25);
+  }
+  .cue-mark .lbl {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.45);
+    white-space: nowrap;
+    font-feature-settings: "ss01";
+  }
+
+  .tl-ui {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 0;
+    height: 48px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(5,6,10,0.85);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    z-index: 21;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .tl-ui button {
+    height: 26px;
+    min-width: 26px;
+    padding: 0 8px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tl-ui button:hover { background: rgba(255,255,255,0.06); }
+  .tl-ui .time { color: var(--ink-mute); font-variant-numeric: tabular-nums; min-width: 124px; }
+  .tl-ui input[type=range] {
+    flex: 1;
+    height: 2px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255,255,255,0.12);
+    outline: none;
+  }
+  .tl-ui input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--warm-hi);
+    box-shadow: 0 0 10px rgba(255,216,155,0.4);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="scene">
+    <!-- deep-space star dust (canvas, deterministic seed) -->
+    <canvas id="stars" class="layer"></canvas>
+
+    <!-- floor bleed -->
+    <div class="floor-bleed layer" id="floorBleed"></div>
+
+    <!-- ground reflection: SVG mirror of the check -->
+    <div id="groundLayer" class="layer">
+      <svg id="groundSvg" class="ground" viewBox="-380 -160 760 320" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="groundFade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffd89b" stop-opacity="0.55"/>
+            <stop offset="45%" stop-color="#c0c4cc" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#c0c4cc" stop-opacity="0"/>
+          </linearGradient>
+          <mask id="groundMask">
+            <rect x="-380" y="-160" width="760" height="320" fill="url(#groundFade)"/>
+          </mask>
+        </defs>
+        <g mask="url(#groundMask)" transform="scale(0.95 -0.42)">
+          <!-- mirrored checkmark path, semi-opaque warm silver -->
+          <path d="M -220 -30 L -90 100 L 220 -180"
+                fill="none"
+                stroke="#d7dae2"
+                stroke-width="66"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                opacity="0.55"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- bloom glow -->
+    <div id="bloomLayer"></div>
+
+    <!-- main 3D check -->
+    <div id="checkWrap">
+      <div id="checkInner">
+        <svg id="checkSvg" viewBox="-400 -400 800 800" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- BODY fill: vertical metal gradient, brushed titanium -->
+            <!-- Top bright, middle mid-tone, bottom darker — classic polished metal -->
+            <linearGradient id="metalBody" gradientUnits="userSpaceOnUse" x1="0" y1="-220" x2="0" y2="160">
+              <stop offset="0%"   stop-color="#f8faff"/>
+              <stop offset="14%"  stop-color="#dfe3ec"/>
+              <stop offset="30%"  stop-color="#b8bcc6"/>
+              <stop offset="46%"  stop-color="#9aa0aa"/>
+              <stop offset="58%"  stop-color="#c4c8d0"/>
+              <stop offset="74%"  stop-color="#8c9098"/>
+              <stop offset="90%"  stop-color="#5a5e68"/>
+              <stop offset="100%" stop-color="#3e4249"/>
+            </linearGradient>
+
+            <!-- Warm highlight band (Fresnel-inspired rim warmth) -->
+            <linearGradient id="warmRim" gradientUnits="userSpaceOnUse" x1="0" y1="-220" x2="0" y2="160">
+              <stop offset="0%"   stop-color="#ffd89b" stop-opacity="0.1"/>
+              <stop offset="18%"  stop-color="#ffd89b" stop-opacity="0.55"/>
+              <stop offset="38%"  stop-color="#ffc580" stop-opacity="0.28"/>
+              <stop offset="62%"  stop-color="#ffd89b" stop-opacity="0.08"/>
+              <stop offset="100%" stop-color="#ffd89b" stop-opacity="0"/>
+            </linearGradient>
+
+            <!-- Top bevel highlight (simulates rounded top edge catching light) -->
+            <linearGradient id="bevelTop" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.95"/>
+              <stop offset="30%"  stop-color="#ffffff" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+            </linearGradient>
+
+            <!-- Bottom bevel darker edge -->
+            <linearGradient id="bevelBot" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stop-color="#000000" stop-opacity="0"/>
+              <stop offset="70%"  stop-color="#000000" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#000000" stop-opacity="0.75"/>
+            </linearGradient>
+
+            <!-- Specular sweep band (diagonal, animated via x offset on <rect>) -->
+            <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0.3">
+              <stop offset="0%"   stop-color="#ffffff" stop-opacity="0"/>
+              <stop offset="38%"  stop-color="#ffffff" stop-opacity="0"/>
+              <stop offset="45%"  stop-color="#fff5e0" stop-opacity="0.7"/>
+              <stop offset="50%"  stop-color="#ffffff" stop-opacity="1"/>
+              <stop offset="55%"  stop-color="#ffd89b" stop-opacity="0.85"/>
+              <stop offset="62%"  stop-color="#ffffff" stop-opacity="0"/>
+              <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+            </linearGradient>
+
+            <!-- Environmental reflection band (fake env map: subtle horizon banding on top of metal) -->
+            <linearGradient id="envRefl" gradientUnits="userSpaceOnUse" x1="0" y1="-220" x2="0" y2="160">
+              <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.3"/>
+              <stop offset="24%"  stop-color="#e8ebf0" stop-opacity="0.35"/>
+              <stop offset="38%"  stop-color="#ffd89b" stop-opacity="0.35"/>
+              <stop offset="55%"  stop-color="#c0c4cc" stop-opacity="0.15"/>
+              <stop offset="72%"  stop-color="#6a6e78" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#1a1d24" stop-opacity="0.3"/>
+            </linearGradient>
+
+            <!-- The checkmark shape (a thick stroke rendered as a path, then also used as clip) -->
+            <!-- This path represents the V check: left-down-up-right sweep -->
+            <path id="checkPath"
+                  d="M -260 -30 L -90 130 L 260 -200"
+                  fill="none"
+                  stroke-width="110"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"/>
+
+            <clipPath id="checkClip">
+              <use href="#checkPath" stroke="#000"/>
+            </clipPath>
+
+            <!-- sheen band rectangle (will be transformed) -->
+          </defs>
+
+          <!-- Layer A: main metallic body (stroked path with metal gradient) -->
+          <use href="#checkPath" stroke="url(#metalBody)"/>
+
+          <!-- Layer B: environmental reflection banding (subtle overlay, blend-mode screen-like via opacity) -->
+          <g clip-path="url(#checkClip)" opacity="0.55">
+            <rect x="-400" y="-400" width="800" height="800" fill="url(#envRefl)"/>
+          </g>
+
+          <!-- Layer C: warm fresnel rim across the body -->
+          <g clip-path="url(#checkClip)" opacity="0.55">
+            <rect x="-400" y="-400" width="800" height="800" fill="url(#warmRim)"/>
+          </g>
+
+          <!-- Layer D: top bevel highlight (bright top edge of the stroke) -->
+          <g clip-path="url(#checkClip)" opacity="0.7" id="bevelTopGroup">
+            <rect x="-400" y="-260" width="800" height="200" fill="url(#bevelTop)"/>
+          </g>
+
+          <!-- Layer E: bottom bevel shade (dark bottom edge) -->
+          <g clip-path="url(#checkClip)" opacity="0.55">
+            <rect x="-400" y="60" width="800" height="220" fill="url(#bevelBot)"/>
+          </g>
+
+          <!-- Layer F: specular sweep (moves along the length) -->
+          <g id="sheenGroup" clip-path="url(#checkClip)">
+            <rect id="sheenRect" x="-1200" y="-400" width="800" height="800" fill="url(#sheen)"/>
+          </g>
+
+          <!-- Layer G: crisp rim outline (very thin, for silhouette) -->
+          <use href="#checkPath"
+               fill="none"
+               stroke="rgba(20,22,30,0.4)"
+               stroke-width="2"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- film grain -->
+    <div class="grain layer"></div>
+
+    <!-- soft vignette -->
+    <div class="vignette layer"></div>
+  </div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 10.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+</div>
+
+<script>
+(() => {
+  const DURATION = 10.0;
+  const FPS = 30;
+
+  const clamp01 = t => Math.max(0, Math.min(1, t));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut  = x => 1 - Math.pow(1 - x, 3);
+  const easeOutQuint = x => 1 - Math.pow(1 - x, 5);
+  const easeInOut = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+
+  // Heavy spring: slow overshoot, mass=1.5 for weight feel
+  function spring(t, k = 140, d = 12, mass = 1.5) {
+    if (t <= 0) return 0;
+    const wn = Math.sqrt(k / mass);
+    const zeta = d / (2 * Math.sqrt(k * mass));
+    if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+    }
+    return 1 - (1 + wn * t) * Math.exp(-wn * t);
+  }
+
+  const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+  // Cinematic beat plan (10s loop)
+  const CUES = [
+    { t: 0.00, label: 'void' },
+    { t: 1.00, label: 'enter' },     // rotate in from deep
+    { t: 2.00, label: 'face' },      // faces camera
+    { t: 2.50, label: 'push-in' },   // camera nudge closer
+    { t: 3.00, label: 'sheen' },     // specular sweep
+    { t: 3.50, label: 'settle' },    // ground shadow lands
+    { t: 6.50, label: 'breathe' },   // weighty idle rotation
+    { t: 9.00, label: 'loop-sheen' },
+  ];
+
+  // ============== Star dust (deterministic, frame-pure) ==============
+  const starsCanvas = document.getElementById('stars');
+  const starsCtx = starsCanvas.getContext('2d');
+  const NSTARS = 280;
+  const stars = [];
+  // small mulberry32 seed PRNG
+  function seed32(s) { return function() {
+    s |= 0; s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };}
+  const rng = seed32(42);
+  for (let i = 0; i < NSTARS; i++) {
+    stars.push({
+      x: rng(),
+      y: rng(),
+      r: rng() * 1.3 + 0.15,
+      twinkleSeed: rng() * 6.28,
+      twinkleRate: rng() * 0.6 + 0.3,
+      baseAlpha: rng() * 0.45 + 0.15,
+      warm: rng() > 0.78, // a few warm stars
+    });
+  }
+  function resizeStars() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    starsCanvas.width  = 1920 * dpr;
+    starsCanvas.height = 1080 * dpr;
+    starsCanvas.style.width  = '1920px';
+    starsCanvas.style.height = '1080px';
+    starsCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resizeStars();
+  window.addEventListener('resize', resizeStars);
+
+  function drawStars(t) {
+    starsCtx.clearRect(0, 0, 1920, 1080);
+    // subtle nebula center
+    const grad = starsCtx.createRadialGradient(960, 560, 60, 960, 560, 780);
+    grad.addColorStop(0, 'rgba(40, 32, 60, 0.55)');
+    grad.addColorStop(0.4, 'rgba(18, 14, 30, 0.25)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    starsCtx.fillStyle = grad;
+    starsCtx.fillRect(0, 0, 1920, 1080);
+
+    for (const s of stars) {
+      const tw = 0.5 + 0.5 * Math.sin(t * s.twinkleRate * 2 + s.twinkleSeed);
+      const a = s.baseAlpha * (0.55 + 0.45 * tw);
+      starsCtx.beginPath();
+      starsCtx.arc(s.x * 1920, s.y * 1080, s.r, 0, Math.PI * 2);
+      starsCtx.fillStyle = s.warm
+        ? `rgba(255, 216, 155, ${a.toFixed(3)})`
+        : `rgba(235, 240, 250, ${a.toFixed(3)})`;
+      starsCtx.fill();
+    }
+  }
+
+  // ============== Elements ==============
+  const checkWrap   = document.getElementById('checkWrap');
+  const checkInner  = document.getElementById('checkInner');
+  const checkSvg    = document.getElementById('checkSvg');
+  const sheenRect   = document.getElementById('sheenRect');
+  const bevelTopGroup = document.getElementById('bevelTopGroup');
+  const groundSvg   = document.getElementById('groundSvg');
+  const floorBleed  = document.getElementById('floorBleed');
+  const bloomLayer  = document.getElementById('bloomLayer');
+
+  function render(t) {
+    // ---------------- Act timing ----------------
+    // 0.0-1.0  void (fade nebula in)
+    // 1.0-2.0  rotate in from deep (rotateY 180 -> 0, opacity 0 -> 1, scale 0.6 -> 1.0)
+    // 2.0-2.3  spring overshoot (scale 1.0 -> 1.12 -> 1.0)
+    // 2.3-3.0  camera push-in (scale 1.0 -> 1.04 on inner)
+    // 3.0-3.6  sheen sweep across metal
+    // 3.5-4.0  ground reflection + floor bleed ease in
+    // 4.0-8.8  weighty hold: breathe rotation ±2deg, 0.15hz
+    // 8.8-10.0 loop sheen + quiet rotation back to neutral
+
+    // ---- ENTRY: rotation + opacity + scale ----
+    const enterP = kern(t, 1.0, 1.0, easeOutQuint); // 1.0 -> 2.0
+    const rotY   = lerp(180, 0, enterP);              // come from back
+    const rotX   = lerp(-22, 0, enterP);              // tilt upward as it faces us
+    const enterScale = lerp(0.62, 1.0, enterP);
+    const enterOpacity = clamp01(enterP * 1.4);       // appear quickly in the first half of entry
+
+    // ---- SPRING OVERSHOOT at face (t=2.0 -> 2.35 peak, then settle) ----
+    // spring returns 0..~1.05 ish, so convert to 1 + (sp-1)*0.12 type bump
+    const springDt = Math.max(0, t - 2.0);
+    const sp = spring(springDt, 140, 12, 1.5); // slow, weighty
+    // convert to an overshoot bump that peaks ~1.10 then sits near 1.0
+    const overshoot = 1.0 + (sp - 1.0) * 0.10; // when sp > 1, bump
+    // clamp so we only apply during the window
+    const overshootGate = clamp01((t - 2.0) / 0.1) * (1 - clamp01((t - 4.2) / 0.8));
+    const overshootScale = lerp(1.0, overshoot, clamp01(overshootGate));
+
+    // ---- Camera push-in (subtle zoom on the whole check) ----
+    const pushP = kern(t, 2.3, 0.7, easeOutQuint);
+    const pushScale = lerp(0.965, 1.0, pushP); // slight push to full "close"
+    // before push, at t~2.0 we're at ~0.965*1.0 = already close enough; enterScale above handles 1.0 target
+
+    // ---- Weighty breathing rotation (after 3.5s) ----
+    const breathePhase = Math.max(0, t - 3.5);
+    const breatheAmp   = clamp01((t - 3.5) / 1.0) * (1 - kern(t, 9.4, 0.6, easeOutQuint));
+    const breatheY     = Math.sin(breathePhase * 0.9) * 2.5 * breatheAmp;   // ±2.5deg
+    const breatheX     = Math.sin(breathePhase * 0.6 + 1.2) * 1.2 * breatheAmp;
+    const breatheScale = 1.0 + Math.sin(breathePhase * 0.7) * 0.008 * breatheAmp; // tiny weight-breath
+
+    // ---- Compose transform ----
+    const finalRotY = rotY + breatheY;
+    const finalRotX = rotX + breatheX;
+    const finalScale = enterScale * overshootScale * pushScale * breatheScale;
+
+    checkInner.style.transform =
+      `translateZ(0) rotateX(${finalRotX.toFixed(3)}deg) rotateY(${finalRotY.toFixed(3)}deg) scale(${finalScale.toFixed(4)})`;
+    checkInner.style.opacity = enterOpacity.toFixed(3);
+
+    // ---- SHEEN sweep (specular highlight across metal) ----
+    // Two sweeps: primary at t=3.0-3.6, loop-sheen at t=9.0-9.9
+    // sheenRect base x = -1200 (off-left), we translate by sweepOffset
+    function sheenProgress(start, dur) {
+      return clamp01((t - start) / dur);
+    }
+    const s1 = sheenProgress(3.0, 0.7);
+    const s2 = sheenProgress(9.0, 0.9);
+    // Pick whichever is active (neither overlap; take max)
+    const sweep = Math.max(easeInOut(s1), easeInOut(s2) * 0.85);
+    // Sheen rect is 800 wide; bright band sits near x=0.5. Sweep so bright band passes
+    // from the check's left edge (-315) to right edge (+315).
+    // rect_x = brightCenter - 400. range: brightCenter ∈ [-400, +400] → rect_x ∈ [-800, 0]
+    const sheenX = lerp(-800, 0, sweep);
+    sheenRect.setAttribute('x', sheenX.toFixed(1));
+    // During active sweep: full opacity. Otherwise: faint idle shimmer so metal feels alive.
+    const shimmer = 0.08 + 0.05 * Math.sin(t * 1.3);
+    // Park idle sheen far off to the right so only shimmer shows
+    if (sweep <= 0.001) {
+      sheenRect.setAttribute('x', '1200');
+      sheenRect.setAttribute('opacity', shimmer.toFixed(3));
+    } else {
+      sheenRect.setAttribute('opacity', '1.0');
+    }
+
+    // ---- Bevel top breathing intensity (subtle) ----
+    const bevelOpac = 0.72 + 0.08 * Math.sin(t * 0.6 + 0.3);
+    bevelTopGroup.setAttribute('opacity', bevelOpac.toFixed(3));
+
+    // ---- Ground reflection + floor bleed ----
+    const groundP = kern(t, 2.2, 1.2, easeOutQuint);
+    groundSvg.style.opacity = (groundP * 0.75).toFixed(3);
+    // ground also pulses slightly with breath
+    const groundBreath = 1.0 + Math.sin(breathePhase * 0.7) * 0.03 * breatheAmp;
+    groundSvg.style.transform = `translate(-50%, 0) scale(${groundBreath.toFixed(4)}, 1)`;
+
+    const bleedP = kern(t, 2.4, 1.0, easeOutQuint);
+    floorBleed.style.opacity = (bleedP * 0.9).toFixed(3);
+
+    // ---- Bloom around mark ----
+    const bloomBase = clamp01((t - 1.8) / 0.6);
+    const bloomPulse = sweep * 0.8;  // bloom pulses during sheen
+    bloomLayer.style.opacity = (bloomBase * 0.6 + bloomPulse * 0.5).toFixed(3);
+
+    // ---- Starfield (always redraw; frame-pure from t) ----
+    drawStars(t);
+  }
+
+  // ============== Timeline controller ==============
+  const scrubber   = document.getElementById('scrubber');
+  const playBtn    = document.getElementById('playBtn');
+  const resetBtn   = document.getElementById('resetBtn');
+  const timeLabel  = document.getElementById('timeLabel');
+  const frameLabel = document.getElementById('frameLabel');
+  const cueRow     = document.getElementById('cueRow');
+
+  let currentT = 0, playing = true, lastFrame = performance.now();
+
+  function setTime(t) {
+    currentT = Math.max(0, Math.min(DURATION, t));
+    scrubber.value = Math.round(currentT / DURATION * 1000);
+    timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+    frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+    render(currentT);
+  }
+
+  function loop() {
+    const now = performance.now();
+    const dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (playing) {
+      let next = currentT + dt;
+      if (next >= DURATION) next = 0;
+      setTime(next);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  scrubber.addEventListener('input', () => {
+    playing = false;
+    playBtn.textContent = '▶';
+    setTime(scrubber.value / 1000 * DURATION);
+  });
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    lastFrame = performance.now();
+  });
+  resetBtn.addEventListener('click', () => setTime(0));
+
+  CUES.forEach(cue => {
+    const m = document.createElement('div');
+    m.className = 'cue-mark';
+    m.style.left = (cue.t / DURATION * 100) + '%';
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl';
+    lbl.textContent = cue.label;
+    m.appendChild(lbl);
+    cueRow.appendChild(m);
+  });
+
+  setTime(0);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
