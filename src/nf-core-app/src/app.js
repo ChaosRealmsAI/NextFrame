@@ -36,13 +36,20 @@ function step(ctx, t) {
 // is how Rust knows the paint pass finished before snapshotting pixels.
 function nextFrameCommitted(win) {
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
     const raf = win && typeof win.requestAnimationFrame === "function"
       ? win.requestAnimationFrame.bind(win)
       : (cb) => setTimeout(() => cb(0), 16);
     raf(() => raf(() => {
       // Queue microtask so any style/layout writes in the 2nd RAF flush.
-      Promise.resolve().then(resolve);
+      Promise.resolve().then(finish);
     }));
+    setTimeout(finish, 32);
   });
 }
 
@@ -112,8 +119,9 @@ export function start(opts = {}) {
     resume();
   } else if (mode === "record") {
     // Rust drives frames via __nfTick.
-    win.__nfTick = async (t) => {
-      step(ctx, Number(t) || 0);
+    win.__nfTick = async (seqOrT, maybeT) => {
+      const t = Number(maybeT === undefined ? seqOrT : maybeT) || 0;
+      step(ctx, t);
       await nextFrameCommitted(win);
       return { t: ctx.lastT, audio: ctx.lastAudio };
     };

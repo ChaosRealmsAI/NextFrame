@@ -31,6 +31,9 @@ test("bundler: outputs resolved JSON + track scripts", () => {
   assert.ok(html.includes("__nfResolved"));
   assert.ok(html.includes('id="nf-root"'));
   assert.ok(html.includes("__nfTracks"));
+  assert.ok(html.includes("__nfRuntime"));
+  assert.ok(html.includes("__nfStart"));
+  assert.ok(html.includes("window.__nfMode = mode"));
   // Track IIFE must carry the kind key.
   assert.ok(html.includes('"text"'));
   // The original describe() function body should be present.

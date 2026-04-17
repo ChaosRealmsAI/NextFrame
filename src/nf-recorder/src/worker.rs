@@ -338,7 +338,12 @@ pub fn pump_main_run_loop(duration: Duration) {
 }
 
 fn load_bundle(web_view: &WKWebView, html_path: &Path) -> Result<()> {
-    let file_url = NSURL::fileURLWithPath(&NSString::from_str(&html_path.display().to_string()));
+    let base_file_url = NSURL::fileURLWithPath(&NSString::from_str(&html_path.display().to_string()));
+    let file_url = NSURL::URLWithString_relativeToURL(
+        &NSString::from_str("?mode=record"),
+        Some(&base_file_url),
+    )
+    .context("build recorder bundle URL with mode=record")?;
     let root = html_path.parent().unwrap_or_else(|| Path::new("."));
     let root_url = NSURL::fileURLWithPath(&NSString::from_str(&root.display().to_string()));
     // SAFETY: The file URL and read-access URL remain valid Objective-C objects for the call.

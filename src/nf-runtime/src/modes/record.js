@@ -10,7 +10,7 @@
 // On resolve, we post `{kind:'frame_ready', payload:{t}}` to the bridge so
 // the Rust-side recorder knows when to pull the IOSurface.
 
-const FRAME_READY_KIND = "frame_ready";
+const FRAME_READY_KINDS = ["frameReady", "frame_ready"];
 
 export function createRecord({ host, bridge, options = {} }) {
   const rafFn = options.raf || globalThis.requestAnimationFrame;
@@ -23,24 +23,34 @@ export function createRecord({ host, bridge, options = {} }) {
 
   const doubleRaf = () =>
     new Promise((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
       rafFn(() => {
-        rafFn(() => resolve());
+        rafFn(() => finish());
       });
+      setTimeout(finish, 32);
     });
 
-  const tick = async (t) => {
-    lastTickT = Number(t) || 0;
+  const tick = async (seqOrT, maybeT) => {
+    const seq = maybeT === undefined ? null : Number(seqOrT) || 0;
+    lastTickT = Number(maybeT === undefined ? seqOrT : maybeT) || 0;
     host.setT(lastTickT);
     host.render();
     await doubleRaf();
     frameCount++;
-    const framePayload = { t: lastTickT, frame: frameCount };
+    const framePayload = { t: lastTickT, frame: frameCount, seq };
     if (bridge) {
-      try {
-        await bridge.sendMessage({ kind: FRAME_READY_KIND, payload: framePayload });
-      } catch (_err) {
-        // frame_ready failure must not crash the tick — the recorder may
-        // resend or probe via another channel.
+      for (const kind of FRAME_READY_KINDS) {
+        try {
+          await bridge.sendMessage({ kind, seq, payload: framePayload });
+        } catch (_err) {
+          // frame_ready failure must not crash the tick — the recorder may
+          // resend or probe via another channel.
+        }
       }
     }
     return framePayload;

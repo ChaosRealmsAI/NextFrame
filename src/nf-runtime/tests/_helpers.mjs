@@ -89,12 +89,13 @@ export function installBridge({ withReply = true } = {}) {
   const handlers = [];
   const handler = {
     postMessage(msg) {
-      sent.push(msg);
-      if (withReply) return Promise.resolve({ ok: true, echo: msg });
+      const parsed = typeof msg === "string" ? JSON.parse(msg) : msg;
+      sent.push(parsed);
+      if (withReply) return Promise.resolve({ ok: true, echo: parsed });
       return undefined;
     },
   };
-  globalThis.webkit = { messageHandlers: { nfBridge: handler } };
+  globalThis.webkit = { messageHandlers: { nfBridge: handler, __nfBridge: handler } };
   return {
     sent,
     push(message) {

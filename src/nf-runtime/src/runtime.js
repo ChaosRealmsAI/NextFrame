@@ -19,6 +19,8 @@ import { createRecord } from "./modes/record.js";
 
 let currentRuntime = null;
 let currentModeName = null;
+const READY_KINDS = ["ready", "domReady"];
+const FRAME_READY_KINDS = ["frameReady", "frame_ready"];
 
 function defaultEngine() {
   return globalThis.__nfEngine || {
@@ -77,56 +79,128 @@ export function start(arg, legacyMode) {
   if (typeof arg === "string") {
     return startLegacy(arg);
   }
+  stop();
   const options = arg || {};
   const mode = options.mode || legacyMode || "play";
   const resolved = pickResolved(options.resolved);
   const mount = pickMount(options.mount);
-  const engine = options.engine || defaultEngine();
-  const tracks = options.tracks || defaultTrackHost();
   const bridge = options.bridge || getBridge();
-
-  const host = createRenderHost({ engine, tracks, mount, resolved });
-  host.setT(options.initialT || 0);
-  host.render();
-
   let runtime;
-  switch (mode) {
-    case "play":
-      runtime = createPlay({ host, options });
-      break;
-    case "edit":
-      runtime = createEdit({ host, bridge, options });
-      break;
-    case "record":
-      runtime = createRecord({ host, bridge, options });
-      break;
-    default:
-      throw new Error(`nf-runtime: unknown mode: ${mode}`);
+
+  if (!options.engine && !options.tracks && typeof globalThis.__nfStart === "function") {
+    runtime = startBundledApp({ mode, resolved, mount, bridge, options });
+  } else {
+    const engine = options.engine || defaultEngine();
+    const tracks = options.tracks || defaultTrackHost();
+    const host = createRenderHost({ engine, tracks, mount, resolved });
+    host.setT(options.initialT || 0);
+    host.render();
+
+    switch (mode) {
+      case "play":
+        runtime = createPlay({ host, options });
+        runtime.start?.();
+        break;
+      case "edit":
+        runtime = createEdit({ host, bridge, options });
+        break;
+      case "record":
+        runtime = createRecord({ host, bridge, options });
+        break;
+      default:
+        throw new Error(`nf-runtime: unknown mode: ${mode}`);
+    }
   }
 
   currentRuntime = runtime;
   currentModeName = mode;
-  exposeGlobals(runtime, host, bridge);
+  exposeGlobals(runtime, bridge);
   return runtime;
 }
 
-function exposeGlobals(runtime, host, bridge) {
+function startBundledApp({ mode, resolved, mount, bridge, options }) {
+  const win = options.win || globalThis;
+  const previousTick = win.__nfTick;
+  const app = globalThis.__nfStart({ mode, resolved, root: mount, win });
+  let wrappedTick = null;
+  if (mode === "record" && typeof win.__nfTick === "function") {
+    const appTick = win.__nfTick;
+    wrappedTick = async (seqOrT, maybeT) => {
+      const seq = maybeT === undefined ? null : Number(seqOrT) || 0;
+      const t = maybeT === undefined ? seqOrT : maybeT;
+      const frame = await appTick(t);
+      await postCompatMessages(bridge, FRAME_READY_KINDS, {
+        seq,
+        payload: { ...(frame || {}), t: Number(t) || 0, seq },
+      });
+      return frame;
+    };
+    win.__nfTick = wrappedTick;
+  }
+  const runtime = {
+    mode,
+    seek: (t) => app.seek?.(t),
+    pause: () => app.pause?.(),
+    resume: () => app.resume?.(),
+    tick: (...args) => {
+      if (mode !== "record" || typeof win.__nfTick !== "function") {
+        return Promise.resolve({ t: app.currentT ?? 0 });
+      }
+      return win.__nfTick(...args);
+    },
+    getT: () => app.currentT ?? 0,
+    diagnose: () => ({
+      mode,
+      t: app.currentT ?? 0,
+      snapshot: app.snapshot ?? [],
+      audio: app.audio ?? [],
+    }),
+    dispose: () => {
+      if (mode === "record" && win.__nfTick === wrappedTick) {
+        win.__nfTick = previousTick;
+      }
+    },
+  };
+  void postCompatMessages(bridge, READY_KINDS, { payload: runtime.diagnose() });
+  return runtime;
+}
+
+async function postCompatMessages(bridge, kinds, extra = {}) {
+  if (!bridge || typeof bridge.sendMessage !== "function") return;
+  for (const kind of kinds) {
+    try {
+      await bridge.sendMessage({ kind, ...extra });
+    } catch (_err) {
+      // Compatibility bridge failures must never crash playback or recording.
+    }
+  }
+}
+
+function exposeGlobals(runtime, bridge) {
   const api = {
+    start,
+    stop,
+    currentMode,
     mode: () => currentModeName,
-    seek: (t) => (typeof runtime.seek === "function" ? runtime.seek(t) : host.setT(t)),
-    getT: () => host.getT(),
+    seek: (t) => runtime.seek?.(t),
+    getT: () => runtime.getT?.() ?? 0,
     pause: () => runtime.pause?.(),
-    resume: () => runtime.resume?.(),
-    tick: (t) => runtime.tick?.(t),
+    resume: () => {
+      if (typeof runtime.resume === "function") return runtime.resume();
+      return runtime.start?.();
+    },
+    tick: (...args) => runtime.tick?.(...args),
     setProps: (id, path, v) => runtime.setProps?.(id, path, v),
     requestWriteBack: () => runtime.requestWriteBack?.(),
-    diagnose: () => runtime.diagnose?.(),
+    diagnose: () => runtime.diagnose?.() ?? { mode: currentModeName },
     bridge,
   };
   globalThis.__nfRuntime = api;
   globalThis.__nfDiagnose = () => api.diagnose();
   if (currentModeName === "edit") {
     globalThis.__nfEditorDiagnose = () => api.diagnose();
+  } else {
+    delete globalThis.__nfEditorDiagnose;
   }
   // Record mode exposes __nfTick through createRecord directly.
 }
@@ -144,6 +218,16 @@ export function stop() {
   }
   currentRuntime = null;
   currentModeName = null;
+  const bootstrap = globalThis.__nfRuntime || {};
+  globalThis.__nfRuntime = {
+    ...bootstrap,
+    start,
+    stop,
+    currentMode,
+    mode: () => currentModeName,
+  };
+  delete globalThis.__nfDiagnose;
+  delete globalThis.__nfEditorDiagnose;
 }
 
 // Legacy entry — used by the walking stub call sites.

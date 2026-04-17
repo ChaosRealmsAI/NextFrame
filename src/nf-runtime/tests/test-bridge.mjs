@@ -52,7 +52,10 @@ test("bridge: __replyTo routing resolves pending promises", async (t) => {
   globalThis.webkit = {
     messageHandlers: {
       nfBridge: {
-        postMessage(msg) { sent.push(msg); /* no return = legacy */ },
+        postMessage(msg) {
+          sent.push(typeof msg === "string" ? JSON.parse(msg) : msg);
+          /* no return = legacy */
+        },
       },
     },
   };

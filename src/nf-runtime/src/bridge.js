@@ -1,8 +1,8 @@
 // Bridge — thin wrapper around WKScriptMessageHandlerWithReply.
 //
-// Native side registers a message handler named `nfBridge` on the WKWebView's
-// content controller. The browser side calls
-// `window.webkit.messageHandlers.nfBridge.postMessage({...})`.
+// Native side registers a message handler named `nfBridge` or `__nfBridge`
+// on the WKWebView's content controller. The browser side calls
+// `window.webkit.messageHandlers.<bridge>.postMessage(...)`.
 // When `postMessage` is registered as `WKScriptMessageHandlerWithReply`,
 // it returns a Promise. Otherwise we fall back to a callback table keyed by
 // a monotonic request id.
@@ -15,7 +15,7 @@
 const REPLY_TIMEOUT_MS = 10_000;
 
 export function createBridge(options = {}) {
-  const handlerName = options.handlerName ?? "nfBridge";
+  const handlerNames = normalizeHandlerNames(options.handlerName);
   const timeoutMs = options.timeoutMs ?? REPLY_TIMEOUT_MS;
 
   const listeners = new Set();
@@ -27,9 +27,11 @@ export function createBridge(options = {}) {
     if (!webkit) return null;
     const handlers = webkit.messageHandlers;
     if (!handlers) return null;
-    const h = handlers[handlerName];
-    if (!h || typeof h.postMessage !== "function") return null;
-    return h;
+    for (const handlerName of handlerNames) {
+      const handler = handlers[handlerName];
+      if (handler && typeof handler.postMessage === "function") return handler;
+    }
+    return null;
   };
 
   const receive = (message) => {
@@ -70,16 +72,16 @@ export function createBridge(options = {}) {
     // Attempt reply-style post first. WKScriptMessageHandlerWithReply returns
     // a thenable from postMessage.
     const id = nextId++;
-    const payload = { id, kind: message.kind, payload: message.payload ?? null };
+    const payload = normalizeOutgoingMessage({ ...message, id, payload: message.payload ?? null });
     let result;
     try {
-      result = handler.postMessage(payload);
+      result = handler.postMessage(JSON.stringify(payload));
     } catch (err) {
       return Promise.reject(err instanceof Error ? err : new Error(String(err)));
     }
 
     if (result && typeof result.then === "function") {
-      return result;
+      return result.then(parseReplyValue);
     }
 
     // Fallback: register a pending callback, native is expected to push
@@ -108,6 +110,29 @@ export function createBridge(options = {}) {
   const isAvailable = () => getNativeHandler() !== null;
 
   return { sendMessage, onMessage, isAvailable, receive };
+}
+
+function normalizeHandlerNames(input) {
+  if (Array.isArray(input)) return input;
+  if (typeof input === "string" && input.length > 0) return [input];
+  return ["__nfBridge", "nfBridge"];
+}
+
+function normalizeOutgoingMessage(message) {
+  const payload = { ...message };
+  if (!Object.prototype.hasOwnProperty.call(payload, "payload")) {
+    payload.payload = null;
+  }
+  return payload;
+}
+
+function parseReplyValue(value) {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch (_err) {
+    return value;
+  }
 }
 
 // Module-level singleton for the common case.
