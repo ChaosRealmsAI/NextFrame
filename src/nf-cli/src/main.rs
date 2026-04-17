@@ -21,9 +21,22 @@ enum Command {
     },
     /// Render bundle.html → MP4 via nf-recorder.
     Record {
+        #[arg(long, default_value = "spec/fixtures/sample.json")]
         bundle: std::path::PathBuf,
-        #[arg(short, long)]
-        output: std::path::PathBuf,
+        #[arg(short = 'o', long = "out", default_value = "out/record.mp4")]
+        out: std::path::PathBuf,
+        #[arg(long, default_value_t = 1.0)]
+        duration: f64,
+        #[arg(long, default_value_t = 30)]
+        fps: u32,
+        #[arg(long, default_value = "1920x1080")]
+        resolution: String,
+        #[arg(long, default_value_t = 6)]
+        workers: usize,
+        #[arg(long)]
+        verify_pixels: bool,
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Validate a source.json (anchors / viewport / refs).
     Validate { source: std::path::PathBuf },
@@ -36,25 +49,52 @@ enum Command {
 
 fn main() {
     let cli = Cli::parse();
-    let result: anyhow::Result<Option<serde_json::Value>> = match cli.command {
-        Command::Build { source, output } => commands::build::run(&source, &output).map(Some),
-        Command::Record { bundle, output } => commands::record::run(&bundle, &output).map(Some),
-        Command::Validate { source } => commands::validate::run(&source).map(Some),
+    let result: anyhow::Result<commands::CommandOutput> = match cli.command {
+        Command::Build { source, output } => {
+            commands::build::run(&source, &output).map(commands::CommandOutput::json)
+        }
+        Command::Record {
+            bundle,
+            out,
+            duration,
+            fps,
+            resolution,
+            workers,
+            verify_pixels,
+            dry_run,
+        } => commands::record::run(commands::record::RecordOptions {
+            bundle,
+            out,
+            duration_s: duration,
+            fps,
+            resolution,
+            workers,
+            verify_pixels,
+            dry_run,
+        }),
+        Command::Validate { source } => commands::validate::run(&source),
         Command::AiOps { action } => commands::ai_ops::run(action),
     };
     match result {
-        Ok(Some(value)) => {
-            if let Ok(s) = serde_json::to_string(&value) {
-                println!("{}", s);
+        Ok(output) => {
+            let exit_code = output.exit_code;
+            if let Some(value) = output.value {
+                if let Ok(s) = serde_json::to_string(&value) {
+                    println!("{}", s);
+                }
+            }
+            if exit_code != 0 {
+                std::process::exit(exit_code);
             }
         }
-        Ok(None) => {}
         Err(err) => {
             let payload = serde_json::json!({
                 "ok": false,
                 "error": err.to_string(),
             });
-            eprintln!("{}", payload);
+            if let Ok(s) = serde_json::to_string(&payload) {
+                eprintln!("{}", s);
+            }
             std::process::exit(1);
         }
     }

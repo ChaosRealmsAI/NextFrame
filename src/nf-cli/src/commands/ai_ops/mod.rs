@@ -5,19 +5,21 @@ pub mod serve;
 
 pub use self::cmd::{AiOpsCmd, ServeArgs};
 
-pub fn run(cmd: AiOpsCmd) -> anyhow::Result<Option<serde_json::Value>> {
+use crate::commands::CommandOutput;
+
+pub fn run(cmd: AiOpsCmd) -> anyhow::Result<CommandOutput> {
     match cmd {
         AiOpsCmd::Serve(args) => {
             let runtime = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()?;
             runtime.block_on(serve::run(args))?;
-            Ok(None)
+            Ok(CommandOutput::empty())
         }
-        AiOpsCmd::Describe => Ok(Some(describe())),
-        AiOpsCmd::Simulate { action } => Ok(Some(simulate(&action))),
-        AiOpsCmd::State => Ok(Some(state())),
-        AiOpsCmd::Screenshot { output } => Ok(Some(screenshot(&output))),
+        AiOpsCmd::Describe => Ok(CommandOutput::json(describe())),
+        AiOpsCmd::Simulate { action } => Ok(CommandOutput::json(simulate(&action))),
+        AiOpsCmd::State => Ok(CommandOutput::json(state())),
+        AiOpsCmd::Screenshot { output } => Ok(CommandOutput::json(screenshot(&output))),
     }
 }
 
