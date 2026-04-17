@@ -1,6 +1,10 @@
 // Safe AST expression evaluator. Hand-rolled recursive-descent parser over
 // numbers, identifiers, parentheses and the operators + - * / with standard
 // precedence. No eval(). Extracts identifier dependencies for topo sort.
+//
+// NextFrame anchor sugar (kept on top of a generic math grammar):
+//   • identifiers may be prefixed with '@' (treated as the bare name)
+//   • number literals may carry a unit suffix 'ms' (×1) or 's' (×1000)
 
 export class ExprError extends Error {
   constructor(message: string, public readonly pos: number) {
@@ -16,6 +20,18 @@ type Token =
   | { kind: "lp"; pos: number }
   | { kind: "rp"; pos: number }
   | { kind: "eof"; pos: number };
+
+function isDigit(c: string): boolean {
+  return c >= "0" && c <= "9";
+}
+
+function isIdStart(c: string): boolean {
+  return (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c === "_";
+}
+
+function isIdCont(c: string): boolean {
+  return isIdStart(c) || isDigit(c);
+}
 
 function tokenize(src: string): Token[] {
   const tokens: Token[] = [];
@@ -41,18 +57,38 @@ function tokenize(src: string): Token[] {
       i += 1;
       continue;
     }
-    if ((c >= "0" && c <= "9") || c === ".") {
+    if (isDigit(c) || c === ".") {
       const start = i;
       while (i < src.length && /[0-9.]/.test(src[i])) i += 1;
       const text = src.slice(start, i);
       const n = Number(text);
       if (!Number.isFinite(n)) throw new ExprError(`invalid number "${text}"`, start);
-      tokens.push({ kind: "num", value: n, pos: start });
+      // Optional unit suffix: ms (×1) or s (×1000).
+      let value = n;
+      if (src.startsWith("ms", i)) {
+        i += 2;
+      } else if (src[i] === "s" && !isIdCont(src[i + 1] ?? "")) {
+        value = n * 1000;
+        i += 1;
+      }
+      tokens.push({ kind: "num", value, pos: start });
       continue;
     }
-    if ((c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c === "_") {
+    // '@name' is sugar for the bare identifier `name`.
+    if (c === "@") {
       const start = i;
-      while (i < src.length && /[A-Za-z0-9_]/.test(src[i])) i += 1;
+      i += 1;
+      if (i >= src.length || !isIdStart(src[i])) {
+        throw new ExprError('expected identifier after "@"', start);
+      }
+      const idStart = i;
+      while (i < src.length && isIdCont(src[i])) i += 1;
+      tokens.push({ kind: "id", value: src.slice(idStart, i), pos: start });
+      continue;
+    }
+    if (isIdStart(c)) {
+      const start = i;
+      while (i < src.length && isIdCont(src[i])) i += 1;
       tokens.push({ kind: "id", value: src.slice(start, i), pos: start });
       continue;
     }
@@ -65,7 +101,7 @@ function tokenize(src: string): Token[] {
 type AstNode =
   | { kind: "num"; value: number }
   | { kind: "id"; value: string }
-  | { kind: "bin"; op: "+" | "-" | "*" | "/"; lhs: AstNode; rhs: AstNode }
+  | { kind: "bin"; op: "+" | "-" | "*" | "/"; lhs: AstNode; rhs: AstNode; pos: number }
   | { kind: "neg"; operand: AstNode };
 
 class Parser {
@@ -91,7 +127,7 @@ class Parser {
       if (t.kind === "op" && (t.value === "+" || t.value === "-")) {
         this.eat();
         const rhs = this.parseMul();
-        lhs = { kind: "bin", op: t.value, lhs, rhs };
+        lhs = { kind: "bin", op: t.value, lhs, rhs, pos: t.pos };
       } else {
         return lhs;
       }
@@ -104,7 +140,7 @@ class Parser {
       if (t.kind === "op" && (t.value === "*" || t.value === "/")) {
         this.eat();
         const rhs = this.parseUnary();
-        lhs = { kind: "bin", op: t.value, lhs, rhs };
+        lhs = { kind: "bin", op: t.value, lhs, rhs, pos: t.pos };
       } else {
         return lhs;
       }
@@ -174,8 +210,8 @@ function evalAst(n: AstNode, ctx: Record<string, number>, pos: number): number {
     return ctx[n.value];
   }
   if (n.kind === "neg") return -evalAst(n.operand, ctx, pos);
-  const l = evalAst(n.lhs, ctx, pos);
-  const r = evalAst(n.rhs, ctx, pos);
+  const l = evalAst(n.lhs, ctx, n.pos);
+  const r = evalAst(n.rhs, ctx, n.pos);
   switch (n.op) {
     case "+":
       return l + r;
@@ -184,7 +220,7 @@ function evalAst(n: AstNode, ctx: Record<string, number>, pos: number): number {
     case "*":
       return l * r;
     case "/":
-      if (r === 0) throw new ExprError("division by zero", pos);
+      if (r === 0) throw new ExprError("division by zero", n.pos);
       return l / r;
   }
 }

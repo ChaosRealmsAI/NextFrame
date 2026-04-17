@@ -10,9 +10,13 @@ export class CyclicAnchors extends Error {
 }
 
 export class UnknownRef extends Error {
-  constructor(public readonly name: string, public readonly from?: string) {
-    super(from ? `anchor "${from}" references unknown "${name}"` : `unknown reference "${name}"`);
+  public readonly refName: string;
+  public readonly from?: string;
+  constructor(refName: string, from?: string) {
+    super(from ? `anchor "${from}" references unknown "${refName}"` : `unknown reference "${refName}"`);
     this.name = "UnknownRef";
+    this.refName = refName;
+    this.from = from;
   }
 }
 

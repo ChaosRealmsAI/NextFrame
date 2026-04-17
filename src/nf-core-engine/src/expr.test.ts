@@ -41,3 +41,19 @@ test("expr: undefined identifier throws", () => {
 test("expr: division by zero throws", () => {
   assert.throws(() => evalExpr("1 / 0"), (e: unknown) => e instanceof ExprError);
 });
+
+test("expr: @-prefix sugar resolves to bare identifier", () => {
+  assert.equal(evalExpr("@intro_start + 2000", { intro_start: 500 }), 2500);
+  assert.deepEqual(collectDeps("@a + @b * (@c - @a)").sort(), ["a", "b", "c"]);
+});
+
+test("expr: ms and s unit suffix", () => {
+  assert.equal(evalExpr("200ms"), 200);
+  assert.equal(evalExpr("2s"), 2000);
+  assert.equal(evalExpr("@opening + 200ms", { opening: 0 }), 200);
+  assert.equal(evalExpr("@opening + 2s", { opening: 0 }), 2000);
+});
+
+test("expr: dangling '@' raises ExprError", () => {
+  assert.throws(() => evalExpr("@ + 1"), (e: unknown) => e instanceof ExprError);
+});

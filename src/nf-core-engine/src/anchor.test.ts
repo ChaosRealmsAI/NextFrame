@@ -54,3 +54,51 @@ test("anchor: CyclicAnchors with path", () => {
     },
   );
 });
+
+test("anchor: BDD-1 @-prefix + ms sugar + shuffled order", () => {
+  const ast = parseSource(
+    makeSrc({
+      s2_start: "@s1_end - 100ms",
+      s1_end: "@s1_start + 2000ms",
+      s1_start: "@opening + 200ms",
+      opening: 0,
+    }),
+  );
+  const r = resolveAnchors(ast);
+  assert.deepEqual(r.anchors, {
+    s2_start: 2100,
+    s1_end: 2200,
+    s1_start: 200,
+    opening: 0,
+  });
+});
+
+test("anchor: meta carries refs + kind per anchor", () => {
+  const ast = parseSource(
+    makeSrc({ a: 0, b: { ref: "a" }, c: "@a + @b + 1" }),
+  );
+  const r = resolveAnchors(ast);
+  assert.equal(r.anchors_meta.a.kind, "number");
+  assert.deepEqual(r.anchors_meta.a.refs, []);
+  assert.equal(r.anchors_meta.b.kind, "ref");
+  assert.deepEqual(r.anchors_meta.b.refs, ["a"]);
+  assert.equal(r.anchors_meta.c.kind, "expr");
+  assert.deepEqual(r.anchors_meta.c.refs.sort(), ["a", "b"]);
+});
+
+test("anchor: source_line metadata populated from raw text", () => {
+  const rawText = [
+    "{",
+    '  "viewport": { "ratio": "16:9", "w": 1920, "h": 1080 },',
+    '  "anchors": {',
+    '    "first": 0,',
+    '    "second": "@first + 100ms"',
+    "  },",
+    '  "tracks": []',
+    "}",
+  ].join("\n");
+  const ast = parseSource(rawText);
+  const r = resolveAnchors(ast);
+  assert.equal(r.anchors_meta.first.source_line, 4);
+  assert.equal(r.anchors_meta.second.source_line, 5);
+});
