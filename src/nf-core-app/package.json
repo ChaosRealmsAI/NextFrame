@@ -8,5 +8,9 @@
     ".": "./src/app.js",
     "./state": "./src/state.js",
     "./track-host": "./src/track-host.js"
+  },
+  "scripts": {
+    "test": "node --test tests/test-state.mjs tests/test-host.mjs tests/test-app.mjs",
+    "test:smoke": "node tests/integration-smoke.mjs"
   }
 }
