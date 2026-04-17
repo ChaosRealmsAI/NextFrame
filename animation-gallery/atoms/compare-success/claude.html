@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Success · Claude</title>
+<style>
+  :root {
+    /* Anthropic warm cream palette */
+    --bg: #faf9f5;           /* signature warm cream */
+    --bg-soft: #f3f0e8;      /* a touch deeper for subtle layering */
+    --ink-900: #1a1a1a;      /* near-black serif ink */
+    --ink-700: #3a332e;      /* deep warm brown for secondary text */
+    --ink-500: #8a8178;      /* warm dust grey */
+    --ink-300: #c9c2b6;      /* soft warm divider */
+    --ink-100: #e8e3d8;      /* hairline */
+    --anthropic: #d97757;    /* signature orange */
+    --anthropic-soft: #e88b6e;/* gentler coral glow */
+    --anthropic-glow: rgba(217, 119, 87, 0.22);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    font-family: "Tiempos Text", "Source Serif Pro", "Source Serif 4", "New York",
+                 "Iowan Old Style", "Palatino", Georgia, serif;
+    color: var(--ink-900);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: 0.002em;
+  }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .scene {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    background: var(--bg);
+    transform-origin: center;
+    overflow: hidden;
+  }
+
+  /* subtle paper grain — pure CSS, no animation, no noise image */
+  .scene::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 40%, rgba(255,255,255,0.35) 0%, transparent 60%),
+      radial-gradient(ellipse at 50% 90%, rgba(217, 119, 87, 0.05) 0%, transparent 55%);
+    pointer-events: none;
+  }
+
+  /* viewport-based scale so 1920x1080 always fits */
+  @media (max-aspect-ratio: 16/9) {
+    .scene { transform: scale(calc(100vw / 1920)); }
+  }
+  @media (min-aspect-ratio: 16/9) {
+    .scene { transform: scale(calc(100vh / 1080)); }
+  }
+
+  .composition {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 52px;
+  }
+
+  .ring-wrap {
+    position: relative;
+    width: 140px;   /* small — well under 15% of 1080 */
+    height: 140px;
+  }
+
+  .glow-layer {
+    position: absolute;
+    inset: -40px;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .label-block {
+    position: relative;
+    min-height: 90px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .label-main {
+    font-size: 42px;
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: 0.004em;
+    color: var(--ink-900);
+    white-space: nowrap;
+    font-feature-settings: "liga", "dlig", "kern";
+  }
+
+  .label-sub {
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-500);
+    font-family: "Inter", "SF Pro Text", system-ui, sans-serif;
+    font-feature-settings: "ss01";
+  }
+
+  /* drifting dust motes — SVG-drawn, purely positional, frame-pure */
+  .motes {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* Timeline UI — warm cream, serif caps */
+  .cue-row {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 58px;
+    height: 18px;
+    pointer-events: none;
+    z-index: 9;
+  }
+  .cue-mark {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 8px;
+    background: var(--ink-300);
+  }
+  .cue-mark .lbl {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-500);
+    white-space: nowrap;
+    font-family: "Inter", system-ui, sans-serif;
+  }
+
+  .tl-ui {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 0;
+    height: 48px;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(250, 249, 245, 0.94);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--ink-100);
+    z-index: 10;
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--ink-900);
+  }
+  .tl-ui button {
+    height: 26px;
+    min-width: 26px;
+    padding: 0 8px;
+    background: transparent;
+    border: 1px solid var(--ink-100);
+    border-radius: 5px;
+    color: var(--ink-900);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tl-ui button:hover { background: var(--bg-soft); }
+  .tl-ui .time { color: var(--ink-500); font-variant-numeric: tabular-nums; min-width: 124px; }
+  .tl-ui input[type=range] {
+    flex: 1;
+    height: 2px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--ink-100);
+    outline: none;
+  }
+  .tl-ui input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--anthropic);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="scene">
+    <!-- dust motes (SVG, frame-pure positional) -->
+    <svg class="motes" id="motes" viewBox="0 0 1920 1080" width="1920" height="1080" preserveAspectRatio="none">
+      <!-- motes are drawn by JS; template only -->
+    </svg>
+
+    <div class="composition">
+      <div class="ring-wrap">
+        <!-- warm glow behind (SVG filter blur via standalone SVG) -->
+        <svg class="glow-layer" id="glowLayer" viewBox="-40 -40 220 220" width="220" height="220">
+          <defs>
+            <radialGradient id="warmGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"  stop-color="#d97757" stop-opacity="0.55"/>
+              <stop offset="45%" stop-color="#e88b6e" stop-opacity="0.22"/>
+              <stop offset="100%" stop-color="#e88b6e" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <circle id="glow" cx="70" cy="70" r="90" fill="url(#warmGlow)" opacity="0"/>
+        </svg>
+
+        <!-- ring + check, redrawn each frame -->
+        <svg id="ring" viewBox="0 0 140 140" width="140" height="140"
+             style="position:absolute; inset:0;">
+          <!-- idle hollow ring -->
+          <circle id="ringIdle" cx="70" cy="70" r="48"
+                  fill="none" stroke="var(--ink-500)" stroke-width="1.4"
+                  opacity="0.8"/>
+          <!-- filled disc (appears on complete) -->
+          <circle id="ringFill" cx="70" cy="70" r="48"
+                  fill="var(--anthropic)" opacity="0"/>
+          <!-- check drawn stroke-by-stroke; starts from the elbow -->
+          <path id="checkStroke"
+                d="M54 72 L66 84 L90 60"
+                fill="none"
+                stroke="#faf9f5"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-dasharray="50"
+                stroke-dashoffset="50"
+                opacity="0"/>
+        </svg>
+      </div>
+
+      <div class="label-block">
+        <div class="label-main" id="labelMain">Complete.</div>
+        <div class="label-sub"  id="labelSub">with care</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cue-row" id="cueRow"></div>
+<div class="tl-ui">
+  <button id="playBtn">⏸</button>
+  <button id="resetBtn">↺</button>
+  <span class="time" id="timeLabel">0.00 / 10.00s</span>
+  <input type="range" id="scrubber" min="0" max="1000" value="0">
+  <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+</div>
+
+<script>
+(() => {
+  const DURATION = 10.0;
+  const FPS = 30;
+
+  const clamp01 = t => Math.max(0, Math.min(1, t));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut  = x => 1 - Math.pow(1 - x, 3);
+  const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+
+  // Claude-temper spring: k=150, d=20 — near-critical, slow, almost no overshoot
+  function spring(t, k = 150, d = 20, mass = 1) {
+    if (t <= 0) return 0;
+    const wn = Math.sqrt(k / mass);
+    const zeta = d / (2 * Math.sqrt(k * mass));
+    if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+    }
+    return 1 - (1 + wn * t) * Math.exp(-wn * t);
+  }
+  const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+  // --- Timing (slow, gentle — everything is 400–800ms) ---
+  const T_TRIGGER = 2.00;                      // moment of quiet completion
+  const T_FILL    = T_TRIGGER + 0.00;          // ring fills warmly (400ms spring)
+  const T_GLOW    = T_TRIGGER + 0.05;          // glow blooms (700ms)
+  const T_CHECK   = T_TRIGGER + 0.30;          // check draws slowly (600ms)
+  const T_LABEL   = T_TRIGGER + 0.90;          // "Complete." floats in (400ms)
+  const T_SUB     = T_TRIGGER + 1.15;          // subtitle drifts up (400ms, stagger)
+  const T_HOLD    = 4.00;                      // begin slow breath
+  const T_FADE    = 9.00;                      // begin gentle fade-to-loop
+
+  const CUES = [
+    { t: 0.00, label: 'at rest' },
+    { t: 2.00, label: 'warm fill' },
+    { t: 2.30, label: 'slow stroke' },
+    { t: 2.90, label: 'complete.' },
+    { t: 4.00, label: 'breathe' },
+    { t: 9.00, label: 'let go' },
+  ];
+
+  // --- elements ---
+  const ringIdle   = document.getElementById('ringIdle');
+  const ringFill   = document.getElementById('ringFill');
+  const checkStroke= document.getElementById('checkStroke');
+  const glow       = document.getElementById('glow');
+  const labelMain  = document.getElementById('labelMain');
+  const labelSub   = document.getElementById('labelSub');
+  const motesSvg   = document.getElementById('motes');
+  const scene      = document.querySelector('.scene');
+
+  const CHECK_LEN = 50; // path-length budget for the dasharray
+
+  // --- dust motes: 3 fixed positions, sine-drift (frame-pure, no random-per-frame) ---
+  // seeded once at construction; motion is a function of t only
+  const MOTES = [
+    { baseX: 640,  baseY: 420, rx: 40, ry: 22, phase: 0.0,  r: 2.2, speed: 0.18 },
+    { baseX: 1180, baseY: 560, rx: 55, ry: 30, phase: 1.7,  r: 1.8, speed: 0.14 },
+    { baseX: 960,  baseY: 820, rx: 30, ry: 18, phase: 3.3,  r: 1.6, speed: 0.22 },
+  ];
+  const moteNodes = MOTES.map(m => {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', m.baseX);
+    c.setAttribute('cy', m.baseY);
+    c.setAttribute('r', m.r);
+    c.setAttribute('fill', '#d97757');
+    c.setAttribute('opacity', '0');
+    motesSvg.appendChild(c);
+    return c;
+  });
+
+  function render(t) {
+    // ============ RING FILL (400ms, k=150 d=20 spring) ============
+    // map real seconds → spring-seconds: ~0.4s should reach ~1.0
+    // for k=150,d=20 → wn ≈ 12.25, zeta ≈ 0.816; settles ~0.5s. Compress input by 2.2.
+    const fillDt = Math.max(0, t - T_FILL);
+    const fillP  = clamp01(spring(fillDt * 2.2, 150, 20));
+    // idle ring fades as fill grows
+    ringIdle.setAttribute('opacity', ((1 - Math.min(1, fillP * 1.15)) * 0.8).toFixed(3));
+    // filled disc scales up 0.7 → 1.0 on spring (no bouncy overshoot)
+    const discScale = lerp(0.72, 1.0, fillP);
+    ringFill.setAttribute('opacity', (fillP * 0.96).toFixed(3));
+    ringFill.setAttribute('transform',
+      `translate(70 70) scale(${discScale.toFixed(3)}) translate(-70 -70)`);
+
+    // ============ WARM GLOW (700ms bloom, then slow fade) ============
+    const glowInDt = Math.max(0, t - T_GLOW);
+    const glowIn   = kern(t, T_GLOW, 0.70, easeOut);          // 700ms in
+    const glowOutStart = T_GLOW + 2.2;                        // hold ~2s
+    const glowOut  = kern(t, glowOutStart, 3.5, easeInOut);   // 3.5s quiet fade
+    const glowAmp  = clamp01(glowIn - glowOut * 0.55);
+    glow.setAttribute('opacity', (glowAmp * 0.85).toFixed(3));
+
+    // ============ CHECK STROKE (600ms easeInOut, starts from elbow) ============
+    const checkProg = kern(t, T_CHECK, 0.60, easeInOut);
+    const dashOff   = (1 - checkProg) * CHECK_LEN;
+    checkStroke.setAttribute('stroke-dashoffset', dashOff.toFixed(2));
+    // the stroke itself becomes visible as the fill completes
+    const checkOp = clamp01(Math.min(fillP * 1.4, 1) * (t >= T_CHECK ? 1 : 0));
+    checkStroke.setAttribute('opacity', checkOp.toFixed(3));
+
+    // ============ LABEL "Complete." — gentle floating in (400ms, 3px up) ============
+    const labelP    = kern(t, T_LABEL, 0.40, easeOut);
+    const labelOpIn = labelP;
+    const labelDy   = lerp(3, 0, labelP);  // 3px translate upward
+    // slow breath during hold (±1% scale, 0.18 Hz — like quiet breathing)
+    let breathScale = 1.0;
+    if (t > T_HOLD && t < T_FADE) {
+      const phase = (t - T_HOLD) * 2 * Math.PI * 0.18;
+      breathScale = 1.0 + Math.sin(phase) * 0.01; // ±1%
+    }
+    // gentle fade-out near loop end (last 1s)
+    let fadeLoop = 1.0;
+    if (t >= T_FADE) {
+      const fadeP = kern(t, T_FADE, 1.0, easeInOut);
+      fadeLoop = lerp(1.0, 0.0, fadeP);
+      // last 0.3s: small final pulse (very subtle)
+      const pulseStart = T_FADE + 0.3;
+      if (t > pulseStart) {
+        const pulseP = kern(t, pulseStart, 0.5, easeOut);
+        fadeLoop *= (1 - pulseP * 0.4);
+      }
+    }
+    labelMain.style.opacity = (labelOpIn * fadeLoop).toFixed(3);
+    labelMain.style.transform = `translateY(${labelDy.toFixed(2)}px) scale(${breathScale.toFixed(4)})`;
+
+    // ============ SUBTITLE "with care" — drift up, 80ms stagger ============
+    const subP = kern(t, T_SUB, 0.45, easeOut);
+    const subDy = lerp(3, 0, subP);
+    labelSub.style.opacity = (subP * fadeLoop).toFixed(3);
+    labelSub.style.transform = `translateY(${subDy.toFixed(2)}px)`;
+
+    // ============ DUST MOTES — slow drift (visible only after complete) ============
+    const motesIn = kern(t, T_FILL + 0.3, 1.6, easeOut);
+    MOTES.forEach((m, i) => {
+      const phase = t * m.speed * 2 * Math.PI + m.phase;
+      const dx = Math.sin(phase) * m.rx;
+      const dy = Math.cos(phase * 0.7 + m.phase) * m.ry;
+      const node = moteNodes[i];
+      node.setAttribute('cx', (m.baseX + dx).toFixed(2));
+      node.setAttribute('cy', (m.baseY + dy).toFixed(2));
+      // motes have their own gentle opacity envelope
+      const indivPhase = t * 0.28 * 2 * Math.PI + m.phase * 1.3;
+      const shimmer = 0.35 + Math.sin(indivPhase) * 0.25; // 0.10..0.60
+      const amp = motesIn * shimmer * fadeLoop;
+      node.setAttribute('opacity', amp.toFixed(3));
+    });
+
+    // ============ RING-WRAP gentle sync breath (mirror label breath, half amp) ============
+    const ringWrap = document.querySelector('.ring-wrap');
+    if (t > T_HOLD && t < T_FADE) {
+      const phase = (t - T_HOLD) * 2 * Math.PI * 0.18;
+      const s = 1.0 + Math.sin(phase) * 0.005;
+      ringWrap.style.transform = `scale(${s.toFixed(4)})`;
+    } else {
+      ringWrap.style.transform = 'scale(1)';
+    }
+    // ring group fade with the loop envelope
+    ringWrap.style.opacity = fadeLoop.toFixed(3);
+
+    // reset label text in case user scrubs back to idle
+    if (t < T_LABEL) {
+      // (text itself is static; only opacity/transform animate)
+    }
+  }
+
+  // --- Timeline controller ---
+  const scrubber = document.getElementById('scrubber');
+  const playBtn = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const timeLabel = document.getElementById('timeLabel');
+  const frameLabel = document.getElementById('frameLabel');
+  const cueRow = document.getElementById('cueRow');
+
+  let currentT = 0, playing = true, lastFrame = performance.now();
+
+  function setTime(t) {
+    currentT = Math.max(0, Math.min(DURATION, t));
+    scrubber.value = Math.round(currentT / DURATION * 1000);
+    timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+    frameLabel.textContent = 'frame ' + Math.round(currentT * FPS) + ' / ' + Math.round(DURATION * FPS);
+    render(currentT);
+  }
+
+  function loop() {
+    const now = performance.now();
+    const dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (playing) {
+      let next = currentT + dt;
+      if (next >= DURATION) next = 0;
+      setTime(next);
+    }
+    requestAnimationFrame(loop);
+  }
+
+  scrubber.addEventListener('input', () => {
+    playing = false;
+    playBtn.textContent = '▶';
+    setTime(scrubber.value / 1000 * DURATION);
+  });
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    lastFrame = performance.now();
+  });
+  resetBtn.addEventListener('click', () => setTime(0));
+
+  CUES.forEach(cue => {
+    const m = document.createElement('div');
+    m.className = 'cue-mark';
+    m.style.left = (cue.t / DURATION * 100) + '%';
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl';
+    lbl.textContent = cue.label;
+    m.appendChild(lbl);
+    cueRow.appendChild(m);
+  });
+
+  setTime(0);
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
