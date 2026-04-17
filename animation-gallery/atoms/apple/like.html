@@ -1,564 +1,620 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Like · Heart Rate</title>
+<meta charset="UTF-8">
+<title>Like · Glass Heart · Keynote Hero</title>
 <style>
   :root {
-    --bg: #fafafa;
-    --ink: #1c1c1e;
-    --ink-2: #3a3a3c;
-    --ink-3: #8e8e93;
-    --line: rgba(28,28,30,0.08);
-    --accent: #ff3b30;
+    --bg-deep: #05050a;
+    --bg-mid:  #0d0a1a;
+    --bg-accent: #16102a;
+    --text-soft: rgba(220,220,240,0.5);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
-    width: 1920px; height: 1080px;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
-    font-feature-settings: "tnum" 1, "ss01" 1;
+    width: 100%; height: 100%;
+    background: var(--bg-deep);
+    color: #fff;
+    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
     overflow: hidden;
-    letter-spacing: -0.02em;
+    -webkit-font-smoothing: antialiased;
   }
-  body { position: relative; }
-
-  /* Stage */
   .stage {
+    position: relative;
+    width: 1920px; height: 1080px;
+    transform-origin: top left;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 50%, #1b1434 0%, #0a0716 45%, #05040c 85%, #020106 100%);
+    overflow: hidden;
+  }
+  /* Stars layer — faint static twinkle */
+  .stars {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.6), transparent 50%),
+      radial-gradient(1px 1px at 84% 27%, rgba(200,210,255,0.5), transparent 50%),
+      radial-gradient(1px 1px at 23% 72%, rgba(255,220,240,0.5), transparent 50%),
+      radial-gradient(1px 1px at 67% 81%, rgba(200,220,255,0.4), transparent 50%),
+      radial-gradient(1px 1px at 45% 12%, rgba(255,255,255,0.35), transparent 50%),
+      radial-gradient(1.5px 1.5px at 91% 55%, rgba(220,200,255,0.45), transparent 50%),
+      radial-gradient(1px 1px at 8% 60%, rgba(255,240,250,0.4), transparent 50%);
+  }
+  .vignette {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.45) 75%, rgba(0,0,0,0.85) 100%);
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #glShader { z-index: 1; }
+  #particles { z-index: 2; }
+  #bloom { z-index: 3; mix-blend-mode: screen; }
+
+  .wordmark {
     position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
+    left: 72px; bottom: 160px;
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    color: rgba(200,200,230,0.35);
+    font-weight: 300;
+    z-index: 10;
   }
 
-  canvas#main {
-    width: 1920px;
-    height: 1080px;
-    display: block;
-  }
-
-  /* BPM readout */
-  .bpm {
-    position: absolute;
-    left: 50%;
-    top: 210px;
-    transform: translateX(-50%);
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    font-variant-numeric: tabular-nums;
-    color: var(--ink);
-    will-change: opacity;
-  }
-  .bpm .num {
-    font-size: 72px;
-    font-weight: 500;
-    letter-spacing: -0.04em;
-    line-height: 1;
-  }
-  .bpm .unit {
-    font-size: 22px;
-    font-weight: 500;
-    color: var(--ink-3);
-    letter-spacing: 0.02em;
-    text-transform: lowercase;
-  }
-
-  /* Bottom timeline UI */
   .cue-row {
     position: absolute;
-    left: 48px;
-    right: 48px;
-    bottom: 78px;
-    height: 22px;
-    pointer-events: none;
+    left: 72px; right: 72px; bottom: 108px;
+    height: 18px;
+    z-index: 20;
   }
   .cue-mark {
     position: absolute;
     top: 0;
-    width: 1px;
-    height: 10px;
-    background: var(--ink-3);
-    opacity: 0.5;
-    transform: translateX(-0.5px);
+    width: 2px; height: 10px;
+    background: rgba(180,180,220,0.4);
+    transform: translateX(-1px);
   }
   .cue-mark .lbl {
     position: absolute;
-    top: 12px;
-    left: 0;
+    top: 12px; left: 50%;
     transform: translateX(-50%);
-    font-size: 11px;
-    color: var(--ink-3);
-    font-weight: 500;
-    letter-spacing: 0.02em;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: rgba(180,180,220,0.55);
     white-space: nowrap;
+    font-weight: 300;
+    text-transform: uppercase;
   }
   .tl-ui {
     position: absolute;
-    left: 48px;
-    right: 48px;
-    bottom: 32px;
-    height: 36px;
+    left: 72px; right: 72px; bottom: 48px;
+    height: 44px;
     display: flex;
     align-items: center;
     gap: 18px;
-    padding: 0 18px;
-    background: rgba(255,255,255,0.6);
-    backdrop-filter: blur(20px) saturate(1.4);
-    -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    border: 1px solid var(--line);
-    border-radius: 18px;
+    padding: 0 24px;
+    background: rgba(20,16,36,0.55);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 22px;
+    z-index: 20;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
   }
   .tl-ui button {
     background: transparent;
+    color: rgba(240,240,255,0.85);
     border: none;
-    color: var(--ink);
-    font-size: 16px;
     cursor: pointer;
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: inherit;
+    font-size: 16px;
+    width: 28px; height: 28px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    transition: background 0.15s;
   }
-  .tl-ui button:hover { background: rgba(28,28,30,0.06); }
+  .tl-ui button:hover { background: rgba(255,255,255,0.08); }
   .tl-ui .time {
-    font-size: 13px;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
-    font-weight: 500;
-    letter-spacing: 0;
-    min-width: 132px;
+    font-family: "SF Mono", "Menlo", monospace;
+    font-size: 12px;
+    color: rgba(220,220,240,0.7);
+    min-width: 120px;
+    letter-spacing: 0.04em;
   }
-  .tl-ui input[type=range] {
+  .tl-ui input[type="range"] {
     flex: 1;
-    height: 4px;
     -webkit-appearance: none;
-    background: var(--line);
+    appearance: none;
+    height: 3px;
+    background: rgba(255,255,255,0.12);
     border-radius: 2px;
     outline: none;
+    cursor: pointer;
   }
-  .tl-ui input[type=range]::-webkit-slider-thumb {
+  .tl-ui input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    background: var(--ink);
+    appearance: none;
+    width: 12px; height: 12px;
     border-radius: 50%;
+    background: linear-gradient(180deg, #fff, #d8c8ff);
+    box-shadow: 0 0 10px rgba(180,140,255,0.6), 0 2px 4px rgba(0,0,0,0.4);
     cursor: pointer;
   }
 </style>
 </head>
 <body>
+<div class="stage" id="stage">
+  <div class="stars"></div>
+  <canvas id="glShader"  width="1920" height="1080"></canvas>
+  <canvas id="particles" width="1920" height="1080"></canvas>
+  <canvas id="bloom"     width="1920" height="1080"></canvas>
+  <div class="vignette"></div>
 
-<div class="stage">
-  <canvas id="main" width="1920" height="1080"></canvas>
-</div>
+  <div class="wordmark">ONE&nbsp;&nbsp;MORE&nbsp;&nbsp;THING</div>
 
-<div class="bpm" id="bpm">
-  <span class="num" id="bpmNum">72</span>
-  <span class="unit">bpm</span>
-</div>
-
-<div class="cue-row" id="cueRow"></div>
-<div class="tl-ui">
-  <button id="playBtn">⏸</button>
-  <button id="resetBtn">↺</button>
-  <span class="time" id="timeLabel">0.00 / 10.00s</span>
-  <input type="range" id="scrubber" min="0" max="1000" value="0">
-  <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+  <div class="cue-row" id="cueRow"></div>
+  <div class="tl-ui">
+    <button id="playBtn" title="Play/Pause">&#9208;</button>
+    <button id="resetBtn" title="Reset">&#8634;</button>
+    <span class="time" id="timeLabel">0.00 / 10.00s</span>
+    <input type="range" id="scrubber" min="0" max="1000" value="0">
+    <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+  </div>
 </div>
 
 <script>
-'use strict';
+/* Kai Chen — Apple Keynote Hero · Glass Heart with Light Refraction */
+
+function fitStage() {
+  const stage = document.getElementById('stage');
+  const sw = window.innerWidth, sh = window.innerHeight;
+  const scale = Math.min(sw / 1920, sh / 1080);
+  stage.style.transform = `scale(${scale})`;
+  const ox = (sw - 1920 * scale) / 2, oy = (sh - 1080 * scale) / 2;
+  stage.style.left = ox + 'px'; stage.style.top = oy + 'px';
+  stage.style.position = 'absolute';
+}
+window.addEventListener('resize', fitStage);
+fitStage();
 
 const DURATION = 10.0;
 const FPS = 30;
-
-// ---------- math ----------
 const clamp01 = t => Math.max(0, Math.min(1, t));
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const easeOut = x => 1 - Math.pow(1 - x, 3);
-const easeIn  = x => x * x * x;
 const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
-const springOut = x => {
-  const c = clamp01(x);
-  return c===0||c===1 ? c : 1 - Math.exp(-6*c)*Math.cos(9*c);
-};
 const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
 
-// ---------- scene cues ----------
-// resting heartbeat → tap → excited burst → settle
-const TAP_T = 3.0;
-
 const CUES = [
-  { t: 0.0, label: 'resting' },
-  { t: 3.0, label: 'double-tap' },
-  { t: 3.6, label: 'pulse' },
-  { t: 5.5, label: 'peak 128' },
-  { t: 8.4, label: 'settle' }
+  { t: 0.0, label: 'fade-in' },
+  { t: 1.8, label: 'form' },
+  { t: 3.5, label: 'tap' },
+  { t: 4.8, label: 'bloom' },
+  { t: 6.5, label: 'orbit' },
+  { t: 8.5, label: 'rest' },
 ];
 
-// ---------- canvas helpers ----------
-const canvas = document.getElementById('main');
-const ctx = canvas.getContext('2d');
+/* ---------- WebGL: glass heart shader ---------- */
+const glCanvas = document.getElementById('glShader');
+const gl = glCanvas.getContext('webgl', { premultipliedAlpha: false, alpha: true, antialias: true });
 
-// Apple heart shape path (single closed path — symmetric, rounded, pointed bottom)
-// Starts at bottom tip, sweeps up the right side through the right lobe,
-// dips at top center, sweeps down the left side back to bottom tip.
-function heartPath(cx, cy, size) {
-  const s = size;
-  const p = new Path2D();
-  // Bottom tip
-  const tipY = cy + s * 1.00;
-  const topDipY = cy - s * 0.25;
-  p.moveTo(cx, tipY);
-  // Right side up to top center dip
-  p.bezierCurveTo(
-    cx + s * 0.55, cy + s * 0.65,   // c1: just above bottom tip, right
-    cx + s * 1.08, cy - s * 0.10,   // c2: bulge right side outward
-    cx + s * 0.52, cy - s * 0.78    // end: top of right lobe
-  );
-  p.bezierCurveTo(
-    cx + s * 0.22, cy - s * 1.02,   // c1: pull toward top
-    cx + s * 0.05, cy - s * 0.60,   // c2: come inward to center dip
-    cx,            topDipY          // end: top center dip
-  );
-  // Left side mirror
-  p.bezierCurveTo(
-    cx - s * 0.05, cy - s * 0.60,
-    cx - s * 0.22, cy - s * 1.02,
-    cx - s * 0.52, cy - s * 0.78
-  );
-  p.bezierCurveTo(
-    cx - s * 1.08, cy - s * 0.10,
-    cx - s * 0.55, cy + s * 0.65,
-    cx,            tipY
-  );
-  p.closePath();
-  return p;
-}
-
-// Procedural PQRST waveform at phase u ∈ [0,1]
-// amp = vertical amplitude, returns yOffset
-function ecgAt(u, amp) {
-  // u is cyclic 0..1 within one beat
-  // segments: baseline → P → PR → QRS → ST → T → baseline
-  // P wave small bump 0.10-0.18
-  // Q dip 0.24
-  // R spike 0.26-0.30 (the big one)
-  // S dip 0.32
-  // T wave 0.42-0.58
-  const gauss = (x, c, w, a) => a * Math.exp(-Math.pow((x - c) / w, 2));
-  let y = 0;
-  y += gauss(u, 0.14, 0.025, 0.12);    // P
-  y -= gauss(u, 0.24, 0.010, 0.15);    // Q
-  y += gauss(u, 0.27, 0.008, 1.00);    // R (tall spike)
-  y -= gauss(u, 0.30, 0.012, 0.35);    // S
-  y += gauss(u, 0.50, 0.050, 0.28);    // T
-  return y * amp;
-}
-
-// ---------- heart beat envelope ----------
-// returns scale modulation for heart based on time t and current bpm
-// We run our own beat clock so the heart pulses WITH the ECG trace on screen.
-function beatPhase(t, bpm) {
-  // integrate variable bpm is complex; we'll just use a piecewise constant bpm timeline
-  // but also support slight accel via pre-computed cumulative phase (see bpmCurve).
-  return (t * bpm / 60) % 1;
-}
-
-// bpm curve across DURATION (smooth)
-function bpmAt(t) {
-  // 0..3 resting 72
-  // 3..3.4 spike up to 128 (double tap lands at 3.0, physiological jump takes ~0.4s)
-  // 3.4..5.5 climb and hold near 128
-  // 5.5..8.4 decay back toward 76 (sweet afterglow — slightly above 72)
-  // 8.4..10 calm 74 → 72
-  if (t < 3.0) return 72;
-  if (t < 3.4) return lerp(72, 128, easeOut(kern(t, 3.0, 0.4)));
-  if (t < 5.5) return lerp(128, 128, 1); // hold
-  if (t < 8.4) return lerp(128, 76, easeInOut(kern(t, 5.5, 2.9)));
-  return lerp(76, 72, easeInOut(kern(t, 8.4, 1.6)));
-}
-
-// cumulative beat phase — integrate bpm so screen phase is continuous
-const PHASE_SAMPLES = 2000;
-const phaseTable = new Float32Array(PHASE_SAMPLES + 1);
-(function buildPhaseTable(){
-  let acc = 0;
-  phaseTable[0] = 0;
-  const dt = DURATION / PHASE_SAMPLES;
-  for (let i = 1; i <= PHASE_SAMPLES; i++) {
-    const t = i * dt;
-    const bpm = bpmAt(t - dt * 0.5);
-    acc += (bpm / 60) * dt;  // beats per second * dt
-    phaseTable[i] = acc;
+const VS = `
+  attribute vec2 aPos;
+  varying vec2 vUv;
+  void main() {
+    vUv = aPos * 0.5 + 0.5;
+    gl_Position = vec4(aPos, 0.0, 1.0);
   }
-})();
-function cumulativePhase(t) {
-  const i = clamp(Math.floor(t / DURATION * PHASE_SAMPLES), 0, PHASE_SAMPLES - 1);
-  const frac = (t / DURATION * PHASE_SAMPLES) - i;
-  return lerp(phaseTable[i], phaseTable[i + 1], frac);
+`;
+
+const FS = `
+  precision highp float;
+  varying vec2 vUv;
+  uniform float uTime;
+  uniform float uFormAmt;
+  uniform float uTapPulse;
+  uniform float uGlow;
+  uniform float uRipple;
+  uniform float uAspect;
+
+  // Classic heart SDF — tip down, lobes up. Input p: tip at origin, grows upward.
+  float sdHeart(vec2 p) {
+    p.x = abs(p.x);
+    if (p.y + p.x > 1.0)
+      return sqrt(dot(p - vec2(0.25, 0.75), p - vec2(0.25, 0.75))) - sqrt(2.0) / 4.0;
+    return sqrt(min(
+      dot(p - vec2(0.00, 1.00), p - vec2(0.00, 1.00)),
+      dot(p - 0.5 * max(p.x + p.y, 0.0), p - 0.5 * max(p.x + p.y, 0.0))
+    )) * sign(p.x - p.y);
+  }
+
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+  float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f*f*(3.0-2.0*f);
+    return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
+               mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+  }
+
+  void main() {
+    vec2 uv = vUv;
+    vec2 p = uv - 0.5;
+    p.x *= uAspect;
+
+    // Heart coord. In WebGL clip space, uv.y=1 is TOP of screen. p.y > 0 is top.
+    // SDF has lobes near y=1 (top of heart), tip at y=0. So no flip needed.
+    // Scale 2.6x for larger heart, offset so tip sits a bit below center.
+    vec2 hp = p * 2.6;
+    hp.y += 0.55;   // shift heart up: heart center at p.y ~ -0.2 (slightly above screen center)
+
+    float rippleRadius = length(hp) - uTapPulse * 4.0;
+    float ripple = sin(rippleRadius * 8.0 - uTime * 3.0) * uRipple * smoothstep(0.0, 0.3, uTapPulse) * smoothstep(1.5, 0.0, uTapPulse);
+    hp += normalize(hp + 1e-4) * ripple * 0.05;
+
+    float d = sdHeart(hp);
+
+    float edge = 0.015;
+    float mask = 1.0 - smoothstep(0.0, edge, d);
+
+    float innerDist = -d;
+    float shellGrad = smoothstep(0.0, 0.7, innerDist);
+
+    // Thin rim light — just a narrow band at edge (not thick white outline)
+    float rim = smoothstep(0.06, 0.0, abs(d)) * 0.55;
+
+    vec2 nuv = hp * 1.8;
+    float n1 = noise(nuv + vec2(uTime * 0.3, 0.0));
+    float n2 = noise(nuv * 2.5 - vec2(0.0, uTime * 0.2));
+    float sparkles = smoothstep(0.65, 0.95, n1 * n2 * 1.6);
+
+    // TRUE GLASS: the interior is mostly DARK (like the bg) with subtle color tints
+    // Light accumulates at edges (fresnel), highlights (reflection), caustics (refraction).
+    // Start with background-like dark color, add layers of light.
+
+    vec3 cBackground = vec3(0.08, 0.05, 0.14);       // matches stage bg
+    vec3 cViolet    = vec3(0.55, 0.25, 0.85);
+    vec3 cMagenta   = vec3(0.95, 0.35, 0.75);
+    vec3 cRose      = vec3(1.0, 0.65, 0.82);
+    vec3 cGold      = vec3(1.0, 0.78, 0.40);
+    vec3 cCyan      = vec3(0.45, 0.80, 1.0);
+
+    // Base: glass is mostly showing through to BG, with subtle tint
+    vec3 col = cBackground * 1.2;
+
+    // Internal color band gradient (refracted light pooling inside glass)
+    // Top of heart (lobes) = rose/magenta, bottom tip = violet/gold
+    float yBand = clamp((hp.y - 0.1) / 1.1, 0.0, 1.0);
+    vec3 internalTint = mix(cViolet * 0.35, cMagenta * 0.5, yBand);
+    internalTint = mix(internalTint, cRose * 0.6, smoothstep(0.6, 1.0, yBand));
+    col += internalTint * shellGrad * 0.55;
+
+    // Refraction caustics — bright wavy sparkles scattered inside
+    col += cGold * sparkles * 0.85;
+    // Secondary cyan caustic (chromatic split)
+    float sparklesCyan = smoothstep(0.72, 0.92, n1 * noise(nuv * 3.2 + vec2(uTime * 0.1, uTime * 0.15)) * 1.6);
+    col += cCyan * sparklesCyan * 0.45;
+
+    // KEY highlight — top-left reflective hotspot (like real glass catching a light)
+    vec2 hlPos = hp - vec2(-0.42, 0.78);
+    float hl = smoothstep(0.3, 0.0, length(hlPos));
+    col += vec3(1.0, 0.95, 1.0) * hl * 1.4;
+    // add a tiny pinpoint-bright core
+    float hlCore = smoothstep(0.07, 0.0, length(hlPos));
+    col += vec3(1.0, 1.0, 1.0) * hlCore * 1.2;
+
+    // Second reflective highlight — smaller, on right lobe
+    vec2 hlPos2 = hp - vec2(0.55, 0.55);
+    float hl2 = smoothstep(0.18, 0.0, length(hlPos2));
+    col += vec3(1.0, 0.92, 1.0) * hl2 * 0.6;
+
+    // Bottom inner glow — warm caustic pool at tip (where light converges)
+    vec2 hlPos3 = hp - vec2(0.0, 0.15);
+    float hl3 = smoothstep(0.28, 0.0, length(hlPos3));
+    col += cGold * hl3 * 0.55;
+    col += cMagenta * hl3 * 0.3;
+
+    // Fresnel rim — thin bright band right at the edge (from inside)
+    // Uses chromatic split: red shifted in, blue shifted out
+    float fres = smoothstep(0.1, 0.0, innerDist) * smoothstep(0.0, 0.03, innerDist);
+    vec3 fresCol = mix(cMagenta, cRose, 0.5) * 1.2;
+    col += fresCol * fres * 1.0;
+
+    // Outer rim — soft bright edge
+    col += vec3(1.0, 0.82, 0.95) * rim * 1.1;
+
+    // Outer halo — much softer, only visible at bloom moments
+    float halo1 = smoothstep(0.6, 0.0, d) * 0.18;
+    float halo2 = smoothstep(1.3, 0.0, d) * 0.08;
+    float halo3 = smoothstep(2.2, 0.0, d) * 0.04;
+    vec3 haloCol = vec3(0.75, 0.45, 1.0);
+    vec3 halo = haloCol * (halo1 + halo2 + halo3);
+
+    vec3 final = col * mask + halo * (1.0 - mask);
+    final *= uFormAmt;
+    final *= (1.0 + uTapPulse * 1.2);
+    final *= uGlow;
+
+    float caBand = smoothstep(0.08, 0.0, abs(d - 0.03));
+    final.r += caBand * 0.15 * uFormAmt;
+    final.b += caBand * 0.25 * uFormAmt;
+
+    float alpha = mask + (1.0 - mask) * (halo1 + halo2 + halo3) * 3.0;
+    alpha = clamp(alpha, 0.0, 1.0) * uFormAmt;
+
+    gl_FragColor = vec4(final, alpha);
+  }
+`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error('shader err', gl.getShaderInfoLog(s));
+  }
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const quad = new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, 'aPos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const uTime     = gl.getUniformLocation(prog, 'uTime');
+const uFormAmt  = gl.getUniformLocation(prog, 'uFormAmt');
+const uTapPulse = gl.getUniformLocation(prog, 'uTapPulse');
+const uGlow     = gl.getUniformLocation(prog, 'uGlow');
+const uRipple   = gl.getUniformLocation(prog, 'uRipple');
+const uAspect   = gl.getUniformLocation(prog, 'uAspect');
+
+gl.viewport(0, 0, 1920, 1080);
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+/* ---------- Canvas 2D layers ---------- */
+const pCv = document.getElementById('particles');
+const pCtx = pCv.getContext('2d');
+const bCv = document.getElementById('bloom');
+const bCtx = bCv.getContext('2d');
+
+function mulberry32(a) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rng = mulberry32(20260417);
+
+const DUST = [];
+for (let i = 0; i < 60; i++) {
+  DUST.push({
+    x: rng() * 1920,
+    y: rng() * 1080,
+    r: 0.5 + rng() * 2.2,
+    speed: 4 + rng() * 14,
+    phase: rng() * Math.PI * 2,
+    driftX: (rng() - 0.5) * 8,
+    hue: rng() < 0.3 ? 'gold' : (rng() < 0.5 ? 'pink' : 'violet'),
+    alpha: 0.15 + rng() * 0.45,
+  });
 }
 
-// ---------- particle ripples (born at each R-peak) ----------
-// we pre-compute R-peak times from cumulativePhase (peak at phase fraction 0.27 within each beat)
-const R_TIMES = [];
-(function collectRTimes(){
-  const total = phaseTable[PHASE_SAMPLES];
-  const beats = Math.floor(total);
-  for (let k = 0; k <= beats; k++) {
-    // find t where cumulativePhase(t) == k + 0.27
-    const target = k + 0.27;
-    if (target > total) break;
-    // binary search
-    let lo = 0, hi = PHASE_SAMPLES;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (phaseTable[mid] < target) lo = mid + 1; else hi = mid;
-    }
-    const i = Math.max(1, lo);
-    const a = phaseTable[i - 1], b = phaseTable[i];
-    const frac = b === a ? 0 : (target - a) / (b - a);
-    const tR = ((i - 1) + frac) / PHASE_SAMPLES * DURATION;
-    if (tR >= 0 && tR <= DURATION) R_TIMES.push(tR);
-  }
-})();
+const BURST_COUNT = 48;
+const BURST = [];
+for (let i = 0; i < BURST_COUNT; i++) {
+  const angle = (i / BURST_COUNT) * Math.PI * 2 + rng() * 0.3;
+  const speed = 180 + rng() * 260;
+  BURST.push({
+    angle,
+    speed,
+    r: 1.5 + rng() * 3.5,
+    hue: rng() < 0.4 ? 'gold' : (rng() < 0.65 ? 'pink' : 'violet'),
+    life: 1.0 + rng() * 1.2,
+  });
+}
 
-// ---------- render ----------
+const ORBIT_COUNT = 14;
+const ORBIT = [];
+for (let i = 0; i < ORBIT_COUNT; i++) {
+  ORBIT.push({
+    radius: 210 + rng() * 180,
+    angleOffset: (i / ORBIT_COUNT) * Math.PI * 2,
+    speed: 0.35 + rng() * 0.4,
+    elevY: (rng() - 0.5) * 160,
+    r: 1.5 + rng() * 2.8,
+    hue: rng() < 0.5 ? 'gold' : 'pink',
+  });
+}
+
+const HEART_CX = 960, HEART_CY = 480;
+
+function hueColor(hue, a) {
+  if (hue === 'gold')   return `rgba(255,210,120,${a})`;
+  if (hue === 'pink')   return `rgba(255,170,220,${a})`;
+  return `rgba(190,150,255,${a})`;
+}
+
 function render(t) {
-  const W = 1920, H = 1080;
-  ctx.clearRect(0, 0, W, H);
+  const formAmt = easeOut(kern(t, 0.2, 2.3, easeInOut));
 
-  // -- background: very subtle vertical tint + faint grid
-  ctx.fillStyle = '#fafafa';
-  ctx.fillRect(0, 0, W, H);
-
-  // subtle radial vignette behind heart (warmer when excited)
-  const bpm = bpmAt(t);
-  const heat = clamp01((bpm - 72) / (128 - 72));
-  const cx = W / 2, cy = H / 2 - 20;
-  const vg = ctx.createRadialGradient(cx, cy, 0, cx, cy, 620);
-  vg.addColorStop(0, `rgba(255, 59, 48, ${0.04 + heat * 0.10})`);
-  vg.addColorStop(1, 'rgba(255, 59, 48, 0)');
-  ctx.fillStyle = vg;
-  ctx.fillRect(0, 0, W, H);
-
-  // -- ECG trace (horizontal axis across the heart)
-  // Rolling window: last 2.6 seconds of ECG, drawn left→right
-  const traceY = H / 2 + 200;
-  const traceW = 1440;
-  const traceH = 170;
-  const traceX0 = (W - traceW) / 2;
-
-  // baseline
-  ctx.strokeStyle = 'rgba(28,28,30,0.10)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(traceX0, traceY);
-  ctx.lineTo(traceX0 + traceW, traceY);
-  ctx.stroke();
-
-  // ECG line — sample current phase window
-  const windowBeats = lerp(2.0, 3.2, heat); // more beats visible at high bpm
-  const samples = 640;
-  const nowPhase = cumulativePhase(t);
-  // amplitude dims slightly during slow / boosts during fast (Apple Health feel)
-  const amp = lerp(traceH * 0.42, traceH * 0.62, heat);
-
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = '#ff3b30';
-  ctx.lineWidth = 2.6 + heat * 0.8;
-  ctx.shadowBlur = 12 + heat * 10;
-  ctx.shadowColor = 'rgba(255, 59, 48, 0.35)';
-  ctx.beginPath();
-  for (let i = 0; i <= samples; i++) {
-    const frac = i / samples;  // 0 = oldest, 1 = newest
-    const phaseHere = nowPhase - windowBeats + frac * windowBeats;
-    const u = phaseHere - Math.floor(phaseHere); // local [0,1] beat phase
-    // fade in from left edge
-    const leftFade = clamp01(frac * 4);
-    const y = traceY - ecgAt(u, amp) * leftFade;
-    const x = traceX0 + frac * traceW;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  // leading "dot" where new waveform writes in
-  const tipX = traceX0 + traceW;
-  const tipU = nowPhase - Math.floor(nowPhase);
-  const tipY = traceY - ecgAt(tipU, amp);
-  ctx.fillStyle = '#ff3b30';
-  ctx.beginPath();
-  ctx.arc(tipX, tipY, 4.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // -- ripples from each R-peak (subtle circles expanding from heart)
-  for (let i = 0; i < R_TIMES.length; i++) {
-    const tR = R_TIMES[i];
-    const age = t - tR;
-    if (age < 0 || age > 1.2) continue;
-    const rp = clamp01(age / 1.2);
-    const r = lerp(180, 520, easeOut(rp));
-    const alpha = (1 - rp) * 0.18 * (0.4 + heat * 0.8);
-    ctx.strokeStyle = `rgba(255, 59, 48, ${alpha})`;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
+  let tapPulse = 0, ripple = 0;
+  if (t >= 3.5 && t < 5.5) {
+    const tt = t - 3.5;
+    tapPulse = Math.exp(-tt * 2.2) * Math.sin(tt * 6.2) * 0.9 + Math.exp(-tt * 1.5) * 0.4;
+    tapPulse = Math.max(0, tapPulse);
+    ripple = 1.0 * Math.exp(-tt * 1.1);
   }
 
-  // -- heart: squash-stretch synced with R-peak of current beat
-  // pulseEnv: peak at R phase 0.27, settles by 0.55
-  const u = nowPhase - Math.floor(nowPhase);
-  let pulse = 0;
-  {
-    // systole (R spike) — sharp rise, spring settle
-    const rise = clamp01((u - 0.22) / 0.06);
-    const fall = clamp01((u - 0.28) / 0.35);
-    pulse = easeOut(rise) * (1 - easeInOut(fall));
+  let glow = 1.0;
+  if (t >= 3.5 && t < 5.8) {
+    const g = (t - 3.5) / 2.3;
+    glow = 1.0 + Math.exp(-g * 3.0) * 1.0;
   }
 
-  // double-tap cue at TAP_T — big squash impact (Apple-like tap feedback)
-  let tapPulse = 0, tapSquash = 0;
-  // Two taps: at TAP_T and TAP_T + 0.18
-  for (const tt of [TAP_T, TAP_T + 0.18]) {
-    const age = t - tt;
-    if (age >= 0 && age < 0.9) {
-      const env = (1 - easeOut(clamp01(age / 0.9))) * Math.exp(-age * 3);
-      tapPulse = Math.max(tapPulse, env * 0.35);
-      // squash: immediately compress then spring
-      if (age < 0.4) {
-        tapSquash = Math.max(tapSquash, Math.sin(clamp01(age / 0.4) * Math.PI) * 0.22);
-      }
+  const breathe = 1.0 + Math.sin(t * 1.6) * 0.04 * formAmt;
+
+  gl.useProgram(prog);
+  gl.viewport(0, 0, 1920, 1080);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  gl.uniform1f(uTime, t);
+  gl.uniform1f(uFormAmt, formAmt);
+  gl.uniform1f(uTapPulse, tapPulse);
+  gl.uniform1f(uGlow, glow * breathe);
+  gl.uniform1f(uRipple, ripple);
+  gl.uniform1f(uAspect, 1920 / 1080);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  /* Particles */
+  pCtx.clearRect(0, 0, 1920, 1080);
+
+  for (const d of DUST) {
+    const y = ((d.y - t * d.speed) % 1080 + 1080) % 1080;
+    const x = d.x + Math.sin(t * 0.4 + d.phase) * d.driftX;
+    const bobAlpha = d.alpha * (0.6 + 0.4 * Math.sin(t * 1.2 + d.phase));
+    const a = bobAlpha * (0.4 + 0.6 * formAmt);
+    pCtx.beginPath();
+    pCtx.fillStyle = hueColor(d.hue, a);
+    pCtx.arc(x, y, d.r, 0, Math.PI * 2);
+    pCtx.fill();
+    if (d.r > 1.8) {
+      pCtx.beginPath();
+      pCtx.fillStyle = hueColor(d.hue, a * 0.25);
+      pCtx.arc(x, y, d.r * 3, 0, Math.PI * 2);
+      pCtx.fill();
     }
   }
 
-  // entry fade (first 0.6s)
-  const entry = kern(t, 0.0, 0.6, easeOut);
-
-  const baseSize = 150;
-  const scaleY = 1 + pulse * 0.10 + tapPulse - tapSquash; // squash = shorter Y
-  const scaleX = 1 + pulse * 0.06 + tapPulse * 0.7 + tapSquash * 0.9; // stretch X
-  const sizeY = baseSize * scaleY;
-  const sizeX = baseSize * scaleX;
-
-  // heart glow (during tap and during peak bpm)
-  const glowAmt = Math.max(tapPulse * 2.2, heat * 0.6);
-  if (glowAmt > 0.02) {
-    ctx.save();
-    ctx.shadowBlur = 40 + glowAmt * 60;
-    ctx.shadowColor = `rgba(255, 59, 48, ${0.35 + glowAmt * 0.3})`;
-    const hp = heartPath(cx, cy, Math.max(sizeX, sizeY));
-    ctx.fillStyle = `rgba(255, 59, 48, 0.001)`;
-    ctx.fill(hp);
-    ctx.restore();
-  }
-
-  // outlined heart before tap (empty like), filled after
-  const filled = t >= TAP_T;
-
-  // non-uniform scale by drawing into transformed space
-  ctx.save();
-  ctx.translate(cx, cy);
-  // subtle breathing drift
-  const drift = Math.sin(nowPhase * Math.PI * 2) * 2;
-  ctx.translate(0, drift);
-  ctx.scale(scaleX, scaleY);
-  ctx.globalAlpha = entry;
-
-  const hp = heartPath(0, 0, baseSize);
-
-  if (!filled) {
-    // empty, slate outline
-    ctx.lineWidth = 4 / Math.max(scaleX, scaleY);
-    ctx.strokeStyle = 'rgba(28,28,30,0.28)';
-    ctx.stroke(hp);
-    // subtle red fill hinting life
-    ctx.fillStyle = 'rgba(255,59,48,0.05)';
-    ctx.fill(hp);
-  } else {
-    // filled red gradient
-    const fillFade = clamp01((t - TAP_T) / 0.25);
-    const g = ctx.createLinearGradient(0, -baseSize, 0, baseSize);
-    g.addColorStop(0, '#ff5a4f');
-    g.addColorStop(1, '#ff3b30');
-    ctx.fillStyle = g;
-    ctx.globalAlpha = entry * fillFade;
-    ctx.fill(hp);
-    // rim light
-    ctx.globalAlpha = entry * fillFade * 0.6;
-    ctx.lineWidth = 2 / Math.max(scaleX, scaleY);
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.stroke(hp);
-    // specular highlight
-    ctx.globalAlpha = entry * fillFade * 0.35;
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.beginPath();
-    ctx.ellipse(-baseSize * 0.38, -baseSize * 0.45, baseSize * 0.22, baseSize * 0.10, -0.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
-
-  // -- micro particles on tap (hearts float up briefly)
-  if (t >= TAP_T && t < TAP_T + 2.0) {
-    const N = 14;
-    for (let i = 0; i < N; i++) {
-      const seed = i * 12.9898;
-      const rx = Math.sin(seed) * 0.5 + 0.5;
-      const ry = Math.sin(seed * 7.31) * 0.5 + 0.5;
-      const delay = rx * 0.25;
-      const age = t - TAP_T - delay;
-      if (age < 0 || age > 1.6) continue;
-      const p = clamp01(age / 1.6);
-      const rise = easeOut(p);
-      const px = cx + (rx - 0.5) * 420 + Math.sin(seed * 3.7 + p * 4) * 30;
-      const py = cy - baseSize * 0.6 - rise * 220 - ry * 60;
-      const alpha = (1 - p) * 0.8;
-      const s = lerp(6, 10, ry);
-      ctx.save();
-      ctx.globalAlpha = alpha * entry;
-      ctx.fillStyle = '#ff3b30';
-      const ph = heartPath(px, py, s);
-      ctx.fill(ph);
-      ctx.restore();
+  if (t >= 3.5) {
+    const elapsed = t - 3.5;
+    for (const b of BURST) {
+      const life = clamp01(elapsed / b.life);
+      if (life >= 1) continue;
+      const dist = easeOut(life) * b.speed * b.life;
+      const x = HEART_CX + Math.cos(b.angle) * dist;
+      const y = HEART_CY + Math.sin(b.angle) * dist * 0.85 - life * 40;
+      const a = (1 - life) * 0.9;
+      pCtx.beginPath();
+      pCtx.fillStyle = hueColor(b.hue, a);
+      pCtx.arc(x, y, b.r, 0, Math.PI * 2);
+      pCtx.fill();
+      const trailX = HEART_CX + Math.cos(b.angle) * dist * 0.7;
+      const trailY = HEART_CY + Math.sin(b.angle) * dist * 0.7 * 0.85 - life * 28;
+      const grd = pCtx.createLinearGradient(trailX, trailY, x, y);
+      grd.addColorStop(0, hueColor(b.hue, 0));
+      grd.addColorStop(1, hueColor(b.hue, a * 0.6));
+      pCtx.strokeStyle = grd;
+      pCtx.lineWidth = b.r * 0.8;
+      pCtx.beginPath();
+      pCtx.moveTo(trailX, trailY);
+      pCtx.lineTo(x, y);
+      pCtx.stroke();
     }
   }
 
-  // -- BPM numeric readout (updates every few frames, Apple Health style)
-  const bpmDisplay = Math.round(bpm);
-  const bpmEl = document.getElementById('bpmNum');
-  if (bpmEl && bpmEl._last !== bpmDisplay) {
-    bpmEl.textContent = bpmDisplay;
-    bpmEl._last = bpmDisplay;
+  if (t >= 5.0) {
+    const orbitAmt = easeOut(clamp01((t - 5.0) / 1.5));
+    for (const o of ORBIT) {
+      const a = t * o.speed + o.angleOffset;
+      const x = HEART_CX + Math.cos(a) * o.radius;
+      const y = HEART_CY + Math.sin(a) * o.radius * 0.55 + o.elevY * Math.sin(t * 0.7 + o.angleOffset);
+      const alpha = orbitAmt * 0.75 * (0.5 + 0.5 * Math.sin(t * 2.5 + o.angleOffset));
+      pCtx.beginPath();
+      pCtx.fillStyle = hueColor(o.hue, alpha);
+      pCtx.arc(x, y, o.r, 0, Math.PI * 2);
+      pCtx.fill();
+      pCtx.beginPath();
+      pCtx.fillStyle = hueColor(o.hue, alpha * 0.3);
+      pCtx.arc(x, y, o.r * 4, 0, Math.PI * 2);
+      pCtx.fill();
+    }
   }
-  // color shifts smoothly toward Apple red at high bpm
-  {
-    const mix = easeInOut(clamp01((heat - 0.15) / 0.35));
-    const r = Math.round(lerp(28, 255, mix));
-    const g = Math.round(lerp(28, 59, mix));
-    const b = Math.round(lerp(30, 48, mix));
-    bpmEl.style.color = `rgb(${r},${g},${b})`;
+
+  /* Bloom */
+  bCtx.clearRect(0, 0, 1920, 1080);
+
+  const atmosR = 550 + 80 * Math.sin(t * 0.8);
+  const atmosAlpha = 0.32 * formAmt * (1 + tapPulse * 0.8);
+  const atmGrd = bCtx.createRadialGradient(HEART_CX, HEART_CY, 0, HEART_CX, HEART_CY, atmosR);
+  atmGrd.addColorStop(0.0, `rgba(170,100,255,${atmosAlpha})`);
+  atmGrd.addColorStop(0.4, `rgba(220,120,200,${atmosAlpha * 0.4})`);
+  atmGrd.addColorStop(1.0, 'rgba(100,50,150,0)');
+  bCtx.fillStyle = atmGrd;
+  bCtx.fillRect(0, 0, 1920, 1080);
+
+  const goldR = 320 + 60 * Math.sin(t * 1.1 + 1.5);
+  const goldAlpha = 0.18 * formAmt * (1 + tapPulse * 0.6);
+  const goldGrd = bCtx.createRadialGradient(HEART_CX, HEART_CY + 20, 0, HEART_CX, HEART_CY + 20, goldR);
+  goldGrd.addColorStop(0.0, `rgba(255,200,130,${goldAlpha})`);
+  goldGrd.addColorStop(1.0, 'rgba(255,180,100,0)');
+  bCtx.fillStyle = goldGrd;
+  bCtx.fillRect(0, 0, 1920, 1080);
+
+  // Single soft shockwave halo — a glow pulse outward, not a hard ring
+  if (t >= 3.5 && t < 6.0) {
+    const tt = t - 3.5;
+    const life = clamp01(tt / 2.0);
+    if (life < 1) {
+      const radius = 100 + easeOut(life) * 550;
+      const alpha = (1 - life) * 0.22;
+      const ringGrd = bCtx.createRadialGradient(HEART_CX, HEART_CY, radius - 60, HEART_CX, HEART_CY, radius + 80);
+      ringGrd.addColorStop(0.0, 'rgba(230,180,255,0)');
+      ringGrd.addColorStop(0.4, `rgba(230,180,255,${alpha})`);
+      ringGrd.addColorStop(0.55, `rgba(255,220,255,${alpha * 0.6})`);
+      ringGrd.addColorStop(1.0, 'rgba(230,180,255,0)');
+      bCtx.fillStyle = ringGrd;
+      bCtx.fillRect(0, 0, 1920, 1080);
+    }
   }
-  // entry fade
-  document.getElementById('bpm').style.opacity = entry.toFixed(3);
+
+  // Subtle HDR light sweeps — angled, wide, soft (not vertical spotlights)
+  if (t >= 1.5 && t < 4.5) {
+    const s = clamp01((t - 1.5) / 3.0);
+    const cx = lerp(-200, 2100, easeInOut(s));
+    const streakAlpha = 0.09 * Math.sin(s * Math.PI);
+    // diagonal soft wide band
+    bCtx.save();
+    bCtx.translate(cx, 540);
+    bCtx.rotate(-0.35);
+    const grd = bCtx.createLinearGradient(-600, 0, 600, 0);
+    grd.addColorStop(0, 'rgba(220,200,255,0)');
+    grd.addColorStop(0.5, `rgba(240,220,255,${streakAlpha})`);
+    grd.addColorStop(1, 'rgba(220,200,255,0)');
+    bCtx.fillStyle = grd;
+    bCtx.fillRect(-600, -900, 1200, 1800);
+    bCtx.restore();
+  }
+  if (t >= 5.5 && t < 8.5) {
+    const s = clamp01((t - 5.5) / 3.0);
+    const cx = lerp(2100, -200, easeInOut(s));
+    const streakAlpha = 0.07 * Math.sin(s * Math.PI);
+    bCtx.save();
+    bCtx.translate(cx, 540);
+    bCtx.rotate(0.3);
+    const grd = bCtx.createLinearGradient(-700, 0, 700, 0);
+    grd.addColorStop(0, 'rgba(255,200,230,0)');
+    grd.addColorStop(0.5, `rgba(255,215,240,${streakAlpha})`);
+    grd.addColorStop(1, 'rgba(255,200,230,0)');
+    bCtx.fillStyle = grd;
+    bCtx.fillRect(-700, -900, 1400, 1800);
+    bCtx.restore();
+  }
 }
 
-// ---------- controller (template) ----------
 const scrubber = document.getElementById('scrubber');
 const playBtn = document.getElementById('playBtn');
 const resetBtn = document.getElementById('resetBtn');
 const timeLabel = document.getElementById('timeLabel');
 const frameLabel = document.getElementById('frameLabel');
 const cueRow = document.getElementById('cueRow');
-
 let currentT = 0, playing = true, lastFrame = performance.now();
 
 function setTime(t) {
@@ -568,7 +624,6 @@ function setTime(t) {
   frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
   render(currentT);
 }
-
 function loop() {
   const now = performance.now();
   const dt = (now - lastFrame) / 1000;
@@ -580,15 +635,13 @@ function loop() {
   }
   requestAnimationFrame(loop);
 }
-
 scrubber.addEventListener('input', () => {
-  playing = false;
-  playBtn.textContent = '▶';
+  playing = false; playBtn.textContent = '\u25B6';
   setTime(scrubber.value / 1000 * DURATION);
 });
 playBtn.addEventListener('click', () => {
   playing = !playing;
-  playBtn.textContent = playing ? '⏸' : '▶';
+  playBtn.textContent = playing ? '\u23F8' : '\u25B6';
   lastFrame = performance.now();
 });
 resetBtn.addEventListener('click', () => setTime(0));
@@ -607,6 +660,5 @@ CUES.forEach(cue => {
 setTime(0);
 requestAnimationFrame(loop);
 </script>
-
 </body>
 </html>
