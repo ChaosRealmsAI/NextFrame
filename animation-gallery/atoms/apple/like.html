@@ -2,663 +2,618 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Like · Glass Heart · Keynote Hero</title>
+<title>Like · Motion-First · Spring Physics</title>
 <style>
-  :root {
-    --bg-deep: #05050a;
-    --bg-mid:  #0d0a1a;
-    --bg-accent: #16102a;
-    --text-soft: rgba(220,220,240,0.5);
-  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     width: 100%; height: 100%;
-    background: var(--bg-deep);
-    color: #fff;
-    font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+    background: #fafafa;
+    color: #111;
+    font-family: -apple-system, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", Arial, sans-serif;
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   .stage {
     position: relative;
     width: 1920px; height: 1080px;
     transform-origin: top left;
-    background:
-      radial-gradient(ellipse 70% 60% at 50% 50%, #1b1434 0%, #0a0716 45%, #05040c 85%, #020106 100%);
+    background: #fafafa;
     overflow: hidden;
   }
-  /* Stars layer — faint static twinkle */
-  .stars {
+  /* very subtle grid — almost invisible, keeps the background from being dead flat */
+  .grid-bg {
     position: absolute; inset: 0;
     background-image:
-      radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,0.6), transparent 50%),
-      radial-gradient(1px 1px at 84% 27%, rgba(200,210,255,0.5), transparent 50%),
-      radial-gradient(1px 1px at 23% 72%, rgba(255,220,240,0.5), transparent 50%),
-      radial-gradient(1px 1px at 67% 81%, rgba(200,220,255,0.4), transparent 50%),
-      radial-gradient(1px 1px at 45% 12%, rgba(255,255,255,0.35), transparent 50%),
-      radial-gradient(1.5px 1.5px at 91% 55%, rgba(220,200,255,0.45), transparent 50%),
-      radial-gradient(1px 1px at 8% 60%, rgba(255,240,250,0.4), transparent 50%);
-  }
-  .vignette {
-    position: absolute; inset: 0;
-    background: radial-gradient(ellipse 80% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.45) 75%, rgba(0,0,0,0.85) 100%);
+      linear-gradient(to right, rgba(0,0,0,0.015) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0,0,0,0.015) 1px, transparent 1px);
+    background-size: 120px 120px;
     pointer-events: none;
-    mix-blend-mode: multiply;
   }
-  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-  #glShader { z-index: 1; }
-  #particles { z-index: 2; }
-  #bloom { z-index: 3; mix-blend-mode: screen; }
 
-  .wordmark {
+  /* the hero heart area */
+  .hero {
     position: absolute;
-    left: 72px; bottom: 160px;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 900px; height: 700px;
+    pointer-events: none;
+  }
+  svg.heart-svg {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    overflow: visible;
+    filter: drop-shadow(0 6px 20px rgba(0,0,0,0.06));
+  }
+  svg.particles-svg {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    overflow: visible;
+  }
+
+  /* counter — large but restrained */
+  .counter {
+    position: absolute;
+    left: 50%; top: calc(50% + 220px);
+    transform: translate(-50%, 0);
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #111;
+    font-feature-settings: "tnum" 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .counter .plus {
+    position: absolute;
+    left: 50%;
+    top: -60px;
+    transform: translate(-50%, 0);
+    font-size: 42px;
+    font-weight: 600;
+    color: #ff3b30;
+    letter-spacing: -0.01em;
+  }
+
+  /* caption — single tiny label */
+  .caption {
+    position: absolute;
+    left: 50%;
+    top: 160px;
+    transform: translate(-50%, 0);
     font-size: 13px;
-    letter-spacing: 0.3em;
-    color: rgba(200,200,230,0.35);
-    font-weight: 300;
-    z-index: 10;
-  }
-
-  .cue-row {
-    position: absolute;
-    left: 72px; right: 72px; bottom: 108px;
-    height: 18px;
-    z-index: 20;
-  }
-  .cue-mark {
-    position: absolute;
-    top: 0;
-    width: 2px; height: 10px;
-    background: rgba(180,180,220,0.4);
-    transform: translateX(-1px);
-  }
-  .cue-mark .lbl {
-    position: absolute;
-    top: 12px; left: 50%;
-    transform: translateX(-50%);
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    color: rgba(180,180,220,0.55);
-    white-space: nowrap;
-    font-weight: 300;
+    font-weight: 500;
+    color: #aaa;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
   }
+
+  /* timeline UI */
   .tl-ui {
     position: absolute;
-    left: 72px; right: 72px; bottom: 48px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    padding: 0 24px;
-    background: rgba(20,16,36,0.55);
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 22px;
-    z-index: 20;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+    left: 40px; right: 40px; bottom: 40px;
+    height: 52px;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 26px;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    font-size: 13px; color: #222;
+    z-index: 10;
   }
   .tl-ui button {
-    background: transparent;
-    color: rgba(240,240,255,0.85);
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    width: 28px; height: 28px;
-    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px;
     border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.1);
+    background: #fff;
+    color: #111;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
     transition: background 0.15s;
   }
-  .tl-ui button:hover { background: rgba(255,255,255,0.08); }
+  .tl-ui button:hover { background: #f3f3f3; }
   .tl-ui .time {
-    font-family: "SF Mono", "Menlo", monospace;
-    font-size: 12px;
-    color: rgba(220,220,240,0.7);
-    min-width: 120px;
-    letter-spacing: 0.04em;
+    min-width: 110px;
+    font-variant-numeric: tabular-nums;
+    color: #555;
+    font-weight: 500;
   }
   .tl-ui input[type="range"] {
     flex: 1;
+    height: 4px;
     -webkit-appearance: none;
     appearance: none;
-    height: 3px;
-    background: rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.08);
     border-radius: 2px;
     outline: none;
-    cursor: pointer;
   }
   .tl-ui input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 12px; height: 12px;
+    width: 14px; height: 14px;
     border-radius: 50%;
-    background: linear-gradient(180deg, #fff, #d8c8ff);
-    box-shadow: 0 0 10px rgba(180,140,255,0.6), 0 2px 4px rgba(0,0,0,0.4);
+    background: #ff3b30;
     cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  /* cue row sits just above the timeline */
+  .cue-row {
+    position: absolute;
+    left: 60px; right: 60px; bottom: 100px;
+    height: 22px;
+    pointer-events: none;
+    z-index: 9;
+  }
+  .cue-mark {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 12px;
+    background: rgba(0,0,0,0.2);
+    transform: translateX(-0.5px);
+  }
+  .cue-mark .lbl {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #999;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
   }
 </style>
 </head>
 <body>
-<div class="stage" id="stage">
-  <div class="stars"></div>
-  <canvas id="glShader"  width="1920" height="1080"></canvas>
-  <canvas id="particles" width="1920" height="1080"></canvas>
-  <canvas id="bloom"     width="1920" height="1080"></canvas>
-  <div class="vignette"></div>
+  <div class="stage" id="stage">
+    <div class="grid-bg"></div>
 
-  <div class="wordmark">ONE&nbsp;&nbsp;MORE&nbsp;&nbsp;THING</div>
+    <div class="caption">Double tap to like</div>
 
-  <div class="cue-row" id="cueRow"></div>
-  <div class="tl-ui">
-    <button id="playBtn" title="Play/Pause">&#9208;</button>
-    <button id="resetBtn" title="Reset">&#8634;</button>
-    <span class="time" id="timeLabel">0.00 / 10.00s</span>
-    <input type="range" id="scrubber" min="0" max="1000" value="0">
-    <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+    <div class="hero">
+      <svg class="particles-svg" id="particles" width="800" height="600" viewBox="-400 -300 800 600"></svg>
+      <svg class="heart-svg" id="heart" width="420" height="380" viewBox="-210 -190 420 380">
+        <!-- heart path is drawn dynamically to allow fill/stroke control -->
+        <path id="heartPath" d="" />
+        <path id="heartRing" d="" fill="none" />
+      </svg>
+    </div>
+
+    <div class="counter" id="counter">
+      <span class="plus" id="plusOne">+1</span>
+      <span id="countVal">0</span>
+    </div>
+
+    <div class="cue-row" id="cueRow"></div>
+    <div class="tl-ui">
+      <button id="playBtn" title="Play/Pause">⏸</button>
+      <button id="resetBtn" title="Reset">↺</button>
+      <span class="time" id="timeLabel">0.00 / 10.00s</span>
+      <input type="range" id="scrubber" min="0" max="1000" value="0">
+      <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+    </div>
   </div>
-</div>
 
 <script>
-/* Kai Chen — Apple Keynote Hero · Glass Heart with Light Refraction */
+(() => {
+  // ---------- helpers ----------
+  const DURATION = 10.0;
+  const FPS = 30;
+  const clamp01 = t => Math.max(0, Math.min(1, t));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut = x => 1 - Math.pow(1 - x, 3);
+  const easeIn = x => x * x * x;
+  const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+  const easeOutQuint = x => 1 - Math.pow(1 - x, 5);
 
-function fitStage() {
-  const stage = document.getElementById('stage');
-  const sw = window.innerWidth, sh = window.innerHeight;
-  const scale = Math.min(sw / 1920, sh / 1080);
-  stage.style.transform = `scale(${scale})`;
-  const ox = (sw - 1920 * scale) / 2, oy = (sh - 1080 * scale) / 2;
-  stage.style.left = ox + 'px'; stage.style.top = oy + 'px';
-  stage.style.position = 'absolute';
-}
-window.addEventListener('resize', fitStage);
-fitStage();
-
-const DURATION = 10.0;
-const FPS = 30;
-const clamp01 = t => Math.max(0, Math.min(1, t));
-const lerp = (a, b, t) => a + (b - a) * t;
-const easeOut = x => 1 - Math.pow(1 - x, 3);
-const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
-const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
-
-const CUES = [
-  { t: 0.0, label: 'fade-in' },
-  { t: 1.8, label: 'form' },
-  { t: 3.5, label: 'tap' },
-  { t: 4.8, label: 'bloom' },
-  { t: 6.5, label: 'orbit' },
-  { t: 8.5, label: 'rest' },
-];
-
-/* ---------- WebGL: glass heart shader ---------- */
-const glCanvas = document.getElementById('glShader');
-const gl = glCanvas.getContext('webgl', { premultipliedAlpha: false, alpha: true, antialias: true });
-
-const VS = `
-  attribute vec2 aPos;
-  varying vec2 vUv;
-  void main() {
-    vUv = aPos * 0.5 + 0.5;
-    gl_Position = vec4(aPos, 0.0, 1.0);
-  }
-`;
-
-const FS = `
-  precision highp float;
-  varying vec2 vUv;
-  uniform float uTime;
-  uniform float uFormAmt;
-  uniform float uTapPulse;
-  uniform float uGlow;
-  uniform float uRipple;
-  uniform float uAspect;
-
-  // Classic heart SDF — tip down, lobes up. Input p: tip at origin, grows upward.
-  float sdHeart(vec2 p) {
-    p.x = abs(p.x);
-    if (p.y + p.x > 1.0)
-      return sqrt(dot(p - vec2(0.25, 0.75), p - vec2(0.25, 0.75))) - sqrt(2.0) / 4.0;
-    return sqrt(min(
-      dot(p - vec2(0.00, 1.00), p - vec2(0.00, 1.00)),
-      dot(p - 0.5 * max(p.x + p.y, 0.0), p - 0.5 * max(p.x + p.y, 0.0))
-    )) * sign(p.x - p.y);
+  // parametric spring (underdamped overshoot or critically-damped settle)
+  function springVal(t, k = 180, d = 12, mass = 1) {
+    if (t <= 0) return 0;
+    const wn = Math.sqrt(k / mass);
+    const zeta = d / (2 * Math.sqrt(k * mass));
+    if (zeta < 1) {
+      const wd = wn * Math.sqrt(1 - zeta * zeta);
+      return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+    }
+    return 1 - (1 + wn * t) * Math.exp(-wn * t);
   }
 
-  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
-  float noise(vec2 p) {
-    vec2 i = floor(p), f = fract(p);
-    vec2 u = f*f*(3.0-2.0*f);
-    return mix(mix(hash(i), hash(i+vec2(1,0)), u.x),
-               mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y);
+  // small seeded rng for repeatable stagger jitter
+  function mulberry32(a) {
+    return function() {
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const rng = mulberry32(42);
+  const particleSeeds = Array.from({length: 12}, () => ({
+    angle: rng() * Math.PI * 2,
+    distJitter: 0.85 + rng() * 0.3,
+    sizeJitter: 0.7 + rng() * 0.6,
+    rotJitter: (rng() - 0.5) * 1.2
+  }));
+  // secondary tiny hearts
+  const miniHeartSeeds = Array.from({length: 6}, () => ({
+    angle: (rng() - 0.5) * 1.6 - Math.PI/2,  // roughly upward-spread
+    dist: 120 + rng() * 100,
+    size: 10 + rng() * 14,
+    drift: (rng() - 0.5) * 60
+  }));
+
+  // ---------- heart path generation ----------
+  // classic heart using cubic bezier; size = outer half-width
+  // recentered so the geometric center is (0,0) — important because scale() is around origin
+  function heartPath(size = 140) {
+    const s = size;
+    // raw path spans y ∈ [-0.95s, 1.35s], center ≈ 0.20s
+    // subtract 0.20s from every y coord to recenter around 0
+    const Y_SHIFT = -0.20 * s;
+    const Y = (v) => (v * s) + Y_SHIFT;
+    return [
+      `M 0 ${Y(-0.25)}`,
+      `C ${-0.55*s} ${Y(-0.95)}, ${-1.4*s} ${Y(-0.55)}, ${-1.4*s} ${Y(0.05)}`,
+      `C ${-1.4*s} ${Y(0.55)}, ${-0.75*s} ${Y(0.95)}, 0 ${Y(1.35)}`,
+      `C ${0.75*s} ${Y(0.95)}, ${1.4*s} ${Y(0.55)}, ${1.4*s} ${Y(0.05)}`,
+      `C ${1.4*s} ${Y(-0.55)}, ${0.55*s} ${Y(-0.95)}, 0 ${Y(-0.25)}`,
+      'Z'
+    ].join(' ');
   }
 
-  void main() {
-    vec2 uv = vUv;
-    vec2 p = uv - 0.5;
-    p.x *= uAspect;
+  // ---------- tap definitions (the rhythm) ----------
+  // each tap: t_anticipate_start, t_burst, duration mult
+  // We schedule 4 taps with accelerating rhythm.
+  const TAPS = [
+    { ant: 2.00, burst: 2.10, colorAt: 2.15, stagger: 2.20, settleAt: 2.80, plus: 3.00, endCount: 1,  speed: 1.0 },
+    { ant: 4.40, burst: 4.46, colorAt: 4.50, stagger: 4.54, settleAt: 5.00, plus: 5.10, endCount: 2,  speed: 1.5 },
+    { ant: 5.90, burst: 5.95, colorAt: 5.98, stagger: 6.00, settleAt: 6.35, plus: 6.45, endCount: 3,  speed: 2.0 },
+    { ant: 7.30, burst: 7.34, colorAt: 7.36, stagger: 7.37, settleAt: 7.65, plus: 7.72, endCount: 5,  speed: 2.4 },
+  ];
+  // final settle — last pulse at t=9s
 
-    // Heart coord. In WebGL clip space, uv.y=1 is TOP of screen. p.y > 0 is top.
-    // SDF has lobes near y=1 (top of heart), tip at y=0. So no flip needed.
-    // Scale 2.6x for larger heart, offset so tip sits a bit below center.
-    vec2 hp = p * 2.6;
-    hp.y += 0.55;   // shift heart up: heart center at p.y ~ -0.2 (slightly above screen center)
+  // ---------- compute heart scale at any t ----------
+  function heartScale(t) {
+    // idle breathing (always running, overwritten near taps)
+    const breathe = 1.0 + 0.018 * Math.sin(t * 1.4 * Math.PI * 2 * 0.5); // ~0.7 Hz
+    let scale = breathe;
+    let overlayContribution = 0;
 
-    float rippleRadius = length(hp) - uTapPulse * 4.0;
-    float ripple = sin(rippleRadius * 8.0 - uTime * 3.0) * uRipple * smoothstep(0.0, 0.3, uTapPulse) * smoothstep(1.5, 0.0, uTapPulse);
-    hp += normalize(hp + 1e-4) * ripple * 0.05;
+    for (const tap of TAPS) {
+      // anticipation: compress from 1.0 to 0.92 between ant and burst
+      if (t >= tap.ant && t < tap.burst) {
+        const u = clamp01((t - tap.ant) / (tap.burst - tap.ant));
+        const antEase = easeIn(u);
+        const comp = lerp(1.0, 0.92, antEase);
+        scale = comp + (breathe - 1.0) * (1 - antEase); // blend
+      }
+      // burst spring: 0.92 -> 1.35 (scaled by speed)
+      // then settle back toward 1.05 over ~0.6s
+      const burstEnd = tap.settleAt;
+      if (t >= tap.burst && t < burstEnd) {
+        const local = (t - tap.burst);
+        // spring rise amplitude
+        const peak = lerp(1.35, 1.22, Math.min(1, (tap.speed - 1) / 1.5)); // higher speed = less overshoot
+        const sv = springVal(local * 4.0 * tap.speed, 260, 14);
+        // from 0.92 -> peak -> settle (spring goes past 1, overshoot then settle)
+        // we use: base=0.92, target=peak, spring carries us past target
+        // mix: scale = 0.92 + (peak - 0.92) * sv, but spring overshoots 1 → overshoot
+        const raw = 0.92 + (peak - 0.92) * sv;
+        // after burst peak, lerp toward 1.05 at settleAt
+        const settleProgress = clamp01((t - tap.burst) / (burstEnd - tap.burst));
+        const settleBlend = easeOut(settleProgress);
+        const settledPart = lerp(raw, 1.05, settleBlend * 0.5);
+        scale = settledPart;
+      }
+      // after settleAt: slow drift back to 1.0
+      if (t >= burstEnd && t < burstEnd + 0.8) {
+        const u = clamp01((t - burstEnd) / 0.8);
+        const back = lerp(1.05, 1.0, easeOut(u));
+        scale = back + (breathe - 1.0) * u;
+      }
+    }
 
-    float d = sdHeart(hp);
-
-    float edge = 0.015;
-    float mask = 1.0 - smoothstep(0.0, edge, d);
-
-    float innerDist = -d;
-    float shellGrad = smoothstep(0.0, 0.7, innerDist);
-
-    // Thin rim light — just a narrow band at edge (not thick white outline)
-    float rim = smoothstep(0.06, 0.0, abs(d)) * 0.55;
-
-    vec2 nuv = hp * 1.8;
-    float n1 = noise(nuv + vec2(uTime * 0.3, 0.0));
-    float n2 = noise(nuv * 2.5 - vec2(0.0, uTime * 0.2));
-    float sparkles = smoothstep(0.65, 0.95, n1 * n2 * 1.6);
-
-    // TRUE GLASS: the interior is mostly DARK (like the bg) with subtle color tints
-    // Light accumulates at edges (fresnel), highlights (reflection), caustics (refraction).
-    // Start with background-like dark color, add layers of light.
-
-    vec3 cBackground = vec3(0.08, 0.05, 0.14);       // matches stage bg
-    vec3 cViolet    = vec3(0.55, 0.25, 0.85);
-    vec3 cMagenta   = vec3(0.95, 0.35, 0.75);
-    vec3 cRose      = vec3(1.0, 0.65, 0.82);
-    vec3 cGold      = vec3(1.0, 0.78, 0.40);
-    vec3 cCyan      = vec3(0.45, 0.80, 1.0);
-
-    // Base: glass is mostly showing through to BG, with subtle tint
-    vec3 col = cBackground * 1.2;
-
-    // Internal color band gradient (refracted light pooling inside glass)
-    // Top of heart (lobes) = rose/magenta, bottom tip = violet/gold
-    float yBand = clamp((hp.y - 0.1) / 1.1, 0.0, 1.0);
-    vec3 internalTint = mix(cViolet * 0.35, cMagenta * 0.5, yBand);
-    internalTint = mix(internalTint, cRose * 0.6, smoothstep(0.6, 1.0, yBand));
-    col += internalTint * shellGrad * 0.55;
-
-    // Refraction caustics — bright wavy sparkles scattered inside
-    col += cGold * sparkles * 0.85;
-    // Secondary cyan caustic (chromatic split)
-    float sparklesCyan = smoothstep(0.72, 0.92, n1 * noise(nuv * 3.2 + vec2(uTime * 0.1, uTime * 0.15)) * 1.6);
-    col += cCyan * sparklesCyan * 0.45;
-
-    // KEY highlight — top-left reflective hotspot (like real glass catching a light)
-    vec2 hlPos = hp - vec2(-0.42, 0.78);
-    float hl = smoothstep(0.3, 0.0, length(hlPos));
-    col += vec3(1.0, 0.95, 1.0) * hl * 1.4;
-    // add a tiny pinpoint-bright core
-    float hlCore = smoothstep(0.07, 0.0, length(hlPos));
-    col += vec3(1.0, 1.0, 1.0) * hlCore * 1.2;
-
-    // Second reflective highlight — smaller, on right lobe
-    vec2 hlPos2 = hp - vec2(0.55, 0.55);
-    float hl2 = smoothstep(0.18, 0.0, length(hlPos2));
-    col += vec3(1.0, 0.92, 1.0) * hl2 * 0.6;
-
-    // Bottom inner glow — warm caustic pool at tip (where light converges)
-    vec2 hlPos3 = hp - vec2(0.0, 0.15);
-    float hl3 = smoothstep(0.28, 0.0, length(hlPos3));
-    col += cGold * hl3 * 0.55;
-    col += cMagenta * hl3 * 0.3;
-
-    // Fresnel rim — thin bright band right at the edge (from inside)
-    // Uses chromatic split: red shifted in, blue shifted out
-    float fres = smoothstep(0.1, 0.0, innerDist) * smoothstep(0.0, 0.03, innerDist);
-    vec3 fresCol = mix(cMagenta, cRose, 0.5) * 1.2;
-    col += fresCol * fres * 1.0;
-
-    // Outer rim — soft bright edge
-    col += vec3(1.0, 0.82, 0.95) * rim * 1.1;
-
-    // Outer halo — much softer, only visible at bloom moments
-    float halo1 = smoothstep(0.6, 0.0, d) * 0.18;
-    float halo2 = smoothstep(1.3, 0.0, d) * 0.08;
-    float halo3 = smoothstep(2.2, 0.0, d) * 0.04;
-    vec3 haloCol = vec3(0.75, 0.45, 1.0);
-    vec3 halo = haloCol * (halo1 + halo2 + halo3);
-
-    vec3 final = col * mask + halo * (1.0 - mask);
-    final *= uFormAmt;
-    final *= (1.0 + uTapPulse * 1.2);
-    final *= uGlow;
-
-    float caBand = smoothstep(0.08, 0.0, abs(d - 0.03));
-    final.r += caBand * 0.15 * uFormAmt;
-    final.b += caBand * 0.25 * uFormAmt;
-
-    float alpha = mask + (1.0 - mask) * (halo1 + halo2 + halo3) * 3.0;
-    alpha = clamp(alpha, 0.0, 1.0) * uFormAmt;
-
-    gl_FragColor = vec4(final, alpha);
+    // final pulse at 9s
+    if (t >= 9.0 && t < 9.9) {
+      const local = t - 9.0;
+      const sv = springVal(local * 5, 220, 16);
+      const peak = 1.0 + 0.12 * (1 - Math.abs(sv - 1));
+      scale = Math.max(scale, peak);
+    }
+    return scale;
   }
-`;
 
-function compile(type, src) {
-  const s = gl.createShader(type);
-  gl.shaderSource(s, src); gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-    console.error('shader err', gl.getShaderInfoLog(s));
+  // fill progress (0 = outline gray, 1 = fully red)
+  function heartFill(t) {
+    let f = 0;
+    for (const tap of TAPS) {
+      if (t >= tap.colorAt) {
+        // color persists
+        const u = clamp01((t - tap.colorAt) / 0.18);
+        f = Math.max(f, easeOut(u));
+      }
+    }
+    return f;
   }
-  return s;
-}
-const prog = gl.createProgram();
-gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
-gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
-gl.linkProgram(prog);
-gl.useProgram(prog);
 
-const quad = new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]);
-const buf = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
-const aPos = gl.getAttribLocation(prog, 'aPos');
-gl.enableVertexAttribArray(aPos);
-gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+  // counter value — integer, animated to jump slightly before plus
+  function counterValue(t) {
+    let v = 0;
+    for (const tap of TAPS) {
+      if (t >= tap.plus) v = tap.endCount;
+    }
+    return v;
+  }
+  // plus-one overlay: opacity + translate
+  function plusOneState(t) {
+    let best = null;
+    for (const tap of TAPS) {
+      // active window: [tap.burst, tap.plus + 0.9]
+      if (t >= tap.burst && t < tap.plus + 0.9) {
+        best = tap;
+      }
+    }
+    if (!best) return { op: 0, ty: 0 };
+    const local = t - best.plus;
+    if (local < -0.1) return { op: 0, ty: -30 };
+    if (local < 0.6) {
+      // spring-in from ty=-30 to ty=0, scale up
+      const sv = springVal(Math.max(0, local) * 6, 240, 14);
+      const ty = lerp(-30, 0, clamp01(sv));
+      const op = clamp01(local * 8);
+      return { op, ty };
+    }
+    // fade out
+    const u = clamp01((local - 0.6) / 0.3);
+    return { op: 1 - u, ty: -10 * u };
+  }
 
-const uTime     = gl.getUniformLocation(prog, 'uTime');
-const uFormAmt  = gl.getUniformLocation(prog, 'uFormAmt');
-const uTapPulse = gl.getUniformLocation(prog, 'uTapPulse');
-const uGlow     = gl.getUniformLocation(prog, 'uGlow');
-const uRipple   = gl.getUniformLocation(prog, 'uRipple');
-const uAspect   = gl.getUniformLocation(prog, 'uAspect');
+  // ---------- SVG setup ----------
+  const heartPathEl = document.getElementById('heartPath');
+  const heartRingEl = document.getElementById('heartRing');
+  const HEART_SIZE = 88;
+  const PATH_D = heartPath(HEART_SIZE);
+  heartPathEl.setAttribute('d', PATH_D);
+  heartRingEl.setAttribute('d', PATH_D);
 
-gl.viewport(0, 0, 1920, 1080);
-gl.enable(gl.BLEND);
-gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-/* ---------- Canvas 2D layers ---------- */
-const pCv = document.getElementById('particles');
-const pCtx = pCv.getContext('2d');
-const bCv = document.getElementById('bloom');
-const bCtx = bCv.getContext('2d');
-
-function mulberry32(a) {
-  return function() {
-    let t = a += 0x6D2B79F5;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
-const rng = mulberry32(20260417);
-
-const DUST = [];
-for (let i = 0; i < 60; i++) {
-  DUST.push({
-    x: rng() * 1920,
-    y: rng() * 1080,
-    r: 0.5 + rng() * 2.2,
-    speed: 4 + rng() * 14,
-    phase: rng() * Math.PI * 2,
-    driftX: (rng() - 0.5) * 8,
-    hue: rng() < 0.3 ? 'gold' : (rng() < 0.5 ? 'pink' : 'violet'),
-    alpha: 0.15 + rng() * 0.45,
+  const particlesSvg = document.getElementById('particles');
+  // prebuild particle elements
+  const particleEls = particleSeeds.map((seed, i) => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('r', 6);
+    c.setAttribute('fill', '#ff3b30');
+    g.appendChild(c);
+    particlesSvg.appendChild(g);
+    return { g, c, seed };
   });
-}
 
-const BURST_COUNT = 48;
-const BURST = [];
-for (let i = 0; i < BURST_COUNT; i++) {
-  const angle = (i / BURST_COUNT) * Math.PI * 2 + rng() * 0.3;
-  const speed = 180 + rng() * 260;
-  BURST.push({
-    angle,
-    speed,
-    r: 1.5 + rng() * 3.5,
-    hue: rng() < 0.4 ? 'gold' : (rng() < 0.65 ? 'pink' : 'violet'),
-    life: 1.0 + rng() * 1.2,
+  // prebuild mini-heart bursts (small hearts that float up)
+  const miniHeartEls = miniHeartSeeds.map((seed, i) => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', heartPath(seed.size));
+    p.setAttribute('fill', '#ff6b6b');
+    g.appendChild(p);
+    particlesSvg.appendChild(g);
+    return { g, p, seed };
   });
-}
 
-const ORBIT_COUNT = 14;
-const ORBIT = [];
-for (let i = 0; i < ORBIT_COUNT; i++) {
-  ORBIT.push({
-    radius: 210 + rng() * 180,
-    angleOffset: (i / ORBIT_COUNT) * Math.PI * 2,
-    speed: 0.35 + rng() * 0.4,
-    elevY: (rng() - 0.5) * 160,
-    r: 1.5 + rng() * 2.8,
-    hue: rng() < 0.5 ? 'gold' : 'pink',
+  // secondary "shockwave" ring
+  const shockwave = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  shockwave.setAttribute('cx', 0); shockwave.setAttribute('cy', 0);
+  shockwave.setAttribute('r', 0);
+  shockwave.setAttribute('fill', 'none');
+  shockwave.setAttribute('stroke', '#ff3b30');
+  shockwave.setAttribute('stroke-width', 2);
+  shockwave.setAttribute('opacity', 0);
+  particlesSvg.appendChild(shockwave);
+
+  // ---------- render frame-pure ----------
+  const counterEl = document.getElementById('countVal');
+  const plusEl = document.getElementById('plusOne');
+
+  function render(t) {
+    // heart scale
+    const s = heartScale(t);
+    const f = heartFill(t);
+
+    // tilt: tiny rotation tied to breathing & taps for life
+    const breatheRot = Math.sin(t * 0.9) * 0.6;
+    let tapRot = 0;
+    for (const tap of TAPS) {
+      if (t >= tap.burst && t < tap.settleAt) {
+        const local = (t - tap.burst);
+        const decay = Math.exp(-local * 4);
+        tapRot += Math.sin(local * 30) * 3 * decay * (tap.speed * 0.5);
+      }
+    }
+    const rot = breatheRot + tapRot;
+
+    heartPathEl.setAttribute('transform', `scale(${s}) rotate(${rot.toFixed(3)})`);
+    heartRingEl.setAttribute('transform', `scale(${s}) rotate(${rot.toFixed(3)})`);
+
+    // fill color: gray outline -> red fill
+    // at f=0: fill none, stroke gray
+    // at f=1: fill red, stroke none
+    const fillAlpha = f;
+    const fillColor = `rgba(255, 59, 48, ${fillAlpha})`;
+    heartPathEl.setAttribute('fill', fillColor);
+    // stroke: gray only when not fully filled, fades out
+    const strokeAlpha = (1 - f) * 0.85;
+    heartRingEl.setAttribute('stroke', `rgba(170,170,175, ${strokeAlpha})`);
+    heartRingEl.setAttribute('stroke-width', 4);
+
+    // particle burst — reset per tap
+    // find latest tap in burst window
+    let activeParticleTap = null;
+    for (const tap of TAPS) {
+      if (t >= tap.stagger && t < tap.stagger + 0.9) {
+        activeParticleTap = tap;
+      }
+    }
+    particleEls.forEach((p, i) => {
+      if (!activeParticleTap) {
+        p.g.setAttribute('opacity', 0);
+        return;
+      }
+      const perStagger = 0.025;
+      const startT = activeParticleTap.stagger + i * perStagger;
+      const local = t - startT;
+      if (local < 0) {
+        p.g.setAttribute('opacity', 0);
+        return;
+      }
+      const lifespan = 0.7 / activeParticleTap.speed;
+      const u = clamp01(local / lifespan);
+      if (u >= 1) { p.g.setAttribute('opacity', 0); return; }
+      // spring-driven outward travel
+      const dist = springVal(u * 1.6, 140, 18) * 200 * p.seed.distJitter;
+      const angle = p.seed.angle;
+      const x = Math.cos(angle) * dist;
+      const y = Math.sin(angle) * dist - u * 30; // slight upward drift
+      const r = 5 * p.seed.sizeJitter * (1 - easeIn(u) * 0.6);
+      const op = (1 - easeIn(u)) * 1.0;
+      p.g.setAttribute('transform', `translate(${x.toFixed(2)}, ${y.toFixed(2)})`);
+      p.c.setAttribute('r', Math.max(0.01, r).toFixed(2));
+      p.g.setAttribute('opacity', op.toFixed(3));
+      // color alternates red / coral
+      p.c.setAttribute('fill', i % 3 === 0 ? '#ff6b6b' : '#ff3b30');
+    });
+
+    // mini floating hearts — only on strong taps (speed >= 1.5)
+    miniHeartEls.forEach((mh, i) => {
+      let active = null;
+      for (const tap of TAPS) {
+        if (tap.speed >= 1.5 && t >= tap.burst && t < tap.burst + 1.4) {
+          active = tap;
+        }
+      }
+      if (!active) { mh.g.setAttribute('opacity', 0); return; }
+      const local = t - (active.burst + i * 0.05);
+      if (local < 0) { mh.g.setAttribute('opacity', 0); return; }
+      const life = 1.2;
+      const u = clamp01(local / life);
+      if (u >= 1) { mh.g.setAttribute('opacity', 0); return; }
+      const risen = easeOut(u) * mh.seed.dist;
+      const x = Math.cos(mh.seed.angle) * risen * 0.6 + mh.seed.drift * u;
+      const y = Math.sin(mh.seed.angle) * risen;
+      const scale = springVal(u * 2, 200, 16);
+      const op = (1 - easeIn(u)) * 0.85;
+      mh.g.setAttribute('transform', `translate(${x.toFixed(2)}, ${y.toFixed(2)}) scale(${(scale * 0.9).toFixed(3)})`);
+      mh.g.setAttribute('opacity', op.toFixed(3));
+    });
+
+    // shockwave ring — one per tap
+    let activeShockTap = null;
+    for (const tap of TAPS) {
+      if (t >= tap.burst && t < tap.burst + 0.55) {
+        activeShockTap = tap;
+      }
+    }
+    if (activeShockTap) {
+      const local = t - activeShockTap.burst;
+      const u = clamp01(local / 0.5);
+      const r = easeOutQuint(u) * 220;
+      const op = (1 - u) * 0.45;
+      shockwave.setAttribute('r', r.toFixed(2));
+      shockwave.setAttribute('opacity', op.toFixed(3));
+      shockwave.setAttribute('stroke-width', (2.5 - u * 2).toFixed(2));
+    } else {
+      shockwave.setAttribute('opacity', 0);
+    }
+
+    // counter
+    counterEl.textContent = counterValue(t);
+    // plus one
+    const pz = plusOneState(t);
+    plusEl.style.opacity = pz.op.toFixed(3);
+    plusEl.style.transform = `translate(-50%, ${pz.ty.toFixed(2)}px) scale(${(0.8 + pz.op * 0.3).toFixed(3)})`;
+  }
+
+  // ---------- cues ----------
+  const CUES = [
+    { t: 0.0, label: 'idle' },
+    { t: 2.1, label: 'tap 1' },
+    { t: 4.5, label: 'tap 2' },
+    { t: 6.0, label: 'x3' },
+    { t: 7.4, label: 'x5' },
+    { t: 9.0, label: 'settle' },
+  ];
+
+  // ---------- UI wiring ----------
+  const scrubber = document.getElementById('scrubber');
+  const playBtn  = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const timeLabel  = document.getElementById('timeLabel');
+  const frameLabel = document.getElementById('frameLabel');
+  const cueRow     = document.getElementById('cueRow');
+
+  let currentT = 0;
+  let playing = true;
+  let lastFrame = performance.now();
+
+  function setTime(t) {
+    currentT = Math.max(0, Math.min(DURATION, t));
+    scrubber.value = Math.round(currentT / DURATION * 1000);
+    timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+    frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+    render(currentT);
+  }
+  function loop() {
+    const now = performance.now();
+    const dt = (now - lastFrame) / 1000;
+    lastFrame = now;
+    if (playing) {
+      let next = currentT + dt;
+      if (next >= DURATION) next = 0;
+      setTime(next);
+    }
+    requestAnimationFrame(loop);
+  }
+  scrubber.addEventListener('input', () => {
+    playing = false;
+    playBtn.textContent = '▶';
+    setTime(scrubber.value / 1000 * DURATION);
   });
-}
+  playBtn.addEventListener('click', () => {
+    playing = !playing;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    lastFrame = performance.now();
+  });
+  resetBtn.addEventListener('click', () => setTime(0));
 
-const HEART_CX = 960, HEART_CY = 480;
+  CUES.forEach(cue => {
+    const m = document.createElement('div');
+    m.className = 'cue-mark';
+    m.style.left = (cue.t / DURATION * 100) + '%';
+    const lbl = document.createElement('div');
+    lbl.className = 'lbl'; lbl.textContent = cue.label;
+    m.appendChild(lbl);
+    cueRow.appendChild(m);
+  });
 
-function hueColor(hue, a) {
-  if (hue === 'gold')   return `rgba(255,210,120,${a})`;
-  if (hue === 'pink')   return `rgba(255,170,220,${a})`;
-  return `rgba(190,150,255,${a})`;
-}
-
-function render(t) {
-  const formAmt = easeOut(kern(t, 0.2, 2.3, easeInOut));
-
-  let tapPulse = 0, ripple = 0;
-  if (t >= 3.5 && t < 5.5) {
-    const tt = t - 3.5;
-    tapPulse = Math.exp(-tt * 2.2) * Math.sin(tt * 6.2) * 0.9 + Math.exp(-tt * 1.5) * 0.4;
-    tapPulse = Math.max(0, tapPulse);
-    ripple = 1.0 * Math.exp(-tt * 1.1);
+  // fit stage to window
+  function fit() {
+    const stage = document.getElementById('stage');
+    const sx = window.innerWidth / 1920;
+    const sy = window.innerHeight / 1080;
+    const s = Math.min(sx, sy);
+    stage.style.transform = `scale(${s})`;
+    stage.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px';
+    stage.style.top  = ((window.innerHeight - 1080 * s) / 2) + 'px';
+    stage.style.position = 'absolute';
   }
+  fit();
+  window.addEventListener('resize', fit);
 
-  let glow = 1.0;
-  if (t >= 3.5 && t < 5.8) {
-    const g = (t - 3.5) / 2.3;
-    glow = 1.0 + Math.exp(-g * 3.0) * 1.0;
-  }
-
-  const breathe = 1.0 + Math.sin(t * 1.6) * 0.04 * formAmt;
-
-  gl.useProgram(prog);
-  gl.viewport(0, 0, 1920, 1080);
-  gl.clearColor(0, 0, 0, 0);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
-  gl.uniform1f(uTime, t);
-  gl.uniform1f(uFormAmt, formAmt);
-  gl.uniform1f(uTapPulse, tapPulse);
-  gl.uniform1f(uGlow, glow * breathe);
-  gl.uniform1f(uRipple, ripple);
-  gl.uniform1f(uAspect, 1920 / 1080);
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-  /* Particles */
-  pCtx.clearRect(0, 0, 1920, 1080);
-
-  for (const d of DUST) {
-    const y = ((d.y - t * d.speed) % 1080 + 1080) % 1080;
-    const x = d.x + Math.sin(t * 0.4 + d.phase) * d.driftX;
-    const bobAlpha = d.alpha * (0.6 + 0.4 * Math.sin(t * 1.2 + d.phase));
-    const a = bobAlpha * (0.4 + 0.6 * formAmt);
-    pCtx.beginPath();
-    pCtx.fillStyle = hueColor(d.hue, a);
-    pCtx.arc(x, y, d.r, 0, Math.PI * 2);
-    pCtx.fill();
-    if (d.r > 1.8) {
-      pCtx.beginPath();
-      pCtx.fillStyle = hueColor(d.hue, a * 0.25);
-      pCtx.arc(x, y, d.r * 3, 0, Math.PI * 2);
-      pCtx.fill();
-    }
-  }
-
-  if (t >= 3.5) {
-    const elapsed = t - 3.5;
-    for (const b of BURST) {
-      const life = clamp01(elapsed / b.life);
-      if (life >= 1) continue;
-      const dist = easeOut(life) * b.speed * b.life;
-      const x = HEART_CX + Math.cos(b.angle) * dist;
-      const y = HEART_CY + Math.sin(b.angle) * dist * 0.85 - life * 40;
-      const a = (1 - life) * 0.9;
-      pCtx.beginPath();
-      pCtx.fillStyle = hueColor(b.hue, a);
-      pCtx.arc(x, y, b.r, 0, Math.PI * 2);
-      pCtx.fill();
-      const trailX = HEART_CX + Math.cos(b.angle) * dist * 0.7;
-      const trailY = HEART_CY + Math.sin(b.angle) * dist * 0.7 * 0.85 - life * 28;
-      const grd = pCtx.createLinearGradient(trailX, trailY, x, y);
-      grd.addColorStop(0, hueColor(b.hue, 0));
-      grd.addColorStop(1, hueColor(b.hue, a * 0.6));
-      pCtx.strokeStyle = grd;
-      pCtx.lineWidth = b.r * 0.8;
-      pCtx.beginPath();
-      pCtx.moveTo(trailX, trailY);
-      pCtx.lineTo(x, y);
-      pCtx.stroke();
-    }
-  }
-
-  if (t >= 5.0) {
-    const orbitAmt = easeOut(clamp01((t - 5.0) / 1.5));
-    for (const o of ORBIT) {
-      const a = t * o.speed + o.angleOffset;
-      const x = HEART_CX + Math.cos(a) * o.radius;
-      const y = HEART_CY + Math.sin(a) * o.radius * 0.55 + o.elevY * Math.sin(t * 0.7 + o.angleOffset);
-      const alpha = orbitAmt * 0.75 * (0.5 + 0.5 * Math.sin(t * 2.5 + o.angleOffset));
-      pCtx.beginPath();
-      pCtx.fillStyle = hueColor(o.hue, alpha);
-      pCtx.arc(x, y, o.r, 0, Math.PI * 2);
-      pCtx.fill();
-      pCtx.beginPath();
-      pCtx.fillStyle = hueColor(o.hue, alpha * 0.3);
-      pCtx.arc(x, y, o.r * 4, 0, Math.PI * 2);
-      pCtx.fill();
-    }
-  }
-
-  /* Bloom */
-  bCtx.clearRect(0, 0, 1920, 1080);
-
-  const atmosR = 550 + 80 * Math.sin(t * 0.8);
-  const atmosAlpha = 0.32 * formAmt * (1 + tapPulse * 0.8);
-  const atmGrd = bCtx.createRadialGradient(HEART_CX, HEART_CY, 0, HEART_CX, HEART_CY, atmosR);
-  atmGrd.addColorStop(0.0, `rgba(170,100,255,${atmosAlpha})`);
-  atmGrd.addColorStop(0.4, `rgba(220,120,200,${atmosAlpha * 0.4})`);
-  atmGrd.addColorStop(1.0, 'rgba(100,50,150,0)');
-  bCtx.fillStyle = atmGrd;
-  bCtx.fillRect(0, 0, 1920, 1080);
-
-  const goldR = 320 + 60 * Math.sin(t * 1.1 + 1.5);
-  const goldAlpha = 0.18 * formAmt * (1 + tapPulse * 0.6);
-  const goldGrd = bCtx.createRadialGradient(HEART_CX, HEART_CY + 20, 0, HEART_CX, HEART_CY + 20, goldR);
-  goldGrd.addColorStop(0.0, `rgba(255,200,130,${goldAlpha})`);
-  goldGrd.addColorStop(1.0, 'rgba(255,180,100,0)');
-  bCtx.fillStyle = goldGrd;
-  bCtx.fillRect(0, 0, 1920, 1080);
-
-  // Single soft shockwave halo — a glow pulse outward, not a hard ring
-  if (t >= 3.5 && t < 6.0) {
-    const tt = t - 3.5;
-    const life = clamp01(tt / 2.0);
-    if (life < 1) {
-      const radius = 100 + easeOut(life) * 550;
-      const alpha = (1 - life) * 0.22;
-      const ringGrd = bCtx.createRadialGradient(HEART_CX, HEART_CY, radius - 60, HEART_CX, HEART_CY, radius + 80);
-      ringGrd.addColorStop(0.0, 'rgba(230,180,255,0)');
-      ringGrd.addColorStop(0.4, `rgba(230,180,255,${alpha})`);
-      ringGrd.addColorStop(0.55, `rgba(255,220,255,${alpha * 0.6})`);
-      ringGrd.addColorStop(1.0, 'rgba(230,180,255,0)');
-      bCtx.fillStyle = ringGrd;
-      bCtx.fillRect(0, 0, 1920, 1080);
-    }
-  }
-
-  // Subtle HDR light sweeps — angled, wide, soft (not vertical spotlights)
-  if (t >= 1.5 && t < 4.5) {
-    const s = clamp01((t - 1.5) / 3.0);
-    const cx = lerp(-200, 2100, easeInOut(s));
-    const streakAlpha = 0.09 * Math.sin(s * Math.PI);
-    // diagonal soft wide band
-    bCtx.save();
-    bCtx.translate(cx, 540);
-    bCtx.rotate(-0.35);
-    const grd = bCtx.createLinearGradient(-600, 0, 600, 0);
-    grd.addColorStop(0, 'rgba(220,200,255,0)');
-    grd.addColorStop(0.5, `rgba(240,220,255,${streakAlpha})`);
-    grd.addColorStop(1, 'rgba(220,200,255,0)');
-    bCtx.fillStyle = grd;
-    bCtx.fillRect(-600, -900, 1200, 1800);
-    bCtx.restore();
-  }
-  if (t >= 5.5 && t < 8.5) {
-    const s = clamp01((t - 5.5) / 3.0);
-    const cx = lerp(2100, -200, easeInOut(s));
-    const streakAlpha = 0.07 * Math.sin(s * Math.PI);
-    bCtx.save();
-    bCtx.translate(cx, 540);
-    bCtx.rotate(0.3);
-    const grd = bCtx.createLinearGradient(-700, 0, 700, 0);
-    grd.addColorStop(0, 'rgba(255,200,230,0)');
-    grd.addColorStop(0.5, `rgba(255,215,240,${streakAlpha})`);
-    grd.addColorStop(1, 'rgba(255,200,230,0)');
-    bCtx.fillStyle = grd;
-    bCtx.fillRect(-700, -900, 1400, 1800);
-    bCtx.restore();
-  }
-}
-
-const scrubber = document.getElementById('scrubber');
-const playBtn = document.getElementById('playBtn');
-const resetBtn = document.getElementById('resetBtn');
-const timeLabel = document.getElementById('timeLabel');
-const frameLabel = document.getElementById('frameLabel');
-const cueRow = document.getElementById('cueRow');
-let currentT = 0, playing = true, lastFrame = performance.now();
-
-function setTime(t) {
-  currentT = Math.max(0, Math.min(DURATION, t));
-  scrubber.value = Math.round(currentT / DURATION * 1000);
-  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
-  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
-  render(currentT);
-}
-function loop() {
-  const now = performance.now();
-  const dt = (now - lastFrame) / 1000;
-  lastFrame = now;
-  if (playing) {
-    let next = currentT + dt;
-    if (next >= DURATION) next = 0;
-    setTime(next);
-  }
+  setTime(0);
   requestAnimationFrame(loop);
-}
-scrubber.addEventListener('input', () => {
-  playing = false; playBtn.textContent = '\u25B6';
-  setTime(scrubber.value / 1000 * DURATION);
-});
-playBtn.addEventListener('click', () => {
-  playing = !playing;
-  playBtn.textContent = playing ? '\u23F8' : '\u25B6';
-  lastFrame = performance.now();
-});
-resetBtn.addEventListener('click', () => setTime(0));
-
-CUES.forEach(cue => {
-  const m = document.createElement('div');
-  m.className = 'cue-mark';
-  m.style.left = (cue.t / DURATION * 100) + '%';
-  const lbl = document.createElement('div');
-  lbl.className = 'lbl';
-  lbl.textContent = cue.label;
-  m.appendChild(lbl);
-  cueRow.appendChild(m);
-});
-
-setTime(0);
-requestAnimationFrame(loop);
+})();
 </script>
 </body>
 </html>
