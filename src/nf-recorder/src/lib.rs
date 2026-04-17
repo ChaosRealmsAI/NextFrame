@@ -32,12 +32,6 @@ pub struct RecordSpec {
     pub fps: u32,
     pub resolution: (u32, u32),
     pub worker_count: usize,
-    pub bundle_html: PathBuf,
-    pub output_mp4: PathBuf,
-    pub width: u32,
-    pub height: u32,
-    pub duration_sec: f64,
-    pub hdr10: bool,
 }
 
 impl Default for RecordSpec {
@@ -49,12 +43,6 @@ impl Default for RecordSpec {
             fps: 30,
             resolution: (1280, 720),
             worker_count: 6,
-            bundle_html: PathBuf::new(),
-            output_mp4: PathBuf::from("out.mp4"),
-            width: 1280,
-            height: 720,
-            duration_sec: 1.0,
-            hdr10: true,
         }
     }
 }
@@ -70,41 +58,8 @@ pub struct Progress {
 pub struct RecordHandle {
     pub out_path: PathBuf,
     pub total_frames: u64,
-    pub id: String,
 }
 
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
-}
-
-pub struct StubRecorder {
-    inner: PipelineRecorder,
-}
-
-impl StubRecorder {
-    pub fn new() -> Self {
-        Self {
-            inner: PipelineRecorder::new(),
-        }
-    }
-}
-
-impl Default for StubRecorder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Recorder for StubRecorder {
-    fn record(&mut self, spec: RecordSpec) -> anyhow::Result<RecordHandle> {
-        self.inner.record(spec)
-    }
-
-    fn progress(&self) -> Progress {
-        self.inner.progress()
-    }
-
-    fn cancel(&mut self) {
-        self.inner.cancel();
-    }
 }

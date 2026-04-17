@@ -26,7 +26,6 @@ fn main() -> Result<()> {
         fps: cli.fps,
         resolution: cli.size,
         worker_count: cli.worker_count,
-        ..RecordSpec::default()
     })?;
 
     let verify = if cli.verify {

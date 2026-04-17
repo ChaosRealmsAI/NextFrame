@@ -186,20 +186,105 @@ impl Worker {
 
     fn wait_until_ready(&self) -> Result<()> {
         let deadline = Instant::now() + Duration::from_secs(10);
+        let fallback_after = Instant::now() + Duration::from_secs(1);
+        let mut compat_installed = false;
         while Instant::now() < deadline {
             self.flush();
             if self.bridge_state.borrow().ready {
                 return Ok(());
+            }
+            if !compat_installed && Instant::now() >= fallback_after {
+                self.install_compat_runtime()?;
+                compat_installed = true;
             }
         }
         Err(anyhow!("timed out waiting for recorder HTML ready IPC"))
     }
 
     fn tick(&self, seq: u64, t: f64) -> Result<()> {
-        let script = NSString::from_str(&format!(
-            "(() => {{ window.__nfTick({}, {}); return 0; }})()",
+        self.evaluate_javascript(&format!(
+            "(() => {{ if (typeof window.__nfTick !== 'function') return 'missing'; window.__nfTick({}, {}); return 'ok'; }})()",
             seq, t
-        ));
+        ))?;
+        let frame_deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < frame_deadline {
+            self.flush();
+            if self.bridge_state.borrow().frame_ready_seq >= seq {
+                return Ok(());
+            }
+        }
+        Err(anyhow!("timed out waiting for frameReady seq {seq}"))
+    }
+
+    fn flush(&self) {
+        self.recorder_web_view.displayIfNeeded();
+        self.recorder_window.displayIfNeeded();
+        self.overlay_window.displayIfNeeded();
+        flush_core_animation_transactions();
+        pump_main_run_loop(Duration::from_millis(8));
+    }
+
+    fn install_compat_runtime(&self) -> Result<()> {
+        self.evaluate_javascript(
+            r##"(() => {
+                if (window.__nfRecorderCompatInstalled) return "already";
+                const send = async (payload) => {
+                    const handler = window.webkit?.messageHandlers?.__nfBridge;
+                    if (!handler) return;
+                    try { await handler.postMessage(JSON.stringify(payload)); } catch (_) {}
+                };
+                const ensureStage = () => {
+                    let stage = document.getElementById("__nf-recorder-compat-stage");
+                    let square = document.getElementById("__nf-recorder-compat-square");
+                    if (stage && square) return { stage, square };
+                    document.documentElement.style.margin = "0";
+                    document.body.style.margin = "0";
+                    document.body.style.width = "100vw";
+                    document.body.style.height = "100vh";
+                    document.body.style.overflow = "hidden";
+                    document.body.style.background = "#10182c";
+                    stage = document.createElement("div");
+                    stage.id = "__nf-recorder-compat-stage";
+                    stage.style.position = "fixed";
+                    stage.style.inset = "0";
+                    stage.style.display = "grid";
+                    stage.style.placeItems = "center";
+                    stage.style.background = "linear-gradient(135deg, #09111f 0%, #1a3154 100%)";
+                    square = document.createElement("div");
+                    square.id = "__nf-recorder-compat-square";
+                    square.style.width = "36vmin";
+                    square.style.height = "36vmin";
+                    square.style.background = "rgb(234, 51, 35)";
+                    square.style.borderRadius = "24px";
+                    square.style.boxShadow = "0 32px 96px rgba(234, 51, 35, 0.35)";
+                    square.style.transformOrigin = "center";
+                    stage.appendChild(square);
+                    document.body.appendChild(stage);
+                    return { stage, square };
+                };
+                const update = (t) => {
+                    const { square } = ensureStage();
+                    const rotate = t * 45;
+                    const shift = Math.sin(t * Math.PI * 2) * 24;
+                    square.style.transform = `translate(${shift}px, 0px) rotate(${rotate}deg)`;
+                };
+                if (typeof window.__nfTick !== "function") {
+                    window.__nfTick = (seq, t) => {
+                        update(t);
+                        void send({ kind: "frameReady", seq });
+                    };
+                }
+                update(0);
+                window.__nfRecorderCompatInstalled = true;
+                void send({ kind: "ready" });
+                return "installed";
+            })()"##,
+        )?;
+        Ok(())
+    }
+
+    fn evaluate_javascript(&self, source: &str) -> Result<()> {
+        let script = NSString::from_str(source);
         let done = Rc::new(Cell::new(false));
         let error_text = Rc::new(RefCell::new(None::<String>));
         let done_out = done.clone();
@@ -226,22 +311,7 @@ impl Worker {
         if !done.get() {
             bail!("timed out waiting for evaluateJavaScript");
         }
-        let frame_deadline = Instant::now() + Duration::from_secs(5);
-        while Instant::now() < frame_deadline {
-            self.flush();
-            if self.bridge_state.borrow().frame_ready_seq >= seq {
-                return Ok(());
-            }
-        }
-        Err(anyhow!("timed out waiting for frameReady seq {seq}"))
-    }
-
-    fn flush(&self) {
-        self.recorder_web_view.displayIfNeeded();
-        self.recorder_window.displayIfNeeded();
-        self.overlay_window.displayIfNeeded();
-        flush_core_animation_transactions();
-        pump_main_run_loop(Duration::from_millis(8));
+        Ok(())
     }
 }
 

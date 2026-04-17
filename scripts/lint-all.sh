@@ -11,7 +11,7 @@ run_step() {
   local name="$1"
   shift
 
-  if "$@"; then
+  if "$@" 1>&2; then
     passes[${#passes[@]}]="$name"
   else
     echo "[lint-all] ${name} failed" >&2

@@ -51,18 +51,17 @@ impl PipelineRecorder {
 impl Recorder for PipelineRecorder {
     fn record(&mut self, spec: RecordSpec) -> Result<RecordHandle> {
         validate_spec(&spec)?;
-        let out_path = resolved_out_path(&spec).to_path_buf();
-        ensure_parent_dir(&out_path)?;
+        ensure_parent_dir(&spec.out_path)?;
 
-        let total_frames = frame_count(spec.duration_s, spec.duration_sec, spec.fps)?;
+        let total_frames = frame_count(spec.duration_s, spec.fps)?;
         self.progress = ProgressState::new(total_frames);
         self.emit_progress(self.progress.snapshot())?;
 
-        let width = resolved_width(spec.resolution.0, spec.width) as usize;
-        let height = resolved_height(spec.resolution.1, spec.height) as usize;
+        let width = spec.resolution.0 as usize;
+        let height = spec.resolution.1 as usize;
         let worker_count = spec.worker_count.max(1);
         let mut workers = (0..worker_count)
-            .map(|_| Worker::new(resolved_bundle_path(&spec), width, height, spec.fps))
+            .map(|_| Worker::new(&spec.bundle_path, width, height, spec.fps))
             .collect::<Result<Vec<_>>>()?;
 
         let compositor = MetalCompositor::new(width, height)?;
@@ -81,7 +80,7 @@ impl Recorder for PipelineRecorder {
             let encoded = encoder.encode_frame(frame_index as u32, composited.pixel_buffer())?;
             if muxer.is_none() {
                 muxer = Some(FragmentedMp4Writer::new(
-                    &out_path,
+                    &spec.out_path,
                     width as u16,
                     height as u16,
                     spec.fps,
@@ -102,9 +101,8 @@ impl Recorder for PipelineRecorder {
         }
 
         Ok(RecordHandle {
-            out_path,
+            out_path: spec.out_path,
             total_frames,
-            id: "completed".to_string(),
         })
     }
 
@@ -118,62 +116,30 @@ impl Recorder for PipelineRecorder {
 }
 
 fn validate_spec(spec: &RecordSpec) -> Result<()> {
-    if spec.bundle_path.as_os_str().is_empty() && spec.bundle_html.as_os_str().is_empty() {
+    if spec.bundle_path.as_os_str().is_empty() {
         bail!("bundle_path must not be empty");
     }
-    let bundle_path = resolved_bundle_path(spec);
-    if !bundle_path.is_file() {
-        bail!("bundle_path does not exist: {}", bundle_path.display());
+    if !spec.bundle_path.is_file() {
+        bail!("bundle_path does not exist: {}", spec.bundle_path.display());
     }
     if spec.fps == 0 {
         bail!("fps must be > 0");
     }
-    if resolved_width(spec.resolution.0, spec.width) == 0
-        || resolved_height(spec.resolution.1, spec.height) == 0
-    {
+    if spec.resolution.0 == 0 || spec.resolution.1 == 0 {
         bail!("resolution must be > 0");
     }
-    if spec.duration_s <= 0.0 && spec.duration_sec <= 0.0 {
+    if spec.duration_s <= 0.0 {
         bail!("duration_s must be > 0");
     }
     Ok(())
 }
 
-fn frame_count(duration_s: f64, duration_sec: f64, fps: u32) -> Result<u64> {
-    let duration = if duration_s > 0.0 {
-        duration_s
-    } else {
-        duration_sec
-    };
-    let frames = (duration * fps as f64).round();
+fn frame_count(duration_s: f64, fps: u32) -> Result<u64> {
+    let frames = (duration_s * fps as f64).round();
     if !(frames.is_finite() && frames > 0.0) {
         bail!("duration/fps produced an invalid frame count");
     }
     Ok(frames as u64)
-}
-
-fn resolved_bundle_path(spec: &RecordSpec) -> &Path {
-    if spec.bundle_path.as_os_str().is_empty() {
-        &spec.bundle_html
-    } else {
-        &spec.bundle_path
-    }
-}
-
-fn resolved_out_path(spec: &RecordSpec) -> &Path {
-    if spec.out_path.as_os_str().is_empty() {
-        &spec.output_mp4
-    } else {
-        &spec.out_path
-    }
-}
-
-fn resolved_width(width: u32, legacy_width: u32) -> u32 {
-    if width > 0 { width } else { legacy_width }
-}
-
-fn resolved_height(height: u32, legacy_height: u32) -> u32 {
-    if height > 0 { height } else { legacy_height }
 }
 
 fn ensure_parent_dir(path: &Path) -> Result<()> {

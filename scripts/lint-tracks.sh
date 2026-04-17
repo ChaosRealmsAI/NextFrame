@@ -4,6 +4,10 @@ set -u
 
 cd "$(dirname "$0")/.."
 
+if [ ! -d src/nf-tracks/node_modules/acorn ] || [ ! -d src/nf-tracks/node_modules/acorn-walk ]; then
+  npm --prefix src/nf-tracks ci --silent 1>&2
+fi
+
 files_tmp="$(mktemp)"
 violations_tmp="$(mktemp)"
 trap 'rm -f "$files_tmp" "$violations_tmp"' EXIT
