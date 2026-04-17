@@ -1,6 +1,7 @@
 //! `nf build <src> -o <out>` → shell out to the TypeScript engine.
 
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 pub fn run(source: &Path, output: &Path) -> anyhow::Result<serde_json::Value> {
@@ -38,18 +39,20 @@ pub fn run(source: &Path, output: &Path) -> anyhow::Result<serde_json::Value> {
 }
 
 fn engine_cli_path() -> anyhow::Result<std::path::PathBuf> {
-    let candidates = [
-        "src/nf-core-engine/dist/cli.js",
-        "../src/nf-core-engine/dist/cli.js",
-        "../../src/nf-core-engine/dist/cli.js",
-    ];
-    for c in candidates.iter() {
-        let p = std::path::PathBuf::from(c);
-        if p.exists() {
-            return Ok(p);
+    for candidate in engine_cli_candidates() {
+        if candidate.exists() {
+            return Ok(candidate);
         }
     }
     Err(anyhow::anyhow!(
-        "engine cli not found — run `npm run build` in src/nf-core-engine"
+        "engine cli not found in dist or source-runner locations"
     ))
+}
+
+fn engine_cli_candidates() -> [PathBuf; 2] {
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    [
+        repo_root.join("src/nf-core-engine/dist/cli.js"),
+        repo_root.join("src/nf-core-engine/scripts/cli.mjs"),
+    ]
 }
