@@ -1,0 +1,18 @@
+deny = [
+  "tauri",
+  "electron",
+  "react",
+  "vue",
+  "svelte",
+  "next",
+  "bevy",
+  "actix-web",
+  "egui",
+  "gsap",
+  "lottie",
+  "metal-rs",
+  "io-surface",
+  "videotoolbox-sys",
+  "cocoa-rs",
+  "libc-rs-legacy",
+]

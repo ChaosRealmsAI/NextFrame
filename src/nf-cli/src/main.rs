@@ -30,7 +30,7 @@ enum Command {
     /// AI-ops introspection. Emits JSON on stdout.
     AiOps {
         #[command(subcommand)]
-        action: commands::ai_ops::AiOpsCmd,
+        action: commands::AiOpsCmd,
     },
 }
 
