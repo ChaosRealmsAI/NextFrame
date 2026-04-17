@@ -1,0 +1,279 @@
+{
+  "feature": "Recorder — 性能上限版 4K 录制 · IOSurface 零拷贝 + Metal + HEVC 10-bit",
+  "version": "v2.0",
+  "module": "recorder",
+  "crate": "nf-recorder",
+  "axioms": [
+    "axiom-3",
+    "axiom-4"
+  ],
+  "mandate": "直达 Mac 平台能提供的最高吞吐。ceiling 标签不可降级，每一条由 POC 压测验证",
+  "invariants": {
+    "behavior": [
+      "同一 source + 同参数 → MP4 字节级相同（deterministic）",
+      "10 秒视频 @ 30fps 必须精确 300 帧，不多不少",
+      "ceiling 功能（IOSurface / Metal / HEVC / 帧池）在 telemetry 中必须可证实际被走过",
+      "workers 默认 = 物理核心数；压测数据指示上限由 GPU 编码器带宽决定",
+      "不用 screencapture / PNG 中间文件 / CGContext —— 任何拷贝到系统内存的路径都是降级"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "recorder-1-deterministic",
+      "version": "v2.0",
+      "type": "feature",
+      "tags": [
+        "core",
+        "axiom-3"
+      ],
+      "status": "todo",
+      "verify_status": "pending",
+      "story": "同一 source + 同参数 → 跑 3 次出 3 个字节完全相同的 MP4",
+      "given": "source.json 含 10 tracks，命令行参数 --res 4k --fps 30 --workers 4 固定",
+      "when": "连续跑 nf record 3 次",
+      "then": [
+        "3 个 MP4 文件 SHA256 完全相同",
+        "duration / 分辨率 / 帧率 / 编码参数完全一致",
+        "音频轨道 hash 也相同（同 resolved anchors → 同 mix）"
+      ],
+      "verify": [
+        "nf build tmp/fixture.json --out tmp/bundle.html",
+        "nf record tmp/bundle.html --out tmp/r1.mp4 --res 4k --fps 30 --workers 4",
+        "nf record tmp/bundle.html --out tmp/r2.mp4 --res 4k --fps 30 --workers 4",
+        "nf record tmp/bundle.html --out tmp/r3.mp4 --res 4k --fps 30 --workers 4",
+        "shasum -a 256 tmp/r1.mp4 tmp/r2.mp4 tmp/r3.mp4 | awk '{print $1}' | sort -u | wc -l | grep '^1$'"
+      ],
+      "critical": "非确定性 = 不可调试。每轮都要重新人眼看片，自动化验证破产",
+      "module": "nf-recorder",
+      "refs": [
+        "adrs.json#ADR-023"
+      ]
+    },
+    {
+      "id": "recorder-2-frame-count",
+      "version": "v2.0",
+      "type": "poc",
+      "tags": [
+        "core",
+        "safety",
+        "poc-3"
+      ],
+      "status": "todo",
+      "verify_status": "pending",
+      "story": "10 秒视频 @ 30fps 必须精确 300 帧，不多不少",
+      "given": "source 标注 duration = exactly 10000ms",
+      "when": "nf record --fps 30",
+      "then": [
+        "ffprobe 结果 nb_frames = 300",
+        "duration_ts 与期望完全匹配（不舍入出错）",
+        "第 0 帧 pts=0，第 299 帧 pts=9966666 (≈9.967s @ 30fps timebase)"
+      ],
+      "verify": [
+        "nf record tmp/bundle.html --out tmp/exact.mp4 --fps 30",
+        "ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames tmp/exact.mp4 | grep '^nb_read_frames=300$'",
+        "ffprobe -v error -select_streams v:0 -show_entries packet=pts -of csv=p=0 tmp/exact.mp4 | head -1 | grep '^0$'"
+      ],
+      "critical": "帧数不精确 → 音画错位累积 → 长视频末尾会偏移几十毫秒",
+      "module": "nf-recorder",
+      "refs": [
+        "adrs.json#ADR-023"
+      ]
+    },
+    {
+      "id": "recorder-3-parallel-workers",
+      "version": "v2.0",
+      "type": "feature",
+      "tags": [
+        "core",
+        "performance",
+        "ceiling",
+        "axiom-3"
+      ],
+      "status": "todo",
+      "verify_status": "pending",
+      "story": "多 worker 按物理核心数并行，各一个 WKWebView，按帧号合流",
+      "given": "M2/M3 Pro 物理核心 8（性能 6 + 效率 2）· 10 秒 30fps 视频",
+      "when": "nf record --workers 6（对齐性能核心）",
+      "then": [
+        "6 个独立 WKWebView 子进程被 spawn，每个负责 frame_idx % 6",
+        "总录制时间 < 单 worker 的 1/4（6x 并行 + 合流开销扣除后至少 4x 加速）",
+        "按帧号合流后帧顺序完全正确（pts 严格递增）",
+        "perf telemetry 记录每个 worker 的帧吞吐"
+      ],
+      "verify": [
+        "t1=$(date +%s); nf record tmp/bundle.html --out tmp/w1.mp4 --workers 1; t2=$(date +%s)",
+        "t3=$(date +%s); nf record tmp/bundle.html --out tmp/w6.mp4 --workers 6; t4=$(date +%s)",
+        "echo \"w1=$((t2-t1))s w6=$((t4-t3))s\" && test $((t2-t1)) -gt $((($t4-$t3)*4))",
+        "cat logs/latest/recorder.perf.json | jq '.workers | length == 6'",
+        "cat logs/latest/recorder.perf.json | jq '[.workers[].frames_processed] | add == 300'"
+      ],
+      "critical": "worker 并行是公理 3 纯函数的性能红利。不并行 → 4K 录制慢到不可用",
+      "module": "nf-recorder",
+      "refs": [
+        "adrs.json#ADR-023"
+      ]
+    },
+    {
+      "id": "recorder-4-iosurface-zero-copy",
+      "version": "v2.0",
+      "type": "poc",
+      "tags": [
+        "core",
+        "performance",
+        "ceiling",
+        "poc-recorder"
+      ],
+      "status": "todo",
+      "verify_status": "pending",
+      "story": "IOSurface 零拷贝管线：WKWebView 渲染后的 IOSurface 直接喂 VideoToolbox，全程不拷贝到系统内存",
+      "given": "录制 4K @ 30fps 10 秒视频，workers=6",
+      "when": "nf record 跑完 + 收 perf telemetry",
+      "then": [
+        "perf telemetry 字段 path_zero_copy = true，所有帧标记 via_iosurface",
+        "不出现 bitmap_copy_bytes / cgcontext_draw / nsimage_from_cgimage 任何一项（为 0）",
+        "每帧从 surface 拿到到送入编码器耗时 < 1ms（P95）",
+        "Instruments Allocations 面板显示录制期间无 CGImage 新增"
+      ],
+      "verify": [
+        "nf record tmp/bundle.html --out tmp/zc.mp4 --workers 6 --perf tmp/zc.perf.json",
+        "jq '.path_zero_copy == true' tmp/zc.perf.json | grep true",
+        "jq '.bitmap_copy_bytes == 0 and .cgcontext_draw_calls == 0' tmp/zc.perf.json | grep true",
+        "jq '.surface_to_encoder_us.p95 < 1000' tmp/zc.perf.json | grep true"
+      ],
+      "critical": "零拷贝是 ceiling 的基础。走 bitmap → 每帧多 40MB 拷贝 → 4K 性能崩盘",
+      "module": "nf-recorder",
+      "refs": [
+        "adrs.json#ADR-023"
+      ]
+    },
+    {
+      "id": "recorder-5-metal-compositor",
+      "version": "v2.0",
+      "type": "poc",
+      "tags": [
+        "core",
+        "performance",
+        "ceiling",
+        "poc-recorder"
+      ],
+      "status": "todo",
+      "verify_status": "pending",
+      "story": "Metal compositor：多 Track 合成走 GPU shader，WKWebView 开启 accelerated compositing",
+      "given": "source 含 5 层 transform + 1 层 blur + 字幕",
+      "when": "record 期间",
+      "then": [
+        "GPU 使用率持续 > 50%（Mac Activity Monitor 或 powermetrics）",
+        "CPU Canvas 路径 0 调用（telemetry canvas_compose_frames == 0）",
+        "WKWebView 诊断显示 accelerated_compositing = ON",
+        "Metal 性能 HUD 显示 shader 调用数 > 帧数 × track 数"
+      ],
+      "verify": [
+        "sudo powermetrics --samplers gpu_power -n 1 -i 1000 > tmp/gpu-idle.txt &",
+        "PID=$!; nf record tmp/bundle.html --out tmp/metal.mp4 --perf tmp/metal.perf.json &",
+        "sleep 3; sudo powermetrics --samplers gpu_power -n 1 -i 1000 > tmp/gpu-busy.txt; wait",
+        "jq '.canvas_compose_frames == 0 and .metal_shader_calls > 0' tmp/metal.perf.json | grep true",
+        "grep 'accelerated_compositing.*true' logs/latest/recorder.log"
+      ],
+      "critical": "CPU 合成 → 4K 多 track 场景性能 5x 劣化。必须 GPU 路径",
+      "module": "nf-recorder",
+      "refs": [
+        "adrs.json#ADR-023"
+      ]
+    },
+    {
+      "id": "recorder-6-hevc-10bit",
+      "version": "v2.0",
+      "type": "feature",
+      "tags": [
+        "core",
+        "performance",
+        "ceiling"
+      ],
+      "status": "todo",
+      "verify_status": "pending",
+      "story": "VideoToolbox 硬编 H.265 HEVC，10-bit HDR 可选",
+      "given": "--codec hevc --bit-depth 10",
+      "when": "nf record 4K @ 30fps",
+      "then": [
+        "ffprobe 显示 codec_name=hevc, pix_fmt=yuv420p10le",
+        "VideoToolbox 硬件编码器被使用（perf telemetry encoder=VTHardware）",
+        "编码耗时 P95 < 10ms/帧（硬编体现）",
+        "不使用 libx265 软编（process 无 x265 子进程）"
+      ],
+      "verify": [
+        "nf record tmp/bundle.html --out tmp/hdr.mp4 --codec hevc --bit-depth 10 --perf tmp/hdr.perf.json",
+        "ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,pix_fmt -of csv=p=0 tmp/hdr.mp4 | grep 'hevc,yuv420p10le'",
+        "jq '.encoder == \"VTHardware\" and .encode_ms.p95 < 10' tmp/hdr.perf.json | grep true"
+      ],
+      "critical": "软编 → 4K 实时录制不可能。HDR 10-bit 是质量上限标",
+      "module": "nf-recorder",
+      "refs": [
+        "adrs.json#ADR-023"
+      ]
+    },
+    {
+      "id": "recorder-7-frame-pool",
+      "version": "v2.0",
+      "type": "feature",
+      "tags": [
+        "core",
+        "performance",
+        "ceiling"
+      ],
+      "status": "todo",
+      "verify_status": "pending",
+      "story": "帧池预分配：启动时按 workers × ringbuffer 预分配 IOSurface，录制期间零分配",
+      "given": "workers=6, ringbuffer=4 → 预分配 24 帧 IOSurface",
+      "when": "nf record 跑 10 秒",
+      "then": [
+        "启动阶段一次性分配 24 × 4K IOSurface ≈ 770 MB",
+        "录制期间 IOSurface_create 调用次数 == 0（全部复用）",
+        "帧耗时分布无长尾（P99 / P50 比值 < 1.5，证明无分配抖动）",
+        "进程 RSS 波动 < 10 MB（无泄漏无分配）"
+      ],
+      "verify": [
+        "nf record tmp/bundle.html --out tmp/pool.mp4 --workers 6 --ringbuffer 4 --perf tmp/pool.perf.json",
+        "jq '.iosurface_create_count_during_record == 0' tmp/pool.perf.json | grep true",
+        "jq '(.frame_us.p99 / .frame_us.p50) < 1.5' tmp/pool.perf.json | grep true",
+        "jq '.rss_delta_mb | fabs < 10' tmp/pool.perf.json | grep true"
+      ],
+      "critical": "运行时分配 = GC 抖动 / malloc 长尾 → 长片尾帧掉速。必须预分配",
+      "module": "nf-recorder",
+      "refs": [
+        "adrs.json#ADR-023"
+      ]
+    },
+    {
+      "id": "recorder-8-perf-telemetry",
+      "version": "v2.0",
+      "type": "feature",
+      "tags": [
+        "performance",
+        "ai-ops",
+        "ceiling"
+      ],
+      "status": "todo",
+      "verify_status": "pending",
+      "story": "每帧记录结构化 perf 数据 · 输出 P50/P95/P99 + GPU 使用 + 编码器吞吐 + 未命中原因",
+      "given": "任意 record 命令 + --perf 参数",
+      "when": "录制完成",
+      "then": [
+        "产出 recorder.perf.json，含 frame_us / stable_wait_us / encode_ms / io_ms 四组 P50/P95/P99",
+        "含 gpu_util_pct_avg / encoder_throughput_fps",
+        "含 miss_reasons {\"cgcontext\":0, \"bitmap_copy\":0, \"canvas_compose\":0} 等降级计数",
+        "AI 能直接读该文件判定 ceiling 是否全部达成"
+      ],
+      "verify": [
+        "nf record tmp/bundle.html --out tmp/final.mp4 --perf tmp/final.perf.json",
+        "test -f tmp/final.perf.json",
+        "jq 'has(\"frame_us\") and has(\"gpu_util_pct_avg\") and has(\"miss_reasons\")' tmp/final.perf.json | grep true",
+        "jq '.miss_reasons | [.[]] | max == 0' tmp/final.perf.json | grep true"
+      ],
+      "critical": "没有 telemetry → POC 凭感觉验证 → ceiling 不可证 → v2.0 定位破产",
+      "module": "nf-recorder",
+      "refs": [
+        "adrs.json#ADR-023"
+      ]
+    }
+  ]
+}

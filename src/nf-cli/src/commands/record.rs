@@ -2,24 +2,31 @@
 
 use std::path::Path;
 
-use nf_recorder::{RecordSpec, Recorder, StubRecorder};
+use nf_recorder::{PipelineRecorder, RecordSpec, Recorder};
 
 pub fn run(bundle: &Path, output: &Path) -> anyhow::Result<serde_json::Value> {
     let spec = RecordSpec {
-        bundle_html: bundle.to_path_buf(),
-        output_mp4: output.to_path_buf(),
+        bundle_path: bundle.to_path_buf(),
+        out_path: output.to_path_buf(),
         ..RecordSpec::default()
     };
-    let mut rec = StubRecorder::new();
+    let mut rec = PipelineRecorder::new();
     let (status, error) = match rec.record(spec.clone()) {
-        Ok(handle) => (format!("started:{}", handle.id), None),
+        Ok(handle) => (
+            format!(
+                "completed:{}:{}",
+                handle.out_path.display(),
+                handle.total_frames
+            ),
+            None,
+        ),
         Err(e) => ("pending".to_string(), Some(e.to_string())),
     };
     Ok(serde_json::json!({
         "ok": true,
         "command": "record",
-        "bundle": spec.bundle_html.display().to_string(),
-        "output": spec.output_mp4.display().to_string(),
+        "bundle": spec.bundle_path.display().to_string(),
+        "output": spec.out_path.display().to_string(),
         "status": status,
         "error": error,
     }))

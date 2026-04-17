@@ -1,86 +1,63 @@
-//! nf-recorder — hidden WKWebView → IOSurface → Metal → VTCompressionSession HEVC HDR10 → fMP4.
-//!
-//! Walking skeleton: exposes the `Recorder` trait and module seams; no FFI yet.
+#![doc = "nf-recorder — hidden WKWebView → SCStream → IOSurface → Metal → VT HEVC Main 10 HDR10 → fMP4."]
 
+pub mod bindings;
 pub mod capture;
 pub mod compositor;
 pub mod encoder;
 pub mod frame_pool;
+pub mod io_surface_alias;
 pub mod muxer;
+pub mod pattern;
+pub mod progress;
+pub mod recorder;
 pub mod sei_injector;
 pub mod worker;
 
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// High-level recorder contract. Real impl is a state machine over the whole pipeline.
+pub use progress::ProgressState;
+pub use recorder::PipelineRecorder;
+
 pub trait Recorder {
     fn record(&mut self, spec: RecordSpec) -> anyhow::Result<RecordHandle>;
     fn progress(&self) -> Progress;
+    fn cancel(&mut self);
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct RecordSpec {
-    pub bundle_html: PathBuf,
-    pub output_mp4: PathBuf,
-    pub width: u32,
-    pub height: u32,
+    pub bundle_path: PathBuf,
+    pub out_path: PathBuf,
+    pub duration_s: f64,
     pub fps: u32,
-    pub duration_sec: f64,
-    pub hdr10: bool,
+    pub resolution: (u32, u32),
+    pub worker_count: usize,
 }
 
 impl Default for RecordSpec {
     fn default() -> Self {
         Self {
-            bundle_html: PathBuf::from("out/bundle.html"),
-            output_mp4: PathBuf::from("out/out.mp4"),
-            width: 3840,
-            height: 2160,
+            bundle_path: PathBuf::new(),
+            out_path: PathBuf::from("out.mp4"),
+            duration_s: 1.0,
             fps: 30,
-            duration_sec: 0.0,
-            hdr10: true,
+            resolution: (1280, 720),
+            worker_count: 6,
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordHandle {
-    pub id: String,
-}
-
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
 pub struct Progress {
     pub frames_done: u64,
     pub total: u64,
+    pub fps_observed: f64,
 }
 
-pub struct StubRecorder {
-    progress: Progress,
-}
-
-impl StubRecorder {
-    pub fn new() -> Self {
-        Self {
-            progress: Progress::default(),
-        }
-    }
-}
-
-impl Default for StubRecorder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Recorder for StubRecorder {
-    fn record(&mut self, _spec: RecordSpec) -> anyhow::Result<RecordHandle> {
-        Err(anyhow::anyhow!("walking stub: recorder not implemented"))
-    }
-
-    fn progress(&self) -> Progress {
-        self.progress
-    }
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RecordHandle {
+    pub out_path: PathBuf,
+    pub total_frames: u64,
 }
 
 pub fn version() -> &'static str {

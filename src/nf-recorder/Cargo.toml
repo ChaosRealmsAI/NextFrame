@@ -7,13 +7,29 @@ edition = "2021"
 path = "src/lib.rs"
 
 [[bin]]
-name = "nf-recorder"
-path = "src/main.rs"
+name = "poc-recorder"
+path = "src/bin/poc-recorder.rs"
 
 [dependencies]
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+block2 = "0.6"
+crossbeam = "0.8"
+dispatch2 = "0.3.1"
+libc = "0.2"
+mp4-atom = "0.4"
+objc2 = "0.6.4"
+objc2-app-kit = "0.3.2"
+objc2-core-foundation = { version = "0.3.2", features = ["CFDictionary", "CFNumber", "CFString"] }
+objc2-core-media = "0.3.2"
+objc2-core-video = { version = "0.3.2", features = ["objc2-io-surface"] }
+objc2-foundation = { version = "0.3.2", features = ["NSError", "NSString"] }
+objc2-io-surface = "0.3.2"
+objc2-metal = { version = "0.3.2", features = ["objc2-io-surface"] }
+objc2-screen-capture-kit = "0.3.2"
+objc2-video-toolbox = "0.3.2"
+objc2-web-kit = "0.3.2"
 
 [lints]
 workspace = true

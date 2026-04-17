@@ -1,47 +1,63 @@
-//! Frame buffer pool — producer-consumer queue between worker and encoder.
-//!
-//! Real impl uses `crossbeam::queue::ArrayQueue<IoSurfaceSlot>`; skeleton is a thin
-//! wrapper over `std::collections::VecDeque` so the trait surface is stable.
+use std::hint::spin_loop;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-use std::collections::VecDeque;
+use anyhow::{Result, anyhow, bail};
+use crossbeam::queue::ArrayQueue;
 
-use crate::worker::FrameRef;
+const SPIN_THRESHOLD: Duration = Duration::from_micros(250);
 
-pub trait FramePool {
-    fn acquire(&mut self) -> Option<FrameRef>;
-    fn release(&mut self, frame: FrameRef);
-    fn capacity(&self) -> usize;
+pub struct FramePool<T> {
+    free: Arc<ArrayQueue<Arc<T>>>,
 }
 
-pub struct StubPool {
-    cap: usize,
-    free: VecDeque<FrameRef>,
-}
-
-impl StubPool {
-    pub fn new(cap: usize) -> Self {
-        let mut free = VecDeque::with_capacity(cap);
-        for i in 0..cap {
-            free.push_back(FrameRef {
-                io_surface_id: i as u64,
-            });
-        }
-        Self { cap, free }
-    }
-}
-
-impl FramePool for StubPool {
-    fn acquire(&mut self) -> Option<FrameRef> {
-        self.free.pop_front()
-    }
-
-    fn release(&mut self, frame: FrameRef) {
-        if self.free.len() < self.cap {
-            self.free.push_back(frame);
+impl<T> Clone for FramePool<T> {
+    fn clone(&self) -> Self {
+        Self {
+            free: self.free.clone(),
         }
     }
+}
 
-    fn capacity(&self) -> usize {
-        self.cap
+impl<T> FramePool<T> {
+    pub fn new(preallocated: Vec<Arc<T>>) -> Result<Self> {
+        if preallocated.is_empty() {
+            bail!("frame pool requires at least one slot");
+        }
+        let free = Arc::new(ArrayQueue::new(preallocated.len()));
+        for slot in preallocated {
+            free.push(slot)
+                .map_err(|_| anyhow!("failed to seed frame pool"))?;
+        }
+        Ok(Self { free })
+    }
+
+    pub fn acquire(&self) -> Option<Arc<T>> {
+        self.free.pop()
+    }
+
+    pub fn release(&self, slot: Arc<T>) -> Result<()> {
+        self.free
+            .push(slot)
+            .map_err(|_| anyhow!("frame pool overflow on release"))
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.free.capacity()
+    }
+}
+
+pub fn sleep_then_spin_until(deadline: Instant) {
+    loop {
+        let now = Instant::now();
+        if now >= deadline {
+            return;
+        }
+        let remaining = deadline.saturating_duration_since(now);
+        if remaining > SPIN_THRESHOLD {
+            std::thread::sleep(remaining - SPIN_THRESHOLD);
+            continue;
+        }
+        spin_loop();
     }
 }
