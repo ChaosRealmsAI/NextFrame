@@ -1,15 +1,23 @@
 //! AI-ops surface — stable JSON contract for AI agents. All subcommands emit JSON.
 
 mod cmd;
+pub mod serve;
 
-pub use self::cmd::AiOpsCmd;
+pub use self::cmd::{AiOpsCmd, ServeArgs};
 
-pub fn run(cmd: AiOpsCmd) -> anyhow::Result<serde_json::Value> {
+pub fn run(cmd: AiOpsCmd) -> anyhow::Result<Option<serde_json::Value>> {
     match cmd {
-        AiOpsCmd::Describe => Ok(describe()),
-        AiOpsCmd::Simulate { action } => Ok(simulate(&action)),
-        AiOpsCmd::State => Ok(state()),
-        AiOpsCmd::Screenshot { output } => Ok(screenshot(&output)),
+        AiOpsCmd::Serve(args) => {
+            let runtime = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()?;
+            runtime.block_on(serve::run(args))?;
+            Ok(None)
+        }
+        AiOpsCmd::Describe => Ok(Some(describe())),
+        AiOpsCmd::Simulate { action } => Ok(Some(simulate(&action))),
+        AiOpsCmd::State => Ok(Some(state())),
+        AiOpsCmd::Screenshot { output } => Ok(Some(screenshot(&output))),
     }
 }
 

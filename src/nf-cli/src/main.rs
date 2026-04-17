@@ -36,18 +36,19 @@ enum Command {
 
 fn main() {
     let cli = Cli::parse();
-    let result: anyhow::Result<serde_json::Value> = match cli.command {
-        Command::Build { source, output } => commands::build::run(&source, &output),
-        Command::Record { bundle, output } => commands::record::run(&bundle, &output),
-        Command::Validate { source } => commands::validate::run(&source),
+    let result: anyhow::Result<Option<serde_json::Value>> = match cli.command {
+        Command::Build { source, output } => commands::build::run(&source, &output).map(Some),
+        Command::Record { bundle, output } => commands::record::run(&bundle, &output).map(Some),
+        Command::Validate { source } => commands::validate::run(&source).map(Some),
         Command::AiOps { action } => commands::ai_ops::run(action),
     };
     match result {
-        Ok(value) => {
+        Ok(Some(value)) => {
             if let Ok(s) = serde_json::to_string(&value) {
                 println!("{}", s);
             }
         }
+        Ok(None) => {}
         Err(err) => {
             let payload = serde_json::json!({
                 "ok": false,

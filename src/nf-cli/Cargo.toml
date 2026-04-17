@@ -12,7 +12,13 @@ anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 clap = { version = "4", features = ["derive"] }
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
+png = "0.18"
+tokio-stream = "0.1"
 nf-shell-mac = { path = "../nf-shell-mac" }
 nf-recorder = { path = "../nf-recorder" }
 
