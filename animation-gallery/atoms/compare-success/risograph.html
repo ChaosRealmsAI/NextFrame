@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>"Success ✓" · Risograph Print</title>
+<style>
+  :root {
+    /* Paper — warm cream, NOT dead white */
+    --paper:       #f7f3e9;
+    --paper-dark:  #ebe3cf;
+    --paper-soft:  #fdf0e5;  /* alt peach */
+
+    /* Riso inks (the two-color soul) */
+    --riso-pink:   #ff6680;   /* Fluorescent Pink */
+    --riso-pink-d: #e84a66;
+    --riso-teal:   #0aa8a8;   /* Teal */
+    --riso-teal-d: #07888a;
+
+    /* Ink accent */
+    --ink-900:     #1c1410;   /* warm black — not pure black */
+    --ink-600:     #3a2a22;
+    --ink-300:     #8a7a6e;
+
+    /* Misregistration offset (the SOUL) */
+    --offset-x:    3px;
+    --offset-y:    2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #e8e0cc;
+    font-family: "Uncut Sans", "Neue Haas Grotesk", "Söhne", "Inter", system-ui, sans-serif;
+    color: var(--ink-900);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .stage { position: fixed; inset: 0; display: grid; place-items: center; }
+
+  .scene {
+    position: relative;
+    width: 1920px; height: 1080px;
+    background: var(--paper);
+    overflow: hidden;
+    transform-origin: center;
+  }
+  @media (max-aspect-ratio: 16/9) { .scene { transform: scale(calc(100vw / 1920)); } }
+  @media (min-aspect-ratio: 16/9) { .scene { transform: scale(calc(100vh / 1080)); } }
+
+  /* ---------- Paper texture (grain + halftone) ---------- */
+
+  .paper-grain {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+    opacity: 0.35;
+  }
+
+  .halftone-bg {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle at 50% 50%, #c0b5a0 0.8px, transparent 1.5px);
+    background-size: 8px 8px;
+    opacity: 0.22;
+    pointer-events: none;
+  }
+
+  /* Registration crosshairs (Riso print trademark) */
+  .reg-mark {
+    position: absolute;
+    width: 32px; height: 32px;
+    pointer-events: none;
+  }
+  .reg-mark::before, .reg-mark::after {
+    content: "";
+    position: absolute;
+    background: var(--ink-900);
+  }
+  .reg-mark::before {
+    left: 50%; top: 0;
+    width: 1.5px; height: 100%;
+    transform: translateX(-50%);
+  }
+  .reg-mark::after {
+    top: 50%; left: 0;
+    width: 100%; height: 1.5px;
+    transform: translateY(-50%);
+  }
+  .reg-mark .ring {
+    position: absolute;
+    inset: 8px;
+    border: 1.5px solid var(--ink-900);
+    border-radius: 50%;
+  }
+  .reg-mark.tl { top: 72px; left: 72px; }
+  .reg-mark.tr { top: 72px; right: 72px; }
+  .reg-mark.bl { bottom: 160px; left: 72px; }
+  .reg-mark.br { bottom: 160px; right: 72px; }
+
+  /* Small print-shop meta (Riso editioning) */
+  .edition-top {
+    position: absolute;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--ink-600);
+    display: flex; gap: 14px; align-items: center;
+  }
+  .edition-top .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--riso-pink); }
+  .edition-top .dot.t { background: var(--riso-teal); }
+
+  .edition-bottom {
+    position: absolute;
+    bottom: 150px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    color: var(--ink-300);
+    text-align: center;
+  }
+
+  /* ---------- Main canvas wrapper ---------- */
+  .main-wrap {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 1200px; height: 720px;
+    display: grid; place-items: center;
+  }
+
+  /* The "card" — a folded zine page */
+  .zine-card {
+    position: relative;
+    width: 880px; height: 560px;
+  }
+
+  /* SVG layer container — each color is its own layer (misreg) */
+  .ink-layer {
+    position: absolute; inset: 0;
+    mix-blend-mode: multiply;   /* Riso inks stack like ink on paper */
+  }
+
+  /* ---------- Stamp (top-right rubber stamp) ---------- */
+  .stamp {
+    position: absolute;
+    top: -40px; right: -60px;
+    width: 220px; height: 220px;
+    pointer-events: none;
+    transform-origin: center;
+    mix-blend-mode: multiply;
+  }
+
+  /* ---------- Handwritten signature ---------- */
+  .signature {
+    position: absolute;
+    left: 50%; bottom: -70px;
+    transform: translateX(-50%) rotate(-1.5deg);
+    font-family: "Caveat", "Kalam", "Homemade Apple", "Brush Script MT", cursive;
+    font-size: 26px;
+    color: var(--riso-teal-d);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    mix-blend-mode: multiply;
+  }
+
+  /* ---------- Halftone dot breathing (overlay on the check area) ---------- */
+  .dot-breath {
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 50% 50%, rgba(255, 102, 128, 0.20) 1px, transparent 2px);
+    background-size: 14px 14px;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+
+  /* ---------- Bottom time-axis (shared base) ---------- */
+  .tl-wrap {
+    position: fixed;
+    left: 24px; right: 24px; bottom: 18px;
+    z-index: 50;
+  }
+
+  .cue-row {
+    position: relative;
+    height: 22px;
+    margin-bottom: 6px;
+  }
+  .cue-mark {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: 14px;
+    background: var(--riso-pink);
+    border-radius: 2px;
+    opacity: 0.6;
+  }
+  .cue-mark .lbl {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--ink-600);
+    opacity: 0.85;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .tl-ui {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 11px 18px;
+    background: rgba(247, 243, 233, 0.92);
+    border: 1.5px solid rgba(28, 20, 16, 0.18);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(28, 20, 16, 0.08);
+  }
+
+  .tl-ui button {
+    appearance: none;
+    border: 1.5px solid var(--ink-900);
+    background: var(--paper);
+    color: var(--ink-900);
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 700;
+    transition: transform 0.12s ease;
+  }
+  .tl-ui button:hover { transform: translateY(-1px); background: var(--riso-pink); color: var(--paper); }
+
+  .tl-ui .time {
+    color: var(--ink-900);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    min-width: 110px;
+  }
+
+  .tl-ui input[type="range"] {
+    appearance: none;
+    flex: 1;
+    height: 4px;
+    background: linear-gradient(90deg,
+      rgba(255, 102, 128, 0.28),
+      rgba(10, 168, 168, 0.28));
+    border-radius: 4px;
+    outline: none;
+  }
+  .tl-ui input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--riso-pink);
+    border: 2px solid var(--ink-900);
+    box-shadow: 0 2px 6px rgba(28, 20, 16, 0.25);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="scene" id="scene">
+
+    <!-- Paper grain (SVG turbulence) -->
+    <svg class="paper-grain" width="1920" height="1080" preserveAspectRatio="none" aria-hidden="true">
+      <filter id="grain">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7"/>
+        <feColorMatrix type="matrix" values="0 0 0 0 0.35
+                                             0 0 0 0 0.28
+                                             0 0 0 0 0.18
+                                             0 0 0 1.2 0"/>
+      </filter>
+      <rect width="100%" height="100%" filter="url(#grain)"/>
+    </svg>
+
+    <!-- Halftone dots background -->
+    <div class="halftone-bg"></div>
+
+    <!-- Registration crosshairs (4 corners) -->
+    <div class="reg-mark tl"><span class="ring"></span></div>
+    <div class="reg-mark tr"><span class="ring"></span></div>
+    <div class="reg-mark bl"><span class="ring"></span></div>
+    <div class="reg-mark br"><span class="ring"></span></div>
+
+    <!-- Top editioning line -->
+    <div class="edition-top">
+      <span>RISO · PRINT SHOP</span>
+      <span class="dot"></span>
+      <span>2 COLOR</span>
+      <span class="dot t"></span>
+      <span>NO. 0421</span>
+    </div>
+
+    <!-- Bottom edition # -->
+    <div class="edition-bottom">Edition 17 / 50 — Fluorescent Pink + Teal</div>
+
+    <!-- Main art area -->
+    <div class="main-wrap" id="mainWrap">
+      <div class="zine-card" id="zineCard">
+
+        <!-- PINK ink layer (behind) — offset -3px,-2px -->
+        <svg class="ink-layer" id="layerPink" viewBox="0 0 880 560" style="transform: translate(-3px, -2px);">
+          <!-- Halftone pattern definition (pink dots for texture fill) -->
+          <defs>
+            <pattern id="halftone-pink" x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
+              <circle cx="3" cy="3" r="1.6" fill="#ff6680"/>
+            </pattern>
+            <pattern id="halftone-pink-sparse" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+              <circle cx="5" cy="5" r="1.2" fill="#ff6680"/>
+            </pattern>
+          </defs>
+
+          <!-- Outer ring (circle stroke) -->
+          <circle id="pinkRing" cx="440" cy="280" r="180"
+            fill="none" stroke="#ff6680" stroke-width="14" stroke-linecap="round"/>
+
+          <!-- Halftone fill disk inside (breathing) -->
+          <circle id="pinkFill" cx="440" cy="280" r="172" fill="url(#halftone-pink-sparse)"/>
+
+          <!-- Hand-drawn check stroke (pink underlayer) -->
+          <path id="pinkCheck"
+            d="M 350 285 L 415 350 L 540 220"
+            fill="none" stroke="#ff6680" stroke-width="28"
+            stroke-linecap="round" stroke-linejoin="round"
+            stroke-dasharray="300" stroke-dashoffset="300"/>
+        </svg>
+
+        <!-- TEAL ink layer (front) — offset +3px,+2px -->
+        <svg class="ink-layer" id="layerTeal" viewBox="0 0 880 560" style="transform: translate(3px, 2px);">
+          <defs>
+            <pattern id="halftone-teal" x="0" y="0" width="5" height="5" patternUnits="userSpaceOnUse">
+              <circle cx="2.5" cy="2.5" r="1.4" fill="#0aa8a8"/>
+            </pattern>
+          </defs>
+
+          <!-- Outer ring (teal) -->
+          <circle id="tealRing" cx="440" cy="280" r="180"
+            fill="none" stroke="#0aa8a8" stroke-width="6" stroke-linecap="round"
+            stroke-dasharray="1200" stroke-dashoffset="1200"/>
+
+          <!-- Check stroke (thinner, teal) — drawn on top of pink for the misreg -->
+          <path id="tealCheck"
+            d="M 350 285 L 415 350 L 540 220"
+            fill="none" stroke="#0aa8a8" stroke-width="10"
+            stroke-linecap="round" stroke-linejoin="round"
+            stroke-dasharray="300" stroke-dashoffset="300"/>
+
+          <!-- Ink splatter around stamp -->
+          <g id="splatter" opacity="0">
+            <circle cx="720" cy="110" r="3.5" fill="#0aa8a8"/>
+            <circle cx="755" cy="135" r="2.2" fill="#0aa8a8"/>
+            <circle cx="710" cy="150" r="2.8" fill="#0aa8a8"/>
+            <circle cx="770" cy="95"  r="1.8" fill="#ff6680"/>
+            <circle cx="695" cy="130" r="1.5" fill="#ff6680"/>
+            <circle cx="740" cy="165" r="2.0" fill="#0aa8a8"/>
+            <circle cx="780" cy="150" r="1.6" fill="#ff6680"/>
+            <circle cx="660" cy="115" r="1.4" fill="#0aa8a8"/>
+          </g>
+        </svg>
+
+        <!-- Halftone dot breathing overlay (center area) -->
+        <div class="dot-breath" id="dotBreath" style="clip-path: circle(180px at 50% 50%); opacity: 0;"></div>
+
+        <!-- Rubber stamp "DONE" (SVG, rotated) -->
+        <svg class="stamp" id="stamp" viewBox="0 0 220 220"
+             style="transform: rotate(-30deg) scale(0.6); opacity: 0; top: -80px; right: -90px;">
+          <defs>
+            <filter id="stampRough">
+              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="3"/>
+              <feDisplacementMap in="SourceGraphic" scale="2"/>
+            </filter>
+          </defs>
+          <g filter="url(#stampRough)" opacity="0.92">
+            <!-- Outer ring (double) -->
+            <circle cx="110" cy="110" r="96" fill="none" stroke="#e84a66" stroke-width="5"/>
+            <circle cx="110" cy="110" r="86" fill="none" stroke="#e84a66" stroke-width="2"/>
+            <!-- Text "DONE" -->
+            <text x="110" y="105" text-anchor="middle"
+                  font-family="'Helvetica Neue', Arial, sans-serif"
+                  font-weight="900" font-size="44" fill="#e84a66"
+                  letter-spacing="4">DONE</text>
+            <!-- Subtext -->
+            <text x="110" y="135" text-anchor="middle"
+                  font-family="'Helvetica Neue', Arial, sans-serif"
+                  font-weight="600" font-size="12" fill="#e84a66"
+                  letter-spacing="6">APPROVED</text>
+            <!-- Star ornaments -->
+            <text x="40" y="118" font-size="18" fill="#e84a66" font-weight="700">★</text>
+            <text x="165" y="118" font-size="18" fill="#e84a66" font-weight="700">★</text>
+            <!-- Date stamp -->
+            <text x="110" y="165" text-anchor="middle"
+                  font-family="'Courier New', monospace"
+                  font-weight="700" font-size="10" fill="#e84a66"
+                  letter-spacing="2">04 · 2026</text>
+          </g>
+        </svg>
+
+        <!-- Handwritten signature -->
+        <div class="signature" id="signature" style="opacity: 0;">
+          — printed with care, no. 0421
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Bottom scrubber UI (shared) -->
+<div class="tl-wrap">
+  <div class="cue-row" id="cueRow"></div>
+  <div class="tl-ui">
+    <button id="playBtn" aria-label="play/pause">⏸</button>
+    <button id="resetBtn" aria-label="reset">↺</button>
+    <span class="time" id="timeLabel">0.00 / 10.00s</span>
+    <input type="range" id="scrubber" min="0" max="1000" value="0">
+    <span class="time" id="frameLabel" style="min-width:110px;text-align:right">frame 0 / 300</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const DURATION = 10.0;
+const FPS = 30;
+
+/* ---------- math helpers ---------- */
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeInOut = x => x < 0.5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2;
+
+function spring(t, k = 180, d = 15, mass = 1) {
+  if (t <= 0) return 0;
+  const wn = Math.sqrt(k / mass);
+  const zeta = d / (2 * Math.sqrt(k * mass));
+  if (zeta < 1) {
+    const wd = wn * Math.sqrt(1 - zeta * zeta);
+    return 1 - Math.exp(-zeta * wn * t) * (Math.cos(wd * t) + (zeta * wn / wd) * Math.sin(wd * t));
+  }
+  return 1 - (1 + wn * t) * Math.exp(-wn * t);
+}
+
+const kern = (t, s, d, ease = easeOut) => ease(clamp01((t - s) / d));
+
+/* seeded RNG for deterministic halftone flicker */
+function seededRand(seed) {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* ---------- CUES ---------- */
+const CUES = [
+  { t: 0.0,  label: 'idle' },
+  { t: 1.5,  label: 'pink ring' },
+  { t: 1.58, label: 'teal offset' },
+  { t: 1.8,  label: 'check draws' },
+  { t: 2.3,  label: 'stamp slams' },
+  { t: 2.8,  label: 'signature' },
+  { t: 6.5,  label: 'breathe' },
+  { t: 9.0,  label: 'loop prep' },
+];
+
+/* ---------- DOM refs ---------- */
+const scene = document.getElementById('scene');
+const zineCard = document.getElementById('zineCard');
+const layerPink = document.getElementById('layerPink');
+const layerTeal = document.getElementById('layerTeal');
+const pinkRing = document.getElementById('pinkRing');
+const pinkFill = document.getElementById('pinkFill');
+const tealRing = document.getElementById('tealRing');
+const pinkCheck = document.getElementById('pinkCheck');
+const tealCheck = document.getElementById('tealCheck');
+const stamp = document.getElementById('stamp');
+const splatter = document.getElementById('splatter');
+const signature = document.getElementById('signature');
+const dotBreath = document.getElementById('dotBreath');
+const mainWrap = document.getElementById('mainWrap');
+
+/* check stroke total length (used for dasharray draw-on) */
+const CHECK_LEN = 300;
+const TEAL_RING_LEN = 2 * Math.PI * 180; // ≈1131
+
+/* ---------- render(t) — pure frame ---------- */
+function render(t) {
+  /* ===== BASE: subtle paper jitter (all the time, very low) ===== */
+  const jitterX = (seededRand(Math.floor(t * 12)) - 0.5) * 2.0;
+  const jitterY = (seededRand(Math.floor(t * 12) + 97) - 0.5) * 1.6;
+  const jitterR = (seededRand(Math.floor(t * 8) + 13) - 0.5) * 0.3;
+  const jitterScale = 1 + (seededRand(Math.floor(t * 6) + 41) - 0.5) * 0.004;
+  mainWrap.style.transform = `translate(calc(-50% + ${jitterX}px), calc(-50% + ${jitterY}px)) rotate(${jitterR}deg) scale(${jitterScale})`;
+
+  /* ===== 0 – 1.5s: idle — halftone faint breathing ===== */
+  // Everything starts hidden except registration marks
+
+  /* ===== 1.5s: PINK ring appears (spring) ===== */
+  const tPink = t - 1.5;
+  const pinkIn = clamp01(spring(tPink, 180, 15));
+  pinkRing.setAttribute('stroke-width', lerp(0, 14, pinkIn));
+  pinkRing.style.opacity = clamp01(kern(t, 1.5, 0.3));
+  // pink fill (halftone dots) fades in slightly later
+  pinkFill.style.opacity = clamp01(kern(t, 1.6, 0.4)) * 0.55;
+
+  // Pink misregistration offset — varies slightly during life (ink doesn't sit still)
+  const pinkOffsetX = -3 + (seededRand(Math.floor(t * 10) + 3) - 0.5) * 0.6;
+  const pinkOffsetY = -2 + (seededRand(Math.floor(t * 10) + 7) - 0.5) * 0.5;
+  layerPink.style.transform = `translate(${pinkOffsetX}px, ${pinkOffsetY}px)`;
+
+  /* ===== 1.58s: TEAL ring appears (80ms after pink → misregistration reveal) ===== */
+  const tTeal = t - 1.58;
+  const tealRingProg = clamp01(kern(t, 1.58, 0.5, easeOut));
+  tealRing.setAttribute('stroke-dashoffset', TEAL_RING_LEN * (1 - tealRingProg));
+  tealRing.style.opacity = clamp01(kern(t, 1.58, 0.3));
+
+  // Teal offset — opposite direction to pink for max "misreg" feel
+  const tealOffsetX = 3 + (seededRand(Math.floor(t * 10) + 5) - 0.5) * 0.6;
+  const tealOffsetY = 2 + (seededRand(Math.floor(t * 10) + 11) - 0.5) * 0.5;
+  layerTeal.style.transform = `translate(${tealOffsetX}px, ${tealOffsetY}px)`;
+
+  /* ===== 1.8s: CHECK strokes draw on (pink underlayer + teal top) ===== */
+  const checkProg = clamp01(kern(t, 1.8, 0.55, easeOut));
+  pinkCheck.setAttribute('stroke-dashoffset', CHECK_LEN * (1 - checkProg));
+  pinkCheck.style.opacity = clamp01(kern(t, 1.8, 0.2));
+
+  // Teal check lags 60ms (misregistration in time)
+  const tealCheckProg = clamp01(kern(t, 1.86, 0.55, easeOut));
+  tealCheck.setAttribute('stroke-dashoffset', CHECK_LEN * (1 - tealCheckProg));
+  tealCheck.style.opacity = clamp01(kern(t, 1.86, 0.2));
+
+  /* ===== 2.0s: halftone dot breathing activates ===== */
+  const breatheBase = clamp01(kern(t, 2.0, 0.6));
+  const breatheOsc = 0.5 + 0.5 * Math.sin(t * 6.0 + seededRand(Math.floor(t * 3)) * 2);
+  dotBreath.style.opacity = breatheBase * (0.35 + 0.35 * breatheOsc);
+
+  /* ===== 2.3s: rubber STAMP slams down from top-right ===== */
+  const tStamp = t - 2.3;
+  const stampIn = clamp01(spring(tStamp, 220, 14));
+  const stampRot = lerp(-30, -12, stampIn);
+  const stampScale = lerp(0.4, 1.0, stampIn);
+  const stampOp = clamp01(kern(t, 2.3, 0.15));
+  // add a small post-settle wobble
+  const wobble = Math.exp(-Math.max(0, tStamp - 0.3) * 4) * Math.sin((tStamp - 0.3) * 22) * 1.2;
+  stamp.style.transform = `rotate(${stampRot + wobble}deg) scale(${stampScale})`;
+  stamp.style.opacity = stampOp;
+
+  // splatter dots appear after stamp hits
+  const splatterOp = clamp01(kern(t, 2.45, 0.3));
+  splatter.style.opacity = splatterOp * 0.9;
+
+  /* ===== 2.8s: handwritten SIGNATURE fades in ===== */
+  const sigOp = clamp01(kern(t, 2.8, 0.6));
+  const sigTilt = -1.5 + Math.sin(t * 0.8) * 0.4; // tiny hand sway
+  signature.style.opacity = sigOp;
+  signature.style.transform = `translateX(-50%) rotate(${sigTilt}deg)`;
+
+  /* ===== 3 – 7s: hold — gentle halftone breathe ===== */
+  /* ===== 8.5s: final "misreg twitch" — pink layer shifts extra ===== */
+  if (t > 8.5 && t < 9.2) {
+    const twitch = Math.sin((t - 8.5) * 18) * Math.exp(-(t - 8.5) * 3);
+    layerPink.style.transform = `translate(${pinkOffsetX + twitch * 2}px, ${pinkOffsetY + twitch * 1.2}px)`;
+  }
+
+  /* ===== 9.2s → 10s: fade out & loop ===== */
+  if (t > 9.2) {
+    const fadeOut = 1 - clamp01((t - 9.2) / 0.8);
+    zineCard.style.opacity = fadeOut;
+  } else {
+    zineCard.style.opacity = 1;
+  }
+}
+
+/* ---------- time controller ---------- */
+const scrubber = document.getElementById('scrubber');
+const playBtn = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const timeLabel = document.getElementById('timeLabel');
+const frameLabel = document.getElementById('frameLabel');
+const cueRow = document.getElementById('cueRow');
+
+let currentT = 0;
+let playing = true;
+let lastFrame = performance.now();
+
+function setTime(t) {
+  currentT = Math.max(0, Math.min(DURATION, t));
+  scrubber.value = Math.round(currentT / DURATION * 1000);
+  timeLabel.textContent = currentT.toFixed(2) + ' / ' + DURATION.toFixed(2) + 's';
+  frameLabel.textContent = `frame ${Math.round(currentT * FPS)} / ${Math.round(DURATION * FPS)}`;
+  render(currentT);
+}
+
+function loop() {
+  const now = performance.now();
+  const dt = (now - lastFrame) / 1000;
+  lastFrame = now;
+  if (playing) {
+    let next = currentT + dt;
+    if (next >= DURATION) next = 0;
+    setTime(next);
+  }
+  requestAnimationFrame(loop);
+}
+
+scrubber.addEventListener('input', () => {
+  playing = false;
+  playBtn.textContent = '▶';
+  setTime(scrubber.value / 1000 * DURATION);
+});
+
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+  lastFrame = performance.now();
+});
+
+resetBtn.addEventListener('click', () => setTime(0));
+
+CUES.forEach(cue => {
+  const m = document.createElement('div');
+  m.className = 'cue-mark';
+  m.style.left = (cue.t / DURATION * 100) + '%';
+  const lbl = document.createElement('div');
+  lbl.className = 'lbl';
+  lbl.textContent = cue.label;
+  m.appendChild(lbl);
+  cueRow.appendChild(m);
+});
+
+setTime(0);
+requestAnimationFrame(loop);
+
+</script>
+
+</body>
+</html>
