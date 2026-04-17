@@ -21,9 +21,9 @@ impl SourceWatcher for StubWatcher {
 
 /// Atomic rename write: write to sibling tmp then rename over target.
 pub fn atomic_write(target: &Path, bytes: &[u8]) -> anyhow::Result<()> {
-    let parent = target.parent().ok_or_else(|| {
-        anyhow::anyhow!("source path has no parent: {}", target.display())
-    })?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("source path has no parent: {}", target.display()))?;
     let mut tmp: PathBuf = parent.to_path_buf();
     let name = target
         .file_name()
