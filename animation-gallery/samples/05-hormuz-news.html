@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Hormuz Strait · Breaking News · nfa sample 05</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #000;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Helvetica Neue', Arial, sans-serif;
+    color: #f2f4f5;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+
+  .stage {
+    width: 1920px; height: 1080px;
+    position: relative;
+    background: #050607;
+    overflow: hidden;
+    transform-origin: center;
+    transform: scale(min(calc(100vw / 1920), calc((100vh - 56px) / 1080)));
+  }
+
+  .main-layer { position: absolute; inset: 0; z-index: 1; }
+
+  /* 底图：按 width=1920 贴合，高 768，电影黑框 letterbox */
+  .bg-layer {
+    position: absolute;
+    left: 0; top: 120px;
+    width: 1920px;
+    height: 840px;
+    background-image: url('../assets/hormuz-set/01-bg.jpg');
+    background-size: cover;
+    background-position: center 30%;
+    transform-origin: center;
+    will-change: transform;
+    z-index: 2;
+  }
+
+  /* 粒子氛围层 (mix-blend screen) */
+  .particles-layer {
+    position: absolute;
+    left: 0; top: 80px;
+    width: 1920px; height: 920px;
+    background-image: url('../assets/hormuz-set/05-particles.png');
+    background-size: 120% 120%;
+    background-position: center;
+    background-repeat: no-repeat;
+    mix-blend-mode: screen;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 8;
+  }
+
+  /* vignette 暗角 */
+  .vignette {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(0,0,0,0.55) 78%, rgba(0,0,0,0.85) 100%);
+    pointer-events: none;
+    z-index: 7;
+  }
+
+  /* 电影 letterbox 黑渐变（让字叠在黑区上） */
+  .lb-top {
+    position: absolute; left: 0; top: 0; right: 0; height: 260px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0) 100%);
+    z-index: 6;
+    pointer-events: none;
+  }
+  .lb-bot {
+    position: absolute; left: 0; bottom: 0; right: 0; height: 340px;
+    background: linear-gradient(to top, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.85) 40%, rgba(0,0,0,0) 100%);
+    z-index: 6;
+    pointer-events: none;
+  }
+
+  /* BREAKING + 位置 */
+  .news-badge {
+    position: absolute;
+    top: 60px; left: 90px;
+    z-index: 12;
+    display: flex; align-items: center; gap: 18px;
+    opacity: 0;
+  }
+  .pill {
+    background: #d32235;
+    color: #fff;
+    padding: 8px 18px;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 5px;
+    border-radius: 3px;
+    box-shadow: 0 2px 14px rgba(211,34,53,0.5);
+  }
+  .loc {
+    color: rgba(255,255,255,0.88);
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    font-family: 'Optima', 'Baskerville', 'Georgia', serif;
+  }
+  .loc .sep {
+    margin: 0 14px;
+    color: rgba(255,255,255,0.35);
+  }
+
+  /* 主标题区 */
+  .title-wrap {
+    position: absolute;
+    top: 150px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 12;
+    width: 1500px;
+    text-align: center;
+  }
+  .title-cn {
+    font-size: 84px;
+    font-weight: 700;
+    letter-spacing: 6px;
+    line-height: 1.12;
+    text-shadow: 0 4px 28px rgba(0,0,0,0.85);
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+  }
+  .title-cn .ch {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(18px);
+    will-change: transform, opacity;
+  }
+  .title-en {
+    font-family: 'Optima', 'Baskerville', 'Georgia', serif;
+    font-size: 34px;
+    font-weight: 300;
+    color: rgba(235, 238, 240, 0.62);
+    letter-spacing: 3px;
+    margin-top: 22px;
+    opacity: 0;
+    transform: translateY(14px);
+    font-style: italic;
+  }
+  .title-divider {
+    width: 60px;
+    height: 2px;
+    background: #d32235;
+    margin: 18px auto 0;
+    opacity: 0;
+    transform: scaleX(0.1);
+    transform-origin: center;
+  }
+
+  /* 货轮 */
+  .ship {
+    position: absolute;
+    left: 0; top: 0;
+    width: 280px;
+    transform-origin: center;
+    opacity: 0;
+    filter: drop-shadow(0 12px 22px rgba(0,0,0,0.7));
+    will-change: transform, opacity;
+    z-index: 10;
+  }
+
+  /* 红 X */
+  .cross {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100px;
+    transform-origin: center;
+    opacity: 0;
+    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.8));
+    will-change: transform, opacity;
+    z-index: 11;
+  }
+
+  /* 爆炸 */
+  .burst {
+    position: absolute;
+    left: 50%; top: 48%;
+    width: 640px; height: 640px;
+    background-image: url('../assets/hormuz-set/04-burst.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    mix-blend-mode: screen;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+    pointer-events: none;
+    z-index: 7;
+    will-change: transform, opacity;
+  }
+
+  /* 底部副标题 */
+  .subtitle-wrap {
+    position: absolute;
+    bottom: 160px;
+    left: 50%;
+    transform: translateX(-50%) translateY(14px);
+    z-index: 12;
+    text-align: center;
+    opacity: 0;
+    width: 1600px;
+    will-change: transform, opacity;
+  }
+  .sub-cn {
+    font-size: 46px;
+    font-weight: 600;
+    color: #f2f4f5;
+    letter-spacing: 4px;
+    text-shadow: 0 4px 16px rgba(0,0,0,0.8);
+  }
+  .sub-en {
+    font-family: 'Optima', 'Georgia', serif;
+    font-size: 24px;
+    color: rgba(235,238,240,0.58);
+    letter-spacing: 2px;
+    margin-top: 10px;
+    font-style: italic;
+  }
+
+  /* 数据 */
+  .stats {
+    position: absolute;
+    right: 140px;
+    bottom: 290px;
+    z-index: 12;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    align-items: flex-end;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    opacity: 0;
+    transform: translateX(44px);
+    will-change: transform, opacity;
+  }
+  .stat .num {
+    font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+    font-size: 62px;
+    font-weight: 700;
+    color: #f05d6e;
+    letter-spacing: 2px;
+    line-height: 1;
+    text-shadow: 0 2px 18px rgba(240,93,110,0.45);
+  }
+  .stat .num .unit {
+    font-size: 36px;
+    color: rgba(240,93,110,0.85);
+    margin-left: 4px;
+  }
+  .stat .label {
+    font-size: 15px;
+    color: rgba(255,255,255,0.58);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  /* 来源 */
+  .source {
+    position: absolute;
+    bottom: 105px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 12;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 14px;
+    color: rgba(255,255,255,0.42);
+    letter-spacing: 5px;
+    opacity: 0;
+  }
+
+  /* 控制条 */
+  .controls {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(20, 22, 28, 0.85);
+    color: #eee;
+    border-radius: 30px;
+    padding: 8px 20px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 12px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .controls button {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 14px;
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: 2px;
+  }
+  .controls button:hover { background: rgba(255,255,255,0.2); }
+  .controls input[type=range] {
+    width: 440px;
+    cursor: pointer;
+  }
+  .controls .hud {
+    min-width: 160px;
+    color: rgba(255,255,255,0.75);
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="main-layer">
+      <div class="bg-layer" id="bg"></div>
+      <div class="vignette"></div>
+      <div class="particles-layer" id="particles"></div>
+      <div class="lb-top"></div>
+      <div class="lb-bot"></div>
+
+      <!-- 货轮 3 艘 -->
+      <img class="ship" src="../assets/hormuz-set/02-ship.png" data-idx="0" alt="">
+      <img class="ship" src="../assets/hormuz-set/02-ship.png" data-idx="1" alt="">
+      <img class="ship" src="../assets/hormuz-set/02-ship.png" data-idx="2" alt="">
+
+      <!-- 红 X 8 个 -->
+      <img class="cross" src="../assets/hormuz-set/03-cross.png" alt="">
+      <img class="cross" src="../assets/hormuz-set/03-cross.png" alt="">
+      <img class="cross" src="../assets/hormuz-set/03-cross.png" alt="">
+      <img class="cross" src="../assets/hormuz-set/03-cross.png" alt="">
+      <img class="cross" src="../assets/hormuz-set/03-cross.png" alt="">
+      <img class="cross" src="../assets/hormuz-set/03-cross.png" alt="">
+      <img class="cross" src="../assets/hormuz-set/03-cross.png" alt="">
+      <img class="cross" src="../assets/hormuz-set/03-cross.png" alt="">
+
+      <!-- 爆炸 -->
+      <div class="burst" id="burst"></div>
+
+      <!-- BREAKING -->
+      <div class="news-badge" id="newsBadge">
+        <span class="pill">BREAKING</span>
+        <span class="loc">HORMUZ STRAIT<span class="sep">·</span>MIDDLE EAST</span>
+      </div>
+
+      <!-- 主标题 -->
+      <div class="title-wrap">
+        <div class="title-cn" id="titleCn"></div>
+        <div class="title-divider" id="titleDiv"></div>
+        <div class="title-en" id="titleEn">Iran threatens to close the Strait of Hormuz</div>
+      </div>
+
+      <!-- 底部副标题 -->
+      <div class="subtitle-wrap" id="subBottom">
+        <div class="sub-cn">海峡承载全球 20% 石油运输</div>
+        <div class="sub-en">The Strait carries 20% of the world's oil trade</div>
+      </div>
+
+      <!-- 数据 -->
+      <div class="stats">
+        <div class="stat">
+          <span class="num">20<span class="unit">%</span></span>
+          <span class="label">Global Oil Trade</span>
+        </div>
+        <div class="stat">
+          <span class="num">17M</span>
+          <span class="label">Barrels Per Day</span>
+        </div>
+        <div class="stat">
+          <span class="num">$2.3T</span>
+          <span class="label">Annual Trade Value</span>
+        </div>
+      </div>
+
+      <div class="source" id="source">SOURCE · REUTERS · 2026.03.02</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="playBtn">PAUSE</button>
+    <input type="range" min="0" max="15" step="0.01" value="0" id="scrubber">
+    <span class="hud" id="hud">t=0.00s frame=0</span>
+  </div>
+
+<script>
+(function() {
+  const DURATION = 15;
+
+  // 拆中文标题
+  const titleCn = document.getElementById('titleCn');
+  const titleText = '伊朗威胁封锁海峡';
+  const titleChars = [];
+  titleText.split('').forEach(ch => {
+    const span = document.createElement('span');
+    span.className = 'ch';
+    span.textContent = ch;
+    titleCn.appendChild(span);
+    titleChars.push(span);
+  });
+
+  // 红 X 8 个位置（沿海峡窄口弧线，从左到右，越往右越小越靠上）
+  const crossEls = document.querySelectorAll('.cross');
+  const crossPos = [
+    { x: 620, y: 430, s: 1.00 },
+    { x: 720, y: 465, s: 0.96 },
+    { x: 820, y: 495, s: 0.92 },
+    { x: 920, y: 520, s: 0.88 },
+    { x: 1020, y: 530, s: 0.84 },
+    { x: 1120, y: 528, s: 0.80 },
+    { x: 1220, y: 515, s: 0.76 },
+    { x: 1320, y: 495, s: 0.72 },
+  ];
+
+  // 3 艘货轮配置（波斯湾一侧开阔海面，画面左侧）
+  const ships = document.querySelectorAll('.ship');
+  const shipConfigs = [
+    { from: { x: -360, y: 300 }, to: { x: 240, y: 280 }, delay: 2.6, scale: 0.50 },
+    { from: { x: -360, y: 380 }, to: { x: 400, y: 360 }, delay: 3.0, scale: 0.44 },
+    { from: { x: -360, y: 460 }, to: { x: 140, y: 460 }, delay: 3.4, scale: 0.40 },
+  ];
+
+  // Utils
+  const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+  const lerp  = (a,b,p) => a + (b-a)*p;
+  const easeOutCubic = p => 1 - Math.pow(1-p, 3);
+  const easeOutQuint = p => 1 - Math.pow(1-p, 5);
+  function spring(t, s=0.5, d=8) {
+    if (t <= 0) return 0;
+    if (t >= 1.5) return 1;
+    return 1 - Math.pow(2, -d*t) * Math.cos(t * Math.PI * 2 * s);
+  }
+
+  // Elements
+  const bg = document.getElementById('bg');
+  const particles = document.getElementById('particles');
+  const newsBadge = document.getElementById('newsBadge');
+  const titleEn = document.getElementById('titleEn');
+  const titleDiv = document.getElementById('titleDiv');
+  const subBottom = document.getElementById('subBottom');
+  const burst = document.getElementById('burst');
+  const source = document.getElementById('source');
+  const stats = document.querySelectorAll('.stat');
+  const mainLayer = document.querySelector('.main-layer');
+  const hud = document.getElementById('hud');
+  const scrubber = document.getElementById('scrubber');
+  const playBtn = document.getElementById('playBtn');
+
+  const state = { t: 0, playing: true };
+
+  function renderFrame(t) {
+    // 底图 Ken Burns（15s 缓慢推拉）
+    const kbP = clamp(t/DURATION, 0, 1);
+    const scale = lerp(1.00, 1.09, kbP);
+    const tx = lerp(0, -26, kbP);
+    const ty = lerp(0, -14, kbP);
+    bg.style.transform = `scale(${scale}) translate(${tx}px, ${ty}px)`;
+
+    // 粒子氛围（低调）
+    const partA = clamp((t-0.5)/1.5, 0, 1) * 0.22;
+    particles.style.opacity = partA;
+
+    // BREAKING badge
+    const badgeA = clamp((t-0.8)/0.6, 0, 1);
+    newsBadge.style.opacity = badgeA;
+    newsBadge.style.transform = `translateX(${(1-badgeA)*-18}px)`;
+
+    // 主标题每字 stagger
+    titleChars.forEach((el, i) => {
+      const start = 1.6 + i * 0.07;
+      const a = clamp((t - start) / 0.6, 0, 1);
+      el.style.opacity = a;
+      el.style.transform = `translateY(${(1-a)*20}px)`;
+    });
+
+    // 红色分割线
+    const dvP = clamp((t - 2.3) / 0.6, 0, 1);
+    titleDiv.style.opacity = dvP;
+    titleDiv.style.transform = `scaleX(${lerp(0.1, 1, easeOutCubic(dvP))})`;
+
+    // 英文副标题
+    const enA = clamp((t - 2.5) / 0.8, 0, 1);
+    titleEn.style.opacity = enA;
+    titleEn.style.transform = `translateY(${(1-enA)*12}px)`;
+
+    // 货轮 3 艘
+    ships.forEach((ship, i) => {
+      const cfg = shipConfigs[i];
+      const p = easeOutCubic(clamp((t - cfg.delay) / 2.4, 0, 1));
+      const x = lerp(cfg.from.x, cfg.to.x, p);
+      const y = lerp(cfg.from.y, cfg.to.y, p);
+      ship.style.opacity = p > 0 ? clamp(p * 4, 0, 1) : 0;
+      ship.style.transform = `translate(${x}px, ${y}px) scale(${cfg.scale})`;
+    });
+
+    // 红 X stagger drop + spring
+    crossEls.forEach((el, i) => {
+      const pos = crossPos[i];
+      const start = 5.2 + i * 0.18;
+      const localT = t - start;
+      if (localT < 0) { el.style.opacity = 0; return; }
+      const springP = spring(localT, 0.5, 10);
+      const fadeA = clamp(localT / 0.25, 0, 1);
+      el.style.opacity = fadeA;
+      const x = pos.x;
+      const y = pos.y - 60 + springP * 60; // 从上落下 60px
+      const s = pos.s * springP;
+      el.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    });
+
+    // 爆炸（海峡中央）
+    const burstLocal = t - 7.6;
+    if (burstLocal >= 0 && burstLocal <= 2.2) {
+      const p = burstLocal / 2.2;
+      let scale;
+      if (p < 0.15) scale = easeOutCubic(p/0.15) * 1.9;
+      else scale = lerp(1.9, 1.55, (p - 0.15)/0.85);
+      let alpha;
+      if (p < 0.12) alpha = p/0.12;
+      else alpha = lerp(1, 0, (p - 0.12)/0.88);
+      burst.style.opacity = alpha;
+      burst.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    } else {
+      burst.style.opacity = 0;
+    }
+
+    // 底部副标题
+    const subA = clamp((t - 9.2) / 0.9, 0, 1);
+    subBottom.style.opacity = subA;
+    subBottom.style.transform = `translateX(-50%) translateY(${(1-subA)*16}px)`;
+
+    // 3 条数据 stagger
+    stats.forEach((el, i) => {
+      const start = 10.6 + i * 0.42;
+      const p = easeOutQuint(clamp((t - start) / 0.9, 0, 1));
+      el.style.opacity = p;
+      el.style.transform = `translateX(${(1-p)*44}px)`;
+    });
+
+    // 来源
+    const srcA = clamp((t - 13.3) / 0.9, 0, 1);
+    source.style.opacity = srcA;
+
+    // 末尾淡出（14.6-15.0）
+    if (t > 14.6) {
+      const fade = 1 - clamp((t - 14.6) / 0.4, 0, 1);
+      mainLayer.style.opacity = fade;
+    } else {
+      mainLayer.style.opacity = 1;
+    }
+
+    hud.textContent = `t=${t.toFixed(2)}s frame=${Math.round(t*60)}`;
+  }
+
+  function setTime(t) {
+    state.t = t;
+    scrubber.value = t;
+    renderFrame(t);
+  }
+
+  playBtn.addEventListener('click', () => {
+    state.playing = !state.playing;
+    playBtn.textContent = state.playing ? 'PAUSE' : 'PLAY';
+  });
+
+  scrubber.addEventListener('input', (e) => {
+    state.playing = false;
+    playBtn.textContent = 'PLAY';
+    setTime(parseFloat(e.target.value));
+  });
+
+  let lastRaf = null;
+  function tick(ts) {
+    if (state.playing) {
+      if (lastRaf !== null) {
+        const dt = (ts - lastRaf) / 1000;
+        let next = state.t + dt;
+        if (next > DURATION) next = 0;
+        setTime(next);
+      }
+      lastRaf = ts;
+    } else {
+      lastRaf = null;
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // URL ?t=N 静帧
+  const urlT = parseFloat(new URL(location.href).searchParams.get('t'));
+  if (!isNaN(urlT)) {
+    state.playing = false;
+    playBtn.textContent = 'PLAY';
+    setTime(urlT);
+  } else {
+    setTime(0);
+  }
+})();
+</script>
+</body>
+</html>

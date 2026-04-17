@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Hormuz Coast · nfa sample 06</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #000;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'PingFang SC', 'Hiragino Sans GB', 'Helvetica Neue', Arial, sans-serif;
+    color: #f2f4f5;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+
+  .stage {
+    width: 1920px; height: 1080px;
+    position: relative;
+    background: #050607;
+    overflow: hidden;
+    transform-origin: center;
+    transform: scale(min(calc(100vw / 1920), calc((100vh - 56px) / 1080)));
+  }
+
+  /* 底图 */
+  .bg-layer {
+    position: absolute;
+    inset: 0;
+    background-image: url('../assets/hormuz-set/01-bg.jpg');
+    background-size: cover;
+    background-position: center 40%;
+    transform-origin: center;
+    will-change: transform;
+    z-index: 1;
+  }
+
+  .vignette {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 55%, transparent 25%, rgba(0,0,0,0.45) 75%, rgba(0,0,0,0.85) 100%);
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  /* SVG 覆盖层 */
+  .coast-svg {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+  }
+
+  /* 顶部章节 tag */
+  .tag-top {
+    position: absolute;
+    top: 58px; left: 90px;
+    z-index: 12;
+    display: flex; align-items: center; gap: 18px;
+    opacity: 0;
+    will-change: opacity, transform;
+  }
+  .tag-top .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #e74458;
+    box-shadow: 0 0 12px rgba(231,68,88,0.9);
+  }
+  .tag-top .txt {
+    font-family: 'Optima', 'Georgia', serif;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 5px;
+    color: rgba(255,255,255,0.88);
+  }
+  .tag-top .sep { margin: 0 10px; color: rgba(255,255,255,0.35); }
+
+  /* 右上角章节号 */
+  .chapter {
+    position: absolute;
+    top: 58px; right: 90px;
+    z-index: 12;
+    text-align: right;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 14px;
+    letter-spacing: 4px;
+    color: rgba(255,255,255,0.45);
+    opacity: 0;
+  }
+  .chapter .big {
+    font-size: 40px;
+    color: rgba(255,255,255,0.75);
+    font-weight: 300;
+    letter-spacing: 2px;
+  }
+
+  /* 主标题（屏幕下方） */
+  .title-main {
+    position: absolute;
+    left: 50%;
+    top: 140px;
+    transform: translateX(-50%);
+    z-index: 12;
+    text-align: center;
+    opacity: 0;
+    will-change: opacity, transform;
+  }
+  .title-cn {
+    font-size: 76px;
+    font-weight: 700;
+    letter-spacing: 12px;
+    color: #ffffff;
+    text-shadow: 0 4px 30px rgba(0,0,0,0.9);
+    line-height: 1;
+  }
+  .title-en {
+    font-family: 'Optima', 'Baskerville', 'Georgia', serif;
+    font-size: 26px;
+    font-weight: 300;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 10px;
+    margin-top: 14px;
+    font-style: italic;
+  }
+
+  /* 地理标签 (中英双层) */
+  .geo-label {
+    position: absolute;
+    z-index: 11;
+    opacity: 0;
+    will-change: opacity, transform;
+    text-shadow: 0 3px 18px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.7);
+    pointer-events: none;
+  }
+  .geo-label .cn {
+    font-size: 52px;
+    font-weight: 600;
+    color: #eaf2f8;
+    letter-spacing: 4px;
+    line-height: 1;
+  }
+  .geo-label .en {
+    font-family: 'Optima', 'Georgia', serif;
+    font-size: 22px;
+    font-style: italic;
+    color: rgba(202, 223, 236, 0.78);
+    letter-spacing: 3px;
+    margin-top: 6px;
+  }
+
+  /* 底部 caption 条 */
+  .caption {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 130px;
+    z-index: 12;
+    text-align: center;
+    opacity: 0;
+    will-change: opacity, transform;
+  }
+  .caption .main {
+    font-size: 38px;
+    font-weight: 500;
+    letter-spacing: 6px;
+    color: #f2f4f5;
+    text-shadow: 0 3px 18px rgba(0,0,0,0.85);
+  }
+  .caption .meta {
+    margin-top: 10px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 14px;
+    letter-spacing: 5px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* 底部电影黑渐变 */
+  .letterbox-bot {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 300px;
+    background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 40%, rgba(0,0,0,0) 100%);
+    z-index: 5;
+    pointer-events: none;
+  }
+  .letterbox-top {
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 240px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 45%, rgba(0,0,0,0) 100%);
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  /* 控制条 */
+  .controls {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(20, 22, 28, 0.85);
+    color: #eee;
+    border-radius: 30px;
+    padding: 8px 20px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 12px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .controls button {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 14px;
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: 2px;
+  }
+  .controls button:hover { background: rgba(255,255,255,0.22); }
+  .controls input[type=range] { width: 440px; cursor: pointer; }
+  .controls .hud { min-width: 180px; color: rgba(255,255,255,0.75); }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="bg-layer" id="bg"></div>
+    <div class="vignette"></div>
+    <div class="letterbox-top"></div>
+    <div class="letterbox-bot"></div>
+
+    <!-- 海峡描边 SVG -->
+    <svg class="coast-svg" viewBox="0 0 1920 1080" preserveAspectRatio="none">
+      <defs>
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge>
+            <feMergeNode in="b"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+
+      <!-- 真实海岸线（4 条，从 01-bg.jpg 自动提取） -->
+      <path class="coast" id="coast-0" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" opacity="0.88"></path>
+      <path class="coast" id="coast-1" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" opacity="0.88"></path>
+      <path class="coast" id="coast-2" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" opacity="0.88"></path>
+      <path class="coast" id="coast-3" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" opacity="0.88"></path>
+
+      <!-- 海峡方向箭头（可选装饰 · 在中间） -->
+      <g id="arrow" opacity="0">
+        <circle cx="960" cy="560" r="28" fill="none" stroke="#e74458" stroke-width="2"/>
+        <path d="M 945,560 L 975,560 M 968,553 L 975,560 L 968,567" stroke="#e74458"
+              stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </svg>
+
+    <!-- 顶部 tag -->
+    <div class="tag-top" id="tagTop">
+      <span class="dot"></span>
+      <span class="txt">STRAIT OF HORMUZ<span class="sep">·</span>IRAN<span class="sep">·</span>2026</span>
+    </div>
+
+    <div class="chapter" id="chapter">
+      <div class="big">06</div>
+      <div>THE CHOKE POINT</div>
+    </div>
+
+    <!-- 主标题 -->
+    <div class="title-main" id="titleMain">
+      <div class="title-cn">霍尔木兹海峡</div>
+      <div class="title-en">World's Most Critical Oil Transit Chokepoint</div>
+    </div>
+
+    <!-- 3 个地理标签 -->
+    <div class="geo-label" id="label1" style="top: 260px; left: 240px;">
+      <div class="cn">波斯湾</div>
+      <div class="en">Persian Gulf</div>
+    </div>
+    <div class="geo-label" id="label2" style="top: 600px; left: 50%; transform: translateX(-50%);">
+      <div class="cn" style="font-size: 42px; letter-spacing: 6px;">霍尔木兹海峡</div>
+      <div class="en" style="text-align: center;">Strait of Hormuz</div>
+    </div>
+    <div class="geo-label" id="label3" style="top: 790px; right: 220px; text-align: right;">
+      <div class="cn">阿拉伯海</div>
+      <div class="en">Arabian Sea</div>
+    </div>
+
+    <!-- 底部 caption -->
+    <div class="caption" id="caption">
+      <div class="main">全球 20% 石油贸易 · 每日 1700 万桶</div>
+      <div class="meta">SOURCE · REUTERS · 2026.03</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="playBtn">PAUSE</button>
+    <input type="range" min="0" max="12" step="0.01" value="0" id="scrubber">
+    <span class="hud" id="hud">t=0.00s</span>
+  </div>
+
+<script>
+(function() {
+  const DURATION = 12;
+
+  const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+  const lerp = (a,b,p) => a + (b-a)*p;
+  const easeOutCubic = p => 1 - Math.pow(1-p, 3);
+  const easeOutQuint = p => 1 - Math.pow(1-p, 5);
+
+  const bg = document.getElementById('bg');
+  const tagTop = document.getElementById('tagTop');
+  const chapter = document.getElementById('chapter');
+  const titleMain = document.getElementById('titleMain');
+  const labels = [
+    document.getElementById('label1'),
+    document.getElementById('label2'),
+    document.getElementById('label3'),
+  ];
+  const caption = document.getElementById('caption');
+  const arrow = document.getElementById('arrow');
+  const hud = document.getElementById('hud');
+  const scrubber = document.getElementById('scrubber');
+  const playBtn = document.getElementById('playBtn');
+
+  // 真实海岸线（从 01-bg.jpg 用 skimage.measure.find_contours 提取）
+  const coastPaths = [
+    "M 837,337 L 831,336 L 833,328 L 821,332 L 811,325 L 820,320 L 819,314 L 802,323 L 789,317 L 786,323 L 768,323 L 756,330 L 749,323 L 733,323 L 735,330 L 728,323 L 719,326 L 722,324 L 708,312 L 707,323 L 701,317 L 673,316 L 673,309 L 693,307 L 690,301 L 694,298 L 723,295 L 733,302 L 736,296 L 716,291 L 716,281 L 701,289 L 670,291 L 657,285 L 659,272 L 628,281 L 624,288 L 617,286 L 617,281 L 589,277 L 584,280 L 587,284 L 612,282 L 614,287 L 605,296 L 582,296 L 562,303 L 554,298 L 511,305 L 508,312 L 498,303 L 496,289 L 488,299 L 497,301 L 492,310 L 475,305 L 453,317 L 446,312 L 425,314 L 422,309 L 409,312 L 399,303 L 397,309 L 385,305 L 376,295 L 372,296 L 376,302 L 365,295 L 360,302 L 355,295 L 348,300 L 348,293 L 341,295 L 333,288 L 337,282 L 355,288 L 352,278 L 369,274 L 387,279 L 408,274 L 431,275 L 426,271 L 439,270 L 435,264 L 452,258 L 455,251 L 504,251 L 511,246 L 498,243 L 510,237 L 547,235 L 577,242 L 580,249 L 595,250 L 583,252 L 587,254 L 612,254 L 621,263 L 621,256 L 637,259 L 630,253 L 641,252 L 638,244 L 635,251 L 628,249 L 628,244 L 624,247 L 595,239 L 606,235 L 613,240 L 616,236 L 611,232 L 622,230 L 703,244 L 697,248 L 708,252 L 696,258 L 696,251 L 646,252 L 670,252 L 673,263 L 710,268 L 715,266 L 712,259 L 726,268 L 727,253 L 721,242 L 710,247 L 701,231 L 664,224 L 636,226 L 621,217 L 575,217 L 577,223 L 595,223 L 597,227 L 588,232 L 595,237 L 589,240 L 582,240 L 584,237 L 574,230 L 585,231 L 589,224 L 568,224 L 562,219 L 540,219 L 529,214 L 519,219 L 501,208 L 504,223 L 455,221 L 445,228 L 431,217 L 401,221 L 399,212 L 387,217 L 374,210 L 375,222 L 369,223 L 364,214 L 350,214 L 323,203 L 317,199 L 321,192 L 313,191 L 296,174 L 308,165 L 307,159 L 334,182 L 341,182 L 329,172 L 336,167 L 331,165 L 334,157 L 349,169 L 340,171 L 344,177 L 366,172 L 356,179 L 373,192 L 365,201 L 378,203 L 378,210 L 390,212 L 387,204 L 401,207 L 402,200 L 408,205 L 399,182 L 387,182 L 370,172 L 373,164 L 378,170 L 402,155 L 387,147 L 385,140 L 366,141 L 369,135 L 379,134 L 378,128 L 385,136 L 397,138 L 394,131 L 384,130 L 394,128 L 414,141 L 419,157 L 413,161 L 427,163 L 426,157 L 421,157 L 434,152 L 432,166 L 438,163 L 443,168 L 446,163 L 451,167 L 434,173 L 457,180 L 459,189 L 469,186 L 478,193 L 483,184 L 482,190 L 495,201 L 492,208 L 507,204 L 498,195 L 501,193 L 518,193 L 517,187 L 499,189 L 497,180 L 517,186 L 519,183 L 510,173 L 522,179 L 526,173 L 543,173 L 538,182 L 529,177 L 521,183 L 538,191 L 526,189 L 507,199 L 533,200 L 540,191 L 591,187 L 597,192 L 584,200 L 577,194 L 572,197 L 577,200 L 561,203 L 547,201 L 540,194 L 539,204 L 557,205 L 555,211 L 559,215 L 562,207 L 575,208 L 594,200 L 592,207 L 610,203 L 622,215 L 638,208 L 654,208 L 668,215 L 686,209 L 674,199 L 675,193 L 700,194 L 710,189 L 722,192 L 695,202 L 744,201 L 767,215 L 764,222 L 770,224 L 784,224 L 783,213 L 792,215 L 791,203 L 802,212 L 814,214 L 816,217 L 808,216 L 811,225 L 823,228 L 835,217 L 866,222 L 862,211 L 869,209 L 854,210 L 855,201 L 847,193 L 883,194 L 888,203 L 904,198 L 908,204 L 904,201 L 900,207 L 913,205 L 917,209 L 913,212 L 923,212 L 915,199 L 928,196 L 934,203 L 934,186 L 941,182 L 977,197 L 956,198 L 953,203 L 970,206 L 948,217 L 974,214 L 976,207 L 1110,208 L 1097,198 L 1088,203 L 1073,197 L 1087,189 L 1090,194 L 1101,193 L 1117,201 L 1148,193 L 1145,203 L 1121,211 L 1163,218 L 1160,223 L 1165,223 L 1166,238 L 1046,238 L 1032,249 L 1007,252 L 1002,244 L 950,229 L 960,228 L 960,223 L 934,224 L 925,215 L 923,228 L 898,232 L 923,238 L 953,237 L 957,241 L 954,255 L 934,261 L 918,261 L 914,254 L 902,258 L 900,254 L 911,254 L 912,250 L 902,252 L 897,247 L 865,254 L 861,241 L 876,235 L 856,237 L 854,246 L 846,251 L 826,245 L 784,251 L 772,235 L 765,242 L 729,239 L 740,247 L 766,244 L 756,254 L 734,259 L 749,268 L 752,263 L 782,265 L 773,255 L 786,252 L 796,263 L 807,258 L 810,262 L 805,259 L 803,264 L 809,266 L 817,266 L 814,254 L 833,261 L 839,256 L 856,259 L 861,266 L 872,266 L 876,258 L 877,272 L 882,267 L 878,255 L 884,258 L 888,252 L 895,261 L 919,266 L 907,279 L 898,275 L 895,281 L 851,289 L 844,282 L 823,286 L 820,283 L 826,281 L 777,281 L 774,285 L 785,290 L 771,296 L 778,299 L 775,302 L 765,302 L 758,293 L 738,300 L 729,310 L 735,321 L 732,310 L 744,305 L 758,312 L 779,303 L 789,309 L 789,302 L 806,296 L 803,282 L 807,288 L 887,306 L 860,319 L 842,316 L 850,324 L 839,325 L 837,330 L 862,331 L 837,337",
+    "M -25,363 L -11,376 L 14,374 L 15,379 L 28,379 L 47,390 L 68,391 L 64,387 L 73,386 L 135,416 L 183,420 L 215,412 L 194,420 L 198,423 L 218,418 L 219,411 L 230,421 L 257,417 L 232,411 L 228,405 L 216,407 L 209,400 L 193,409 L 174,405 L 183,410 L 156,412 L 154,407 L 137,405 L 133,393 L 123,397 L 93,384 L 61,381 L 56,365 L 26,351 L 24,346 L -16,346 L -18,340 L -3,339 L -7,333 L -24,331 L -17,324 L -21,317 L -9,310 L 19,319 L 38,333 L 46,331 L 49,321 L 73,330 L 126,332 L 145,341 L 137,349 L 110,352 L 135,353 L 146,361 L 158,363 L 163,372 L 168,369 L 161,361 L 174,360 L 184,367 L 180,361 L 188,361 L 189,352 L 168,356 L 160,351 L 166,355 L 158,356 L 142,335 L 161,335 L 168,340 L 170,333 L 225,337 L 223,346 L 216,344 L 214,353 L 206,352 L 233,371 L 235,383 L 244,374 L 260,376 L 265,386 L 279,388 L 278,382 L 286,374 L 315,369 L 307,361 L 304,369 L 290,365 L 281,374 L 271,366 L 272,360 L 263,360 L 271,369 L 263,372 L 256,358 L 235,361 L 226,345 L 256,346 L 270,340 L 273,348 L 265,349 L 267,353 L 291,352 L 279,360 L 304,354 L 306,360 L 311,356 L 325,361 L 318,363 L 319,368 L 341,379 L 342,387 L 350,386 L 363,401 L 362,407 L 347,412 L 355,421 L 359,419 L 366,434 L 355,442 L 336,435 L 334,423 L 314,423 L 311,418 L 289,426 L 309,423 L 313,428 L 264,431 L 268,449 L 263,455 L 299,456 L 302,463 L 313,456 L 311,462 L 328,468 L 328,475 L 321,474 L 319,480 L 330,485 L 324,489 L 330,492 L 351,485 L 355,490 L 383,490 L 390,495 L 409,487 L 397,490 L 395,481 L 388,488 L 380,488 L 378,481 L 369,485 L 357,476 L 363,485 L 355,481 L 350,485 L 342,480 L 349,478 L 340,473 L 337,462 L 376,469 L 387,483 L 405,477 L 391,468 L 394,460 L 403,459 L 402,455 L 416,458 L 425,451 L 448,449 L 457,456 L 459,448 L 470,450 L 471,462 L 467,458 L 466,463 L 457,460 L 413,471 L 408,460 L 405,473 L 418,490 L 424,484 L 417,478 L 420,476 L 439,476 L 439,483 L 449,477 L 441,474 L 455,472 L 459,478 L 478,479 L 479,471 L 472,464 L 492,462 L 477,457 L 499,451 L 518,457 L 510,458 L 502,471 L 509,478 L 507,484 L 513,485 L 519,475 L 518,464 L 525,466 L 518,459 L 523,456 L 519,452 L 536,448 L 547,456 L 591,458 L 592,465 L 598,462 L 604,466 L 589,474 L 563,475 L 571,483 L 590,485 L 578,490 L 580,495 L 596,500 L 649,502 L 666,509 L 680,529 L 707,520 L 723,522 L 765,500 L 770,502 L 767,493 L 774,493 L 768,478 L 781,476 L 786,481 L 798,472 L 812,471 L 820,454 L 807,449 L 870,437 L 869,426 L 882,422 L 867,418 L 869,414 L 900,412 L 913,421 L 927,421 L 955,420 L 966,412 L 964,390 L 942,379 L 920,377 L 910,368 L 911,361 L 904,369 L 883,374 L 874,369 L 854,369 L 851,358 L 854,363 L 869,365 L 893,358 L 890,369 L 901,359 L 894,357 L 906,352 L 901,341 L 913,335 L 920,342 L 927,335 L 932,340 L 946,339 L 942,344 L 928,340 L 927,345 L 958,351 L 965,358 L 961,352 L 972,349 L 984,336 L 979,328 L 976,337 L 964,341 L 967,335 L 975,334 L 966,331 L 977,322 L 968,315 L 970,310 L 974,305 L 1000,312 L 1015,300 L 1022,304 L 1015,310 L 1019,313 L 1011,307 L 1000,322 L 1002,328 L 1004,325 L 1012,329 L 990,330 L 988,337 L 995,333 L 1002,340 L 1029,344 L 1044,342 L 1053,335 L 1062,342 L 1069,333 L 1076,337 L 1080,330 L 1088,331 L 1087,326 L 1095,328 L 1101,319 L 1125,319 L 1133,306 L 1124,307 L 1125,300 L 1150,300 L 1178,288 L 1229,291 L 1233,286 L 1212,280 L 1222,281 L 1224,270 L 1238,275 L 1245,275 L 1245,270 L 1251,278 L 1246,283 L 1251,285 L 1244,288 L 1252,291 L 1270,291 L 1287,281 L 1290,285 L 1284,289 L 1331,289 L 1356,296 L 1361,303 L 1375,302 L 1384,291 L 1399,304 L 1396,310 L 1383,313 L 1387,317 L 1401,323 L 1409,316 L 1420,325 L 1408,329 L 1414,339 L 1470,365 L 1468,369 L 1453,364 L 1471,375 L 1499,422 L 1528,439 L 1543,459 L 1539,467 L 1525,446 L 1509,444 L 1517,456 L 1515,471 L 1547,494 L 1543,505 L 1551,511 L 1553,506 L 1562,518 L 1568,519 L 1563,499 L 1569,500 L 1577,523 L 1587,517 L 1587,526 L 1605,540 L 1599,563 L 1608,579 L 1615,579 L 1608,584 L 1630,588 L 1658,608 L 1668,628 L 1693,651 L 1692,657 L 1762,655 L 1792,664 L 1795,661 L 1788,658 L 1801,650 L 1847,659 L 1854,655 L 1865,668 L 1858,684 L 1868,687 L 1865,675 L 1878,675 L 1877,661 L 1888,660 L 1869,643 L 1848,645 L 1839,640 L 1847,637 L 1842,626 L 1850,615 L 1864,618 L 1871,629 L 1875,625 L 1883,630 L 1884,635 L 1877,642 L 1890,650 L 1890,655 L 1905,653 L 1905,662 L 1936,668",
+    "M 1945,576 L 1927,585 L 1898,576 L 1885,566 L 1869,566 L 1854,555 L 1831,550 L 1825,555 L 1818,553 L 1810,547 L 1817,547 L 1814,540 L 1810,543 L 1800,533 L 1805,531 L 1796,528 L 1801,520 L 1785,514 L 1776,500 L 1731,468 L 1726,456 L 1737,456 L 1738,447 L 1747,445 L 1744,439 L 1730,451 L 1722,444 L 1720,451 L 1699,448 L 1676,456 L 1672,448 L 1654,449 L 1661,468 L 1672,474 L 1693,476 L 1693,469 L 1716,471 L 1725,485 L 1748,485 L 1740,491 L 1743,497 L 1734,490 L 1730,493 L 1737,498 L 1734,502 L 1722,488 L 1708,490 L 1686,478 L 1676,483 L 1655,467 L 1651,472 L 1635,463 L 1631,468 L 1669,497 L 1685,495 L 1679,506 L 1688,507 L 1690,502 L 1760,537 L 1777,549 L 1774,558 L 1760,558 L 1748,541 L 1748,546 L 1737,543 L 1734,536 L 1731,542 L 1738,547 L 1735,552 L 1743,557 L 1727,555 L 1730,547 L 1722,548 L 1713,537 L 1703,536 L 1711,550 L 1701,546 L 1698,533 L 1686,528 L 1672,502 L 1661,505 L 1671,512 L 1661,519 L 1668,524 L 1665,529 L 1656,521 L 1662,507 L 1650,518 L 1645,514 L 1651,506 L 1632,511 L 1608,484 L 1621,485 L 1620,495 L 1636,489 L 1630,481 L 1640,484 L 1622,475 L 1626,471 L 1615,464 L 1616,456 L 1599,460 L 1591,449 L 1594,447 L 1587,447 L 1589,436 L 1578,429 L 1584,421 L 1595,428 L 1606,424 L 1596,420 L 1599,412 L 1593,411 L 1593,418 L 1583,421 L 1574,412 L 1597,407 L 1628,434 L 1655,432 L 1665,420 L 1679,421 L 1689,427 L 1679,425 L 1678,430 L 1706,441 L 1710,438 L 1701,427 L 1703,422 L 1687,413 L 1703,408 L 1699,400 L 1686,400 L 1678,390 L 1678,395 L 1664,399 L 1679,398 L 1689,408 L 1685,411 L 1678,402 L 1669,402 L 1664,405 L 1679,413 L 1669,416 L 1669,411 L 1659,412 L 1663,408 L 1656,399 L 1657,392 L 1647,389 L 1652,383 L 1637,376 L 1633,378 L 1636,366 L 1631,355 L 1639,356 L 1636,350 L 1645,348 L 1634,332 L 1619,331 L 1638,325 L 1626,313 L 1651,316 L 1659,324 L 1653,326 L 1646,319 L 1640,327 L 1644,332 L 1664,330 L 1690,349 L 1693,339 L 1690,342 L 1682,334 L 1693,328 L 1706,337 L 1708,332 L 1718,333 L 1710,324 L 1713,317 L 1735,334 L 1722,337 L 1739,347 L 1743,342 L 1767,370 L 1784,380 L 1792,397 L 1759,379 L 1745,383 L 1763,385 L 1758,387 L 1768,394 L 1765,405 L 1777,412 L 1777,422 L 1786,426 L 1783,430 L 1769,430 L 1773,437 L 1755,432 L 1749,438 L 1753,451 L 1767,451 L 1783,462 L 1818,462 L 1848,478 L 1853,477 L 1848,471 L 1855,471 L 1862,479 L 1871,472 L 1903,488 L 1912,481 L 1918,498 L 1930,503 L 1920,500 L 1912,507 L 1908,502 L 1913,518 L 1899,511 L 1889,495 L 1890,505 L 1880,507 L 1876,514 L 1857,514 L 1854,505 L 1847,501 L 1861,502 L 1851,494 L 1861,492 L 1845,492 L 1847,500 L 1839,493 L 1820,497 L 1805,493 L 1847,513 L 1848,522 L 1899,530 L 1912,525 L 1919,530 L 1941,525",
+    "M 1538,1078 L 1503,1048 L 1422,936 L 1402,881 L 1397,821 L 1394,817 L 1388,823 L 1394,828 L 1384,835 L 1376,825 L 1379,815 L 1392,816 L 1383,809 L 1383,786 L 1364,735 L 1354,727 L 1345,740 L 1341,735 L 1348,732 L 1338,731 L 1337,742 L 1351,755 L 1340,759 L 1329,753 L 1334,730 L 1325,719 L 1329,704 L 1314,698 L 1329,686 L 1322,676 L 1333,675 L 1336,666 L 1344,670 L 1343,653 L 1348,647 L 1337,635 L 1343,632 L 1345,638 L 1348,633 L 1345,627 L 1334,631 L 1344,617 L 1328,611 L 1326,602 L 1321,603 L 1327,605 L 1324,608 L 1306,603 L 1308,599 L 1314,604 L 1317,597 L 1325,598 L 1309,586 L 1318,586 L 1310,567 L 1299,564 L 1303,574 L 1291,567 L 1278,571 L 1288,575 L 1285,583 L 1271,583 L 1271,573 L 1266,583 L 1265,575 L 1255,568 L 1266,566 L 1269,554 L 1262,552 L 1264,562 L 1257,551 L 1244,554 L 1254,548 L 1241,552 L 1241,561 L 1253,566 L 1250,571 L 1241,568 L 1244,586 L 1248,583 L 1252,590 L 1259,585 L 1273,608 L 1278,597 L 1285,601 L 1291,595 L 1292,603 L 1286,603 L 1291,613 L 1295,609 L 1294,618 L 1285,611 L 1268,613 L 1263,619 L 1270,627 L 1273,622 L 1278,624 L 1280,632 L 1280,620 L 1285,629 L 1293,626 L 1283,637 L 1293,639 L 1275,652 L 1264,652 L 1267,656 L 1260,661 L 1270,668 L 1266,678 L 1277,672 L 1274,682 L 1248,689 L 1241,682 L 1229,694 L 1225,690 L 1225,682 L 1230,682 L 1225,677 L 1228,663 L 1239,660 L 1238,652 L 1243,657 L 1247,646 L 1256,648 L 1253,642 L 1258,635 L 1232,642 L 1235,633 L 1222,629 L 1219,623 L 1243,624 L 1246,617 L 1231,604 L 1232,614 L 1223,610 L 1228,614 L 1216,621 L 1216,633 L 1207,644 L 1208,650 L 1224,646 L 1228,653 L 1220,652 L 1224,657 L 1201,664 L 1157,711 L 1134,719 L 1093,763 L 1094,780 L 1087,777 L 1085,782 L 1078,778 L 1071,784 L 1068,774 L 1075,772 L 1068,769 L 1066,759 L 1042,804 L 1045,811 L 1039,810 L 1024,827 L 1037,828 L 1022,831 L 1008,848 L 1014,871 L 1011,873 L 1003,864 L 1008,862 L 1004,856 L 993,867 L 993,873 L 990,870 L 986,877 L 977,876 L 964,908 L 969,912 L 976,909 L 977,918 L 964,919 L 962,914 L 942,942 L 934,939 L 934,955 L 904,995 L 890,993 L 898,999 L 872,1018 L 861,1014 L 860,1026 L 851,1016 L 847,1037 L 796,1072 L 791,1069 L 787,1078"
+  ];
+  const coastEls = [0,1,2,3].map(i => document.getElementById(`coast-${i}`));
+  const coastLens = coastEls.map((el, i) => {
+    el.setAttribute('d', coastPaths[i]);
+    const len = el.getTotalLength();
+    el.style.strokeDasharray = len;
+    el.style.strokeDashoffset = len;
+    return len;
+  });
+
+  const state = { t: 0, playing: true };
+
+  function renderFrame(t) {
+    // Ken Burns (12s 缓慢推拉)
+    const kbP = clamp(t / DURATION, 0, 1);
+    const scale = lerp(1.00, 1.06, kbP);
+    const tx = lerp(0, -18, kbP);
+    const ty = lerp(0, -10, kbP);
+    bg.style.transform = `scale(${scale}) translate(${tx}px, ${ty}px)`;
+
+    // 顶部 tag
+    const tagA = clamp((t - 0.5) / 0.8, 0, 1);
+    tagTop.style.opacity = tagA;
+    tagTop.style.transform = `translateX(${(1-tagA)*-16}px)`;
+
+    // 章节号
+    const chA = clamp((t - 0.8) / 0.8, 0, 1);
+    chapter.style.opacity = chA;
+
+    // 主标题（t=1.2s 浮现）
+    const titleP = clamp((t - 1.2) / 1.0, 0, 1);
+    titleMain.style.opacity = titleP;
+    titleMain.style.transform = `translateX(-50%) translateY(${(1-titleP)*20}px)`;
+
+    // 海岸线 draw-on：4 条 stagger，每条 3.2s 画完
+    coastEls.forEach((el, i) => {
+      const start = 2.5 + i * 0.35;
+      const p = easeOutCubic(clamp((t - start) / 3.2, 0, 1));
+      el.style.strokeDashoffset = (1 - p) * coastLens[i];
+    });
+
+    // 描边完成后 glow 收敛（6.8 后变淡）
+    const shrink = clamp((t - 6.8) / 0.8, 0, 1);
+    const strokeOp = lerp(0.88, 0.62, shrink);
+    coastEls.forEach(el => el.setAttribute('opacity', strokeOp));
+
+    // 3 个地理标签 stagger（5.8, 6.3, 6.8）
+    labels.forEach((el, i) => {
+      const start = 5.8 + i * 0.5;
+      const a = clamp((t - start) / 0.8, 0, 1);
+      el.style.opacity = a;
+      const baseTransform = (i === 1) ? 'translateX(-50%)' : '';
+      el.style.transform = `${baseTransform} translateY(${(1-a)*14}px)`;
+    });
+
+    // 方向箭头（海峡中心，t=7.5 出现）
+    const arrA = clamp((t - 7.5) / 0.8, 0, 1);
+    arrow.style.opacity = arrA * 0.8;
+    const arrScale = lerp(0.6, 1, easeOutCubic(arrA));
+    arrow.setAttribute('transform', `translate(${960*(1-arrScale)},${560*(1-arrScale)}) scale(${arrScale})`);
+
+    // 底部 caption
+    const capA = clamp((t - 8.5) / 1.0, 0, 1);
+    caption.style.opacity = capA;
+    caption.style.transform = `translateY(${(1-capA)*16}px)`;
+
+    hud.textContent = `t=${t.toFixed(2)}s frame=${Math.round(t*60)}`;
+  }
+
+  function setTime(t) { state.t = t; scrubber.value = t; renderFrame(t); }
+
+  playBtn.addEventListener('click', () => {
+    state.playing = !state.playing;
+    playBtn.textContent = state.playing ? 'PAUSE' : 'PLAY';
+  });
+
+  scrubber.addEventListener('input', e => {
+    state.playing = false;
+    playBtn.textContent = 'PLAY';
+    setTime(parseFloat(e.target.value));
+  });
+
+  let lastRaf = null;
+  function tick(ts) {
+    if (state.playing) {
+      if (lastRaf !== null) {
+        const dt = (ts - lastRaf) / 1000;
+        let next = state.t + dt;
+        if (next > DURATION) next = 0;
+        setTime(next);
+      }
+      lastRaf = ts;
+    } else lastRaf = null;
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  const urlT = parseFloat(new URL(location.href).searchParams.get('t'));
+  if (!isNaN(urlT)) {
+    state.playing = false;
+    playBtn.textContent = 'PLAY';
+    setTime(urlT);
+  } else {
+    setTime(0);
+  }
+})();
+</script>
+</body>
+</html>
