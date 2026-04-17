@@ -61,26 +61,94 @@ Cyberpunk → Monospace           （科技终端）
 
 ---
 
-## 🎯 如何用这份图谱
+## 🎯 三大核心场景 × 10 风格适配矩阵
 
-### 场景 → 风格推荐
+### 评分标准（★★★★★ = 完美契合 / ★ = 不推荐）
 
-| 使用场景 | 推荐风格 |
-|---|---|
-| 企业级 SaaS 功能反馈 | Linear / Apple |
-| AI 产品 / 对话界面 | Claude |
-| 发布会 / 年度总结 | Awwwards / Cinematic3D |
-| 游戏化 / 课程 / 成就 | Nintendo / Arc |
-| 短视频 / 社交内容 | TikTok |
-| 杂志 / 品牌站 / 时尚 | Off-White / Risograph |
-| 科技产品 / Web3 | Cyberpunk |
-| 日常 UI 工具 | Arc / Apple |
+| 风格 | 🖥 **前端 UI 界面**（SaaS / 产品 / 工具） | 📱 **短视频**（TikTok / 小红书 / Reels） | 📊 **PPT / 数据故事**（汇报 / 发布 / 培训） |
+|---|---|---|---|
+| **Linear** | ★★★★★ 极致合适（Vercel / Stripe 同源） | ★ 太冷静，3 秒被划走 | ★★★ 专业严肃风场合合适 |
+| **Apple** | ★★★★★ 通用基准，最安全 | ★★★ 通用感好但可能偏克制 | ★★★★ 产品发布 / 企业汇报王者 |
+| **Arc** | ★★★★★ 创新型 SaaS / 工具 app 绝配 | ★★★★ 可爱年轻向产品 · 视觉记忆点强 | ★★★ 轻松课程 / 团队内部分享 |
+| **Claude** | ★★★★ AI / 写作 / 阅读类产品 | ★★ 节奏太慢，短视频不友好 | ★★★★★ 学术 / 深度阅读 / 文学向 |
+| **TikTok** | ★ 过于浮夸，企业产品不敢用 | ★★★★★ 原生契合，爆款必备 | ★★ PPT 用会显得廉价 |
+| **Nintendo** | ★★★ 游戏化 / 儿童产品 / 教育 | ★★★★ 短视频"成就解锁"类 hook 很强 | ★★★★ 课程完成 / 游戏化培训 |
+| **Off-White** | ★★★ 时尚 / 品牌站 | ★★★★ 短视频开场 / 产品亮相 | ★★★★★ **品牌年报 / 设计分享必杀** |
+| **Risograph** | ★★★ 独立工作室 / 博客 / 艺术 | ★★★ 小红书手作风 / 文艺向 | ★★★★ 独立创作者作品集 |
+| **Awwwards** | ★★ 日常 UI 太重，成就页 OK | ★★★★★ 短视频开场 hero 炸裂 | ★★★★★ **产品发布 / 年终总结剧场** |
+| **Cyberpunk** | ★★ 科技产品首屏 / Web3 | ★★★★ 科技向 / 游戏向短视频 | ★★★ 赛博 / 科技主题汇报 |
+| **Cinematic3D** | ★ UI 太重无必要 | ★★★★ 产品 reveal 瞬间 | ★★★★★ **发布会 hero / 新品亮相** |
+
+### 一句话匹配指南
+
+**🖥 前端 UI 界面**（用户每天要用 100 次的）
+- 首选：**Linear / Apple / Arc** — 克制不打扰
+- 避开：Awwwards / Cinematic3D / TikTok（仪式感太重，日用会累）
+- 细分：AI 产品 → Claude · 游戏化 → Nintendo · 创新工具 → Arc
+
+**📱 短视频**（3 秒吸引 + 10 秒讲完）
+- 首选：**TikTok / Awwwards / Nintendo** — 钩子强 · 密度高 · 有记忆点
+- 避开：Linear / Claude（节奏慢，被划走）
+- 细分：开场 hero → Awwwards/Cinematic3D · 互动反馈 → TikTok · 成就 → Nintendo
+
+**📊 PPT / 数据故事**（有上下文，观众主动看）
+- 首选：**Off-White / Apple / Awwwards / Cinematic3D** — 有仪式感不轻佻
+- 避开：TikTok（会显得廉价）
+- 细分：汇报 → Apple/Linear · 品牌年报 → Off-White · 发布会 → Awwwards/Cinematic3D · 学术 → Claude
+
+---
+
+## 🔀 不同场景的"组合策略"
+
+### 前端 UI 界面 · 混搭推荐
+- **主交互** Linear / Apple 克制基准
+- **成就 / 升级** 瞬间切 Nintendo / Arc（打破日常）
+- **高光庆祝** 偶尔用 Awwwards（年度解锁 · 里程碑）
+- **错误** Linear 红色 shake（不过度惊动）
+
+### 短视频 · 节奏混搭
+- **开场 3 秒** Cinematic3D / Awwwards hero（炸场）
+- **中段讲解** Apple / Arc（观众不累）
+- **数字反馈** TikTok（爆炸感抓眼球）
+- **收尾** Off-White typography + 品牌章
+
+### PPT · 结构混搭
+- **封面** Cinematic3D / Awwwards（仪式）
+- **章节页** Off-White typography
+- **内容页** Apple / Linear（克制，让数据说话）
+- **成就 / 总结** Nintendo / Arc（情感高点）
+
+---
+
+## 🎨 选择流程图
+
+```
+你的作品场景是？
+├── 每天要用的 UI → Linear / Apple / Arc
+│   ├── AI / 对话 → Claude
+│   ├── 创新工具 → Arc
+│   ├── 游戏化 → Nintendo
+│   └── 标准 SaaS → Linear
+│
+├── 短视频内容 → TikTok / Nintendo / Awwwards
+│   ├── 3 秒 hook → Awwwards / Cinematic3D
+│   ├── 互动反馈 → TikTok
+│   ├── 成就展示 → Nintendo
+│   └── 品牌亮相 → Off-White
+│
+└── PPT / 汇报 / 发布 → Apple / Off-White / Awwwards
+    ├── 企业汇报 → Apple / Linear
+    ├── 发布会 → Awwwards / Cinematic3D
+    ├── 品牌设计 → Off-White / Risograph
+    ├── 学术 / 深度 → Claude
+    └── 课程 / 培训 → Nintendo / Arc
+```
 
 ### 选择维度（当你不知道选哪个）
-1. **时长**：用户有几秒耐心？
-2. **情感**：想让人冷静 / 温暖 / 兴奋 / 敬畏？
-3. **品牌**：已有品牌调性是什么？
-4. **平台**：短视频（慢了会被划走）vs PPT（可以慢）vs Web（中等）
+1. **用户看多久**？5 秒以下 → TikTok/Awwwards；5-15 秒 → Apple/Arc；> 15 秒 → Linear/Claude
+2. **情感温度**？冷静 Linear · 温暖 Claude · 兴奋 TikTok · 敬畏 Cinematic3D
+3. **场合**？日常 UI → 克制；高光时刻 → 仪式感；内容创作 → 匹配品牌
+4. **品牌**：已有品牌调性是什么？品牌用户期待哪种反馈？
 
 ---
 
