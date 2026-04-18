@@ -1,0 +1,17 @@
+{
+  "name": "@nextframe/runtime",
+  "version": "1.1.0",
+  "description": "NextFrame browser-side runtime: boot + RAF + getStateAt pure function + __nf self-verify builtins.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./runtime": "./src/runtime.js",
+    "./self-verify": "./src/self-verify.js"
+  },
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "dependencies": {},
+  "license": "MIT"
+}

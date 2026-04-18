@@ -1,0 +1,23 @@
+{
+  "name": "@nextframe/tracks",
+  "version": "0.1.1",
+  "type": "module",
+  "description": "NextFrame Track ABI contract + official tracks (scene). Single-file, zero-import, pure-function tracks per ADR-033 / ADR-024.",
+  "main": "abi/index.js",
+  "exports": {
+    ".": "./abi/index.js",
+    "./abi": "./abi/index.js",
+    "./official/scene": "./official/scene.js"
+  },
+  "files": [
+    "abi/",
+    "official/",
+    "scripts/"
+  ],
+  "scripts": {
+    "check": "node scripts/check-abi.mjs official/scene.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

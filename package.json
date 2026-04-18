@@ -1,4 +1,11 @@
 {
+  "name": "nextframe",
+  "private": true,
+  "workspaces": [
+    "src/nf-core-engine",
+    "src/nf-runtime",
+    "src/nf-tracks"
+  ],
   "devDependencies": {
     "@types/node": "^25.6.0",
     "typescript": "^6.0.2"

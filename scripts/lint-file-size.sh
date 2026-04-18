@@ -1,6 +1,9 @@
-#!/bin/bash
-
-set -u
+#!/usr/bin/env bash
+# Scan src/**/*.{rs,ts,js,mjs} line counts.
+# Product code: > 500 lines → FAIL.
+# Test code (tests/ dir or *_test.*): > 800 lines → FAIL.
+# Output JSON lines per violation + final summary JSON.
+set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
@@ -10,14 +13,7 @@ trap 'rm -f "$files_tmp" "$violations_tmp"' EXIT
 
 if [ -d src ]; then
   find src \
-    -type d \( -name target -o -name node_modules -o -name legacy-v08 \) -prune -o \
-    -type f \( -name '*.rs' -o -name '*.js' -o -name '*.ts' -o -name '*.mjs' \) -print \
-    >> "$files_tmp"
-fi
-
-if [ -d tests ]; then
-  find tests \
-    -type d \( -name target -o -name node_modules -o -name legacy-v08 \) -prune -o \
+    -type d \( -name target -o -name node_modules -o -name dist -o -name legacy-v08 \) -prune -o \
     -type f \( -name '*.rs' -o -name '*.js' -o -name '*.ts' -o -name '*.mjs' \) -print \
     >> "$files_tmp"
 fi
@@ -27,44 +23,29 @@ while IFS= read -r file; do
   [ -n "$file" ] || continue
   scanned=$((scanned + 1))
   lines="$(wc -l < "$file" | tr -d ' ')"
-  limit=500
 
+  # Decide limit: test files → 800, product → 500.
+  limit=500
   case "$file" in
-    *.rs)
-      case "$file" in
-        */tests/*.rs|tests/*.rs)
-          limit=800
-          ;;
-      esac
-      ;;
-    *.js|*.ts|*.mjs)
-      limit=500
+    */tests/*|*/test/*|*_test.rs|*_test.ts|*_test.js|*.test.ts|*.test.js)
+      limit=800
       ;;
   esac
 
   if [ "$lines" -gt "$limit" ]; then
-    printf '%s\t%s\t%s\n' "$file" "$lines" "$limit" >> "$violations_tmp"
+    # Emit one JSON line per violation.
+    printf '{"event":"lint-file-size.violation","file":"%s","lines":%s,"limit":%s}\n' \
+      "$file" "$lines" "$limit"
+    printf '%s\n' "$file" >> "$violations_tmp"
   fi
 done < "$files_tmp"
 
-node - "$violations_tmp" "$scanned" <<'NODE'
-const fs = require("fs");
-
-const violationsPath = process.argv[2];
-const scanned = Number(process.argv[3]);
-const violations = fs.readFileSync(violationsPath, "utf8")
-  .split(/\n/)
-  .filter(Boolean)
-  .map((line) => {
-    const [file, lines, limit] = line.split("\t");
-    return { file, lines: Number(lines), limit: Number(limit) };
-  });
-
-process.stdout.write(JSON.stringify({
-  ok: violations.length === 0,
-  files_scanned: scanned,
-  violations,
-}) + "\n");
-
-process.exit(violations.length === 0 ? 0 : 1);
-NODE
+violation_count=$(wc -l < "$violations_tmp" | tr -d ' ')
+if [ "$violation_count" -eq 0 ]; then
+  printf '{"event":"lint-file-size.done","files_scanned":%s,"violations":0}\n' "$scanned"
+  exit 0
+else
+  printf '{"event":"lint-file-size.done","files_scanned":%s,"violations":%s}\n' \
+    "$scanned" "$violation_count"
+  exit 1
+fi

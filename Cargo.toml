@@ -1,9 +1,5 @@
 [workspace]
-# Empty workspace — project reset at v0.x-final (2026-04-17).
-# Previous src/ (7 crate) archived to archive/v0.x-src-final.tar.gz (local only, .gitignored).
-# Previous spec/ archived to archive/v0.x-spec-full.tar.gz (local) + github.com/ChaosRealmsAI/NextFrame-spec.
-# Next version v1.0 will add members here.
-members = []
+members = ["src/nf-cli"]
 resolver = "2"
 
 [workspace.package]
