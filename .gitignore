@@ -3,8 +3,9 @@ target/
 node_modules/
 *.log
 out/
-src/nf-core-engine/dist/
-src/nf-core-engine/package-lock.json
+
+# Temporary / scratch (project-structure rule)
+tmp/
 
 # Private / internal
 spec/
