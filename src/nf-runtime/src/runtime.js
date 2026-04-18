@@ -355,6 +355,26 @@ export function boot(options) {
     rafId = _raf(tick);
   }
 
+  // Helper: call v.play() / v.pause() on every persist <video> directly
+  // inside the click / key handler. BUG-20260419-01 round 3: browsers only
+  // honour autoplay when play() fires synchronously inside the user-gesture
+  // event; invoking it later inside RAF tick is rejected → silent video.
+  function _syncVideosFromGesture(targetPlaying) {
+    const vs = stage.querySelectorAll && stage.querySelectorAll("video[data-nf-persist]");
+    if (!vs) return;
+    for (let i = 0; i < vs.length; i++) {
+      const v = vs[i];
+      try {
+        if (targetPlaying && v.paused) {
+          const p = v.play();
+          if (p && typeof p.catch === "function") p.catch(() => {});
+        } else if (!targetPlaying && !v.paused) {
+          v.pause();
+        }
+      } catch (_e) { /* noop */ }
+    }
+  }
+
   // --- NFHandle ---
   const handle = {
     play() {
@@ -364,16 +384,21 @@ export function boot(options) {
       startPerf = _perf() - pausedAtMs;
       playing = true;
       handle._paused = false;
+      // Kick <video> playback synchronously so browsers honour the user
+      // gesture (the outer click handler). Don't wait for next RAF tick.
+      _syncVideosFromGesture(true);
       if (rafId == null) rafId = _raf(tick);
     },
     pause() {
       if (!playing) {
         handle._paused = true;
+        _syncVideosFromGesture(false);
         return;
       }
       pausedAtMs = _perf() - startPerf;
       playing = false;
       handle._paused = true;
+      _syncVideosFromGesture(false);
     },
     seek(t_ms, opts) {
       const shouldPause = !opts || opts.pause !== false; // default: pause on seek
@@ -590,7 +615,29 @@ function _bindTimelineUi(doc, handle, duration_ms) {
   };
   bindBtn('button[data-nf="to-start"]',    () => handle.seek(0, { pause: true }));
   bindBtn('button[data-nf="prev-frame"]',  () => handle.seek(Math.max(0, handle.getState().t_ms - 33), { pause: true }));
-  bindBtn('button[data-nf="play-pause"]',  () => { if (handle._paused) handle.play(); else handle.pause(); });
+  bindBtn('button[data-nf="play-pause"]',  () => {
+    // BUG-20260419-01 round 3 · unlock video audio on user gesture.
+    // If autoplay=true at boot, handle._paused=false but browsers still
+    // blocked v.play() (rejected Promise) → video silently stuck paused.
+    // First click must unconditionally call v.play() in the click handler
+    // so browser honours the gesture; then sync runtime state.
+    const vs = doc.querySelectorAll('video[data-nf-persist]');
+    const anyVideoPaused = Array.prototype.slice.call(vs).some((v) => v.paused);
+    if (handle._paused || anyVideoPaused) {
+      for (let i = 0; i < vs.length; i++) {
+        const v = vs[i];
+        if (v.paused) {
+          try {
+            const pr = v.play();
+            if (pr && typeof pr.catch === 'function') pr.catch(() => {});
+          } catch (_e) { /* noop */ }
+        }
+      }
+      if (handle._paused) handle.play();
+    } else {
+      handle.pause();
+    }
+  });
   bindBtn('button[data-nf="next-frame"]',  () => handle.seek(Math.min(duration_ms, handle.getState().t_ms + 33), { pause: true }));
   bindBtn('button[data-nf="to-end"]',      () => handle.seek(duration_ms, { pause: true }));
   bindBtn('button[data-nf="loop-toggle"]', () => handle.setLoop(!handle._loop));
