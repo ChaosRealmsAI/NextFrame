@@ -57,11 +57,30 @@ function loadSourceText(sourcePath: string): string {
 }
 
 function buildRuntime(runtimePath: string | undefined): string {
+  // Priority 1: explicit --runtime arg
   if (runtimePath && existsSync(runtimePath)) {
     try {
       return readFileSync(runtimePath, 'utf8');
-    } catch {
-      return DEFAULT_RUNTIME_PLACEHOLDER;
+    } catch { /* fall through */ }
+  }
+  // Priority 2: env var NF_RUNTIME_PATH
+  if (process.env.NF_RUNTIME_PATH && existsSync(process.env.NF_RUNTIME_PATH)) {
+    try {
+      return readFileSync(process.env.NF_RUNTIME_PATH, 'utf8');
+    } catch { /* fall through */ }
+  }
+  // Priority 3: auto-discover sibling nf-runtime/dist/runtime-iife.js (workspace layout)
+  // engine.js lives at src/nf-core-engine/dist/engine.js → sibling is src/nf-runtime/dist/
+  const candidates = [
+    pathResolve(process.cwd(), 'src/nf-runtime/dist/runtime-iife.js'),
+    pathResolve(process.cwd(), '../nf-runtime/dist/runtime-iife.js'),
+    pathResolve(process.cwd(), 'dist/runtime-iife.js'),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) {
+      try {
+        return readFileSync(c, 'utf8');
+      } catch { /* keep trying */ }
     }
   }
   return DEFAULT_RUNTIME_PLACEHOLDER;

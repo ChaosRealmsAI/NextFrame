@@ -1,3 +1,5 @@
+(function(){
+"use strict";
 // nf-runtime — boot + RAF loop + getStateAt pure function.
 // Zero dependencies. Plain JS. Runs in browser as IIFE; also importable in Node for tests.
 //
@@ -12,7 +14,7 @@
 // -----------------------------------------------------------------------------
 // getStateAt — pure, no globals, no Date.now, no Math.random
 // -----------------------------------------------------------------------------
-export function getStateAt(resolved, t_ms) {
+function getStateAt(resolved, t_ms) {
   const duration_ms = resolved && typeof resolved.duration_ms === "number"
     ? resolved.duration_ms
     : 0;
@@ -56,7 +58,7 @@ export function getStateAt(resolved, t_ms) {
 // -----------------------------------------------------------------------------
 // loadTrack — compile a track source string into { describe, sample, render }
 // -----------------------------------------------------------------------------
-export function loadTrack(src) {
+function loadTrack(src) {
   // Tracks are written as ES modules (`export function describe() {}`) per
   // Track ABI. Strip top-level `export function X(` → `function X(`, record
   // names, then `new Function` body returns them as an object.
@@ -86,7 +88,7 @@ export function loadTrack(src) {
 // -----------------------------------------------------------------------------
 // boot — wire up DOM, RAF loop, self-verify
 // -----------------------------------------------------------------------------
-export function boot(options) {
+function boot(options) {
   options = options || {};
   const mode = options.mode || "play";
   const stageSelector = options.stageSelector || "#nf-stage";
@@ -285,3 +287,88 @@ function _ts() {
   // Log timestamps use wallclock epoch — acceptable (not part of pure state).
   return Date.now();
 }
+
+// self-verify — attach __nf builtins to window.
+// ai-coding-mindset #4: verification capabilities live INSIDE product code.
+// Not a test helper; shipped runtime surface.
+//
+// Surface:
+//   window.__nf.getState()       — pure read of current state
+//   window.__nf.screenshot()     — Promise<dataURL | snapshot>
+//   window.__nf.log(level,msg,d) — structured JSON line to console
+//   window.__nf.simulate(op)     — AI-operable action (same code path as user)
+function attachSelfVerify(handle) {
+  const g = globalThis;
+  if (!g.window) return; // Node / non-browser — no-op.
+
+  const nf = {
+    // --- read-only state ---
+    getState() {
+      return handle.getState();
+    },
+
+    // --- capture ---
+    screenshot() {
+      return handle.screenshot();
+    },
+
+    // --- structured log ---
+    log(level, msg, data) {
+      handle.log(level, msg, data);
+    },
+
+    // --- action simulator — walks the same code path as UI interactions ---
+    // op shape: { kind: 'seek' | 'play' | 'pause' | 'restart', t_ms?: number }
+    simulate(op) {
+      if (!op || typeof op.kind !== "string") {
+        handle.log("error", "simulate.bad_op", { op });
+        return { ok: false, error: "bad_op" };
+      }
+      switch (op.kind) {
+        case "seek":
+        case "seekTo": {
+          const t = typeof op.t_ms === "number" ? op.t_ms : (op.t || 0);
+          handle.seek(t);
+          handle.log("info", "simulate.seek", { t_ms: t });
+          return { ok: true };
+        }
+        case "play": {
+          handle.play();
+          handle.log("info", "simulate.play", {});
+          return { ok: true };
+        }
+        case "pause": {
+          handle.pause();
+          handle.log("info", "simulate.pause", {});
+          return { ok: true };
+        }
+        case "restart": {
+          handle.seek(0);
+          handle.play();
+          handle.log("info", "simulate.restart", {});
+          return { ok: true };
+        }
+        default:
+          handle.log("error", "simulate.unknown_kind", { kind: op.kind });
+          return { ok: false, error: "unknown_kind" };
+      }
+    },
+
+    // Expose handle passthroughs so playwright flow works as-is.
+    play: () => handle.play(),
+    pause: () => handle.pause(),
+    seek: (t) => handle.seek(t),
+    __diagnostics: () => handle.__diagnostics(),
+  };
+
+  g.window.__nf = nf;
+  return nf;
+}
+
+var __nf_boot = boot;
+window.NFRuntime = {
+  boot: function(options){ var h = __nf_boot(options); attachSelfVerify(h); return h; },
+  getStateAt: getStateAt
+};
+window.__nf_boot = function(options){ return window.NFRuntime.boot(options || {}); };
+})();

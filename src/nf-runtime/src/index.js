@@ -61,6 +61,8 @@ export function getRuntimeSource() {
     "  boot: function(options){ var h = __nf_boot(options); attachSelfVerify(h); return h; },",
     "  getStateAt: getStateAt",
     "};",
+    // Compat alias: bundler script calls window.__nf_boot() without args.
+    "window.__nf_boot = function(options){ return window.NFRuntime.boot(options || {}); };",
     "})();",
   ].join("\n");
 }

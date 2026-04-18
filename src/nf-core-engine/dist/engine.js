@@ -7346,7 +7346,25 @@ function buildRuntime(runtimePath) {
     try {
       return readFileSync2(runtimePath, "utf8");
     } catch {
-      return DEFAULT_RUNTIME_PLACEHOLDER;
+    }
+  }
+  if (process.env.NF_RUNTIME_PATH && existsSync2(process.env.NF_RUNTIME_PATH)) {
+    try {
+      return readFileSync2(process.env.NF_RUNTIME_PATH, "utf8");
+    } catch {
+    }
+  }
+  const candidates = [
+    pathResolve2(process.cwd(), "src/nf-runtime/dist/runtime-iife.js"),
+    pathResolve2(process.cwd(), "../nf-runtime/dist/runtime-iife.js"),
+    pathResolve2(process.cwd(), "dist/runtime-iife.js")
+  ];
+  for (const c of candidates) {
+    if (existsSync2(c)) {
+      try {
+        return readFileSync2(c, "utf8");
+      } catch {
+      }
     }
   }
   return DEFAULT_RUNTIME_PLACEHOLDER;
