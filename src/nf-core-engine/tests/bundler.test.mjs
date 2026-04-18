@@ -25,6 +25,35 @@ test('bundler: required tags present', () => {
   assert.match(html, /<script id="nf-runtime">/);
 });
 
+test('bundler: v1.2 three-layer DOM (stage-wrap / controls / timeline)', () => {
+  const html = bundle({ resolved: baseResolved, trackSources: { 'scene-main': '// s' }, runtimeJs: '// rt' });
+  assert.match(html, /<div class="stage-wrap">/);
+  assert.match(html, /<div class="controls">/);
+  assert.match(html, /<div class="timeline">/);
+  assert.match(html, /<div class="ruler"><\/div>/);
+  assert.match(html, /<div class="tracks">/);
+  assert.match(html, /<div class="playhead">/);
+  assert.match(html, /<div class="ph-triangle"><\/div>/);
+  assert.match(html, /<div class="ph-line"><\/div>/);
+  assert.match(html, /<div class="ph-label">/);
+});
+
+test('bundler: v1.2 five control buttons with data-nf attrs', () => {
+  const html = bundle({ resolved: baseResolved, trackSources: { 'scene-main': '// s' }, runtimeJs: '// rt' });
+  for (const key of ['to-start', 'prev-frame', 'play-pause', 'next-frame', 'to-end', 'loop-toggle']) {
+    assert.match(html, new RegExp(`data-nf="${key}"`), `button data-nf="${key}" missing`);
+  }
+  assert.match(html, /data-nf="loop-toggle" data-active="false"/);
+  assert.match(html, /<span class="timecode">/);
+  assert.match(html, /<span class="now">00:00\.000<\/span>/);
+});
+
+test('bundler: v1.2 CSS hard-rule comments inlined (ADR-036 markers)', () => {
+  const html = bundle({ resolved: baseResolved, trackSources: { 'scene-main': '// s' }, runtimeJs: '// rt' });
+  const hits = html.match(/NO OVERFLOW: ADR-036/g) ?? [];
+  assert.ok(hits.length >= 3, `expected >=3 ADR-036 markers, got ${hits.length}`);
+});
+
 test('bundler: missing track source throws', () => {
   assert.throws(
     () => bundle({ resolved: baseResolved, trackSources: {}, runtimeJs: '// rt' }),

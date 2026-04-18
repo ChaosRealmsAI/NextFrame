@@ -2,11 +2,16 @@
 // ai-coding-mindset #4: verification capabilities live INSIDE product code.
 // Not a test helper; shipped runtime surface.
 //
-// Surface:
-//   window.__nf.getState()       — pure read of current state
-//   window.__nf.screenshot()     — Promise<dataURL | snapshot>
-//   window.__nf.log(level,msg,d) — structured JSON line to console
-//   window.__nf.simulate(op)     — AI-operable action (same code path as user)
+// Surface (v1.2 — full control surface exposed for AI-operable verification):
+//   window.__nf.getState()        — pure read of current state (incl. loop + duration_ms)
+//   window.__nf.seek(t, opts?)    — jump to t_ms (pause-by-default per ADR-035)
+//   window.__nf.play()            — resume playback
+//   window.__nf.pause()           — pause playback
+//   window.__nf.setLoop(on)       — toggle loop mode
+//   window.__nf.onTimeUpdate(cb)  — subscribe to RAF-tick time updates (returns unsubscribe)
+//   window.__nf.screenshot()      — Promise<dataURL | snapshot>
+//   window.__nf.log(level,msg,d)  — structured JSON line to console
+//   window.__nf.simulate(op)      — AI-operable action dispatcher (walks same code path as UI)
 
 export function attachSelfVerify(handle) {
   const g = globalThis;
@@ -29,7 +34,7 @@ export function attachSelfVerify(handle) {
     },
 
     // --- action simulator — walks the same code path as UI interactions ---
-    // op shape: { kind: 'seek' | 'play' | 'pause' | 'restart', t_ms?: number }
+    // op shape: { kind: 'seek' | 'play' | 'pause' | 'setLoop' | 'restart', t_ms?, enabled? }
     simulate(op) {
       if (!op || typeof op.kind !== "string") {
         handle.log("error", "simulate.bad_op", { op });
@@ -53,6 +58,13 @@ export function attachSelfVerify(handle) {
           handle.log("info", "simulate.pause", {});
           return { ok: true };
         }
+        case "setLoop":
+        case "loop": {
+          const enabled = op.enabled !== undefined ? !!op.enabled : !handle._loop;
+          handle.setLoop(enabled);
+          handle.log("info", "simulate.setLoop", { enabled });
+          return { ok: true };
+        }
         case "restart": {
           handle.seek(0);
           handle.play();
@@ -65,10 +77,13 @@ export function attachSelfVerify(handle) {
       }
     },
 
-    // Expose handle passthroughs so playwright flow works as-is.
-    play: () => handle.play(),
-    pause: () => handle.pause(),
-    seek: (t) => handle.seek(t),
+    // --- handle passthroughs (v1.2 control surface) ---
+    // Bound to handle so callers may `const {seek} = window.__nf` without losing this.
+    seek: handle.seek.bind(handle),
+    play: handle.play.bind(handle),
+    pause: handle.pause.bind(handle),
+    setLoop: handle.setLoop.bind(handle),
+    onTimeUpdate: handle.onTimeUpdate.bind(handle),
     __diagnostics: () => handle.__diagnostics(),
   };
 
