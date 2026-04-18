@@ -30,9 +30,9 @@
           "begin": "demo.begin",
           "end": "demo.end",
           "params": {
-            "src": "file:///Users/Zhuanz/bigbang/MediaAgentTeam/series/claude-code-%E6%BA%90%E7%A0%81%E8%AE%B2%E8%A7%A3/E02-claudemd/video/E02.mp4",
-            "from_ms": 10000,
-            "to_ms": 15000,
+            "src": "file:///Users/Zhuanz/bigbang/NextFrame/demo/assets/v1.8-real-clip.mp4",
+            "from_ms": 0,
+            "to_ms": 5000,
             "fit": "contain",
             "muted_in_record": true
           }

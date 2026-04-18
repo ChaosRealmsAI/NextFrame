@@ -305,6 +305,21 @@ function boot(options) {
         if (isRecord) {
           v.muted = true;
           try { if (typeof v.pause === "function") v.pause(); } catch (_e) { /* noop */ }
+        } else {
+          // play / edit mode: unmute + mirror runtime playing state.
+          // BUG-20260419-01 · render HTML no longer carries muted attr so
+          // browser starts with muted=true default → explicitly set false.
+          // BUG-20260419-01 fix B · runtime 'playing' → also call v.play()
+          // otherwise the <video> element stays paused (silent).
+          v.muted = false;
+          try {
+            if (playing && v.paused) {
+              const p = v.play();
+              if (p && typeof p.catch === "function") p.catch(() => {});
+            } else if (!playing && !v.paused) {
+              v.pause();
+            }
+          } catch (_e) { /* noop */ }
         }
         if (ac) {
           const fromMs = parseFloat(v.getAttribute("data-nf-t-offset") || "0") || 0;

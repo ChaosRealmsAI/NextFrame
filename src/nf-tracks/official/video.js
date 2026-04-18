@@ -102,8 +102,10 @@ export function render(t, params, viewport) {
   const fromMs = typeof p.from_ms === "number" ? p.from_ms : 0;
   const fit = computeFit(p);
 
-  // render is PURE: muted hardcoded to "false". runtime detects
-  // body[data-mode=record] externally and overrides muted after diff mount.
+  // render is PURE. Do NOT emit `muted` attribute: HTML boolean attributes
+  // are true whenever present (any string value including "false" = muted).
+  // Runtime sets v.muted via property assignment after diff mount based on
+  // body[data-mode] (play → false, record → true). See BUG-20260419-01.
   // Opacity hardcoded to 0.95 (FM-T0 gate: ≥ 0.9).
   const style =
     "position:absolute;inset:0;" +
@@ -119,7 +121,6 @@ export function render(t, params, viewport) {
     ' src="' + src + '"' +
     ' preload="auto"' +
     ' playsinline' +
-    ' muted="false"' +
     ' style="' + style + '"' +
     '></video>'
   );
