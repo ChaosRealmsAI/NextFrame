@@ -28,8 +28,8 @@ def emit(vp, pass_, detail):
 
 
 def vp1_interfaces_coverage():
-    """interfaces.json 20 模块字段级全覆盖"""
-    ifp = V14 / "spec" / "interfaces.json"
+    """interfaces.json 20 模块字段级全覆盖 (项目级 · spec/ 根)"""
+    ifp = SPEC / "interfaces.json"
     if not ifp.exists():
         return emit("VP-1-interfaces-coverage", False, {"error": f"not found: {ifp}"})
     data = json.loads(ifp.read_text())
