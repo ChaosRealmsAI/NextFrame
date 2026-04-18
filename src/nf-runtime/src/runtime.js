@@ -104,6 +104,87 @@ function _escapeHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
+// -----------------------------------------------------------------------------
+// diffAndMount — ADR-047 · data-nf-persist DOM diff
+//
+// Replaces `stage.innerHTML = html` so stateful elements (<video>, <audio>,
+// <input>, <iframe>) survive re-renders. Elements that carry
+// data-nf-persist="<key>" on both sides are reused by identity; everything
+// else takes the old path (full rebuild) — scene Track (no persist attr)
+// therefore behaves exactly like `innerHTML = html`.
+//
+// Algorithm (O(N), N = persist-element count per frame):
+//   1. Parse new HTML into a throw-away fragment.
+//   2. Index persist elements on both sides by their key.
+//   3. For each shared key, copy non-identity attributes from the new
+//      placeholder onto the old element, then swap the placeholder with the
+//      old element inside the fragment (preserves .currentTime / .paused /
+//      decoder state / focus / selection).
+//   4. Wipe stage and move fragment children in. Old persist elements that
+//      were reused are no longer live in `stage` at this moment (they now
+//      live in the fragment) → they're moved back by appendChild, not
+//      discarded. Old persist elements whose key is gone from the new HTML
+//      are simply not re-appended (unmounted).
+//
+// IDENTITY_ATTRS never overwritten on the reused element — e.g. resetting
+// `src` on a <video> would reset currentTime/decoder state.
+// -----------------------------------------------------------------------------
+const IDENTITY_ATTRS = new Set(["src", "type", "name", "data-nf-persist"]);
+
+export function diffAndMount(stage, html) {
+  const doc = stage.ownerDocument || globalThis.document;
+  const tmp = doc.createElement("div");
+  tmp.innerHTML = html;
+
+  // Collect persist elements on both sides.
+  const newPersist = new Map();
+  const newList = tmp.querySelectorAll("[data-nf-persist]");
+  for (let i = 0; i < newList.length; i++) {
+    const el = newList[i];
+    newPersist.set(el.getAttribute("data-nf-persist"), el);
+  }
+  const oldPersist = new Map();
+  const oldList = stage.querySelectorAll("[data-nf-persist]");
+  for (let i = 0; i < oldList.length; i++) {
+    const el = oldList[i];
+    oldPersist.set(el.getAttribute("data-nf-persist"), el);
+  }
+
+  // Reuse old elements where the key matches on both sides.
+  newPersist.forEach((newEl, key) => {
+    const oldEl = oldPersist.get(key);
+    if (!oldEl) return;
+    // Copy non-identity attributes new → old.
+    const attrs = newEl.attributes;
+    for (let i = 0; i < attrs.length; i++) {
+      const a = attrs[i];
+      if (!IDENTITY_ATTRS.has(a.name)) {
+        oldEl.setAttribute(a.name, a.value);
+      }
+    }
+    // Remove stale attributes that the new placeholder no longer carries.
+    const oldAttrs = Array.from(oldEl.attributes);
+    for (let i = 0; i < oldAttrs.length; i++) {
+      const a = oldAttrs[i];
+      if (IDENTITY_ATTRS.has(a.name)) continue;
+      if (!newEl.hasAttribute(a.name)) {
+        oldEl.removeAttribute(a.name);
+      }
+    }
+    // Swap placeholder → old element inside the fragment.
+    if (newEl.parentNode) {
+      newEl.parentNode.replaceChild(oldEl, newEl);
+    }
+  });
+
+  // Mount: clear stage + move fragment children in (old reused persist
+  // elements ride along via the fragment, keeping their live state).
+  stage.innerHTML = "";
+  while (tmp.firstChild) {
+    stage.appendChild(tmp.firstChild);
+  }
+}
+
 function _fmtTime(t_ms) {
   // mm:ss.sss — deterministic, no locale.
   const t = Math.max(0, t_ms | 0);
@@ -198,7 +279,42 @@ export function boot(options) {
         }));
       }
     }
-    stage.innerHTML = html;
+    // ADR-047 · stateful-element-safe mount (replaces stage.innerHTML = html).
+    diffAndMount(stage, html);
+
+    // ADR-045 / ADR-046 · record-mode audio discipline + external-t driver.
+    // record mode: force mute + pause, drive currentTime from playhead.
+    // play mode: only correct currentTime when drift exceeds tolerance so we
+    // don't break the browser's natural playback.
+    const isRecord = !!(doc.body && doc.body.dataset && doc.body.dataset.mode === "record");
+    const videoEls = stage.querySelectorAll("video[data-nf-persist]");
+    if (videoEls && videoEls.length > 0) {
+      // Match video DOM ↔ activeClip by src attribute (independent of persist
+      // key format — Track kinds hash src their own way, but src is the single
+      // stable identity across render calls).
+      const bySrc = new Map();
+      for (const ac of state.activeClips) {
+        if (ac.params && typeof ac.params.src === "string") {
+          bySrc.set(ac.params.src, ac);
+        }
+      }
+      for (let i = 0; i < videoEls.length; i++) {
+        const v = videoEls[i];
+        const ac = bySrc.get(v.getAttribute("src"));
+        if (isRecord) {
+          v.muted = true;
+          try { if (typeof v.pause === "function") v.pause(); } catch (_e) { /* noop */ }
+        }
+        if (ac) {
+          const fromMs = parseFloat(v.getAttribute("data-nf-t-offset") || "0") || 0;
+          const target = (ac.localT + fromMs) / 1000;
+          if (isRecord || Math.abs((v.currentTime || 0) - target) > 0.1) {
+            try { v.currentTime = target; } catch (_e) { /* noop */ }
+          }
+        }
+      }
+    }
+
     renderCalls++;
     lastRenderMs = _perf() - t0;
   }

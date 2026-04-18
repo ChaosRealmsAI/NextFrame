@@ -1,0 +1,61 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {
+    "name": "v1.8 video-track showcase",
+    "description": "多轨叠加 · 底层 video 元素精确 seek · 上层 scene hero 文字覆盖 · 演示 VP-2/3/4",
+    "version": "v1.8",
+    "created": "2026-04-19"
+  },
+  "viewport": {
+    "ratio": "16:9",
+    "w": 1920,
+    "h": 1080
+  },
+  "duration": "demo.end",
+  "anchors": {
+    "demo": {
+      "begin": "0",
+      "end": "demo.begin + 5s",
+      "filler": "manual"
+    }
+  },
+  "tracks": [
+    {
+      "id": "video-bg",
+      "kind": "video",
+      "src": "src/nf-tracks/official/video.js",
+      "clips": [
+        {
+          "id": "video-clip-01",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "src": "file:///Users/Zhuanz/bigbang/NextFrame/demo/assets/sample-clip.mp4",
+            "from_ms": 2000,
+            "to_ms": 7000,
+            "fit": "contain",
+            "muted_in_record": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "scene-hero",
+      "kind": "scene",
+      "src": "src/nf-tracks/official/scene.js",
+      "clips": [
+        {
+          "id": "scene-hero-01",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "layout": "hero",
+            "title": "NextFrame",
+            "subtitle": "AI 视频引擎 · v1.8 video track",
+            "accent_color": "#bc8cff"
+          }
+        }
+      ]
+    }
+  ]
+}
