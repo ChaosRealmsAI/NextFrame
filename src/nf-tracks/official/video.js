@@ -36,6 +36,15 @@ export function describe() {
         to_ms: { type: "number", minimum: 0 },
         fit: { type: "string", enum: ["contain", "cover"] },
         muted_in_record: { const: true },
+        // Embedding rect (viewport-percent 0-100). Omit → full-stage.
+        x: { type: "number", minimum: 0, maximum: 100 },
+        y: { type: "number", minimum: 0, maximum: 100 },
+        w: { type: "number", minimum: 0, maximum: 100 },
+        h: { type: "number", minimum: 0, maximum: 100 },
+        // Visual chrome.
+        radius: { type: "number", minimum: 0 },
+        border: { type: "string" },
+        shadow: { type: "string" },
       },
     },
   };
@@ -46,8 +55,16 @@ export function sample() {
     src: "file:///tmp/sample-clip.mp4",
     from_ms: 2000,
     to_ms: 7000,
-    fit: "contain",
+    fit: "cover",
     muted_in_record: true,
+    // Embed bottom-right ≈ 40% × 40% PIP-style window.
+    x: 55,
+    y: 55,
+    w: 40,
+    h: 40,
+    radius: 16,
+    border: "2px solid rgba(255,255,255,0.25)",
+    shadow: "0 12px 40px rgba(0,0,0,0.5)",
   };
 }
 
@@ -102,17 +119,38 @@ export function render(t, params, viewport) {
   const fromMs = typeof p.from_ms === "number" ? p.from_ms : 0;
   const fit = computeFit(p);
 
+  // Embed rect — percent of viewport. Omit x/y/w/h → full-stage (back-compat).
+  const hasRect = typeof p.x === "number" || typeof p.y === "number"
+    || typeof p.w === "number" || typeof p.h === "number";
+  const x = typeof p.x === "number" ? p.x : 0;
+  const y = typeof p.y === "number" ? p.y : 0;
+  const w = typeof p.w === "number" ? p.w : 100;
+  const h = typeof p.h === "number" ? p.h : 100;
+
   // render is PURE. Do NOT emit `muted` attribute: HTML boolean attributes
   // are true whenever present (any string value including "false" = muted).
   // Runtime sets v.muted via property assignment after diff mount based on
   // body[data-mode] (play → false, record → true). See BUG-20260419-01.
   // Opacity hardcoded to 0.95 (FM-T0 gate: ≥ 0.9).
+  const posStyle = hasRect
+    ? "position:absolute;" +
+      "left:" + x + "%;top:" + y + "%;" +
+      "width:" + w + "%;height:" + h + "%;"
+    : "position:absolute;inset:0;" +
+      "width:" + vp.w + "px;height:" + vp.h + "px;";
+
+  const radius = typeof p.radius === "number" ? p.radius : 0;
+  const border = typeof p.border === "string" ? p.border : "";
+  const shadow = typeof p.shadow === "string" ? p.shadow : "";
+
   const style =
-    "position:absolute;inset:0;" +
-    "width:" + vp.w + "px;height:" + vp.h + "px;" +
+    posStyle +
     "object-fit:" + fit + ";" +
     "background:#000;" +
-    "opacity:0.95;";
+    "opacity:0.95;" +
+    (radius ? ("border-radius:" + radius + "px;") : "") +
+    (border ? ("border:" + escapeAttr(border) + ";box-sizing:border-box;") : "") +
+    (shadow ? ("box-shadow:" + escapeAttr(shadow) + ";") : "");
 
   return (
     '<video' +

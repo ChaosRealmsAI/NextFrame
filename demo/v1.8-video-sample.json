@@ -33,8 +33,15 @@
             "src": "file:///Users/Zhuanz/bigbang/NextFrame/demo/assets/v1.8-real-clip.mp4",
             "from_ms": 0,
             "to_ms": 5000,
-            "fit": "contain",
-            "muted_in_record": true
+            "fit": "cover",
+            "muted_in_record": true,
+            "x": 55,
+            "y": 50,
+            "w": 40,
+            "h": 40,
+            "radius": 16,
+            "border": "2px solid rgba(255,255,255,0.3)",
+            "shadow": "0 16px 48px rgba(0,0,0,0.55)"
           }
         }
       ]
