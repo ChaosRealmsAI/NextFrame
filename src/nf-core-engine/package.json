@@ -1,0 +1,20 @@
+{
+  "name": "@nextframe/core-engine",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "NextFrame 3-stage compile pipeline (parse / resolve / bundle). Single-file esbuild bundle.",
+  "main": "dist/engine.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "test": "node --test --test-reporter=spec 'tests/*.test.mjs'"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0"
+  }
+}
