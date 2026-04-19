@@ -1,0 +1,46 @@
+{
+  "$schema": "../spec/schema/source.schema.json",
+  "meta": {
+    "title": "v1.41 WebGL Particles Demo",
+    "description": "First L2 Track · Canvas-2D 800 particles driven by RAF · behind scene title",
+    "version": "v1.41.0"
+  },
+  "viewport": { "ratio": "16:9", "w": 1920, "h": 1080 },
+  "duration": "demo.end",
+  "anchors": {
+    "demo": { "begin": "0", "end": "demo.begin + 10s" }
+  },
+  "tracks": [
+    {
+      "id": "particles-bg",
+      "kind": "webgl-particles",
+      "src": "src/nf-tracks/community/webgl-particles.js",
+      "clips": [
+        {
+          "id": "particles-all",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": { "count": 800, "hue_base": 280 }
+        }
+      ]
+    },
+    {
+      "id": "hero-title",
+      "kind": "scene",
+      "src": "src/nf-tracks/official/scene.js",
+      "clips": [
+        {
+          "id": "title-intro",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "layout": "hero",
+            "title": "WebGL Particles",
+            "subtitle": "v1.41 · L2 Track · 800 Canvas-2D 粒子",
+            "accent_color": "#a78bfa"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -477,6 +477,17 @@ export function diffAndMount(stage, html) {
       stage.insertBefore(want, current || null);
     }
   }
+
+  // v1.41 · Collect old persist elements whose key is NOT in the new snapshot
+  // (they're not in `reused`). Runtime uses these to dispatch L2 unmount().
+  // Note: these Elements are now detached from `stage` (removed above), but
+  // the Element reference is still live — Track's unmount() can still read
+  // el._nfState / cleanup WebGL context / etc.
+  const removedPersistEls = [];
+  for (const [key, oldEl] of oldPersist) {
+    if (!reused.has(key)) removedPersistEls.push(oldEl);
+  }
+  return { removedPersistEls };
 }
 
 function _fmtTime(t_ms) {
@@ -615,7 +626,75 @@ export function boot(options) {
       }
     }
     // ADR-047 · stateful-element-safe mount (replaces stage.innerHTML = html).
-    diffAndMount(stage, html);
+    const mountResult = diffAndMount(stage, html);
+
+    // --- v1.41 · L2 生命周期 dispatch (ADR-063) -------------------------------
+    // L2 Track 的 render() 输出 HTML 含 [data-nf-persist][data-nf-track-id=<trackId>]
+    // 根元素。runtime 按 data-nf-track-id 反查 trackRegistry · 按 level 分路径：
+    //   level=2 且元素首次出现 → mount(el, params, viewport) · 设 el._nfState
+    //   level=2 且已 mount     → update(el, t, params)
+    //   diffAndMount 返回 removedPersistEls 里 level=2 → unmount(el)
+    // L1 Track 不输出 data-nf-track-id · 不会进这块 · 行为字节级不变。
+    // Build L2 lookup: data-nf-track-id in render output holds the KIND (not
+    // runtime-assigned trackId, which render can't know). Match persist elements
+    // by kind → ac + track. Multi-instance-of-same-kind: ambiguous (rare).
+    const l2ByKind = new Map();
+    for (const ac of state.activeClips) {
+      const tr = trackRegistry.get(ac.trackId);
+      if (!tr) continue;
+      let d = null;
+      try { d = tr.describe(); } catch (_e) { d = null; }
+      if (d && d.level === 2 && typeof d.kind === "string") {
+        l2ByKind.set(d.kind, { track: tr, ac });
+      }
+    }
+    if (mountResult && mountResult.removedPersistEls) {
+      for (const removed of mountResult.removedPersistEls) {
+        const kind = removed.getAttribute && removed.getAttribute("data-nf-track-id");
+        if (!kind) continue;
+        // On removal, ac may be gone — try trackRegistry lookup by last known kind
+        let track = null;
+        for (const [, entry] of l2ByKind) {
+          try { if (entry.track.describe && entry.track.describe().kind === kind) { track = entry.track; break; } } catch (_e) {}
+        }
+        if (track && typeof track.unmount === "function" && removed._nfState) {
+          try { track.unmount(removed); } catch (err) {
+            console.log(JSON.stringify({ ts: _ts(), level: "error", source: "nf-runtime",
+              msg: "l2_unmount_failed", data: { kind, error: String(err) } }));
+          }
+          removed._nfState = null;
+        }
+      }
+    }
+    // Mount + update current L2 elements (matched by kind).
+    const l2Els = stage.querySelectorAll("[data-nf-persist][data-nf-track-id]");
+    for (let i = 0; i < l2Els.length; i++) {
+      const el = l2Els[i];
+      const kind = el.getAttribute("data-nf-track-id");
+      const entry = l2ByKind.get(kind);
+      if (!entry) continue;
+      const { track, ac } = entry;
+      // Mount-once.
+      if (!el._nfState && typeof track.mount === "function") {
+        try {
+          track.mount(el, ac.params, state.viewport);
+          el._nfState = el._nfState || { mounted: true };
+          console.log(JSON.stringify({ ts: _ts(), level: "info", source: "nf-runtime",
+            msg: "l2_mount_called", data: { kind } }));
+        } catch (err) {
+          console.log(JSON.stringify({ ts: _ts(), level: "error", source: "nf-runtime",
+            msg: "l2_mount_failed", data: { kind, error: String(err) } }));
+        }
+      }
+      // Update every frame.
+      if (el._nfState && typeof track.update === "function") {
+        try { track.update(el, ac.localT, ac.params); } catch (err) {
+          console.log(JSON.stringify({ ts: _ts(), level: "error", source: "nf-runtime",
+            msg: "l2_update_failed", data: { kind, error: String(err) } }));
+        }
+      }
+    }
+    // --- end L2 dispatch ------------------------------------------------------
 
     // ADR-045 / ADR-046 / ADR-054 / ADR-056 · record-mode media discipline +
     // external-t driver. Handles both <video> and <audio> persist elements.
