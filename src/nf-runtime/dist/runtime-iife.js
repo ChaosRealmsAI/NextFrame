@@ -141,6 +141,8 @@ function liteResolve(source) {
       id: track.id,
       kind: track.kind,
       src: track.src,
+      muted: track.muted === true,
+      solo: track.solo === true,
       clips: rClips,
     });
   }
@@ -351,8 +353,11 @@ function getStateAt(resolved, t_ms) {
 
   const activeClips = [];
   const tracks = (resolved && resolved.tracks) || [];
+  const hasSolo = tracks.some((track) => track && track.solo === true);
   for (let ti = 0; ti < tracks.length; ti++) {
     const track = tracks[ti];
+    if (!track || track.muted === true) continue;
+    if (hasSolo && track.solo !== true) continue;
     const trackId = track.id;
     const clips = track.clips || [];
     for (let ci = 0; ci < clips.length; ci++) {
@@ -626,7 +631,9 @@ function boot(options) {
   }
   const trackRegistry = new Map();
   const resolvedTracks = (resolved && resolved.tracks) || [];
+  const resolvedTrackById = new Map();
   for (const t of resolvedTracks) {
+    resolvedTrackById.set(t.id, t);
     // Prefer exact trackId match (bundler), fall back to kind (shell-mac dedup).
     const api = compiledByKey.get(t.id) || compiledByKey.get(t.kind);
     if (api) trackRegistry.set(t.id, api);
@@ -690,6 +697,19 @@ function boot(options) {
     }
     // ADR-047 · stateful-element-safe mount (replaces stage.innerHTML = html).
     const mountResult = diffAndMount(stage, html, commitToken);
+
+    if (mountResult && mountResult.removedPersistEls) {
+      for (const removed of mountResult.removedPersistEls) {
+        const tagName = removed && removed.tagName ? String(removed.tagName).toUpperCase() : "";
+        if (tagName === "VIDEO" || tagName === "AUDIO") {
+          try { if (typeof removed.pause === "function") removed.pause(); } catch (_e) { /* noop */ }
+          try { removed.removeAttribute("data-nf-autoplayed"); } catch (_e) { /* noop */ }
+        } else if (tagName === "IFRAME" && removed.contentWindow && typeof removed.contentWindow.postMessage === "function") {
+          try { removed.contentWindow.postMessage("pause", "*"); } catch (_e) { /* noop */ }
+          try { removed.contentWindow.postMessage({ type: "pause" }, "*"); } catch (_e) { /* noop */ }
+        }
+      }
+    }
 
     // --- v1.41 · L2 生命周期 dispatch (ADR-063) -------------------------------
     // L2 Track 的 render() 输出 HTML 含 [data-nf-persist][data-nf-track-id=<trackId>]
@@ -1019,6 +1039,23 @@ function boot(options) {
           trackId: c.trackId, clipIdx: c.clipIdx, localT: c.localT,
         })),
       };
+    },
+    getCurrentAudioTracks() {
+      const t_ms = currentTMs();
+      const state = getStateAt(resolved, Math.min(t_ms, Math.max(0, duration_ms - 1)));
+      return state.activeClips
+        .filter((c) => {
+          const track = resolvedTrackById.get(c.trackId);
+          return track && track.kind === "audio";
+        })
+        .map((c) => {
+          const track = resolvedTrackById.get(c.trackId) || {};
+          return {
+            trackId: c.trackId,
+            clipId: c.clipId,
+            kind: track.kind || null,
+          };
+        });
     },
     screenshot() {
       // v1.1: return HTML snapshot + metadata; playwright driver converts to PNG.

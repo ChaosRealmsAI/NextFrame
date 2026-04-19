@@ -86,21 +86,7 @@ impl EditorState {
             return self.selection.clone();
         };
 
-        if let Some((track_idx, _)) = self.find_clip_by_id(&clip_id) {
-            let track_id = self
-                .source
-                .pointer(&format!("/tracks/{track_idx}/id"))
-                .and_then(Value::as_str)
-                .map(str::to_string);
-            self.selection = Selection {
-                kind: "clip".to_string(),
-                clip_id: Some(clip_id),
-                track_id,
-                multi: Vec::new(),
-            };
-        } else {
-            self.selection = Selection::default();
-        }
+        self.selection = self.selection_for_clip(&clip_id);
         self.selection.clone()
     }
 
@@ -124,7 +110,7 @@ impl EditorState {
             "add"
         };
         let selection_before = self.selection.clone();
-        let selection_after = self.select_clip(Some(clip_id.to_string()));
+        let selection_after = self.selection_for_clip(clip_id);
         let reverse_patch = match old_value {
             Some(prev) => JsonPatch {
                 op: "replace".to_string(),
@@ -157,8 +143,7 @@ impl EditorState {
             selection_before,
             selection_after: selection_after.clone(),
         };
-        self.push_undo(entry.clone());
-        self.redo_stack.clear();
+        self.push_with_cap(entry.clone());
         self.selection = selection_after;
         self.bump_commit_token();
         Ok(entry)
@@ -183,9 +168,17 @@ impl EditorState {
             return None;
         }
         self.selection = entry.selection_after.clone();
-        self.push_undo(entry.clone());
+        self.push_undo_capped(entry.clone());
         self.bump_commit_token();
         Some(entry)
+    }
+
+    pub fn set_track_mute(&mut self, track_id: &str, muted: bool) -> Result<UndoEntry, String> {
+        self.set_track_flag(track_id, "muted", muted, "mute track")
+    }
+
+    pub fn set_track_solo(&mut self, track_id: &str, solo: bool) -> Result<UndoEntry, String> {
+        self.set_track_flag(track_id, "solo", solo, "solo track")
     }
 
     pub fn apply_patches(source: &mut Value, patches: &[JsonPatch]) -> Result<(), String> {
@@ -193,6 +186,16 @@ impl EditorState {
             apply_patch(source, patch)?;
         }
         Ok(())
+    }
+
+    pub fn find_track_by_id(&self, track_id: &str) -> Option<usize> {
+        let tracks = self.source.get("tracks")?.as_array()?;
+        for (track_idx, track) in tracks.iter().enumerate() {
+            if track.get("id").and_then(Value::as_str) == Some(track_id) {
+                return Some(track_idx);
+            }
+        }
+        None
     }
 
     pub fn find_clip_by_id(&self, clip_id: &str) -> Option<(usize, usize)> {
@@ -215,14 +218,85 @@ impl EditorState {
         self.commit_token = make_editor_id("commit");
     }
 
-    fn push_undo(&mut self, entry: UndoEntry) {
-        self.undo_stack.push(entry);
-        if self.undo_stack.len() > self.config.max_undo {
-            let overflow = self.undo_stack.len().saturating_sub(self.config.max_undo);
-            if overflow > 0 {
-                self.undo_stack.drain(0..overflow);
+    fn selection_for_clip(&self, clip_id: &str) -> Selection {
+        if let Some((track_idx, _)) = self.find_clip_by_id(clip_id) {
+            let track_id = self
+                .source
+                .pointer(&format!("/tracks/{track_idx}/id"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            Selection {
+                kind: "clip".to_string(),
+                clip_id: Some(clip_id.to_string()),
+                track_id,
+                multi: Vec::new(),
             }
+        } else {
+            Selection::default()
         }
+    }
+
+    fn set_track_flag(
+        &mut self,
+        track_id: &str,
+        field: &str,
+        value: bool,
+        op_label: &str,
+    ) -> Result<UndoEntry, String> {
+        let track_idx = self
+            .find_track_by_id(track_id)
+            .ok_or_else(|| format!("set-track-{field}: track not found: {track_id}"))?;
+        let pointer = format!("/tracks/{track_idx}/{}", escape_pointer_segment(field));
+        let old_value = self.source.pointer(&pointer).cloned();
+        let forward_patch = JsonPatch {
+            op: if old_value.is_some() {
+                "replace".to_string()
+            } else {
+                "add".to_string()
+            },
+            path: pointer.clone(),
+            value: Some(Value::Bool(value)),
+        };
+        let reverse_patch = match old_value {
+            Some(prev) => JsonPatch {
+                op: "replace".to_string(),
+                path: pointer.clone(),
+                value: Some(prev),
+            },
+            None => JsonPatch {
+                op: "remove".to_string(),
+                path: pointer.clone(),
+                value: None,
+            },
+        };
+        let selection_before = self.selection.clone();
+        let selection_after = self.selection.clone();
+        Self::apply_patches(&mut self.source, &[forward_patch.clone()])?;
+        let entry = UndoEntry {
+            id: make_editor_id("undo"),
+            ts: now_ms(),
+            op_label: op_label.to_string(),
+            forward: vec![forward_patch],
+            reverse: vec![reverse_patch],
+            selection_before,
+            selection_after,
+        };
+        self.push_with_cap(entry.clone());
+        self.bump_commit_token();
+        Ok(entry)
+    }
+
+    fn push_undo_capped(&mut self, entry: UndoEntry) {
+        let cap = self.config.max_undo.max(1);
+        if self.undo_stack.len() >= cap {
+            self.undo_stack.remove(0);
+        }
+        self.undo_stack.push(entry);
+    }
+
+    fn push_with_cap(&mut self, entry: UndoEntry) {
+        self.push_undo_capped(entry);
+        self.redo_stack.clear();
     }
 }
 
@@ -387,4 +461,163 @@ fn now_ms() -> u64 {
 fn make_editor_id(prefix: &str) -> String {
     let seq = EDITOR_ID_SEQ.fetch_add(1, Ordering::Relaxed);
     format!("{prefix}-{}-{seq}", now_ms())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EditorState;
+    use serde_json::{json, Value};
+
+    fn sample_source() -> Value {
+        json!({
+            "meta": {
+                "editor": {
+                    "max_undo": 50
+                }
+            },
+            "tracks": [
+                {
+                    "id": "tr_scene",
+                    "kind": "scene",
+                    "clips": [
+                        {
+                            "id": "clip_title",
+                            "begin": 0,
+                            "end": 1000,
+                            "params": {
+                                "title": "A"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "tr_audio",
+                    "kind": "audio",
+                    "clips": [
+                        {
+                            "id": "clip_audio",
+                            "begin": 0,
+                            "end": 1000,
+                            "params": {
+                                "src": "file:///tmp/demo.mp3"
+                            }
+                        }
+                    ]
+                }
+            ]
+        })
+    }
+
+    fn title(editor: &EditorState) -> String {
+        editor
+            .source
+            .pointer("/tracks/0/clips/0/params/title")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    }
+
+    #[test]
+    fn undo_redo_restores_title_and_selection() {
+        let mut editor = EditorState::new(sample_source());
+        editor.select_clip(Some("clip_title".to_string()));
+        let selection_before = editor.selection.clone();
+
+        let entry = editor
+            .set_param("clip_title", "title", Value::String("B".to_string()))
+            .unwrap();
+        assert_eq!(entry.op_label, "set param title");
+        assert_eq!(title(&editor), "B");
+        assert_eq!(editor.undo_stack.len(), 1);
+        assert_eq!(editor.redo_stack.len(), 0);
+
+        let undone = editor.undo().unwrap();
+        assert_eq!(undone.id, entry.id);
+        assert_eq!(title(&editor), "A");
+        assert_eq!(editor.undo_stack.len(), 0);
+        assert_eq!(editor.redo_stack.len(), 1);
+        assert_eq!(editor.selection.clip_id, selection_before.clip_id);
+
+        let redone = editor.redo().unwrap();
+        assert_eq!(redone.id, entry.id);
+        assert_eq!(title(&editor), "B");
+        assert_eq!(editor.undo_stack.len(), 1);
+        assert_eq!(editor.redo_stack.len(), 0);
+        assert_eq!(editor.selection.clip_id.as_deref(), Some("clip_title"));
+    }
+
+    #[test]
+    fn new_edit_clears_redo_stack() {
+        let mut editor = EditorState::new(sample_source());
+        editor.select_clip(Some("clip_title".to_string()));
+        editor
+            .set_param("clip_title", "title", Value::String("B".to_string()))
+            .unwrap();
+        editor.undo().unwrap();
+        assert_eq!(editor.redo_stack.len(), 1);
+
+        editor
+            .set_param("clip_title", "title", Value::String("C".to_string()))
+            .unwrap();
+        assert_eq!(editor.redo_stack.len(), 0);
+        assert_eq!(title(&editor), "C");
+    }
+
+    #[test]
+    fn undo_stack_is_fifo_capped_at_fifty() {
+        let mut editor = EditorState::new(sample_source());
+        editor.select_clip(Some("clip_title".to_string()));
+        for idx in 1..=51 {
+            editor
+                .set_param("clip_title", "title", Value::String(format!("T{idx}")))
+                .unwrap();
+        }
+
+        assert_eq!(editor.undo_stack.len(), 50);
+        let oldest_retained = &editor.undo_stack[0];
+        assert_eq!(
+            oldest_retained
+                .reverse
+                .first()
+                .and_then(|patch| patch.value.as_ref())
+                .and_then(Value::as_str),
+            Some("T1")
+        );
+        assert_eq!(title(&editor), "T51");
+    }
+
+    #[test]
+    fn track_mute_and_solo_are_undoable() {
+        let mut editor = EditorState::new(sample_source());
+
+        let mute = editor.set_track_mute("tr_audio", true).unwrap();
+        assert_eq!(mute.op_label, "mute track");
+        assert_eq!(
+            editor
+                .source
+                .pointer("/tracks/1/muted")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+        editor.undo().unwrap();
+        assert!(editor.source.pointer("/tracks/1/muted").is_none());
+        editor.redo().unwrap();
+        assert_eq!(
+            editor
+                .source
+                .pointer("/tracks/1/muted")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+
+        let solo = editor.set_track_solo("tr_scene", true).unwrap();
+        assert_eq!(solo.op_label, "solo track");
+        assert_eq!(
+            editor
+                .source
+                .pointer("/tracks/0/solo")
+                .and_then(Value::as_bool),
+            Some(true)
+        );
+    }
 }
