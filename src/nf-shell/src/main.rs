@@ -43,6 +43,9 @@ const TRACK_AUDIO: &str = include_str!("../../nf-tracks/official/audio.js");
 const TRACK_CHART: &str = include_str!("../../nf-tracks/official/chart.js");
 const TRACK_DATA: &str = include_str!("../../nf-tracks/official/data.js");
 const TRACK_SUBTITLE: &str = include_str!("../../nf-tracks/official/subtitle.js");
+// v1.41 · L2 community Track · WebGL particles
+const TRACK_WEBGL_PARTICLES: &str =
+    include_str!("../../nf-tracks/community/webgl-particles.js");
 
 #[derive(Debug, Clone)]
 enum UserEvent {
@@ -73,6 +76,7 @@ fn track_source_for(kind: &str) -> Option<&'static str> {
         "chart" => Some(TRACK_CHART),
         "data" => Some(TRACK_DATA),
         "subtitle" => Some(TRACK_SUBTITLE),
+        "webgl-particles" => Some(TRACK_WEBGL_PARTICLES),
         _ => None,
     }
 }
