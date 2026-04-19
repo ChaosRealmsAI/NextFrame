@@ -69,15 +69,7 @@ CLI 合成给 Agent 看的是：
 
 ## 给 Agent 的提示词
 
-你是字幕翻译员，专业做中文演讲字幕。把英文翻译成自然流畅的中文，按**阅读节奏**切成完整 cue。
-
-### 硬规则（违反任何一条都是错）
-
-1. **每个 cue 必须是完整中文句子**——有主谓、能独立读懂、有终结标点（。？！…）。
-2. **不机械切碎**——宁可一整句长一点，也不能切出残句。
-3. **不切半句话**——「是什么」+「让他们」这种分法零分。
-4. **保留专有名词原文**——Apple / Golden Circle / Why / How / What / Martin Luther King / Wright brothers / MP3 / TED 等**不翻**。
-5. **一个 segment 输出的 cue 加起来 = 原意的完整翻译**，不能漏、不能加解释。
+你是字幕翻译员，专业做中文演讲字幕。把英文翻译成自然流畅的中文，按**阅读节奏**切成完整 cue。**输出格式 + 硬规则见本文档下方** —— 先看示例 + 输出 schema · 再翻。
 
 ### 1 对 N 的判断法
 
@@ -147,20 +139,72 @@ CLI 合成给 Agent 看的是：
 - 保留了演讲者「抛问题 → 展开反差 → 落点」的节奏
 - 口语感
 
-### 输出格式
+### 输出格式（硬 schema · 违反 = `nf karaoke` 报 invalid type 拒收）
 
-**严格输出这个 JSON，其他什么都不要说**：
+**`cn` 数组的元素必须是 `{text, start, end}` 对象 · 不是字符串**。time 你按字数线性插值算（见下）。
+
+**最终写到 `<episode>/clips/clip_NN.translations.zh.json`**：
 
 ```json
-[
-  {"id": 1, "cn": ["完整句 1"]},
-  {"id": 2, "cn": ["完整句 1", "完整句 2"]}
+{
+  "clip_num": 1,
+  "lang": "zh",
+  "segments": [
+    {
+      "id": 1,
+      "en": "How do you explain when things don't go as we assume?",
+      "start": 16.8, "end": 19.9,
+      "cn": [
+        {"text": "事情没按预想发展时，", "start": 16.8, "end": 18.5},
+        {"text": "你怎么解释？",         "start": 18.5, "end": 19.9}
+      ]
+    }
+  ]
+}
+```
+
+#### ✅ 对：object 数组（含 start/end 秒）
+
+```json
+"cn": [
+  {"text": "完整句 1", "start": 16.8, "end": 18.5},
+  {"text": "完整句 2", "start": 18.5, "end": 19.9}
 ]
 ```
 
-- 数组顺序和输入顺序一致
-- `id` 必须匹配输入的 segment id
-- `cn` 数组元素必须是字符串，每个都是完整句（含终结标点）
+#### ❌ 错：字符串数组（BUG-20260419 #7 真踩过）
+
+```json
+"cn": ["完整句 1", "完整句 2"]
+```
+
+→ `nf karaoke` 直接报 `invalid type: string, expected struct` · 整个 pipeline 死。
+
+### start/end 怎么算
+
+按每条 cue 的中文字数占 segment 总字数的比例 · 在 segment `[start, end]` 内线性插值 · 首 cue 对齐 segment.start · 末 cue 对齐 segment.end · 中间相邻 cue 首尾接上：
+
+```python
+# 伪码 · agent 心算 / Python 一行 / Bash + jq 都行
+seg_dur = seg.end - seg.start
+total_chars = sum(len(c) for c in cn_texts)
+t = seg.start
+for ct in cn_texts:
+    cue_dur = seg_dur * len(ct) / total_chars
+    cn.append({"text": ct, "start": round(t, 2), "end": round(t + cue_dur, 2)})
+    t += cue_dur
+# 末 cue.end 强制 = seg.end（防浮点漂移）
+cn[-1]["end"] = seg.end
+```
+
+### 硬规则（违反任何一条都是错）
+
+1. **每个 cue 必须是完整中文句子**——有主谓、能独立读懂、有终结标点（。？！…）。
+2. **不机械切碎**——宁可一整句长一点，也不能切出残句。
+3. **不切半句话**——「是什么」+「让他们」这种分法零分。
+4. **保留专有名词原文**——Apple / Golden Circle / Why / How / What / Martin Luther King / Wright brothers / MP3 / TED 等**不翻**。
+5. **一个 segment 输出的 cue 加起来 = 原意的完整翻译**，不能漏、不能加解释。
+6. **`cn` 元素必须是 object**（`{text, start, end}`）· 不是字符串 · `start/end` 自己按字数插值算。
 
 ### 输入（由 CLI 附上）
 
