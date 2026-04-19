@@ -1,7 +1,7 @@
 // getStateAt purity tests — no DOM, no RAF, Node --test runner.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { getStateAt, loadTrack } from "../src/runtime.js";
+import { getStateAt, liteResolve, loadTrack } from "../src/runtime.js";
 import { getRuntimeSource } from "../src/index.js";
 
 const demo = {
@@ -19,6 +19,27 @@ const demo = {
       clips: [
         { id: "t0", begin_ms: 500, end_ms: 2000, params: { text: "Hello" } },
         { id: "t1", begin_ms: 2500, end_ms: 4500, params: { text: "World" } },
+      ],
+    },
+  ],
+};
+
+const transitionDemo = {
+  duration_ms: 5000,
+  viewport: { w: 1920, h: 1080 },
+  meta: {
+    transitions: [
+      { between: ["a", "b"], type: "fade", duration_ms: 1000 },
+      { between: ["b", "c"], type: "dissolve", duration_ms: 500 },
+    ],
+  },
+  tracks: [
+    {
+      id: "scene",
+      clips: [
+        { id: "a", begin_ms: 0, end_ms: 3000, params: { text: "A" } },
+        { id: "b", begin_ms: 2000, end_ms: 4000, params: { text: "B" } },
+        { id: "c", begin_ms: 3500, end_ms: 5000, params: { text: "C" } },
       ],
     },
   ],
@@ -83,6 +104,53 @@ test("getStateAt: handles empty/missing resolved gracefully", () => {
   const s = getStateAt({}, 100);
   assert.equal(s.activeClips.length, 0);
   assert.equal(s.duration_ms, 0);
+});
+
+test("liteResolve: accepts numeric editor-mutated duration and clip bounds", () => {
+  const resolved = liteResolve({
+    viewport: { w: 1920, h: 1080 },
+    duration: 5000,
+    tracks: [
+      {
+        id: "scene",
+        kind: "scene",
+        clips: [
+          { id: "n0", begin: 0, end: 2000, params: { title: "A" } },
+          { id: "n1", begin: 2000, end: 5000, params: { title: "B" } },
+        ],
+      },
+    ],
+  });
+  assert.equal(resolved.duration_ms, 5000);
+  assert.equal(resolved.tracks[0].clips[1].begin_ms, 2000);
+  assert.equal(resolved.tracks[0].clips[1].end_ms, 5000);
+});
+
+test("getStateAt: fade transition linearly blends overlapping clips", () => {
+  const s = getStateAt(transitionDemo, 2300);
+  const a = s.activeClips.find((clip) => clip.clipId === "a");
+  const b = s.activeClips.find((clip) => clip.clipId === "b");
+  assert.ok(a && b, "fade window should keep both clips active");
+  assert.equal(s.activeTransitions.length, 1);
+  assert.equal(s.activeTransitions[0].type, "fade");
+  assert.ok(a.opacity > 0.6 && a.opacity < 0.8, `expected fade-out opacity around 0.7, got ${a.opacity}`);
+  assert.ok(b.opacity > 0.2 && b.opacity < 0.4, `expected fade-in opacity around 0.3, got ${b.opacity}`);
+});
+
+test("getStateAt: dissolve transition is stable inside and outside overlap window", () => {
+  assert.doesNotThrow(() => {
+    getStateAt(transitionDemo, 3400);
+    getStateAt(transitionDemo, 3600);
+    getStateAt(transitionDemo, 4300);
+  });
+  const s = getStateAt(transitionDemo, 3600);
+  const b = s.activeClips.find((clip) => clip.clipId === "b");
+  const c = s.activeClips.find((clip) => clip.clipId === "c");
+  assert.ok(b && c, "dissolve window should keep both clips active");
+  assert.equal(s.activeTransitions.length, 1);
+  assert.equal(s.activeTransitions[0].type, "dissolve");
+  assert.ok(b.opacity > 0 && b.opacity < 1);
+  assert.ok(c.opacity > 0 && c.opacity < 1);
 });
 
 test("loadTrack: compiles CommonJS track source", () => {

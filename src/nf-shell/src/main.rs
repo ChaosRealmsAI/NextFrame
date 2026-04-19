@@ -412,6 +412,58 @@ fn dispatch_ipc(editor: &mut EditorState, body: &str) -> Result<IpcOutcome> {
                 mutation: true,
             })
         }
+        "split-clip" => {
+            let clip_id = payload
+                .get("clip_id")
+                .or_else(|| payload.get("clipId"))
+                .and_then(Value::as_str)
+                .context("split-clip: clip_id missing")?;
+            let at_ms = payload
+                .get("at_ms")
+                .or_else(|| payload.get("atMs"))
+                .and_then(Value::as_u64)
+                .context("split-clip: at_ms missing")?;
+            let _ = editor
+                .split_clip(clip_id, at_ms)
+                .map_err(anyhow::Error::msg)?;
+            Ok(IpcOutcome::EvalScript {
+                message: Some(format!("split-clip applied: {clip_id} @ {at_ms}ms")),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
+        "delete-clip" => {
+            let clip_id = payload
+                .get("clip_id")
+                .or_else(|| payload.get("clipId"))
+                .and_then(Value::as_str)
+                .context("delete-clip: clip_id missing")?;
+            let ripple = payload
+                .get("ripple")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let _ = editor
+                .delete_clip(clip_id, ripple)
+                .map_err(anyhow::Error::msg)?;
+            Ok(IpcOutcome::EvalScript {
+                message: Some(format!("delete-clip applied: {clip_id} ripple={ripple}")),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
+        "ripple-delete" => {
+            let clip_id = payload
+                .get("clip_id")
+                .or_else(|| payload.get("clipId"))
+                .and_then(Value::as_str)
+                .context("ripple-delete: clip_id missing")?;
+            let _ = editor.ripple_delete(clip_id).map_err(anyhow::Error::msg)?;
+            Ok(IpcOutcome::EvalScript {
+                message: Some(format!("ripple-delete applied: {clip_id}")),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
         "set-track-mute" => {
             let track_id = payload
                 .get("track_id")
@@ -1201,6 +1253,10 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
       '.nf-track-toggle:hover{{background:rgba(255,255,255,0.10);color:var(--token-text);transform:translateY(-1px);}}' +
       '.nf-track-toggle.is-active[data-nf-track-toggle="mute"]{{background:rgba(249,115,22,0.18);border-color:rgba(249,115,22,0.48);color:#fdba74;}}' +
       '.nf-track-toggle.is-active[data-nf-track-toggle="solo"]{{background:rgba(52,211,153,0.18);border-color:rgba(52,211,153,0.48);color:#6ee7b7;}}' +
+      '#nf-editor-context-menu{{position:fixed;display:none;min-width:168px;padding:8px;flex-direction:column;gap:4px;background:rgba(7,10,18,0.96);border:1px solid rgba(255,255,255,0.10);border-radius:12px;backdrop-filter:blur(18px);box-shadow:0 18px 48px rgba(0,0,0,0.45);z-index:720;}}' +
+      '#nf-editor-context-menu[data-open="1"]{{display:flex;}}' +
+      '#nf-editor-context-menu button{{width:100%;border:0;border-radius:8px;background:transparent;color:var(--token-text);padding:9px 11px;text-align:left;font:600 12px/1.2 var(--font-sans,-apple-system,sans-serif);cursor:pointer;}}' +
+      '#nf-editor-context-menu button:hover{{background:rgba(255,255,255,0.08);}}' +
       '@media (max-width: 1120px){{#nf-inspector-panel{{width:232px;top:52px;right:4px;bottom:4px;}}}}';
     document.head.appendChild(style);
   }}
@@ -1223,6 +1279,107 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
 
   api.send = function(kind, payload) {{
     window.ipc.postMessage(JSON.stringify({{ kind: kind, payload: payload || {{}} }}));
+  }};
+
+  api.hasEditableFocus = function() {{
+    var active = document.activeElement;
+    if (!active) return false;
+    var tag = String(active.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || !!active.isContentEditable;
+  }};
+
+  api.playheadMs = function() {{
+    var raw = window.__nf_last_playhead_t_ms;
+    return isFinite(raw) ? Math.max(0, Math.round(raw)) : 0;
+  }};
+
+  api.splitSelectedAt = function(atMs) {{
+    var selected = api.selectedClip();
+    if (!selected) return false;
+    api.send('split-clip', {{
+      clip_id: api.clipIdentity(selected.clip),
+      at_ms: Math.max(0, Math.round(atMs || 0))
+    }});
+    return true;
+  }};
+
+  api.deleteSelected = function(ripple) {{
+    var selected = api.selectedClip();
+    if (!selected) return false;
+    api.send(ripple ? 'ripple-delete' : 'delete-clip', {{
+      clip_id: api.clipIdentity(selected.clip),
+      ripple: !!ripple
+    }});
+    return true;
+  }};
+
+  api.closeContextMenu = function() {{
+    var menu = document.getElementById('nf-editor-context-menu');
+    if (!menu) return;
+    menu.dataset.open = '0';
+    menu.style.display = 'none';
+  }};
+
+  api.ensureContextMenu = function() {{
+    var existing = document.getElementById('nf-editor-context-menu');
+    if (existing) return existing;
+    var menu = document.createElement('div');
+    menu.id = 'nf-editor-context-menu';
+    menu.innerHTML =
+      '<button type="button" data-nf-menu-action="split">Split here</button>' +
+      '<button type="button" data-nf-menu-action="delete">Delete</button>' +
+      '<button type="button" data-nf-menu-action="ripple">Ripple delete</button>';
+    menu.addEventListener('click', function(ev) {{
+      var btn = ev.target && ev.target.closest ? ev.target.closest('button[data-nf-menu-action]') : null;
+      if (!btn) return;
+      var clipId = menu.dataset.clipId || '';
+      var splitAt = Number(menu.dataset.atMs || '0');
+      var action = btn.dataset.nfMenuAction || '';
+      api.closeContextMenu();
+      if (!clipId) return;
+      if (action === 'split') {{
+        api.send('split-clip', {{ clip_id: clipId, at_ms: Math.max(0, Math.round(splitAt)) }});
+      }} else if (action === 'delete') {{
+        api.send('delete-clip', {{ clip_id: clipId }});
+      }} else if (action === 'ripple') {{
+        api.send('ripple-delete', {{ clip_id: clipId }});
+      }}
+    }});
+    document.body.appendChild(menu);
+    document.addEventListener('mousedown', function(ev) {{
+      if (!menu.contains(ev.target)) api.closeContextMenu();
+    }}, true);
+    document.addEventListener('keydown', function(ev) {{
+      if (String(ev.key || '') === 'Escape') api.closeContextMenu();
+    }}, true);
+    return menu;
+  }};
+
+  api.contextSplitMs = function(ev, bar) {{
+    var lanes = window.__nf_timeline_lanes ? window.__nf_timeline_lanes() : document.querySelector('.tl-lanes');
+    if (!lanes || !bar) return api.playheadMs();
+    var rect = lanes.getBoundingClientRect();
+    var durationMs = window.__nf_timeline_duration_ms ? window.__nf_timeline_duration_ms(lanes) : 0;
+    var timelineMs = window.__nf_timeline_px_to_ms
+      ? window.__nf_timeline_px_to_ms(ev.clientX - rect.left, lanes, durationMs)
+      : api.playheadMs();
+    var beginMs = parseFloat(bar.dataset.nfBeginMs || '0');
+    var endMs = parseFloat(bar.dataset.nfEndMs || '0');
+    var innerMin = beginMs + 1;
+    var innerMax = Math.max(beginMs + 1, endMs - 1);
+    if (!(innerMax > innerMin)) return Math.round(beginMs);
+    return Math.round(Math.max(innerMin, Math.min(innerMax, timelineMs)));
+  }};
+
+  api.openClipMenu = function(clipId, atMs, clientX, clientY) {{
+    var menu = api.ensureContextMenu();
+    if (!menu || !clipId) return;
+    menu.dataset.clipId = String(clipId);
+    menu.dataset.atMs = String(Math.max(0, Math.round(atMs || 0)));
+    menu.style.left = Math.max(8, Math.round(clientX || 0)) + 'px';
+    menu.style.top = Math.max(8, Math.round(clientY || 0)) + 'px';
+    menu.style.display = 'flex';
+    menu.dataset.open = '1';
   }};
 
   api.sleep = function(ms) {{
@@ -1253,16 +1410,33 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
     if (api.shortcuts_installed) return;
     api.shortcuts_installed = true;
     document.addEventListener('keydown', function(e) {{
-      var key = String(e.key || '').toLowerCase();
-      if (!e.metaKey || key !== 'z' || e.ctrlKey || e.altKey || e.isComposing) return;
-      e.preventDefault();
-      api.send(e.shiftKey ? 'redo' : 'undo', {{}});
+      var rawKey = String(e.key || '');
+      var key = rawKey.toLowerCase();
+      if (e.metaKey && !e.ctrlKey && !e.altKey && !e.isComposing && key === 'z') {{
+        e.preventDefault();
+        api.send(e.shiftKey ? 'redo' : 'undo', {{}});
+        return;
+      }}
+      if (e.metaKey && !e.ctrlKey && !e.altKey && !e.isComposing && key === 'b') {{
+        if (api.hasEditableFocus()) return;
+        if (!api.selectedClip()) return;
+        e.preventDefault();
+        api.splitSelectedAt(api.playheadMs());
+        return;
+      }}
+      if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing || api.hasEditableFocus()) return;
+      if (rawKey === 'Delete' || rawKey === 'Backspace') {{
+        if (!api.selectedClip()) return;
+        e.preventDefault();
+        api.deleteSelected(!!e.shiftKey);
+      }}
     }});
   }};
 
   api.ensureShellLayout = function() {{
     ensureStyle();
     document.body.classList.add('nf-editor-open');
+    api.ensureContextMenu();
     if (document.getElementById('nf-inspector-panel')) return;
     var inspector = document.createElement('div');
     inspector.id = 'nf-inspector-panel';
@@ -1491,6 +1665,19 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
             ev.stopPropagation();
             api.send('select-clip', {{ clip_id: this.dataset.clipId || null }});
           }});
+          bar.addEventListener('contextmenu', function(ev) {{
+            ev.preventDefault();
+            ev.stopPropagation();
+            var clipId = this.dataset.clipId || '';
+            if (!clipId) return;
+            api.send('select-clip', {{ clip_id: clipId }});
+            api.openClipMenu(
+              clipId,
+              api.contextSplitMs(ev, this),
+              ev.clientX,
+              ev.clientY
+            );
+          }});
         }}
       }}
     }}
@@ -1534,12 +1721,14 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
   api.receiveSelection = function(selection) {{
     api.state = api.state || {{}};
     api.state.selection = selection || {{ kind: 'none', clip_id: null, track_id: null, multi: [] }};
+    api.closeContextMenu();
     api.applySelection();
     api.renderInspector();
   }};
 
   api.receiveSourceUpdate = function(state) {{
     if (!state) return;
+    api.closeContextMenu();
     if (state.commit_token && api.last_applied_token === state.commit_token) {{
       api.state = state;
       api.applySelection();
