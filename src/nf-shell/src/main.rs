@@ -1374,6 +1374,7 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
     var fieldCount = document.querySelectorAll('[data-nf-inspector-field]').length;
     var selectedBar = document.querySelector('.nf-tl-bar.selected');
     var undoSize = api.state && typeof api.state.undo_stack_size === 'number' ? api.state.undo_stack_size : -1;
+    if (typeof __nf_snapshot_dom === 'function') __nf_snapshot_dom('verify_finish');
     api.send('verify-select-report', {{
       selected_clip_id: api.state && api.state.selection ? api.state.selection.clip_id || null : null,
       inspector_field_count: fieldCount,
@@ -1381,6 +1382,8 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
       selected_class: !!selectedBar,
       undo_stack_size: undoSize,
       three_panel_layout: !!document.querySelector('.preview-panel') && !!document.querySelector('.timeline') && !!document.getElementById('nf-inspector-panel') && !!document.body.classList.contains('nf-editor-open'),
+      mount_trace: window.__nf_mount_trace || [],
+      dom_trace: window.__nf_dom_trace || [],
       ok: fieldCount > 0 && titleApplied && !!selectedBar && undoSize === 1
     }});
   }};
@@ -1881,14 +1884,67 @@ window.__nf_register_raf = function(loop_fn) {{
 }};
 
 window.__nf_mount_trace = [];
+window.__nf_dom_trace = [];
+// v1.52.1 · baseline visibility patch
+// prototype.html 的 @keyframes up + fill-mode:both 在 WKWebView 下
+// 不触发 · 导致 .topbar/.preview-panel/.timeline/.props 永远 opacity:0。
+// 强制清 animation + opacity:1 · 让主 layout 可见。
+function __nf_force_visible_layout() {{
+  var sels = ['.topbar', '.preview-panel', '.timeline', '.props'];
+  for (var i = 0; i < sels.length; i++) {{
+    var el = document.querySelector(sels[i]);
+    if (el) {{
+      el.style.animation = 'none';
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+    }}
+  }}
+}}
+function __nf_snapshot_dom(label) {{
+  try {{
+    var pp = document.querySelector('.preview-panel');
+    var tl = document.querySelector('.timeline');
+    var mc = document.querySelector('.main-col');
+    var mn = document.querySelector('.main');
+    var app = document.querySelector('.app');
+    var bodyKids = [];
+    if (document.body && document.body.children) {{
+      for (var i = 0; i < document.body.children.length; i++) {{
+        var el = document.body.children[i];
+        bodyKids.push((el.tagName||'?').toLowerCase() + '.' + (el.className||'').replace(/\s+/g,'.').slice(0,50));
+      }}
+    }}
+    window.__nf_dom_trace.push({{
+      label: label,
+      t: Date.now(),
+      readyState: document.readyState,
+      body_children: bodyKids,
+      app_exists: !!app,
+      main_exists: !!mn,
+      main_col_exists: !!mc,
+      preview_panel_exists: !!pp,
+      timeline_exists: !!tl,
+      preview_offset_w: pp ? pp.offsetWidth : -1,
+      preview_offset_h: pp ? pp.offsetHeight : -1,
+      timeline_offset_w: tl ? tl.offsetWidth : -1,
+      timeline_offset_h: tl ? tl.offsetHeight : -1,
+      preview_display: pp ? getComputedStyle(pp).display : 'n/a',
+      preview_opacity: pp ? getComputedStyle(pp).opacity : 'n/a',
+      timeline_display: tl ? getComputedStyle(tl).display : 'n/a'
+    }});
+  }} catch(_) {{}}
+}}
 window.__nf_mount = function() {{
   // Teardown any previous session before building a fresh one.
   window.__nf_teardown();
   window.__nf_mount_trace = ['enter'];
+  __nf_force_visible_layout();  // v1.52.1 · 保证 .preview-panel/.timeline 等 opacity:1
+  __nf_snapshot_dom('mount_enter');
   try {{
     var ps = document.querySelector('.preview-stage');
     var cp = document.querySelector('.canvas-plate.canvas-16-9');
     var host = ps || cp || document.body;
+    window.__nf_mount_trace.push('host=' + (ps?'preview-stage':(cp?'canvas-plate':'BODY_FALLBACK')));
     var vp = (window.__NF_SOURCE__ && window.__NF_SOURCE__.viewport) || {{w:1920, h:1080}};
     // Plate 填充可用空间 (flex container) · 不强制 aspect-ratio (避免宽高约束冲突)
     // stage native size = viewport px · transform-origin:top-left + scale +
@@ -1898,6 +1954,7 @@ window.__nf_mount = function() {{
         '<div id="nf-stage" style="position:absolute;top:0;left:0;width:' + vp.w + 'px;height:' + vp.h + 'px;transform-origin:top left;overflow:hidden;z-index:10"></div>' +
       '</div>';
     window.__nf_mount_trace.push('host.innerHTML set');
+    __nf_snapshot_dom('after_host_innerHTML');
     // v1.28: replace rAF with setTimeout — rAF can be suspended in
     // WKWebView when the window is marked offscreen / background during
     // early load, and we observed mount_trace stuck at 'host.innerHTML set'
