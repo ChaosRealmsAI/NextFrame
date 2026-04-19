@@ -60,6 +60,13 @@ const TRACK_SCENE_METRIC_GRID: &str =
     include_str!("../../nf-tracks/community/scene-metric-grid.js");
 const TRACK_SCENE_KPI_CALLOUT: &str =
     include_str!("../../nf-tracks/community/scene-kpi-callout.js");
+// v1.48 · scene Narrative family (3 L1 community Tracks)
+const TRACK_SCENE_QUOTE: &str =
+    include_str!("../../nf-tracks/community/scene-quote.js");
+const TRACK_SCENE_LIST_BULLETS: &str =
+    include_str!("../../nf-tracks/community/scene-list-bullets.js");
+const TRACK_SCENE_TIMELINE: &str =
+    include_str!("../../nf-tracks/community/scene-timeline.js");
 
 #[derive(Debug, Clone)]
 enum UserEvent {
@@ -97,6 +104,9 @@ fn track_source_for(kind: &str) -> Option<&'static str> {
         "scene-stat-giant" => Some(TRACK_SCENE_STAT_GIANT),
         "scene-metric-grid" => Some(TRACK_SCENE_METRIC_GRID),
         "scene-kpi-callout" => Some(TRACK_SCENE_KPI_CALLOUT),
+        "scene-quote" => Some(TRACK_SCENE_QUOTE),
+        "scene-list-bullets" => Some(TRACK_SCENE_LIST_BULLETS),
+        "scene-timeline" => Some(TRACK_SCENE_TIMELINE),
         _ => None,
     }
 }
