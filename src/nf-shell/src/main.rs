@@ -488,10 +488,18 @@ fn run_recorder_export(
     out: &std::path::Path,
     duration_s: f64,
     parallel: usize,
+    resolution_override: Option<&str>,
 ) -> Result<u64> {
     if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent).context("mkdir parent")?;
     }
+    let resolution_override = resolution_override
+        .map(|raw| {
+            nf_recorder::ExportResolution::parse_str(raw).ok_or_else(|| {
+                anyhow::anyhow!("invalid --resolution {raw} (expected 1080p or 4k)")
+            })
+        })
+        .transpose()?;
     // MacHeadlessShell 要 main thread · 所以用 current_thread runtime。
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -504,6 +512,7 @@ fn run_recorder_export(
             nf_recorder::ExportOpts {
                 duration_s,
                 parallel,
+                resolution_override,
                 ..Default::default()
             },
         ))
@@ -2582,6 +2591,7 @@ struct CliOpts {
     /// v1.44.1 · 并行切片 N · 默认 1 = 单进程 · ≥2 走 orchestrator spawn N 子进程 + ffmpeg concat.
     /// duration < 6s 自动降级单进程(orchestrator 内部判)。
     export_parallel: usize,
+    export_resolution: Option<String>,
     menu_test: bool,
     window_x: f64,
     window_y: f64,
@@ -2600,6 +2610,7 @@ fn parse_cli() -> CliOpts {
     let mut export_path: Option<PathBuf> = None;
     let mut export_duration_s: f64 = 5.0;
     let mut export_parallel: usize = 1;
+    let mut export_resolution: Option<String> = None;
     let mut menu_test = false;
     // Auto-cascade: count sibling nf-shell processes · stagger 40px per window.
     let cascade = count_running_nf_shell_pids();
@@ -2674,6 +2685,12 @@ fn parse_cli() -> CliOpts {
                     }
                 }
             }
+            "--resolution" => {
+                i += 1;
+                if i < args.len() {
+                    export_resolution = Some(args[i].clone());
+                }
+            }
             other if !other.starts_with("--") && positional.is_none() => {
                 positional = Some(other.to_string());
             }
@@ -2691,6 +2708,7 @@ fn parse_cli() -> CliOpts {
         export_path,
         export_duration_s,
         export_parallel,
+        export_resolution,
         menu_test,
         window_x,
         window_y,
@@ -2974,11 +2992,14 @@ fn main() -> Result<()> {
         shell_log(
             stdout_json_mode,
             &format!(
-                "[NF-RECORDER] CLI --export direct mode · source={} · out={} · duration={}s · parallel={}",
+                "[NF-RECORDER] CLI --export direct mode · source={} · out={} · duration={}s · parallel={} · resolution={}",
                 opts.source_arg,
                 export_path.display(),
                 opts.export_duration_s,
-                opts.export_parallel
+                opts.export_parallel,
+                opts.export_resolution
+                    .as_deref()
+                    .unwrap_or("source/default")
             ),
         );
         let src_path = PathBuf::from(&opts.source_arg);
@@ -2987,6 +3008,7 @@ fn main() -> Result<()> {
             &export_path,
             opts.export_duration_s,
             opts.export_parallel,
+            opts.export_resolution.as_deref(),
         ) {
             Ok(bytes) => {
                 shell_log(

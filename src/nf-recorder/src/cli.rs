@@ -23,6 +23,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+use crate::pipeline::VideoCodec;
 use crate::record_loop::RecordConfig;
 
 /// v1.14 `nf-recorder` command-line interface.
@@ -49,7 +50,7 @@ pub struct Cli {
     #[arg(short = 'o', long = "output", required = false)]
     pub output: Option<PathBuf>,
 
-    /// Resolution · v1.14 only supports `1080p` (4K in v1.24+).
+    /// Resolution preset · supports `1080p` and `4k`.
     #[arg(long, default_value = "1080p")]
     pub res: String,
 
@@ -127,7 +128,7 @@ pub fn parse() -> Cli {
 ///
 /// Performs contract validation:
 /// - `bundle` exists on disk
-/// - `--res` ∈ {`1080p`}
+/// - `--res` ∈ {`1080p`, `4k`} or explicit `<W>x<H>`
 /// - `--fps` ∈ {30, 60}
 /// - `--bitrate` parses to a positive u32 bps
 pub fn to_config(cli: &Cli) -> Result<RecordConfig, String> {
@@ -144,14 +145,7 @@ pub fn to_config(cli: &Cli) -> Result<RecordConfig, String> {
         return Err(format!("bundle does not exist: {}", bundle.display()));
     }
 
-    let (width, height) = match cli.res.as_str() {
-        "1080p" => (1920u32, 1080u32),
-        other => {
-            return Err(format!(
-                "--res {other} not supported in v1.14 (only 1080p)"
-            ));
-        }
-    };
+    let (width, height, codec) = parse_resolution(&cli.res)?;
 
     if !(cli.fps == 30 || cli.fps == 60) {
         return Err(format!("--fps must be 30 or 60 (got {})", cli.fps));
@@ -174,9 +168,26 @@ pub fn to_config(cli: &Cli) -> Result<RecordConfig, String> {
         height,
         fps: cli.fps,
         bitrate_bps,
+        codec,
         max_duration_s: cli.max_duration,
         frame_range,
     })
+}
+
+pub fn parse_resolution(s: &str) -> Result<(u32, u32, VideoCodec), String> {
+    let trimmed = s.trim();
+    match trimmed.to_ascii_lowercase().as_str() {
+        "1080p" => Ok((1920, 1080, VideoCodec::H264)),
+        "4k" => Ok((3840, 2160, VideoCodec::HevcMain8)),
+        _ => {
+            let (width, height) = parse_viewport(trimmed)?;
+            let codec = match (width, height) {
+                (3840, 2160) => VideoCodec::HevcMain8,
+                _ => VideoCodec::H264,
+            };
+            Ok((width, height, codec))
+        }
+    }
 }
 
 /// Parse `<start>,<end>` frame-range · half-open `[start, end)`.

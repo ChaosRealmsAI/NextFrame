@@ -1,12 +1,12 @@
-//! VTCompressionSession wrapper · v1.14 T-07
+//! VTCompressionSession wrapper · v1.14 T-07 + v1.55 HEVC Main 8-bit
 //!
-//! Rust wrapper around `VTCompressionSession` producing H.264 AVC compressed frames.
+//! Rust wrapper around `VTCompressionSession` producing compressed frames.
 //! The output callback pushes each `CompressedFrame` onto a lock-free `SegQueue`
 //! so `encode_pixel_buffer` never blocks on the encoder's queue. `finalize` drains
 //! pending frames via `VTCompressionSessionCompleteFrames(kCMTimeInvalid)`.
 //!
-//! Shape mirrors POC-02 (`poc/POC-02-vt-h264/src/main.rs`): BT.709 triple,
-//! Main profile AutoLevel, `AllowFrameReordering=false`, `MaxKeyFrameInterval=fps`.
+//! Shape mirrors POC-02 (`poc/POC-02-vt-h264/src/main.rs`) and v1.53 4K POC:
+//! BT.709 triple, `AllowFrameReordering=false`, `MaxKeyFrameInterval=60`.
 //!
 //! ## Contract with T-08 (Mp4Writer)
 //! `CompressedFrame::data` is H.264 **AVCC** (length-prefixed NAL units — the
@@ -23,8 +23,9 @@ use objc2_core_foundation::{
     kCFBooleanTrue, CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFString, CFType,
 };
 use objc2_core_media::{
-    kCMSampleAttachmentKey_NotSync, kCMTimeInvalid, kCMVideoCodecType_H264, CMBlockBuffer,
-    CMSampleBuffer, CMTime, CMVideoFormatDescription,
+    kCMSampleAttachmentKey_NotSync, kCMTimeInvalid, kCMVideoCodecType_H264,
+    kCMVideoCodecType_HEVC, CMBlockBuffer, CMSampleBuffer, CMTime,
+    CMVideoFormatDescription,
 };
 use objc2_core_video::{
     kCVImageBufferColorPrimaries_ITU_R_709_2, kCVImageBufferTransferFunction_ITU_R_709_2,
@@ -38,14 +39,14 @@ use objc2_video_toolbox::{
     kVTCompressionPropertyKey_MaxKeyFrameInterval, kVTCompressionPropertyKey_ProfileLevel,
     kVTCompressionPropertyKey_RealTime, kVTCompressionPropertyKey_TransferFunction,
     kVTCompressionPropertyKey_YCbCrMatrix, kVTEncodeFrameOptionKey_ForceKeyFrame,
-    kVTProfileLevel_H264_Main_AutoLevel, VTCompressionSession, VTEncodeInfoFlags, VTSession,
-    VTSessionSetProperty,
+    kVTProfileLevel_H264_Main_AutoLevel, kVTProfileLevel_HEVC_Main_AutoLevel,
+    VTCompressionSession, VTEncodeInfoFlags, VTSession, VTSessionSetProperty,
 };
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_foundation::{NSCopying, NSDictionary, NSMutableDictionary, NSString};
 
-use super::{ColorSpec, PipelineError};
+use super::{ColorSpec, PipelineError, VideoCodec};
 
 // ─── Sendable CF wrapper ────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ pub struct VtCompressor {
     height: u32,
     fps: u32,
     bitrate_bps: u32,
+    codec: VideoCodec,
 }
 
 // SAFETY: VTCompressionSession retain/release is thread-safe. The callback
@@ -161,6 +163,42 @@ impl VtCompressor {
         fps: u32,
         bitrate_bps: u32,
         color: ColorSpec,
+    ) -> Result<Self, PipelineError> {
+        Self::new_with_codec(
+            width,
+            height,
+            fps,
+            bitrate_bps,
+            color,
+            VideoCodec::H264,
+        )
+    }
+
+    /// Create a new HEVC Main 8-bit VT compressor.
+    pub fn new_hevc_main(
+        width: u32,
+        height: u32,
+        fps: u32,
+        bitrate_bps: u32,
+        color: ColorSpec,
+    ) -> Result<Self, PipelineError> {
+        Self::new_with_codec(
+            width,
+            height,
+            fps,
+            bitrate_bps,
+            color,
+            VideoCodec::HevcMain8,
+        )
+    }
+
+    fn new_with_codec(
+        width: u32,
+        height: u32,
+        fps: u32,
+        bitrate_bps: u32,
+        color: ColorSpec,
+        codec: VideoCodec,
     ) -> Result<Self, PipelineError> {
         if !matches!(color, ColorSpec::BT709_SDR_8bit) {
             return Err(PipelineError::EncoderInitFailed);
@@ -183,7 +221,10 @@ impl VtCompressor {
                 None,
                 width as i32,
                 height as i32,
-                kCMVideoCodecType_H264,
+                match codec {
+                    VideoCodec::H264 => kCMVideoCodecType_H264,
+                    VideoCodec::HevcMain8 => kCMVideoCodecType_HEVC,
+                },
                 None,
                 Some(attrs.as_ref()),
                 None,
@@ -203,7 +244,7 @@ impl VtCompressor {
         #[allow(unsafe_code)]
         let session = unsafe { CFRetained::from_raw(session_nn) };
 
-        configure_session(&session, fps as i32, bitrate_bps as i32)?;
+        configure_session(&session, fps as i32, bitrate_bps as i32, codec)?;
 
         // SAFETY: prepare_to_encode_frames is an FFI call on a valid session.
         #[allow(unsafe_code)]
@@ -220,7 +261,17 @@ impl VtCompressor {
             height,
             fps,
             bitrate_bps,
+            codec,
         })
+    }
+
+    /// Backward-compatible default path: no forced keyframe.
+    pub fn encode_pixel_buffer(
+        &self,
+        pixel_buffer: &CVPixelBuffer,
+        pts_ms: u64,
+    ) -> Result<(), PipelineError> {
+        self.encode_pixel_buffer_with_options(pixel_buffer, pts_ms, false)
     }
 
     /// Encode a single pixel buffer. Does **not** block waiting for the encoder —
@@ -229,7 +280,7 @@ impl VtCompressor {
     /// `force_keyframe=true` forces this frame to emit as IDR. v1.15 uses this for
     /// the very first frame of every subprocess so each segment MP4 starts with a
     /// keyframe · enabling `ffmpeg concat -c copy` (no re-encode) at merge time.
-    pub fn encode_pixel_buffer(
+    pub fn encode_pixel_buffer_with_options(
         &self,
         pixel_buffer: &CVPixelBuffer,
         pts_ms: u64,
@@ -347,6 +398,10 @@ impl VtCompressor {
     pub fn bitrate_bps(&self) -> u32 {
         self.bitrate_bps
     }
+
+    pub fn codec(&self) -> VideoCodec {
+        self.codec
+    }
 }
 
 impl Drop for VtCompressor {
@@ -368,6 +423,7 @@ fn configure_session(
     session: &VTCompressionSession,
     fps: i32,
     bitrate_bps: i32,
+    codec: VideoCodec,
 ) -> Result<(), PipelineError> {
     // Frame reordering off — MP4 / streaming friendly.
     set_prop(
@@ -387,14 +443,14 @@ fn configure_session(
         },
         CFNumber::new_i32(fps).as_ref(),
     )?;
-    // One IDR per second.
+    // v1.55 · one forced keyframe every 60 frames (1s @ 60fps / 2s @ 30fps).
     set_prop(
         session,
         #[allow(unsafe_code)]
         unsafe {
             kVTCompressionPropertyKey_MaxKeyFrameInterval
         },
-        CFNumber::new_i32(fps).as_ref(),
+        CFNumber::new_i32(60).as_ref(),
     )?;
     set_prop(
         session,
@@ -404,18 +460,19 @@ fn configure_session(
         },
         CFNumber::new_i32(bitrate_bps).as_ref(),
     )?;
-    // H.264 Main / AutoLevel.
+    // Codec profile preset.
     set_prop(
         session,
         #[allow(unsafe_code)]
         unsafe {
             kVTCompressionPropertyKey_ProfileLevel
         },
-        #[allow(unsafe_code)]
-        unsafe {
-            kVTProfileLevel_H264_Main_AutoLevel
-        }
-        .as_ref(),
+        match codec {
+            #[allow(unsafe_code)]
+            VideoCodec::H264 => unsafe { kVTProfileLevel_H264_Main_AutoLevel }.as_ref(),
+            #[allow(unsafe_code)]
+            VideoCodec::HevcMain8 => unsafe { kVTProfileLevel_HEVC_Main_AutoLevel }.as_ref(),
+        },
     )?;
     // BT.709 color triple.
     set_prop(

@@ -20,7 +20,7 @@ use nf_shell_mac::IOSurfaceHandle;
 
 use super::mp4_writer::Mp4Writer;
 use super::vt_wrap::VtCompressor;
-use super::{ColorSpec, OutputStats, PipelineError, RecordOpts, RecordPipeline};
+use super::{ColorSpec, OutputStats, PipelineError, RecordOpts, RecordPipeline, VideoCodec};
 
 /// v1.14 H.264 1080p pipeline.
 pub struct PipelineH264_1080p {
@@ -47,6 +47,9 @@ unsafe impl Send for PipelineH264_1080p {}
 impl RecordPipeline for PipelineH264_1080p {
     fn new(opts: RecordOpts) -> Result<Self, PipelineError> {
         if !matches!(opts.color, ColorSpec::BT709_SDR_8bit) {
+            return Err(PipelineError::EncoderInitFailed);
+        }
+        if opts.codec != VideoCodec::H264 {
             return Err(PipelineError::EncoderInitFailed);
         }
         let compressor = VtCompressor::new(
@@ -84,9 +87,9 @@ impl RecordPipeline for PipelineH264_1080p {
         //    v1.15 · force IDR on the very first frame of this pipeline instance · so each
         //    segment MP4 (including parallel subprocess segments) starts with a keyframe ·
         //    enabling `ffmpeg -f concat -c copy` without re-encoding at merge time.
-        let force_keyframe = self.frames_pushed == 0;
+        let force_keyframe = self.frames_pushed == 0 || self.frames_pushed % 60 == 0;
         self.compressor
-            .encode_pixel_buffer(&pixel_buffer, pts_ms, force_keyframe)?;
+            .encode_pixel_buffer_with_options(&pixel_buffer, pts_ms, force_keyframe)?;
 
         // 3. Drain any completed frames from the encoder output queue into the writer.
         // On the very first frame the Mp4Writer is created using the format_description

@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use nf_shell_mac::IOSurfaceHandle;
 
 pub mod h264;       // T-07 填
+pub mod hevc;       // v1.55 · HEVC Main 8-bit
 pub mod vt_wrap;    // T-07 填
 pub mod mp4_writer; // T-08 填
 
@@ -17,8 +18,15 @@ pub struct RecordOpts {
     pub height: u32,
     pub fps: u32,
     pub bitrate_bps: u32,
+    pub codec: VideoCodec,
     pub output: PathBuf,
     pub color: ColorSpec,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoCodec {
+    H264,
+    HevcMain8,
 }
 
 #[derive(Debug, Clone, Copy)]
