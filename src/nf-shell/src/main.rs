@@ -318,9 +318,12 @@ fn build_init_script(
     tracks_map: &Map<String, Value>,
     verify_mode: bool,
     screenshot_after_ms: Option<u64>,
+    source_path: &str,
 ) -> String {
     let source_str = serde_json::to_string(source_json).unwrap_or_else(|_| "{}".to_string());
     let tracks_str = serde_json::to_string(tracks_map).unwrap_or_else(|_| "{}".to_string());
+    let source_path_str =
+        serde_json::to_string(source_path).unwrap_or_else(|_| "\"<unknown>\"".to_string());
     let verify_block = if verify_mode {
         r#"
 setTimeout(function(){
@@ -348,7 +351,31 @@ setTimeout(function(){
         r#"
 window.__NF_SOURCE__ = {source};
 window.__NF_TRACKS__ = {tracks};
+window.__NF_SOURCE_PATH__ = {source_path};
 {runtime}
+
+// v1.23: source badge — fixed top-right chip showing which JSON drives this view.
+window.__nf_install_source_badge = function() {{
+  if (document.getElementById('nf-source-badge')) return;
+  var meta = (window.__NF_SOURCE__ && window.__NF_SOURCE__.meta) || {{}};
+  var name = meta.name || '';
+  var path = window.__NF_SOURCE_PATH__ || '';
+  var tracks = (window.__NF_SOURCE__ && Array.isArray(window.__NF_SOURCE__.tracks)) ? window.__NF_SOURCE__.tracks.length : 0;
+  var el = document.createElement('div');
+  el.id = 'nf-source-badge';
+  el.style.cssText =
+    'position:fixed;top:60px;right:14px;z-index:9998;' +
+    'background:rgba(0,0,0,0.55);backdrop-filter:blur(12px);' +
+    'border:1px solid rgba(167,139,250,0.30);border-radius:8px;' +
+    'padding:6px 12px;color:rgba(255,255,255,0.85);' +
+    'font:500 11px/1.5 "SF Mono",Menlo,monospace;' +
+    'max-width:420px;pointer-events:auto;user-select:text';
+  el.innerHTML =
+    '<div style="color:#a78bfa;font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:9px;margin-bottom:2px">Source · Live JSON</div>' +
+    '<div style="color:#fff;font-weight:600;font-size:12px">' + (name ? String(name).replace(/</g,'&lt;') : '(untitled)') + '</div>' +
+    '<div style="color:rgba(255,255,255,0.55);font-size:10px;margin-top:2px">' + tracks + ' tracks · ' + String(path).replace(/</g,'&lt;') + '</div>';
+  document.body.appendChild(el);
+}};
 
 // v1.22.1 letterbox reflow: stage 是 viewport px size · letterbox scale to fit
 // plate (取 min(scaleW, scaleH) · 保证等比 · 不变形) · center 留白 pillarbox/letterbox
@@ -386,6 +413,7 @@ window.__nf_mount = function() {{
       console.log('[NF] runtime booted · tracks=' + Object.keys(window.__NF_TRACKS__).length);
       window.__nf_install_drag_handles();
       window.__nf_install_play_button();
+      window.__nf_install_source_badge();
     }});
     if (!window.__nf_resize_wired) {{
       window.__nf_resize_wired = true;
@@ -482,6 +510,7 @@ if (document.readyState === 'loading') {{
 "#,
         source = source_str,
         tracks = tracks_str,
+        source_path = source_path_str,
         runtime = RUNTIME_IIFE,
         verify = verify_block,
         screenshot = screenshot_block,
@@ -576,6 +605,7 @@ fn main() -> Result<()> {
         &tracks_map,
         opts.verify_mode,
         opts.screenshot_path.as_ref().map(|_| opts.screenshot_delay_ms),
+        &opts.source_arg,
     );
 
     // Inline init into prototype HTML; hand the full document string directly

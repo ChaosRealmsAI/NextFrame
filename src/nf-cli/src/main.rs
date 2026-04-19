@@ -76,6 +76,15 @@ enum Command {
         /// + clips/cut_report.json + clips/clip_NN.translations.zh.json).
         episode_dir: PathBuf,
     },
+    /// Open a source.json in the NextFrame desktop shell (live preview).
+    ///
+    /// Replaces the old `build` subcommand: the desktop shell is now the sole
+    /// preview surface (ADR-060) — no HTML files written to disk.
+    /// Spawns `nf-shell <source>` detached from this process.
+    Open {
+        /// Path to timeline source JSON.
+        source: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -92,6 +101,7 @@ fn main() -> ExitCode {
         Command::Schema { track } => commands::schema::run(&track),
         Command::New { out, ratio } => commands::new_cmd::run(out.as_deref(), &ratio),
         Command::Karaoke { episode_dir } => commands::karaoke::run(&episode_dir),
+        Command::Open { source } => commands::open::run(&source),
     };
 
     match result {
