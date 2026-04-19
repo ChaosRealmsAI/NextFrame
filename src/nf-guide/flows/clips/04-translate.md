@@ -1,38 +1,33 @@
-# Step 4: 翻译字幕（Agent 干，每次一个 clip 一种语言）
+# Step 4: 翻译字幕（Agent 自己干 · 没有 CLI · 每次一个 clip 一种语言）
 
-## CLI
+## 谁做
+
+**你（Agent / LLM）自己翻 + 自己算时间 + 自己写 JSON**。没有 `nf-cli source-translate` · 没有工具调你 · 你读文件 → 翻译 → 写文件。
+
+## 你要做（4 步）
 
 ```bash
-nf-cli source-translate <project> <episode> --clip <N> --lang zh
-# 可选：--lang ja / ko / fr / es / de
-# 可选：--dry-run  （只打印任务不写产物）
+EP=tmp/<run>/projects/<project>/<episode>
+SLUG=<slug>
+N=1   # clip 编号 · 每 clip 每语言单独跑一遍
+
+# 1. 从 cut_report.json 拿 clip N 的 from_id / to_id / start / end
+jq --argjson n $N '.success[] | select(.clip_num == $n) | {from_id, to_id, start, end}' \
+  $EP/clips/cut_report.json
+
+# 2. 从 sentences.json 抽出 clip 对应的英文句子
+jq --argjson f <from_id> --argjson t <to_id> \
+  '.sentences[] | select(.id >= $f and .id <= $t) | {id, en: .text, start, end}' \
+  $EP/sources/$SLUG/sentences.json
+
+# 3. 按下面提示词 · 对每句英文产 1-N 条中文 cue（完整句 + 终结标点）
+# 4. 自己按字数线性插值算 start/end（公式见下）· 写 JSON 到产物路径
 ```
 
-## CLI 会做的事
+## 输入（你自己读）
 
-1. 读 `cut_report.json` 拿到 clip N 的 `from_id` / `to_id` / `start` / `end`
-2. 从 `sentences.json` 抽出 clip N 对应的英文句子（按 id 过滤）
-3. 把本 MD 的提示词 + 抽出的句子 → 打印到 stdout 或 `.translate.N.zh.task.md`
-4. 等你（Agent）把 `cn` 数组写到 `<episode>/clips/clip_NN.translations.zh.json`
-5. **Code 自动算时间**：按每条 cue 的中文字数占 segment 总字数的比例，在 segment [start, end] 内线性插值。首 cue 对齐 segment.start，末 cue 对齐 segment.end，中间相邻 cue 首尾接上。
-6. 校验：每个 segment.cn 非空 + 每句都是完整中文（有终结标点）
-
-## 输入
-
-- `cut_report.json`（定位 clip）
-- `sentences.json`（抽出 [from_id, to_id] 范围）
-
-CLI 合成给 Agent 看的是：
-```json
-{
-  "clip_num": 1,
-  "clip_title": "开场三问",
-  "segments": [
-    {"id": 1, "en": "How do you explain when things don't go as we assume?"},
-    {"id": 2, "en": "Or better, how do you explain when others are able to achieve things that seem to defy all of the assumptions?"}
-  ]
-}
-```
+- `<episode>/clips/cut_report.json` · 定位 clip N
+- `<episode>/sources/<slug>/sentences.json` · 英文字幕
 
 ## 产出（gate: translated）
 

@@ -1,24 +1,30 @@
-# Step 5: 写传播文案（Agent 干，每次一个 clip）
+# Step 5: 写传播文案（Agent 自己干 · 没有 CLI · 每次一个 clip）
 
-## CLI
+## 谁做
+
+**你（Agent / LLM）自己写 + 自己落 md 文件**。没有 `nf-cli source-polish` · 没有工具调你 · 你读文件 → 写文案 → 落 md。
+
+## 你要做（3 步）
 
 ```bash
-nf-cli source-polish <project> <episode> --clip <N> --lang zh
-# 可选：--platform douyin / bilibili / xiaohongshu / shipinhao / youtube
-#       默认输出所有平台的版本
+EP=tmp/<run>/projects/<project>/<episode>
+N=1   # clip 编号
+
+# 1. 读 cut_report.json 拿 clip N 的 title / duration / text_preview
+jq --argjson n $N '.success[] | select(.clip_num == $n)' $EP/clips/cut_report.json
+
+# 2. 读 translations.zh.json 拿完整中文内容
+NN=$(printf "%02d" $N)
+jq '.segments[] | .cn[] | .text' $EP/clips/clip_$NN.translations.zh.json
+
+# 3. 按下面提示词写多平台文案 · 直接落 md 到：
+#    $EP/clips/clip_$NN.caption.zh.md
 ```
 
-## CLI 会做的事
+## 输入（你自己读）
 
-1. 读 `cut_report.json` 拿 clip N 的 title / from_id / to_id / duration / text_preview
-2. 读 `clip_NN.translations.zh.json` 拿每句的中文完整翻译
-3. 把本 MD 的提示词 + 以上两份数据打印给 Agent
-4. Agent 写到 `<episode>/clips/clip_NN.caption.zh.md`
-
-## 输入
-
-- `cut_report.json` 中的 clip N
-- `clip_NN.translations.zh.json`（给 Agent 真实中文内容，不是英文）
+- `<episode>/clips/cut_report.json` · clip 基本信息（title / duration / text_preview）
+- `<episode>/clips/clip_NN.translations.zh.json` · 完整中文字幕内容
 
 ## 产出（gate: polished）
 
@@ -125,10 +131,18 @@ nf-cli source-polish <project> <episode> --clip <N> --lang zh
 - ❌ 超 5 个低相关标签
 - ❌ 机翻英文描述（YouTube 必须原创英文，不是中译英）
 
-### 输入（由 CLI 附上）
+### 输入（你自己读）
 
-你会看到：
-- clip 基本信息（title、duration、text_preview）
-- 这个 clip 的中文字幕完整内容（translations.zh.json 里 segments[].cn 拼起来）
+- clip 基本信息（title、duration、text_preview）· 从 `cut_report.json` 读
+- 这个 clip 的中文字幕完整内容（segments[].cn[].text 拼起来）· 从 `translations.zh.json` 读
 
 **禁止抄中文字幕当描述**。描述是运营文案，不是字幕。
+
+## 验证
+
+```bash
+# md 文件存在 + 含所有 5 平台（抖音 / 小红书 / B站 / 视频号 / YouTube）
+test -f $EP/clips/clip_$NN.caption.zh.md
+grep -c "^## " $EP/clips/clip_$NN.caption.zh.md
+# 期望：≥ 6（5 平台 + 剪辑建议）
+```

@@ -63,18 +63,21 @@ projects/<project>/<episode>/
 
 ## 每步命令
 
-**查提示词**：`nf-guide clips <step>`
-**实际执行**：看每步 MD 里的 CLI（例如 `nf-source download ...` / `nf-cli source-translate ...`）
+**查提示词**：`nf-guide clips <step>`（产 prompt 文本）
+**实际执行**：
+- **Code 步骤**（download / transcribe / cut）→ agent 跑 prompt 里给的 bare 命令（`yt-dlp` / `whisperx` / `ffmpeg`）· **没有 `nf-cli source-*` wrapper**
+- **Agent 步骤**（plan / translate / polish）→ agent 自己读 JSON / 写 JSON · **没有工具调你 · 你就是 LLM**
+- **karaoke** → 跑内置 `nf karaoke <episode-dir>`（nf-cli 子命令 · 已有）
 
-| 步骤 | 查提示词 | 谁做 | 产物（gate） |
-|------|---------|------|--------------|
-| 0 | `nf-guide clips download` | Code | `sources/<slug>/source.mp4` + `meta.json` |
-| 1 | `nf-guide clips transcribe` | Code | `sources/<slug>/sentences.json` + `words.json` |
-| 2 | `nf-guide clips plan` | **Agent** | `plan.json` |
-| 3 | `nf-guide clips cut` | Code | `clips/clip_NN.mp4` + `cut_report.json` |
-| 4 | `nf-guide clips translate` | **Agent** | `clips/clip_NN.translations.<lang>.json` |
-| 5 | `nf-guide clips polish` | **Agent** | `clips/clip_NN.caption.<lang>.md` |
-| 6 | `nf-guide clips publish` | Code | `clips/clip_NN.publish.json` |
+| 步骤 | 查提示词 | 谁做 | CLI | 产物（gate） |
+|------|---------|------|-----|--------------|
+| 0 | `nf-guide clips download` | Code | bare `yt-dlp` | `sources/<slug>/source.mp4` + `meta.json` |
+| 1 | `nf-guide clips transcribe` | Code | bare `whisperx` + `jq` | `sources/<slug>/{source,sentences,words}.json` |
+| 2 | `nf-guide clips plan` | **Agent** | 自读自写 | `plan.json` |
+| 3 | `nf-guide clips cut` | Code | bare `ffmpeg` + `jq` | `clips/clip_NN.mp4` + `cut_report.json` |
+| 4 | `nf-guide clips translate` | **Agent** | 自读自写 | `clips/clip_NN.translations.<lang>.json` |
+| 5 | `nf-guide clips polish` | **Agent** | 自读自写 | `clips/clip_NN.caption.<lang>.md` |
+| 6 | `nf-guide clips karaoke` | Code | **`nf karaoke <episode-dir>`** | `clips/index.html` |
 
 ## 粒度原则
 

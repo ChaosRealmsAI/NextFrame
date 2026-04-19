@@ -1,25 +1,36 @@
-# Step 2: 挑 highlight（Agent 干）
+# Step 2: 挑 highlight（Agent 自己干 · 没有 CLI）
 
-## CLI
+## 谁做
+
+**你（Agent / LLM）自己挑 + 自己写 JSON**。没有 `nf-cli source-plan` · 没有工具调你 · 你读文件 → 决策 → 写文件。
+
+## 你要做（3 步）
 
 ```bash
-nf-cli source-plan <project> <episode>
-# 可选：--target-count 3  (默认 3-5)
-# 可选：--min-duration 30 --max-duration 90
+EP=tmp/<run>/projects/<project>/<episode>
+SLUG=<slug>
+
+# 1. 读 sentences.json（transcribe 步产的）
+cat $EP/sources/$SLUG/sentences.json   # {total_sentences, sentences: [{id, start, end, text}]}
+
+# 2. 按下面 prompt 挑 3-5 个 highlight（只看 text + id · 不用 start/end）
+
+# 3. 自己写 plan.json
+cat > $EP/plan.json <<'EOF'
+{
+  "episode": "<episode>",
+  "source": "<slug>",
+  "clips": [
+    {"id": 1, "from": <起始句 id>, "to": <结束句 id>, "title": "...", "why": "..."}
+  ]
+}
+EOF
 ```
-
-## CLI 会做的事
-
-1. 读 `<slug>/sentences.json`（271 句英文，带 start/end/text）
-2. 把本 MD 的提示词 + sentences 拼成一份任务
-3. 打印到 stdout（或写到 `<episode>/.plan.task.md`）
-4. **等你（Agent）把结果写到** `<episode>/plan.json`
-5. 校验格式（from/to 必须是合法 sentence id, to > from, duration 在窗口内）
-6. 退出码 0 = 完成
 
 ## 输入
 
-`<slug>/sentences.json`
+`<episode>/sources/<slug>/sentences.json`
+
 ```json
 {"total_sentences": 271, "sentences": [{"id": 1, "start": 16.8, "end": 19.9, "text": "..."}]}
 ```
@@ -27,6 +38,7 @@ nf-cli source-plan <project> <episode>
 ## 产出（gate: plan-written）
 
 `<episode>/plan.json`
+
 ```json
 {
   "episode": "<episode id>",
@@ -37,11 +49,13 @@ nf-cli source-plan <project> <episode>
 }
 ```
 
+**关键**：`from` / `to` 是 **sentence id**（不是秒！）· cut 步会按 id 查 sentences.json 拿真实秒数。
+
 ---
 
-## 给 Agent 的提示词
+## 挑 clip 的规则
 
-你是中文短视频合集的剪辑主理人。这是一份长演讲的完整英文字幕。从中挑 3-5 段能独立传播的片段。
+你是中文短视频合集的剪辑主理人。从长英文字幕里挑 3-5 段能独立传播的片段。
 
 ### 什么叫「能独立传播」
 
@@ -69,7 +83,7 @@ nf-cli source-plan <project> <episode>
 2. **以 hook 句为中心，向前向后延展**，直到：
    - 前面到达一个自然入口（上一句是完整收尾 / 明显话题切换）
    - 后面到达一个自然出口（下一句开始新话题 / 完整结论已给）
-3. **卡时长**：若 < 30s 太短，看能不能往外扩；若 > 90s 太长，看能不能砍掉不重要的铺垫。
+3. **卡时长**：用 sentences[].end - sentences[].start 估算。若 < 30s 太短，往外扩；若 > 90s 太长，砍不重要铺垫。
 4. **写 title**：10 字内，**是钩子不是剧透**。
    - ❌ 「苹果为什么靠 why 成功」（剧透）
    - ✅ 「苹果凭什么？」（钩子）
@@ -91,7 +105,7 @@ nf-cli source-plan <project> <episode>
 
 ### 输出格式
 
-**只输出这个 JSON，其他什么都不要说**：
+**只写这个 JSON 到 `plan.json` · 其他什么都不要产**：
 
 ```json
 {
@@ -106,9 +120,20 @@ nf-cli source-plan <project> <episode>
 ### 数量原则
 
 - **宁缺毋滥**：3 个精华 > 5 个凑数
-- 如果整篇质量不匀，只挑 2 个也行，但 why 要说清楚为什么整篇只有这 2 段值得
-- 上限 5 个，超过说明没挑出重点
+- 整篇质量不匀，只挑 2 个也行 · 但 why 要说清楚为什么整篇只有这 2 段值得
+- 上限 5 个 · 超过说明没挑出重点
 
-### 输入（由 CLI 附上）
+## 验证
 
-你会看到 `sentences.json` 的完整内容。**只看 text 和 id，不要看 start/end**（时间不重要，code 会按 id 去算）。
+```bash
+jq '.clips | length' $EP/plan.json
+# 期望：2-5 之间
+
+jq '.clips[0] | {from, to, title, why}' $EP/plan.json
+# 期望：from/to 是数字 id · title/why 非空
+
+# 交叉验：from/to 必须 ≤ total_sentences
+TOTAL=$(jq '.total_sentences' $EP/sources/$SLUG/sentences.json)
+jq --argjson t $TOTAL '.clips[] | select(.to > $t)' $EP/plan.json
+# 期望：空（无超界）
+```
