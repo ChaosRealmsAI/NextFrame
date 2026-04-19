@@ -376,9 +376,9 @@ impl EditorState {
         let target_track_idx = preferred_track_id
             .and_then(|track_id| self.find_track_by_id(track_id))
             .or_else(|| {
-                tracks.iter().position(|track| {
-                    track.get("kind").and_then(Value::as_str) == Some(track_kind)
-                })
+                tracks
+                    .iter()
+                    .position(|track| track.get("kind").and_then(Value::as_str) == Some(track_kind))
             });
 
         let selection_before = self.selection.clone();
@@ -399,7 +399,9 @@ impl EditorState {
                     &mut forward,
                     &mut reverse,
                     clips_path,
-                    self.source.pointer(&format!("/tracks/{track_idx}/clips")).cloned(),
+                    self.source
+                        .pointer(&format!("/tracks/{track_idx}/clips"))
+                        .cloned(),
                     Some(Value::Array(next_clips)),
                 )?;
             }
@@ -828,6 +830,28 @@ impl MultiSourceState {
         self.active_tab_id = tab_id.clone();
         self.tabs.push(tab);
         tab_id
+    }
+
+    pub fn replace_active_source(&mut self, source: Value) -> Result<(), String> {
+        let tab = self
+            .active_tab_mut()
+            .ok_or_else(|| "active tab missing".to_string())?;
+        let title = source
+            .get("meta")
+            .and_then(|meta| meta.get("name"))
+            .and_then(Value::as_str)
+            .filter(|name| !name.trim().is_empty())
+            .map(str::to_string)
+            .or_else(|| {
+                std::path::Path::new(&tab.path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(str::to_string)
+            })
+            .unwrap_or_else(|| "source.json".to_string());
+        tab.title = title;
+        tab.editor = EditorState::new(source);
+        Ok(())
     }
 }
 
@@ -1857,10 +1881,7 @@ mod tests {
                 .and_then(Value::as_str),
             Some("audio")
         );
-        assert_eq!(
-            editor.selection.track_id.as_deref(),
-            Some("tr_audio")
-        );
+        assert_eq!(editor.selection.track_id.as_deref(), Some("tr_audio"));
         assert!(editor.selection.clip_id.is_some());
     }
 
@@ -1882,5 +1903,51 @@ mod tests {
 
         assert!(state.switch_tab(&first_id));
         assert_eq!(state.active_tab().unwrap().path, "demo/a.json");
+    }
+
+    #[test]
+    fn replace_active_source_resets_editor_history_and_title() {
+        let mut state = MultiSourceState::new("demo/a.json".to_string(), sample_source());
+        {
+            let editor = state.active_editor_mut().unwrap();
+            editor
+                .set_param("clip_title", "title", Value::String("B".to_string()))
+                .unwrap();
+            assert_eq!(editor.undo_stack.len(), 1);
+        }
+
+        state
+            .replace_active_source(json!({
+                "meta": { "name": "Serve Source" },
+                "tracks": [
+                    {
+                        "id": "tr_scene",
+                        "kind": "scene",
+                        "clips": [
+                            {
+                                "id": "clip_http",
+                                "begin": 0,
+                                "end": 500,
+                                "params": { "title": "HTTP" }
+                            }
+                        ]
+                    }
+                ]
+            }))
+            .unwrap();
+
+        let active = state.active_tab().unwrap();
+        assert_eq!(active.title, "Serve Source");
+        assert_eq!(
+            active
+                .editor
+                .source
+                .pointer("/tracks/0/clips/0/id")
+                .and_then(Value::as_str),
+            Some("clip_http")
+        );
+        assert!(active.editor.undo_stack.is_empty());
+        assert!(active.editor.redo_stack.is_empty());
+        assert_eq!(active.editor.selection.kind, "none");
     }
 }
