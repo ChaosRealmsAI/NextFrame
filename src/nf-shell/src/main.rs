@@ -108,6 +108,11 @@ fn find_clip_mut<'a>(source: &'a mut Value, clip_id: &str) -> Option<&'a mut Val
     None
 }
 
+/// FIX-4 (v1.31): clip-drag now mutates the REAL begin/end that runtime
+/// resolves, not a fake `_v1_21_drag_offset_*` field that nothing reads.
+/// Side effects: keeps `end > begin + 100ms` (min clip length) · clamps to
+/// [0, duration_ms] if the source has a top-level anchor that resolves to a
+/// known total.
 fn apply_clip_drag(source: &mut Value, payload: &Value) -> Result<String> {
     let clip_id = payload
         .get("clipId")
@@ -117,16 +122,71 @@ fn apply_clip_drag(source: &mut Value, payload: &Value) -> Result<String> {
         .get("side")
         .and_then(|v| v.as_str())
         .unwrap_or("right");
-    let delta = payload
+    if side != "left" && side != "right" {
+        anyhow::bail!("clip-drag: side must be 'left' or 'right', got {side}");
+    }
+    let delta_ms = payload
         .get("deltaT_ms")
         .and_then(|v| v.as_i64())
         .context("clip-drag: deltaT_ms missing or not int")?;
     let clip = find_clip_mut(source, clip_id)
         .with_context(|| format!("clip-drag: clip not found: {clip_id}"))?;
-    let key = format!("_v1_21_drag_offset_{side}_ms");
-    let current = clip.get(&key).and_then(|v| v.as_i64()).unwrap_or(0);
-    clip[key] = Value::from(current + delta);
-    Ok(format!("clip-drag applied: {clip_id} {side} {delta:+}ms"))
+    // Read current begin/end. Anchor expressions get numericised at this
+    // point (lossy — the user opted in by dragging, so we freeze the value).
+    let old_begin_ms = clip
+        .get("begin")
+        .and_then(ms_from_value)
+        .context("clip-drag: clip.begin not numeric (anchor expressions not yet supported in drag edit)")?;
+    let old_end_ms = clip
+        .get("end")
+        .and_then(ms_from_value)
+        .context("clip-drag: clip.end not numeric (anchor expressions not yet supported in drag edit)")?;
+    const MIN_LEN_MS: i64 = 100;
+    let (new_begin, new_end) = if side == "left" {
+        let candidate = (old_begin_ms + delta_ms).max(0);
+        let clamped = candidate.min(old_end_ms - MIN_LEN_MS);
+        (clamped.max(0), old_end_ms)
+    } else {
+        let candidate = old_end_ms + delta_ms;
+        let clamped = candidate.max(old_begin_ms + MIN_LEN_MS);
+        (old_begin_ms, clamped)
+    };
+    clip["begin"] = Value::from(new_begin);
+    clip["end"] = Value::from(new_end);
+    Ok(format!(
+        "clip-drag applied: {clip_id} {side} {delta_ms:+}ms · {old_begin_ms}→{new_begin} / {old_end_ms}→{new_end}"
+    ))
+}
+
+/// Accept either a plain number (ms) or a "Ns"/"Nms"/"Nm" literal string.
+/// Anchor-expression strings like "demo.begin + 10s" return None — caller
+/// must error out so the user knows drag on anchor-bound clips isn't wired
+/// yet (documented, not silent).
+fn ms_from_value(v: &Value) -> Option<i64> {
+    if let Some(n) = v.as_i64() {
+        return Some(n);
+    }
+    if let Some(f) = v.as_f64() {
+        return Some(f as i64);
+    }
+    let s = v.as_str()?.trim();
+    // N / Ns / Nms / Nm
+    let (num_part, unit) = if let Some(rest) = s.strip_suffix("ms") {
+        (rest, "ms")
+    } else if let Some(rest) = s.strip_suffix('s') {
+        (rest, "s")
+    } else if let Some(rest) = s.strip_suffix('m') {
+        (rest, "m")
+    } else {
+        (s, "s")
+    };
+    let n: f64 = num_part.trim().parse().ok()?;
+    Some(match unit {
+        "ms" => n as i64,
+        "s" => (n * 1000.0) as i64,
+        "m" => (n * 60_000.0) as i64,
+        _ => n as i64,
+    })
 }
 
 fn apply_set_param(source: &mut Value, payload: &Value) -> Result<String> {
@@ -522,9 +582,42 @@ window.__nf_errors = [];
   }});
 }})();
 
+// FIX-1 (v1.31): teardown registry · every mount registers listeners /
+// timers / rAF handles here so the next mount cleanly destroys them.
+// Before v1.31 every clip-drag remount stacked a new mousemove/mouseup +
+// rAF pump, explaining the user-reported "drag becomes unresponsive" +
+// "CPU climbs over time" + "crash-like freezes".
+window.__nf_teardown_stack = [];
+window.__nf_teardown = function() {{
+  while (window.__nf_teardown_stack.length) {{
+    var fn = window.__nf_teardown_stack.pop();
+    try {{ fn(); }} catch (_e) {{}}
+  }}
+  // Pause + null the old runtime handle so its internal RAF loop stops.
+  if (window.__nf_handle && typeof window.__nf_handle.pause === 'function') {{
+    try {{ window.__nf_handle.pause(); }} catch (_e) {{}}
+  }}
+  window.__nf_handle = null;
+  window.__nf_playing = false;
+}};
+window.__nf_register_listener = function(target, evt, handler, opts) {{
+  target.addEventListener(evt, handler, opts);
+  window.__nf_teardown_stack.push(function() {{
+    try {{ target.removeEventListener(evt, handler, opts); }} catch (_e) {{}}
+  }});
+}};
+window.__nf_register_raf = function(loop_fn) {{
+  var running = true;
+  function tick() {{ if (!running) return; loop_fn(); requestAnimationFrame(tick); }}
+  requestAnimationFrame(tick);
+  window.__nf_teardown_stack.push(function() {{ running = false; }});
+}};
+
 window.__nf_mount_trace = [];
 window.__nf_mount = function() {{
-  window.__nf_mount_trace.push('enter');
+  // Teardown any previous session before building a fresh one.
+  window.__nf_teardown();
+  window.__nf_mount_trace = ['enter'];
   try {{
     var ps = document.querySelector('.preview-stage');
     var cp = document.querySelector('.canvas-plate.canvas-16-9');
@@ -545,15 +638,15 @@ window.__nf_mount = function() {{
     setTimeout(function(){{
       window.__nf_mount_trace.push('setTimeout fired');
       window.__nf_reflow();
-      // v1.24: force boot at t=0 so preview plays from the start of the
-      // timeline (earlier we relied on runtime default which wasn't always 0).
+      // FIX-3 (v1.31): DO NOT seek(0) after boot · GPT-5.4 review found this
+      // puts runtime into pause state. boot(autoplay:true) already starts
+      // at t=0 playing. If we need to re-seek on remount we must pass
+      // pause:false explicitly so the runtime continues playback.
       window.__nf_mount_trace.push('pre-boot · NFRuntime=' + (typeof window.NFRuntime));
-      window.__nf_handle = window.NFRuntime.boot({{ stage: '#nf-stage', autoplay: true, startAtMs: 0 }});
+      window.__nf_handle = window.NFRuntime.boot({{ stage: '#nf-stage', autoplay: true }});
       window.__nf_mount_trace.push('post-boot · handle=' + (typeof window.__nf_handle));
       window.__nf_playing = true;
-      // Belt-and-suspenders: if the handle exposes seek(), snap to 0.
-      try {{ if (window.__nf_handle && typeof window.__nf_handle.seek === 'function') window.__nf_handle.seek(0); }} catch (_e) {{}}
-      console.log('[NF] runtime booted · tracks=' + Object.keys(window.__NF_TRACKS__).length + ' · seeked to 0');
+      console.log('[NF] runtime booted · tracks=' + Object.keys(window.__NF_TRACKS__).length + ' · autoplay');
       window.__nf_install_drag_handles();
       window.__nf_install_play_button();
       window.__nf_install_source_badge();
@@ -821,19 +914,38 @@ window.__nf_install_playhead = function() {{
     else tlHead.appendChild(lab);
   }}
 
-  // Subscribe to runtime time ticks.
+  // FIX (v1.31 hotfix): user report "首次播放 进度条没跟进" ·
+  // WKWebView suspends runtime's rAF pump in early-load · handle.onTimeUpdate
+  // cb may never fire. Use a multi-source driver:
+  //   1. runtime handle.onTimeUpdate (cheap · accurate · preferred if fires)
+  //   2. <video> / <audio> currentTime (independent decoder clock · always ticks)
+  //   3. setInterval 100ms · always running · register for teardown
   if (typeof handle.onTimeUpdate === 'function') {{
     handle.onTimeUpdate(function(t_ms) {{ updatePh(t_ms); }});
-  }} else {{
-    // Fallback: RAF polling via handle.getStateAt if available.
-    (function tick(){{
-      try {{
-        var st = (typeof handle.getStateAt === 'function') ? handle.getStateAt() : null;
-        if (st && typeof st.t_ms === 'number') updatePh(st.t_ms);
-      }} catch (_e) {{}}
-      requestAnimationFrame(tick);
-    }})();
   }}
+  var _startedAt = performance.now();
+  var _pollId = setInterval(function() {{
+    // Prefer first playing video/audio as the clock source (ground truth).
+    var media = document.querySelector('video, audio');
+    if (media && !media.paused && media.currentTime > 0) {{
+      updatePh(media.currentTime * 1000);
+      return;
+    }}
+    // Fallback: handle.getStateAt()
+    try {{
+      var st = (typeof handle.getStateAt === 'function') ? handle.getStateAt() : null;
+      if (st && typeof st.t_ms === 'number' && st.t_ms > 0) {{
+        updatePh(st.t_ms);
+        return;
+      }}
+    }} catch (_e) {{}}
+    // Last resort: wall-clock if runtime/media clocks both stuck.
+    if (window.__nf_playing) {{
+      var el = performance.now() - _startedAt;
+      if (el < durationMs) updatePh(el);
+    }}
+  }}, 100);
+  window.__nf_teardown_stack.push(function() {{ clearInterval(_pollId); }});
   updatePh(0);
 
   // ---- Drag-to-seek (v1.29: rAF-throttled, UI-first, GPU-composited) ----
@@ -897,7 +1009,8 @@ window.__nf_install_playhead = function() {{
     }}
   }}
   // rAF pump — UI updates every frame, seek throttled to 40ms.
-  function pump() {{
+  // FIX-1: registered via __nf_register_raf so remount tears it down.
+  window.__nf_register_raf(function() {{
     if (_dirty && dragging) {{
       updatePh(_targetTms);
       var now = performance.now();
@@ -907,24 +1020,22 @@ window.__nf_install_playhead = function() {{
       }}
       _dirty = false;
     }}
-    requestAnimationFrame(pump);
-  }}
-  requestAnimationFrame(pump);
+  }});
 
   // Events: mousedown on lanes (click anywhere) or knob (drag). move+up bind
   // on document so drag works even if cursor leaves lanes.
-  lanes.addEventListener('mousedown', grab);
-  knob.addEventListener('mousedown', function(ev) {{ grab(ev); ev.stopPropagation(); }});
-  document.addEventListener('mousemove', move, {{ passive: false }});
-  document.addEventListener('mouseup', release);
-  // Touch support (trackpad / iOS-like) — map to same handlers.
-  lanes.addEventListener('touchstart', function(ev) {{
+  // FIX-1: use __nf_register_listener so remount removes previous handlers.
+  window.__nf_register_listener(lanes, 'mousedown', grab);
+  window.__nf_register_listener(knob, 'mousedown', function(ev) {{ grab(ev); ev.stopPropagation(); }});
+  window.__nf_register_listener(document, 'mousemove', move, {{ passive: false }});
+  window.__nf_register_listener(document, 'mouseup', release);
+  window.__nf_register_listener(lanes, 'touchstart', function(ev) {{
     var t = ev.touches[0]; if (t) grab({{clientX: t.clientX, preventDefault: function(){{}}}});
   }}, {{ passive: true }});
-  document.addEventListener('touchmove', function(ev) {{
+  window.__nf_register_listener(document, 'touchmove', function(ev) {{
     var t = ev.touches[0]; if (t) move({{clientX: t.clientX, preventDefault: function(){{}}}});
   }}, {{ passive: true }});
-  document.addEventListener('touchend', release);
+  window.__nf_register_listener(document, 'touchend', release);
 }};
 
 window.__nf_fmt_ms = function(ms) {{
@@ -1180,21 +1291,137 @@ fn parse_cli() -> CliOpts {
 
 /// Walk tracks[].clips[].params and rewrite any "src" that starts with
 /// `file://` to the `nf-asset://x<abs-path>` custom protocol URL.
-fn rewrite_file_srcs(v: &mut Value) {
-    let Some(tracks) = v.get_mut("tracks").and_then(|t| t.as_array_mut()) else { return; };
+/// FIX-5 (v1.31): rewrite `params.src` to nf-asset://x<abs-path>.
+/// - `file:///abs/path` → nf-asset://x/abs/path (kept)
+/// - `./rel.mp4` / `rel.mp4` (relative) → resolved against source.json dir
+///   then wrapped as nf-asset
+/// - already-http(s)/nf-asset left alone
+fn rewrite_file_srcs(v: &mut Value, source_dir: &std::path::Path) {
+    let Some(tracks) = v.get_mut("tracks").and_then(|t| t.as_array_mut()) else {
+        return;
+    };
     for t in tracks.iter_mut() {
-        let Some(clips) = t.get_mut("clips").and_then(|c| c.as_array_mut()) else { continue; };
+        let Some(clips) = t.get_mut("clips").and_then(|c| c.as_array_mut()) else {
+            continue;
+        };
         for c in clips.iter_mut() {
             let Some(params) = c.get_mut("params") else { continue; };
-            if let Some(src) = params.get("src").and_then(|s| s.as_str()) {
-                if let Some(abs) = src.strip_prefix("file://") {
-                    // nf-asset://x/<abs> where abs already has leading /
-                    let new_src = format!("nf-asset://x{abs}");
-                    params["src"] = Value::String(new_src);
+            let Some(src) = params.get("src").and_then(|s| s.as_str()).map(String::from) else {
+                continue;
+            };
+            let new_src: Option<String> = if let Some(abs) = src.strip_prefix("file://") {
+                Some(format!("nf-asset://x{abs}"))
+            } else if src.starts_with("http://")
+                || src.starts_with("https://")
+                || src.starts_with("nf-asset:")
+                || src.starts_with("data:")
+            {
+                None
+            } else {
+                // Relative — resolve against source.json directory.
+                let candidate = source_dir.join(&src);
+                if let Ok(abs) = candidate.canonicalize() {
+                    Some(format!("nf-asset://x{}", abs.display()))
+                } else {
+                    None
                 }
+            };
+            if let Some(n) = new_src {
+                params["src"] = Value::String(n);
             }
         }
     }
+}
+
+/// FIX-2 (v1.31): nf-asset custom protocol — supports HTTP Range/206 so
+/// WKWebView can stream/seek into large mp4s without dragging the main
+/// thread into a multi-MB fs::read on every seek.
+fn nf_asset_response(req: http::Request<Vec<u8>>) -> http::Response<std::borrow::Cow<'static, [u8]>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let empty_body = || {
+        http::Response::builder()
+            .status(500)
+            .body(std::borrow::Cow::<[u8]>::Owned(Vec::new()))
+            .unwrap_or_else(|_| http::Response::new(std::borrow::Cow::Owned(Vec::new())))
+    };
+    let uri = req.uri().to_string();
+    let path_str = uri
+        .strip_prefix("nf-asset://x/")
+        .or_else(|| uri.strip_prefix("nf-asset://x"))
+        .or_else(|| uri.strip_prefix("nf-asset:"))
+        .unwrap_or(&uri);
+    let mut path_owned = String::from("/");
+    path_owned.push_str(path_str);
+    if let Some(q) = path_owned.find('?') {
+        path_owned.truncate(q);
+    }
+    let path = std::path::PathBuf::from(
+        percent_decode_str(&path_owned).unwrap_or_else(|| path_owned.clone()),
+    );
+    let Ok(mut file) = std::fs::File::open(&path) else {
+        return http::Response::builder()
+            .status(404)
+            .header("Content-Type", "text/plain")
+            .body(std::borrow::Cow::Owned(b"nf-asset: file not found".to_vec()))
+            .unwrap_or_else(|_| empty_body());
+    };
+    let total: u64 = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let mime = guess_mime_from_path(&path);
+    // Parse Range: bytes=START-END (inclusive) · RFC 7233.
+    let range_hdr = req
+        .headers()
+        .get(http::header::RANGE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.strip_prefix("bytes="))
+        .map(|s| s.to_owned());
+    let (start, end, is_range) = match range_hdr {
+        Some(spec) => {
+            let mut parts = spec.splitn(2, '-');
+            let s = parts.next().unwrap_or("").trim();
+            let e = parts.next().unwrap_or("").trim();
+            let s: u64 = s.parse().unwrap_or(0);
+            let e: u64 = if e.is_empty() {
+                total.saturating_sub(1)
+            } else {
+                e.parse().unwrap_or(total.saturating_sub(1))
+            };
+            (s.min(total), e.min(total.saturating_sub(1)), true)
+        }
+        None => (0, total.saturating_sub(1), false),
+    };
+    if total == 0 || start > end {
+        return http::Response::builder()
+            .status(416)
+            .header("Content-Range", format!("bytes */{total}"))
+            .body(std::borrow::Cow::<[u8]>::Owned(Vec::new()))
+            .unwrap_or_else(|_| empty_body());
+    }
+    let len = end - start + 1;
+    let mut buf = vec![0u8; len as usize];
+    if file.seek(SeekFrom::Start(start)).is_err() {
+        return empty_body();
+    }
+    if file.read_exact(&mut buf).is_err() {
+        // Short read (file truncated during read); still return what we have.
+        // Don't panic.
+    }
+    let status = if is_range { 206 } else { 200 };
+    let mut builder = http::Response::builder()
+        .status(status)
+        .header("Content-Type", mime)
+        .header("Accept-Ranges", "bytes")
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Cache-Control", "no-store")
+        .header("Content-Length", len.to_string());
+    if is_range {
+        builder = builder.header(
+            "Content-Range",
+            format!("bytes {start}-{end}/{total}"),
+        );
+    }
+    builder
+        .body(std::borrow::Cow::Owned(buf))
+        .unwrap_or_else(|_| empty_body())
 }
 
 /// Naive percent-decoder — handles the common %20/%2F/%3A cases seen in
@@ -1297,7 +1524,13 @@ fn main() -> Result<()> {
         serde_json::from_str(&source_text).context("source.json not valid JSON")?;
     // v1.28: rewrite file:// URLs to nf-asset:// so WKWebView will actually
     // load them (WebKit blocks <video src="file:..."> with MEDIA_ERR_SRC_NOT_SUPPORTED).
-    rewrite_file_srcs(&mut source_json);
+    // FIX-5: resolve relative asset paths against source.json's dir.
+    let source_dir = std::path::Path::new(&opts.source_arg)
+        .canonicalize()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+    rewrite_file_srcs(&mut source_json, &source_dir);
     let tracks_map = build_track_sources(&source_json);
     let n_tracks = tracks_map.len();
 
@@ -1349,38 +1582,7 @@ fn main() -> Result<()> {
     let webview = WebViewBuilder::new(&window)
         .with_custom_protocol(
             "nf-asset".to_string(),
-            move |req| {
-                // URL shape: nf-asset://x/ABSOLUTE/PATH/TO/FILE.mp4
-                // WKWebView normalises host → lowercase + strips leading slash.
-                // We reconstruct the absolute filesystem path from path + query.
-                let uri = req.uri().to_string();
-                let path_str = uri
-                    .strip_prefix("nf-asset://x/")
-                    .or_else(|| uri.strip_prefix("nf-asset://x"))
-                    .or_else(|| uri.strip_prefix("nf-asset:"))
-                    .unwrap_or(&uri);
-                let mut path_owned = String::from("/");
-                path_owned.push_str(path_str);
-                // Strip query fragment if any.
-                if let Some(q) = path_owned.find('?') {
-                    path_owned.truncate(q);
-                }
-                let p = std::path::PathBuf::from(percent_decode_str(&path_owned).unwrap_or(path_owned));
-                let body = std::fs::read(&p).unwrap_or_default();
-                let mime = guess_mime_from_path(&p);
-                http::Response::builder()
-                    .status(if body.is_empty() { 404 } else { 200 })
-                    .header("Content-Type", mime)
-                    .header("Access-Control-Allow-Origin", "*")
-                    .header("Cache-Control", "no-store")
-                    .body(std::borrow::Cow::Owned(body))
-                    .unwrap_or_else(|_| {
-                        http::Response::builder()
-                            .status(500)
-                            .body(std::borrow::Cow::Owned(Vec::new()))
-                            .unwrap_or_else(|_| http::Response::new(std::borrow::Cow::Owned(Vec::new())))
-                    })
-            },
+            move |req| nf_asset_response(req),
         )
         .with_html(&full_html)
         .with_devtools(true)
@@ -1591,31 +1793,64 @@ fn main() -> Result<()> {
                 }
             }
             Event::UserEvent(UserEvent::MenuOpen) => {
-                println!("[NF-MENU] open dispatched · showing NSOpenPanel");
-                // Spawn on a worker thread — rfd blocks until the user picks.
-                std::thread::spawn(move || {
-                    let picked = rfd::FileDialog::new()
-                        .add_filter("NextFrame source", &["json"])
-                        .set_title("Open source.json")
-                        .pick_file();
-                    match picked {
-                        Some(p) => println!("[NF-MENU] open selected: {}", p.display()),
-                        None => println!("[NF-MENU] open cancelled"),
+                // FIX-6 (v1.31): rfd::FileDialog on macOS calls NSOpenPanel,
+                // which is MAIN-thread only (Cocoa UB otherwise). The event
+                // loop IS the main thread — run synchronously here. It
+                // blocks the event loop briefly, but that's how every native
+                // desktop app does it and it's correct.
+                println!("[NF-MENU] open · NSOpenPanel on main thread");
+                let picked = rfd::FileDialog::new()
+                    .add_filter("NextFrame source", &["json"])
+                    .set_title("Open source.json")
+                    .pick_file();
+                match picked {
+                    Some(p) => {
+                        println!("[NF-MENU] open selected: {}", p.display());
+                        // Re-load in the current webview: read + rewrite +
+                        // push new __NF_SOURCE__ via evaluate_script.
+                        if let Ok(text) = std::fs::read_to_string(&p) {
+                            if let Ok(mut new_src) = serde_json::from_str::<Value>(&text) {
+                                let sd = p
+                                    .canonicalize()
+                                    .ok()
+                                    .and_then(|q| q.parent().map(|q| q.to_path_buf()))
+                                    .unwrap_or_else(|| {
+                                        std::env::current_dir().unwrap_or_default()
+                                    });
+                                rewrite_file_srcs(&mut new_src, &sd);
+                                let new_str = serde_json::to_string(&new_src)
+                                    .unwrap_or_else(|_| "null".into());
+                                let js = format!("window.__nf_apply_source({new_str});");
+                                let _ = webview.evaluate_script(&js);
+                            }
+                        }
                     }
-                });
+                    None => println!("[NF-MENU] open cancelled"),
+                }
             }
             Event::UserEvent(UserEvent::MenuSave) => {
-                println!("[NF-MENU] save dispatched · showing NSSavePanel");
-                std::thread::spawn(move || {
-                    let picked = rfd::FileDialog::new()
-                        .add_filter("NextFrame source", &["json"])
-                        .set_file_name("source.json")
-                        .save_file();
-                    match picked {
-                        Some(p) => println!("[NF-MENU] save to: {}", p.display()),
-                        None => println!("[NF-MENU] save cancelled"),
+                println!("[NF-MENU] save · NSSavePanel on main thread");
+                let picked = rfd::FileDialog::new()
+                    .add_filter("NextFrame source", &["json"])
+                    .set_file_name("source.json")
+                    .save_file();
+                match picked {
+                    Some(p) => {
+                        // Snapshot in-memory source and write it out.
+                        let written = source_state
+                            .lock()
+                            .ok()
+                            .and_then(|state| {
+                                serde_json::to_string_pretty(&*state).ok().and_then(|s| {
+                                    let n = s.len();
+                                    std::fs::write(&p, s).ok().map(|_| n)
+                                })
+                            })
+                            .unwrap_or(0);
+                        println!("[NF-MENU] save to: {} ({} bytes)", p.display(), written);
                     }
-                });
+                    None => println!("[NF-MENU] save cancelled"),
+                }
             }
             _ => {}
         }
