@@ -25,6 +25,7 @@ use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use tao::platform::macos::WindowBuilderExtMacOS;
 use tao::window::WindowBuilder;
+use wry::http;
 use wry::WebViewBuilder;
 
 const WINDOW_TITLE: &str = "NextFrame";
@@ -60,6 +61,7 @@ enum UserEvent {
     MenuOpen,
     MenuSave,
     VerifyDone,
+    VerifyMediaReport { path: PathBuf, json: String },
 }
 
 fn track_source_for(kind: &str) -> Option<&'static str> {
@@ -183,6 +185,7 @@ enum IpcOutcome {
     MenuOpen,
     MenuSave,
     StartExport { path: PathBuf, duration_s: f64 },
+    VerifyMediaReport(String),
 }
 
 fn dispatch_ipc(source: &mut Value, body: &str) -> Result<IpcOutcome> {
@@ -198,6 +201,12 @@ fn dispatch_ipc(source: &mut Value, body: &str) -> Result<IpcOutcome> {
         "drag-window" => Ok(IpcOutcome::DragWindow),
         "menu-open" => Ok(IpcOutcome::MenuOpen),
         "menu-save" => Ok(IpcOutcome::MenuSave),
+        "verify-media-report" => {
+            let p = env.get("payload").cloned().unwrap_or(Value::Null);
+            Ok(IpcOutcome::VerifyMediaReport(
+                serde_json::to_string_pretty(&p).unwrap_or_else(|_| "null".into()),
+            ))
+        }
         "export-mp4" => {
             let path = payload
                 .get("path")
@@ -319,6 +328,7 @@ fn build_init_script(
     verify_mode: bool,
     screenshot_after_ms: Option<u64>,
     source_path: &str,
+    verify_media_mode: bool,
 ) -> String {
     let source_str = serde_json::to_string(source_json).unwrap_or_else(|_| "{}".to_string());
     let tracks_str = serde_json::to_string(tracks_map).unwrap_or_else(|_| "{}".to_string());
@@ -347,6 +357,110 @@ setTimeout(function(){
     // no in-page JS needed for it.
     let _ = screenshot_after_ms;
     let screenshot_block = String::new();
+
+    // v1.28 self-verify media playback:
+    // Snapshot all <video>/<audio> element state at t0 and t1 (2s apart).
+    // If currentTime advanced → media is playing. If paused=true or
+    // currentTime did not change → media did NOT play. Report via IPC.
+    let verify_media_block = if verify_media_mode {
+        r#"
+setTimeout(function() {
+  // Kick media elements into playback — WKWebView has autoplay=true (via
+  // with_autoplay wry flag) which sets mediaTypesRequiringUserActionForPlayback:0,
+  // but nf-runtime only calls v.play() after first user gesture. In
+  // verify-media mode we force-play all media so the probe measures actual
+  // playback capability, not a gating artefact.
+  try {
+    var vids = document.querySelectorAll('video');
+    for (var i = 0; i < vids.length; i++) { try { vids[i].muted = true; vids[i].play(); } catch(_e){} }
+    var auds = document.querySelectorAll('audio');
+    for (var j = 0; j < auds.length; j++) { try { auds[j].play(); } catch(_e){} }
+    if (window.__nf_handle && typeof window.__nf_handle.play === 'function') {
+      try { window.__nf_handle.play(); } catch(_e){}
+    }
+  } catch(_e){}
+}, 1000);
+setTimeout(function() {
+  function docSummary() {
+    var stage = document.querySelector('#nf-stage');
+    return {
+      doc_videos: document.querySelectorAll('video').length,
+      doc_audios: document.querySelectorAll('audio').length,
+      stage_exists: !!stage,
+      stage_children: stage ? stage.children.length : -1,
+      stage_html_head: stage ? (stage.innerHTML || '').slice(0, 400) : '',
+      nf_handle: !!window.__nf_handle,
+      source_tracks_n: (window.__NF_SOURCE__ && window.__NF_SOURCE__.tracks) ? window.__NF_SOURCE__.tracks.length : 0,
+      tracks_map_keys: Object.keys(window.__NF_TRACKS__ || {}),
+      nf_playing: !!window.__nf_playing,
+      console_errors: window.__nf_errors || [],
+      mount_trace: window.__nf_mount_trace || [],
+      ready_state: document.readyState
+    };
+  }
+  function snapMedia() {
+    var out = {videos:[], audios:[]};
+    var vids = document.querySelectorAll('video');
+    for (var i = 0; i < vids.length; i++) {
+      var v = vids[i];
+      out.videos.push({
+        idx: i,
+        src: v.currentSrc || v.src || '',
+        paused: v.paused,
+        muted: v.muted,
+        currentTime: v.currentTime,
+        duration: isFinite(v.duration) ? v.duration : -1,
+        readyState: v.readyState,
+        error: v.error ? String(v.error.code) : null
+      });
+    }
+    var auds = document.querySelectorAll('audio');
+    for (var j = 0; j < auds.length; j++) {
+      var a = auds[j];
+      out.audios.push({
+        idx: j,
+        src: a.currentSrc || a.src || '',
+        paused: a.paused,
+        muted: a.muted,
+        volume: a.volume,
+        currentTime: a.currentTime,
+        duration: isFinite(a.duration) ? a.duration : -1,
+        readyState: a.readyState,
+        error: a.error ? String(a.error.code) : null
+      });
+    }
+    return out;
+  }
+  var t0 = snapMedia();
+  setTimeout(function() {
+    var t1 = snapMedia();
+    function verdict(a, b) {
+      if (!a || !b) return 'missing';
+      if (b.paused && a.paused) return 'paused_stuck';
+      if (b.currentTime > a.currentTime + 0.05) return 'PLAYING';
+      if (b.readyState < 2) return 'not_loaded';
+      return 'stalled_at_' + b.currentTime.toFixed(2);
+    }
+    var summary = docSummary();
+    var report = {
+      source_path: window.__NF_SOURCE_PATH__,
+      source_name: (window.__NF_SOURCE__ && window.__NF_SOURCE__.meta && window.__NF_SOURCE__.meta.name) || '',
+      interval_s: 2.0,
+      summary: summary,
+      t0: t0, t1: t1,
+      videos_verdict: t0.videos.map(function(v0, i) {
+        return { src_tail: (v0.src || '').split('/').pop(), verdict: verdict(v0, t1.videos[i]), t0_paused: v0.paused, t1_paused: t1.videos[i] && t1.videos[i].paused, t0_ct: v0.currentTime, t1_ct: t1.videos[i] && t1.videos[i].currentTime, error: t1.videos[i] && t1.videos[i].error };
+      }),
+      audios_verdict: t0.audios.map(function(a0, i) {
+        return { src_tail: (a0.src || '').split('/').pop(), verdict: verdict(a0, t1.audios[i]), t0_paused: a0.paused, t1_paused: t1.audios[i] && t1.audios[i].paused, t0_ct: a0.currentTime, t1_ct: t1.audios[i] && t1.audios[i].currentTime, error: t1.audios[i] && t1.audios[i].error };
+      })
+    };
+    console.log('[NF-VERIFY-MEDIA]', JSON.stringify(report));
+    window.ipc.postMessage(JSON.stringify({kind:'verify-media-report', payload: report}));
+  }, 2000);
+}, 2500);
+"#.to_string()
+    } else { String::new() };
     format!(
         r#"
 window.__NF_SOURCE__ = {source};
@@ -393,7 +507,22 @@ window.__nf_reflow = function() {{
   stage.style.top = ((ph - displayH) / 2) + 'px';
 }};
 
+// v1.28: trap console errors for self-verify diagnostics.
+window.__nf_errors = [];
+(function(){{
+  var orig = console.error;
+  console.error = function() {{
+    try {{ window.__nf_errors.push(Array.prototype.slice.call(arguments).map(String).join(' ')); }} catch(_e){{}}
+    return orig.apply(console, arguments);
+  }};
+  window.addEventListener('error', function(e) {{
+    window.__nf_errors.push('window.onerror: ' + (e.message || String(e)));
+  }});
+}})();
+
+window.__nf_mount_trace = [];
 window.__nf_mount = function() {{
+  window.__nf_mount_trace.push('enter');
   try {{
     var ps = document.querySelector('.preview-stage');
     var cp = document.querySelector('.canvas-plate.canvas-16-9');
@@ -406,11 +535,19 @@ window.__nf_mount = function() {{
       '<div class="canvas-plate canvas-16-9" id="nf-plate" style="position:relative;width:100%;height:100%;max-width:100%;max-height:100%;border-radius:10px;overflow:hidden;background:#0a0a0f">' +
         '<div id="nf-stage" style="position:absolute;top:0;left:0;width:' + vp.w + 'px;height:' + vp.h + 'px;transform-origin:top left;overflow:hidden;z-index:10"></div>' +
       '</div>';
-    requestAnimationFrame(function(){{
+    window.__nf_mount_trace.push('host.innerHTML set');
+    // v1.28: replace rAF with setTimeout — rAF can be suspended in
+    // WKWebView when the window is marked offscreen / background during
+    // early load, and we observed mount_trace stuck at 'host.innerHTML set'
+    // because the rAF callback never fired. setTimeout(0) is reliable.
+    setTimeout(function(){{
+      window.__nf_mount_trace.push('setTimeout fired');
       window.__nf_reflow();
       // v1.24: force boot at t=0 so preview plays from the start of the
       // timeline (earlier we relied on runtime default which wasn't always 0).
+      window.__nf_mount_trace.push('pre-boot · NFRuntime=' + (typeof window.NFRuntime));
       window.__nf_handle = window.NFRuntime.boot({{ stage: '#nf-stage', autoplay: true, startAtMs: 0 }});
+      window.__nf_mount_trace.push('post-boot · handle=' + (typeof window.__nf_handle));
       window.__nf_playing = true;
       // Belt-and-suspenders: if the handle exposes seek(), snap to 0.
       try {{ if (window.__nf_handle && typeof window.__nf_handle.seek === 'function') window.__nf_handle.seek(0); }} catch (_e) {{}}
@@ -420,7 +557,25 @@ window.__nf_mount = function() {{
       window.__nf_install_source_badge();
       window.__nf_render_timeline();
       window.__nf_install_playhead();
-    }});
+      // v1.28: force media playback — WKWebView has autoplay=true via the
+      // wry attribute (mediaTypesRequiringUserActionForPlayback:0), but the
+      // nf-runtime keeps a _userEverPlayed gate that prevents auto-play
+      // until the first click. The desktop shell wants video/audio to come
+      // up ready-to-watch, so we kick every <video>/<audio> once the stage
+      // is mounted. 200ms lets diffAndMount settle.
+      setTimeout(function() {{
+        var stage = document.querySelector('#nf-stage');
+        if (!stage) return;
+        var vids = stage.querySelectorAll('video');
+        for (var i = 0; i < vids.length; i++) {{
+          try {{ var vp = vids[i].play(); if (vp && vp.catch) vp.catch(function(){{}}); }} catch(_e){{}}
+        }}
+        var auds = stage.querySelectorAll('audio');
+        for (var j = 0; j < auds.length; j++) {{
+          try {{ var ap = auds[j].play(); if (ap && ap.catch) ap.catch(function(){{}}); }} catch(_e){{}}
+        }}
+      }}, 200);
+    }}, 0);
     if (!window.__nf_resize_wired) {{
       window.__nf_resize_wired = true;
       window.addEventListener('resize', window.__nf_reflow);
@@ -770,6 +925,7 @@ if (document.readyState === 'loading') {{
 }}
 {verify}
 {screenshot}
+{verify_media}
 "#,
         source = source_str,
         tracks = tracks_str,
@@ -777,6 +933,7 @@ if (document.readyState === 'loading') {{
         runtime = RUNTIME_IIFE,
         verify = verify_block,
         screenshot = screenshot_block,
+        verify_media = verify_media_block,
     )
 }
 
@@ -789,6 +946,7 @@ struct CliOpts {
     menu_test: bool,
     window_x: f64,
     window_y: f64,
+    verify_media_path: Option<PathBuf>,
     source_arg: String,
 }
 
@@ -804,6 +962,7 @@ fn parse_cli() -> CliOpts {
     let cascade = count_running_nf_shell_pids();
     let mut window_x: f64 = 120.0 + (cascade as f64) * 40.0;
     let mut window_y: f64 = 80.0 + (cascade as f64) * 40.0;
+    let mut verify_media_path: Option<PathBuf> = None;
     let mut positional: Option<String> = None;
     let mut i = 1;
     while i < args.len() {
@@ -839,6 +998,10 @@ fn parse_cli() -> CliOpts {
                 i += 1;
                 if i < args.len() { if let Ok(v) = args[i].parse::<f64>() { window_y = v; } }
             }
+            "--verify-media" => {
+                i += 1;
+                if i < args.len() { verify_media_path = Some(PathBuf::from(&args[i])); }
+            }
             "--duration" => {
                 i += 1;
                 if i < args.len() {
@@ -863,7 +1026,66 @@ fn parse_cli() -> CliOpts {
         menu_test,
         window_x,
         window_y,
+        verify_media_path,
         source_arg: positional.unwrap_or_else(|| "demo/v1.8-video-sample.json".to_string()),
+    }
+}
+
+/// Walk tracks[].clips[].params and rewrite any "src" that starts with
+/// `file://` to the `nf-asset://x<abs-path>` custom protocol URL.
+fn rewrite_file_srcs(v: &mut Value) {
+    let Some(tracks) = v.get_mut("tracks").and_then(|t| t.as_array_mut()) else { return; };
+    for t in tracks.iter_mut() {
+        let Some(clips) = t.get_mut("clips").and_then(|c| c.as_array_mut()) else { continue; };
+        for c in clips.iter_mut() {
+            let Some(params) = c.get_mut("params") else { continue; };
+            if let Some(src) = params.get("src").and_then(|s| s.as_str()) {
+                if let Some(abs) = src.strip_prefix("file://") {
+                    // nf-asset://x/<abs> where abs already has leading /
+                    let new_src = format!("nf-asset://x{abs}");
+                    params["src"] = Value::String(new_src);
+                }
+            }
+        }
+    }
+}
+
+/// Naive percent-decoder — handles the common %20/%2F/%3A cases seen in
+/// file paths without pulling in urlencoding as a dep.
+fn percent_decode_str(s: &str) -> Option<String> {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hi = (bytes[i + 1] as char).to_digit(16)?;
+            let lo = (bytes[i + 2] as char).to_digit(16)?;
+            out.push(((hi << 4) | lo) as u8);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+fn guess_mime_from_path(p: &std::path::Path) -> &'static str {
+    match p.extension().and_then(|e| e.to_str()).map(|s| s.to_ascii_lowercase()) {
+        Some(ref e) if e == "mp4" => "video/mp4",
+        Some(ref e) if e == "m4v" => "video/mp4",
+        Some(ref e) if e == "mov" => "video/quicktime",
+        Some(ref e) if e == "webm" => "video/webm",
+        Some(ref e) if e == "mp3" => "audio/mpeg",
+        Some(ref e) if e == "m4a" => "audio/mp4",
+        Some(ref e) if e == "wav" => "audio/wav",
+        Some(ref e) if e == "ogg" => "audio/ogg",
+        Some(ref e) if e == "flac" => "audio/flac",
+        Some(ref e) if e == "png" => "image/png",
+        Some(ref e) if e == "jpg" || e == "jpeg" => "image/jpeg",
+        Some(ref e) if e == "webp" => "image/webp",
+        Some(ref e) if e == "svg" => "image/svg+xml",
+        _ => "application/octet-stream",
     }
 }
 
@@ -891,8 +1113,11 @@ fn main() -> Result<()> {
 
     let source_text = std::fs::read_to_string(&opts.source_arg)
         .with_context(|| format!("read source.json at {}", opts.source_arg))?;
-    let source_json: Value =
+    let mut source_json: Value =
         serde_json::from_str(&source_text).context("source.json not valid JSON")?;
+    // v1.28: rewrite file:// URLs to nf-asset:// so WKWebView will actually
+    // load them (WebKit blocks <video src="file:..."> with MEDIA_ERR_SRC_NOT_SUPPORTED).
+    rewrite_file_srcs(&mut source_json);
     let tracks_map = build_track_sources(&source_json);
     let n_tracks = tracks_map.len();
 
@@ -904,6 +1129,7 @@ fn main() -> Result<()> {
         opts.verify_mode,
         opts.screenshot_path.as_ref().map(|_| opts.screenshot_delay_ms),
         &opts.source_arg,
+        opts.verify_media_path.is_some(),
     );
 
     // Inline init into prototype HTML; hand the full document string directly
@@ -938,8 +1164,44 @@ fn main() -> Result<()> {
     let verify_mode = opts.verify_mode;
     let verify_count = Arc::new(Mutex::new(0u32));
     let verify_count_for_handler = Arc::clone(&verify_count);
+    let verify_media_path_for_handler = opts.verify_media_path.clone();
 
     let webview = WebViewBuilder::new(&window)
+        .with_custom_protocol(
+            "nf-asset".to_string(),
+            move |req| {
+                // URL shape: nf-asset://x/ABSOLUTE/PATH/TO/FILE.mp4
+                // WKWebView normalises host → lowercase + strips leading slash.
+                // We reconstruct the absolute filesystem path from path + query.
+                let uri = req.uri().to_string();
+                let path_str = uri
+                    .strip_prefix("nf-asset://x/")
+                    .or_else(|| uri.strip_prefix("nf-asset://x"))
+                    .or_else(|| uri.strip_prefix("nf-asset:"))
+                    .unwrap_or(&uri);
+                let mut path_owned = String::from("/");
+                path_owned.push_str(path_str);
+                // Strip query fragment if any.
+                if let Some(q) = path_owned.find('?') {
+                    path_owned.truncate(q);
+                }
+                let p = std::path::PathBuf::from(percent_decode_str(&path_owned).unwrap_or(path_owned));
+                let body = std::fs::read(&p).unwrap_or_default();
+                let mime = guess_mime_from_path(&p);
+                http::Response::builder()
+                    .status(if body.is_empty() { 404 } else { 200 })
+                    .header("Content-Type", mime)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Cache-Control", "no-store")
+                    .body(std::borrow::Cow::Owned(body))
+                    .unwrap_or_else(|_| {
+                        http::Response::builder()
+                            .status(500)
+                            .body(std::borrow::Cow::Owned(Vec::new()))
+                            .unwrap_or_else(|_| http::Response::new(std::borrow::Cow::Owned(Vec::new())))
+                    })
+            },
+        )
         .with_html(&full_html)
         .with_devtools(true)
         .with_ipc_handler(move |req| {
@@ -983,6 +1245,14 @@ fn main() -> Result<()> {
                         path,
                         duration_s,
                     });
+                }
+                Ok(IpcOutcome::VerifyMediaReport(json)) => {
+                    if let Some(ref p) = verify_media_path_for_handler {
+                        let _ = proxy_for_handler.send_event(UserEvent::VerifyMediaReport {
+                            path: p.clone(),
+                            json,
+                        });
+                    }
                 }
                 Err(e) => {
                     println!("[NF-IPC] error: {e}");
@@ -1087,6 +1357,22 @@ fn main() -> Result<()> {
             Event::UserEvent(UserEvent::VerifyDone) => {
                 println!("[NF-VERIFY] all IPC mutations applied · exit in 1500ms");
                 std::thread::sleep(std::time::Duration::from_millis(1500));
+                *control_flow = ControlFlow::Exit;
+            }
+            Event::UserEvent(UserEvent::VerifyMediaReport { path, json }) => {
+                if let Some(parent) = path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                match std::fs::write(&path, &json) {
+                    Ok(_) => println!(
+                        "[NF-VERIFY-MEDIA] wrote {} ({} bytes)",
+                        path.display(),
+                        json.len()
+                    ),
+                    Err(e) => eprintln!("[NF-VERIFY-MEDIA] write failed: {e}"),
+                }
+                // exit so caller (cron / ci / dev) gets result and releases port.
+                std::thread::sleep(std::time::Duration::from_millis(200));
                 *control_flow = ControlFlow::Exit;
             }
             Event::UserEvent(UserEvent::StartExport { path, duration_s }) => {
