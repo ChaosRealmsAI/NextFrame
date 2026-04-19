@@ -1,0 +1,22 @@
+name: windows-smoke
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build nf-shell
+        run: cargo build -p nf-shell --release
+      - name: Smoke check
+        shell: pwsh
+        run: |
+          $exe = "target/release/nf-shell.exe"
+          if (!(Test-Path $exe)) { throw "build failed" }
+          $size = (Get-Item $exe).Length / 1MB
+          Write-Host ("nf-shell.exe = {0:N2} MB" -f $size)
+          if ($size -gt 8) { throw "binary too large (>8MB)" }

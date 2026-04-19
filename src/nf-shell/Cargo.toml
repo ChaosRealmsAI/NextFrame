@@ -14,9 +14,21 @@ rfd = "0.14"
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tokio = { version = "1", features = ["rt", "macros"] }
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
 # v1.44 · runtime 驱动 export · 替换 v1.22 的 ffmpeg avfoundation 路径(ADR-064)
 nf-recorder = { path = "../nf-recorder" }
-tokio = { version = "1", features = ["rt", "macros"] }
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.33"
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Memory",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [package.metadata.bundle]
 name = "NextFrame"
