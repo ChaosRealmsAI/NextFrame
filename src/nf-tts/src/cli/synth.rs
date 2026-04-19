@@ -182,9 +182,13 @@ pub async fn run(command: SynthCommand) -> Result<()> {
         .with_context(|| format!("failed to write audio file {}", out_path.display()))?;
 
     // Generate timeline JSON + SRT + karaoke HTML via Whisper alignment.
+    // Track the authoritative duration (aligned if available, else synth-reported).
+    let mut authoritative_duration_ms = result.duration_ms;
     if gen_srt {
         match crate::whisper::align_audio(&out_path, &text, &params.voice) {
             Ok(Some(timeline)) => {
+                // Prefer aligned duration over synth-reported (they can differ by ~1s).
+                authoritative_duration_ms = Some(timeline.duration_ms);
                 let json_path = timeline.write_json(&out_path)?;
                 crate::output::write_stderr_line(format_args!("[whisper] timeline: {json_path}"));
                 let srt_path = srt::write_srt(&out_path, &timeline.to_boundaries())?;
@@ -206,7 +210,7 @@ pub async fn run(command: SynthCommand) -> Result<()> {
     let _ = cache.put(&cache_key, &result.audio);
 
     let file_str = out_path.to_string_lossy().to_string();
-    Event::done(0, &file_str, false, result.duration_ms).emit();
+    Event::done(0, &file_str, false, authoritative_duration_ms).emit();
 
     Ok(())
 }
