@@ -61,7 +61,7 @@ projects/<project>/<episode>/
 **查提示词**：`nf-guide clips <step>`（产 prompt 文本）
 **实际执行**：
 - **Code 步骤**（download / transcribe / cut）→ agent 跑 prompt 里给的 bare 命令（`yt-dlp` / `whisperx` / `ffmpeg`）· **没有 `nf-cli source-*` wrapper**
-- **Agent 步骤**（plan / translate / polish）→ agent 自己读 JSON / 写 JSON · **没有工具调你 · 你就是 LLM**
+- **Agent 步骤**（plan / translate）→ agent 自己读 JSON / 写 JSON · **没有工具调你 · 你就是 LLM**
 - **karaoke** → 跑内置 `nf karaoke <episode-dir>`（nf-cli 子命令 · 已有）
 
 | 步骤 | 查提示词 | 谁做 | CLI | 产物（gate） |
