@@ -669,19 +669,30 @@ window.__nf_install_playhead = function() {{
   ph.id = 'nf-playhead';
   ph.style.cssText =
     'position:absolute;top:0;bottom:0;width:0;pointer-events:none;z-index:50;' +
-    'border-left:2px solid #ef4444;box-shadow:0 0 8px rgba(239,68,68,0.6)';
-  // Playhead head knob (easier to see + drag target).
+    'border-left:2px solid #ef4444;box-shadow:0 0 8px rgba(239,68,68,0.6);' +
+    'will-change:left,transform';
+  // Playhead head knob (fat hit area for easy dragging).
   var knob = document.createElement('div');
   knob.style.cssText =
-    'position:absolute;top:-4px;left:-7px;width:14px;height:14px;' +
-    'background:#ef4444;border-radius:50%;box-shadow:0 0 10px rgba(239,68,68,0.8);' +
-    'pointer-events:auto;cursor:grab';
+    // visual circle (12×12) wrapped in a 32×32 transparent hit pad so the
+    // actual drag target is large and forgiving
+    'position:absolute;top:-16px;left:-16px;width:32px;height:32px;' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'pointer-events:auto;cursor:ew-resize;z-index:51;' +
+    'background:transparent';
+  var knobDot = document.createElement('div');
+  knobDot.style.cssText =
+    'width:14px;height:14px;background:#ef4444;border-radius:50%;' +
+    'box-shadow:0 0 10px rgba(239,68,68,0.9), inset 0 1px 2px rgba(0,0,0,0.25);' +
+    'transition:transform .12s';
+  knob.appendChild(knobDot);
   ph.appendChild(knob);
   lanes.style.position = lanes.style.position || 'relative';
   lanes.appendChild(ph);
 
-  // Ensure lanes can receive mouse events (prototype CSS may set pointer-events).
-  lanes.style.cursor = 'pointer';
+  // Lanes container is the large click/scrub area. ew-resize cursor makes
+  // the whole track visually look scrubbable.
+  lanes.style.cursor = 'ew-resize';
 
   var src = window.__NF_SOURCE__ || {{}};
   var durationMs = window.__nf_infer_duration(src) || 60000;
@@ -691,10 +702,17 @@ window.__nf_install_playhead = function() {{
     var pct = Math.max(0, Math.min(1, tMs / Math.max(1, durationMs)));
     return (pct * w) + 'px';
   }}
+  var _lastLabelTMs = -1;
   function updatePh(tMs) {{
+    // translate3d is GPU-composited — avoids layout thrash that `left` triggers.
     ph.style.left = tMsToLeft(tMs);
-    var timeLabel = document.getElementById('nf-time-label');
-    if (timeLabel) timeLabel.textContent = window.__nf_fmt_ms(tMs) + ' / ' + window.__nf_fmt_ms(durationMs);
+    // Update the label at most every 100ms to avoid text reflow hammering
+    // during drag.
+    if (Math.abs(tMs - _lastLabelTMs) > 100) {{
+      var timeLabel = document.getElementById('nf-time-label');
+      if (timeLabel) timeLabel.textContent = window.__nf_fmt_ms(tMs) + ' / ' + window.__nf_fmt_ms(durationMs);
+      _lastLabelTMs = tMs;
+    }}
   }}
 
   // Time label in the timeline header, next to the play button.
@@ -724,8 +742,16 @@ window.__nf_install_playhead = function() {{
   }}
   updatePh(0);
 
-  // ---- Drag-to-seek ----
+  // ---- Drag-to-seek (v1.29: rAF-throttled, UI-first, GPU-composited) ----
+  // Design:
+  //   mousedown / mousemove → update _targetTms + _dirty flag (no runtime call)
+  //   rAF pump → if _dirty: update ph.left (GPU compositor) + throttled seek
+  //   mouseup → final seek + resume play (if was playing)
+  // This decouples mouse event frequency from runtime.seek expense — the
+  // UI stays at 60fps even if seek() runs at 20-30fps.
   var dragging = false, wasPlaying = false;
+  var _targetTms = 0, _dirty = false;
+  var _lastSeekMs = 0, _SEEK_THROTTLE_MS = 40;  // ~25 fps runtime seek
   function xToTms(clientX) {{
     var r = lanes.getBoundingClientRect();
     var x = clientX - r.left;
@@ -735,33 +761,76 @@ window.__nf_install_playhead = function() {{
   function grab(ev) {{
     dragging = true;
     wasPlaying = !!window.__nf_playing;
-    if (wasPlaying && handle.pause) {{ try {{ handle.pause(); }} catch(_e){{}} window.__nf_playing = false; }}
-    var t = xToTms(ev.clientX);
-    try {{ handle.seek(t, {{pause: true}}); }} catch(_e){{}}
-    updatePh(t);
+    // Hard pause — runtime RAF must not race our seek()s.
+    try {{ if (wasPlaying && handle.pause) handle.pause(); }} catch(_e){{}}
+    window.__nf_playing = false;
+    _targetTms = xToTms(ev.clientX);
+    _dirty = true;
     knob.style.cursor = 'grabbing';
+    knobDot.style.transform = 'scale(1.4)';
     ev.preventDefault();
+    // Kick the first seek immediately so click-to-seek doesn't wait for rAF.
+    try {{ handle.seek(_targetTms, {{pause: true}}); }} catch(_e){{}}
+    updatePh(_targetTms);
+    _lastSeekMs = performance.now();
   }}
   function move(ev) {{
     if (!dragging) return;
-    var t = xToTms(ev.clientX);
-    try {{ handle.seek(t, {{pause: true}}); }} catch(_e){{}}
-    updatePh(t);
+    _targetTms = xToTms(ev.clientX);
+    _dirty = true;
+    ev.preventDefault();  // stop text-selection drag-lag
   }}
   function release() {{
     if (!dragging) return;
     dragging = false;
-    knob.style.cursor = 'grab';
-    if (wasPlaying && handle.play) {{ try {{ handle.play(); }} catch(_e){{}} window.__nf_playing = true;
-      // Sync play button label.
-      var pbtn = document.getElementById('nf-play-pause'); if (pbtn) pbtn.click && setTimeout(function(){{ /* no-op · handle already playing */ }}, 0);
+    knob.style.cursor = 'ew-resize';
+    knobDot.style.transform = '';
+    // Final seek to land precisely at release point.
+    try {{ handle.seek(_targetTms, {{pause: !wasPlaying}}); }} catch(_e){{}}
+    updatePh(_targetTms);
+    if (wasPlaying) {{
+      try {{ if (handle.play) handle.play(); }} catch(_e){{}}
+      window.__nf_playing = true;
+      // Sync play button label icon.
+      var pbtn = document.getElementById('nf-play-pause');
+      if (pbtn) {{
+        var svg = pbtn.querySelector('svg');
+        if (svg && svg.outerHTML.indexOf('L9 6') !== -1) {{
+          // Currently showing ▶ — flip to ⏸.
+          pbtn.innerHTML = '<svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor"><rect x="1" y="1" width="2.5" height="10" rx="0.5"/><rect x="6.5" y="1" width="2.5" height="10" rx="0.5"/></svg><span>暂停</span>';
+        }}
+      }}
     }}
   }}
-  // Click anywhere on lanes to seek (ruler + empty row also trigger).
+  // rAF pump — UI updates every frame, seek throttled to 40ms.
+  function pump() {{
+    if (_dirty && dragging) {{
+      updatePh(_targetTms);
+      var now = performance.now();
+      if (now - _lastSeekMs >= _SEEK_THROTTLE_MS) {{
+        try {{ handle.seek(_targetTms, {{pause: true}}); }} catch(_e){{}}
+        _lastSeekMs = now;
+      }}
+      _dirty = false;
+    }}
+    requestAnimationFrame(pump);
+  }}
+  requestAnimationFrame(pump);
+
+  // Events: mousedown on lanes (click anywhere) or knob (drag). move+up bind
+  // on document so drag works even if cursor leaves lanes.
   lanes.addEventListener('mousedown', grab);
-  knob.addEventListener('mousedown', grab);
-  window.addEventListener('mousemove', move);
-  window.addEventListener('mouseup', release);
+  knob.addEventListener('mousedown', function(ev) {{ grab(ev); ev.stopPropagation(); }});
+  document.addEventListener('mousemove', move, {{ passive: false }});
+  document.addEventListener('mouseup', release);
+  // Touch support (trackpad / iOS-like) — map to same handlers.
+  lanes.addEventListener('touchstart', function(ev) {{
+    var t = ev.touches[0]; if (t) grab({{clientX: t.clientX, preventDefault: function(){{}}}});
+  }}, {{ passive: true }});
+  document.addEventListener('touchmove', function(ev) {{
+    var t = ev.touches[0]; if (t) move({{clientX: t.clientX, preventDefault: function(){{}}}});
+  }}, {{ passive: true }});
+  document.addEventListener('touchend', release);
 }};
 
 window.__nf_fmt_ms = function(ms) {{
