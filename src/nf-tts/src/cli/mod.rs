@@ -88,6 +88,25 @@ Pass --subdir to nest under `{dir}/{stem}/` (legacy).
 
   If you need style/emotion  →  switch to `-b volcengine`.
 
+═══ DURATION ESTIMATION (char count → audio seconds) ══════════════════════
+
+  Rule of thumb at default rate (+0%) · Edge zh-CN XiaoxiaoNeural:
+    CJK char (含标点 · 自然节奏): ~220ms each  → N seconds = N × 4.5 chars
+    Pure English word (avg 5 letters):  ~300-400ms each
+    Heavy punctuation (every 8-10 chars): +10-15% total
+
+  Quick targets (目标时长 → 写多少 CJK 字 · 含标点):
+    10 s   →  40-50 chars
+    15 s   →  60-75 chars
+    20 s   →  85-100 chars
+    25 s   →  110-130 chars
+    30 s   →  135-160 chars
+    60 s   →  270-320 chars (考虑断段)
+
+  Rate effect:  --rate -10% ≈ 1.1× longer · +15% ≈ 0.87× shorter.
+  If target shot is tight (e.g. 15s exactly) · write short, measure once,
+  adjust char count by observed_ms / target_ms.
+
 ═══ LONG TEXT STRATEGY ════════════════════════════════════════════════════
 
   Edge:       stable 300-1000 chars single call
@@ -106,6 +125,7 @@ Pass --subdir to nest under `{dir}/{stem}/` (legacy).
   5. --rate +40% 超过 30%              → robotic · clamp within ±30%
   6. 用 --subdir 后 karaoke.html 仍 open 根目录 → layouts differ · check actual path
   7. 传 SSML 标签到 text (e.g. <break>) → Edge rejects · use punctuation instead
+  8. 字符数随便估 → 时长不准            → use DURATION ESTIMATION table above
 
 ═══ EXAMPLES ══════════════════════════════════════════════════════════════
 
@@ -137,13 +157,9 @@ Pass --subdir to nest under `{dir}/{stem}/` (legacy).
   # Dialect (volcengine · vivi voice only)
   nf-tts play -b volcengine --dialect dongbei "整挺好"
 
-═══ VERIFYING OUTPUT ══════════════════════════════════════════════════════
+═══ VERIFY (one-liner) ════════════════════════════════════════════════════
 
-  After `nf-tts synth ... -o demo.mp3`, verify:
-    ls {-d}/demo.{mp3,timeline.json,srt,karaoke.html}
-    ffprobe demo.mp3                           # duration + codec
-    jq '.words | length' demo.timeline.json    # word count
-    open demo.karaoke.html                     # visual playback
+  jq '{duration_ms, voice, words: (.words|length)}' <stem>.timeline.json
 
 ═══ SEE ALSO ══════════════════════════════════════════════════════════════
 

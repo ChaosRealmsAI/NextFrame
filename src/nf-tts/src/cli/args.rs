@@ -200,16 +200,16 @@ pub struct SynthArgs {
     #[arg(short, long)]
     pub voice: Option<String>,
 
-    /// Speech rate (e.g. "+20%", "-10%"). Edge only.
-    #[arg(long, default_value = "+0%")]
+    /// Speech rate (e.g. "+20%", "-10%"). Edge only. Accepts leading `-` via `allow_hyphen_values`.
+    #[arg(long, default_value = "+0%", allow_hyphen_values = true)]
     pub rate: String,
 
-    /// Volume (e.g. "+0%"). Edge only.
-    #[arg(long, default_value = "+0%")]
+    /// Volume (e.g. "+0%"). Edge only. Accepts leading `-`.
+    #[arg(long, default_value = "+0%", allow_hyphen_values = true)]
     pub volume: String,
 
-    /// Pitch (e.g. "+0Hz"). Edge only.
-    #[arg(long, default_value = "+0Hz")]
+    /// Pitch (e.g. "+0Hz", "-2Hz"). Edge only. Accepts leading `-`.
+    #[arg(long, default_value = "+0Hz", allow_hyphen_values = true)]
     pub pitch: String,
 
     /// Output directory.
@@ -298,16 +298,16 @@ pub struct PlayArgs {
     #[arg(short, long)]
     pub voice: Option<String>,
 
-    /// Speech rate. Edge only.
-    #[arg(long, default_value = "+0%")]
+    /// Speech rate (e.g. "-10%"). Edge only.
+    #[arg(long, default_value = "+0%", allow_hyphen_values = true)]
     pub rate: String,
 
     /// Volume. Edge only.
-    #[arg(long, default_value = "+0%")]
+    #[arg(long, default_value = "+0%", allow_hyphen_values = true)]
     pub volume: String,
 
-    /// Pitch. Edge only.
-    #[arg(long, default_value = "+0Hz")]
+    /// Pitch (e.g. "-2Hz"). Edge only.
+    #[arg(long, default_value = "+0Hz", allow_hyphen_values = true)]
     pub pitch: String,
 
     /// TTS backend: "edge" (free, default, for debugging) or "volcengine" (paid, production quality).
