@@ -1,5 +1,5 @@
 [workspace]
-members = ["src/nf-cli", "src/nf-tts", "src/nf-guide"]
+members = ["src/nf-cli", "src/nf-tts", "src/nf-guide", "src/nf-shell"]
 resolver = "2"
 
 [workspace.package]
@@ -21,3 +21,9 @@ wildcard_imports = "deny"
 
 [profile.release]
 lto = "thin"
+
+# nf-shell: aggressive size opt for binary < 8MB target
+[profile.release.package.nf-shell]
+opt-level = "z"
+codegen-units = 1
+strip = true
