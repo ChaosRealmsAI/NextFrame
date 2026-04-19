@@ -1,6 +1,27 @@
 # Clips Pipeline — 智能切片状态机
 
-长视频 → 挑亮点 → 切片 → 多语言字幕 → 传播文案。每步有提示词，跑 `nf-guide clips <step>` 获取。
+长视频 → 挑亮点 → 切片 → 多语言字幕 → **字级 karaoke HTML** → 传播文案。每步有提示词，跑 `nf-guide clips <step>` 获取。
+
+## 工作目录约定（v1.13.1 硬规则）
+
+```
+projects/<project>/<episode>/
+├── sources/<slug>/
+│   ├── source.mp4          # yt-dlp
+│   ├── meta.json
+│   ├── sentences.json      # whisperx 句级 · flat [{id,start,end,text}]
+│   └── words.json          # whisperx 词级 · flat [{text,start,end}]
+├── plan.json               # Agent 挑 highlight · clips[].from/to = **sentence id**（不是秒）
+├── clips/
+│   ├── cut_report.json     # ffmpeg 切片 · start/end = **秒**（真实时间戳）
+│   ├── clip_NN.mp4
+│   ├── clip_NN.translations.*.json
+│   ├── clip_NN.karaoke.html   # karaoke 步产物
+│   └── index.html          # 所有 clips sidebar 切换
+└── run.log
+```
+
+**易混点**（BUG-20260419 真踩过）：`plan.from/to` 是 sentence id · `cut_report.start/end` 才是秒。字级对齐消费**秒**不消费 id。
 
 ## 流程图
 
@@ -32,6 +53,11 @@
        │                             │
        └──────────┬──────────────────┘
                   ▼
+            ┌──────────┐
+            │ karaoke  │  Code · 产 index.html (sidebar 切所有 clips)
+            │          │  中英双行字级高亮 · whisperx 英词精准 + 中文字级插值
+            └────┬─────┘
+                 ▼
             ┌──────────┐
             │ publish  │  发布到抖音/B站/小红书/视频号/YouTube
             └──────────┘
