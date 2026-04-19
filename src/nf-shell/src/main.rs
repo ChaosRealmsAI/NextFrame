@@ -53,6 +53,13 @@ const TRACK_SCENE_HERO_SPLIT: &str =
     include_str!("../../nf-tracks/community/scene-hero-split.js");
 const TRACK_SCENE_HERO_OVERLAY: &str =
     include_str!("../../nf-tracks/community/scene-hero-overlay.js");
+// v1.47 · scene Data family (3 L1 community Tracks)
+const TRACK_SCENE_STAT_GIANT: &str =
+    include_str!("../../nf-tracks/community/scene-stat-giant.js");
+const TRACK_SCENE_METRIC_GRID: &str =
+    include_str!("../../nf-tracks/community/scene-metric-grid.js");
+const TRACK_SCENE_KPI_CALLOUT: &str =
+    include_str!("../../nf-tracks/community/scene-kpi-callout.js");
 
 #[derive(Debug, Clone)]
 enum UserEvent {
@@ -87,6 +94,9 @@ fn track_source_for(kind: &str) -> Option<&'static str> {
         "scene-hero-centered" => Some(TRACK_SCENE_HERO_CENTERED),
         "scene-hero-split" => Some(TRACK_SCENE_HERO_SPLIT),
         "scene-hero-overlay" => Some(TRACK_SCENE_HERO_OVERLAY),
+        "scene-stat-giant" => Some(TRACK_SCENE_STAT_GIANT),
+        "scene-metric-grid" => Some(TRACK_SCENE_METRIC_GRID),
+        "scene-kpi-callout" => Some(TRACK_SCENE_KPI_CALLOUT),
         _ => None,
     }
 }
