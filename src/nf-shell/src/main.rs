@@ -20,6 +20,8 @@
 
 mod editor;
 mod platform;
+mod plugins;
+mod template_market;
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -30,6 +32,7 @@ use anyhow::{Context, Result};
 use editor::{EditorState, MultiSourceState, Selection};
 #[cfg(any(windows, all(unix, not(target_vendor = "apple"))))]
 use platform::ShellWebView;
+use plugins::{scan_user_plugins, PluginCatalog};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
@@ -38,6 +41,7 @@ use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 #[cfg(target_vendor = "apple")]
 use tao::platform::macos::WindowBuilderExtMacOS;
+use template_market::materialize_template;
 use wry::http;
 
 const WINDOW_TITLE: &str = "NextFrame";
@@ -140,6 +144,9 @@ enum UserEvent {
     },
     MenuOpen,
     MenuSave,
+    MenuTemplate {
+        template_name: String,
+    },
     VerifyDone,
     VerifyMediaReport {
         path: PathBuf,
@@ -204,7 +211,7 @@ fn track_source_for(kind: &str) -> Option<&'static str> {
     }
 }
 
-fn build_track_sources(source_json: &Value) -> Map<String, Value> {
+fn build_track_sources(source_json: &Value, plugins: &PluginCatalog) -> Map<String, Value> {
     let mut map = Map::new();
     let Some(tracks) = source_json.get("tracks").and_then(|v| v.as_array()) else {
         return map;
@@ -215,7 +222,7 @@ fn build_track_sources(source_json: &Value) -> Map<String, Value> {
         if id.is_empty() {
             continue;
         }
-        if let Some(src) = track_source_for(kind) {
+        if let Some(src) = track_source_for(kind).or_else(|| plugins.source_for_kind(kind)) {
             map.insert(id.to_string(), Value::String(src.to_string()));
         }
     }
@@ -381,6 +388,9 @@ enum IpcOutcome {
     },
     MenuOpen,
     MenuSave,
+    MenuTemplate {
+        template_name: String,
+    },
     StartExportDialog {
         duration_s: f64,
         parallel: Option<usize>,
@@ -420,7 +430,11 @@ fn export_state_value(export_ui: &ExportUiState) -> Value {
     })
 }
 
-fn workspace_state_value(workspace: &MultiSourceState, export_ui: &ExportUiState) -> Value {
+fn workspace_state_value(
+    workspace: &MultiSourceState,
+    export_ui: &ExportUiState,
+    plugins: &PluginCatalog,
+) -> Value {
     let Some(active_tab) = workspace.active_tab() else {
         return json!({
             "source": Value::Null,
@@ -468,7 +482,7 @@ fn workspace_state_value(workspace: &MultiSourceState, export_ui: &ExportUiState
         })).collect::<Vec<_>>(),
         "active_tab_id": workspace.active_tab_id,
         "source_path": active_tab.path,
-        "track_sources": build_track_sources(&editor.source),
+        "track_sources": build_track_sources(&editor.source, plugins),
         "media_bin": collect_media_bin_items(&active_tab.path),
         "export": export_state_value(export_ui),
     })
@@ -520,6 +534,7 @@ fn apply_clip_move_editor(workspace: &mut MultiSourceState, payload: &Value) -> 
 fn dispatch_ipc(
     workspace: &mut MultiSourceState,
     export_ui: &ExportUiState,
+    plugins: &PluginCatalog,
     body: &str,
 ) -> Result<IpcOutcome> {
     let env: Value = serde_json::from_str(body).context("IPC body not JSON")?;
@@ -544,7 +559,10 @@ fn dispatch_ipc(
             let message = apply_clip_drag_editor(workspace, &payload)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(message),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -552,7 +570,10 @@ fn dispatch_ipc(
             let message = apply_clip_move_editor(workspace, &payload)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(message),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -594,7 +615,10 @@ fn dispatch_ipc(
                 .map_err(anyhow::Error::msg)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(format!("set-param applied: {clip_id}.{path}")),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -633,7 +657,10 @@ fn dispatch_ipc(
                 .map_err(anyhow::Error::msg)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(format!("set-keyframe applied: {clip_id}.{path} @ {t_ms}ms")),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -654,7 +681,10 @@ fn dispatch_ipc(
                 .map_err(anyhow::Error::msg)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(format!("split-clip applied: {clip_id} @ {at_ms}ms")),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -674,7 +704,10 @@ fn dispatch_ipc(
                 .map_err(anyhow::Error::msg)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(format!("delete-clip applied: {clip_id} ripple={ripple}")),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -688,7 +721,10 @@ fn dispatch_ipc(
             let _ = editor.ripple_delete(clip_id).map_err(anyhow::Error::msg)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(format!("ripple-delete applied: {clip_id}")),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -708,7 +744,10 @@ fn dispatch_ipc(
                 .map_err(anyhow::Error::msg)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(format!("set-track-mute applied: {track_id} -> {muted}")),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -728,7 +767,10 @@ fn dispatch_ipc(
                 .map_err(anyhow::Error::msg)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(format!("set-track-solo applied: {track_id} -> {solo}")),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -824,8 +866,14 @@ fn dispatch_ipc(
                 }
             }
             Ok(IpcOutcome::EvalScript {
-                message: Some(format!("insert-media applied: {track_kind} {}", entry.op_label)),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                message: Some(format!(
+                    "insert-media applied: {track_kind} {}",
+                    entry.op_label
+                )),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -840,7 +888,10 @@ fn dispatch_ipc(
             }
             Ok(IpcOutcome::EvalScript {
                 message: Some(format!("switch-tab applied: {tab_id}")),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: false,
             })
         }
@@ -855,7 +906,10 @@ fn dispatch_ipc(
         }
         "get-state" => Ok(IpcOutcome::EvalScript {
             message: None,
-            js: editor_js_call("receiveState", &workspace_state_value(workspace, export_ui)),
+            js: editor_js_call(
+                "receiveState",
+                &workspace_state_value(workspace, export_ui, plugins),
+            ),
             mutation: false,
         }),
         "undo" => {
@@ -863,7 +917,10 @@ fn dispatch_ipc(
             let _ = editor.undo();
             Ok(IpcOutcome::EvalScript {
                 message: Some("undo processed".to_string()),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
@@ -872,13 +929,28 @@ fn dispatch_ipc(
             let _ = editor.redo();
             Ok(IpcOutcome::EvalScript {
                 message: Some("redo processed".to_string()),
-                js: editor_js_call("receiveSourceUpdate", &workspace_state_value(workspace, export_ui)),
+                js: editor_js_call(
+                    "receiveSourceUpdate",
+                    &workspace_state_value(workspace, export_ui, plugins),
+                ),
                 mutation: true,
             })
         }
         "drag-window" => Ok(IpcOutcome::DragWindow),
         "menu-open" => Ok(IpcOutcome::MenuOpen),
         "menu-save" => Ok(IpcOutcome::MenuSave),
+        "menu-template" => {
+            let template_name = payload
+                .get("template_name")
+                .or_else(|| payload.get("template"))
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .context("menu-template: template_name missing")?;
+            Ok(IpcOutcome::MenuTemplate {
+                template_name: template_name.to_string(),
+            })
+        }
         "verify-media-report" => Ok(IpcOutcome::VerifyMediaReport(pretty_json(&payload))),
         "verify-select-report" => Ok(IpcOutcome::VerifySelectReport(payload)),
         "verify-zoom-report" => Ok(IpcOutcome::VerifyZoomReport(payload)),
@@ -1489,6 +1561,8 @@ window.__NF_EXPORT_SUPPORTED__ = {export_supported};
       '.nf-tab-chip{{display:inline-flex;align-items:center;gap:8px;max-width:240px;height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.72);font:600 12px/1.1 var(--font-sans,-apple-system,sans-serif);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease;}}' +
       '.nf-tab-chip:hover{{transform:translateY(-1px);background:rgba(255,255,255,0.08);color:#fff;}}' +
       '.nf-tab-chip.is-active{{background:rgba(167,139,250,0.16);border-color:rgba(167,139,250,0.42);color:#f5f3ff;box-shadow:0 0 0 1px rgba(167,139,250,0.14);}}' +
+      '.nf-tab-template{{height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(94,234,212,0.28);background:rgba(94,234,212,0.08);color:#d5fffb;font:600 11px/1.1 var(--font-sans,-apple-system,sans-serif);cursor:pointer;letter-spacing:0.04em;text-transform:uppercase;}}' +
+      '.nf-tab-template:hover{{background:rgba(94,234,212,0.16);}}' +
       '.nf-tab-plus{{width:32px;height:32px;border-radius:999px;border:1px dashed rgba(255,255,255,0.18);background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.72);font:700 18px/1 var(--font-mono,"SF Mono",monospace);cursor:pointer;}}' +
       '.nf-tab-plus:hover{{background:rgba(255,255,255,0.08);color:#fff;}}' +
       '#nf-media-bin{{width:180px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,0.05);background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));}}' +
@@ -1567,7 +1641,17 @@ window.__NF_EXPORT_SUPPORTED__ = {export_supported};
     if (!shell) {{
       shell = document.createElement('div');
       shell.id = 'nf-tabbar';
-      shell.innerHTML = '<div id="nf-tabbar-list"></div><button type="button" class="nf-tab-plus" title="Open source.json">+</button>';
+      shell.innerHTML = '<div id="nf-tabbar-list"></div><button type="button" class="nf-tab-template" title="Create from template">Template</button><button type="button" class="nf-tab-plus" title="Open source.json">+</button>';
+      var templateBtn = shell.querySelector('.nf-tab-template');
+      templateBtn.addEventListener('click', function(ev) {{
+        ev.preventDefault();
+        ev.stopPropagation();
+        var picked = window.prompt ? window.prompt('Template name', 'basic-slideshow') : 'basic-slideshow';
+        if (picked == null) return;
+        picked = String(picked).trim();
+        if (!picked) return;
+        api.send('menu-template', {{ template_name: picked }});
+      }});
       var plus = shell.querySelector('.nf-tab-plus');
       plus.addEventListener('click', function(ev) {{
         ev.preventDefault();
@@ -4206,6 +4290,8 @@ struct CliOpts {
     /// duration < 6s 自动降级单进程(orchestrator 内部判)。
     export_parallel: Option<usize>,
     export_resolution: Option<String>,
+    list_plugins: bool,
+    template_name: Option<String>,
     menu_test: bool,
     window_x: f64,
     window_y: f64,
@@ -4226,6 +4312,8 @@ fn parse_cli() -> CliOpts {
     let mut export_fps: u32 = 60;
     let mut export_parallel: Option<usize> = None;
     let mut export_resolution: Option<String> = None;
+    let mut list_plugins = false;
+    let mut template_name: Option<String> = None;
     let mut menu_test = false;
     // Auto-cascade: count sibling nf-shell processes · stagger 40px per window.
     let cascade = count_running_nf_shell_pids();
@@ -4259,6 +4347,13 @@ fn parse_cli() -> CliOpts {
                 i += 1;
                 if i < args.len() {
                     export_path = Some(PathBuf::from(&args[i]));
+                }
+            }
+            "--list-plugins" => list_plugins = true,
+            "--template" => {
+                i += 1;
+                if i < args.len() {
+                    template_name = Some(args[i].clone());
                 }
             }
             "--menu-test" => menu_test = true,
@@ -4333,6 +4428,8 @@ fn parse_cli() -> CliOpts {
         export_fps,
         export_parallel,
         export_resolution,
+        list_plugins,
+        template_name,
         menu_test,
         window_x,
         window_y,
@@ -4485,10 +4582,11 @@ fn collect_media_bin_items(source_path: &str) -> Vec<Value> {
     out
 }
 
-fn load_source_from_path(path: &std::path::Path, ensure_undo_fixture_mode: bool) -> Result<LoadedSource> {
-    let canonical_path = path
-        .canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf());
+fn load_source_from_path(
+    path: &std::path::Path,
+    ensure_undo_fixture_mode: bool,
+) -> Result<LoadedSource> {
+    let canonical_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let source_text = std::fs::read_to_string(&canonical_path)
         .with_context(|| format!("read source.json at {}", canonical_path.display()))?;
     let mut source_json: Value =
@@ -4940,6 +5038,27 @@ fn shell_log(stdout_json_mode: bool, message: &str) {
     }
 }
 
+fn print_plugin_list(catalog: &PluginCatalog) {
+    if catalog.plugins.is_empty() {
+        println!("no plugins found\troot={}", catalog.root.display());
+        return;
+    }
+
+    for plugin in &catalog.plugins {
+        let version = plugin.version.as_deref().unwrap_or("-");
+        let description = plugin.description.as_deref().unwrap_or("-");
+        println!(
+            "{}\tkind={}\tversion={}\tentry={}\tmanifest={}\tdescription={}",
+            plugin.name,
+            plugin.kind,
+            version,
+            plugin.entry_path.display(),
+            plugin.manifest_path.display(),
+            description
+        );
+    }
+}
+
 fn ensure_parent_dir(path: &std::path::Path) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).with_context(|| format!("mkdir {}", parent.display()))?;
@@ -5059,6 +5178,7 @@ fn push_workspace_state_to_webview(
     webview: &wry::WebView,
     workspace_state: &Arc<Mutex<MultiSourceState>>,
     export_ui_state: &Arc<Mutex<ExportUiState>>,
+    plugins: &PluginCatalog,
     method: &str,
 ) -> Result<()> {
     let workspace = workspace_state
@@ -5067,16 +5187,51 @@ fn push_workspace_state_to_webview(
     let export_ui = export_ui_state
         .lock()
         .map_err(|e| anyhow::anyhow!("export ui lock poisoned: {e}"))?;
-    let js = editor_js_call(method, &workspace_state_value(&workspace, &export_ui));
+    let js = editor_js_call(
+        method,
+        &workspace_state_value(&workspace, &export_ui, plugins),
+    );
     drop(export_ui);
     drop(workspace);
     evaluate_webview_script(window, webview, &js)
 }
 
 fn main() -> Result<()> {
-    let opts = parse_cli();
+    let mut opts = parse_cli();
     let stdout_json_mode =
         opts.verify_select_mode || opts.verify_zoom_mode || opts.verify_undo_mode;
+    let plugin_catalog = scan_user_plugins();
+
+    for warning in &plugin_catalog.warnings {
+        eprintln!("[NF-PLUGIN] {warning}");
+    }
+    if opts.list_plugins {
+        print_plugin_list(&plugin_catalog);
+        return Ok(());
+    }
+    shell_log(
+        stdout_json_mode,
+        &format!(
+            "[NF-PLUGIN] scanned {} plugin(s) from {}",
+            plugin_catalog.plugins.len(),
+            plugin_catalog.root.display()
+        ),
+    );
+
+    if let Some(template_name) = opts.template_name.clone() {
+        let created = materialize_template(&template_name)?;
+        shell_log(
+            stdout_json_mode,
+            &format!(
+                "[NF-TEMPLATE] created {} via {} → {}",
+                created.name,
+                created.origin.label(),
+                created.path.display()
+            ),
+        );
+        opts.source_arg = created.path.display().to_string();
+    }
+    let plugin_catalog = Arc::new(plugin_catalog);
 
     // v1.44 · CLI --export 快捷路径:不启 tao event_loop · 不开窗口 ·
     // 直接用 headless WKWebView + CARenderer (nf-recorder) 产 MP4 · 退出。
@@ -5126,11 +5281,13 @@ fn main() -> Result<()> {
         }
     }
 
-    let initial_loaded =
-        load_source_from_path(std::path::Path::new(&opts.source_arg), opts.verify_undo_mode)?;
+    let initial_loaded = load_source_from_path(
+        std::path::Path::new(&opts.source_arg),
+        opts.verify_undo_mode,
+    )?;
     let source_json = initial_loaded.source.clone();
     let source_path = initial_loaded.path.clone();
-    let tracks_map = build_track_sources(&source_json);
+    let tracks_map = build_track_sources(&source_json, &plugin_catalog);
     let n_tracks = tracks_map.len();
     let workspace_state = Arc::new(Mutex::new(MultiSourceState::new(
         source_path.clone(),
@@ -5144,7 +5301,7 @@ fn main() -> Result<()> {
         let export_ui = export_ui_state
             .lock()
             .map_err(|e| anyhow::anyhow!("export ui lock poisoned: {e}"))?;
-        workspace_state_value(&state, &export_ui)
+        workspace_state_value(&state, &export_ui, &plugin_catalog)
     };
 
     let init_script = build_init_script(
@@ -5180,6 +5337,7 @@ fn main() -> Result<()> {
 
     let workspace_state_for_handler = Arc::clone(&workspace_state);
     let export_ui_for_handler = Arc::clone(&export_ui_state);
+    let plugin_catalog_for_handler = Arc::clone(&plugin_catalog);
     let proxy_for_handler = proxy.clone();
     let verify_mode = opts.verify_mode;
     let verify_count = Arc::new(Mutex::new(0u32));
@@ -5214,7 +5372,7 @@ fn main() -> Result<()> {
                     return;
                 }
             };
-            match dispatch_ipc(&mut state, &export_ui, body) {
+            match dispatch_ipc(&mut state, &export_ui, &plugin_catalog_for_handler, body) {
                 Ok(IpcOutcome::EvalScript {
                     message,
                     js,
@@ -5246,6 +5404,9 @@ fn main() -> Result<()> {
                 Ok(IpcOutcome::MenuSave) => {
                     let _ = proxy_for_handler.send_event(UserEvent::MenuSave);
                 }
+                Ok(IpcOutcome::MenuTemplate { template_name }) => {
+                    let _ = proxy_for_handler.send_event(UserEvent::MenuTemplate { template_name });
+                }
                 Ok(IpcOutcome::StartExportDialog {
                     duration_s,
                     parallel,
@@ -5271,10 +5432,8 @@ fn main() -> Result<()> {
                     });
                 }
                 Ok(IpcOutcome::StartSimulatedExport { path, duration_s }) => {
-                    let _ = proxy_for_handler.send_event(UserEvent::StartSimulatedExport {
-                        path,
-                        duration_s,
-                    });
+                    let _ = proxy_for_handler
+                        .send_event(UserEvent::StartSimulatedExport { path, duration_s });
                 }
                 Ok(IpcOutcome::VerifyMediaReport(json)) => {
                     if let Some(ref p) = verify_media_path_for_handler {
@@ -5593,6 +5752,7 @@ fn main() -> Result<()> {
                             &webview,
                             &workspace_state,
                             &export_ui_state,
+                            &plugin_catalog,
                             "receiveSourceUpdate",
                         );
                         shell_log(
@@ -5688,6 +5848,7 @@ fn main() -> Result<()> {
                     &webview,
                     &workspace_state,
                     &export_ui_state,
+                    &plugin_catalog,
                     "receiveState",
                 );
                 let running = Arc::new(AtomicBool::new(true));
@@ -5928,6 +6089,7 @@ fn main() -> Result<()> {
                             &webview,
                             &workspace_state,
                             &export_ui_state,
+                            &plugin_catalog,
                             "receiveState",
                         );
                         shell_log(
@@ -5936,6 +6098,28 @@ fn main() -> Result<()> {
                         );
                     }
                     None => shell_log(stdout_json_mode, "[NF-MENU] save cancelled"),
+                }
+            }
+            Event::UserEvent(UserEvent::MenuTemplate { template_name }) => {
+                match materialize_template(&template_name) {
+                    Ok(created) => {
+                        shell_log(
+                            stdout_json_mode,
+                            &format!(
+                                "[NF-TEMPLATE] created {} via {} → {}",
+                                created.name,
+                                created.origin.label(),
+                                created.path.display()
+                            ),
+                        );
+                        let _ = proxy.send_event(UserEvent::OpenTab { path: created.path });
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "[NF-TEMPLATE] create failed · {} · {err}",
+                            template_name
+                        );
+                    }
                 }
             }
             _ => {}
