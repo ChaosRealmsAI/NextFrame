@@ -27,7 +27,10 @@ use nf_shell_mac::{DesktopShell, MacHeadlessShell, ShellConfig, ShellError};
 use crate::events::{emit, Event};
 use crate::frame_pool::FramePool;
 use crate::pipeline::h264::PipelineH264_1080p;
-use crate::pipeline::{ColorSpec, OutputStats, PipelineError, RecordOpts, RecordPipeline};
+use crate::pipeline::hevc::PipelineHevcMain;
+use crate::pipeline::{
+    ColorSpec, OutputStats, PipelineError, RecordOpts, RecordPipeline, VideoCodec,
+};
 
 /// Per-frame seek await timeout · contract hard cap.
 const FRAME_SEEK_TIMEOUT: Duration = Duration::from_secs(5);
@@ -55,6 +58,8 @@ pub struct RecordConfig {
     pub fps: u32,
     /// VT target bitrate in bits per second.
     pub bitrate_bps: u32,
+    /// v1.55 · encoder codec preset.
+    pub codec: VideoCodec,
     /// Hard cap on recording duration in seconds · timeout → exit 2.
     pub max_duration_s: u32,
     /// v1.15 · 子进程录制的 frame 子区间 `[start, end)` · None = 录整个 duration。
@@ -165,6 +170,31 @@ impl From<PipelineError> for RecordError {
     }
 }
 
+enum ActivePipeline {
+    H264(PipelineH264_1080p),
+    Hevc(PipelineHevcMain),
+}
+
+impl ActivePipeline {
+    fn push_frame(
+        &mut self,
+        surface: nf_shell_mac::IOSurfaceHandle,
+        pts_ms: u64,
+    ) -> Result<(), PipelineError> {
+        match self {
+            Self::H264(p) => p.push_frame(surface, pts_ms),
+            Self::Hevc(p) => p.push_frame(surface, pts_ms),
+        }
+    }
+
+    fn finish(self) -> Result<OutputStats, PipelineError> {
+        match self {
+            Self::H264(p) => p.finish(),
+            Self::Hevc(p) => p.finish(),
+        }
+    }
+}
+
 /// Run the full record loop · returns `OutputStats` on success.
 ///
 /// The underlying shell pumps the macOS main run loop inside `call_async`
@@ -223,18 +253,20 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
             vp.setAttribute('name', 'viewport');
             document.head.appendChild(vp);
         }
-        vp.setAttribute('content', 'width=1920,height=1080,initial-scale=1,user-scalable=no');
+        vp.setAttribute('content', 'width=__NF_WIDTH__,height=__NF_HEIGHT__,initial-scale=1,user-scalable=no');
         var s = document.getElementById('__nf_record_force_size');
         if (!s) {
             s = document.createElement('style');
             s.id = '__nf_record_force_size';
             document.head.appendChild(s);
         }
-        s.textContent = 'html,body{width:1920px!important;height:1080px!important;min-height:1080px!important;margin:0!important;padding:0!important;background:#ff00ff!important;}';
+        s.textContent = 'html,body{width:__NF_WIDTH__px!important;height:__NF_HEIGHT__px!important;min-height:__NF_HEIGHT__px!important;margin:0!important;padding:0!important;background:#ff00ff!important;}';
         document.body.dataset.mode = 'record';
         return { bodyW: document.body.clientWidth, bodyH: document.body.clientHeight, vpContent: vp.content };
-    "#;
-    let _ = shell.call_async(mode_switch).await?;
+    "#
+    .replace("__NF_WIDTH__", &cfg.width.to_string())
+    .replace("__NF_HEIGHT__", &cfg.height.to_string());
+    let _ = shell.call_async(&mode_switch).await?;
 
     let has_export_seek_bridge = shell
         .call_async(
@@ -252,14 +284,26 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
         == Some(true);
 
     // 3. Construct encoder/writer pipeline.
-    let mut pipeline = PipelineH264_1080p::new(RecordOpts {
-        width: cfg.width,
-        height: cfg.height,
-        fps: cfg.fps,
-        bitrate_bps: cfg.bitrate_bps,
-        output: cfg.output.clone(),
-        color: ColorSpec::BT709_SDR_8bit,
-    })?;
+    let mut pipeline = match cfg.codec {
+        VideoCodec::H264 => ActivePipeline::H264(PipelineH264_1080p::new(RecordOpts {
+            width: cfg.width,
+            height: cfg.height,
+            fps: cfg.fps,
+            bitrate_bps: cfg.bitrate_bps,
+            codec: cfg.codec,
+            output: cfg.output.clone(),
+            color: ColorSpec::BT709_SDR_8bit,
+        })?),
+        VideoCodec::HevcMain8 => ActivePipeline::Hevc(PipelineHevcMain::new(RecordOpts {
+            width: cfg.width,
+            height: cfg.height,
+            fps: cfg.fps,
+            bitrate_bps: cfg.bitrate_bps,
+            codec: cfg.codec,
+            output: cfg.output.clone(),
+            color: ColorSpec::BT709_SDR_8bit,
+        })?),
+    };
 
     let mut pool = FramePool::new(FRAME_POOL_CAPACITY);
 

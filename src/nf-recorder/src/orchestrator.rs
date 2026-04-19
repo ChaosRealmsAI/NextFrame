@@ -98,8 +98,9 @@ pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), Reco
         let fps_str = format!("{}", cfg.fps);
         let max_dur_str = format!("{}", cfg.max_duration_s);
         let range_str = format!("{start},{end}");
-        let res_str = match cfg.width {
-            1920 => "1080p".to_string(),
+        let res_str = match (cfg.width, cfg.height) {
+            (1920, 1080) => "1080p".to_string(),
+            (3840, 2160) => "4k".to_string(),
             _ => format!("{}x{}", cfg.width, cfg.height),
         };
         emit(Event::RecordSegmentStart {

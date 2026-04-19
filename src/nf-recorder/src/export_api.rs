@@ -14,6 +14,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::orchestrator;
+use crate::pipeline::VideoCodec;
 use crate::record_loop::{self, RecordConfig, RecordError};
 use crate::OutputStats;
 
@@ -29,6 +30,8 @@ const TRACK_AUDIO: &str = include_str!("../../nf-tracks/official/audio.js");
 const TRACK_CHART: &str = include_str!("../../nf-tracks/official/chart.js");
 const TRACK_DATA: &str = include_str!("../../nf-tracks/official/data.js");
 const TRACK_SUBTITLE: &str = include_str!("../../nf-tracks/official/subtitle.js");
+const TRACK_WEBGL_PARTICLES: &str =
+    include_str!("../../nf-tracks/community/webgl-particles.js");
 
 fn track_source_for(kind: &str) -> Option<&'static str> {
     match kind {
@@ -39,6 +42,7 @@ fn track_source_for(kind: &str) -> Option<&'static str> {
         "chart" => Some(TRACK_CHART),
         "data" => Some(TRACK_DATA),
         "subtitle" => Some(TRACK_SUBTITLE),
+        "webgl-particles" => Some(TRACK_WEBGL_PARTICLES),
         _ => None,
     }
 }
@@ -71,11 +75,13 @@ pub struct ExportOpts {
     pub viewport: (u32, u32),
     /// 帧率 · ∈ {30, 60} · 默认 60。
     pub fps: u32,
-    /// VideoToolbox 目标比特率(bps)· 默认 12Mbps。
+    /// VideoToolbox 目标比特率(bps)· 默认 20Mbps。
     pub bitrate_bps: u32,
     /// v1.44.1 · 并行切片 N(ADR-061)· 默认 1 = 单进程 · ≥2 走 orchestrator。
     /// duration < 6s 时 orchestrator 自动降级单进程(segment boot 开销吃掉收益)。
     pub parallel: usize,
+    /// v1.55 · CLI `--resolution` 覆盖 `source.json meta.export.resolution`。
+    pub resolution_override: Option<ExportResolution>,
 }
 
 impl Default for ExportOpts {
@@ -84,10 +90,63 @@ impl Default for ExportOpts {
             duration_s: 5.0,
             viewport: (1920, 1080),
             fps: 60,
-            bitrate_bps: 12_000_000,
+            bitrate_bps: 20_000_000,
             parallel: 1,
+            resolution_override: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportResolution {
+    P1080,
+    K4,
+}
+
+impl ExportResolution {
+    pub fn parse_str(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "1080p" => Some(Self::P1080),
+            "4k" => Some(Self::K4),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::P1080 => "1080p",
+            Self::K4 => "4k",
+        }
+    }
+
+    pub fn viewport(self) -> (u32, u32) {
+        match self {
+            Self::P1080 => (1920, 1080),
+            Self::K4 => (3840, 2160),
+        }
+    }
+
+    pub fn bitrate_bps(self) -> u32 {
+        match self {
+            Self::P1080 => 20_000_000,
+            Self::K4 => 80_000_000,
+        }
+    }
+
+    pub fn codec(self) -> VideoCodec {
+        match self {
+            // Keep the default 1080p path on H.264 for regression parity.
+            Self::P1080 => VideoCodec::H264,
+            Self::K4 => VideoCodec::HevcMain8,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ResolvedExportPreset {
+    viewport: (u32, u32),
+    bitrate_bps: u32,
+    codec: VideoCodec,
 }
 
 /// v1.44 · 高层 lib API · 输入 source.json 路径 · 输出 MP4。
@@ -122,21 +181,26 @@ pub async fn run_export_from_source(
         )));
     }
 
-    // 读 source.json · 直接 inline 到 HTML 的 __NF_SOURCE__ 里。
+    // 读 source.json · inline 到 HTML 的 __NF_SOURCE__ 里。
     let source_text = std::fs::read_to_string(source_path).map_err(|e| {
         RecordError::BundleLoadFailed(format!(
             "read source.json {}: {e}",
             source_path.display()
         ))
     })?;
-    // Parse 一次拿到 viewport · 同时用于构建 tracks map。
-    let source_json: serde_json::Value =
+    // Parse 一次拿到 viewport · 同时用于构建 tracks map / 应用 resolution preset。
+    let mut source_json: serde_json::Value =
         serde_json::from_str(&source_text).map_err(|e| {
             RecordError::BundleLoadFailed(format!("source.json not valid JSON: {e}"))
         })?;
+    let preset = resolve_export_preset(&source_json, &opts)?;
+    override_source_viewport(&mut source_json, preset.viewport);
     let tracks_map_json = build_tracks_map_json(&source_json);
+    let source_text = serde_json::to_string(&source_json).map_err(|e| {
+        RecordError::BundleLoadFailed(format!("serialize source.json for export HTML: {e}"))
+    })?;
 
-    let (vp_w, vp_h) = opts.viewport;
+    let (vp_w, vp_h) = preset.viewport;
     let requested_duration_ms = (opts.duration_s.max(0.0) * 1000.0).round() as u64;
     let html = build_export_html(
         &source_text,
@@ -169,7 +233,8 @@ pub async fn run_export_from_source(
         width: vp_w,
         height: vp_h,
         fps: opts.fps,
-        bitrate_bps: opts.bitrate_bps,
+        bitrate_bps: preset.bitrate_bps,
+        codec: preset.codec,
         max_duration_s,
         frame_range: None,
     };
@@ -201,6 +266,81 @@ pub async fn run_export_from_source(
     let _ = std::fs::remove_file(&tmp_html);
 
     result
+}
+
+fn resolve_export_preset(
+    source_json: &serde_json::Value,
+    opts: &ExportOpts,
+) -> Result<ResolvedExportPreset, RecordError> {
+    let resolution = if let Some(override_resolution) = opts.resolution_override {
+        override_resolution
+    } else if let Some(raw) = source_json
+        .pointer("/meta/export/resolution")
+        .and_then(serde_json::Value::as_str)
+    {
+        ExportResolution::parse_str(raw).ok_or_else(|| {
+            RecordError::BundleLoadFailed(format!(
+                "meta.export.resolution must be '1080p' or '4k' (got '{raw}')"
+            ))
+        })?
+    } else {
+        match opts.viewport {
+            (3840, 2160) => ExportResolution::K4,
+            _ => ExportResolution::P1080,
+        }
+    };
+
+    let default_viewport = resolution.viewport();
+    let viewport = if opts.resolution_override.is_some()
+        || source_json.pointer("/meta/export/resolution").is_some()
+    {
+        default_viewport
+    } else {
+        opts.viewport
+    };
+
+    let bitrate_bps = if opts.resolution_override.is_some()
+        || source_json.pointer("/meta/export/resolution").is_some()
+    {
+        resolution.bitrate_bps()
+    } else {
+        opts.bitrate_bps
+    };
+
+    let codec = match viewport {
+        (3840, 2160) => VideoCodec::HevcMain8,
+        _ => resolution.codec(),
+    };
+
+    Ok(ResolvedExportPreset {
+        viewport,
+        bitrate_bps,
+        codec,
+    })
+}
+
+fn override_source_viewport(source_json: &mut serde_json::Value, viewport: (u32, u32)) {
+    let Some(root) = source_json.as_object_mut() else {
+        return;
+    };
+    let (w, h) = viewport;
+    let ratio = if h == 0 {
+        "16:9"
+    } else {
+        match w.saturating_mul(9).cmp(&h.saturating_mul(16)) {
+            std::cmp::Ordering::Equal => "16:9",
+            _ => "custom",
+        }
+    };
+
+    root.insert(
+        "viewport".to_string(),
+        serde_json::json!({
+            "ratio": ratio,
+            "w": w,
+            "h": h
+        }),
+    );
 }
 
 /// 构造自包含 export HTML · 含 runtime + __NF_SOURCE__ + mount。

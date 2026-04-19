@@ -10,5 +10,7 @@ pub mod verify_mp4;   // T-17 · product-internal MP4 atom verifier
 pub mod orchestrator; // v1.15 · 并行录制父进程 · spawn N 子 + ffmpeg concat
 pub mod export_api;   // v1.44 · high-level lib API · 从 source.json 直接导出 MP4
 
-pub use pipeline::{RecordPipeline, RecordOpts, OutputStats, ColorSpec, PipelineError};
-pub use export_api::{run_export_from_source, ExportOpts};
+pub use pipeline::{
+    ColorSpec, OutputStats, PipelineError, RecordOpts, RecordPipeline, VideoCodec,
+};
+pub use export_api::{run_export_from_source, ExportOpts, ExportResolution};
