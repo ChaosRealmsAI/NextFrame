@@ -14,6 +14,7 @@
 //!   `nf-shell --verify [source.json]`       — run built-in IPC verify suite
 //!   `nf-shell --verify-select [source.json]`— run clip-selection + inspector verify
 //!   `nf-shell --verify-zoom [source.json]`  — run timeline zoom + scroll verify
+//!   `nf-shell --verify-undo [source.json]`  — run undo/redo + mute/solo verify
 //!   `nf-shell --screenshot <out.png> [--delay-ms N] [source.json]`
 //!                                            — capture WebView → PNG and exit
 
@@ -80,6 +81,9 @@ const VERIFY_SELECT_SCREENSHOT_PATH: &str = "tmp/v1.49-verify-select.png";
 // v1.50 · timeline zoom verify output paths
 const VERIFY_ZOOM_JSON_PATH: &str = "tmp/v1.50-verify.json";
 const VERIFY_ZOOM_SCREENSHOT_PATH: &str = "tmp/v1.50-60s-demo-30s-click.png";
+// v1.51 · undo/mute/solo verify output paths
+const VERIFY_UNDO_JSON_PATH: &str = "tmp/v1.51-verify.json";
+const VERIFY_UNDO_SCREENSHOT_PATH: &str = "tmp/v1.51-undo-mute.png";
 
 #[derive(Debug, Clone)]
 enum UserEvent {
@@ -106,6 +110,9 @@ enum UserEvent {
         payload: Value,
     },
     VerifyZoomReport {
+        payload: Value,
+    },
+    VerifyUndoReport {
         payload: Value,
     },
 }
@@ -259,6 +266,7 @@ enum IpcOutcome {
     VerifyMediaReport(String),
     VerifySelectReport(Value),
     VerifyZoomReport(Value),
+    VerifyUndoReport(Value),
 }
 
 fn selection_value(selection: &Selection) -> Value {
@@ -271,11 +279,19 @@ fn selection_value(selection: &Selection) -> Value {
 }
 
 fn editor_state_value(editor: &EditorState) -> Value {
+    let undo_oldest_reverse_value = editor
+        .undo_stack
+        .first()
+        .and_then(|entry| entry.reverse.first())
+        .and_then(|patch| patch.value.clone())
+        .unwrap_or(Value::Null);
     json!({
         "source": editor.source.clone(),
         "selection": selection_value(&editor.selection),
         "undo_stack_size": editor.undo_stack.len(),
         "redo_stack_size": editor.redo_stack.len(),
+        "undo_oldest_id": editor.undo_stack.first().map(|entry| entry.id.clone()),
+        "undo_oldest_reverse_value": undo_oldest_reverse_value,
         "commit_token": editor.commit_token.clone(),
         "config": {
             "max_undo": editor.config.max_undo,
@@ -380,6 +396,44 @@ fn dispatch_ipc(editor: &mut EditorState, body: &str) -> Result<IpcOutcome> {
                 mutation: true,
             })
         }
+        "set-track-mute" => {
+            let track_id = payload
+                .get("track_id")
+                .or_else(|| payload.get("trackId"))
+                .and_then(Value::as_str)
+                .context("set-track-mute: track_id missing")?;
+            let muted = payload
+                .get("muted")
+                .and_then(Value::as_bool)
+                .context("set-track-mute: muted missing")?;
+            let _ = editor
+                .set_track_mute(track_id, muted)
+                .map_err(anyhow::Error::msg)?;
+            Ok(IpcOutcome::EvalScript {
+                message: Some(format!("set-track-mute applied: {track_id} -> {muted}")),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
+        "set-track-solo" => {
+            let track_id = payload
+                .get("track_id")
+                .or_else(|| payload.get("trackId"))
+                .and_then(Value::as_str)
+                .context("set-track-solo: track_id missing")?;
+            let solo = payload
+                .get("solo")
+                .and_then(Value::as_bool)
+                .context("set-track-solo: solo missing")?;
+            let _ = editor
+                .set_track_solo(track_id, solo)
+                .map_err(anyhow::Error::msg)?;
+            Ok(IpcOutcome::EvalScript {
+                message: Some(format!("set-track-solo applied: {track_id} -> {solo}")),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
         "get-state" => Ok(IpcOutcome::EvalScript {
             message: None,
             js: editor_js_call("receiveState", &editor_state_value(editor)),
@@ -407,6 +461,7 @@ fn dispatch_ipc(editor: &mut EditorState, body: &str) -> Result<IpcOutcome> {
         "verify-media-report" => Ok(IpcOutcome::VerifyMediaReport(pretty_json(&payload))),
         "verify-select-report" => Ok(IpcOutcome::VerifySelectReport(payload)),
         "verify-zoom-report" => Ok(IpcOutcome::VerifyZoomReport(payload)),
+        "verify-undo-report" => Ok(IpcOutcome::VerifyUndoReport(payload)),
         "export-mp4" => {
             let path = payload
                 .get("path")
@@ -560,6 +615,7 @@ fn build_init_script(
     source_path: &str,
     verify_media_mode: bool,
     verify_zoom_mode: bool,
+    verify_undo_mode: bool,
 ) -> String {
     let source_str = serde_json::to_string(source_json).unwrap_or_else(|_| "{}".to_string());
     let tracks_str = serde_json::to_string(tracks_map).unwrap_or_else(|_| "{}".to_string());
@@ -594,6 +650,7 @@ setTimeout(function(){
     let screenshot_block = String::new();
     let verify_select_flag = if verify_select_mode { "true" } else { "false" };
     let verify_zoom_flag = if verify_zoom_mode { "true" } else { "false" };
+    let verify_undo_flag = if verify_undo_mode { "true" } else { "false" };
     let timeline_zoom_block = r#"
 window.__nfTimeline = window.__nfTimeline || { zoom: 1.0, scroll_ms: 0, min_zoom: 0.2, max_zoom: 10.0 };
 window.__nf_timeline_clamp = function(value, min, max) {
@@ -917,6 +974,7 @@ window.nfEditor.timelineState = function() {{
 window.__NF_EDITOR_INITIAL_STATE__ = {initial_state};
 window.__NF_COMMIT_TOKEN__ = (window.__NF_EDITOR_INITIAL_STATE__ && window.__NF_EDITOR_INITIAL_STATE__.commit_token) || null;
 window.__NF_VERIFY_SELECT__ = {verify_select};
+window.__NF_VERIFY_UNDO__ = {verify_undo};
 (function() {{
   var TOKENS_CSS = {tokens_css};
   function esc(value) {{
@@ -949,6 +1007,11 @@ window.__NF_VERIFY_SELECT__ = {verify_select};
       '.nf-inspector-bool input{{width:18px;height:18px;accent-color:var(--token-accent);}}' +
       '.nf-tl-bar{{transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease;cursor:pointer;}}' +
       '.nf-tl-bar.selected{{border:2px solid var(--token-accent)!important;box-shadow:0 0 0 1px rgba(167,139,250,0.24),0 0 18px rgba(167,139,250,0.20);transform:translateY(-1px);}}' +
+      '.tk-ctrls{{display:flex;align-items:center;gap:6px;margin-left:auto;}}' +
+      '.nf-track-toggle{{width:28px;height:28px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:var(--token-text-soft);font:700 11px/1 var(--font-mono,"SF Mono",monospace);cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease;}}' +
+      '.nf-track-toggle:hover{{background:rgba(255,255,255,0.10);color:var(--token-text);transform:translateY(-1px);}}' +
+      '.nf-track-toggle.is-active[data-nf-track-toggle="mute"]{{background:rgba(249,115,22,0.18);border-color:rgba(249,115,22,0.48);color:#fdba74;}}' +
+      '.nf-track-toggle.is-active[data-nf-track-toggle="solo"]{{background:rgba(52,211,153,0.18);border-color:rgba(52,211,153,0.48);color:#6ee7b7;}}' +
       '@media (max-width: 1120px){{#nf-inspector-panel{{width:232px;top:52px;right:4px;bottom:4px;}}}}';
     document.head.appendChild(style);
   }}
@@ -959,6 +1022,8 @@ window.__NF_VERIFY_SELECT__ = {verify_select};
   api.pending = api.pending || {{}};
   api.last_applied_token = (api.state && api.state.commit_token) || null;
   api.verify_select_started = false;
+  api.verify_undo_started = false;
+  api.shortcuts_installed = false;
 
   api.clipIdentity = function(clip) {{
     if (!clip || typeof clip !== 'object') return '';
@@ -969,6 +1034,41 @@ window.__NF_VERIFY_SELECT__ = {verify_select};
 
   api.send = function(kind, payload) {{
     window.ipc.postMessage(JSON.stringify({{ kind: kind, payload: payload || {{}} }}));
+  }};
+
+  api.sleep = function(ms) {{
+    return new Promise(function(resolve) {{ window.setTimeout(resolve, ms); }});
+  }};
+
+  api.waitFor = function(predicate, timeoutMs) {{
+    var deadline = Date.now() + (timeoutMs || 4000);
+    return new Promise(function(resolve, reject) {{
+      function poll() {{
+        var ok = false;
+        try {{ ok = !!predicate(); }} catch (_err) {{ ok = false; }}
+        if (ok) {{
+          resolve(true);
+          return;
+        }}
+        if (Date.now() >= deadline) {{
+          reject(new Error('waitFor timeout'));
+          return;
+        }}
+        window.setTimeout(poll, 40);
+      }}
+      poll();
+    }});
+  }};
+
+  api.installShortcuts = function() {{
+    if (api.shortcuts_installed) return;
+    api.shortcuts_installed = true;
+    document.addEventListener('keydown', function(e) {{
+      var key = String(e.key || '').toLowerCase();
+      if (!e.metaKey || key !== 'z' || e.ctrlKey || e.altKey || e.isComposing) return;
+      e.preventDefault();
+      api.send(e.shiftKey ? 'redo' : 'undo', {{}});
+    }});
   }};
 
   api.ensureShellLayout = function() {{
@@ -1005,6 +1105,62 @@ window.__NF_VERIFY_SELECT__ = {verify_select};
       }}
     }}
     return null;
+  }};
+
+  api.findTrackById = function(trackId) {{
+    var state = api.state;
+    var tracks = state && state.source && Array.isArray(state.source.tracks) ? state.source.tracks : [];
+    for (var i = 0; i < tracks.length; i++) {{
+      if (String((tracks[i] && tracks[i].id) || '') === String(trackId || '')) return tracks[i];
+    }}
+    return null;
+  }};
+
+  api.findClipById = function(clipId) {{
+    var state = api.state;
+    var tracks = state && state.source && Array.isArray(state.source.tracks) ? state.source.tracks : [];
+    for (var ti = 0; ti < tracks.length; ti++) {{
+      var track = tracks[ti] || {{}};
+      var clips = Array.isArray(track.clips) ? track.clips : [];
+      for (var ci = 0; ci < clips.length; ci++) {{
+        var clip = clips[ci] || {{}};
+        if (api.clipIdentity(clip) === String(clipId || '')) {{
+          return {{ track: track, clip: clip, track_idx: ti, clip_idx: ci }};
+        }}
+      }}
+    }}
+    return null;
+  }};
+
+  api.findFirstClipWithTitle = function() {{
+    var state = api.state;
+    var tracks = state && state.source && Array.isArray(state.source.tracks) ? state.source.tracks : [];
+    for (var ti = 0; ti < tracks.length; ti++) {{
+      var track = tracks[ti] || {{}};
+      var clips = Array.isArray(track.clips) ? track.clips : [];
+      for (var ci = 0; ci < clips.length; ci++) {{
+        var clip = clips[ci] || {{}};
+        if (clip.params && typeof clip.params.title === 'string') {{
+          return {{ track: track, clip: clip, track_idx: ti, clip_idx: ci }};
+        }}
+      }}
+    }}
+    return null;
+  }};
+
+  api.findTrackButton = function(trackId, action) {{
+    return document.querySelector('.nf-track-toggle[data-track-id="' + String(trackId || '') + '"][data-nf-track-toggle="' + String(action || '') + '"]');
+  }};
+
+  api.pressUndoShortcut = function(redo) {{
+    document.dispatchEvent(new KeyboardEvent('keydown', {{
+      key: 'z',
+      code: 'KeyZ',
+      metaKey: true,
+      shiftKey: !!redo,
+      bubbles: true,
+      cancelable: true
+    }}));
   }};
 
   api.fieldKind = function(value) {{
@@ -1149,6 +1305,25 @@ window.__NF_VERIFY_SELECT__ = {verify_select};
         }}
       }}
     }}
+    var toggles = document.querySelectorAll('.nf-track-toggle');
+    for (var bi = 0; bi < toggles.length; bi++) {{
+      var btn = toggles[bi];
+      if (btn.__nf_track_toggle_wired) continue;
+      btn.__nf_track_toggle_wired = true;
+      btn.addEventListener('click', function(ev) {{
+        ev.preventDefault();
+        ev.stopPropagation();
+        var trackId = this.dataset.trackId || '';
+        var active = this.dataset.active === '1';
+        var action = this.dataset.nfTrackToggle || '';
+        if (!trackId || !action) return;
+        if (action === 'mute') {{
+          api.send('set-track-mute', {{ track_id: trackId, muted: !active }});
+        }} else if (action === 'solo') {{
+          api.send('set-track-solo', {{ track_id: trackId, solo: !active }});
+        }}
+      }});
+    }}
     api.applySelection();
   }};
 
@@ -1162,6 +1337,7 @@ window.__NF_VERIFY_SELECT__ = {verify_select};
     api.last_applied_token = state.commit_token || null;
     if (state.source) window.__NF_SOURCE__ = state.source;
     if (state.commit_token) window.__NF_COMMIT_TOKEN__ = state.commit_token;
+    api.installShortcuts();
     api.renderInspector();
     api.decorateTimeline();
   }};
@@ -1227,6 +1403,199 @@ window.__NF_VERIFY_SELECT__ = {verify_select};
     }}, 2000);
   }};
 
+  api.runVerifyUndo = function() {{
+    if (!window.__NF_VERIFY_UNDO__ || api.verify_undo_started) return;
+    api.verify_undo_started = true;
+    window.setTimeout(async function() {{
+      var steps = [
+        {{ id: 'step_1_edit_title', pass: false }},
+        {{ id: 'step_2_undo_stack_size', pass: false }},
+        {{ id: 'step_3_undo_shortcut', pass: false }},
+        {{ id: 'step_4_redo_shortcut', pass: false }},
+        {{ id: 'step_5_fifo_50', pass: false }},
+        {{ id: 'step_6_mute_and_undo', pass: false }},
+        {{ id: 'step_7_screenshot', pass: false }}
+      ];
+      function activeAudioCount() {{
+        if (window.__nf_handle && typeof window.__nf_handle.getCurrentAudioTracks === 'function') {{
+          try {{ return window.__nf_handle.getCurrentAudioTracks().length; }} catch (_err) {{}}
+        }}
+        return document.querySelectorAll('audio[data-nf-persist]').length;
+      }}
+      try {{
+        api.installShortcuts();
+        await api.waitFor(function() {{
+          return api.state && api.state.source && Array.isArray(api.state.source.tracks);
+        }}, 5000);
+        var target = api.findFirstClipWithTitle();
+        if (!target) throw new Error('verify-undo: no clip with params.title');
+        var audioTrack = null;
+        var tracks = api.state.source.tracks || [];
+        for (var ti = 0; ti < tracks.length; ti++) {{
+          if ((tracks[ti] && tracks[ti].kind) === 'audio') {{
+            audioTrack = tracks[ti];
+            break;
+          }}
+        }}
+        if (!audioTrack) throw new Error('verify-undo: no audio track available');
+        var soloTrack = null;
+        for (var si = 0; si < tracks.length; si++) {{
+          if (tracks[si] && tracks[si].id !== audioTrack.id) {{
+            soloTrack = tracks[si];
+            break;
+          }}
+        }}
+        if (!soloTrack) throw new Error('verify-undo: no solo candidate track');
+
+        var clipId = api.clipIdentity(target.clip);
+        var initialTitle = String((target.clip.params && target.clip.params.title) || '');
+        var editedTitle = initialTitle + ' · undo';
+
+        api.send('select-clip', {{ clip_id: clipId }});
+        await api.waitFor(function() {{
+          return api.state && api.state.selection && api.state.selection.clip_id === clipId;
+        }}, 2000);
+        await api.waitFor(function() {{
+          return document.querySelector('#nf-inspector-body [data-nf-path="title"]');
+        }}, 2000);
+
+        var titleInput = document.querySelector('#nf-inspector-body [data-nf-path="title"]');
+        if (!titleInput) throw new Error('verify-undo: title input missing');
+        titleInput.value = editedTitle;
+        titleInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        await api.waitFor(function() {{
+          var current = api.findClipById(clipId);
+          return current && current.clip && current.clip.params && current.clip.params.title === editedTitle;
+        }}, 4000);
+        steps[0].pass = true;
+        steps[0].clip_id = clipId;
+        steps[0].title_after = editedTitle;
+
+        steps[1].undo_stack_size = api.state && api.state.undo_stack_size;
+        steps[1].pass = steps[1].undo_stack_size === 1;
+
+        api.pressUndoShortcut(false);
+        await api.waitFor(function() {{
+          var current = api.findClipById(clipId);
+          return current &&
+            current.clip &&
+            current.clip.params &&
+            current.clip.params.title === initialTitle &&
+            api.state &&
+            api.state.undo_stack_size === 0 &&
+            api.state.redo_stack_size === 1;
+        }}, 4000);
+        steps[2].pass = true;
+        steps[2].title_after = initialTitle;
+        steps[2].undo_stack_size = api.state.undo_stack_size;
+        steps[2].redo_stack_size = api.state.redo_stack_size;
+
+        api.pressUndoShortcut(true);
+        await api.waitFor(function() {{
+          var current = api.findClipById(clipId);
+          return current &&
+            current.clip &&
+            current.clip.params &&
+            current.clip.params.title === editedTitle &&
+            api.state &&
+            api.state.undo_stack_size === 1 &&
+            api.state.redo_stack_size === 0;
+        }}, 4000);
+        steps[3].pass = true;
+        steps[3].title_after = editedTitle;
+        steps[3].undo_stack_size = api.state.undo_stack_size;
+        steps[3].redo_stack_size = api.state.redo_stack_size;
+
+        for (var idx = 1; idx <= 51; idx++) {{
+          var nextTitle = 'FIFO-' + idx;
+          api.send('set-param', {{ clip_id: clipId, path: 'title', value: nextTitle }});
+          await api.waitFor(function() {{
+            var current = api.findClipById(clipId);
+            return current && current.clip && current.clip.params && current.clip.params.title === nextTitle;
+          }}, 4000);
+        }}
+        steps[4].undo_stack_size = api.state && api.state.undo_stack_size;
+        steps[4].oldest_reverse_value = api.state ? api.state.undo_oldest_reverse_value : null;
+        steps[4].pass = steps[4].undo_stack_size === 50 && steps[4].oldest_reverse_value === 'FIFO-1';
+
+        var beforeSoloState = window.__nf_handle && typeof window.__nf_handle.getState === 'function'
+          ? window.__nf_handle.getState()
+          : null;
+        var beforeSoloActive = beforeSoloState && Array.isArray(beforeSoloState.activeClips)
+          ? beforeSoloState.activeClips.length
+          : 0;
+        var soloBtn = api.findTrackButton(soloTrack.id, 'solo');
+        if (!soloBtn) throw new Error('verify-undo: solo button missing');
+        soloBtn.click();
+        await api.waitFor(function() {{
+          var currentTrack = api.findTrackById(soloTrack.id);
+          return currentTrack && currentTrack.solo === true;
+        }}, 4000);
+        await api.sleep(240);
+        var afterSoloState = window.__nf_handle && typeof window.__nf_handle.getState === 'function'
+          ? window.__nf_handle.getState()
+          : null;
+        var soloActiveIds = [];
+        if (afterSoloState && Array.isArray(afterSoloState.activeClips)) {{
+          for (var ai = 0; ai < afterSoloState.activeClips.length; ai++) {{
+            var activeId = afterSoloState.activeClips[ai] && afterSoloState.activeClips[ai].trackId;
+            if (activeId && soloActiveIds.indexOf(activeId) === -1) soloActiveIds.push(activeId);
+          }}
+        }}
+        var soloSkipped = Math.max(0, beforeSoloActive - soloActiveIds.length);
+        var soloPass = soloActiveIds.length === 1 && soloActiveIds[0] === soloTrack.id && soloSkipped >= 1;
+        soloBtn = api.findTrackButton(soloTrack.id, 'solo');
+        if (soloBtn) soloBtn.click();
+        await api.waitFor(function() {{
+          var currentTrack = api.findTrackById(soloTrack.id);
+          return currentTrack && currentTrack.solo !== true;
+        }}, 4000);
+
+        var muteBtn = api.findTrackButton(audioTrack.id, 'mute');
+        if (!muteBtn) throw new Error('verify-undo: mute button missing');
+        muteBtn.click();
+        await api.waitFor(function() {{
+          var currentTrack = api.findTrackById(audioTrack.id);
+          return currentTrack && currentTrack.muted === true && activeAudioCount() === 0;
+        }}, 5000);
+        api.pressUndoShortcut(false);
+        await api.waitFor(function() {{
+          var currentTrack = api.findTrackById(audioTrack.id);
+          return currentTrack && currentTrack.muted !== true && activeAudioCount() > 0;
+        }}, 5000);
+        steps[5].pass = true;
+        steps[5].audio_track_id = audioTrack.id;
+        steps[5].audio_count_after_mute = 0;
+        steps[5].audio_count_after_undo = activeAudioCount();
+
+        api.send('verify-undo-report', {{
+          steps: steps,
+          solo_check: {{
+            track_id: soloTrack.id,
+            active_before: beforeSoloActive,
+            active_after: soloActiveIds.length,
+            skipped_tracks: soloSkipped,
+            active_track_ids: soloActiveIds,
+            pass: soloPass
+          }},
+          vp: {{
+            title_roundtrip_ok: steps[2].pass && steps[3].pass,
+            fifo_depth: steps[4].undo_stack_size || 0,
+            audio_count_after_mute: 0,
+            solo_skipped_tracks: soloSkipped
+          }},
+          ok: steps[0].pass && steps[1].pass && steps[2].pass && steps[3].pass && steps[4].pass && steps[5].pass && soloPass
+        }});
+      }} catch (err) {{
+        api.send('verify-undo-report', {{
+          steps: steps,
+          ok: false,
+          error: String(err && err.stack || err)
+        }});
+      }}
+    }}, 2200);
+  }};
+
   if (!window.__nf_apply_source_base) {{
     window.__nf_apply_source_base = window.__nf_apply_source;
     window.__nf_apply_source = function(newSource, commitToken) {{
@@ -1264,6 +1633,7 @@ window.__NF_VERIFY_SELECT__ = {verify_select};
         if (api.state) api.receiveState(api.state);
         api.requestState();
         api.runVerifySelect();
+        api.runVerifyUndo();
       }}, 160);
       return result;
     }};
@@ -1273,6 +1643,7 @@ window.__NF_VERIFY_SELECT__ = {verify_select};
         tokens_css = design_tokens_str,
         initial_state = initial_editor_state_str,
         verify_select = verify_select_flag,
+        verify_undo = verify_undo_flag,
     );
 
     // v1.28 self-verify media playback:
@@ -1615,6 +1986,8 @@ window.__nf_render_timeline = function() {{
       var label = iconMap[t.kind] || (t.kind || '?').slice(0,1).toUpperCase();
       var srcFile = t.src ? String(t.src).split('/').pop() : ((t.kind || 'track') + '.js');
       var clipCount = (t.clips || []).length;
+      var muteActive = t.muted === true;
+      var soloActive = t.solo === true;
       el.innerHTML =
         '<div class="tk-icon v">' + label + '</div>' +
         '<div class="tk-text">' +
@@ -1622,7 +1995,10 @@ window.__nf_render_timeline = function() {{
           '<div class="tk-meta">' + srcFile.replace(/</g,'&lt;') + '</div>' +
           '<div class="tk-anim">kind=' + String(t.kind || '?') + ' · ' + clipCount + ' clip(s)</div>' +
         '</div>' +
-        '<div class="tk-ctrls"></div>';
+        '<div class="tk-ctrls">' +
+          '<button class="nf-track-toggle' + (muteActive ? ' is-active' : '') + '" data-nf-track-toggle="mute" data-track-id="' + String(t.id || '').replace(/</g,'&lt;') + '" data-active="' + (muteActive ? '1' : '0') + '" title="Mute track">M</button>' +
+          '<button class="nf-track-toggle' + (soloActive ? ' is-active' : '') + '" data-nf-track-toggle="solo" data-track-id="' + String(t.id || '').replace(/</g,'&lt;') + '" data-active="' + (soloActive ? '1' : '0') + '" title="Solo track">S</button>' +
+        '</div>';
       labels.appendChild(el);
     }});
   }}
@@ -2103,6 +2479,7 @@ struct CliOpts {
     verify_mode: bool,
     verify_select_mode: bool,
     verify_zoom_mode: bool,
+    verify_undo_mode: bool,
     screenshot_path: Option<PathBuf>,
     screenshot_delay_ms: u64,
     export_path: Option<PathBuf>,
@@ -2122,6 +2499,7 @@ fn parse_cli() -> CliOpts {
     let mut verify_mode = false;
     let mut verify_select_mode = false;
     let mut verify_zoom_mode = false;
+    let mut verify_undo_mode = false;
     let mut screenshot_path: Option<PathBuf> = None;
     let mut screenshot_delay_ms: u64 = 2500;
     let mut export_path: Option<PathBuf> = None;
@@ -2141,6 +2519,7 @@ fn parse_cli() -> CliOpts {
             "--verify" => verify_mode = true,
             "--verify-select" => verify_select_mode = true,
             "--verify-zoom" => verify_zoom_mode = true,
+            "--verify-undo" => verify_undo_mode = true,
             "--screenshot" => {
                 i += 1;
                 if i < args.len() {
@@ -2211,6 +2590,7 @@ fn parse_cli() -> CliOpts {
         verify_mode,
         verify_select_mode,
         verify_zoom_mode,
+        verify_undo_mode,
         screenshot_path,
         screenshot_delay_ms,
         export_path,
@@ -2268,6 +2648,47 @@ fn rewrite_file_srcs(v: &mut Value, source_dir: &std::path::Path) {
             }
         }
     }
+}
+
+fn ensure_verify_undo_fixture(source: &mut Value) {
+    let has_audio = source
+        .get("tracks")
+        .and_then(Value::as_array)
+        .map(|tracks| {
+            tracks
+                .iter()
+                .any(|track| track.get("kind").and_then(Value::as_str) == Some("audio"))
+        })
+        .unwrap_or(false);
+    if has_audio {
+        return;
+    }
+    let use_demo_anchor = source.pointer("/anchors/demo").is_some();
+    let Some(tracks) = source.get_mut("tracks").and_then(Value::as_array_mut) else {
+        return;
+    };
+    let (begin_expr, end_expr) = if use_demo_anchor {
+        ("demo.begin", "demo.end")
+    } else {
+        ("0", "10s")
+    };
+    tracks.push(json!({
+        "id": "tr_audio",
+        "kind": "audio",
+        "src": "src/nf-tracks/official/audio.js",
+        "clips": [
+            {
+                "id": "clip_audio_verify",
+                "begin": begin_expr,
+                "end": end_expr,
+                "params": {
+                    "src": "file:///Users/Zhuanz/bigbang/NextFrame/tmp/v1121-demo.mp3",
+                    "from_ms": 0,
+                    "volume": 0.8
+                }
+            }
+        ]
+    }));
 }
 
 /// FIX-2 (v1.31): nf-asset custom protocol — supports HTTP Range/206 so
@@ -2448,7 +2869,8 @@ fn window_capture_rect(window: &tao::window::Window) -> (f64, f64, f64, f64) {
 
 fn main() -> Result<()> {
     let opts = parse_cli();
-    let stdout_json_mode = opts.verify_select_mode || opts.verify_zoom_mode;
+    let stdout_json_mode =
+        opts.verify_select_mode || opts.verify_zoom_mode || opts.verify_undo_mode;
 
     // v1.44 · CLI --export 快捷路径:不启 tao event_loop · 不开窗口 ·
     // 直接用 headless WKWebView + CARenderer (nf-recorder) 产 MP4 · 退出。
@@ -2493,6 +2915,9 @@ fn main() -> Result<()> {
         .with_context(|| format!("read source.json at {}", opts.source_arg))?;
     let mut source_json: Value =
         serde_json::from_str(&source_text).context("source.json not valid JSON")?;
+    if opts.verify_undo_mode {
+        ensure_verify_undo_fixture(&mut source_json);
+    }
     // v1.28: rewrite file:// URLs to nf-asset:// so WKWebView will actually
     // load them (WebKit blocks <video src="file:..."> with MEDIA_ERR_SRC_NOT_SUPPORTED).
     // FIX-5: resolve relative asset paths against source.json's dir.
@@ -2526,6 +2951,7 @@ fn main() -> Result<()> {
         &opts.source_arg,
         opts.verify_media_path.is_some(),
         opts.verify_zoom_mode,
+        opts.verify_undo_mode,
     );
 
     let event_loop: EventLoop<UserEvent> = EventLoopBuilder::with_user_event().build();
@@ -2554,6 +2980,7 @@ fn main() -> Result<()> {
     let verify_media_path_for_handler = opts.verify_media_path.clone();
     let verify_select_mode = opts.verify_select_mode;
     let verify_zoom_mode = opts.verify_zoom_mode;
+    let verify_undo_mode = opts.verify_undo_mode;
 
     let webview = WebViewBuilder::new(&window)
         // v1.31.1 hotfix: ASYNC protocol · WKWebView URLSchemeTask is
@@ -2630,6 +3057,12 @@ fn main() -> Result<()> {
                             proxy_for_handler.send_event(UserEvent::VerifyZoomReport { payload });
                     }
                 }
+                Ok(IpcOutcome::VerifyUndoReport(payload)) => {
+                    if verify_undo_mode {
+                        let _ =
+                            proxy_for_handler.send_event(UserEvent::VerifyUndoReport { payload });
+                    }
+                }
                 Err(e) => {
                     shell_log(stdout_json_mode, &format!("[NF-IPC] error: {e}"));
                 }
@@ -2641,12 +3074,13 @@ fn main() -> Result<()> {
     shell_log(
         stdout_json_mode,
         &format!(
-            "[NF] window {WINDOW_W}x{WINDOW_H} · titlebar transparent + traffic lights · resizable · source={} · tracks={} · verify={} · verify_select={} · verify_zoom={} · screenshot={}",
+            "[NF] window {WINDOW_W}x{WINDOW_H} · titlebar transparent + traffic lights · resizable · source={} · tracks={} · verify={} · verify_select={} · verify_zoom={} · verify_undo={} · screenshot={}",
             opts.source_arg,
             n_tracks,
             opts.verify_mode,
             opts.verify_select_mode,
             opts.verify_zoom_mode,
+            opts.verify_undo_mode,
             opts.screenshot_path
                 .as_ref()
                 .map(|p| p.display().to_string())
@@ -2842,6 +3276,68 @@ fn main() -> Result<()> {
                 let _ = ensure_parent_dir(&json_path);
                 if let Err(err) = std::fs::write(&json_path, &report_json) {
                     eprintln!("[NF-VERIFY-ZOOM] write failed: {err}");
+                    final_ok = false;
+                }
+                let mut stdout = std::io::stdout();
+                if std::io::Write::write_all(&mut stdout, report_json.as_bytes()).is_err() {
+                    final_ok = false;
+                }
+                if std::io::Write::write_all(&mut stdout, b"\n").is_err() {
+                    final_ok = false;
+                }
+                let _ = std::io::Write::flush(&mut stdout);
+                std::process::exit(if final_ok { 0 } else { 1 });
+            }
+            Event::UserEvent(UserEvent::VerifyUndoReport { payload }) => {
+                let json_path = PathBuf::from(VERIFY_UNDO_JSON_PATH);
+                let screenshot_path = PathBuf::from(VERIFY_UNDO_SCREENSHOT_PATH);
+                let (x, y, width, height) = window_capture_rect(&window_for_loop);
+                let screenshot_ok =
+                    capture_region_png(&screenshot_path, x, y, width, height).is_ok();
+                let mut report = if payload.is_object() {
+                    payload
+                } else {
+                    json!({ "ok": false, "payload": payload })
+                };
+                let mut final_ok = report.get("ok").and_then(Value::as_bool).unwrap_or(false);
+                if let Some(obj) = report.as_object_mut() {
+                    if let Some(steps) = obj.get_mut("steps").and_then(Value::as_array_mut) {
+                        if let Some(step) = steps.get_mut(6).and_then(Value::as_object_mut) {
+                            step.insert("pass".to_string(), Value::Bool(screenshot_ok));
+                            step.insert(
+                                "path".to_string(),
+                                Value::String(VERIFY_UNDO_SCREENSHOT_PATH.to_string()),
+                            );
+                        }
+                    }
+                    let steps_pass = obj
+                        .get("steps")
+                        .and_then(Value::as_array)
+                        .map(|steps| {
+                            steps.iter().all(|step| {
+                                step.get("pass").and_then(Value::as_bool).unwrap_or(false)
+                            })
+                        })
+                        .unwrap_or(false);
+                    final_ok = final_ok && steps_pass && screenshot_ok;
+                    obj.insert(
+                        "screenshot_path".to_string(),
+                        Value::String(VERIFY_UNDO_SCREENSHOT_PATH.to_string()),
+                    );
+                    obj.insert(
+                        "report_path".to_string(),
+                        Value::String(VERIFY_UNDO_JSON_PATH.to_string()),
+                    );
+                    obj.insert(
+                        "screenshot_captured".to_string(),
+                        Value::Bool(screenshot_ok),
+                    );
+                    obj.insert("ok".to_string(), Value::Bool(final_ok));
+                }
+                let report_json = pretty_json(&report);
+                let _ = ensure_parent_dir(&json_path);
+                if let Err(err) = std::fs::write(&json_path, &report_json) {
+                    eprintln!("[NF-VERIFY-UNDO] write failed: {err}");
                     final_ok = false;
                 }
                 let mut stdout = std::io::stdout();
