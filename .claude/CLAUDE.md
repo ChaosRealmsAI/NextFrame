@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AI 视频引擎 — 把结构化信息变成视频。输入 JSON，输出可播放 HTML 或 4K MP4。场景不限于自媒体：教育、产品演示、数据报告、内部培训、开源项目介绍。
 
-## 当前状态（2026-04-19）：v1.40 spec + v1.43 lint gates 落地 · v1.41/42 可并行
+## 当前状态（2026-04-19）：v1.40/41/42/43 全部落地 · Track ABI v2 完整闭环
 
 **v0.x 探索期于 2026-04-17 结束并硬重置**（commit `61d4aa0`）· v1.0 从零重启 · v1.12.5 + v1.14 recorder + v1.15 parallel-record + v1.20 wry-shell + v1.22 mp4-export 完成（见 `spec/roadmap.json history`）。
 
@@ -23,6 +23,18 @@ AI 视频引擎 — 把结构化信息变成视频。输入 JSON，输出可播�
 - emitFail 扩 fix_hint 字段 · loadTrackFromSource 扩识别 optional mount/update/unmount export
 - 7 official Tracks 补 describe 3 字段（name / description ≥ 42 字 / use_cases string[]）
 - 5/5 VP 全绿 · 7 Tracks × 11 gates = 77 检查全过
+
+**v1.41 Runtime L2 + WebGL Particles**（2026-04-19 done · merge e0f727e8）：
+- `src/nf-runtime/src/runtime.js` +69 行 · L2 生命周期 dispatch（mount/update/unmount）· 按 kind 匹配 · L1 路径字节级不变
+- `src/nf-tracks/community/webgl-particles.js` · Canvas 2D 800 粒子螺旋动画 · level=2 · 过 11 gates
+- `nf-shell` + demo/v1.41-webgl-particles.json · 窗口可见动画 · 2 亲验截图
+- 5/5 VP 全绿
+
+**v1.42 source.json v2 · data/theme/$ref**（2026-04-19 done · merge ce910015）：
+- `src/nf-core-engine/src/{types,parser,resolve}.ts` · TS 路径加 data/theme + `resolveRefs` JSON Pointer resolver
+- `src/nf-runtime/src/runtime.js` mirror 实现 `_resolveRefs` · 在 liteResolve 里调用 · nf-shell 透明获益
+- `demo/v1.42-ref-demo.json` · bg 色从 theme · 标题/副标/accent 从 data
+- 5/5 VP 全绿 · 3 场景亲验（base / changed / bad ref error）· backward compat L1 零回归
 
 **已有能力**（src/ 下活 crate）：
 | Crate | 能力 |
