@@ -2211,6 +2211,8 @@ dependencies = [
  "serde_json",
  "tao",
  "tokio",
+ "webview2-com",
+ "windows",
  "wry",
 ]
 

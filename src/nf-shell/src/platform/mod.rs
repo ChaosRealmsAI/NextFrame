@@ -9,16 +9,16 @@ pub trait ShellWebView {
     fn set_bounds(&self, x: f64, y: f64, w: f64, h: f64);
 }
 
-#[cfg(target_vendor = "apple")]
-mod mac;
 #[cfg(all(unix, not(target_vendor = "apple")))]
 mod linux;
+#[cfg(target_vendor = "apple")]
+mod mac;
 #[cfg(windows)]
 mod win;
 
-#[cfg(target_vendor = "apple")]
-pub(crate) use self::mac::{build_platform_webview, build_platform_window};
 #[cfg(all(unix, not(target_vendor = "apple")))]
 pub(crate) use self::linux::{build_platform_webview, build_platform_window};
+#[cfg(target_vendor = "apple")]
+pub(crate) use self::mac::{build_platform_webview, build_platform_window};
 #[cfg(windows)]
-pub(crate) use self::win::{build_platform_webview, build_platform_window};
+pub(crate) use self::win::{build_platform_webview, build_platform_window, WinShellWebView};

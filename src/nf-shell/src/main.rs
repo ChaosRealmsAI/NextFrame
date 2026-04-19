@@ -19,20 +19,22 @@
 //!                                            — capture WebView → PNG and exit
 
 mod editor;
+mod platform;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use editor::{EditorState, Selection};
+#[cfg(windows)]
+use platform::ShellWebView;
 use serde_json::{json, Map, Value};
-use tao::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
+use tao::dpi::PhysicalPosition;
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
+#[cfg(target_vendor = "apple")]
 use tao::platform::macos::WindowBuilderExtMacOS;
-use tao::window::WindowBuilder;
 use wry::http;
-use wry::WebViewBuilder;
 
 const WINDOW_TITLE: &str = "NextFrame";
 const WINDOW_W: f64 = 1440.0;
@@ -522,6 +524,7 @@ fn dispatch_ipc(editor: &mut EditorState, body: &str) -> Result<IpcOutcome> {
 // + VideoToolbox · 脱屏录制 · 和 preview 像素级一致(ADR-064)。
 // 参考历史:v1.22 1179900b / v1.22.1 294316ca 的 run_ffmpeg_export 实现 ·
 // 通过 git log 可查 · 若特殊场景需回退可 cherry-pick 回来。
+#[cfg(target_vendor = "apple")]
 fn run_recorder_export(
     source_path: &std::path::Path,
     out: &std::path::Path,
@@ -567,6 +570,26 @@ fn run_recorder_export(
     // stats 用于 log · 不用返回
     let _ = stats;
     Ok(bytes)
+}
+
+#[cfg(not(target_vendor = "apple"))]
+fn run_recorder_export(
+    source_path: &std::path::Path,
+    out: &std::path::Path,
+    duration_s: f64,
+    fps: u32,
+    parallel: Option<usize>,
+    resolution_override: Option<&str>,
+) -> Result<u64> {
+    let _ = (
+        source_path,
+        out,
+        duration_s,
+        fps,
+        parallel,
+        resolution_override,
+    );
+    anyhow::bail!("nf-recorder export is only available on Apple targets")
 }
 
 fn format_parallel_override(parallel: Option<usize>) -> String {
@@ -3130,6 +3153,25 @@ fn ensure_parent_dir(path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(windows)]
+fn evaluate_webview_script(
+    window: &tao::window::Window,
+    webview: &wry::WebView,
+    js: &str,
+) -> Result<()> {
+    let _ = platform::WinShellWebView::new(window, webview).eval_async(js)?;
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn evaluate_webview_script(
+    _window: &tao::window::Window,
+    webview: &wry::WebView,
+    js: &str,
+) -> Result<()> {
+    webview.evaluate_script(js).context("webview eval")
+}
+
 fn window_capture_rect(window: &tao::window::Window) -> (f64, f64, f64, f64) {
     let pos = window
         .outer_position()
@@ -3141,6 +3183,28 @@ fn window_capture_rect(window: &tao::window::Window) -> (f64, f64, f64, f64) {
         f64::from(size.width),
         f64::from(size.height),
     )
+}
+
+#[cfg(windows)]
+fn capture_preview_to_path(
+    path: &std::path::Path,
+    window: &tao::window::Window,
+    webview: &wry::WebView,
+) -> Result<u64> {
+    ensure_parent_dir(path)?;
+    let bytes = platform::WinShellWebView::new(window, webview).snapshot()?;
+    std::fs::write(path, &bytes).with_context(|| format!("write {}", path.display()))?;
+    Ok(bytes.len() as u64)
+}
+
+#[cfg(not(windows))]
+fn capture_preview_to_path(
+    path: &std::path::Path,
+    window: &tao::window::Window,
+    _webview: &wry::WebView,
+) -> Result<u64> {
+    let (x, y, w, h) = window_capture_rect(window);
+    capture_region_png(path, x, y, w, h)
 }
 
 fn main() -> Result<()> {
@@ -3237,20 +3301,18 @@ fn main() -> Result<()> {
     let event_loop: EventLoop<UserEvent> = EventLoopBuilder::with_user_event().build();
     let proxy = event_loop.create_proxy();
 
-    let window = WindowBuilder::new()
-        .with_title(WINDOW_TITLE)
-        .with_inner_size(LogicalSize::new(WINDOW_W, WINDOW_H))
-        .with_position(LogicalPosition::new(opts.window_x, opts.window_y))
-        .with_resizable(true)
-        .with_min_inner_size(LogicalSize::new(960.0, 600.0))
-        .with_title_hidden(true)
-        .with_titlebar_transparent(true)
-        .with_fullsize_content_view(true)
-        .with_has_shadow(true)
-        .with_traffic_light_inset(LogicalPosition::new(TITLEBAR_INSET_X, TITLEBAR_INSET_Y))
-        .build(&event_loop)
-        .context("window build")?;
-    window.set_focus();
+    let window = platform::build_platform_window!(
+        &event_loop,
+        WINDOW_TITLE,
+        WINDOW_W,
+        WINDOW_H,
+        opts.window_x,
+        opts.window_y,
+        960.0,
+        600.0,
+        TITLEBAR_INSET_X,
+        TITLEBAR_INSET_Y
+    );
 
     let editor_state_for_handler = Arc::clone(&editor_state);
     let proxy_for_handler = proxy.clone();
@@ -3262,20 +3324,16 @@ fn main() -> Result<()> {
     let verify_zoom_mode = opts.verify_zoom_mode;
     let verify_undo_mode = opts.verify_undo_mode;
 
-    let webview = WebViewBuilder::new(&window)
-        // v1.31.1 hotfix: ASYNC protocol · WKWebView URLSchemeTask is
-        // main-threaded on macOS. 16 parallel Range requests during seek
-        // + sync File::open/read melt the run loop → "卡". Push each
-        // request onto a worker thread so the event loop keeps pumping.
-        .with_asynchronous_custom_protocol("nf-asset".to_string(), move |req, responder| {
+    let webview = platform::build_platform_webview!(
+        &window,
+        PROTOTYPE_HTML,
+        &init_script,
+        move |req, responder| {
             std::thread::spawn(move || {
                 responder.respond(nf_asset_response(req));
             });
-        })
-        .with_html(PROTOTYPE_HTML)
-        .with_initialization_script(&init_script)
-        .with_devtools(true)
-        .with_ipc_handler(move |req| {
+        },
+        move |req| {
             let body: &str = req.body().as_ref();
             let mut state = match editor_state_for_handler.lock() {
                 Ok(g) => g,
@@ -3367,9 +3425,8 @@ fn main() -> Result<()> {
                     shell_log(stdout_json_mode, &format!("[NF-IPC] error: {e}"));
                 }
             }
-        })
-        .build()
-        .context("webview build")?;
+        }
+    );
 
     shell_log(
         stdout_json_mode,
@@ -3429,25 +3486,16 @@ fn main() -> Result<()> {
                 *control_flow = ControlFlow::Exit;
             }
             Event::UserEvent(UserEvent::EvalScript(js)) => {
-                let _ = webview.evaluate_script(&js);
+                let _ = evaluate_webview_script(&window_for_loop, &webview, &js);
             }
             Event::UserEvent(UserEvent::DragWindow) => {
                 let _ = window_for_loop.drag_window();
             }
             Event::UserEvent(UserEvent::ScreenshotNow(path)) => {
-                let (x, y, width, height) = window_capture_rect(&window_for_loop);
-                match capture_region_png(&path, x, y, width, height) {
+                match capture_preview_to_path(&path, &window_for_loop, &webview) {
                     Ok(n) => shell_log(
                         stdout_json_mode,
-                        &format!(
-                            "[NF-SHOT] wrote {} ({} bytes · region {}x{} @({},{}))",
-                            path.display(),
-                            n,
-                            width as i64,
-                            height as i64,
-                            x as i64,
-                            y as i64
-                        ),
+                        &format!("[NF-SHOT] wrote {} ({} bytes)", path.display(), n),
                     ),
                     Err(e) => eprintln!("[NF-SHOT] failed: {e}"),
                 }
@@ -3482,9 +3530,8 @@ fn main() -> Result<()> {
             Event::UserEvent(UserEvent::VerifySelectReport { payload }) => {
                 let json_path = PathBuf::from(VERIFY_SELECT_JSON_PATH);
                 let screenshot_path = PathBuf::from(VERIFY_SELECT_SCREENSHOT_PATH);
-                let (x, y, width, height) = window_capture_rect(&window_for_loop);
                 let screenshot_ok =
-                    capture_region_png(&screenshot_path, x, y, width, height).is_ok();
+                    capture_preview_to_path(&screenshot_path, &window_for_loop, &webview).is_ok();
                 let mut report = if payload.is_object() {
                     payload
                 } else {
@@ -3526,9 +3573,8 @@ fn main() -> Result<()> {
             Event::UserEvent(UserEvent::VerifyZoomReport { payload }) => {
                 let json_path = PathBuf::from(VERIFY_ZOOM_JSON_PATH);
                 let screenshot_path = PathBuf::from(VERIFY_ZOOM_SCREENSHOT_PATH);
-                let (x, y, width, height) = window_capture_rect(&window_for_loop);
                 let screenshot_ok =
-                    capture_region_png(&screenshot_path, x, y, width, height).is_ok();
+                    capture_preview_to_path(&screenshot_path, &window_for_loop, &webview).is_ok();
                 let mut report = if payload.is_object() {
                     payload
                 } else {
@@ -3591,9 +3637,8 @@ fn main() -> Result<()> {
             Event::UserEvent(UserEvent::VerifyUndoReport { payload }) => {
                 let json_path = PathBuf::from(VERIFY_UNDO_JSON_PATH);
                 let screenshot_path = PathBuf::from(VERIFY_UNDO_SCREENSHOT_PATH);
-                let (x, y, width, height) = window_capture_rect(&window_for_loop);
                 let screenshot_ok =
-                    capture_region_png(&screenshot_path, x, y, width, height).is_ok();
+                    capture_preview_to_path(&screenshot_path, &window_for_loop, &webview).is_ok();
                 let mut report = if payload.is_object() {
                     payload
                 } else {
@@ -3788,7 +3833,8 @@ fn main() -> Result<()> {
                                         "receiveSourceUpdate",
                                         &editor_state_value(&editor),
                                     );
-                                    let _ = webview.evaluate_script(&js);
+                                    let _ =
+                                        evaluate_webview_script(&window_for_loop, &webview, &js);
                                 }
                             }
                         }
