@@ -214,69 +214,40 @@ fn dispatch_ipc(source: &mut Value, body: &str) -> Result<IpcOutcome> {
     }
 }
 
-/// Check `ffmpeg` is on PATH. Used for export pre-flight.
-fn ffmpeg_available() -> bool {
-    std::process::Command::new("ffmpeg")
-        .arg("-version")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
-/// Run `ffmpeg -f avfoundation -framerate 30 -i "2:none" -t <dur> -vf "crop=Wx:H:X:Y"
-/// -c:v h264 -pix_fmt yuv420p <out.mp4>` for `duration_s` seconds.
-///
-/// Screen index 2 matches the device enumeration on this machine (confirmed
-/// via the v1.22 POC); we pass it through as-is since avfoundation's index
-/// space is system-dependent and the POC validated this exact invocation.
-fn run_ffmpeg_export(
+// v1.44 · 老 ffmpeg avfoundation 屏幕录制路径(run_ffmpeg_export / ffmpeg_available)
+// 已砍 · 改为走 nf_recorder::run_export_from_source · runtime 驱动 · CARenderer
+// + VideoToolbox · 脱屏录制 · 和 preview 像素级一致(ADR-064)。
+// 参考历史:v1.22 1179900b / v1.22.1 294316ca 的 run_ffmpeg_export 实现 ·
+// 通过 git log 可查 · 若特殊场景需回退可 cherry-pick 回来。
+fn run_recorder_export(
+    source_path: &std::path::Path,
     out: &std::path::Path,
     duration_s: f64,
-    x: i64,
-    y: i64,
-    w: i64,
-    h: i64,
 ) -> Result<u64> {
     if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent).context("mkdir parent")?;
     }
-    // avfoundation coordinates are in *physical* pixels, so multiply by the
-    // retina scale (assume 2x on macOS — HiDPI path will refine this in v1.23).
-    let px = x * 2;
-    let py = y * 2;
-    let pw = w * 2;
-    let ph = h * 2;
-    let crop = format!("crop={pw}:{ph}:{px}:{py}");
-    let status = std::process::Command::new("ffmpeg")
-        .args([
-            "-y",
-            "-f",
-            "avfoundation",
-            "-framerate",
-            "30",
-            "-i",
-            "2:none",
-            "-t",
-            &format!("{duration_s}"),
-            "-vf",
-            &crop,
-            "-c:v",
-            "h264",
-            "-pix_fmt",
-            "yuv420p",
-        ])
-        .arg(out)
-        .status()
-        .context("spawn ffmpeg")?;
-    if !status.success() {
-        anyhow::bail!("ffmpeg exited with {}", status);
-    }
+    // MacHeadlessShell 要 main thread · 所以用 current_thread runtime。
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("build tokio current-thread runtime")?;
+    let stats = rt
+        .block_on(nf_recorder::run_export_from_source(
+            source_path,
+            out,
+            nf_recorder::ExportOpts {
+                duration_s,
+                ..Default::default()
+            },
+        ))
+        .map_err(|e| anyhow::anyhow!("nf-recorder: {e}"))?;
     let bytes = std::fs::metadata(out).map(|m| m.len()).unwrap_or(0);
     if bytes == 0 {
-        anyhow::bail!("ffmpeg produced empty file");
+        anyhow::bail!("nf-recorder produced empty file");
     }
+    // stats 用于 log · 不用返回
+    let _ = stats;
     Ok(bytes)
 }
 
@@ -889,6 +860,33 @@ fn count_running_nf_shell_pids() -> usize {
 fn main() -> Result<()> {
     let opts = parse_cli();
 
+    // v1.44 · CLI --export 快捷路径:不启 tao event_loop · 不开窗口 ·
+    // 直接用 headless WKWebView + CARenderer (nf-recorder) 产 MP4 · 退出。
+    // 一致性靠 ADR-045 t 纯驱动 + viewport 绑 source.json · 跟 preview 像素级一致。
+    if let Some(export_path) = opts.export_path.clone() {
+        println!(
+            "[NF-RECORDER] CLI --export direct mode · source={} · out={} · duration={}s",
+            opts.source_arg,
+            export_path.display(),
+            opts.export_duration_s
+        );
+        let src_path = PathBuf::from(&opts.source_arg);
+        match run_recorder_export(&src_path, &export_path, opts.export_duration_s) {
+            Ok(bytes) => {
+                println!(
+                    "[NF-RECORDER] done · wrote {} bytes → {}",
+                    bytes,
+                    export_path.display()
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("[NF-RECORDER] failed · {e}");
+                return Err(e);
+            }
+        }
+    }
+
     let source_text = std::fs::read_to_string(&opts.source_arg)
         .with_context(|| format!("read source.json at {}", opts.source_arg))?;
     let source_json: Value =
@@ -1025,25 +1023,10 @@ fn main() -> Result<()> {
         });
     }
 
-    // If --export was passed, kick off the export right after initial mount.
-    if let Some(path) = opts.export_path.clone() {
-        if !ffmpeg_available() {
-            eprintln!(
-                "[NF-EXPORT] ffmpeg not on PATH — install with `brew install ffmpeg` then re-run"
-            );
-            return Ok(());
-        }
-        let duration = opts.export_duration_s;
-        let proxy_exp = proxy.clone();
-        std::thread::spawn(move || {
-            // Let the runtime mount + stabilise before recording.
-            std::thread::sleep(std::time::Duration::from_millis(1500));
-            let _ = proxy_exp.send_event(UserEvent::StartExport {
-                path,
-                duration_s: duration,
-            });
-        });
-    }
+    // v1.44 · --export 模式改走 nf-recorder (runtime 驱动 · 脱屏录制) ·
+    // 不依赖 tao 窗口可见 · 菜单 IPC 触发时仍走 StartExport 事件 (spawn 自身子进程)。
+    // CLI 直接 --export 在 main() 开头已短路退出 (见 fn main 首部) · 这里不再处理。
+    let _ = proxy.clone(); // 保留 proxy · 其他事件仍用。
 
     let window_for_loop = window;
     event_loop.run(move |event, _, control_flow| {
@@ -1090,36 +1073,34 @@ fn main() -> Result<()> {
                 *control_flow = ControlFlow::Exit;
             }
             Event::UserEvent(UserEvent::StartExport { path, duration_s }) => {
-                let pos = window_for_loop
-                    .outer_position()
-                    .map(|p| p.to_logical::<f64>(window_for_loop.scale_factor()))
-                    .unwrap_or(LogicalPosition::new(120.0, 80.0));
-                let sz = window_for_loop
-                    .outer_size()
-                    .to_logical::<f64>(window_for_loop.scale_factor());
+                // v1.44 · 菜单 IPC 触发 · spawn 自身子进程跑 --export · 不阻塞
+                // 交互 preview 窗口。子进程在 fn main() 开头的 early-exit 分支里用
+                // current_thread tokio 跑 nf_recorder::run_export_from_source。
                 println!(
-                    "[NF-EXPORT] start · duration={duration_s}s · region {}x{} @({},{}) → {}",
-                    sz.width as i64,
-                    sz.height as i64,
-                    pos.x as i64,
-                    pos.y as i64,
+                    "[NF-RECORDER] start · duration={duration_s}s → {}",
                     path.display()
                 );
+                let self_exe = std::env::current_exe().unwrap_or_default();
+                let source_arg = opts.source_arg.clone();
                 let path_thread = path.clone();
                 let proxy_exp = proxy.clone();
-                // Run ffmpeg on a worker thread so the event loop keeps pumping.
                 std::thread::spawn(move || {
-                    let result = run_ffmpeg_export(
-                        &path_thread,
-                        duration_s,
-                        pos.x as i64,
-                        pos.y as i64,
-                        sz.width as i64,
-                        sz.height as i64,
-                    );
-                    let (ok, msg) = match result {
-                        Ok(bytes) => (true, format!("wrote {bytes} bytes")),
-                        Err(e) => (false, format!("{e}")),
+                    let status = std::process::Command::new(&self_exe)
+                        .arg(&source_arg)
+                        .arg("--export")
+                        .arg(&path_thread)
+                        .arg("--duration")
+                        .arg(format!("{duration_s}"))
+                        .status();
+                    let (ok, msg) = match status {
+                        Ok(s) if s.success() => {
+                            let bytes = std::fs::metadata(&path_thread)
+                                .map(|m| m.len())
+                                .unwrap_or(0);
+                            (true, format!("wrote {bytes} bytes"))
+                        }
+                        Ok(s) => (false, format!("child exited {s}")),
+                        Err(e) => (false, format!("spawn child: {e}")),
                     };
                     let _ = proxy_exp.send_event(UserEvent::ExportDone {
                         path: path_thread,

@@ -13,6 +13,9 @@ tao = "0.30"
 rfd = "0.14"
 anyhow = { workspace = true }
 serde_json = { workspace = true }
+# v1.44 · runtime 驱动 export · 替换 v1.22 的 ffmpeg avfoundation 路径(ADR-064)
+nf-recorder = { path = "../nf-recorder" }
+tokio = { version = "1", features = ["rt", "macros"] }
 
 [package.metadata.bundle]
 name = "NextFrame"
