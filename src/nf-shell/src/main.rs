@@ -408,12 +408,17 @@ window.__nf_mount = function() {{
       '</div>';
     requestAnimationFrame(function(){{
       window.__nf_reflow();
-      window.__nf_handle = window.NFRuntime.boot({{ stage: '#nf-stage', autoplay: true }});
+      // v1.24: force boot at t=0 so preview plays from the start of the
+      // timeline (earlier we relied on runtime default which wasn't always 0).
+      window.__nf_handle = window.NFRuntime.boot({{ stage: '#nf-stage', autoplay: true, startAtMs: 0 }});
       window.__nf_playing = true;
-      console.log('[NF] runtime booted · tracks=' + Object.keys(window.__NF_TRACKS__).length);
+      // Belt-and-suspenders: if the handle exposes seek(), snap to 0.
+      try {{ if (window.__nf_handle && typeof window.__nf_handle.seek === 'function') window.__nf_handle.seek(0); }} catch (_e) {{}}
+      console.log('[NF] runtime booted · tracks=' + Object.keys(window.__NF_TRACKS__).length + ' · seeked to 0');
       window.__nf_install_drag_handles();
       window.__nf_install_play_button();
       window.__nf_install_source_badge();
+      window.__nf_render_timeline();
     }});
     if (!window.__nf_resize_wired) {{
       window.__nf_resize_wired = true;
@@ -427,6 +432,151 @@ window.__nf_mount = function() {{
 window.__nf_apply_source = function(newSource) {{
   window.__NF_SOURCE__ = newSource;
   window.__nf_mount();
+}};
+
+// ---- v1.24: Render timeline header + labels + lanes + ruler FROM live JSON.
+// Replaces the static 4-track hifi mockup in prototype.html. Track count,
+// names, src filename, clip count all driven by __NF_SOURCE__.tracks.
+window.__nf_render_timeline = function() {{
+  var src = window.__NF_SOURCE__;
+  if (!src || !Array.isArray(src.tracks)) return;
+  var tracks = src.tracks;
+  var durationMs = (typeof src.duration_ms === 'number' && src.duration_ms > 0)
+    ? src.duration_ms
+    : window.__nf_infer_duration(src) || 60000;
+
+  var title = document.querySelector('.tl-title');
+  if (title) title.textContent = 'Timeline · ' + tracks.length + ' tracks';
+  var chips = document.querySelectorAll('.tl-info .mini-chip');
+  var totalClips = tracks.reduce(function(a,t){{ return a + ((t.clips||[]).length); }}, 0);
+  if (chips[0]) chips[0].textContent = tracks.length + ' tracks · ' + totalClips + ' clips';
+  if (chips[1]) chips[1].textContent = 'anchors: ' + Object.keys(src.anchors||{{}}).length;
+
+  // Labels column.
+  var labels = document.querySelector('.tl-labels');
+  if (labels) {{
+    var head = labels.querySelector('.tl-labels-head');
+    labels.innerHTML = '';
+    if (head) labels.appendChild(head);
+    else {{ var h=document.createElement('div'); h.className='tl-labels-head'; h.textContent='Track · Component'; labels.appendChild(h); }}
+    var iconMap = {{'bg':'B','scene':'S','video':'V','audio':'A','chart':'C','data':'D','subtitle':'T'}};
+    tracks.forEach(function(t, i) {{
+      var el = document.createElement('div');
+      el.className = 'tk-label' + (i === 0 ? ' active' : '');
+      var label = iconMap[t.kind] || (t.kind || '?').slice(0,1).toUpperCase();
+      var srcFile = t.src ? String(t.src).split('/').pop() : ((t.kind || 'track') + '.js');
+      var clipCount = (t.clips || []).length;
+      el.innerHTML =
+        '<div class="tk-icon v">' + label + '</div>' +
+        '<div class="tk-text">' +
+          '<div class="tk-name">' + String(t.id || '(no id)').replace(/</g,'&lt;') + '</div>' +
+          '<div class="tk-meta">' + srcFile.replace(/</g,'&lt;') + '</div>' +
+          '<div class="tk-anim">kind=' + String(t.kind || '?') + ' · ' + clipCount + ' clip(s)</div>' +
+        '</div>' +
+        '<div class="tk-ctrls"></div>';
+      labels.appendChild(el);
+    }});
+  }}
+
+  // Lanes + ruler.
+  var lanes = document.querySelector('.tl-lanes');
+  if (lanes) {{
+    lanes.innerHTML = '';
+    // Ruler: N ticks spanning total duration.
+    var ruler = document.createElement('div');
+    ruler.className = 'tl-ruler';
+    ruler.style.cssText = 'position:relative;height:22px;border-bottom:1px solid rgba(255,255,255,0.08);font:10px/1 "SF Mono",monospace;color:rgba(255,255,255,0.5)';
+    var tickCount = 8;
+    for (var j = 0; j <= tickCount; j++) {{
+      var tick = document.createElement('div');
+      var pct = (j / tickCount) * 100;
+      var tMs = (durationMs * j / tickCount) | 0;
+      tick.style.cssText = 'position:absolute;left:' + pct + '%;top:2px;bottom:2px;border-left:1px solid rgba(255,255,255,0.12);padding-left:4px';
+      tick.textContent = window.__nf_fmt_ms(tMs);
+      ruler.appendChild(tick);
+    }}
+    lanes.appendChild(ruler);
+    // One lane row per track; clip bars sized by clip.begin/end in ms.
+    var palette = ['#a78bfa','#f97316','#34d399','#38bdf8','#f472b6','#fbbf24','#fb7185'];
+    tracks.forEach(function(t, i) {{
+      var row = document.createElement('div');
+      row.style.cssText = 'position:relative;height:44px;border-bottom:1px solid rgba(255,255,255,0.04)';
+      var color = palette[i % palette.length];
+      (t.clips || []).forEach(function(c) {{
+        var beginMs = window.__nf_resolve_ms(c.begin, src, 0);
+        var endMs   = window.__nf_resolve_ms(c.end,   src, durationMs);
+        var l = (beginMs / durationMs) * 100;
+        var w = Math.max(2, ((endMs - beginMs) / durationMs) * 100);
+        var bar = document.createElement('div');
+        bar.style.cssText =
+          'position:absolute;left:' + l + '%;width:' + w + '%;top:6px;bottom:6px;' +
+          'background:linear-gradient(90deg,' + color + '55,' + color + 'aa);' +
+          'border:1px solid ' + color + 'cc;border-radius:5px;' +
+          'padding:6px 10px;box-sizing:border-box;' +
+          'font:12px/1.3 -apple-system,sans-serif;color:rgba(255,255,255,0.92);' +
+          'overflow:hidden;white-space:nowrap;text-overflow:ellipsis';
+        bar.textContent = (c.id || t.id) + ' · ' + window.__nf_fmt_ms(endMs - beginMs);
+        bar.title = t.id + '.' + (c.id || '');
+        row.appendChild(bar);
+      }});
+      lanes.appendChild(row);
+    }});
+  }}
+  console.log('[NF] timeline rendered · ' + tracks.length + ' tracks · duration=' + durationMs + 'ms');
+}};
+
+window.__nf_fmt_ms = function(ms) {{
+  if (!isFinite(ms) || ms < 0) return '0s';
+  if (ms < 1000) return ms + 'ms';
+  var s = ms / 1000;
+  if (s < 60) return (s.toFixed(s < 10 ? 1 : 0)) + 's';
+  var m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return m + ':' + (sec < 10 ? '0' : '') + sec;
+}};
+
+// Naive ms resolver: matches v1.19.1 liteResolve's anchor arithmetic for the
+// common cases used in the demos (literal "Ns", "begin"/"end", "anchor.begin + Ns").
+window.__nf_resolve_ms = function(expr, src, fallbackMs) {{
+  if (typeof expr === 'number') return expr;
+  if (typeof expr !== 'string') return fallbackMs;
+  var s = expr.trim();
+  var mNum = s.match(/^(-?\d+(\.\d+)?)(ms|s|m)?$/);
+  if (mNum) {{
+    var n = parseFloat(mNum[1]);
+    var unit = mNum[3] || 's';
+    return unit === 'ms' ? n : (unit === 'm' ? n * 60000 : n * 1000);
+  }}
+  // anchor.begin / anchor.end / anchor.end - Ns / anchor.begin + Ns
+  var mAnchor = s.match(/^(\w+)\.(begin|end)\s*([+\-])?\s*(\d+(\.\d+)?)(ms|s|m)?$/);
+  if (mAnchor) {{
+    var anchorKey = mAnchor[1], side = mAnchor[2];
+    var a = (src.anchors || {{}})[anchorKey];
+    var base = 0;
+    if (a) {{
+      base = window.__nf_resolve_ms(a[side] || (side === 'begin' ? '0' : a.end), src, fallbackMs);
+    }} else if (anchorKey === 'demo') {{
+      base = side === 'begin' ? 0 : fallbackMs;
+    }}
+    if (mAnchor[3]) {{
+      var delta = parseFloat(mAnchor[4]);
+      var unit2 = mAnchor[6] || 's';
+      var deltaMs = unit2 === 'ms' ? delta : (unit2 === 'm' ? delta * 60000 : delta * 1000);
+      base += (mAnchor[3] === '-' ? -deltaMs : deltaMs);
+    }}
+    return base;
+  }}
+  return fallbackMs;
+}};
+
+window.__nf_infer_duration = function(src) {{
+  // Try to resolve end of the "demo" anchor or first anchor's .end.
+  var anchors = src.anchors || {{}};
+  var keys = Object.keys(anchors);
+  if (!keys.length) return 60000;
+  var first = anchors[keys[0]];
+  if (!first) return 60000;
+  // Resolve anchor.end in ms — treat "demo.begin + 60s" → 60000.
+  return window.__nf_resolve_ms(first.end, src, 60000);
 }};
 
 // ---- Play / Pause button injected into Timeline header (.tl-head) ----
