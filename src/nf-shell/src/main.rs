@@ -419,6 +419,7 @@ window.__nf_mount = function() {{
       window.__nf_install_play_button();
       window.__nf_install_source_badge();
       window.__nf_render_timeline();
+      window.__nf_install_playhead();
     }});
     if (!window.__nf_resize_wired) {{
       window.__nf_resize_wired = true;
@@ -523,6 +524,118 @@ window.__nf_render_timeline = function() {{
     }});
   }}
   console.log('[NF] timeline rendered · ' + tracks.length + ' tracks · duration=' + durationMs + 'ms');
+}};
+
+// v1.25: Playhead red line + drag-to-seek.
+// - Subscribes to handle.onTimeUpdate(t_ms) (RAF-driven) to update .left
+// - Listens for mousedown/mousemove on .tl-lanes · converts x → t_ms via
+//   lanes.clientWidth · calls handle.seek(t_ms, {{pause: true}})
+// - Drag-release: resume if was playing before the grab
+window.__nf_install_playhead = function() {{
+  var lanes = document.querySelector('.tl-lanes');
+  if (!lanes) return;
+  var handle = window.__nf_handle;
+  if (!handle) return;
+  // Remove any old playhead (re-mount safety).
+  var old = document.getElementById('nf-playhead'); if (old) old.remove();
+
+  var ph = document.createElement('div');
+  ph.id = 'nf-playhead';
+  ph.style.cssText =
+    'position:absolute;top:0;bottom:0;width:0;pointer-events:none;z-index:50;' +
+    'border-left:2px solid #ef4444;box-shadow:0 0 8px rgba(239,68,68,0.6)';
+  // Playhead head knob (easier to see + drag target).
+  var knob = document.createElement('div');
+  knob.style.cssText =
+    'position:absolute;top:-4px;left:-7px;width:14px;height:14px;' +
+    'background:#ef4444;border-radius:50%;box-shadow:0 0 10px rgba(239,68,68,0.8);' +
+    'pointer-events:auto;cursor:grab';
+  ph.appendChild(knob);
+  lanes.style.position = lanes.style.position || 'relative';
+  lanes.appendChild(ph);
+
+  // Ensure lanes can receive mouse events (prototype CSS may set pointer-events).
+  lanes.style.cursor = 'pointer';
+
+  var src = window.__NF_SOURCE__ || {{}};
+  var durationMs = window.__nf_infer_duration(src) || 60000;
+
+  function tMsToLeft(tMs) {{
+    var w = lanes.clientWidth || 1;
+    var pct = Math.max(0, Math.min(1, tMs / Math.max(1, durationMs)));
+    return (pct * w) + 'px';
+  }}
+  function updatePh(tMs) {{
+    ph.style.left = tMsToLeft(tMs);
+    var timeLabel = document.getElementById('nf-time-label');
+    if (timeLabel) timeLabel.textContent = window.__nf_fmt_ms(tMs) + ' / ' + window.__nf_fmt_ms(durationMs);
+  }}
+
+  // Time label in the timeline header, next to the play button.
+  var tlHead = document.querySelector('.tl-head');
+  if (tlHead && !document.getElementById('nf-time-label')) {{
+    var lab = document.createElement('span');
+    lab.id = 'nf-time-label';
+    lab.style.cssText = 'margin-left:10px;font:12px/1 "SF Mono",monospace;color:rgba(255,255,255,0.72);min-width:110px;display:inline-block';
+    lab.textContent = window.__nf_fmt_ms(0) + ' / ' + window.__nf_fmt_ms(durationMs);
+    var btn = document.getElementById('nf-play-pause');
+    if (btn && btn.parentElement) btn.parentElement.insertBefore(lab, btn.nextSibling);
+    else tlHead.appendChild(lab);
+  }}
+
+  // Subscribe to runtime time ticks.
+  if (typeof handle.onTimeUpdate === 'function') {{
+    handle.onTimeUpdate(function(t_ms) {{ updatePh(t_ms); }});
+  }} else {{
+    // Fallback: RAF polling via handle.getStateAt if available.
+    (function tick(){{
+      try {{
+        var st = (typeof handle.getStateAt === 'function') ? handle.getStateAt() : null;
+        if (st && typeof st.t_ms === 'number') updatePh(st.t_ms);
+      }} catch (_e) {{}}
+      requestAnimationFrame(tick);
+    }})();
+  }}
+  updatePh(0);
+
+  // ---- Drag-to-seek ----
+  var dragging = false, wasPlaying = false;
+  function xToTms(clientX) {{
+    var r = lanes.getBoundingClientRect();
+    var x = clientX - r.left;
+    var pct = Math.max(0, Math.min(1, x / Math.max(1, r.width)));
+    return pct * durationMs;
+  }}
+  function grab(ev) {{
+    dragging = true;
+    wasPlaying = !!window.__nf_playing;
+    if (wasPlaying && handle.pause) {{ try {{ handle.pause(); }} catch(_e){{}} window.__nf_playing = false; }}
+    var t = xToTms(ev.clientX);
+    try {{ handle.seek(t, {{pause: true}}); }} catch(_e){{}}
+    updatePh(t);
+    knob.style.cursor = 'grabbing';
+    ev.preventDefault();
+  }}
+  function move(ev) {{
+    if (!dragging) return;
+    var t = xToTms(ev.clientX);
+    try {{ handle.seek(t, {{pause: true}}); }} catch(_e){{}}
+    updatePh(t);
+  }}
+  function release() {{
+    if (!dragging) return;
+    dragging = false;
+    knob.style.cursor = 'grab';
+    if (wasPlaying && handle.play) {{ try {{ handle.play(); }} catch(_e){{}} window.__nf_playing = true;
+      // Sync play button label.
+      var pbtn = document.getElementById('nf-play-pause'); if (pbtn) pbtn.click && setTimeout(function(){{ /* no-op · handle already playing */ }}, 0);
+    }}
+  }}
+  // Click anywhere on lanes to seek (ruler + empty row also trigger).
+  lanes.addEventListener('mousedown', grab);
+  knob.addEventListener('mousedown', grab);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', release);
 }};
 
 window.__nf_fmt_ms = function(ms) {{
