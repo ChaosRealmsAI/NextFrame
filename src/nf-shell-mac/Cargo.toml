@@ -1,0 +1,22 @@
+[package]
+name = "nf-shell-mac"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "nf-shell-mac"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+objc2 = "0.5"
+objc2-foundation = "0.2"
+objc2-app-kit = "0.2"
+objc2-web-kit = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints]
+workspace = true
