@@ -1,5 +1,6 @@
 //! output module exports
 pub(crate) mod event;
+pub(crate) mod karaoke;
 pub(crate) mod manifest;
 pub(crate) mod naming;
 pub(crate) mod srt;

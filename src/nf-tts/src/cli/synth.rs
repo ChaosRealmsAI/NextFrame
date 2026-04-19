@@ -155,6 +155,14 @@ pub async fn run(command: SynthCommand) -> Result<()> {
                     ));
                     let srt_path = srt::write_srt(&out_path, &timeline.to_boundaries())?;
                     crate::output::write_stderr_line(format_args!("[whisper] srt: {srt_path}"));
+                    match crate::output::karaoke::write_karaoke_html(&out_path, &timeline) {
+                        Ok(karaoke_path) => crate::output::write_stderr_line(format_args!(
+                            "[karaoke] {karaoke_path}"
+                        )),
+                        Err(e) => {
+                            crate::output::write_stderr_line(format_args!("[karaoke] {e}"))
+                        }
+                    }
                 }
                 Ok(None) => {
                     crate::output::write_stderr_line(format_args!("[whisper] no segments detected"))
@@ -173,7 +181,7 @@ pub async fn run(command: SynthCommand) -> Result<()> {
     std::fs::write(&out_path, &result.audio)
         .with_context(|| format!("failed to write audio file {}", out_path.display()))?;
 
-    // Generate timeline JSON + SRT via Whisper alignment.
+    // Generate timeline JSON + SRT + karaoke HTML via Whisper alignment.
     if gen_srt {
         match crate::whisper::align_audio(&out_path, &text, &params.voice) {
             Ok(Some(timeline)) => {
@@ -181,6 +189,12 @@ pub async fn run(command: SynthCommand) -> Result<()> {
                 crate::output::write_stderr_line(format_args!("[whisper] timeline: {json_path}"));
                 let srt_path = srt::write_srt(&out_path, &timeline.to_boundaries())?;
                 crate::output::write_stderr_line(format_args!("[whisper] srt: {srt_path}"));
+                match crate::output::karaoke::write_karaoke_html(&out_path, &timeline) {
+                    Ok(karaoke_path) => crate::output::write_stderr_line(format_args!(
+                        "[karaoke] {karaoke_path}"
+                    )),
+                    Err(e) => crate::output::write_stderr_line(format_args!("[karaoke] {e}")),
+                }
             }
             Ok(None) => {
                 crate::output::write_stderr_line(format_args!("[whisper] no segments detected"))

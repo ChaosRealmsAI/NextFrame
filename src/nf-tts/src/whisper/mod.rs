@@ -21,7 +21,7 @@
 //! `spec/interfaces.json`.
 
 mod aligner;
-mod timeline;
+pub(crate) mod timeline;
 
 use std::path::Path;
 
