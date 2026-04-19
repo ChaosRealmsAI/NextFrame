@@ -1,16 +1,12 @@
 {
   "$schema": "../spec/interfaces.json#/source_json_schema",
   "meta": {
-    "name": "v1.8 video-track showcase",
-    "description": "Track.video PIP · 底层横屏视频嵌入 + 上层 scene hero 文字 · 时长与源一致 (212s)",
+    "name": "v1.8 video-track showcase (multi-track)",
+    "description": "3 轨叠加演示 · 底层 bg 渐变 · 中间 scene hero 文字 · 右下 video PIP · 内容互不重叠",
     "version": "v1.8",
     "created": "2026-04-19"
   },
-  "viewport": {
-    "ratio": "16:9",
-    "w": 1920,
-    "h": 1080
-  },
+  "viewport": { "ratio": "16:9", "w": 1920, "h": 1080 },
   "duration": "demo.end",
   "anchors": {
     "demo": {
@@ -21,7 +17,47 @@
   },
   "tracks": [
     {
-      "id": "video-bg",
+      "id": "bg-gradient",
+      "kind": "bg",
+      "src": "src/nf-tracks/official/bg.js",
+      "clips": [
+        {
+          "id": "bg-clip-01",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "type": "gradient",
+            "gradient": "linear",
+            "angle": 135,
+            "stops": [
+              { "offset": 0, "color": "#1e1b4b" },
+              { "offset": 0.5, "color": "#4c1d95" },
+              { "offset": 1, "color": "#7c2d12" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "scene-hero",
+      "kind": "scene",
+      "src": "src/nf-tracks/official/scene.js",
+      "clips": [
+        {
+          "id": "scene-hero-01",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "layout": "hero",
+            "title": "NextFrame",
+            "subtitle": "v1.8 Track.video · 3 轨叠加不重叠",
+            "accent_color": "#a78bfa"
+          }
+        }
+      ]
+    },
+    {
+      "id": "video-pip",
       "kind": "video",
       "src": "src/nf-tracks/official/video.js",
       "clips": [
@@ -40,8 +76,8 @@
             "w": 30,
             "h": 30,
             "radius": 16,
-            "border": "2px solid rgba(255,255,255,0.3)",
-            "shadow": "0 16px 48px rgba(0,0,0,0.55)"
+            "border": "2px solid rgba(255,255,255,0.35)",
+            "shadow": "0 20px 60px rgba(0,0,0,0.65)"
           }
         }
       ]
