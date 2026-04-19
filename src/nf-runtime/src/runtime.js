@@ -301,28 +301,59 @@ export function boot(options) {
     // ADR-047 · stateful-element-safe mount (replaces stage.innerHTML = html).
     diffAndMount(stage, html);
 
-    // ADR-045 / ADR-046 · record-mode audio discipline + external-t driver.
-    // record mode: force mute + pause, drive currentTime from playhead.
-    // play mode: only correct currentTime when drift exceeds tolerance so we
-    // don't break the browser's natural playback.
+    // ADR-045 / ADR-046 / ADR-054 / ADR-056 · record-mode media discipline +
+    // external-t driver. Handles both <video> and <audio> persist elements.
+    //   record mode: force mute + pause, drive currentTime from playhead.
+    //   play mode:   only correct currentTime when drift exceeds tolerance so
+    //                we don't break the browser's natural playback.
+    // Audio-specific additions (per audio.js DOM contract):
+    //   - data-nf-volume → el.volume (post-mount)
+    //   - data-nf-t-max  → pause when (localT + from) exceeds cap (IS-2a)
     const isRecord = !!(doc.body && doc.body.dataset && doc.body.dataset.mode === "record");
-    const videoEls = stage.querySelectorAll("video[data-nf-persist]");
-    if (videoEls && videoEls.length > 0) {
-      // Match video DOM ↔ activeClip by src attribute (independent of persist
+    const mediaEls = stage.querySelectorAll("video[data-nf-persist], audio[data-nf-persist]");
+    if (mediaEls && mediaEls.length > 0) {
+      // Match media DOM ↔ activeClip by src attribute (independent of persist
       // key format — Track kinds hash src their own way, but src is the single
-      // stable identity across render calls).
+      // stable identity across render calls). audio.js params also expose src.
       const bySrc = new Map();
       for (const ac of state.activeClips) {
         if (ac.params && typeof ac.params.src === "string") {
           bySrc.set(ac.params.src, ac);
         }
       }
-      for (let i = 0; i < videoEls.length; i++) {
-        const v = videoEls[i];
+      for (let i = 0; i < mediaEls.length; i++) {
+        const v = mediaEls[i];
+        const isAudio = v.tagName === "AUDIO";
         const ac = bySrc.get(v.getAttribute("src"));
         if (isRecord) {
           v.muted = true;
           try { if (typeof v.pause === "function") v.pause(); } catch (_e) { /* noop */ }
+        }
+        // Audio-specific: apply volume from data-nf-volume (audio.js contract).
+        // Video has no volume attribute surfaced in its Track contract yet, so
+        // only AUDIO gets this treatment (keeps video v1.8 behaviour intact).
+        if (isAudio) {
+          const volAttr = v.getAttribute("data-nf-volume");
+          if (volAttr != null && volAttr !== "") {
+            const volNum = parseFloat(volAttr);
+            if (!isNaN(volNum)) {
+              try { v.volume = volNum; } catch (_e) { /* noop */ }
+            }
+          }
+        }
+        // Track-window upper bound (IS-2a · design-review ②): audio.js emits
+        // data-nf-t-max as the absolute media-time cap (ms). When the current
+        // localT + offset exceeds it, runtime must pause so audio/video don't
+        // bleed past the Track window. Empty attribute = no cap.
+        const tMaxAttr = v.getAttribute("data-nf-t-max");
+        if (ac && tMaxAttr != null && tMaxAttr !== "") {
+          const tMax = parseFloat(tMaxAttr);
+          if (!isNaN(tMax)) {
+            const fromMsCap = parseFloat(v.getAttribute("data-nf-t-offset") || "0") || 0;
+            if ((ac.localT + fromMsCap) > tMax) {
+              try { if (typeof v.pause === "function") v.pause(); } catch (_e) { /* noop */ }
+            }
+          }
         }
         // play / edit mode: DO NOT touch v.muted or call v.play()/pause()
         // every RAF tick. Chromium re-evaluates autoplay policy on mute
@@ -373,12 +404,13 @@ export function boot(options) {
   // driver + explicit seek call use this write path.
   let _seekForceSync = false;
 
-  // Helper: call v.play() / v.pause() on every persist <video> directly
-  // inside the click / key handler. BUG-20260419-01 round 3: browsers only
-  // honour autoplay when play() fires synchronously inside the user-gesture
-  // event; invoking it later inside RAF tick is rejected → silent video.
-  function _syncVideosFromGesture(targetPlaying) {
-    const vs = stage.querySelectorAll && stage.querySelectorAll("video[data-nf-persist]");
+  // Helper: call el.play() / el.pause() on every persist <video>/<audio>
+  // directly inside the click / key handler. BUG-20260419-01 round 3:
+  // browsers only honour autoplay when play() fires synchronously inside the
+  // user-gesture event; invoking it later inside RAF tick is rejected →
+  // silent media. v1.10 extended to audio (ADR-054).
+  function _syncMediaFromGesture(targetPlaying) {
+    const vs = stage.querySelectorAll && stage.querySelectorAll("video[data-nf-persist], audio[data-nf-persist]");
     if (!vs) return;
     for (let i = 0; i < vs.length; i++) {
       const v = vs[i];
@@ -392,6 +424,26 @@ export function boot(options) {
       } catch (_e) { /* noop */ }
     }
   }
+  // Backward-compat alias — older call sites / external references may still
+  // use the v1.8 name. Keep both pointing at the same impl.
+  const _syncVideosFromGesture = _syncMediaFromGesture;
+
+  // Batch apply mode-driven discipline (record → mute + pause) to every
+  // persist media element. Cheap — called from handle.play()/pause() so mode
+  // flips take effect without waiting for the next renderState tick.
+  function _syncMediaFromMode() {
+    const mode = doc.body && doc.body.dataset ? doc.body.dataset.mode : null;
+    const isRec = mode === "record";
+    const els = stage.querySelectorAll("video[data-nf-persist], audio[data-nf-persist]");
+    for (let i = 0; i < els.length; i++) {
+      const el = els[i];
+      if (isRec) {
+        el.muted = true;
+        try { if (typeof el.pause === "function") el.pause(); } catch (_e) { /* noop */ }
+      }
+      // play/edit mode: 不动 muted (保持用户设置)
+    }
+  }
 
   // --- NFHandle ---
   const handle = {
@@ -402,9 +454,12 @@ export function boot(options) {
       startPerf = _perf() - pausedAtMs;
       playing = true;
       handle._paused = false;
-      // Kick <video> playback synchronously so browsers honour the user
-      // gesture (the outer click handler). Don't wait for next RAF tick.
-      _syncVideosFromGesture(true);
+      // record-mode batch: mute + pause every persist media (cheap, ensures
+      // mode flips take effect without waiting for renderState tick).
+      _syncMediaFromMode();
+      // Kick <video>/<audio> playback synchronously so browsers honour the
+      // user gesture (the outer click handler). Don't wait for next RAF tick.
+      _syncMediaFromGesture(true);
       if (rafId == null) rafId = _raf(tick);
       // BUG-20260419-03 fix 1: emit one tick so play-pause icon flips to ⏸
       // immediately. The RAF loop will supersede on its first frame anyway.
@@ -413,7 +468,8 @@ export function boot(options) {
     pause() {
       if (!playing) {
         handle._paused = true;
-        _syncVideosFromGesture(false);
+        _syncMediaFromMode();
+        _syncMediaFromGesture(false);
         // BUG-20260419-03 fix 1: still notify listeners so the play-pause icon
         // flips to ▶ even when pause is called while already paused (defensive).
         emitTime(currentTMs());
@@ -422,7 +478,8 @@ export function boot(options) {
       pausedAtMs = _perf() - startPerf;
       playing = false;
       handle._paused = true;
-      _syncVideosFromGesture(false);
+      _syncMediaFromMode();
+      _syncMediaFromGesture(false);
       // BUG-20260419-03 fix 1: RAF is about to stop; without this emit the
       // icon stays on ⏸ until the next tick (never). Listeners must see the
       // transition to paused state.
@@ -450,10 +507,10 @@ export function boot(options) {
       // BUG-20260419-03 fix 2: if seek paused the runtime, videos/audios must
       // actually pause too. Without this, dragging the playhead leaves audio
       // playing from the pre-seek position while the frame/time says paused.
-      // _syncVideosFromGesture(false) mirrors pause() behavior: every media
+      // _syncMediaFromGesture(false) mirrors pause() behavior: every media
       // element gets .pause() and currentTime synced by renderState above.
       if (shouldPause) {
-        _syncVideosFromGesture(false);
+        _syncMediaFromGesture(false);
       }
       emitTime(clamped);
     },
