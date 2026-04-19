@@ -355,12 +355,24 @@ export function boot(options) {
             }
           }
         }
-        // play / edit mode: DO NOT touch v.muted or call v.play()/pause()
-        // every RAF tick. Chromium re-evaluates autoplay policy on mute
-        // state change and will pause the video when not inside a user
-        // gesture. Muted autoplay is bootstrapped once after first diff
-        // (see post-mount below); unmute + play happens in the click
-        // handler (inherits the user gesture).
+        // v1.10: late-mounted media autoplay. When a media element is freshly
+        // diff-mounted (Track window just entered · e.g. audio-outro at t=6s)
+        // and runtime is playing, call play() once. Guard via per-element
+        // `data-nf-autoplayed` so we don't re-trigger on every RAF tick (which
+        // would fight Chromium autoplay policy · FM-AUTOPLAY-POLICY). Also
+        // gated by the page-level `_userEverPlayed` flag (set by play() from
+        // user gesture) so we never call play() on page-first-render when the
+        // user hasn't clicked ▶ yet (autoplay policy would silently reject).
+        if (!isRecord && playing && _userEverPlayed) {
+          const alreadyAutoplayed = v.getAttribute("data-nf-autoplayed") === "1";
+          if (!alreadyAutoplayed && v.paused && typeof v.play === "function") {
+            try {
+              const p = v.play();
+              if (p && typeof p.catch === "function") p.catch(() => {});
+            } catch (_e) { /* noop */ }
+            v.setAttribute("data-nf-autoplayed", "1");
+          }
+        }
         if (ac && (isRecord || _seekForceSync)) {
           // Drive v.currentTime from outside only when: (a) record mode
           // (recorder provides external t), or (b) explicit seek jump.
@@ -403,6 +415,10 @@ export function boot(options) {
   // currentTime (that breaks natural playback). Only record mode external-t
   // driver + explicit seek call use this write path.
   let _seekForceSync = false;
+  // v1.10: set to true after the first user-gesture-driven play() call.
+  // Gates post-mount autoplay for late-mounted media so we never call play()
+  // on page-first-render before user interaction (autoplay policy rejects).
+  let _userEverPlayed = false;
 
   // Helper: call el.play() / el.pause() on every persist <video>/<audio>
   // directly inside the click / key handler. BUG-20260419-01 round 3:
@@ -418,8 +434,12 @@ export function boot(options) {
         if (targetPlaying && v.paused) {
           const p = v.play();
           if (p && typeof p.catch === "function") p.catch(() => {});
+          // Mark autoplayed so post-mount RAF loop won't double-play this
+          // element (fights Chromium autoplay policy per FM-AUTOPLAY-POLICY).
+          v.setAttribute("data-nf-autoplayed", "1");
         } else if (!targetPlaying && !v.paused) {
           v.pause();
+          v.removeAttribute("data-nf-autoplayed");
         }
       } catch (_e) { /* noop */ }
     }
@@ -454,6 +474,7 @@ export function boot(options) {
       startPerf = _perf() - pausedAtMs;
       playing = true;
       handle._paused = false;
+      _userEverPlayed = true;
       // record-mode batch: mute + pause every persist media (cheap, ensures
       // mode flips take effect without waiting for renderState tick).
       _syncMediaFromMode();
@@ -733,8 +754,10 @@ function _bindTimelineUi(doc, handle, duration_ms) {
     // BUG-20260419-01 round 4 · muted-autoplay + gesture-unmute pattern.
     // Boot mutes videos so autoplay is allowed (Chromium autoplay policy).
     // First click = user gesture → unmute + ensure playing. Toggling
-    // thereafter flips play/pause state (runtime + video in sync).
-    const vs = doc.querySelectorAll('video[data-nf-persist]');
+    // thereafter flips play/pause state (runtime + media in sync).
+    // v1.10: extended selector to cover audio[data-nf-persist] too so click
+    // handler works on audio-only bundles (no video track).
+    const vs = doc.querySelectorAll('video[data-nf-persist], audio[data-nf-persist]');
     const anyMuted = Array.prototype.slice.call(vs).some((v) => v.muted);
     const anyVideoPaused = Array.prototype.slice.call(vs).some((v) => v.paused);
     if (anyMuted || handle._paused || anyVideoPaused) {

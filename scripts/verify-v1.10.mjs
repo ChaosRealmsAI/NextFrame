@@ -37,9 +37,10 @@ const ABI_LINTER = path.join(ROOT, "src", "nf-tracks", "scripts", "check-abi.mjs
 const ENGINE_JS = path.join(ROOT, "src", "nf-core-engine", "dist", "engine.js");
 
 // mp3 assets (shared across worktrees)
-const MP3_DEMO = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1.12-demo.mp3";     // ≈ 7.8s
-const MP3_LONG = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1.12-long.mp3";     // ≈ 37s
-const MP3_SHORT = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1121-demo.mp3";    // ≈ 19.8s
+// v1.12.5 cleanup deleted v1.12-demo.*/v1.12-long.*; reuse v1121/v1122 assets.
+const MP3_DEMO = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1121-demo.mp3";     // ≈ 19.8s
+const MP3_LONG = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1122-demo.mp3";     // ≈ 19.4s
+const MP3_SHORT = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1122-demo.mp3";    // ≈ 19.4s (distinct from MP3_DEMO for VP-7 overlap test)
 
 mkdirSync(VERIFY_DIR, { recursive: true });
 mkdirSync(SCREENSHOT_DIR, { recursive: true });
