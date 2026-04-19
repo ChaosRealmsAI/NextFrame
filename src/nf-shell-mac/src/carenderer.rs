@@ -187,7 +187,8 @@ impl CARendererSampler {
         // 3. beginFrame · timeStamp=null 让 renderer 用 now
         // SAFETY: beginFrameAtTime_timeStamp 主线程调用 · timeStamp 允许 null (Apple 文档)。
         unsafe {
-            self.renderer.beginFrameAtTime_timeStamp(0.0, core::ptr::null_mut());
+            self.renderer
+                .beginFrameAtTime_timeStamp(0.0, core::ptr::null_mut());
         }
 
         // 4. addUpdateRect · full bounds（每帧全量脏区 · 简单稳定）
@@ -227,9 +228,9 @@ fn flip_y_surface(
     width: usize,
     height: usize,
 ) -> Result<(), ShellError> {
-    let row_bytes = width.checked_mul(BYTES_PER_ELEMENT).ok_or_else(|| {
-        ShellError::SnapshotFailed(format!("flip row overflow: width={width}"))
-    })?;
+    let row_bytes = width
+        .checked_mul(BYTES_PER_ELEMENT)
+        .ok_or_else(|| ShellError::SnapshotFailed(format!("flip row overflow: width={width}")))?;
 
     let mut src_seed: u32 = 0;
     // SAFETY: src lock(ReadOnly) · seed out-slot valid。

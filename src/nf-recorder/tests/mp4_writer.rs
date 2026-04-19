@@ -43,8 +43,8 @@ fn writes_minimal_mp4_with_moov_front() {
     let template = encode_one_real_frame();
 
     // ── Step 2: replay 60 frames through Mp4Writer ──────────────────────────
-    let mut writer = Mp4Writer::new(&tmp_path, WIDTH as u32, HEIGHT as u32, FPS)
-        .expect("Mp4Writer::new failed");
+    let mut writer =
+        Mp4Writer::new(&tmp_path, WIDTH as u32, HEIGHT as u32, FPS).expect("Mp4Writer::new failed");
 
     for i in 0..FRAME_COUNT {
         // 60 fps → 1000/60 ≈ 16 ms per frame (prompt asks pts_ms = i * 16).

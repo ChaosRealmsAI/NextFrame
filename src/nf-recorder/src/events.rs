@@ -112,10 +112,7 @@ pub enum Event {
     RecordConcatStart { segments: Vec<String> },
     /// v1.15 · 并行录制全部完成 · wall time 统计。
     #[serde(rename = "record.parallel.done")]
-    RecordParallelDone {
-        parallel: usize,
-        wall_time_ms: f64,
-    },
+    RecordParallelDone { parallel: usize, wall_time_ms: f64 },
     /// Fatal error · recorder exits non-zero after emitting.
     #[serde(rename = "error")]
     Error { code: String, message: String },

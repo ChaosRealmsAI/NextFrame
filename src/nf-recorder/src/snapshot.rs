@@ -28,6 +28,8 @@ use std::ptr::NonNull;
 
 use nf_shell_mac::{DesktopShell, IOSurfaceHandle, MacHeadlessShell, ShellConfig};
 
+const EXPORT_SEEK_SETTLE: std::time::Duration = std::time::Duration::from_millis(12);
+
 /// Errors returned by `snapshot` · mapped 1-to-1 onto exit codes in `main`.
 #[derive(Debug, thiserror::Error)]
 pub enum SnapshotError {
@@ -140,17 +142,13 @@ async fn snapshot_once(
     }
 
     let has_export_seek_bridge = shell
-        .call_async(
-            "return !!(window.__nf_seek_export && window.__nf_read_seek_export);",
-        )
+        .eval_sync("return !!(window.__nf_seek_export && window.__nf_read_seek_export);")
         .await
         .map_err(|e| SnapshotError::JsCall(format!("{e}")))?
         .as_bool()
         == Some(true);
     let has_video_state_probe = shell
-        .call_async(
-            "return !!(window.__nf && typeof window.__nf.getVideoState === 'function');",
-        )
+        .eval_sync("return !!(window.__nf && typeof window.__nf.getVideoState === 'function');")
         .await
         .map_err(|e| SnapshotError::JsCall(format!("{e}")))?
         .as_bool()
@@ -158,26 +156,23 @@ async fn snapshot_once(
 
     // 4. Seek + await frameReady. Runtime contract: `{ t, frameReady, seq }`.
     let v = if has_export_seek_bridge {
-        let script = format!("window.__nf_seek_export({t_ms}); return true;");
-        let seek_ok = shell
-            .call_async(&script)
-            .await
+        let script = format!("window.__nf_seek_export({t_ms});");
+        shell
+            .eval_fire_and_forget(&script)
             .map_err(|e| SnapshotError::JsCall(format!("{e}")))?;
-        if seek_ok.as_bool() != Some(true) {
-            return Err(SnapshotError::FrameReadyContract(format!(
-                "export seek bridge returned non-true at t_ms={t_ms} · got {seek_ok}"
-            )));
-        }
         if has_video_state_probe {
             wait_for_video_state_ready(&shell, t_ms).await?;
+            wait_for_export_seek_ready(&shell, t_ms, 0).await?
+        } else {
+            shell.pump_for(EXPORT_SEEK_SETTLE);
+            serde_json::json!({
+                "t": t_ms,
+                "frameReady": true,
+                "seq": 1
+            })
         }
-        serde_json::json!({
-            "t": t_ms,
-            "frameReady": true,
-            "seq": 1
-        })
     } else {
-        let script = format!("return await window.__nf.seek({t_ms});");
+        let script = format!("return JSON.stringify(await window.__nf.seek({t_ms}));");
         let v_raw = shell
             .call_async(&script)
             .await
@@ -248,13 +243,14 @@ async fn wait_for_video_state_ready(
 ) -> Result<(), SnapshotError> {
     let started = std::time::Instant::now();
     loop {
-        let value = shell
-            .call_async(
-                "return (window.__nf && typeof window.__nf.getVideoState === 'function') \
-                 ? window.__nf.getVideoState() : { count: 0, clips: [] };",
+        let raw = shell
+            .eval_sync(
+                "return JSON.stringify((window.__nf && typeof window.__nf.getVideoState === 'function') \
+                 ? window.__nf.getVideoState() : { count: 0, clips: [] });",
             )
             .await
             .map_err(|e| SnapshotError::JsCall(format!("video-state poll: {e}")))?;
+        let value = parse_seek_result(raw)?;
         if video_state_is_ready(&value, t_ms)? {
             return Ok(());
         }
@@ -264,6 +260,41 @@ async fn wait_for_video_state_ready(
             )));
         }
         tokio::time::sleep(std::time::Duration::from_millis(16)).await;
+    }
+}
+
+async fn wait_for_export_seek_ready(
+    shell: &MacHeadlessShell,
+    t_ms: u64,
+    min_seq_exclusive: u64,
+) -> Result<serde_json::Value, SnapshotError> {
+    let started = std::time::Instant::now();
+    loop {
+        let raw = shell
+            .eval_sync("return window.__nf_read_seek_export();")
+            .await
+            .map_err(|e| SnapshotError::JsCall(format!("export seek poll: {e}")))?;
+        let value = parse_seek_result(raw)?;
+        let runtime_seq = value
+            .get("seq")
+            .and_then(|v| v.as_u64())
+            .or_else(|| {
+                value
+                    .get("seq")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite() && *v >= 0.0 && v.fract() == 0.0)
+                    .map(|v| v as u64)
+            })
+            .unwrap_or(0);
+        if runtime_seq > min_seq_exclusive {
+            return Ok(value);
+        }
+        if started.elapsed() >= std::time::Duration::from_secs(5) {
+            return Err(SnapshotError::FrameReadyContract(format!(
+                "export seek not ready at t_ms={t_ms} after 5000ms"
+            )));
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(4)).await;
     }
 }
 
@@ -415,9 +446,9 @@ pub(crate) fn iosurface_to_png(handle: &IOSurfaceHandle) -> Result<Vec<u8>, Snap
 
     let base: NonNull<c_void> = surface.base_address();
     let bytes_per_row = surface.bytes_per_row();
-    let row_bytes = width.checked_mul(4).ok_or_else(|| {
-        SnapshotError::FrameReadyContract(format!("width overflow: {width}"))
-    })?;
+    let row_bytes = width
+        .checked_mul(4)
+        .ok_or_else(|| SnapshotError::FrameReadyContract(format!("width overflow: {width}")))?;
     if bytes_per_row < row_bytes {
         // Unlock before bail-out to keep refcount balanced.
         // SAFETY: symmetric unlock with same seed · always sound after a
@@ -435,9 +466,7 @@ pub(crate) fn iosurface_to_png(handle: &IOSurfaceHandle) -> Result<Vec<u8>, Snap
 
     // Tightly-packed RGBA buffer. Capacity checked for overflow.
     let total = row_bytes.checked_mul(height).ok_or_else(|| {
-        SnapshotError::FrameReadyContract(format!(
-            "raster overflow: {width}x{height}"
-        ))
+        SnapshotError::FrameReadyContract(format!("raster overflow: {width}x{height}"))
     })?;
     let mut rgba: Vec<u8> = vec![0u8; total];
 
@@ -547,10 +576,7 @@ fn parse_seek_result(value: serde_json::Value) -> Result<serde_json::Value, Snap
     }
 }
 
-fn video_state_is_ready(
-    value: &serde_json::Value,
-    t_ms: u64,
-) -> Result<bool, SnapshotError> {
+fn video_state_is_ready(value: &serde_json::Value, t_ms: u64) -> Result<bool, SnapshotError> {
     let Some(obj) = value.as_object() else {
         return Err(SnapshotError::FrameReadyContract(format!(
             "video-state expected object at t_ms={t_ms} · got {value}"

@@ -55,8 +55,8 @@ define_class!(
         ) {
             // SAFETY: WKScriptMessage.body 返 id · 必 unsafe。main thread 持有。
             let body = unsafe { message.body() };
-            let value = crate::headless::mac::objc_to_json(&body)
-                .unwrap_or(serde_json::Value::Null);
+            let value =
+                crate::headless::mac::objc_to_json(&body).unwrap_or(serde_json::Value::Null);
             let _ = self.ivars().tx.send(WebViewEvent::BridgeMessage(value));
         }
     }
@@ -141,9 +141,8 @@ pub fn create_webview(
     };
 
     // SAFETY: initWithFrame_configuration 需 main thread · WKWebView::alloc 同样需 mtm。
-    let web_view = unsafe {
-        WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), frame, &config)
-    };
+    let web_view =
+        unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), frame, &config) };
     web_view.setFrame(frame);
     // FM-COMPOSITOR-COMMIT-ASYNC (BUG-20260419-v1.14-compositor-commit):
     // setWantsLayer(true) 是走 CALayer-backed 同步渲染路径的前提 · 不开则

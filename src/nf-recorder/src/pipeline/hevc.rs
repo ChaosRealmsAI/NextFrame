@@ -44,11 +44,7 @@ impl RecordPipeline for PipelineHevcMain {
         })
     }
 
-    fn push_frame(
-        &mut self,
-        surface: IOSurfaceHandle,
-        pts_ms: u64,
-    ) -> Result<(), PipelineError> {
+    fn push_frame(&mut self, surface: IOSurfaceHandle, pts_ms: u64) -> Result<(), PipelineError> {
         let pixel_buffer = surface
             .as_cv_pixel_buffer()
             .map_err(|e| PipelineError::IoError(format!("{e}")))?;

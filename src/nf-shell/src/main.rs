@@ -90,9 +90,16 @@ enum UserEvent {
     EvalScript(String),
     DragWindow,
     ScreenshotNow(PathBuf),
+    StartExportDialog {
+        duration_s: f64,
+        parallel: Option<usize>,
+        resolution: Option<String>,
+    },
     StartExport {
         path: PathBuf,
         duration_s: f64,
+        parallel: Option<usize>,
+        resolution: Option<String>,
     },
     ExportDone {
         path: PathBuf,
@@ -259,9 +266,16 @@ enum IpcOutcome {
     DragWindow,
     MenuOpen,
     MenuSave,
+    StartExportDialog {
+        duration_s: f64,
+        parallel: Option<usize>,
+        resolution: Option<String>,
+    },
     StartExport {
         path: PathBuf,
         duration_s: f64,
+        parallel: Option<usize>,
+        resolution: Option<String>,
     },
     VerifyMediaReport(String),
     VerifySelectReport(Value),
@@ -463,16 +477,41 @@ fn dispatch_ipc(editor: &mut EditorState, body: &str) -> Result<IpcOutcome> {
         "verify-zoom-report" => Ok(IpcOutcome::VerifyZoomReport(payload)),
         "verify-undo-report" => Ok(IpcOutcome::VerifyUndoReport(payload)),
         "export-mp4" => {
-            let path = payload
-                .get("path")
-                .and_then(|v| v.as_str())
-                .map(PathBuf::from)
-                .context("export-mp4: path missing")?;
             let duration_s = payload
                 .get("duration_s")
                 .and_then(|v| v.as_f64())
                 .unwrap_or(5.0);
-            Ok(IpcOutcome::StartExport { path, duration_s })
+            let parallel = payload
+                .get("parallel")
+                .map(|v| {
+                    let raw = v
+                        .as_u64()
+                        .context("export-mp4: parallel must be a positive integer")?;
+                    usize::try_from(raw).context("export-mp4: parallel out of usize range")
+                })
+                .transpose()?;
+            let resolution = payload
+                .get("resolution")
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            if let Some(path) = payload
+                .get("path")
+                .and_then(|v| v.as_str())
+                .map(PathBuf::from)
+            {
+                Ok(IpcOutcome::StartExport {
+                    path,
+                    duration_s,
+                    parallel,
+                    resolution,
+                })
+            } else {
+                Ok(IpcOutcome::StartExportDialog {
+                    duration_s,
+                    parallel,
+                    resolution,
+                })
+            }
         }
         other => anyhow::bail!("unknown ipc kind: {other}"),
     }
@@ -487,17 +526,20 @@ fn run_recorder_export(
     source_path: &std::path::Path,
     out: &std::path::Path,
     duration_s: f64,
-    parallel: usize,
+    fps: u32,
+    parallel: Option<usize>,
     resolution_override: Option<&str>,
 ) -> Result<u64> {
     if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent).context("mkdir parent")?;
     }
+    if fps != 30 && fps != 60 {
+        anyhow::bail!("invalid --fps {fps} (expected 30 or 60)");
+    }
     let resolution_override = resolution_override
         .map(|raw| {
-            nf_recorder::ExportResolution::parse_str(raw).ok_or_else(|| {
-                anyhow::anyhow!("invalid --resolution {raw} (expected 1080p or 4k)")
-            })
+            nf_recorder::ExportResolution::parse_str(raw)
+                .ok_or_else(|| anyhow::anyhow!("invalid --resolution {raw} (expected 1080p or 4k)"))
         })
         .transpose()?;
     // MacHeadlessShell 要 main thread · 所以用 current_thread runtime。
@@ -511,6 +553,7 @@ fn run_recorder_export(
             out,
             nf_recorder::ExportOpts {
                 duration_s,
+                fps,
                 parallel,
                 resolution_override,
                 ..Default::default()
@@ -524,6 +567,26 @@ fn run_recorder_export(
     // stats 用于 log · 不用返回
     let _ = stats;
     Ok(bytes)
+}
+
+fn format_parallel_override(parallel: Option<usize>) -> String {
+    parallel
+        .map(|n| n.to_string())
+        .unwrap_or_else(|| "auto".to_string())
+}
+
+fn format_resolution_override(resolution: Option<&str>) -> String {
+    resolution.unwrap_or("source/default").to_string()
+}
+
+fn default_export_filename(source_arg: &str, resolution: Option<&str>) -> String {
+    let stem = std::path::Path::new(source_arg)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("nextframe-export");
+    let suffix = resolution.unwrap_or("auto");
+    format!("{stem}-{suffix}.mp4")
 }
 
 /// Capture the nf-shell window region via `screencapture -R x,y,w,h`.
@@ -854,6 +917,95 @@ window.nfEditor.scroll = function(deltaMs) {{
 window.nfEditor.timelineState = function() {{
   return window.__nf_timeline_snapshot ? window.__nf_timeline_snapshot() : null;
 }};
+window.nfExport = window.nfExport || {{}};
+window.nfExport.state = window.nfExport.state || {{ parallel4k: true }};
+window.nfExport.exportDurationSeconds = function() {{
+  try {{
+    if (window.__nf && typeof window.__nf.getDuration === 'function') {{
+      var ms = Number(window.__nf.getDuration());
+      if (isFinite(ms) && ms > 0) return Number((ms / 1000).toFixed(3));
+    }}
+  }} catch (_err) {{}}
+  try {{
+    if (window.__nf_handle && typeof window.__nf_handle.getState === 'function') {{
+      var state = window.__nf_handle.getState();
+      var durationMs = state && Number(state.duration_ms);
+      if (isFinite(durationMs) && durationMs > 0) return Number((durationMs / 1000).toFixed(3));
+    }}
+  }} catch (_err) {{}}
+  return 5.0;
+}};
+window.nfExport.ensureStyle = function() {{
+  if (document.getElementById('nf-export-style')) return;
+  var style = document.createElement('style');
+  style.id = 'nf-export-style';
+  style.textContent =
+    '.nf-export-toggle{{display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.82);font:600 12px/1 -apple-system,\"SF Pro\",sans-serif;cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease;}}' +
+    '.nf-export-toggle:hover{{background:rgba(255,255,255,0.10);color:#fff;}}' +
+    '.nf-export-toggle[data-active=\"1\"]{{background:rgba(52,211,153,0.16);border-color:rgba(52,211,153,0.42);color:#6ee7b7;}}' +
+    '.nf-export-toggle[data-active=\"0\"]{{background:rgba(249,115,22,0.14);border-color:rgba(249,115,22,0.34);color:#fdba74;}}';
+  document.head.appendChild(style);
+}};
+window.nfExport.render = function() {{
+  var toggle = document.getElementById('nf-export-toggle');
+  if (!toggle) return;
+  var active = !!(window.nfExport.state && window.nfExport.state.parallel4k);
+  toggle.dataset.active = active ? '1' : '0';
+  toggle.textContent = active ? '4K 并行' : '4K 串行';
+  toggle.title = active ? '当前导出：4K 并行 (parallel=4)' : '当前导出：4K 串行 (parallel=1)';
+}};
+window.nfExport.ensureUi = function() {{
+  window.nfExport.ensureStyle();
+  var topbar = document.querySelector('.topbar');
+  if (!topbar) return;
+  var exportBtn = topbar.querySelector('.btn-primary');
+  if (!exportBtn) return;
+  var toggle = document.getElementById('nf-export-toggle');
+  if (!toggle) {{
+    toggle = document.createElement('button');
+    toggle.id = 'nf-export-toggle';
+    toggle.type = 'button';
+    toggle.className = 'nf-export-toggle';
+    toggle.addEventListener('click', function(ev) {{
+      ev.preventDefault();
+      ev.stopPropagation();
+      window.nfExport.state.parallel4k = !window.nfExport.state.parallel4k;
+      window.nfExport.render();
+    }});
+    exportBtn.parentElement.insertBefore(toggle, exportBtn);
+  }}
+  if (!exportBtn.__nf_export_wired) {{
+    exportBtn.__nf_export_wired = true;
+    exportBtn.addEventListener('click', function(ev) {{
+      ev.preventDefault();
+      ev.stopPropagation();
+      window.ipc.postMessage(JSON.stringify({{
+        kind: 'export-mp4',
+        payload: {{
+          duration_s: window.nfExport.exportDurationSeconds(),
+          resolution: '4k',
+          parallel: window.nfExport.state.parallel4k ? 4 : 1
+        }}
+      }}));
+    }});
+  }}
+  window.nfExport.render();
+}};
+if (document.readyState === 'loading') {{
+  document.addEventListener('DOMContentLoaded', function() {{
+    window.setTimeout(function() {{
+      if (window.nfExport && typeof window.nfExport.ensureUi === 'function') {{
+        window.nfExport.ensureUi();
+      }}
+    }}, 0);
+  }});
+}} else {{
+  window.setTimeout(function() {{
+    if (window.nfExport && typeof window.nfExport.ensureUi === 'function') {{
+      window.nfExport.ensureUi();
+    }}
+  }}, 0);
+}}
 "#,
         verify_zoom = verify_zoom_flag,
     );
@@ -2588,9 +2740,10 @@ struct CliOpts {
     screenshot_delay_ms: u64,
     export_path: Option<PathBuf>,
     export_duration_s: f64,
+    export_fps: u32,
     /// v1.44.1 · 并行切片 N · 默认 1 = 单进程 · ≥2 走 orchestrator spawn N 子进程 + ffmpeg concat.
     /// duration < 6s 自动降级单进程(orchestrator 内部判)。
-    export_parallel: usize,
+    export_parallel: Option<usize>,
     export_resolution: Option<String>,
     menu_test: bool,
     window_x: f64,
@@ -2609,7 +2762,8 @@ fn parse_cli() -> CliOpts {
     let mut screenshot_delay_ms: u64 = 2500;
     let mut export_path: Option<PathBuf> = None;
     let mut export_duration_s: f64 = 5.0;
-    let mut export_parallel: usize = 1;
+    let mut export_fps: u32 = 60;
+    let mut export_parallel: Option<usize> = None;
     let mut export_resolution: Option<String> = None;
     let mut menu_test = false;
     // Auto-cascade: count sibling nf-shell processes · stagger 40px per window.
@@ -2677,11 +2831,19 @@ fn parse_cli() -> CliOpts {
                     }
                 }
             }
+            "--fps" => {
+                i += 1;
+                if i < args.len() {
+                    if let Ok(v) = args[i].parse::<u32>() {
+                        export_fps = v;
+                    }
+                }
+            }
             "--parallel" => {
                 i += 1;
                 if i < args.len() {
                     if let Ok(v) = args[i].parse::<usize>() {
-                        export_parallel = v.max(1);
+                        export_parallel = Some(v);
                     }
                 }
             }
@@ -2707,6 +2869,7 @@ fn parse_cli() -> CliOpts {
         screenshot_delay_ms,
         export_path,
         export_duration_s,
+        export_fps,
         export_parallel,
         export_resolution,
         menu_test,
@@ -2992,14 +3155,13 @@ fn main() -> Result<()> {
         shell_log(
             stdout_json_mode,
             &format!(
-                "[NF-RECORDER] CLI --export direct mode · source={} · out={} · duration={}s · parallel={} · resolution={}",
+                "[NF-RECORDER] CLI --export direct mode · source={} · out={} · duration={}s · fps={} · parallel={} · resolution={}",
                 opts.source_arg,
                 export_path.display(),
                 opts.export_duration_s,
-                opts.export_parallel,
-                opts.export_resolution
-                    .as_deref()
-                    .unwrap_or("source/default")
+                opts.export_fps,
+                format_parallel_override(opts.export_parallel),
+                format_resolution_override(opts.export_resolution.as_deref())
             ),
         );
         let src_path = PathBuf::from(&opts.source_arg);
@@ -3007,6 +3169,7 @@ fn main() -> Result<()> {
             &src_path,
             &export_path,
             opts.export_duration_s,
+            opts.export_fps,
             opts.export_parallel,
             opts.export_resolution.as_deref(),
         ) {
@@ -3150,9 +3313,29 @@ fn main() -> Result<()> {
                 Ok(IpcOutcome::MenuSave) => {
                     let _ = proxy_for_handler.send_event(UserEvent::MenuSave);
                 }
-                Ok(IpcOutcome::StartExport { path, duration_s }) => {
-                    let _ =
-                        proxy_for_handler.send_event(UserEvent::StartExport { path, duration_s });
+                Ok(IpcOutcome::StartExportDialog {
+                    duration_s,
+                    parallel,
+                    resolution,
+                }) => {
+                    let _ = proxy_for_handler.send_event(UserEvent::StartExportDialog {
+                        duration_s,
+                        parallel,
+                        resolution,
+                    });
+                }
+                Ok(IpcOutcome::StartExport {
+                    path,
+                    duration_s,
+                    parallel,
+                    resolution,
+                }) => {
+                    let _ = proxy_for_handler.send_event(UserEvent::StartExport {
+                        path,
+                        duration_s,
+                        parallel,
+                        resolution,
+                    });
                 }
                 Ok(IpcOutcome::VerifyMediaReport(json)) => {
                     if let Some(ref p) = verify_media_path_for_handler {
@@ -3467,29 +3650,75 @@ fn main() -> Result<()> {
                 let _ = std::io::Write::flush(&mut stdout);
                 std::process::exit(if final_ok { 0 } else { 1 });
             }
-            Event::UserEvent(UserEvent::StartExport { path, duration_s }) => {
+            Event::UserEvent(UserEvent::StartExportDialog {
+                duration_s,
+                parallel,
+                resolution,
+            }) => {
+                shell_log(
+                    stdout_json_mode,
+                    &format!(
+                        "[NF-EXPORT] pick path · duration={duration_s}s · parallel={} · resolution={}",
+                        format_parallel_override(parallel),
+                        format_resolution_override(resolution.as_deref())
+                    ),
+                );
+                let picked = rfd::FileDialog::new()
+                    .add_filter("MP4 video", &["mp4"])
+                    .set_file_name(&default_export_filename(
+                        &opts.source_arg,
+                        resolution.as_deref(),
+                    ))
+                    .save_file();
+                match picked {
+                    Some(path) => {
+                        let _ = proxy.send_event(UserEvent::StartExport {
+                            path,
+                            duration_s,
+                            parallel,
+                            resolution,
+                        });
+                    }
+                    None => shell_log(stdout_json_mode, "[NF-EXPORT] cancelled"),
+                }
+            }
+            Event::UserEvent(UserEvent::StartExport {
+                path,
+                duration_s,
+                parallel,
+                resolution,
+            }) => {
                 // v1.44 · 菜单 IPC 触发 · spawn 自身子进程跑 --export · 不阻塞
                 // 交互 preview 窗口。子进程在 fn main() 开头的 early-exit 分支里用
                 // current_thread tokio 跑 nf_recorder::run_export_from_source。
                 shell_log(
                     stdout_json_mode,
                     &format!(
-                        "[NF-RECORDER] start · duration={duration_s}s → {}",
-                        path.display()
+                        "[NF-RECORDER] start · duration={duration_s}s · parallel={} · resolution={} → {}",
+                        format_parallel_override(parallel),
+                        format_resolution_override(resolution.as_deref()),
+                        path.display(),
                     ),
                 );
                 let self_exe = std::env::current_exe().unwrap_or_default();
                 let source_arg = opts.source_arg.clone();
                 let path_thread = path.clone();
                 let proxy_exp = proxy.clone();
+                let resolution_thread = resolution.clone();
                 std::thread::spawn(move || {
-                    let status = std::process::Command::new(&self_exe)
-                        .arg(&source_arg)
+                    let mut cmd = std::process::Command::new(&self_exe);
+                    cmd.arg(&source_arg)
                         .arg("--export")
                         .arg(&path_thread)
                         .arg("--duration")
-                        .arg(format!("{duration_s}"))
-                        .status();
+                        .arg(format!("{duration_s}"));
+                    if let Some(ref resolution) = resolution_thread {
+                        cmd.arg("--resolution").arg(resolution);
+                    }
+                    if let Some(parallel) = parallel {
+                        cmd.arg("--parallel").arg(parallel.to_string());
+                    }
+                    let status = cmd.status();
                     let (ok, msg) = match status {
                         Ok(s) if s.success() => {
                             let bytes = std::fs::metadata(&path_thread)

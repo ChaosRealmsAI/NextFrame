@@ -73,11 +73,7 @@ impl RecordPipeline for PipelineH264_1080p {
         })
     }
 
-    fn push_frame(
-        &mut self,
-        surface: IOSurfaceHandle,
-        pts_ms: u64,
-    ) -> Result<(), PipelineError> {
+    fn push_frame(&mut self, surface: IOSurfaceHandle, pts_ms: u64) -> Result<(), PipelineError> {
         // 1. IOSurface → CVPixelBuffer (zero-copy · CVPixelBufferCreateWithIOSurface).
         let pixel_buffer = surface
             .as_cv_pixel_buffer()

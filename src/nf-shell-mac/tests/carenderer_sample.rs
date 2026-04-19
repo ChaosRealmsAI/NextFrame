@@ -78,8 +78,7 @@ define_class!(
             _navigation: Option<&WKNavigation>,
             error: &NSError,
         ) {
-            self.ivars().state.borrow_mut().failed =
-                Some(error.localizedDescription().to_string());
+            self.ivars().state.borrow_mut().failed = Some(error.localizedDescription().to_string());
         }
 
         #[allow(non_snake_case)]
@@ -90,8 +89,7 @@ define_class!(
             _navigation: Option<&WKNavigation>,
             error: &NSError,
         ) {
-            self.ivars().state.borrow_mut().failed =
-                Some(error.localizedDescription().to_string());
+            self.ivars().state.borrow_mut().failed = Some(error.localizedDescription().to_string());
         }
     }
 );
@@ -167,9 +165,8 @@ fn execute_test(mtm: MainThreadMarker) -> Result<(u8, u8, u8, f64), String> {
         config.setWebsiteDataStore(&store);
     }
 
-    let web_view = unsafe {
-        WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), frame, &config)
-    };
+    let web_view =
+        unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), frame, &config) };
     // SAFETY: setNavigationDelegate 主线程 · delegate 由 Retained 保活。
     unsafe {
         web_view.setNavigationDelegate(Some(ProtocolObject::from_ref(&*nav_delegate)));
@@ -192,8 +189,7 @@ fn execute_test(mtm: MainThreadMarker) -> Result<(u8, u8, u8, f64), String> {
     CATransaction::flush();
 
     // 3. CARendererSampler · warm-up + 稳态 · 多帧循环直到中心像素转红（debug build 容差）
-    let sampler =
-        CARendererSampler::new(WIDTH, HEIGHT).map_err(|e| format!("sampler new: {e}"))?;
+    let sampler = CARendererSampler::new(WIDTH, HEIGHT).map_err(|e| format!("sampler new: {e}"))?;
 
     let layer = web_view
         .layer()
@@ -269,20 +265,14 @@ fn run_carenderer_sample_test() {
 
     match outcome {
         Ok((r, g, b, avg_ms)) => {
-            eprintln!(
-                "carenderer_sample: center=({r},{g},{b}) avg_sample_ms={avg_ms:.3}"
-            );
+            eprintln!("carenderer_sample: center=({r},{g},{b}) avg_sample_ms={avg_ms:.3}");
             // ±2 tolerance · 抗 sRGB / linear 微小差异
             if !(r >= 253 && g <= 2 && b <= 2) {
                 eprintln!("test sample_returns_red_center_pixel ... FAILED");
-                eprintln!(
-                    "  reason: expected center red (255,0,0)±2 · got ({r},{g},{b})"
-                );
+                eprintln!("  reason: expected center red (255,0,0)±2 · got ({r},{g},{b})");
                 std::process::exit(1);
             }
-            eprintln!(
-                "avg sample time: {avg_ms:.3}ms (POC-04B release baseline 0.31ms)"
-            );
+            eprintln!("avg sample time: {avg_ms:.3}ms (POC-04B release baseline 0.31ms)");
         }
         Err(msg) => {
             eprintln!("test sample_returns_red_center_pixel ... FAILED");

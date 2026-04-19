@@ -74,12 +74,7 @@ impl IOSurfaceHandle {
         // 返回 OSStatus=0 表示成功 · CVPixelBufferCreateWithIOSurface 按 Create Rule
         // 返回 +1 retained 指针 · 由下游 CFRetained::from_raw 接管。
         let status = unsafe {
-            CVPixelBufferCreateWithIOSurface(
-                None,
-                &self.surface,
-                None,
-                NonNull::from(&mut out),
-            )
+            CVPixelBufferCreateWithIOSurface(None, &self.surface, None, NonNull::from(&mut out))
         };
         if status != 0 {
             return Err(IoError::CVPixelBufferCreateFailed(status));

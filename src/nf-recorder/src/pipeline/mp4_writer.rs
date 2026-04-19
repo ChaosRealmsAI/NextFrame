@@ -76,12 +76,7 @@ impl Mp4Writer {
     /// # 硬约束
     /// - 目标文件已存在会先删除 (AVAssetWriter 遇到 file-exists 直接报错)
     /// - `shouldOptimizeForNetworkUse = YES` + `movieFragmentInterval = 1s` = moov-front
-    pub fn new(
-        output: &Path,
-        width: u32,
-        height: u32,
-        fps: u32,
-    ) -> Result<Self, PipelineError> {
+    pub fn new(output: &Path, width: u32, height: u32, fps: u32) -> Result<Self, PipelineError> {
         // AVAssetWriter 不接受已有文件 · 先清掉
         if output.exists() {
             std::fs::remove_file(output).map_err(|e| {
@@ -94,8 +89,7 @@ impl Mp4Writer {
             .ok_or_else(|| PipelineError::IoError(format!("invalid path {}", output.display())))?;
 
         // SAFETY: AVFileTypeMPEG4 是 Apple 暴露的静态常量 · 取地址安全。
-        let file_type =
-            unsafe { AVFileTypeMPEG4 }.ok_or(PipelineError::WriterSessionFailed)?;
+        let file_type = unsafe { AVFileTypeMPEG4 }.ok_or(PipelineError::WriterSessionFailed)?;
 
         // SAFETY: assetWriterWithURL_fileType_error 是 Apple 标准构造器 · error-out 已包 Result。
         let writer = unsafe { AVAssetWriter::assetWriterWithURL_fileType_error(&url, file_type) }
@@ -134,7 +128,10 @@ impl Mp4Writer {
             self.init_input_and_session(cf)?;
         }
 
-        let input = self.input.as_ref().ok_or(PipelineError::WriterSessionFailed)?;
+        let input = self
+            .input
+            .as_ref()
+            .ok_or(PipelineError::WriterSessionFailed)?;
 
         let sample = build_sample_buffer(cf, self.fps)?;
 
@@ -161,8 +158,7 @@ impl Mp4Writer {
     /// 用第一帧的 format_description 作为 sourceFormatHint 创建 input + 启动 session。
     fn init_input_and_session(&mut self, cf: &CompressedFrame) -> Result<(), PipelineError> {
         // SAFETY: AVMediaTypeVideo 是 Apple 静态常量。
-        let media_type =
-            unsafe { AVMediaTypeVideo }.ok_or(PipelineError::WriterSessionFailed)?;
+        let media_type = unsafe { AVMediaTypeVideo }.ok_or(PipelineError::WriterSessionFailed)?;
 
         // passthrough 模式: outputSettings = None → AVAssetWriter 不再编码,
         // 直接 re-wrap 传进来的已压缩 CMSampleBuffer 成 MP4 sample entry。
@@ -244,11 +240,7 @@ impl Mp4Writer {
 
         let size_bytes = std::fs::metadata(&self.output_path)
             .map_err(|e| {
-                PipelineError::IoError(format!(
-                    "stat output {}: {}",
-                    self.output_path.display(),
-                    e
-                ))
+                PipelineError::IoError(format!("stat output {}: {}", self.output_path.display(), e))
             })?
             .len();
 
@@ -318,9 +310,8 @@ fn build_sample_buffer(
         return Err(PipelineError::WriterSessionFailed);
     }
     // SAFETY: 非空指针 · 成功接管 · Retained 负责 CFRelease。
-    let block_buffer = unsafe {
-        Retained::from_raw(block_buffer_raw).ok_or(PipelineError::WriterSessionFailed)?
-    };
+    let block_buffer =
+        unsafe { Retained::from_raw(block_buffer_raw).ok_or(PipelineError::WriterSessionFailed)? };
 
     let duration_ms = (1_000 / fps as i64).max(1);
     // SAFETY: CMTime::new is a plain struct initializer (wraps CMTimeMake).
@@ -359,9 +350,8 @@ fn build_sample_buffer(
         return Err(PipelineError::WriterSessionFailed);
     }
     // SAFETY: 非空 · Retained 接管。
-    let sample = unsafe {
-        Retained::from_raw(sample_raw).ok_or(PipelineError::WriterSessionFailed)?
-    };
+    let sample =
+        unsafe { Retained::from_raw(sample_raw).ok_or(PipelineError::WriterSessionFailed)? };
     Ok(sample)
 }
 
