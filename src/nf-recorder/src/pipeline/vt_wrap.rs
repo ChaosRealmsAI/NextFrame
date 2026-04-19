@@ -16,13 +16,13 @@
 
 use std::ffi::c_void;
 use std::ptr::NonNull;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::{collections::VecDeque};
 
 use crossbeam::queue::SegQueue;
-use objc2::rc::Retained;
-use objc2::runtime::ProtocolObject;
 use objc2_core_foundation::{
     kCFBooleanTrue, CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFString, CFType,
+    Type,
 };
 use objc2_core_media::{
     kCMSampleAttachmentKey_NotSync, kCMTimeInvalid, kCMVideoCodecType_H264, kCMVideoCodecType_HEVC,
@@ -34,15 +34,16 @@ use objc2_core_video::{
     kCVPixelBufferIOSurfacePropertiesKey, kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey,
     kCVPixelFormatType_32BGRA, CVImageBuffer, CVPixelBuffer,
 };
-use objc2_foundation::{NSCopying, NSDictionary, NSMutableDictionary, NSString};
 use objc2_video_toolbox::{
     kVTCompressionPropertyKey_AllowFrameReordering, kVTCompressionPropertyKey_AverageBitRate,
-    kVTCompressionPropertyKey_ColorPrimaries, kVTCompressionPropertyKey_ExpectedFrameRate,
-    kVTCompressionPropertyKey_MaxKeyFrameInterval, kVTCompressionPropertyKey_ProfileLevel,
+    kVTCompressionPropertyKey_ColorPrimaries, kVTCompressionPropertyKey_ConstantBitRate,
+    kVTCompressionPropertyKey_DataRateLimits, kVTCompressionPropertyKey_ExpectedFrameRate,
+    kVTCompressionPropertyKey_MaxAllowedFrameQP, kVTCompressionPropertyKey_MaxKeyFrameInterval,
+    kVTCompressionPropertyKey_ProfileLevel, kVTCompressionPropertyKey_Quality,
     kVTCompressionPropertyKey_RealTime, kVTCompressionPropertyKey_TransferFunction,
     kVTCompressionPropertyKey_YCbCrMatrix, kVTEncodeFrameOptionKey_ForceKeyFrame,
     kVTProfileLevel_H264_Main_AutoLevel, kVTProfileLevel_HEVC_Main_AutoLevel, VTCompressionSession,
-    VTEncodeInfoFlags, VTSession, VTSessionSetProperty,
+    VTEncodeInfoFlags, VTSession, VTSessionSetProperty, kVTPropertyNotSupportedErr,
 };
 
 use super::{ColorSpec, PipelineError, VideoCodec};
@@ -85,6 +86,27 @@ impl SendableFormatDescription {
     }
 }
 
+/// Clone + Send wrapper around a source pixel buffer retained until VT emits
+/// the corresponding output callback.
+struct SendablePixelBuffer {
+    _buffer: CFRetained<CVPixelBuffer>,
+}
+
+// SAFETY: CVPixelBuffer is a CF object backed by thread-safe retain/release.
+#[allow(unsafe_code)]
+unsafe impl Send for SendablePixelBuffer {}
+// SAFETY: Same rationale as Send — we only transfer ownership across threads.
+#[allow(unsafe_code)]
+unsafe impl Sync for SendablePixelBuffer {}
+
+impl SendablePixelBuffer {
+    fn retain(pixel_buffer: &CVPixelBuffer) -> Self {
+        Self {
+            _buffer: pixel_buffer.retain(),
+        }
+    }
+}
+
 // ─── CompressedFrame ────────────────────────────────────────────────────────
 
 /// A single encoded H.264 frame produced by the compressor callback.
@@ -115,6 +137,8 @@ struct VtCallbackState {
     output_queue: SegQueue<CompressedFrame>,
     /// Records only the first error to keep the queue bounded.
     first_error: SegQueue<String>,
+    /// Holds source CVPixelBuffers until the matching VT callback fires.
+    in_flight: Mutex<VecDeque<SendablePixelBuffer>>,
 }
 
 impl VtCallbackState {
@@ -122,6 +146,7 @@ impl VtCallbackState {
         Self {
             output_queue: SegQueue::new(),
             first_error: SegQueue::new(),
+            in_flight: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -129,6 +154,38 @@ impl VtCallbackState {
         if self.first_error.is_empty() {
             self.first_error.push(message);
         }
+    }
+
+    fn retain_source_buffer(&self, pixel_buffer: &CVPixelBuffer) {
+        let mut in_flight = self
+            .in_flight
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        in_flight.push_back(SendablePixelBuffer::retain(pixel_buffer));
+    }
+
+    fn release_source_buffer(&self) {
+        let mut in_flight = self
+            .in_flight
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        in_flight.pop_front();
+    }
+
+    fn cancel_last_source_buffer(&self) {
+        let mut in_flight = self
+            .in_flight
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        in_flight.pop_back();
+    }
+
+    fn drain_source_buffers(&self) {
+        let mut in_flight = self
+            .in_flight
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        in_flight.clear();
     }
 }
 
@@ -290,44 +347,36 @@ impl VtCompressor {
         // v1.15 · Per-frame frameProperties CFDictionary carrying ForceKeyFrame.
         // Built only when force_keyframe=true · None otherwise (zero overhead path
         // for the 99% non-IDR-forced frames).
-        let frame_props: Option<Retained<NSMutableDictionary<NSString, CFBoolean>>> =
-            if force_keyframe {
-                let dict: Retained<NSMutableDictionary<NSString, CFBoolean>> =
-                    NSMutableDictionary::new();
-                // SAFETY: kVTEncodeFrameOptionKey_ForceKeyFrame is CFString · toll-free to NSString.
-                #[allow(unsafe_code)]
-                let key: &NSString = unsafe {
-                    &*(kVTEncodeFrameOptionKey_ForceKeyFrame as *const CFString as *const NSString)
-                };
-                let key_proto: &ProtocolObject<dyn NSCopying> = ProtocolObject::from_ref(key);
-                // SAFETY: setObject:forKey: on main or bg thread is safe · NSMutableDictionary
-                // is a standard Foundation class. CFBoolean::true_() returns a shared singleton.
-                // SAFETY: kCFBooleanTrue is a static shared singleton · unwrap safe.
-                #[allow(unsafe_code)]
-                let b_true: &CFBoolean =
-                    unsafe { kCFBooleanTrue }.ok_or(PipelineError::EncoderInitFailed)?;
-                // SAFETY: setObject:forKey: on Foundation NSMutableDictionary · thread-safe
-                // usage guaranteed by callee context (encode_pixel_buffer is called from record
-                // loop main thread only).
-                #[allow(unsafe_code)]
-                unsafe {
-                    dict.setObject_forKey(b_true, key_proto);
-                }
-                Some(dict)
-            } else {
-                None
-            };
+        let frame_props: Option<CFRetained<CFDictionary<CFType, CFType>>> = if force_keyframe {
+            // SAFETY: kCFBooleanTrue / kVTEncodeFrameOptionKey_ForceKeyFrame are static CF
+            // singletons with process lifetime; we only build an immutable CoreFoundation
+            // dictionary and pass it straight through to VT.
+            #[allow(unsafe_code)]
+            let b_true: &CFBoolean =
+                unsafe { kCFBooleanTrue }.ok_or(PipelineError::EncoderInitFailed)?;
+            #[allow(unsafe_code)]
+            let key = unsafe { kVTEncodeFrameOptionKey_ForceKeyFrame };
+            #[allow(unsafe_code)]
+            Some(CFDictionary::<CFType, CFType>::from_slices(
+                &[key.as_ref()],
+                &[b_true.as_ref()],
+            ))
+        } else {
+            None
+        };
 
+        self.state.retain_source_buffer(pixel_buffer);
         // SAFETY: VTCompressionSessionEncodeFrame takes a CVImageBuffer (CVPixelBuffer
-        // is a subtype — same ABI). frame_properties is a CFDictionary (toll-free from
-        // NSDictionary). We pass null for source refcon and info_flags.
+        // is a subtype — same ABI). frame_properties is a CFDictionary. We pass
+        // null for source refcon and info_flags.
         #[allow(unsafe_code)]
         let status = unsafe {
             let image_buffer: &CVImageBuffer =
                 &*(pixel_buffer as *const CVPixelBuffer as *const CVImageBuffer);
             let props_ref: Option<&CFDictionary> = frame_props.as_deref().map(|d| {
-                let ns_dict: &NSDictionary<NSString, CFBoolean> = d;
-                &*(ns_dict as *const NSDictionary<NSString, CFBoolean> as *const CFDictionary)
+                // SAFETY: VT takes an untyped CFDictionaryRef here; the concrete key/value
+                // types are erased at the CoreFoundation ABI layer.
+                &*(d as *const CFDictionary<CFType, CFType> as *const CFDictionary)
             });
             self.session.encode_frame(
                 image_buffer,
@@ -339,6 +388,7 @@ impl VtCompressor {
             )
         };
         if status != 0 {
+            self.state.cancel_last_source_buffer();
             return Err(PipelineError::EncoderInitFailed);
         }
         self.check_callback_error()?;
@@ -351,6 +401,7 @@ impl VtCompressor {
         // SAFETY: kCMTimeInvalid means "complete every pending frame".
         #[allow(unsafe_code)]
         let status = unsafe { self.session.complete_frames(kCMTimeInvalid) };
+        self.state.drain_source_buffers();
         if status != 0 {
             return Err(PipelineError::EncoderInitFailed);
         }
@@ -406,6 +457,7 @@ impl Drop for VtCompressor {
             let _ = self.session.complete_frames(kCMTimeInvalid);
             self.session.invalidate();
         }
+        self.state.drain_source_buffers();
     }
 }
 
@@ -444,14 +496,61 @@ fn configure_session(
         },
         CFNumber::new_i32(60).as_ref(),
     )?;
-    set_prop(
-        session,
-        #[allow(unsafe_code)]
-        unsafe {
-            kVTCompressionPropertyKey_AverageBitRate
-        },
-        CFNumber::new_i32(bitrate_bps).as_ref(),
-    )?;
+    let use_constant_bitrate = if codec == VideoCodec::HevcMain8 {
+        try_set_prop(
+            session,
+            #[allow(unsafe_code)]
+            unsafe {
+                kVTCompressionPropertyKey_ConstantBitRate
+            },
+            CFNumber::new_i32(bitrate_bps).as_ref(),
+        )?
+    } else {
+        false
+    };
+    if !use_constant_bitrate {
+        set_prop(
+            session,
+            #[allow(unsafe_code)]
+            unsafe {
+                kVTCompressionPropertyKey_AverageBitRate
+            },
+            CFNumber::new_i32(bitrate_bps).as_ref(),
+        )?;
+        let max_bytes_per_second = ((i64::from(bitrate_bps).max(1) * 2) / 8).max(1);
+        let max_bytes = CFNumber::new_i64(max_bytes_per_second);
+        let window_seconds = CFNumber::new_f64(1.0);
+        let data_rate_limits: CFRetained<CFArray<CFType>> =
+            CFArray::from_objects(&[max_bytes.as_ref(), window_seconds.as_ref()]);
+        set_prop(
+            session,
+            #[allow(unsafe_code)]
+            unsafe {
+                kVTCompressionPropertyKey_DataRateLimits
+            },
+            data_rate_limits.as_ref(),
+        )?;
+    }
+    if codec == VideoCodec::HevcMain8 {
+        let quality = CFNumber::new_f64(if use_constant_bitrate { 1.0 } else { 0.9 });
+        set_prop(
+            session,
+            #[allow(unsafe_code)]
+            unsafe {
+                kVTCompressionPropertyKey_Quality
+            },
+            quality.as_ref(),
+        )?;
+        let max_allowed_qp = CFNumber::new_i32(18);
+        let _supports_qp_cap = try_set_prop(
+            session,
+            #[allow(unsafe_code)]
+            unsafe {
+                kVTCompressionPropertyKey_MaxAllowedFrameQP
+            },
+            max_allowed_qp.as_ref(),
+        )?;
+    }
     // Codec profile preset.
     set_prop(
         session,
@@ -523,6 +622,25 @@ fn set_prop(
     Ok(())
 }
 
+fn try_set_prop(
+    session: &VTCompressionSession,
+    key: &CFString,
+    value: &CFType,
+) -> Result<bool, PipelineError> {
+    #[allow(unsafe_code)]
+    let status = unsafe {
+        let vt_session: &VTSession = &*(session as *const VTCompressionSession as *const VTSession);
+        VTSessionSetProperty(vt_session, key, Some(value))
+    };
+    if status == 0 {
+        return Ok(true);
+    }
+    if status == kVTPropertyNotSupportedErr {
+        return Ok(false);
+    }
+    Err(PipelineError::EncoderInitFailed)
+}
+
 fn pixel_buffer_attributes(width: i32, height: i32) -> CFRetained<CFDictionary<CFType, CFType>> {
     let w = CFNumber::new_i32(width);
     let h = CFNumber::new_i32(height);
@@ -560,6 +678,7 @@ unsafe extern "C-unwind" fn vt_output_callback(
     // the Arc alive for the entire session lifetime, and no callback fires after
     // VTCompressionSessionInvalidate (called in Drop).
     let state: &VtCallbackState = unsafe { &*(output_callback_ref_con as *const VtCallbackState) };
+    state.release_source_buffer();
 
     if status != 0 {
         state.record_error(format!("VT output callback status {status}"));

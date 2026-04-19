@@ -26,7 +26,8 @@ use objc2::rc::{autoreleasepool, Retained};
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{msg_send, AnyThread, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
-    NSApp, NSApplicationActivationPolicy, NSBackingStoreType, NSImage, NSWindow, NSWindowStyleMask,
+    NSApp, NSApplicationActivationPolicy, NSBackingStoreType, NSImage, NSWindow,
+    NSWindowStyleMask,
 };
 use objc2_core_foundation::{CFDictionary, CFRetained, CFString, CGPoint, CGRect, CGSize};
 use objc2_core_graphics::CGColorSpace;
@@ -488,129 +489,112 @@ impl DesktopShell for MacHeadlessShell {
     }
 
     fn snapshot(&self) -> Result<IOSurfaceHandle, ShellError> {
-        // v1.14.4 · takeSnapshot + CIImage → IOSurface (POC-B 方向 1)。
-        //
-        // 放弃 v1.14.0-1.14.3 的 CARenderer + N 轮 pump barrier:
-        //   CARenderer 只发 CA commit 指令 · 不等 WebContent XPC 子进程真 paint 完 ·
-        //   无 vsync 强同步 · barrier 8 轮也不保证拿到当前帧 (POC-C 证 off-screen
-        //   无 vsync commit · FM-COMPOSITOR-COMMIT-ASYNC).
-        //
-        // takeSnapshot 是 Apple 官方 "等 WebKit 全栈 (layout + style + paint + composite)
-        // 完成后回调" API · 保证拿当前 t 的画面。POC-A 实测 5.92ms · POC-B 方向 1
-        // (CIContext.render → IOSurface) 7.38ms · 下游 VT 零拷贝吃 IOSurface。
-        //
-        // Flow: seek(t) → takeSnapshot 等 paint done → NSImage → CGImage → CIImage →
-        //       CIContext.render_toIOSurface_bounds_colorSpace → output_surface 有
-        //       当前帧像素 → clone handle 给下游 VT encoder.
-        let mtm = MainThreadMarker::new()
-            .ok_or_else(|| ShellError::SnapshotFailed("snapshot not on main thread".into()))?;
+        autoreleasepool(|_| {
+            // v1.14.4 · takeSnapshot + CIImage → IOSurface (POC-B 方向 1)。
+            //
+            // 放弃 v1.14.0-1.14.3 的 CARenderer + N 轮 pump barrier:
+            //   CARenderer 只发 CA commit 指令 · 不等 WebContent XPC 子进程真 paint 完 ·
+            //   无 vsync 强同步 · barrier 8 轮也不保证拿到当前帧 (POC-C 证 off-screen
+            //   无 vsync commit · FM-COMPOSITOR-COMMIT-ASYNC).
+            //
+            // takeSnapshot 是 Apple 官方 "等 WebKit 全栈 (layout + style + paint + composite)
+            // 完成后回调" API · 保证拿当前 t 的画面。POC-A 实测 5.92ms · POC-B 方向 1
+            // (CIContext.render → IOSurface) 7.38ms · 下游 VT 零拷贝吃 IOSurface。
+            //
+            // Flow: seek(t) → takeSnapshot 等 paint done → NSImage → CGImage → CIImage →
+            //       CIContext.render_toIOSurface_bounds_colorSpace → output_surface 有
+            //       当前帧像素 → clone handle 给下游 VT encoder.
+            let mtm = MainThreadMarker::new()
+                .ok_or_else(|| ShellError::SnapshotFailed("snapshot not on main thread".into()))?;
 
-        // 1. takeSnapshot blocking · 等 Apple 回调 NSImage (保证当前画面).
-        // v1.56 · 长跑 4K export 尾段里 takeSnapshot 会偶发 "An unknown error occurred"。
-        // 对 export bundle 来说我们只需要 stage，不需要 editor controls/timeline，
-        // 因此可以安全退回 CARenderer 路径，再把复用 surface 拷到独立 per-frame
-        // IOSurface，避免 VT 吃到后续帧覆盖的像素。
-        let ns_image = match take_snapshot_blocking(&self.web_view, mtm) {
-            Ok(image) => image,
-            Err(take_snapshot_err) => {
-                self.web_view.displayIfNeeded();
-                CATransaction::flush();
-                pump_main_run_loop(Duration::from_millis(16));
+            // 1. takeSnapshot blocking · 等 Apple 回调 NSImage (保证当前画面)。
+            // v1.56 · 长跑 4K export 尾段里 takeSnapshot 会偶发 "An unknown error occurred"。
+            // 正式 fallback 改成 AppKit `cacheDisplayInRect:toBitmapImageRep:`:
+            // 它直接 snapshot 当前 NSView 树，不依赖 WebKit 的 takeSnapshot 实现，
+            // 比 CARenderer 备援更接近屏幕结果，也不会拿到复用 surface 的旧像素。
+            let cg_image = match take_snapshot_blocking(&self.web_view, mtm) {
+                Ok(image) => cg_image_from_ns_image(&image)?,
+                Err(first_take_snapshot_err) => {
+                    self.web_view.displayIfNeeded();
+                    CATransaction::flush();
+                    pump_main_run_loop(Duration::from_millis(16));
 
-                let layer = self.web_view.layer().ok_or_else(|| {
-                    ShellError::SnapshotFailed(format!(
-                        "takeSnapshot failed: {take_snapshot_err}; fallback web_view.layer=nil"
-                    ))
-                })?;
-                let sampled = self
-                    ._sampler_legacy
-                    .lock()
-                    .map_err(|e| ShellError::SnapshotFailed(format!("sampler poisoned: {e}")))?
-                    .sample(&layer)
-                    .map_err(|sample_err| {
-                        ShellError::SnapshotFailed(format!(
-                            "takeSnapshot failed: {take_snapshot_err}; CARenderer fallback failed: {sample_err}"
-                        ))
+                    let retry_mtm = MainThreadMarker::new().ok_or_else(|| {
+                        ShellError::SnapshotFailed("snapshot retry not on main thread".into())
                     })?;
-                let per_frame_surface_ref =
-                    copy_iosurface(sampled.as_iosurface(), self.viewport.0, self.viewport.1)
-                        .map_err(|copy_err| {
-                            ShellError::SnapshotFailed(format!(
-                                "takeSnapshot failed: {take_snapshot_err}; IOSurface copy failed: {copy_err}"
-                            ))
-                        })?;
-                return Ok(IOSurfaceHandle::from_surface(per_frame_surface_ref));
-            }
-        };
-
-        // 2. NSImage → CGImage (跟 POC-A/B 一致 · 使用 CGImageForProposedRect).
-        let cg_image = unsafe {
-            ns_image.CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None)
-        }
-        .ok_or_else(|| {
-            ShellError::SnapshotFailed("NSImage.CGImageForProposedRect returned nil".into())
-        })?;
-
-        // 3. CGImage → CIImage (GPU-friendly wrapper · 零拷贝).
-        let ci_image: Retained<CIImage> = unsafe { CIImage::imageWithCGImage(&cg_image) };
-
-        // 3.1 **关键修复 · v1.14.4**: Retina 屏 backingScaleFactor=2 · takeSnapshot 返 3840×2160 CGImage
-        // (即使 snapshotWidth=1920 points · NSImage.size 是 points · 底层 CGImage 仍是 pixel ×2).
-        // CIImage.extent 跟随 CGImage pixel size · 如不 scale 直接 render bounds (0,0,1920,1080) 只会取
-        // **源的左下 1/4** (CI 坐标从左下开始 · y 轴朝上) → MP4 看着像"只有一部分画面" · 丢 timeline UI.
-        // 解法: 按实际 CG size vs target viewport 算 scale · 用 CGAffineTransform 在 CIImage 层 downsample
-        // (highQualityDownsample=true 走 Lanczos) · 让 extent 变成 viewport size · 再 render 1:1 覆盖 IOSurface.
-        let (w, h) = self.viewport;
-        let target_w = f64::from(w);
-        let target_h = f64::from(h);
-        let cg_w = objc2_core_graphics::CGImage::width(Some(&cg_image)) as f64;
-        let cg_h = objc2_core_graphics::CGImage::height(Some(&cg_image)) as f64;
-        let scaled_ci: Retained<CIImage> =
-            if (cg_w - target_w).abs() < 0.5 && (cg_h - target_h).abs() < 0.5 {
-                // 1x 屏 · CGImage 已是目标尺寸 · 无需 scale.
-                ci_image
-            } else {
-                let sx = target_w / cg_w;
-                let sy = target_h / cg_h;
-                let tm = objc2_core_foundation::CGAffineTransform {
-                    a: sx,
-                    b: 0.0,
-                    c: 0.0,
-                    d: sy,
-                    tx: 0.0,
-                    ty: 0.0,
-                };
-                unsafe { ci_image.imageByApplyingTransform_highQualityDownsample(tm, true) }
+                    match take_snapshot_blocking(&self.web_view, retry_mtm) {
+                        Ok(image) => cg_image_from_ns_image(&image)?,
+                        Err(_retry_err) => cache_display_cg_image(&self.web_view)
+                            .map_err(|cache_err| {
+                                ShellError::SnapshotFailed(format!(
+                                    "takeSnapshot failed: {first_take_snapshot_err}; cacheDisplay fallback failed: {cache_err}"
+                                ))
+                            })?,
+                    }
+                }
             };
 
-        // 4. 每帧新建 IOSurface · 不复用 self.output_surface (bug 发现于 v1.14.4 首版):
-        //    VT encoder 是异步 pipeline · 540 帧共享同一 IOSurface 会让 encoder queue
-        //    里"老帧"的内容被下一次 render 覆盖 (race condition) · 最终 MP4 像素不变.
-        //    每帧独立 IOSurface · render 完后交给 VT · IOSurface 生命周期由 handle clone
-        //    管 · VT 编完自动 drop.
-        let bounds = CGRect {
-            origin: CGPoint { x: 0.0, y: 0.0 },
-            size: CGSize {
-                width: target_w,
-                height: target_h,
-            },
-        };
-        let per_frame_surface_ref = create_output_iosurface(w, h).ok_or_else(|| {
-            ShellError::SnapshotFailed("IOSurfaceCreate per-frame returned nil".into())
-        })?;
-        // SAFETY: ci_context / per_frame_surface / color_space 生命周期覆盖本调用.
-        // render_toIOSurface_bounds_colorSpace 把 CIImage 渲染到独立 IOSurface (Metal backend).
-        unsafe {
-            self.ci_context.render_toIOSurface_bounds_colorSpace(
-                &scaled_ci,
-                &per_frame_surface_ref,
-                bounds,
-                Some(&self.color_space),
-            );
-        }
+            // 2. CGImage → CIImage (GPU-friendly wrapper · 零拷贝).
+            let ci_image: Retained<CIImage> = unsafe { CIImage::imageWithCGImage(&cg_image) };
 
-        // 5. 返回独立 handle · 下游 VT encoder 吃完 drop 释放 IOSurface 内存.
-        Ok(IOSurfaceHandle::from_surface(per_frame_surface_ref))
+            // 2.1 **关键修复 · v1.14.4**: Retina 屏 backingScaleFactor=2 · takeSnapshot 返 3840×2160 CGImage
+            // (即使 snapshotWidth=1920 points · NSImage.size 是 points · 底层 CGImage 仍是 pixel ×2).
+            // CIImage.extent 跟随 CGImage pixel size · 如不 scale 直接 render bounds (0,0,1920,1080) 只会取
+            // **源的左下 1/4** (CI 坐标从左下开始 · y 轴朝上) → MP4 看着像"只有一部分画面" · 丢 timeline UI.
+            // 解法: 按实际 CG size vs target viewport 算 scale · 用 CGAffineTransform 在 CIImage 层 downsample
+            // (highQualityDownsample=true 走 Lanczos) · 让 extent 变成 viewport size · 再 render 1:1 覆盖 IOSurface.
+            let (w, h) = self.viewport;
+            let target_w = f64::from(w);
+            let target_h = f64::from(h);
+            let cg_w = objc2_core_graphics::CGImage::width(Some(&cg_image)) as f64;
+            let cg_h = objc2_core_graphics::CGImage::height(Some(&cg_image)) as f64;
+            let scaled_ci: Retained<CIImage> =
+                if (cg_w - target_w).abs() < 0.5 && (cg_h - target_h).abs() < 0.5 {
+                    // 1x 屏 · CGImage 已是目标尺寸 · 无需 scale.
+                    ci_image
+                } else {
+                    let sx = target_w / cg_w;
+                    let sy = target_h / cg_h;
+                    let tm = objc2_core_foundation::CGAffineTransform {
+                        a: sx,
+                        b: 0.0,
+                        c: 0.0,
+                        d: sy,
+                        tx: 0.0,
+                        ty: 0.0,
+                    };
+                    unsafe { ci_image.imageByApplyingTransform_highQualityDownsample(tm, true) }
+                };
+
+            // 3. 每帧新建 IOSurface · 不复用 self.output_surface (bug 发现于 v1.14.4 首版):
+            //    VT encoder 是异步 pipeline · 540 帧共享同一 IOSurface 会让 encoder queue
+            //    里"老帧"的内容被下一次 render 覆盖 (race condition) · 最终 MP4 像素不变.
+            //    每帧独立 IOSurface · render 完后交给 VT · IOSurface 生命周期由 handle clone
+            //    管 · VT 编完自动 drop.
+            let bounds = CGRect {
+                origin: CGPoint { x: 0.0, y: 0.0 },
+                size: CGSize {
+                    width: target_w,
+                    height: target_h,
+                },
+            };
+            let per_frame_surface_ref = create_output_iosurface(w, h).ok_or_else(|| {
+                ShellError::SnapshotFailed("IOSurfaceCreate per-frame returned nil".into())
+            })?;
+            // SAFETY: ci_context / per_frame_surface / color_space 生命周期覆盖本调用.
+            // render_toIOSurface_bounds_colorSpace 把 CIImage 渲染到独立 IOSurface (Metal backend).
+            unsafe {
+                self.ci_context.render_toIOSurface_bounds_colorSpace(
+                    &scaled_ci,
+                    &per_frame_surface_ref,
+                    bounds,
+                    Some(&self.color_space),
+                );
+            }
+
+            // 4. 返回独立 handle · 下游 VT encoder 吃完 drop 释放 IOSurface 内存.
+            Ok(IOSurfaceHandle::from_surface(per_frame_surface_ref))
+        })
     }
 
     fn on_bridge_message<F>(&self, handler: F)
@@ -765,75 +749,102 @@ fn take_snapshot_blocking(
     web_view: &WKWebView,
     mtm: MainThreadMarker,
 ) -> Result<Retained<NSImage>, ShellError> {
-    // SAFETY: WKSnapshotConfiguration::new 需 main thread marker · 已有 mtm.
-    let config = unsafe { WKSnapshotConfiguration::new(mtm) };
-    // afterScreenUpdates=true: 强制等任何 pending 布局/渲染完成再截 (苹果官方语义).
-    unsafe {
-        config.setAfterScreenUpdates(true);
-    }
-    // **显式设 rect 为 webview 的本地坐标 (0,0,w,h)**: default (CGRect.zero) 语义
-    // 不稳定 + webview.frame() 在屏幕坐标系里 (x=20000) · 传进去会错位。
-    // snapshot rect 应是 webview bounds (局部坐标)。
-    let size = web_view.frame().size;
-    let local_rect = CGRect {
-        origin: CGPoint { x: 0.0, y: 0.0 },
-        size,
-    };
-    unsafe {
-        config.setRect(local_rect);
-    }
-
-    // **关键**: snapshotWidth 强制 1x · 否则 Retina 屏 backingScaleFactor=2 会返 3840×2160 ·
-    // 下游 CIContext.render bounds 1920×1080 只会取 4K 图左下 1/4 · 丢了 timeline UI 右半 +
-    // 其他区域。snapshotWidth 告诉 WebKit "我只要 1920 宽的 NSImage" · Apple 按比例计算高度 1080。
-    // 这是 v1.14.4 MP4 pixel 不变 + canary magenta 漏看的**真根因**。
-    let snap_w = NSNumber::new_f64(size.width);
-    unsafe {
-        config.setSnapshotWidth(Some(&snap_w));
-    }
-
-    type Slot = Rc<RefCell<Option<Result<Retained<NSImage>, String>>>>;
-    let slot: Slot = Rc::new(RefCell::new(None));
-    let slot_for_block = slot.clone();
-
-    // SAFETY: completion handler 签名 = (NSImage?, NSError?) -> Void · Apple 保证
-    // image/error 至多一非 null。RcBlock 在 main thread 保活。
-    let handler = RcBlock::new(move |image_ptr: *mut NSImage, err_ptr: *mut NSError| {
-        let result: Result<Retained<NSImage>, String> = if !image_ptr.is_null() {
-            // SAFETY: image_ptr 非 null · Retained::retain 接管 +1 ref.
-            match unsafe { Retained::retain(image_ptr) } {
-                Some(img) => Ok(img),
-                None => Err("Retained::retain returned None for NSImage".into()),
-            }
-        } else if !err_ptr.is_null() {
-            // SAFETY: err_ptr 非 null · &*err_ptr 借用。
-            let err_ref = unsafe { &*err_ptr };
-            Err(err_ref.localizedDescription().to_string())
-        } else {
-            Err("takeSnapshot: both image and error are null".into())
-        };
-        *slot_for_block.borrow_mut() = Some(result);
-    });
-
-    // SAFETY: takeSnapshot 是标准 WKWebView API · 需 main thread · 已有 mtm.
-    unsafe {
-        web_view.takeSnapshotWithConfiguration_completionHandler(Some(&config), &handler);
-    }
-
-    // 阻塞 pump 主 run loop · 等 completion handler 填 slot (3s 超时 · 正常 5-10ms).
-    let deadline = Instant::now() + Duration::from_secs(3);
-    while Instant::now() < deadline {
-        pump_main_run_loop(Duration::from_millis(8));
-        if slot.borrow().is_some() {
-            break;
+    autoreleasepool(|_| {
+        // SAFETY: WKSnapshotConfiguration::new 需 main thread marker · 已有 mtm.
+        let config = unsafe { WKSnapshotConfiguration::new(mtm) };
+        // afterScreenUpdates=true: 强制等任何 pending 布局/渲染完成再截 (苹果官方语义).
+        unsafe {
+            config.setAfterScreenUpdates(true);
         }
-    }
+        // **显式设 rect 为 webview 的本地坐标 (0,0,w,h)**: default (CGRect.zero) 语义
+        // 不稳定 + webview.frame() 在屏幕坐标系里 (x=20000) · 传进去会错位。
+        // snapshot rect 应是 webview bounds (局部坐标)。
+        let size = web_view.frame().size;
+        let local_rect = CGRect {
+            origin: CGPoint { x: 0.0, y: 0.0 },
+            size,
+        };
+        unsafe {
+            config.setRect(local_rect);
+        }
 
-    let taken = slot
-        .borrow_mut()
-        .take()
-        .ok_or_else(|| ShellError::SnapshotFailed("takeSnapshot timeout (3s)".into()))?;
-    taken.map_err(ShellError::SnapshotFailed)
+        // **关键**: snapshotWidth 强制 1x · 否则 Retina 屏 backingScaleFactor=2 会返 3840×2160 ·
+        // 下游 CIContext.render bounds 1920×1080 只会取 4K 图左下 1/4 · 丢了 timeline UI 右半 +
+        // 其他区域。snapshotWidth 告诉 WebKit "我只要 1920 宽的 NSImage" · Apple 按比例计算高度 1080。
+        // 这是 v1.14.4 MP4 pixel 不变 + canary magenta 漏看的**真根因**。
+        let snap_w = NSNumber::new_f64(size.width);
+        unsafe {
+            config.setSnapshotWidth(Some(&snap_w));
+        }
+
+        type Slot = Rc<RefCell<Option<Result<Retained<NSImage>, String>>>>;
+        let slot: Slot = Rc::new(RefCell::new(None));
+        let slot_for_block = slot.clone();
+
+        // SAFETY: completion handler 签名 = (NSImage?, NSError?) -> Void · Apple 保证
+        // image/error 至多一非 null。RcBlock 在 main thread 保活。
+        let handler = RcBlock::new(move |image_ptr: *mut NSImage, err_ptr: *mut NSError| {
+            let result: Result<Retained<NSImage>, String> = if !image_ptr.is_null() {
+                // SAFETY: image_ptr 非 null · Retained::retain 接管 +1 ref.
+                match unsafe { Retained::retain(image_ptr) } {
+                    Some(img) => Ok(img),
+                    None => Err("Retained::retain returned None for NSImage".into()),
+                }
+            } else if !err_ptr.is_null() {
+                // SAFETY: err_ptr 非 null · &*err_ptr 借用。
+                let err_ref = unsafe { &*err_ptr };
+                Err(err_ref.localizedDescription().to_string())
+            } else {
+                Err("takeSnapshot: both image and error are null".into())
+            };
+            *slot_for_block.borrow_mut() = Some(result);
+        });
+
+        // SAFETY: takeSnapshot 是标准 WKWebView API · 需 main thread · 已有 mtm.
+        unsafe {
+            web_view.takeSnapshotWithConfiguration_completionHandler(Some(&config), &handler);
+        }
+
+        // 阻塞 pump 主 run loop · 等 completion handler 填 slot (3s 超时 · 正常 5-10ms).
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            pump_main_run_loop(Duration::from_millis(8));
+            if slot.borrow().is_some() {
+                break;
+            }
+        }
+
+        let taken = slot
+            .borrow_mut()
+            .take()
+            .ok_or_else(|| ShellError::SnapshotFailed("takeSnapshot timeout (3s)".into()))?;
+        taken.map_err(ShellError::SnapshotFailed)
+    })
+}
+
+fn cg_image_from_ns_image(image: &NSImage) -> Result<Retained<objc2_core_graphics::CGImage>, ShellError> {
+    unsafe { image.CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None) }
+        .ok_or_else(|| {
+            ShellError::SnapshotFailed("NSImage.CGImageForProposedRect returned nil".into())
+        })
+}
+
+fn cache_display_cg_image(
+    web_view: &WKWebView,
+) -> Result<Retained<objc2_core_graphics::CGImage>, String> {
+    let size = web_view.frame().size;
+    let local_rect = NSRect {
+        origin: NSPoint::new(0.0, 0.0),
+        size: NSSize::new(size.width, size.height),
+    };
+    web_view.displayIfNeeded();
+    let bitmap = web_view
+        .bitmapImageRepForCachingDisplayInRect(local_rect)
+        .ok_or_else(|| "bitmapImageRepForCachingDisplayInRect returned nil".to_string())?;
+    web_view.cacheDisplayInRect_toBitmapImageRep(local_rect, &bitmap);
+    bitmap
+        .CGImage()
+        .ok_or_else(|| "NSBitmapImageRep.CGImage returned nil".to_string())
 }
 
 /// 分配一块 BGRA IOSurface (w × h) · CIContext.render 的目标。
@@ -877,95 +888,4 @@ fn create_output_iosurface(w: u32, h: u32) -> Option<CFRetained<IOSurfaceRef>> {
     // SAFETY: IOSurfaceRef::new(properties_dict) 是 IOSurfaceCreate wrapper · 返回
     // +1 retained IOSurfaceRef · 由 CFRetained::from_raw 接管所有权 (objc2-io-surface 内部).
     unsafe { IOSurfaceRef::new(cf_dict) }
-}
-
-fn copy_iosurface(
-    src: &IOSurfaceRef,
-    width: u32,
-    height: u32,
-) -> Result<CFRetained<IOSurfaceRef>, String> {
-    let dst = create_output_iosurface(width, height)
-        .ok_or_else(|| "IOSurfaceCreate per-frame returned nil".to_string())?;
-    let row_bytes = (width as usize)
-        .checked_mul(4)
-        .ok_or_else(|| format!("copy row overflow: width={width}"))?;
-
-    let mut src_seed: u32 = 0;
-    let src_lock = unsafe {
-        src.lock(
-            objc2_io_surface::IOSurfaceLockOptions::ReadOnly,
-            &mut src_seed,
-        )
-    };
-    if src_lock != 0 {
-        return Err(format!("copy: src lock failed: {src_lock}"));
-    }
-
-    let mut dst_seed: u32 = 0;
-    let dst_lock = unsafe {
-        dst.lock(
-            objc2_io_surface::IOSurfaceLockOptions::empty(),
-            &mut dst_seed,
-        )
-    };
-    if dst_lock != 0 {
-        let _ = unsafe {
-            src.unlock(
-                objc2_io_surface::IOSurfaceLockOptions::ReadOnly,
-                &mut src_seed,
-            )
-        };
-        return Err(format!("copy: dst lock failed: {dst_lock}"));
-    }
-
-    let src_base = src.base_address().as_ptr() as *const u8;
-    let dst_base = dst.base_address().as_ptr() as *mut u8;
-    let src_bpr = src.bytes_per_row();
-    let dst_bpr = dst.bytes_per_row();
-    if src_bpr < row_bytes || dst_bpr < row_bytes {
-        let _ = unsafe {
-            src.unlock(
-                objc2_io_surface::IOSurfaceLockOptions::ReadOnly,
-                &mut src_seed,
-            )
-        };
-        let _ = unsafe {
-            dst.unlock(
-                objc2_io_surface::IOSurfaceLockOptions::empty(),
-                &mut dst_seed,
-            )
-        };
-        return Err(format!(
-            "copy: row-stride too small · src_bpr={src_bpr} dst_bpr={dst_bpr} need={row_bytes}"
-        ));
-    }
-
-    for y in 0..height as usize {
-        let src_row = unsafe { src_base.add(y * src_bpr) };
-        let dst_row = unsafe { dst_base.add(y * dst_bpr) };
-        unsafe {
-            std::ptr::copy_nonoverlapping(src_row, dst_row, row_bytes);
-        }
-    }
-
-    let src_unlock = unsafe {
-        src.unlock(
-            objc2_io_surface::IOSurfaceLockOptions::ReadOnly,
-            &mut src_seed,
-        )
-    };
-    let dst_unlock = unsafe {
-        dst.unlock(
-            objc2_io_surface::IOSurfaceLockOptions::empty(),
-            &mut dst_seed,
-        )
-    };
-    if src_unlock != 0 {
-        eprintln!("snapshot copy: src unlock returned {src_unlock} (non-fatal)");
-    }
-    if dst_unlock != 0 {
-        eprintln!("snapshot copy: dst unlock returned {dst_unlock} (non-fatal)");
-    }
-
-    Ok(dst)
 }

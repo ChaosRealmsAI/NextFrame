@@ -28,9 +28,11 @@ use objc2::rc::Retained;
 use objc2_av_foundation::{
     AVAssetWriter, AVAssetWriterInput, AVAssetWriterStatus, AVFileTypeMPEG4, AVMediaTypeVideo,
 };
+use objc2_core_foundation::{CFArray, CFBoolean, CFMutableDictionary, CFString};
 use objc2_core_media::{
-    kCMBlockBufferAssureMemoryNowFlag, kCMTimeInvalid, CMBlockBuffer, CMFormatDescription,
-    CMSampleBuffer, CMSampleTimingInfo, CMTime, CMVideoFormatDescription,
+    kCMBlockBufferAssureMemoryNowFlag, kCMSampleAttachmentKey_NotSync, kCMTimeInvalid,
+    CMBlockBuffer, CMFormatDescription, CMSampleBuffer, CMSampleTimingInfo, CMTime,
+    CMVideoFormatDescription,
 };
 use objc2_foundation::NSURL;
 
@@ -352,6 +354,7 @@ fn build_sample_buffer(
     // SAFETY: 非空 · Retained 接管。
     let sample =
         unsafe { Retained::from_raw(sample_raw).ok_or(PipelineError::WriterSessionFailed)? };
+    set_sample_sync_attachment(&sample, cf.is_keyframe)?;
     Ok(sample)
 }
 
@@ -363,6 +366,33 @@ fn cv_to_cm_format(v: &CMVideoFormatDescription) -> &CMFormatDescription {
     unsafe {
         &*(v as *const CMVideoFormatDescription as *const CMFormatDescription)
     }
+}
+
+fn set_sample_sync_attachment(
+    sample: &CMSampleBuffer,
+    is_keyframe: bool,
+) -> Result<(), PipelineError> {
+    // SAFETY: create_if_necessary=true gives us the mutable per-sample
+    // attachment dictionaries owned by this sample buffer.
+    let attachments = unsafe { sample.sample_attachments_array(true) }
+        .ok_or(PipelineError::WriterSessionFailed)?;
+    if CFArray::count(&attachments) == 0 {
+        return Err(PipelineError::WriterSessionFailed);
+    }
+
+    // SAFETY: index 0 is valid because count > 0; CoreMedia documents each
+    // element as a mutable CFDictionary keyed by CFString attachments.
+    let dict_ptr = unsafe { CFArray::value_at_index(&attachments, 0) };
+    if dict_ptr.is_null() {
+        return Err(PipelineError::WriterSessionFailed);
+    }
+    // SAFETY: CoreMedia stores a mutable sample-attachments dictionary here.
+    let dict = unsafe { &*(dict_ptr as *const CFMutableDictionary<CFString, CFBoolean>) };
+
+    // SAFETY: static CoreMedia attachment key with process lifetime.
+    let not_sync_key = unsafe { kCMSampleAttachmentKey_NotSync };
+    dict.set(not_sync_key, CFBoolean::new(!is_keyframe));
+    Ok(())
 }
 
 /// 阻塞等 finishWriting 的 completion handler 触发。
