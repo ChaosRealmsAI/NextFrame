@@ -1,6 +1,6 @@
 # Clips Pipeline — 智能切片状态机
 
-长视频 → 挑亮点 → 切片 → 多语言字幕 → **字级 karaoke HTML** → 传播文案。每步有提示词，跑 `nf-guide clips <step>` 获取。
+长视频 → 挑亮点 → 切片 → 多语言字幕 → **字级 karaoke HTML**。每步有提示词，跑 `nf-guide clips <step>` 获取。
 
 ## 工作目录约定（v1.13.1 硬规则）
 
@@ -16,8 +16,7 @@ projects/<project>/<episode>/
 │   ├── cut_report.json     # ffmpeg 切片 · start/end = **秒**（真实时间戳）
 │   ├── clip_NN.mp4
 │   ├── clip_NN.translations.*.json
-│   ├── clip_NN.karaoke.html   # karaoke 步产物
-│   └── index.html          # 所有 clips sidebar 切换
+│   └── index.html          # karaoke · 所有 clips sidebar 切换 · 字级同步
 └── run.log
 ```
 
@@ -42,24 +41,20 @@ projects/<project>/<episode>/
   │   cut    │  ffmpeg 按 plan 切 clip_NN.mp4 + cut_report.json
   └────┬─────┘
        │
-       ├── 每个 clip 独立做 ──────────┐
-       │                              │
-       ▼                              ▼
-  ┌────────────┐                ┌────────────┐
-  │ translate  │  Agent 翻译   │  polish    │  Agent 写文案
-  │ (per clip  │  1对N切cue     │ (per clip  │  多平台适配
-  │  per lang) │                │  per lang) │
-  └────┬───────┘                └────┬───────┘
-       │                             │
-       └──────────┬──────────────────┘
-                  ▼
-            ┌──────────┐
-            │ karaoke  │  Code · `nf karaoke <episode>` 一键产 index.html
-            │ (终点)   │  sidebar 切所有 clips · 中英双行字级同步
-            └──────────┘
+       ▼
+  ┌────────────┐
+  │ translate  │  Agent 翻译 · 每 clip 每语言一份 · 1对N切cue
+  │ (per clip  │  产 clip_NN.translations.zh.json
+  │  per lang) │
+  └────┬───────┘
+       ▼
+  ┌──────────┐
+  │ karaoke  │  Code · `nf karaoke <episode>` 一键产 index.html
+  │ (终点)   │  sidebar 切所有 clips · 中英双行字级同步
+  └──────────┘
 ```
 
-**Pipeline 终点 = karaoke HTML**（可直接双击播放 + 分享 · 不在本流程做平台发布）。
+**Pipeline 终点 = karaoke HTML**（可直接双击播放 + 分享）。
 
 ## 每步命令
 
@@ -76,8 +71,7 @@ projects/<project>/<episode>/
 | 2 | `nf-guide clips plan` | **Agent** | 自读自写 | `plan.json` |
 | 3 | `nf-guide clips cut` | Code | bare `ffmpeg` + `jq` | `clips/clip_NN.mp4` + `cut_report.json` |
 | 4 | `nf-guide clips translate` | **Agent** | 自读自写 | `clips/clip_NN.translations.<lang>.json` |
-| 5 | `nf-guide clips polish` | **Agent** | 自读自写 | `clips/clip_NN.caption.<lang>.md` |
-| 6 | `nf-guide clips karaoke` | Code | **`nf karaoke <episode-dir>`** | `clips/index.html` |
+| 5 | `nf-guide clips karaoke` | Code | **`nf karaoke <episode-dir>`** | `clips/index.html` |
 
 ## 粒度原则
 
@@ -90,7 +84,7 @@ projects/<project>/<episode>/
 | plan | 一整个 episode（一次挑 N 个 clip） |
 | cut | 一整个 episode（按 plan 批量切） |
 | **translate** | **一个 clip 一个语言**（并行友好） |
-| **polish** | **一个 clip**（默认出所有平台版本） |
+| karaoke | 一整个 episode（产 sidebar 可切的 index.html） |
 
 ## 状态检测
 
@@ -108,15 +102,14 @@ episode/
     ├── cut_report.json         ← cut ✓
     ├── clip_01.translations.zh.json  ← translate zh ✓
     ├── clip_02.translations.zh.json
-    ├── clip_01.caption.zh.md   ← polish zh ✓
-    └── clip_01.publish.json    ← publish ✓
+    └── index.html                    ← karaoke ✓
 ```
 
 ## 回路
 
 - plan 结果不满意 → 改 plan.json → 重跑 cut
 - translate 某 clip 不满意 → 删 `clip_NN.translations.zh.json` → 重跑 translate
-- polish 某 clip 不满意 → 删 `clip_NN.caption.zh.md` → 重跑 polish
+- karaoke 渲染不满意 → 删 `clips/index.html` → 重跑 karaoke
 
 每步**幂等**：命令重跑不会破坏已产物，除非显式 `--force`。
 
