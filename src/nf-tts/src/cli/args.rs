@@ -99,6 +99,11 @@ pub struct SynthArgs {
     #[arg(long)]
     pub no_sub: bool,
 
+    /// Nest output under `{dir}/{stem}/` instead of writing flat into `-d`.
+    /// Default is flat: `{dir}/{stem}.mp3` + `.timeline.json` + `.srt`.
+    #[arg(long)]
+    pub subdir: bool,
+
     /// TTS backend: "edge" (free, default, for debugging) or "volcengine" (paid, production quality).
     #[arg(short, long)]
     pub backend: Option<String>,
@@ -241,6 +246,7 @@ impl From<SynthArgs> for SynthCommand {
             dir: args.dir,
             output: args.output,
             gen_srt: !args.no_sub,
+            subdir: args.subdir,
             backend_name: args.backend,
             emotion: args.emotion,
             emotion_scale: args.emotion_scale,

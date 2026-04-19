@@ -21,6 +21,9 @@ pub struct SynthCommand {
     pub dir: String,
     pub output: Option<String>,
     pub gen_srt: bool,
+    /// When true, nest outputs under `{dir}/{stem}/` (legacy behavior).
+    /// When false (default), outputs land flat in `{dir}`.
+    pub subdir: bool,
     pub backend_name: Option<String>,
     pub emotion: Option<String>,
     pub emotion_scale: Option<f32>,
@@ -42,6 +45,7 @@ pub async fn run(command: SynthCommand) -> Result<()> {
         dir,
         output,
         gen_srt,
+        subdir,
         backend_name,
         emotion,
         emotion_scale,
@@ -115,24 +119,19 @@ pub async fn run(command: SynthCommand) -> Result<()> {
         )
     });
 
-    // When --srt is used, put all output into a subdirectory named after the file stem.
-    // e.g. "test.mp3" → "test/test.mp3" + "test/test.timeline.json" + "test/test.srt"
-    let dir = if gen_srt {
-        let stem = Path::new(&filename)
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("vox-output");
-        let sub = dir.join(stem);
-        std::fs::create_dir_all(&sub)
-            .with_context(|| format!("failed to create output directory {}", sub.display()))?;
-        sub
-    } else {
-        dir.to_path_buf()
-    };
-    let out_path = dir.join(&filename);
+    // Default: outputs land flat in `-d`. With `--subdir`, nest under `{dir}/{stem}/`
+    // so mp3 + timeline.json + srt stay grouped per invocation.
+    let out_dir = naming::resolve_output_dir(dir, &filename, subdir);
+    if subdir {
+        std::fs::create_dir_all(&out_dir).with_context(|| {
+            format!("failed to create output directory {}", out_dir.display())
+        })?;
+    }
+    let out_path = out_dir.join(&filename);
 
-    // Check cache.
-    let cache = Cache::new(&dir)?;
+    // Cache lives next to `-d` regardless of subdir, so the same text+voice
+    // combo hits across flat and subdir invocations.
+    let cache = Cache::new(dir)?;
     let cache_key = Cache::key(
         &text,
         &params.voice,
@@ -148,7 +147,7 @@ pub async fn run(command: SynthCommand) -> Result<()> {
             )
         })?;
         if gen_srt {
-            match crate::whisper::align_audio(&out_path, &text) {
+            match crate::whisper::align_audio(&out_path, &text, &params.voice) {
                 Ok(Some(timeline)) => {
                     let json_path = timeline.write_json(&out_path)?;
                     crate::output::write_stderr_line(format_args!(
@@ -176,7 +175,7 @@ pub async fn run(command: SynthCommand) -> Result<()> {
 
     // Generate timeline JSON + SRT via Whisper alignment.
     if gen_srt {
-        match crate::whisper::align_audio(&out_path, &text) {
+        match crate::whisper::align_audio(&out_path, &text, &params.voice) {
             Ok(Some(timeline)) => {
                 let json_path = timeline.write_json(&out_path)?;
                 crate::output::write_stderr_line(format_args!("[whisper] timeline: {json_path}"));
@@ -196,4 +195,61 @@ pub async fn run(command: SynthCommand) -> Result<()> {
     Event::done(0, &file_str, false, result.duration_ms).emit();
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cli::args::SynthArgs;
+    use crate::cli::synth::SynthCommand;
+    use crate::output::naming::resolve_output_dir;
+    use std::path::PathBuf;
+
+    fn base_args() -> SynthArgs {
+        SynthArgs {
+            text: Some("hello".to_string()),
+            file: None,
+            voice: None,
+            rate: "+0%".to_string(),
+            volume: "+0%".to_string(),
+            pitch: "+0Hz".to_string(),
+            dir: ".".to_string(),
+            output: Some("fb.mp3".to_string()),
+            no_sub: false,
+            subdir: false,
+            backend: None,
+            emotion: None,
+            emotion_scale: None,
+            speech_rate: None,
+            loudness_rate: None,
+            volc_pitch: None,
+            context_text: None,
+            dialect: None,
+        }
+    }
+
+    #[test]
+    fn synth_args_defaults_to_flat_layout() {
+        let args = base_args();
+        let cmd: SynthCommand = args.into();
+        assert!(!cmd.subdir, "default must be flat, not subdir");
+
+        let base = PathBuf::from("/tmp/nftts-flat");
+        let out_dir = resolve_output_dir(&base, "fb.mp3", cmd.subdir);
+        assert_eq!(out_dir.join("fb.mp3"), PathBuf::from("/tmp/nftts-flat/fb.mp3"));
+    }
+
+    #[test]
+    fn synth_args_subdir_flag_nests_under_stem() {
+        let mut args = base_args();
+        args.subdir = true;
+        let cmd: SynthCommand = args.into();
+        assert!(cmd.subdir);
+
+        let base = PathBuf::from("/tmp/nftts-sub");
+        let out_dir = resolve_output_dir(&base, "fb.mp3", cmd.subdir);
+        assert_eq!(
+            out_dir.join("fb.mp3"),
+            PathBuf::from("/tmp/nftts-sub/fb/fb.mp3")
+        );
+    }
 }

@@ -11,6 +11,7 @@ pub use output::manifest::{Manifest, ManifestEntry};
 mod tests {
     #![allow(clippy::unwrap_used)]
     #![allow(clippy::expect_used)]
+    #![allow(clippy::field_reassign_with_default)]
 
     use super::*;
 

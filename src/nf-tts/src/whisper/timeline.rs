@@ -8,8 +8,23 @@ use crate::backend::WordBoundary;
 
 use super::aligner::{FfaOutput, FfaUnit};
 
+/// Alignment timeline for a synthesized audio file.
+///
+/// Schema (v1.12.1+): both a flat top-level `words` array (primary contract
+/// per `spec/interfaces.json`) AND the historical nested `segments` structure
+/// are emitted, so downstream consumers can pick whichever shape they prefer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Timeline {
+    /// Total duration of the audio in milliseconds (from the aligner, or
+    /// fallback to `max(words[].end_ms)` if the aligner did not report one).
+    pub duration_ms: u64,
+    /// Voice identifier used during synthesis (e.g. "zh-CN-XiaoxiaoNeural").
+    /// May be empty when the caller does not know / does not care.
+    pub voice: String,
+    /// Flat, top-level per-unit timing — `text` + start/end. Primary contract.
+    pub words: Vec<TimelineWord>,
+    /// Segmented view (sentence / punctuation-bounded). Kept for backward
+    /// compatibility with pre-v1.12 consumers.
     pub segments: Vec<TimelineSegment>,
 }
 
@@ -23,7 +38,10 @@ pub struct TimelineSegment {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimelineWord {
-    pub word: String,
+    /// Verbatim text for this unit — a CJK character or a Latin word.
+    /// (Field was renamed from `word` to `text` in v1.12.1 to match
+    /// `spec/interfaces.json`.)
+    pub text: String,
     pub start_ms: u64,
     pub end_ms: u64,
 }
@@ -160,10 +178,11 @@ fn split_segments(original: &str, is_char_lang: bool) -> Vec<(String, usize)> {
     out
 }
 
-pub(super) fn build_timeline(ffa: FfaOutput, original_text: &str) -> Timeline {
+pub(super) fn build_timeline(ffa: FfaOutput, original_text: &str, voice: &str) -> Timeline {
     let is_char_lang = is_char_language(&ffa.language);
     let segments_raw = split_segments(original_text, is_char_lang);
 
+    let ffa_duration_ms = ffa.duration_ms;
     let mut unit_iter = ffa.units.into_iter();
     let mut segments = Vec::with_capacity(segments_raw.len());
     let mut last_end_ms = 0u64;
@@ -194,7 +213,7 @@ pub(super) fn build_timeline(ffa: FfaOutput, original_text: &str) -> Timeline {
         let words = taken
             .into_iter()
             .map(|unit| TimelineWord {
-                word: unit.text,
+                text: unit.text,
                 start_ms: unit.start_ms,
                 end_ms: unit.end_ms.max(unit.start_ms),
             })
@@ -215,7 +234,7 @@ pub(super) fn build_timeline(ffa: FfaOutput, original_text: &str) -> Timeline {
             for unit in leftover {
                 last_segment.end_ms = last_segment.end_ms.max(unit.end_ms);
                 last_segment.words.push(TimelineWord {
-                    word: unit.text,
+                    text: unit.text,
                     start_ms: unit.start_ms,
                     end_ms: unit.end_ms.max(unit.start_ms),
                 });
@@ -223,12 +242,34 @@ pub(super) fn build_timeline(ffa: FfaOutput, original_text: &str) -> Timeline {
         }
     }
 
-    Timeline { segments }
+    // Flatten: segments[*].words → flat top-level words[].
+    let flat_words: Vec<TimelineWord> = segments
+        .iter()
+        .flat_map(|seg| seg.words.iter().cloned())
+        .collect();
+
+    // duration_ms: prefer the aligner's value; fall back to max(end_ms) over
+    // all flat words so the field is always meaningful.
+    let duration_ms = if ffa_duration_ms > 0 {
+        ffa_duration_ms
+    } else {
+        flat_words.iter().map(|w| w.end_ms).max().unwrap_or(0)
+    };
+
+    Timeline {
+        duration_ms,
+        voice: voice.to_string(),
+        words: flat_words,
+        segments,
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{build_timeline, content_count, detect_language, split_segments};
+    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::expect_used)]
+
+    use super::{build_timeline, content_count, detect_language, split_segments, Timeline};
     use crate::whisper::aligner::{FfaOutput, FfaUnit};
 
     fn unit(text: &str, start_ms: u64, end_ms: u64) -> FfaUnit {
@@ -310,13 +351,17 @@ mod tests {
                 unit("吧", 1700, 1800),
             ],
         };
-        let timeline = build_timeline(ffa, "今天天气真不错，我们一起去公园散步吧。");
+        let timeline = build_timeline(
+            ffa,
+            "今天天气真不错，我们一起去公园散步吧。",
+            "zh-CN-XiaoxiaoNeural",
+        );
         assert_eq!(timeline.segments.len(), 2);
         assert_eq!(timeline.segments[0].text, "今天天气真不错，");
         assert_eq!(timeline.segments[0].start_ms, 0);
         assert_eq!(timeline.segments[0].end_ms, 700);
         assert_eq!(timeline.segments[0].words.len(), 7);
-        assert_eq!(timeline.segments[0].words[0].word, "今");
+        assert_eq!(timeline.segments[0].words[0].text, "今");
         assert_eq!(timeline.segments[1].text, "我们一起去公园散步吧。");
         assert_eq!(timeline.segments[1].start_ms, 800);
         assert_eq!(timeline.segments[1].end_ms, 1800);
@@ -330,7 +375,7 @@ mod tests {
             language: "zh".into(),
             units: vec![unit("你", 0, 200), unit("好", 200, 400)],
         };
-        let timeline = build_timeline(ffa, "你好世界。");
+        let timeline = build_timeline(ffa, "你好世界。", "");
         assert_eq!(timeline.segments.len(), 1);
         assert_eq!(timeline.segments[0].text, "你好世界。");
         assert_eq!(timeline.segments[0].start_ms, 0);
@@ -351,7 +396,7 @@ mod tests {
                 unit("you", 1600, 1900),
             ],
         };
-        let timeline = build_timeline(ffa, "Hello, world. How are you?");
+        let timeline = build_timeline(ffa, "Hello, world. How are you?", "en-US-AriaNeural");
         assert_eq!(timeline.segments.len(), 2);
         assert_eq!(timeline.segments[0].text, "Hello, world.");
         assert_eq!(timeline.segments[0].start_ms, 100);
@@ -375,7 +420,7 @@ mod tests {
                 unit("界", 1600, 2000),
             ],
         };
-        let timeline = build_timeline(ffa, "你好，世界。");
+        let timeline = build_timeline(ffa, "你好，世界。", "");
         let boundaries = timeline.to_boundaries();
         assert_eq!(boundaries.len(), 2);
         assert_eq!(boundaries[0].text, "你好，");
@@ -399,7 +444,7 @@ mod tests {
                 unit("！", 1300, 1500),
             ],
         };
-        let timeline = build_timeline(ffa, "你好世界");
+        let timeline = build_timeline(ffa, "你好世界", "");
         assert_eq!(timeline.segments.len(), 1);
         assert_eq!(timeline.segments[0].words.len(), 5);
         assert_eq!(timeline.segments[0].end_ms, 1500);
@@ -412,7 +457,7 @@ mod tests {
             language: "zh".into(),
             units: vec![],
         };
-        let timeline = build_timeline(ffa, "你好世界");
+        let timeline = build_timeline(ffa, "你好世界", "");
         assert_eq!(timeline.segments.len(), 1);
         assert_eq!(timeline.segments[0].words.len(), 0);
     }
@@ -442,7 +487,7 @@ mod tests {
                 unit("大", 5388, 5588),
             ],
         };
-        let timeline = build_timeline(ffa, "人工智能的发展速度，大模型让机器强大。");
+        let timeline = build_timeline(ffa, "人工智能的发展速度，大模型让机器强大。", "");
         assert_eq!(timeline.segments.len(), 2);
         assert_eq!(timeline.segments[0].text, "人工智能的发展速度，");
         assert_eq!(timeline.segments[0].start_ms, 220);
@@ -461,7 +506,7 @@ mod tests {
             language: "zh".into(),
             units: vec![unit("你", 300, 600), unit("好", 600, 900)],
         };
-        let timeline = build_timeline(ffa, "你好");
+        let timeline = build_timeline(ffa, "你好", "");
         assert_eq!(timeline.segments[0].start_ms, 300);
         assert_eq!(timeline.segments[0].end_ms, 900);
     }
@@ -480,5 +525,135 @@ mod tests {
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].0, "嗯。");
         assert_eq!(segments[1].0, "啊。");
+    }
+
+    // --- v1.12.1 schema contract tests ------------------------------------
+
+    #[test]
+    fn timeline_flat_words_match_segment_words_count_and_order() {
+        // Primary flatten invariant: top-level `words[]` is the concatenation
+        // of `segments[*].words[]` in order, with no gaps / dupes.
+        let ffa = FfaOutput {
+            duration_ms: 1900,
+            language: "en".into(),
+            units: vec![
+                unit("hello", 100, 500),
+                unit("world", 600, 1000),
+                unit("how", 1200, 1400),
+                unit("are", 1400, 1600),
+                unit("you", 1600, 1900),
+            ],
+        };
+        let timeline = build_timeline(ffa, "Hello, world. How are you?", "en-US-AriaNeural");
+
+        let flat_count: usize = timeline.segments.iter().map(|s| s.words.len()).sum();
+        assert_eq!(timeline.words.len(), flat_count);
+        assert_eq!(timeline.words.len(), 5);
+
+        let segment_concat: Vec<(String, u64, u64)> = timeline
+            .segments
+            .iter()
+            .flat_map(|s| s.words.iter())
+            .map(|w| (w.text.clone(), w.start_ms, w.end_ms))
+            .collect();
+        let flat: Vec<(String, u64, u64)> = timeline
+            .words
+            .iter()
+            .map(|w| (w.text.clone(), w.start_ms, w.end_ms))
+            .collect();
+        assert_eq!(flat, segment_concat);
+    }
+
+    #[test]
+    fn timeline_empty_segments_produce_empty_flat_words() {
+        // Edge case: if the aligner produced nothing and the text has no
+        // recognizable content, `words` is empty (but still present).
+        let ffa = FfaOutput {
+            duration_ms: 0,
+            language: "zh".into(),
+            units: vec![],
+        };
+        let timeline = build_timeline(ffa, "", "zh-CN-XiaoxiaoNeural");
+        assert!(timeline.words.is_empty());
+        assert!(timeline.segments.is_empty());
+        assert_eq!(timeline.duration_ms, 0);
+        assert_eq!(timeline.voice, "zh-CN-XiaoxiaoNeural");
+    }
+
+    #[test]
+    fn timeline_json_has_both_flat_words_and_segments() {
+        // The JSON wire-shape must contain BOTH top-level "words" (v1.12+
+        // contract) AND nested "segments" (backward compat) at the same time,
+        // plus top-level "duration_ms" + "voice".
+        let ffa = FfaOutput {
+            duration_ms: 1800,
+            language: "zh".into(),
+            units: vec![
+                unit("你", 0, 300),
+                unit("好", 300, 600),
+                unit("世", 900, 1200),
+                unit("界", 1200, 1500),
+            ],
+        };
+        let timeline = build_timeline(ffa, "你好，世界。", "zh-CN-XiaoxiaoNeural");
+        let json = serde_json::to_string(&timeline).expect("serialize");
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse");
+
+        assert!(parsed.get("words").is_some(), "missing top-level words");
+        assert!(
+            parsed.get("segments").is_some(),
+            "missing top-level segments"
+        );
+        assert!(parsed.get("duration_ms").is_some(), "missing duration_ms");
+        assert!(parsed.get("voice").is_some(), "missing voice");
+
+        // words[] elements use `text` (not `word`) per v1.12 contract.
+        let first_word = &parsed["words"][0];
+        assert!(
+            first_word.get("text").is_some(),
+            "flat word missing `text` field"
+        );
+        assert!(
+            first_word.get("start_ms").is_some(),
+            "flat word missing `start_ms` field"
+        );
+        assert!(
+            first_word.get("end_ms").is_some(),
+            "flat word missing `end_ms` field"
+        );
+
+        assert_eq!(parsed["voice"], "zh-CN-XiaoxiaoNeural");
+        assert_eq!(parsed["duration_ms"], 1800);
+    }
+
+    #[test]
+    fn timeline_duration_ms_falls_back_to_max_end_ms_when_ffa_reports_zero() {
+        // When the aligner reports duration_ms: 0, we fall back to max end_ms
+        // over flat words, so `duration_ms` is always meaningful downstream.
+        let ffa = FfaOutput {
+            duration_ms: 0,
+            language: "zh".into(),
+            units: vec![unit("你", 0, 400), unit("好", 400, 900)],
+        };
+        let timeline = build_timeline(ffa, "你好", "");
+        assert_eq!(timeline.duration_ms, 900);
+    }
+
+    #[test]
+    fn timeline_deserializes_its_own_output() {
+        // Round-trip: serialized JSON can be re-parsed into a Timeline.
+        let ffa = FfaOutput {
+            duration_ms: 900,
+            language: "zh".into(),
+            units: vec![unit("你", 0, 400), unit("好", 400, 900)],
+        };
+        let timeline = build_timeline(ffa, "你好", "zh-CN-XiaoxiaoNeural");
+        let json = serde_json::to_string(&timeline).expect("serialize");
+        let restored: Timeline = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.words.len(), 2);
+        assert_eq!(restored.segments.len(), 1);
+        assert_eq!(restored.duration_ms, 900);
+        assert_eq!(restored.voice, "zh-CN-XiaoxiaoNeural");
+        assert_eq!(restored.words[0].text, "你");
     }
 }

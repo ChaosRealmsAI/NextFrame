@@ -135,7 +135,7 @@ pub async fn run_batch(
                 let _ = cache.put(&cache_key, &audio);
 
                 if gen_srt {
-                    match crate::whisper::align_audio(&out_path, &job.text) {
+                    match crate::whisper::align_audio(&out_path, &job.text, &params.voice) {
                         Ok(Some(timeline)) => {
                             if let Ok(json_path) = timeline.write_json(&out_path) {
                                 crate::output::write_stderr_line(format_args!(

@@ -21,6 +21,7 @@ Backends:\n\
   volcengine  Paid (¥2/万字, seed-tts-2.0). Production quality. Use -b volcengine.\n\n\
 Common flags (both backends):\n\
   --no-sub           Skip subtitle generation (on by default)\n\
+  --subdir           Nest outputs under {dir}/{stem}/ instead of flat (default flat)\n\
   -v, --voice        Voice name (auto-detected from text language if omitted)\n\
   -o, --output       Output filename\n\
   -d, --dir          Output directory\n\n\
@@ -40,7 +41,7 @@ Subtitle generation (default ON):\n\
   Subtitles use whisperX forced alignment (wav2vec2 CTC).\n\
   Original text is preserved verbatim; timestamps come from acoustic alignment.\n\
   Output: <name>.timeline.json (word-level, primary) + <name>.srt (segment-level).\n\
-  Files are placed in a subdirectory named after the output file.\n\
+  Files land flat in -d by default; pass --subdir to nest under {dir}/{stem}/.\n\
   Use --no-sub to skip subtitle generation.\n\n\
 Text length (volcengine):\n\
   Best:  200-400 chars per call. Natural tone, no timeout.\n\
@@ -49,8 +50,9 @@ Text length (volcengine):\n\
   Limit: ~1000 chars per call. Beyond that -> timeout risk.\n\
   Tip:   longer text = better tone continuity. Split by paragraph, not sentence.\n\n\
 Examples:\n\
-  # Synthesize with subtitles (default: MP3 + timeline.json + SRT)\n\
-  vox synth \"测试文本\" -o test.mp3                  # -> test/test.mp3 + .timeline.json + .srt\n\
+  # Synthesize with subtitles (default: MP3 + timeline.json + SRT, flat into -d)\n\
+  vox synth \"测试文本\" -o test.mp3                  # -> ./test.mp3 + .timeline.json + .srt\n\
+  vox synth \"测试\" -o test.mp3 --subdir             # -> ./test/test.mp3 + sidecars (legacy layout)\n\
   vox synth \"测试\" -o test.mp3 --no-sub             # audio only, no subtitles\n\
   vox play \"hello world\"                           # quick listen (no files saved)\n\n\
   # Production with volcengine (same workflow, add -b volcengine)\n\

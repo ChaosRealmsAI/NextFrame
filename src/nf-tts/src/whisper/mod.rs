@@ -15,8 +15,10 @@
 //! verbatim — including all punctuation — and whisperX only supplies timing.
 //!
 //! Public types (`Timeline`, `TimelineSegment`, `TimelineWord`) and the
-//! `align_audio(audio_path, original_text)` entry point keep the same shape
-//! as before, so callers (synth, scheduler, srt) need no changes.
+//! `align_audio(audio_path, original_text, voice)` entry point keep the same
+//! overall shape as before; the `voice` parameter was added in v1.12.1 so the
+//! emitted `*.timeline.json` can carry a top-level `voice` field per
+//! `spec/interfaces.json`.
 
 mod aligner;
 mod timeline;
@@ -29,7 +31,17 @@ pub use timeline::Timeline;
 #[allow(unused_imports)]
 pub use timeline::{TimelineSegment, TimelineWord};
 
-pub fn align_audio(audio_path: &Path, original_text: &str) -> Result<Option<Timeline>> {
+/// Force-align audio against the original text.
+///
+/// `voice` is the TTS voice id that produced `audio_path` (e.g.
+/// `"zh-CN-XiaoxiaoNeural"`). It is carried verbatim into the resulting
+/// `Timeline::voice` field — pass `""` when the caller does not know / does
+/// not care.
+pub fn align_audio(
+    audio_path: &Path,
+    original_text: &str,
+    voice: &str,
+) -> Result<Option<Timeline>> {
     if original_text.trim().is_empty() {
         return Ok(None);
     }
@@ -39,7 +51,7 @@ pub fn align_audio(audio_path: &Path, original_text: &str) -> Result<Option<Time
         return Ok(None);
     }
 
-    let timeline = timeline::build_timeline(ffa, original_text);
+    let timeline = timeline::build_timeline(ffa, original_text, voice);
     if timeline.segments.is_empty() {
         return Ok(None);
     }

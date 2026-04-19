@@ -40,7 +40,9 @@ Thumbs.db
 
 # Test / output artifacts
 test-results/
-output/
+/output/
+/src/*/output/out/
+# NOTE: was `output/` globally · shadowed src/nf-tts/src/output/ module · v1.12.1 fix
 
 # Accidental CLI output files
 -o

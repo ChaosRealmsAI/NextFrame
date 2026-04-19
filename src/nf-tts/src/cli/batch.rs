@@ -158,6 +158,9 @@ pub async fn run(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+    #![allow(clippy::expect_used)]
+
     use super::{ensure_batch_success, prepare_jobs, resolve_batch_options, BatchOptions};
     use crate::config::VoxConfig;
     use crate::output::manifest::Manifest;

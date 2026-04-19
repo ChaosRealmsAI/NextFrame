@@ -10,13 +10,8 @@ keywords = ["tts", "cli", "speech", "audio", "edge"]
 categories = ["command-line-utilities", "multimedia::audio"]
 rust-version = "1.75"
 
-[lints.clippy]
-unwrap_used = "deny"
-expect_used = "deny"
-panic = "deny"
-unreachable = "deny"
-todo = "deny"
-wildcard_imports = "deny"
+[lints]
+workspace = true
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }

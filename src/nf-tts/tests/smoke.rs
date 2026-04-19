@@ -1,3 +1,6 @@
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::expect_used)]
+
 use nf_tts::{Manifest, ManifestEntry, VoxConfig};
 use std::collections::HashMap;
 use std::fs;
