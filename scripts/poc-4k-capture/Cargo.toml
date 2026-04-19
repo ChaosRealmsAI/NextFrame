@@ -1,0 +1,24 @@
+[package]
+name = "poc-4k-capture"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+libc = "0.2"
+nf-shell-mac = { path = "../../src/nf-shell-mac" }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSColor"] }
+objc2-core-foundation = { version = "0.3", features = ["CFBase", "CFCGTypes", "CFDictionary", "CFNumber", "CFString"] }
+objc2-core-graphics = { version = "0.3", features = ["CGColor"] }
+objc2-core-media = { version = "0.3", features = ["CMBase", "CMFormatDescription", "CMSampleBuffer"] }
+objc2-core-video = { version = "0.3", features = ["CVImageBuffer", "CVPixelBuffer", "CVPixelBufferIOSurface"] }
+objc2-foundation = { version = "0.3", features = ["NSString"] }
+objc2-io-surface = { version = "0.3", features = ["IOSurface", "IOSurfaceRef", "IOSurfaceTypes", "libc", "objc2", "objc2-core-foundation", "objc2-foundation"] }
+objc2-quartz-core = { version = "0.3", features = ["CALayer", "CARenderer", "CATransaction", "objc2-core-foundation", "objc2-core-video", "objc2-core-graphics", "objc2-metal"] }
+objc2-video-toolbox = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[workspace]
+members = []
