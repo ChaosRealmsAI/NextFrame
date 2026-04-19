@@ -136,13 +136,7 @@ export function diffAndMount(stage, html) {
   const tmp = doc.createElement("div");
   tmp.innerHTML = html;
 
-  // Collect persist elements on both sides.
-  const newPersist = new Map();
-  const newList = tmp.querySelectorAll("[data-nf-persist]");
-  for (let i = 0; i < newList.length; i++) {
-    const el = newList[i];
-    newPersist.set(el.getAttribute("data-nf-persist"), el);
-  }
+  // Index old persist elements by key (still attached to stage).
   const oldPersist = new Map();
   const oldList = stage.querySelectorAll("[data-nf-persist]");
   for (let i = 0; i < oldList.length; i++) {
@@ -150,38 +144,63 @@ export function diffAndMount(stage, html) {
     oldPersist.set(el.getAttribute("data-nf-persist"), el);
   }
 
-  // Reuse old elements where the key matches on both sides.
-  newPersist.forEach((newEl, key) => {
-    const oldEl = oldPersist.get(key);
-    if (!oldEl) return;
-    // Copy non-identity attributes new → old.
-    const attrs = newEl.attributes;
-    for (let i = 0; i < attrs.length; i++) {
-      const a = attrs[i];
-      if (!IDENTITY_ATTRS.has(a.name)) {
-        oldEl.setAttribute(a.name, a.value);
+  // Build the desired children list: for each top-level new child, either
+  // reuse an existing persist element (NEVER detach it from stage) or use
+  // the newly parsed element. Writing media (<video>/<audio>) must not
+  // leave the document tree — Chromium pauses playback on detach.
+  const desired = [];
+  const reused = new Set();
+  const topNew = Array.from(tmp.children);
+  for (let i = 0; i < topNew.length; i++) {
+    const nc = topNew[i];
+    if (nc.nodeType === 1 && nc.hasAttribute && nc.hasAttribute("data-nf-persist")) {
+      const key = nc.getAttribute("data-nf-persist");
+      const oldEl = oldPersist.get(key);
+      if (oldEl) {
+        // Copy non-identity attrs to the old element.
+        const attrs = nc.attributes;
+        for (let j = 0; j < attrs.length; j++) {
+          const a = attrs[j];
+          if (!IDENTITY_ATTRS.has(a.name)) {
+            oldEl.setAttribute(a.name, a.value);
+          }
+        }
+        // Remove stale non-identity attrs that the new snapshot dropped.
+        const oldAttrs = Array.from(oldEl.attributes);
+        for (let j = 0; j < oldAttrs.length; j++) {
+          const a = oldAttrs[j];
+          if (IDENTITY_ATTRS.has(a.name)) continue;
+          if (!nc.hasAttribute(a.name)) {
+            oldEl.removeAttribute(a.name);
+          }
+        }
+        desired.push(oldEl);
+        reused.add(key);
+        continue;
       }
     }
-    // Remove stale attributes that the new placeholder no longer carries.
-    const oldAttrs = Array.from(oldEl.attributes);
-    for (let i = 0; i < oldAttrs.length; i++) {
-      const a = oldAttrs[i];
-      if (IDENTITY_ATTRS.has(a.name)) continue;
-      if (!newEl.hasAttribute(a.name)) {
-        oldEl.removeAttribute(a.name);
-      }
-    }
-    // Swap placeholder → old element inside the fragment.
-    if (newEl.parentNode) {
-      newEl.parentNode.replaceChild(oldEl, newEl);
-    }
-  });
+    desired.push(nc);
+  }
 
-  // Mount: clear stage + move fragment children in (old reused persist
-  // elements ride along via the fragment, keeping their live state).
-  stage.innerHTML = "";
-  while (tmp.firstChild) {
-    stage.appendChild(tmp.firstChild);
+  // Remove stage children that are neither reused persist elements nor
+  // part of the new snapshot. Non-persist old children are always removed.
+  const children = Array.from(stage.children);
+  for (let i = 0; i < children.length; i++) {
+    const c = children[i];
+    const key = c.nodeType === 1 && c.getAttribute && c.getAttribute("data-nf-persist");
+    if (key && reused.has(key)) continue; // keep — will be re-ordered below
+    stage.removeChild(c);
+  }
+
+  // Ensure `desired` is the ordered child list of stage WITHOUT detaching
+  // already-mounted persist elements (insertBefore a live node to its own
+  // parent at the same position is a no-op in DOM spec).
+  for (let i = 0; i < desired.length; i++) {
+    const want = desired[i];
+    const current = stage.children[i];
+    if (current !== want) {
+      stage.insertBefore(want, current || null);
+    }
   }
 }
 
@@ -304,28 +323,21 @@ export function boot(options) {
         if (isRecord) {
           v.muted = true;
           try { if (typeof v.pause === "function") v.pause(); } catch (_e) { /* noop */ }
-        } else {
-          // play / edit mode: unmute + mirror runtime playing state.
-          // BUG-20260419-01 · render HTML no longer carries muted attr so
-          // browser starts with muted=true default → explicitly set false.
-          // BUG-20260419-01 fix B · runtime 'playing' → also call v.play()
-          // otherwise the <video> element stays paused (silent).
-          v.muted = false;
-          try {
-            if (playing && v.paused) {
-              const p = v.play();
-              if (p && typeof p.catch === "function") p.catch(() => {});
-            } else if (!playing && !v.paused) {
-              v.pause();
-            }
-          } catch (_e) { /* noop */ }
         }
-        if (ac) {
+        // play / edit mode: DO NOT touch v.muted or call v.play()/pause()
+        // every RAF tick. Chromium re-evaluates autoplay policy on mute
+        // state change and will pause the video when not inside a user
+        // gesture. Muted autoplay is bootstrapped once after first diff
+        // (see post-mount below); unmute + play happens in the click
+        // handler (inherits the user gesture).
+        if (ac && (isRecord || _seekForceSync)) {
+          // Drive v.currentTime from outside only when: (a) record mode
+          // (recorder provides external t), or (b) explicit seek jump.
+          // Do NOT write currentTime on every tick in play mode — that
+          // triggers a seeking/seeked cycle and silently stops playback.
           const fromMs = parseFloat(v.getAttribute("data-nf-t-offset") || "0") || 0;
           const target = (ac.localT + fromMs) / 1000;
-          if (isRecord || Math.abs((v.currentTime || 0) - target) > 0.1) {
-            try { v.currentTime = target; } catch (_e) { /* noop */ }
-          }
+          try { v.currentTime = target; } catch (_e) { /* noop */ }
         }
       }
     }
@@ -354,6 +366,12 @@ export function boot(options) {
     emitTime(t);
     rafId = _raf(tick);
   }
+
+  // One-shot flag: when seek() calls renderState it wants <video>.currentTime
+  // jumped to the target. In play mode the normal tick must NOT touch
+  // currentTime (that breaks natural playback). Only record mode external-t
+  // driver + explicit seek call use this write path.
+  let _seekForceSync = false;
 
   // Helper: call v.play() / v.pause() on every persist <video> directly
   // inside the click / key handler. BUG-20260419-01 round 3: browsers only
@@ -414,7 +432,11 @@ export function boot(options) {
           pausedAtMs = clamped;
         }
       }
+      // Force <video>.currentTime to jump this once (renderState normally
+      // avoids writing currentTime in play mode to preserve playback).
+      _seekForceSync = true;
       renderState(getStateAt(resolved, Math.min(clamped, Math.max(0, duration_ms - 1))));
+      _seekForceSync = false;
       emitTime(clamped);
     },
     setLoop(enabled) {
@@ -487,6 +509,23 @@ export function boot(options) {
   };
 
   if (autoplay) {
+    // Render one frame first so persist <video> elements exist in the stage.
+    renderState(getStateAt(resolved, 0));
+    // Muted autoplay is always allowed (Chromium/Safari/Firefox). Start
+    // every persist <video> muted so the picture-in-picture window shows
+    // motion right away; the play-pause button click handler will unmute
+    // inside the user gesture.
+    const __bootVs = stage.querySelectorAll && stage.querySelectorAll("video[data-nf-persist]");
+    if (__bootVs) {
+      for (let __i = 0; __i < __bootVs.length; __i++) {
+        const __v = __bootVs[__i];
+        try {
+          __v.muted = true;
+          const __p = __v.play();
+          if (__p && typeof __p.catch === "function") __p.catch(() => {});
+        } catch (_e) { /* noop */ }
+      }
+    }
     rafId = _raf(tick);
   } else {
     // Render initial frame at t=0 so stage isn't blank when paused.
@@ -616,25 +655,29 @@ function _bindTimelineUi(doc, handle, duration_ms) {
   bindBtn('button[data-nf="to-start"]',    () => handle.seek(0, { pause: true }));
   bindBtn('button[data-nf="prev-frame"]',  () => handle.seek(Math.max(0, handle.getState().t_ms - 33), { pause: true }));
   bindBtn('button[data-nf="play-pause"]',  () => {
-    // BUG-20260419-01 round 3 · unlock video audio on user gesture.
-    // If autoplay=true at boot, handle._paused=false but browsers still
-    // blocked v.play() (rejected Promise) → video silently stuck paused.
-    // First click must unconditionally call v.play() in the click handler
-    // so browser honours the gesture; then sync runtime state.
+    // BUG-20260419-01 round 4 · muted-autoplay + gesture-unmute pattern.
+    // Boot mutes videos so autoplay is allowed (Chromium autoplay policy).
+    // First click = user gesture → unmute + ensure playing. Toggling
+    // thereafter flips play/pause state (runtime + video in sync).
     const vs = doc.querySelectorAll('video[data-nf-persist]');
+    const anyMuted = Array.prototype.slice.call(vs).some((v) => v.muted);
     const anyVideoPaused = Array.prototype.slice.call(vs).some((v) => v.paused);
-    if (handle._paused || anyVideoPaused) {
+    if (anyMuted || handle._paused || anyVideoPaused) {
+      // Unmute + play inside the user-gesture call stack.
       for (let i = 0; i < vs.length; i++) {
         const v = vs[i];
-        if (v.paused) {
-          try {
+        try {
+          v.muted = false;
+          v.volume = 1.0;
+          if (v.paused) {
             const pr = v.play();
             if (pr && typeof pr.catch === 'function') pr.catch(() => {});
-          } catch (_e) { /* noop */ }
-        }
+          }
+        } catch (_e) { /* noop */ }
       }
       if (handle._paused) handle.play();
     } else {
+      // All videos already unmuted + playing + runtime playing → pause.
       handle.pause();
     }
   });
