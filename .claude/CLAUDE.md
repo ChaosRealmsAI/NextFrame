@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AI 视频引擎 — 把结构化信息变成视频。输入 JSON，输出可播放 HTML 或 4K MP4。场景不限于自媒体：教育、产品演示、数据报告、内部培训、开源项目介绍。
 
-## 当前状态（2026-04-19）：v1.40/41/42/43 全部落地 · Track ABI v2 完整闭环
+## 当前状态（2026-04-19）：Track ABI v2 闭环 + Scene 家族 9 Track（v1.46/47/48）
 
 **v0.x 探索期于 2026-04-17 结束并硬重置**（commit `61d4aa0`）· v1.0 从零重启 · v1.12.5 + v1.14 recorder + v1.15 parallel-record + v1.20 wry-shell + v1.22 mp4-export 完成（见 `spec/roadmap.json history`）。
 
@@ -35,6 +35,15 @@ AI 视频引擎 — 把结构化信息变成视频。输入 JSON，输出可播�
 - `src/nf-runtime/src/runtime.js` mirror 实现 `_resolveRefs` · 在 liteResolve 里调用 · nf-shell 透明获益
 - `demo/v1.42-ref-demo.json` · bg 色从 theme · 标题/副标/accent 从 data
 - 5/5 VP 全绿 · 3 场景亲验（base / changed / bad ref error）· backward compat L1 零回归
+
+**v1.46/47/48 Scene Family · 9 L1 community Tracks**（2026-04-19 done）：
+- v1.46 Hero 批 · hero-centered / hero-split (circle/triangle/hexagon) / hero-overlay
+- v1.47 Data 批 · stat-giant (count-up) / metric-grid (2×2) / kpi-callout (trend triangle)
+- v1.48 Narrative 批 · quote (装饰引号) / list-bullets (dot/num/check) / timeline (水平里程碑)
+- 每 Track L1 · 过 11 lint gates · motion-first · 扁平 2.5D radial gradient
+- **9 Playwright headless 亲验 screenshot**（屏幕锁定时 screencapture 失效 · Playwright 稳定替代）
+- 17 Tracks 全仓回归（7 official + 10 community 含 webgl-particles）
+- demo: `demo/v1.46-hero-family.json` / `v1.47-data-family.json` / `v1.48-narrative-family.json`
 
 **已有能力**（src/ 下活 crate）：
 | Crate | 能力 |
