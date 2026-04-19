@@ -195,14 +195,16 @@ function pickPadding(style) {
 }
 
 function positionCss(position, padding) {
+  // Use !important to override bundle CSS that forces top:0 / left:0 /
+  // transform:scale on every #nf-stage > * child (ADR-046 layout scaling).
   if (position === "top") {
-    return "top:" + padding + "px;";
+    return "top:" + padding + "px !important;bottom:auto !important;transform:none !important;";
   }
   if (position === "middle") {
-    return "top:50%;transform:translateY(-50%);";
+    return "top:50% !important;bottom:auto !important;transform:translateY(-50%) !important;";
   }
   // bottom (default)
-  return "bottom:" + padding + "px;";
+  return "bottom:" + padding + "px !important;top:auto !important;transform:none !important;";
 }
 
 // Colour for the three word states. We emit inline styles directly (no CSS
@@ -305,7 +307,7 @@ export function render(t, params, viewport) {
   // Container: absolute-positioned strip spanning the stage width. Inline
   // style so the bundle stays self-contained (no external stylesheet needed).
   const containerStyle =
-    "position:absolute;left:0;right:0;" +
+    "position:absolute !important;left:0 !important;right:0 !important;width:auto !important;height:auto !important;" +
     positionCss(position, padding) +
     "text-align:center;" +
     "font-size:" +

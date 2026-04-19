@@ -32,9 +32,10 @@ const SUBTITLE_JS = path.join(ROOT, "src", "nf-tracks", "official", "subtitle.js
 const ABI_LINTER = path.join(ROOT, "src", "nf-tracks", "scripts", "check-abi.mjs");
 const ENGINE_JS = path.join(ROOT, "src", "nf-core-engine", "dist", "engine.js");
 
-const MP3_DEMO = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1.12-demo.mp3";
-const TIMELINE_DEMO = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1.12-demo.timeline.json";
-const TIMELINE_LONG = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1.12-long.timeline.json";
+// Demo assets — cross-version: v1.12.5 cleaned tmp/v1.12-demo.*, we reuse v1121/v1122
+const MP3_DEMO = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1121-demo.mp3";
+const TIMELINE_DEMO = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1121-demo.timeline.json";
+const TIMELINE_LONG = "/Users/Zhuanz/bigbang/NextFrame/tmp/v1122-demo.timeline.json";
 
 mkdirSync(VERIFY_DIR, { recursive: true });
 mkdirSync(SCREENSHOT_DIR, { recursive: true });
@@ -459,14 +460,17 @@ async function vp4() {
     // A expect: rgb(255, 0, 0) · fontSize 36px · container inline `top:12px`
     const aColorOk = (A.info?.active_color || "").replace(/\s+/g, "") === "rgb(255,0,0)";
     const aSizeOk = (A.info?.active_font_size || "") === "36px";
-    // subtitle.js emits inline `top:<padding>px` for position=top; read the
-    // inline style directly since stage layout can mask getComputedStyle.
-    const aPosOk = A.info?.inline_top === "12px" && A.info?.inline_bottom == null;
+    // subtitle.js emits inline `top:<padding>px !important` for position=top
+    // (!important to override ADR-046 bundle stage `top:0 !important`).
+    // Accept both the padding value and the `auto` sibling. Use startsWith to
+    // allow the `!important` suffix.
+    const aPosOk = (A.info?.inline_top || "").startsWith("12px") &&
+                   (A.info?.inline_bottom || "").startsWith("auto");
 
     const bColorOk = (B.info?.active_color || "").replace(/\s+/g, "") === "rgb(0,255,0)";
     const bSizeOk = (B.info?.active_font_size || "") === "24px";
-    // for bottom position, subtitle.js emits `bottom:<padding>px` inline.
-    const bPosOk = B.info?.inline_bottom === "4px" && B.info?.inline_top == null;
+    const bPosOk = (B.info?.inline_bottom || "").startsWith("4px") &&
+                   (B.info?.inline_top || "").startsWith("auto");
 
     const differ = (A.info?.active_color !== B.info?.active_color) &&
       (A.info?.active_font_size !== B.info?.active_font_size);
