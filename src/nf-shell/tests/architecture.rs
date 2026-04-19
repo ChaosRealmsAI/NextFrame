@@ -33,7 +33,10 @@ fn platform_split_files_exist() -> Result<(), String> {
     if missing.is_empty() {
         Ok(())
     } else {
-        Err(format!("missing platform split files:\n{}", missing.join("\n")))
+        Err(format!(
+            "missing platform split files:\n{}",
+            missing.join("\n")
+        ))
     }
 }
 

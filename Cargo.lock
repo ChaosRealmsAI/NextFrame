@@ -2212,6 +2212,7 @@ dependencies = [
  "rfd",
  "serde",
  "serde_json",
+ "sha2",
  "tao",
  "tokio",
  "webkit2gtk",

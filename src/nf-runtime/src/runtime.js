@@ -348,6 +348,49 @@ function _topoSort(graph) {
 // -----------------------------------------------------------------------------
 // getStateAt — pure, no globals, no Date.now, no Math.random
 // -----------------------------------------------------------------------------
+function _sampleKeyframes(keyframes, localT, fallback) {
+  if (!Array.isArray(keyframes)) return fallback;
+  const points = keyframes
+    .map((frame) => ({
+      t: Number(frame && frame.t),
+      v: Number(frame && frame.v),
+    }))
+    .filter((frame) => Number.isFinite(frame.t) && Number.isFinite(frame.v))
+    .sort((a, b) => a.t - b.t);
+  if (points.length === 0) return fallback;
+  if (localT <= points[0].t) return points[0].v;
+  for (let i = 0; i < points.length - 1; i++) {
+    const left = points[i];
+    const right = points[i + 1];
+    if (localT === left.t) return left.v;
+    if (localT <= right.t) {
+      if (right.t <= left.t) return right.v;
+      const progress = Math.max(0, Math.min(1, (localT - left.t) / (right.t - left.t)));
+      return left.v + (right.v - left.v) * progress;
+    }
+  }
+  return points[points.length - 1].v;
+}
+
+function _paramsAtLocalT(value, localT) {
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((item) => _paramsAtLocalT(item, localT));
+  const out = {};
+  const keys = Object.keys(value);
+  for (const key of keys) {
+    if (key.endsWith("_keyframes")) continue;
+    out[key] = _paramsAtLocalT(value[key], localT);
+  }
+  for (const key of keys) {
+    if (!key.endsWith("_keyframes")) continue;
+    const baseKey = key.slice(0, -10);
+    if (!baseKey) continue;
+    const sampled = _sampleKeyframes(value[key], localT, out[baseKey]);
+    if (typeof sampled !== "undefined") out[baseKey] = sampled;
+  }
+  return out;
+}
+
 export function getStateAt(resolved, t_ms) {
   const duration_ms = resolved && typeof resolved.duration_ms === "number"
     ? resolved.duration_ms
@@ -383,12 +426,13 @@ export function getStateAt(resolved, t_ms) {
       });
       // half-open interval [begin_ms, end_ms)
       if (t_ms >= b && t_ms < e) {
+        const localT = t_ms - b;
         const active = {
           trackId,
           clipIdx: ci,
           clipId,
-          params: clip.params || {},
-          localT: t_ms - b,
+          params: _paramsAtLocalT(clip.params || {}, localT),
+          localT,
           opacity: 1,
           transition: null,
         };
