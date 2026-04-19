@@ -2,7 +2,7 @@
   "$schema": "../spec/interfaces.json#/source_json_schema",
   "meta": {
     "name": "v1.8 video-track showcase",
-    "description": "多轨叠加 · 底层 video 元素精确 seek · 上层 scene hero 文字覆盖 · 演示 VP-2/3/4",
+    "description": "Track.video PIP · 底层横屏视频嵌入 + 上层 scene hero 文字 · 时长与源一致 (212s)",
     "version": "v1.8",
     "created": "2026-04-19"
   },
@@ -15,7 +15,7 @@
   "anchors": {
     "demo": {
       "begin": "0",
-      "end": "demo.begin + 5s",
+      "end": "demo.begin + 212s",
       "filler": "manual"
     }
   },
@@ -32,13 +32,13 @@
           "params": {
             "src": "file:///Users/Zhuanz/bigbang/NextFrame/demo/assets/v1.8-real-clip.mp4",
             "from_ms": 0,
-            "to_ms": 5000,
-            "fit": "contain",
+            "to_ms": 212000,
+            "fit": "cover",
             "muted_in_record": true,
-            "x": 72,
-            "y": 10,
-            "w": 25,
-            "h": 80,
+            "x": 65,
+            "y": 60,
+            "w": 30,
+            "h": 30,
             "radius": 16,
             "border": "2px solid rgba(255,255,255,0.3)",
             "shadow": "0 16px 48px rgba(0,0,0,0.55)"
