@@ -529,21 +529,13 @@ export function boot(options) {
   if (autoplay) {
     // Render one frame first so persist <video> elements exist in the stage.
     renderState(getStateAt(resolved, 0));
-    // Muted autoplay is always allowed (Chromium/Safari/Firefox). Start
-    // every persist <video> muted so the picture-in-picture window shows
-    // motion right away; the play-pause button click handler will unmute
-    // inside the user gesture.
-    const __bootVs = stage.querySelectorAll && stage.querySelectorAll("video[data-nf-persist]");
-    if (__bootVs) {
-      for (let __i = 0; __i < __bootVs.length; __i++) {
-        const __v = __bootVs[__i];
-        try {
-          __v.muted = true;
-          const __p = __v.play();
-          if (__p && typeof __p.catch === "function") __p.catch(() => {});
-        } catch (_e) { /* noop */ }
-      }
-    }
+    // BUG-20260419-01 round 5 · do NOT muted-autoplay persist <video>.
+    // The old muted-bootstrap + gesture-unmute pattern made the first click
+    // merely "unmute" (icon still ⏸ from autoplay) so users needed three
+    // clicks to pause. Keep <video> paused; the first click in the
+    // play-pause button handler will v.play() inside the user gesture and
+    // start unmuted playback from the beginning. scene Track animation
+    // still advances via RAF below.
     rafId = _raf(tick);
   } else {
     // Render initial frame at t=0 so stage isn't blank when paused.
@@ -753,6 +745,23 @@ function _bindTimelineUi(doc, handle, duration_ms) {
 
   if (tcTotal) tcTotal.textContent = _fmtTime(duration_ms);
 
+  // BUG-20260419-01 round 5 · play-pause icon reflects EFFECTIVE state:
+  // even when runtime._paused=false, if any persist <video> is paused OR
+  // muted the user isn't actually hearing playback, so show ▶. Only when
+  // runtime playing AND all videos active (unmuted + playing) show ⏸.
+  function _effectivelyPlaying() {
+    if (handle._paused) return false;
+    const vs = doc.querySelectorAll("video[data-nf-persist]");
+    for (let i = 0; i < vs.length; i++) {
+      const v = vs[i];
+      if (v.paused || v.muted) return false;
+    }
+    return true;
+  }
+  function _refreshPlayBtn() {
+    if (playBtn) playBtn.textContent = _effectivelyPlaying() ? "⏸" : "▶";
+  }
+
   handle.onTimeUpdate((t) => {
     if (playhead && duration_ms > 0) {
       const pct = (t / duration_ms) * 100;
@@ -763,9 +772,29 @@ function _bindTimelineUi(doc, handle, duration_ms) {
     }
     if (phLabel) phLabel.textContent = (t / 1000).toFixed(3) + "s";
     if (tcNow) tcNow.textContent = _fmtTime(t);
-    if (playBtn) playBtn.textContent = handle._paused ? "▶" : "⏸";
+    _refreshPlayBtn();
     if (loopBtn) loopBtn.setAttribute("data-active", handle._loop ? "true" : "false");
   });
+
+  // Keep button in sync with <video> native events (play / pause / unmute).
+  // onTimeUpdate only fires when runtime tick is advancing t; clicking a
+  // button that flips v.paused without runtime state change must still
+  // update the icon immediately.
+  const __bindVideoEvents = () => {
+    const vs = doc.querySelectorAll("video[data-nf-persist]");
+    for (let i = 0; i < vs.length; i++) {
+      const v = vs[i];
+      if (v.__nfIconBound) continue;
+      v.__nfIconBound = true;
+      ["play", "playing", "pause", "volumechange", "loadedmetadata"].forEach((ev) => {
+        v.addEventListener(ev, _refreshPlayBtn);
+      });
+    }
+  };
+  __bindVideoEvents();
+  // Also re-scan after each RAF tick (new persist <video> may appear when
+  // the active clip set changes).
+  handle.onTimeUpdate(() => __bindVideoEvents());
 
   // Emit one synthetic initial tick so UI reflects current state before first RAF.
   try { handle.onTimeUpdate; } catch (_e) { /* noop */ }
@@ -774,7 +803,7 @@ function _bindTimelineUi(doc, handle, duration_ms) {
   if (playhead && duration_ms > 0) {
     playhead.style.setProperty("--ph-pct", ((s0.t_ms / duration_ms) * 100) + "%");
   }
-  if (playBtn) playBtn.textContent = handle._paused ? "▶" : "⏸";
+  _refreshPlayBtn();
   if (loopBtn) loopBtn.setAttribute("data-active", handle._loop ? "true" : "false");
   if (tcNow) tcNow.textContent = _fmtTime(s0.t_ms);
 }
