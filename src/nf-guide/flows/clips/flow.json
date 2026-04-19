@@ -1,0 +1,66 @@
+{
+  "id": "clips",
+  "name": "Smart Clips Pipeline",
+  "description": "长视频 → 转写 → 挑亮点 → 切片 → 多语言字幕 → 传播文案。CLI 驱动，每步一个命令，Agent 读提示词干活。",
+  "steps": [
+    {
+      "id": "download",
+      "title": "下载源视频",
+      "prompt": "00-download.md",
+      "gate": "source-downloaded",
+      "description": "yt-dlp 下载视频，产出 source.mp4 + meta.json",
+      "agent_driven": false
+    },
+    {
+      "id": "transcribe",
+      "title": "转写字幕",
+      "prompt": "01-transcribe.md",
+      "gate": "transcript-ready",
+      "description": "WhisperX 转写，产出句级 sentences.json + 词级 words.json",
+      "agent_driven": false
+    },
+    {
+      "id": "plan",
+      "title": "挑 3-5 个 highlight",
+      "prompt": "02-plan.md",
+      "gate": "plan-written",
+      "description": "Agent 读 sentences.json，挑最能传播的片段，写 plan.json",
+      "agent_driven": true
+    },
+    {
+      "id": "cut",
+      "title": "切真实视频片段",
+      "prompt": "03-cut.md",
+      "gate": "clips-cut",
+      "description": "按 plan 切 clip_NN.mp4 + cut_report.json",
+      "agent_driven": false
+    },
+    {
+      "id": "translate",
+      "title": "翻译字幕（单 clip 单语言）",
+      "prompt": "04-translate.md",
+      "gate": "translated",
+      "description": "Agent 按完整句原则 1对N 切 cue，产出 clip_NN.translations.zh.json",
+      "agent_driven": true,
+      "per_item": "clip"
+    },
+    {
+      "id": "polish",
+      "title": "写传播文案（单 clip）",
+      "prompt": "05-polish.md",
+      "gate": "polished",
+      "description": "Agent 写标题/描述/标签/封面，产出 clip_NN.caption.zh.md",
+      "agent_driven": true,
+      "per_item": "clip"
+    },
+    {
+      "id": "publish",
+      "title": "多平台发布",
+      "prompt": "06-publish.md",
+      "gate": "published",
+      "description": "推到抖音/B站/小红书/YouTube",
+      "agent_driven": false,
+      "optional": true
+    }
+  ]
+}
