@@ -12,8 +12,34 @@ path = "src/lib.rs"
 
 [dependencies]
 objc2 = "0.5"
-objc2-foundation = "0.2"
-objc2-app-kit = "0.2"
+# objc2 0.2 需显式开 feature 拉生成类 · union of T-04 (window) + T-05 (topbar) · 后续 task 追加
+objc2-foundation = { version = "0.2", features = [
+    "NSArray",
+    "NSGeometry",
+    "NSNotification",
+    "NSObject",
+    "NSString",
+    "NSThread",
+] }
+objc2-app-kit = { version = "0.2", features = [
+    "NSApplication",
+    "NSBox",
+    "NSButton",
+    "NSButtonCell",
+    "NSCell",
+    "NSColor",
+    "NSControl",
+    "NSFont",
+    "NSFontDescriptor",
+    "NSGraphics",
+    "NSResponder",
+    "NSRunningApplication",
+    "NSText",
+    "NSTextField",
+    "NSView",
+    "NSVisualEffectView",
+    "NSWindow",
+] }
 objc2-web-kit = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
