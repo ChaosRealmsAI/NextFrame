@@ -75,9 +75,7 @@
             "y": 60,
             "w": 30,
             "h": 30,
-            "radius": 16,
-            "border": "2px solid rgba(255,255,255,0.35)",
-            "shadow": "0 20px 60px rgba(0,0,0,0.65)"
+            "radius": 16
           }
         }
       ]
