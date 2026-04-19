@@ -12,15 +12,19 @@
 //! CLI:
 //!   `nf-shell [source.json]`                — interactive
 //!   `nf-shell --verify [source.json]`       — run built-in IPC verify suite
+//!   `nf-shell --verify-select [source.json]`— run clip-selection + inspector verify
 //!   `nf-shell --screenshot <out.png> [--delay-ms N] [source.json]`
 //!                                            — capture WebView → PNG and exit
+
+mod editor;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
-use serde_json::{Map, Value};
-use tao::dpi::{LogicalPosition, LogicalSize};
+use editor::{EditorState, Selection};
+use serde_json::{json, Map, Value};
+use tao::dpi::{LogicalPosition, LogicalSize, PhysicalPosition};
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use tao::platform::macos::WindowBuilderExtMacOS;
@@ -34,7 +38,14 @@ const WINDOW_H: f64 = 900.0;
 const TITLEBAR_INSET_X: f64 = 18.0;
 const TITLEBAR_INSET_Y: f64 = 18.0;
 
-const PROTOTYPE_HTML: &str = include_str!("../../../spec/versions/v1.20/prototype.html");
+const PROTOTYPE_HTML: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../../spec/versions/v1.20/prototype.html"
+));
+const DESIGN_TOKENS_CSS: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../../spec/design/tokens.css"
+));
 const RUNTIME_IIFE: &str = include_str!("../../nf-runtime/dist/runtime-iife.js");
 const TRACK_BG: &str = include_str!("../../nf-tracks/official/bg.js");
 const TRACK_SCENE: &str = include_str!("../../nf-tracks/official/scene.js");
@@ -67,6 +78,9 @@ const TRACK_SCENE_LIST_BULLETS: &str =
     include_str!("../../nf-tracks/community/scene-list-bullets.js");
 const TRACK_SCENE_TIMELINE: &str =
     include_str!("../../nf-tracks/community/scene-timeline.js");
+// v1.49 · editor verify-select output paths
+const VERIFY_SELECT_JSON_PATH: &str = "spec/versions/v1.49/verify/verify-select.json";
+const VERIFY_SELECT_SCREENSHOT_PATH: &str = "tmp/v1.49-verify-select.png";
 
 #[derive(Debug, Clone)]
 enum UserEvent {
@@ -85,7 +99,13 @@ enum UserEvent {
     MenuOpen,
     MenuSave,
     VerifyDone,
-    VerifyMediaReport { path: PathBuf, json: String },
+    VerifyMediaReport {
+        path: PathBuf,
+        json: String,
+    },
+    VerifySelectReport {
+        payload: Value,
+    },
 }
 
 fn track_source_for(kind: &str) -> Option<&'static str> {
@@ -167,14 +187,12 @@ fn apply_clip_drag(source: &mut Value, payload: &Value) -> Result<String> {
         .with_context(|| format!("clip-drag: clip not found: {clip_id}"))?;
     // Read current begin/end. Anchor expressions get numericised at this
     // point (lossy — the user opted in by dragging, so we freeze the value).
-    let old_begin_ms = clip
-        .get("begin")
-        .and_then(ms_from_value)
-        .context("clip-drag: clip.begin not numeric (anchor expressions not yet supported in drag edit)")?;
-    let old_end_ms = clip
-        .get("end")
-        .and_then(ms_from_value)
-        .context("clip-drag: clip.end not numeric (anchor expressions not yet supported in drag edit)")?;
+    let old_begin_ms = clip.get("begin").and_then(ms_from_value).context(
+        "clip-drag: clip.begin not numeric (anchor expressions not yet supported in drag edit)",
+    )?;
+    let old_end_ms = clip.get("end").and_then(ms_from_value).context(
+        "clip-drag: clip.end not numeric (anchor expressions not yet supported in drag edit)",
+    )?;
     const MIN_LEN_MS: i64 = 100;
     let (new_begin, new_end) = if side == "left" {
         let candidate = (old_begin_ms + delta_ms).max(0);
@@ -223,84 +241,168 @@ fn ms_from_value(v: &Value) -> Option<i64> {
     })
 }
 
-fn apply_set_param(source: &mut Value, payload: &Value) -> Result<String> {
-    let clip_id = payload
-        .get("clipId")
-        .and_then(|v| v.as_str())
-        .context("set-param: clipId missing")?;
-    let path = payload
-        .get("path")
-        .and_then(|v| v.as_str())
-        .context("set-param: path missing")?;
-    let new_value = payload
-        .get("value")
-        .cloned()
-        .context("set-param: value missing")?;
-    let clip = find_clip_mut(source, clip_id)
-        .with_context(|| format!("set-param: clip not found: {clip_id}"))?;
-    let params = clip
-        .get_mut("params")
-        .context("set-param: clip has no params")?;
-    let segments: Vec<&str> = path.split('.').collect();
-    let mut cursor: &mut Value = params;
-    for seg in &segments[..segments.len() - 1] {
-        cursor = if let Ok(idx) = seg.parse::<usize>() {
-            cursor
-                .get_mut(idx)
-                .with_context(|| format!("set-param: index {idx} missing"))?
-        } else {
-            cursor
-                .get_mut(*seg)
-                .with_context(|| format!("set-param: key {seg} missing"))?
-        };
-    }
-    let last = segments[segments.len() - 1];
-    if let Ok(idx) = last.parse::<usize>() {
-        if let Some(arr) = cursor.as_array_mut() {
-            if idx < arr.len() {
-                arr[idx] = new_value;
-            } else {
-                anyhow::bail!("set-param: index {idx} out of bounds");
-            }
-        } else {
-            anyhow::bail!("set-param: tail expects array");
-        }
-    } else if let Some(obj) = cursor.as_object_mut() {
-        obj.insert(last.to_string(), new_value);
-    } else {
-        anyhow::bail!("set-param: tail expects object");
-    }
-    Ok(format!("set-param applied: {clip_id}.{path}"))
-}
-
 enum IpcOutcome {
-    Mutated(String),
+    EvalScript {
+        message: Option<String>,
+        js: String,
+        mutation: bool,
+    },
     DragWindow,
     MenuOpen,
     MenuSave,
-    StartExport { path: PathBuf, duration_s: f64 },
+    StartExport {
+        path: PathBuf,
+        duration_s: f64,
+    },
     VerifyMediaReport(String),
+    VerifySelectReport(Value),
 }
 
-fn dispatch_ipc(source: &mut Value, body: &str) -> Result<IpcOutcome> {
+fn selection_value(selection: &Selection) -> Value {
+    json!({
+        "kind": selection.kind.clone(),
+        "clip_id": selection.clip_id.clone(),
+        "track_id": selection.track_id.clone(),
+        "multi": selection.multi.clone(),
+    })
+}
+
+fn editor_state_value(editor: &EditorState) -> Value {
+    json!({
+        "source": editor.source.clone(),
+        "selection": selection_value(&editor.selection),
+        "undo_stack_size": editor.undo_stack.len(),
+        "redo_stack_size": editor.redo_stack.len(),
+        "commit_token": editor.commit_token.clone(),
+        "config": {
+            "max_undo": editor.config.max_undo,
+            "debounce_ms": editor.config.debounce_ms,
+            "autosave": editor.config.autosave,
+        }
+    })
+}
+
+fn value_to_js(value: &Value) -> String {
+    match serde_json::to_string(value) {
+        Ok(serialized) => serialized,
+        Err(_) => "null".to_string(),
+    }
+}
+
+fn editor_js_call(method: &str, payload: &Value) -> String {
+    format!(
+        "if (window.__nf_editor && typeof window.__nf_editor.{method} === 'function') {{ window.__nf_editor.{method}({}); }}",
+        value_to_js(payload)
+    )
+}
+
+fn pretty_json(value: &Value) -> String {
+    match serde_json::to_string_pretty(value) {
+        Ok(serialized) => serialized,
+        Err(_) => "null".to_string(),
+    }
+}
+
+fn apply_clip_drag_editor(editor: &mut EditorState, payload: &Value) -> Result<String> {
+    let message = apply_clip_drag(&mut editor.source, payload)?;
+    editor.redo_stack.clear();
+    editor.bump_commit_token();
+    Ok(message)
+}
+
+fn dispatch_ipc(editor: &mut EditorState, body: &str) -> Result<IpcOutcome> {
     let env: Value = serde_json::from_str(body).context("IPC body not JSON")?;
     let kind = env
         .get("kind")
+        .or_else(|| env.get("type"))
         .and_then(|v| v.as_str())
         .context("envelope: kind missing")?;
-    let payload = env.get("payload").cloned().unwrap_or(Value::Null);
+    let payload = match env.get("payload") {
+        Some(value) => value.clone(),
+        None => {
+            let mut cloned = env.clone();
+            if let Some(obj) = cloned.as_object_mut() {
+                obj.remove("kind");
+                obj.remove("type");
+            }
+            cloned
+        }
+    };
     match kind {
-        "clip-drag" => Ok(IpcOutcome::Mutated(apply_clip_drag(source, &payload)?)),
-        "set-param" => Ok(IpcOutcome::Mutated(apply_set_param(source, &payload)?)),
+        "clip-drag" => {
+            let message = apply_clip_drag_editor(editor, &payload)?;
+            Ok(IpcOutcome::EvalScript {
+                message: Some(message),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
+        "select-clip" => {
+            let clip_id = payload
+                .get("clip_id")
+                .or_else(|| payload.get("clipId"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let selection = editor.select_clip(clip_id.clone());
+            let message = match clip_id {
+                Some(id) => format!("select-clip applied: {id}"),
+                None => "select-clip cleared".to_string(),
+            };
+            Ok(IpcOutcome::EvalScript {
+                message: Some(message),
+                js: editor_js_call("receiveSelection", &selection_value(&selection)),
+                mutation: false,
+            })
+        }
+        "set-param" => {
+            let clip_id = payload
+                .get("clip_id")
+                .or_else(|| payload.get("clipId"))
+                .and_then(Value::as_str)
+                .context("set-param: clip_id missing")?;
+            let path = payload
+                .get("path")
+                .and_then(Value::as_str)
+                .context("set-param: path missing")?;
+            let value = payload
+                .get("value")
+                .cloned()
+                .context("set-param: value missing")?;
+            let _ = editor
+                .set_param(clip_id, path, value)
+                .map_err(anyhow::Error::msg)?;
+            Ok(IpcOutcome::EvalScript {
+                message: Some(format!("set-param applied: {clip_id}.{path}")),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
+        "get-state" => Ok(IpcOutcome::EvalScript {
+            message: None,
+            js: editor_js_call("receiveState", &editor_state_value(editor)),
+            mutation: false,
+        }),
+        "undo" => {
+            let _ = editor.undo();
+            Ok(IpcOutcome::EvalScript {
+                message: Some("undo processed".to_string()),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
+        "redo" => {
+            let _ = editor.redo();
+            Ok(IpcOutcome::EvalScript {
+                message: Some("redo processed".to_string()),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
         "drag-window" => Ok(IpcOutcome::DragWindow),
         "menu-open" => Ok(IpcOutcome::MenuOpen),
         "menu-save" => Ok(IpcOutcome::MenuSave),
-        "verify-media-report" => {
-            let p = env.get("payload").cloned().unwrap_or(Value::Null);
-            Ok(IpcOutcome::VerifyMediaReport(
-                serde_json::to_string_pretty(&p).unwrap_or_else(|_| "null".into()),
-            ))
-        }
+        "verify-media-report" => Ok(IpcOutcome::VerifyMediaReport(pretty_json(&payload))),
+        "verify-select-report" => Ok(IpcOutcome::VerifySelectReport(payload)),
         "export-mp4" => {
             let path = payload
                 .get("path")
@@ -365,13 +467,8 @@ fn run_recorder_export(
 /// its own window region) and gives us a 1:1 PNG of what the user sees.
 /// The user-facing contract remains "one CLI flag → a PNG on disk".
 fn capture_region_png(path: &std::path::Path, x: f64, y: f64, w: f64, h: f64) -> Result<u64> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).context("mkdir parent")?;
-    }
-    let region = format!(
-        "{},{},{},{}",
-        x as i64, y as i64, w as i64, h as i64
-    );
+    ensure_parent_dir(path)?;
+    let region = format!("{},{},{},{}", x as i64, y as i64, w as i64, h as i64);
     let status = std::process::Command::new("screencapture")
         .arg("-x")
         .arg("-R")
@@ -379,12 +476,72 @@ fn capture_region_png(path: &std::path::Path, x: f64, y: f64, w: f64, h: f64) ->
         .arg(path)
         .status()
         .context("spawn screencapture")?;
+    if status.success() {
+        let bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+        if bytes > 0 {
+            return Ok(bytes);
+        }
+    }
+    capture_window_png_pyobjc(path)
+}
+
+fn capture_window_png_pyobjc(path: &std::path::Path) -> Result<u64> {
+    ensure_parent_dir(path)?;
+    let owner_name = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| "nf-shell".to_string());
+    let script = r#"
+import sys
+import Quartz
+from AppKit import NSBitmapImageRep, NSPNGFileType
+
+out_path, owner_name, window_name = sys.argv[1:4]
+window_id = None
+windows = Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID)
+for window in windows:
+    owner = str(window.get("kCGWindowOwnerName") or "")
+    name = str(window.get("kCGWindowName") or "")
+    if owner == owner_name and name == window_name:
+        window_id = window.get("kCGWindowNumber")
+        break
+if window_id is None:
+    for window in windows:
+        name = str(window.get("kCGWindowName") or "")
+        if name == window_name:
+            window_id = window.get("kCGWindowNumber")
+            break
+if window_id is None:
+    raise SystemExit(2)
+image = Quartz.CGWindowListCreateImage(
+    Quartz.CGRectNull,
+    Quartz.kCGWindowListOptionIncludingWindow,
+    window_id,
+    Quartz.kCGWindowImageBoundsIgnoreFraming,
+)
+if image is None:
+    raise SystemExit(3)
+rep = NSBitmapImageRep.alloc().initWithCGImage_(image)
+data = rep.representationUsingType_properties_(NSPNGFileType, None)
+if data is None:
+    raise SystemExit(4)
+if not data.writeToFile_atomically_(out_path, True):
+    raise SystemExit(5)
+"#;
+    let status = std::process::Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .arg(path)
+        .arg(owner_name)
+        .arg(WINDOW_TITLE)
+        .status()
+        .context("spawn python3 pyobjc screenshot fallback")?;
     if !status.success() {
-        anyhow::bail!("screencapture exited with {}", status);
+        anyhow::bail!("pyobjc screenshot fallback exited with {}", status);
     }
     let bytes = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
     if bytes == 0 {
-        anyhow::bail!("screencapture produced empty file");
+        anyhow::bail!("pyobjc screenshot fallback produced empty file");
     }
     Ok(bytes)
 }
@@ -392,13 +549,19 @@ fn capture_region_png(path: &std::path::Path, x: f64, y: f64, w: f64, h: f64) ->
 fn build_init_script(
     source_json: &Value,
     tracks_map: &Map<String, Value>,
+    initial_editor_state: &Value,
     verify_mode: bool,
+    verify_select_mode: bool,
     screenshot_after_ms: Option<u64>,
     source_path: &str,
     verify_media_mode: bool,
 ) -> String {
     let source_str = serde_json::to_string(source_json).unwrap_or_else(|_| "{}".to_string());
     let tracks_str = serde_json::to_string(tracks_map).unwrap_or_else(|_| "{}".to_string());
+    let initial_editor_state_str =
+        serde_json::to_string(initial_editor_state).unwrap_or_else(|_| "null".to_string());
+    let design_tokens_str =
+        serde_json::to_string(DESIGN_TOKENS_CSS).unwrap_or_else(|_| "\"\"".to_string());
     let source_path_str =
         serde_json::to_string(source_path).unwrap_or_else(|_| "\"<unknown>\"".to_string());
     let verify_block = if verify_mode {
@@ -424,6 +587,369 @@ setTimeout(function(){
     // no in-page JS needed for it.
     let _ = screenshot_after_ms;
     let screenshot_block = String::new();
+    let verify_select_flag = if verify_select_mode { "true" } else { "false" };
+    let editor_ui_block = format!(
+        r#"
+window.__NF_EDITOR_INITIAL_STATE__ = {initial_state};
+window.__NF_COMMIT_TOKEN__ = (window.__NF_EDITOR_INITIAL_STATE__ && window.__NF_EDITOR_INITIAL_STATE__.commit_token) || null;
+window.__NF_VERIFY_SELECT__ = {verify_select};
+(function() {{
+  var TOKENS_CSS = {tokens_css};
+  function esc(value) {{
+    return String(value == null ? '' : value).replace(/[&<>"]/g, function(ch) {{
+      return ch === '&' ? '&amp;' : (ch === '<' ? '&lt;' : (ch === '>' ? '&gt;' : '&quot;'));
+    }});
+  }}
+  function ensureStyle() {{
+    if (document.getElementById('nf-editor-style')) return;
+    var style = document.createElement('style');
+    style.id = 'nf-editor-style';
+    style.textContent = TOKENS_CSS + '\n' +
+      ':root{{--token-bg:var(--color-bg,#050507);--token-panel:rgba(7,10,18,0.78);--token-panel-soft:rgba(255,255,255,0.04);--token-accent:var(--color-accent,#a78bfa);--token-accent-strong:var(--color-accent-strong,#8b5cf6);--token-border:rgba(255,255,255,0.10);--token-text:var(--text-100,rgba(255,255,255,0.96));--token-text-soft:var(--text-60,rgba(255,255,255,0.60));--token-warm:var(--color-warm,#f97316);}}' +
+      '/* v1.46 · inspector overlay 右侧 · 独立 z-index · 不干扰 prototype 内部 flex */' +
+      '#nf-inspector-panel{{position:fixed;top:56px;right:8px;bottom:8px;width:280px;display:flex;flex-direction:column;overflow:hidden;background:var(--token-panel);border:1px solid var(--token-border);border-radius:12px;backdrop-filter:blur(18px);z-index:500;box-shadow:0 24px 60px rgba(0,0,0,0.45);}}' +
+      '#nf-inspector-panel .g-body{{display:flex;flex-direction:column;height:100%;min-height:0;}}' +
+      '.nf-inspector-head{{padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;gap:6px;}}' +
+      '.nf-inspector-kicker{{font:600 10px/1.2 var(--font-mono,"SF Mono",monospace);letter-spacing:0.08em;text-transform:uppercase;color:var(--token-accent);}}' +
+      '#nf-inspector-title{{font:600 16px/1.2 var(--font-sans,-apple-system,sans-serif);color:var(--token-text);}}' +
+      '#nf-inspector-meta{{font:500 11px/1.4 var(--font-mono,"SF Mono",monospace);color:var(--token-text-soft);}}' +
+      '#nf-inspector-body{{padding:14px 14px 16px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);}}' +
+      '.nf-inspector-empty{{padding:14px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.10);font:500 12px/1.5 var(--font-sans,-apple-system,sans-serif);color:var(--token-text-soft);}}' +
+      '.nf-inspector-field{{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:var(--token-panel-soft);border:1px solid rgba(255,255,255,0.06);}}' +
+      '.nf-inspector-label{{font:600 11px/1.2 var(--font-mono,"SF Mono",monospace);letter-spacing:0.04em;text-transform:uppercase;color:var(--token-text-soft);}}' +
+      '.nf-inspector-field input[type="text"],.nf-inspector-field input[type="number"],.nf-inspector-field input[type="color"],.nf-inspector-field textarea{{width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.10);background:rgba(10,13,22,0.88);color:var(--token-text);padding:9px 10px;font:500 13px/1.45 var(--font-sans,-apple-system,sans-serif);outline:none;}}' +
+      '.nf-inspector-field textarea{{min-height:96px;resize:vertical;font-family:var(--font-mono,"SF Mono",monospace);font-size:12px;}}' +
+      '.nf-inspector-field input[type="color"]{{padding:4px;height:42px;}}' +
+      '.nf-inspector-field input:focus,.nf-inspector-field textarea:focus{{border-color:rgba(167,139,250,0.55);box-shadow:0 0 0 1px rgba(167,139,250,0.24),0 0 14px rgba(167,139,250,0.18);}}' +
+      '.nf-inspector-bool{{display:flex;align-items:center;justify-content:space-between;gap:12px;}}' +
+      '.nf-inspector-bool input{{width:18px;height:18px;accent-color:var(--token-accent);}}' +
+      '.nf-tl-bar{{transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease;cursor:pointer;}}' +
+      '.nf-tl-bar.selected{{border:2px solid var(--token-accent)!important;box-shadow:0 0 0 1px rgba(167,139,250,0.24),0 0 18px rgba(167,139,250,0.20);transform:translateY(-1px);}}' +
+      '@media (max-width: 1120px){{#nf-inspector-panel{{width:232px;top:52px;right:4px;bottom:4px;}}}}';
+    document.head.appendChild(style);
+  }}
+
+  window.__nf_editor = window.__nf_editor || {{}};
+  var api = window.__nf_editor;
+  api.state = window.__NF_EDITOR_INITIAL_STATE__ || null;
+  api.pending = api.pending || {{}};
+  api.last_applied_token = (api.state && api.state.commit_token) || null;
+  api.verify_select_started = false;
+
+  api.clipIdentity = function(clip) {{
+    if (!clip || typeof clip !== 'object') return '';
+    if (clip.id) return String(clip.id);
+    if (clip.begin) return String(clip.begin);
+    return '';
+  }};
+
+  api.send = function(kind, payload) {{
+    window.ipc.postMessage(JSON.stringify({{ kind: kind, payload: payload || {{}} }}));
+  }};
+
+  api.ensureShellLayout = function() {{
+    ensureStyle();
+    document.body.classList.add('nf-editor-open');
+    if (document.getElementById('nf-inspector-panel')) return;
+    var inspector = document.createElement('div');
+    inspector.id = 'nf-inspector-panel';
+    inspector.className = 'glass';
+    inspector.innerHTML =
+      '<div class="g-body">' +
+        '<div class="nf-inspector-head">' +
+          '<span class="nf-inspector-kicker">Inspector</span>' +
+          '<div id="nf-inspector-title">Clip: none</div>' +
+          '<div id="nf-inspector-meta">Select a clip in the timeline.</div>' +
+        '</div>' +
+        '<div id="nf-inspector-body"></div>' +
+      '</div>';
+    document.body.appendChild(inspector);
+  }};
+
+  api.selectedClip = function() {{
+    var state = api.state;
+    if (!state || !state.source || !state.selection || state.selection.kind !== 'clip' || !state.selection.clip_id) return null;
+    var tracks = Array.isArray(state.source.tracks) ? state.source.tracks : [];
+    for (var ti = 0; ti < tracks.length; ti++) {{
+      var track = tracks[ti] || {{}};
+      var clips = Array.isArray(track.clips) ? track.clips : [];
+      for (var ci = 0; ci < clips.length; ci++) {{
+        var clip = clips[ci] || {{}};
+        if (api.clipIdentity(clip) === state.selection.clip_id) {{
+          return {{ track: track, clip: clip, track_idx: ti, clip_idx: ci }};
+        }}
+      }}
+    }}
+    return null;
+  }};
+
+  api.fieldKind = function(value) {{
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'string' && /^#([0-9a-fA-F]{{3}}|[0-9a-fA-F]{{6}})$/.test(value)) return 'color';
+    if (value && typeof value === 'object') return 'json';
+    return 'text';
+  }};
+
+  api.readFieldValue = function(el, kind) {{
+    if (!el) return undefined;
+    if (kind === 'boolean') return !!el.checked;
+    if (kind === 'number') {{
+      if (el.value === '') return 0;
+      var num = Number(el.value);
+      return isFinite(num) ? num : undefined;
+    }}
+    if (kind === 'json') {{
+      try {{
+        el.dataset.invalid = '0';
+        return JSON.parse(el.value);
+      }} catch (_err) {{
+        el.dataset.invalid = '1';
+        return undefined;
+      }}
+    }}
+    return el.value;
+  }};
+
+  api.scheduleCommit = function(clipId, path, value) {{
+    var delay = (api.state && api.state.config && api.state.config.debounce_ms) || 300;
+    var key = clipId + '::' + path;
+    if (api.pending[key]) window.clearTimeout(api.pending[key]);
+    api.pending[key] = window.setTimeout(function() {{
+      delete api.pending[key];
+      api.send('set-param', {{ clip_id: clipId, path: path, value: value }});
+    }}, delay);
+  }};
+
+  api.bindField = function(el) {{
+    if (!el || el.__nf_editor_wired) return;
+    el.__nf_editor_wired = true;
+    var eventName = el.dataset.nfKind === 'boolean' ? 'change' : 'input';
+    el.addEventListener(eventName, function() {{
+      var selected = api.selectedClip();
+      if (!selected) return;
+      var value = api.readFieldValue(el, el.dataset.nfKind || 'text');
+      if (typeof value === 'undefined') return;
+      api.scheduleCommit(api.clipIdentity(selected.clip), el.dataset.nfPath || '', value);
+    }});
+  }};
+
+  api.renderInspector = function() {{
+    api.ensureShellLayout();
+    var titleEl = document.getElementById('nf-inspector-title');
+    var metaEl = document.getElementById('nf-inspector-meta');
+    var body = document.getElementById('nf-inspector-body');
+    if (!titleEl || !metaEl || !body) return;
+    var selected = api.selectedClip();
+    if (!selected) {{
+      titleEl.textContent = 'Clip: none';
+      metaEl.textContent = 'Select a clip in the timeline.';
+      body.innerHTML = '<div class="nf-inspector-empty">No clip selected.</div>';
+      return;
+    }}
+    var clip = selected.clip || {{}};
+    var params = clip.params || {{}};
+    var clipTitle = params.title || clip.id || selected.track.id || 'clip';
+    titleEl.textContent = 'Clip: ' + clipTitle;
+    metaEl.textContent = String(selected.track.id || 'track') + ' · ' + String(api.clipIdentity(clip) || 'clip') + ' · undo ' + String((api.state && api.state.undo_stack_size) || 0);
+    var keys = Object.keys(params);
+    if (!keys.length) {{
+      body.innerHTML = '<div class="nf-inspector-empty">Clip has no params.</div>';
+      return;
+    }}
+    var html = '';
+    for (var i = 0; i < keys.length; i++) {{
+      var key = keys[i];
+      var value = params[key];
+      var kind = api.fieldKind(value);
+      if (kind === 'boolean') {{
+        html += '<label class="nf-inspector-field nf-inspector-bool" data-nf-inspector-field="1">' +
+          '<span><span class="nf-inspector-label">' + esc(key) + '</span></span>' +
+          '<input data-nf-kind="boolean" data-nf-path="' + esc(key) + '" type="checkbox"' + (value ? ' checked' : '') + ' />' +
+        '</label>';
+      }} else if (kind === 'json') {{
+        html += '<label class="nf-inspector-field" data-nf-inspector-field="1">' +
+          '<span class="nf-inspector-label">' + esc(key) + '</span>' +
+          '<textarea data-nf-kind="json" data-nf-path="' + esc(key) + '">' + esc(JSON.stringify(value, null, 2)) + '</textarea>' +
+        '</label>';
+      }} else {{
+        var inputType = kind === 'number' ? 'number' : (kind === 'color' ? 'color' : 'text');
+        var inputValue = kind === 'number' ? String(value) : String(value == null ? '' : value);
+        html += '<label class="nf-inspector-field" data-nf-inspector-field="1">' +
+          '<span class="nf-inspector-label">' + esc(key) + '</span>' +
+          '<input data-nf-kind="' + esc(kind) + '" data-nf-path="' + esc(key) + '" type="' + inputType + '" value="' + esc(inputValue) + '" />' +
+        '</label>';
+      }}
+    }}
+    body.innerHTML = html;
+    var fields = body.querySelectorAll('[data-nf-path]');
+    for (var fi = 0; fi < fields.length; fi++) api.bindField(fields[fi]);
+  }};
+
+  api.applySelection = function() {{
+    var selectedId = api.state && api.state.selection ? api.state.selection.clip_id : null;
+    var bars = document.querySelectorAll('.nf-tl-bar');
+    for (var i = 0; i < bars.length; i++) {{
+      var active = !!selectedId && bars[i].dataset.clipId === selectedId;
+      bars[i].classList.toggle('selected', active);
+    }}
+  }};
+
+  api.decorateTimeline = function() {{
+    var state = api.state;
+    var source = state && state.source ? state.source : window.__NF_SOURCE__;
+    var tracks = source && Array.isArray(source.tracks) ? source.tracks : [];
+    var bars = document.querySelectorAll('.nf-tl-bar');
+    var cursor = 0;
+    for (var ti = 0; ti < tracks.length; ti++) {{
+      var track = tracks[ti] || {{}};
+      var clips = Array.isArray(track.clips) ? track.clips : [];
+      for (var ci = 0; ci < clips.length; ci++) {{
+        var clip = clips[ci] || {{}};
+        var bar = bars[cursor++];
+        if (!bar) continue;
+        bar.dataset.clipId = api.clipIdentity(clip);
+        bar.dataset.trackIdx = String(ti);
+        bar.dataset.trackId = String(track.id || '');
+        if (!bar.__nf_select_wired) {{
+          bar.__nf_select_wired = true;
+          bar.addEventListener('mousedown', function(ev) {{
+            ev.preventDefault();
+            ev.stopPropagation();
+          }});
+          bar.addEventListener('click', function(ev) {{
+            ev.preventDefault();
+            ev.stopPropagation();
+            api.send('select-clip', {{ clip_id: this.dataset.clipId || null }});
+          }});
+        }}
+      }}
+    }}
+    api.applySelection();
+  }};
+
+  api.requestState = function() {{
+    api.send('get-state', {{}});
+  }};
+
+  api.receiveState = function(state) {{
+    if (!state) return;
+    api.state = state;
+    api.last_applied_token = state.commit_token || null;
+    if (state.source) window.__NF_SOURCE__ = state.source;
+    if (state.commit_token) window.__NF_COMMIT_TOKEN__ = state.commit_token;
+    api.renderInspector();
+    api.decorateTimeline();
+  }};
+
+  api.receiveSelection = function(selection) {{
+    api.state = api.state || {{}};
+    api.state.selection = selection || {{ kind: 'none', clip_id: null, track_id: null, multi: [] }};
+    api.applySelection();
+    api.renderInspector();
+  }};
+
+  api.receiveSourceUpdate = function(state) {{
+    if (!state) return;
+    if (state.commit_token && api.last_applied_token === state.commit_token) {{
+      api.state = state;
+      api.applySelection();
+      api.renderInspector();
+      return;
+    }}
+    api.state = state;
+    api.last_applied_token = state.commit_token || null;
+    if (state.commit_token) window.__NF_COMMIT_TOKEN__ = state.commit_token;
+    if (state.source) window.__NF_SOURCE__ = state.source;
+    window.__nf_apply_source(state.source, state.commit_token || null);
+    window.setTimeout(function() {{
+      api.applySelection();
+      api.renderInspector();
+    }}, 120);
+  }};
+
+  api.finishVerifySelect = function() {{
+    var stage = document.getElementById('nf-stage');
+    var titleApplied = !!(stage && stage.textContent && stage.textContent.indexOf('VerifyTitle') !== -1);
+    var fieldCount = document.querySelectorAll('[data-nf-inspector-field]').length;
+    var selectedBar = document.querySelector('.nf-tl-bar.selected');
+    var undoSize = api.state && typeof api.state.undo_stack_size === 'number' ? api.state.undo_stack_size : -1;
+    api.send('verify-select-report', {{
+      selected_clip_id: api.state && api.state.selection ? api.state.selection.clip_id || null : null,
+      inspector_field_count: fieldCount,
+      title_applied: titleApplied,
+      selected_class: !!selectedBar,
+      undo_stack_size: undoSize,
+      three_panel_layout: !!document.querySelector('.preview-panel') && !!document.querySelector('.timeline') && !!document.getElementById('nf-inspector-panel') && !!document.body.classList.contains('nf-editor-open'),
+      ok: fieldCount > 0 && titleApplied && !!selectedBar && undoSize === 1
+    }});
+  }};
+
+  api.runVerifySelect = function() {{
+    if (!window.__NF_VERIFY_SELECT__ || api.verify_select_started) return;
+    api.verify_select_started = true;
+    window.setTimeout(function() {{
+      var bars = document.querySelectorAll('.nf-tl-bar');
+      var target = bars.length > 1 ? bars[1] : null;
+      if (target) target.click();
+      window.setTimeout(function() {{
+        var titleInput = document.querySelector('#nf-inspector-body [data-nf-path="title"]');
+        if (titleInput) {{
+          titleInput.value = 'VerifyTitle';
+          titleInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+        }}
+        window.setTimeout(api.finishVerifySelect, 2200);
+      }}, 350);
+    }}, 2000);
+  }};
+
+  if (!window.__nf_apply_source_base) {{
+    window.__nf_apply_source_base = window.__nf_apply_source;
+    window.__nf_apply_source = function(newSource, commitToken) {{
+      window.__NF_SOURCE__ = newSource;
+      if (commitToken) window.__NF_COMMIT_TOKEN__ = commitToken;
+      return window.__nf_apply_source_base(newSource);
+    }};
+  }}
+  if (!window.__nf_render_timeline_base) {{
+    window.__nf_render_timeline_base = window.__nf_render_timeline;
+    window.__nf_render_timeline = function() {{
+      var result = window.__nf_render_timeline_base();
+      api.decorateTimeline();
+      api.renderInspector();
+      return result;
+    }};
+  }}
+  if (!window.__nf_mount_base) {{
+    window.__nf_mount_base = window.__nf_mount;
+    window.__nf_mount = function() {{
+      api.ensureShellLayout();
+      if (window.NFRuntime && !window.NFRuntime.__nf_editor_patched) {{
+        var baseBoot = window.NFRuntime.boot;
+        window.NFRuntime.boot = function(options) {{
+          options = options || {{}};
+          if (!options.source && window.__NF_SOURCE__) options.source = window.__NF_SOURCE__;
+          if (!options.tracks && window.__NF_TRACKS__) options.tracks = window.__NF_TRACKS__;
+          if (!options.commit_token && window.__NF_COMMIT_TOKEN__) options.commit_token = window.__NF_COMMIT_TOKEN__;
+          return baseBoot(options);
+        }};
+        window.NFRuntime.__nf_editor_patched = true;
+      }}
+      var result = window.__nf_mount_base();
+      window.setTimeout(function() {{
+        if (api.state) api.receiveState(api.state);
+        api.requestState();
+        api.runVerifySelect();
+      }}, 160);
+      return result;
+    }};
+  }}
+}})();
+"#,
+        tokens_css = design_tokens_str,
+        initial_state = initial_editor_state_str,
+        verify_select = verify_select_flag,
+    );
 
     // v1.28 self-verify media playback:
     // Snapshot all <video>/<audio> element state at t0 and t1 (2s apart).
@@ -556,7 +1082,9 @@ setTimeout(function() {
   }, 2000);
 }, 2500);
 "#.to_string()
-    } else { String::new() };
+    } else {
+        String::new()
+    };
     format!(
         r#"
 window.__NF_SOURCE__ = {source};
@@ -1197,6 +1725,8 @@ window.__nf_install_drag_handles = function() {{
   }});
 }};
 
+{editor_ui}
+
 if (document.readyState === 'loading') {{
   document.addEventListener('DOMContentLoaded', window.__nf_mount);
 }} else {{
@@ -1210,6 +1740,7 @@ if (document.readyState === 'loading') {{
         tracks = tracks_str,
         source_path = source_path_str,
         runtime = RUNTIME_IIFE,
+        editor_ui = editor_ui_block,
         verify = verify_block,
         screenshot = screenshot_block,
         verify_media = verify_media_block,
@@ -1218,6 +1749,7 @@ if (document.readyState === 'loading') {{
 
 struct CliOpts {
     verify_mode: bool,
+    verify_select_mode: bool,
     screenshot_path: Option<PathBuf>,
     screenshot_delay_ms: u64,
     export_path: Option<PathBuf>,
@@ -1235,6 +1767,7 @@ struct CliOpts {
 fn parse_cli() -> CliOpts {
     let args: Vec<String> = std::env::args().collect();
     let mut verify_mode = false;
+    let mut verify_select_mode = false;
     let mut screenshot_path: Option<PathBuf> = None;
     let mut screenshot_delay_ms: u64 = 2500;
     let mut export_path: Option<PathBuf> = None;
@@ -1252,6 +1785,7 @@ fn parse_cli() -> CliOpts {
         let a = &args[i];
         match a.as_str() {
             "--verify" => verify_mode = true,
+            "--verify-select" => verify_select_mode = true,
             "--screenshot" => {
                 i += 1;
                 if i < args.len() {
@@ -1275,15 +1809,25 @@ fn parse_cli() -> CliOpts {
             "--menu-test" => menu_test = true,
             "--x" => {
                 i += 1;
-                if i < args.len() { if let Ok(v) = args[i].parse::<f64>() { window_x = v; } }
+                if i < args.len() {
+                    if let Ok(v) = args[i].parse::<f64>() {
+                        window_x = v;
+                    }
+                }
             }
             "--y" => {
                 i += 1;
-                if i < args.len() { if let Ok(v) = args[i].parse::<f64>() { window_y = v; } }
+                if i < args.len() {
+                    if let Ok(v) = args[i].parse::<f64>() {
+                        window_y = v;
+                    }
+                }
             }
             "--verify-media" => {
                 i += 1;
-                if i < args.len() { verify_media_path = Some(PathBuf::from(&args[i])); }
+                if i < args.len() {
+                    verify_media_path = Some(PathBuf::from(&args[i]));
+                }
             }
             "--duration" => {
                 i += 1;
@@ -1310,6 +1854,7 @@ fn parse_cli() -> CliOpts {
     }
     CliOpts {
         verify_mode,
+        verify_select_mode,
         screenshot_path,
         screenshot_delay_ms,
         export_path,
@@ -1339,7 +1884,9 @@ fn rewrite_file_srcs(v: &mut Value, source_dir: &std::path::Path) {
             continue;
         };
         for c in clips.iter_mut() {
-            let Some(params) = c.get_mut("params") else { continue; };
+            let Some(params) = c.get_mut("params") else {
+                continue;
+            };
             let Some(src) = params.get("src").and_then(|s| s.as_str()).map(String::from) else {
                 continue;
             };
@@ -1448,14 +1995,9 @@ fn nf_asset_response(req: http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
         .header("Cache-Control", "no-store")
         .header("Content-Length", len.to_string());
     if is_range {
-        builder = builder.header(
-            "Content-Range",
-            format!("bytes {start}-{end}/{total}"),
-        );
+        builder = builder.header("Content-Range", format!("bytes {start}-{end}/{total}"));
     }
-    builder
-        .body(buf)
-        .unwrap_or_else(|_| empty_body())
+    builder.body(buf).unwrap_or_else(|_| empty_body())
 }
 
 /// Naive percent-decoder — handles the common %20/%2F/%3A cases seen in
@@ -1479,7 +2021,11 @@ fn percent_decode_str(s: &str) -> Option<String> {
 }
 
 fn guess_mime_from_path(p: &std::path::Path) -> &'static str {
-    match p.extension().and_then(|e| e.to_str()).map(|s| s.to_ascii_lowercase()) {
+    match p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+    {
         Some(ref e) if e == "mp4" => "video/mp4",
         Some(ref e) if e == "m4v" => "video/mp4",
         Some(ref e) if e == "mov" => "video/quicktime",
@@ -1516,19 +2062,51 @@ fn count_running_nf_shell_pids() -> usize {
     }
 }
 
+fn shell_log(stdout_json_mode: bool, message: &str) {
+    if stdout_json_mode {
+        eprintln!("{message}");
+    } else {
+        println!("{message}");
+    }
+}
+
+fn ensure_parent_dir(path: &std::path::Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("mkdir {}", parent.display()))?;
+    }
+    Ok(())
+}
+
+fn window_capture_rect(window: &tao::window::Window) -> (f64, f64, f64, f64) {
+    let pos = window
+        .outer_position()
+        .unwrap_or(PhysicalPosition::new(120, 80));
+    let size = window.outer_size();
+    (
+        f64::from(pos.x.max(0)),
+        f64::from(pos.y.max(0)),
+        f64::from(size.width),
+        f64::from(size.height),
+    )
+}
+
 fn main() -> Result<()> {
     let opts = parse_cli();
+    let stdout_json_mode = opts.verify_select_mode;
 
     // v1.44 · CLI --export 快捷路径:不启 tao event_loop · 不开窗口 ·
     // 直接用 headless WKWebView + CARenderer (nf-recorder) 产 MP4 · 退出。
     // 一致性靠 ADR-045 t 纯驱动 + viewport 绑 source.json · 跟 preview 像素级一致。
     if let Some(export_path) = opts.export_path.clone() {
-        println!(
-            "[NF-RECORDER] CLI --export direct mode · source={} · out={} · duration={}s · parallel={}",
-            opts.source_arg,
-            export_path.display(),
-            opts.export_duration_s,
-            opts.export_parallel
+        shell_log(
+            stdout_json_mode,
+            &format!(
+                "[NF-RECORDER] CLI --export direct mode · source={} · out={} · duration={}s · parallel={}",
+                opts.source_arg,
+                export_path.display(),
+                opts.export_duration_s,
+                opts.export_parallel
+            ),
         );
         let src_path = PathBuf::from(&opts.source_arg);
         match run_recorder_export(
@@ -1538,10 +2116,13 @@ fn main() -> Result<()> {
             opts.export_parallel,
         ) {
             Ok(bytes) => {
-                println!(
-                    "[NF-RECORDER] done · wrote {} bytes → {}",
-                    bytes,
-                    export_path.display()
+                shell_log(
+                    stdout_json_mode,
+                    &format!(
+                        "[NF-RECORDER] done · wrote {} bytes → {}",
+                        bytes,
+                        export_path.display()
+                    ),
                 );
                 return Ok(());
             }
@@ -1563,30 +2144,32 @@ fn main() -> Result<()> {
         .canonicalize()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+        .unwrap_or_else(|| {
+            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+        });
     rewrite_file_srcs(&mut source_json, &source_dir);
     let tracks_map = build_track_sources(&source_json);
     let n_tracks = tracks_map.len();
-
-    let source_state = Arc::new(Mutex::new(source_json.clone()));
+    let editor_state = Arc::new(Mutex::new(EditorState::new(source_json.clone())));
+    let initial_editor_state = match editor_state.lock() {
+        Ok(state) => editor_state_value(&state),
+        Err(e) => {
+            return Err(anyhow::anyhow!("editor state lock poisoned: {e}"));
+        }
+    };
 
     let init_script = build_init_script(
         &source_json,
         &tracks_map,
+        &initial_editor_state,
         opts.verify_mode,
-        opts.screenshot_path.as_ref().map(|_| opts.screenshot_delay_ms),
+        opts.verify_select_mode,
+        opts.screenshot_path
+            .as_ref()
+            .map(|_| opts.screenshot_delay_ms),
         &opts.source_arg,
         opts.verify_media_path.is_some(),
     );
-
-    // Inline init into prototype HTML; hand the full document string directly
-    // to wry via `.with_html(...)` — avoids the wry-0.45 `file://` + long
-    // tmp-dir path URI parse crash.
-    let injected_marker = "<!-- __nf_runtime_inject__ -->";
-    let injected = format!(
-        "<script id=\"__nf_runtime_bootstrap\">\n{init_script}\n</script>\n{injected_marker}\n</body>"
-    );
-    let full_html = PROTOTYPE_HTML.replacen("</body>", &injected, 1);
 
     let event_loop: EventLoop<UserEvent> = EventLoopBuilder::with_user_event().build();
     let proxy = event_loop.create_proxy();
@@ -1606,31 +2189,30 @@ fn main() -> Result<()> {
         .context("window build")?;
     window.set_focus();
 
-    let source_state_for_handler = Arc::clone(&source_state);
+    let editor_state_for_handler = Arc::clone(&editor_state);
     let proxy_for_handler = proxy.clone();
     let verify_mode = opts.verify_mode;
     let verify_count = Arc::new(Mutex::new(0u32));
     let verify_count_for_handler = Arc::clone(&verify_count);
     let verify_media_path_for_handler = opts.verify_media_path.clone();
+    let verify_select_mode = opts.verify_select_mode;
 
     let webview = WebViewBuilder::new(&window)
         // v1.31.1 hotfix: ASYNC protocol · WKWebView URLSchemeTask is
         // main-threaded on macOS. 16 parallel Range requests during seek
         // + sync File::open/read melt the run loop → "卡". Push each
         // request onto a worker thread so the event loop keeps pumping.
-        .with_asynchronous_custom_protocol(
-            "nf-asset".to_string(),
-            move |req, responder| {
-                std::thread::spawn(move || {
-                    responder.respond(nf_asset_response(req));
-                });
-            },
-        )
-        .with_html(&full_html)
+        .with_asynchronous_custom_protocol("nf-asset".to_string(), move |req, responder| {
+            std::thread::spawn(move || {
+                responder.respond(nf_asset_response(req));
+            });
+        })
+        .with_html(PROTOTYPE_HTML)
+        .with_initialization_script(&init_script)
         .with_devtools(true)
         .with_ipc_handler(move |req| {
             let body: &str = req.body().as_ref();
-            let mut state = match source_state_for_handler.lock() {
+            let mut state = match editor_state_for_handler.lock() {
                 Ok(g) => g,
                 Err(e) => {
                     eprintln!("[NF-IPC] state lock poisoned: {e}");
@@ -1638,15 +2220,17 @@ fn main() -> Result<()> {
                 }
             };
             match dispatch_ipc(&mut state, body) {
-                Ok(IpcOutcome::Mutated(msg)) => {
-                    println!("[NF-IPC] {msg}");
-                    let new_src = state.clone();
+                Ok(IpcOutcome::EvalScript {
+                    message,
+                    js,
+                    mutation,
+                }) => {
+                    if let Some(msg) = message {
+                        shell_log(stdout_json_mode, &format!("[NF-IPC] {msg}"));
+                    }
                     drop(state);
-                    let new_src_str =
-                        serde_json::to_string(&new_src).unwrap_or_else(|_| "null".to_string());
-                    let js = format!("window.__nf_apply_source({new_src_str});");
                     let _ = proxy_for_handler.send_event(UserEvent::EvalScript(js));
-                    if verify_mode {
+                    if verify_mode && mutation {
                         if let Ok(mut c) = verify_count_for_handler.lock() {
                             *c += 1;
                             if *c >= 3 {
@@ -1665,10 +2249,8 @@ fn main() -> Result<()> {
                     let _ = proxy_for_handler.send_event(UserEvent::MenuSave);
                 }
                 Ok(IpcOutcome::StartExport { path, duration_s }) => {
-                    let _ = proxy_for_handler.send_event(UserEvent::StartExport {
-                        path,
-                        duration_s,
-                    });
+                    let _ =
+                        proxy_for_handler.send_event(UserEvent::StartExport { path, duration_s });
                 }
                 Ok(IpcOutcome::VerifyMediaReport(json)) => {
                     if let Some(ref p) = verify_media_path_for_handler {
@@ -1678,20 +2260,33 @@ fn main() -> Result<()> {
                         });
                     }
                 }
+                Ok(IpcOutcome::VerifySelectReport(payload)) => {
+                    if verify_select_mode {
+                        let _ =
+                            proxy_for_handler.send_event(UserEvent::VerifySelectReport { payload });
+                    }
+                }
                 Err(e) => {
-                    println!("[NF-IPC] error: {e}");
+                    shell_log(stdout_json_mode, &format!("[NF-IPC] error: {e}"));
                 }
             }
         })
         .build()
         .context("webview build")?;
 
-    println!(
-        "[NF] window {WINDOW_W}x{WINDOW_H} · titlebar transparent + traffic lights · resizable · source={} · tracks={} · verify={} · screenshot={}",
-        opts.source_arg,
-        n_tracks,
-        opts.verify_mode,
-        opts.screenshot_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "off".to_string()),
+    shell_log(
+        stdout_json_mode,
+        &format!(
+            "[NF] window {WINDOW_W}x{WINDOW_H} · titlebar transparent + traffic lights · resizable · source={} · tracks={} · verify={} · verify_select={} · screenshot={}",
+            opts.source_arg,
+            n_tracks,
+            opts.verify_mode,
+            opts.verify_select_mode,
+            opts.screenshot_path
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "off".to_string()),
+        ),
     );
 
     // Schedule a delayed screenshot via a dedicated thread that fires a
@@ -1741,22 +2336,19 @@ fn main() -> Result<()> {
                 let _ = window_for_loop.drag_window();
             }
             Event::UserEvent(UserEvent::ScreenshotNow(path)) => {
-                let pos = window_for_loop
-                    .outer_position()
-                    .map(|p| p.to_logical::<f64>(window_for_loop.scale_factor()))
-                    .unwrap_or(LogicalPosition::new(120.0, 80.0));
-                let sz = window_for_loop
-                    .outer_size()
-                    .to_logical::<f64>(window_for_loop.scale_factor());
-                match capture_region_png(&path, pos.x, pos.y, sz.width, sz.height) {
-                    Ok(n) => println!(
-                        "[NF-SHOT] wrote {} ({} bytes · region {}x{} @({},{}))",
-                        path.display(),
-                        n,
-                        sz.width as i64,
-                        sz.height as i64,
-                        pos.x as i64,
-                        pos.y as i64
+                let (x, y, width, height) = window_capture_rect(&window_for_loop);
+                match capture_region_png(&path, x, y, width, height) {
+                    Ok(n) => shell_log(
+                        stdout_json_mode,
+                        &format!(
+                            "[NF-SHOT] wrote {} ({} bytes · region {}x{} @({},{}))",
+                            path.display(),
+                            n,
+                            width as i64,
+                            height as i64,
+                            x as i64,
+                            y as i64
+                        ),
                     ),
                     Err(e) => eprintln!("[NF-SHOT] failed: {e}"),
                 }
@@ -1764,19 +2356,23 @@ fn main() -> Result<()> {
                 *control_flow = ControlFlow::Exit;
             }
             Event::UserEvent(UserEvent::VerifyDone) => {
-                println!("[NF-VERIFY] all IPC mutations applied · exit in 1500ms");
+                shell_log(
+                    stdout_json_mode,
+                    "[NF-VERIFY] all IPC mutations applied · exit in 1500ms",
+                );
                 std::thread::sleep(std::time::Duration::from_millis(1500));
                 *control_flow = ControlFlow::Exit;
             }
             Event::UserEvent(UserEvent::VerifyMediaReport { path, json }) => {
-                if let Some(parent) = path.parent() {
-                    let _ = std::fs::create_dir_all(parent);
-                }
+                let _ = ensure_parent_dir(&path);
                 match std::fs::write(&path, &json) {
-                    Ok(_) => println!(
-                        "[NF-VERIFY-MEDIA] wrote {} ({} bytes)",
-                        path.display(),
-                        json.len()
+                    Ok(_) => shell_log(
+                        stdout_json_mode,
+                        &format!(
+                            "[NF-VERIFY-MEDIA] wrote {} ({} bytes)",
+                            path.display(),
+                            json.len()
+                        ),
                     ),
                     Err(e) => eprintln!("[NF-VERIFY-MEDIA] write failed: {e}"),
                 }
@@ -1784,13 +2380,60 @@ fn main() -> Result<()> {
                 std::thread::sleep(std::time::Duration::from_millis(200));
                 *control_flow = ControlFlow::Exit;
             }
+            Event::UserEvent(UserEvent::VerifySelectReport { payload }) => {
+                let json_path = PathBuf::from(VERIFY_SELECT_JSON_PATH);
+                let screenshot_path = PathBuf::from(VERIFY_SELECT_SCREENSHOT_PATH);
+                let (x, y, width, height) = window_capture_rect(&window_for_loop);
+                let screenshot_ok =
+                    capture_region_png(&screenshot_path, x, y, width, height).is_ok();
+                let mut report = if payload.is_object() {
+                    payload
+                } else {
+                    json!({ "ok": false, "payload": payload })
+                };
+                let mut final_ok = report.get("ok").and_then(Value::as_bool).unwrap_or(false);
+                final_ok = final_ok && screenshot_ok;
+                if let Some(obj) = report.as_object_mut() {
+                    obj.insert(
+                        "screenshot_path".to_string(),
+                        Value::String(VERIFY_SELECT_SCREENSHOT_PATH.to_string()),
+                    );
+                    obj.insert(
+                        "report_path".to_string(),
+                        Value::String(VERIFY_SELECT_JSON_PATH.to_string()),
+                    );
+                    obj.insert(
+                        "screenshot_captured".to_string(),
+                        Value::Bool(screenshot_ok),
+                    );
+                    obj.insert("ok".to_string(), Value::Bool(final_ok));
+                }
+                let report_json = pretty_json(&report);
+                let _ = ensure_parent_dir(&json_path);
+                if let Err(err) = std::fs::write(&json_path, &report_json) {
+                    eprintln!("[NF-VERIFY-SELECT] write failed: {err}");
+                    final_ok = false;
+                }
+                let mut stdout = std::io::stdout();
+                if std::io::Write::write_all(&mut stdout, report_json.as_bytes()).is_err() {
+                    final_ok = false;
+                }
+                if std::io::Write::write_all(&mut stdout, b"\n").is_err() {
+                    final_ok = false;
+                }
+                let _ = std::io::Write::flush(&mut stdout);
+                std::process::exit(if final_ok { 0 } else { 1 });
+            }
             Event::UserEvent(UserEvent::StartExport { path, duration_s }) => {
                 // v1.44 · 菜单 IPC 触发 · spawn 自身子进程跑 --export · 不阻塞
                 // 交互 preview 窗口。子进程在 fn main() 开头的 early-exit 分支里用
                 // current_thread tokio 跑 nf_recorder::run_export_from_source。
-                println!(
-                    "[NF-RECORDER] start · duration={duration_s}s → {}",
-                    path.display()
+                shell_log(
+                    stdout_json_mode,
+                    &format!(
+                        "[NF-RECORDER] start · duration={duration_s}s → {}",
+                        path.display()
+                    ),
                 );
                 let self_exe = std::env::current_exe().unwrap_or_default();
                 let source_arg = opts.source_arg.clone();
@@ -1823,7 +2466,10 @@ fn main() -> Result<()> {
             }
             Event::UserEvent(UserEvent::ExportDone { path, ok, msg }) => {
                 if ok {
-                    println!("[NF-EXPORT] done · {} · {msg}", path.display());
+                    shell_log(
+                        stdout_json_mode,
+                        &format!("[NF-EXPORT] done · {} · {msg}", path.display()),
+                    );
                 } else {
                     eprintln!("[NF-EXPORT] failed · {} · {msg}", path.display());
                 }
@@ -1840,14 +2486,20 @@ fn main() -> Result<()> {
                 // loop IS the main thread — run synchronously here. It
                 // blocks the event loop briefly, but that's how every native
                 // desktop app does it and it's correct.
-                println!("[NF-MENU] open · NSOpenPanel on main thread");
+                shell_log(
+                    stdout_json_mode,
+                    "[NF-MENU] open · NSOpenPanel on main thread",
+                );
                 let picked = rfd::FileDialog::new()
                     .add_filter("NextFrame source", &["json"])
                     .set_title("Open source.json")
                     .pick_file();
                 match picked {
                     Some(p) => {
-                        println!("[NF-MENU] open selected: {}", p.display());
+                        shell_log(
+                            stdout_json_mode,
+                            &format!("[NF-MENU] open selected: {}", p.display()),
+                        );
                         // Re-load in the current webview: read + rewrite +
                         // push new __NF_SOURCE__ via evaluate_script.
                         if let Ok(text) = std::fs::read_to_string(&p) {
@@ -1856,22 +2508,27 @@ fn main() -> Result<()> {
                                     .canonicalize()
                                     .ok()
                                     .and_then(|q| q.parent().map(|q| q.to_path_buf()))
-                                    .unwrap_or_else(|| {
-                                        std::env::current_dir().unwrap_or_default()
-                                    });
+                                    .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
                                 rewrite_file_srcs(&mut new_src, &sd);
-                                let new_str = serde_json::to_string(&new_src)
-                                    .unwrap_or_else(|_| "null".into());
-                                let js = format!("window.__nf_apply_source({new_str});");
-                                let _ = webview.evaluate_script(&js);
+                                if let Ok(mut editor) = editor_state.lock() {
+                                    *editor = EditorState::new(new_src);
+                                    let js = editor_js_call(
+                                        "receiveSourceUpdate",
+                                        &editor_state_value(&editor),
+                                    );
+                                    let _ = webview.evaluate_script(&js);
+                                }
                             }
                         }
                     }
-                    None => println!("[NF-MENU] open cancelled"),
+                    None => shell_log(stdout_json_mode, "[NF-MENU] open cancelled"),
                 }
             }
             Event::UserEvent(UserEvent::MenuSave) => {
-                println!("[NF-MENU] save · NSSavePanel on main thread");
+                shell_log(
+                    stdout_json_mode,
+                    "[NF-MENU] save · NSSavePanel on main thread",
+                );
                 let picked = rfd::FileDialog::new()
                     .add_filter("NextFrame source", &["json"])
                     .set_file_name("source.json")
@@ -1879,19 +2536,24 @@ fn main() -> Result<()> {
                 match picked {
                     Some(p) => {
                         // Snapshot in-memory source and write it out.
-                        let written = source_state
+                        let written = editor_state
                             .lock()
                             .ok()
                             .and_then(|state| {
-                                serde_json::to_string_pretty(&*state).ok().and_then(|s| {
-                                    let n = s.len();
-                                    std::fs::write(&p, s).ok().map(|_| n)
-                                })
+                                serde_json::to_string_pretty(&state.source)
+                                    .ok()
+                                    .and_then(|s| {
+                                        let n = s.len();
+                                        std::fs::write(&p, s).ok().map(|_| n)
+                                    })
                             })
                             .unwrap_or(0);
-                        println!("[NF-MENU] save to: {} ({} bytes)", p.display(), written);
+                        shell_log(
+                            stdout_json_mode,
+                            &format!("[NF-MENU] save to: {} ({} bytes)", p.display(), written),
+                        );
                     }
-                    None => println!("[NF-MENU] save cancelled"),
+                    None => shell_log(stdout_json_mode, "[NF-MENU] save cancelled"),
                 }
             }
             _ => {}
