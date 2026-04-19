@@ -424,7 +424,36 @@ setTimeout(function() {
       }),
       audios_verdict: t0.audios.map(function(a0, i) {
         return { src_tail: (a0.src || '').split('/').pop(), verdict: verdict(a0, t1.audios[i]), t0_paused: a0.paused, t1_paused: t1.audios[i] && t1.audios[i].paused, t0_ct: a0.currentTime, t1_ct: t1.audios[i] && t1.audios[i].currentTime, error: t1.audios[i] && t1.audios[i].error };
-      })
+      }),
+      timeline_alignment: (function() {
+        var lanes = document.querySelector('.tl-lanes');
+        if (!lanes) return { error: 'no .tl-lanes' };
+        var dur = parseFloat(lanes.dataset.nfDurationMs || '60000');
+        var lanesRect = lanes.getBoundingClientRect();
+        var lanesLeft = lanesRect.left;
+        var w = lanes.clientWidth;
+        function expectedPx(ms) { return Math.round((ms / dur) * w); }
+        var ph = document.getElementById('nf-playhead');
+        var phLeft = ph ? parseFloat(ph.style.left || '0') : -1;
+        var firstBar = lanes.querySelector('.nf-tl-bar');
+        var firstTick = lanes.querySelector('.nf-tl-tick');
+        var lastTick = lanes.querySelectorAll('.nf-tl-tick');
+        lastTick = lastTick.length ? lastTick[lastTick.length - 1] : null;
+        return {
+          duration_ms: dur,
+          lanes_width_px: w,
+          ph_t_ms: (document.querySelector('video') && document.querySelector('video').currentTime * 1000) || 0,
+          ph_left_px: phLeft,
+          tick_first_left: firstTick ? parseFloat(firstTick.style.left || '0') : -1,
+          tick_first_expected: expectedPx(0),
+          tick_last_left: lastTick ? parseFloat(lastTick.style.left || '0') : -1,
+          tick_last_expected: expectedPx(dur),
+          bar_first_left: firstBar ? parseFloat(firstBar.style.left || '0') : -1,
+          bar_first_expected: firstBar ? expectedPx(parseFloat(firstBar.dataset.nfBeginMs || '0')) : -1,
+          bar_first_width: firstBar ? parseFloat(firstBar.style.width || '0') : -1,
+          bar_first_width_expected: firstBar ? Math.max(2, Math.round(((parseFloat(firstBar.dataset.nfEndMs || '0') - parseFloat(firstBar.dataset.nfBeginMs || '0')) / dur) * w)) : -1
+        };
+      })()
     };
     console.log('[NF-VERIFY-MEDIA]', JSON.stringify(report));
     window.ipc.postMessage(JSON.stringify({kind:'verify-media-report', payload: report}));
@@ -606,50 +635,110 @@ window.__nf_render_timeline = function() {{
   }}
 
   // Lanes + ruler.
+  // v1.30: strict px alignment — ALL horizontal positions (ruler ticks,
+  // clip bars, playhead) are computed as `tMs / durationMs * lanesWidth`
+  // and stored as data-nf-ms so reflow on resize recomputes them from the
+  // same source of truth. No more % vs px mixing that caused sub-px drift.
   var lanes = document.querySelector('.tl-lanes');
   if (lanes) {{
     lanes.innerHTML = '';
-    // Ruler: N ticks spanning total duration.
+    lanes.style.position = 'relative';
+    lanes.dataset.nfDurationMs = String(durationMs);
+
+    // Ruler row (22px tall). Ticks positioned in px.
     var ruler = document.createElement('div');
     ruler.className = 'tl-ruler';
-    ruler.style.cssText = 'position:relative;height:22px;border-bottom:1px solid rgba(255,255,255,0.08);font:10px/1 "SF Mono",monospace;color:rgba(255,255,255,0.5)';
-    var tickCount = 8;
+    ruler.id = 'nf-tl-ruler';
+    ruler.style.cssText = 'position:relative;height:22px;border-bottom:1px solid rgba(255,255,255,0.08);font:10px/1 "SF Mono",monospace;color:rgba(255,255,255,0.55);box-sizing:border-box';
+    var tickCount = 10;
     for (var j = 0; j <= tickCount; j++) {{
       var tick = document.createElement('div');
-      var pct = (j / tickCount) * 100;
       var tMs = (durationMs * j / tickCount) | 0;
-      tick.style.cssText = 'position:absolute;left:' + pct + '%;top:2px;bottom:2px;border-left:1px solid rgba(255,255,255,0.12);padding-left:4px';
-      tick.textContent = window.__nf_fmt_ms(tMs);
+      tick.className = 'nf-tl-tick';
+      tick.dataset.nfMs = String(tMs);
+      tick.style.cssText =
+        'position:absolute;top:0;bottom:0;' +
+        'border-left:1px solid rgba(255,255,255,0.14);' +
+        'padding-left:4px;white-space:nowrap;pointer-events:none';
+      tick.textContent = window.__nf_fmt_time(tMs, durationMs);
       ruler.appendChild(tick);
     }}
     lanes.appendChild(ruler);
-    // One lane row per track; clip bars sized by clip.begin/end in ms.
+
+    // Lane rows · clip bars. Use data-nf-begin-ms / data-nf-end-ms for
+    // reflow to re-position on window resize.
     var palette = ['#a78bfa','#f97316','#34d399','#38bdf8','#f472b6','#fbbf24','#fb7185'];
     tracks.forEach(function(t, i) {{
       var row = document.createElement('div');
-      row.style.cssText = 'position:relative;height:44px;border-bottom:1px solid rgba(255,255,255,0.04)';
+      row.className = 'nf-tl-row';
+      row.style.cssText = 'position:relative;height:44px;border-bottom:1px solid rgba(255,255,255,0.04);box-sizing:border-box';
       var color = palette[i % palette.length];
       (t.clips || []).forEach(function(c) {{
         var beginMs = window.__nf_resolve_ms(c.begin, src, 0);
         var endMs   = window.__nf_resolve_ms(c.end,   src, durationMs);
-        var l = (beginMs / durationMs) * 100;
-        var w = Math.max(2, ((endMs - beginMs) / durationMs) * 100);
         var bar = document.createElement('div');
+        bar.className = 'nf-tl-bar';
+        bar.dataset.nfBeginMs = String(beginMs);
+        bar.dataset.nfEndMs = String(endMs);
         bar.style.cssText =
-          'position:absolute;left:' + l + '%;width:' + w + '%;top:6px;bottom:6px;' +
+          'position:absolute;top:6px;bottom:6px;' +
           'background:linear-gradient(90deg,' + color + '55,' + color + 'aa);' +
           'border:1px solid ' + color + 'cc;border-radius:5px;' +
           'padding:6px 10px;box-sizing:border-box;' +
           'font:12px/1.3 -apple-system,sans-serif;color:rgba(255,255,255,0.92);' +
           'overflow:hidden;white-space:nowrap;text-overflow:ellipsis';
         bar.textContent = (c.id || t.id) + ' · ' + window.__nf_fmt_ms(endMs - beginMs);
-        bar.title = t.id + '.' + (c.id || '');
+        bar.title = t.id + '.' + (c.id || '') + ' [' + window.__nf_fmt_ms(beginMs) + '→' + window.__nf_fmt_ms(endMs) + ']';
         row.appendChild(bar);
       }});
       lanes.appendChild(row);
     }});
+    window.__nf_reflow_timeline();
+    if (!window.__nf_tl_resize_wired) {{
+      window.__nf_tl_resize_wired = true;
+      window.addEventListener('resize', window.__nf_reflow_timeline);
+    }}
   }}
   console.log('[NF] timeline rendered · ' + tracks.length + ' tracks · duration=' + durationMs + 'ms');
+}};
+
+// v1.30: reflow all timeline ms→px positions from a single source of truth.
+// This is the ONLY place left/width for ticks/bars gets set after render.
+window.__nf_reflow_timeline = function() {{
+  var lanes = document.querySelector('.tl-lanes');
+  if (!lanes) return;
+  var dur = parseFloat(lanes.dataset.nfDurationMs || '60000');
+  if (!(dur > 0)) dur = 60000;
+  var w = lanes.clientWidth || 1;
+  var ticks = lanes.querySelectorAll('.nf-tl-tick');
+  for (var i = 0; i < ticks.length; i++) {{
+    var tMs = parseFloat(ticks[i].dataset.nfMs || '0');
+    var x = Math.round((tMs / dur) * w);
+    ticks[i].style.left = x + 'px';
+  }}
+  var bars = lanes.querySelectorAll('.nf-tl-bar');
+  for (var k = 0; k < bars.length; k++) {{
+    var b = parseFloat(bars[k].dataset.nfBeginMs || '0');
+    var e = parseFloat(bars[k].dataset.nfEndMs || '0');
+    var left = Math.round((b / dur) * w);
+    var wid  = Math.max(2, Math.round(((e - b) / dur) * w));
+    bars[k].style.left = left + 'px';
+    bars[k].style.width = wid + 'px';
+  }}
+}};
+
+// v1.30: format time as m:ss or h:mm:ss · exactly like JianYing/PR timecode.
+// Short durations use 0.0s fraction for precision at the head of the ruler.
+window.__nf_fmt_time = function(ms, total) {{
+  if (!isFinite(ms) || ms < 0) ms = 0;
+  var totalH = total / 3600000;
+  var s = Math.floor(ms / 1000);
+  var m = Math.floor(s / 60);
+  var h = Math.floor(m / 60);
+  var sec = s % 60, min = m % 60;
+  var pad = function(n) {{ return n < 10 ? '0' + n : String(n); }};
+  if (totalH >= 1 || h >= 1) return h + ':' + pad(min) + ':' + pad(sec);
+  return m + ':' + pad(sec);
 }};
 
 // v1.25: Playhead red line + drag-to-seek.
@@ -697,20 +786,23 @@ window.__nf_install_playhead = function() {{
   var src = window.__NF_SOURCE__ || {{}};
   var durationMs = window.__nf_infer_duration(src) || 60000;
 
-  function tMsToLeft(tMs) {{
+  // v1.30: use the SAME ms→px math as ruler ticks and clip bars · strict match.
+  function tMsToLeftPx(tMs) {{
     var w = lanes.clientWidth || 1;
-    var pct = Math.max(0, Math.min(1, tMs / Math.max(1, durationMs)));
-    return (pct * w) + 'px';
+    var clamped = Math.max(0, Math.min(durationMs, tMs));
+    return Math.round((clamped / durationMs) * w);
   }}
   var _lastLabelTMs = -1;
   function updatePh(tMs) {{
-    // translate3d is GPU-composited — avoids layout thrash that `left` triggers.
-    ph.style.left = tMsToLeft(tMs);
+    var px = tMsToLeftPx(tMs);
+    ph.style.left = px + 'px';
     // Update the label at most every 100ms to avoid text reflow hammering
     // during drag.
     if (Math.abs(tMs - _lastLabelTMs) > 100) {{
       var timeLabel = document.getElementById('nf-time-label');
-      if (timeLabel) timeLabel.textContent = window.__nf_fmt_ms(tMs) + ' / ' + window.__nf_fmt_ms(durationMs);
+      if (timeLabel) {{
+        timeLabel.textContent = window.__nf_fmt_time(tMs, durationMs) + ' / ' + window.__nf_fmt_time(durationMs, durationMs);
+      }}
       _lastLabelTMs = tMs;
     }}
   }}
@@ -721,7 +813,7 @@ window.__nf_install_playhead = function() {{
     var lab = document.createElement('span');
     lab.id = 'nf-time-label';
     lab.style.cssText = 'margin-left:10px;font:12px/1 "SF Mono",monospace;color:rgba(255,255,255,0.72);min-width:110px;display:inline-block';
-    lab.textContent = window.__nf_fmt_ms(0) + ' / ' + window.__nf_fmt_ms(durationMs);
+    lab.textContent = window.__nf_fmt_time(0, durationMs) + ' / ' + window.__nf_fmt_time(durationMs, durationMs);
     var btn = document.getElementById('nf-play-pause');
     if (btn && btn.parentElement) btn.parentElement.insertBefore(lab, btn.nextSibling);
     else tlHead.appendChild(lab);
