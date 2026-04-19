@@ -45,24 +45,6 @@
           }
         }
       ]
-    },
-    {
-      "id": "scene-hero",
-      "kind": "scene",
-      "src": "src/nf-tracks/official/scene.js",
-      "clips": [
-        {
-          "id": "scene-hero-01",
-          "begin": "demo.begin",
-          "end": "demo.end",
-          "params": {
-            "layout": "hero",
-            "title": "NextFrame",
-            "subtitle": "AI 视频引擎 · v1.8 video track",
-            "accent_color": "#bc8cff"
-          }
-        }
-      ]
     }
   ]
 }
