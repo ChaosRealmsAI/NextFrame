@@ -26,7 +26,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use editor::{EditorState, Selection};
-#[cfg(windows)]
+#[cfg(any(windows, all(unix, not(target_vendor = "apple"))))]
 use platform::ShellWebView;
 use serde_json::{json, Map, Value};
 use tao::dpi::PhysicalPosition;
@@ -479,6 +479,9 @@ fn dispatch_ipc(editor: &mut EditorState, body: &str) -> Result<IpcOutcome> {
         "verify-zoom-report" => Ok(IpcOutcome::VerifyZoomReport(payload)),
         "verify-undo-report" => Ok(IpcOutcome::VerifyUndoReport(payload)),
         "export-mp4" => {
+            if cfg!(all(unix, not(target_vendor = "apple"))) {
+                anyhow::bail!(linux_export_error_message());
+            }
             let duration_s = payload
                 .get("duration_s")
                 .and_then(|v| v.as_f64())
@@ -620,6 +623,7 @@ fn default_export_filename(source_arg: &str, resolution: Option<&str>) -> String
 /// on every macOS (no brew, no permissions if invoked by the app itself on
 /// its own window region) and gives us a 1:1 PNG of what the user sees.
 /// The user-facing contract remains "one CLI flag → a PNG on disk".
+#[cfg(target_vendor = "apple")]
 fn capture_region_png(path: &std::path::Path, x: f64, y: f64, w: f64, h: f64) -> Result<u64> {
     ensure_parent_dir(path)?;
     let region = format!("{},{},{},{}", x as i64, y as i64, w as i64, h as i64);
@@ -639,6 +643,7 @@ fn capture_region_png(path: &std::path::Path, x: f64, y: f64, w: f64, h: f64) ->
     capture_window_png_pyobjc(path)
 }
 
+#[cfg(target_vendor = "apple")]
 fn capture_window_png_pyobjc(path: &std::path::Path) -> Result<u64> {
     ensure_parent_dir(path)?;
     let owner_name = std::env::current_exe()
@@ -3153,6 +3158,14 @@ fn ensure_parent_dir(path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
+fn linux_export_error_message() -> &'static str {
+    "export not supported on Linux in v1.60 preview-only mode; use macOS/Windows or --serve (planned for v1.66)"
+}
+
+fn linux_export_not_supported_error() -> anyhow::Error {
+    anyhow::anyhow!(linux_export_error_message())
+}
+
 #[cfg(windows)]
 fn evaluate_webview_script(
     window: &tao::window::Window,
@@ -3163,7 +3176,17 @@ fn evaluate_webview_script(
     Ok(())
 }
 
-#[cfg(not(windows))]
+#[cfg(all(unix, not(target_vendor = "apple")))]
+fn evaluate_webview_script(
+    window: &tao::window::Window,
+    webview: &wry::WebView,
+    js: &str,
+) -> Result<()> {
+    let _ = platform::LinuxShellWebView::new(window, webview).eval_async(js)?;
+    Ok(())
+}
+
+#[cfg(target_vendor = "apple")]
 fn evaluate_webview_script(
     _window: &tao::window::Window,
     webview: &wry::WebView,
@@ -3197,7 +3220,7 @@ fn capture_preview_to_path(
     Ok(bytes.len() as u64)
 }
 
-#[cfg(not(windows))]
+#[cfg(target_vendor = "apple")]
 fn capture_preview_to_path(
     path: &std::path::Path,
     window: &tao::window::Window,
@@ -3205,6 +3228,41 @@ fn capture_preview_to_path(
 ) -> Result<u64> {
     let (x, y, w, h) = window_capture_rect(window);
     capture_region_png(path, x, y, w, h)
+}
+
+#[cfg(all(unix, not(target_vendor = "apple")))]
+fn capture_preview_to_path(
+    path: &std::path::Path,
+    window: &tao::window::Window,
+    webview: &wry::WebView,
+) -> Result<u64> {
+    ensure_parent_dir(path)?;
+    let bytes = platform::LinuxShellWebView::new(window, webview).snapshot()?;
+    std::fs::write(path, &bytes).with_context(|| format!("write {}", path.display()))?;
+    Ok(bytes.len() as u64)
+}
+
+#[cfg(all(unix, not(target_vendor = "apple")))]
+fn resize_platform_webview(
+    window: &tao::window::Window,
+    webview: &wry::WebView,
+    size: tao::dpi::PhysicalSize<u32>,
+) {
+    let logical = size.to_logical::<u32>(window.scale_factor());
+    platform::LinuxShellWebView::new(window, webview).set_bounds(
+        0.0,
+        0.0,
+        logical.width as f64,
+        logical.height as f64,
+    );
+}
+
+#[cfg(not(all(unix, not(target_vendor = "apple"))))]
+fn resize_platform_webview(
+    _window: &tao::window::Window,
+    _webview: &wry::WebView,
+    _size: tao::dpi::PhysicalSize<u32>,
+) {
 }
 
 fn main() -> Result<()> {
@@ -3216,6 +3274,11 @@ fn main() -> Result<()> {
     // 直接用 headless WKWebView + CARenderer (nf-recorder) 产 MP4 · 退出。
     // 一致性靠 ADR-045 t 纯驱动 + viewport 绑 source.json · 跟 preview 像素级一致。
     if let Some(export_path) = opts.export_path.clone() {
+        if cfg!(all(unix, not(target_vendor = "apple"))) {
+            let err = linux_export_not_supported_error();
+            eprintln!("[NF-RECORDER] failed · {err}");
+            return Err(err);
+        }
         shell_log(
             stdout_json_mode,
             &format!(
@@ -3480,6 +3543,12 @@ fn main() -> Result<()> {
         *control_flow = ControlFlow::Wait;
         match event {
             Event::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                resize_platform_webview(&window_for_loop, &webview, size);
+            }
+            Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
             } => {
@@ -3700,6 +3769,10 @@ fn main() -> Result<()> {
                 parallel,
                 resolution,
             }) => {
+                if cfg!(all(unix, not(target_vendor = "apple"))) {
+                    eprintln!("[NF-EXPORT] {}", linux_export_error_message());
+                    return;
+                }
                 shell_log(
                     stdout_json_mode,
                     &format!(
@@ -3733,6 +3806,10 @@ fn main() -> Result<()> {
                 parallel,
                 resolution,
             }) => {
+                if cfg!(all(unix, not(target_vendor = "apple"))) {
+                    eprintln!("[NF-EXPORT] {}", linux_export_error_message());
+                    return;
+                }
                 // v1.44 · 菜单 IPC 触发 · spawn 自身子进程跑 --export · 不阻塞
                 // 交互 preview 窗口。子进程在 fn main() 开头的 early-exit 分支里用
                 // current_thread tokio 跑 nf_recorder::run_export_from_source。

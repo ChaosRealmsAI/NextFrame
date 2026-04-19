@@ -30,6 +30,12 @@ windows = { version = "0.58", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
+[target.'cfg(all(unix, not(target_vendor = "apple")))'.dependencies]
+cairo-rs = { version = "0.18", features = ["png"] }
+gtk = "0.18"
+javascriptcore-rs = "1"
+webkit2gtk = { version = "2", features = ["v2_40"] }
+
 [package.metadata.bundle]
 name = "NextFrame"
 identifier = "com.nextframe.app"

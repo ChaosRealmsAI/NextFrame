@@ -2205,12 +2205,16 @@ name = "nf-shell"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cairo-rs",
+ "gtk",
+ "javascriptcore-rs",
  "nf-recorder",
  "rfd",
  "serde",
  "serde_json",
  "tao",
  "tokio",
+ "webkit2gtk",
  "webview2-com",
  "windows",
  "wry",
