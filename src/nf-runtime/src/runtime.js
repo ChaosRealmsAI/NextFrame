@@ -41,7 +41,9 @@ export function liteResolve(source) {
     throw new Error("liteResolve: source must be an object");
   }
   if (!source.viewport) throw new Error("liteResolve: source.viewport missing");
-  if (typeof source.duration !== "string") throw new Error("liteResolve: source.duration must be string");
+  if (typeof source.duration !== "string" && typeof source.duration !== "number") {
+    throw new Error("liteResolve: source.duration must be string|number");
+  }
   if (!Array.isArray(source.tracks)) throw new Error("liteResolve: source.tracks must be array");
 
   const anchorsRaw = source.anchors || {};
@@ -51,9 +53,12 @@ export function liteResolve(source) {
   const parsedAnchors = {};
   for (const name of Object.keys(anchorsRaw)) {
     const a = anchorsRaw[name];
-    if (typeof a.at === "string") {
+    if (typeof a.at === "string" || typeof a.at === "number") {
       parsedAnchors[name] = { kind: "point", exprs: { at: _parseExpr(a.at) } };
-    } else if (typeof a.begin === "string" && typeof a.end === "string") {
+    } else if (
+      (typeof a.begin === "string" || typeof a.begin === "number") &&
+      (typeof a.end === "string" || typeof a.end === "number")
+    ) {
       parsedAnchors[name] = {
         kind: "range",
         exprs: { begin: _parseExpr(a.begin), end: _parseExpr(a.end) },
@@ -204,6 +209,9 @@ function _resolveOneRef(ref, data, theme, clipId) {
 //   Duration = Number Unit?     (Unit: 'ms' | 's' | 'm'; bare 0 allowed)
 //   AnchorRef= Ident ('.' Ident)?
 function _parseExpr(src) {
+  if (typeof src === "number" && Number.isFinite(src)) {
+    return { type: "dur", ms: src };
+  }
   if (typeof src !== "string" || src.length === 0) {
     throw new Error(`liteResolve: expr must be non-empty string (got ${JSON.stringify(src)})`);
   }
@@ -253,8 +261,7 @@ function _parseTerm(st) {
     if (st.src.startsWith("ms", st.pos)) { st.pos += 2; factor = 1; }
     else if (st.src[st.pos] === "s") { st.pos++; factor = 1000; }
     else if (st.src[st.pos] === "m") { st.pos++; factor = 60000; }
-    else if (n === 0) { factor = 1; }
-    else throw new Error(`liteResolve: duration '${n}' needs unit (ms/s/m) in '${st.src}'`);
+    else { factor = 1; }
     return { type: "dur", ms: n * factor };
   }
   if (_isIdStart(c)) {
@@ -350,6 +357,9 @@ export function getStateAt(resolved, t_ms) {
     : { w: 1920, h: 1080 };
 
   const activeClips = [];
+  const activeById = new Map();
+  const clipById = new Map();
+  const activeTransitions = [];
   const tracks = (resolved && resolved.tracks) || [];
   const hasSolo = tracks.some((track) => track && track.solo === true);
   for (let ti = 0; ti < tracks.length; ti++) {
@@ -363,17 +373,86 @@ export function getStateAt(resolved, t_ms) {
       const b = clip.begin_ms;
       const e = clip.end_ms;
       if (typeof b !== "number" || typeof e !== "number") continue;
+      const clipId = clip.id || `${trackId}#${ci}`;
+      clipById.set(clipId, {
+        trackId,
+        clipIdx: ci,
+        clipId,
+        begin_ms: b,
+        end_ms: e,
+      });
       // half-open interval [begin_ms, end_ms)
       if (t_ms >= b && t_ms < e) {
-        activeClips.push({
+        const active = {
           trackId,
           clipIdx: ci,
-          clipId: clip.id || `${trackId}#${ci}`,
+          clipId,
           params: clip.params || {},
           localT: t_ms - b,
-        });
+          opacity: 1,
+          transition: null,
+        };
+        activeClips.push(active);
+        activeById.set(clipId, active);
       }
     }
+  }
+
+  const transitions = resolved && resolved.meta && Array.isArray(resolved.meta.transitions)
+    ? resolved.meta.transitions
+    : [];
+  for (let i = 0; i < transitions.length; i++) {
+    const transition = transitions[i];
+    if (!transition || typeof transition !== "object") continue;
+    const between = Array.isArray(transition.between) ? transition.between : [];
+    if (between.length !== 2) continue;
+    const type = transition.type === "dissolve" ? "dissolve" : (transition.type === "fade" ? "fade" : "");
+    const requestedDuration = Number(transition.duration_ms);
+    if (!type || !Number.isFinite(requestedDuration) || requestedDuration <= 0) continue;
+    const fromRef = clipById.get(String(between[0] || ""));
+    const toRef = clipById.get(String(between[1] || ""));
+    if (!fromRef || !toRef || fromRef.trackId !== toRef.trackId) continue;
+    if (Math.abs(fromRef.clipIdx - toRef.clipIdx) !== 1) continue;
+    const overlapStart = Math.max(fromRef.begin_ms, toRef.begin_ms);
+    const overlapEnd = Math.min(fromRef.end_ms, toRef.end_ms);
+    const overlapDuration = overlapEnd - overlapStart;
+    if (!(overlapDuration > 0)) continue;
+    const effectiveDuration = Math.min(overlapDuration, requestedDuration);
+    const windowStart = overlapStart;
+    const windowEnd = windowStart + effectiveDuration;
+    if (!(t_ms >= windowStart && t_ms < windowEnd)) continue;
+    const fromActive = activeById.get(fromRef.clipId);
+    const toActive = activeById.get(toRef.clipId);
+    if (!fromActive || !toActive) continue;
+    const progress = Math.max(0, Math.min(1, (t_ms - windowStart) / effectiveDuration));
+    const fromOpacity = 1 - progress;
+    const toOpacity = progress;
+    fromActive.opacity *= fromOpacity;
+    toActive.opacity *= toOpacity;
+    fromActive.transition = {
+      type,
+      role: "out",
+      progress,
+      duration_ms: effectiveDuration,
+      between: [fromRef.clipId, toRef.clipId],
+    };
+    toActive.transition = {
+      type,
+      role: "in",
+      progress,
+      duration_ms: effectiveDuration,
+      between: [fromRef.clipId, toRef.clipId],
+    };
+    activeTransitions.push({
+      type,
+      between: [fromRef.clipId, toRef.clipId],
+      duration_ms: effectiveDuration,
+      window_begin_ms: windowStart,
+      window_end_ms: windowEnd,
+      progress,
+      from_opacity: fromOpacity,
+      to_opacity: toOpacity,
+    });
   }
 
   return {
@@ -382,6 +461,7 @@ export function getStateAt(resolved, t_ms) {
     duration_ms,
     viewport,
     activeClips,
+    activeTransitions,
   };
 }
 
@@ -427,6 +507,40 @@ function _escapeHtml(s) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function _injectRootAttrs(html, attrs) {
+  if (typeof html !== "string" || html.length === 0) return "";
+  const leading = (html.match(/^\s*/) || [""])[0];
+  const body = html.slice(leading.length);
+  const match = body.match(/^<([A-Za-z][A-Za-z0-9:_-]*)([^>]*)>/);
+  if (!match) return html;
+  const insert = Object.entries(attrs || {})
+    .filter(([, value]) => value != null && value !== "")
+    .map(([key, value]) => ` ${key}="${_escapeHtml(value)}"`)
+    .join("");
+  return leading + `<${match[1]}${insert}${match[2]}>` + body.slice(match[0].length);
+}
+
+function _applyClipOpacities(stage, state) {
+  if (!stage || !state || !Array.isArray(state.activeClips)) return;
+  const activeById = new Map();
+  for (const clip of state.activeClips) {
+    if (clip && clip.clipId) activeById.set(clip.clipId, clip);
+  }
+  const els = stage.querySelectorAll("[data-nf-runtime-clip]");
+  for (let i = 0; i < els.length; i++) {
+    const el = els[i];
+    const clipId = el.getAttribute("data-nf-runtime-clip") || "";
+    const active = activeById.get(clipId);
+    const factor = active && typeof active.opacity === "number"
+      ? Math.max(0, Math.min(1, active.opacity))
+      : 1;
+    const baseOpacity = parseFloat(el.style.opacity || "1");
+    const base = Number.isFinite(baseOpacity) ? baseOpacity : 1;
+    el.style.opacity = String(Number((base * factor).toFixed(4)));
+    el.setAttribute("data-nf-transition-opacity", String(Number(factor.toFixed(4))));
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -822,7 +936,10 @@ export function boot(options) {
       const track = trackRegistry.get(ac.trackId);
       if (!track) continue;
       try {
-        html += track.render(ac.localT, ac.params, state.viewport);
+        html += _injectRootAttrs(track.render(ac.localT, ac.params, state.viewport), {
+          "data-nf-runtime-clip": ac.clipId,
+          "data-nf-runtime-track": ac.trackId,
+        });
       } catch (err) {
         console.log(JSON.stringify({
           ts: _ts(), level: "error", source: "nf-runtime",
@@ -913,6 +1030,7 @@ export function boot(options) {
         }
       }
     }
+    _applyClipOpacities(stage, state);
     // --- end L2 dispatch ------------------------------------------------------
 
     // ADR-045 / ADR-046 / ADR-054 / ADR-056 · record-mode media discipline +
@@ -1201,8 +1319,14 @@ export function boot(options) {
         duration_ms,
         viewport: state.viewport,
         activeClips: state.activeClips.map((c) => ({
-          trackId: c.trackId, clipIdx: c.clipIdx, localT: c.localT,
+          trackId: c.trackId,
+          clipId: c.clipId,
+          clipIdx: c.clipIdx,
+          localT: c.localT,
+          opacity: c.opacity,
+          transition: c.transition || null,
         })),
+        activeTransitions: state.activeTransitions || [],
       };
     },
     getCurrentAudioTracks() {

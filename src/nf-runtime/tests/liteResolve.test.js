@@ -166,8 +166,12 @@ test("liteResolve: throws on bad expr", () => {
   assert.throws(() => liteResolve(src));
 });
 
-test("liteResolve: throws on non-string duration", () => {
-  assert.throws(() => liteResolve({ viewport: { w: 1, h: 1, ratio: "1:1" }, duration: 5, tracks: [] }));
+test("liteResolve: throws on unsupported duration type", () => {
+  assert.throws(() => liteResolve({
+    viewport: { w: 1, h: 1, ratio: "1:1" },
+    duration: { ms: 5 },
+    tracks: [],
+  }));
 });
 
 test("liteResolve: resolved.tracks carry kind + src (for runtime kind-fallback)", () => {

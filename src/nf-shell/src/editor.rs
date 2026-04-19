@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -149,6 +150,264 @@ impl EditorState {
         Ok(entry)
     }
 
+    pub fn split_clip(&mut self, clip_id: &str, at_ms: u64) -> Result<UndoEntry, String> {
+        let split_ms = i64::try_from(at_ms).map_err(|_| "split-clip: at_ms out of range")?;
+        let (track_idx, clip_idx) = self
+            .find_clip_by_id(clip_id)
+            .ok_or_else(|| format!("split-clip: clip not found: {clip_id}"))?;
+        let clips_path = format!("/tracks/{track_idx}/clips");
+        let old_clips = self
+            .source
+            .pointer(&clips_path)
+            .and_then(Value::as_array)
+            .cloned()
+            .ok_or_else(|| format!("split-clip: clips missing for track {track_idx}"))?;
+        let original_clip = old_clips
+            .get(clip_idx)
+            .cloned()
+            .ok_or_else(|| format!("split-clip: invalid clip index {clip_idx}"))?;
+        let mut resolver = TimelineResolver::new(&self.source);
+        let (begin_ms, end_ms) = clip_bounds_ms(&mut resolver, &original_clip)?;
+        if split_ms <= begin_ms || split_ms >= end_ms {
+            return Err(format!(
+                "split-clip: split {split_ms}ms must be inside {begin_ms}..{end_ms} for {clip_id}"
+            ));
+        }
+
+        let mut next_clips = old_clips.clone();
+        let right_clip_id = make_editor_id("clip");
+
+        let mut left_clip = original_clip.clone();
+        if left_clip.get("id").is_none() {
+            left_clip["id"] = Value::String(clip_id.to_string());
+        }
+        left_clip["end"] = ms_value(split_ms);
+
+        let mut right_clip = original_clip;
+        right_clip["id"] = Value::String(right_clip_id.clone());
+        right_clip["begin"] = ms_value(split_ms);
+
+        next_clips[clip_idx] = left_clip;
+        next_clips.insert(clip_idx + 1, right_clip);
+
+        let next_transitions =
+            transitions_after_split(self.source.get("meta"), clip_id, &right_clip_id);
+        let selection_before = self.selection.clone();
+        let mut forward = Vec::new();
+        let mut reverse = Vec::new();
+        push_value_patch_if_changed(
+            &mut forward,
+            &mut reverse,
+            clips_path,
+            Some(Value::Array(old_clips)),
+            Some(Value::Array(next_clips.clone())),
+        )?;
+        push_value_patch_if_changed(
+            &mut forward,
+            &mut reverse,
+            "/meta/transitions".to_string(),
+            self.source.pointer("/meta/transitions").cloned(),
+            next_transitions,
+        )?;
+
+        Self::apply_patches(&mut self.source, &forward)?;
+        let selection_after = selection_after_source_change(
+            &self.source,
+            &selection_before,
+            if selection_before.clip_id.as_deref() == Some(clip_id) {
+                Some(right_clip_id.as_str())
+            } else {
+                None
+            },
+        );
+        let entry = UndoEntry {
+            id: make_editor_id("undo"),
+            ts: now_ms(),
+            op_label: "split clip".to_string(),
+            forward,
+            reverse,
+            selection_before,
+            selection_after: selection_after.clone(),
+        };
+        self.push_with_cap(entry.clone());
+        self.selection = selection_after;
+        self.bump_commit_token();
+        Ok(entry)
+    }
+
+    pub fn delete_clip(&mut self, clip_id: &str, ripple: bool) -> Result<UndoEntry, String> {
+        let (track_idx, clip_idx) = self
+            .find_clip_by_id(clip_id)
+            .ok_or_else(|| format!("delete-clip: clip not found: {clip_id}"))?;
+        let tracks = self
+            .source
+            .get("tracks")
+            .and_then(Value::as_array)
+            .ok_or_else(|| "delete-clip: source.tracks missing".to_string())?;
+        let mut resolver = TimelineResolver::new(&self.source);
+        let target_clip = tracks
+            .get(track_idx)
+            .and_then(|track| track.get("clips"))
+            .and_then(Value::as_array)
+            .and_then(|clips| clips.get(clip_idx))
+            .cloned()
+            .ok_or_else(|| format!("delete-clip: invalid clip index {clip_idx}"))?;
+        let (cut_begin_ms, cut_end_ms) = clip_bounds_ms(&mut resolver, &target_clip)?;
+        let gap_ms = cut_end_ms - cut_begin_ms;
+        if gap_ms <= 0 {
+            return Err(format!(
+                "delete-clip: non-positive clip duration for {clip_id}"
+            ));
+        }
+
+        let mut next_tracks = Vec::with_capacity(tracks.len());
+        let mut modified_tracks = Vec::new();
+        let mut removed_clip_ids = HashSet::from([clip_id.to_string()]);
+
+        for (current_track_idx, track) in tracks.iter().enumerate() {
+            let old_clips = track
+                .get("clips")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let mut next_clips = Vec::with_capacity(old_clips.len());
+            let mut changed = false;
+            for clip in old_clips.iter() {
+                let current_id = clip
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+                    .unwrap_or_default();
+                if current_track_idx == track_idx && clip_identity_matches(clip, clip_id) {
+                    changed = true;
+                    continue;
+                }
+                if ripple {
+                    let (begin_ms, end_ms) = clip_bounds_ms(&mut resolver, clip)?;
+                    match ripple_adjust_clip_bounds(begin_ms, end_ms, cut_begin_ms, cut_end_ms) {
+                        Some((next_begin_ms, next_end_ms)) => {
+                            if next_begin_ms != begin_ms || next_end_ms != end_ms {
+                                let mut next_clip = clip.clone();
+                                next_clip["begin"] = ms_value(next_begin_ms);
+                                next_clip["end"] = ms_value(next_end_ms);
+                                next_clips.push(next_clip);
+                                changed = true;
+                            } else {
+                                next_clips.push(clip.clone());
+                            }
+                        }
+                        None => {
+                            changed = true;
+                            if !current_id.is_empty() {
+                                removed_clip_ids.insert(current_id);
+                            }
+                        }
+                    }
+                } else {
+                    next_clips.push(clip.clone());
+                }
+            }
+            if changed {
+                modified_tracks.push((current_track_idx, old_clips.clone(), next_clips.clone()));
+            }
+            let mut next_track = track.clone();
+            next_track["clips"] = Value::Array(next_clips);
+            next_tracks.push(next_track);
+        }
+
+        let fallback_clip_id = next_tracks
+            .get(track_idx)
+            .and_then(|track| track.get("clips"))
+            .and_then(Value::as_array)
+            .and_then(|clips| {
+                clips
+                    .get(clip_idx)
+                    .or_else(|| clip_idx.checked_sub(1).and_then(|idx| clips.get(idx)))
+            })
+            .and_then(|clip| clip.get("id"))
+            .and_then(Value::as_str)
+            .map(str::to_string);
+
+        let selection_before = self.selection.clone();
+        let mut forward = Vec::new();
+        let mut reverse = Vec::new();
+        for (changed_track_idx, old_clips, next_clips) in modified_tracks {
+            push_value_patch_if_changed(
+                &mut forward,
+                &mut reverse,
+                format!("/tracks/{changed_track_idx}/clips"),
+                Some(Value::Array(old_clips)),
+                Some(Value::Array(next_clips)),
+            )?;
+        }
+
+        let next_transitions = transitions_after_delete(self.source.get("meta"), &removed_clip_ids);
+        push_value_patch_if_changed(
+            &mut forward,
+            &mut reverse,
+            "/meta/transitions".to_string(),
+            self.source.pointer("/meta/transitions").cloned(),
+            next_transitions,
+        )?;
+
+        if ripple {
+            let next_duration_ms = next_tracks
+                .iter()
+                .flat_map(|track| {
+                    track
+                        .get("clips")
+                        .and_then(Value::as_array)
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|clip| {
+                            let end = clip.get("end")?;
+                            resolve_ms_in_value(&self.source, end).ok()
+                        })
+                })
+                .max()
+                .unwrap_or(0);
+            push_value_patch_if_changed(
+                &mut forward,
+                &mut reverse,
+                "/duration".to_string(),
+                self.source.get("duration").cloned(),
+                Some(ms_value(next_duration_ms)),
+            )?;
+        }
+
+        Self::apply_patches(&mut self.source, &forward)?;
+        let selection_after = selection_after_source_change(
+            &self.source,
+            &selection_before,
+            if selection_before.clip_id.as_deref() == Some(clip_id) {
+                fallback_clip_id.as_deref()
+            } else {
+                None
+            },
+        );
+        let entry = UndoEntry {
+            id: make_editor_id("undo"),
+            ts: now_ms(),
+            op_label: if ripple {
+                "ripple delete clip".to_string()
+            } else {
+                "delete clip".to_string()
+            },
+            forward,
+            reverse,
+            selection_before,
+            selection_after: selection_after.clone(),
+        };
+        self.push_with_cap(entry.clone());
+        self.selection = selection_after;
+        self.bump_commit_token();
+        Ok(entry)
+    }
+
+    pub fn ripple_delete(&mut self, clip_id: &str) -> Result<UndoEntry, String> {
+        self.delete_clip(clip_id, true)
+    }
+
     pub fn undo(&mut self) -> Option<UndoEntry> {
         let entry = self.undo_stack.pop()?;
         if Self::apply_patches(&mut self.source, &entry.reverse).is_err() {
@@ -199,7 +458,15 @@ impl EditorState {
     }
 
     pub fn find_clip_by_id(&self, clip_id: &str) -> Option<(usize, usize)> {
-        let tracks = self.source.get("tracks")?.as_array()?;
+        Self::find_clip_by_id_in_source(&self.source, clip_id)
+    }
+
+    pub fn bump_commit_token(&mut self) {
+        self.commit_token = make_editor_id("commit");
+    }
+
+    fn find_clip_by_id_in_source(source: &Value, clip_id: &str) -> Option<(usize, usize)> {
+        let tracks = source.get("tracks")?.as_array()?;
         for (track_idx, track) in tracks.iter().enumerate() {
             let clips = track.get("clips")?.as_array()?;
             for (clip_idx, clip) in clips.iter().enumerate() {
@@ -214,26 +481,8 @@ impl EditorState {
         None
     }
 
-    pub fn bump_commit_token(&mut self) {
-        self.commit_token = make_editor_id("commit");
-    }
-
     fn selection_for_clip(&self, clip_id: &str) -> Selection {
-        if let Some((track_idx, _)) = self.find_clip_by_id(clip_id) {
-            let track_id = self
-                .source
-                .pointer(&format!("/tracks/{track_idx}/id"))
-                .and_then(Value::as_str)
-                .map(str::to_string);
-            Selection {
-                kind: "clip".to_string(),
-                clip_id: Some(clip_id.to_string()),
-                track_id,
-                multi: Vec::new(),
-            }
-        } else {
-            Selection::default()
-        }
+        selection_for_clip_in_source(&self.source, clip_id)
     }
 
     fn set_track_flag(
@@ -297,6 +546,485 @@ impl EditorState {
     fn push_with_cap(&mut self, entry: UndoEntry) {
         self.push_undo_capped(entry);
         self.redo_stack.clear();
+    }
+}
+
+#[derive(Clone, Debug)]
+enum ExprNode {
+    Duration(i64),
+    Ref {
+        anchor: String,
+        field: Option<String>,
+    },
+    Binary {
+        op: char,
+        left: Box<ExprNode>,
+        right: Box<ExprNode>,
+    },
+}
+
+#[derive(Clone, Debug)]
+enum ResolvedAnchor {
+    Point { at_ms: i64 },
+    Range { begin_ms: i64, end_ms: i64 },
+}
+
+struct TimelineResolver<'a> {
+    source: &'a Value,
+    cache: HashMap<String, ResolvedAnchor>,
+    visiting: HashSet<String>,
+}
+
+impl<'a> TimelineResolver<'a> {
+    fn new(source: &'a Value) -> Self {
+        Self {
+            source,
+            cache: HashMap::new(),
+            visiting: HashSet::new(),
+        }
+    }
+
+    fn resolve_value(&mut self, value: &Value) -> Result<i64, String> {
+        match value {
+            Value::Number(num) => {
+                if let Some(raw) = num.as_i64() {
+                    Ok(raw)
+                } else if let Some(raw) = num.as_f64() {
+                    Ok(raw.round() as i64)
+                } else {
+                    Err("timeline-resolve: unsupported numeric value".to_string())
+                }
+            }
+            Value::String(raw) => self.resolve_expr(raw),
+            other => Err(format!(
+                "timeline-resolve: expected number|string, got {}",
+                other
+            )),
+        }
+    }
+
+    fn resolve_expr(&mut self, expr: &str) -> Result<i64, String> {
+        let parsed = parse_expr(expr)?;
+        self.eval_expr(&parsed)
+    }
+
+    fn eval_expr(&mut self, expr: &ExprNode) -> Result<i64, String> {
+        match expr {
+            ExprNode::Duration(ms) => Ok(*ms),
+            ExprNode::Binary { op, left, right } => {
+                let lhs = self.eval_expr(left)?;
+                let rhs = self.eval_expr(right)?;
+                Ok(if *op == '+' { lhs + rhs } else { lhs - rhs })
+            }
+            ExprNode::Ref { anchor, field } => {
+                let resolved = self.resolve_anchor(anchor)?;
+                match (resolved, field.as_deref()) {
+                    (ResolvedAnchor::Point { at_ms }, None) => Ok(at_ms),
+                    (ResolvedAnchor::Range { begin_ms, .. }, None) => Ok(begin_ms),
+                    (ResolvedAnchor::Point { at_ms }, Some("at")) => Ok(at_ms),
+                    (ResolvedAnchor::Range { begin_ms, .. }, Some("begin")) => Ok(begin_ms),
+                    (ResolvedAnchor::Range { end_ms, .. }, Some("end")) => Ok(end_ms),
+                    (_, Some(name)) => Err(format!(
+                        "timeline-resolve: unknown anchor field '{anchor}.{name}'"
+                    )),
+                }
+            }
+        }
+    }
+
+    fn resolve_anchor(&mut self, name: &str) -> Result<ResolvedAnchor, String> {
+        if let Some(resolved) = self.cache.get(name).cloned() {
+            return Ok(resolved);
+        }
+        if !self.visiting.insert(name.to_string()) {
+            return Err(format!("timeline-resolve: anchor cycle at '{name}'"));
+        }
+
+        let raw = self
+            .source
+            .get("anchors")
+            .and_then(Value::as_object)
+            .and_then(|anchors| anchors.get(name))
+            .cloned()
+            .ok_or_else(|| format!("timeline-resolve: anchor '{name}' not found"))?;
+        let resolved = if let Some(at_value) = raw.get("at").cloned() {
+            ResolvedAnchor::Point {
+                at_ms: self.resolve_value(&at_value)?,
+            }
+        } else {
+            let begin_value = raw
+                .get("begin")
+                .cloned()
+                .ok_or_else(|| format!("timeline-resolve: anchor '{name}' missing begin"))?;
+            let begin_ms = self.resolve_value(&begin_value)?;
+            self.cache.insert(
+                name.to_string(),
+                ResolvedAnchor::Range {
+                    begin_ms,
+                    end_ms: begin_ms,
+                },
+            );
+            let end_value = raw
+                .get("end")
+                .cloned()
+                .ok_or_else(|| format!("timeline-resolve: anchor '{name}' missing end"))?;
+            let end_ms = self.resolve_value(&end_value)?;
+            ResolvedAnchor::Range { begin_ms, end_ms }
+        };
+
+        self.cache.insert(name.to_string(), resolved.clone());
+        self.visiting.remove(name);
+        Ok(resolved)
+    }
+}
+
+struct ExprParser<'a> {
+    src: &'a str,
+    pos: usize,
+}
+
+impl<'a> ExprParser<'a> {
+    fn parse_add_sub(&mut self) -> Result<ExprNode, String> {
+        let mut left = self.parse_term()?;
+        loop {
+            self.skip_ws();
+            let op = match self.peek() {
+                Some('+') => '+',
+                Some('-') => '-',
+                _ => break,
+            };
+            self.pos += 1;
+            let right = self.parse_term()?;
+            left = ExprNode::Binary {
+                op,
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        }
+        Ok(left)
+    }
+
+    fn parse_term(&mut self) -> Result<ExprNode, String> {
+        self.skip_ws();
+        match self.peek() {
+            Some(ch) if ch.is_ascii_digit() => self.parse_duration(),
+            Some(ch) if is_ident_start(ch) => self.parse_ref(),
+            Some(ch) => Err(format!(
+                "timeline-resolve: unexpected '{ch}' in '{}' at col {}",
+                self.src, self.pos
+            )),
+            None => Err("timeline-resolve: unexpected end of expr".to_string()),
+        }
+    }
+
+    fn parse_duration(&mut self) -> Result<ExprNode, String> {
+        let start = self.pos;
+        while matches!(self.peek(), Some(ch) if ch.is_ascii_digit()) {
+            self.pos += 1;
+        }
+        if self.peek() == Some('.') {
+            let dot_pos = self.pos;
+            self.pos += 1;
+            if !matches!(self.peek(), Some(ch) if ch.is_ascii_digit()) {
+                self.pos = dot_pos;
+            } else {
+                while matches!(self.peek(), Some(ch) if ch.is_ascii_digit()) {
+                    self.pos += 1;
+                }
+            }
+        }
+        let number = self.src[start..self.pos]
+            .trim()
+            .parse::<f64>()
+            .map_err(|_| {
+                format!(
+                    "timeline-resolve: invalid duration '{}'",
+                    &self.src[start..self.pos]
+                )
+            })?;
+        let factor = if self.src[self.pos..].starts_with("ms") {
+            self.pos += 2;
+            1.0
+        } else if self.src[self.pos..].starts_with('s') {
+            self.pos += 1;
+            1000.0
+        } else if self.src[self.pos..].starts_with('m') {
+            self.pos += 1;
+            60_000.0
+        } else {
+            1.0
+        };
+        Ok(ExprNode::Duration((number * factor).round() as i64))
+    }
+
+    fn parse_ref(&mut self) -> Result<ExprNode, String> {
+        let anchor = self.parse_ident()?;
+        let field = if self.peek() == Some('.') {
+            self.pos += 1;
+            Some(self.parse_ident()?)
+        } else {
+            None
+        };
+        Ok(ExprNode::Ref { anchor, field })
+    }
+
+    fn parse_ident(&mut self) -> Result<String, String> {
+        let start = self.pos;
+        match self.peek() {
+            Some(ch) if is_ident_start(ch) => self.pos += 1,
+            _ => {
+                return Err(format!(
+                    "timeline-resolve: expected identifier in '{}' at col {}",
+                    self.src, self.pos
+                ))
+            }
+        }
+        while matches!(self.peek(), Some(ch) if is_ident_continue(ch)) {
+            self.pos += 1;
+        }
+        Ok(self.src[start..self.pos].to_string())
+    }
+
+    fn skip_ws(&mut self) {
+        while matches!(self.peek(), Some(' ' | '\t')) {
+            self.pos += 1;
+        }
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.src.as_bytes().get(self.pos).map(|b| *b as char)
+    }
+}
+
+fn parse_expr(src: &str) -> Result<ExprNode, String> {
+    if src.trim().is_empty() {
+        return Err("timeline-resolve: empty expression".to_string());
+    }
+    let mut parser = ExprParser { src, pos: 0 };
+    let parsed = parser.parse_add_sub()?;
+    parser.skip_ws();
+    if parser.pos < src.len() {
+        return Err(format!(
+            "timeline-resolve: unexpected '{}' in '{}' at col {}",
+            src.as_bytes()[parser.pos] as char,
+            src,
+            parser.pos
+        ));
+    }
+    Ok(parsed)
+}
+
+fn is_ident_start(ch: char) -> bool {
+    ch.is_ascii_alphabetic() || ch == '_'
+}
+
+fn is_ident_continue(ch: char) -> bool {
+    is_ident_start(ch) || ch.is_ascii_digit()
+}
+
+fn resolve_ms_in_value(source: &Value, value: &Value) -> Result<i64, String> {
+    TimelineResolver::new(source).resolve_value(value)
+}
+
+fn clip_bounds_ms(resolver: &mut TimelineResolver<'_>, clip: &Value) -> Result<(i64, i64), String> {
+    let begin_ms = clip
+        .get("begin")
+        .ok_or_else(|| "clip bounds: begin missing".to_string())
+        .and_then(|value| resolver.resolve_value(value))?;
+    let end_ms = clip
+        .get("end")
+        .ok_or_else(|| "clip bounds: end missing".to_string())
+        .and_then(|value| resolver.resolve_value(value))?;
+    Ok((begin_ms, end_ms))
+}
+
+fn ms_value(ms: i64) -> Value {
+    Value::String(format!("{ms}ms"))
+}
+
+fn clip_identity_matches(clip: &Value, clip_id: &str) -> bool {
+    clip.get("id").and_then(Value::as_str) == Some(clip_id)
+        || (clip.get("id").is_none() && clip.get("begin").and_then(Value::as_str) == Some(clip_id))
+}
+
+fn selection_for_clip_in_source(source: &Value, clip_id: &str) -> Selection {
+    if let Some((track_idx, _)) = EditorState::find_clip_by_id_in_source(source, clip_id) {
+        let track_id = source
+            .pointer(&format!("/tracks/{track_idx}/id"))
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        Selection {
+            kind: "clip".to_string(),
+            clip_id: Some(clip_id.to_string()),
+            track_id,
+            multi: Vec::new(),
+        }
+    } else {
+        Selection::default()
+    }
+}
+
+fn selection_after_source_change(
+    source: &Value,
+    selection_before: &Selection,
+    preferred_clip_id: Option<&str>,
+) -> Selection {
+    if let Some(clip_id) = preferred_clip_id {
+        let next = selection_for_clip_in_source(source, clip_id);
+        if next.kind == "clip" {
+            return next;
+        }
+    }
+    if selection_before.kind == "clip" {
+        if let Some(clip_id) = selection_before.clip_id.as_deref() {
+            let current = selection_for_clip_in_source(source, clip_id);
+            if current.kind == "clip" {
+                return current;
+            }
+        }
+    }
+    Selection::default()
+}
+
+fn build_patch_pair(
+    path: String,
+    old_value: Option<Value>,
+    new_value: Option<Value>,
+) -> Result<(JsonPatch, JsonPatch), String> {
+    match (old_value, new_value) {
+        (Some(old), Some(new)) => Ok((
+            JsonPatch {
+                op: "replace".to_string(),
+                path: path.clone(),
+                value: Some(new),
+            },
+            JsonPatch {
+                op: "replace".to_string(),
+                path,
+                value: Some(old),
+            },
+        )),
+        (None, Some(new)) => Ok((
+            JsonPatch {
+                op: "add".to_string(),
+                path: path.clone(),
+                value: Some(new),
+            },
+            JsonPatch {
+                op: "remove".to_string(),
+                path,
+                value: None,
+            },
+        )),
+        (Some(old), None) => Ok((
+            JsonPatch {
+                op: "remove".to_string(),
+                path: path.clone(),
+                value: None,
+            },
+            JsonPatch {
+                op: "add".to_string(),
+                path,
+                value: Some(old),
+            },
+        )),
+        (None, None) => Err("patch pair: no-op value pair".to_string()),
+    }
+}
+
+fn push_value_patch_if_changed(
+    forward: &mut Vec<JsonPatch>,
+    reverse: &mut Vec<JsonPatch>,
+    path: String,
+    old_value: Option<Value>,
+    new_value: Option<Value>,
+) -> Result<(), String> {
+    if old_value == new_value {
+        return Ok(());
+    }
+    let (next_forward, next_reverse) = build_patch_pair(path, old_value, new_value)?;
+    forward.push(next_forward);
+    reverse.push(next_reverse);
+    Ok(())
+}
+
+fn transitions_after_split(
+    meta: Option<&Value>,
+    clip_id: &str,
+    right_clip_id: &str,
+) -> Option<Value> {
+    let mut transitions = meta
+        .and_then(|value| value.get("transitions"))
+        .and_then(Value::as_array)
+        .cloned()?;
+    for transition in transitions.iter_mut() {
+        let Some(between) = transition.get_mut("between").and_then(Value::as_array_mut) else {
+            continue;
+        };
+        if between.len() != 2 {
+            continue;
+        }
+        let first_is_target = between[0].as_str() == Some(clip_id);
+        let second_is_target = between[1].as_str() == Some(clip_id);
+        if first_is_target {
+            between[0] = Value::String(right_clip_id.to_string());
+        }
+        if first_is_target && second_is_target {
+            between[1] = Value::String(clip_id.to_string());
+        }
+    }
+    Some(Value::Array(transitions))
+}
+
+fn transitions_after_delete(
+    meta: Option<&Value>,
+    removed_clip_ids: &HashSet<String>,
+) -> Option<Value> {
+    let transitions = meta
+        .and_then(|value| value.get("transitions"))
+        .and_then(Value::as_array)?;
+    let filtered = transitions
+        .iter()
+        .filter(|transition| {
+            let between = transition.get("between").and_then(Value::as_array);
+            !between
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .any(|clip_id| removed_clip_ids.contains(clip_id))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    Some(Value::Array(filtered))
+}
+
+fn ripple_adjust_clip_bounds(
+    begin_ms: i64,
+    end_ms: i64,
+    cut_begin_ms: i64,
+    cut_end_ms: i64,
+) -> Option<(i64, i64)> {
+    if end_ms <= cut_begin_ms {
+        return Some((begin_ms, end_ms));
+    }
+    if begin_ms >= cut_end_ms {
+        let delta = cut_end_ms - cut_begin_ms;
+        return Some((begin_ms - delta, end_ms - delta));
+    }
+    let next_begin_ms = if begin_ms < cut_begin_ms {
+        begin_ms
+    } else {
+        cut_begin_ms
+    };
+    let next_end_ms = if end_ms > cut_end_ms {
+        end_ms - (cut_end_ms - cut_begin_ms)
+    } else {
+        cut_begin_ms
+    };
+    if next_end_ms <= next_begin_ms {
+        None
+    } else {
+        Some((next_begin_ms, next_end_ms))
     }
 }
 
@@ -517,6 +1245,58 @@ mod tests {
             .to_string()
     }
 
+    fn clip_edit_source() -> Value {
+        json!({
+            "duration": "5s",
+            "tracks": [
+                {
+                    "id": "tr_scene",
+                    "kind": "scene",
+                    "clips": [
+                        {
+                            "id": "clip_a",
+                            "begin": "0",
+                            "end": "5s",
+                            "params": {
+                                "title": "A"
+                            }
+                        }
+                    ]
+                }
+            ]
+        })
+    }
+
+    fn ripple_source() -> Value {
+        json!({
+            "duration": "5s",
+            "tracks": [
+                {
+                    "id": "tr_scene",
+                    "kind": "scene",
+                    "clips": [
+                        {
+                            "id": "clip_a",
+                            "begin": "0",
+                            "end": "3s",
+                            "params": {
+                                "title": "A"
+                            }
+                        },
+                        {
+                            "id": "clip_b",
+                            "begin": "3s",
+                            "end": "5s",
+                            "params": {
+                                "title": "B"
+                            }
+                        }
+                    ]
+                }
+            ]
+        })
+    }
+
     #[test]
     fn undo_redo_restores_title_and_selection() {
         let mut editor = EditorState::new(sample_source());
@@ -619,5 +1399,77 @@ mod tests {
                 .and_then(Value::as_bool),
             Some(true)
         );
+    }
+
+    #[test]
+    fn split_clip_creates_right_half_and_selects_it() {
+        let mut editor = EditorState::new(clip_edit_source());
+        editor.select_clip(Some("clip_a".to_string()));
+
+        let entry = editor.split_clip("clip_a", 2_000).unwrap();
+        assert_eq!(entry.op_label, "split clip");
+
+        let clips = editor
+            .source
+            .pointer("/tracks/0/clips")
+            .and_then(Value::as_array)
+            .unwrap();
+        assert_eq!(clips.len(), 2);
+        assert_eq!(clips[0].get("id").and_then(Value::as_str), Some("clip_a"));
+        assert_eq!(clips[0].get("begin").and_then(Value::as_str), Some("0"));
+        assert_eq!(clips[0].get("end").and_then(Value::as_str), Some("2000ms"));
+        assert_eq!(
+            clips[1].get("begin").and_then(Value::as_str),
+            Some("2000ms")
+        );
+        assert_eq!(clips[1].get("end").and_then(Value::as_str), Some("5s"));
+
+        let right_id = clips[1].get("id").and_then(Value::as_str).unwrap();
+        assert_ne!(right_id, "clip_a");
+        assert_eq!(editor.selection.clip_id.as_deref(), Some(right_id));
+    }
+
+    #[test]
+    fn undo_split_restores_single_clip() {
+        let mut editor = EditorState::new(clip_edit_source());
+        editor.select_clip(Some("clip_a".to_string()));
+        editor.split_clip("clip_a", 2_000).unwrap();
+
+        editor.undo().unwrap();
+
+        let clips = editor
+            .source
+            .pointer("/tracks/0/clips")
+            .and_then(Value::as_array)
+            .unwrap();
+        assert_eq!(clips.len(), 1);
+        assert_eq!(clips[0].get("id").and_then(Value::as_str), Some("clip_a"));
+        assert_eq!(clips[0].get("begin").and_then(Value::as_str), Some("0"));
+        assert_eq!(clips[0].get("end").and_then(Value::as_str), Some("5s"));
+        assert_eq!(editor.selection.clip_id.as_deref(), Some("clip_a"));
+    }
+
+    #[test]
+    fn ripple_delete_shifts_later_clips_and_reduces_duration() {
+        let mut editor = EditorState::new(ripple_source());
+        editor.select_clip(Some("clip_a".to_string()));
+
+        let entry = editor.ripple_delete("clip_a").unwrap();
+        assert_eq!(entry.op_label, "ripple delete clip");
+
+        let clips = editor
+            .source
+            .pointer("/tracks/0/clips")
+            .and_then(Value::as_array)
+            .unwrap();
+        assert_eq!(clips.len(), 1);
+        assert_eq!(clips[0].get("id").and_then(Value::as_str), Some("clip_b"));
+        assert_eq!(clips[0].get("begin").and_then(Value::as_str), Some("0ms"));
+        assert_eq!(clips[0].get("end").and_then(Value::as_str), Some("2000ms"));
+        assert_eq!(
+            editor.source.get("duration").and_then(Value::as_str),
+            Some("2000ms")
+        );
+        assert_eq!(editor.selection.clip_id.as_deref(), Some("clip_b"));
     }
 }
