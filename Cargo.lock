@@ -2207,6 +2207,7 @@ dependencies = [
  "anyhow",
  "nf-recorder",
  "rfd",
+ "serde",
  "serde_json",
  "tao",
  "tokio",

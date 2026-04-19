@@ -448,9 +448,13 @@ function _escapeHtml(s) {
 // `src` on a <video> would reset currentTime/decoder state.
 // -----------------------------------------------------------------------------
 const IDENTITY_ATTRS = new Set(["src", "type", "name", "data-nf-persist"]);
+const RESOLVE_CACHE_KEY = "__NF_RUNTIME_RESOLVE_CACHE__";
 
-export function diffAndMount(stage, html) {
+export function diffAndMount(stage, html, commit_token) {
   const doc = stage.ownerDocument || globalThis.document;
+  if (commit_token && stage && stage.dataset) {
+    stage.dataset.nfCommitToken = String(commit_token);
+  }
   const tmp = doc.createElement("div");
   tmp.innerHTML = html;
 
@@ -533,6 +537,18 @@ export function diffAndMount(stage, html) {
   return { removedPersistEls };
 }
 
+function _readResolvedCache(win, token) {
+  if (!win || !token) return null;
+  const cache = win[RESOLVE_CACHE_KEY];
+  if (!cache || cache.token !== token || !cache.resolved) return null;
+  return cache.resolved;
+}
+
+function _writeResolvedCache(win, token, resolved) {
+  if (!win || !token || !resolved) return;
+  win[RESOLVE_CACHE_KEY] = { token, resolved };
+}
+
 function _fmtTime(t_ms) {
   // mm:ss.sss — deterministic, no locale.
   const t = Math.max(0, t_ms | 0);
@@ -569,18 +585,21 @@ export function boot(options) {
   const resolvedEl = doc.getElementById("nf-resolved");
   const tracksEl = doc.getElementById("nf-tracks");
   const win = typeof window !== "undefined" ? window : null;
+  const commitToken = options.commit_token || (win && win.__NF_COMMIT_TOKEN__) || "";
   if (resolvedEl) {
     // Path 1 — bundler pre-resolved (back-compat).
     resolved = JSON.parse(resolvedEl.textContent || "{}");
     trackSources = tracksEl ? JSON.parse(tracksEl.textContent || "{}") : {};
   } else if (options.source) {
     // Path 2a — shell-mac passes raw source via options.
-    resolved = liteResolve(options.source);
+    resolved = _readResolvedCache(win, commitToken) || liteResolve(options.source);
+    _writeResolvedCache(win, commitToken, resolved);
     trackSources = options.tracks || {};
   } else if (win && win.__NF_SOURCE__) {
     // Path 2b — window globals (shell-mac HTML template also sets these
     // for inspector/debug visibility).
-    resolved = liteResolve(win.__NF_SOURCE__);
+    resolved = _readResolvedCache(win, commitToken) || liteResolve(win.__NF_SOURCE__);
+    _writeResolvedCache(win, commitToken, resolved);
     trackSources = win.__NF_TRACKS__ || {};
   } else {
     throw new Error(
@@ -669,7 +688,7 @@ export function boot(options) {
       }
     }
     // ADR-047 · stateful-element-safe mount (replaces stage.innerHTML = html).
-    const mountResult = diffAndMount(stage, html);
+    const mountResult = diffAndMount(stage, html, commitToken);
 
     // --- v1.41 · L2 生命周期 dispatch (ADR-063) -------------------------------
     // L2 Track 的 render() 输出 HTML 含 [data-nf-persist][data-nf-track-id=<trackId>]
