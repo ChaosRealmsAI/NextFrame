@@ -18,6 +18,8 @@ export function describe() {
   return {
     id: "chart",
     name: "Chart Track",
+    description: "数据图表轨道 · 支持柱状 / 折线 / 饼图 · 数据驱动入场 · 适合财报 / 数据汇报",
+    use_cases: ["月度财报", "数据报告", "KPI 展示"],
     viewport: "any",
     // FM-T0 gate: t=0 container opacity must be >= 0.9. Target 0.95.
     t0_visibility: 0.95,

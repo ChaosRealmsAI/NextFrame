@@ -21,6 +21,8 @@ export function describe() {
     id: "audio",
     kind: "audio",
     name: "Audio Track",
+    description: "音频轨道 · 支持 MP3/WAV · 支持起止时间裁剪 · 适合旁白 / 音效 / 背景音乐",
+    use_cases: ["旁白配音", "背景音乐", "音效"],
     viewport: "any",
     // Audio has no visual, but FM-T0 gate still requires a numeric
     // t0_visibility. Set to 1.0 — the <audio> element's opacity is set to

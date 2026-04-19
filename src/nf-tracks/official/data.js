@@ -5,7 +5,9 @@
 export function describe() {
   return {
     id: "data",
-    name: "Data Table Track",
+    name: "Data Ranking Track",
+    description: "数据排名轨道 · 动态排序条形图 · 名次变化动画 · 适合榜单 / 竞赛 / 趋势",
+    use_cases: ["排行榜", "竞赛榜单", "趋势对比"],
     viewport: "any",
     t0_visibility: 0.95,
     params: {

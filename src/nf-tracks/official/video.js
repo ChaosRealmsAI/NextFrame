@@ -18,6 +18,8 @@ export function describe() {
     id: "video",
     kind: "video",
     name: "Video Track",
+    description: "视频轨道 · PIP 画中画 · 支持 file:// / http:// · 起止时间裁剪 · 适合产品演示",
+    use_cases: ["产品演示", "画中画", "采访剪辑"],
     viewport: "any",
     t0_visibility: 0.95,
     z_order_hint: 0,

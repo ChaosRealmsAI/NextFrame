@@ -18,6 +18,8 @@ export function describe() {
   return {
     id: "bg",
     name: "Background Track",
+    description: "背景轨道 · 支持纯色 / 渐变 / 图片 / 视频 · 全屏铺底 · 适合任何开场",
+    use_cases: ["品牌背景", "氛围铺底", "过场"],
     viewport: "any",
     // Backgrounds don't fade — always fully opaque. FM-T0 safely exceeds 0.9.
     t0_visibility: 1.0,
