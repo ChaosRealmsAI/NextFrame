@@ -248,6 +248,13 @@ impl HudView {
         // --- Right cluster (loop · fit) -----------------------------------
         let loop_btn = make_icon_button(mtm, "⟲", &controller, sel!(onLoopToggle:));
         let fit_btn = make_icon_button(mtm, "⛶", &controller, sel!(onFitToggle:));
+        // Fit toggle is disabled in v1.19.2 — the preview's letterbox is a
+        // fixed function of `source.viewport.ratio` and there is no runtime
+        // verb yet for a "fit vs fill" mode (that lands with T-14 recorder
+        // export · v1.20+).  AppKit draws a disabled NSButton at ~38 % alpha
+        // so the user sees it's non-interactive rather than clicking a
+        // ghost button.
+        fit_btn.setEnabled(false);
 
         // --- Layout --------------------------------------------------------
         //
@@ -531,21 +538,30 @@ declare_class!(
             self.dispatch(&format!("window.nfHandle.seek({total})"));
         }
 
-        /// ⟲ loop toggle — stub for v1.19.  Real behaviour lands once the
-        /// runtime exposes a `setLoop(bool)` verb; until then we log to
-        /// stderr so manual QA can confirm the gesture reached the shell.
+        /// ⟲ loop toggle — wired to runtime.js `handle.setLoop(bool)`
+        /// (dist/runtime-iife.js:858, src/runtime.js:857).  The runtime
+        /// also exposes `handle._loop` as the public-read-only current
+        /// state, so we can toggle by passing its inverse.  Purely JS-
+        /// side — no Rust-side state needed for v1.19.2; the runtime is
+        /// the authority.
         #[method(onLoopToggle:)]
         fn on_loop_toggle(&self, _sender: Option<&AnyObject>) {
-            eprintln!("nf-shell-mac: HUD loop toggle (stub · v1.19)");
+            self.dispatch("window.nfHandle.setLoop(!window.nfHandle._loop)");
         }
 
-        /// ⛶ fit-to-window toggle — stub.  The preview's aspect-fit math is
-        /// already driven by `preview::PreviewPanel::resize`; a dedicated
-        /// "fit" vs "fill" verb arrives with the T-14 recorder export
-        /// pipeline which cares about 1:1 pixel pipelines.
+        /// ⛶ fit-to-window toggle — button is disabled (`setEnabled:NO`)
+        /// at construction time (see [`HudView::new`]).  Preview letter-
+        /// box is driven by `source.viewport.ratio` in
+        /// [`preview::PreviewPanel`] and a "fit vs fill" verb requires
+        /// the recorder-export pipeline (T-14 / v1.20+).  Leaving this
+        /// selector in place so the button can be re-enabled without
+        /// touching the declare_class! shape later.
         #[method(onFitToggle:)]
         fn on_fit_toggle(&self, _sender: Option<&AnyObject>) {
-            eprintln!("nf-shell-mac: HUD fit-to-window toggle (stub · v1.19)");
+            // Disabled button can't fire the selector, but if someone
+            // re-enables it without wiring runtime support this log makes
+            // the stub status obvious.
+            eprintln!("nf-shell-mac: HUD fit toggle fired but no runtime verb (v1.19.2)");
         }
     }
 );
@@ -604,9 +620,42 @@ impl HudController {
     /// payload will succeed.  Any deferred execution (Promise.then,
     /// setTimeout, RAF) would lose that flag → FM-AUTOPLAY-POLICY rule #2
     /// violation.
+    ///
+    /// ## FM-READY-GUARD (v1.19.2 hotfix)
+    ///
+    /// `WKWebView.loadHTMLString` is asynchronous — the Rust side returns
+    /// immediately and WebKit parses/executes the `__nf_boot` script off
+    /// the main thread.  A user that clicks ▶ within the first ~50 ms of
+    /// launch lands inside this selector before `window.nfHandle` exists,
+    /// which used to surface as a silent `TypeError` swallowed to stderr
+    /// (invisible when launched from Finder).
+    ///
+    /// Every dispatched expression is now wrapped by
+    /// [`wrap_with_ready_guard`] so the JS body becomes an IIFE that:
+    ///   * returns `"NOT_READY"` when `window.nfHandle` hasn't been set
+    ///     yet — handler logs once and returns (no retry in gesture path;
+    ///     a 200 ms delayed retry would stale the user-activation flag per
+    ///     FM-AUTOPLAY-POLICY rule #2);
+    ///   * returns `"OK"` on successful execution — handler stays silent;
+    ///   * returns `"ERR:<message>"` when the body throws — handler logs
+    ///     the specific JS error message (e.g. `"setLoop is not a
+    ///     function"`) so we can tell a runtime-API drift from a WebKit
+    ///     transport failure.
+    ///
+    /// NSError surfaces at the WebKit layer (transport / sandbox) and is
+    /// logged with its `localizedDescription`.
     fn dispatch(&self, js: &str) {
+        self.dispatch_raw(&wrap_with_ready_guard(js), js);
+    }
+
+    /// Inner dispatch — takes the already-wrapped JS body plus the
+    /// original body for logging context.  Split out so tests can feed
+    /// their own wrapped strings without re-running [`wrap_with_ready_guard`]
+    /// twice, and so the two call sites (transport wrapping vs raw) stay
+    /// visible.
+    fn dispatch_raw(&self, wrapped_js: &str, original_js: &str) {
         let ivars = self.ivars();
-        let ns_js = NSString::from_str(js);
+        let ns_js = NSString::from_str(wrapped_js);
         // No arguments dictionary (we inline any number/string literals
         // directly into the body — the bodies here are tiny like
         // "window.nfHandle.seek(1234)").  An empty dict is semantically
@@ -618,36 +667,69 @@ impl HudController {
         // the page world.  `pageWorld()` returns the main world where
         // nf-runtime boots, so the lookup chain resolves.
         let world = unsafe { WKContentWorld::pageWorld() };
-        // Completion handler is a no-op for v1.19: we don't need the
-        // return value (the verbs don't resolve with data) and FM-ASYNC
-        // documents that the Promise resolution is handled by WebKit
-        // internally.  The handler is still supplied so WebKit can surface
-        // NSErrors through the transcript in debug builds.  Wrapping in
-        // `RcBlock::new` moves the closure onto a heap block whose
-        // retain/release is managed by the ObjC runtime.
-        //
-        // The eprintln! on `!err.is_null()` is a thin belt-and-suspenders
-        // guard: during development a typo in the JS body (e.g.
-        // `nfHandle.playy()`) silently no-ops without it.  Production
-        // verbosity is opt-in via `NF_SHELL_DEBUG=1` once T-11 wires up
-        // env-var logging.
+        // Copy the original body onto the heap so the closure can log it
+        // if the JS side reports ERR — helps triage which verb failed
+        // without recording every dispatch pre-emptively.
+        let original_owned = original_js.to_string();
         let handler = RcBlock::new(move |result: *mut AnyObject, err: *mut NSError| {
+            // Transport-level failure (sandbox denied, WebKit shut down
+            // mid-dispatch, etc).  Surface the NSError.localizedDescription
+            // unconditionally — this is the path that used to carry a
+            // TypeError under v1.19.1 before the guard was added.
             if !err.is_null() {
                 // SAFETY: WebKit guarantees `err` is a valid, +0-retained
-                // NSError when non-null.  We read its `localizedDescription`
-                // purely for logging.
+                // NSError when non-null.
                 unsafe {
                     if let Some(e) = err.as_ref() {
                         let desc = e.localizedDescription();
-                        eprintln!("nf-shell-mac HUD dispatch error: {desc}");
+                        eprintln!(
+                            "nf-shell-mac HUD dispatch transport error: {desc} (js={original_owned})"
+                        );
                     }
                 }
+                return;
             }
-            // `result` is a Promise resolution value; the current verbs
-            // resolve with `undefined` (`nfHandle.play()` etc.) so the
-            // pointer is null most of the time.  We explicitly ignore it
-            // here.
-            let _ = result;
+            // Promise-resolution-level outcome.  `result` should be a
+            // retained NSString matching one of "OK" / "NOT_READY" /
+            // "ERR:<msg>"; if it's null the runtime returned undefined
+            // (shouldn't happen with the guard but tolerate gracefully).
+            if result.is_null() {
+                return;
+            }
+            // SAFETY: `result` is a retained NSString when non-null; the
+            // guard IIFE only ever returns string literals.
+            let outcome = unsafe {
+                let obj: &AnyObject = &*result;
+                let ns_str: *const NSString = obj as *const AnyObject as *const NSString;
+                (*ns_str).to_string()
+            };
+            match outcome.as_str() {
+                "OK" => {
+                    // Success path — silent.  Optimistic state was already
+                    // flipped in the selector so the HUD reads correctly.
+                }
+                "NOT_READY" => {
+                    // Runtime hasn't finished booting.  Log once to stderr
+                    // so `--log-stderr-to` captures it; no auto-retry (see
+                    // dispatch() doc · FM-AUTOPLAY-POLICY rule #2).
+                    eprintln!(
+                        "nf-shell-mac HUD: runtime not ready yet (js={original_owned}) · try again in a moment"
+                    );
+                }
+                other if other.starts_with("ERR:") => {
+                    eprintln!(
+                        "nf-shell-mac HUD dispatch JS error: {other} (js={original_owned})"
+                    );
+                }
+                other => {
+                    // Unknown sentinel — shouldn't happen but don't
+                    // swallow; record verbatim so future guard changes
+                    // stay debuggable.
+                    eprintln!(
+                        "nf-shell-mac HUD dispatch unexpected outcome: {other:?} (js={original_owned})"
+                    );
+                }
+            }
         });
 
         // SAFETY: main-thread AppKit dispatch; `ns_js` / `args` / `world` /
@@ -890,6 +972,32 @@ fn place_label(view: &NSTextField, mid_y: f64, x: &mut f64, w: f64, h: f64, gap:
 }
 
 // ---------------------------------------------------------------------------
+// JS ready-guard (FM-READY-GUARD · v1.19.2 hotfix)
+// ---------------------------------------------------------------------------
+
+/// Wrap a raw JS expression in an IIFE that short-circuits when
+/// `window.nfHandle` hasn't been mounted by the runtime boot script yet.
+///
+/// Sentinels:
+///   * `"NOT_READY"` — handle missing (WKWebView load still racing with
+///     the user's first click).
+///   * `"OK"` — body evaluated without throwing.
+///   * `"ERR:<message>"` — body threw; message is the JS Error.message.
+///
+/// The guard is intentionally synchronous inside the IIFE — no
+/// `setTimeout` / Promise / RAF detour — so FM-AUTOPLAY-POLICY rule #2
+/// (user-activation synchronous-in-gesture) holds even when the wrapped
+/// body is `window.nfHandle.play()`.
+///
+/// Public (crate) so `#[cfg(test)]` can assert the produced string carries
+/// the guard pattern without reaching through any NSWebView machinery.
+pub(crate) fn wrap_with_ready_guard(body: &str) -> String {
+    format!(
+        "(function(){{if(!window.nfHandle){{return 'NOT_READY';}}try{{{body};return 'OK';}}catch(e){{return 'ERR:'+(e&&e.message?e.message:String(e));}}}})()"
+    )
+}
+
+// ---------------------------------------------------------------------------
 // Timecode formatting
 // ---------------------------------------------------------------------------
 
@@ -967,6 +1075,95 @@ mod tests {
         // Catch a copy-paste regression where both glyphs end up the same
         // (rule #5 of FM-AUTOPLAY-POLICY is lost if icon never changes).
         assert_ne!(PLAY_GLYPH, PAUSE_GLYPH);
+    }
+
+    // -- FM-READY-GUARD · v1.19.2 hotfix ------------------------------------
+    //
+    // These tests live in Rust because the guard is a Rust helper; the JS
+    // it produces is evaluated by WebKit at runtime.  Pure-string tests
+    // guarantee every dispatched expression carries the three sentinels
+    // we match on in the completion handler.
+
+    #[test]
+    fn ready_guard_contains_not_ready_sentinel() {
+        let wrapped = wrap_with_ready_guard("window.nfHandle.play()");
+        assert!(
+            wrapped.contains("NOT_READY"),
+            "guard must emit NOT_READY when handle missing; got: {wrapped}"
+        );
+    }
+
+    #[test]
+    fn ready_guard_contains_ok_sentinel() {
+        let wrapped = wrap_with_ready_guard("window.nfHandle.play()");
+        assert!(
+            wrapped.contains("'OK'"),
+            "guard must return 'OK' on success; got: {wrapped}"
+        );
+    }
+
+    #[test]
+    fn ready_guard_contains_err_sentinel() {
+        let wrapped = wrap_with_ready_guard("window.nfHandle.play()");
+        assert!(
+            wrapped.contains("'ERR:'"),
+            "guard must return 'ERR:'+msg on throw; got: {wrapped}"
+        );
+    }
+
+    #[test]
+    fn ready_guard_checks_handle_before_use() {
+        let wrapped = wrap_with_ready_guard("window.nfHandle.play()");
+        // The `!window.nfHandle` check must appear before any usage of
+        // nfHandle.play() so undefined-deref can't happen.
+        let guard_pos = wrapped
+            .find("!window.nfHandle")
+            .expect("guard pattern missing");
+        let play_pos = wrapped
+            .find("window.nfHandle.play()")
+            .expect("body missing");
+        assert!(
+            guard_pos < play_pos,
+            "guard must appear before body use of nfHandle"
+        );
+    }
+
+    #[test]
+    fn ready_guard_wraps_in_iife() {
+        // Must be an IIFE so callAsyncJavaScript receives an expression
+        // whose resolved value is a string (our sentinel).  Without the
+        // trailing `()` WebKit would resolve with the function itself.
+        let wrapped = wrap_with_ready_guard("1+1");
+        assert!(wrapped.starts_with("(function(){"));
+        assert!(wrapped.ends_with("})()"));
+    }
+
+    #[test]
+    fn ready_guard_try_catch_wraps_body() {
+        // The body must run inside try/catch so a JS throw becomes ERR
+        // rather than a rejected promise (which would surface as
+        // NSError only in the transport completion path).
+        let wrapped = wrap_with_ready_guard("window.nfHandle.play()");
+        assert!(wrapped.contains("try{"));
+        assert!(wrapped.contains("}catch(e){"));
+    }
+
+    #[test]
+    fn ready_guard_preserves_body_verbatim() {
+        // The verb string (verify the runtime API it calls) must pass
+        // through untouched — otherwise runtime.js's setLoop / seek / play
+        // contract silently drifts.
+        for body in [
+            "window.nfHandle.play()",
+            "window.nfHandle.pause()",
+            "window.nfHandle.seek(0)",
+            "window.nfHandle.seek(33)",
+            "window.nfHandle.seek(212000)",
+            "window.nfHandle.setLoop(!window.nfHandle._loop)",
+        ] {
+            let wrapped = wrap_with_ready_guard(body);
+            assert!(wrapped.contains(body), "body '{body}' lost in: {wrapped}");
+        }
     }
 
     // Compile-time layout-constant sanity checks.  `const { assert!(…) }`
