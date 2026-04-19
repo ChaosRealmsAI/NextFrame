@@ -13,6 +13,7 @@
 //!   `nf-shell [source.json]`                — interactive
 //!   `nf-shell --verify [source.json]`       — run built-in IPC verify suite
 //!   `nf-shell --verify-select [source.json]`— run clip-selection + inspector verify
+//!   `nf-shell --verify-zoom [source.json]`  — run timeline zoom + scroll verify
 //!   `nf-shell --screenshot <out.png> [--delay-ms N] [source.json]`
 //!                                            — capture WebView → PNG and exit
 
@@ -55,32 +56,30 @@ const TRACK_CHART: &str = include_str!("../../nf-tracks/official/chart.js");
 const TRACK_DATA: &str = include_str!("../../nf-tracks/official/data.js");
 const TRACK_SUBTITLE: &str = include_str!("../../nf-tracks/official/subtitle.js");
 // v1.41 · L2 community Track · WebGL particles
-const TRACK_WEBGL_PARTICLES: &str =
-    include_str!("../../nf-tracks/community/webgl-particles.js");
+const TRACK_WEBGL_PARTICLES: &str = include_str!("../../nf-tracks/community/webgl-particles.js");
 // v1.46 · scene Hero family (3 L1 community Tracks)
 const TRACK_SCENE_HERO_CENTERED: &str =
     include_str!("../../nf-tracks/community/scene-hero-centered.js");
-const TRACK_SCENE_HERO_SPLIT: &str =
-    include_str!("../../nf-tracks/community/scene-hero-split.js");
+const TRACK_SCENE_HERO_SPLIT: &str = include_str!("../../nf-tracks/community/scene-hero-split.js");
 const TRACK_SCENE_HERO_OVERLAY: &str =
     include_str!("../../nf-tracks/community/scene-hero-overlay.js");
 // v1.47 · scene Data family (3 L1 community Tracks)
-const TRACK_SCENE_STAT_GIANT: &str =
-    include_str!("../../nf-tracks/community/scene-stat-giant.js");
+const TRACK_SCENE_STAT_GIANT: &str = include_str!("../../nf-tracks/community/scene-stat-giant.js");
 const TRACK_SCENE_METRIC_GRID: &str =
     include_str!("../../nf-tracks/community/scene-metric-grid.js");
 const TRACK_SCENE_KPI_CALLOUT: &str =
     include_str!("../../nf-tracks/community/scene-kpi-callout.js");
 // v1.48 · scene Narrative family (3 L1 community Tracks)
-const TRACK_SCENE_QUOTE: &str =
-    include_str!("../../nf-tracks/community/scene-quote.js");
+const TRACK_SCENE_QUOTE: &str = include_str!("../../nf-tracks/community/scene-quote.js");
 const TRACK_SCENE_LIST_BULLETS: &str =
     include_str!("../../nf-tracks/community/scene-list-bullets.js");
-const TRACK_SCENE_TIMELINE: &str =
-    include_str!("../../nf-tracks/community/scene-timeline.js");
+const TRACK_SCENE_TIMELINE: &str = include_str!("../../nf-tracks/community/scene-timeline.js");
 // v1.49 · editor verify-select output paths
 const VERIFY_SELECT_JSON_PATH: &str = "spec/versions/v1.49/verify/verify-select.json";
 const VERIFY_SELECT_SCREENSHOT_PATH: &str = "tmp/v1.49-verify-select.png";
+// v1.50 · timeline zoom verify output paths
+const VERIFY_ZOOM_JSON_PATH: &str = "tmp/v1.50-verify.json";
+const VERIFY_ZOOM_SCREENSHOT_PATH: &str = "tmp/v1.50-60s-demo-30s-click.png";
 
 #[derive(Debug, Clone)]
 enum UserEvent {
@@ -104,6 +103,9 @@ enum UserEvent {
         json: String,
     },
     VerifySelectReport {
+        payload: Value,
+    },
+    VerifyZoomReport {
         payload: Value,
     },
 }
@@ -256,6 +258,7 @@ enum IpcOutcome {
     },
     VerifyMediaReport(String),
     VerifySelectReport(Value),
+    VerifyZoomReport(Value),
 }
 
 fn selection_value(selection: &Selection) -> Value {
@@ -403,6 +406,7 @@ fn dispatch_ipc(editor: &mut EditorState, body: &str) -> Result<IpcOutcome> {
         "menu-save" => Ok(IpcOutcome::MenuSave),
         "verify-media-report" => Ok(IpcOutcome::VerifyMediaReport(pretty_json(&payload))),
         "verify-select-report" => Ok(IpcOutcome::VerifySelectReport(payload)),
+        "verify-zoom-report" => Ok(IpcOutcome::VerifyZoomReport(payload)),
         "export-mp4" => {
             let path = payload
                 .get("path")
@@ -555,6 +559,7 @@ fn build_init_script(
     screenshot_after_ms: Option<u64>,
     source_path: &str,
     verify_media_mode: bool,
+    verify_zoom_mode: bool,
 ) -> String {
     let source_str = serde_json::to_string(source_json).unwrap_or_else(|_| "{}".to_string());
     let tracks_str = serde_json::to_string(tracks_map).unwrap_or_else(|_| "{}".to_string());
@@ -588,6 +593,325 @@ setTimeout(function(){
     let _ = screenshot_after_ms;
     let screenshot_block = String::new();
     let verify_select_flag = if verify_select_mode { "true" } else { "false" };
+    let verify_zoom_flag = if verify_zoom_mode { "true" } else { "false" };
+    let timeline_zoom_block = r#"
+window.__nfTimeline = window.__nfTimeline || { zoom: 1.0, scroll_ms: 0, min_zoom: 0.2, max_zoom: 10.0 };
+window.__nf_timeline_clamp = function(value, min, max) {
+  if (!isFinite(value)) value = min;
+  if (!isFinite(min)) min = 0;
+  if (!isFinite(max)) max = min;
+  if (max < min) max = min;
+  return Math.max(min, Math.min(max, value));
+};
+window.__nf_timeline_state = function() {
+  var state = window.__nfTimeline || {};
+  if (!isFinite(state.zoom)) state.zoom = 1.0;
+  if (!isFinite(state.scroll_ms)) state.scroll_ms = 0;
+  if (!isFinite(state.min_zoom)) state.min_zoom = 0.2;
+  if (!isFinite(state.max_zoom)) state.max_zoom = 10.0;
+  window.__nfTimeline = state;
+  return state;
+};
+window.__nf_timeline_lanes = function() {
+  return document.querySelector('.tl-lanes');
+};
+window.__nf_timeline_duration_ms = function(lanes) {
+  var dur = lanes ? parseFloat(lanes.dataset.nfDurationMs || '0') : 0;
+  if (!(dur > 0)) {
+    var src = window.__NF_SOURCE__ || {};
+    dur = (typeof src.duration_ms === 'number' && src.duration_ms > 0)
+      ? src.duration_ms
+      : (window.__nf_infer_duration(src) || 60000);
+  }
+  return dur > 0 ? dur : 60000;
+};
+window.__nf_timeline_px_per_second = function(lanes, durationMs) {
+  var dur = durationMs || window.__nf_timeline_duration_ms(lanes);
+  var laneWidth = lanes && lanes.clientWidth ? lanes.clientWidth : 0;
+  if (!(laneWidth > 0) || !(dur > 0)) return 20;
+  return Math.max(20, laneWidth / Math.max(1, dur / 1000));
+};
+window.__nf_timeline_bar_width_px = function(beginMs, endMs, lanes, durationMs) {
+  var state = window.__nf_timeline_state();
+  var pxPerSecond = window.__nf_timeline_px_per_second(lanes, durationMs);
+  return Math.max(2, ((endMs - beginMs) / 1000) * pxPerSecond * state.zoom);
+};
+window.__nf_timeline_view_ms = function(lanes, durationMs) {
+  var state = window.__nf_timeline_state();
+  var laneWidth = lanes && lanes.clientWidth ? lanes.clientWidth : 0;
+  var pxPerSecond = window.__nf_timeline_px_per_second(lanes, durationMs);
+  if (!(laneWidth > 0) || !(pxPerSecond > 0) || !(state.zoom > 0)) return durationMs || 60000;
+  return (laneWidth / (pxPerSecond * state.zoom)) * 1000;
+};
+window.__nf_timeline_max_scroll_ms = function(lanes, durationMs) {
+  var dur = durationMs || window.__nf_timeline_duration_ms(lanes);
+  return Math.max(0, dur - Math.max(0, window.__nf_timeline_view_ms(lanes, dur)));
+};
+window.__nf_timeline_clamp_scroll = function(scrollMs, lanes, durationMs) {
+  var dur = durationMs || window.__nf_timeline_duration_ms(lanes);
+  return window.__nf_timeline_clamp(scrollMs, 0, window.__nf_timeline_max_scroll_ms(lanes, dur));
+};
+window.__nf_timeline_ms_to_px = function(ms, lanes, durationMs) {
+  var state = window.__nf_timeline_state();
+  var pxPerSecond = window.__nf_timeline_px_per_second(lanes, durationMs);
+  return ((ms - state.scroll_ms) / 1000) * pxPerSecond * state.zoom;
+};
+window.__nf_timeline_px_to_ms = function(px, lanes, durationMs) {
+  var state = window.__nf_timeline_state();
+  var pxPerSecond = window.__nf_timeline_px_per_second(lanes, durationMs);
+  if (!(pxPerSecond > 0) || !(state.zoom > 0)) return state.scroll_ms;
+  return state.scroll_ms + (px / (pxPerSecond * state.zoom)) * 1000;
+};
+window.__nf_timeline_snapshot = function() {
+  var lanes = window.__nf_timeline_lanes();
+  var durationMs = window.__nf_timeline_duration_ms(lanes);
+  var state = window.__nf_timeline_state();
+  var snapshot = {
+    zoom: Number(state.zoom.toFixed(4)),
+    scroll_ms: Math.round(state.scroll_ms),
+    min_zoom: state.min_zoom,
+    max_zoom: state.max_zoom,
+    duration_ms: Math.round(durationMs),
+    px_per_second: Number(window.__nf_timeline_px_per_second(lanes, durationMs).toFixed(4))
+  };
+  if (lanes) snapshot.lanes_width_px = lanes.clientWidth || 0;
+  return snapshot;
+};
+window.__nf_timeline_find_bar_at_ms = function(ms) {
+  var bars = document.querySelectorAll('.nf-tl-bar');
+  for (var i = 0; i < bars.length; i++) {
+    var beginMs = parseFloat(bars[i].dataset.nfBeginMs || '0');
+    var endMs = parseFloat(bars[i].dataset.nfEndMs || '0');
+    if (ms >= beginMs && ms < endMs) return bars[i];
+  }
+  return bars.length ? bars[bars.length - 1] : null;
+};
+window.__nf_ensure_timeline_zoom_style = function() {
+  if (document.getElementById('nf-timeline-zoom-style')) return;
+  var style = document.createElement('style');
+  style.id = 'nf-timeline-zoom-style';
+  style.textContent = '.tl-zoom .z-bar::before{width:var(--nf-zoom-pct,42%)!important;}';
+  document.head.appendChild(style);
+};
+window.__nf_update_timeline_meta = function() {
+  var state = window.__nf_timeline_state();
+  var timeline = document.querySelector('.timeline');
+  if (timeline) {
+    timeline.dataset.zoom = state.zoom.toFixed(2);
+    timeline.dataset.scrollMs = String(Math.round(state.scroll_ms));
+  }
+  window.__nf_ensure_timeline_zoom_style();
+  var zoomEl = document.querySelector('.tl-zoom');
+  if (!zoomEl) return;
+  var zoomBar = zoomEl.querySelector('.z-bar');
+  if (zoomBar) {
+    var denom = Math.max(0.0001, state.max_zoom - state.min_zoom);
+    var pct = ((state.zoom - state.min_zoom) / denom) * 100;
+    zoomBar.style.setProperty('--nf-zoom-pct', Math.max(0, Math.min(100, pct)).toFixed(2) + '%');
+  }
+  for (var n = zoomEl.childNodes.length - 1; n >= 0; n--) {
+    if (zoomEl.childNodes[n].nodeType === 3) zoomEl.removeChild(zoomEl.childNodes[n]);
+  }
+  var label = zoomEl.querySelector('.nf-zoom-label');
+  if (!label) {
+    label = document.createElement('span');
+    label.className = 'nf-zoom-label';
+    zoomEl.appendChild(label);
+  }
+  label.textContent = Math.round(state.zoom * 100) + '%';
+};
+window.__nf_set_timeline_zoom = function(nextZoom, anchorPx, lanes) {
+  var targetLanes = lanes || window.__nf_timeline_lanes();
+  var durationMs = window.__nf_timeline_duration_ms(targetLanes);
+  var state = window.__nf_timeline_state();
+  var clampedZoom = window.__nf_timeline_clamp(nextZoom, state.min_zoom, state.max_zoom);
+  if (!(targetLanes && targetLanes.clientWidth)) {
+    state.zoom = clampedZoom;
+    state.scroll_ms = window.__nf_timeline_clamp_scroll(state.scroll_ms, targetLanes, durationMs);
+    window.__nf_update_timeline_meta();
+    return window.__nf_timeline_snapshot();
+  }
+  var localX = isFinite(anchorPx) ? anchorPx : (targetLanes.clientWidth / 2);
+  localX = window.__nf_timeline_clamp(localX, 0, targetLanes.clientWidth || 0);
+  var anchorMs = window.__nf_timeline_px_to_ms(localX, targetLanes, durationMs);
+  state.zoom = clampedZoom;
+  state.scroll_ms = anchorMs - (localX / (window.__nf_timeline_px_per_second(targetLanes, durationMs) * state.zoom)) * 1000;
+  state.scroll_ms = window.__nf_timeline_clamp_scroll(state.scroll_ms, targetLanes, durationMs);
+  window.__nf_reflow_timeline();
+  return window.__nf_timeline_snapshot();
+};
+window.__nf_timeline_zoom_by = function(factor, anchorPx, lanes) {
+  var state = window.__nf_timeline_state();
+  return window.__nf_set_timeline_zoom(state.zoom * factor, anchorPx, lanes);
+};
+window.__nf_scroll_timeline = function(deltaMs, lanes) {
+  var targetLanes = lanes || window.__nf_timeline_lanes();
+  var durationMs = window.__nf_timeline_duration_ms(targetLanes);
+  var state = window.__nf_timeline_state();
+  state.scroll_ms = window.__nf_timeline_clamp_scroll(state.scroll_ms + deltaMs, targetLanes, durationMs);
+  window.__nf_reflow_timeline();
+  return window.__nf_timeline_snapshot();
+};
+window.__nf_install_timeline_wheel = function() {
+  var timeline = document.querySelector('.timeline');
+  if (!timeline || timeline.__nf_timeline_wheel_wired) return;
+  timeline.__nf_timeline_wheel_wired = true;
+  timeline.addEventListener('wheel', function(e) {
+    var lanes = window.__nf_timeline_lanes();
+    if (!lanes) return;
+    var rect = lanes.getBoundingClientRect();
+    var localX = e.clientX - rect.left;
+    if (e.metaKey) {
+      e.preventDefault();
+      window.__nf_timeline_zoom_by(e.deltaY < 0 ? 1.1 : 0.9, localX, lanes);
+    } else if (e.shiftKey) {
+      e.preventDefault();
+      window.__nf_scroll_timeline(e.deltaY * 10, lanes);
+    }
+  }, { passive: false });
+};
+"#
+    .to_string();
+    let control_surface_block = format!(
+        r#"
+window.__NF_VERIFY_ZOOM__ = {verify_zoom};
+window.nfEditor = window.nfEditor || {{}};
+window.nfEditor.zoom = function(factor) {{
+  return window.__nf_timeline_zoom_by ? window.__nf_timeline_zoom_by(factor) : null;
+}};
+window.nfEditor.zoomTo = function(zoom, anchorPx) {{
+  return window.__nf_set_timeline_zoom ? window.__nf_set_timeline_zoom(zoom, anchorPx) : null;
+}};
+window.nfEditor.scroll = function(deltaMs) {{
+  return window.__nf_scroll_timeline ? window.__nf_scroll_timeline(deltaMs) : null;
+}};
+window.nfEditor.timelineState = function() {{
+  return window.__nf_timeline_snapshot ? window.__nf_timeline_snapshot() : null;
+}};
+"#,
+        verify_zoom = verify_zoom_flag,
+    );
+    let verify_zoom_block = if verify_zoom_mode {
+        r#"
+(function() {
+  if (!window.__NF_VERIFY_ZOOM__) return;
+  function sleep(ms) {
+    return new Promise(function(resolve) { window.setTimeout(resolve, ms); });
+  }
+  function wheel(target, init) {
+    target.dispatchEvent(new WheelEvent('wheel', Object.assign({ bubbles: true, cancelable: true }, init)));
+  }
+  async function waitForTimeline() {
+    var deadline = Date.now() + 12000;
+    while (Date.now() < deadline) {
+      var timeline = document.querySelector('.timeline');
+      var lanes = document.querySelector('.tl-lanes');
+      var bars = document.querySelectorAll('.nf-tl-bar');
+      if (timeline && lanes && bars.length) return { timeline: timeline, lanes: lanes };
+      await sleep(150);
+    }
+    return null;
+  }
+  async function run() {
+    try {
+      var ready = await waitForTimeline();
+      if (!ready) {
+        window.ipc.postMessage(JSON.stringify({kind:'verify-zoom-report', payload:{ ok:false, error:'timeline not ready' }}));
+        return;
+      }
+      var timeline = ready.timeline;
+      var lanes = ready.lanes;
+      var lanesRect = lanes.getBoundingClientRect();
+      var anchorClientX = lanesRect.left + Math.max(8, Math.min(lanesRect.width - 8, lanesRect.width * 0.55));
+      var anchorLocalX = anchorClientX - lanesRect.left;
+      var anchorClientY = lanesRect.top + 12;
+      if (window.nfEditor && typeof window.nfEditor.zoomTo === 'function') window.nfEditor.zoomTo(1.0, anchorLocalX);
+      if (window.nfEditor && typeof window.nfEditor.scroll === 'function') window.nfEditor.scroll(-1e9);
+      await sleep(160);
+
+      for (var i = 0; i < 5; i++) {
+        wheel(timeline, { deltaY: -100, metaKey: true, clientX: anchorClientX, clientY: anchorClientY });
+      }
+      await sleep(160);
+      var afterZoom = window.nfEditor.timelineState();
+      var vp1Zoom = afterZoom && typeof afterZoom.zoom === 'number' ? afterZoom.zoom : 0;
+      var vp1Pass = vp1Zoom >= 1.60;
+
+      if (window.nfEditor && typeof window.nfEditor.scroll === 'function') window.nfEditor.scroll(-1e9);
+      await sleep(120);
+      for (var j = 0; j < 10; j++) {
+        wheel(timeline, { deltaY: 150, shiftKey: true, clientX: anchorClientX, clientY: anchorClientY });
+      }
+      await sleep(160);
+      var afterScroll = window.nfEditor.timelineState();
+      var scrollMs = afterScroll && typeof afterScroll.scroll_ms === 'number' ? afterScroll.scroll_ms : 0;
+      var vp4Pass = Math.abs(scrollMs - 15000) <= 250;
+
+      var targetMs = 30500;
+      var targetBar = window.__nf_timeline_find_bar_at_ms(targetMs);
+      var targetX = window.__nf_timeline_ms_to_px(targetMs, lanes, afterScroll && afterScroll.duration_ms);
+      var targetBarRect = targetBar ? targetBar.getBoundingClientRect() : null;
+      var geometryHit = !!(targetBarRect && (lanesRect.left + targetX) >= targetBarRect.left - 1 && (lanesRect.left + targetX) <= targetBarRect.right + 1);
+      if (targetBar) {
+        targetBar.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: lanesRect.left + targetX, clientY: targetBarRect.top + Math.max(6, targetBarRect.height / 2) }));
+        targetBar.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: lanesRect.left + targetX, clientY: targetBarRect.top + Math.max(6, targetBarRect.height / 2) }));
+      }
+      await sleep(360);
+      var selectedClipId = window.__nf_editor && window.__nf_editor.state && window.__nf_editor.state.selection
+        ? window.__nf_editor.state.selection.clip_id || null
+        : null;
+      var vp2Pass = geometryHit && selectedClipId === 'clip-30s';
+
+      if (window.__nf_handle && typeof window.__nf_handle.seek === 'function') {
+        try { window.__nf_handle.seek(30000, { pause: true }); } catch (_err) {}
+      }
+      await sleep(260);
+      var playhead = document.getElementById('nf-playhead');
+      var playheadActual = playhead ? parseFloat(playhead.style.left || '0') : NaN;
+      var playheadExpected = window.__nf_timeline_ms_to_px(30000, lanes, afterScroll && afterScroll.duration_ms);
+      var playheadOffset = Math.abs((isFinite(playheadActual) ? playheadActual : 0) - playheadExpected);
+      var vp3Pass = playheadOffset <= 2;
+
+      var factorToMax = vp1Zoom > 0 ? (10 / vp1Zoom) : 10;
+      if (window.nfEditor && typeof window.nfEditor.zoom === 'function') window.nfEditor.zoom(factorToMax);
+      await sleep(160);
+      var afterMaxZoom = window.nfEditor.timelineState();
+      var highZoomBar = window.__nf_timeline_find_bar_at_ms(targetMs);
+      var barWidth = highZoomBar ? parseFloat(highZoomBar.style.width || '0') : 0;
+      var vp5Pass = barWidth >= 200;
+
+      var report = {
+        cmd_wheel_5_times: { final_zoom: Number(vp1Zoom.toFixed(2)), pass: vp1Pass },
+        click_at_30s: {
+          target_ms: targetMs,
+          target_x_px: Number(targetX.toFixed(2)),
+          selected_clip_id: selectedClipId,
+          pass: vp2Pass
+        },
+        playhead_offset_px: Number(playheadOffset.toFixed(2)),
+        shift_wheel_scroll: { scroll_ms: Math.round(scrollMs), pass: vp4Pass },
+        high_zoom_bar_width: {
+          zoom: afterMaxZoom && typeof afterMaxZoom.zoom === 'number' ? Number(afterMaxZoom.zoom.toFixed(2)) : 0,
+          bar_width_px: Number(barWidth.toFixed(2)),
+          pass: vp5Pass
+        },
+        ok: vp1Pass && vp2Pass && vp3Pass && vp4Pass && vp5Pass
+      };
+      window.ipc.postMessage(JSON.stringify({kind:'verify-zoom-report', payload: report}));
+    } catch (err) {
+      window.ipc.postMessage(JSON.stringify({
+        kind:'verify-zoom-report',
+        payload:{ ok:false, error:String(err && err.stack || err) }
+      }));
+    }
+  }
+  window.setTimeout(run, 2200);
+})();
+"#
+        .to_string()
+    } else {
+        String::new()
+    };
     let editor_ui_block = format!(
         r#"
 window.__NF_EDITOR_INITIAL_STATE__ = {initial_state};
@@ -1051,10 +1375,11 @@ setTimeout(function() {
         var lanes = document.querySelector('.tl-lanes');
         if (!lanes) return { error: 'no .tl-lanes' };
         var dur = parseFloat(lanes.dataset.nfDurationMs || '60000');
-        var lanesRect = lanes.getBoundingClientRect();
-        var lanesLeft = lanesRect.left;
         var w = lanes.clientWidth;
-        function expectedPx(ms) { return Math.round((ms / dur) * w); }
+        function expectedPx(ms) {
+          if (window.__nf_timeline_ms_to_px) return Math.round(window.__nf_timeline_ms_to_px(ms, lanes, dur));
+          return Math.round((ms / dur) * w);
+        }
         var ph = document.getElementById('nf-playhead');
         var phLeft = ph ? parseFloat(ph.style.left || '0') : -1;
         var firstBar = lanes.querySelector('.nf-tl-bar');
@@ -1073,7 +1398,16 @@ setTimeout(function() {
           bar_first_left: firstBar ? parseFloat(firstBar.style.left || '0') : -1,
           bar_first_expected: firstBar ? expectedPx(parseFloat(firstBar.dataset.nfBeginMs || '0')) : -1,
           bar_first_width: firstBar ? parseFloat(firstBar.style.width || '0') : -1,
-          bar_first_width_expected: firstBar ? Math.max(2, Math.round(((parseFloat(firstBar.dataset.nfEndMs || '0') - parseFloat(firstBar.dataset.nfBeginMs || '0')) / dur) * w)) : -1
+          bar_first_width_expected: firstBar
+            ? (window.__nf_timeline_bar_width_px
+                ? Math.max(2, Math.round(window.__nf_timeline_bar_width_px(
+                    parseFloat(firstBar.dataset.nfBeginMs || '0'),
+                    parseFloat(firstBar.dataset.nfEndMs || '0'),
+                    lanes,
+                    dur
+                  )))
+                : Math.max(2, Math.round(((parseFloat(firstBar.dataset.nfEndMs || '0') - parseFloat(firstBar.dataset.nfBeginMs || '0')) / dur) * w)))
+            : -1
         };
       })()
     };
@@ -1247,6 +1581,8 @@ window.__nf_apply_source = function(newSource) {{
   window.__nf_mount();
 }};
 
+{timeline_zoom}
+
 // ---- v1.24: Render timeline header + labels + lanes + ruler FROM live JSON.
 // Replaces the static 4-track hifi mockup in prototype.html. Track count,
 // names, src filename, clip count all driven by __NF_SOURCE__.tracks.
@@ -1292,10 +1628,8 @@ window.__nf_render_timeline = function() {{
   }}
 
   // Lanes + ruler.
-  // v1.30: strict px alignment — ALL horizontal positions (ruler ticks,
-  // clip bars, playhead) are computed as `tMs / durationMs * lanesWidth`
-  // and stored as data-nf-ms so reflow on resize recomputes them from the
-  // same source of truth. No more % vs px mixing that caused sub-px drift.
+  // v1.50: all x positions now flow through shared timeline helpers so
+  // zoom / horizontal scroll / playhead stay in lock-step.
   var lanes = document.querySelector('.tl-lanes');
   if (lanes) {{
     lanes.innerHTML = '';
@@ -1351,6 +1685,8 @@ window.__nf_render_timeline = function() {{
       lanes.appendChild(row);
     }});
     window.__nf_reflow_timeline();
+    window.__nf_install_timeline_wheel();
+    window.__nf_update_timeline_meta();
     if (!window.__nf_tl_resize_wired) {{
       window.__nf_tl_resize_wired = true;
       window.addEventListener('resize', window.__nf_reflow_timeline);
@@ -1364,23 +1700,28 @@ window.__nf_render_timeline = function() {{
 window.__nf_reflow_timeline = function() {{
   var lanes = document.querySelector('.tl-lanes');
   if (!lanes) return;
-  var dur = parseFloat(lanes.dataset.nfDurationMs || '60000');
-  if (!(dur > 0)) dur = 60000;
-  var w = lanes.clientWidth || 1;
+  var dur = window.__nf_timeline_duration_ms(lanes);
+  var state = window.__nf_timeline_state();
+  state.scroll_ms = window.__nf_timeline_clamp_scroll(state.scroll_ms, lanes, dur);
   var ticks = lanes.querySelectorAll('.nf-tl-tick');
   for (var i = 0; i < ticks.length; i++) {{
     var tMs = parseFloat(ticks[i].dataset.nfMs || '0');
-    var x = Math.round((tMs / dur) * w);
+    var x = Math.round(window.__nf_timeline_ms_to_px(tMs, lanes, dur));
     ticks[i].style.left = x + 'px';
   }}
   var bars = lanes.querySelectorAll('.nf-tl-bar');
   for (var k = 0; k < bars.length; k++) {{
     var b = parseFloat(bars[k].dataset.nfBeginMs || '0');
     var e = parseFloat(bars[k].dataset.nfEndMs || '0');
-    var left = Math.round((b / dur) * w);
-    var wid  = Math.max(2, Math.round(((e - b) / dur) * w));
+    var left = Math.round(window.__nf_timeline_ms_to_px(b, lanes, dur));
+    var wid  = Math.max(2, Math.round(window.__nf_timeline_bar_width_px(b, e, lanes, dur)));
     bars[k].style.left = left + 'px';
     bars[k].style.width = wid + 'px';
+  }}
+  lanes.dataset.nfPxPerSecond = String(window.__nf_timeline_px_per_second(lanes, dur));
+  window.__nf_update_timeline_meta();
+  if (typeof window.__nf_update_playhead_position === 'function') {{
+    window.__nf_update_playhead_position(window.__nf_last_playhead_t_ms || 0);
   }}
 }};
 
@@ -1440,19 +1781,20 @@ window.__nf_install_playhead = function() {{
   // the whole track visually look scrubbable.
   lanes.style.cursor = 'ew-resize';
 
-  var src = window.__NF_SOURCE__ || {{}};
-  var durationMs = window.__nf_infer_duration(src) || 60000;
+  var durationMs = window.__nf_timeline_duration_ms(lanes);
 
-  // v1.30: use the SAME ms→px math as ruler ticks and clip bars · strict match.
+  // v1.50: use the SAME ms→px math as ruler ticks and clip bars, including
+  // zoom + scroll offset.
   function tMsToLeftPx(tMs) {{
-    var w = lanes.clientWidth || 1;
     var clamped = Math.max(0, Math.min(durationMs, tMs));
-    return Math.round((clamped / durationMs) * w);
+    return Math.round(window.__nf_timeline_ms_to_px(clamped, lanes, durationMs));
   }}
   var _lastLabelTMs = -1;
   function updatePh(tMs) {{
+    durationMs = window.__nf_timeline_duration_ms(lanes);
     var px = tMsToLeftPx(tMs);
     ph.style.left = px + 'px';
+    window.__nf_last_playhead_t_ms = tMs;
     // Update the label at most every 100ms to avoid text reflow hammering
     // during drag.
     if (Math.abs(tMs - _lastLabelTMs) > 100) {{
@@ -1463,6 +1805,7 @@ window.__nf_install_playhead = function() {{
       _lastLabelTMs = tMs;
     }}
   }}
+  window.__nf_update_playhead_position = updatePh;
 
   // Time label in the timeline header, next to the play button.
   var tlHead = document.querySelector('.tl-head');
@@ -1523,8 +1866,12 @@ window.__nf_install_playhead = function() {{
   function xToTms(clientX) {{
     var r = lanes.getBoundingClientRect();
     var x = clientX - r.left;
-    var pct = Math.max(0, Math.min(1, x / Math.max(1, r.width)));
-    return pct * durationMs;
+    durationMs = window.__nf_timeline_duration_ms(lanes);
+    return window.__nf_timeline_clamp(
+      window.__nf_timeline_px_to_ms(x, lanes, durationMs),
+      0,
+      durationMs
+    );
   }}
   function grab(ev) {{
     dragging = true;
@@ -1726,6 +2073,7 @@ window.__nf_install_drag_handles = function() {{
 }};
 
 {editor_ui}
+{control_surface}
 
 if (document.readyState === 'loading') {{
   document.addEventListener('DOMContentLoaded', window.__nf_mount);
@@ -1735,21 +2083,26 @@ if (document.readyState === 'loading') {{
 {verify}
 {screenshot}
 {verify_media}
+{verify_zoom}
 "#,
         source = source_str,
         tracks = tracks_str,
         source_path = source_path_str,
         runtime = RUNTIME_IIFE,
+        timeline_zoom = timeline_zoom_block,
         editor_ui = editor_ui_block,
+        control_surface = control_surface_block,
         verify = verify_block,
         screenshot = screenshot_block,
         verify_media = verify_media_block,
+        verify_zoom = verify_zoom_block,
     )
 }
 
 struct CliOpts {
     verify_mode: bool,
     verify_select_mode: bool,
+    verify_zoom_mode: bool,
     screenshot_path: Option<PathBuf>,
     screenshot_delay_ms: u64,
     export_path: Option<PathBuf>,
@@ -1768,6 +2121,7 @@ fn parse_cli() -> CliOpts {
     let args: Vec<String> = std::env::args().collect();
     let mut verify_mode = false;
     let mut verify_select_mode = false;
+    let mut verify_zoom_mode = false;
     let mut screenshot_path: Option<PathBuf> = None;
     let mut screenshot_delay_ms: u64 = 2500;
     let mut export_path: Option<PathBuf> = None;
@@ -1786,6 +2140,7 @@ fn parse_cli() -> CliOpts {
         match a.as_str() {
             "--verify" => verify_mode = true,
             "--verify-select" => verify_select_mode = true,
+            "--verify-zoom" => verify_zoom_mode = true,
             "--screenshot" => {
                 i += 1;
                 if i < args.len() {
@@ -1855,6 +2210,7 @@ fn parse_cli() -> CliOpts {
     CliOpts {
         verify_mode,
         verify_select_mode,
+        verify_zoom_mode,
         screenshot_path,
         screenshot_delay_ms,
         export_path,
@@ -2092,7 +2448,7 @@ fn window_capture_rect(window: &tao::window::Window) -> (f64, f64, f64, f64) {
 
 fn main() -> Result<()> {
     let opts = parse_cli();
-    let stdout_json_mode = opts.verify_select_mode;
+    let stdout_json_mode = opts.verify_select_mode || opts.verify_zoom_mode;
 
     // v1.44 · CLI --export 快捷路径:不启 tao event_loop · 不开窗口 ·
     // 直接用 headless WKWebView + CARenderer (nf-recorder) 产 MP4 · 退出。
@@ -2169,6 +2525,7 @@ fn main() -> Result<()> {
             .map(|_| opts.screenshot_delay_ms),
         &opts.source_arg,
         opts.verify_media_path.is_some(),
+        opts.verify_zoom_mode,
     );
 
     let event_loop: EventLoop<UserEvent> = EventLoopBuilder::with_user_event().build();
@@ -2196,6 +2553,7 @@ fn main() -> Result<()> {
     let verify_count_for_handler = Arc::clone(&verify_count);
     let verify_media_path_for_handler = opts.verify_media_path.clone();
     let verify_select_mode = opts.verify_select_mode;
+    let verify_zoom_mode = opts.verify_zoom_mode;
 
     let webview = WebViewBuilder::new(&window)
         // v1.31.1 hotfix: ASYNC protocol · WKWebView URLSchemeTask is
@@ -2266,6 +2624,12 @@ fn main() -> Result<()> {
                             proxy_for_handler.send_event(UserEvent::VerifySelectReport { payload });
                     }
                 }
+                Ok(IpcOutcome::VerifyZoomReport(payload)) => {
+                    if verify_zoom_mode {
+                        let _ =
+                            proxy_for_handler.send_event(UserEvent::VerifyZoomReport { payload });
+                    }
+                }
                 Err(e) => {
                     shell_log(stdout_json_mode, &format!("[NF-IPC] error: {e}"));
                 }
@@ -2277,11 +2641,12 @@ fn main() -> Result<()> {
     shell_log(
         stdout_json_mode,
         &format!(
-            "[NF] window {WINDOW_W}x{WINDOW_H} · titlebar transparent + traffic lights · resizable · source={} · tracks={} · verify={} · verify_select={} · screenshot={}",
+            "[NF] window {WINDOW_W}x{WINDOW_H} · titlebar transparent + traffic lights · resizable · source={} · tracks={} · verify={} · verify_select={} · verify_zoom={} · screenshot={}",
             opts.source_arg,
             n_tracks,
             opts.verify_mode,
             opts.verify_select_mode,
+            opts.verify_zoom_mode,
             opts.screenshot_path
                 .as_ref()
                 .map(|p| p.display().to_string())
@@ -2412,6 +2777,71 @@ fn main() -> Result<()> {
                 let _ = ensure_parent_dir(&json_path);
                 if let Err(err) = std::fs::write(&json_path, &report_json) {
                     eprintln!("[NF-VERIFY-SELECT] write failed: {err}");
+                    final_ok = false;
+                }
+                let mut stdout = std::io::stdout();
+                if std::io::Write::write_all(&mut stdout, report_json.as_bytes()).is_err() {
+                    final_ok = false;
+                }
+                if std::io::Write::write_all(&mut stdout, b"\n").is_err() {
+                    final_ok = false;
+                }
+                let _ = std::io::Write::flush(&mut stdout);
+                std::process::exit(if final_ok { 0 } else { 1 });
+            }
+            Event::UserEvent(UserEvent::VerifyZoomReport { payload }) => {
+                let json_path = PathBuf::from(VERIFY_ZOOM_JSON_PATH);
+                let screenshot_path = PathBuf::from(VERIFY_ZOOM_SCREENSHOT_PATH);
+                let (x, y, width, height) = window_capture_rect(&window_for_loop);
+                let screenshot_ok =
+                    capture_region_png(&screenshot_path, x, y, width, height).is_ok();
+                let mut report = if payload.is_object() {
+                    payload
+                } else {
+                    json!({ "ok": false, "payload": payload })
+                };
+                let vp1_ok = report
+                    .pointer("/cmd_wheel_5_times/pass")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let vp2_ok = report
+                    .pointer("/click_at_30s/pass")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let vp3_ok = report
+                    .get("playhead_offset_px")
+                    .and_then(Value::as_f64)
+                    .map(|v| v <= 2.0)
+                    .unwrap_or(false);
+                let vp4_ok = report
+                    .pointer("/shift_wheel_scroll/pass")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let vp5_ok = report
+                    .pointer("/high_zoom_bar_width/pass")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let mut final_ok = vp1_ok && vp2_ok && vp3_ok && vp4_ok && vp5_ok && screenshot_ok;
+                if let Some(obj) = report.as_object_mut() {
+                    obj.insert("playhead_pass".to_string(), Value::Bool(vp3_ok));
+                    obj.insert(
+                        "screenshot_path".to_string(),
+                        Value::String(VERIFY_ZOOM_SCREENSHOT_PATH.to_string()),
+                    );
+                    obj.insert(
+                        "report_path".to_string(),
+                        Value::String(VERIFY_ZOOM_JSON_PATH.to_string()),
+                    );
+                    obj.insert(
+                        "screenshot_captured".to_string(),
+                        Value::Bool(screenshot_ok),
+                    );
+                    obj.insert("ok".to_string(), Value::Bool(final_ok));
+                }
+                let report_json = pretty_json(&report);
+                let _ = ensure_parent_dir(&json_path);
+                if let Err(err) = std::fs::write(&json_path, &report_json) {
+                    eprintln!("[NF-VERIFY-ZOOM] write failed: {err}");
                     final_ok = false;
                 }
                 let mut stdout = std::io::stdout();

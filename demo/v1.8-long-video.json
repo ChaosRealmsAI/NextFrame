@@ -1,0 +1,90 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {
+    "name": "v1.50 Timeline Zoom Verify Demo",
+    "description": "60s long demo for timeline zoom/scroll DOM verification",
+    "version": "v1.50.0",
+    "created": "2026-04-19"
+  },
+  "viewport": {
+    "ratio": "16:9",
+    "w": 1920,
+    "h": 1080
+  },
+  "duration": "demo.end",
+  "anchors": {
+    "demo": {
+      "begin": "0",
+      "end": "demo.begin + 60s"
+    }
+  },
+  "tracks": [
+    {
+      "id": "bg-long",
+      "kind": "bg",
+      "src": "src/nf-tracks/official/bg.js",
+      "clips": [
+        { "id": "clip-0s", "begin": "demo.begin + 0s", "end": "demo.begin + 1s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-1s", "begin": "demo.begin + 1s", "end": "demo.begin + 2s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-2s", "begin": "demo.begin + 2s", "end": "demo.begin + 3s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-3s", "begin": "demo.begin + 3s", "end": "demo.begin + 4s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-4s", "begin": "demo.begin + 4s", "end": "demo.begin + 5s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-5s", "begin": "demo.begin + 5s", "end": "demo.begin + 6s", "params": { "type": "solid", "color": "#7c3aed" } },
+        { "id": "clip-6s", "begin": "demo.begin + 6s", "end": "demo.begin + 7s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-7s", "begin": "demo.begin + 7s", "end": "demo.begin + 8s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-8s", "begin": "demo.begin + 8s", "end": "demo.begin + 9s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-9s", "begin": "demo.begin + 9s", "end": "demo.begin + 10s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-10s", "begin": "demo.begin + 10s", "end": "demo.begin + 11s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-11s", "begin": "demo.begin + 11s", "end": "demo.begin + 12s", "params": { "type": "solid", "color": "#7c3aed" } },
+        { "id": "clip-12s", "begin": "demo.begin + 12s", "end": "demo.begin + 13s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-13s", "begin": "demo.begin + 13s", "end": "demo.begin + 14s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-14s", "begin": "demo.begin + 14s", "end": "demo.begin + 15s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-15s", "begin": "demo.begin + 15s", "end": "demo.begin + 16s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-16s", "begin": "demo.begin + 16s", "end": "demo.begin + 17s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-17s", "begin": "demo.begin + 17s", "end": "demo.begin + 18s", "params": { "type": "solid", "color": "#7c3aed" } },
+        { "id": "clip-18s", "begin": "demo.begin + 18s", "end": "demo.begin + 19s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-19s", "begin": "demo.begin + 19s", "end": "demo.begin + 20s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-20s", "begin": "demo.begin + 20s", "end": "demo.begin + 21s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-21s", "begin": "demo.begin + 21s", "end": "demo.begin + 22s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-22s", "begin": "demo.begin + 22s", "end": "demo.begin + 23s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-23s", "begin": "demo.begin + 23s", "end": "demo.begin + 24s", "params": { "type": "solid", "color": "#7c3aed" } },
+        { "id": "clip-24s", "begin": "demo.begin + 24s", "end": "demo.begin + 25s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-25s", "begin": "demo.begin + 25s", "end": "demo.begin + 26s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-26s", "begin": "demo.begin + 26s", "end": "demo.begin + 27s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-27s", "begin": "demo.begin + 27s", "end": "demo.begin + 28s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-28s", "begin": "demo.begin + 28s", "end": "demo.begin + 29s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-29s", "begin": "demo.begin + 29s", "end": "demo.begin + 30s", "params": { "type": "solid", "color": "#7c3aed" } },
+        { "id": "clip-30s", "begin": "demo.begin + 30s", "end": "demo.begin + 31s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-31s", "begin": "demo.begin + 31s", "end": "demo.begin + 32s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-32s", "begin": "demo.begin + 32s", "end": "demo.begin + 33s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-33s", "begin": "demo.begin + 33s", "end": "demo.begin + 34s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-34s", "begin": "demo.begin + 34s", "end": "demo.begin + 35s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-35s", "begin": "demo.begin + 35s", "end": "demo.begin + 36s", "params": { "type": "solid", "color": "#7c3aed" } },
+        { "id": "clip-36s", "begin": "demo.begin + 36s", "end": "demo.begin + 37s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-37s", "begin": "demo.begin + 37s", "end": "demo.begin + 38s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-38s", "begin": "demo.begin + 38s", "end": "demo.begin + 39s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-39s", "begin": "demo.begin + 39s", "end": "demo.begin + 40s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-40s", "begin": "demo.begin + 40s", "end": "demo.begin + 41s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-41s", "begin": "demo.begin + 41s", "end": "demo.begin + 42s", "params": { "type": "solid", "color": "#7c3aed" } },
+        { "id": "clip-42s", "begin": "demo.begin + 42s", "end": "demo.begin + 43s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-43s", "begin": "demo.begin + 43s", "end": "demo.begin + 44s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-44s", "begin": "demo.begin + 44s", "end": "demo.begin + 45s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-45s", "begin": "demo.begin + 45s", "end": "demo.begin + 46s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-46s", "begin": "demo.begin + 46s", "end": "demo.begin + 47s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-47s", "begin": "demo.begin + 47s", "end": "demo.begin + 48s", "params": { "type": "solid", "color": "#7c3aed" } },
+        { "id": "clip-48s", "begin": "demo.begin + 48s", "end": "demo.begin + 49s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-49s", "begin": "demo.begin + 49s", "end": "demo.begin + 50s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-50s", "begin": "demo.begin + 50s", "end": "demo.begin + 51s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-51s", "begin": "demo.begin + 51s", "end": "demo.begin + 52s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-52s", "begin": "demo.begin + 52s", "end": "demo.begin + 53s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-53s", "begin": "demo.begin + 53s", "end": "demo.begin + 54s", "params": { "type": "solid", "color": "#7c3aed" } },
+        { "id": "clip-54s", "begin": "demo.begin + 54s", "end": "demo.begin + 55s", "params": { "type": "solid", "color": "#1f2937" } },
+        { "id": "clip-55s", "begin": "demo.begin + 55s", "end": "demo.begin + 56s", "params": { "type": "solid", "color": "#4f46e5" } },
+        { "id": "clip-56s", "begin": "demo.begin + 56s", "end": "demo.begin + 57s", "params": { "type": "solid", "color": "#0f766e" } },
+        { "id": "clip-57s", "begin": "demo.begin + 57s", "end": "demo.begin + 58s", "params": { "type": "solid", "color": "#b45309" } },
+        { "id": "clip-58s", "begin": "demo.begin + 58s", "end": "demo.begin + 59s", "params": { "type": "solid", "color": "#be123c" } },
+        { "id": "clip-59s", "begin": "demo.begin + 59s", "end": "demo.begin + 60s", "params": { "type": "solid", "color": "#7c3aed" } }
+      ]
+    }
+  ]
+}
