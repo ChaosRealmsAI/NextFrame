@@ -260,6 +260,64 @@ async function vp5() {
   });
 }
 
+// ---------- VP-6: control-surface regression (BUG-20260419-03) ----------
+// Added after round 3 fix so pause-icon-sync + seek-pauses-videos don't silently
+// regress. Pure DOM + window.__nf state assertions.
+async function vp6() {
+  const bundlePath = join(REPO, "tmp", "v1.35-vp6-bundle.html");
+  await buildBundle(DEMO_V15, bundlePath);
+  const { browser } = await launch();
+  const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  const page = await ctx.newPage();
+  let pass = true;
+  const log = [];
+  try {
+    await page.goto("file://" + bundlePath);
+    await page.waitForSelector("#nf-stage");
+    await page.waitForTimeout(500);
+    const probe = () => page.evaluate(() => {
+      const btn = document.querySelector('button[data-nf="play-pause"]');
+      const st = window.__nf && window.__nf.getState ? window.__nf.getState() : null;
+      return { btn: btn ? btn.textContent : null, playing: st ? st.playing : null };
+    });
+    const s0 = await probe(); log.push({ step: "initial-autoplay", ...s0 });
+    if (!(s0.btn === "⏸" && s0.playing === true)) pass = false;
+
+    // click → pause
+    await page.locator('button[data-nf="play-pause"]').click();
+    await page.waitForTimeout(250);
+    const s1 = await probe(); log.push({ step: "click-pause", ...s1 });
+    if (!(s1.btn === "▶" && s1.playing === false)) pass = false;
+
+    // click → resume
+    await page.locator('button[data-nf="play-pause"]').click();
+    await page.waitForTimeout(250);
+    const s2 = await probe(); log.push({ step: "click-resume", ...s2 });
+    if (!(s2.btn === "⏸" && s2.playing === true)) pass = false;
+
+    // ruler seek → should pause
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      const r = document.querySelector(".ruler").getBoundingClientRect();
+      const e = new MouseEvent("click", { bubbles: true, clientX: r.left + r.width * 0.6, clientY: r.top + r.height / 2 });
+      document.querySelector(".ruler").dispatchEvent(e);
+    });
+    await page.waitForTimeout(300);
+    const s3 = await page.evaluate(() => {
+      const btn = document.querySelector('button[data-nf="play-pause"]');
+      const st = window.__nf.getState();
+      const vids = Array.from(document.querySelectorAll("video")).map(v => ({ paused: v.paused }));
+      return { btn: btn.textContent, playing: st.playing, vids };
+    });
+    log.push({ step: "ruler-seek", ...s3 });
+    const seekOk = s3.btn === "▶" && s3.playing === false && s3.vids.every(v => v.paused);
+    if (!seekOk) pass = false;
+  } finally {
+    await ctx.close(); await browser.close();
+  }
+  return emit("VP-6-control-surface", pass, { log });
+}
+
 // ---------- main ----------
 
 const results = [];
@@ -268,6 +326,7 @@ results.push(await vp2());
 results.push(await vp3());
 results.push(await vp4());
 results.push(await vp5());
+results.push(await vp6());
 const passed = results.filter(Boolean).length;
 console.log(`\n=== ${passed}/${results.length} green ===`);
 process.exit(passed === results.length ? 0 : 1);

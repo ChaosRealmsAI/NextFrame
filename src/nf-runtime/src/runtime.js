@@ -406,17 +406,27 @@ export function boot(options) {
       // gesture (the outer click handler). Don't wait for next RAF tick.
       _syncVideosFromGesture(true);
       if (rafId == null) rafId = _raf(tick);
+      // BUG-20260419-03 fix 1: emit one tick so play-pause icon flips to ⏸
+      // immediately. The RAF loop will supersede on its first frame anyway.
+      emitTime(currentTMs());
     },
     pause() {
       if (!playing) {
         handle._paused = true;
         _syncVideosFromGesture(false);
+        // BUG-20260419-03 fix 1: still notify listeners so the play-pause icon
+        // flips to ▶ even when pause is called while already paused (defensive).
+        emitTime(currentTMs());
         return;
       }
       pausedAtMs = _perf() - startPerf;
       playing = false;
       handle._paused = true;
       _syncVideosFromGesture(false);
+      // BUG-20260419-03 fix 1: RAF is about to stop; without this emit the
+      // icon stays on ⏸ until the next tick (never). Listeners must see the
+      // transition to paused state.
+      emitTime(pausedAtMs);
     },
     seek(t_ms, opts) {
       const shouldPause = !opts || opts.pause !== false; // default: pause on seek
@@ -437,6 +447,14 @@ export function boot(options) {
       _seekForceSync = true;
       renderState(getStateAt(resolved, Math.min(clamped, Math.max(0, duration_ms - 1))));
       _seekForceSync = false;
+      // BUG-20260419-03 fix 2: if seek paused the runtime, videos/audios must
+      // actually pause too. Without this, dragging the playhead leaves audio
+      // playing from the pre-seek position while the frame/time says paused.
+      // _syncVideosFromGesture(false) mirrors pause() behavior: every media
+      // element gets .pause() and currentTime synced by renderState above.
+      if (shouldPause) {
+        _syncVideosFromGesture(false);
+      }
       emitTime(clamped);
     },
     setLoop(enabled) {
