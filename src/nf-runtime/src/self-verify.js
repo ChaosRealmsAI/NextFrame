@@ -9,6 +9,10 @@
 //   window.__nf.pause()           — pause playback
 //   window.__nf.setLoop(on)       — toggle loop mode
 //   window.__nf.onTimeUpdate(cb)  — subscribe to RAF-tick time updates (returns unsubscribe)
+//   window.__nf.getVideoState()   — JSON-only video proxy state for preview/export verify
+//   window.__nf.waitForMediaReady(opts?) — await iframe video settle after seek/play
+//   window.__nf.unmuteAll()       — gesture-safe unmute bridge for iframe video
+//   window.__nf.getMediaClock()   — active media clock in ms when available
 //   window.__nf.screenshot()      — Promise<dataURL | snapshot>
 //   window.__nf.log(level,msg,d)  — structured JSON line to console
 //   window.__nf.simulate(op)      — AI-operable action dispatcher (walks same code path as UI)
@@ -84,6 +88,12 @@ export function attachSelfVerify(handle) {
     pause: handle.pause.bind(handle),
     setLoop: handle.setLoop.bind(handle),
     onTimeUpdate: handle.onTimeUpdate.bind(handle),
+    getVideoState: handle.getVideoState ? handle.getVideoState.bind(handle) : (() => ({ count: 0, clips: [] })),
+    waitForMediaReady: handle.waitForMediaReady
+      ? handle.waitForMediaReady.bind(handle)
+      : (() => Promise.resolve({ ok: true, active_videos: 0, clips: [] })),
+    unmuteAll: handle.unmuteAll ? handle.unmuteAll.bind(handle) : (() => ({ count: 0, clips: [] })),
+    getMediaClock: handle.getMediaClock ? handle.getMediaClock.bind(handle) : (() => null),
     __diagnostics: () => handle.__diagnostics(),
   };
 

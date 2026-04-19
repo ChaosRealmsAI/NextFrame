@@ -95,6 +95,25 @@ pub async fn snapshot(
     width: u32,
     height: u32,
 ) -> Result<(), SnapshotError> {
+    let mut png = snapshot_once(bundle, t_ms, width, height).await?;
+    let pixel_count = u64::from(width) * u64::from(height);
+    if pixel_count > MAX_SAFE_SNAPSHOT_PIXELS
+        && rgba_png_looks_black(&png)
+        && (width != FALLBACK_WIDTH || height != FALLBACK_HEIGHT)
+    {
+        png = snapshot_once(bundle, t_ms, FALLBACK_WIDTH, FALLBACK_HEIGHT).await?;
+    }
+
+    std::fs::write(out, &png).map_err(|e| SnapshotError::Io(e.to_string()))?;
+    Ok(())
+}
+
+async fn snapshot_once(
+    bundle: &Path,
+    t_ms: u64,
+    width: u32,
+    height: u32,
+) -> Result<Vec<u8>, SnapshotError> {
     // 1. Boot headless shell (NSWindow orderOut · WKWebView child · CARenderer sampler).
     let shell = MacHeadlessShell::new_headless(ShellConfig {
         viewport: (width, height),
@@ -120,12 +139,51 @@ pub async fn snapshot(
         )));
     }
 
-    // 4. Seek + await frameReady. Runtime contract: `{ t, frameReady, seq }`.
-    let script = format!("return await window.__nf.seek({t_ms});");
-    let v = shell
-        .call_async(&script)
+    let has_export_seek_bridge = shell
+        .call_async(
+            "return !!(window.__nf_seek_export && window.__nf_read_seek_export);",
+        )
         .await
-        .map_err(|e| SnapshotError::JsCall(format!("{e}")))?;
+        .map_err(|e| SnapshotError::JsCall(format!("{e}")))?
+        .as_bool()
+        == Some(true);
+    let has_video_state_probe = shell
+        .call_async(
+            "return !!(window.__nf && typeof window.__nf.getVideoState === 'function');",
+        )
+        .await
+        .map_err(|e| SnapshotError::JsCall(format!("{e}")))?
+        .as_bool()
+        == Some(true);
+
+    // 4. Seek + await frameReady. Runtime contract: `{ t, frameReady, seq }`.
+    let v = if has_export_seek_bridge {
+        let script = format!("window.__nf_seek_export({t_ms}); return true;");
+        let seek_ok = shell
+            .call_async(&script)
+            .await
+            .map_err(|e| SnapshotError::JsCall(format!("{e}")))?;
+        if seek_ok.as_bool() != Some(true) {
+            return Err(SnapshotError::FrameReadyContract(format!(
+                "export seek bridge returned non-true at t_ms={t_ms} · got {seek_ok}"
+            )));
+        }
+        if has_video_state_probe {
+            wait_for_video_state_ready(&shell, t_ms).await?;
+        }
+        serde_json::json!({
+            "t": t_ms,
+            "frameReady": true,
+            "seq": 1
+        })
+    } else {
+        let script = format!("return await window.__nf.seek({t_ms});");
+        let v_raw = shell
+            .call_async(&script)
+            .await
+            .map_err(|e| SnapshotError::JsCall(format!("{e}")))?;
+        parse_seek_result(v_raw)?
+    };
 
     // Validate frameReady. Missing / wrong type / false all count as failure.
     let ready = v
@@ -139,6 +197,29 @@ pub async fn snapshot(
     if !ready {
         return Err(SnapshotError::FrameNotReady { t_ms });
     }
+
+    // 4.1 Wait one more visual turn before takeSnapshot. Off-screen WebKit may
+    // throttle RAF, so keep a setTimeout fallback.
+    let paint_barrier = r#"
+      return await new Promise(resolve => {
+        let done = false;
+        function finish(v) {
+          if (done) return;
+          done = true;
+          resolve(v);
+        }
+        try {
+          if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => requestAnimationFrame(() => finish('raf')));
+          }
+        } catch (_e) {}
+        setTimeout(() => finish('timeout'), 34);
+      });
+    "#;
+    let _ = shell
+        .call_async(paint_barrier)
+        .await
+        .map_err(|e| SnapshotError::JsCall(format!("paint barrier: {e}")))?;
 
     // 5. Sample CARenderer → IOSurface (zero-copy · same path as record).
     //
@@ -158,11 +239,32 @@ pub async fn snapshot(
 
     // 6. Encode PNG from BGRA pixels (swap → RGBA).
     let png = iosurface_to_png(&surface)?;
+    Ok(png)
+}
 
-    // 7. Write to disk.
-    std::fs::write(out, &png).map_err(|e| SnapshotError::Io(e.to_string()))?;
-
-    Ok(())
+async fn wait_for_video_state_ready(
+    shell: &MacHeadlessShell,
+    t_ms: u64,
+) -> Result<(), SnapshotError> {
+    let started = std::time::Instant::now();
+    loop {
+        let value = shell
+            .call_async(
+                "return (window.__nf && typeof window.__nf.getVideoState === 'function') \
+                 ? window.__nf.getVideoState() : { count: 0, clips: [] };",
+            )
+            .await
+            .map_err(|e| SnapshotError::JsCall(format!("video-state poll: {e}")))?;
+        if video_state_is_ready(&value, t_ms)? {
+            return Ok(());
+        }
+        if started.elapsed() >= std::time::Duration::from_secs(5) {
+            return Err(SnapshotError::FrameReadyContract(format!(
+                "video-state not ready at t_ms={t_ms} after 5000ms · payload={value}"
+            )));
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(16)).await;
+    }
 }
 
 /// Max sampler retries when waiting for the WebContent layer to commit.
@@ -170,6 +272,9 @@ pub async fn snapshot(
 /// `carenderer_sample` test observed ≤ 30 frames to converge in debug build;
 /// release build is typically ≤ 5. 60 leaves comfortable head-room.
 const MAX_COMMIT_RETRIES: u32 = 60;
+const MAX_SAFE_SNAPSHOT_PIXELS: u64 = 16_777_216;
+const FALLBACK_WIDTH: u32 = 1920;
+const FALLBACK_HEIGHT: u32 = 1080;
 
 /// Sample CARenderer until the IOSurface reflects a **stable committed
 /// layer paint** — not just "some bytes are non-zero" (that flips at the
@@ -388,4 +493,126 @@ pub(crate) fn iosurface_to_png(handle: &IOSurfaceHandle) -> Result<Vec<u8>, Snap
     }
 
     Ok(buf)
+}
+
+fn rgba_png_looks_black(png: &[u8]) -> bool {
+    let decoder = png::Decoder::new(std::io::Cursor::new(png));
+    let mut reader = match decoder.read_info() {
+        Ok(reader) => reader,
+        Err(_) => return false,
+    };
+    let out_size = reader.output_buffer_size();
+    if out_size == 0 {
+        return false;
+    }
+    let mut buf = vec![0u8; out_size];
+    let info = match reader.next_frame(&mut buf) {
+        Ok(info) => info,
+        Err(_) => return false,
+    };
+    let bytes = &buf[..info.buffer_size()];
+    if bytes.len() < 4 {
+        return false;
+    }
+
+    let px_count = bytes.len() / 4;
+    let stride = (px_count / 4096).max(1);
+    let mut bright_samples = 0usize;
+    let mut sampled = 0usize;
+    let mut i = 0usize;
+    while i + 3 < bytes.len() {
+        let r = bytes[i] as u16;
+        let g = bytes[i + 1] as u16;
+        let b = bytes[i + 2] as u16;
+        let a = bytes[i + 3] as u16;
+        if a > 8 && (r + g + b) > 24 {
+            bright_samples += 1;
+        }
+        sampled += 1;
+        i += stride * 4;
+    }
+
+    sampled > 0 && bright_samples == 0
+}
+
+fn parse_seek_result(value: serde_json::Value) -> Result<serde_json::Value, SnapshotError> {
+    if let Some(s) = value.as_str() {
+        serde_json::from_str::<serde_json::Value>(s).map_err(|e| {
+            SnapshotError::FrameReadyContract(format!(
+                "seek returned non-JSON string: {e} · raw={s}"
+            ))
+        })
+    } else {
+        Ok(value)
+    }
+}
+
+fn video_state_is_ready(
+    value: &serde_json::Value,
+    t_ms: u64,
+) -> Result<bool, SnapshotError> {
+    let Some(obj) = value.as_object() else {
+        return Err(SnapshotError::FrameReadyContract(format!(
+            "video-state expected object at t_ms={t_ms} · got {value}"
+        )));
+    };
+    let count = obj
+        .get("count")
+        .and_then(|v| v.as_u64())
+        .or_else(|| {
+            obj.get("count")
+                .and_then(|v| v.as_f64())
+                .filter(|v| v.is_finite() && *v >= 0.0 && v.fract() == 0.0)
+                .map(|v| v as u64)
+        })
+        .unwrap_or(0);
+    if count == 0 {
+        return Ok(true);
+    }
+    let Some(clips) = obj.get("clips").and_then(serde_json::Value::as_array) else {
+        return Err(SnapshotError::FrameReadyContract(format!(
+            "video-state missing clips at t_ms={t_ms} · payload={value}"
+        )));
+    };
+    let target_ms = t_ms as i64;
+    for clip in clips {
+        let Some(clip_obj) = clip.as_object() else {
+            return Err(SnapshotError::FrameReadyContract(format!(
+                "video-state clip not object at t_ms={t_ms} · payload={clip}"
+            )));
+        };
+        let frame_ready = clip_obj
+            .get("frame_ready")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+        let ready_state = clip_obj
+            .get("ready_state")
+            .and_then(|v| v.as_u64())
+            .or_else(|| {
+                clip_obj
+                    .get("ready_state")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite() && *v >= 0.0 && v.fract() == 0.0)
+                    .map(|v| v as u64)
+            })
+            .unwrap_or(0);
+        let current_time_ms = clip_obj
+            .get("current_time_ms")
+            .and_then(serde_json::Value::as_i64)
+            .or_else(|| {
+                clip_obj
+                    .get("current_time_ms")
+                    .and_then(serde_json::Value::as_f64)
+                    .filter(|v| v.is_finite())
+                    .map(|v| v.round() as i64)
+            })
+            .unwrap_or(-1);
+        if !frame_ready || ready_state < 2 {
+            return Ok(false);
+        }
+        if (current_time_ms - target_ms).abs() > 80 {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }

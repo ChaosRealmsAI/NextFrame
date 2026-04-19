@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // scripts/check-abi.mjs
-// Lint CLI for nf-tracks: runs 11 ABI gates over a single Track .js file.
+// Lint CLI for nf-tracks: runs 12 ABI gates over a single Track .js file.
 //
 //   Usage:  node check-abi.mjs <path-to-track.js>
 //
 //   Output: JSON-only (rule-ai-operable). One line on success:
-//     {"event":"lint-track.pass","file":"<abs>","gates":11}
+//     {"event":"lint-track.pass","file":"<abs>","gates":12}
 //   One line on failure:
 //     {"event":"lint-track.fail","file":"<abs>","failed_gate":"<name>","details":"...","fix_hint":"..."}
-//     (fix_hint is present for gates 7-11; gates 1-6 omit it for backward compat.)
+//     (fix_hint is present for gates 7-12; gates 1-6 omit it for backward compat.)
 //
 //   Gates:
 //     1. single-file                 — file is self-contained, readable
@@ -22,6 +22,7 @@
 //     9. use-cases-non-empty-array   — describe().use_cases is non-empty string[]
 //    10. level-valid                 — describe().level (if present) ∈ {1,2,3}
 //    11. l2-hooks-complete           — if level === 2, mount/update/unmount all exported
+//    12. no-non-json-on-handle       — L2 hooks must not return HTMLElement / EventTarget / non-JSON handles
 //
 // Exits 0 on pass, non-zero (matches interfaces.json exit_codes) on fail:
 //   1 = bad args / missing file
@@ -37,7 +38,7 @@ const require = createRequire(import.meta.url);
 
 function emitPass(file) {
   process.stdout.write(
-    JSON.stringify({ event: "lint-track.pass", file, gates: 11 }) + "\n",
+    JSON.stringify({ event: "lint-track.pass", file, gates: 12 }) + "\n",
   );
 }
 
@@ -231,6 +232,8 @@ const FIX_HINT = Object.freeze({
   l2Hooks:
     "L2 (level=2) 必须同时 export mount + update + unmount · 当前缺: <list>. " +
     "如果不需要 canvas/webgl · 把 level 改回 1 (或删掉) · 用 render-only 模式",
+  handleJson:
+    "L2 hooks 对外只能返回 JSON-serializable 值或 undefined · 不要返回 HTMLElement / EventTarget / DOM handle。",
 });
 
 // Gate 7: name-non-empty — describe().name must be a non-empty string
@@ -341,6 +344,101 @@ function checkL2Hooks(exp, level) {
       details: "L2 Track 缺 hooks: " + missing.join(","),
       fix_hint: FIX_HINT.l2Hooks.replace("<list>", missing.join(",")),
     };
+  }
+  return { ok: true };
+}
+
+function makeFakeElement() {
+  const attrs = new Map();
+  const children = [];
+  return {
+    nodeType: 1,
+    tagName: "DIV",
+    style: {},
+    width: 1920,
+    height: 1080,
+    dataset: {},
+    _nfState: null,
+    setAttribute(name, value) { attrs.set(name, String(value)); },
+    getAttribute(name) { return attrs.has(name) ? attrs.get(name) : null; },
+    removeAttribute(name) { attrs.delete(name); },
+    appendChild(node) { children.push(node); return node; },
+    removeChild(node) {
+      const idx = children.indexOf(node);
+      if (idx >= 0) children.splice(idx, 1);
+      return node;
+    },
+    querySelector() { return children.length > 0 ? children[0] : null; },
+    getContext() {
+      return {
+        fillStyle: "",
+        beginPath() {},
+        arc() {},
+        fill() {},
+        fillRect() {},
+      };
+    },
+  };
+}
+
+function isNonJsonHandle(value, seen = new Set()) {
+  if (value == null) return false;
+  const t = typeof value;
+  if (t === "string" || t === "number" || t === "boolean") return false;
+  if (t === "function" || t === "symbol" || t === "bigint") return true;
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return false;
+    seen.add(value);
+    return value.some((item) => isNonJsonHandle(item, seen));
+  }
+  if (t !== "object") return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+  if (
+    value.nodeType === 1 ||
+    typeof value.tagName === "string" ||
+    typeof value.addEventListener === "function" ||
+    typeof value.removeEventListener === "function"
+  ) {
+    return true;
+  }
+  if (typeof EventTarget !== "undefined" && value instanceof EventTarget) {
+    return true;
+  }
+  const keys = Object.keys(value);
+  for (const key of keys) {
+    if (isNonJsonHandle(value[key], seen)) return true;
+  }
+  return false;
+}
+
+function checkHandleJsonBoundary(exp, level, sampleRes) {
+  if (level !== 2) return { ok: true, skipped: true };
+  const fakeEl = makeFakeElement();
+  const viewport = { w: 1920, h: 1080 };
+  const calls = [
+    ["mount", () => exp.mount(fakeEl, sampleRes, viewport)],
+    ["update", () => exp.update(fakeEl, 0, sampleRes)],
+    ["unmount", () => exp.unmount(fakeEl)],
+  ];
+  for (const [name, run] of calls) {
+    let result;
+    try {
+      result = run();
+    } catch (e) {
+      return {
+        ok: false,
+        details: name + "() threw while validating handle boundary: " + e.message,
+        fix_hint: FIX_HINT.handleJson,
+      };
+    }
+    if (isNonJsonHandle(result)) {
+      return {
+        ok: false,
+        details: name + "() returned non-JSON handle: " + Object.prototype.toString.call(result),
+        fix_hint: FIX_HINT.handleJson,
+      };
+    }
   }
   return { ok: true };
 }
@@ -486,6 +584,13 @@ async function main() {
   const g11 = checkL2Hooks(exp, effectiveLevel);
   if (!g11.ok) {
     emitFail(filePath, "l2-hooks-complete", g11.details, g11.fix_hint);
+    process.exit(2);
+  }
+
+  // Gate 12: no-non-json-on-handle — L2 hooks must not return DOM handles
+  const g12 = checkHandleJsonBoundary(exp, effectiveLevel, sampleRes);
+  if (!g12.ok) {
+    emitFail(filePath, "no-non-json-on-handle", g12.details, g12.fix_hint);
     process.exit(2);
   }
 

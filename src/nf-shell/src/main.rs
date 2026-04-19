@@ -1662,6 +1662,9 @@ setTimeout(function() {
   // verify-media mode we force-play all media so the probe measures actual
   // playback capability, not a gating artefact.
   try {
+    if (window.__nf && typeof window.__nf.unmuteAll === 'function') {
+      try { window.__nf.unmuteAll(); } catch(_e){}
+    }
     var vids = document.querySelectorAll('video');
     for (var i = 0; i < vids.length; i++) { try { vids[i].muted = true; vids[i].play(); } catch(_e){} }
     var auds = document.querySelectorAll('audio');
@@ -1674,9 +1677,13 @@ setTimeout(function() {
 setTimeout(function() {
   function docSummary() {
     var stage = document.querySelector('#nf-stage');
+    var videoState = (window.__nf && typeof window.__nf.getVideoState === 'function')
+      ? window.__nf.getVideoState()
+      : { count: 0, clips: [] };
     return {
       doc_videos: document.querySelectorAll('video').length,
       doc_audios: document.querySelectorAll('audio').length,
+      proxy_videos: videoState.count || 0,
       stage_exists: !!stage,
       stage_children: stage ? stage.children.length : -1,
       stage_html_head: stage ? (stage.innerHTML || '').slice(0, 400) : '',
@@ -1691,19 +1698,37 @@ setTimeout(function() {
   }
   function snapMedia() {
     var out = {videos:[], audios:[]};
-    var vids = document.querySelectorAll('video');
-    for (var i = 0; i < vids.length; i++) {
-      var v = vids[i];
-      out.videos.push({
-        idx: i,
-        src: v.currentSrc || v.src || '',
-        paused: v.paused,
-        muted: v.muted,
-        currentTime: v.currentTime,
-        duration: isFinite(v.duration) ? v.duration : -1,
-        readyState: v.readyState,
-        error: v.error ? String(v.error.code) : null
-      });
+    if (window.__nf && typeof window.__nf.getVideoState === 'function') {
+      var state = window.__nf.getVideoState();
+      var clips = Array.isArray(state.clips) ? state.clips : [];
+      for (var i = 0; i < clips.length; i++) {
+        var v = clips[i];
+        out.videos.push({
+          idx: i,
+          src: v.src || '',
+          paused: !!v.paused,
+          muted: !!v.muted,
+          currentTime: (Number(v.current_time_ms) || 0) / 1000,
+          duration: (Number(v.duration_ms) || 0) / 1000,
+          readyState: Number(v.ready_state) || 0,
+          error: v.error || null
+        });
+      }
+    } else {
+      var vids = document.querySelectorAll('video');
+      for (var i = 0; i < vids.length; i++) {
+        var v = vids[i];
+        out.videos.push({
+          idx: i,
+          src: v.currentSrc || v.src || '',
+          paused: v.paused,
+          muted: v.muted,
+          currentTime: v.currentTime,
+          duration: isFinite(v.duration) ? v.duration : -1,
+          readyState: v.readyState,
+          error: v.error ? String(v.error.code) : null
+        });
+      }
     }
     var auds = document.querySelectorAll('audio');
     for (var j = 0; j < auds.length; j++) {
@@ -1763,7 +1788,7 @@ setTimeout(function() {
         return {
           duration_ms: dur,
           lanes_width_px: w,
-          ph_t_ms: (document.querySelector('video') && document.querySelector('video').currentTime * 1000) || 0,
+          ph_t_ms: (window.__nf && typeof window.__nf.getMediaClock === 'function' && window.__nf.getMediaClock()) || 0,
           ph_left_px: phLeft,
           tick_first_left: firstTick ? parseFloat(firstTick.style.left || '0') : -1,
           tick_first_expected: expectedPx(0),
@@ -1985,6 +2010,9 @@ window.__nf_mount = function() {{
       setTimeout(function() {{
         var stage = document.querySelector('#nf-stage');
         if (!stage) return;
+        if (window.__nf && typeof window.__nf.unmuteAll === 'function') {{
+          try {{ window.__nf.unmuteAll(); }} catch(_e){{}}
+        }}
         var vids = stage.querySelectorAll('video');
         for (var i = 0; i < vids.length; i++) {{
           try {{ var vp = vids[i].play(); if (vp && vp.catch) vp.catch(function(){{}}); }} catch(_e){{}}
@@ -2263,7 +2291,17 @@ window.__nf_install_playhead = function() {{
   }}
   var _startedAt = performance.now();
   var _pollId = setInterval(function() {{
-    // Prefer first playing video/audio as the clock source (ground truth).
+    // Prefer runtime video proxy / direct media clock when available.
+    if (window.__nf && typeof window.__nf.getMediaClock === 'function') {{
+      try {{
+        var mediaClock = window.__nf.getMediaClock();
+        if (typeof mediaClock === 'number' && mediaClock > 0) {{
+          updatePh(mediaClock);
+          return;
+        }}
+      }} catch (_e) {{}}
+    }}
+    // Fallback: first playing direct video/audio as the clock source.
     var media = document.querySelector('video, audio');
     if (media && !media.paused && media.currentTime > 0) {{
       updatePh(media.currentTime * 1000);
