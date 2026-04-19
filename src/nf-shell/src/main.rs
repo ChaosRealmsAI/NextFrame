@@ -787,6 +787,8 @@ struct CliOpts {
     export_path: Option<PathBuf>,
     export_duration_s: f64,
     menu_test: bool,
+    window_x: f64,
+    window_y: f64,
     source_arg: String,
 }
 
@@ -798,6 +800,10 @@ fn parse_cli() -> CliOpts {
     let mut export_path: Option<PathBuf> = None;
     let mut export_duration_s: f64 = 5.0;
     let mut menu_test = false;
+    // Auto-cascade: count sibling nf-shell processes · stagger 40px per window.
+    let cascade = count_running_nf_shell_pids();
+    let mut window_x: f64 = 120.0 + (cascade as f64) * 40.0;
+    let mut window_y: f64 = 80.0 + (cascade as f64) * 40.0;
     let mut positional: Option<String> = None;
     let mut i = 1;
     while i < args.len() {
@@ -825,6 +831,14 @@ fn parse_cli() -> CliOpts {
                 }
             }
             "--menu-test" => menu_test = true,
+            "--x" => {
+                i += 1;
+                if i < args.len() { if let Ok(v) = args[i].parse::<f64>() { window_x = v; } }
+            }
+            "--y" => {
+                i += 1;
+                if i < args.len() { if let Ok(v) = args[i].parse::<f64>() { window_y = v; } }
+            }
             "--duration" => {
                 i += 1;
                 if i < args.len() {
@@ -847,7 +861,28 @@ fn parse_cli() -> CliOpts {
         export_path,
         export_duration_s,
         menu_test,
+        window_x,
+        window_y,
         source_arg: positional.unwrap_or_else(|| "demo/v1.8-video-sample.json".to_string()),
+    }
+}
+
+/// Count sibling `nf-shell` processes for auto-cascade window positioning.
+/// Falls back to 0 if `pgrep` missing or errors.
+fn count_running_nf_shell_pids() -> usize {
+    let out = std::process::Command::new("pgrep")
+        .args(["-f", "nf-shell"])
+        .output();
+    match out {
+        Ok(o) if o.status.success() => {
+            let me = std::process::id();
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter_map(|l| l.trim().parse::<u32>().ok())
+                .filter(|pid| *pid != me)
+                .count()
+        }
+        _ => 0,
     }
 }
 
@@ -886,7 +921,7 @@ fn main() -> Result<()> {
     let window = WindowBuilder::new()
         .with_title(WINDOW_TITLE)
         .with_inner_size(LogicalSize::new(WINDOW_W, WINDOW_H))
-        .with_position(LogicalPosition::new(120.0, 80.0))
+        .with_position(LogicalPosition::new(opts.window_x, opts.window_y))
         .with_resizable(true)
         .with_min_inner_size(LogicalSize::new(960.0, 600.0))
         .with_title_hidden(true)
