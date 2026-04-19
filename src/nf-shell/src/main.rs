@@ -1336,13 +1336,13 @@ fn rewrite_file_srcs(v: &mut Value, source_dir: &std::path::Path) {
 /// FIX-2 (v1.31): nf-asset custom protocol — supports HTTP Range/206 so
 /// WKWebView can stream/seek into large mp4s without dragging the main
 /// thread into a multi-MB fs::read on every seek.
-fn nf_asset_response(req: http::Request<Vec<u8>>) -> http::Response<std::borrow::Cow<'static, [u8]>> {
+fn nf_asset_response(req: http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
     use std::io::{Read, Seek, SeekFrom};
     let empty_body = || {
         http::Response::builder()
             .status(500)
-            .body(std::borrow::Cow::<[u8]>::Owned(Vec::new()))
-            .unwrap_or_else(|_| http::Response::new(std::borrow::Cow::Owned(Vec::new())))
+            .body(Vec::<u8>::new())
+            .unwrap_or_else(|_| http::Response::new(Vec::new()))
     };
     let uri = req.uri().to_string();
     let path_str = uri
@@ -1362,7 +1362,7 @@ fn nf_asset_response(req: http::Request<Vec<u8>>) -> http::Response<std::borrow:
         return http::Response::builder()
             .status(404)
             .header("Content-Type", "text/plain")
-            .body(std::borrow::Cow::Owned(b"nf-asset: file not found".to_vec()))
+            .body(b"nf-asset: file not found".to_vec())
             .unwrap_or_else(|_| empty_body());
     };
     let total: u64 = file.metadata().map(|m| m.len()).unwrap_or(0);
@@ -1393,7 +1393,7 @@ fn nf_asset_response(req: http::Request<Vec<u8>>) -> http::Response<std::borrow:
         return http::Response::builder()
             .status(416)
             .header("Content-Range", format!("bytes */{total}"))
-            .body(std::borrow::Cow::<[u8]>::Owned(Vec::new()))
+            .body(Vec::<u8>::new())
             .unwrap_or_else(|_| empty_body());
     }
     let len = end - start + 1;
@@ -1420,7 +1420,7 @@ fn nf_asset_response(req: http::Request<Vec<u8>>) -> http::Response<std::borrow:
         );
     }
     builder
-        .body(std::borrow::Cow::Owned(buf))
+        .body(buf)
         .unwrap_or_else(|_| empty_body())
 }
 
@@ -1580,9 +1580,17 @@ fn main() -> Result<()> {
     let verify_media_path_for_handler = opts.verify_media_path.clone();
 
     let webview = WebViewBuilder::new(&window)
-        .with_custom_protocol(
+        // v1.31.1 hotfix: ASYNC protocol · WKWebView URLSchemeTask is
+        // main-threaded on macOS. 16 parallel Range requests during seek
+        // + sync File::open/read melt the run loop → "卡". Push each
+        // request onto a worker thread so the event loop keeps pumping.
+        .with_asynchronous_custom_protocol(
             "nf-asset".to_string(),
-            move |req| nf_asset_response(req),
+            move |req, responder| {
+                std::thread::spawn(move || {
+                    responder.respond(nf_asset_response(req));
+                });
+            },
         )
         .with_html(&full_html)
         .with_devtools(true)
