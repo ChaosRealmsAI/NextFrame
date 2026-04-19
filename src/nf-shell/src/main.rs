@@ -350,26 +350,45 @@ window.__NF_SOURCE__ = {source};
 window.__NF_TRACKS__ = {tracks};
 {runtime}
 
+// v1.22.1 letterbox reflow: stage 是 viewport px size · letterbox scale to fit
+// plate (取 min(scaleW, scaleH) · 保证等比 · 不变形) · center 留白 pillarbox/letterbox
+window.__nf_reflow = function() {{
+  var plate = document.querySelector('#nf-plate');
+  var stage = document.querySelector('#nf-stage');
+  if (!plate || !stage) return;
+  var vp = (window.__NF_SOURCE__ && window.__NF_SOURCE__.viewport) || {{w:1920, h:1080}};
+  var pw = plate.clientWidth, ph = plate.clientHeight;
+  var scale = Math.min(pw / vp.w, ph / vp.h);
+  if (!isFinite(scale) || scale <= 0) return;
+  var displayW = vp.w * scale, displayH = vp.h * scale;
+  stage.style.transform = 'scale(' + scale + ')';
+  stage.style.left = ((pw - displayW) / 2) + 'px';
+  stage.style.top = ((ph - displayH) / 2) + 'px';
+}};
+
 window.__nf_mount = function() {{
   try {{
     var ps = document.querySelector('.preview-stage');
     var cp = document.querySelector('.canvas-plate.canvas-16-9');
     var host = ps || cp || document.body;
     var vp = (window.__NF_SOURCE__ && window.__NF_SOURCE__.viewport) || {{w:1920, h:1080}};
+    // Plate 填充可用空间 (flex container) · 不强制 aspect-ratio (避免宽高约束冲突)
+    // stage native size = viewport px · transform-origin:top-left + scale +
+    // top/left 由 __nf_reflow 动态计算 · resize 自动重算
     host.innerHTML =
-      '<div class="canvas-plate canvas-16-9" id="nf-plate" style="position:relative;width:100%;aspect-ratio:' + vp.w + '/' + vp.h + ';max-width:100%;border-radius:10px;overflow:hidden;background:#0a0a0f">' +
+      '<div class="canvas-plate canvas-16-9" id="nf-plate" style="position:relative;width:100%;height:100%;max-width:100%;max-height:100%;border-radius:10px;overflow:hidden;background:#0a0a0f">' +
         '<div id="nf-stage" style="position:absolute;top:0;left:0;width:' + vp.w + 'px;height:' + vp.h + 'px;transform-origin:top left;overflow:hidden;z-index:10"></div>' +
       '</div>';
     requestAnimationFrame(function(){{
-      var plate = document.querySelector('#nf-plate');
-      var stage = document.querySelector('#nf-stage');
-      if (plate && stage) {{
-        stage.style.transform = 'scale(' + (plate.clientWidth / vp.w) + ')';
-      }}
+      window.__nf_reflow();
       window.NFRuntime.boot({{ stage: '#nf-stage', autoplay: true }});
       console.log('[NF] runtime booted · tracks=' + Object.keys(window.__NF_TRACKS__).length);
       window.__nf_install_drag_handles();
     }});
+    if (!window.__nf_resize_wired) {{
+      window.__nf_resize_wired = true;
+      window.addEventListener('resize', window.__nf_reflow);
+    }}
   }} catch (e) {{
     console.error('[NF] mount failed:', e && e.stack || e);
   }}
