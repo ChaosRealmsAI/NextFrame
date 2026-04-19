@@ -48,6 +48,17 @@ enum UserEvent {
     EvalScript(String),
     DragWindow,
     ScreenshotNow(PathBuf),
+    StartExport {
+        path: PathBuf,
+        duration_s: f64,
+    },
+    ExportDone {
+        path: PathBuf,
+        ok: bool,
+        msg: String,
+    },
+    MenuOpen,
+    MenuSave,
     VerifyDone,
 }
 
@@ -169,6 +180,9 @@ fn apply_set_param(source: &mut Value, payload: &Value) -> Result<String> {
 enum IpcOutcome {
     Mutated(String),
     DragWindow,
+    MenuOpen,
+    MenuSave,
+    StartExport { path: PathBuf, duration_s: f64 },
 }
 
 fn dispatch_ipc(source: &mut Value, body: &str) -> Result<IpcOutcome> {
@@ -182,8 +196,88 @@ fn dispatch_ipc(source: &mut Value, body: &str) -> Result<IpcOutcome> {
         "clip-drag" => Ok(IpcOutcome::Mutated(apply_clip_drag(source, &payload)?)),
         "set-param" => Ok(IpcOutcome::Mutated(apply_set_param(source, &payload)?)),
         "drag-window" => Ok(IpcOutcome::DragWindow),
+        "menu-open" => Ok(IpcOutcome::MenuOpen),
+        "menu-save" => Ok(IpcOutcome::MenuSave),
+        "export-mp4" => {
+            let path = payload
+                .get("path")
+                .and_then(|v| v.as_str())
+                .map(PathBuf::from)
+                .context("export-mp4: path missing")?;
+            let duration_s = payload
+                .get("duration_s")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(5.0);
+            Ok(IpcOutcome::StartExport { path, duration_s })
+        }
         other => anyhow::bail!("unknown ipc kind: {other}"),
     }
+}
+
+/// Check `ffmpeg` is on PATH. Used for export pre-flight.
+fn ffmpeg_available() -> bool {
+    std::process::Command::new("ffmpeg")
+        .arg("-version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// Run `ffmpeg -f avfoundation -framerate 30 -i "2:none" -t <dur> -vf "crop=Wx:H:X:Y"
+/// -c:v h264 -pix_fmt yuv420p <out.mp4>` for `duration_s` seconds.
+///
+/// Screen index 2 matches the device enumeration on this machine (confirmed
+/// via the v1.22 POC); we pass it through as-is since avfoundation's index
+/// space is system-dependent and the POC validated this exact invocation.
+fn run_ffmpeg_export(
+    out: &std::path::Path,
+    duration_s: f64,
+    x: i64,
+    y: i64,
+    w: i64,
+    h: i64,
+) -> Result<u64> {
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent).context("mkdir parent")?;
+    }
+    // avfoundation coordinates are in *physical* pixels, so multiply by the
+    // retina scale (assume 2x on macOS — HiDPI path will refine this in v1.23).
+    let px = x * 2;
+    let py = y * 2;
+    let pw = w * 2;
+    let ph = h * 2;
+    let crop = format!("crop={pw}:{ph}:{px}:{py}");
+    let status = std::process::Command::new("ffmpeg")
+        .args([
+            "-y",
+            "-f",
+            "avfoundation",
+            "-framerate",
+            "30",
+            "-i",
+            "2:none",
+            "-t",
+            &format!("{duration_s}"),
+            "-vf",
+            &crop,
+            "-c:v",
+            "h264",
+            "-pix_fmt",
+            "yuv420p",
+        ])
+        .arg(out)
+        .status()
+        .context("spawn ffmpeg")?;
+    if !status.success() {
+        anyhow::bail!("ffmpeg exited with {}", status);
+    }
+    let bytes = std::fs::metadata(out).map(|m| m.len()).unwrap_or(0);
+    if bytes == 0 {
+        anyhow::bail!("ffmpeg produced empty file");
+    }
+    Ok(bytes)
 }
 
 /// Capture the nf-shell window region via `screencapture -R x,y,w,h`.
@@ -325,6 +419,9 @@ struct CliOpts {
     verify_mode: bool,
     screenshot_path: Option<PathBuf>,
     screenshot_delay_ms: u64,
+    export_path: Option<PathBuf>,
+    export_duration_s: f64,
+    menu_test: bool,
     source_arg: String,
 }
 
@@ -333,6 +430,9 @@ fn parse_cli() -> CliOpts {
     let mut verify_mode = false;
     let mut screenshot_path: Option<PathBuf> = None;
     let mut screenshot_delay_ms: u64 = 2500;
+    let mut export_path: Option<PathBuf> = None;
+    let mut export_duration_s: f64 = 5.0;
+    let mut menu_test = false;
     let mut positional: Option<String> = None;
     let mut i = 1;
     while i < args.len() {
@@ -353,6 +453,21 @@ fn parse_cli() -> CliOpts {
                     }
                 }
             }
+            "--export" => {
+                i += 1;
+                if i < args.len() {
+                    export_path = Some(PathBuf::from(&args[i]));
+                }
+            }
+            "--menu-test" => menu_test = true,
+            "--duration" => {
+                i += 1;
+                if i < args.len() {
+                    if let Ok(v) = args[i].parse::<f64>() {
+                        export_duration_s = v;
+                    }
+                }
+            }
             other if !other.starts_with("--") && positional.is_none() => {
                 positional = Some(other.to_string());
             }
@@ -364,6 +479,9 @@ fn parse_cli() -> CliOpts {
         verify_mode,
         screenshot_path,
         screenshot_delay_ms,
+        export_path,
+        export_duration_s,
+        menu_test,
         source_arg: positional.unwrap_or_else(|| "demo/v1.8-video-sample.json".to_string()),
     }
 }
@@ -453,6 +571,18 @@ fn main() -> Result<()> {
                 Ok(IpcOutcome::DragWindow) => {
                     let _ = proxy_for_handler.send_event(UserEvent::DragWindow);
                 }
+                Ok(IpcOutcome::MenuOpen) => {
+                    let _ = proxy_for_handler.send_event(UserEvent::MenuOpen);
+                }
+                Ok(IpcOutcome::MenuSave) => {
+                    let _ = proxy_for_handler.send_event(UserEvent::MenuSave);
+                }
+                Ok(IpcOutcome::StartExport { path, duration_s }) => {
+                    let _ = proxy_for_handler.send_event(UserEvent::StartExport {
+                        path,
+                        duration_s,
+                    });
+                }
                 Err(e) => {
                     println!("[NF-IPC] error: {e}");
                 }
@@ -478,6 +608,39 @@ fn main() -> Result<()> {
         std::thread::spawn(move || {
             std::thread::sleep(delay);
             let _ = proxy_shot.send_event(UserEvent::ScreenshotNow(path));
+        });
+    }
+
+    // --menu-test: fire menu-open + menu-save IPC after mount, exit ~3s later.
+    if opts.menu_test {
+        let proxy_m = proxy.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+            let _ = proxy_m.send_event(UserEvent::MenuOpen);
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            let _ = proxy_m.send_event(UserEvent::MenuSave);
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+            let _ = proxy_m.send_event(UserEvent::VerifyDone);
+        });
+    }
+
+    // If --export was passed, kick off the export right after initial mount.
+    if let Some(path) = opts.export_path.clone() {
+        if !ffmpeg_available() {
+            eprintln!(
+                "[NF-EXPORT] ffmpeg not on PATH — install with `brew install ffmpeg` then re-run"
+            );
+            return Ok(());
+        }
+        let duration = opts.export_duration_s;
+        let proxy_exp = proxy.clone();
+        std::thread::spawn(move || {
+            // Let the runtime mount + stabilise before recording.
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+            let _ = proxy_exp.send_event(UserEvent::StartExport {
+                path,
+                duration_s: duration,
+            });
         });
     }
 
@@ -524,6 +687,85 @@ fn main() -> Result<()> {
                 println!("[NF-VERIFY] all IPC mutations applied · exit in 1500ms");
                 std::thread::sleep(std::time::Duration::from_millis(1500));
                 *control_flow = ControlFlow::Exit;
+            }
+            Event::UserEvent(UserEvent::StartExport { path, duration_s }) => {
+                let pos = window_for_loop
+                    .outer_position()
+                    .map(|p| p.to_logical::<f64>(window_for_loop.scale_factor()))
+                    .unwrap_or(LogicalPosition::new(120.0, 80.0));
+                let sz = window_for_loop
+                    .outer_size()
+                    .to_logical::<f64>(window_for_loop.scale_factor());
+                println!(
+                    "[NF-EXPORT] start · duration={duration_s}s · region {}x{} @({},{}) → {}",
+                    sz.width as i64,
+                    sz.height as i64,
+                    pos.x as i64,
+                    pos.y as i64,
+                    path.display()
+                );
+                let path_thread = path.clone();
+                let proxy_exp = proxy.clone();
+                // Run ffmpeg on a worker thread so the event loop keeps pumping.
+                std::thread::spawn(move || {
+                    let result = run_ffmpeg_export(
+                        &path_thread,
+                        duration_s,
+                        pos.x as i64,
+                        pos.y as i64,
+                        sz.width as i64,
+                        sz.height as i64,
+                    );
+                    let (ok, msg) = match result {
+                        Ok(bytes) => (true, format!("wrote {bytes} bytes")),
+                        Err(e) => (false, format!("{e}")),
+                    };
+                    let _ = proxy_exp.send_event(UserEvent::ExportDone {
+                        path: path_thread,
+                        ok,
+                        msg,
+                    });
+                });
+            }
+            Event::UserEvent(UserEvent::ExportDone { path, ok, msg }) => {
+                if ok {
+                    println!("[NF-EXPORT] done · {} · {msg}", path.display());
+                } else {
+                    eprintln!("[NF-EXPORT] failed · {} · {msg}", path.display());
+                }
+                // If invoked via CLI --export, exit the app; if invoked via
+                // menu IPC, keep running.
+                if opts.export_path.is_some() {
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    *control_flow = ControlFlow::Exit;
+                }
+            }
+            Event::UserEvent(UserEvent::MenuOpen) => {
+                println!("[NF-MENU] open dispatched · showing NSOpenPanel");
+                // Spawn on a worker thread — rfd blocks until the user picks.
+                std::thread::spawn(move || {
+                    let picked = rfd::FileDialog::new()
+                        .add_filter("NextFrame source", &["json"])
+                        .set_title("Open source.json")
+                        .pick_file();
+                    match picked {
+                        Some(p) => println!("[NF-MENU] open selected: {}", p.display()),
+                        None => println!("[NF-MENU] open cancelled"),
+                    }
+                });
+            }
+            Event::UserEvent(UserEvent::MenuSave) => {
+                println!("[NF-MENU] save dispatched · showing NSSavePanel");
+                std::thread::spawn(move || {
+                    let picked = rfd::FileDialog::new()
+                        .add_filter("NextFrame source", &["json"])
+                        .set_file_name("source.json")
+                        .save_file();
+                    match picked {
+                        Some(p) => println!("[NF-MENU] save to: {}", p.display()),
+                        None => println!("[NF-MENU] save cancelled"),
+                    }
+                });
             }
             _ => {}
         }

@@ -10,8 +10,18 @@ path = "src/main.rs"
 [dependencies]
 wry = "0.45"
 tao = "0.30"
+rfd = "0.14"
 anyhow = { workspace = true }
 serde_json = { workspace = true }
+
+[package.metadata.bundle]
+name = "NextFrame"
+identifier = "com.nextframe.app"
+category = "public.app-category.video"
+short_description = "AI 视频引擎 · JSON 进，视频出"
+long_description = "NextFrame 把结构化的 JSON 时间线变成可播放的视频 —— 教育 / 产品演示 / 数据报告 / 培训 / 开源项目都能用"
+copyright = "© 2026 NextFrame"
+osx_minimum_system_version = "11.0"
 
 [lints]
 workspace = true
