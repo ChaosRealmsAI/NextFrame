@@ -12,19 +12,45 @@ import assert from "node:assert/strict";
 // -----------------------------------------------------------------------------
 function installEnv({ duration_ms = 10000, tracks = [] } = {}) {
   const resolved = { duration_ms, viewport: { w: 1920, h: 1080 }, tracks };
-  const makeEl = () => ({
-    textContent: "",
-    innerHTML: "",
-    className: "",
-    style: { setProperty: () => {}, left: "", width: "" },
-    outerHTML: "<div></div>",
-    appendChild: () => {},
-    setAttribute: () => {},
-    addEventListener: () => {},
-    querySelector: () => null,
-    querySelectorAll: () => [],
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 400 }),
-  });
+  const makeEl = () => {
+    const attrs = new Map();
+    const el = {
+      textContent: "",
+      innerHTML: "",
+      className: "",
+      children: [],
+      dataset: {},
+      style: { setProperty: () => {}, left: "", width: "" },
+      outerHTML: "<div></div>",
+      appendChild(child) { this.children.push(child); return child; },
+      insertBefore(child, ref) {
+        const existing = this.children.indexOf(child);
+        if (existing >= 0) this.children.splice(existing, 1);
+        if (!ref) this.children.push(child);
+        else {
+          const idx = this.children.indexOf(ref);
+          if (idx >= 0) this.children.splice(idx, 0, child);
+          else this.children.push(child);
+        }
+        return child;
+      },
+      removeChild(child) {
+        const idx = this.children.indexOf(child);
+        if (idx >= 0) this.children.splice(idx, 1);
+        return child;
+      },
+      setAttribute(name, value) { attrs.set(name, String(value)); },
+      getAttribute(name) { return attrs.has(name) ? attrs.get(name) : null; },
+      removeAttribute(name) { attrs.delete(name); },
+      addEventListener: () => {},
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 400 }),
+    };
+    return el;
+  };
+
+  const stage = makeEl();
 
   globalThis.document = {
     getElementById: (id) => {
@@ -33,17 +59,19 @@ function installEnv({ duration_ms = 10000, tracks = [] } = {}) {
       return null;
     },
     querySelector: (sel) => {
-      if (sel === "#nf-stage") return makeEl();
+      if (sel === "#nf-stage") return stage;
       return null;
     },
     querySelectorAll: () => [],
     createElement: () => makeEl(),
     activeElement: null,
+    body: { dataset: {} },
   };
 
   globalThis.window = {
     addEventListener: () => {},
     removeEventListener: () => {},
+    setTimeout: globalThis.setTimeout,
   };
 
   let perfT = 0;

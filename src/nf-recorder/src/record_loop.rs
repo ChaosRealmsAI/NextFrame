@@ -236,6 +236,21 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
     "#;
     let _ = shell.call_async(mode_switch).await?;
 
+    let has_export_seek_bridge = shell
+        .call_async(
+            "return !!(window.__nf_seek_export && window.__nf_read_seek_export);",
+        )
+        .await?
+        .as_bool()
+        == Some(true);
+    let has_video_state_probe = shell
+        .call_async(
+            "return !!(window.__nf && typeof window.__nf.getVideoState === 'function');",
+        )
+        .await?
+        .as_bool()
+        == Some(true);
+
     // 3. Construct encoder/writer pipeline.
     let mut pipeline = PipelineH264_1080p::new(RecordOpts {
         width: cfg.width,
@@ -288,16 +303,48 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
 
         // 5.1 Drive runtime seek · await frameReady · hard 5 s timeout.
         // 传 f64 精确值给 bundle · runtime.js seek() 本是 JS Number (f64) 吃 f64 不 reject。
-        let seek_script = format!("return await window.__nf.seek({t_exact_ms:.6});");
-        let seek_fut = shell.call_async(&seek_script);
-        let result = match tokio::time::timeout(FRAME_SEEK_TIMEOUT, seek_fut).await {
-            Ok(r) => r?,
-            Err(_elapsed) => {
-                return Err(RecordError::FrameReadyTimeout(format!(
-                    "{}ms at t_exact_ms={t_exact_ms:.6}",
-                    FRAME_SEEK_TIMEOUT.as_millis()
-                )));
+        let result = if has_export_seek_bridge {
+            let seek_script = format!("window.__nf_seek_export({t_exact_ms:.6}); return true;");
+            let seek_fut = shell.call_async(&seek_script);
+            match tokio::time::timeout(FRAME_SEEK_TIMEOUT, seek_fut).await {
+                Ok(r) => {
+                    let seek_ok = r?;
+                    if seek_ok.as_bool() != Some(true) {
+                        return Err(RecordError::FrameReadyContract(format!(
+                            "export seek bridge returned non-true at expected_t={t_exact_ms:.6} · got {seek_ok}"
+                        )));
+                    }
+                }
+                Err(_elapsed) => {
+                    return Err(RecordError::FrameReadyTimeout(format!(
+                        "{}ms at t_exact_ms={t_exact_ms:.6}",
+                        FRAME_SEEK_TIMEOUT.as_millis()
+                    )));
+                }
             }
+
+            if has_video_state_probe {
+                wait_for_video_state_ready(&shell, t_exact_ms).await?;
+            }
+
+            serde_json::json!({
+                "t": t_exact_ms,
+                "frameReady": true,
+                "seq": seq + 1
+            })
+        } else {
+            let seek_script = format!("return await window.__nf.seek({t_exact_ms:.6});");
+            let seek_fut = shell.call_async(&seek_script);
+            let raw_result = match tokio::time::timeout(FRAME_SEEK_TIMEOUT, seek_fut).await {
+                Ok(r) => r?,
+                Err(_elapsed) => {
+                    return Err(RecordError::FrameReadyTimeout(format!(
+                        "{}ms at t_exact_ms={t_exact_ms:.6}",
+                        FRAME_SEEK_TIMEOUT.as_millis()
+                    )));
+                }
+            };
+            parse_seek_result(raw_result)?
         };
 
         // Validate frameReady handshake shape (f64 容差判 · 不严格整数相等).
@@ -374,6 +421,31 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
     Ok(stats)
 }
 
+async fn wait_for_video_state_ready(
+    shell: &MacHeadlessShell,
+    expected_t: f64,
+) -> Result<(), RecordError> {
+    let started = Instant::now();
+    loop {
+        let value = shell
+            .call_async(
+                "return (window.__nf && typeof window.__nf.getVideoState === 'function') \
+                 ? window.__nf.getVideoState() : { count: 0, clips: [] };",
+            )
+            .await?;
+        if video_state_is_ready(&value, expected_t)? {
+            return Ok(());
+        }
+        if started.elapsed() >= FRAME_SEEK_TIMEOUT {
+            return Err(RecordError::FrameReadyTimeout(format!(
+                "video-state not ready after {}ms at expected_t={expected_t:.6}",
+                FRAME_SEEK_TIMEOUT.as_millis()
+            )));
+        }
+        tokio::time::sleep(Duration::from_millis(16)).await;
+    }
+}
+
 /// Validate `{t, frameReady, seq}` returned by `window.__nf.seek`.
 ///
 /// Contract (interfaces-delta.json `nf-runtime::record-mode`):
@@ -433,6 +505,69 @@ fn verify_frame_ready(value: &serde_json::Value, expected_t: f64) -> Result<(), 
     Ok(())
 }
 
+fn parse_seek_result(value: serde_json::Value) -> Result<serde_json::Value, RecordError> {
+    if let Some(s) = value.as_str() {
+        serde_json::from_str::<serde_json::Value>(s).map_err(|e| {
+            RecordError::FrameReadyContract(format!(
+                "seek returned non-JSON string: {e} · raw={s}"
+            ))
+        })
+    } else {
+        Ok(value)
+    }
+}
+
+fn video_state_is_ready(
+    value: &serde_json::Value,
+    expected_t: f64,
+) -> Result<bool, RecordError> {
+    let Some(obj) = value.as_object() else {
+        return Err(RecordError::FrameReadyContract(format!(
+            "video-state expected object at expected_t={expected_t:.6} · got: {value}"
+        )));
+    };
+    let count = js_number_as_u64(obj.get("count")).unwrap_or(0);
+    if count == 0 {
+        return Ok(true);
+    }
+    let Some(clips) = obj.get("clips").and_then(serde_json::Value::as_array) else {
+        return Err(RecordError::FrameReadyContract(format!(
+            "video-state missing clips at expected_t={expected_t:.6} · payload={value}"
+        )));
+    };
+    let target_ms = expected_t.round() as i64;
+    for clip in clips {
+        let Some(clip_obj) = clip.as_object() else {
+            return Err(RecordError::FrameReadyContract(format!(
+                "video-state clip not object at expected_t={expected_t:.6} · payload={clip}"
+            )));
+        };
+        let frame_ready = clip_obj
+            .get("frame_ready")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+        let ready_state = js_number_as_u64(clip_obj.get("ready_state")).unwrap_or(0);
+        let current_time_ms = clip_obj
+            .get("current_time_ms")
+            .and_then(serde_json::Value::as_i64)
+            .or_else(|| {
+                clip_obj
+                    .get("current_time_ms")
+                    .and_then(serde_json::Value::as_f64)
+                    .filter(|v| v.is_finite())
+                    .map(|v| v.round() as i64)
+            })
+            .unwrap_or(-1);
+        if !frame_ready || ready_state < 2 {
+            return Ok(false);
+        }
+        if (current_time_ms - target_ms).abs() > 80 {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 /// JS returns numbers as doubles · NSNumber round-trip lands them as `f64` in
 /// `serde_json::Value`. `Value::as_u64()` only accepts native-integer variants ·
 /// so for interop we also accept integer-valued `f64` / `i64`. Fractional /
@@ -454,4 +589,3 @@ pub fn js_number_as_u64(v: Option<&serde_json::Value>) -> Option<u64> {
     }
     None
 }
-

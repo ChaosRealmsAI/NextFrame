@@ -137,7 +137,14 @@ pub async fn run_export_from_source(
     let tracks_map_json = build_tracks_map_json(&source_json);
 
     let (vp_w, vp_h) = opts.viewport;
-    let html = build_export_html(&source_text, &tracks_map_json, vp_w, vp_h);
+    let requested_duration_ms = (opts.duration_s.max(0.0) * 1000.0).round() as u64;
+    let html = build_export_html(
+        &source_text,
+        &tracks_map_json,
+        vp_w,
+        vp_h,
+        requested_duration_ms,
+    );
 
     // 写 tmp file · macOS /tmp 没 gitignore 问题 · 独占进程 pid + nanos 防撞。
     let pid = std::process::id();
@@ -204,7 +211,13 @@ pub async fn run_export_from_source(
 /// - 挂载到 body · stage 固定尺寸 viewport px
 /// - boot({startAtMs:0}) · autoplay · 后续 record_loop 用 seek(t) 精确驱动
 /// - 暴露 window.__nf.{seek, getDuration} 给 recorder 调
-fn build_export_html(source_json: &str, tracks_map_json: &str, vp_w: u32, vp_h: u32) -> String {
+fn build_export_html(
+    source_json: &str,
+    tracks_map_json: &str,
+    vp_w: u32,
+    vp_h: u32,
+    requested_duration_ms: u64,
+) -> String {
     format!(
         r#"<!DOCTYPE html>
 <html lang="en">
@@ -227,35 +240,108 @@ window.__NF_TRACKS__ = {tracks_map_json};
 (function(){{
   try {{
     var handle = window.NFRuntime.boot({{ stage: '#nf-stage', autoplay: false, startAtMs: 0 }});
+    var REQUESTED_DURATION_MS = {requested_duration_ms};
     window.__nf = window.__nf || {{}};
-    window.__nf.handle = handle;
+    window.__nf_handle = handle;
     // recorder 合约 (v1.14 FrameReadyContract):
     // - seek(t_ms) 返 {{t, frameReady:true, seq}} · t 在 0.01ms 容差内等于 t_ms · seq 单调递增
     // - 外部 t 纯驱动 (ADR-045) · 不依赖 RAF
     var _seq = 0;
-    window.__nf.seek = function(t_ms) {{
+    window.__nf_last_seek_json = JSON.stringify({{
+      t: 0,
+      frameReady: true,
+      seq: 0
+    }});
+    window.__nf_last_media_ready_json = JSON.stringify({{
+      ok: true,
+      active_videos: 0,
+      waited_ms: 0,
+      clips: []
+    }});
+    window.__nf_seek_export = function(t_ms) {{
       var t = Number(t_ms) || 0;
+      var h = window.__nf_handle;
       try {{
-        if (handle && typeof handle.seek === 'function') handle.seek(t);
+        if (h && typeof h.seek === 'function') h.seek(t);
       }} catch (e) {{
         // track update 抛错不让录制中断 · 记 console · 继续下一帧
         try {{ console.error('[NF-EXPORT] track.update threw at t=' + t, e && e.message); }} catch (_e) {{}}
       }}
       _seq += 1;
-      // JSON 往返 · 防 WKWebView callAsyncJavaScript 抛 "unsupported type" ·
-      // 保证返回值总是纯可序列化 JSON。
-      return JSON.parse(JSON.stringify({{ t: t, frameReady: true, seq: _seq }}));
+      window.__nf_last_seek_json = JSON.stringify({{
+        t: t,
+        frameReady: true,
+        seq: _seq
+      }});
+      return true;
+    }};
+    window.__nf_read_seek_export = function() {{
+      return String(window.__nf_last_seek_json || 'null');
+    }};
+    window.__nf_wait_media_export = async function(t_ms) {{
+      var t = Number(t_ms) || 0;
+      if (window.__nf && typeof window.__nf.waitForMediaReady === 'function') {{
+        try {{
+          var ready = await window.__nf.waitForMediaReady({{
+            t_ms: t,
+            timeout_ms: 4500
+          }});
+          window.__nf_last_media_ready_json = JSON.stringify(ready || {{
+            ok: true,
+            active_videos: 0,
+            waited_ms: 0,
+            clips: []
+          }});
+          return true;
+        }} catch (e) {{
+          window.__nf_last_media_ready_json = JSON.stringify({{
+            ok: false,
+            error: String((e && e.message) || e || 'waitForMediaReady failed'),
+            t_ms: t
+          }});
+          return false;
+        }}
+      }}
+      window.__nf_last_media_ready_json = JSON.stringify({{
+        ok: true,
+        active_videos: 0,
+        waited_ms: 0,
+        clips: []
+      }});
+      return true;
+    }};
+    window.__nf_read_media_ready_export = function() {{
+      return String(window.__nf_last_media_ready_json || 'null');
+    }};
+    window.__nf.seek = function(t_ms) {{
+      window.__nf_seek_export(t_ms);
+      return window.__nf_read_seek_export();
     }};
     window.__nf.getDuration = function() {{
-      if (handle && typeof handle.getDuration === 'function') return handle.getDuration();
+      var h = window.__nf_handle;
+      if (h && typeof h.getDuration === 'function') {{
+        var handleDuration = Number(h.getDuration()) || 0;
+        return REQUESTED_DURATION_MS > 0
+          ? Math.min(handleDuration || REQUESTED_DURATION_MS, REQUESTED_DURATION_MS)
+          : handleDuration;
+      }}
       // fallback · 读 source.meta.duration_ms / duration_ms / max(track.clips.end_ms)
       var src = window.__NF_SOURCE__ || {{}};
-      if (src.meta && typeof src.meta.duration_ms === 'number') return src.meta.duration_ms;
-      if (typeof src.duration_ms === 'number') return src.duration_ms;
+      if (src.meta && typeof src.meta.duration_ms === 'number') {{
+        return REQUESTED_DURATION_MS > 0
+          ? Math.min(src.meta.duration_ms, REQUESTED_DURATION_MS)
+          : src.meta.duration_ms;
+      }}
+      if (typeof src.duration_ms === 'number') {{
+        return REQUESTED_DURATION_MS > 0
+          ? Math.min(src.duration_ms, REQUESTED_DURATION_MS)
+          : src.duration_ms;
+      }}
       var max = 0;
       (src.tracks||[]).forEach(function(tr){{ (tr.clips||[]).forEach(function(c){{
         if (typeof c.end_ms === 'number' && c.end_ms > max) max = c.end_ms;
       }}); }});
+      if (REQUESTED_DURATION_MS > 0) return REQUESTED_DURATION_MS;
       return max || 5000;
     }};
     console.log('[NF-EXPORT] runtime booted · viewport {vp_w}x{vp_h}');

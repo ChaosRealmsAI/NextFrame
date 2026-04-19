@@ -392,9 +392,8 @@ function getStateAt(resolved, t_ms) {
 // -----------------------------------------------------------------------------
 function loadTrack(src) {
   // Tracks are written as ES modules (`export function describe() {}`) per
-  // Track ABI. Strip top-level `export function X(` → `function X(`, record
-  // names, then `new Function` body returns them as an object.
-  // Shared convention with nf-tracks/abi/index.js (FM-SHAPE single source).
+  // Track ABI, but some legacy tests still hand in `module.exports = {...}`.
+  // Support both shapes so the loader stays back-compat.
   if (typeof src !== "string" || src.length === 0) {
     throw new Error("track: source must be non-empty string");
   }
@@ -405,9 +404,12 @@ function loadTrack(src) {
   );
   const body =
     '"use strict";\n' +
+    "const module = { exports: {} };\n" +
+    "const exports = module.exports;\n" +
     rewritten +
     "\n;const __nfExports = {};\n" +
     names.map((n) => "if (typeof " + n + " === 'function') __nfExports." + n + " = " + n + ";").join("\n") +
+    "\nif (module.exports && Object.keys(module.exports).length > 0) return module.exports;\n" +
     "\nreturn __nfExports;\n";
   const fn = new Function(body);
   const api = fn();
@@ -553,6 +555,141 @@ function _readResolvedCache(win, token) {
 function _writeResolvedCache(win, token, resolved) {
   if (!win || !token || !resolved) return;
   win[RESOLVE_CACHE_KEY] = { token, resolved };
+}
+
+function _attrNum(el, name, fallback) {
+  if (!el || typeof el.getAttribute !== "function") return fallback;
+  const raw = el.getAttribute(name);
+  if (raw == null || raw === "") return fallback;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function _attrBool(el, name) {
+  if (!el || typeof el.getAttribute !== "function") return false;
+  const raw = el.getAttribute(name);
+  return raw === "1" || raw === "true";
+}
+
+function _videoProxyEls(stage) {
+  if (!stage || typeof stage.querySelectorAll !== "function") return [];
+  return stage.querySelectorAll("[data-nf-video-proxy='1'][data-nf-persist]");
+}
+
+function _videoProxyState(el) {
+  return {
+    key: el && el.getAttribute ? (el.getAttribute("data-nf-video-key") || "") : "",
+    src: el && el.getAttribute ? (el.getAttribute("data-nf-src") || "") : "",
+    paused: _attrBool(el, "data-nf-video-paused"),
+    muted: _attrBool(el, "data-nf-video-muted"),
+    currentTime: _attrNum(el, "data-nf-video-current-time", 0),
+    duration: _attrNum(el, "data-nf-video-duration", 0),
+    readyState: _attrNum(el, "data-nf-video-ready-state", 0),
+    frameReady: _attrBool(el, "data-nf-video-frame-ready"),
+    playing: _attrBool(el, "data-nf-video-playing"),
+    targetMs: _attrNum(el, "data-nf-video-target-ms", null),
+    error: el && el.getAttribute ? (el.getAttribute("data-nf-video-error") || null) : null,
+  };
+}
+
+function _postVideoProxy(el, payload) {
+  if (!el || typeof el.querySelector !== "function") return false;
+  const frame = el.querySelector("iframe[data-nf-video-frame='1']");
+  if (!frame || !frame.contentWindow || typeof frame.contentWindow.postMessage !== "function") {
+    return false;
+  }
+  const key = el.getAttribute("data-nf-video-key") || el.getAttribute("data-nf-persist") || "";
+  try {
+    frame.contentWindow.postMessage(
+      Object.assign({ __nfVideoProxy: true, key }, payload || {}),
+      "*",
+    );
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+function _afterVisualTick(win) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    try {
+      if (win && typeof win.requestAnimationFrame === "function") {
+        win.requestAnimationFrame(() => {
+          win.requestAnimationFrame(finish);
+        });
+        if (typeof win.setTimeout === "function") win.setTimeout(finish, 34);
+        return;
+      }
+    } catch (_e) {
+      // fall through
+    }
+    if (win && typeof win.setTimeout === "function") {
+      win.setTimeout(finish, 34);
+      return;
+    }
+    if (typeof globalThis.setTimeout === "function") {
+      globalThis.setTimeout(finish, 34);
+      return;
+    }
+    finish();
+  });
+}
+
+function _waitForVideoProxies(stage, targetMs, timeoutMs, perf, win) {
+  return _afterVisualTick(win).then(() => new Promise((resolve) => {
+    const started = perf();
+    const check = () => {
+      const els = Array.from(_videoProxyEls(stage) || []);
+      if (els.length === 0) {
+        resolve({ ok: true, active_videos: 0, waited_ms: perf() - started, clips: [] });
+        return;
+      }
+      const clips = els.map((el) => _videoProxyState(el));
+      const ready = clips.every((clip) => {
+        const wantMs = typeof clip.targetMs === "number" ? clip.targetMs : targetMs;
+        if (!clip.frameReady || clip.readyState < 2) return false;
+        if (typeof wantMs === "number" && wantMs >= 0) {
+          return Math.abs((clip.currentTime * 1000) - wantMs) <= 80;
+        }
+        return true;
+      });
+      if (ready) {
+        resolve({ ok: true, active_videos: clips.length, waited_ms: perf() - started, clips });
+        return;
+      }
+      if ((perf() - started) >= timeoutMs) {
+        resolve({
+          ok: false,
+          timed_out: true,
+          active_videos: clips.length,
+          waited_ms: perf() - started,
+          clips,
+        });
+        return;
+      }
+      const setTimer = (win && typeof win.setTimeout === "function")
+        ? win.setTimeout.bind(win)
+        : (typeof globalThis.setTimeout === "function" ? globalThis.setTimeout.bind(globalThis) : null);
+      if (!setTimer) {
+        resolve({
+          ok: false,
+          timed_out: true,
+          active_videos: clips.length,
+          waited_ms: perf() - started,
+          clips,
+        });
+        return;
+      }
+      setTimer(check, 16);
+    };
+    check();
+  }));
 }
 
 function _fmtTime(t_ms) {
@@ -780,86 +917,84 @@ function boot(options) {
     // --- end L2 dispatch ------------------------------------------------------
 
     // ADR-045 / ADR-046 / ADR-054 / ADR-056 · record-mode media discipline +
-    // external-t driver. Handles both <video> and <audio> persist elements.
-    //   record mode: force mute + pause, drive currentTime from playhead.
-    //   play mode:   only correct currentTime when drift exceeds tolerance so
-    //                we don't break the browser's natural playback.
-    // Audio-specific additions (per audio.js DOM contract):
-    //   - data-nf-volume → el.volume (post-mount)
-    //   - data-nf-t-max  → pause when (localT + from) exceeds cap (IS-2a)
+    // external-t driver. Audio remains direct DOM. Official video v1.54
+    // Fallback B runs in iframe isolate scope and is controlled only via
+    // postMessage + JSON state attrs on the proxy wrapper.
     const isRecord = !!(doc.body && doc.body.dataset && doc.body.dataset.mode === "record");
-    const mediaEls = stage.querySelectorAll("video[data-nf-persist], audio[data-nf-persist]");
-    if (mediaEls && mediaEls.length > 0) {
-      // Match media DOM ↔ activeClip by src attribute (independent of persist
-      // key format — Track kinds hash src their own way, but src is the single
-      // stable identity across render calls). audio.js params also expose src.
-      const bySrc = new Map();
-      for (const ac of state.activeClips) {
-        if (ac.params && typeof ac.params.src === "string") {
-          bySrc.set(ac.params.src, ac);
+    const bySrc = new Map();
+    for (const ac of state.activeClips) {
+      if (ac.params && typeof ac.params.src === "string") {
+        bySrc.set(ac.params.src, ac);
+      }
+    }
+
+    const audioEls = stage.querySelectorAll("audio[data-nf-persist]");
+    for (let i = 0; i < audioEls.length; i++) {
+      const v = audioEls[i];
+      const ac = bySrc.get(v.getAttribute("src"));
+      if (isRecord) {
+        v.muted = true;
+        try { if (typeof v.pause === "function") v.pause(); } catch (_e) { /* noop */ }
+      }
+      const volAttr = v.getAttribute("data-nf-volume");
+      if (volAttr != null && volAttr !== "") {
+        const volNum = parseFloat(volAttr);
+        if (!isNaN(volNum)) {
+          try { v.volume = volNum; } catch (_e) { /* noop */ }
         }
       }
-      for (let i = 0; i < mediaEls.length; i++) {
-        const v = mediaEls[i];
-        const isAudio = v.tagName === "AUDIO";
-        const ac = bySrc.get(v.getAttribute("src"));
-        if (isRecord) {
-          v.muted = true;
-          try { if (typeof v.pause === "function") v.pause(); } catch (_e) { /* noop */ }
-        }
-        // Audio-specific: apply volume from data-nf-volume (audio.js contract).
-        // Video has no volume attribute surfaced in its Track contract yet, so
-        // only AUDIO gets this treatment (keeps video v1.8 behaviour intact).
-        if (isAudio) {
-          const volAttr = v.getAttribute("data-nf-volume");
-          if (volAttr != null && volAttr !== "") {
-            const volNum = parseFloat(volAttr);
-            if (!isNaN(volNum)) {
-              try { v.volume = volNum; } catch (_e) { /* noop */ }
-            }
+      const tMaxAttr = v.getAttribute("data-nf-t-max");
+      if (ac && tMaxAttr != null && tMaxAttr !== "") {
+        const tMax = parseFloat(tMaxAttr);
+        if (!isNaN(tMax)) {
+          const fromMsCap = parseFloat(v.getAttribute("data-nf-t-offset") || "0") || 0;
+          if ((ac.localT + fromMsCap) > tMax) {
+            try { if (typeof v.pause === "function") v.pause(); } catch (_e) { /* noop */ }
           }
         }
-        // Track-window upper bound (IS-2a · design-review ②): audio.js emits
-        // data-nf-t-max as the absolute media-time cap (ms). When the current
-        // localT + offset exceeds it, runtime must pause so audio/video don't
-        // bleed past the Track window. Empty attribute = no cap.
-        const tMaxAttr = v.getAttribute("data-nf-t-max");
-        if (ac && tMaxAttr != null && tMaxAttr !== "") {
-          const tMax = parseFloat(tMaxAttr);
-          if (!isNaN(tMax)) {
-            const fromMsCap = parseFloat(v.getAttribute("data-nf-t-offset") || "0") || 0;
-            if ((ac.localT + fromMsCap) > tMax) {
-              try { if (typeof v.pause === "function") v.pause(); } catch (_e) { /* noop */ }
-            }
-          }
+      }
+      if (!isRecord && playing && _userEverPlayed) {
+        const alreadyAutoplayed = v.getAttribute("data-nf-autoplayed") === "1";
+        if (!alreadyAutoplayed && v.paused && typeof v.play === "function") {
+          try {
+            const p = v.play();
+            if (p && typeof p.catch === "function") p.catch(() => {});
+          } catch (_e) { /* noop */ }
+          v.setAttribute("data-nf-autoplayed", "1");
         }
-        // v1.10: late-mounted media autoplay. When a media element is freshly
-        // diff-mounted (Track window just entered · e.g. audio-outro at t=6s)
-        // and runtime is playing, call play() once. Guard via per-element
-        // `data-nf-autoplayed` so we don't re-trigger on every RAF tick (which
-        // would fight Chromium autoplay policy · FM-AUTOPLAY-POLICY). Also
-        // gated by the page-level `_userEverPlayed` flag (set by play() from
-        // user gesture) so we never call play() on page-first-render when the
-        // user hasn't clicked ▶ yet (autoplay policy would silently reject).
-        if (!isRecord && playing && _userEverPlayed) {
-          const alreadyAutoplayed = v.getAttribute("data-nf-autoplayed") === "1";
-          if (!alreadyAutoplayed && v.paused && typeof v.play === "function") {
-            try {
-              const p = v.play();
-              if (p && typeof p.catch === "function") p.catch(() => {});
-            } catch (_e) { /* noop */ }
-            v.setAttribute("data-nf-autoplayed", "1");
-          }
+      }
+      if (ac && (isRecord || _seekForceSync)) {
+        const fromMs = parseFloat(v.getAttribute("data-nf-t-offset") || "0") || 0;
+        const target = (ac.localT + fromMs) / 1000;
+        try { v.currentTime = target; } catch (_e) { /* noop */ }
+      }
+    }
+
+    const proxyEls = _videoProxyEls(stage);
+    for (let i = 0; i < proxyEls.length; i++) {
+      const proxy = proxyEls[i];
+      const ac = bySrc.get(proxy.getAttribute("data-nf-src"));
+      if (isRecord) {
+        _postVideoProxy(proxy, { type: "mute" });
+        _postVideoProxy(proxy, { type: "pause" });
+        proxy.setAttribute("data-nf-video-muted", "1");
+        proxy.setAttribute("data-nf-video-paused", "1");
+        proxy.setAttribute("data-nf-video-playing", "0");
+      }
+      if (!isRecord && playing && _userEverPlayed) {
+        const alreadyAutoplayed = proxy.getAttribute("data-nf-autoplayed") === "1";
+        const snap = _videoProxyState(proxy);
+        if (!alreadyAutoplayed && snap.paused) {
+          _postVideoProxy(proxy, { type: "play" });
+          proxy.setAttribute("data-nf-autoplayed", "1");
         }
-        if (ac && (isRecord || _seekForceSync)) {
-          // Drive v.currentTime from outside only when: (a) record mode
-          // (recorder provides external t), or (b) explicit seek jump.
-          // Do NOT write currentTime on every tick in play mode — that
-          // triggers a seeking/seeked cycle and silently stops playback.
-          const fromMs = parseFloat(v.getAttribute("data-nf-t-offset") || "0") || 0;
-          const target = (ac.localT + fromMs) / 1000;
-          try { v.currentTime = target; } catch (_e) { /* noop */ }
-        }
+      }
+      if (ac && (isRecord || _seekForceSync)) {
+        const fromMs = parseFloat(proxy.getAttribute("data-nf-t-offset") || "0") || 0;
+        const target = ac.localT + fromMs;
+        proxy.setAttribute("data-nf-video-target-ms", String(target));
+        proxy.setAttribute("data-nf-video-frame-ready", "0");
+        _postVideoProxy(proxy, { type: "seek", t: target });
       }
     }
 
@@ -907,20 +1042,34 @@ function boot(options) {
   // user-gesture event; invoking it later inside RAF tick is rejected →
   // silent media. v1.10 extended to audio (ADR-054).
   function _syncMediaFromGesture(targetPlaying) {
-    const vs = stage.querySelectorAll && stage.querySelectorAll("video[data-nf-persist], audio[data-nf-persist]");
-    if (!vs) return;
-    for (let i = 0; i < vs.length; i++) {
-      const v = vs[i];
+    const mediaEls = stage.querySelectorAll && stage.querySelectorAll("video[data-nf-persist], audio[data-nf-persist]");
+    if (mediaEls) {
+      for (let i = 0; i < mediaEls.length; i++) {
+        const v = mediaEls[i];
+        try {
+          if (targetPlaying && v.paused) {
+            const p = v.play();
+            if (p && typeof p.catch === "function") p.catch(() => {});
+            v.setAttribute("data-nf-autoplayed", "1");
+          } else if (!targetPlaying && !v.paused) {
+            v.pause();
+            v.removeAttribute("data-nf-autoplayed");
+          }
+        } catch (_e) { /* noop */ }
+      }
+    }
+    const proxies = _videoProxyEls(stage);
+    for (let i = 0; i < proxies.length; i++) {
+      const proxy = proxies[i];
       try {
-        if (targetPlaying && v.paused) {
-          const p = v.play();
-          if (p && typeof p.catch === "function") p.catch(() => {});
-          // Mark autoplayed so post-mount RAF loop won't double-play this
-          // element (fights Chromium autoplay policy per FM-AUTOPLAY-POLICY).
-          v.setAttribute("data-nf-autoplayed", "1");
-        } else if (!targetPlaying && !v.paused) {
-          v.pause();
-          v.removeAttribute("data-nf-autoplayed");
+        if (targetPlaying) {
+          _postVideoProxy(proxy, { type: "play" });
+          proxy.setAttribute("data-nf-autoplayed", "1");
+        } else {
+          _postVideoProxy(proxy, { type: "pause" });
+          proxy.removeAttribute("data-nf-autoplayed");
+          proxy.setAttribute("data-nf-video-playing", "0");
+          proxy.setAttribute("data-nf-video-paused", "1");
         }
       } catch (_e) { /* noop */ }
     }
@@ -944,12 +1093,29 @@ function boot(options) {
       }
       // play/edit mode: 不动 muted (保持用户设置)
     }
+    const proxies = _videoProxyEls(stage);
+    for (let i = 0; i < proxies.length; i++) {
+      const proxy = proxies[i];
+      if (!isRec) continue;
+      _postVideoProxy(proxy, { type: "mute" });
+      _postVideoProxy(proxy, { type: "pause" });
+      proxy.setAttribute("data-nf-video-muted", "1");
+      proxy.setAttribute("data-nf-video-paused", "1");
+      proxy.setAttribute("data-nf-video-playing", "0");
+    }
   }
 
   // --- NFHandle ---
   const handle = {
     play() {
-      if (playing) return;
+      if (playing) {
+        handle._paused = false;
+        _userEverPlayed = true;
+        _syncMediaFromMode();
+        _syncMediaFromGesture(true);
+        emitTime(currentTMs());
+        return;
+      }
       // If paused at end, restart from 0 (friendly default for user).
       if (pausedAtMs >= duration_ms) pausedAtMs = 0;
       startPerf = _perf() - pausedAtMs;
@@ -1057,6 +1223,62 @@ function boot(options) {
           };
         });
     },
+    getDuration() {
+      return duration_ms;
+    },
+    getVideoState() {
+      const proxies = Array.from(_videoProxyEls(stage) || []).map((el) => _videoProxyState(el));
+      return {
+        count: proxies.length,
+        active: proxies.length,
+        all_playing: proxies.length === 0 ? true : proxies.every((clip) =>
+          clip.playing && !clip.paused && !clip.muted && clip.frameReady
+        ),
+        clips: proxies.map((clip) => ({
+          key: clip.key,
+          src: clip.src,
+          paused: clip.paused,
+          muted: clip.muted,
+          current_time_ms: Math.round(clip.currentTime * 1000),
+          duration_ms: Math.round(clip.duration * 1000),
+          ready_state: clip.readyState,
+          frame_ready: clip.frameReady,
+          error: clip.error,
+        })),
+      };
+    },
+    getMediaClock() {
+      const proxies = Array.from(_videoProxyEls(stage) || []);
+      for (let i = 0; i < proxies.length; i++) {
+        const clip = _videoProxyState(proxies[i]);
+        if (!clip.paused && clip.currentTime > 0) return clip.currentTime * 1000;
+      }
+      const media = stage.querySelector && stage.querySelector("video[data-nf-persist], audio[data-nf-persist]");
+      if (media && !media.paused && media.currentTime > 0) {
+        return media.currentTime * 1000;
+      }
+      return null;
+    },
+    unmuteAll() {
+      const proxies = _videoProxyEls(stage);
+      for (let i = 0; i < proxies.length; i++) {
+        _postVideoProxy(proxies[i], { type: "unmute", volume: 1.0 });
+        proxies[i].setAttribute("data-nf-video-muted", "0");
+      }
+      const videos = stage.querySelectorAll("video[data-nf-persist]");
+      for (let i = 0; i < videos.length; i++) {
+        try {
+          videos[i].muted = false;
+          videos[i].volume = 1.0;
+        } catch (_e) { /* noop */ }
+      }
+      return handle.getVideoState();
+    },
+    waitForMediaReady(opts) {
+      const timeoutMs = opts && typeof opts.timeout_ms === "number" ? opts.timeout_ms : 1500;
+      const targetMs = opts && typeof opts.t_ms === "number" ? opts.t_ms : currentTMs();
+      return _waitForVideoProxies(stage, targetMs, timeoutMs, _perf, win);
+    },
     screenshot() {
       // v1.1: return HTML snapshot + metadata; playwright driver converts to PNG.
       // Also provide SVG-foreignObject → dataURL path when available (browser only).
@@ -1095,6 +1317,7 @@ function boot(options) {
         render_calls: renderCalls,
         last_render_ms: lastRenderMs,
         listeners: listeners.size,
+        video_proxy_count: (_videoProxyEls(stage) || []).length,
       };
     },
     // Exposed flags (read-only by convention · mutated only via methods above).
@@ -1112,7 +1335,10 @@ function boot(options) {
     // media. Keep the whole runtime paused until the user gestures play;
     // scene-only timelines (no persist media) retain the v1.1/v1.2 autoplay
     // behaviour.
-    const __hasPersistMedia = !!(stage.querySelector && stage.querySelector("video[data-nf-persist], audio[data-nf-persist]"));
+    const __hasPersistMedia = !!(
+      (stage.querySelector && stage.querySelector("video[data-nf-persist], audio[data-nf-persist]")) ||
+      (_videoProxyEls(stage) && _videoProxyEls(stage).length > 0)
+    );
     if (__hasPersistMedia) {
       playing = false;
       pausedAtMs = 0;
@@ -1258,20 +1484,23 @@ function _bindTimelineUi(doc, handle, duration_ms) {
     const vs = doc.querySelectorAll('video[data-nf-persist], audio[data-nf-persist]');
     const anyMuted = Array.prototype.slice.call(vs).some((v) => v.muted);
     const anyVideoPaused = Array.prototype.slice.call(vs).some((v) => v.paused);
-    if (anyMuted || handle._paused || anyVideoPaused) {
-      // Unmute + play inside the user-gesture call stack.
+    const proxyState = typeof handle.getVideoState === "function"
+      ? handle.getVideoState()
+      : { clips: [] };
+    const anyProxyMuted = Array.isArray(proxyState.clips)
+      && proxyState.clips.some((v) => v.muted);
+    const anyProxyPaused = Array.isArray(proxyState.clips)
+      && proxyState.clips.some((v) => v.paused || !v.frame_ready);
+    if (anyMuted || anyProxyMuted || handle._paused || anyVideoPaused || anyProxyPaused) {
+      if (typeof handle.unmuteAll === "function") handle.unmuteAll();
       for (let i = 0; i < vs.length; i++) {
         const v = vs[i];
         try {
           v.muted = false;
           v.volume = 1.0;
-          if (v.paused) {
-            const pr = v.play();
-            if (pr && typeof pr.catch === 'function') pr.catch(() => {});
-          }
         } catch (_e) { /* noop */ }
       }
-      if (handle._paused) handle.play();
+      handle.play();
     } else {
       // All videos already unmuted + playing + runtime playing → pause.
       handle.pause();
@@ -1337,6 +1566,12 @@ function _bindTimelineUi(doc, handle, duration_ms) {
   // runtime playing AND all videos active (unmuted + playing) show ⏸.
   function _effectivelyPlaying() {
     if (handle._paused) return false;
+    const proxyState = typeof handle.getVideoState === "function"
+      ? handle.getVideoState()
+      : null;
+    if (proxyState && Array.isArray(proxyState.clips) && proxyState.clips.length > 0) {
+      return !!proxyState.all_playing;
+    }
     const vs = doc.querySelectorAll("video[data-nf-persist]");
     for (let i = 0; i < vs.length; i++) {
       const v = vs[i];
@@ -1378,6 +1613,9 @@ function _bindTimelineUi(doc, handle, duration_ms) {
     }
   };
   __bindVideoEvents();
+  if (win && typeof win.addEventListener === "function") {
+    win.addEventListener("message", _refreshPlayBtn);
+  }
   // Also re-scan after each RAF tick (new persist <video> may appear when
   // the active clip set changes).
   handle.onTimeUpdate(() => __bindVideoEvents());
@@ -1430,6 +1668,10 @@ function _ts() {
 //   window.__nf.pause()           — pause playback
 //   window.__nf.setLoop(on)       — toggle loop mode
 //   window.__nf.onTimeUpdate(cb)  — subscribe to RAF-tick time updates (returns unsubscribe)
+//   window.__nf.getVideoState()   — JSON-only video proxy state for preview/export verify
+//   window.__nf.waitForMediaReady(opts?) — await iframe video settle after seek/play
+//   window.__nf.unmuteAll()       — gesture-safe unmute bridge for iframe video
+//   window.__nf.getMediaClock()   — active media clock in ms when available
 //   window.__nf.screenshot()      — Promise<dataURL | snapshot>
 //   window.__nf.log(level,msg,d)  — structured JSON line to console
 //   window.__nf.simulate(op)      — AI-operable action dispatcher (walks same code path as UI)
@@ -1504,6 +1746,12 @@ function attachSelfVerify(handle) {
     pause: handle.pause.bind(handle),
     setLoop: handle.setLoop.bind(handle),
     onTimeUpdate: handle.onTimeUpdate.bind(handle),
+    getVideoState: handle.getVideoState ? handle.getVideoState.bind(handle) : (() => ({ count: 0, clips: [] })),
+    waitForMediaReady: handle.waitForMediaReady
+      ? handle.waitForMediaReady.bind(handle)
+      : (() => Promise.resolve({ ok: true, active_videos: 0, clips: [] })),
+    unmuteAll: handle.unmuteAll ? handle.unmuteAll.bind(handle) : (() => ({ count: 0, clips: [] })),
+    getMediaClock: handle.getMediaClock ? handle.getMediaClock.bind(handle) : (() => null),
     __diagnostics: () => handle.__diagnostics(),
   };
 
