@@ -10,3 +10,4 @@ pub mod preview;
 pub mod timeline;
 pub mod inspector;
 pub mod hud;
+pub mod sync;

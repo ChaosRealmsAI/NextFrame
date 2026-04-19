@@ -384,11 +384,16 @@ pub struct TimelineView {
     /// has an owned copy before we tear down subviews.
     #[allow(dead_code)]
     source: Source,
-    /// Playhead position in milliseconds.  Since the skeleton does not
-    /// evaluate `source.duration` (an expression string — see mistakes.json
-    /// FM-SHAPE), we display playhead at `x = 0` until T-10 wires a real
-    /// `playhead_ms / total_ms` ratio.
+    /// Playhead position in milliseconds.  T-10 playhead sync drives this
+    /// via `set_playhead_ms` at 60 Hz.
     playhead_ms: u64,
+    /// Total duration in milliseconds.  Because `source.duration` is an
+    /// expression string (FM-SHAPE), we do not evaluate it in shell — T-11
+    /// main.rs sets this via `set_total_ms` after pulling the resolved
+    /// duration from the runtime (or hardcoding per-source during L5
+    /// integration).  `0` means the ratio computation falls back to `x = 0`
+    /// to avoid divide-by-zero.
+    total_ms: u64,
     /// Owned handle to the thin playhead bar so [`Self::set_playhead_ms`] can
     /// move it.  Child of the root; see [`Self::relayout_playhead`].
     playhead_bar: Retained<NSBox>,
@@ -504,6 +509,7 @@ impl TimelineView {
             root,
             source: source.clone(),
             playhead_ms: 0,
+            total_ms: 0,
             playhead_bar,
             header_track_chip,
             header_title,
@@ -521,14 +527,20 @@ impl TimelineView {
         &self.root
     }
 
-    /// Move the playhead to the given absolute milliseconds.  Does not
-    /// re-evaluate `source.duration` (which is an expression string in this
-    /// skeleton); the x position is computed as a simple ratio once a
-    /// non-zero total is known.  For v1.19 the playhead stays at x=0 and
-    /// this is effectively a no-op — T-10 will extend the API once a
-    /// resolved duration becomes available.
+    /// Move the playhead to the given absolute milliseconds.  x position =
+    /// `(ms / total_ms) * ruler_width`; if total is 0 (not yet set) the
+    /// playhead stays at x=0.  T-10 sync drives this at 60 Hz; T-11 main
+    /// calls [`Self::set_total_ms`] once at startup.
     pub fn set_playhead_ms(&mut self, ms: u64) {
         self.playhead_ms = ms;
+        self.relayout_playhead();
+    }
+
+    /// Set the total duration (ms) used as the playhead-ratio denominator.
+    /// Called by T-11 integrator after the runtime resolves `source.duration`
+    /// (or with a best-guess from source if no JS side is yet initialised).
+    pub fn set_total_ms(&mut self, ms: u64) {
+        self.total_ms = ms;
         self.relayout_playhead();
     }
 
@@ -705,12 +717,14 @@ impl TimelineView {
         let ruler_inner_x = OUTER_PAD_X;
         let ruler_inner_w = (width - OUTER_PAD_X * 2.0).max(1.0);
 
-        // v1.19 skeleton: until T-10 wires a resolved duration, the playhead
-        // parks at the left edge regardless of `playhead_ms`.  `_` guard on
-        // the field avoids an unused-assignment lint while documenting that
-        // the API accepts future input.
-        let _ = self.playhead_ms;
-        let ratio: f64 = 0.0;
+        // Ratio = playhead / total · clamped [0, 1].  total_ms = 0 means
+        // caller has not yet injected a denominator → fall back to x = 0
+        // (no divide-by-zero).  T-11 integrator wires total_ms at startup.
+        let ratio: f64 = if self.total_ms == 0 {
+            0.0
+        } else {
+            ((self.playhead_ms as f64) / (self.total_ms as f64)).clamp(0.0, 1.0)
+        };
         let x = ruler_inner_x + ruler_inner_w * ratio;
 
         // Playhead spans from the top of the ruler strip down through the

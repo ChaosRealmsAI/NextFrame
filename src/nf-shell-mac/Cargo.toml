@@ -12,17 +12,25 @@ path = "src/lib.rs"
 
 [dependencies]
 objc2 = "0.5"
-# objc2 0.2 需显式开 feature 拉生成类 · union of T-04 (window) + T-05 (topbar) · 后续 task 追加
+# block2 = NSTimer block variant (T-10) + WKWebView callAsyncJavaScript 完成回调 (T-09/T-10)
+block2 = "0.5"
+# objc2 0.2 显式开 feature 拉生成类 · union of T-04 window / T-05 topbar / T-06 preview / T-10 sync-timer
 objc2-foundation = { version = "0.2", features = [
     "NSArray",
+    "NSDate",
+    "NSDictionary",
+    "NSError",
     "NSGeometry",
     "NSKeyValueCoding",
     "NSNotification",
     "NSObject",
+    "NSRunLoop",
     "NSString",
     "NSThread",
+    "NSTimer",
     "NSURL",
     "NSValue",
+    "block2",
 ] }
 objc2-app-kit = { version = "0.2", features = [
     "NSApplication",
@@ -45,6 +53,9 @@ objc2-app-kit = { version = "0.2", features = [
 ] }
 objc2-web-kit = { version = "0.2", features = [
     "objc2-app-kit",
+    "block2",
+    "WKContentWorld",
+    "WKFrameInfo",
     "WKNavigation",
     "WKPreferences",
     "WKWebView",
