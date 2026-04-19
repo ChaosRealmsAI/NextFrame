@@ -54,6 +54,14 @@ function buildAspectCss(ratio: string): { css: string; num: string } {
   return { css: `${m[1]} / ${m[2]}`, num: (w / h).toFixed(4) };
 }
 
+// ADR-046 round 2: Tracks render with viewport pixel sizes (e.g. width:1920px).
+// Stage box is smaller — we scale the Track content down to fit without distortion.
+function buildViewportPx(w: number, h: number): { vw: string; vh: string } {
+  const vw = Number.isFinite(w) && w > 0 ? Math.round(w) : 1920;
+  const vh = Number.isFinite(h) && h > 0 ? Math.round(h) : 1080;
+  return { vw: `${vw}px`, vh: `${vh}px` };
+}
+
 export function bundle(input: BundleInput): string {
   if (typeof input.runtimeJs !== 'string') {
     throw bundleError('E_RUNTIME_MISSING', 'runtimeJs must be a string', 'Provide runtime source or placeholder.');
@@ -87,10 +95,12 @@ export function bundle(input: BundleInput): string {
   const trackSourcesJson = sortedJsonStringify(sortedTrackSources, input.pretty ?? false);
   const assetsJson = sortedJsonStringify(sortedAssets, input.pretty ?? false);
 
-  // ADR-046: inject --nf-aspect (CSS aspect-ratio) and --nf-aspect-num (decimal) from
-  // resolved.viewport.ratio so the stage CSS can drive its box.
+  // ADR-046: inject --nf-aspect (CSS aspect-ratio) + --nf-aspect-num (decimal) +
+  // --nf-vw / --nf-vh (logical viewport pixel size) so the stage CSS can both
+  // preserve aspect-ratio AND scale Track-rendered content (which uses viewport px).
   const aspect = buildAspectCss(input.resolved.viewport.ratio);
-  const rootVars = `:root{--nf-aspect:${aspect.css};--nf-aspect-num:${aspect.num};}`;
+  const vp = buildViewportPx(input.resolved.viewport.w, input.resolved.viewport.h);
+  const rootVars = `:root{--nf-aspect:${aspect.css};--nf-aspect-num:${aspect.num};--nf-vw:${vp.vw};--nf-vh:${vp.vh};}`;
 
   const html = [
     '<!DOCTYPE html>',
@@ -167,11 +177,20 @@ const INLINE_CSS = [
   'container-type:size}',
   // #nf-stage width is min(container width, container height * aspect ratio) — the classic
   // contain formula. This is equivalent to object-fit:contain but for a div. aspect-ratio
-  // sets height from the computed width.
+  // sets height from the computed width. `container-type:size` here lets children scale
+  // off #nf-stage's resolved pixel size via container queries.
   '#nf-stage{position:relative;aspect-ratio:var(--nf-aspect);',
   'width:min(100cqw - 24px, (100cqh - 24px) * var(--nf-aspect-num));',
-  'height:auto;background:#050507}',
-  '#nf-stage > *{position:absolute;inset:0}',
+  'height:auto;background:#050507;container-type:size}',
+  // Track-rendered children use viewport pixel sizes (e.g. width:1920px). We scale them
+  // to fit the actual stage box: scale = stage_width / viewport_width. transform-origin
+  // top-left keeps positioning stable. !important is required to beat Track inline
+  // transforms (e.g. scene.js breathe effect 1.008); the cosmetic breathe loss is
+  // acceptable to keep viewport fit correct. Inline width/height:1920px stays; we only
+  // scale the rendered box visually. Content using % inside the Track is unaffected.
+  '#nf-stage > *{position:absolute !important;top:0 !important;left:0 !important;',
+  'transform-origin:top left !important;',
+  'transform:scale(calc(100cqw / var(--nf-vw))) !important}',
   // controls row (unchanged 48px fixed).
   '.controls{flex:0 0 48px;display:flex;align-items:center;gap:10px;padding:0 16px;',
   'background:var(--card);border-top:1px solid var(--border);z-index:2}',
