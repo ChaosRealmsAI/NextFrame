@@ -67,6 +67,8 @@ export interface ParseOutput {
   parsedClips: ParsedClip[];
   refGraph: Record<string, string[]>;
   raw: SourceRaw;
+  data?: Record<string, unknown>;
+  theme?: Record<string, unknown>;
 }
 
 // Resolve stage output.
@@ -95,6 +97,8 @@ export interface Resolved {
   anchors: Record<string, ResolvedAnchor>;
   tracks: ResolvedTrack[];
   meta?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+  theme?: Record<string, unknown>;
 }
 
 // Unified error shape. FM-SHAPE: same shape across stages.

@@ -269,7 +269,7 @@ export function parseSource(text: string, file?: string): ParseOutput {
     throw e;
   }
 
-  return {
+  const out: ParseOutput = {
     viewport: source.viewport,
     durationExpr,
     anchors,
@@ -278,4 +278,8 @@ export function parseSource(text: string, file?: string): ParseOutput {
     refGraph,
     raw: source,
   };
+  const rawObj = raw as { data?: unknown; theme?: unknown };
+  if (rawObj.data !== undefined) out.data = rawObj.data as Record<string, unknown>;
+  if (rawObj.theme !== undefined) out.theme = rawObj.theme as Record<string, unknown>;
+  return out;
 }

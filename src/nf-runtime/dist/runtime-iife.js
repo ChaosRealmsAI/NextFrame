@@ -121,7 +121,7 @@ function liteResolve(source) {
     throw new Error(`liteResolve: duration_ms=${duration_ms} must be > 0`);
   }
 
-  // --- Resolve clips per track ---
+  // --- Resolve clips per track · v1.42: resolve $ref from data/theme ---
   const resolvedTracks = [];
   for (const track of source.tracks) {
     const rClips = [];
@@ -134,7 +134,7 @@ function liteResolve(source) {
         trackId: track.id,
         begin_ms,
         end_ms,
-        params: pc.params,
+        params: _resolveRefs(pc.params, source.data, source.theme, pc.id),
       });
     }
     resolvedTracks.push({
@@ -152,7 +152,50 @@ function liteResolve(source) {
     tracks: resolvedTracks,
   };
   if (source.meta !== undefined) out.meta = source.meta;
+  if (source.data !== undefined) out.data = source.data;
+  if (source.theme !== undefined) out.theme = source.theme;
   return out;
+}
+
+// v1.42 · $ref resolver (ADR-063 data/theme schema v2).
+// Recursively replaces `{$ref:"#/data/x"}` or `{$ref:"#/theme/y"}` (JSON Pointer)
+// with the actual value. Throws with available keys hint if unresolved.
+function _resolveRefs(value, data, theme, clipId) {
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((v) => _resolveRefs(v, data, theme, clipId));
+  const keys = Object.keys(value);
+  if (keys.length === 1 && keys[0] === "$ref" && typeof value.$ref === "string") {
+    return _resolveOneRef(value.$ref, data, theme, clipId);
+  }
+  const out = {};
+  for (const k of keys) out[k] = _resolveRefs(value[k], data, theme, clipId);
+  return out;
+}
+function _resolveOneRef(ref, data, theme, clipId) {
+  if (ref.indexOf("#/") !== 0) {
+    throw new Error("liteResolve: $ref '" + ref + "' must start with '#/' (clip " + clipId + ")");
+  }
+  const parts = ref.slice(2).split("/").map((s) => s.replace(/~1/g, "/").replace(/~0/g, "~"));
+  const root = parts[0];
+  let cur;
+  if (root === "data") cur = data;
+  else if (root === "theme") cur = theme;
+  else throw new Error("liteResolve: $ref '" + ref + "' root must be 'data' or 'theme' (clip " + clipId + ")");
+  if (cur === undefined) {
+    throw new Error("liteResolve: $ref '" + ref + "' · source.json has no '" + root + "' section (clip " + clipId + ")");
+  }
+  for (let i = 1; i < parts.length; i++) {
+    const key = parts[i];
+    if (cur === null || typeof cur !== "object") {
+      throw new Error("liteResolve: $ref '" + ref + "' walks into non-object at '" + parts.slice(0, i).join("/") + "' (clip " + clipId + ")");
+    }
+    if (!(key in cur)) {
+      const availAll = Object.keys(cur).slice(0, 10).join(", ");
+      throw new Error("liteResolve: $ref '" + ref + "' unresolved at key '" + key + "' · available at #/" + parts.slice(0, i).join("/") + ": [" + availAll + "] (clip " + clipId + ")");
+    }
+    cur = cur[key];
+  }
+  return cur;
 }
 
 // Expr parser — recursive-descent, shared grammar with expr.ts.
