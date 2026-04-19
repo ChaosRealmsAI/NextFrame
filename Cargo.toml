@@ -1,5 +1,5 @@
 [workspace]
-members = ["src/nf-cli", "src/nf-tts", "src/nf-guide", "src/nf-shell"]
+members = ["src/nf-cli", "src/nf-tts", "src/nf-guide", "src/nf-shell", "src/nf-recorder", "src/nf-shell-mac"]
 resolver = "2"
 
 [workspace.package]

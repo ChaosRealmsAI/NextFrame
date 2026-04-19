@@ -1,0 +1,124 @@
+[package]
+name = "nf-shell-mac"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# objc2 生态 · 对齐 POC-04B 版本
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = [
+  "NSArray",
+  "NSDate",
+  "NSDictionary",
+  "NSError",
+  "NSGeometry",
+  "NSObject",
+  "NSRunLoop",
+  "NSString",
+  "NSURL",
+  "NSValue",
+] }
+objc2-app-kit = { version = "0.3", features = [
+  "NSApplication",
+  "NSColor",
+  "NSGraphics",
+  "NSImage",
+  "NSResponder",
+  "NSView",
+  "NSWindow",
+] }
+objc2-web-kit = { version = "0.3", features = [
+  "WKContentWorld",
+  "WKFrameInfo",
+  "WKNavigation",
+  "WKNavigationDelegate",
+  "WKScriptMessage",
+  "WKScriptMessageHandler",
+  "WKSnapshotConfiguration",
+  "WKUserContentController",
+  "WKWebView",
+  "WKWebViewConfiguration",
+  "WKWebsiteDataStore",
+  "block2",
+  "objc2-app-kit",
+] }
+objc2-core-image = { version = "0.3", features = [
+  "CIContext",
+  "CIImage",
+  "objc2-core-foundation",
+  "objc2-core-graphics",
+  "objc2-io-surface",
+] }
+objc2-core-graphics = { version = "0.3", features = [
+  "CGColorSpace",
+  "CGImage",
+] }
+objc2-quartz-core = { version = "0.3", features = [
+  "CALayer",
+  "CARenderer",
+  "CATransaction",
+  "objc2-metal",
+  "objc2-core-foundation",
+  "objc2-core-video",
+] }
+objc2-metal = { version = "0.3", features = [
+  "MTLDevice",
+  "MTLPixelFormat",
+  "MTLResource",
+  "MTLTexture",
+  "MTLLibrary",
+  "MTLCommandQueue",
+  "MTLCommandBuffer",
+  "MTLCommandEncoder",
+  "MTLAllocation",
+  "objc2-io-surface",
+] }
+objc2-core-video = { version = "0.3", features = [
+  "CVBuffer",
+  "CVImageBuffer",
+  "CVPixelBuffer",
+  "CVPixelBufferIOSurface",
+  "CVReturn",
+  "objc2-io-surface",
+] }
+objc2-core-foundation = { version = "0.3", features = [
+  "CFBase",
+  "CFCGTypes",
+  "CFDictionary",
+  "CFNumber",
+  "CFString",
+] }
+objc2-io-surface = { version = "0.3", features = [
+  "IOSurface",
+  "IOSurfaceRef",
+  "IOSurfaceTypes",
+  "libc",
+  "objc2",
+  "objc2-core-foundation",
+  "objc2-foundation",
+] }
+block2 = "0.6"
+libc = "0.2"
+# async + serde
+tokio = { version = "1", features = ["rt", "macros", "sync"] }
+serde_json = "1"
+thiserror = "1"
+
+[[test]]
+name = "headless_smoke"
+path = "tests/headless_smoke.rs"
+harness = false
+
+[[test]]
+name = "carenderer_sample"
+path = "tests/carenderer_sample.rs"
+harness = false
+
+[[test]]
+name = "wkwebview_async_seek"
+path = "tests/wkwebview_async_seek.rs"
+harness = false
+
+[lints]
+workspace = true
