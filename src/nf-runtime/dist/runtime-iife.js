@@ -402,6 +402,9 @@ function boot(options) {
         playing = false;
         pausedAtMs = duration_ms;
         renderState(getStateAt(resolved, Math.max(0, duration_ms - 1)));
+        // v1.11.3: runtime 到 duration_ms 停 RAF 后 · 强制暂停所有持久化 media ·
+        // 否则 audio/video 元素仍按自身 duration 继续播 (media 独立于 RAF).
+        _syncMediaFromGesture(false);
         emitTime(duration_ms);
         return;
       }
