@@ -6,6 +6,8 @@ export { topologicalOrder, CycleError } from './topo.js';
 export { parseSource } from './parser.js';
 export { resolve, TrackDescribeLoader, TrackDescriptor } from './resolve.js';
 export { bundle, BundleInput } from './bundler.js';
+export { resolveSubtitleSources } from './subtitle-resolver.js';
+export type { SubtitleResolverOpts } from './subtitle-resolver.js';
 export { rename } from './rename.js';
 export { loadTrack, loadTracksFor, executeTrackSrc, LoadedTrack } from './track-loader.js';
 export * from './types.js';
