@@ -15,6 +15,8 @@
 //!   `nf-shell --verify-select [source.json]`— run clip-selection + inspector verify
 //!   `nf-shell --verify-zoom [source.json]`  — run timeline zoom + scroll verify
 //!   `nf-shell --verify-undo [source.json]`  — run undo/redo + mute/solo verify
+//!   `nf-shell --serve [--port 8848] [source.json]`
+//!                                            — expose HTTP editor API + WS events
 //!   `nf-shell --screenshot <out.png> [--delay-ms N] [source.json]`
 //!                                            — capture WebView → PNG and exit
 
@@ -24,11 +26,21 @@ mod plugins;
 mod template_market;
 
 use std::collections::HashSet;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
+use axum::body::Bytes;
+use axum::extract::{
+    ws::{Message as WsMessage, WebSocket, WebSocketUpgrade},
+    State as AxumState,
+};
+use axum::http::{header as axum_header, HeaderValue as AxumHeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response as AxumResponse};
+use axum::routing::{get, post};
+use axum::{Json, Router};
 use editor::{EditorState, MultiSourceState, Selection};
 #[cfg(any(windows, all(unix, not(target_vendor = "apple"))))]
 use platform::ShellWebView;
@@ -38,10 +50,11 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use tao::dpi::PhysicalPosition;
 use tao::event::{Event, WindowEvent};
-use tao::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
+use tao::event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy};
 #[cfg(target_vendor = "apple")]
 use tao::platform::macos::WindowBuilderExtMacOS;
 use template_market::materialize_template;
+use tokio::sync::{broadcast, oneshot};
 use wry::http;
 
 const WINDOW_TITLE: &str = "NextFrame";
@@ -49,6 +62,7 @@ const WINDOW_W: f64 = 1440.0;
 const WINDOW_H: f64 = 900.0;
 const TITLEBAR_INSET_X: f64 = 18.0;
 const TITLEBAR_INSET_Y: f64 = 18.0;
+const DEFAULT_SERVE_PORT: u16 = 8848;
 
 const PROTOTYPE_HTML: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -108,11 +122,14 @@ struct AudioPeaksCache {
     peaks: Vec<f32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum UserEvent {
     EvalScript(String),
     DragWindow,
     ScreenshotNow(PathBuf),
+    ServeSnapshot {
+        tx: oneshot::Sender<Result<Vec<u8>, String>>,
+    },
     OpenTab {
         path: PathBuf,
     },
@@ -161,6 +178,22 @@ enum UserEvent {
     VerifyUndoReport {
         payload: Value,
     },
+}
+
+#[derive(Clone)]
+struct ServeState {
+    workspace_state: Arc<Mutex<MultiSourceState>>,
+    export_ui_state: Arc<Mutex<ExportUiState>>,
+    plugins: Arc<PluginCatalog>,
+    proxy: EventLoopProxy<UserEvent>,
+    events: broadcast::Sender<String>,
+}
+
+#[derive(Clone, Serialize)]
+struct ServeEventEnvelope {
+    #[serde(rename = "type")]
+    kind: String,
+    payload: Value,
 }
 
 #[derive(Debug, Clone)]
@@ -4281,6 +4314,8 @@ struct CliOpts {
     verify_select_mode: bool,
     verify_zoom_mode: bool,
     verify_undo_mode: bool,
+    serve_mode: bool,
+    serve_port: u16,
     screenshot_path: Option<PathBuf>,
     screenshot_delay_ms: u64,
     export_path: Option<PathBuf>,
@@ -4305,6 +4340,8 @@ fn parse_cli() -> CliOpts {
     let mut verify_select_mode = false;
     let mut verify_zoom_mode = false;
     let mut verify_undo_mode = false;
+    let mut serve_mode = false;
+    let mut serve_port = DEFAULT_SERVE_PORT;
     let mut screenshot_path: Option<PathBuf> = None;
     let mut screenshot_delay_ms: u64 = 2500;
     let mut export_path: Option<PathBuf> = None;
@@ -4329,6 +4366,15 @@ fn parse_cli() -> CliOpts {
             "--verify-select" => verify_select_mode = true,
             "--verify-zoom" => verify_zoom_mode = true,
             "--verify-undo" => verify_undo_mode = true,
+            "--serve" => serve_mode = true,
+            "--port" => {
+                i += 1;
+                if i < args.len() {
+                    if let Ok(v) = args[i].parse::<u16>() {
+                        serve_port = v;
+                    }
+                }
+            }
             "--screenshot" => {
                 i += 1;
                 if i < args.len() {
@@ -4421,6 +4467,8 @@ fn parse_cli() -> CliOpts {
         verify_select_mode,
         verify_zoom_mode,
         verify_undo_mode,
+        serve_mode,
+        serve_port,
         screenshot_path,
         screenshot_delay_ms,
         export_path,
@@ -5067,7 +5115,7 @@ fn ensure_parent_dir(path: &std::path::Path) -> Result<()> {
 }
 
 fn linux_export_error_message() -> &'static str {
-    "export not supported on Linux in v1.60 preview-only mode; use macOS/Windows or --serve (planned for v1.66)"
+    "export not supported on Linux in v1.60 preview-only mode; use macOS/Windows; HTTP edit API is available via --serve"
 }
 
 fn linux_export_not_supported_error() -> anyhow::Error {
@@ -5150,6 +5198,25 @@ fn capture_preview_to_path(
     Ok(bytes.len() as u64)
 }
 
+fn capture_preview_to_bytes(
+    window: &tao::window::Window,
+    webview: &wry::WebView,
+) -> Result<Vec<u8>> {
+    let temp_path = std::env::temp_dir().join(format!(
+        "nf-shell-serve-snapshot-{}-{}.png",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    capture_preview_to_path(&temp_path, window, webview)?;
+    let bytes =
+        std::fs::read(&temp_path).with_context(|| format!("read {}", temp_path.display()))?;
+    let _ = std::fs::remove_file(&temp_path);
+    Ok(bytes)
+}
+
 #[cfg(all(unix, not(target_vendor = "apple")))]
 fn resize_platform_webview(
     window: &tao::window::Window,
@@ -5173,6 +5240,433 @@ fn resize_platform_webview(
 ) {
 }
 
+fn current_workspace_state_value(
+    workspace_state: &Arc<Mutex<MultiSourceState>>,
+    export_ui_state: &Arc<Mutex<ExportUiState>>,
+    plugins: &PluginCatalog,
+) -> Result<Value> {
+    let workspace = workspace_state
+        .lock()
+        .map_err(|e| anyhow::anyhow!("workspace state lock poisoned: {e}"))?;
+    let export_ui = export_ui_state
+        .lock()
+        .map_err(|e| anyhow::anyhow!("export ui lock poisoned: {e}"))?;
+    Ok(workspace_state_value(&workspace, &export_ui, plugins))
+}
+
+fn serve_event_json(method: &str, payload: Value) -> String {
+    serde_json::to_string(&ServeEventEnvelope {
+        kind: method.to_string(),
+        payload,
+    })
+    .unwrap_or_else(|_| "{\"type\":\"error\",\"payload\":null}".to_string())
+}
+
+fn broadcast_workspace_state(serve_state: &ServeState, method: &str) -> Result<Value> {
+    let snapshot = current_workspace_state_value(
+        &serve_state.workspace_state,
+        &serve_state.export_ui_state,
+        &serve_state.plugins,
+    )?;
+    let _ = serve_state
+        .events
+        .send(serve_event_json(method, snapshot.clone()));
+    Ok(snapshot)
+}
+
+fn queue_webview_call(serve_state: &ServeState, method: &str, payload: &Value) -> Result<()> {
+    serve_state
+        .proxy
+        .send_event(UserEvent::EvalScript(editor_js_call(method, payload)))
+        .map_err(|e| anyhow::anyhow!("send user event: {e}"))
+}
+
+fn serve_error(status: StatusCode, message: impl Into<String>) -> (StatusCode, Json<Value>) {
+    (
+        status,
+        Json(json!({
+            "ok": false,
+            "error": message.into(),
+        })),
+    )
+}
+
+fn serve_json_ok(extra: Value) -> Json<Value> {
+    let mut base = json!({ "ok": true });
+    if let (Some(base_obj), Some(extra_obj)) = (base.as_object_mut(), extra.as_object()) {
+        base_obj.extend(extra_obj.clone());
+    }
+    Json(base)
+}
+
+async fn serve_post_source(
+    AxumState(serve_state): AxumState<ServeState>,
+    body: Bytes,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let source: Value = serde_json::from_slice(&body).map_err(|err| {
+        serve_error(
+            StatusCode::BAD_REQUEST,
+            format!("source JSON invalid: {err}"),
+        )
+    })?;
+    if !source.is_object() {
+        return Err(serve_error(
+            StatusCode::BAD_REQUEST,
+            "source JSON must be an object",
+        ));
+    }
+    {
+        let mut workspace = serve_state.workspace_state.lock().map_err(|e| {
+            serve_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("workspace state lock poisoned: {e}"),
+            )
+        })?;
+        workspace
+            .replace_active_source(source)
+            .map_err(|err| serve_error(StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    }
+    let state = broadcast_workspace_state(&serve_state, "receiveState")
+        .map_err(|err| serve_error(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+    queue_webview_call(&serve_state, "receiveState", &state)
+        .map_err(|err| serve_error(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+    Ok(serve_json_ok(json!({ "state": state })))
+}
+
+async fn serve_post_ipc(
+    AxumState(serve_state): AxumState<ServeState>,
+    body: Bytes,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let body_str = std::str::from_utf8(&body).map_err(|err| {
+        serve_error(
+            StatusCode::BAD_REQUEST,
+            format!("ipc body not utf-8: {err}"),
+        )
+    })?;
+    let outcome = {
+        let mut workspace = serve_state.workspace_state.lock().map_err(|e| {
+            serve_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("workspace state lock poisoned: {e}"),
+            )
+        })?;
+        let export_ui = serve_state.export_ui_state.lock().map_err(|e| {
+            serve_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("export ui lock poisoned: {e}"),
+            )
+        })?;
+        dispatch_ipc(&mut workspace, &export_ui, &serve_state.plugins, body_str)
+            .map_err(|err| serve_error(StatusCode::BAD_REQUEST, err.to_string()))?
+    };
+    let mut response = json!({ "accepted": true });
+    match outcome {
+        IpcOutcome::EvalScript { message, js, .. } => {
+            serve_state
+                .proxy
+                .send_event(UserEvent::EvalScript(js))
+                .map_err(|e| {
+                    serve_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("send user event: {e}"),
+                    )
+                })?;
+            let state = broadcast_workspace_state(&serve_state, "receiveState")
+                .map_err(|err| serve_error(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+            response["state"] = state;
+            response["queued"] = Value::String("eval".to_string());
+            response["message"] = message.map(Value::String).unwrap_or(Value::Null);
+        }
+        IpcOutcome::DragWindow => {
+            serve_state
+                .proxy
+                .send_event(UserEvent::DragWindow)
+                .map_err(|e| {
+                    serve_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("send user event: {e}"),
+                    )
+                })?;
+            response["queued"] = Value::String("drag-window".to_string());
+        }
+        IpcOutcome::OpenTab { path } => {
+            serve_state
+                .proxy
+                .send_event(UserEvent::OpenTab { path: path.clone() })
+                .map_err(|e| {
+                    serve_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("send user event: {e}"),
+                    )
+                })?;
+            response["queued"] = Value::String("open-tab".to_string());
+            response["path"] = Value::String(path.display().to_string());
+        }
+        IpcOutcome::MenuOpen => {
+            serve_state
+                .proxy
+                .send_event(UserEvent::MenuOpen)
+                .map_err(|e| {
+                    serve_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("send user event: {e}"),
+                    )
+                })?;
+            response["queued"] = Value::String("menu-open".to_string());
+        }
+        IpcOutcome::MenuSave => {
+            serve_state
+                .proxy
+                .send_event(UserEvent::MenuSave)
+                .map_err(|e| {
+                    serve_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("send user event: {e}"),
+                    )
+                })?;
+            response["queued"] = Value::String("menu-save".to_string());
+        }
+        IpcOutcome::MenuTemplate { template_name } => {
+            serve_state
+                .proxy
+                .send_event(UserEvent::MenuTemplate {
+                    template_name: template_name.clone(),
+                })
+                .map_err(|e| {
+                    serve_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("send user event: {e}"),
+                    )
+                })?;
+            response["queued"] = Value::String("menu-template".to_string());
+            response["template"] = Value::String(template_name);
+        }
+        IpcOutcome::StartExportDialog {
+            duration_s,
+            parallel,
+            resolution,
+        } => {
+            serve_state
+                .proxy
+                .send_event(UserEvent::StartExportDialog {
+                    duration_s,
+                    parallel,
+                    resolution: resolution.clone(),
+                })
+                .map_err(|e| {
+                    serve_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("send user event: {e}"),
+                    )
+                })?;
+            response["queued"] = Value::String("export-dialog".to_string());
+            response["duration_s"] = json!(duration_s);
+            response["parallel"] = json!(parallel);
+            response["resolution"] = resolution.map(Value::String).unwrap_or(Value::Null);
+        }
+        IpcOutcome::StartExport {
+            path,
+            duration_s,
+            parallel,
+            resolution,
+        } => {
+            serve_state
+                .proxy
+                .send_event(UserEvent::StartExport {
+                    path: path.clone(),
+                    duration_s,
+                    parallel,
+                    resolution: resolution.clone(),
+                })
+                .map_err(|e| {
+                    serve_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("send user event: {e}"),
+                    )
+                })?;
+            response["queued"] = Value::String("export".to_string());
+            response["path"] = Value::String(path.display().to_string());
+            response["duration_s"] = json!(duration_s);
+            response["parallel"] = json!(parallel);
+            response["resolution"] = resolution.map(Value::String).unwrap_or(Value::Null);
+        }
+        IpcOutcome::StartSimulatedExport { path, duration_s } => {
+            serve_state
+                .proxy
+                .send_event(UserEvent::StartSimulatedExport {
+                    path: path.clone(),
+                    duration_s,
+                })
+                .map_err(|e| {
+                    serve_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("send user event: {e}"),
+                    )
+                })?;
+            response["queued"] = Value::String("verify-export-progress".to_string());
+            response["path"] = Value::String(path.display().to_string());
+            response["duration_s"] = json!(duration_s);
+        }
+        IpcOutcome::VerifyMediaReport(json) => {
+            response["queued"] = Value::String("verify-media-report".to_string());
+            response["payload"] = json!(json);
+        }
+        IpcOutcome::VerifySelectReport(payload) => {
+            response["queued"] = Value::String("verify-select-report".to_string());
+            response["payload"] = payload;
+        }
+        IpcOutcome::VerifyZoomReport(payload) => {
+            response["queued"] = Value::String("verify-zoom-report".to_string());
+            response["payload"] = payload;
+        }
+        IpcOutcome::VerifyUndoReport(payload) => {
+            response["queued"] = Value::String("verify-undo-report".to_string());
+            response["payload"] = payload;
+        }
+    }
+    Ok(serve_json_ok(response))
+}
+
+async fn serve_get_snapshot(
+    AxumState(serve_state): AxumState<ServeState>,
+) -> Result<AxumResponse, (StatusCode, Json<Value>)> {
+    let (tx, rx) = oneshot::channel();
+    serve_state
+        .proxy
+        .send_event(UserEvent::ServeSnapshot { tx })
+        .map_err(|e| {
+            serve_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("send user event: {e}"),
+            )
+        })?;
+    let png = rx
+        .await
+        .map_err(|_| {
+            serve_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "snapshot channel cancelled",
+            )
+        })?
+        .map_err(|err| serve_error(StatusCode::INTERNAL_SERVER_ERROR, err))?;
+    let mut response = png.into_response();
+    response.headers_mut().insert(
+        axum_header::CONTENT_TYPE,
+        AxumHeaderValue::from_static("image/png"),
+    );
+    response.headers_mut().insert(
+        axum_header::CACHE_CONTROL,
+        AxumHeaderValue::from_static("no-store"),
+    );
+    Ok(response)
+}
+
+async fn serve_events(
+    ws: WebSocketUpgrade,
+    AxumState(serve_state): AxumState<ServeState>,
+) -> AxumResponse {
+    ws.on_upgrade(move |socket| handle_serve_socket(socket, serve_state))
+}
+
+async fn handle_serve_socket(mut socket: WebSocket, serve_state: ServeState) {
+    match current_workspace_state_value(
+        &serve_state.workspace_state,
+        &serve_state.export_ui_state,
+        &serve_state.plugins,
+    ) {
+        Ok(snapshot) => {
+            let _ = socket
+                .send(WsMessage::Text(
+                    serve_event_json("receiveState", snapshot).into(),
+                ))
+                .await;
+        }
+        Err(err) => {
+            let _ = socket
+                .send(WsMessage::Text(
+                    serve_event_json("error", json!({ "message": err.to_string() })).into(),
+                ))
+                .await;
+            return;
+        }
+    }
+    let mut rx = serve_state.events.subscribe();
+    loop {
+        tokio::select! {
+            incoming = socket.recv() => {
+                match incoming {
+                    Some(Ok(WsMessage::Close(_))) | None => break,
+                    Some(Ok(_)) => {}
+                    Some(Err(_)) => break,
+                }
+            }
+            event = rx.recv() => {
+                match event {
+                    Ok(payload) => {
+                        if socket.send(WsMessage::Text(payload.into())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        if let Ok(snapshot) = current_workspace_state_value(
+                            &serve_state.workspace_state,
+                            &serve_state.export_ui_state,
+                            &serve_state.plugins,
+                        ) {
+                            if socket
+                                .send(WsMessage::Text(serve_event_json("receiveState", snapshot).into()))
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        }
+    }
+}
+
+fn spawn_serve_thread(serve_state: ServeState, port: u16, stdout_json_mode: bool) {
+    std::thread::spawn(move || {
+        let runtime = match tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+        {
+            Ok(runtime) => runtime,
+            Err(err) => {
+                eprintln!("[NF-SERVE] runtime init failed: {err}");
+                return;
+            }
+        };
+        runtime.block_on(async move {
+            let app = Router::new()
+                .route("/source", post(serve_post_source))
+                .route("/ipc", post(serve_post_ipc))
+                .route("/snapshot", get(serve_get_snapshot))
+                .route("/events", get(serve_events))
+                .with_state(serve_state);
+            let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+            match tokio::net::TcpListener::bind(addr).await {
+                Ok(listener) => {
+                    shell_log(
+                        stdout_json_mode,
+                        &format!("[NF-SERVE] listening http://127.0.0.1:{port}"),
+                    );
+                    if let Err(err) = axum::serve(listener, app).await {
+                        eprintln!("[NF-SERVE] server failed: {err}");
+                    }
+                }
+                Err(err) => {
+                    eprintln!("[NF-SERVE] bind 127.0.0.1:{port} failed: {err}");
+                }
+            }
+        });
+    });
+}
+
 fn push_workspace_state_to_webview(
     window: &tao::window::Window,
     webview: &wry::WebView,
@@ -5181,18 +5675,8 @@ fn push_workspace_state_to_webview(
     plugins: &PluginCatalog,
     method: &str,
 ) -> Result<()> {
-    let workspace = workspace_state
-        .lock()
-        .map_err(|e| anyhow::anyhow!("workspace state lock poisoned: {e}"))?;
-    let export_ui = export_ui_state
-        .lock()
-        .map_err(|e| anyhow::anyhow!("export ui lock poisoned: {e}"))?;
-    let js = editor_js_call(
-        method,
-        &workspace_state_value(&workspace, &export_ui, plugins),
-    );
-    drop(export_ui);
-    drop(workspace);
+    let snapshot = current_workspace_state_value(workspace_state, export_ui_state, plugins)?;
+    let js = editor_js_call(method, &snapshot);
     evaluate_webview_script(window, webview, &js)
 }
 
@@ -5321,6 +5805,18 @@ fn main() -> Result<()> {
 
     let event_loop: EventLoop<UserEvent> = EventLoopBuilder::with_user_event().build();
     let proxy = event_loop.create_proxy();
+    let (serve_events_tx, _) = broadcast::channel(64);
+    let serve_state = if opts.serve_mode {
+        Some(ServeState {
+            workspace_state: Arc::clone(&workspace_state),
+            export_ui_state: Arc::clone(&export_ui_state),
+            plugins: Arc::clone(&plugin_catalog),
+            proxy: proxy.clone(),
+            events: serve_events_tx,
+        })
+    } else {
+        None
+    };
 
     let window = platform::build_platform_window!(
         &event_loop,
@@ -5339,6 +5835,7 @@ fn main() -> Result<()> {
     let export_ui_for_handler = Arc::clone(&export_ui_state);
     let plugin_catalog_for_handler = Arc::clone(&plugin_catalog);
     let proxy_for_handler = proxy.clone();
+    let serve_state_for_handler = serve_state.clone();
     let verify_mode = opts.verify_mode;
     let verify_count = Arc::new(Mutex::new(0u32));
     let verify_count_for_handler = Arc::clone(&verify_count);
@@ -5372,7 +5869,10 @@ fn main() -> Result<()> {
                     return;
                 }
             };
-            match dispatch_ipc(&mut state, &export_ui, &plugin_catalog_for_handler, body) {
+            let outcome = dispatch_ipc(&mut state, &export_ui, &plugin_catalog_for_handler, body);
+            drop(export_ui);
+            drop(state);
+            match outcome {
                 Ok(IpcOutcome::EvalScript {
                     message,
                     js,
@@ -5381,8 +5881,10 @@ fn main() -> Result<()> {
                     if let Some(msg) = message {
                         shell_log(stdout_json_mode, &format!("[NF-IPC] {msg}"));
                     }
-                    drop(state);
                     let _ = proxy_for_handler.send_event(UserEvent::EvalScript(js));
+                    if let Some(serve_state) = serve_state_for_handler.as_ref() {
+                        let _ = broadcast_workspace_state(serve_state, "receiveState");
+                    }
                     if verify_mode && mutation {
                         if let Ok(mut c) = verify_count_for_handler.lock() {
                             *c += 1;
@@ -5471,19 +5973,25 @@ fn main() -> Result<()> {
     shell_log(
         stdout_json_mode,
         &format!(
-            "[NF] window {WINDOW_W}x{WINDOW_H} · titlebar transparent + traffic lights · resizable · source={} · tracks={} · verify={} · verify_select={} · verify_zoom={} · verify_undo={} · screenshot={}",
+            "[NF] window {WINDOW_W}x{WINDOW_H} · titlebar transparent + traffic lights · resizable · source={} · tracks={} · verify={} · verify_select={} · verify_zoom={} · verify_undo={} · serve={} · port={} · screenshot={}",
             source_path,
             n_tracks,
             opts.verify_mode,
             opts.verify_select_mode,
             opts.verify_zoom_mode,
             opts.verify_undo_mode,
+            opts.serve_mode,
+            opts.serve_port,
             opts.screenshot_path
                 .as_ref()
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "off".to_string()),
         ),
     );
+
+    if let Some(serve_state) = serve_state.clone() {
+        spawn_serve_thread(serve_state, opts.serve_port, stdout_json_mode);
+    }
 
     // Schedule a delayed screenshot via a dedicated thread that fires a
     // UserEvent on the event loop (which has the proxy to talk to the
@@ -5514,6 +6022,7 @@ fn main() -> Result<()> {
     // 不依赖 tao 窗口可见 · 菜单 IPC 触发时仍走 StartExport 事件 (spawn 自身子进程)。
     // CLI 直接 --export 在 main() 开头已短路退出 (见 fn main 首部) · 这里不再处理。
     let _ = proxy.clone(); // 保留 proxy · 其他事件仍用。
+    let serve_state_for_loop = serve_state.clone();
 
     let window_for_loop = window;
     event_loop.run(move |event, _, control_flow| {
@@ -5536,6 +6045,11 @@ fn main() -> Result<()> {
             }
             Event::UserEvent(UserEvent::DragWindow) => {
                 let _ = window_for_loop.drag_window();
+            }
+            Event::UserEvent(UserEvent::ServeSnapshot { tx }) => {
+                let outcome = capture_preview_to_bytes(&window_for_loop, &webview)
+                    .map_err(|err| err.to_string());
+                let _ = tx.send(outcome);
             }
             Event::UserEvent(UserEvent::ScreenshotNow(path)) => {
                 match capture_preview_to_path(&path, &window_for_loop, &webview) {
@@ -5755,6 +6269,9 @@ fn main() -> Result<()> {
                             &plugin_catalog,
                             "receiveSourceUpdate",
                         );
+                        if let Some(serve_state) = serve_state_for_loop.as_ref() {
+                            let _ = broadcast_workspace_state(serve_state, "receiveState");
+                        }
                         shell_log(
                             stdout_json_mode,
                             &format!("[NF-TAB] open {}", loaded.path),
@@ -5969,6 +6486,9 @@ fn main() -> Result<()> {
                 };
                 let js = editor_js_call("receiveExportState", &payload);
                 let _ = evaluate_webview_script(&window_for_loop, &webview, &js);
+                if let Some(serve_state) = serve_state_for_loop.as_ref() {
+                    let _ = broadcast_workspace_state(serve_state, "receiveState");
+                }
             }
             Event::UserEvent(UserEvent::ExportDone { path, ok, msg }) => {
                 let payload = if let Ok(mut export_ui) = export_ui_state.lock() {
@@ -5991,6 +6511,9 @@ fn main() -> Result<()> {
                 };
                 let js = editor_js_call("receiveExportState", &payload);
                 let _ = evaluate_webview_script(&window_for_loop, &webview, &js);
+                if let Some(serve_state) = serve_state_for_loop.as_ref() {
+                    let _ = broadcast_workspace_state(serve_state, "receiveState");
+                }
                 if ok {
                     shell_log(
                         stdout_json_mode,
@@ -6092,6 +6615,9 @@ fn main() -> Result<()> {
                             &plugin_catalog,
                             "receiveState",
                         );
+                        if let Some(serve_state) = serve_state_for_loop.as_ref() {
+                            let _ = broadcast_workspace_state(serve_state, "receiveState");
+                        }
                         shell_log(
                             stdout_json_mode,
                             &format!("[NF-MENU] save to: {} ({} bytes)", p.display(), written),
