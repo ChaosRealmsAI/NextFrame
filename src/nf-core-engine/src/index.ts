@@ -5,7 +5,7 @@ export { parseExpr, collectRefs, ExprParseError } from './expr.js';
 export { topologicalOrder, CycleError } from './topo.js';
 export { parseSource } from './parser.js';
 export { resolve, TrackDescribeLoader, TrackDescriptor } from './resolve.js';
-export { bundle, BundleInput } from './bundler.js';
+// `bundle` removed in v1.20 (ADR-060 · nf-shell desktop app is the sole preview surface).
 export { resolveSubtitleSources } from './subtitle-resolver.js';
 export type { SubtitleResolverOpts } from './subtitle-resolver.js';
 export { rename } from './rename.js';

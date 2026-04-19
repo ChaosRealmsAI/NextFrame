@@ -39,7 +39,3 @@ pub fn emit_error(err: &CliError) {
     }
 }
 
-/// Pass-through engine event on stdout (already valid JSON).
-pub fn emit_raw_line(line: &str) {
-    println!("{line}");
-}
