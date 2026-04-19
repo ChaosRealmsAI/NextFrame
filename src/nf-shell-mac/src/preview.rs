@@ -51,13 +51,11 @@ use std::error::Error;
 use std::fmt;
 use std::path::Path;
 
-use objc2::msg_send;
 use objc2::rc::Retained;
-use objc2::runtime::AnyObject;
 use objc2::ClassType;
 use objc2_app_kit::{NSAutoresizingMaskOptions, NSBorderType, NSBox, NSBoxType, NSColor, NSTitlePosition, NSView};
-use objc2_foundation::{MainThreadMarker, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL};
-use objc2_web_kit::{WKPreferences, WKWebView, WKWebViewConfiguration};
+use objc2_foundation::{MainThreadMarker, NSPoint, NSRect, NSSize, NSString, NSURL};
+use objc2_web_kit::{WKWebView, WKWebViewConfiguration};
 
 use crate::html_template::{assemble_html, AssembleError};
 use crate::source::Source;
@@ -168,30 +166,18 @@ impl PreviewPanel {
 
         // --- Configuration --------------------------------------------------
         //
-        // `preferences.setValue:forKey:` is the AppKit-blessed escape hatch
-        // for a pair of WebKit flags that aren't exposed on the typed
-        // `WKPreferences` API:
-        //   - `allowFileAccessFromFileURLs` — grants `file://` pages access
-        //     to other `file://` resources, which is how demo asset clips
-        //     resolve.
-        //   - `allowUniversalAccessFromFileURLs` — same idea, widened to
-        //     cross-origin. Needed because runtime.js may fetch a `file://`
-        //     asset from an `about:blank` document when `baseURL` is nil.
+        // Default WKWebViewConfiguration is sufficient: `loadHTMLString` with
+        // baseURL = `file://source_dir/` makes the WKWebView's loading origin
+        // `file://`, and same-origin (file→file) loads are permitted without
+        // any extra flags (POC-v1.8-file-url-local-load validated this).
         //
-        // Both keys are listed in Apple's WebKit OSS headers; `setValue:` on
-        // NSObject silently ignores unknown keys, so the call is safe even
-        // on macOS versions that drop support.
-        let configuration = unsafe {
-            let cfg = WKWebViewConfiguration::new();
-            let prefs: Retained<WKPreferences> = cfg.preferences();
-            // Cast &WKPreferences to &AnyObject so the KVC helper can dispatch
-            // setValue:forKey: via msg_send! without requiring the trait to
-            // be implemented on the concrete class.
-            let prefs_any: &AnyObject = &*prefs as &WKPreferences as &AnyObject;
-            kvc_set_bool(prefs_any, "allowFileAccessFromFileURLs", true);
-            kvc_set_bool(prefs_any, "allowUniversalAccessFromFileURLs", true);
-            cfg
-        };
+        // NOTE: earlier T-06 tried to KVC-set `allowFileAccessFromFileURLs` +
+        // `allowUniversalAccessFromFileURLs` on WKPreferences — see
+        // spec/bug/2026-04-19-v1.19-wkpreferences-kvc-crash.md — but modern
+        // WKPreferences is NOT KVC-compliant for those UIWebView-era keys and
+        // raises NSUndefinedKeyException. They're not needed for the same-
+        // origin local-file pipeline we use, so we simply omit them.
+        let configuration = unsafe { WKWebViewConfiguration::new() };
 
         // --- WKWebView ------------------------------------------------------
         //
@@ -398,23 +384,10 @@ fn make_black_backdrop(mtm: MainThreadMarker, size: NSSize) -> Retained<NSBox> {
     }
 }
 
-/// KVC helper: send `[obj setValue:NSNumber(value) forKey:key]` via
-/// `msg_send!`. Used for WebKit's undocumented-but-stable preference keys
-/// that aren't exposed on the typed `WKPreferences` API.
-///
-/// `setValue:forKey:` is defined on NSObject; every Objective-C object
-/// responds to it, but objc2's `NSObjectNSKeyValueCoding` trait is only
-/// implemented for `NSObject` itself — so we go through `msg_send!` and
-/// cast the target to `&AnyObject`. Unknown keys are silently ignored by
-/// AppKit, which is the fallback behaviour we want if a future macOS
-/// renames either WebKit preference.
-fn kvc_set_bool(obj: &AnyObject, key: &str, value: bool) {
-    unsafe {
-        let ns_key = NSString::from_str(key);
-        let number: Retained<NSNumber> = NSNumber::numberWithBool(value);
-        let () = msg_send![obj, setValue: &*number, forKey: &*ns_key];
-    }
-}
+// NOTE: kvc_set_bool was removed with the WKPreferences KVC hack. See
+// spec/bug/2026-04-19-v1.19-wkpreferences-kvc-crash.md. loadHTMLString
+// with a file:// baseURL is sufficient for the same-origin local asset
+// load the runtime needs — no extra preference writes required.
 
 // ---------------------------------------------------------------------------
 // Tests — pure algorithmic, no AppKit main-thread dependency.
