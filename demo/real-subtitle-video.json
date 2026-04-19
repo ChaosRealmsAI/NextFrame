@@ -1,0 +1,37 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {"name": "视频 + 字幕 · video + subtitle", "version": "v1.26", "created": "2026-04-19",
+    "description": "bg + 视频全屏 + 底部卡拉 OK 字幕 (words-mode)"},
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "demo.begin + 30s", "filler": "manual"}},
+  "tracks": [
+    {"id": "bg", "kind": "bg", "src": "src/nf-tracks/official/bg.js",
+      "clips": [{"id": "c0", "begin": "demo.begin", "end": "demo.end",
+        "params": {"type": "solid", "color": "#000000"}}]},
+    {"id": "video-full", "kind": "video", "src": "src/nf-tracks/official/video.js",
+      "clips": [{"id": "v1", "begin": "demo.begin", "end": "demo.end",
+        "params": {"src": "file:///Users/Zhuanz/bigbang/NextFrame/demo/assets/real-clip-2.mp4",
+          "from_ms": 0, "to_ms": 30000, "fit": "cover",
+          "x": 0, "y": 0, "w": 100, "h": 80, "radius": 0}}]},
+    {"id": "subtitle-words", "kind": "subtitle", "src": "src/nf-tracks/official/subtitle.js",
+      "clips": [{"id": "s1", "begin": "demo.begin", "end": "demo.end",
+        "params": {"source": {"words": [
+          {"text": "欢", "start_ms": 500, "end_ms": 900},
+          {"text": "迎", "start_ms": 900, "end_ms": 1300},
+          {"text": "使", "start_ms": 1500, "end_ms": 1900},
+          {"text": "用", "start_ms": 1900, "end_ms": 2300},
+          {"text": "NextFrame", "start_ms": 2500, "end_ms": 3800},
+          {"text": "·", "start_ms": 4000, "end_ms": 4200},
+          {"text": "真", "start_ms": 4400, "end_ms": 4800},
+          {"text": "实", "start_ms": 4800, "end_ms": 5200},
+          {"text": "视", "start_ms": 5400, "end_ms": 5800},
+          {"text": "频", "start_ms": 5800, "end_ms": 6200},
+          {"text": "·", "start_ms": 6400, "end_ms": 6600},
+          {"text": "字", "start_ms": 6800, "end_ms": 7200},
+          {"text": "级", "start_ms": 7200, "end_ms": 7600},
+          {"text": "对", "start_ms": 7800, "end_ms": 8200},
+          {"text": "齐", "start_ms": 8200, "end_ms": 8600}]},
+          "style": {"active_color": "#fbbf24", "size_px": 48, "position": "bottom", "padding": 24}}}]}
+  ]
+}

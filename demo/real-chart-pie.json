@@ -1,0 +1,20 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {"name": "饼图 · chart pie", "version": "v1.26", "created": "2026-04-19",
+    "description": "bg + chart pie 市场份额饼图"},
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "demo.begin + 15s", "filler": "manual"}},
+  "tracks": [
+    {"id": "bg", "kind": "bg", "src": "src/nf-tracks/official/bg.js",
+      "clips": [{"id": "c0", "begin": "demo.begin", "end": "demo.end",
+        "params": {"type": "solid", "color": "#0a0a14"}}]},
+    {"id": "chart-pie", "kind": "chart", "src": "src/nf-tracks/official/chart.js",
+      "clips": [{"id": "c1", "begin": "demo.begin", "end": "demo.end",
+        "params": {"chart_type": "pie",
+          "categories": ["移动端", "桌面端", "平板", "电视", "其他"],
+          "series": [{"name": "占比", "data": [52, 28, 10, 6, 4]}],
+          "animation": {"duration_ms": 1200, "mode": "rise"},
+          "title": "2026 Q3 终端占比"}}]}
+  ]
+}

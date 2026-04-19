@@ -1,0 +1,27 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {"name": "柱状图 · chart bar", "version": "v1.26", "created": "2026-04-19",
+    "description": "bg 渐变 + scene 标题 + chart bar 3 系列柱状图"},
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "demo.begin + 20s", "filler": "manual"}},
+  "tracks": [
+    {"id": "bg", "kind": "bg", "src": "src/nf-tracks/official/bg.js",
+      "clips": [{"id": "c0", "begin": "demo.begin", "end": "demo.end",
+        "params": {"type": "gradient", "gradient": "linear", "angle": 135, "stops": [
+          {"offset": 0, "color": "#0f172a"}, {"offset": 1, "color": "#1e1b4b"}]}}]},
+    {"id": "title", "kind": "scene", "src": "src/nf-tracks/official/scene.js",
+      "clips": [{"id": "c1", "begin": "demo.begin", "end": "demo.end",
+        "params": {"layout": "hero", "title": "季度销售额对比", "subtitle": "2024 vs 2025 vs 2026", "accent_color": "#a78bfa"}}]},
+    {"id": "chart-bar", "kind": "chart", "src": "src/nf-tracks/official/chart.js",
+      "clips": [{"id": "c2", "begin": "demo.begin", "end": "demo.end",
+        "params": {"chart_type": "bar", "layout": "grouped",
+          "categories": ["Q1", "Q2", "Q3", "Q4"],
+          "series": [
+            {"name": "2024", "color": "#a78bfa", "data": [45, 55, 50, 62]},
+            {"name": "2025", "color": "#f97316", "data": [58, 68, 65, 78]},
+            {"name": "2026", "color": "#34d399", "data": [72, 82, 88, 95]}],
+          "animation": {"duration_ms": 1500, "stagger_ms": 80, "mode": "rise"},
+          "title": "季度销售额（万元）"}}]}
+  ]
+}

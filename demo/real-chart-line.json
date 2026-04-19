@@ -1,0 +1,23 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {"name": "折线图 · chart line", "version": "v1.26", "created": "2026-04-19",
+    "description": "bg + chart line 月度增长曲线"},
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "demo.begin + 20s", "filler": "manual"}},
+  "tracks": [
+    {"id": "bg", "kind": "bg", "src": "src/nf-tracks/official/bg.js",
+      "clips": [{"id": "c0", "begin": "demo.begin", "end": "demo.end",
+        "params": {"type": "gradient", "gradient": "radial", "stops": [
+          {"offset": 0, "color": "#1e1b4b"}, {"offset": 1, "color": "#050507"}]}}]},
+    {"id": "chart-line", "kind": "chart", "src": "src/nf-tracks/official/chart.js",
+      "clips": [{"id": "c1", "begin": "demo.begin", "end": "demo.end",
+        "params": {"chart_type": "line",
+          "categories": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+          "series": [
+            {"name": "活跃用户 (万)", "color": "#a78bfa", "data": [12, 15, 18, 22, 28, 35]},
+            {"name": "付费用户 (万)", "color": "#34d399", "data": [2, 3, 5, 7, 10, 14]}],
+          "animation": {"duration_ms": 1800, "mode": "draw"},
+          "title": "2026 H1 用户增长"}}]}
+  ]
+}

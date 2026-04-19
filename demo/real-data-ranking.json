@@ -1,0 +1,24 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {"name": "排行榜 · data ranking", "version": "v1.26", "created": "2026-04-19",
+    "description": "bg + data Top 5 排行榜"},
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "demo.begin + 15s", "filler": "manual"}},
+  "tracks": [
+    {"id": "bg", "kind": "bg", "src": "src/nf-tracks/official/bg.js",
+      "clips": [{"id": "c0", "begin": "demo.begin", "end": "demo.end",
+        "params": {"type": "gradient", "gradient": "linear", "angle": 180, "stops": [
+          {"offset": 0, "color": "#1e3a8a"}, {"offset": 1, "color": "#0a0a14"}]}}]},
+    {"id": "rank", "kind": "data", "src": "src/nf-tracks/official/data.js",
+      "clips": [{"id": "c1", "begin": "demo.begin", "end": "demo.end",
+        "params": {"type": "ranking", "title": "2026 Top 5 区域销售",
+          "rows": [
+            {"label": "华东", "value": 1250, "delta": 8.2},
+            {"label": "华南", "value": 980, "delta": 5.1},
+            {"label": "华北", "value": 820, "delta": -2.3},
+            {"label": "西南", "value": 560, "delta": 12.0},
+            {"label": "东北", "value": 410, "delta": 3.4}],
+          "highlight_top": 3, "value_format": "integer"}}]}
+  ]
+}

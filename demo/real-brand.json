@@ -1,0 +1,39 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {
+    "name": "品牌开场 · 真视频 #1",
+    "description": "30s brand teaser · real-clip-1.mp4 (前 30s 片段)",
+    "version": "v1.26",
+    "created": "2026-04-19"
+  },
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "demo.begin + 30s", "filler": "manual"}},
+  "tracks": [
+    {
+      "id": "bg-ink",
+      "kind": "bg",
+      "src": "src/nf-tracks/official/bg.js",
+      "clips": [{"id": "bg-ink-01", "begin": "demo.begin", "end": "demo.end",
+        "params": {"type": "gradient", "gradient": "linear", "angle": 135, "stops": [
+          {"offset": 0, "color": "#0f172a"},
+          {"offset": 1, "color": "#1e1b4b"}]}}]
+    },
+    {
+      "id": "scene-title",
+      "kind": "scene",
+      "src": "src/nf-tracks/official/scene.js",
+      "clips": [{"id": "scene-01", "begin": "demo.begin", "end": "demo.end",
+        "params": {"layout": "hero", "title": "2026 品牌开场", "subtitle": "30 秒 teaser · 真实视频 #1", "accent_color": "#a78bfa"}}]
+    },
+    {
+      "id": "video-fullframe",
+      "kind": "video",
+      "src": "src/nf-tracks/official/video.js",
+      "clips": [{"id": "video-01", "begin": "demo.begin", "end": "demo.end",
+        "params": {"src": "file:///Users/Zhuanz/bigbang/NextFrame/demo/assets/real-clip-1.mp4",
+          "from_ms": 0, "to_ms": 30000, "fit": "cover", "muted_in_record": true,
+          "x": 0, "y": 0, "w": 100, "h": 100, "radius": 0}}]
+    }
+  ]
+}

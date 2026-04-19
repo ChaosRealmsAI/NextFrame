@@ -1,0 +1,40 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {
+    "name": "产品演示 · 真视频 #2",
+    "description": "30s product walkthrough · real-clip-2.mp4 (中段)",
+    "version": "v1.26",
+    "created": "2026-04-19"
+  },
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "demo.begin + 30s", "filler": "manual"}},
+  "tracks": [
+    {
+      "id": "bg-warm",
+      "kind": "bg",
+      "src": "src/nf-tracks/official/bg.js",
+      "clips": [{"id": "bg-warm-01", "begin": "demo.begin", "end": "demo.end",
+        "params": {"type": "gradient", "gradient": "radial", "stops": [
+          {"offset": 0, "color": "#7c2d12"},
+          {"offset": 0.6, "color": "#1e1b4b"},
+          {"offset": 1, "color": "#050507"}]}}]
+    },
+    {
+      "id": "scene-feat",
+      "kind": "scene",
+      "src": "src/nf-tracks/official/scene.js",
+      "clips": [{"id": "scene-feat-01", "begin": "demo.begin", "end": "demo.end",
+        "params": {"layout": "hero", "title": "产品实景演示", "subtitle": "用户旅程 · 真实画面 #2", "accent_color": "#f97316"}}]
+    },
+    {
+      "id": "video-pip-large",
+      "kind": "video",
+      "src": "src/nf-tracks/official/video.js",
+      "clips": [{"id": "video-pip-01", "begin": "demo.begin", "end": "demo.end",
+        "params": {"src": "file:///Users/Zhuanz/bigbang/NextFrame/demo/assets/real-clip-2.mp4",
+          "from_ms": 0, "to_ms": 30000, "fit": "cover", "muted_in_record": true,
+          "x": 8, "y": 20, "w": 60, "h": 60, "radius": 18}}]
+    }
+  ]
+}

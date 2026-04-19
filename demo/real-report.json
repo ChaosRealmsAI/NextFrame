@@ -1,0 +1,40 @@
+{
+  "$schema": "../spec/interfaces.json#/source_json_schema",
+  "meta": {
+    "name": "数据回顾 · 真视频 #3",
+    "description": "30s data review · real-clip-3.mp4 (后段) · 右下 PIP 小窗",
+    "version": "v1.26",
+    "created": "2026-04-19"
+  },
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "demo.begin + 30s", "filler": "manual"}},
+  "tracks": [
+    {
+      "id": "bg-cool",
+      "kind": "bg",
+      "src": "src/nf-tracks/official/bg.js",
+      "clips": [{"id": "bg-cool-01", "begin": "demo.begin", "end": "demo.end",
+        "params": {"type": "gradient", "gradient": "linear", "angle": 225, "stops": [
+          {"offset": 0, "color": "#064e3b"},
+          {"offset": 0.5, "color": "#1e3a8a"},
+          {"offset": 1, "color": "#0a0a14"}]}}]
+    },
+    {
+      "id": "scene-data",
+      "kind": "scene",
+      "src": "src/nf-tracks/official/scene.js",
+      "clips": [{"id": "scene-data-01", "begin": "demo.begin", "end": "demo.end",
+        "params": {"layout": "hero", "title": "Q3 数据回顾", "subtitle": "关键指标 +34% · 真实视频 #3", "accent_color": "#34d399"}}]
+    },
+    {
+      "id": "video-pip-corner",
+      "kind": "video",
+      "src": "src/nf-tracks/official/video.js",
+      "clips": [{"id": "video-pip-01", "begin": "demo.begin", "end": "demo.end",
+        "params": {"src": "file:///Users/Zhuanz/bigbang/NextFrame/demo/assets/real-clip-3.mp4",
+          "from_ms": 0, "to_ms": 30000, "fit": "cover", "muted_in_record": true,
+          "x": 65, "y": 60, "w": 30, "h": 30, "radius": 16}}]
+    }
+  ]
+}
