@@ -6,75 +6,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AI 视频引擎 — 把结构化信息变成视频。输入 JSON，输出可播放 HTML 或 4K MP4。场景不限于自媒体：教育、产品演示、数据报告、内部培训、开源项目介绍。
 
-## 当前状态（2026-04-19）：Track ABI v2 闭环 + Scene 家族 9 Track（v1.46/47/48）
+> 版本进度 / 最近做了啥 / 当前 phase → 看 `git log` + `spec/roadmap.json` + `spec/overview.html`。**本文件不记版本日志**（rule `self-evolution-dna`）。
 
-**v0.x 探索期于 2026-04-17 结束并硬重置**（commit `61d4aa0`）· v1.0 从零重启 · v1.12.5 + v1.14 recorder + v1.15 parallel-record + v1.20 wry-shell + v1.22 mp4-export 完成（见 `spec/roadmap.json history`）。
+## 已有能力（src/ 下活着的 crate）
 
-**v1.40 Track ABI v2 spec lock**（2026-04-19 done · 纯 spec · ADR-063）：
-- L1/L2/L3 三级 · L1 静态（HTML/CSS/SVG · 90% Track · 现有 7 kinds 全兼容）· L2 动态（+mount/update/unmount · Canvas/WebGL/Lottie）· L3 组合（+compose 展开多子 Track）
-- 禁 iframe · 保 innerHTML 单挂载 · L2 update(t) 对 t 幂等（recorder 精确复现前提）
-- 11 lint gates（6 既有 + 5 新 · name/description/use_cases/level/l2-hooks-complete）
-- `spec/versions/v1.40/spec-lock.html` 汇总讲透（gitignored · 本地 open）
-- 契约锚点：ADR-063 · `spec/adrs.json` / `spec/interfaces.json` nf-tracks 扩 5 contract / `spec/bdd/v1.40/track-abi-v2.json` 4 场景
-- 解锁：v1.41 runtime L2 调度 · v1.42 source.json v2（data/theme/$ref）· 两分支可并行
-
-**v1.43 Track ABI v2 lint 落地**（2026-04-19 done · commit 943d23e1）：
-- `src/nf-tracks/scripts/check-abi.mjs` 323→507 行 · 加 gates 7-11（name / description / use_cases / level / l2-hooks-complete）
-- emitFail 扩 fix_hint 字段 · loadTrackFromSource 扩识别 optional mount/update/unmount export
-- 7 official Tracks 补 describe 3 字段（name / description ≥ 42 字 / use_cases string[]）
-- 5/5 VP 全绿 · 7 Tracks × 11 gates = 77 检查全过
-
-**v1.41 Runtime L2 + WebGL Particles**（2026-04-19 done · merge e0f727e8）：
-- `src/nf-runtime/src/runtime.js` +69 行 · L2 生命周期 dispatch（mount/update/unmount）· 按 kind 匹配 · L1 路径字节级不变
-- `src/nf-tracks/community/webgl-particles.js` · Canvas 2D 800 粒子螺旋动画 · level=2 · 过 11 gates
-- `nf-shell` + demo/v1.41-webgl-particles.json · 窗口可见动画 · 2 亲验截图
-- 5/5 VP 全绿
-
-**v1.42 source.json v2 · data/theme/$ref**（2026-04-19 done · merge ce910015）：
-- `src/nf-core-engine/src/{types,parser,resolve}.ts` · TS 路径加 data/theme + `resolveRefs` JSON Pointer resolver
-- `src/nf-runtime/src/runtime.js` mirror 实现 `_resolveRefs` · 在 liteResolve 里调用 · nf-shell 透明获益
-- `demo/v1.42-ref-demo.json` · bg 色从 theme · 标题/副标/accent 从 data
-- 5/5 VP 全绿 · 3 场景亲验（base / changed / bad ref error）· backward compat L1 零回归
-
-**v1.46/47/48 Scene Family · 9 L1 community Tracks**（2026-04-19 done）：
-- v1.46 Hero 批 · hero-centered / hero-split (circle/triangle/hexagon) / hero-overlay
-- v1.47 Data 批 · stat-giant (count-up) / metric-grid (2×2) / kpi-callout (trend triangle)
-- v1.48 Narrative 批 · quote (装饰引号) / list-bullets (dot/num/check) / timeline (水平里程碑)
-- 每 Track L1 · 过 11 lint gates · motion-first · 扁平 2.5D radial gradient
-- **9 Playwright headless 亲验 screenshot**（屏幕锁定时 screencapture 失效 · Playwright 稳定替代）
-- 17 Tracks 全仓回归（7 official + 10 community 含 webgl-particles）
-- demo: `demo/v1.46-hero-family.json` / `v1.47-data-family.json` / `v1.48-narrative-family.json`
-
-**已有能力**（src/ 下活 crate）：
 | Crate | 能力 |
 |---|---|
-| `nf-cli` | `nf build / validate / anchors / lint-track / schema / new` (v1.1+) |
-| `nf-core-engine` | source → resolved → bundle.html 三阶段编译 |
-| `nf-runtime` | browser 运行时 · boot + RAF + getStateAt · 3 模式（v1.8 扩 data-nf-persist） |
-| `nf-tracks` | scene (v1.1) + chart (v1.6) + video (v1.8) Track kinds |
-| `nf-tts` | **v1.12 一步到位迁移** · Edge + Volcengine + whisperX 字级对齐 · 4 产物默认（mp3+timeline+srt+karaoke.html）· 详见 `src/nf-tts/CLAUDE.md` |
-
-**v1.12 系列完成链**：
-- v1.12.0 迁 v0.8 nf-tts 4802 行
-- v1.12.1 timeline 扁平 schema + flat output + workspace lints（3 并行 subagent）
-- v1.12.2 karaoke.html 作为 4th 默认产物（self-contained player）
-- v1.12.3 CLI help 扩成 AI-agent playbook（162 行 + 3 subcommand long_about）
-- v1.12.4 sonnet 盲测找到 2 真 bug · 修 bare `--rate -10%` + DURATION ESTIMATION 表
-- v1.12.5 status.done duration_ms 对齐 timeline.json (aligned vs synth-raw 统一)
-
-**下一版 idle · 等用户 kickoff**（roadmap current: v1.14.0 idle）
-
-**归档（本地 `.gitignore` 不进仓）**：`archive/*.tar.gz`
-- `v0.x-src-final.tar.gz` · `v0.x-spec-full.tar.gz` · `v0.8-legacy.tar.gz`（nf-tts 源 · 已迁）· `v1.0-legacy.tar.gz` · `v2.0-poc-source.tar.gz`
-
-需要参考历史：解压到 `/tmp/` · **不要**挪回主仓。
+| `nf-cli` | 命令行入口 · `nf build / validate / anchors / lint-track / schema / new / karaoke` |
+| `nf-core-engine` | 编译器 · source → resolved → bundle.html 三阶段 |
+| `nf-runtime` | 浏览器运行时 · boot + RAF + `getStateAt(t)` · play/edit/record 三模式 |
+| `nf-tracks` | Track 家族（scene / chart / video / audio / subtitle …）+ ABI lint gates |
+| `nf-tts` | TTS 合成 · Edge + Volcengine + whisperX 字级对齐 · 详见 `src/nf-tts/CLAUDE.md` |
+| `nf-guide` | AI agent 工具链分发器（clips / produce / audio / script …） |
+| `nf-recorder` | 外驱 runtime + 像素采样 → MP4（含时间切片并行） |
+| `nf-shell` | 跨平台桌面壳（wry + tao · macOS / Windows / Linux） |
+| `nf-shell-mac` | macOS 专属旧路径（保留历史 · 详见 roadmap history） |
+| `nf-publish` | 发布器（douyin / bilibili / youtube / wechat） |
 
 ## 写代码前（强制）
 
-1. 先读 `git log --oneline -30` 看最近发生啥
+1. `git log --oneline -30` 看最近发生啥
 2. 读 `spec/versions/v{current}/kickoff/playbook.json`（没有 = 还没 kickoff，先 kickoff 再干）
 3. 读 `spec/design/DESIGN.md`（做任何 HTML / UI 前必查）
-4. 产品代码必须经过 kickoff → plan → execute 三 phase，不跳步
+4. 产品代码必走 kickoff → plan → execute 三 phase，不跳步
 
 ## 基线 lint（workspace 级 deny）
 
