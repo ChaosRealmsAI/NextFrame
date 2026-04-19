@@ -20,7 +20,10 @@ use crate::events::{emit, Event};
 use crate::record_loop::{RecordConfig, RecordError};
 
 /// 并行模式最低启用阈值 (ms) · 低于此走单进程 (N 进程 boot ~1s × N 吃掉收益)。
-pub const PARALLEL_MIN_DURATION_MS: u64 = 6000;
+///
+/// v1.44.1 · 从 6000 降到 2000 · 让 3-5s 短 demo 也能触发并行验证 ·
+/// 生产使用时建议仍按 6s 判断(可通过 env `NF_PARALLEL_MIN_MS` 覆盖)。
+pub const PARALLEL_MIN_DURATION_MS: u64 = 2000;
 
 /// 运行并行录制流水线 · 父进程入口。
 pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), RecordError> {
@@ -70,8 +73,13 @@ pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), Reco
     debug_assert_eq!(cursor, total_frames);
 
     // 4. spawn N 子进程 · 输出到临时 segment_i.mp4。
-    let self_exe = std::env::current_exe()
-        .map_err(|e| RecordError::PipelineError(format!("current_exe: {e}")))?;
+    //
+    // v1.44.1 · 找 nf-recorder binary:
+    //   v1.15 假设 current_exe = nf-recorder · 直接 spawn 自己;
+    //   v1.44+ 从 nf-shell lib 调用时 current_exe = nf-shell · 不能直接 spawn
+    //   (nf-shell 的 main 走 event_loop · 不跑 record_loop).
+    // 策略:优先找同目录的 nf-recorder · 兜底用 current_exe (单 binary 场景兼容).
+    let self_exe = resolve_recorder_binary()?;
     let tmp_dir = cfg.output.parent().unwrap_or(Path::new("."));
     let stem = cfg
         .output
@@ -242,4 +250,43 @@ async fn probe_duration(cfg: &RecordConfig) -> Result<u64, RecordError> {
         Some(d) => d.min(max_cap_ms),
     };
     Ok(duration_ms)
+}
+
+/// v1.44.1 · 解析 nf-recorder binary 路径 · 供 orchestrator spawn 子进程用。
+///
+/// 探测顺序:
+/// 1. `$NF_RECORDER_BIN` 环境变量 (开发时 override)
+/// 2. `current_exe().parent()/nf-recorder` (cargo 默认布局: target/release/{nf-shell,nf-recorder})
+/// 3. `current_exe()` 自身 (nf-recorder 单 binary 场景 · v1.15 兼容路径)
+fn resolve_recorder_binary() -> Result<PathBuf, RecordError> {
+    if let Ok(env_path) = std::env::var("NF_RECORDER_BIN") {
+        let p = PathBuf::from(env_path);
+        if p.exists() {
+            return Ok(p);
+        }
+    }
+    let current = std::env::current_exe()
+        .map_err(|e| RecordError::PipelineError(format!("current_exe: {e}")))?;
+    if let Some(parent) = current.parent() {
+        let candidate = parent.join("nf-recorder");
+        if candidate.exists() {
+            return Ok(candidate);
+        }
+        let candidate_exe = parent.join("nf-recorder.exe"); // windows safety
+        if candidate_exe.exists() {
+            return Ok(candidate_exe);
+        }
+    }
+    // v1.15 兼容 · 若当前就是 nf-recorder 自己 · 直接用。
+    if current
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map_or(false, |n| n == "nf-recorder")
+    {
+        return Ok(current);
+    }
+    Err(RecordError::PipelineError(format!(
+        "nf-recorder binary not found next to {} · set NF_RECORDER_BIN env var",
+        current.display()
+    )))
 }

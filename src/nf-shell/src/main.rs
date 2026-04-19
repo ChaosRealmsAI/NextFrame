@@ -232,6 +232,7 @@ fn run_recorder_export(
     source_path: &std::path::Path,
     out: &std::path::Path,
     duration_s: f64,
+    parallel: usize,
 ) -> Result<u64> {
     if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent).context("mkdir parent")?;
@@ -247,6 +248,7 @@ fn run_recorder_export(
             out,
             nf_recorder::ExportOpts {
                 duration_s,
+                parallel,
                 ..Default::default()
             },
         ))
@@ -1075,6 +1077,9 @@ struct CliOpts {
     screenshot_delay_ms: u64,
     export_path: Option<PathBuf>,
     export_duration_s: f64,
+    /// v1.44.1 · 并行切片 N · 默认 1 = 单进程 · ≥2 走 orchestrator spawn N 子进程 + ffmpeg concat.
+    /// duration < 6s 自动降级单进程(orchestrator 内部判)。
+    export_parallel: usize,
     menu_test: bool,
     window_x: f64,
     window_y: f64,
@@ -1089,6 +1094,7 @@ fn parse_cli() -> CliOpts {
     let mut screenshot_delay_ms: u64 = 2500;
     let mut export_path: Option<PathBuf> = None;
     let mut export_duration_s: f64 = 5.0;
+    let mut export_parallel: usize = 1;
     let mut menu_test = false;
     // Auto-cascade: count sibling nf-shell processes · stagger 40px per window.
     let cascade = count_running_nf_shell_pids();
@@ -1142,6 +1148,14 @@ fn parse_cli() -> CliOpts {
                     }
                 }
             }
+            "--parallel" => {
+                i += 1;
+                if i < args.len() {
+                    if let Ok(v) = args[i].parse::<usize>() {
+                        export_parallel = v.max(1);
+                    }
+                }
+            }
             other if !other.starts_with("--") && positional.is_none() => {
                 positional = Some(other.to_string());
             }
@@ -1155,6 +1169,7 @@ fn parse_cli() -> CliOpts {
         screenshot_delay_ms,
         export_path,
         export_duration_s,
+        export_parallel,
         menu_test,
         window_x,
         window_y,
@@ -1248,13 +1263,19 @@ fn main() -> Result<()> {
     // 一致性靠 ADR-045 t 纯驱动 + viewport 绑 source.json · 跟 preview 像素级一致。
     if let Some(export_path) = opts.export_path.clone() {
         println!(
-            "[NF-RECORDER] CLI --export direct mode · source={} · out={} · duration={}s",
+            "[NF-RECORDER] CLI --export direct mode · source={} · out={} · duration={}s · parallel={}",
             opts.source_arg,
             export_path.display(),
-            opts.export_duration_s
+            opts.export_duration_s,
+            opts.export_parallel
         );
         let src_path = PathBuf::from(&opts.source_arg);
-        match run_recorder_export(&src_path, &export_path, opts.export_duration_s) {
+        match run_recorder_export(
+            &src_path,
+            &export_path,
+            opts.export_duration_s,
+            opts.export_parallel,
+        ) {
             Ok(bytes) => {
                 println!(
                     "[NF-RECORDER] done · wrote {} bytes → {}",
