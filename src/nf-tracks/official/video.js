@@ -119,13 +119,18 @@ export function render(t, params, viewport) {
   const fromMs = typeof p.from_ms === "number" ? p.from_ms : 0;
   const fit = computeFit(p);
 
-  // Embed rect — percent of viewport. Omit x/y/w/h → full-stage (back-compat).
+  // Embed rect — percent of viewport (NOT px): bundle CSS scales #nf-stage>*
+  // by stage/viewport ratio, and scale() does NOT scale `left` values — so
+  // percent is the only way to express position relative to stage. Also add
+  // transform: none to cancel the global scale on this element (the video
+  // should fill its PIP rect at native resolution, not be re-scaled).
+  // !important overrides bundle CSS `#nf-stage > *{top:0!important;left:0!important;transform:scale...!important}`.
   const hasRect = typeof p.x === "number" || typeof p.y === "number"
     || typeof p.w === "number" || typeof p.h === "number";
-  const x = typeof p.x === "number" ? p.x : 0;
-  const y = typeof p.y === "number" ? p.y : 0;
-  const w = typeof p.w === "number" ? p.w : 100;
-  const h = typeof p.h === "number" ? p.h : 100;
+  const xPct = typeof p.x === "number" ? p.x : 0;
+  const yPct = typeof p.y === "number" ? p.y : 0;
+  const wPct = typeof p.w === "number" ? p.w : 100;
+  const hPct = typeof p.h === "number" ? p.h : 100;
 
   // render is PURE. Do NOT emit `muted` attribute: HTML boolean attributes
   // are true whenever present (any string value including "false" = muted).
@@ -133,11 +138,14 @@ export function render(t, params, viewport) {
   // body[data-mode] (play → false, record → true). See BUG-20260419-01.
   // Opacity hardcoded to 0.95 (FM-T0 gate: ≥ 0.9).
   const posStyle = hasRect
-    ? "position:absolute;" +
-      "left:" + x + "%;top:" + y + "%;" +
-      "width:" + w + "%;height:" + h + "%;"
-    : "position:absolute;inset:0;" +
-      "width:" + vp.w + "px;height:" + vp.h + "px;";
+    ? "position:absolute !important;" +
+      "left:" + xPct + "% !important;top:" + yPct + "% !important;" +
+      "width:" + wPct + "% !important;height:" + hPct + "% !important;" +
+      "transform:none !important;"
+    : "position:absolute !important;" +
+      "left:0 !important;top:0 !important;" +
+      "width:100% !important;height:100% !important;" +
+      "transform:none !important;";
 
   const radius = typeof p.radius === "number" ? p.radius : 0;
   const border = typeof p.border === "string" ? p.border : "";
