@@ -381,9 +381,11 @@ window.__nf_mount = function() {{
       '</div>';
     requestAnimationFrame(function(){{
       window.__nf_reflow();
-      window.NFRuntime.boot({{ stage: '#nf-stage', autoplay: true }});
+      window.__nf_handle = window.NFRuntime.boot({{ stage: '#nf-stage', autoplay: true }});
+      window.__nf_playing = true;
       console.log('[NF] runtime booted · tracks=' + Object.keys(window.__NF_TRACKS__).length);
       window.__nf_install_drag_handles();
+      window.__nf_install_play_button();
     }});
     if (!window.__nf_resize_wired) {{
       window.__nf_resize_wired = true;
@@ -397,6 +399,58 @@ window.__nf_mount = function() {{
 window.__nf_apply_source = function(newSource) {{
   window.__NF_SOURCE__ = newSource;
   window.__nf_mount();
+}};
+
+// ---- Play / Pause button injected into Timeline header (.tl-head) ----
+window.__nf_install_play_button = function() {{
+  var tlHead = document.querySelector('.tl-head');
+  if (!tlHead || tlHead.querySelector('#nf-play-pause')) return;
+  var btn = document.createElement('button');
+  btn.id = 'nf-play-pause';
+  btn.title = 'Play / Pause (Space)';
+  btn.style.cssText =
+    'display:inline-flex;align-items:center;gap:6px;margin:0 14px 0 12px;' +
+    'padding:6px 14px;background:rgba(167,139,250,0.18);color:#a78bfa;' +
+    'border:1px solid rgba(167,139,250,0.32);border-radius:999px;' +
+    'font:600 13px/1 -apple-system,"SF Pro",sans-serif;cursor:pointer;' +
+    'transition:background .15s';
+  btn.onmouseenter = function(){{ btn.style.background = 'rgba(167,139,250,0.28)'; }};
+  btn.onmouseleave = function(){{ btn.style.background = 'rgba(167,139,250,0.18)'; }};
+  var pauseSvg = '<svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor"><rect x="1" y="1" width="2.5" height="10" rx="0.5"/><rect x="6.5" y="1" width="2.5" height="10" rx="0.5"/></svg>';
+  var playSvg  = '<svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor"><path d="M1 1 L9 6 L1 11 Z"/></svg>';
+  function render(){{
+    btn.innerHTML = (window.__nf_playing ? (pauseSvg + '<span>暂停</span>') : (playSvg + '<span>播放</span>'));
+  }}
+  btn.addEventListener('click', function(){{
+    if (!window.__nf_handle) return;
+    try {{
+      if (window.__nf_playing) {{
+        window.__nf_handle.pause();
+        window.__nf_playing = false;
+      }} else {{
+        window.__nf_handle.play();
+        window.__nf_playing = true;
+      }}
+      render();
+      console.log('[NF] play/pause toggled · playing=' + window.__nf_playing);
+    }} catch (e) {{ console.error('[NF] play/pause failed:', e); }}
+  }});
+  render();
+  var tlTitle = tlHead.querySelector('.tl-title');
+  if (tlTitle && tlTitle.nextSibling) {{
+    tlHead.insertBefore(btn, tlTitle.nextSibling);
+  }} else {{
+    tlHead.appendChild(btn);
+  }}
+  if (!window.__nf_spacebar_wired) {{
+    window.__nf_spacebar_wired = true;
+    document.addEventListener('keydown', function(e){{
+      if (e.code === 'Space' && !/INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) {{
+        e.preventDefault();
+        btn.click();
+      }}
+    }});
+  }}
 }};
 
 // ---- Drag-window: click topbar + non-button → Rust window.drag_window() ----
