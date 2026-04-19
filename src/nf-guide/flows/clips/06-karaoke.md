@@ -3,11 +3,14 @@
 ## CLI
 
 ```bash
-# 不再包装 nf-cli · 直接 python 脚本（流程内 code 步）
-python3 scripts/build_clips_karaoke.py <episode_dir>
+nf karaoke <episode-dir>
+# 等价: nf-cli karaoke <episode-dir>
+# Code · Rust 实现 · 模板 include_str! 嵌入 binary · 零外部依赖
 # 读 <episode>/clips/cut_report.json + clip_NN.translations.*.json + <episode>/sources/<slug>/words.json
-# 产 <episode>/clips/index.html （sidebar 所有 clips 可切 · 视频 + 双行字幕卡 + 字级高亮）
+# 产 <episode>/clips/index.html (sidebar 所有 clips 可切 · 视频 + 双行字幕卡 + 字级高亮)
 ```
+
+**不是 python 脚本** · 是 nf-cli 内置子命令。跟 nf-tts karaoke (v1.12.2) 同模式 · include_str! 把 HTML 模板烘进 binary · 运行时零文件依赖。
 
 ## 输入
 

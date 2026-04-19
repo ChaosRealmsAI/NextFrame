@@ -79,6 +79,12 @@ enum Command {
         #[arg(long, default_value = "16:9")]
         ratio: String,
     },
+    /// Build a bilingual word-level karaoke `index.html` for an episode's clips.
+    Karaoke {
+        /// Path to the episode directory (must contain sources/<slug>/words.json
+        /// + clips/cut_report.json + clips/clip_NN.translations.zh.json).
+        episode_dir: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
@@ -99,6 +105,7 @@ fn main() -> ExitCode {
         Command::LintTrack { file } => commands::lint_track::run(&file),
         Command::Schema { track } => commands::schema::run(&track),
         Command::New { out, ratio } => commands::new_cmd::run(out.as_deref(), &ratio),
+        Command::Karaoke { episode_dir } => commands::karaoke::run(&episode_dir),
     };
 
     match result {

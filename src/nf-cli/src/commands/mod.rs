@@ -2,6 +2,7 @@
 
 pub mod anchors;
 pub mod build;
+pub mod karaoke;
 pub mod lint_track;
 pub mod new_cmd;
 pub mod schema;

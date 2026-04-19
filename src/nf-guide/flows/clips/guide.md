@@ -54,14 +54,12 @@ projects/<project>/<episode>/
        └──────────┬──────────────────┘
                   ▼
             ┌──────────┐
-            │ karaoke  │  Code · 产 index.html (sidebar 切所有 clips)
-            │          │  中英双行字级高亮 · whisperx 英词精准 + 中文字级插值
-            └────┬─────┘
-                 ▼
-            ┌──────────┐
-            │ publish  │  发布到抖音/B站/小红书/视频号/YouTube
+            │ karaoke  │  Code · `nf karaoke <episode>` 一键产 index.html
+            │ (终点)   │  sidebar 切所有 clips · 中英双行字级同步
             └──────────┘
 ```
+
+**Pipeline 终点 = karaoke HTML**（可直接双击播放 + 分享 · 不在本流程做平台发布）。
 
 ## 每步命令
 
