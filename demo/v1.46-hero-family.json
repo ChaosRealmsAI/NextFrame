@@ -1,0 +1,66 @@
+{
+  "$schema": "../spec/schema/source.schema.json",
+  "meta": { "title": "v1.46 Hero Family demo · 3 scene tracks", "version": "v1.46.0" },
+  "viewport": { "ratio": "16:9", "w": 1920, "h": 1080 },
+  "duration": "demo.end",
+  "anchors": {
+    "demo": { "begin": "0", "end": "demo.begin + 9s" },
+    "s1": { "begin": "0", "end": "demo.begin + 3s" },
+    "s2": { "begin": "demo.begin + 3s", "end": "demo.begin + 6s" },
+    "s3": { "begin": "demo.begin + 6s", "end": "demo.begin + 9s" }
+  },
+  "tracks": [
+    {
+      "id": "hero-centered",
+      "kind": "scene-hero-centered",
+      "src": "src/nf-tracks/community/scene-hero-centered.js",
+      "clips": [
+        {
+          "id": "c1-centered",
+          "begin": "s1.begin",
+          "end": "s1.end",
+          "params": {
+            "title": "NextFrame",
+            "subtitle": "AI 视频引擎 · 让数据说话",
+            "accent_color": "#a78bfa"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hero-split",
+      "kind": "scene-hero-split",
+      "src": "src/nf-tracks/community/scene-hero-split.js",
+      "clips": [
+        {
+          "id": "c2-split",
+          "begin": "s2.begin",
+          "end": "s2.end",
+          "params": {
+            "title": "Canvas + WebGL",
+            "subtitle": "一个 JS 文件 · 浏览器能画的都能用",
+            "accent_color": "#f472b6",
+            "visual_shape": "circle"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hero-overlay",
+      "kind": "scene-hero-overlay",
+      "src": "src/nf-tracks/community/scene-hero-overlay.js",
+      "clips": [
+        {
+          "id": "c3-overlay",
+          "begin": "s3.begin",
+          "end": "s3.end",
+          "params": {
+            "headline": "10 万粒子",
+            "kicker": "WEBGL · L2 TRACK",
+            "accent_color": "#a78bfa"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -46,6 +46,13 @@ const TRACK_SUBTITLE: &str = include_str!("../../nf-tracks/official/subtitle.js"
 // v1.41 · L2 community Track · WebGL particles
 const TRACK_WEBGL_PARTICLES: &str =
     include_str!("../../nf-tracks/community/webgl-particles.js");
+// v1.46 · scene Hero family (3 L1 community Tracks)
+const TRACK_SCENE_HERO_CENTERED: &str =
+    include_str!("../../nf-tracks/community/scene-hero-centered.js");
+const TRACK_SCENE_HERO_SPLIT: &str =
+    include_str!("../../nf-tracks/community/scene-hero-split.js");
+const TRACK_SCENE_HERO_OVERLAY: &str =
+    include_str!("../../nf-tracks/community/scene-hero-overlay.js");
 
 #[derive(Debug, Clone)]
 enum UserEvent {
@@ -77,6 +84,9 @@ fn track_source_for(kind: &str) -> Option<&'static str> {
         "data" => Some(TRACK_DATA),
         "subtitle" => Some(TRACK_SUBTITLE),
         "webgl-particles" => Some(TRACK_WEBGL_PARTICLES),
+        "scene-hero-centered" => Some(TRACK_SCENE_HERO_CENTERED),
+        "scene-hero-split" => Some(TRACK_SCENE_HERO_SPLIT),
+        "scene-hero-overlay" => Some(TRACK_SCENE_HERO_OVERLAY),
         _ => None,
     }
 }
