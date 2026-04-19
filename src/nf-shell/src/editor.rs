@@ -60,6 +60,20 @@ pub struct JsonPatch {
     pub value: Option<Value>,
 }
 
+#[derive(Debug)]
+pub struct SourceTab {
+    pub id: String,
+    pub path: String,
+    pub title: String,
+    pub editor: EditorState,
+}
+
+pub struct MultiSourceState {
+    pub tabs: Vec<SourceTab>,
+    pub active_tab_id: String,
+}
+
+#[derive(Clone, Debug)]
 pub struct EditorState {
     pub source: Value,
     pub selection: Selection,
@@ -315,6 +329,108 @@ impl EditorState {
             id: make_editor_id("undo"),
             ts: now_ms(),
             op_label: "split clip".to_string(),
+            forward,
+            reverse,
+            selection_before,
+            selection_after: selection_after.clone(),
+        };
+        self.push_with_cap(entry.clone());
+        self.selection = selection_after;
+        self.bump_commit_token();
+        Ok(entry)
+    }
+
+    pub fn insert_clip(
+        &mut self,
+        track_kind: &str,
+        track_src: &str,
+        mut clip: Value,
+        preferred_track_id: Option<&str>,
+    ) -> Result<UndoEntry, String> {
+        if track_kind.trim().is_empty() {
+            return Err("insert-clip: track_kind missing".to_string());
+        }
+        if track_src.trim().is_empty() {
+            return Err("insert-clip: track_src missing".to_string());
+        }
+        if clip.get("begin").is_none() || clip.get("end").is_none() {
+            return Err("insert-clip: clip.begin/end required".to_string());
+        }
+
+        let clip_id = clip
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.trim().is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| make_editor_id("clip"));
+        if clip.get("id").is_none() {
+            clip["id"] = Value::String(clip_id.clone());
+        }
+
+        let tracks = self
+            .source
+            .get("tracks")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let target_track_idx = preferred_track_id
+            .and_then(|track_id| self.find_track_by_id(track_id))
+            .or_else(|| {
+                tracks.iter().position(|track| {
+                    track.get("kind").and_then(Value::as_str) == Some(track_kind)
+                })
+            });
+
+        let selection_before = self.selection.clone();
+        let mut forward = Vec::new();
+        let mut reverse = Vec::new();
+
+        match target_track_idx {
+            Some(track_idx) => {
+                let clips_path = format!("/tracks/{track_idx}/clips");
+                let mut next_clips = self
+                    .source
+                    .pointer(&clips_path)
+                    .and_then(Value::as_array)
+                    .cloned()
+                    .unwrap_or_default();
+                next_clips.push(clip);
+                push_value_patch_if_changed(
+                    &mut forward,
+                    &mut reverse,
+                    clips_path,
+                    self.source.pointer(&format!("/tracks/{track_idx}/clips")).cloned(),
+                    Some(Value::Array(next_clips)),
+                )?;
+            }
+            None => {
+                let mut next_tracks = tracks.clone();
+                let track_id = preferred_track_id
+                    .filter(|track_id| !track_id.trim().is_empty())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("{track_kind}-{}", make_editor_id("track")));
+                next_tracks.push(serde_json::json!({
+                    "id": track_id,
+                    "kind": track_kind,
+                    "src": track_src,
+                    "clips": [clip],
+                }));
+                push_value_patch_if_changed(
+                    &mut forward,
+                    &mut reverse,
+                    "/tracks".to_string(),
+                    self.source.get("tracks").cloned(),
+                    Some(Value::Array(next_tracks)),
+                )?;
+            }
+        }
+
+        Self::apply_patches(&mut self.source, &forward)?;
+        let selection_after = self.selection_for_clip(&clip_id);
+        let entry = UndoEntry {
+            id: make_editor_id("undo"),
+            ts: now_ms(),
+            op_label: format!("insert {track_kind} clip"),
             forward,
             reverse,
             selection_before,
@@ -637,6 +753,81 @@ impl EditorState {
     fn push_with_cap(&mut self, entry: UndoEntry) {
         self.push_undo_capped(entry);
         self.redo_stack.clear();
+    }
+}
+
+impl SourceTab {
+    fn new(path: String, source: Value) -> Self {
+        let title = source
+            .get("meta")
+            .and_then(|meta| meta.get("name"))
+            .and_then(Value::as_str)
+            .filter(|name| !name.trim().is_empty())
+            .map(str::to_string)
+            .or_else(|| {
+                std::path::Path::new(&path)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .map(str::to_string)
+            })
+            .unwrap_or_else(|| "source.json".to_string());
+        Self {
+            id: make_editor_id("tab"),
+            path,
+            title,
+            editor: EditorState::new(source),
+        }
+    }
+}
+
+impl MultiSourceState {
+    pub fn new(path: String, source: Value) -> Self {
+        let tab = SourceTab::new(path, source);
+        let active_tab_id = tab.id.clone();
+        Self {
+            tabs: vec![tab],
+            active_tab_id,
+        }
+    }
+
+    pub fn active_tab(&self) -> Option<&SourceTab> {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == self.active_tab_id)
+            .or_else(|| self.tabs.first())
+    }
+
+    pub fn active_tab_mut(&mut self) -> Option<&mut SourceTab> {
+        let active_id = self.active_tab_id.clone();
+        if let Some(index) = self.tabs.iter().position(|tab| tab.id == active_id) {
+            return self.tabs.get_mut(index);
+        }
+        self.tabs.get_mut(0)
+    }
+
+    pub fn active_editor_mut(&mut self) -> Option<&mut EditorState> {
+        self.active_tab_mut().map(|tab| &mut tab.editor)
+    }
+
+    pub fn switch_tab(&mut self, tab_id: &str) -> bool {
+        if self.tabs.iter().any(|tab| tab.id == tab_id) {
+            self.active_tab_id = tab_id.to_string();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn open_tab(&mut self, path: String, source: Value) -> String {
+        if let Some(existing) = self.tabs.iter().find(|tab| tab.path == path) {
+            self.active_tab_id = existing.id.clone();
+            return existing.id.clone();
+        }
+        let tab = SourceTab::new(path, source);
+        let tab_id = tab.id.clone();
+        self.active_tab_id = tab_id.clone();
+        self.tabs.push(tab);
+        tab_id
     }
 }
 
@@ -1307,7 +1498,7 @@ fn make_editor_id(prefix: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::EditorState;
+    use super::{EditorState, MultiSourceState};
     use serde_json::{json, Value};
 
     fn sample_source() -> Value {
@@ -1630,5 +1821,66 @@ mod tests {
             Some("2000ms")
         );
         assert_eq!(editor.selection.clip_id.as_deref(), Some("clip_b"));
+    }
+
+    #[test]
+    fn insert_clip_creates_new_track_and_selects_clip() {
+        let mut editor = EditorState::new(clip_edit_source());
+        let entry = editor
+            .insert_clip(
+                "audio",
+                "src/nf-tracks/official/audio.js",
+                json!({
+                    "begin": "0ms",
+                    "end": "1000ms",
+                    "params": {
+                        "src": "nf-asset://x/tmp/test.mp3",
+                        "from_ms": 0,
+                        "volume": 1.0
+                    }
+                }),
+                Some("tr_audio"),
+            )
+            .unwrap();
+        assert_eq!(entry.op_label, "insert audio clip");
+        assert_eq!(
+            editor
+                .source
+                .pointer("/tracks/1/id")
+                .and_then(Value::as_str),
+            Some("tr_audio")
+        );
+        assert_eq!(
+            editor
+                .source
+                .pointer("/tracks/1/kind")
+                .and_then(Value::as_str),
+            Some("audio")
+        );
+        assert_eq!(
+            editor.selection.track_id.as_deref(),
+            Some("tr_audio")
+        );
+        assert!(editor.selection.clip_id.is_some());
+    }
+
+    #[test]
+    fn multi_source_state_opens_and_switches_tabs() {
+        let mut state = MultiSourceState::new("demo/a.json".to_string(), sample_source());
+        let first_id = state.active_tab().unwrap().id.clone();
+        let second_id = state.open_tab("demo/b.json".to_string(), clip_edit_source());
+
+        assert_ne!(first_id, second_id);
+        assert_eq!(state.tabs.len(), 2);
+        assert_eq!(
+            state
+                .active_tab()
+                .and_then(|tab| tab.editor.source.pointer("/tracks/0/id"))
+                .and_then(Value::as_str),
+            Some("tr_scene")
+        );
+
+        assert!(state.switch_tab(&first_id));
+        assert_eq!(state.active_tab().unwrap().path, "demo/a.json");
     }
 }
