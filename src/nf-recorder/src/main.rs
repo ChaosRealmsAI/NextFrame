@@ -42,7 +42,6 @@ async fn main() -> ExitCode {
 // ───────────────────────── legacy record path ─────────────────────────
 
 async fn dispatch_record(parsed: cli::Cli) -> ExitCode {
-    let parallel = parsed.parallel;
     let is_subprocess = parsed.frame_range.is_some();
     let cfg = match cli::to_config(&parsed) {
         Ok(c) => c,
@@ -55,6 +54,16 @@ async fn dispatch_record(parsed: cli::Cli) -> ExitCode {
             return ExitCode::from(1);
         }
     };
+    let parallel =
+        match orchestrator::resolve_requested_parallel(parsed.parallel, cfg.width, cfg.height) {
+            Ok(n) => n,
+            Err(e) => {
+                let code = e.code_str().to_string();
+                let message = e.to_string();
+                emit(Event::Error { code, message });
+                return ExitCode::from(exit_code_u8(&e));
+            }
+        };
 
     // v1.15 · --parallel N 且不是子进程(无 --frame-range) → 走 orchestrator
     //   orchestrator 内部 probe duration · spawn N 子 · ffmpeg concat

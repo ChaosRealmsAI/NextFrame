@@ -30,9 +30,7 @@ fn battle_mp4_path() -> PathBuf {
         // crate cwd
         PathBuf::from("tmp/v1.14-battle.mp4"),
         // absolute (last resort for subagent runs)
-        PathBuf::from(
-            "/Users/Zhuanz/bigbang/NextFrame/.worktrees/v1.14/tmp/v1.14-battle.mp4",
-        ),
+        PathBuf::from("/Users/Zhuanz/bigbang/NextFrame/.worktrees/v1.14/tmp/v1.14-battle.mp4"),
     ];
     for c in candidates.iter() {
         if c.exists() {
@@ -66,14 +64,18 @@ fn verify_battle_mp4_passes_all_six_assertions() {
     // on honest reporting.
     let (probe_verdict, _) = verify_mp4::verify(&path, 60, None)
         .expect("probe pass must succeed on well-formed battle MP4");
-    let expected_bitrate = u32::try_from(probe_verdict.bit_rate)
-        .expect("bit_rate fits in u32");
+    let expected_bitrate = u32::try_from(probe_verdict.bit_rate).expect("bit_rate fits in u32");
 
     let (verdict, asserts) = verify_mp4::verify(&path, 60, Some(expected_bitrate))
         .expect("verify should succeed on well-formed battle MP4");
 
     // There must be exactly 6 assertions.
-    assert_eq!(asserts.len(), 6, "expected 6 assertions · got {}", asserts.len());
+    assert_eq!(
+        asserts.len(),
+        6,
+        "expected 6 assertions · got {}",
+        asserts.len()
+    );
 
     // Dump for debug before asserting (so failure prints context).
     eprintln!("verdict: codec={} fps={:.3} bitrate={} primaries={} transfer={} matrix={} duration_ms={} moov_front={}",
@@ -81,18 +83,22 @@ fn verify_battle_mp4_passes_all_six_assertions() {
         verdict.color_primaries, verdict.transfer, verdict.ycbcr_matrix,
         verdict.duration_ms, verdict.moov_front);
     for a in &asserts {
-        eprintln!("  [{:<22}] expected={:<45} actual={:<45} pass={}",
-            a.name, a.expected, a.actual, a.pass);
+        eprintln!(
+            "  [{:<22}] expected={:<45} actual={:<45} pass={}",
+            a.name, a.expected, a.actual, a.pass
+        );
     }
 
-    let failed: Vec<&str> = asserts.iter()
+    let failed: Vec<&str> = asserts
+        .iter()
         .filter(|a| !a.pass)
         .map(|a| a.name.as_str())
         .collect();
     assert!(
         failed.is_empty(),
         "assertions failed: {:?} · verdict={:?}",
-        failed, verdict
+        failed,
+        verdict
     );
 }
 
@@ -100,8 +106,7 @@ fn verify_battle_mp4_passes_all_six_assertions() {
 fn verify_rejects_non_mp4_file() {
     // Write a bogus byte sequence · must not panic · must return Malformed.
     let tmp = std::env::temp_dir().join("t17-verify-bogus.bin");
-    std::fs::write(&tmp, b"this is not an mp4 at all, just some text bytes")
-        .expect("write bogus");
+    std::fs::write(&tmp, b"this is not an mp4 at all, just some text bytes").expect("write bogus");
 
     let res = verify_mp4::verify(&tmp, 60, Some(12_000_000));
     match res {

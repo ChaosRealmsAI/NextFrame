@@ -2,7 +2,8 @@
 //!
 //! Coverage:
 //! - `parse_bitrate` — `12M` / `12000000` / `500K` (+ lowercase variants)
-//! - `--res` — only `1080p` accepted (other values error from `to_config`)
+//! - `--res` — `1080p` / `4k` accepted; malformed values error from `to_config`
+//! - `--parallel` — unset stays `None`; 4K default resolution policy lives in orchestrator
 //! - `--fps` — only `{30, 60}` accepted (other values error)
 //! - `Event` — all 5 variants serialize to JSON-Line with correct `event` tag
 //!
@@ -17,6 +18,8 @@
 use clap::Parser;
 use nf_recorder::cli::{parse_bitrate, to_config, Cli};
 use nf_recorder::events::{emit, Event};
+use nf_recorder::orchestrator;
+use nf_recorder::VideoCodec;
 use std::fs::File;
 use std::io::Write as _;
 use std::path::PathBuf;
@@ -99,8 +102,8 @@ fn to_config_accepts_1080p() {
 }
 
 #[test]
-fn to_config_rejects_non_1080p() {
-    let (bundle, output) = mk_bundle("res_bad_4k");
+fn to_config_accepts_4k() {
+    let (bundle, output) = mk_bundle("res_ok_4k");
     let cli = cli_from(&[
         "nf-recorder",
         bundle.to_str().expect("utf8"),
@@ -109,8 +112,10 @@ fn to_config_rejects_non_1080p() {
         "--res",
         "4k",
     ]);
-    let err = to_config(&cli).expect_err("4k must error");
-    assert!(err.contains("4k") || err.contains("1080p"), "got: {err}");
+    let cfg = to_config(&cli).expect("4k must validate");
+    assert_eq!(cfg.width, 3840);
+    assert_eq!(cfg.height, 2160);
+    assert_eq!(cfg.codec, VideoCodec::HevcMain8);
 }
 
 #[test]
@@ -125,6 +130,41 @@ fn to_config_rejects_720p() {
         "720p",
     ]);
     assert!(to_config(&cli).is_err());
+}
+
+#[test]
+fn cli_parallel_unset_stays_none() {
+    let (bundle, output) = mk_bundle("parallel_unset");
+    let cli = cli_from(&[
+        "nf-recorder",
+        bundle.to_str().expect("utf8"),
+        "-o",
+        output.to_str().expect("utf8"),
+        "--res",
+        "4k",
+    ]);
+    assert_eq!(cli.parallel, None);
+}
+
+#[test]
+fn orchestrator_resolves_4k_default_parallel() {
+    let n = orchestrator::resolve_requested_parallel(None, 3840, 2160)
+        .expect("4k default parallel should resolve");
+    assert_eq!(n, orchestrator::PARALLEL_DEFAULT_4K);
+}
+
+#[test]
+fn orchestrator_preserves_explicit_serial_override() {
+    let n = orchestrator::resolve_requested_parallel(Some(1), 3840, 2160)
+        .expect("explicit serial should override 4k default");
+    assert_eq!(n, 1);
+}
+
+#[test]
+fn orchestrator_rejects_parallel_above_cap() {
+    let err = orchestrator::resolve_requested_parallel(Some(9), 3840, 2160)
+        .expect_err("parallel > 8 must fail");
+    assert!(err.to_string().contains("<= 8"));
 }
 
 // ─────────────────────────────── --fps ───────────────────────────────

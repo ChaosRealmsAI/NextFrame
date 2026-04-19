@@ -19,32 +19,31 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 
 use crossbeam::queue::SegQueue;
+use objc2::rc::Retained;
+use objc2::runtime::ProtocolObject;
 use objc2_core_foundation::{
     kCFBooleanTrue, CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFString, CFType,
 };
 use objc2_core_media::{
-    kCMSampleAttachmentKey_NotSync, kCMTimeInvalid, kCMVideoCodecType_H264,
-    kCMVideoCodecType_HEVC, CMBlockBuffer, CMSampleBuffer, CMTime,
-    CMVideoFormatDescription,
+    kCMSampleAttachmentKey_NotSync, kCMTimeInvalid, kCMVideoCodecType_H264, kCMVideoCodecType_HEVC,
+    CMBlockBuffer, CMSampleBuffer, CMTime, CMVideoFormatDescription,
 };
 use objc2_core_video::{
     kCVImageBufferColorPrimaries_ITU_R_709_2, kCVImageBufferTransferFunction_ITU_R_709_2,
     kCVImageBufferYCbCrMatrix_ITU_R_709_2, kCVPixelBufferHeightKey,
-    kCVPixelBufferIOSurfacePropertiesKey, kCVPixelBufferPixelFormatTypeKey,
-    kCVPixelBufferWidthKey, kCVPixelFormatType_32BGRA, CVImageBuffer, CVPixelBuffer,
+    kCVPixelBufferIOSurfacePropertiesKey, kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey,
+    kCVPixelFormatType_32BGRA, CVImageBuffer, CVPixelBuffer,
 };
+use objc2_foundation::{NSCopying, NSDictionary, NSMutableDictionary, NSString};
 use objc2_video_toolbox::{
     kVTCompressionPropertyKey_AllowFrameReordering, kVTCompressionPropertyKey_AverageBitRate,
     kVTCompressionPropertyKey_ColorPrimaries, kVTCompressionPropertyKey_ExpectedFrameRate,
     kVTCompressionPropertyKey_MaxKeyFrameInterval, kVTCompressionPropertyKey_ProfileLevel,
     kVTCompressionPropertyKey_RealTime, kVTCompressionPropertyKey_TransferFunction,
     kVTCompressionPropertyKey_YCbCrMatrix, kVTEncodeFrameOptionKey_ForceKeyFrame,
-    kVTProfileLevel_H264_Main_AutoLevel, kVTProfileLevel_HEVC_Main_AutoLevel,
-    VTCompressionSession, VTEncodeInfoFlags, VTSession, VTSessionSetProperty,
+    kVTProfileLevel_H264_Main_AutoLevel, kVTProfileLevel_HEVC_Main_AutoLevel, VTCompressionSession,
+    VTEncodeInfoFlags, VTSession, VTSessionSetProperty,
 };
-use objc2::rc::Retained;
-use objc2::runtime::ProtocolObject;
-use objc2_foundation::{NSCopying, NSDictionary, NSMutableDictionary, NSString};
 
 use super::{ColorSpec, PipelineError, VideoCodec};
 
@@ -164,14 +163,7 @@ impl VtCompressor {
         bitrate_bps: u32,
         color: ColorSpec,
     ) -> Result<Self, PipelineError> {
-        Self::new_with_codec(
-            width,
-            height,
-            fps,
-            bitrate_bps,
-            color,
-            VideoCodec::H264,
-        )
+        Self::new_with_codec(width, height, fps, bitrate_bps, color, VideoCodec::H264)
     }
 
     /// Create a new HEVC Main 8-bit VT compressor.
@@ -312,8 +304,8 @@ impl VtCompressor {
                 // is a standard Foundation class. CFBoolean::true_() returns a shared singleton.
                 // SAFETY: kCFBooleanTrue is a static shared singleton · unwrap safe.
                 #[allow(unsafe_code)]
-                let b_true: &CFBoolean = unsafe { kCFBooleanTrue }
-                    .ok_or(PipelineError::EncoderInitFailed)?;
+                let b_true: &CFBoolean =
+                    unsafe { kCFBooleanTrue }.ok_or(PipelineError::EncoderInitFailed)?;
                 // SAFETY: setObject:forKey: on Foundation NSMutableDictionary · thread-safe
                 // usage guaranteed by callee context (encode_pixel_buffer is called from record
                 // loop main thread only).
@@ -482,10 +474,7 @@ fn configure_session(
             kVTCompressionPropertyKey_ColorPrimaries
         },
         #[allow(unsafe_code)]
-        unsafe {
-            kCVImageBufferColorPrimaries_ITU_R_709_2
-        }
-        .as_ref(),
+        unsafe { kCVImageBufferColorPrimaries_ITU_R_709_2 }.as_ref(),
     )?;
     set_prop(
         session,
@@ -494,10 +483,7 @@ fn configure_session(
             kVTCompressionPropertyKey_TransferFunction
         },
         #[allow(unsafe_code)]
-        unsafe {
-            kCVImageBufferTransferFunction_ITU_R_709_2
-        }
-        .as_ref(),
+        unsafe { kCVImageBufferTransferFunction_ITU_R_709_2 }.as_ref(),
     )?;
     set_prop(
         session,
@@ -506,10 +492,7 @@ fn configure_session(
             kVTCompressionPropertyKey_YCbCrMatrix
         },
         #[allow(unsafe_code)]
-        unsafe {
-            kCVImageBufferYCbCrMatrix_ITU_R_709_2
-        }
-        .as_ref(),
+        unsafe { kCVImageBufferYCbCrMatrix_ITU_R_709_2 }.as_ref(),
     )?;
     // Non-realtime — let VT consume GPU fully.
     set_prop(
@@ -531,8 +514,7 @@ fn set_prop(
     // SAFETY: FFI setter. VTCompressionSession is a subtype of VTSession (same ABI).
     #[allow(unsafe_code)]
     let status = unsafe {
-        let vt_session: &VTSession =
-            &*(session as *const VTCompressionSession as *const VTSession);
+        let vt_session: &VTSession = &*(session as *const VTCompressionSession as *const VTSession);
         VTSessionSetProperty(vt_session, key, Some(value))
     };
     if status != 0 {

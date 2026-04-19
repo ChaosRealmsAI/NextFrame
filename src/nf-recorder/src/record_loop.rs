@@ -40,6 +40,7 @@ const FRAME_POOL_CAPACITY: usize = 3;
 
 /// Encode progress reporting cadence (every N frames).
 const PROGRESS_EVERY: u64 = 30;
+const EXPORT_SEEK_SETTLE: Duration = Duration::from_millis(12);
 
 /// Validated recorder job parameters · product of `cli::to_config`.
 ///
@@ -140,9 +141,9 @@ impl RecordError {
 impl From<ShellError> for RecordError {
     fn from(e: ShellError) -> Self {
         match e {
-            ShellError::UnsupportedPlatform => Self::UnsupportedPlatform(
-                "shell reports unsupported platform".into(),
-            ),
+            ShellError::UnsupportedPlatform => {
+                Self::UnsupportedPlatform("shell reports unsupported platform".into())
+            }
             ShellError::SnapshotFailed(m) => Self::CARendererInitFailed(m),
             ShellError::JsCallFailed(m) => Self::ShellError(m),
             ShellError::BundleLoadFailed(m) => Self::BundleLoadFailed(m),
@@ -153,18 +154,12 @@ impl From<ShellError> for RecordError {
 impl From<PipelineError> for RecordError {
     fn from(e: PipelineError) -> Self {
         match e {
-            PipelineError::EncoderInitFailed => {
-                Self::VtEncoderFailed("encoder init failed".into())
-            }
+            PipelineError::EncoderInitFailed => Self::VtEncoderFailed("encoder init failed".into()),
             PipelineError::WriterSessionFailed => {
                 Self::WriterSessionFailed("writer session failed".into())
             }
-            PipelineError::FrameOutOfOrder => {
-                Self::PipelineError("frame out of order".into())
-            }
-            PipelineError::Timeout => {
-                Self::FrameReadyTimeout("pipeline internal timeout".into())
-            }
+            PipelineError::FrameOutOfOrder => Self::PipelineError("frame out of order".into()),
+            PipelineError::Timeout => Self::FrameReadyTimeout("pipeline internal timeout".into()),
             PipelineError::IoError(m) => Self::PipelineError(m),
         }
     }
@@ -225,8 +220,7 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
         .map_err(|e| RecordError::BundleLoadFailed(format!("{e}")))?;
 
     // 2.1 Probe runtime duration · fall back to `max_duration_s` on miss.
-    let duration_script =
-        "return (window.__nf && typeof window.__nf.getDuration === 'function') \
+    let duration_script = "return (window.__nf && typeof window.__nf.getDuration === 'function') \
          ? window.__nf.getDuration() : null;";
     let probe = shell.call_async(duration_script).await?;
     let probed_ms = js_number_as_u64(Some(&probe));
@@ -262,26 +256,34 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
         }
         s.textContent = 'html,body{width:__NF_WIDTH__px!important;height:__NF_HEIGHT__px!important;min-height:__NF_HEIGHT__px!important;margin:0!important;padding:0!important;background:#ff00ff!important;}';
         document.body.dataset.mode = 'record';
-        return { bodyW: document.body.clientWidth, bodyH: document.body.clientHeight, vpContent: vp.content };
+        return true;
     "#
     .replace("__NF_WIDTH__", &cfg.width.to_string())
     .replace("__NF_HEIGHT__", &cfg.height.to_string());
     let _ = shell.call_async(&mode_switch).await?;
 
     let has_export_seek_bridge = shell
-        .call_async(
-            "return !!(window.__nf_seek_export && window.__nf_read_seek_export);",
-        )
+        .eval_sync("return !!(window.__nf_seek_export && window.__nf_read_seek_export);")
         .await?
         .as_bool()
         == Some(true);
     let has_video_state_probe = shell
-        .call_async(
-            "return !!(window.__nf && typeof window.__nf.getVideoState === 'function');",
-        )
+        .eval_sync("return !!(window.__nf && typeof window.__nf.getVideoState === 'function');")
         .await?
         .as_bool()
         == Some(true);
+    let has_active_video_probe = if has_video_state_probe {
+        let initial_probe = shell
+            .eval_sync(
+                "return JSON.stringify((window.__nf && typeof window.__nf.getVideoState === 'function') \
+                 ? window.__nf.getVideoState() : { count: 0, clips: [] });",
+            )
+            .await?;
+        let initial_state = parse_json_result(initial_probe, "video-state bootstrap")?;
+        js_number_as_u64(initial_state.get("count")).unwrap_or(0) > 0
+    } else {
+        false
+    };
 
     // 3. Construct encoder/writer pipeline.
     let mut pipeline = match cfg.codec {
@@ -335,6 +337,7 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
         return Err(RecordError::NoFrames);
     }
     let mut frames_encoded: u64 = 0;
+    let mut last_export_seq: u64 = 0;
 
     for seq in range_start..range_end {
         // FM-T-QUANTIZATION: precise f64 · 禁 round 到整 ms。
@@ -348,36 +351,26 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
         // 5.1 Drive runtime seek · await frameReady · hard 5 s timeout.
         // 传 f64 精确值给 bundle · runtime.js seek() 本是 JS Number (f64) 吃 f64 不 reject。
         let result = if has_export_seek_bridge {
-            let seek_script = format!("window.__nf_seek_export({t_exact_ms:.6}); return true;");
-            let seek_fut = shell.call_async(&seek_script);
-            match tokio::time::timeout(FRAME_SEEK_TIMEOUT, seek_fut).await {
-                Ok(r) => {
-                    let seek_ok = r?;
-                    if seek_ok.as_bool() != Some(true) {
-                        return Err(RecordError::FrameReadyContract(format!(
-                            "export seek bridge returned non-true at expected_t={t_exact_ms:.6} · got {seek_ok}"
-                        )));
-                    }
-                }
-                Err(_elapsed) => {
-                    return Err(RecordError::FrameReadyTimeout(format!(
-                        "{}ms at t_exact_ms={t_exact_ms:.6}",
-                        FRAME_SEEK_TIMEOUT.as_millis()
-                    )));
-                }
-            }
+            let seek_script = format!("window.__nf_seek_export({t_exact_ms:.6});");
+            shell.eval_fire_and_forget(&seek_script)?;
 
-            if has_video_state_probe {
+            if has_active_video_probe {
+                let value = wait_for_export_seek_ready(&shell, t_exact_ms, last_export_seq).await?;
+                last_export_seq = js_number_as_u64(value.get("seq")).unwrap_or(last_export_seq);
                 wait_for_video_state_ready(&shell, t_exact_ms).await?;
+                value
+            } else {
+                shell.pump_for(EXPORT_SEEK_SETTLE);
+                last_export_seq = last_export_seq.saturating_add(1);
+                serde_json::json!({
+                    "t": t_exact_ms,
+                    "frameReady": true,
+                    "seq": last_export_seq
+                })
             }
-
-            serde_json::json!({
-                "t": t_exact_ms,
-                "frameReady": true,
-                "seq": seq + 1
-            })
         } else {
-            let seek_script = format!("return await window.__nf.seek({t_exact_ms:.6});");
+            let seek_script =
+                format!("return JSON.stringify(await window.__nf.seek({t_exact_ms:.6}));");
             let seek_fut = shell.call_async(&seek_script);
             let raw_result = match tokio::time::timeout(FRAME_SEEK_TIMEOUT, seek_fut).await {
                 Ok(r) => r?,
@@ -388,7 +381,7 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
                     )));
                 }
             };
-            parse_seek_result(raw_result)?
+            parse_json_result(raw_result, "seek result")?
         };
 
         // Validate frameReady handshake shape (f64 容差判 · 不严格整数相等).
@@ -471,12 +464,13 @@ async fn wait_for_video_state_ready(
 ) -> Result<(), RecordError> {
     let started = Instant::now();
     loop {
-        let value = shell
-            .call_async(
-                "return (window.__nf && typeof window.__nf.getVideoState === 'function') \
-                 ? window.__nf.getVideoState() : { count: 0, clips: [] };",
+        let raw = shell
+            .eval_sync(
+                "return JSON.stringify((window.__nf && typeof window.__nf.getVideoState === 'function') \
+                 ? window.__nf.getVideoState() : { count: 0, clips: [] });",
             )
             .await?;
+        let value = parse_json_result(raw, "video-state")?;
         if video_state_is_ready(&value, expected_t)? {
             return Ok(());
         }
@@ -487,6 +481,32 @@ async fn wait_for_video_state_ready(
             )));
         }
         tokio::time::sleep(Duration::from_millis(16)).await;
+    }
+}
+
+async fn wait_for_export_seek_ready(
+    shell: &MacHeadlessShell,
+    expected_t: f64,
+    min_seq_exclusive: u64,
+) -> Result<serde_json::Value, RecordError> {
+    let started = Instant::now();
+    loop {
+        let raw = shell
+            .eval_sync("return window.__nf_read_seek_export();")
+            .await?;
+        let value = parse_json_result(raw, "export seek result")?;
+        let runtime_seq = js_number_as_u64(value.get("seq")).unwrap_or(0);
+        if runtime_seq > min_seq_exclusive {
+            verify_frame_ready(&value, expected_t)?;
+            return Ok(value);
+        }
+        if started.elapsed() >= FRAME_SEEK_TIMEOUT {
+            return Err(RecordError::FrameReadyTimeout(format!(
+                "export seek not ready after {}ms at expected_t={expected_t:.6}",
+                FRAME_SEEK_TIMEOUT.as_millis()
+            )));
+        }
+        tokio::time::sleep(Duration::from_millis(4)).await;
     }
 }
 
@@ -541,19 +561,20 @@ fn verify_frame_ready(value: &serde_json::Value, expected_t: f64) -> Result<(), 
     // seq must be present + numeric · specific value is not asserted here
     // (monotonic / strictly-increasing checks are downstream verify tasks).
     let _runtime_seq = js_number_as_u64(obj.get("seq")).ok_or_else(|| {
-        RecordError::FrameReadyContract(format!(
-            "missing seq at expected_t={expected_t:.6}"
-        ))
+        RecordError::FrameReadyContract(format!("missing seq at expected_t={expected_t:.6}"))
     })?;
 
     Ok(())
 }
 
-fn parse_seek_result(value: serde_json::Value) -> Result<serde_json::Value, RecordError> {
+fn parse_json_result(
+    value: serde_json::Value,
+    context: &str,
+) -> Result<serde_json::Value, RecordError> {
     if let Some(s) = value.as_str() {
         serde_json::from_str::<serde_json::Value>(s).map_err(|e| {
             RecordError::FrameReadyContract(format!(
-                "seek returned non-JSON string: {e} · raw={s}"
+                "{context} returned non-JSON string: {e} · raw={s}"
             ))
         })
     } else {
@@ -561,10 +582,7 @@ fn parse_seek_result(value: serde_json::Value) -> Result<serde_json::Value, Reco
     }
 }
 
-fn video_state_is_ready(
-    value: &serde_json::Value,
-    expected_t: f64,
-) -> Result<bool, RecordError> {
+fn video_state_is_ready(value: &serde_json::Value, expected_t: f64) -> Result<bool, RecordError> {
     let Some(obj) = value.as_object() else {
         return Err(RecordError::FrameReadyContract(format!(
             "video-state expected object at expected_t={expected_t:.6} · got: {value}"

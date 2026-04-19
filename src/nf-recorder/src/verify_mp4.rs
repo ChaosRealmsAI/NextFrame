@@ -148,10 +148,7 @@ pub fn verify(
     asserts.push(Assertion {
         name: "moov_front".into(),
         expected: "moov_offset < mdat_offset".into(),
-        actual: format!(
-            "moov@{} mdat@{}",
-            verdict.moov_offset, verdict.mdat_offset
-        ),
+        actual: format!("moov@{} mdat@{}", verdict.moov_offset, verdict.mdat_offset),
         pass: verdict.moov_front,
     });
 
@@ -195,10 +192,7 @@ pub fn verify(
             let pass = actual_f >= lo && actual_f <= hi;
             asserts.push(Assertion {
                 name: "bit_rate".into(),
-                expected: format!(
-                    "{exp} bps ± 15% (range {:.0}..{:.0})",
-                    lo, hi
-                ),
+                expected: format!("{exp} bps ± 15% (range {:.0}..{:.0})", lo, hi),
                 actual: format!("{} bps", verdict.bit_rate),
                 pass,
             });
@@ -325,10 +319,8 @@ fn scan_top_level(file: &mut File, file_size: u64) -> Result<TopLevel, VerifyErr
         offset = next;
     }
 
-    let moov_offset =
-        moov_offset.ok_or_else(|| VerifyError::Malformed("no moov atom".into()))?;
-    let mdat_offset =
-        mdat_offset.ok_or_else(|| VerifyError::Malformed("no mdat atom".into()))?;
+    let moov_offset = moov_offset.ok_or_else(|| VerifyError::Malformed("no moov atom".into()))?;
+    let mdat_offset = mdat_offset.ok_or_else(|| VerifyError::Malformed("no mdat atom".into()))?;
     if moov_bytes.is_empty() {
         return Err(VerifyError::Malformed("empty moov body".into()));
     }
@@ -807,29 +799,54 @@ impl<'a> BitReader<'a> {
 ///             - colour_primaries · transfer · matrix (each u8)
 fn parse_sps_vui(rbsp: &[u8], info: &mut MoovInfo) {
     let mut r = BitReader::new(rbsp);
-    let Some(profile_idc) = r.read_bits(8) else { return };
+    let Some(profile_idc) = r.read_bits(8) else {
+        return;
+    };
     // constraint_set_flags (8) + reserved_zero_2bits (already in 8)
-    if r.read_bits(8).is_none() { return; }
+    if r.read_bits(8).is_none() {
+        return;
+    }
     // level_idc
-    if r.read_bits(8).is_none() { return; }
+    if r.read_bits(8).is_none() {
+        return;
+    }
     // seq_parameter_set_id ue
-    if r.read_ue().is_none() { return; }
+    if r.read_ue().is_none() {
+        return;
+    }
 
-    let has_chroma = matches!(profile_idc, 100|110|122|244|44|83|86|118|128|138|139|134|135);
+    let has_chroma = matches!(
+        profile_idc,
+        100 | 110 | 122 | 244 | 44 | 83 | 86 | 118 | 128 | 138 | 139 | 134 | 135
+    );
     if has_chroma {
-        let chroma = match r.read_ue() { Some(v) => v, None => return };
+        let chroma = match r.read_ue() {
+            Some(v) => v,
+            None => return,
+        };
         if chroma == 3 {
             // separate_colour_plane_flag
-            if r.read_bit().is_none() { return; }
+            if r.read_bit().is_none() {
+                return;
+            }
         }
         // bit_depth_luma_minus8 ue
-        if r.read_ue().is_none() { return; }
+        if r.read_ue().is_none() {
+            return;
+        }
         // bit_depth_chroma_minus8 ue
-        if r.read_ue().is_none() { return; }
+        if r.read_ue().is_none() {
+            return;
+        }
         // qpprime_y_zero_transform_bypass_flag u1
-        if r.read_bit().is_none() { return; }
+        if r.read_bit().is_none() {
+            return;
+        }
         // seq_scaling_matrix_present_flag u1
-        let scaling_present = match r.read_bit() { Some(v) => v, None => return };
+        let scaling_present = match r.read_bit() {
+            Some(v) => v,
+            None => return,
+        };
         if scaling_present == 1 {
             // 8 or 12 scaling_list flags each possibly followed by a list · complex.
             // Skip pragmatically — if present, we fail gracefully and leave VUI unset
@@ -839,76 +856,164 @@ fn parse_sps_vui(rbsp: &[u8], info: &mut MoovInfo) {
     }
 
     // log2_max_frame_num_minus4 ue
-    if r.read_ue().is_none() { return; }
+    if r.read_ue().is_none() {
+        return;
+    }
     // pic_order_cnt_type ue
-    let poc_type = match r.read_ue() { Some(v) => v, None => return };
+    let poc_type = match r.read_ue() {
+        Some(v) => v,
+        None => return,
+    };
     if poc_type == 0 {
-        if r.read_ue().is_none() { return; } // log2_max_pic_order_cnt_lsb_minus4
+        if r.read_ue().is_none() {
+            return;
+        } // log2_max_pic_order_cnt_lsb_minus4
     } else if poc_type == 1 {
-        if r.read_bit().is_none() { return; } // delta_pic_order_always_zero_flag
-        if r.read_se().is_none() { return; } // offset_for_non_ref_pic
-        if r.read_se().is_none() { return; } // offset_for_top_to_bottom_field
-        let num_ref = match r.read_ue() { Some(v) => v, None => return };
+        if r.read_bit().is_none() {
+            return;
+        } // delta_pic_order_always_zero_flag
+        if r.read_se().is_none() {
+            return;
+        } // offset_for_non_ref_pic
+        if r.read_se().is_none() {
+            return;
+        } // offset_for_top_to_bottom_field
+        let num_ref = match r.read_ue() {
+            Some(v) => v,
+            None => return,
+        };
         for _ in 0..num_ref {
-            if r.read_se().is_none() { return; }
+            if r.read_se().is_none() {
+                return;
+            }
         }
     }
 
     // max_num_ref_frames ue
-    let _max_ref = match r.read_ue() { Some(v) => v, None => return };
+    let _max_ref = match r.read_ue() {
+        Some(v) => v,
+        None => return,
+    };
     // gaps_in_frame_num_value_allowed_flag u1
-    if r.read_bit().is_none() { return; }
+    if r.read_bit().is_none() {
+        return;
+    }
     // pic_width_in_mbs_minus1 ue
-    if r.read_ue().is_none() { return; }
+    if r.read_ue().is_none() {
+        return;
+    }
     // pic_height_in_map_units_minus1 ue
-    if r.read_ue().is_none() { return; }
+    if r.read_ue().is_none() {
+        return;
+    }
     // frame_mbs_only_flag u1
-    let frame_mbs_only = match r.read_bit() { Some(v) => v, None => return };
+    let frame_mbs_only = match r.read_bit() {
+        Some(v) => v,
+        None => return,
+    };
     if frame_mbs_only == 0 {
-        if r.read_bit().is_none() { return; } // mb_adaptive_frame_field_flag
+        if r.read_bit().is_none() {
+            return;
+        } // mb_adaptive_frame_field_flag
     }
     // direct_8x8_inference_flag u1
-    if r.read_bit().is_none() { return; }
+    if r.read_bit().is_none() {
+        return;
+    }
     // frame_cropping_flag u1
-    let crop = match r.read_bit() { Some(v) => v, None => return };
+    let crop = match r.read_bit() {
+        Some(v) => v,
+        None => return,
+    };
     if crop == 1 {
-        if r.read_ue().is_none() { return; }
-        if r.read_ue().is_none() { return; }
-        if r.read_ue().is_none() { return; }
-        if r.read_ue().is_none() { return; }
+        if r.read_ue().is_none() {
+            return;
+        }
+        if r.read_ue().is_none() {
+            return;
+        }
+        if r.read_ue().is_none() {
+            return;
+        }
+        if r.read_ue().is_none() {
+            return;
+        }
     }
     // vui_parameters_present_flag
-    let vui = match r.read_bit() { Some(v) => v, None => return };
-    if vui == 0 { return; }
+    let vui = match r.read_bit() {
+        Some(v) => v,
+        None => return,
+    };
+    if vui == 0 {
+        return;
+    }
 
     // VUI (E.1.1): aspect / overscan / video_signal_type / chroma_loc / timing / ...
     // aspect_ratio_info_present_flag
-    let ar_present = match r.read_bit() { Some(v) => v, None => return };
+    let ar_present = match r.read_bit() {
+        Some(v) => v,
+        None => return,
+    };
     if ar_present == 1 {
-        let idc = match r.read_bits(8) { Some(v) => v, None => return };
+        let idc = match r.read_bits(8) {
+            Some(v) => v,
+            None => return,
+        };
         if idc == 255 {
-            if r.read_bits(16).is_none() { return; }
-            if r.read_bits(16).is_none() { return; }
+            if r.read_bits(16).is_none() {
+                return;
+            }
+            if r.read_bits(16).is_none() {
+                return;
+            }
         }
     }
     // overscan_info_present_flag
-    let ov = match r.read_bit() { Some(v) => v, None => return };
+    let ov = match r.read_bit() {
+        Some(v) => v,
+        None => return,
+    };
     if ov == 1 {
-        if r.read_bit().is_none() { return; } // overscan_appropriate_flag
+        if r.read_bit().is_none() {
+            return;
+        } // overscan_appropriate_flag
     }
     // video_signal_type_present_flag
-    let vs = match r.read_bit() { Some(v) => v, None => return };
-    if vs == 0 { return; }
+    let vs = match r.read_bit() {
+        Some(v) => v,
+        None => return,
+    };
+    if vs == 0 {
+        return;
+    }
     // video_format u3
-    if r.read_bits(3).is_none() { return; }
+    if r.read_bits(3).is_none() {
+        return;
+    }
     // video_full_range_flag u1
-    if r.read_bit().is_none() { return; }
+    if r.read_bit().is_none() {
+        return;
+    }
     // colour_description_present_flag
-    let cdp = match r.read_bit() { Some(v) => v, None => return };
-    if cdp == 0 { return; }
-    let prim = match r.read_bits(8) { Some(v) => v, None => return };
-    let tf = match r.read_bits(8) { Some(v) => v, None => return };
-    let mat = match r.read_bits(8) { Some(v) => v, None => return };
+    let cdp = match r.read_bit() {
+        Some(v) => v,
+        None => return,
+    };
+    if cdp == 0 {
+        return;
+    }
+    let prim = match r.read_bits(8) {
+        Some(v) => v,
+        None => return,
+    };
+    let tf = match r.read_bits(8) {
+        Some(v) => v,
+        None => return,
+    };
+    let mat = match r.read_bits(8) {
+        Some(v) => v,
+        None => return,
+    };
     info.color_primaries = describe_primaries(prim as u16);
     info.transfer = describe_transfer(tf as u16);
     info.matrix = describe_matrix(mat as u16);

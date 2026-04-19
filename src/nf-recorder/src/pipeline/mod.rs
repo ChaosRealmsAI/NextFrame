@@ -1,13 +1,15 @@
-use std::path::PathBuf;
 use nf_shell_mac::IOSurfaceHandle;
+use std::path::PathBuf;
 
-pub mod h264;       // T-07 填
-pub mod hevc;       // v1.55 · HEVC Main 8-bit
-pub mod vt_wrap;    // T-07 填
-pub mod mp4_writer; // T-08 填
+pub mod h264; // T-07 填
+pub mod hevc; // v1.55 · HEVC Main 8-bit
+pub mod mp4_writer;
+pub mod vt_wrap; // T-07 填 // T-08 填
 
 pub trait RecordPipeline: Send {
-    fn new(opts: RecordOpts) -> Result<Self, PipelineError> where Self: Sized;
+    fn new(opts: RecordOpts) -> Result<Self, PipelineError>
+    where
+        Self: Sized;
     fn push_frame(&mut self, surface: IOSurfaceHandle, pts_ms: u64) -> Result<(), PipelineError>;
     fn finish(self) -> Result<OutputStats, PipelineError>;
 }

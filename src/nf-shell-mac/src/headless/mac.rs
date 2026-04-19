@@ -22,26 +22,31 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use block2::RcBlock;
-use objc2::rc::Retained;
+use objc2::rc::{autoreleasepool, Retained};
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{msg_send, AnyThread, MainThreadMarker, MainThreadOnly};
-use objc2_app_kit::{NSBackingStoreType, NSImage, NSWindow, NSWindowStyleMask};
+use objc2_app_kit::{
+    NSApp, NSApplicationActivationPolicy, NSBackingStoreType, NSImage, NSWindow, NSWindowStyleMask,
+};
 use objc2_core_foundation::{CFDictionary, CFRetained, CFString, CGPoint, CGRect, CGSize};
 use objc2_core_graphics::CGColorSpace;
 use objc2_core_image::{CIContext, CIImage};
 use objc2_foundation::{
-    NSCopying, NSDictionary, NSError, NSMutableDictionary, NSNumber, NSPoint, NSRect, NSSize,
-    NSString, NSURL,
+    NSActivityOptions, NSCopying, NSDictionary, NSError, NSMutableDictionary, NSNumber, NSPoint,
+    NSProcessInfo, NSRect, NSSize, NSString, NSURL,
 };
 use objc2_io_surface::{
     kIOSurfaceBytesPerElement, kIOSurfaceBytesPerRow, kIOSurfaceHeight, kIOSurfacePixelFormat,
     kIOSurfaceWidth, IOSurfaceRef,
 };
+use objc2_quartz_core::CATransaction;
 use objc2_web_kit::{WKContentWorld, WKSnapshotConfiguration, WKWebView};
 
 use crate::carenderer::CARendererSampler;
 use crate::iosurface::PIXEL_FORMAT_BGRA;
-use crate::webview::{create_webview, pump_main_run_loop, NavigationDelegate, ScriptHandler, WebViewEvent};
+use crate::webview::{
+    create_webview, pump_main_run_loop, NavigationDelegate, ScriptHandler, WebViewEvent,
+};
 use crate::{DesktopShell, IOSurfaceHandle, ShellConfig, ShellError};
 
 /// 单次 blocking wait 的默认超时。
@@ -52,6 +57,16 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// bridge 消息 handler 类型别名。
 type BridgeHandler = Box<dyn Fn(&str, &serde_json::Value) + Send + Sync + 'static>;
+
+fn script_preview(script: &str) -> String {
+    const LIMIT: usize = 120;
+    let compact = script.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.len() <= LIMIT {
+        compact
+    } else {
+        format!("{}...", &compact[..LIMIT])
+    }
+}
 
 /// `MacHeadlessShell` · headless WKWebView host。
 ///
@@ -68,6 +83,8 @@ pub struct MacHeadlessShell {
     _navigation_delegate: Retained<NavigationDelegate>,
     events_rx: Mutex<Receiver<WebViewEvent>>,
     bridge_handlers: Mutex<Vec<BridgeHandler>>,
+    process_info: Retained<NSProcessInfo>,
+    activity_token: Retained<ProtocolObject<dyn objc2_foundation::NSObjectProtocol>>,
     /// (v1.14.0-1.14.3 残留) CARenderer sampler · 已不用 · snapshot 走 takeSnapshot。
     /// 保留字段是为了不破坏构造 API · 下版本清理。
     _sampler_legacy: Mutex<CARendererSampler>,
@@ -91,6 +108,89 @@ unsafe impl Send for MacHeadlessShell {}
 unsafe impl Sync for MacHeadlessShell {}
 
 impl MacHeadlessShell {
+    pub fn eval_fire_and_forget(&self, script: &str) -> Result<(), ShellError> {
+        let _mtm = MainThreadMarker::new()
+            .ok_or_else(|| ShellError::JsCallFailed("not on main thread".into()))?;
+        let wrapped_script = format!("(() => {{ {script} }})()");
+        let script_ns = autoreleasepool(|_| NSString::from_str(&wrapped_script));
+        unsafe {
+            self.web_view
+                .evaluateJavaScript_completionHandler(&script_ns, None);
+        }
+        Ok(())
+    }
+
+    pub fn pump_for(&self, duration: Duration) {
+        autoreleasepool(|_| {
+            pump_main_run_loop(duration);
+            self.drain_events();
+        });
+    }
+
+    pub fn eval_sync<'a>(
+        &'a self,
+        script: &'a str,
+    ) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, ShellError>> + Send + 'a>> {
+        Box::pin(async move {
+            let script_preview = script_preview(script);
+            let wrapped_script = format!("(() => {{ {script} }})()");
+            let script_ns = autoreleasepool(|_| NSString::from_str(&wrapped_script));
+
+            let outcome: std::sync::Arc<Mutex<Option<Result<serde_json::Value, String>>>> =
+                std::sync::Arc::new(Mutex::new(None));
+            let outcome_clone = std::sync::Arc::clone(&outcome);
+
+            let completion = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
+                let parsed: Result<serde_json::Value, String> = unsafe {
+                    if let Some(err) = error.as_ref() {
+                        Err(err.localizedDescription().to_string())
+                    } else if result.is_null() {
+                        Ok(serde_json::Value::Null)
+                    } else {
+                        match Retained::retain(result) {
+                            Some(obj) => objc_to_json(&obj).map_err(|e| e.to_string()),
+                            None => Ok(serde_json::Value::Null),
+                        }
+                    }
+                };
+                if let Ok(mut slot) = outcome_clone.lock() {
+                    *slot = Some(parsed);
+                }
+            });
+
+            unsafe {
+                self.web_view
+                    .evaluateJavaScript_completionHandler(&script_ns, Some(&completion));
+            }
+
+            let deadline = Instant::now() + DEFAULT_TIMEOUT;
+            loop {
+                let (completed, expired) = autoreleasepool(|_| {
+                    pump_main_run_loop(Duration::from_millis(8));
+                    self.drain_events();
+                    let completed = outcome.lock().map(|slot| slot.is_some()).unwrap_or(false);
+                    (completed, Instant::now() >= deadline)
+                });
+                if completed {
+                    break;
+                }
+                if expired {
+                    return Err(ShellError::JsCallFailed(format!(
+                        "evaluateJavaScript timed out · script={script_preview}"
+                    )));
+                }
+            }
+
+            let final_result = outcome
+                .lock()
+                .map_err(|e| ShellError::JsCallFailed(format!("outcome poisoned: {e}")))?
+                .take()
+                .ok_or_else(|| ShellError::JsCallFailed("no result recorded".into()))?;
+            final_result
+                .map_err(|e| ShellError::JsCallFailed(format!("{e} · script={script_preview}")))
+        })
+    }
+
     /// 从事件 rx 拉 bridge 消息给注册的 handler。非阻塞 · 调用方在 call_async / wait 循环里轮询。
     fn drain_events(&self) {
         let rx = match self.events_rx.lock() {
@@ -121,18 +221,21 @@ impl MacHeadlessShell {
     fn wait_for_navigation_finished(&self, timeout: Duration) -> Result<(), ShellError> {
         let deadline = Instant::now() + timeout;
         loop {
-            pump_main_run_loop(Duration::from_millis(8));
-            {
-                let rx = self
-                    .events_rx
-                    .lock()
-                    .map_err(|e| ShellError::BundleLoadFailed(format!("events rx poisoned: {e}")))?;
+            let navigation_done = autoreleasepool(|_| {
+                pump_main_run_loop(Duration::from_millis(8));
+                let rx = self.events_rx.lock().map_err(|e| {
+                    ShellError::BundleLoadFailed(format!("events rx poisoned: {e}"))
+                })?;
                 while let Ok(ev) = rx.try_recv() {
                     if matches!(ev, WebViewEvent::NavigationFinished) {
-                        return Ok(());
+                        return Ok(true);
                     }
                     // 其他事件丢弃（navigation 之前的 bridge 消息不该有）
                 }
+                Ok(false)
+            })?;
+            if navigation_done {
+                return Ok(());
             }
             if Instant::now() >= deadline {
                 return Err(ShellError::BundleLoadFailed(
@@ -151,12 +254,16 @@ impl DesktopShell for MacHeadlessShell {
         let mtm = MainThreadMarker::new().ok_or(ShellError::UnsupportedPlatform)?;
 
         let (w, h) = config.viewport;
-        // v1.14.4 · 窗口放屏幕右边外 (主屏通常 ≤ 5760px 宽 · 用户双屏也难到 20000px)
-        // 替代 v1.14.0-1.14.3 的 orderOut 方案：orderOut 窗口下 takeSnapshot 只截 stage ·
-        // 不截 controls + timeline (WKWebView layer tree layout 不完整 · 实测漏 playhead)。
-        // 屏幕外 orderFront 窗口 WindowServer 视为 visible · 会完整 layout + paint ·
-        // 用户看不见 · takeSnapshot 拿到完整 DOM。
-        const OFFSCREEN_X: f64 = 20_000.0;
+        // v1.56 · 屏幕外窗口在长时 4K 导出里会命中 WebKit/WindowServer 节流:
+        // callAsyncJavaScript 在 ~30s wall-clock 后开始稳定报
+        // "JavaScript execution returned a result of an unsupported type"。
+        //
+        // 观察到短任务(<30s real)稳定、长任务不稳定，且失败与视频时间无关，
+        // 更像是“长期屏幕外 window 被系统降级”而不是 source 本身。这里改成
+        // **屏幕内但几乎全透明** 的 borderless window:
+        // - WindowServer 仍把它当 visible window，layout/paint/takeSnapshot 完整
+        // - alpha≈0 + ignoresMouseEvents 让用户几乎不可见且不拦截输入
+        const OFFSCREEN_X: f64 = 0.0;
         const OFFSCREEN_Y: f64 = 0.0;
         let frame = NSRect::new(
             NSPoint::new(OFFSCREEN_X, OFFSCREEN_Y),
@@ -177,20 +284,37 @@ impl DesktopShell for MacHeadlessShell {
         window.setIgnoresMouseEvents(true);
         // SAFETY: setReleasedWhenClosed 必须 main thread · 防 close 释放 window 导致 UAF。
         unsafe {
+            let _: () = msg_send![&*window, setOpaque: false];
+            let _: () = msg_send![&*window, setAlphaValue: 0.02f64];
             window.setReleasedWhenClosed(false);
         }
 
-        let (events_tx, events_rx): (Sender<WebViewEvent>, Receiver<WebViewEvent>) = mpsc::channel();
+        let (events_tx, events_rx): (Sender<WebViewEvent>, Receiver<WebViewEvent>) =
+            mpsc::channel();
         let (web_view, script_handler, navigation_delegate) = create_webview(mtm, frame, events_tx);
 
         window.setContentView(Some(&web_view));
-        // v1.14.4 · orderFrontRegardless 让窗口"可见" (WindowServer 视角 · 完整 layout)
-        // 但因 frame 在屏幕外 (x=20000) · 用户看不见 · 不抢焦点 (setIgnoresMouseEvents=YES)。
-        // 对比 v1.14.0-3 的 orderOut: 那个让 window 不在 window list · takeSnapshot 漏 UI。
-        unsafe {
-            // SAFETY: AppKit 主线程调用 · mtm 已拿到。orderFrontRegardless 不抢 key/main.
-            let _: () = msg_send![&*window, orderFrontRegardless];
-        }
+        // v1.56 · 保持 orderFrontRegardless 让窗口留在 WindowServer 的可见集合里。
+        // 它现在位于屏幕内，但 alpha≈0 + ignoresMouseEvents，不抢交互。
+        let app = NSApp(mtm);
+        app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
+        app.activateIgnoringOtherApps(true);
+        window.makeKeyAndOrderFront(None);
+
+        // v1.56 · 禁掉 App Nap / 自动终止，避免长时 headless export 在 ~30s
+        // wall-clock 后被系统降级。
+        let process_info = NSProcessInfo::processInfo();
+        let activity_reason = NSString::from_str("NextFrame headless export");
+        let activity_token = process_info.beginActivityWithOptions_reason(
+            NSActivityOptions::UserInteractive
+                | NSActivityOptions::IdleDisplaySleepDisabled
+                | NSActivityOptions::IdleSystemSleepDisabled
+                | NSActivityOptions::AnimationTrackingEnabled
+                | NSActivityOptions::TrackingEnabled
+                | NSActivityOptions::SuddenTerminationDisabled
+                | NSActivityOptions::AutomaticTerminationDisabled,
+            &activity_reason,
+        );
 
         // v1.14.0-1.14.3 残留 CARenderer sampler · 已不用 · 保留避免破坏 new_headless。
         let sampler = CARendererSampler::new(w, h)?;
@@ -204,8 +328,9 @@ impl DesktopShell for MacHeadlessShell {
         // CGColorSpace::new_device_rgb() 是纯 C 调用。IOSurface 通过 IOSurfaceRef::new
         // 分配 · 由内核 IOKit 服务管理 · 跨线程 thread-safe (见 iosurface.rs)。
         let ci_context = unsafe { CIContext::context() };
-        let color_space = CGColorSpace::new_device_rgb()
-            .ok_or_else(|| ShellError::SnapshotFailed("CGColorSpaceCreateDeviceRGB returned nil".into()))?;
+        let color_space = CGColorSpace::new_device_rgb().ok_or_else(|| {
+            ShellError::SnapshotFailed("CGColorSpaceCreateDeviceRGB returned nil".into())
+        })?;
         let output_surface_ref = create_output_iosurface(w, h)
             .ok_or_else(|| ShellError::SnapshotFailed("IOSurfaceCreate returned nil".into()))?;
         let output_surface = IOSurfaceHandle::from_surface(output_surface_ref);
@@ -217,6 +342,8 @@ impl DesktopShell for MacHeadlessShell {
             _navigation_delegate: navigation_delegate,
             events_rx: Mutex::new(events_rx),
             bridge_handlers: Mutex::new(Vec::new()),
+            process_info,
+            activity_token,
             _sampler_legacy: Mutex::new(sampler),
             ci_context,
             color_space,
@@ -254,9 +381,8 @@ impl DesktopShell for MacHeadlessShell {
         // SAFETY: URLWithString / NSURLRequest 需 main thread · mtm 在 new 时拿过 · 但
         // load_bundle 没 mtm · 我们用 `MainThreadMarker::new()` 重新获取（会检查）。
         let _mtm = MainThreadMarker::new().ok_or(ShellError::UnsupportedPlatform)?;
-        let url = NSURL::URLWithString(&ns_url_str).ok_or_else(|| {
-            ShellError::BundleLoadFailed(format!("invalid URL: {url_str}"))
-        })?;
+        let url = NSURL::URLWithString(&ns_url_str)
+            .ok_or_else(|| ShellError::BundleLoadFailed(format!("invalid URL: {url_str}")))?;
 
         // SAFETY: NSURLRequest::alloc + initWithURL 需 main thread · 已校验。
         let request: Retained<objc2_foundation::NSURLRequest> = unsafe {
@@ -279,13 +405,17 @@ impl DesktopShell for MacHeadlessShell {
         script: &'a str,
     ) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, ShellError>> + Send + 'a>> {
         Box::pin(async move {
+            let script_preview = script_preview(script);
             let mtm = MainThreadMarker::new()
                 .ok_or_else(|| ShellError::JsCallFailed("not on main thread".into()))?;
-            let script_ns = NSString::from_str(script);
-            let arguments: Retained<NSDictionary<NSString, AnyObject>> =
-                NSDictionary::from_slices::<NSString>(&[], &[]);
-            // SAFETY: pageWorld 必须 main thread · mtm 已检。
-            let world = unsafe { WKContentWorld::pageWorld(mtm) };
+            let (script_ns, arguments, world) = autoreleasepool(|_| {
+                let script_ns = NSString::from_str(script);
+                let arguments: Retained<NSDictionary<NSString, AnyObject>> =
+                    NSDictionary::from_slices::<NSString>(&[], &[]);
+                // SAFETY: pageWorld 必须 main thread · mtm 已检。
+                let world = unsafe { WKContentWorld::pageWorld(mtm) };
+                (script_ns, arguments, world)
+            });
 
             // 共享结果容器 · block 写、poll 读。
             // 用 Arc<Mutex<..>> 因 RcBlock 的 closure 需 'static · Rc 不满足 Send。
@@ -330,18 +460,20 @@ impl DesktopShell for MacHeadlessShell {
             // · 直接在 main thread 上 pump + poll outcome。
             let deadline = Instant::now() + DEFAULT_TIMEOUT;
             loop {
-                pump_main_run_loop(Duration::from_millis(8));
-                // drain bridge 消息 · 不阻塞
-                self.drain_events();
-                if let Ok(slot) = outcome.lock() {
-                    if slot.is_some() {
-                        break;
-                    }
+                let (completed, expired) = autoreleasepool(|_| {
+                    pump_main_run_loop(Duration::from_millis(8));
+                    // drain bridge 消息 · 不阻塞
+                    self.drain_events();
+                    let completed = outcome.lock().map(|slot| slot.is_some()).unwrap_or(false);
+                    (completed, Instant::now() >= deadline)
+                });
+                if completed {
+                    break;
                 }
-                if Instant::now() >= deadline {
-                    return Err(ShellError::JsCallFailed(
-                        "callAsyncJavaScript timed out".into(),
-                    ));
+                if expired {
+                    return Err(ShellError::JsCallFailed(format!(
+                        "callAsyncJavaScript timed out · script={script_preview}"
+                    )));
                 }
             }
 
@@ -350,7 +482,8 @@ impl DesktopShell for MacHeadlessShell {
                 .map_err(|e| ShellError::JsCallFailed(format!("outcome poisoned: {e}")))?
                 .take()
                 .ok_or_else(|| ShellError::JsCallFailed("no result recorded".into()))?;
-            final_result.map_err(ShellError::JsCallFailed)
+            final_result
+                .map_err(|e| ShellError::JsCallFailed(format!("{e} · script={script_preview}")))
         })
     }
 
@@ -373,7 +506,42 @@ impl DesktopShell for MacHeadlessShell {
             .ok_or_else(|| ShellError::SnapshotFailed("snapshot not on main thread".into()))?;
 
         // 1. takeSnapshot blocking · 等 Apple 回调 NSImage (保证当前画面).
-        let ns_image = take_snapshot_blocking(&self.web_view, mtm)?;
+        // v1.56 · 长跑 4K export 尾段里 takeSnapshot 会偶发 "An unknown error occurred"。
+        // 对 export bundle 来说我们只需要 stage，不需要 editor controls/timeline，
+        // 因此可以安全退回 CARenderer 路径，再把复用 surface 拷到独立 per-frame
+        // IOSurface，避免 VT 吃到后续帧覆盖的像素。
+        let ns_image = match take_snapshot_blocking(&self.web_view, mtm) {
+            Ok(image) => image,
+            Err(take_snapshot_err) => {
+                self.web_view.displayIfNeeded();
+                CATransaction::flush();
+                pump_main_run_loop(Duration::from_millis(16));
+
+                let layer = self.web_view.layer().ok_or_else(|| {
+                    ShellError::SnapshotFailed(format!(
+                        "takeSnapshot failed: {take_snapshot_err}; fallback web_view.layer=nil"
+                    ))
+                })?;
+                let sampled = self
+                    ._sampler_legacy
+                    .lock()
+                    .map_err(|e| ShellError::SnapshotFailed(format!("sampler poisoned: {e}")))?
+                    .sample(&layer)
+                    .map_err(|sample_err| {
+                        ShellError::SnapshotFailed(format!(
+                            "takeSnapshot failed: {take_snapshot_err}; CARenderer fallback failed: {sample_err}"
+                        ))
+                    })?;
+                let per_frame_surface_ref =
+                    copy_iosurface(sampled.as_iosurface(), self.viewport.0, self.viewport.1)
+                        .map_err(|copy_err| {
+                            ShellError::SnapshotFailed(format!(
+                                "takeSnapshot failed: {take_snapshot_err}; IOSurface copy failed: {copy_err}"
+                            ))
+                        })?;
+                return Ok(IOSurfaceHandle::from_surface(per_frame_surface_ref));
+            }
+        };
 
         // 2. NSImage → CGImage (跟 POC-A/B 一致 · 使用 CGImageForProposedRect).
         let cg_image = unsafe {
@@ -382,7 +550,6 @@ impl DesktopShell for MacHeadlessShell {
         .ok_or_else(|| {
             ShellError::SnapshotFailed("NSImage.CGImageForProposedRect returned nil".into())
         })?;
-
 
         // 3. CGImage → CIImage (GPU-friendly wrapper · 零拷贝).
         let ci_image: Retained<CIImage> = unsafe { CIImage::imageWithCGImage(&cg_image) };
@@ -398,17 +565,23 @@ impl DesktopShell for MacHeadlessShell {
         let target_h = f64::from(h);
         let cg_w = objc2_core_graphics::CGImage::width(Some(&cg_image)) as f64;
         let cg_h = objc2_core_graphics::CGImage::height(Some(&cg_image)) as f64;
-        let scaled_ci: Retained<CIImage> = if (cg_w - target_w).abs() < 0.5 && (cg_h - target_h).abs() < 0.5 {
-            // 1x 屏 · CGImage 已是目标尺寸 · 无需 scale.
-            ci_image
-        } else {
-            let sx = target_w / cg_w;
-            let sy = target_h / cg_h;
-            let tm = objc2_core_foundation::CGAffineTransform {
-                a: sx, b: 0.0, c: 0.0, d: sy, tx: 0.0, ty: 0.0,
+        let scaled_ci: Retained<CIImage> =
+            if (cg_w - target_w).abs() < 0.5 && (cg_h - target_h).abs() < 0.5 {
+                // 1x 屏 · CGImage 已是目标尺寸 · 无需 scale.
+                ci_image
+            } else {
+                let sx = target_w / cg_w;
+                let sy = target_h / cg_h;
+                let tm = objc2_core_foundation::CGAffineTransform {
+                    a: sx,
+                    b: 0.0,
+                    c: 0.0,
+                    d: sy,
+                    tx: 0.0,
+                    ty: 0.0,
+                };
+                unsafe { ci_image.imageByApplyingTransform_highQualityDownsample(tm, true) }
             };
-            unsafe { ci_image.imageByApplyingTransform_highQualityDownsample(tm, true) }
-        };
 
         // 4. 每帧新建 IOSurface · 不复用 self.output_surface (bug 发现于 v1.14.4 首版):
         //    VT encoder 是异步 pipeline · 540 帧共享同一 IOSurface 会让 encoder queue
@@ -422,8 +595,9 @@ impl DesktopShell for MacHeadlessShell {
                 height: target_h,
             },
         };
-        let per_frame_surface_ref = create_output_iosurface(w, h)
-            .ok_or_else(|| ShellError::SnapshotFailed("IOSurfaceCreate per-frame returned nil".into()))?;
+        let per_frame_surface_ref = create_output_iosurface(w, h).ok_or_else(|| {
+            ShellError::SnapshotFailed("IOSurfaceCreate per-frame returned nil".into())
+        })?;
         // SAFETY: ci_context / per_frame_surface / color_space 生命周期覆盖本调用.
         // render_toIOSurface_bounds_colorSpace 把 CIImage 渲染到独立 IOSurface (Metal backend).
         unsafe {
@@ -451,6 +625,10 @@ impl DesktopShell for MacHeadlessShell {
 
 impl Drop for MacHeadlessShell {
     fn drop(&mut self) {
+        // SAFETY: token 由 beginActivityWithOptions 返回 · 在 shell drop 时对称结束。
+        unsafe {
+            self.process_info.endActivity(&self.activity_token);
+        }
         // main thread 释放 · 主 run loop 还在转时 orderOut 已足够。
         self.window.orderOut(None);
         self.window.close();
@@ -512,7 +690,9 @@ pub(crate) fn objc_to_json(obj: &AnyObject) -> Result<serde_json::Value, String>
                 .unwrap_or(serde_json::Value::Null));
         }
         // 默认整数
-        return Ok(serde_json::Value::Number(serde_json::Number::from(num.as_i64())));
+        return Ok(serde_json::Value::Number(serde_json::Number::from(
+            num.as_i64(),
+        )));
     }
 
     if is_kind(cls_ns_string) {
@@ -523,16 +703,13 @@ pub(crate) fn objc_to_json(obj: &AnyObject) -> Result<serde_json::Value, String>
 
     if is_kind(cls_ns_array) {
         // SAFETY: 已校验 NSArray · cast 到 id-array 再手工遍历。
-        let arr: &objc2_foundation::NSArray = unsafe {
-            &*(obj as *const AnyObject as *const objc2_foundation::NSArray)
-        };
+        let arr: &objc2_foundation::NSArray =
+            unsafe { &*(obj as *const AnyObject as *const objc2_foundation::NSArray) };
         let count: usize = arr.count();
         let mut out = Vec::with_capacity(count);
         for i in 0..count {
             // SAFETY: i < count · objectAtIndex 返 id · 非 null。
-            let item: Retained<AnyObject> = unsafe {
-                msg_send![arr, objectAtIndex: i]
-            };
+            let item: Retained<AnyObject> = unsafe { msg_send![arr, objectAtIndex: i] };
             out.push(objc_to_json(&item)?);
         }
         return Ok(serde_json::Value::Array(out));
@@ -540,9 +717,7 @@ pub(crate) fn objc_to_json(obj: &AnyObject) -> Result<serde_json::Value, String>
 
     if is_kind(cls_ns_dict) {
         // SAFETY: 已校验 NSDictionary · cast 到 id-dict。
-        let dict: &NSDictionary = unsafe {
-            &*(obj as *const AnyObject as *const NSDictionary)
-        };
+        let dict: &NSDictionary = unsafe { &*(obj as *const AnyObject as *const NSDictionary) };
         // SAFETY: allKeys 返 NSArray<id> · NSString 键假设。
         let keys: Retained<objc2_foundation::NSArray> = unsafe { msg_send![dict, allKeys] };
         let key_count: usize = keys.count();
@@ -704,3 +879,93 @@ fn create_output_iosurface(w: u32, h: u32) -> Option<CFRetained<IOSurfaceRef>> {
     unsafe { IOSurfaceRef::new(cf_dict) }
 }
 
+fn copy_iosurface(
+    src: &IOSurfaceRef,
+    width: u32,
+    height: u32,
+) -> Result<CFRetained<IOSurfaceRef>, String> {
+    let dst = create_output_iosurface(width, height)
+        .ok_or_else(|| "IOSurfaceCreate per-frame returned nil".to_string())?;
+    let row_bytes = (width as usize)
+        .checked_mul(4)
+        .ok_or_else(|| format!("copy row overflow: width={width}"))?;
+
+    let mut src_seed: u32 = 0;
+    let src_lock = unsafe {
+        src.lock(
+            objc2_io_surface::IOSurfaceLockOptions::ReadOnly,
+            &mut src_seed,
+        )
+    };
+    if src_lock != 0 {
+        return Err(format!("copy: src lock failed: {src_lock}"));
+    }
+
+    let mut dst_seed: u32 = 0;
+    let dst_lock = unsafe {
+        dst.lock(
+            objc2_io_surface::IOSurfaceLockOptions::empty(),
+            &mut dst_seed,
+        )
+    };
+    if dst_lock != 0 {
+        let _ = unsafe {
+            src.unlock(
+                objc2_io_surface::IOSurfaceLockOptions::ReadOnly,
+                &mut src_seed,
+            )
+        };
+        return Err(format!("copy: dst lock failed: {dst_lock}"));
+    }
+
+    let src_base = src.base_address().as_ptr() as *const u8;
+    let dst_base = dst.base_address().as_ptr() as *mut u8;
+    let src_bpr = src.bytes_per_row();
+    let dst_bpr = dst.bytes_per_row();
+    if src_bpr < row_bytes || dst_bpr < row_bytes {
+        let _ = unsafe {
+            src.unlock(
+                objc2_io_surface::IOSurfaceLockOptions::ReadOnly,
+                &mut src_seed,
+            )
+        };
+        let _ = unsafe {
+            dst.unlock(
+                objc2_io_surface::IOSurfaceLockOptions::empty(),
+                &mut dst_seed,
+            )
+        };
+        return Err(format!(
+            "copy: row-stride too small · src_bpr={src_bpr} dst_bpr={dst_bpr} need={row_bytes}"
+        ));
+    }
+
+    for y in 0..height as usize {
+        let src_row = unsafe { src_base.add(y * src_bpr) };
+        let dst_row = unsafe { dst_base.add(y * dst_bpr) };
+        unsafe {
+            std::ptr::copy_nonoverlapping(src_row, dst_row, row_bytes);
+        }
+    }
+
+    let src_unlock = unsafe {
+        src.unlock(
+            objc2_io_surface::IOSurfaceLockOptions::ReadOnly,
+            &mut src_seed,
+        )
+    };
+    let dst_unlock = unsafe {
+        dst.unlock(
+            objc2_io_surface::IOSurfaceLockOptions::empty(),
+            &mut dst_seed,
+        )
+    };
+    if src_unlock != 0 {
+        eprintln!("snapshot copy: src unlock returned {src_unlock} (non-fatal)");
+    }
+    if dst_unlock != 0 {
+        eprintln!("snapshot copy: dst unlock returned {dst_unlock} (non-fatal)");
+    }
+
+    Ok(dst)
+}

@@ -181,7 +181,9 @@ fn execute_snapshot_trial() -> Result<(), String> {
     // Decode PNG · verify dimensions + center pixel.
     let data = std::fs::read(&out_path).map_err(|e| format!("read PNG: {e}"))?;
     let decoder = png::Decoder::new(std::io::Cursor::new(&data));
-    let mut reader = decoder.read_info().map_err(|e| format!("png header: {e}"))?;
+    let mut reader = decoder
+        .read_info()
+        .map_err(|e| format!("png header: {e}"))?;
     let info = reader.info().clone();
 
     if info.width != 1920 || info.height != 1080 {

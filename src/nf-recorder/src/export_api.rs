@@ -30,8 +30,7 @@ const TRACK_AUDIO: &str = include_str!("../../nf-tracks/official/audio.js");
 const TRACK_CHART: &str = include_str!("../../nf-tracks/official/chart.js");
 const TRACK_DATA: &str = include_str!("../../nf-tracks/official/data.js");
 const TRACK_SUBTITLE: &str = include_str!("../../nf-tracks/official/subtitle.js");
-const TRACK_WEBGL_PARTICLES: &str =
-    include_str!("../../nf-tracks/community/webgl-particles.js");
+const TRACK_WEBGL_PARTICLES: &str = include_str!("../../nf-tracks/community/webgl-particles.js");
 
 fn track_source_for(kind: &str) -> Option<&'static str> {
     match kind {
@@ -77,9 +76,10 @@ pub struct ExportOpts {
     pub fps: u32,
     /// VideoToolbox 目标比特率(bps)· 默认 20Mbps。
     pub bitrate_bps: u32,
-    /// v1.44.1 · 并行切片 N(ADR-061)· 默认 1 = 单进程 · ≥2 走 orchestrator。
+    /// v1.44.1 / v1.56 · 并行切片 N(ADR-061) · `None` = 按分辨率取默认
+    /// (1080p=1 / 4k=4) · `Some(1)` 可显式强制串行。
     /// duration < 6s 时 orchestrator 自动降级单进程(segment boot 开销吃掉收益)。
-    pub parallel: usize,
+    pub parallel: Option<usize>,
     /// v1.55 · CLI `--resolution` 覆盖 `source.json meta.export.resolution`。
     pub resolution_override: Option<ExportResolution>,
 }
@@ -91,7 +91,7 @@ impl Default for ExportOpts {
             viewport: (1920, 1080),
             fps: 60,
             bitrate_bps: 20_000_000,
-            parallel: 1,
+            parallel: None,
             resolution_override: None,
         }
     }
@@ -183,16 +183,11 @@ pub async fn run_export_from_source(
 
     // 读 source.json · inline 到 HTML 的 __NF_SOURCE__ 里。
     let source_text = std::fs::read_to_string(source_path).map_err(|e| {
-        RecordError::BundleLoadFailed(format!(
-            "read source.json {}: {e}",
-            source_path.display()
-        ))
+        RecordError::BundleLoadFailed(format!("read source.json {}: {e}", source_path.display()))
     })?;
     // Parse 一次拿到 viewport · 同时用于构建 tracks map / 应用 resolution preset。
-    let mut source_json: serde_json::Value =
-        serde_json::from_str(&source_text).map_err(|e| {
-            RecordError::BundleLoadFailed(format!("source.json not valid JSON: {e}"))
-        })?;
+    let mut source_json: serde_json::Value = serde_json::from_str(&source_text)
+        .map_err(|e| RecordError::BundleLoadFailed(format!("source.json not valid JSON: {e}")))?;
     let preset = resolve_export_preset(&source_json, &opts)?;
     override_source_viewport(&mut source_json, preset.viewport);
     let tracks_map_json = build_tracks_map_json(&source_json);
@@ -218,10 +213,7 @@ pub async fn run_export_from_source(
         .unwrap_or(0);
     let tmp_html: PathBuf = std::env::temp_dir().join(format!("nf-export-{pid}-{nanos}.html"));
     std::fs::write(&tmp_html, html.as_bytes()).map_err(|e| {
-        RecordError::BundleLoadFailed(format!(
-            "write tmp html {}: {e}",
-            tmp_html.display()
-        ))
+        RecordError::BundleLoadFailed(format!("write tmp html {}: {e}", tmp_html.display()))
     })?;
 
     // max_duration_s 给 recorder 留一点 buffer · ceil + 2s。
@@ -239,13 +231,20 @@ pub async fn run_export_from_source(
         frame_range: None,
     };
 
-    // v1.44.1 · parallel >= 2 走 orchestrator (spawn N 子进程 + ffmpeg concat) ·
+    let parallel = orchestrator::resolve_requested_parallel(
+        opts.parallel,
+        preset.viewport.0,
+        preset.viewport.1,
+    )?;
+
+    // v1.44.1 / v1.56 · parallel >= 2 走 orchestrator (spawn N 子进程 +
+    // ffmpeg concat) · 4k 未显式指定时默认 parallel=4。
     // 短视频(<6s) orchestrator 内部自动降级单进程 · duration 够长走真并行。
     // 单进程路径用 record_loop::run 拿 OutputStats · 并行路径 orchestrator 返 ()
     // · 用一个 synthetic stats 满足返回类型(size 从文件 metadata 读).
-    let result: Result<OutputStats, RecordError> = if opts.parallel >= 2 {
+    let result: Result<OutputStats, RecordError> = if parallel >= 2 {
         let total_frames = ((opts.duration_s * f64::from(opts.fps)).round()) as u64;
-        match orchestrator::run_parallel(cfg, opts.parallel).await {
+        match orchestrator::run_parallel(cfg, parallel).await {
             Ok(()) => {
                 let size_bytes = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
                 Ok(OutputStats {
@@ -417,6 +416,22 @@ window.__NF_TRACKS__ = {tracks_map_json};
     }};
     window.__nf_read_seek_export = function() {{
       return String(window.__nf_last_seek_json || 'null');
+    }};
+    window.__nf_kick_seek_export = function(t_ms) {{
+      var t = Number(t_ms) || 0;
+      setTimeout(function() {{
+        try {{
+          window.__nf_seek_export(t);
+        }} catch (e) {{
+          window.__nf_last_seek_json = JSON.stringify({{
+            t: t,
+            frameReady: false,
+            seq: _seq,
+            error: String((e && e.message) || e || 'seek_export failed')
+          }});
+        }}
+      }}, 0);
+      return true;
     }};
     window.__nf_wait_media_export = async function(t_ms) {{
       var t = Number(t_ms) || 0;

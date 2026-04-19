@@ -191,7 +191,10 @@ fn execute_seek_trials() -> Result<(), String> {
         let received_pts = received_f64
             .filter(|v| v.is_finite() && v.fract() == 0.0 && *v >= 0.0)
             .map(|v| v as u64);
-        let frame_ready = v.get("frameReady").and_then(|x| x.as_bool()).unwrap_or(false);
+        let frame_ready = v
+            .get("frameReady")
+            .and_then(|x| x.as_bool())
+            .unwrap_or(false);
         let seq = v
             .get("seq")
             .and_then(|x| x.as_f64())
@@ -216,8 +219,8 @@ fn execute_seek_trials() -> Result<(), String> {
 
     // Dump trials JSON 到 target/vp1-seek-trials.json (Python verify 读)。
     let out_path = trials_output_path()?;
-    let payload = serde_json::to_vec_pretty(&trials)
-        .map_err(|e| format!("serialize trials: {e}"))?;
+    let payload =
+        serde_json::to_vec_pretty(&trials).map_err(|e| format!("serialize trials: {e}"))?;
     std::fs::write(&out_path, &payload)
         .map_err(|e| format!("write trials {}: {e}", out_path.display()))?;
 

@@ -20,14 +20,57 @@ use crate::events::{emit, Event};
 use crate::record_loop::{RecordConfig, RecordError};
 
 /// 并行模式最低启用阈值 (ms) · 低于此走单进程 (N 进程 boot ~1s × N 吃掉收益)。
-///
-/// v1.44.1 · 从 6000 降到 2000 · 让 3-5s 短 demo 也能触发并行验证 ·
-/// 生产使用时建议仍按 6s 判断(可通过 env `NF_PARALLEL_MIN_MS` 覆盖)。
-pub const PARALLEL_MIN_DURATION_MS: u64 = 2000;
+pub const PARALLEL_MIN_DURATION_MS: u64 = 6000;
+
+/// v1.56 · 4K 走 orchestrator 时的默认并发度。
+pub const PARALLEL_DEFAULT_4K: usize = 4;
+
+/// v1.56 · 并行上限 · >8 会放大内存/VT 压力，直接拒绝。
+pub const PARALLEL_MAX: usize = 8;
+
+pub fn default_parallel_for_viewport(width: u32, height: u32) -> usize {
+    match (width, height) {
+        (3840, 2160) => PARALLEL_DEFAULT_4K,
+        _ => 1,
+    }
+}
+
+pub fn validate_requested_parallel(parallel: usize) -> Result<usize, RecordError> {
+    if parallel == 0 {
+        return Err(RecordError::PipelineError(
+            "parallel must be >= 1".to_string(),
+        ));
+    }
+    if parallel > PARALLEL_MAX {
+        return Err(RecordError::PipelineError(format!(
+            "parallel must be <= {PARALLEL_MAX} (got {parallel})"
+        )));
+    }
+    Ok(parallel)
+}
+
+pub fn resolve_requested_parallel(
+    requested: Option<usize>,
+    width: u32,
+    height: u32,
+) -> Result<usize, RecordError> {
+    let parallel = requested.unwrap_or_else(|| default_parallel_for_viewport(width, height));
+    validate_requested_parallel(parallel)
+}
+
+fn parallel_min_duration_ms() -> u64 {
+    std::env::var("NF_PARALLEL_MIN_MS")
+        .ok()
+        .and_then(|raw| raw.parse::<u64>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(PARALLEL_MIN_DURATION_MS)
+}
 
 /// 运行并行录制流水线 · 父进程入口。
 pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), RecordError> {
     let t0 = Instant::now();
+    let requested_parallel = validate_requested_parallel(parallel)?;
+    let min_duration_ms = parallel_min_duration_ms();
 
     // 1. probe duration · 启一次 shell · 快速读 + close。
     let duration_ms = probe_duration(&cfg).await?;
@@ -38,16 +81,16 @@ pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), Reco
     }
 
     // 2. 降级判断 · 短视频 / parallel=1 走单进程。
-    let effective_n = if duration_ms < PARALLEL_MIN_DURATION_MS || parallel <= 1 {
+    let effective_n = if duration_ms < min_duration_ms || requested_parallel <= 1 {
         1
     } else {
-        parallel
+        requested_parallel
     };
     if effective_n == 1 {
         // 降级 · 直接跑 record_loop (cfg.frame_range 为 None · 等价全 range)。
         eprintln!(
-            "[v1.15 orchestrator] parallel={parallel} · duration_ms={duration_ms} · \
-             degrading to single-process (duration<6s or parallel<=1)"
+            "[v1.15 orchestrator] parallel={requested_parallel} · duration_ms={duration_ms} · \
+             degrading to single-process (duration<{min_duration_ms}ms or parallel<=1)"
         );
         return crate::record_loop::run(cfg).await.map(|_stats| ());
     }
@@ -126,9 +169,7 @@ pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), Reco
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(|e| {
-                RecordError::PipelineError(format!("spawn segment {i}: {e}"))
-            })?;
+            .map_err(|e| RecordError::PipelineError(format!("spawn segment {i}: {e}")))?;
         children.push((i, *start, *end, child));
     }
 
@@ -160,16 +201,17 @@ pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), Reco
 
     // 6. ffmpeg concat demuxer · -c copy · 零重编码。
     emit(Event::RecordConcatStart {
-        segments: segment_paths.iter().map(|p| p.display().to_string()).collect(),
+        segments: segment_paths
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect(),
     });
     let list_path = tmp_dir.join(format!("{stem}.concat.txt"));
     let list_content = segment_paths
         .iter()
         .map(|p| {
             // ffmpeg concat 语法 · 绝对路径安全 · 单引号包裹防空格。
-            let abs = p
-                .canonicalize()
-                .unwrap_or_else(|_| p.clone());
+            let abs = p.canonicalize().unwrap_or_else(|_| p.clone());
             format!("file '{}'", abs.display())
         })
         .collect::<Vec<_>>()
@@ -238,8 +280,7 @@ async fn probe_duration(cfg: &RecordConfig) -> Result<u64, RecordError> {
         .load_bundle(&cfg.bundle)
         .map_err(|e| RecordError::BundleLoadFailed(format!("probe load: {e}")))?;
 
-    let script =
-        "return (window.__nf && typeof window.__nf.getDuration === 'function') \
+    let script = "return (window.__nf && typeof window.__nf.getDuration === 'function') \
          ? window.__nf.getDuration() : null;";
     let probe = shell
         .call_async(script)

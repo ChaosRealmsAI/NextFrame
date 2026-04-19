@@ -66,10 +66,11 @@ pub struct Cli {
     #[arg(long = "max-duration", default_value_t = 60)]
     pub max_duration: u32,
 
-    /// v1.15 · 时间切片并行录制 · 父进程启 N 个子进程各录 1/N 段 · ffmpeg concat 合并。
-    /// 1 = 单进程（默认 · 兼容 v1.14）· ≥2 = 并行。N≥2 但视频 duration<6s 自动退化单进程。
-    #[arg(long = "parallel", default_value_t = 1)]
-    pub parallel: usize,
+    /// v1.15 / v1.56 · 时间切片并行录制 · 父进程启 N 个子进程各录 1/N 段 ·
+    /// ffmpeg concat 合并。未指定时按分辨率取默认值：1080p=1 · 4k=4。
+    /// 显式 `--parallel 1` 可强制串行基线；N≥2 但视频 duration<6s 自动退化单进程。
+    #[arg(long = "parallel")]
+    pub parallel: Option<usize>,
 
     /// v1.15 · 子进程内部参数 · 父 orchestrator 调子进程时传 · 用户不用设（hidden）。
     /// 格式 `<start_frame>,<end_frame>` · 半开区间 [start, end) · 0-indexed。
@@ -196,7 +197,9 @@ pub fn parse_frame_range(s: &str) -> Result<(u64, u64), String> {
     let trimmed = s.trim();
     let parts: Vec<&str> = trimmed.splitn(2, ',').collect();
     if parts.len() != 2 {
-        return Err(format!("frame-range: expected <start>,<end>, got '{trimmed}'"));
+        return Err(format!(
+            "frame-range: expected <start>,<end>, got '{trimmed}'"
+        ));
     }
     let start: u64 = parts[0]
         .trim()
@@ -207,7 +210,9 @@ pub fn parse_frame_range(s: &str) -> Result<(u64, u64), String> {
         .parse()
         .map_err(|e: std::num::ParseIntError| format!("frame-range end: {e}"))?;
     if end <= start {
-        return Err(format!("frame-range: end ({end}) must be > start ({start})"));
+        return Err(format!(
+            "frame-range: end ({end}) must be > start ({start})"
+        ));
     }
     Ok((start, end))
 }
