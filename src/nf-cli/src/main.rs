@@ -1,8 +1,10 @@
 //! nf-cli — NextFrame command-line interface.
 //!
-//! Rust 6-subcommand wrapper that spawns the TypeScript engine subprocess
-//! (`src/nf-core-engine/dist/engine.js`) for most work and delegates track
-//! linting directly to the Node ABI checker (`src/nf-tracks/scripts/check-abi.mjs`).
+//! Subcommand wrapper that spawns the TypeScript engine subprocess for
+//! validate/anchors/schema (parse/resolve/track-loader stays as a library)
+//! and delegates track linting to the Node ABI checker.
+//! `build` (bundle.html) was removed in v1.20 — the desktop shell (nf-shell) is
+//! now the sole preview surface (ADR-060).
 //!
 //! stdout is JSON-only (rule-ai-operable). Every code path emits either a
 //! success envelope `{"ok":true,"data":...}` or an error envelope
@@ -21,7 +23,7 @@ mod io_json;
 #[derive(Parser, Debug)]
 #[command(
     name = "nf",
-    about = "NextFrame CLI — JSON in, video (HTML) out.",
+    about = "NextFrame CLI — JSON in. Preview via nf-shell desktop app.",
     version,
     disable_help_subcommand = true
 )]
@@ -32,17 +34,6 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Compile source.json to single-file bundle.html.
-    Build {
-        /// Path to timeline source JSON.
-        source: PathBuf,
-        /// Output bundle.html path.
-        #[arg(short, long)]
-        out: PathBuf,
-        /// Pretty-print inlined resolved JSON (debug).
-        #[arg(long, default_value_t = false)]
-        pretty: bool,
-    },
     /// Static-check source.json (schema + anchors + expr + track ABI refs).
     Validate {
         /// Path to timeline source JSON.
@@ -91,11 +82,6 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     let result = match cli.cmd {
-        Command::Build {
-            source,
-            out,
-            pretty,
-        } => commands::build::run(&source, &out, pretty),
         Command::Validate { source } => commands::validate::run(&source),
         Command::Anchors {
             source,

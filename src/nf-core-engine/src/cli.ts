@@ -2,40 +2,15 @@
 // Reads stdin JSON lines {cmd, args}, writes stdout JSON lines {event, ...} or {error}.
 // Stdout is strictly JSON-only (rule-ai-operable). All errors routed through error envelope.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve as pathResolve } from 'node:path';
 import { createInterface } from 'node:readline';
-import { createHash } from 'node:crypto';
 
 import { parseSource } from './parser.js';
 import { resolve as resolveStage, TrackDescribeLoader } from './resolve.js';
-import { bundle } from './bundler.js';
 import { rename } from './rename.js';
-import { parseExpr } from './expr.js';
 import { loadTracksFor } from './track-loader.js';
-import { resolveSubtitleSources } from './subtitle-resolver.js';
-import { ParseOutput, Resolved, StageError, StageErrorException } from './types.js';
-
-const DEFAULT_RUNTIME_PLACEHOLDER = `/* nf-runtime placeholder · T4-RUNTIME not yet produced.
-   Minimal boot that paints a diagnostic banner so the bundle renders something visible. */
-(function(){
-  function boot(){
-    var stage = document.getElementById('nf-stage');
-    if(!stage) return;
-    var resolvedEl = document.getElementById('nf-resolved');
-    var data = {};
-    try { data = JSON.parse(resolvedEl.textContent||'{}'); } catch(e){}
-    stage.innerHTML = '<div style="color:#fff;font-family:-apple-system,sans-serif;padding:32px;max-width:960px;line-height:1.6"><h1 style="margin:0 0 16px;font-size:28px">NextFrame bundle</h1><p style="opacity:0.75">runtime placeholder · '+ (data.tracks?data.tracks.length:0) +' track(s) · duration '+ (data.duration_ms||0) +'ms</p></div>';
-  }
-  if(typeof window !== 'undefined'){
-    window.__nf_boot = boot;
-    window.__nf = {
-      getState: function(){ return { mode:'play', t_ms:0, playing:false }; },
-      screenshot: function(){ return Promise.resolve('data:image/png;base64,'); },
-      log: function(level,msg,data){ try{console.log(JSON.stringify({level:level,msg:msg,data:data||null,source:'nf-runtime-stub'}));}catch(e){} }
-    };
-  }
-})();`;
+import { ParseOutput, StageError, StageErrorException } from './types.js';
 
 interface Cmd {
   cmd: string;
@@ -57,36 +32,6 @@ function loadSourceText(sourcePath: string): string {
   return readFileSync(sourcePath, 'utf8');
 }
 
-function buildRuntime(runtimePath: string | undefined): string {
-  // Priority 1: explicit --runtime arg
-  if (runtimePath && existsSync(runtimePath)) {
-    try {
-      return readFileSync(runtimePath, 'utf8');
-    } catch { /* fall through */ }
-  }
-  // Priority 2: env var NF_RUNTIME_PATH
-  if (process.env.NF_RUNTIME_PATH && existsSync(process.env.NF_RUNTIME_PATH)) {
-    try {
-      return readFileSync(process.env.NF_RUNTIME_PATH, 'utf8');
-    } catch { /* fall through */ }
-  }
-  // Priority 3: auto-discover sibling nf-runtime/dist/runtime-iife.js (workspace layout)
-  // engine.js lives at src/nf-core-engine/dist/engine.js → sibling is src/nf-runtime/dist/
-  const candidates = [
-    pathResolve(process.cwd(), 'src/nf-runtime/dist/runtime-iife.js'),
-    pathResolve(process.cwd(), '../nf-runtime/dist/runtime-iife.js'),
-    pathResolve(process.cwd(), 'dist/runtime-iife.js'),
-  ];
-  for (const c of candidates) {
-    if (existsSync(c)) {
-      try {
-        return readFileSync(c, 'utf8');
-      } catch { /* keep trying */ }
-    }
-  }
-  return DEFAULT_RUNTIME_PLACEHOLDER;
-}
-
 function makeLoader(parsed: ParseOutput, sourceDir: string): { loader: TrackDescribeLoader; loaded: Map<string, { id: string; source_text: string }> } {
   const loaded = loadTracksFor(parsed.tracks, sourceDir);
   const loader: TrackDescribeLoader = (trackId) => {
@@ -99,23 +44,18 @@ function makeLoader(parsed: ParseOutput, sourceDir: string): { loader: TrackDesc
   return { loader, loaded: simplified };
 }
 
-function sha256(s: string): string {
-  return createHash('sha256').update(s, 'utf8').digest('hex');
-}
-
 function handleCmd(input: Cmd): void {
   try {
     switch (input.cmd) {
       case 'parse': return doParse(input.args);
       case 'resolve': return doResolve(input.args);
-      case 'build': return doBuild(input.args);
       case 'validate': return doValidate(input.args);
       case 'anchors': return doAnchors(input.args);
       case 'rename-anchor': return doRename(input.args);
       case 'load-track-describe': return doLoadTrack(input.args);
       case 'ping': return emit({ event: 'pong' });
       default:
-        emitError('parse', 'E_UNKNOWN_CMD', `unknown cmd '${input.cmd}'`, 'Valid: parse / resolve / build / validate / anchors / rename-anchor / load-track-describe / ping');
+        emitError('parse', 'E_UNKNOWN_CMD', `unknown cmd '${input.cmd}'`, 'Valid: parse / resolve / validate / anchors / rename-anchor / load-track-describe / ping');
     }
   } catch (e) {
     if (e instanceof StageErrorException) {
@@ -215,44 +155,8 @@ function doLoadTrack(args: Record<string, unknown>): void {
   emit({ event: 'load-track-describe.done', tracks: out });
 }
 
-function doBuild(args: Record<string, unknown>): void {
-  const source = String(args.source ?? '');
-  const out = String(args.out ?? '');
-  const pretty = Boolean(args.pretty ?? false);
-  const runtime = args.runtime !== undefined ? String(args.runtime) : undefined;
-  if (!source || !out) throw new StageErrorException({ stage: 'parse', code: 'E_ARGS', message: "missing 'source' or 'out'" });
-
-  const text = loadSourceText(source);
-  const parsed = parseSource(text, source);
-  const sourceDir = dirname(pathResolve(source));
-  const { loader, loaded } = makeLoader(parsed, sourceDir);
-  const resolved: Resolved = resolveStage(parsed, loader);
-
-  // ADR-055: resolve subtitle source (audio_track_id / timeline_path / words)
-  // to inline words[] BEFORE bundler runs (bundle.html is self-contained,
-  // runtime has no fs access).
-  resolveSubtitleSources(resolved.tracks, { strict: false });
-
-  // Track sources map.
-  const trackSources: Record<string, string> = {};
-  for (const [id, t] of loaded.entries()) trackSources[id] = t.source_text;
-
-  const runtimeJs = buildRuntime(runtime);
-  const html = bundle({ resolved, trackSources, runtimeJs, pretty });
-
-  mkdirSync(dirname(pathResolve(out)), { recursive: true });
-  writeFileSync(out, html, 'utf8');
-
-  emit({
-    event: 'build.done',
-    out,
-    bytes: Buffer.byteLength(html, 'utf8'),
-    anchors_resolved: Object.keys(resolved.anchors).length,
-    tracks_bundled: resolved.tracks.length,
-    duration_ms: resolved.duration_ms,
-    sha256: sha256(html),
-  });
-}
+// `build` cmd removed in v1.20 (ADR-060 · bundle.html axed; nf-shell desktop app
+// is the sole preview surface).
 
 // ----------- Entry -----------
 // Two modes: (a) read one {cmd,args} argument via `--cmd '{json}'` flag

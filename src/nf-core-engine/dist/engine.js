@@ -6478,10 +6478,9 @@ var require_ajv = __commonJS({
 });
 
 // src/cli.ts
-import { readFileSync as readFileSync2, writeFileSync, mkdirSync, existsSync as existsSync2 } from "node:fs";
+import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
 import { dirname as dirname2, resolve as pathResolve2 } from "node:path";
 import { createInterface } from "node:readline";
-import { createHash } from "node:crypto";
 
 // src/parser.ts
 var import_ajv = __toESM(require_ajv(), 1);
@@ -7093,193 +7092,6 @@ function resolve(parsed, loadDescribe) {
   return out;
 }
 
-// src/bundler.ts
-function bundleError(code, message, fix_hint) {
-  const err = { stage: "bundle", code, message };
-  if (fix_hint !== void 0) err.fix_hint = fix_hint;
-  return new StageErrorException(err);
-}
-function escapeForScript(s) {
-  return s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--").replace(/]]>/g, "]]\\u003E");
-}
-function sortedJsonStringify(value, pretty) {
-  const sortKeys = (v) => {
-    if (Array.isArray(v)) return v.map(sortKeys);
-    if (v && typeof v === "object") {
-      const out = {};
-      const keys = Object.keys(v).sort();
-      for (const k of keys) out[k] = sortKeys(v[k]);
-      return out;
-    }
-    return v;
-  };
-  return JSON.stringify(sortKeys(value), null, pretty ? 2 : 0);
-}
-function buildAspectCss(ratio) {
-  const m = /^(\d+):(\d+)$/.exec(String(ratio || ""));
-  if (!m) return { css: "16 / 9", num: "1.7778" };
-  const w = Number(m[1]);
-  const h = Number(m[2]);
-  return { css: `${m[1]} / ${m[2]}`, num: (w / h).toFixed(4) };
-}
-function buildViewportPx(w, h) {
-  const vw = Number.isFinite(w) && w > 0 ? Math.round(w) : 1920;
-  const vh = Number.isFinite(h) && h > 0 ? Math.round(h) : 1080;
-  return { vw: `${vw}px`, vh: `${vh}px` };
-}
-function bundle(input) {
-  if (typeof input.runtimeJs !== "string") {
-    throw bundleError("E_RUNTIME_MISSING", "runtimeJs must be a string", "Provide runtime source or placeholder.");
-  }
-  for (const track of input.resolved.tracks) {
-    if (!(track.id in input.trackSources)) {
-      throw bundleError(
-        "E_TRACK_SRC_MISSING",
-        `track source not provided for id='${track.id}'`,
-        "Include every Track id in trackSources map."
-      );
-    }
-  }
-  const sortedTrackSources = {};
-  for (const k of Object.keys(input.trackSources).sort()) {
-    sortedTrackSources[k] = input.trackSources[k];
-  }
-  const sortedAssets = {};
-  if (input.assets) {
-    for (const k of Object.keys(input.assets).sort()) {
-      const bytes = input.assets[k];
-      sortedAssets[k] = Buffer.from(bytes).toString("base64");
-    }
-  }
-  const resolvedJson = sortedJsonStringify(input.resolved, input.pretty ?? false);
-  const trackSourcesJson = sortedJsonStringify(sortedTrackSources, input.pretty ?? false);
-  const assetsJson = sortedJsonStringify(sortedAssets, input.pretty ?? false);
-  const aspect = buildAspectCss(input.resolved.viewport.ratio);
-  const vp = buildViewportPx(input.resolved.viewport.w, input.resolved.viewport.h);
-  const rootVars = `:root{--nf-aspect:${aspect.css};--nf-aspect-num:${aspect.num};--nf-vw:${vp.vw};--nf-vh:${vp.vh};}`;
-  const html = [
-    "<!DOCTYPE html>",
-    '<html lang="en">',
-    "<head>",
-    '<meta charset="utf-8">',
-    "<title>NextFrame bundle</title>",
-    `<style>${rootVars}${INLINE_CSS}</style>`,
-    "</head>",
-    "<body>",
-    '<div class="stage-wrap">',
-    '<div id="nf-stage"></div>',
-    "</div>",
-    '<div class="controls">',
-    '<button data-nf="to-start" title="\u5230\u5934">\u23EE</button>',
-    '<button data-nf="prev-frame" title="\u4E0A\u4E00\u5E27">\u23EA</button>',
-    '<button data-nf="play-pause" title="\u64AD\u653E/\u6682\u505C">\u25B6</button>',
-    '<button data-nf="next-frame" title="\u4E0B\u4E00\u5E27">\u23E9</button>',
-    '<button data-nf="to-end" title="\u5230\u5C3E">\u23ED</button>',
-    '<span class="timecode"><span class="now">00:00.000</span><span class="dur"> / 00:00.000</span></span>',
-    '<div class="spacer"></div>',
-    '<button data-nf="timeline-toggle" data-active="true" title="\u6298\u53E0\u65F6\u95F4\u8F74">\u25BC timeline</button>',
-    '<button data-nf="loop-toggle" data-active="false" title="\u5FAA\u73AF">\u{1F501} loop</button>',
-    "</div>",
-    '<div class="timeline" data-nf-tl="open">',
-    '<div class="ruler"></div>',
-    '<div class="tracks">',
-    '<div class="playhead">',
-    '<div class="ph-triangle"></div>',
-    '<div class="ph-line"></div>',
-    '<div class="ph-label">0.000s</div>',
-    "</div>",
-    "</div>",
-    "</div>",
-    `<script id="nf-resolved" type="application/json">${escapeForScript(resolvedJson)}</script>`,
-    `<script id="nf-tracks" type="application/json">${escapeForScript(trackSourcesJson)}</script>`,
-    `<script id="nf-assets" type="application/json">${escapeForScript(assetsJson)}</script>`,
-    `<script id="nf-runtime">${input.runtimeJs}</script>`,
-    '<script>if(typeof window!=="undefined"&&typeof window.__nf_boot==="function"){window.__nf_boot();}document.addEventListener("click",function(e){var b=e.target&&e.target.closest&&e.target.closest("[data-nf=\\"timeline-toggle\\"]");if(!b)return;var tl=document.querySelector(".timeline");if(!tl)return;var open=tl.getAttribute("data-nf-tl")!=="closed";if(open){tl.setAttribute("data-nf-tl","closed");b.textContent="\u25B2 timeline";b.setAttribute("data-active","false");}else{tl.setAttribute("data-nf-tl","open");b.textContent="\u25BC timeline";b.setAttribute("data-active","true");}});</script>',
-    "</body>",
-    "</html>",
-    ""
-  ].join("\n");
-  return html;
-}
-var INLINE_CSS = [
-  // base tokens (wrapped in :root block; --nf-aspect is injected via a separate :root block at runtime)
-  ":root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--text-sub:#8b949e;",
-  "--primary:#58a6ff;--purple:#bc8cff;--success:#3fb950;",
-  "--primary-bg:rgba(88,166,255,0.18);--purple-bg:rgba(188,140,255,0.18);",
-  "--success-bg:rgba(63,185,80,0.12);}",
-  "*{box-sizing:border-box}",
-  // body: height:100vh (was min-height) so flex children can split the viewport.
-  "html,body{margin:0;padding:0;background:var(--bg);color:var(--text);",
-  'font-family:-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC",sans-serif;',
-  "font-size:14px;height:100vh;overflow:hidden}",
-  "body{display:flex;flex-direction:column}",
-  // ADR-046: stage-wrap is the sizing container for #nf-stage.
-  // Using `container-type: size` lets the stage size itself off the wrap using cqw/cqh,
-  // which is stable in headless chromium (unlike aspect-ratio + flex which can collapse).
-  ".stage-wrap{flex:1 1 auto;min-height:0;position:relative;background:#000;",
-  "display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden;",
-  "container-type:size}",
-  // #nf-stage width is min(container width, container height * aspect ratio) — the classic
-  // contain formula. This is equivalent to object-fit:contain but for a div. aspect-ratio
-  // sets height from the computed width. `container-type:size` here lets children scale
-  // off #nf-stage's resolved pixel size via container queries.
-  "#nf-stage{position:relative;aspect-ratio:var(--nf-aspect);",
-  "width:min(100cqw - 24px, (100cqh - 24px) * var(--nf-aspect-num));",
-  "height:auto;background:#050507;container-type:size}",
-  // Track-rendered children use viewport pixel sizes (e.g. width:1920px). We scale them
-  // to fit the actual stage box: scale = stage_width / viewport_width. transform-origin
-  // top-left keeps positioning stable. !important is required to beat Track inline
-  // transforms (e.g. scene.js breathe effect 1.008); the cosmetic breathe loss is
-  // acceptable to keep viewport fit correct. Inline width/height:1920px stays; we only
-  // scale the rendered box visually. Content using % inside the Track is unaffected.
-  "#nf-stage > *{position:absolute !important;top:0 !important;left:0 !important;",
-  "transform-origin:top left !important;",
-  "transform:scale(calc(100cqw / var(--nf-vw))) !important}",
-  // controls row (unchanged 48px fixed).
-  ".controls{flex:0 0 48px;display:flex;align-items:center;gap:10px;padding:0 16px;",
-  "background:var(--card);border-top:1px solid var(--border);z-index:2}",
-  ".controls button{width:34px;height:34px;display:flex;align-items:center;justify-content:center;",
-  "background:transparent;border:1px solid var(--border);color:var(--text-sub);",
-  "border-radius:6px;font-size:14px;cursor:pointer;transition:all 0.12s;padding:0}",
-  ".controls button:hover{background:rgba(255,255,255,0.04);color:var(--text)}",
-  '.controls button[data-nf="play-pause"]{background:var(--primary-bg);color:var(--primary);border-color:var(--primary)}',
-  '.controls button[data-nf="loop-toggle"][data-active="true"]{background:var(--success-bg);color:var(--success);border-color:var(--success);width:auto;padding:0 12px;font-size:12px;font-weight:600}',
-  '.controls button[data-nf="loop-toggle"][data-active="false"]{width:auto;padding:0 12px;font-size:12px}',
-  '.controls button[data-nf="timeline-toggle"]{width:auto;padding:0 12px;font-size:12px;color:var(--text-sub)}',
-  '.controls button[data-nf="timeline-toggle"][data-active="false"]{opacity:0.6}',
-  '.controls .timecode{font-family:"SF Mono",Menlo,monospace;font-size:13px;color:var(--text);margin-left:8px}',
-  ".controls .timecode .now{color:var(--purple);font-weight:700}",
-  ".controls .timecode .dur{color:var(--text-sub)}",
-  ".controls .spacer{flex:1}",
-  // ADR-046: timeline now fixed-max with scroll (keeps ADR-036 no-truncation via overflow-y:auto, not flex-grow).
-  ".timeline{flex:0 0 auto;max-height:30vh;min-height:0;overflow-y:auto;overflow-x:auto;",
-  "padding:14px 16px;background:var(--bg);border-top:1px solid rgba(255,255,255,0.05);",
-  "transition:max-height 0.2s ease-out}",
-  // collapsed state hides the timeline content; scroll and max-height both go to 0.
-  '.timeline[data-nf-tl="closed"]{max-height:0;padding-top:0;padding-bottom:0;overflow:hidden}',
-  ".ruler{position:relative;height:24px;margin:0 0 6px 140px;",
-  'font-family:"SF Mono",Menlo,monospace;font-size:10px;color:rgba(255,255,255,0.45)}',
-  ".ruler-tick{position:absolute;top:0;width:1px;height:7px;background:rgba(255,255,255,0.12)}",
-  ".ruler-tick.major{height:11px;background:rgba(255,255,255,0.25)}",
-  ".ruler-label{position:absolute;top:13px;transform:translateX(-50%)}",
-  ".tracks{position:relative}",
-  ".track-row{display:grid;grid-template-columns:140px 1fr;align-items:center;gap:0;margin-bottom:5px;height:40px}",
-  '.track-label{font-family:"SF Mono",Menlo,monospace;font-size:12px;color:var(--text-sub);padding-right:12px}',
-  ".track-lane{position:relative;height:40px;background:#0a0e14;border-radius:5px;border:1px solid rgba(255,255,255,0.06)}",
-  ".clip{position:absolute;top:3px;bottom:3px;display:flex;flex-direction:column;justify-content:center;",
-  'padding:0 10px;border-radius:3px;font-family:"SF Mono",Menlo,monospace;font-size:11px;overflow:hidden;',
-  "background:var(--primary-bg);border:1px solid var(--primary);color:var(--primary)}",
-  ".clip b{font-size:12px;color:inherit}",
-  ".clip span{font-size:9px;opacity:0.7;margin-top:2px}",
-  ".playhead{position:absolute;top:0;bottom:0;left:140px;width:0;z-index:10;cursor:ew-resize}",
-  ".ph-line{position:absolute;top:0;bottom:0;width:2px;background:var(--purple);",
-  "box-shadow:0 0 6px var(--purple);transform:translateX(-1px)}",
-  ".ph-triangle{position:absolute;top:-4px;width:0;height:0;transform:translateX(-7px);",
-  "border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid var(--purple)}",
-  ".ph-label{position:absolute;top:-22px;transform:translateX(-50%);background:var(--purple);color:#0d1117;",
-  'font-family:"SF Mono",Menlo,monospace;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap}'
-].join("");
-
 // src/rename.ts
 function replaceIdentInExpr(expr, from, to) {
   const re = new RegExp(`(^|[^A-Za-z0-9_])${escapeReg(from)}(?![A-Za-z0-9_])`, "g");
@@ -7424,174 +7236,7 @@ function loadTracksFor(tracks, cwdDir) {
   return out;
 }
 
-// src/subtitle-resolver.ts
-import { readFileSync as nodeReadFileSync, existsSync as nodeExistsSync } from "node:fs";
-function subtitleError(code, message, fix_hint, clip_id) {
-  const err = { stage: "resolve", code, message };
-  if (fix_hint !== void 0) err.fix_hint = fix_hint;
-  if (clip_id !== void 0) err.loc = { clip_id };
-  return new StageErrorException(err);
-}
-function fileUrlToPath(srcOrUrl) {
-  if (srcOrUrl.startsWith("file://")) {
-    try {
-      return new URL(srcOrUrl).pathname;
-    } catch {
-      return srcOrUrl.slice("file://".length);
-    }
-  }
-  return srcOrUrl;
-}
-function deriveTimelinePath(audioPath) {
-  const m = /\.[A-Za-z0-9]+$/.exec(audioPath);
-  if (m) {
-    return audioPath.slice(0, -m[0].length) + ".timeline.json";
-  }
-  return audioPath + ".timeline.json";
-}
-function isWordEntry(x) {
-  if (!x || typeof x !== "object") return false;
-  const w = x;
-  return typeof w.text === "string" && typeof w.start_ms === "number" && typeof w.end_ms === "number";
-}
-function parseTimelineWords(json, filePath, strict, log, clipId) {
-  let parsed;
-  try {
-    parsed = JSON.parse(json);
-  } catch (e) {
-    const msg = `subtitle timeline JSON parse failed at ${filePath}: ${e instanceof Error ? e.message : String(e)}`;
-    if (strict) {
-      throw subtitleError("E_SUBTITLE_TIMELINE_JSON", msg, "Ensure timeline file is valid JSON.", clipId);
-    }
-    log(`[subtitle-resolver] ${msg}`);
-    return [];
-  }
-  if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.words)) {
-    const msg = `subtitle timeline at ${filePath} missing .words array`;
-    if (strict) {
-      throw subtitleError("E_SUBTITLE_TIMELINE_SHAPE", msg, "Timeline file must be {duration_ms, voice, words:[{text,start_ms,end_ms}...]}.", clipId);
-    }
-    log(`[subtitle-resolver] ${msg}`);
-    return [];
-  }
-  const words = parsed.words.filter(isWordEntry);
-  return words;
-}
-function resolveSubtitleSources(tracks, opts) {
-  const strict = opts?.strict === true;
-  const log = opts?.log ?? ((msg) => {
-    console.warn(msg);
-  });
-  const fs = opts?.fs ?? {
-    readFileSync: (p, enc) => nodeReadFileSync(p, enc),
-    existsSync: (p) => nodeExistsSync(p)
-  };
-  const audioSrcByTrackId = /* @__PURE__ */ new Map();
-  for (const t of tracks) {
-    if (t.kind !== "audio") continue;
-    for (const c of t.clips) {
-      const src = c.params.src;
-      if (typeof src === "string" && src.length > 0) {
-        audioSrcByTrackId.set(t.id, src);
-        break;
-      }
-    }
-  }
-  for (const track of tracks) {
-    if (track.kind !== "subtitle") continue;
-    for (const clip of track.clips) {
-      resolveClip(clip, audioSrcByTrackId, strict, log, fs);
-    }
-  }
-}
-function resolveClip(clip, audioSrcByTrackId, strict, log, fs) {
-  const params = clip.params;
-  const source = params.source;
-  if (!source || typeof source !== "object") {
-    params.source = { words: [] };
-    return;
-  }
-  if (Array.isArray(source.words)) {
-    const words = source.words.filter(isWordEntry);
-    params.source = { words };
-    return;
-  }
-  if (typeof source.audio_track_id === "string") {
-    const audioTrackId = source.audio_track_id;
-    const audioSrc = audioSrcByTrackId.get(audioTrackId);
-    if (!audioSrc) {
-      const msg2 = `subtitle clip '${clip.id}' references audio_track_id='${audioTrackId}' but no audio track with that id found (or track has no src)`;
-      if (strict) {
-        throw subtitleError("E_SUBTITLE_SOURCE_MISSING", msg2, `Add an audio track with id='${audioTrackId}' or switch to timeline_path / words.`, clip.id);
-      }
-      log(`[subtitle-resolver] ${msg2}`);
-      params.source = { words: [] };
-      return;
-    }
-    const audioPath = fileUrlToPath(audioSrc);
-    const timelinePath = deriveTimelinePath(audioPath);
-    readAndAssign(clip, params, timelinePath, strict, log, fs);
-    return;
-  }
-  if (typeof source.timeline_path === "string") {
-    const timelinePath = fileUrlToPath(source.timeline_path);
-    readAndAssign(clip, params, timelinePath, strict, log, fs);
-    return;
-  }
-  const msg = `subtitle clip '${clip.id}' has unrecognised source shape; expected audio_track_id | timeline_path | words`;
-  if (strict) {
-    throw subtitleError("E_SUBTITLE_SOURCE_SHAPE", msg, "Use one of audio_track_id / timeline_path / words.", clip.id);
-  }
-  log(`[subtitle-resolver] ${msg}`);
-  params.source = { words: [] };
-}
-function readAndAssign(clip, params, timelinePath, strict, log, fs) {
-  if (!fs.existsSync(timelinePath)) {
-    const msg = `subtitle clip '${clip.id}' timeline file not found: ${timelinePath}`;
-    if (strict) {
-      throw subtitleError("E_SUBTITLE_TIMELINE_MISSING", msg, "Ensure timeline JSON exists at sibling of audio (basename.timeline.json) or provide timeline_path.", clip.id);
-    }
-    log(`[subtitle-resolver] ${msg}`);
-    params.source = { words: [] };
-    return;
-  }
-  let text;
-  try {
-    text = fs.readFileSync(timelinePath, "utf8");
-  } catch (e) {
-    const msg = `subtitle clip '${clip.id}' timeline read failed at ${timelinePath}: ${e instanceof Error ? e.message : String(e)}`;
-    if (strict) {
-      throw subtitleError("E_SUBTITLE_TIMELINE_READ", msg, "Check file permissions and path.", clip.id);
-    }
-    log(`[subtitle-resolver] ${msg}`);
-    params.source = { words: [] };
-    return;
-  }
-  const words = parseTimelineWords(text, timelinePath, strict, log, clip.id);
-  params.source = { words };
-}
-
 // src/cli.ts
-var DEFAULT_RUNTIME_PLACEHOLDER = `/* nf-runtime placeholder \xB7 T4-RUNTIME not yet produced.
-   Minimal boot that paints a diagnostic banner so the bundle renders something visible. */
-(function(){
-  function boot(){
-    var stage = document.getElementById('nf-stage');
-    if(!stage) return;
-    var resolvedEl = document.getElementById('nf-resolved');
-    var data = {};
-    try { data = JSON.parse(resolvedEl.textContent||'{}'); } catch(e){}
-    stage.innerHTML = '<div style="color:#fff;font-family:-apple-system,sans-serif;padding:32px;max-width:960px;line-height:1.6"><h1 style="margin:0 0 16px;font-size:28px">NextFrame bundle</h1><p style="opacity:0.75">runtime placeholder \xB7 '+ (data.tracks?data.tracks.length:0) +' track(s) \xB7 duration '+ (data.duration_ms||0) +'ms</p></div>';
-  }
-  if(typeof window !== 'undefined'){
-    window.__nf_boot = boot;
-    window.__nf = {
-      getState: function(){ return { mode:'play', t_ms:0, playing:false }; },
-      screenshot: function(){ return Promise.resolve('data:image/png;base64,'); },
-      log: function(level,msg,data){ try{console.log(JSON.stringify({level:level,msg:msg,data:data||null,source:'nf-runtime-stub'}));}catch(e){} }
-    };
-  }
-})();`;
 function emit(obj) {
   process.stdout.write(JSON.stringify(obj) + "\n");
 }
@@ -7604,34 +7249,6 @@ function emitError(stage, code, message, fix_hint, loc) {
 function loadSourceText(sourcePath) {
   return readFileSync2(sourcePath, "utf8");
 }
-function buildRuntime(runtimePath) {
-  if (runtimePath && existsSync2(runtimePath)) {
-    try {
-      return readFileSync2(runtimePath, "utf8");
-    } catch {
-    }
-  }
-  if (process.env.NF_RUNTIME_PATH && existsSync2(process.env.NF_RUNTIME_PATH)) {
-    try {
-      return readFileSync2(process.env.NF_RUNTIME_PATH, "utf8");
-    } catch {
-    }
-  }
-  const candidates = [
-    pathResolve2(process.cwd(), "src/nf-runtime/dist/runtime-iife.js"),
-    pathResolve2(process.cwd(), "../nf-runtime/dist/runtime-iife.js"),
-    pathResolve2(process.cwd(), "dist/runtime-iife.js")
-  ];
-  for (const c of candidates) {
-    if (existsSync2(c)) {
-      try {
-        return readFileSync2(c, "utf8");
-      } catch {
-      }
-    }
-  }
-  return DEFAULT_RUNTIME_PLACEHOLDER;
-}
 function makeLoader(parsed, sourceDir) {
   const loaded = loadTracksFor(parsed.tracks, sourceDir);
   const loader = (trackId) => {
@@ -7643,9 +7260,6 @@ function makeLoader(parsed, sourceDir) {
   for (const [k, v] of loaded.entries()) simplified.set(k, { id: v.id, source_text: v.source_text });
   return { loader, loaded: simplified };
 }
-function sha256(s) {
-  return createHash("sha256").update(s, "utf8").digest("hex");
-}
 function handleCmd(input) {
   try {
     switch (input.cmd) {
@@ -7653,8 +7267,6 @@ function handleCmd(input) {
         return doParse(input.args);
       case "resolve":
         return doResolve(input.args);
-      case "build":
-        return doBuild(input.args);
       case "validate":
         return doValidate(input.args);
       case "anchors":
@@ -7666,7 +7278,7 @@ function handleCmd(input) {
       case "ping":
         return emit({ event: "pong" });
       default:
-        emitError("parse", "E_UNKNOWN_CMD", `unknown cmd '${input.cmd}'`, "Valid: parse / resolve / build / validate / anchors / rename-anchor / load-track-describe / ping");
+        emitError("parse", "E_UNKNOWN_CMD", `unknown cmd '${input.cmd}'`, "Valid: parse / resolve / validate / anchors / rename-anchor / load-track-describe / ping");
     }
   } catch (e) {
     if (e instanceof StageErrorException) {
@@ -7758,34 +7370,6 @@ function doLoadTrack(args) {
     out[id] = { id, bytes: t.source_text.length };
   }
   emit({ event: "load-track-describe.done", tracks: out });
-}
-function doBuild(args) {
-  const source = String(args.source ?? "");
-  const out = String(args.out ?? "");
-  const pretty = Boolean(args.pretty ?? false);
-  const runtime = args.runtime !== void 0 ? String(args.runtime) : void 0;
-  if (!source || !out) throw new StageErrorException({ stage: "parse", code: "E_ARGS", message: "missing 'source' or 'out'" });
-  const text = loadSourceText(source);
-  const parsed = parseSource(text, source);
-  const sourceDir = dirname2(pathResolve2(source));
-  const { loader, loaded } = makeLoader(parsed, sourceDir);
-  const resolved = resolve(parsed, loader);
-  resolveSubtitleSources(resolved.tracks, { strict: false });
-  const trackSources = {};
-  for (const [id, t] of loaded.entries()) trackSources[id] = t.source_text;
-  const runtimeJs = buildRuntime(runtime);
-  const html = bundle({ resolved, trackSources, runtimeJs, pretty });
-  mkdirSync(dirname2(pathResolve2(out)), { recursive: true });
-  writeFileSync(out, html, "utf8");
-  emit({
-    event: "build.done",
-    out,
-    bytes: Buffer.byteLength(html, "utf8"),
-    anchors_resolved: Object.keys(resolved.anchors).length,
-    tracks_bundled: resolved.tracks.length,
-    duration_ms: resolved.duration_ms,
-    sha256: sha256(html)
-  });
 }
 function runOneShot(cmdJson) {
   let parsed;
