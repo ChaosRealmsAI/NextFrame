@@ -21,6 +21,8 @@ export function describe() {
     id: "subtitle",
     kind: "subtitle",
     name: "Subtitle Track",
+    description: "字幕轨道 · 每字独立 span · 三态 (read / active / unread) · 适合演讲 / 教学 / 翻译",
+    use_cases: ["演讲字幕", "教学课程", "翻译视频"],
     viewport: "any",
     // FM-T0 gate: subtitle container opacity is always 1.0 (no entry fade —
     // captions must be readable from t=0). Safely above the 0.9 minimum.

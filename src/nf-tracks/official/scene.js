@@ -15,6 +15,8 @@ export function describe() {
   return {
     id: "scene",
     name: "Scene Track",
+    description: "场景轨道 · 支持 hero / stat 两种 layout · 适合开场标题 / 关键数据",
+    use_cases: ["开场介绍", "关键数据", "章节过渡"],
     viewport: "any",
     // FM-T0 gate: render(t=0) opacity must be >= 0.9. We target 0.95 so we
     // have headroom; lint enforces the 0.9 minimum.
