@@ -16,39 +16,42 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Synthesize text to audio file.
+    /// Synthesize text to mp3 + word-level subtitles + karaoke HTML.
+    #[command(long_about = SYNTH_LONG_ABOUT)]
     Synth(SynthArgs),
-    /// Batch synthesize from JSON (file or stdin). JSON fields: text (required), id, voice, filename, backend, rate, volume, pitch, emotion, emotion_scale, speech_rate, loudness_rate, volc_pitch, context_text, dialect.
+    /// Batch synthesize from JSON (file or stdin).
+    #[command(long_about = BATCH_LONG_ABOUT)]
     Batch(BatchArgs),
     /// Synthesize and play immediately (no file saved).
     Play(PlayArgs),
-    /// Preview a voice with sample text.
+    /// Preview a voice with a short sample.
     Preview {
-        /// Voice name to preview.
+        /// Voice name (e.g. zh-CN-XiaoxiaoNeural · see `nf-tts voices --lang zh`).
         #[arg(short, long)]
         voice: Option<String>,
 
-        /// Custom preview text.
+        /// Custom preview text (default: a short sample).
         #[arg(short, long)]
         text: Option<String>,
 
-        /// TTS backend: "edge" (free, default) or "volcengine" (paid, production quality).
+        /// TTS backend: "edge" (free, default) or "volcengine" (paid).
         #[arg(short, long)]
         backend: Option<String>,
     },
-    /// List available voices.
+    /// List available voices (edge: 322 across 74 langs · volcengine: catalog).
+    #[command(long_about = VOICES_LONG_ABOUT)]
     Voices {
-        /// Filter by language (e.g. "zh", "en", "ja").
+        /// Filter by language prefix (e.g. "zh" for zh-CN/zh-HK/zh-TW · "en" · "ja").
         #[arg(short, long)]
         lang: Option<String>,
 
-        /// TTS backend.
+        /// TTS backend: edge (default) or volcengine.
         #[arg(short, long)]
         backend: Option<String>,
     },
-    /// Concatenate multiple audio files into one.
+    /// Concatenate multiple mp3 files into one.
     Concat {
-        /// Input MP3 files.
+        /// Input MP3 files in order.
         files: Vec<String>,
 
         /// Output file path.
@@ -61,6 +64,128 @@ pub enum Command {
         action: ConfigAction,
     },
 }
+
+/// Long help for `synth` subcommand · surfaces the quality playbook.
+const SYNTH_LONG_ABOUT: &str = r#"Synthesize text to audio + timing + subtitles + karaoke HTML.
+
+DEFAULT OUTPUT (4 files · flat into -d):
+  <stem>.mp3            audio (mp3, 24kHz · edge default voice: zh-CN-XiaoxiaoNeural)
+  <stem>.timeline.json  word-level timing { duration_ms, voice, words[{text,start_ms,end_ms}], segments }
+  <stem>.srt            SubRip subtitles (segment-level)
+  <stem>.karaoke.html   self-contained player (open in browser, word-sync highlight)
+  (disable with --no-sub for audio-only · --subdir for legacy nested layout)
+
+QUALITY PLAYBOOK (Edge free backend):
+  1. PUNCTUATION is the only pause control.
+     "。" = long (~600ms) · "，" = medium (~250ms) · "、" = short (~100ms)
+     Long sentences: insert "，" every 10-15 CJK chars.
+     Lists: use "、" between items not "，".
+  2. --rate  -10% for narration · +0% default · +15% for快消 · clamp ±30%.
+  3. --pitch -2Hz sober male · +0Hz default · +2Hz youthful · range ±5Hz.
+  4. --volume keep +0% · post-mix instead.
+
+EDGE CAN'T DO (do not pass with -b edge · ignored silently):
+  --emotion  --emotion-scale  --context-text  --dialect
+  SSML <break>/<emphasis>/<style>  multi-talker
+  → switch to -b volcengine for any of these.
+
+VOICE RECOMMENDATIONS (zh-CN · edge · all free):
+  XiaoxiaoNeural  亲和 · 讲解/客服 · DEFAULT
+  YunxiNeural     稳 · 新闻/商务 (male)
+  YunjianNeural   磁性 · 体育/纪录片 (male)
+  XiaoyiNeural    活泼 · 快消/生活
+  YunyangNeural   正式 · 播音员 (male)
+  (preview: `nf-tts preview --voice zh-CN-YunxiNeural`)
+
+EXAMPLES:
+  # Default 4-product bundle
+  nf-tts synth "这是一段，配好标点，的，中文演示。" -o demo.mp3
+
+  # Narrator pace + male voice
+  nf-tts synth "讲解文案。" --voice zh-CN-YunxiNeural --rate -10% -o vid.mp3
+
+  # Audio only (no subtitles/karaoke)
+  nf-tts synth "只要音频" -o only.mp3 --no-sub
+
+  # Paid production with emotion
+  nf-tts synth -b volcengine --emotion news "正式播报。" -o news.mp3
+
+  # TTS 2.0 natural-language style (volcengine only)
+  nf-tts synth -b volcengine --context-text "用特别开心的语气" \
+    "今天真好！" -o happy.mp3
+
+See `nf-tts --help` for voice catalog, long-text strategy, common mistakes.
+"#;
+
+/// Long help for `batch` subcommand · JSON schema + semantics.
+const BATCH_LONG_ABOUT: &str = r#"Batch synthesize from JSON array (file or stdin `-`).
+
+JSON SCHEMA (array of job objects):
+  [
+    {
+      "text":       "必填 · 要合成的文字",
+      "id":         1,                                      // optional, auto-assigned
+      "voice":      "zh-CN-XiaoxiaoNeural",                 // optional, overrides --voice
+      "filename":   "seg01",                                // optional, without extension
+      "backend":    "edge" | "volcengine",                  // optional, overrides -b
+      "rate":       "+0%", "volume": "+0%", "pitch": "+0Hz", // edge-only
+      "emotion":    "happy",  "emotion_scale": 3,           // volcengine-only
+      "speech_rate":0, "loudness_rate": 0, "volc_pitch": 0, // volcengine-only
+      "context_text":"用新闻的语气",                          // volcengine-only
+      "dialect":    "dongbei"                               // volcengine vivi only
+    },
+    ...
+  ]
+
+DEFAULTS:
+  - Output files go into -d (same naming as `synth`)
+  - Each job produces: {filename}.mp3 + .timeline.json + .srt + .karaoke.html
+  - Subtitles ON by default · --no-sub to disable for ALL jobs
+  - Concurrency: controlled by backend (edge=3, volcengine follows token limit)
+  - Jobs are synthesized in parallel within concurrency limit · cache shared
+
+USE CASES:
+  - Long article split into paragraphs (preserves tone continuity per segment)
+  - A/B test same text across 5 different voices
+  - Multilingual video: one job per subtitle language track
+
+EXAMPLES:
+  # File input
+  nf-tts batch jobs.json -d out
+
+  # Stdin input
+  echo '[{"text":"hello","voice":"en-US-AriaNeural"}]' | nf-tts batch -d out
+
+  # Dry run (plan only, no synthesis)
+  nf-tts batch jobs.json -d out --dry-run
+
+  # Override default backend for the whole batch
+  nf-tts batch jobs.json -d out -b volcengine
+"#;
+
+/// Long help for `voices` subcommand.
+const VOICES_LONG_ABOUT: &str = r#"List available voices from the chosen backend.
+
+OUTPUT:
+  Default: human-readable table (name · gender · locale · sample rate).
+  --format json emits one voice per line for piping.
+
+EDGE (free · default):
+  322 voices · 74 languages. Naming: {locale}-{Name}Neural.
+  Popular zh-CN: Xiaoxiao / Yunxi / Yunjian / Xiaoyi / Yunyang
+  Popular en-US: Aria / Guy / Jenny / Davis
+
+VOLCENGINE (paid):
+  Curated voice catalog · seed-tts-2.0 multi-style support.
+  Voices: zh_female_*, zh_male_*, zh_vivi (dialect-capable).
+
+EXAMPLES:
+  nf-tts voices                        # all edge voices
+  nf-tts voices --lang zh              # zh-CN/HK/TW only
+  nf-tts voices --lang en              # en-* only
+  nf-tts voices -b volcengine          # volcengine catalog
+  nf-tts voices --lang ja -b edge      # Japanese edge voices
+"#;
 
 #[derive(Args)]
 pub struct SynthArgs {

@@ -12,59 +12,146 @@ use anyhow::Result;
 
 pub use args::{Cli, Command, ConfigAction};
 
-pub(crate) const LONG_ABOUT: &str = "\
-Multi-backend TTS CLI, agent-friendly.\n\n\
-Workflow: use Edge (free) to debug text/timing/subtitles, then switch to\n\
-volcengine (-b volcengine) for production. Same flags, same output.\n\n\
-Backends:\n\
-  edge        Free. Microsoft Edge TTS. Default. For debugging and drafts.\n\
-  volcengine  Paid (¥2/万字, seed-tts-2.0). Production quality. Use -b volcengine.\n\n\
-Common flags (both backends):\n\
-  --no-sub           Skip subtitle generation (on by default)\n\
-  --subdir           Nest outputs under {dir}/{stem}/ instead of flat (default flat)\n\
-  -v, --voice        Voice name (auto-detected from text language if omitted)\n\
-  -o, --output       Output filename\n\
-  -d, --dir          Output directory\n\n\
-Volcengine-only flags:\n\
-  --speech-rate <-50~100>    Speech speed (-50=0.5x, 0=normal, 100=2x)\n\
-  --loudness-rate <-50~100>  Volume (-50=0.5x, 0=normal, 100=2x)\n\
-  --volc-pitch <-12~12>     Pitch shift in semitones\n\
-  --emotion <TYPE>           happy/angry/sad/surprise/fear/gentle/serious/excited/calm/news/story\n\
-  --emotion-scale <1-5>     Emotion intensity (only with --emotion)\n\
-  --context-text <TEXT>      TTS 2.0 style hint (e.g. \"用开心的语气说话\")\n\
-  --dialect <TYPE>           dongbei/shaanxi/sichuan (vivi voice only)\n\n\
-Edge-only flags (for debugging, volcengine does not use these):\n\
-  --rate               Speech rate (e.g. \"+20%\", \"-10%\")\n\
-  --volume             Volume (e.g. \"+0%\")\n\
-  --pitch              Pitch (e.g. \"+0Hz\")\n\n\
-Subtitle generation (default ON):\n\
-  Subtitles use whisperX forced alignment (wav2vec2 CTC).\n\
-  Original text is preserved verbatim; timestamps come from acoustic alignment.\n\
-  Output: <name>.timeline.json (word-level, primary) + <name>.srt (segment-level).\n\
-  Files land flat in -d by default; pass --subdir to nest under {dir}/{stem}/.\n\
-  Use --no-sub to skip subtitle generation.\n\n\
-Text length (volcengine):\n\
-  Best:  200-400 chars per call. Natural tone, no timeout.\n\
-  OK:    400-800 chars. May take 20-30s, still one coherent piece.\n\
-  Long:  800+ chars -> split into 200-400 char paragraphs, use batch + concat.\n\
-  Limit: ~1000 chars per call. Beyond that -> timeout risk.\n\
-  Tip:   longer text = better tone continuity. Split by paragraph, not sentence.\n\n\
-Examples:\n\
-  # Synthesize with subtitles (default: MP3 + timeline.json + SRT, flat into -d)\n\
-  vox synth \"测试文本\" -o test.mp3                  # -> ./test.mp3 + .timeline.json + .srt\n\
-  vox synth \"测试\" -o test.mp3 --subdir             # -> ./test/test.mp3 + sidecars (legacy layout)\n\
-  vox synth \"测试\" -o test.mp3 --no-sub             # audio only, no subtitles\n\
-  vox play \"hello world\"                           # quick listen (no files saved)\n\n\
-  # Production with volcengine (same workflow, add -b volcengine)\n\
-  vox synth -b volcengine \"正式文本\" -o out.mp3\n\
-  vox play -b volcengine \"你好世界\"\n\
-  vox voices -b volcengine                          # list voices\n\n\
-  # Emotion — only when explicitly requested, non-default\n\
-  vox synth -b volcengine --emotion angry \"我很生气！\" -o angry.mp3\n\n\
-  # TTS 2.0 context — guide tone/emotion via natural language\n\
-  vox synth -b volcengine --context-text \"用特别开心的语气\" \"今天天气真好！\" -o happy.mp3\n\n\
-  # Dialect — vivi voice only\n\
-  vox play -b volcengine --dialect dongbei \"整挺好\"";
+pub(crate) const LONG_ABOUT: &str = r#"nf-tts · Multi-backend TTS CLI · agent-friendly · 中文原生.
+
+═══ OUTPUT (default · 4 files · flat into -d) ═══════════════════════════════
+
+  <stem>.mp3            audio
+  <stem>.timeline.json  word-level timing (flat `words[]` + `segments` dual schema)
+  <stem>.srt            SubRip subtitles
+  <stem>.karaoke.html   self-contained word-highlight player (double-click to play)
+
+Pass --no-sub to skip subtitles/karaoke (audio only).
+Pass --subdir to nest under `{dir}/{stem}/` (legacy).
+
+═══ BACKENDS ═══════════════════════════════════════════════════════════════
+
+  edge        FREE · reverse-engineered Edge browser TTS · DEFAULT · debug/drafts
+  volcengine  PAID (¥2/万字, seed-tts-2.0) · 豆包 · production · -b volcengine
+
+═══ VOICE SELECTION · zh-CN 主力 5 (Edge free) ════════════════════════════
+
+  zh-CN-XiaoxiaoNeural    年轻女 · 亲和 · DEFAULT · 讲解/客服/视频配音
+  zh-CN-YunxiNeural       中年男 · 稳 · 新闻/教育/商务
+  zh-CN-YunjianNeural     磁性男 · 低沉 · 体育/纪录片
+  zh-CN-XiaoyiNeural      年轻女 · 活泼 · 生活向/快消
+  zh-CN-YunyangNeural     播音员 · 正式 · 严肃场合
+
+  Full list:  nf-tts voices --lang zh        (322 voices · 74 langs · edge)
+              nf-tts voices -b volcengine    (volcengine voice catalog)
+  Preview:    nf-tts preview --voice <name>  (hear a sample)
+
+═══ QUALITY TIPS · Edge 免费接口 (唯一 3 个杠杆) ═══════════════════════════
+
+1. PUNCTUATION is the ONLY pause control (Edge 无 SSML <break>/<emphasis>):
+
+     。     long pause (sentence end)     ~500-800ms
+     ！？   long pause + tone             ~500-800ms
+     ，     medium pause (clause)         ~200-300ms
+     ；     medium-long pause (semicolon) ~300-400ms
+     ：     medium pause + preview (colon · implies continuation)
+     、     short pause (list separator)  ~100ms
+     space  ultra-short · nearly none
+
+   WRITING RULES:
+     - Long sentences MUST have "，" every 10-15 CJK chars (else robotic)
+     - Lists use "、" not "，" (natural enumeration rhythm)
+     - Stress a word by placing "，" after it:   "这个特别，重要"
+     - Never dump 20+ chars without any punctuation
+
+2. --rate  (Edge prosody rate · one of the only 3 tunables):
+
+     -20%   老年讲故事 / 严肃新闻     (slow, grave)
+     -10%   讲解稳  · RECOMMENDED     (calm narration)
+     +0%    default                   (slightly fast)
+     +15%   快消广告 / 年轻活力       (energetic)
+     +30%   extreme · not recommended
+
+3. --pitch  (Edge prosody pitch · range ~ -5Hz to +5Hz):
+
+     +0Hz   default
+     -2Hz   更沉稳 · male voice recommended
+     +2Hz   更年轻 · livelier
+     -5Hz   deep/authoritative        (extreme low)
+     +5Hz   youthful/chirpy           (extreme high)
+
+4. --volume  keep +0% usually · post-mixing handles loudness better
+
+═══ EDGE 不能做的 · 常见误区 (DO NOT pass these expecting effect) ═════════
+
+  ❌ 情感 style (cheerful/sad/empathy)    · only volcengine
+  ❌ --emotion / --emotion-scale          · Edge ignores silently, no error
+  ❌ SSML <break> / <emphasis> / <phoneme>· Microsoft blocks non-Edge SSML
+  ❌ Multi-talker dialog                  · paid Azure only
+  ❌ Custom dictionary / lexicon          · paid Azure only
+  ❌ --context-text / --dialect           · volcengine-only TTS 2.0 features
+
+  If you need style/emotion  →  switch to `-b volcengine`.
+
+═══ LONG TEXT STRATEGY ════════════════════════════════════════════════════
+
+  Edge:       stable 300-1000 chars single call
+  Volcengine: stable 200-400 chars · 800+ chars = split into paragraphs
+  超长 (2000+):
+    1. Split by paragraph (200-400 chars each · NOT by sentence — loses tone)
+    2. nf-tts batch jobs.json        (concurrent synth)
+    3. nf-tts concat p1.mp3 p2.mp3 -o full.mp3
+
+═══ COMMON MISTAKES ═══════════════════════════════════════════════════════
+
+  1. 一口气塞 1500+ chars to Edge      → WS timeout risk · split it
+  2. 中英混写无空格 "NextFramework"    → whisperX 逐字母切 · use "Next Framework"
+  3. 长句无标点                         → mechanical tone · add "，" every 10-15 chars
+  4. 期待 --emotion 在 Edge 生效       → silent ignore · use -b volcengine
+  5. --rate +40% 超过 30%              → robotic · clamp within ±30%
+  6. 用 --subdir 后 karaoke.html 仍 open 根目录 → layouts differ · check actual path
+  7. 传 SSML 标签到 text (e.g. <break>) → Edge rejects · use punctuation instead
+
+═══ EXAMPLES ══════════════════════════════════════════════════════════════
+
+  # Default (4-product bundle · free Edge · flat output)
+  nf-tts synth "这是一段，配好标点，的，中文 TTS 演示。" -o demo.mp3
+  # → demo.mp3 · demo.timeline.json · demo.srt · demo.karaoke.html
+
+  # Slower for narration + male voice
+  nf-tts synth "讲解文案，慢一点。" --voice zh-CN-YunxiNeural --rate -10% -o vid.mp3
+
+  # Quick listen (no files saved)
+  nf-tts play "sample text" --voice zh-CN-XiaoyiNeural
+
+  # List available zh voices
+  nf-tts voices --lang zh
+
+  # Long text split + concat
+  echo '[{"text":"段1...","filename":"p1"},{"text":"段2...","filename":"p2"}]' \
+    | nf-tts batch -d out
+  nf-tts concat out/p1.mp3 out/p2.mp3 -o full.mp3
+
+  # Paid production with emotion
+  nf-tts synth -b volcengine --emotion news "正式播报内容。" -o news.mp3
+
+  # TTS 2.0 context hint (volcengine only)
+  nf-tts synth -b volcengine --context-text "用特别开心的语气" \
+    "今天天气真好！" -o happy.mp3
+
+  # Dialect (volcengine · vivi voice only)
+  nf-tts play -b volcengine --dialect dongbei "整挺好"
+
+═══ VERIFYING OUTPUT ══════════════════════════════════════════════════════
+
+  After `nf-tts synth ... -o demo.mp3`, verify:
+    ls {-d}/demo.{mp3,timeline.json,srt,karaoke.html}
+    ffprobe demo.mp3                           # duration + codec
+    jq '.words | length' demo.timeline.json    # word count
+    open demo.karaoke.html                     # visual playback
+
+═══ SEE ALSO ══════════════════════════════════════════════════════════════
+
+  nf-tts synth --help     synth-specific flags
+  nf-tts batch --help     batch JSON schema
+  nf-tts voices --help    voice listing
+  nf-tts concat --help    mp3 concatenation
+"#;
 
 pub async fn run(cli: Cli) -> Result<()> {
     if cli.brief {
