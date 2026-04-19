@@ -13,6 +13,7 @@ import { bundle } from './bundler.js';
 import { rename } from './rename.js';
 import { parseExpr } from './expr.js';
 import { loadTracksFor } from './track-loader.js';
+import { resolveSubtitleSources } from './subtitle-resolver.js';
 import { ParseOutput, Resolved, StageError, StageErrorException } from './types.js';
 
 const DEFAULT_RUNTIME_PLACEHOLDER = `/* nf-runtime placeholder · T4-RUNTIME not yet produced.
@@ -226,6 +227,11 @@ function doBuild(args: Record<string, unknown>): void {
   const sourceDir = dirname(pathResolve(source));
   const { loader, loaded } = makeLoader(parsed, sourceDir);
   const resolved: Resolved = resolveStage(parsed, loader);
+
+  // ADR-055: resolve subtitle source (audio_track_id / timeline_path / words)
+  // to inline words[] BEFORE bundler runs (bundle.html is self-contained,
+  // runtime has no fs access).
+  resolveSubtitleSources(resolved.tracks, { strict: false });
 
   // Track sources map.
   const trackSources: Record<string, string> = {};
