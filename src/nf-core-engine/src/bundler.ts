@@ -2,6 +2,9 @@
 // Input: Resolved + track sources (id -> src string) + runtime source string + optional assets.
 // Output: single-file bundle.html (UTF-8 string), byte-stable (idempotent).
 // No timestamps, no Math.random, no ordering drift.
+//
+// v1.35 ADR-046 supersedes ADR-037: stage uses aspect-ratio preserving layout,
+// timeline becomes scrollable (keeps ADR-036 no-truncation by scroll not by grow).
 
 import { Resolved, StageError, StageErrorException } from './types.js';
 
@@ -43,6 +46,14 @@ function sortedJsonStringify(value: unknown, pretty: boolean): string {
   return JSON.stringify(sortKeys(value), null, pretty ? 2 : 0);
 }
 
+// ADR-046: map "W:H" to CSS aspect-ratio "W / H". Defaults to 16 / 9 on bad input.
+function buildAspectCss(ratio: string): { css: string; num: string } {
+  const m = /^(\d+):(\d+)$/.exec(String(ratio || ''));
+  if (!m) return { css: '16 / 9', num: '1.7778' };
+  const w = Number(m[1]); const h = Number(m[2]);
+  return { css: `${m[1]} / ${m[2]}`, num: (w / h).toFixed(4) };
+}
+
 export function bundle(input: BundleInput): string {
   if (typeof input.runtimeJs !== 'string') {
     throw bundleError('E_RUNTIME_MISSING', 'runtimeJs must be a string', 'Provide runtime source or placeholder.');
@@ -76,13 +87,18 @@ export function bundle(input: BundleInput): string {
   const trackSourcesJson = sortedJsonStringify(sortedTrackSources, input.pretty ?? false);
   const assetsJson = sortedJsonStringify(sortedAssets, input.pretty ?? false);
 
+  // ADR-046: inject --nf-aspect (CSS aspect-ratio) and --nf-aspect-num (decimal) from
+  // resolved.viewport.ratio so the stage CSS can drive its box.
+  const aspect = buildAspectCss(input.resolved.viewport.ratio);
+  const rootVars = `:root{--nf-aspect:${aspect.css};--nf-aspect-num:${aspect.num};}`;
+
   const html = [
     '<!DOCTYPE html>',
     '<html lang="en">',
     '<head>',
     '<meta charset="utf-8">',
     '<title>NextFrame bundle</title>',
-    `<style>${INLINE_CSS}</style>`,
+    `<style>${rootVars}${INLINE_CSS}</style>`,
     '</head>',
     '<body>',
     '<div class="stage-wrap">',
@@ -96,9 +112,10 @@ export function bundle(input: BundleInput): string {
     '<button data-nf="to-end" title="到尾">⏭</button>',
     '<span class="timecode"><span class="now">00:00.000</span><span class="dur"> / 00:00.000</span></span>',
     '<div class="spacer"></div>',
+    '<button data-nf="timeline-toggle" data-active="true" title="折叠时间轴">▼ timeline</button>',
     '<button data-nf="loop-toggle" data-active="false" title="循环">🔁 loop</button>',
     '</div>',
-    '<div class="timeline">',
+    '<div class="timeline" data-nf-tl="open">',
     '<div class="ruler"></div>',
     '<div class="tracks">',
     '<div class="playhead">',
@@ -112,7 +129,14 @@ export function bundle(input: BundleInput): string {
     `<script id="nf-tracks" type="application/json">${escapeForScript(trackSourcesJson)}</script>`,
     `<script id="nf-assets" type="application/json">${escapeForScript(assetsJson)}</script>`,
     `<script id="nf-runtime">${input.runtimeJs}</script>`,
-    '<script>if(typeof window!=="undefined"&&typeof window.__nf_boot==="function"){window.__nf_boot();}</script>',
+    '<script>if(typeof window!=="undefined"&&typeof window.__nf_boot==="function"){window.__nf_boot();}' +
+      // ADR-046 inline mini-controller for timeline toggle (no runtime change needed).
+      'document.addEventListener("click",function(e){var b=e.target&&e.target.closest&&e.target.closest("[data-nf=\\"timeline-toggle\\"]");' +
+      'if(!b)return;var tl=document.querySelector(".timeline");if(!tl)return;' +
+      'var open=tl.getAttribute("data-nf-tl")!=="closed";' +
+      'if(open){tl.setAttribute("data-nf-tl","closed");b.textContent="▲ timeline";b.setAttribute("data-active","false");}' +
+      'else{tl.setAttribute("data-nf-tl","open");b.textContent="▼ timeline";b.setAttribute("data-active","true");}});' +
+      '</script>',
     '</body>',
     '</html>',
     '',
@@ -121,24 +145,36 @@ export function bundle(input: BundleInput): string {
   return html;
 }
 
-// ADR-037 layout tokens + ADR-036 no-truncation rules.
+// ADR-046 layout tokens (supersedes ADR-037) + ADR-036 no-truncation (via scroll).
 // Byte-stable: template literal is a constant — no timestamps / randomness.
 const INLINE_CSS = [
+  // base tokens (wrapped in :root block; --nf-aspect is injected via a separate :root block at runtime)
   ':root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--text-sub:#8b949e;',
   '--primary:#58a6ff;--purple:#bc8cff;--success:#3fb950;',
   '--primary-bg:rgba(88,166,255,0.18);--purple-bg:rgba(188,140,255,0.18);',
   '--success-bg:rgba(63,185,80,0.12);}',
   '*{box-sizing:border-box}',
-  '/* NO OVERFLOW: ADR-036 — body min-height:100vh, no overflow:hidden */',
+  // body: height:100vh (was min-height) so flex children can split the viewport.
   'html,body{margin:0;padding:0;background:var(--bg);color:var(--text);',
   'font-family:-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC",sans-serif;',
-  'font-size:14px;min-height:100vh;overflow-x:hidden}',
+  'font-size:14px;height:100vh;overflow:hidden}',
   'body{display:flex;flex-direction:column}',
-  '.stage-wrap{flex:0 0 70vh;position:relative;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center}',
-  '#nf-stage{position:relative;width:100%;height:100%}',
+  // ADR-046: stage-wrap is the sizing container for #nf-stage.
+  // Using `container-type: size` lets the stage size itself off the wrap using cqw/cqh,
+  // which is stable in headless chromium (unlike aspect-ratio + flex which can collapse).
+  '.stage-wrap{flex:1 1 auto;min-height:0;position:relative;background:#000;',
+  'display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden;',
+  'container-type:size}',
+  // #nf-stage width is min(container width, container height * aspect ratio) — the classic
+  // contain formula. This is equivalent to object-fit:contain but for a div. aspect-ratio
+  // sets height from the computed width.
+  '#nf-stage{position:relative;aspect-ratio:var(--nf-aspect);',
+  'width:min(100cqw - 24px, (100cqh - 24px) * var(--nf-aspect-num));',
+  'height:auto;background:#050507}',
   '#nf-stage > *{position:absolute;inset:0}',
+  // controls row (unchanged 48px fixed).
   '.controls{flex:0 0 48px;display:flex;align-items:center;gap:10px;padding:0 16px;',
-  'background:var(--card);border-top:1px solid var(--border)}',
+  'background:var(--card);border-top:1px solid var(--border);z-index:2}',
   '.controls button{width:34px;height:34px;display:flex;align-items:center;justify-content:center;',
   'background:transparent;border:1px solid var(--border);color:var(--text-sub);',
   'border-radius:6px;font-size:14px;cursor:pointer;transition:all 0.12s;padding:0}',
@@ -146,19 +182,23 @@ const INLINE_CSS = [
   '.controls button[data-nf="play-pause"]{background:var(--primary-bg);color:var(--primary);border-color:var(--primary)}',
   '.controls button[data-nf="loop-toggle"][data-active="true"]{background:var(--success-bg);color:var(--success);border-color:var(--success);width:auto;padding:0 12px;font-size:12px;font-weight:600}',
   '.controls button[data-nf="loop-toggle"][data-active="false"]{width:auto;padding:0 12px;font-size:12px}',
+  '.controls button[data-nf="timeline-toggle"]{width:auto;padding:0 12px;font-size:12px;color:var(--text-sub)}',
+  '.controls button[data-nf="timeline-toggle"][data-active="false"]{opacity:0.6}',
   '.controls .timecode{font-family:"SF Mono",Menlo,monospace;font-size:13px;color:var(--text);margin-left:8px}',
   '.controls .timecode .now{color:var(--purple);font-weight:700}',
   '.controls .timecode .dur{color:var(--text-sub)}',
   '.controls .spacer{flex:1}',
-  '/* NO OVERFLOW: ADR-036 — .timeline flex:1 1 auto, no max-height, overflow:visible */',
-  '.timeline{flex:1 1 auto;min-height:160px;padding:14px 16px;background:var(--bg);',
-  'border-top:1px solid rgba(255,255,255,0.05);overflow:visible}',
+  // ADR-046: timeline now fixed-max with scroll (keeps ADR-036 no-truncation via overflow-y:auto, not flex-grow).
+  '.timeline{flex:0 0 auto;max-height:30vh;min-height:0;overflow-y:auto;overflow-x:auto;',
+  'padding:14px 16px;background:var(--bg);border-top:1px solid rgba(255,255,255,0.05);',
+  'transition:max-height 0.2s ease-out}',
+  // collapsed state hides the timeline content; scroll and max-height both go to 0.
+  '.timeline[data-nf-tl="closed"]{max-height:0;padding-top:0;padding-bottom:0;overflow:hidden}',
   '.ruler{position:relative;height:24px;margin:0 0 6px 140px;',
   'font-family:"SF Mono",Menlo,monospace;font-size:10px;color:rgba(255,255,255,0.45)}',
   '.ruler-tick{position:absolute;top:0;width:1px;height:7px;background:rgba(255,255,255,0.12)}',
   '.ruler-tick.major{height:11px;background:rgba(255,255,255,0.25)}',
   '.ruler-label{position:absolute;top:13px;transform:translateX(-50%)}',
-  '/* NO OVERFLOW: ADR-036 — .tracks / .track-row must NOT set overflow:hidden|scroll|auto */',
   '.tracks{position:relative}',
   '.track-row{display:grid;grid-template-columns:140px 1fr;align-items:center;gap:0;margin-bottom:5px;height:40px}',
   '.track-label{font-family:"SF Mono",Menlo,monospace;font-size:12px;color:var(--text-sub);padding-right:12px}',
