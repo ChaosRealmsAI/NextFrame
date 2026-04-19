@@ -76,7 +76,7 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject, Sel};
 use objc2::{declare_class, msg_send_id, mutability, sel, ClassType, DeclaredClass};
 use objc2_app_kit::{
-    NSAutoresizingMaskOptions, NSBezelStyle, NSBorderType, NSBox, NSBoxType, NSButton, NSControl,
+    NSAutoresizingMaskOptions, NSBorderType, NSBox, NSBoxType, NSButton, NSControl,
     NSFont, NSTextAlignment, NSTextField, NSTitlePosition, NSView,
 };
 use objc2_foundation::{
@@ -217,6 +217,29 @@ impl HudView {
         let next_frame_btn = make_icon_button(mtm, "▶", &controller, sel!(onNextFrame:));
         let jump_next = make_icon_button(mtm, "⏭", &controller, sel!(onJumpEnd:));
 
+        // Primary-button backdrop — accent purple NSBox beneath the
+        // play/pause NSButton so the sample-preview "purple filled primary"
+        // treatment renders without a full NSButtonCell subclass.  AppKit
+        // doesn't expose bezel-fill on NSButton directly; a layered NSBox
+        // is the shortest path to the same visual.
+        let play_backdrop: Retained<NSBox> = unsafe {
+            let alloc = mtm.alloc::<NSBox>();
+            let b = NSBox::initWithFrame(
+                alloc,
+                NSRect::new(
+                    NSPoint::new(0.0, 0.0),
+                    NSSize::new(PLAY_BUTTON_WIDTH, BUTTON_HEIGHT),
+                ),
+            );
+            b.setBoxType(NSBoxType::NSBoxCustom);
+            #[allow(deprecated)]
+            b.setBorderType(NSBorderType::NSNoBorder);
+            b.setTitlePosition(NSTitlePosition::NSNoTitle);
+            b.setFillColor(&color::accent());
+            b.setCornerRadius(6.0);
+            b
+        };
+
         // --- Separator + timecode -----------------------------------------
         let sep1 = make_separator(mtm);
         let timecode = make_timecode_label(mtm, total_ms);
@@ -235,6 +258,16 @@ impl HudView {
 
         place(&jump_prev, mid_y, &mut x, ICON_BUTTON_WIDTH, BUTTON_HEIGHT, ITEM_GAP);
         place(&prev_frame_btn, mid_y, &mut x, ICON_BUTTON_WIDTH, BUTTON_HEIGHT, ITEM_GAP);
+        // Set the accent-purple backdrop frame manually at the same rect
+        // as the play_pause button (which is placed next).  We don't want
+        // `place_box` to advance `x` here — the backdrop is a sibling that
+        // shares the button's slot, not its own flex-row entry.
+        unsafe {
+            play_backdrop.setFrame(NSRect::new(
+                NSPoint::new(x, mid_y - BUTTON_HEIGHT / 2.0),
+                NSSize::new(PLAY_BUTTON_WIDTH, BUTTON_HEIGHT),
+            ));
+        }
         place(&play_pause, mid_y, &mut x, PLAY_BUTTON_WIDTH, BUTTON_HEIGHT, ITEM_GAP);
         place(&next_frame_btn, mid_y, &mut x, ICON_BUTTON_WIDTH, BUTTON_HEIGHT, ITEM_GAP);
         place(&jump_next, mid_y, &mut x, ICON_BUTTON_WIDTH, BUTTON_HEIGHT, CLUSTER_GAP);
@@ -249,9 +282,14 @@ impl HudView {
         place(&fit_btn, mid_y, &mut x, ICON_BUTTON_WIDTH, BUTTON_HEIGHT, H_PAD);
 
         // --- Attach subviews + stash handles on controller ----------------
+        //
+        // Order matters for z-stacking — the play-button backdrop goes on
+        // first so `play_pause` draws on top of it.  AppKit renders in
+        // subview order (back-to-front).
         unsafe {
             content_view.addSubview(&jump_prev);
             content_view.addSubview(&prev_frame_btn);
+            content_view.addSubview(play_backdrop.as_super());
             content_view.addSubview(&play_pause);
             content_view.addSubview(&next_frame_btn);
             content_view.addSubview(&jump_next);
@@ -317,8 +355,10 @@ const PLAY_BUTTON_WIDTH: f64 = 40.0;
 const BUTTON_HEIGHT: f64 = 26.0;
 /// Separator height (matches topbar visual treatment).
 const SEPARATOR_H: f64 = 18.0;
-/// Width reserved for timecode label (mm:ss / mm:ss · plenty of headroom).
-const TIMECODE_WIDTH: f64 = 96.0;
+/// Width reserved for timecode label (`mm:ss  /  mm:ss` = 15 chars of mono
+/// at 11 px ≈ 105 px · we allow 120 px so `h:mm:ss / h:mm:ss` also fits
+/// without clipping).  The previous 96 px truncated `03:32` → `03:`.
+const TIMECODE_WIDTH: f64 = 120.0;
 
 /// Glyph used for the play/pause button while paused.
 const PLAY_GLYPH: &str = "▶";
@@ -697,8 +737,13 @@ fn make_icon_button(
             Some(action),
             mtm,
         );
-        #[allow(deprecated)]
-        button.setBezelStyle(NSBezelStyle::Rounded);
+        // Bezel-less icon buttons — ghost style matching sample-preview's
+        // `.btn-ghost` with clear-ish fill + secondary-white text.  The
+        // default NSButton bezel renders a grey pill that fights against
+        // the dark HUD backdrop; turning the border off leaves just the
+        // glyph on the translucent backdrop, which reads as "transport
+        // control" rather than "system button".
+        button.setBordered(false);
         // Secondary white-ish title.
         let attrs = icon_button_attrs(mtm);
         let styled = NSAttributedString::initWithString_attributes(
@@ -711,10 +756,11 @@ fn make_icon_button(
     }
 }
 
-/// Build the primary play/pause button — accent-purple fill by virtue of
-/// its attributed title colour; a full bezel-replacement is overkill when
-/// the click contract is what matters.  Placed at x-center of the HUD by
-/// the caller.
+/// Build the primary play/pause button — the accent-purple fill is
+/// supplied by an NSBox backdrop behind the button (see [`HudView::new`]);
+/// here we render the button itself bezel-less with a near-black glyph so
+/// the backdrop colour shows through.  Matches the sample-preview
+/// `.btn-primary { background: var(--accent); color: rgba(0,0,0,0.90) }`.
 fn make_primary_button(
     mtm: MainThreadMarker,
     title: &str,
@@ -730,8 +776,10 @@ fn make_primary_button(
             Some(action),
             mtm,
         );
-        #[allow(deprecated)]
-        button.setBezelStyle(NSBezelStyle::Rounded);
+        // Drop the system bezel so the NSBox backdrop behind us provides
+        // the visual fill.  NSButton still lays out + hit-tests its full
+        // frame; only the chrome is hidden.
+        button.setBordered(false);
         let attrs = primary_button_attrs(mtm);
         let styled = NSAttributedString::initWithString_attributes(
             mtm.alloc::<NSAttributedString>(),

@@ -88,8 +88,12 @@ const OUTER_PAD_X: f64 = 14.0;
 const OUTER_PAD_Y: f64 = 10.0;
 /// Left gutter inside each lane for the kind chip + name label before the
 /// clip bar starts.  Matches the combined width of `.lane-kind` (20 px) +
-/// `.lane-name` (min-width 90 px) + gaps in sample-preview.
-const LANE_LEFT_GUTTER: f64 = 130.0;
+/// `.lane-name` (min-width 90 px in CSS, but real names like
+/// `video · video-pip` need ~110 px at 11 px system font) + gaps in
+/// sample-preview.  Previous value of 130 px truncated the longer names
+/// ("scene · scene-hero" → "scene · scene-he"); 160 px gives clean
+/// clearance for the v1.8 demo source and keeps the clip bar rightward.
+const LANE_LEFT_GUTTER: f64 = 160.0;
 /// Width of the kind-letter chip.
 const LANE_CHIP_SIZE: f64 = 20.0;
 /// Playhead stroke width — matches `.playhead { width: 1.5px }`.
@@ -403,6 +407,10 @@ pub struct TimelineView {
     /// Cached header title label ("Timeline · N tracks (shell 解析)") so
     /// [`Self::set_source`] can update its text.
     header_title: Retained<NSTextField>,
+    /// Cached ruler-tick labels so [`Self::set_total_ms`] can rewrite them
+    /// as actual seconds (`"53s" / "106s" / …`) once the integrator injects
+    /// a real duration.  Five entries at 0/25/50/75/100 % of the timeline.
+    ruler_ticks: Vec<Retained<NSTextField>>,
 }
 
 impl TimelineView {
@@ -441,13 +449,12 @@ impl TimelineView {
         let header_static_chip = make_chip_label(mtm, "skeleton · 不交互");
 
         // ----- Ruler row ---------------------------------------------------
-        // Five tick labels at 0 / 25 / 50 / 75 / 100 %.  Labels read as
-        // percentages because `source.duration` is an expression string (not
-        // a pre-resolved ms value) — evaluating anchors is out of scope for
-        // this task.  T-10 can overlay ms labels once the ruler knows the
-        // resolved duration.
-        let ruler_labels: [&str; 5] = ["0", "25%", "50%", "75%", "100%"];
-        let ruler_ticks: Vec<Retained<NSTextField>> = ruler_labels
+        // Five tick labels at 0 / 25 / 50 / 75 / 100 %.  Labels are rendered
+        // as seconds once [`TimelineView::set_total_ms`] lands a real
+        // duration; during construction `total_ms = 0` so we fall back to
+        // the short "0/25%/50%/75%/100%" percentage labels (matches the
+        // visual when the integrator hasn't yet wired duration).
+        let ruler_ticks: Vec<Retained<NSTextField>> = format_ruler_labels(0)
             .iter()
             .map(|txt| {
                 make_label(
@@ -513,6 +520,7 @@ impl TimelineView {
             playhead_bar,
             header_track_chip,
             header_title,
+            ruler_ticks: ruler_ticks.clone(),
         };
 
         // Initial layout pass.
@@ -539,8 +547,16 @@ impl TimelineView {
     /// Set the total duration (ms) used as the playhead-ratio denominator.
     /// Called by T-11 integrator after the runtime resolves `source.duration`
     /// (or with a best-guess from source if no JS side is yet initialised).
+    /// Also rewrites the five ruler-tick labels so they read as actual
+    /// seconds instead of placeholder percentages.
     pub fn set_total_ms(&mut self, ms: u64) {
         self.total_ms = ms;
+        let labels = format_ruler_labels(ms);
+        for (label, text) in self.ruler_ticks.iter().zip(labels.iter()) {
+            unsafe {
+                label.setStringValue(&NSString::from_str(text));
+            }
+        }
         self.relayout_playhead();
     }
 
@@ -595,8 +611,7 @@ impl TimelineView {
             self.header_track_chip.setStringValue(&new_chip);
         }
 
-        let ruler_labels: [&str; 5] = ["0", "25%", "50%", "75%", "100%"];
-        let ruler_ticks: Vec<Retained<NSTextField>> = ruler_labels
+        let ruler_ticks: Vec<Retained<NSTextField>> = format_ruler_labels(self.total_ms)
             .iter()
             .map(|txt| {
                 make_label(
@@ -626,6 +641,7 @@ impl TimelineView {
         }
 
         self.source = source.clone();
+        self.ruler_ticks = ruler_ticks.clone();
         self.relayout(&header_static_chip, &ruler_ticks, &lane_boxes);
     }
 
@@ -966,6 +982,37 @@ fn make_chip_label(mtm: MainThreadMarker, text: &str) -> Retained<NSTextField> {
         label.setSelectable(false);
         label
     }
+}
+
+/// Format the five ruler-tick labels (0 / 25 / 50 / 75 / 100 %) given a
+/// total duration in milliseconds.  When `total_ms == 0` we emit short
+/// percentage placeholders because the integrator hasn't yet wired a
+/// resolved duration — the visual still shows five evenly-spaced ticks
+/// which is the important part.  Non-zero totals render as whole-second
+/// labels (`"53s" / "106s" / "159s" / "212s"`), matching the
+/// sample-preview ruler.
+fn format_ruler_labels(total_ms: u64) -> [String; 5] {
+    if total_ms == 0 {
+        return [
+            "0".to_string(),
+            "25%".to_string(),
+            "50%".to_string(),
+            "75%".to_string(),
+            "100%".to_string(),
+        ];
+    }
+    let total_s = total_ms as f64 / 1000.0;
+    let mk = |r: f64| -> String {
+        let s = (total_s * r).round() as u64;
+        format!("{s}s")
+    };
+    [
+        "0s".to_string(),
+        mk(0.25),
+        mk(0.50),
+        mk(0.75),
+        mk(1.00),
+    ]
 }
 
 // ---------------------------------------------------------------------------

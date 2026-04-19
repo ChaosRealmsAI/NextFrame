@@ -19,6 +19,281 @@
 const LABEL_COL_PX = 140;
 
 // -----------------------------------------------------------------------------
+// liteResolve — v1.19.1 runtime-internal resolve pass (replaces engine's
+// resolve.ts for consumers that skip the bundler: shell-mac / recorder / live
+// preview). Accepts raw `SourceRaw` object and returns a `Resolved`-shaped
+// object compatible with getStateAt().
+//
+// Scope (kept minimal — engine's full resolve.ts does more):
+//   ✅ expr parse (literal ms/s/m, anchor refs, + / -)
+//   ✅ topo sort anchors · eval exprs → absolute ms
+//   ✅ duration resolution
+//   ✅ clip begin/end → begin_ms/end_ms
+//   ✅ viewport passthrough
+//   ❌ AJV schema validation (skipped — engine's job; runtime trusts source)
+//   ❌ describe() loading (tracks are loaded separately via TRACKS map)
+//
+// Back-compat: runtime still reads pre-resolved `#nf-resolved` JSON first
+// (bundler.html path). liteResolve is a fallback for raw-source consumers.
+// -----------------------------------------------------------------------------
+export function liteResolve(source) {
+  if (!source || typeof source !== "object") {
+    throw new Error("liteResolve: source must be an object");
+  }
+  if (!source.viewport) throw new Error("liteResolve: source.viewport missing");
+  if (typeof source.duration !== "string") throw new Error("liteResolve: source.duration must be string");
+  if (!Array.isArray(source.tracks)) throw new Error("liteResolve: source.tracks must be array");
+
+  const anchorsRaw = source.anchors || {};
+
+  // --- Parse all expr strings to AST ---
+  // Shared with nf-core-engine/src/expr.ts grammar (FM-SHAPE single source).
+  const parsedAnchors = {};
+  for (const name of Object.keys(anchorsRaw)) {
+    const a = anchorsRaw[name];
+    if (typeof a.at === "string") {
+      parsedAnchors[name] = { kind: "point", exprs: { at: _parseExpr(a.at) } };
+    } else if (typeof a.begin === "string" && typeof a.end === "string") {
+      parsedAnchors[name] = {
+        kind: "range",
+        exprs: { begin: _parseExpr(a.begin), end: _parseExpr(a.end) },
+      };
+    } else {
+      throw new Error(`liteResolve: anchor '${name}' needs {at} or {begin,end}`);
+    }
+  }
+  const durationExpr = _parseExpr(source.duration);
+
+  // Collect parsed clips.
+  const parsedClips = [];
+  for (const track of source.tracks) {
+    const clips = track.clips || [];
+    for (let i = 0; i < clips.length; i++) {
+      const c = clips[i];
+      parsedClips.push({
+        id: c.id || `${track.id}#${i}`,
+        trackId: track.id,
+        beginExpr: _parseExpr(c.begin),
+        endExpr: _parseExpr(c.end),
+        params: c.params || {},
+      });
+    }
+  }
+
+  // --- Build ref graph (inter-anchor only; intra-anchor self-refs allowed) ---
+  const refGraph = {};
+  for (const name of Object.keys(parsedAnchors)) {
+    const deps = new Set();
+    const pa = parsedAnchors[name];
+    for (const key of Object.keys(pa.exprs)) {
+      const ast = pa.exprs[key];
+      if (ast) _collectRefs(ast, deps);
+    }
+    deps.delete(name); // self-refs resolved intra-anchor
+    refGraph[name] = [...deps];
+  }
+
+  // --- Topo sort anchors (Kahn) ---
+  const order = _topoSort(refGraph);
+
+  // --- Eval anchor exprs in topo order ---
+  const resolvedAnchors = {};
+  for (const name of order) {
+    const pa = parsedAnchors[name];
+    if (!pa) continue;
+    if (pa.kind === "point") {
+      const at_ms = Math.round(_evalExpr(pa.exprs.at, resolvedAnchors));
+      resolvedAnchors[name] = { kind: "point", at_ms };
+    } else {
+      const begin_ms = Math.round(_evalExpr(pa.exprs.begin, resolvedAnchors));
+      // Partial insert so end-expr can ref self.begin.
+      resolvedAnchors[name] = { kind: "range", begin_ms, end_ms: begin_ms };
+      const end_ms = Math.round(_evalExpr(pa.exprs.end, resolvedAnchors));
+      resolvedAnchors[name] = { kind: "range", begin_ms, end_ms };
+    }
+  }
+
+  // --- Resolve duration ---
+  const duration_ms = Math.round(_evalExpr(durationExpr, resolvedAnchors));
+  if (duration_ms <= 0) {
+    throw new Error(`liteResolve: duration_ms=${duration_ms} must be > 0`);
+  }
+
+  // --- Resolve clips per track ---
+  const resolvedTracks = [];
+  for (const track of source.tracks) {
+    const rClips = [];
+    for (const pc of parsedClips) {
+      if (pc.trackId !== track.id) continue;
+      const begin_ms = Math.round(_evalExpr(pc.beginExpr, resolvedAnchors));
+      const end_ms = Math.round(_evalExpr(pc.endExpr, resolvedAnchors));
+      rClips.push({
+        id: pc.id,
+        trackId: track.id,
+        begin_ms,
+        end_ms,
+        params: pc.params,
+      });
+    }
+    resolvedTracks.push({
+      id: track.id,
+      kind: track.kind,
+      src: track.src,
+      clips: rClips,
+    });
+  }
+
+  const out = {
+    viewport: source.viewport,
+    duration_ms,
+    anchors: resolvedAnchors,
+    tracks: resolvedTracks,
+  };
+  if (source.meta !== undefined) out.meta = source.meta;
+  return out;
+}
+
+// Expr parser — recursive-descent, shared grammar with expr.ts.
+//   Expr     = Term (('+' | '-') Term)*
+//   Term     = Duration | AnchorRef
+//   Duration = Number Unit?     (Unit: 'ms' | 's' | 'm'; bare 0 allowed)
+//   AnchorRef= Ident ('.' Ident)?
+function _parseExpr(src) {
+  if (typeof src !== "string" || src.length === 0) {
+    throw new Error(`liteResolve: expr must be non-empty string (got ${JSON.stringify(src)})`);
+  }
+  const st = { src, pos: 0 };
+  const ast = _parseAddSub(st);
+  _skipWs(st);
+  if (st.pos < src.length) {
+    throw new Error(`liteResolve: unexpected '${src[st.pos]}' in '${src}' at col ${st.pos}`);
+  }
+  return ast;
+}
+function _skipWs(st) {
+  while (st.pos < st.src.length) {
+    const c = st.src[st.pos];
+    if (c === " " || c === "\t") st.pos++;
+    else break;
+  }
+}
+function _isDigit(c) { return c >= "0" && c <= "9"; }
+function _isIdStart(c) { return (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c === "_"; }
+function _isIdCont(c) { return _isIdStart(c) || _isDigit(c); }
+function _parseAddSub(st) {
+  let left = _parseTerm(st);
+  while (true) {
+    _skipWs(st);
+    const op = st.src[st.pos];
+    if (op !== "+" && op !== "-") break;
+    st.pos++;
+    const right = _parseTerm(st);
+    left = { type: "binop", op, left, right };
+  }
+  return left;
+}
+function _parseTerm(st) {
+  _skipWs(st);
+  const c = st.src[st.pos];
+  if (_isDigit(c)) {
+    const start = st.pos;
+    while (st.pos < st.src.length && _isDigit(st.src[st.pos])) st.pos++;
+    if (st.src[st.pos] === "." && _isDigit(st.src[st.pos + 1])) {
+      st.pos++;
+      while (st.pos < st.src.length && _isDigit(st.src[st.pos])) st.pos++;
+    }
+    const n = Number(st.src.slice(start, st.pos));
+    // Unit: 'ms' / 's' / 'm' · bare 0 = 0ms sentinel.
+    let factor;
+    if (st.src.startsWith("ms", st.pos)) { st.pos += 2; factor = 1; }
+    else if (st.src[st.pos] === "s") { st.pos++; factor = 1000; }
+    else if (st.src[st.pos] === "m") { st.pos++; factor = 60000; }
+    else if (n === 0) { factor = 1; }
+    else throw new Error(`liteResolve: duration '${n}' needs unit (ms/s/m) in '${st.src}'`);
+    return { type: "dur", ms: n * factor };
+  }
+  if (_isIdStart(c)) {
+    const start = st.pos;
+    st.pos++;
+    while (st.pos < st.src.length && _isIdCont(st.src[st.pos])) st.pos++;
+    const head = st.src.slice(start, st.pos);
+    const path = [head];
+    if (st.src[st.pos] === ".") {
+      st.pos++;
+      const fStart = st.pos;
+      if (!_isIdStart(st.src[st.pos])) {
+        throw new Error(`liteResolve: expected field name after '.' in '${st.src}' at col ${st.pos}`);
+      }
+      st.pos++;
+      while (st.pos < st.src.length && _isIdCont(st.src[st.pos])) st.pos++;
+      path.push(st.src.slice(fStart, st.pos));
+    }
+    return { type: "ref", path };
+  }
+  throw new Error(`liteResolve: expected number or identifier in '${st.src}' at col ${st.pos}`);
+}
+function _collectRefs(ast, out) {
+  if (ast.type === "ref") { if (ast.path[0]) out.add(ast.path[0]); }
+  else if (ast.type === "binop") { _collectRefs(ast.left, out); _collectRefs(ast.right, out); }
+}
+function _evalExpr(ast, resolvedAnchors) {
+  if (ast.type === "dur") return ast.ms;
+  if (ast.type === "binop") {
+    const l = _evalExpr(ast.left, resolvedAnchors);
+    const r = _evalExpr(ast.right, resolvedAnchors);
+    return ast.op === "+" ? l + r : l - r;
+  }
+  // ref
+  const head = ast.path[0];
+  const field = ast.path[1];
+  const ra = resolvedAnchors[head];
+  if (!ra) throw new Error(`liteResolve: anchor '${head}' not resolved (topo order bug or undefined ref)`);
+  if (field === undefined) {
+    if (ra.kind === "point") return ra.at_ms || 0;
+    return ra.begin_ms || 0;
+  }
+  if (field === "at") return ra.at_ms || 0;
+  if (field === "begin") return ra.begin_ms || 0;
+  if (field === "end") return ra.end_ms || 0;
+  throw new Error(`liteResolve: unknown field '${head}.${field}' (valid: .at/.begin/.end)`);
+}
+// Kahn topo sort · deterministic (sorted queue).
+function _topoSort(graph) {
+  const nodes = Object.keys(graph);
+  const nodeSet = new Set(nodes);
+  const indeg = new Map();
+  for (const n of nodes) indeg.set(n, 0);
+  const reverse = new Map();
+  for (const n of nodes) reverse.set(n, []);
+  for (const n of nodes) {
+    for (const d of graph[n]) {
+      if (!nodeSet.has(d)) continue; // unknown refs → deferred to eval-time throw
+      reverse.get(d).push(n);
+      indeg.set(n, (indeg.get(n) || 0) + 1);
+    }
+  }
+  const queue = [];
+  for (const n of nodes) if ((indeg.get(n) || 0) === 0) queue.push(n);
+  queue.sort();
+  const order = [];
+  while (queue.length > 0) {
+    const n = queue.shift();
+    order.push(n);
+    const nexts = (reverse.get(n) || []).slice().sort();
+    for (const m of nexts) {
+      const d = (indeg.get(m) || 0) - 1;
+      indeg.set(m, d);
+      if (d === 0) queue.push(m);
+    }
+  }
+  if (order.length < nodes.length) {
+    const remaining = nodes.filter((n) => !order.includes(n));
+    throw new Error(`liteResolve: anchor cycle among [${remaining.join(", ")}]`);
+  }
+  return order;
+}
+
+// -----------------------------------------------------------------------------
 // getStateAt — pure, no globals, no Date.now, no Math.random
 // -----------------------------------------------------------------------------
 export function getStateAt(resolved, t_ms) {
@@ -221,30 +496,71 @@ function _fmtTime(t_ms) {
 export function boot(options) {
   options = options || {};
   const mode = options.mode || "play";
-  const stageSelector = options.stageSelector || "#nf-stage";
+  // Accept both `stageSelector` (original) and `stage` (shell-mac convention).
+  const stageSelector = options.stageSelector || options.stage || "#nf-stage";
   const autoplay = options.autoplay !== false;
   const initialLoop = options.loop === true;
 
   const doc = globalThis.document;
   if (!doc) throw new Error("boot: document not available (browser-only)");
 
-  // Read resolved + track sources from inlined <script> JSON blocks.
+  // Resolved + track sources come from 3 possible consumers (v1.19.1):
+  //   1. bundler.html          -> script#nf-resolved JSON (pre-resolved)
+  //   2. shell-mac / recorder  -> options.source (raw SourceRaw) + options.tracks map
+  //                              OR window.__NF_SOURCE__ + window.__NF_TRACKS__
+  // Runtime performs lite-resolve when only raw source is provided — avoids
+  // hard dep on the engine's Node-only resolve pipeline for live consumers.
+  let resolved = null;
+  let trackSources = null;
   const resolvedEl = doc.getElementById("nf-resolved");
   const tracksEl = doc.getElementById("nf-tracks");
-  if (!resolvedEl) throw new Error("boot: #nf-resolved not found");
-  if (!tracksEl) throw new Error("boot: #nf-tracks not found");
-  const resolved = JSON.parse(resolvedEl.textContent || "{}");
-  const trackSources = JSON.parse(tracksEl.textContent || "{}");
+  const win = typeof window !== "undefined" ? window : null;
+  if (resolvedEl) {
+    // Path 1 — bundler pre-resolved (back-compat).
+    resolved = JSON.parse(resolvedEl.textContent || "{}");
+    trackSources = tracksEl ? JSON.parse(tracksEl.textContent || "{}") : {};
+  } else if (options.source) {
+    // Path 2a — shell-mac passes raw source via options.
+    resolved = liteResolve(options.source);
+    trackSources = options.tracks || {};
+  } else if (win && win.__NF_SOURCE__) {
+    // Path 2b — window globals (shell-mac HTML template also sets these
+    // for inspector/debug visibility).
+    resolved = liteResolve(win.__NF_SOURCE__);
+    trackSources = win.__NF_TRACKS__ || {};
+  } else {
+    throw new Error(
+      "boot: no source available — need #nf-resolved DOM, options.source, or window.__NF_SOURCE__",
+    );
+  }
 
-  // Compile tracks.
-  const trackRegistry = new Map();
-  for (const trackId of Object.keys(trackSources)) {
+  // Compile tracks. v1.19.1: `trackSources` map keys may be either trackId
+  // (bundler.html convention — one compiled track per track in resolved.tracks)
+  // OR kind (shell-mac convention — dedup'd by kind since multiple tracks of
+  // the same kind share one JS source). Build `trackRegistry` keyed by the
+  // actual trackId (what renderState looks up) regardless of input shape.
+  const compiledByKey = new Map();
+  for (const key of Object.keys(trackSources)) {
     try {
-      trackRegistry.set(trackId, loadTrack(trackSources[trackId]));
+      compiledByKey.set(key, loadTrack(trackSources[key]));
     } catch (err) {
       console.log(JSON.stringify({
         ts: _ts(), level: "error", source: "nf-runtime",
-        msg: "track_load_failed", data: { trackId, error: String(err) },
+        msg: "track_load_failed", data: { key, error: String(err) },
+      }));
+    }
+  }
+  const trackRegistry = new Map();
+  const resolvedTracks = (resolved && resolved.tracks) || [];
+  for (const t of resolvedTracks) {
+    // Prefer exact trackId match (bundler), fall back to kind (shell-mac dedup).
+    const api = compiledByKey.get(t.id) || compiledByKey.get(t.kind);
+    if (api) trackRegistry.set(t.id, api);
+    else {
+      console.log(JSON.stringify({
+        ts: _ts(), level: "error", source: "nf-runtime",
+        msg: "track_not_registered",
+        data: { trackId: t.id, kind: t.kind, availableKeys: [...compiledByKey.keys()] },
       }));
     }
   }

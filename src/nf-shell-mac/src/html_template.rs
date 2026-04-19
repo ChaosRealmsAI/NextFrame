@@ -34,7 +34,7 @@ html,body{margin:0;padding:0;background:#000;color:#fff;overflow:hidden;font-fam
 <script>window.__NF_SOURCE__ = {{SOURCE_JSON}};</script>
 <script>window.__NF_TRACKS__ = {{TRACKS_MAP}};</script>
 <script>{{RUNTIME_IIFE}}</script>
-<script>if(window.__nf_boot){window.__nf_boot({stage:'#nf-stage', source:window.__NF_SOURCE__, tracks:window.__NF_TRACKS__, autoplay:false});}</script>
+<script>if(window.__nf_boot){window.nfHandle=window.__nf_boot({stage:'#nf-stage', source:window.__NF_SOURCE__, tracks:window.__NF_TRACKS__, autoplay:false});}</script>
 </body></html>"#;
 
 /// Errors produced while assembling the HTML.

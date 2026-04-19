@@ -41,7 +41,7 @@
 use objc2::rc::Retained;
 use objc2::ClassType;
 use objc2_app_kit::{
-    NSBezelStyle, NSBorderType, NSBox, NSBoxType, NSButton, NSColor, NSFont, NSTextAlignment,
+    NSBorderType, NSBox, NSBoxType, NSButton, NSColor, NSFont, NSTextAlignment,
     NSTextField, NSTitlePosition, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
     NSVisualEffectState, NSVisualEffectView,
 };
@@ -83,6 +83,22 @@ mod color {
     /// Accent tinted · `rgba(167,139,250,0.28)` · brand-mark border.
     pub fn accent_border() -> Retained<NSColor> {
         unsafe { NSColor::colorWithSRGBRed_green_blue_alpha(0xa7 as f64 / 255.0, 0x8b as f64 / 255.0, 0xfa as f64 / 255.0, 0.28) }
+    }
+
+    /// Brand-mark fill · approximates the sample-preview
+    /// `linear-gradient(145deg, rgba(167,139,250,0.35), rgba(124,58,237,0.15))`.
+    /// NSBox can't do gradients without a CAGradientLayer swap, so we pick
+    /// the midpoint — tinted purple translucent over the dark topbar reads
+    /// as the "glass chip" treatment without solid saturation.
+    pub fn brand_mark_fill() -> Retained<NSColor> {
+        unsafe {
+            NSColor::colorWithSRGBRed_green_blue_alpha(
+                0xa7 as f64 / 255.0,
+                0x8b as f64 / 255.0,
+                0xfa as f64 / 255.0,
+                0.22,
+            )
+        }
     }
 
     /// Pure white · `#ffffff` · brand name text.
@@ -136,6 +152,10 @@ const BRAND_GAP: f64 = 10.0;
 /// Gap between top-level clusters (brand / buttons / avatar).
 const CLUSTER_GAP: f64 = 14.0;
 /// Horizontal padding inside NSButton labels (mimics `.btn-ghost` padding).
+/// Retained for v1.22 when we swap to an NSBox-backed custom bezel with
+/// manual padding; NSButton's built-in bezel already pads, so the runtime
+/// call sites now use `sizeToFit` and leave this constant as documentation.
+#[allow(dead_code)]
 const BTN_H_PAD: f64 = 12.0;
 /// Outer horizontal padding of the topbar (`.topbar { padding: 0 14px }`).
 const OUTER_PAD: f64 = 14.0;
@@ -208,15 +228,19 @@ impl TopbarView {
             #[allow(deprecated)]
             b.setBorderType(NSBorderType::NSLineBorder);
             b.setTitlePosition(NSTitlePosition::NSNoTitle);
-            b.setFillColor(&color::accent());
+            b.setFillColor(&color::brand_mark_fill());
             b.setBorderColor(&color::accent_border());
             b.setCornerRadius(MARK_CORNER);
             b
         };
+        // Star glyph — accent purple on the tinted chip background.
+        // `text_on_accent` (near-black) made the ★ invisible on the new
+        // translucent fill; using the accent colour itself mirrors the
+        // sample-preview `color: var(--accent)` on `.brand-mark`.
         let star_label = make_centered_label(
             mtm,
             "★",
-            &color::text_on_accent(),
+            &color::accent(),
             unsafe { NSFont::boldSystemFontOfSize(11.0) },
             mark_frame,
         );
@@ -256,9 +280,9 @@ impl TopbarView {
         );
 
         // Share button — ghost style: soft fill + border, white-muted text.
-        // NSButton class method `buttonWithTitle_target_action` produces a
-        // pre-styled push button; we then override the bezel colour / text
-        // colour via the attributed title and NSBox-backed background.
+        // Bezel-less NSButton; sample-preview ghost treatment is supplied
+        // by a sibling NSBox (see `share_backdrop` below) placed behind the
+        // label in subview order.
         //
         // TODO: wire target/action to a declare_class!-defined NSObject
         // callback once T-11 lands NSApplicationDelegate.  For v1.19 the
@@ -272,14 +296,25 @@ impl TopbarView {
             &color::ghost_bg(),
             Some(&color::border_soft()),
         );
+        let share_backdrop: Retained<NSBox> = make_button_backdrop(
+            mtm,
+            &color::ghost_bg(),
+            Some(&color::border_soft()),
+        );
 
         // Export button — primary style: accent fill, near-black text,
         // bold 12 px.  Sample-preview prepends a "⬆" glyph; we mirror that
-        // inline in the title.
+        // inline in the title.  The accent NSBox backdrop below supplies
+        // the purple fill.
         let export_button = make_button(
             mtm,
             "⬆ Export 4K MP4",
             &color::text_on_accent(),
+            &color::accent(),
+            None,
+        );
+        let export_backdrop: Retained<NSBox> = make_button_backdrop(
+            mtm,
             &color::accent(),
             None,
         );
@@ -321,6 +356,10 @@ impl TopbarView {
         // Attach every cluster to the root. Layout is performed below in
         // `relayout` so we can reuse it from `set_source_path` (path string
         // changes length → separator / path label shift).
+        //
+        // z-order matters: button backdrops go in *before* their NSButton
+        // so the button renders on top.  Matches the HUD primary-button
+        // layering treatment.
         unsafe {
             // Brand cluster (mark + name + separator + path) in this order
             // so z-stacking matches painter order.
@@ -328,7 +367,9 @@ impl TopbarView {
             root.addSubview(&brand_name);
             root.addSubview(separator.as_super());
             root.addSubview(&source_path_label);
+            root.addSubview(share_backdrop.as_super());
             root.addSubview(&share_button);
+            root.addSubview(export_backdrop.as_super());
             root.addSubview(&export_button);
             root.addSubview(avatar.as_super());
         }
@@ -345,7 +386,9 @@ impl TopbarView {
             &brand_name,
             &separator,
             &share_button,
+            &share_backdrop,
             &export_button,
+            &export_backdrop,
             &avatar,
         );
 
@@ -394,7 +437,9 @@ impl TopbarView {
         brand_name: &NSTextField,
         separator: &NSBox,
         share: &NSButton,
+        share_backdrop: &NSBox,
         export: &NSButton,
+        export_backdrop: &NSBox,
         avatar: &NSBox,
     ) {
         let width = self.root.frame().size.width;
@@ -449,23 +494,31 @@ impl TopbarView {
         }
         right_edge = avatar_x - CLUSTER_GAP;
 
-        let export_width = measure_button_width(export, 150.0);
+        let export_width = measure_button_width(export, 160.0);
         let export_x = right_edge - export_width;
+        let button_h = 26.0;
         unsafe {
-            export.setFrame(NSRect::new(
-                NSPoint::new(export_x, mid_y - 13.0),
-                NSSize::new(export_width, 26.0),
-            ));
+            let export_rect = NSRect::new(
+                NSPoint::new(export_x, mid_y - button_h / 2.0),
+                NSSize::new(export_width, button_h),
+            );
+            export.setFrame(export_rect);
+            // Backdrop shares the exact same frame as the button it sits
+            // behind — the NSButton's bezel is off so the NSBox fill + 6 px
+            // corner radius is what the user perceives as the button.
+            export_backdrop.setFrame(export_rect);
         }
         right_edge = export_x - BRAND_GAP;
 
-        let share_width = measure_button_width(share, 64.0);
+        let share_width = measure_button_width(share, 72.0);
         let share_x = right_edge - share_width;
         unsafe {
-            share.setFrame(NSRect::new(
-                NSPoint::new(share_x, mid_y - 13.0),
-                NSSize::new(share_width, 26.0),
-            ));
+            let share_rect = NSRect::new(
+                NSPoint::new(share_x, mid_y - button_h / 2.0),
+                NSSize::new(share_width, button_h),
+            );
+            share.setFrame(share_rect);
+            share_backdrop.setFrame(share_rect);
         }
     }
 }
@@ -520,11 +573,13 @@ fn make_centered_label(
 }
 
 /// Build a styled push button.  AppKit doesn't give us direct control over
-/// NSButton's background/border without subclassing NSButtonCell, so we fake
-/// the visual treatment with an NSBox backdrop + transparent NSButton on
-/// top.  For v1.19 we use the default bezel and just colour the title — the
-/// T-11 integration pass can swap in the full ghost/primary bezel if the
-/// default look deviates too far from the mockup.
+/// NSButton's background/border without subclassing NSButtonCell, so we
+/// render the button **bezel-less** and rely on a sibling NSBox backdrop
+/// (placed underneath the button in the superview subview list) to supply
+/// the fill + border treatment — same layered approach HUD's primary play
+/// button uses.  Call sites that only want a text-only ghost button
+/// (`Share`) skip the backdrop; primary buttons (`Export`) pair this with
+/// a tinted NSBox behind.
 fn make_button(
     mtm: MainThreadMarker,
     title: &str,
@@ -535,17 +590,12 @@ fn make_button(
     unsafe {
         let ns = NSString::from_str(title);
         // buttonWithTitle_target_action returns a Momentary-Light push
-        // button with a rounded bezel — the closest stock match to the
-        // sample-preview's compact toolbar buttons.
+        // button.  We immediately drop its bezel so the default grey pill
+        // doesn't render — the sample-preview primary / ghost buttons are
+        // text-over-tinted-background, not system push-buttons.
         let button =
             NSButton::buttonWithTitle_target_action(&ns, None, None, mtm);
-        // NSBezelStyle::Rounded was renamed `Push` in macOS 14 SDK but the
-        // underlying NSUInteger value is identical; the rename is cosmetic
-        // and the ObjC runtime still responds to the old constant.  Once
-        // the objc2 crate catches up we'll swap to `Push` without a
-        // behaviour change.
-        #[allow(deprecated)]
-        button.setBezelStyle(NSBezelStyle::Rounded);
+        button.setBordered(false);
         // Override text colour via attributed title so ghost (white-muted)
         // and primary (near-black on purple) read correctly.
         let attrs = build_title_attrs(title_color);
@@ -556,6 +606,43 @@ fn make_button(
         );
         button.setAttributedTitle(&styled);
         button
+    }
+}
+
+/// Build the NSBox backdrop that supplies a button's fill + (optional)
+/// border.  The button frame is re-set later during layout — here we only
+/// need the box's fixed visual properties (fill colour, border colour,
+/// corner radius).
+fn make_button_backdrop(
+    mtm: MainThreadMarker,
+    fill: &NSColor,
+    border: Option<&NSColor>,
+) -> Retained<NSBox> {
+    unsafe {
+        let alloc = mtm.alloc::<NSBox>();
+        let b = NSBox::initWithFrame(
+            alloc,
+            NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(1.0, 1.0)),
+        );
+        b.setBoxType(NSBoxType::NSBoxCustom);
+        #[allow(deprecated)]
+        b.setBorderType(if border.is_some() {
+            NSBorderType::NSLineBorder
+        } else {
+            NSBorderType::NSNoBorder
+        });
+        b.setTitlePosition(NSTitlePosition::NSNoTitle);
+        b.setFillColor(fill);
+        if let Some(c) = border {
+            b.setBorderColor(c);
+            b.setBorderWidth(1.0);
+        } else {
+            b.setBorderWidth(0.0);
+        }
+        // 6 px matches the sample-preview `.btn-*  { border-radius: var(--r-xs) }`
+        // (6 px in `:root`).
+        b.setCornerRadius(6.0);
+        b
     }
 }
 
@@ -584,23 +671,33 @@ fn build_title_attrs(
     }
 }
 
-/// Rough single-line width estimate for a label — AppKit will size-to-fit
-/// via `sizeToFit` but that requires a first pass through layout.  For a
-/// topbar populated with short, known-font strings a 7 px-per-char heuristic
-/// plus a configurable cap is precise enough; exact widths are recomputed
-/// the moment the label attaches to a real window (AppKit auto-adjusts
-/// NSTextField intrinsic size on draw).
+/// Single-line width estimate for a label.  Uses `sizeToFit` under the hood
+/// so AppKit's text engine reports the exact pixel width for the current
+/// font / weight — the previous `7.2 px-per-char` heuristic under-estimated
+/// bold system font (e.g. "NextFrame" measured at 64.8 px when the real
+/// pixel width at 13 pt bold is ~85 px, cutting off the final `e`).  Caller
+/// supplies a sanity-cap for pathological long strings.
 fn measure_label_width(label: &NSTextField, cap: f64) -> f64 {
-    let text = unsafe { label.stringValue() };
-    let len = text.to_string().chars().count() as f64;
-    (len * 7.2).min(cap).max(24.0)
+    // sizeToFit mutates the NSTextField frame to the intrinsic size; we
+    // read it back and then leave the frame alone (caller's `setFrame`
+    // call happens next in relayout).  Adds a small 4 px right padding
+    // so the next sibling doesn't butt up against the last glyph.
+    unsafe {
+        label.sizeToFit();
+    }
+    let w = label.frame().size.width + 4.0;
+    w.min(cap).max(24.0)
 }
 
-/// Same heuristic for NSButton titles — buttons have horizontal padding so
-/// we add a fixed `2 * BTN_H_PAD` on top of the character-count estimate.
+/// Same approach for NSButton titles — `sizeToFit` measures the button's
+/// intrinsic width including its bezel padding, so no extra BTN_H_PAD
+/// arithmetic is required.  The 4 px slack keeps the label from touching
+/// neighbouring controls.
 fn measure_button_width(button: &NSButton, cap: f64) -> f64 {
-    let title = unsafe { button.title() };
-    let len = title.to_string().chars().count() as f64;
-    (len * 7.2 + BTN_H_PAD * 2.0).min(cap).max(56.0)
+    unsafe {
+        button.sizeToFit();
+    }
+    let w = button.frame().size.width + 4.0;
+    w.min(cap).max(56.0)
 }
 
