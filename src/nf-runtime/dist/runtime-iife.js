@@ -530,14 +530,22 @@ function boot(options) {
   if (autoplay) {
     // Render one frame first so persist <video> elements exist in the stage.
     renderState(getStateAt(resolved, 0));
-    // BUG-20260419-01 round 5 · do NOT muted-autoplay persist <video>.
-    // The old muted-bootstrap + gesture-unmute pattern made the first click
-    // merely "unmute" (icon still ⏸ from autoplay) so users needed three
-    // clicks to pause. Keep <video> paused; the first click in the
-    // play-pause button handler will v.play() inside the user gesture and
-    // start unmuted playback from the beginning. scene Track animation
-    // still advances via RAF below.
-    rafId = _raf(tick);
+    // BUG-20260419-01 round 6 · when a persist <video> is present the
+    // runtime must NOT start its tick automatically — browsers block
+    // unmuted autoplay so the <video> stays paused while RAF would advance
+    // the timeline, leaving playhead/timecode out-of-sync with silent
+    // media. Keep the whole runtime paused until the user gestures play;
+    // scene-only timelines (no persist media) retain the v1.1/v1.2 autoplay
+    // behaviour.
+    const __hasPersistMedia = !!(stage.querySelector && stage.querySelector("video[data-nf-persist], audio[data-nf-persist]"));
+    if (__hasPersistMedia) {
+      playing = false;
+      pausedAtMs = 0;
+      handle._paused = true;
+      emitTime(0);
+    } else {
+      rafId = _raf(tick);
+    }
   } else {
     // Render initial frame at t=0 so stage isn't blank when paused.
     renderState(getStateAt(resolved, 0));
