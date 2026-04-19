@@ -13,6 +13,7 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::orchestrator;
 use crate::record_loop::{self, RecordConfig, RecordError};
 use crate::OutputStats;
 
@@ -72,6 +73,9 @@ pub struct ExportOpts {
     pub fps: u32,
     /// VideoToolbox 目标比特率(bps)· 默认 12Mbps。
     pub bitrate_bps: u32,
+    /// v1.44.1 · 并行切片 N(ADR-061)· 默认 1 = 单进程 · ≥2 走 orchestrator。
+    /// duration < 6s 时 orchestrator 自动降级单进程(segment boot 开销吃掉收益)。
+    pub parallel: usize,
 }
 
 impl Default for ExportOpts {
@@ -81,6 +85,7 @@ impl Default for ExportOpts {
             viewport: (1920, 1080),
             fps: 60,
             bitrate_bps: 12_000_000,
+            parallel: 1,
         }
     }
 }
@@ -162,7 +167,28 @@ pub async fn run_export_from_source(
         frame_range: None,
     };
 
-    let result = record_loop::run(cfg).await;
+    // v1.44.1 · parallel >= 2 走 orchestrator (spawn N 子进程 + ffmpeg concat) ·
+    // 短视频(<6s) orchestrator 内部自动降级单进程 · duration 够长走真并行。
+    // 单进程路径用 record_loop::run 拿 OutputStats · 并行路径 orchestrator 返 ()
+    // · 用一个 synthetic stats 满足返回类型(size 从文件 metadata 读).
+    let result: Result<OutputStats, RecordError> = if opts.parallel >= 2 {
+        let total_frames = ((opts.duration_s * f64::from(opts.fps)).round()) as u64;
+        match orchestrator::run_parallel(cfg, opts.parallel).await {
+            Ok(()) => {
+                let size_bytes = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
+                Ok(OutputStats {
+                    path: output.to_path_buf(),
+                    frames: total_frames,
+                    duration_ms: (opts.duration_s * 1000.0) as u64,
+                    size_bytes,
+                    moov_front: true, // orchestrator ffmpeg concat 强制 +faststart
+                })
+            }
+            Err(e) => Err(e),
+        }
+    } else {
+        record_loop::run(cfg).await
+    };
 
     // 清临时文件 · 不管 result 成功与否。
     let _ = std::fs::remove_file(&tmp_html);
