@@ -17,7 +17,7 @@ mod mac;
 mod win;
 
 #[cfg(all(unix, not(target_vendor = "apple")))]
-pub(crate) use self::linux::{build_platform_webview, build_platform_window};
+pub(crate) use self::linux::{build_platform_webview, build_platform_window, LinuxShellWebView};
 #[cfg(target_vendor = "apple")]
 pub(crate) use self::mac::{build_platform_webview, build_platform_window};
 #[cfg(windows)]

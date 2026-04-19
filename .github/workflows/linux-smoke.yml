@@ -1,0 +1,55 @@
+name: linux-smoke
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux preview deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            dpkg-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.0-dev \
+            pkg-config \
+            python3-pil \
+            xvfb
+      - name: Build nf-shell
+        run: cargo build -p nf-shell --release
+      - name: Linux export returns clear error
+        run: |
+          set +e
+          output=$(./target/release/nf-shell demo/real-chart-bar.json --export tmp/linux-smoke.mp4 2>&1)
+          status=$?
+          set -e
+          echo "$output"
+          if [ "$status" -eq 0 ]; then
+            echo "linux export unexpectedly succeeded" >&2
+            exit 1
+          fi
+          grep -F -- "export not supported on Linux" <<<"$output"
+          grep -F -- "--serve" <<<"$output"
+      - name: Linux preview snapshot smoke
+        run: |
+          mkdir -p tmp
+          xvfb-run -a ./target/release/nf-shell demo/real-chart-bar.json --screenshot tmp/linux-smoke.png --delay-ms 3000
+          python3 - <<'PY'
+          from PIL import Image, ImageStat
+
+          image = Image.open("tmp/linux-smoke.png").convert("RGB")
+          stats = ImageStat.Stat(image)
+          variance = sum(stats.var) / len(stats.var)
+          if variance <= 100:
+              raise SystemExit(f"preview snapshot variance too low: {variance}")
+          PY
+      - name: Build .deb package
+        run: |
+          scripts/build-deb.sh target/deb
+          sudo apt-get install -y ./target/deb/nextframe_1.60.0_amd64.deb
+          command -v nf-shell
