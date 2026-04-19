@@ -6,9 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AI 视频引擎 — 把结构化信息变成视频。输入 JSON，输出可播放 HTML 或 4K MP4。场景不限于自媒体：教育、产品演示、数据报告、内部培训、开源项目介绍。
 
-## 当前状态（2026-04-19）：v1.12.4 · nf-tts active · 主链路部分通
+## 当前状态（2026-04-19）：v1.40 Track ABI v2 spec lock 完成 · v1.41/42/43 可并行
 
-**v0.x 探索期于 2026-04-17 结束并硬重置**（commit `61d4aa0`）· v1.0 从零重启 · 已完成到 v1.12.5（见 `spec/roadmap.json history`）。
+**v0.x 探索期于 2026-04-17 结束并硬重置**（commit `61d4aa0`）· v1.0 从零重启 · v1.12.5 + v1.14 recorder + v1.15 parallel-record + v1.20 wry-shell + v1.22 mp4-export 完成（见 `spec/roadmap.json history`）。
+
+**v1.40 Track ABI v2 spec lock**（2026-04-19 done · 纯 spec · ADR-063）：
+- L1/L2/L3 三级 · L1 静态（HTML/CSS/SVG · 90% Track · 现有 7 kinds 全兼容）· L2 动态（+mount/update/unmount · Canvas/WebGL/Lottie）· L3 组合（+compose 展开多子 Track）
+- 禁 iframe · 保 innerHTML 单挂载 · L2 update(t) 对 t 幂等（recorder 精确复现前提）
+- 11 lint gates（6 既有 + 5 新 · name/description/use_cases/level/l2-hooks-complete）
+- `spec/versions/v1.40/spec-lock.html` 汇总讲透（gitignored · 本地 open）
+- 契约锚点：ADR-063 · `spec/adrs.json` / `spec/interfaces.json` nf-tracks 扩 5 contract / `spec/bdd/v1.40/track-abi-v2.json` 4 场景
+- 解锁：v1.41 runtime L2 调度 · v1.42 source.json v2（data/theme/$ref）· v1.43 lint gates + 老 Track 补字段 · 三分支可并行
 
 **已有能力**（src/ 下活 crate）：
 | Crate | 能力 |
