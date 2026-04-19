@@ -45,6 +45,31 @@ const transitionDemo = {
   ],
 };
 
+const keyframeDemo = {
+  duration_ms: 3000,
+  viewport: { w: 1920, h: 1080 },
+  tracks: [
+    {
+      id: "scene",
+      clips: [
+        {
+          id: "kf-clip",
+          begin_ms: 0,
+          end_ms: 3000,
+          params: {
+            opacity: 0,
+            opacity_keyframes: [
+              { t: 0, v: 0 },
+              { t: 1000, v: 1 },
+              { t: 2000, v: 0 },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+};
+
 test("getStateAt: same input → same output (deterministic)", () => {
   const a = getStateAt(demo, 1000);
   const b = getStateAt(demo, 1000);
@@ -151,6 +176,27 @@ test("getStateAt: dissolve transition is stable inside and outside overlap windo
   assert.equal(s.activeTransitions[0].type, "dissolve");
   assert.ok(b.opacity > 0 && b.opacity < 1);
   assert.ok(c.opacity > 0 && c.opacity < 1);
+});
+
+test("getStateAt: keyframe lerp reaches 0.5 halfway to a 1s opacity keyframe", () => {
+  const s = getStateAt(keyframeDemo, 500);
+  const clip = s.activeClips.find((active) => active.clipId === "kf-clip");
+  assert.ok(clip, "keyframed clip should be active at 500ms");
+  assert.ok(
+    Math.abs(clip.params.opacity - 0.5) <= 0.02,
+    `expected opacity ≈ 0.5, got ${clip.params.opacity}`,
+  );
+  assert.equal("opacity_keyframes" in clip.params, false);
+});
+
+test("getStateAt: three-point keyframes peak at 1.0 around the midpoint", () => {
+  const s = getStateAt(keyframeDemo, 1000);
+  const clip = s.activeClips.find((active) => active.clipId === "kf-clip");
+  assert.ok(clip, "keyframed clip should be active at midpoint");
+  assert.ok(
+    Math.abs(clip.params.opacity - 1.0) <= 0.02,
+    `expected opacity ≈ 1.0, got ${clip.params.opacity}`,
+  );
 });
 
 test("loadTrack: compiles CommonJS track source", () => {

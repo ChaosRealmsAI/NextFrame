@@ -28,7 +28,9 @@ use anyhow::{Context, Result};
 use editor::{EditorState, Selection};
 #[cfg(any(windows, all(unix, not(target_vendor = "apple"))))]
 use platform::ShellWebView;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
+use sha2::{Digest, Sha256};
 use tao::dpi::PhysicalPosition;
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
@@ -77,15 +79,28 @@ const TRACK_SCENE_QUOTE: &str = include_str!("../../nf-tracks/community/scene-qu
 const TRACK_SCENE_LIST_BULLETS: &str =
     include_str!("../../nf-tracks/community/scene-list-bullets.js");
 const TRACK_SCENE_TIMELINE: &str = include_str!("../../nf-tracks/community/scene-timeline.js");
-// v1.49 · editor verify-select output paths
-const VERIFY_SELECT_JSON_PATH: &str = "spec/versions/v1.49/verify/verify-select.json";
-const VERIFY_SELECT_SCREENSHOT_PATH: &str = "tmp/v1.49-verify-select.png";
+// v1.63 · waveform + keyframe verify-select output paths
+const VERIFY_SELECT_JSON_PATH: &str = "spec/versions/v1.63/verify/verify-select.json";
+const VERIFY_SELECT_SCREENSHOT_PATH: &str = "tmp/v1.63-verify-select.png";
 // v1.50 · timeline zoom verify output paths
 const VERIFY_ZOOM_JSON_PATH: &str = "tmp/v1.50-verify.json";
 const VERIFY_ZOOM_SCREENSHOT_PATH: &str = "tmp/v1.50-60s-demo-30s-click.png";
 // v1.51 · undo/mute/solo verify output paths
 const VERIFY_UNDO_JSON_PATH: &str = "tmp/v1.51-verify.json";
 const VERIFY_UNDO_SCREENSHOT_PATH: &str = "tmp/v1.51-undo-mute.png";
+const AUDIO_PEAK_BUCKET_MS: u64 = 10;
+const AUDIO_PEAK_SAMPLE_RATE: u32 = 8_000;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AudioPeaksCache {
+    version: u32,
+    src: String,
+    source_path: String,
+    bucket_ms: u64,
+    sample_rate: u32,
+    duration_ms: u64,
+    peaks: Vec<f32>,
+}
 
 #[derive(Debug, Clone)]
 enum UserEvent {
@@ -408,6 +423,44 @@ fn dispatch_ipc(editor: &mut EditorState, body: &str) -> Result<IpcOutcome> {
                 .map_err(anyhow::Error::msg)?;
             Ok(IpcOutcome::EvalScript {
                 message: Some(format!("set-param applied: {clip_id}.{path}")),
+                js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
+                mutation: true,
+            })
+        }
+        "set-keyframe" => {
+            let clip_id = payload
+                .get("clip_id")
+                .or_else(|| payload.get("clipId"))
+                .and_then(Value::as_str)
+                .context("set-keyframe: clip_id missing")?;
+            let path = payload
+                .get("path")
+                .and_then(Value::as_str)
+                .context("set-keyframe: path missing")?;
+            let t_ms = payload
+                .get("t_ms")
+                .or_else(|| payload.get("tMs"))
+                .and_then(Value::as_u64)
+                .context("set-keyframe: t_ms missing")?;
+            let delete = payload
+                .get("delete")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let value = if delete {
+                None
+            } else {
+                Some(
+                    payload
+                        .get("value")
+                        .cloned()
+                        .context("set-keyframe: value missing")?,
+                )
+            };
+            let _ = editor
+                .set_keyframe(clip_id, path, t_ms, value)
+                .map_err(anyhow::Error::msg)?;
+            Ok(IpcOutcome::EvalScript {
+                message: Some(format!("set-keyframe applied: {clip_id}.{path} @ {t_ms}ms")),
                 js: editor_js_call("receiveSourceUpdate", &editor_state_value(editor)),
                 mutation: true,
             })
@@ -1239,7 +1292,11 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
       '#nf-inspector-body{{padding:14px 14px 16px;overflow:auto;display:flex;flex-direction:column;gap:10px;min-height:0;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);}}' +
       '.nf-inspector-empty{{padding:14px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.10);font:500 12px/1.5 var(--font-sans,-apple-system,sans-serif);color:var(--token-text-soft);}}' +
       '.nf-inspector-field{{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:var(--token-panel-soft);border:1px solid rgba(255,255,255,0.06);}}' +
+      '.nf-inspector-field-head{{display:flex;align-items:center;justify-content:space-between;gap:10px;}}' +
       '.nf-inspector-label{{font:600 11px/1.2 var(--font-mono,"SF Mono",monospace);letter-spacing:0.04em;text-transform:uppercase;color:var(--token-text-soft);}}' +
+      '.nf-keyframe-btn{{width:24px;height:24px;border-radius:999px;border:1px solid rgba(255,255,255,0.14);background:rgba(255,255,255,0.04);color:var(--token-text-soft);font:700 13px/1 var(--font-mono,"SF Mono",monospace);cursor:pointer;transition:transform .14s ease,border-color .14s ease,background .14s ease,color .14s ease;}}' +
+      '.nf-keyframe-btn:hover{{transform:translateY(-1px);border-color:rgba(251,191,36,0.72);color:#fde68a;}}' +
+      '.nf-keyframe-btn.is-active{{background:rgba(251,191,36,0.16);border-color:rgba(251,191,36,0.60);color:#fde68a;}}' +
       '.nf-inspector-field input[type="text"],.nf-inspector-field input[type="number"],.nf-inspector-field input[type="color"],.nf-inspector-field textarea{{width:100%;border-radius:10px;border:1px solid rgba(255,255,255,0.10);background:rgba(10,13,22,0.88);color:var(--token-text);padding:9px 10px;font:500 13px/1.45 var(--font-sans,-apple-system,sans-serif);outline:none;}}' +
       '.nf-inspector-field textarea{{min-height:96px;resize:vertical;font-family:var(--font-mono,"SF Mono",monospace);font-size:12px;}}' +
       '.nf-inspector-field input[type="color"]{{padding:4px;height:42px;}}' +
@@ -1248,6 +1305,13 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
       '.nf-inspector-bool input{{width:18px;height:18px;accent-color:var(--token-accent);}}' +
       '.nf-tl-bar{{transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease;cursor:pointer;}}' +
       '.nf-tl-bar.selected{{border:2px solid var(--token-accent)!important;box-shadow:0 0 0 1px rgba(167,139,250,0.24),0 0 18px rgba(167,139,250,0.20);transform:translateY(-1px);}}' +
+      '.nf-tl-bar-audio{{padding:0!important;overflow:hidden;}}' +
+      '.nf-tl-waveform-shell{{position:absolute;inset:0;pointer-events:none;}}' +
+      '.nf-tl-waveform{{display:block;width:100%;height:100%;opacity:0.98;}}' +
+      '.nf-tl-bar-label{{position:absolute;left:0;right:0;bottom:0;z-index:1;padding:6px 10px;background:linear-gradient(180deg,rgba(5,7,11,0.05),rgba(5,7,11,0.44));font:600 11px/1.2 var(--font-sans,-apple-system,sans-serif);color:rgba(255,255,255,0.96);text-shadow:0 1px 8px rgba(0,0,0,0.45);pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}' +
+      '.nf-tl-bar[data-waveform-status="loading"] .nf-tl-waveform-shell{{background:linear-gradient(90deg,rgba(255,255,255,0.04),rgba(255,255,255,0.10),rgba(255,255,255,0.04));background-size:200% 100%;animation:nfWaveLoad 1.2s linear infinite;}}' +
+      '.nf-tl-bar[data-waveform-status="error"] .nf-tl-waveform-shell{{background:linear-gradient(90deg,rgba(239,68,68,0.10),rgba(239,68,68,0.04));}}' +
+      '@keyframes nfWaveLoad{{0%{{background-position:0% 0;}}100%{{background-position:200% 0;}}}}' +
       '.tk-ctrls{{display:flex;align-items:center;gap:6px;margin-left:auto;}}' +
       '.nf-track-toggle{{width:28px;height:28px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);color:var(--token-text-soft);font:700 11px/1 var(--font-mono,"SF Mono",monospace);cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease,transform .16s ease;}}' +
       '.nf-track-toggle:hover{{background:rgba(255,255,255,0.10);color:var(--token-text);transform:translateY(-1px);}}' +
@@ -1554,6 +1618,45 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
     return el.value;
   }};
 
+  api.clipBoundsMs = function(selected) {{
+    var target = selected || api.selectedClip();
+    var source = api.state && api.state.source ? api.state.source : window.__NF_SOURCE__;
+    if (!target || !target.clip || !source || typeof window.__nf_resolve_ms !== 'function') return null;
+    var beginMs = window.__nf_resolve_ms(target.clip.begin, source, 0);
+    var endMs = window.__nf_resolve_ms(target.clip.end, source, beginMs);
+    if (!isFinite(beginMs) || !isFinite(endMs)) return null;
+    return {{ begin_ms: Math.max(0, Math.round(beginMs)), end_ms: Math.max(0, Math.round(endMs)) }};
+  }};
+
+  api.localPlayheadMs = function(selected) {{
+    var bounds = api.clipBoundsMs(selected);
+    if (!bounds) return api.playheadMs();
+    var playhead = api.playheadMs();
+    return Math.max(0, Math.min(bounds.end_ms - bounds.begin_ms, playhead - bounds.begin_ms));
+  }};
+
+  api.keyframesForField = function(clip, path) {{
+    if (!clip || !clip.params || !path) return [];
+    var key = String(path).split('.').filter(Boolean);
+    if (!key.length) return [];
+    key[key.length - 1] = key[key.length - 1] + '_keyframes';
+    var cursor = clip.params;
+    for (var i = 0; i < key.length; i++) {{
+      if (!cursor || typeof cursor !== 'object') return [];
+      cursor = cursor[key[i]];
+    }}
+    return Array.isArray(cursor) ? cursor : [];
+  }};
+
+  api.keyframeAtTime = function(clip, path, tMs) {{
+    var keyframes = api.keyframesForField(clip, path);
+    for (var i = 0; i < keyframes.length; i++) {{
+      var frame = keyframes[i];
+      if (frame && Number(frame.t) === Number(tMs)) return frame;
+    }}
+    return null;
+  }};
+
   api.scheduleCommit = function(clipId, path, value) {{
     var delay = (api.state && api.state.config && api.state.config.debounce_ms) || 300;
     var key = clipId + '::' + path;
@@ -1577,6 +1680,37 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
     }});
   }};
 
+  api.bindKeyframeButton = function(button) {{
+    if (!button || button.__nf_keyframe_wired) return;
+    button.__nf_keyframe_wired = true;
+    button.addEventListener('click', function(ev) {{
+      ev.preventDefault();
+      ev.stopPropagation();
+      var selected = api.selectedClip();
+      if (!selected) return;
+      var path = button.dataset.nfPath || '';
+      if (!path) return;
+      var field = button.closest ? button.closest('[data-nf-inspector-field="1"]') : null;
+      field = field ? field.querySelector('[data-nf-path]') : null;
+      if (!field) return;
+      var kind = field.dataset.nfKind || 'text';
+      var value = api.readFieldValue(field, kind);
+      if (kind !== 'number' || typeof value !== 'number' || !isFinite(value)) return;
+      var localMs = Math.max(0, Math.round(api.localPlayheadMs(selected)));
+      var payload = {{
+        clip_id: api.clipIdentity(selected.clip),
+        path: path,
+        t_ms: localMs
+      }};
+      if (api.keyframeAtTime(selected.clip, path, localMs)) {{
+        payload.delete = true;
+      }} else {{
+        payload.value = value;
+      }}
+      api.send('set-keyframe', payload);
+    }});
+  }};
+
   api.renderInspector = function() {{
     api.ensureShellLayout();
     var titleEl = document.getElementById('nf-inspector-title');
@@ -1595,7 +1729,9 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
     var clipTitle = params.title || clip.id || selected.track.id || 'clip';
     titleEl.textContent = 'Clip: ' + clipTitle;
     metaEl.textContent = String(selected.track.id || 'track') + ' · ' + String(api.clipIdentity(clip) || 'clip') + ' · undo ' + String((api.state && api.state.undo_stack_size) || 0);
-    var keys = Object.keys(params);
+    var keys = Object.keys(params).filter(function(key) {{
+      return !/_keyframes$/.test(key);
+    }});
     if (!keys.length) {{
       body.innerHTML = '<div class="nf-inspector-empty">Clip has no params.</div>';
       return;
@@ -1605,6 +1741,11 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
       var key = keys[i];
       var value = params[key];
       var kind = api.fieldKind(value);
+      var localPlayheadMs = Math.max(0, Math.round(api.localPlayheadMs(selected)));
+      var keyframeActive = kind === 'number' && !!api.keyframeAtTime(clip, key, localPlayheadMs);
+      var keyframeButton = kind === 'number'
+        ? '<button type="button" class="nf-keyframe-btn' + (keyframeActive ? ' is-active' : '') + '" data-nf-keyframe="1" data-nf-path="' + esc(key) + '" title="' + (keyframeActive ? 'Delete keyframe @ ' : 'Add keyframe @ ') + String(localPlayheadMs) + 'ms">' + (keyframeActive ? '●' : '○') + '</button>'
+        : '';
       if (kind === 'boolean') {{
         html += '<label class="nf-inspector-field nf-inspector-bool" data-nf-inspector-field="1">' +
           '<span><span class="nf-inspector-label">' + esc(key) + '</span></span>' +
@@ -1612,14 +1753,14 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
         '</label>';
       }} else if (kind === 'json') {{
         html += '<label class="nf-inspector-field" data-nf-inspector-field="1">' +
-          '<span class="nf-inspector-label">' + esc(key) + '</span>' +
+          '<span class="nf-inspector-field-head"><span class="nf-inspector-label">' + esc(key) + '</span>' + keyframeButton + '</span>' +
           '<textarea data-nf-kind="json" data-nf-path="' + esc(key) + '">' + esc(JSON.stringify(value, null, 2)) + '</textarea>' +
         '</label>';
       }} else {{
         var inputType = kind === 'number' ? 'number' : (kind === 'color' ? 'color' : 'text');
         var inputValue = kind === 'number' ? String(value) : String(value == null ? '' : value);
         html += '<label class="nf-inspector-field" data-nf-inspector-field="1">' +
-          '<span class="nf-inspector-label">' + esc(key) + '</span>' +
+          '<span class="nf-inspector-field-head"><span class="nf-inspector-label">' + esc(key) + '</span>' + keyframeButton + '</span>' +
           '<input data-nf-kind="' + esc(kind) + '" data-nf-path="' + esc(key) + '" type="' + inputType + '" value="' + esc(inputValue) + '" />' +
         '</label>';
       }}
@@ -1627,6 +1768,8 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
     body.innerHTML = html;
     var fields = body.querySelectorAll('[data-nf-path]');
     for (var fi = 0; fi < fields.length; fi++) api.bindField(fields[fi]);
+    var keyButtons = body.querySelectorAll('[data-nf-keyframe]');
+    for (var ki = 0; ki < keyButtons.length; ki++) api.bindKeyframeButton(keyButtons[ki]);
   }};
 
   api.applySelection = function() {{
@@ -1750,19 +1893,29 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
     var stage = document.getElementById('nf-stage');
     var titleApplied = !!(stage && stage.textContent && stage.textContent.indexOf('VerifyTitle') !== -1);
     var fieldCount = document.querySelectorAll('[data-nf-inspector-field]').length;
+    var keyframeButtonCount = document.querySelectorAll('[data-nf-keyframe]').length;
     var selectedBar = document.querySelector('.nf-tl-bar.selected');
     var undoSize = api.state && typeof api.state.undo_stack_size === 'number' ? api.state.undo_stack_size : -1;
+    var waveform = window.__nf_waveform_metrics ? window.__nf_waveform_metrics() : null;
+    var waveformOk = !waveform || !waveform.has_audio_bar || (
+      waveform.waveform_status === 'ready' &&
+      waveform.peak_count >= 200 &&
+      waveform.mapping_pass === true
+    );
     if (typeof __nf_snapshot_dom === 'function') __nf_snapshot_dom('verify_finish');
     api.send('verify-select-report', {{
       selected_clip_id: api.state && api.state.selection ? api.state.selection.clip_id || null : null,
       inspector_field_count: fieldCount,
+      keyframe_button_count: keyframeButtonCount,
       title_applied: titleApplied,
       selected_class: !!selectedBar,
       undo_stack_size: undoSize,
+      waveform: waveform,
+      waveform_ok: waveformOk,
       three_panel_layout: !!document.querySelector('.preview-panel') && !!document.querySelector('.timeline') && !!document.getElementById('nf-inspector-panel') && !!document.body.classList.contains('nf-editor-open'),
       mount_trace: window.__nf_mount_trace || [],
       dom_trace: window.__nf_dom_trace || [],
-      ok: fieldCount > 0 && titleApplied && !!selectedBar && undoSize === 1
+      ok: fieldCount > 0 && titleApplied && !!selectedBar && undoSize === 1 && waveformOk
     }});
   }};
 
@@ -1779,7 +1932,17 @@ window.__NF_VERIFY_UNDO__ = {verify_undo};
           titleInput.value = 'VerifyTitle';
           titleInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
         }}
-        window.setTimeout(api.finishVerifySelect, 2200);
+        window.setTimeout(function() {{
+          var finish = function() {{ window.setTimeout(api.finishVerifySelect, 160); }};
+          if (!document.querySelector('.nf-tl-bar-audio')) {{
+            finish();
+            return;
+          }}
+          api.waitFor(function() {{
+            var metrics = window.__nf_waveform_metrics ? window.__nf_waveform_metrics() : null;
+            return metrics && metrics.waveform_status === 'ready';
+          }}, 8000).then(finish).catch(finish);
+        }}, 2200);
       }}, 350);
     }}, 2000);
   }};
@@ -2415,6 +2578,132 @@ window.__nf_apply_source = function(newSource) {{
   window.__nf_mount();
 }};
 
+window.__nfWaveCache = window.__nfWaveCache || {{ data: {{}}, pending: {{}}, seq: 0 }};
+window.__nf_waveform_url = function(src) {{
+  var raw = String(src || '');
+  if (!raw) return '';
+  return raw + (raw.indexOf('?') === -1 ? '?nf-peaks=1' : '&nf-peaks=1');
+}};
+window.__nf_fetch_audio_waveform = function(src) {{
+  var raw = String(src || '');
+  if (!raw) return Promise.resolve(null);
+  var store = window.__nfWaveCache = window.__nfWaveCache || {{ data: {{}}, pending: {{}}, seq: 0 }};
+  if (store.data[raw]) return Promise.resolve(store.data[raw]);
+  if (store.pending[raw]) return store.pending[raw];
+  var request = fetch(window.__nf_waveform_url(raw), {{ cache: 'no-store' }})
+    .then(function(resp) {{
+      if (!resp.ok) throw new Error('waveform fetch ' + resp.status);
+      return resp.json();
+    }})
+    .then(function(data) {{
+      store.data[raw] = data;
+      delete store.pending[raw];
+      return data;
+    }})
+    .catch(function(err) {{
+      delete store.pending[raw];
+      return {{ ok: false, error: String(err), peaks: [] }};
+    }});
+  store.pending[raw] = request;
+  return request;
+}};
+window.__nf_slice_audio_waveform = function(data, clip, clipDurationMs) {{
+  var peaks = Array.isArray(data && data.peaks) ? data.peaks : [];
+  var bucketMs = Math.max(1, Number(data && data.bucket_ms) || 10);
+  var params = clip && clip.params ? clip.params : {{}};
+  var fromMs = Number(params.from_ms);
+  if (!isFinite(fromMs) || fromMs < 0) fromMs = 0;
+  var clipMs = Math.max(bucketMs, Math.round(clipDurationMs || 0));
+  var toMs = Number(params.to_ms);
+  var endMs = isFinite(toMs) && toMs > fromMs ? Math.min(toMs, fromMs + clipMs) : (fromMs + clipMs);
+  var startIdx = Math.max(0, Math.floor(fromMs / bucketMs));
+  var endIdx = Math.max(startIdx + 1, Math.ceil(endMs / bucketMs));
+  var subset = peaks.slice(startIdx, endIdx + 1).map(function(value) {{
+    var amp = Number(value);
+    if (!isFinite(amp)) amp = 0;
+    return Math.max(0, Math.min(1, amp));
+  }});
+  return {{
+    bucket_ms: bucketMs,
+    duration_ms: Math.max(clipMs, Math.max(bucketMs, subset.length > 1 ? (subset.length - 1) * bucketMs : bucketMs)),
+    peaks: subset
+  }};
+}};
+window.__nf_make_waveform_svg = function(slice, color) {{
+  var peaks = slice && Array.isArray(slice.peaks) ? slice.peaks.slice() : [];
+  var bucketMs = Math.max(1, Number(slice && slice.bucket_ms) || 10);
+  var durationMs = Math.max(bucketMs, Number(slice && slice.duration_ms) || bucketMs);
+  if (!peaks.length) peaks = [0];
+  var upper = '';
+  var lower = '';
+  var mapping = [];
+  for (var i = 0; i < peaks.length; i++) {{
+    var t = Math.min(durationMs, i * bucketMs);
+    var x = Number(t.toFixed(2));
+    var amp = Math.max(0, Math.min(1, Number(peaks[i]) || 0));
+    var yTop = Number((50 - amp * 42).toFixed(2));
+    var yBottom = Number((50 + amp * 42).toFixed(2));
+    upper += (i === 0 ? 'M ' : ' L ') + x + ' ' + yTop;
+    lower = ' L ' + x + ' ' + yBottom + lower;
+    mapping.push(Math.round(t) + ':' + x);
+  }}
+  var d = upper + lower + ' Z';
+  return '<svg class="nf-tl-waveform" viewBox="0 0 ' + durationMs + ' 100" preserveAspectRatio="none" style="color:' + String(color || '#94a3b8') + '">' +
+    '<path class="nf-tl-waveform-path" d="' + d + '" data-v="' + mapping.join(';') + '" data-peak-count="' + peaks.length + '" data-duration-ms="' + durationMs + '" fill="currentColor" fill-opacity="0.22" stroke="currentColor" stroke-opacity="0.82" stroke-width="1.5" vector-effect="non-scaling-stroke"></path>' +
+  '</svg>';
+}};
+window.__nf_attach_audio_waveform = function(bar, track, clip, clipDurationMs, color) {{
+  if (!bar) return;
+  var shell = document.createElement('div');
+  shell.className = 'nf-tl-waveform-shell';
+  bar.appendChild(shell);
+  bar.dataset.waveformStatus = 'loading';
+  var src = clip && clip.params ? clip.params.src : '';
+  if (!src) {{
+    bar.dataset.waveformStatus = 'missing';
+    return;
+  }}
+  var store = window.__nfWaveCache = window.__nfWaveCache || {{ data: {{}}, pending: {{}}, seq: 0 }};
+  store.seq += 1;
+  var token = String(store.seq);
+  bar.dataset.waveformToken = token;
+  window.__nf_fetch_audio_waveform(src).then(function(data) {{
+    if (bar.dataset.waveformToken !== token) return;
+    var slice = window.__nf_slice_audio_waveform(data, clip, clipDurationMs);
+    if (!slice.peaks.length) {{
+      bar.dataset.waveformStatus = 'error';
+      bar.dataset.waveformPeaks = '0';
+      return;
+    }}
+    shell.innerHTML = window.__nf_make_waveform_svg(slice, track && track.muted === true ? '#6b7280' : color);
+    bar.dataset.waveformStatus = 'ready';
+    bar.dataset.waveformPeaks = String(slice.peaks.length);
+  }});
+}};
+window.__nf_waveform_metrics = function() {{
+  var bar = document.querySelector('.nf-tl-bar-audio');
+  var path = bar ? bar.querySelector('.nf-tl-waveform-path') : null;
+  var raw = path && path.dataset ? String(path.dataset.v || '') : '';
+  var pairs = raw.split(';').filter(Boolean).map(function(pair) {{
+    var parts = pair.split(':');
+    return {{ t: Number(parts[0]), x: Number(parts[1]) }};
+  }});
+  var mappingPass = pairs.length > 1;
+  for (var i = 0; i < pairs.length; i++) {{
+    var item = pairs[i];
+    if (!isFinite(item.t) || !isFinite(item.x) || Math.abs(item.t - item.x) > 0.01) mappingPass = false;
+    if (i > 0 && (item.t < pairs[i - 1].t || item.x < pairs[i - 1].x)) mappingPass = false;
+  }}
+  return {{
+    has_audio_bar: !!bar,
+    waveform_status: bar ? (bar.dataset.waveformStatus || null) : null,
+    peak_count: path && path.dataset ? Number(path.dataset.peakCount || bar.dataset.waveformPeaks || 0) : 0,
+    mapping_pairs: pairs.length,
+    mapping_pass: mappingPass,
+    data_v_head: raw.split(';').slice(0, 5)
+  }};
+}};
+
 {timeline_zoom}
 
 // ---- v1.24: Render timeline header + labels + lanes + ruler FROM live JSON.
@@ -2506,6 +2795,8 @@ window.__nf_render_timeline = function() {{
       (t.clips || []).forEach(function(c) {{
         var beginMs = window.__nf_resolve_ms(c.begin, src, 0);
         var endMs   = window.__nf_resolve_ms(c.end,   src, durationMs);
+        var clipDurationMs = Math.max(0, endMs - beginMs);
+        var clipLabel = (c.id || t.id) + ' · ' + window.__nf_fmt_ms(clipDurationMs);
         var bar = document.createElement('div');
         bar.className = 'nf-tl-bar';
         bar.dataset.nfBeginMs = String(beginMs);
@@ -2517,7 +2808,16 @@ window.__nf_render_timeline = function() {{
           'padding:6px 10px;box-sizing:border-box;' +
           'font:12px/1.3 -apple-system,sans-serif;color:rgba(255,255,255,0.92);' +
           'overflow:hidden;white-space:nowrap;text-overflow:ellipsis';
-        bar.textContent = (c.id || t.id) + ' · ' + window.__nf_fmt_ms(endMs - beginMs);
+        if (t.kind === 'audio' && c.params && typeof c.params.src === 'string') {{
+          bar.classList.add('nf-tl-bar-audio');
+          var labelEl = document.createElement('div');
+          labelEl.className = 'nf-tl-bar-label';
+          labelEl.textContent = clipLabel;
+          bar.appendChild(labelEl);
+          window.__nf_attach_audio_waveform(bar, t, c, clipDurationMs, color);
+        }} else {{
+          bar.textContent = clipLabel;
+        }}
         bar.title = t.id + '.' + (c.id || '') + ' [' + window.__nf_fmt_ms(beginMs) + '→' + window.__nf_fmt_ms(endMs) + ']';
         row.appendChild(bar);
       }});
@@ -3143,6 +3443,171 @@ fn rewrite_file_srcs(v: &mut Value, source_dir: &std::path::Path) {
     }
 }
 
+fn nf_asset_uri_to_path(uri: &str) -> Option<std::path::PathBuf> {
+    let path_str = uri
+        .strip_prefix("nf-asset://x/")
+        .or_else(|| uri.strip_prefix("nf-asset://x"))
+        .or_else(|| uri.strip_prefix("nf-asset:"))?;
+    let mut path_owned = String::from("/");
+    path_owned.push_str(path_str);
+    if let Some(q) = path_owned.find('?') {
+        path_owned.truncate(q);
+    }
+    Some(std::path::PathBuf::from(
+        percent_decode_str(&path_owned).unwrap_or(path_owned),
+    ))
+}
+
+fn audio_peaks_cache_dir() -> std::path::PathBuf {
+    if let Ok(xdg) = std::env::var("XDG_CACHE_HOME") {
+        return std::path::PathBuf::from(xdg)
+            .join("nextframe")
+            .join("peaks");
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        return std::path::PathBuf::from(home)
+            .join(".cache")
+            .join("nextframe")
+            .join("peaks");
+    }
+    std::path::PathBuf::from("tmp").join("nextframe-peaks")
+}
+
+fn audio_peaks_cache_path(src: &str) -> std::path::PathBuf {
+    let mut hasher = Sha256::new();
+    hasher.update(src.as_bytes());
+    let digest = format!("{:x}", hasher.finalize());
+    audio_peaks_cache_dir().join(format!("{digest}.json"))
+}
+
+fn load_audio_peaks_cache(src: &str) -> Option<AudioPeaksCache> {
+    let cache_path = audio_peaks_cache_path(src);
+    let bytes = std::fs::read(cache_path).ok()?;
+    let cache: AudioPeaksCache = serde_json::from_slice(&bytes).ok()?;
+    if cache.version != 1
+        || cache.bucket_ms != AUDIO_PEAK_BUCKET_MS
+        || cache.sample_rate != AUDIO_PEAK_SAMPLE_RATE
+        || cache.src != src
+        || cache.peaks.is_empty()
+    {
+        return None;
+    }
+    Some(cache)
+}
+
+fn compute_audio_peaks_cache(src: &str, path: &std::path::Path) -> Result<AudioPeaksCache> {
+    let output = std::process::Command::new("ffmpeg")
+        .arg("-v")
+        .arg("error")
+        .arg("-i")
+        .arg(path)
+        .arg("-vn")
+        .arg("-ac")
+        .arg("1")
+        .arg("-ar")
+        .arg(AUDIO_PEAK_SAMPLE_RATE.to_string())
+        .arg("-f")
+        .arg("s16le")
+        .arg("-")
+        .output()
+        .with_context(|| format!("spawn ffmpeg for audio peaks {}", path.display()))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        anyhow::bail!(
+            "ffmpeg peaks decode failed for {}: {}",
+            path.display(),
+            if stderr.is_empty() {
+                "unknown error".to_string()
+            } else {
+                stderr
+            }
+        );
+    }
+    if output.stdout.len() < 2 {
+        anyhow::bail!("ffmpeg peaks decode returned no PCM for {}", path.display());
+    }
+
+    let bucket_samples =
+        ((u64::from(AUDIO_PEAK_SAMPLE_RATE) * AUDIO_PEAK_BUCKET_MS) / 1000).max(1) as usize;
+    let mut peaks = Vec::new();
+    let mut bucket_peak = 0.0f32;
+    let mut bucket_count = 0usize;
+    let mut sample_count = 0u64;
+    for chunk in output.stdout.chunks_exact(2) {
+        let sample = i16::from_le_bytes([chunk[0], chunk[1]]);
+        let amp = (sample.unsigned_abs() as f32) / (i16::MAX as f32);
+        if amp > bucket_peak {
+            bucket_peak = amp;
+        }
+        bucket_count += 1;
+        sample_count += 1;
+        if bucket_count >= bucket_samples {
+            peaks.push((bucket_peak * 10_000.0).round() / 10_000.0);
+            bucket_peak = 0.0;
+            bucket_count = 0;
+        }
+    }
+    if bucket_count > 0 {
+        peaks.push((bucket_peak * 10_000.0).round() / 10_000.0);
+    }
+    if peaks.is_empty() {
+        anyhow::bail!("computed empty peaks for {}", path.display());
+    }
+    let duration_ms =
+        ((sample_count as f64 / AUDIO_PEAK_SAMPLE_RATE as f64) * 1000.0).round() as u64;
+    Ok(AudioPeaksCache {
+        version: 1,
+        src: src.to_string(),
+        source_path: path.display().to_string(),
+        bucket_ms: AUDIO_PEAK_BUCKET_MS,
+        sample_rate: AUDIO_PEAK_SAMPLE_RATE,
+        duration_ms,
+        peaks,
+    })
+}
+
+fn ensure_audio_peaks_cache(src: &str, path: &std::path::Path) -> Result<AudioPeaksCache> {
+    if let Some(cache) = load_audio_peaks_cache(src) {
+        return Ok(cache);
+    }
+    let cache = compute_audio_peaks_cache(src, path)?;
+    let cache_path = audio_peaks_cache_path(src);
+    ensure_parent_dir(&cache_path)?;
+    let bytes = serde_json::to_vec_pretty(&cache).context("serialize audio peaks cache")?;
+    std::fs::write(&cache_path, bytes)
+        .with_context(|| format!("write audio peaks cache {}", cache_path.display()))?;
+    Ok(cache)
+}
+
+fn warm_audio_peaks_cache(source: &Value) {
+    let Some(tracks) = source.get("tracks").and_then(Value::as_array) else {
+        return;
+    };
+    for track in tracks {
+        if track.get("kind").and_then(Value::as_str) != Some("audio") {
+            continue;
+        }
+        let Some(clips) = track.get("clips").and_then(Value::as_array) else {
+            continue;
+        };
+        for clip in clips {
+            let Some(src) = clip
+                .get("params")
+                .and_then(|params| params.get("src"))
+                .and_then(Value::as_str)
+            else {
+                continue;
+            };
+            let Some(path) = nf_asset_uri_to_path(src) else {
+                continue;
+            };
+            if let Err(err) = ensure_audio_peaks_cache(src, &path) {
+                eprintln!("[NF-PEAKS] warm cache failed for {src}: {err}");
+            }
+        }
+    }
+}
+
 fn ensure_verify_undo_fixture(source: &mut Value) {
     let has_audio = source
         .get("tracks")
@@ -3196,19 +3661,43 @@ fn nf_asset_response(req: http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
             .unwrap_or_else(|_| http::Response::new(Vec::new()))
     };
     let uri = req.uri().to_string();
-    let path_str = uri
-        .strip_prefix("nf-asset://x/")
-        .or_else(|| uri.strip_prefix("nf-asset://x"))
-        .or_else(|| uri.strip_prefix("nf-asset:"))
-        .unwrap_or(&uri);
-    let mut path_owned = String::from("/");
-    path_owned.push_str(path_str);
-    if let Some(q) = path_owned.find('?') {
-        path_owned.truncate(q);
+    let wants_peaks = uri.contains("nf-peaks=1") || uri.contains("peaks=1");
+    let cache_src = uri.split('?').next().unwrap_or(&uri).to_string();
+    let Some(path) = nf_asset_uri_to_path(&uri) else {
+        return http::Response::builder()
+            .status(400)
+            .header("Content-Type", "text/plain")
+            .body(b"nf-asset: invalid path".to_vec())
+            .unwrap_or_else(|_| empty_body());
+    };
+    if wants_peaks {
+        return match ensure_audio_peaks_cache(&cache_src, &path) {
+            Ok(cache) => match serde_json::to_vec(&cache) {
+                Ok(body) => http::Response::builder()
+                    .status(200)
+                    .header("Content-Type", "application/json")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Cache-Control", "no-store")
+                    .header("Content-Length", body.len().to_string())
+                    .body(body)
+                    .unwrap_or_else(|_| empty_body()),
+                Err(_) => empty_body(),
+            },
+            Err(err) => http::Response::builder()
+                .status(500)
+                .header("Content-Type", "application/json")
+                .header("Access-Control-Allow-Origin", "*")
+                .body(
+                    serde_json::to_vec(&json!({
+                        "ok": false,
+                        "error": err.to_string(),
+                        "src": cache_src,
+                    }))
+                    .unwrap_or_else(|_| b"{\"ok\":false}".to_vec()),
+                )
+                .unwrap_or_else(|_| empty_body()),
+        };
     }
-    let path = std::path::PathBuf::from(
-        percent_decode_str(&path_owned).unwrap_or_else(|| path_owned.clone()),
-    );
     let Ok(mut file) = std::fs::File::open(&path) else {
         return http::Response::builder()
             .status(404)
@@ -3525,6 +4014,7 @@ fn main() -> Result<()> {
             std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
         });
     rewrite_file_srcs(&mut source_json, &source_dir);
+    warm_audio_peaks_cache(&source_json);
     let tracks_map = build_track_sources(&source_json);
     let n_tracks = tracks_map.len();
     let editor_state = Arc::new(Mutex::new(EditorState::new(source_json.clone())));

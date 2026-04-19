@@ -150,6 +150,97 @@ impl EditorState {
         Ok(entry)
     }
 
+    pub fn set_keyframe(
+        &mut self,
+        clip_id: &str,
+        param_path: &str,
+        t_ms: u64,
+        value: Option<Value>,
+    ) -> Result<UndoEntry, String> {
+        if param_path.trim().is_empty() {
+            return Err("set-keyframe: path missing".to_string());
+        }
+        if let Some(ref next_value) = value {
+            if next_value.as_f64().is_none() {
+                return Err("set-keyframe: value must be numeric".to_string());
+            }
+        }
+        let (track_idx, clip_idx) = self
+            .find_clip_by_id(clip_id)
+            .ok_or_else(|| format!("set-keyframe: clip not found: {clip_id}"))?;
+        let pointer = clip_keyframe_pointer(track_idx, clip_idx, param_path);
+        let old_value = self.source.pointer(&pointer).cloned();
+        let mut next_keyframes = old_value
+            .as_ref()
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let existing_idx = next_keyframes
+            .iter()
+            .position(|frame| keyframe_time(frame) == Some(t_ms));
+
+        let op_label = if let Some(next_value) = value {
+            let next_frame = serde_json::json!({
+                "t": t_ms,
+                "v": next_value,
+            });
+            if let Some(idx) = existing_idx {
+                next_keyframes[idx] = next_frame;
+            } else {
+                next_keyframes.push(next_frame);
+            }
+            next_keyframes.sort_by_key(|frame| keyframe_time(frame).unwrap_or(u64::MAX));
+            format!(
+                "set keyframe {}",
+                param_path.rsplit('.').next().unwrap_or("param")
+            )
+        } else {
+            let Some(idx) = existing_idx else {
+                return Err(format!(
+                    "set-keyframe: no keyframe at {t_ms}ms for {clip_id}.{param_path}"
+                ));
+            };
+            next_keyframes.remove(idx);
+            format!(
+                "delete keyframe {}",
+                param_path.rsplit('.').next().unwrap_or("param")
+            )
+        };
+
+        let selection_before = self.selection.clone();
+        let selection_after = self.selection_for_clip(clip_id);
+        let mut forward = Vec::new();
+        let mut reverse = Vec::new();
+        push_value_patch_if_changed(
+            &mut forward,
+            &mut reverse,
+            pointer,
+            old_value,
+            if next_keyframes.is_empty() {
+                None
+            } else {
+                Some(Value::Array(next_keyframes))
+            },
+        )?;
+        if forward.is_empty() {
+            return Err("set-keyframe: no-op".to_string());
+        }
+        Self::apply_patches(&mut self.source, &forward)?;
+        let entry = UndoEntry {
+            id: make_editor_id("undo"),
+            ts: now_ms(),
+            op_label,
+            forward,
+            reverse,
+            selection_before,
+            selection_after: selection_after.clone(),
+        };
+        self.push_with_cap(entry.clone());
+        self.selection = selection_after;
+        self.bump_commit_token();
+        Ok(entry)
+    }
+
     pub fn split_clip(&mut self, clip_id: &str, at_ms: u64) -> Result<UndoEntry, String> {
         let split_ms = i64::try_from(at_ms).map_err(|_| "split-clip: at_ms out of range")?;
         let (track_idx, clip_idx) = self
@@ -1060,6 +1151,29 @@ fn clip_param_pointer(track_idx: usize, clip_idx: usize, param_path: &str) -> St
     pointer
 }
 
+fn clip_keyframe_pointer(track_idx: usize, clip_idx: usize, param_path: &str) -> String {
+    let mut segments = param_path
+        .split('.')
+        .filter(|seg| !seg.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if let Some(last) = segments.last_mut() {
+        last.push_str("_keyframes");
+    } else {
+        segments.push("keyframes".to_string());
+    }
+    clip_param_pointer(track_idx, clip_idx, &segments.join("."))
+}
+
+fn keyframe_time(frame: &Value) -> Option<u64> {
+    frame.get("t").and_then(Value::as_u64).or_else(|| {
+        frame
+            .get("t")
+            .and_then(Value::as_i64)
+            .and_then(|v| u64::try_from(v).ok())
+    })
+}
+
 fn apply_patch(source: &mut Value, patch: &JsonPatch) -> Result<(), String> {
     let segments = decode_pointer(&patch.path)?;
     match patch.op.as_str() {
@@ -1398,6 +1512,51 @@ mod tests {
                 .pointer("/tracks/0/solo")
                 .and_then(Value::as_bool),
             Some(true)
+        );
+    }
+
+    #[test]
+    fn keyframe_add_delete_and_undo_restore_field() {
+        let mut source = sample_source();
+        source["tracks"][0]["clips"][0]["params"]["opacity"] = json!(0.25);
+        let mut editor = EditorState::new(source);
+        editor.select_clip(Some("clip_title".to_string()));
+
+        let add = editor
+            .set_keyframe("clip_title", "opacity", 500, Some(json!(0.5)))
+            .unwrap();
+        assert_eq!(add.op_label, "set keyframe opacity");
+        assert_eq!(
+            editor
+                .source
+                .pointer("/tracks/0/clips/0/params/opacity_keyframes/0/t")
+                .and_then(Value::as_u64),
+            Some(500)
+        );
+        assert_eq!(
+            editor
+                .source
+                .pointer("/tracks/0/clips/0/params/opacity_keyframes/0/v")
+                .and_then(Value::as_f64),
+            Some(0.5)
+        );
+
+        let delete = editor
+            .set_keyframe("clip_title", "opacity", 500, None)
+            .unwrap();
+        assert_eq!(delete.op_label, "delete keyframe opacity");
+        assert!(editor
+            .source
+            .pointer("/tracks/0/clips/0/params/opacity_keyframes")
+            .is_none());
+
+        editor.undo().unwrap();
+        assert_eq!(
+            editor
+                .source
+                .pointer("/tracks/0/clips/0/params/opacity_keyframes/0/v")
+                .and_then(Value::as_f64),
+            Some(0.5)
         );
     }
 
