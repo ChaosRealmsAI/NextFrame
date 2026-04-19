@@ -54,9 +54,17 @@
       "per_item": "clip"
     },
     {
+      "id": "karaoke",
+      "title": "产中英字级 karaoke.html",
+      "prompt": "06-karaoke.md",
+      "gate": "karaoke-html-ready",
+      "description": "Code · 读 cut_report + translations + words.json · 产 index.html 所有 clips 可切 · 字级同步 · self-contained",
+      "agent_driven": false
+    },
+    {
       "id": "publish",
       "title": "多平台发布",
-      "prompt": "06-publish.md",
+      "prompt": "07-publish.md",
       "gate": "published",
       "description": "推到抖音/B站/小红书/YouTube",
       "agent_driven": false,
