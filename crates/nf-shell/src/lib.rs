@@ -4,5 +4,7 @@ pub mod events;
 pub mod handlers;
 pub mod ipc_server;
 pub mod storage;
+#[cfg(target_os = "macos")]
+pub mod traffic_light;
 pub mod webview;
 pub mod window_manager;

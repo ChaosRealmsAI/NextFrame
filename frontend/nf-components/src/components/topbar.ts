@@ -16,8 +16,12 @@ const sheet = makeSheet(`
     color: var(--fg-2);
     font-family: var(--font);
   }
+  /* Native 模式 · topbar 中心线 = --tl-center-y(红绿灯中心距窗顶 · Rust 注入) · 见 ADR A-0017
+   * topbar 垂直中心 = height/2 · 要跟 tl-center-y 重合 → height = tl-center-y * 2
+   * fallback 24px(= 原 48px 的一半) · 无系统值时沿用原表现 */
   :host(.native) {
-    height: 48px;
+    height: calc(var(--tl-center-y, 24px) * 2);
+    min-height: 48px;
     -webkit-app-region: drag;
   }
   button {
@@ -37,9 +41,12 @@ const sheet = makeSheet(`
     border-bottom: 1px solid var(--bd);
     gap: 16px;
   }
+  /* Native · 左 padding 预留系统按钮区 · 用 --tl-right-edge(zoom 按钮右边缘) + 16 留白
+   * fallback 80px(原固定值) */
   .topbar.native {
-    height: 48px;
-    padding: 0 18px 0 80px;
+    height: calc(var(--tl-center-y, 24px) * 2);
+    min-height: 48px;
+    padding: 0 18px 0 calc(var(--tl-right-edge, 72px) + 16px);
     background: transparent;
     -webkit-app-region: drag;
   }

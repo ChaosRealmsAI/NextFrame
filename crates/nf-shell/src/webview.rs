@@ -20,22 +20,11 @@ pub fn create_window(
     project: &str,
     episode: &str,
 ) -> Result<(Window, WebView), String> {
-    // Traffic light 位置 · tao 0.35 `with_traffic_light_inset(x, y)` 真实语义:
-    //   title_bar_container_h = button_h + y    // 见 tao view.rs:1168
-    //   button.origin.x = x + i * space_between
-    //   button.origin.y = 不动 · 靠 Cocoa 在容器内默认居中
-    //
-    // 所以要按钮跟 H px DOM topbar 垂直居中对齐 → 容器高度撑到 H:
-    //   y = H - button_h
-    // 数学直觉 (H - button_h) / 2 是 Electron 式"button 距顶 padding" 模型
-    // tao 不是那个模型 · 套错 · 结果偏上(v0.5.1 此前试过 17/20 皆偏)。
-    //
-    // button_h = 14pt 是系统定值(macOS 三色圆按钮 · NSWindowButton 默认)。
-    const TOPBAR_HEIGHT_PT: f64 = 48.0;
-    const TRAFFIC_LIGHT_BUTTON_H_PT: f64 = 14.0;
-    const TRAFFIC_LIGHT_X_PT: f64 = 20.0;
-    const TRAFFIC_LIGHT_Y_PT: f64 = TOPBAR_HEIGHT_PT - TRAFFIC_LIGHT_BUTTON_H_PT; // = 34
-
+    // Traffic light 对齐策略 · FM-TL-SYSTEM-ANCHOR(ADR A-0017):
+    // 不调 `with_traffic_light_inset` 让系统按默认放红绿灯 · Rust 读 close.frame.midY
+    // 作为锚点 · 通过 init script 推给 DOM · topbar 用 CSS 变量 `--tl-center-y` 把
+    // 内容对齐系统按钮中心线。跨 macOS 版本 / fullscreen / titlebar 变体都自动适配 ·
+    // 不靠固定像素猜(v0.5.1 早期 17/20/34/44 都对不准)。
     let builder = WindowBuilder::new()
         .with_title("NextFrame")
         .with_inner_size(LogicalSize::new(1440.0, 900.0))
@@ -47,21 +36,25 @@ pub fn create_window(
         .with_title_hidden(true)
         .with_titlebar_transparent(true)
         .with_fullsize_content_view(true)
-        .with_has_shadow(true)
-        .with_traffic_light_inset(LogicalPosition::new(
-            TRAFFIC_LIGHT_X_PT,
-            TRAFFIC_LIGHT_Y_PT,
-        ));
+        .with_has_shadow(true);
     let window = builder
         .build(target)
         .map_err(|err| format!("window build failed: {err}"))?;
 
+    // 系统按钮度量 · 拿到才能生成 init script 里的 `window.__nfTrafficLight`
+    #[cfg(target_os = "macos")]
+    let tl_init_js = crate::traffic_light::TrafficLightMetrics::read_from_tao(&window)
+        .map(|m| m.to_init_script())
+        .unwrap_or_default();
+    #[cfg(not(target_os = "macos"))]
+    let tl_init_js = String::new();
+
     let frontend_root = frontend_root()?;
     let url = frontend_url(project, episode);
-    let session_script = initialization_script(project, episode);
+    let session_script = initialization_script(project, episode, &tl_init_js);
     let ipc_window_id = window_id.to_string();
     let ipc_proxy = proxy.clone();
-    let webview = WebViewBuilder::new()
+    let webview_builder = WebViewBuilder::new()
         .with_custom_protocol("nextframe".into(), move |_webview_id, request| {
             match frontend_protocol_response(&frontend_root, request) {
                 Ok(response) => response.map(Into::into),
@@ -81,7 +74,8 @@ pub fn create_window(
             let mut handle = stdout.lock();
             let _write_result = writeln!(handle, "NFIPC {body}");
             let _flush_result = handle.flush();
-        })
+        });
+    let webview = webview_builder
         .build(&window)
         .map_err(|err| format!("webview build failed: {err}"))?;
 
@@ -92,7 +86,7 @@ fn frontend_url(project: &str, episode: &str) -> String {
     format!("nextframe://frontend/index.html?project={project}&episode={episode}")
 }
 
-fn initialization_script(project: &str, episode: &str) -> String {
+fn initialization_script(project: &str, episode: &str, tl_init_js: &str) -> String {
     let session = serde_json::json!({
         "project": project,
         "episode": episode
@@ -109,6 +103,7 @@ fn initialization_script(project: &str, episode: &str) -> String {
   }} else {{
     document.addEventListener("DOMContentLoaded", markNativeShell, {{ once: true }});
   }}
+  {tl_init_js}
 }})();"#
     )
 }
