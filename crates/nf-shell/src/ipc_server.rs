@@ -347,6 +347,13 @@ async fn dispatch(
             })
             .await
         }
+        "capture" => {
+            send_event(req, proxy, |request, ack| UserEvent::CaptureWindow {
+                request,
+                ack,
+            })
+            .await
+        }
         "devtools-query" => {
             send_event(req, proxy, |request, ack| UserEvent::DevtoolsQuery {
                 request,

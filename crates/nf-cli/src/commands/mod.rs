@@ -97,6 +97,25 @@ COMMON ERRORS:
     )]
     Screenshot(ScreenshotArgs),
     #[command(
+        about = "Capture a native macOS window PNG including titlebar and shadow",
+        long_about = r#"Capture a full native NextFrame window through macOS CoreGraphics.
+
+USAGE:
+    nf capture --project=<slug> --episode=<slug> --out=<path.png> [--window-id=<id>]
+
+EXAMPLES:
+    nf capture --project=next-frame --episode=ep-01 --out=tmp/cap.png
+    nf capture --project=next-frame --episode=ep-01 --out=tmp/cap.png --window-id=w-1
+
+EXPECTED JSON:
+    {"out":"tmp/cap.png","bytes":12345,"width":2880,"height":1800,"window_id":"w-1","window_number":1234}
+
+COMMON ERRORS:
+    - unsupported platform -> exit 2 · hint: native capture requires macOS CoreGraphics
+    - unknown window -> exit 5 · hint: run `nf ps --project=<slug> --episode=<slug>`"#
+    )]
+    Capture(CaptureArgs),
+    #[command(
         about = "Click a DOM element in a NextFrame window",
         long_about = r#"Click a DOM element through the real app path. Selectors may use ::shadow to cross web component shadow roots.
 
@@ -472,6 +491,22 @@ pub struct ScreenshotArgs {
     pub out: String,
     #[arg(long, value_name = "ID", help = "Optional window id from `nf ps`")]
     pub window: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct CaptureArgs {
+    #[arg(long, value_name = "SLUG", help = "Project slug for the target window")]
+    pub project: String,
+    #[arg(long, value_name = "SLUG", help = "Episode slug for the target window")]
+    pub episode: String,
+    #[arg(long, value_name = "PATH", help = "Output PNG path")]
+    pub out: std::path::PathBuf,
+    #[arg(
+        long = "window-id",
+        value_name = "ID",
+        help = "Optional window id from `nf ps`"
+    )]
+    pub window_id: Option<String>,
 }
 
 #[derive(Debug, Args)]

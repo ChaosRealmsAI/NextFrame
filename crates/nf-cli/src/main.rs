@@ -20,6 +20,7 @@ fn run() -> Result<(), NfError> {
         Command::Open(args) => commands::app::open(args),
         Command::Ps(args) => commands::app::ps(args),
         Command::Screenshot(args) => commands::app::screenshot(args),
+        Command::Capture(args) => commands::app::capture(args),
         Command::Click(args) => commands::app::click(args),
         Command::Select(args) => commands::app::select(args),
         Command::Tab(args) => commands::app::tab(args),

@@ -79,6 +79,10 @@ fn main() {
                 UserEvent::Screenshot { request, ack } => {
                     AppOpHandler::screenshot(&manager, request, ack);
                 }
+                UserEvent::CaptureWindow { request, ack } => {
+                    let response = AppOpHandler::capture(&mut manager, request);
+                    let _send_result = ack.send(response);
+                }
                 UserEvent::DevtoolsQuery { request, ack } => {
                     AppOpHandler::devtools_query(&manager, request, ack);
                 }

@@ -24,6 +24,10 @@ pub enum UserEvent {
         request: IpcRequest,
         ack: oneshot::Sender<IpcResponse>,
     },
+    CaptureWindow {
+        request: IpcRequest,
+        ack: oneshot::Sender<IpcResponse>,
+    },
     DevtoolsQuery {
         request: IpcRequest,
         ack: oneshot::Sender<IpcResponse>,

@@ -1,8 +1,8 @@
 use serde_json::json;
 
 use crate::commands::{
-    send_ipc, ClickArgs, DevtoolsArgs, OpenArgs, ProjectEpisodeFilter, ScreenshotArgs, SelectArgs,
-    StateArgs, TabArgs, WindowTargetArgs,
+    send_ipc, CaptureArgs, ClickArgs, DevtoolsArgs, OpenArgs, ProjectEpisodeFilter, ScreenshotArgs,
+    SelectArgs, StateArgs, TabArgs, WindowTargetArgs,
 };
 use crate::errors::NfError;
 
@@ -39,6 +39,18 @@ pub fn screenshot(args: ScreenshotArgs) -> Result<(), NfError> {
             "region": args.region,
             "out": args.out,
             "window": args.window
+        }),
+    )
+}
+
+pub fn capture(args: CaptureArgs) -> Result<(), NfError> {
+    send_ipc(
+        "capture",
+        json!({
+            "project": args.project,
+            "episode": args.episode,
+            "out": args.out.display().to_string(),
+            "window_id": args.window_id
         }),
     )
 }

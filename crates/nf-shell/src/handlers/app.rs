@@ -168,6 +168,31 @@ impl AppOpHandler {
         }
     }
 
+    pub fn capture(manager: &mut WindowManager, request: IpcRequest) -> IpcResponse {
+        let result = (|| {
+            let project = required_string(&request.params, "project")?;
+            let episode = required_string(&request.params, "episode")?;
+            let out = required_string(&request.params, "out")?;
+            let window = optional_string(&request.params, "window_id")
+                .or_else(|| optional_string(&request.params, "window"));
+            let (window_id, window_number) =
+                manager.native_window_number_for_target(&project, &episode, window.as_deref())?;
+            manager.focus(&window_id)?;
+            std::thread::sleep(std::time::Duration::from_millis(120));
+            let capture = crate::capture::capture_window_by_number(window_number, Path::new(&out))?;
+            Ok(json!({
+                "out": capture.out.display().to_string(),
+                "bytes": capture.bytes,
+                "width": capture.width,
+                "height": capture.height,
+                "window_id": window_id,
+                "window_number": window_number
+            }))
+        })();
+
+        response_from_result(request.req_id, result)
+    }
+
     pub fn devtools_query(
         manager: &WindowManager,
         request: IpcRequest,
