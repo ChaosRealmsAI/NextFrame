@@ -1,6 +1,6 @@
 import { makeSheet, NfBase } from "../_base.js";
 import type { AnchorHoverDetail, ClipSelectDetail, PlayheadMoveDetail, TimelineClipSelectDetail } from "../events.js";
-import { getEpisode, pct } from "../storage.js";
+import { getEpisode, getMockData, pct } from "../storage.js";
 
 const TEXT_CLIPS = [
   { id: "title", label: "title", start: 1, end: 5 },
@@ -117,16 +117,23 @@ export class NfTimeline extends NfBase {
   };
 
   private render(): void {
+    const data = getMockData();
     const episode = getEpisode();
     const duration = Number(this.getAttribute("duration") ?? episode.duration);
     const currentTime = Number(this.getAttribute("current-time") ?? 12.45);
     const sceneClips = episode.clips.filter((clip) => clip.kind === "scene");
-    const bgm = episode.clips.find((clip) => clip.id === "bgm-electric");
+    const textClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "text") : TEXT_CLIPS;
+    const transClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "trans" || clip.kind === "transition") : TRANS_CLIPS;
+    const audioClips = data.source === "ipc"
+      ? episode.clips.filter((clip) => clip.kind === "audio")
+      : episode.clips.filter((clip) => clip.id === "bgm-electric").slice(0, 1);
     const anchors = Object.entries(episode.anchors);
+    const trackCount = data.source === "ipc" ? new Set(episode.clips.map((clip) => clip.kind)).size : 4;
+    const clipCount = data.source === "ipc" ? episode.clips.length : 7;
     this.root.innerHTML = `
       <div class="timeline">
         <div class="tl-top">
-          <div class="t">时间轴 · 4 轨 · 7 片段</div>
+          <div class="t">时间轴 · ${trackCount} 轨 · ${clipCount} 片段</div>
           <div class="anchors">
             ${anchors.map(([name, time]) => `<span><b>${name}</b> ${time.toFixed(1)}</span>`).join("")}
           </div>
@@ -144,13 +151,13 @@ export class NfTimeline extends NfBase {
             ${sceneClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="scene" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${clip.id === "feat-2" ? "feat 2 · 18s" : clip.label}" ${clip.id === "feat-2" ? "active" : ""}></nf-clip>`).join("")}
           </nf-track>
           <nf-track kind="text" label="文字">
-            ${TEXT_CLIPS.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="text" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${clip.label}"></nf-clip>`).join("")}
+            ${textClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="text" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${clip.label}"></nf-clip>`).join("")}
           </nf-track>
           <nf-track kind="trans" label="转场">
-            ${TRANS_CLIPS.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="trans" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${clip.label}"></nf-clip>`).join("")}
+            ${transClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="trans" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${clip.label}"></nf-clip>`).join("")}
           </nf-track>
           <nf-track kind="audio" label="音频">
-            ${bgm ? `<nf-clip slot="clips" id="${bgm.id}" kind="audio" start="${bgm.start}" end="${bgm.end}" duration="${duration}" label="bgm · -6dB"></nf-clip>` : ""}
+            ${audioClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="audio" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${data.source === "ipc" ? clip.label : "bgm · -6dB"}"></nf-clip>`).join("")}
           </nf-track>
           <div class="playhead" style="left: calc(100px + ${pct(currentTime, duration)});"></div>
           ${anchors.map(([name, time]) => `<nf-anchor name="${name}" time="${time}" duration="${duration}"></nf-anchor>`).join("")}

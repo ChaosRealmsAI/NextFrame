@@ -6,7 +6,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --format=esm --outfile=dist/index.js",
+    "build": "esbuild src/index.ts --bundle --format=iife --global-name=NextFrameComponents --outfile=dist/index.js",
     "check": "tsc --noEmit",
     "test": "node test-w4.mjs"
   },
