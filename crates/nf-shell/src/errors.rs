@@ -5,29 +5,29 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum NfError {
-    #[error("unknown project: {slug}")]
+    #[error("unknown project '{slug}' · hint: {hint}")]
     UnknownProject { slug: String, hint: String },
-    #[error("unknown episode: {slug}")]
+    #[error("unknown episode '{slug}' · hint: {hint}")]
     UnknownEpisode { slug: String, hint: String },
-    #[error("unknown clip: {slug}")]
+    #[error("unknown clip '{slug}' · hint: {hint}")]
     UnknownClip { slug: String, hint: String },
-    #[error("unknown log entry: {id}")]
+    #[error("unknown log entry '{id}' · hint: {hint}")]
     UnknownLog { id: String, hint: String },
-    #[error("slug already exists: {slug}")]
+    #[error("slug '{slug}' already exists · hint: {hint}")]
     SlugExists { slug: String, hint: String },
-    #[error("invalid slug: {slug}")]
+    #[error("invalid slug '{slug}' · hint: {hint}")]
     SlugInvalid { slug: String, hint: String },
     #[error("IPC socket failed: {0}")]
     SocketFailed(String),
     #[error("storage failed: {0}")]
     StorageFailed(String),
-    #[error("validation failed: {0}")]
+    #[error("{0} · see `nf <cmd> --help` for expected format")]
     ValidationFailed(String),
     #[error("not implemented: {0}")]
     NotImplemented(String),
-    #[error("operation needs --confirm")]
+    #[error("operation needs --confirm · hint: {hint}")]
     NeedsConfirm { hint: String },
-    #[error("resource is still referenced: {detail}")]
+    #[error("resource is still referenced: {detail} · hint: {hint}")]
     Referenced { detail: String, hint: String },
 }
 

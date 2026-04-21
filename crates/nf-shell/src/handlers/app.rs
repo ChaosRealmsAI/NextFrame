@@ -558,7 +558,10 @@ mod tests {
             .error
             .ok_or_else(|| std::io::Error::other("missing error record"))?;
         assert_eq!(error["error"], "validation failed");
-        assert_eq!(error["detail"], "validation failed: missing");
+        assert_eq!(
+            error["detail"],
+            "missing · see `nf <cmd> --help` for expected format"
+        );
         Ok(())
     }
 }
