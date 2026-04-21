@@ -10,6 +10,10 @@ pub enum NfError {
     UnknownProject { slug: String, hint: String },
     #[error("unknown episode: {slug}")]
     UnknownEpisode { slug: String, hint: String },
+    #[error("unknown clip: {slug}")]
+    UnknownClip { slug: String, hint: String },
+    #[error("unknown log entry: {id}")]
+    UnknownLog { id: String, hint: String },
     #[error("slug already exists: {slug}")]
     SlugExists { slug: String, hint: String },
     #[error("invalid slug: {slug}")]
@@ -30,6 +34,13 @@ pub enum NfError {
     NeedsConfirm { hint: String },
     #[error("resource is still referenced: {detail}")]
     Referenced { detail: String, hint: String },
+    #[error("{detail}")]
+    Remote {
+        error: String,
+        detail: String,
+        hint: String,
+        exit_code: u8,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -46,11 +57,15 @@ impl NfError {
             Self::SocketFailed(_) | Self::StorageFailed(_) => 1,
             Self::SelectorNotFound { .. } => 3,
             Self::NotClickable { .. } => 4,
-            Self::UnknownProject { .. } | Self::UnknownEpisode { .. } => 5,
+            Self::UnknownProject { .. }
+            | Self::UnknownEpisode { .. }
+            | Self::UnknownClip { .. }
+            | Self::UnknownLog { .. } => 5,
             Self::SlugExists { .. } => 6,
             Self::NeedsConfirm { .. } => 7,
             Self::Referenced { .. } => 8,
             Self::SlugInvalid { .. } | Self::ValidationFailed(_) | Self::NotImplemented(_) => 2,
+            Self::Remote { exit_code, .. } => *exit_code,
         }
     }
 
@@ -58,6 +73,8 @@ impl NfError {
         match self {
             Self::UnknownProject { .. } => "unknown project",
             Self::UnknownEpisode { .. } => "unknown episode",
+            Self::UnknownClip { .. } => "unknown clip",
+            Self::UnknownLog { .. } => "unknown log",
             Self::SlugExists { .. } => "slug exists",
             Self::SlugInvalid { .. } => "slug invalid",
             Self::SocketFailed(_) => "socket failed",
@@ -68,6 +85,7 @@ impl NfError {
             Self::NotClickable { .. } => "not clickable",
             Self::NeedsConfirm { .. } => "needs confirm",
             Self::Referenced { .. } => "referenced",
+            Self::Remote { .. } => "remote error",
         }
     }
 
@@ -75,12 +93,15 @@ impl NfError {
         match self {
             Self::UnknownProject { hint, .. }
             | Self::UnknownEpisode { hint, .. }
+            | Self::UnknownClip { hint, .. }
+            | Self::UnknownLog { hint, .. }
             | Self::SlugExists { hint, .. }
             | Self::SlugInvalid { hint, .. }
             | Self::SelectorNotFound { hint, .. }
             | Self::NotClickable { hint, .. }
             | Self::NeedsConfirm { hint }
             | Self::Referenced { hint, .. } => hint.clone(),
+            Self::Remote { hint, .. } => hint.clone(),
             Self::SocketFailed(_) => {
                 "start nf-shell with `nf open` or check the socket path".to_string()
             }
@@ -97,12 +118,18 @@ impl NfError {
     }
 
     pub fn detail(&self) -> String {
-        self.to_string()
+        match self {
+            Self::Remote { detail, .. } => detail.clone(),
+            _ => self.to_string(),
+        }
     }
 
     pub fn to_record(&self) -> ErrorRecord {
         ErrorRecord {
-            error: self.error_type().to_string(),
+            error: match self {
+                Self::Remote { error, .. } => error.clone(),
+                _ => self.error_type().to_string(),
+            },
             detail: self.detail(),
             hint: self.hint(),
             exit_code: self.exit_code(),

@@ -12,6 +12,7 @@ use tokio::sync::oneshot;
 
 use crate::errors::NfError;
 use crate::events::UserEvent;
+use crate::handlers::ComposeOpHandler;
 
 const EVENT_ACK_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -30,7 +31,23 @@ pub struct IpcResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
+    pub error: Option<Value>,
+}
+
+pub trait OpHandler: Send + Sync {
+    fn handle(&self, req: &IpcRequest) -> Result<Option<Value>, NfError>;
+}
+
+#[derive(Debug, Default)]
+pub struct StubHandler;
+
+impl OpHandler for StubHandler {
+    fn handle(&self, req: &IpcRequest) -> Result<Option<Value>, NfError> {
+        Err(NfError::NotImplemented(format!(
+            "{} is not implemented by StubHandler",
+            req.op
+        )))
+    }
 }
 
 pub trait SocketCleanup {
@@ -119,6 +136,42 @@ pub fn spawn_server_thread(
 }
 
 pub async fn serve(path: PathBuf, proxy: EventLoopProxy<UserEvent>) -> Result<(), NfError> {
+    let handler = std::sync::Arc::new(ComposeOpHandler::from_default_storage()?);
+    serve_with_event_loop(path, proxy, handler).await
+}
+
+pub async fn serve_handler(
+    path: PathBuf,
+    handler: std::sync::Arc<dyn OpHandler>,
+) -> Result<(), NfError> {
+    cleanup_stale_socket(&path)?;
+    let name = path
+        .to_str()
+        .ok_or_else(|| NfError::SocketFailed(format!("socket path is not UTF-8: {path:?}")))?
+        .to_fs_name::<GenericFilePath>()
+        .map_err(|err| NfError::SocketFailed(err.to_string()))?;
+    let listener = ListenerOptions::new()
+        .name(name)
+        .create_tokio()
+        .map_err(|err| NfError::SocketFailed(err.to_string()))?;
+
+    loop {
+        let conn = listener
+            .accept()
+            .await
+            .map_err(|err| NfError::SocketFailed(err.to_string()))?;
+        let handler = handler.clone();
+        tokio::spawn(async move {
+            let _conn_result = handle_connection_with_handler(conn, handler).await;
+        });
+    }
+}
+
+async fn serve_with_event_loop(
+    path: PathBuf,
+    proxy: EventLoopProxy<UserEvent>,
+    handler: std::sync::Arc<dyn OpHandler>,
+) -> Result<(), NfError> {
     cleanup_stale_socket(&path)?;
     let name = path
         .to_str()
@@ -136,8 +189,9 @@ pub async fn serve(path: PathBuf, proxy: EventLoopProxy<UserEvent>) -> Result<()
             .await
             .map_err(|err| NfError::SocketFailed(err.to_string()))?;
         let proxy = proxy.clone();
+        let handler = handler.clone();
         tokio::spawn(async move {
-            let _conn_result = handle_connection(conn, proxy).await;
+            let _conn_result = handle_connection(conn, proxy, handler).await;
         });
     }
 }
@@ -145,6 +199,7 @@ pub async fn serve(path: PathBuf, proxy: EventLoopProxy<UserEvent>) -> Result<()
 async fn handle_connection(
     conn: interprocess::local_socket::tokio::Stream,
     proxy: EventLoopProxy<UserEvent>,
+    handler: std::sync::Arc<dyn OpHandler>,
 ) -> Result<(), NfError> {
     let (read_half, mut write_half) = conn.split();
     let mut reader = BufReader::new(read_half);
@@ -165,12 +220,17 @@ async fn handle_connection(
         }
 
         let response = match serde_json::from_str::<IpcRequest>(trimmed) {
-            Ok(req) => dispatch(req, &proxy).await,
+            Ok(req) => dispatch(req, &proxy, handler.as_ref()).await,
             Err(err) => IpcResponse {
                 req_id: "parse-error".to_string(),
                 ok: false,
                 data: None,
-                error: Some(format!("invalid NDJSON request: {err}")),
+                error: Some(json!({
+                    "error": "validation failed",
+                    "detail": format!("invalid NDJSON request: {err}"),
+                    "hint": "send one JSON request per line",
+                    "exit_code": 2
+                })),
             },
         };
         let mut payload = serde_json::to_string(&response)
@@ -183,7 +243,70 @@ async fn handle_connection(
     }
 }
 
-async fn dispatch(req: IpcRequest, proxy: &EventLoopProxy<UserEvent>) -> IpcResponse {
+async fn handle_connection_with_handler(
+    conn: interprocess::local_socket::tokio::Stream,
+    handler: std::sync::Arc<dyn OpHandler>,
+) -> Result<(), NfError> {
+    let (read_half, mut write_half) = conn.split();
+    let mut reader = BufReader::new(read_half);
+    let mut line = String::new();
+
+    loop {
+        line.clear();
+        let bytes = reader
+            .read_line(&mut line)
+            .await
+            .map_err(|err| NfError::SocketFailed(err.to_string()))?;
+        if bytes == 0 {
+            return Ok(());
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let response = match serde_json::from_str::<IpcRequest>(trimmed) {
+            Ok(req) => match handler.handle(&req) {
+                Ok(Some(data)) => ok_response(&req, data),
+                Ok(None) => error_response(
+                    &req,
+                    &NfError::NotImplemented(format!("unknown op: {}", req.op)),
+                ),
+                Err(err) => error_response(&req, &err),
+            },
+            Err(err) => IpcResponse {
+                req_id: "parse-error".to_string(),
+                ok: false,
+                data: None,
+                error: Some(json!({
+                    "error": "validation failed",
+                    "detail": format!("invalid NDJSON request: {err}"),
+                    "hint": "send one JSON request per line",
+                    "exit_code": 2
+                })),
+            },
+        };
+        let mut payload = serde_json::to_string(&response)
+            .map_err(|err| NfError::SocketFailed(err.to_string()))?;
+        payload.push('\n');
+        write_half
+            .write_all(payload.as_bytes())
+            .await
+            .map_err(|err| NfError::SocketFailed(err.to_string()))?;
+    }
+}
+
+async fn dispatch(
+    req: IpcRequest,
+    proxy: &EventLoopProxy<UserEvent>,
+    handler: &dyn OpHandler,
+) -> IpcResponse {
+    match handler.handle(&req) {
+        Ok(Some(data)) => return ok_response(&req, data),
+        Ok(None) => {}
+        Err(err) => return error_response(&req, &err),
+    }
+
     match req.op.as_str() {
         "open-window" => {
             send_event(req, proxy, |request, ack| UserEvent::OpenWindow {
@@ -225,7 +348,12 @@ async fn dispatch(req: IpcRequest, proxy: &EventLoopProxy<UserEvent>) -> IpcResp
             req_id: req.req_id,
             ok: false,
             data: None,
-            error: Some(format!("unknown op: {}", req.op)),
+            error: Some(json!({
+                "error": "not implemented",
+                "detail": format!("unknown op: {}", req.op),
+                "hint": "run `nf help <command>` for supported operations",
+                "exit_code": 2
+            })),
         },
     }
 }
@@ -242,7 +370,12 @@ async fn send_event(
             req_id,
             ok: false,
             data: None,
-            error: Some(format!("event loop proxy failed: {err}")),
+            error: Some(json!({
+                "error": "socket failed",
+                "detail": format!("event loop proxy failed: {err}"),
+                "hint": "restart nf-shell",
+                "exit_code": 1
+            })),
         };
     }
 
@@ -252,13 +385,23 @@ async fn send_event(
             req_id,
             ok: false,
             data: None,
-            error: Some(format!("event ack dropped: {err}")),
+            error: Some(json!({
+                "error": "socket failed",
+                "detail": format!("event ack dropped: {err}"),
+                "hint": "restart nf-shell",
+                "exit_code": 1
+            })),
         },
         Err(_) => IpcResponse {
             req_id,
             ok: false,
             data: None,
-            error: Some("event ack timed out after 10s".to_string()),
+            error: Some(json!({
+                "error": "socket failed",
+                "detail": "event ack timed out after 10s",
+                "hint": "restart nf-shell",
+                "exit_code": 1
+            })),
         },
     }
 }
@@ -268,7 +411,12 @@ pub fn not_implemented_response(req: &IpcRequest) -> IpcResponse {
         req_id: req.req_id.clone(),
         ok: false,
         data: None,
-        error: Some(format!("{} is reserved for W-3 implementation", req.op)),
+        error: Some(json!({
+            "error": "not implemented",
+            "detail": format!("{} is reserved for W-3 implementation", req.op),
+            "hint": "this operation lands in W-3",
+            "exit_code": 2
+        })),
     }
 }
 
@@ -278,6 +426,15 @@ pub fn ok_response(req: &IpcRequest, data: Value) -> IpcResponse {
         ok: true,
         data: Some(data),
         error: None,
+    }
+}
+
+pub fn error_response(req: &IpcRequest, err: &NfError) -> IpcResponse {
+    IpcResponse {
+        req_id: req.req_id.clone(),
+        ok: false,
+        data: None,
+        error: Some(json!(err.to_record())),
     }
 }
 
