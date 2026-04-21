@@ -484,13 +484,39 @@ fn print_ipc_response(resp: IpcResponse) -> Result<(), NfError> {
         return print_json(&value);
     }
 
-    Err(NfError::SocketFailed(resp.error.unwrap_or_else(|| {
-        "IPC server returned an unknown error".to_string()
-    })))
+    match resp.error {
+        Some(value) => Err(remote_error(value)),
+        None => Err(NfError::SocketFailed(
+            "IPC server returned an unknown error".to_string(),
+        )),
+    }
 }
 
-pub fn w2_stub(command: &str) -> Result<(), NfError> {
-    Err(NfError::NotImplemented(format!(
-        "{command} is a W-2 CRUD command stub in W-1"
-    )))
+fn remote_error(value: Value) -> NfError {
+    let Some(object) = value.as_object() else {
+        return NfError::SocketFailed(value.to_string());
+    };
+
+    NfError::Remote {
+        error: object
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("remote error")
+            .to_string(),
+        detail: object
+            .get("detail")
+            .and_then(Value::as_str)
+            .unwrap_or("IPC server returned an error")
+            .to_string(),
+        hint: object
+            .get("hint")
+            .and_then(Value::as_str)
+            .unwrap_or("run `nf help <command>` for supported operations")
+            .to_string(),
+        exit_code: object
+            .get("exit_code")
+            .and_then(Value::as_u64)
+            .and_then(|code| u8::try_from(code).ok())
+            .unwrap_or(1),
+    }
 }

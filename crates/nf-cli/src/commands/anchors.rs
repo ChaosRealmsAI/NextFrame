@@ -1,10 +1,21 @@
-use crate::commands::{w2_stub, AnchorCommand, AnchorSubcommand};
+use serde_json::json;
+
+use crate::commands::{send_ipc, AnchorCommand, AnchorSubcommand};
 use crate::errors::NfError;
 
 pub fn dispatch(args: AnchorCommand) -> Result<(), NfError> {
     match args.command {
-        AnchorSubcommand::List(_) => w2_stub("anchors list"),
-        AnchorSubcommand::Set(_) => w2_stub("anchors set"),
-        AnchorSubcommand::Unset(_) => w2_stub("anchors unset"),
+        AnchorSubcommand::List(args) => send_ipc(
+            "anchors-list",
+            json!({"project": args.project, "episode": args.episode}),
+        ),
+        AnchorSubcommand::Set(args) => send_ipc(
+            "anchors-set",
+            json!({"project": args.project, "episode": args.episode, "name": args.name, "time": args.time}),
+        ),
+        AnchorSubcommand::Unset(args) => send_ipc(
+            "anchors-unset",
+            json!({"project": args.project, "episode": args.episode, "name": args.name}),
+        ),
     }
 }

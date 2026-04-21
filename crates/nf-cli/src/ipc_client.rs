@@ -28,7 +28,7 @@ pub struct IpcResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
+    pub error: Option<Value>,
 }
 
 pub fn socket_path() -> PathBuf {

@@ -9,6 +9,10 @@ pub enum NfError {
     UnknownProject { slug: String, hint: String },
     #[error("unknown episode: {slug}")]
     UnknownEpisode { slug: String, hint: String },
+    #[error("unknown clip: {slug}")]
+    UnknownClip { slug: String, hint: String },
+    #[error("unknown log entry: {id}")]
+    UnknownLog { id: String, hint: String },
     #[error("slug already exists: {slug}")]
     SlugExists { slug: String, hint: String },
     #[error("invalid slug: {slug}")]
@@ -39,7 +43,10 @@ impl NfError {
     pub fn exit_code(&self) -> u8 {
         match self {
             Self::SocketFailed(_) | Self::StorageFailed(_) => 1,
-            Self::UnknownProject { .. } | Self::UnknownEpisode { .. } => 5,
+            Self::UnknownProject { .. }
+            | Self::UnknownEpisode { .. }
+            | Self::UnknownClip { .. }
+            | Self::UnknownLog { .. } => 5,
             Self::SlugExists { .. } => 6,
             Self::NeedsConfirm { .. } => 7,
             Self::Referenced { .. } => 8,
@@ -51,6 +58,8 @@ impl NfError {
         match self {
             Self::UnknownProject { .. } => "unknown project",
             Self::UnknownEpisode { .. } => "unknown episode",
+            Self::UnknownClip { .. } => "unknown clip",
+            Self::UnknownLog { .. } => "unknown log",
             Self::SlugExists { .. } => "slug exists",
             Self::SlugInvalid { .. } => "slug invalid",
             Self::SocketFailed(_) => "socket failed",
@@ -66,6 +75,8 @@ impl NfError {
         match self {
             Self::UnknownProject { hint, .. }
             | Self::UnknownEpisode { hint, .. }
+            | Self::UnknownClip { hint, .. }
+            | Self::UnknownLog { hint, .. }
             | Self::SlugExists { hint, .. }
             | Self::SlugInvalid { hint, .. }
             | Self::NeedsConfirm { hint }
