@@ -1,12 +1,8 @@
-mod commands;
-mod errors;
-mod ipc_client;
-
 use std::process::ExitCode;
 
 use clap::Parser;
-use commands::{Cli, Command};
-use errors::NfError;
+use nf_cli::commands::{self, Cli, Command};
+use nf_cli::errors::NfError;
 
 fn main() -> ExitCode {
     match run() {
@@ -37,7 +33,7 @@ fn run() -> Result<(), NfError> {
         Command::Anchors(args) => commands::anchors::dispatch(args),
         Command::Log(args) => commands::log::dispatch(args),
         Command::Help(args) => commands::utility::help(args),
-        Command::Doctor(args) => commands::utility::doctor(args),
+        Command::Doctor(args) => commands::doctor::run(args),
         Command::Version => commands::utility::version(),
     }
 }

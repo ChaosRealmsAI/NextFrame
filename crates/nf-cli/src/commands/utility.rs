@@ -1,12 +1,7 @@
-use std::fs;
-use std::path::PathBuf;
-
-use directories::BaseDirs;
 use serde_json::{json, Value};
 
-use crate::commands::{print_json, DoctorArgs, HelpArgs};
+use crate::commands::{print_json, HelpArgs};
 use crate::errors::NfError;
-use crate::ipc_client;
 
 const COMMANDS: &[&str] = &[
     "nf open",
@@ -54,36 +49,6 @@ pub fn version() -> Result<(), NfError> {
         "version": env!("CARGO_PKG_VERSION"),
         "git_hash": option_env!("GIT_HASH"),
         "build_date": option_env!("BUILD_DATE")
-    }))
-}
-
-pub fn doctor(_args: DoctorArgs) -> Result<(), NfError> {
-    let binary = std::env::current_exe()
-        .map(path_to_string)
-        .unwrap_or_else(|err| format!("unavailable: {err}"));
-    let socket = ipc_client::socket_path();
-    let registry = registry_path();
-    let mut warnings = Vec::new();
-    let projects = match read_registry_projects(&registry) {
-        Ok(projects) => projects,
-        Err(err) => {
-            warnings.push(json!({
-                "kind": "registry",
-                "detail": err.to_string(),
-                "hint": "repair or recreate ~/.nextframe/registry.json"
-            }));
-            Vec::new()
-        }
-    };
-
-    print_json(&json!({
-        "binary": binary,
-        "version": env!("CARGO_PKG_VERSION"),
-        "socket": path_to_string(socket.clone()),
-        "registry": path_to_string(registry),
-        "projects": projects,
-        "app_running": socket.exists(),
-        "warnings": warnings
     }))
 }
 
@@ -144,7 +109,7 @@ fn usage_for(topic: &str) -> &'static str {
         "clips create" => {
             "nf clips create --project=<slug> --episode=<slug> --slug=<id> --label=<str> --track=<scene|text|audio|trans> --start=<expr> --end=<expr>"
         }
-        "doctor" => "nf doctor [--json]",
+        "doctor" => "nf doctor [--human]",
         "open" => {
             "nf open --project=<slug> --episode=<slug> [--clip=<slug>] [--t=<sec>] [--new-window]"
         }
@@ -164,7 +129,7 @@ fn examples_for(topic: &str) -> Vec<&'static str> {
         ],
         "doctor" => vec![
             "nf doctor",
-            "nf doctor --json | jq .warnings",
+            "nf doctor --human",
         ],
         "open" => vec![
             "nf open --project=next-frame --episode=ep-01",
@@ -185,7 +150,8 @@ fn common_errors_for(topic: &str) -> Vec<&'static str> {
             "invalid anchor expression: hint: nf anchors list --project=<slug> --episode=<slug>",
         ],
         "doctor" => vec![
-            "registry unreadable: hint: repair ~/.nextframe/registry.json or recreate it",
+            "missing toolchain: hint: install Rust via https://rustup.rs/ or Node via brew install node",
+            "unwritable HOME: hint: check HOME write permission",
         ],
         "open" => vec![
             "socket failed: hint: start nf-shell or retry `nf open` after checking permissions",
@@ -193,35 +159,4 @@ fn common_errors_for(topic: &str) -> Vec<&'static str> {
         ],
         _ => vec!["not implemented in W-1: hint: this command is reserved for W-2/W-3"],
     }
-}
-
-fn registry_path() -> PathBuf {
-    BaseDirs::new()
-        .map(|dirs| dirs.home_dir().join(".nextframe").join("registry.json"))
-        .unwrap_or_else(|| PathBuf::from(".nextframe/registry.json"))
-}
-
-fn read_registry_projects(path: &PathBuf) -> Result<Vec<String>, NfError> {
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-
-    let raw = fs::read_to_string(path).map_err(|err| NfError::StorageFailed(err.to_string()))?;
-    let value: Value =
-        serde_json::from_str(&raw).map_err(|err| NfError::StorageFailed(err.to_string()))?;
-    let projects = value
-        .get("projects")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item.get("slug").and_then(Value::as_str).map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
-    Ok(projects)
-}
-
-fn path_to_string(path: PathBuf) -> String {
-    path.display().to_string()
 }
