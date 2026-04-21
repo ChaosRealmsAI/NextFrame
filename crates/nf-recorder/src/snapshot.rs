@@ -1,4 +1,6 @@
-//! `snapshot` · v1.14 T-18 · product-internal single-frame PNG sampling.
+//! `snapshot` · product-internal single-frame PNG sampling.
+//!
+//! Historical: v1.14 T-18 snapshot command.
 //!
 //! **Why this exists (self-verification rule)**: VP-4 needs pixel-level diff
 //! between "mp4 frame at t_ms" and "snapshot at t_ms"; both must come from

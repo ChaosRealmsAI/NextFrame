@@ -1,7 +1,7 @@
 //! T-17 · verify_mp4 self-check.
 //!
 //! Runs against the real battle MP4 produced by T-14 end-to-end record run:
-//! `tmp/v1.14-battle.mp4` (60 fps · 12 Mbps · BT.709 · 1920×1080 · avc1).
+//! Historical: `tmp/v1.14-battle.mp4` (60 fps · 12 Mbps · BT.709 · 1920×1080 · avc1).
 //!
 //! If the battle MP4 does not exist (clean checkout · CI without the recording
 //! step), the test is skipped with a plain `eprintln!` — we do not fail CI
@@ -24,13 +24,13 @@ fn battle_mp4_path() -> PathBuf {
     // and `cargo test --workspace` working-directory conventions.
     let candidates = [
         // workspace root (typical)
-        PathBuf::from("../../tmp/v1.14-battle.mp4"),
+        PathBuf::from("../../tmp/v1.14-battle.mp4"), // Historical: fixture name.
         // worktree root (T-17 self-check)
-        PathBuf::from("../../../tmp/v1.14-battle.mp4"),
+        PathBuf::from("../../../tmp/v1.14-battle.mp4"), // Historical: fixture name.
         // crate cwd
-        PathBuf::from("tmp/v1.14-battle.mp4"),
+        PathBuf::from("tmp/v1.14-battle.mp4"), // Historical: fixture name.
         // absolute (last resort for subagent runs)
-        PathBuf::from("/Users/Zhuanz/bigbang/NextFrame/.worktrees/v1.14/tmp/v1.14-battle.mp4"),
+        PathBuf::from("/Users/Zhuanz/bigbang/NextFrame/.worktrees/v1.14/tmp/v1.14-battle.mp4"), // Historical: fixture path.
     ];
     for c in candidates.iter() {
         if c.exists() {

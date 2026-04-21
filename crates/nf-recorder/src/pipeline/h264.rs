@@ -1,4 +1,6 @@
-//! `PipelineH264_1080p` · v1.14 T-07 + T-8.5 integration
+//! `PipelineH264_1080p` · H.264 AVC Main 1080p pipeline.
+//!
+//! Historical: v1.14 T-07 + T-8.5 integration.
 //!
 //! `RecordPipeline` impl #1: H.264 AVC Main AutoLevel · 1080p @ 30/60 · BT.709 SDR.
 //! Built on `VtCompressor` (this crate's `vt_wrap`) for the encoder and
@@ -22,7 +24,8 @@ use super::mp4_writer::Mp4Writer;
 use super::vt_wrap::VtCompressor;
 use super::{ColorSpec, OutputStats, PipelineError, RecordOpts, RecordPipeline, VideoCodec};
 
-/// v1.14 H.264 1080p pipeline.
+/// H.264 1080p pipeline.
+/// Historical: v1.14 H.264 pipeline.
 pub struct PipelineH264_1080p {
     compressor: VtCompressor,
     opts: RecordOpts,
@@ -37,10 +40,11 @@ pub struct PipelineH264_1080p {
 
 // SAFETY: AVAssetWriter / AVAssetWriterInput / CMFormatDescription are CF / ObjC
 // reference-counted objects with thread-safe retain/release. The pipeline is
-// driven by a single recorder thread in v1.14 (trait doc contract); we never
+// driven by a single recorder thread; we never
 // concurrently mutate these objects from multiple threads. The Send bound on
 // RecordPipeline is what the trait asks for; the auto-traits trip because
 // objc2 types carry PhantomData<*const UnsafeCell<()>> to stay conservative.
+// Historical: v1.14 trait doc contract assumed a single recorder thread.
 #[allow(unsafe_code)]
 unsafe impl Send for PipelineH264_1080p {}
 

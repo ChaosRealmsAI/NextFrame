@@ -1,6 +1,7 @@
-//! CLI parser for `nf-recorder` · v1.14 T-09 / T-18 subcommand refactor.
+//! CLI parser for `nf-recorder` · clap subcommands for record / snapshot / verify.
 //!
-//! Contract source: `spec/versions/v1.14/spec/interfaces-delta.json`
+//! Historical: v1.14 T-09 / T-18 subcommand refactor.
+//! Historical: contract source `spec/versions/v1.14/spec/interfaces-delta.json`
 //! → `additions.modules[nf-recorder].subprocess_protocol`.
 //!
 //! ## Invocation shapes (backward-compatible)
@@ -26,7 +27,7 @@ use std::path::PathBuf;
 use crate::pipeline::VideoCodec;
 use crate::record_loop::RecordConfig;
 
-/// v1.14 `nf-recorder` command-line interface.
+/// `nf-recorder` command-line interface.
 ///
 /// The top-level struct doubles as the legacy record invocation (no
 /// subcommand); `command` is an optional subcommand that takes precedence
@@ -35,7 +36,7 @@ use crate::record_loop::RecordConfig;
 #[command(
     name = "nf-recorder",
     version,
-    about = "Record bundle.html to MP4 · snapshot single frame to PNG (v1.14)"
+    about = "Record bundle.html to MP4 · snapshot single frame to PNG"
 )]
 pub struct Cli {
     /// Optional subcommand (snapshot / future verify). Absent = legacy record.
@@ -66,14 +67,16 @@ pub struct Cli {
     #[arg(long = "max-duration", default_value_t = 60)]
     pub max_duration: u32,
 
-    /// v1.15 / v1.56 · 时间切片并行录制 · 父进程启 N 个子进程各录 1/N 段 ·
+    /// 时间切片并行录制 · 父进程启 N 个子进程各录 1/N 段 ·
     /// ffmpeg concat 合并。未指定时按分辨率取默认值：1080p=1 · 4k=4。
     /// 显式 `--parallel 1` 可强制串行基线；N≥2 但视频 duration<6s 自动退化单进程。
+    /// Historical: v1.15 / v1.56 parallel export.
     #[arg(long = "parallel")]
     pub parallel: Option<usize>,
 
-    /// v1.15 · 子进程内部参数 · 父 orchestrator 调子进程时传 · 用户不用设（hidden）。
+    /// 子进程内部参数 · 父 orchestrator 调子进程时传 · 用户不用设（hidden）。
     /// 格式 `<start_frame>,<end_frame>` · 半开区间 [start, end) · 0-indexed。
+    /// Historical: v1.15 frame-range worker protocol.
     #[arg(long = "frame-range", hide = true)]
     pub frame_range: Option<String>,
 }

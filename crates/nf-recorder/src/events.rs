@@ -1,6 +1,7 @@
-//! Stdout JSON-Line event emitter · v1.14 T-09 minimal implementation.
+//! Stdout JSON-Line event emitter for recorder progress and verification.
 //!
-//! Contract source: `spec/versions/v1.14/spec/interfaces-delta.json`
+//! Historical: v1.14 T-09 minimal implementation.
+//! Historical: contract source `spec/versions/v1.14/spec/interfaces-delta.json`
 //! → `additions.modules[nf-recorder].subprocess_protocol.stdout_events`.
 //!
 //! Emits one JSON object per line to stdout, flushed on every call so
@@ -8,14 +9,16 @@
 //! incrementally without waiting for buffer flushes.
 //!
 //! **Why sync stdout (not tokio::io)**: recorder pipeline is single-threaded
-//! (worker_count = 1 in v1.14) · sync stdout is simpler · avoids tokio
+//! (single recorder worker) · sync stdout is simpler · avoids tokio
 //! runtime contention with the NSRunLoop pump inside `call_async`.
+//! Historical: v1.14 used `worker_count = 1`.
 
 use serde::Serialize;
 use std::io::Write;
 use std::path::PathBuf;
 
-/// v1.14 recorder stdout events · tagged by `event` field.
+/// Recorder stdout events · tagged by `event` field.
+/// Historical: v1.14 recorder stdout event schema.
 #[derive(Debug, Serialize)]
 #[serde(tag = "event")]
 pub enum Event {
@@ -30,10 +33,11 @@ pub enum Event {
     },
     /// Emitted per frame after successful encode.
     ///
-    /// `t_ms` is the legacy integer-ms value (向后兼容 · v1.14.0/1 字段 · 下游脚本仍用).
+    /// `t_ms` is the legacy integer-ms value (向后兼容 · 下游脚本仍用).
     /// `t_exact_ms` is the precise f64 time the recorder sent to `window.__nf.seek`
-    /// (v1.14.2 FM-T-QUANTIZATION 新增 · 精确 `seq * 1000 / fps` · VP-3 用它做
+    /// (精确 `seq * 1000 / fps` · VP-3 用它做
     /// "帧间 t 序列严格等距" 断言 · spread < 1e-6).
+    /// Historical: v1.14.0/1 integer-ms field; v1.14.2 added FM-T-QUANTIZATION.
     #[serde(rename = "record.frame")]
     RecordFrame {
         t_ms: u64,
@@ -41,7 +45,8 @@ pub enum Event {
         seq: u64,
         encode_ms: f64,
     },
-    /// Emitted every N frames (recorder chooses cadence, v1.14 = 30).
+    /// Emitted every N frames (recorder chooses cadence).
+    /// Historical: v1.14 cadence = 30.
     #[serde(rename = "record.encode_progress")]
     RecordEncodeProgress {
         frames_encoded: u64,
@@ -84,7 +89,8 @@ pub enum Event {
         duration_ms: u64,
         asserts: Vec<serde_json::Value>,
     },
-    /// v1.15 · 并行录制开始 · orchestrator 父进程 probe duration 后 emit。
+    /// 并行录制开始 · orchestrator 父进程 probe duration 后 emit。
+    /// Historical: v1.15 parallel recording event.
     #[serde(rename = "record.parallel.start")]
     RecordParallelStart {
         parallel: usize,

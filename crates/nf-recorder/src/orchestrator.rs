@@ -1,4 +1,6 @@
-//! v1.15 · 时间切片并行录制 orchestrator。
+//! 时间切片并行录制 orchestrator。
+//!
+//! Historical: v1.15 time-sliced parallel recording orchestrator.
 //!
 //! 父进程职责（ADR-061）:
 //! 1. probe bundle duration (启一次 MacHeadlessShell · load_bundle · call __nf.getDuration)
@@ -22,10 +24,12 @@ use crate::record_loop::{RecordConfig, RecordError};
 /// 并行模式最低启用阈值 (ms) · 低于此走单进程 (N 进程 boot ~1s × N 吃掉收益)。
 pub const PARALLEL_MIN_DURATION_MS: u64 = 6000;
 
-/// v1.56 · 4K 走 orchestrator 时的默认并发度。
+/// 4K 走 orchestrator 时的默认并发度。
+/// Historical: v1.56 4K parallel default.
 pub const PARALLEL_DEFAULT_4K: usize = 4;
 
-/// v1.56 · 并行上限 · >8 会放大内存/VT 压力，直接拒绝。
+/// 并行上限 · >8 会放大内存/VT 压力，直接拒绝。
+/// Historical: v1.56 parallel cap.
 pub const PARALLEL_MAX: usize = 8;
 
 pub fn default_parallel_for_viewport(width: u32, height: u32) -> usize {
@@ -66,6 +70,39 @@ fn parallel_min_duration_ms() -> u64 {
         .unwrap_or(PARALLEL_MIN_DURATION_MS)
 }
 
+pub(crate) fn compute_frame_ranges(total_frames: u64, parallel: usize) -> Vec<(u64, u64)> {
+    if total_frames == 0 || parallel == 0 {
+        return Vec::new();
+    }
+
+    let step = total_frames / parallel as u64;
+    let mut ranges = Vec::with_capacity(parallel);
+    let mut cursor = 0u64;
+    for i in 0..parallel {
+        let end = if i + 1 == parallel {
+            total_frames
+        } else {
+            cursor + step
+        };
+        ranges.push((cursor, end));
+        cursor = end;
+    }
+    debug_assert_eq!(cursor, total_frames);
+    ranges
+}
+
+pub(crate) fn should_downgrade_to_serial(duration_sec: f64, parallel: usize) -> bool {
+    should_downgrade_to_serial_with_min(duration_sec, parallel, PARALLEL_MIN_DURATION_MS)
+}
+
+fn should_downgrade_to_serial_with_min(
+    duration_sec: f64,
+    parallel: usize,
+    min_duration_ms: u64,
+) -> bool {
+    parallel > 1 && duration_sec * 1000.0 < min_duration_ms as f64
+}
+
 /// 运行并行录制流水线 · 父进程入口。
 pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), RecordError> {
     let t0 = Instant::now();
@@ -81,7 +118,13 @@ pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), Reco
     }
 
     // 2. 降级判断 · 短视频 / parallel=1 走单进程。
-    let effective_n = if duration_ms < min_duration_ms || requested_parallel <= 1 {
+    let duration_sec = duration_ms as f64 / 1000.0;
+    let downgrade_for_duration = if min_duration_ms == PARALLEL_MIN_DURATION_MS {
+        should_downgrade_to_serial(duration_sec, requested_parallel)
+    } else {
+        should_downgrade_to_serial_with_min(duration_sec, requested_parallel, min_duration_ms)
+    };
+    let effective_n = if requested_parallel <= 1 || downgrade_for_duration {
         1
     } else {
         requested_parallel
@@ -102,24 +145,13 @@ pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), Reco
     });
 
     // 3. 平分 N 段 · frame-index 半开区间。
-    let step = total_frames / effective_n as u64;
-    let remainder = total_frames % effective_n as u64;
-    let mut ranges: Vec<(u64, u64)> = Vec::with_capacity(effective_n);
-    let mut cursor = 0u64;
-    for i in 0..effective_n {
-        // 最后一段吸收余数 · 保证 sum == total_frames。
-        let extra = if (i as u64) < remainder { 1 } else { 0 };
-        let end = cursor + step + extra;
-        ranges.push((cursor, end));
-        cursor = end;
-    }
-    debug_assert_eq!(cursor, total_frames);
+    let ranges = compute_frame_ranges(total_frames, effective_n);
 
     // 4. spawn N 子进程 · 输出到临时 segment_i.mp4。
     //
-    // v1.44.1 · 找 nf-recorder binary:
-    //   v1.15 假设 current_exe = nf-recorder · 直接 spawn 自己;
-    //   v1.44+ 从 nf-shell lib 调用时 current_exe = nf-shell · 不能直接 spawn
+    // Historical: v1.44.1 · 找 nf-recorder binary:
+    //   Historical: v1.15 假设 current_exe = nf-recorder · 直接 spawn 自己;
+    //   Historical: v1.44+ 从 nf-shell lib 调用时 current_exe = nf-shell · 不能直接 spawn
     //   (nf-shell 的 main 走 event_loop · 不跑 record_loop).
     // 策略:优先找同目录的 nf-recorder · 兜底用 current_exe (单 binary 场景兼容).
     let self_exe = resolve_recorder_binary()?;
@@ -166,7 +198,7 @@ pub async fn run_parallel(cfg: RecordConfig, parallel: usize) -> Result<(), Reco
             .arg(&res_str)
             .arg("--frame-range")
             .arg(&range_str)
-            .stdout(Stdio::piped())
+            .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| RecordError::PipelineError(format!("spawn segment {i}: {e}")))?;
@@ -294,12 +326,16 @@ async fn probe_duration(cfg: &RecordConfig) -> Result<u64, RecordError> {
     Ok(duration_ms)
 }
 
-/// v1.44.1 · 解析 nf-recorder binary 路径 · 供 orchestrator spawn 子进程用。
+/// 解析 nf-recorder binary 路径 · 供 orchestrator spawn 子进程用。
+///
+/// Historical: v1.44.1 recorder binary resolution.
 ///
 /// 探测顺序:
 /// 1. `$NF_RECORDER_BIN` 环境变量 (开发时 override)
 /// 2. `current_exe().parent()/nf-recorder` (cargo 默认布局: target/release/{nf-shell,nf-recorder})
-/// 3. `current_exe()` 自身 (nf-recorder 单 binary 场景 · v1.15 兼容路径)
+/// 3. `current_exe()` 自身 (nf-recorder 单 binary 场景).
+///
+/// Historical: v1.15 self-spawn compatibility path.
 fn resolve_recorder_binary() -> Result<PathBuf, RecordError> {
     if let Ok(env_path) = std::env::var("NF_RECORDER_BIN") {
         let p = PathBuf::from(env_path);
@@ -331,4 +367,35 @@ fn resolve_recorder_binary() -> Result<PathBuf, RecordError> {
         "nf-recorder binary not found next to {} · set NF_RECORDER_BIN env var",
         current.display()
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{compute_frame_ranges, should_downgrade_to_serial};
+
+    #[test]
+    fn ranges_split_evenly() {
+        assert_eq!(
+            compute_frame_ranges(120, 4),
+            vec![(0, 30), (30, 60), (60, 90), (90, 120)]
+        );
+    }
+
+    #[test]
+    fn ranges_remainder_to_last() {
+        assert_eq!(
+            compute_frame_ranges(122, 4),
+            vec![(0, 30), (30, 60), (60, 90), (90, 122)]
+        );
+    }
+
+    #[test]
+    fn short_video_downgrades() {
+        assert!(should_downgrade_to_serial(5.0, 4));
+    }
+
+    #[test]
+    fn parallel_one_no_downgrade() {
+        assert!(!should_downgrade_to_serial(10.0, 1));
+    }
 }

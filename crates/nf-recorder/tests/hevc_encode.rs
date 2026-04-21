@@ -1,4 +1,6 @@
-//! HEVC integration coverage for v1.67.1 Bug-B / Bug-C fixes.
+//! HEVC integration coverage for rate-control + async flush.
+//!
+//! Historical: v1.67.1 Bug-B / Bug-C fixes.
 
 #![cfg(target_os = "macos")]
 #![allow(clippy::assertions_on_constants, clippy::panic, clippy::unwrap_used)]
@@ -93,7 +95,9 @@ fn hevc_encode_single_frame() {
 fn hevc_encode_3s_tail_frames_not_black() {
     let _lock = ExportLock::acquire(EXPORT_LOCK_NAME);
     let Some((workspace_root, nf_shell)) = release_nf_shell() else {
-        eprintln!("[hevc_encode_3s_tail_frames_not_black] skipping: target/release/nf-shell missing");
+        eprintln!(
+            "[hevc_encode_3s_tail_frames_not_black] skipping: target/release/nf-shell missing"
+        );
         return;
     };
     if !ffprobe_available() {
@@ -103,7 +107,7 @@ fn hevc_encode_3s_tail_frames_not_black() {
 
     let output_path = workspace_root
         .join("target")
-        .join(format!("v1.67.1-hevc-tail-{}.mp4", std::process::id()));
+        .join(format!("hevc-tail-{}.mp4", std::process::id()));
     let export = run_export(
         &workspace_root,
         &nf_shell,
@@ -149,7 +153,9 @@ fn hevc_encode_3s_tail_frames_not_black() {
 fn hevc_encode_bitrate_close_to_target() {
     let _lock = ExportLock::acquire(EXPORT_LOCK_NAME);
     let Some((workspace_root, nf_shell)) = release_nf_shell() else {
-        eprintln!("[hevc_encode_bitrate_close_to_target] skipping: target/release/nf-shell missing");
+        eprintln!(
+            "[hevc_encode_bitrate_close_to_target] skipping: target/release/nf-shell missing"
+        );
         return;
     };
     if !ffprobe_available() {
@@ -159,7 +165,7 @@ fn hevc_encode_bitrate_close_to_target() {
 
     let output_path = workspace_root
         .join("target")
-        .join(format!("v1.67.1-hevc-bitrate-{}.mp4", std::process::id()));
+        .join(format!("hevc-bitrate-{}.mp4", std::process::id()));
     let export = run_export(
         &workspace_root,
         &nf_shell,

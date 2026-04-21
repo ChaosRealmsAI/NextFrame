@@ -4,7 +4,8 @@
 //! for product verification. Recording quality checks must be internal to the
 //! product so a fresh Claude session can verify with only `./nf-recorder verify`.
 //!
-//! ## What it checks (6 assertions for v1.14)
+//! ## What it checks
+//! Historical: 6 assertions for v1.14.
 //! 1. `moov_front` — moov atom appears before mdat (network / web playback OK)
 //! 2. `color_primaries == bt709` — H.264 VUI color primaries
 //! 3. `transfer_characteristics == bt709` — gamma
@@ -612,7 +613,8 @@ fn parse_stsd(body: &[u8], info: &mut MoovInfo) -> Result<(), VerifyError> {
                 }
             }
         }
-        // Only first sample entry is read (v1.14 encoder emits one).
+        // Only first sample entry is read.
+        // Historical: v1.14 encoder emits one sample entry.
     }
     Ok(())
 }

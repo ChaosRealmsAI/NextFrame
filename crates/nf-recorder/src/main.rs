@@ -1,4 +1,6 @@
-//! `nf-recorder` binary entry point · v1.14 T-09 / T-17 / T-18.
+//! `nf-recorder` binary entry point · record / snapshot / verify dispatch.
+//!
+//! Historical: v1.14 T-09 / T-17 / T-18 entry point.
 //!
 //! Single-threaded tokio runtime so the inner `call_async` future can pump
 //! the macOS main run loop on the calling thread (WKWebView / CARenderer
