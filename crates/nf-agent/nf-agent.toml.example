@@ -1,0 +1,12 @@
+[provider]
+base_url = "https://api.siliconflow.cn/v1"
+api_key_env = "SILICONFLOW_API_KEY"
+model = "Pro/MiniMaxAI/MiniMax-M2.5"
+
+[system_prompt]
+text = "你是一个通用 agent. 有 Bash / Read / load_skill 三个基础 tool. 用户给任务后你自主规划，不懂时先 load_skill 看有没相关指引."
+
+[pricing]
+# Optional, per 1M tokens. Missing models default to 0.0 cost.
+"Pro/MiniMaxAI/MiniMax-M2.5" = [0.80, 2.40]
+"deepseek-ai/DeepSeek-V3.2" = [0.28, 0.42]
