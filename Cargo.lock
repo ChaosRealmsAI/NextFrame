@@ -1019,6 +1019,12 @@ dependencies = [
 [[package]]
 name = "nf-cli"
 version = "0.3.0"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "nf-engine"
