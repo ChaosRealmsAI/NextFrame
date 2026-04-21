@@ -20,6 +20,16 @@ pub fn create_window(
     project: &str,
     episode: &str,
 ) -> Result<(Window, WebView), String> {
+    // Traffic light 按 topbar 高度居中(Electron / VSCode 业界公式):
+    //   y_inset = TOPBAR_HEIGHT / 2 - TRAFFIC_LIGHT_DIAMETER / 2
+    // macOS traffic light 按钮直径 ≈ 14pt(行业共识 · 不在 Apple 公开 docs 但 VSCode/Electron/Tauri 都用这值)
+    // 修改 TOPBAR_HEIGHT_PT 时 y_inset 自动重算 · 不再靠魔数
+    const TOPBAR_HEIGHT_PT: f64 = 48.0;
+    const TRAFFIC_LIGHT_DIAMETER_PT: f64 = 14.0;
+    const TRAFFIC_LIGHT_X_PT: f64 = 20.0; // 左 margin · industry 15-20pt 主流
+    const TRAFFIC_LIGHT_Y_PT: f64 =
+        (TOPBAR_HEIGHT_PT - TRAFFIC_LIGHT_DIAMETER_PT) / 2.0; // = 17.0 at bar=48
+
     let builder = WindowBuilder::new()
         .with_title("NextFrame")
         .with_inner_size(LogicalSize::new(1440.0, 900.0))
@@ -32,9 +42,10 @@ pub fn create_window(
         .with_titlebar_transparent(true)
         .with_fullsize_content_view(true)
         .with_has_shadow(true)
-        // traffic light 按 48px topbar 居中:button 直径 ~14pt · y_inset = (48-14)/2 = 17
-        // x=20 让 3 按钮整组视觉平衡(close 中心 ≈ 20 · min ≈ 40 · zoom ≈ 60)· 跟 topbar 左 80px gutter 对齐
-        .with_traffic_light_inset(LogicalPosition::new(20.0, 17.0));
+        .with_traffic_light_inset(LogicalPosition::new(
+            TRAFFIC_LIGHT_X_PT,
+            TRAFFIC_LIGHT_Y_PT,
+        ));
     let window = builder
         .build(target)
         .map_err(|err| format!("window build failed: {err}"))?;
