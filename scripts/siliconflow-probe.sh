@@ -54,7 +54,7 @@ fi
 
 # ---- 参数 ----
 PROMPT="${1:-你好 · 用一句话介绍你自己}"
-MODEL="${SILICONFLOW_MODEL:-deepseek-ai/DeepSeek-V3}"
+MODEL="${SILICONFLOW_MODEL:-Pro/MiniMaxAI/MiniMax-M2.5}"
 BASE_URL="${SILICONFLOW_BASE_URL:-https://api.siliconflow.cn/v1}"
 
 echo "→ 模型: $MODEL"
