@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
     sync::Arc,
+    time::Instant,
 };
 
 use anyhow::{Context, Result, anyhow};
@@ -16,6 +17,7 @@ use crate::{
         BashPermission, BashTool, LoadSkillTool, ReadTool, Tool, VerifyOutputsTool,
         openai_tool_schema,
     },
+    trace::TraceWriter,
 };
 
 const FINAL_CHECK_MAX_RETRIES: usize = 3;
@@ -26,6 +28,7 @@ pub struct Agent {
     tools: Vec<Box<dyn Tool>>,
     skills: Arc<SkillRegistry>,
     config: Config,
+    trace: TraceWriter,
 }
 
 struct DispatchedToolCall {
@@ -90,6 +93,7 @@ impl Agent {
             provider,
             tools,
             skills,
+            trace: TraceWriter::new(config.trace.path.clone()),
             config,
         }
     }
@@ -104,6 +108,7 @@ impl Agent {
             provider,
             tools,
             skills: Arc::new(skills),
+            trace: TraceWriter::new(config.trace.path.clone()),
             config,
         }
     }
@@ -123,6 +128,9 @@ impl Agent {
         let mut warned_cost = false;
 
         for iter in 0..max_iters {
+            let iter_number = iter + 1;
+            let request_started = Instant::now();
+            let retries_before = self.provider.retries_by_status();
             let resp = self
                 .provider
                 .chat(self.config.model(), &messages, &self.tool_schemas())
@@ -130,6 +138,31 @@ impl Agent {
             stats.add(&resp.usage);
             let cost = self.config.estimate_cost_usd(&stats);
             stats.peak_cost_usd = stats.peak_cost_usd.max(cost);
+            let retries_after = self.provider.retries_by_status();
+            let retry_delta =
+                retry_count(&retries_after).saturating_sub(retry_count(&retries_before));
+            self.trace.emit(
+                "chat_request",
+                json!({
+                    "iter": iter_number,
+                    "duration_ms": request_started.elapsed().as_millis(),
+                    "tool_calls": resp.tool_calls.len(),
+                    "cost_usd": cost,
+                    "context_bytes": estimate_history_bytes(&messages),
+                    "retries": retry_delta,
+                    "retries_by_status": retries_after,
+                }),
+            );
+            if retry_delta > 0 {
+                self.trace.emit(
+                    "retry",
+                    json!({
+                        "iter": iter_number,
+                        "retries": retry_delta,
+                        "retries_by_status": self.provider.retries_by_status(),
+                    }),
+                );
+            }
 
             if !warned_cost && cost >= self.config.cost_guard.warn_usd {
                 log::warn!(
@@ -145,9 +178,19 @@ impl Agent {
                     self.config.cost_guard.hard_stop_usd
                 );
                 stats.context_bytes = estimate_history_bytes(&messages);
+                self.trace.emit(
+                    "budget_hit",
+                    json!({
+                        "iter": iter_number,
+                        "cost_usd": cost,
+                        "budget_hit_usd": cost,
+                        "context_bytes": stats.context_bytes,
+                        "retries": retry_count(&self.provider.retries_by_status()),
+                    }),
+                );
                 return Ok(AgentResult {
                     completed: false,
-                    iters: iter + 1,
+                    iters: iter_number,
                     stats,
                     retries_by_status: self.provider.retries_by_status(),
                     final_text: None,
@@ -188,9 +231,20 @@ impl Agent {
                             missing
                         );
                         stats.context_bytes = estimate_history_bytes(&messages);
+                        self.trace.emit(
+                            "forced_stop",
+                            json!({
+                                "iter": iter_number,
+                                "reason": "missing_outputs",
+                                "missing_outputs": missing.clone(),
+                                "cost_usd": cost,
+                                "context_bytes": stats.context_bytes,
+                                "retries": retry_count(&self.provider.retries_by_status()),
+                            }),
+                        );
                         return Ok(AgentResult {
                             completed: false,
-                            iters: iter + 1,
+                            iters: iter_number,
                             stats,
                             retries_by_status: self.provider.retries_by_status(),
                             final_text: resp.content,
@@ -202,9 +256,19 @@ impl Agent {
                 }
                 log::info!("FINAL: {}", resp.content.as_deref().unwrap_or(""));
                 stats.context_bytes = estimate_history_bytes(&messages);
+                self.trace.emit(
+                    "final",
+                    json!({
+                        "iter": iter_number,
+                        "text": resp.content.clone(),
+                        "cost_usd": cost,
+                        "context_bytes": stats.context_bytes,
+                        "retries": retry_count(&self.provider.retries_by_status()),
+                    }),
+                );
                 return Ok(AgentResult {
                     completed: true,
-                    iters: iter + 1,
+                    iters: iter_number,
                     stats,
                     retries_by_status: self.provider.retries_by_status(),
                     final_text: resp.content,
@@ -219,7 +283,9 @@ impl Agent {
                 resp.tool_calls.clone(),
             ));
 
-            let dispatched = self.dispatch_tool_calls(&resp.tool_calls).await;
+            let dispatched = self
+                .dispatch_tool_calls(iter_number, &resp.tool_calls)
+                .await;
             for item in dispatched {
                 if item.tool_call.name == "load_skill" {
                     if let Some(skill_name) = extract_successful_loaded_skill_name(&item.result) {
@@ -240,6 +306,16 @@ impl Agent {
             );
         }
 
+        self.trace.emit(
+            "forced_stop",
+            json!({
+                "iter": max_iters,
+                "reason": "max_iters_reached",
+                "context_bytes": stats.context_bytes,
+                "cost_usd": self.config.estimate_cost_usd(&stats),
+                "retries": retry_count(&self.provider.retries_by_status()),
+            }),
+        );
         Err(anyhow!("max iters reached"))
     }
 
@@ -250,7 +326,11 @@ impl Agent {
             .collect()
     }
 
-    async fn dispatch_tool_calls(&self, tool_calls: &[ToolCall]) -> Vec<DispatchedToolCall> {
+    async fn dispatch_tool_calls(
+        &self,
+        iter: usize,
+        tool_calls: &[ToolCall],
+    ) -> Vec<DispatchedToolCall> {
         let mut safe_calls = Vec::new();
         let mut unsafe_calls = Vec::new();
 
@@ -271,25 +351,42 @@ impl Agent {
 
         let safe_futs = safe_calls
             .iter()
-            .map(|(index, tool_call)| self.dispatch_indexed(*index, tool_call));
+            .map(|(index, tool_call)| self.dispatch_indexed(iter, *index, tool_call));
         let mut results = join_all(safe_futs).await;
 
         for (index, tool_call) in unsafe_calls {
-            results.push(self.dispatch_indexed(index, tool_call).await);
+            results.push(self.dispatch_indexed(iter, index, tool_call).await);
         }
 
         results.sort_by_key(|item| item.index);
         results
     }
 
-    async fn dispatch_indexed(&self, index: usize, tool_call: &ToolCall) -> DispatchedToolCall {
+    async fn dispatch_indexed(
+        &self,
+        iter: usize,
+        index: usize,
+        tool_call: &ToolCall,
+    ) -> DispatchedToolCall {
         log::info!("-> tool: {}({})", tool_call.name, tool_call.args);
+        let started = Instant::now();
         let result = self.dispatch(tool_call).await;
         log::info!(
             "<- result: {}",
             truncate(&serde_json::to_string(&result).unwrap_or_else(|err| {
                 json!({"ok": false, "error": err.to_string()}).to_string()
             }))
+        );
+        self.trace.emit(
+            "tool_call",
+            json!({
+                "iter": iter,
+                "name": tool_call.name,
+                "args": tool_call.args.clone(),
+                "result": result.clone(),
+                "duration_ms": started.elapsed().as_millis(),
+                "retries": 0,
+            }),
         );
         DispatchedToolCall {
             index,
@@ -353,6 +450,10 @@ fn extract_successful_loaded_skill_name(value: &Value) -> Option<String> {
         .get("skill")
         .and_then(Value::as_str)
         .map(ToOwned::to_owned)
+}
+
+fn retry_count(retries_by_status: &HashMap<u16, u32>) -> u32 {
+    retries_by_status.values().copied().sum()
 }
 
 fn compact_history_if_needed(

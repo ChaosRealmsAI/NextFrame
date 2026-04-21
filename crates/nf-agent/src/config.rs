@@ -26,6 +26,8 @@ pub struct Config {
     #[serde(default)]
     pub cost_guard: CostGuardConfig,
     #[serde(default)]
+    pub trace: TraceConfig,
+    #[serde(default)]
     pub providers: BTreeMap<String, ProviderConfig>,
 }
 
@@ -38,6 +40,12 @@ pub struct ProviderConfig {
 
 pub type Model = String;
 pub type PricingTable = BTreeMap<String, [f64; 2]>;
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct TraceConfig {
+    #[serde(default)]
+    pub path: Option<String>,
+}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CostGuardConfig {

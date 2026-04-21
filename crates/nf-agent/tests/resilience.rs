@@ -98,6 +98,7 @@ fn make_config(max_retries: usize, retry_base_ms: u64) -> Config {
         max_history_chars: 200_000,
         pricing: BTreeMap::new(),
         cost_guard: CostGuardConfig::default(),
+        trace: nf_agent::TraceConfig::default(),
         providers: BTreeMap::new(),
     }
 }

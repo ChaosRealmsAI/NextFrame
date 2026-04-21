@@ -22,6 +22,8 @@ struct Cli {
     max_iters: usize,
     #[arg(long, help = "Log output path. Defaults to stderr")]
     log: Option<String>,
+    #[arg(long, help = "Write JSONL trace events to this path")]
+    trace: Option<String>,
 }
 
 #[tokio::main]
@@ -38,7 +40,10 @@ async fn main() -> ExitCode {
 
 async fn run(cli: Cli) -> Result<ExitCode> {
     init_logger(cli.log.as_deref())?;
-    let config = Config::from_path(&cli.config)?;
+    let mut config = Config::from_path(&cli.config)?;
+    if let Some(trace_path) = cli.trace {
+        config.trace.path = Some(trace_path);
+    }
     let skills = SkillRegistry::load(&cli.skills_dir)?;
     let provider = OpenAiCompat::from_config(&config)?;
     let agent = Agent::try_new(config.clone(), skills, Box::new(provider))?;

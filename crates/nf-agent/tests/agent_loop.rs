@@ -127,6 +127,7 @@ fn make_config(final_check_enabled: bool) -> Config {
         max_history_chars: 200_000,
         pricing: BTreeMap::new(),
         cost_guard: CostGuardConfig::default(),
+        trace: nf_agent::TraceConfig::default(),
         providers: BTreeMap::new(),
     }
 }

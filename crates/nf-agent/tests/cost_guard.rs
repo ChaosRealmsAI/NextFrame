@@ -282,6 +282,7 @@ fn make_config(rate_per_million: f64, warn_usd: f64, hard_stop_usd: f64) -> Conf
             warn_usd,
             hard_stop_usd,
         },
+        trace: nf_agent::TraceConfig::default(),
         providers: BTreeMap::new(),
     }
 }

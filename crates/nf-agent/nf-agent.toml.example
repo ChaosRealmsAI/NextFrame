@@ -12,6 +12,10 @@ allowlist = []
 warn_usd = 0.10
 hard_stop_usd = 0.50
 
+[trace]
+# Optional JSONL sidecar path. CLI --trace overrides this.
+# path = "run.jsonl"
+
 [provider]
 base_url = "https://api.siliconflow.cn/v1"
 api_key_env = "SILICONFLOW_API_KEY"

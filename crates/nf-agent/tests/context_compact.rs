@@ -213,6 +213,7 @@ fn make_config(max_tool_result_chars: usize, max_history_chars: usize) -> Config
         max_history_chars,
         pricing: BTreeMap::new(),
         cost_guard: CostGuardConfig::default(),
+        trace: nf_agent::TraceConfig::default(),
         providers: BTreeMap::new(),
     }
 }
