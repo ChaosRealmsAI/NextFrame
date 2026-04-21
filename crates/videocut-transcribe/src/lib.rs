@@ -9,13 +9,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Instant;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tempfile::tempdir;
 use videocut_core::{
-    SentenceSource, Sentences, Word, WordsFile, extract_audio_to_wav, probe_duration, python_bin,
-    split_into_sentences,
+    extract_audio_to_wav, probe_duration, python_bin, split_into_sentences, SentenceSource,
+    Sentences, Word, WordsFile,
 };
 
 use crate::chunk::build_chunks;
@@ -304,17 +304,39 @@ fn whisper_script_path() -> Result<PathBuf> {
         }
     }
 
-    bail!("python/whisper_transcribe.py not found (set SPLICE_WHISPER_SCRIPT)")
+    bail!("python/whisper_transcribe.py not found (set VIDEOCUT_WHISPER_SCRIPT)")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        ENV_LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
-    fn whisper_script_resolves_from_source_tree() -> Result<()> {
+    fn whisper_script_prefers_env_override() -> Result<()> {
+        let _guard = env_lock()
+            .lock()
+            .map_err(|_| anyhow::anyhow!("poisoned env lock"))?;
+        let temp = tempfile::tempdir()?;
+        let script = temp.path().join("whisper_transcribe.py");
+        fs::write(&script, "#!/usr/bin/env python3\n")?;
+
+        // SAFETY: tests serialize environment mutation with `env_lock`.
+        unsafe {
+            std::env::set_var("VIDEOCUT_WHISPER_SCRIPT", &script);
+        }
         let path = whisper_script_path()?;
-        assert!(path.ends_with("python/whisper_transcribe.py"));
+        // SAFETY: tests serialize environment mutation with `env_lock`.
+        unsafe {
+            std::env::remove_var("VIDEOCUT_WHISPER_SCRIPT");
+        }
+
+        assert_eq!(path, script);
         Ok(())
     }
 }

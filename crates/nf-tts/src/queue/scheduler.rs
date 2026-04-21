@@ -49,13 +49,7 @@ pub async fn run_batch(
             .ok_or_else(|| anyhow!("backend {backend_name} was not initialized"))?;
         let output_dir = output_dir.to_path_buf();
         let params = job.to_synth_params(default_voice);
-        let cache_key = Cache::key(
-            &job.text,
-            &params.voice,
-            &params.rate,
-            &params.pitch,
-            &params.volume,
-        );
+        let cache_key = Cache::key(&backend_name, &job.text, &params);
         let filename = job
             .filename
             .clone()
@@ -125,13 +119,7 @@ pub async fn run_batch(
                 let backend_name = job.backend_name(default_backend);
 
                 // Write to cache.
-                let cache_key = Cache::key(
-                    &job.text,
-                    &params.voice,
-                    &params.rate,
-                    &params.pitch,
-                    &params.volume,
-                );
+                let cache_key = Cache::key(&backend_name, &job.text, &params);
                 let _ = cache.put(&cache_key, &audio);
 
                 if gen_srt {

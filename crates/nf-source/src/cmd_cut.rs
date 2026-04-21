@@ -1,7 +1,7 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde_json::to_string;
 use videocut_core::CutReport;
-use videocut_cut::{CutOptions, cut_plan};
+use videocut_cut::{cut_plan, CutOptions};
 
 use crate::cli::CutArgs;
 
@@ -24,6 +24,9 @@ pub fn run(args: CutArgs) -> Result<()> {
 
     report.write_to_path(&report_path)?;
     print_summary(&report);
+    if !report.failed.is_empty() {
+        bail!("cut failed for {} clip(s)", report.failed.len());
+    }
     Ok(())
 }
 

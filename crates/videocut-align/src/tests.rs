@@ -1,10 +1,16 @@
 //! Test coverage for `videocut-align`.
 
 use anyhow::Result;
+use std::sync::{Mutex, OnceLock};
 
-use super::AlignUnit;
 use super::script::align_script_path;
 use super::text::{build_sentences, normalize_language_arg, parse_plain_text, rebuild_words};
+use super::AlignUnit;
+
+fn env_lock() -> &'static Mutex<()> {
+    static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    ENV_LOCK.get_or_init(|| Mutex::new(()))
+}
 
 fn unit(text: &str, start_ms: u64, end_ms: u64) -> AlignUnit {
     AlignUnit {
@@ -15,9 +21,25 @@ fn unit(text: &str, start_ms: u64, end_ms: u64) -> AlignUnit {
 }
 
 #[test]
-fn align_script_resolves_from_source_tree() -> Result<()> {
+fn align_script_prefers_env_override() -> Result<()> {
+    let _guard = env_lock()
+        .lock()
+        .map_err(|_| anyhow::anyhow!("poisoned env lock"))?;
+    let temp = tempfile::tempdir()?;
+    let script = temp.path().join("align_ffa.py");
+    std::fs::write(&script, "#!/usr/bin/env python3\n")?;
+
+    // SAFETY: tests serialize environment mutation with `env_lock`.
+    unsafe {
+        std::env::set_var("VIDEOCUT_ALIGN_SCRIPT", &script);
+    }
     let path = align_script_path()?;
-    assert!(path.ends_with("python/align_ffa.py"));
+    // SAFETY: tests serialize environment mutation with `env_lock`.
+    unsafe {
+        std::env::remove_var("VIDEOCUT_ALIGN_SCRIPT");
+    }
+
+    assert_eq!(path, script);
     Ok(())
 }
 

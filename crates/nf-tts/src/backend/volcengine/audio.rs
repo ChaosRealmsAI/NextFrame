@@ -3,6 +3,7 @@ use std::io::Write;
 use std::process::Command;
 
 use anyhow::Result;
+use uuid::Uuid;
 
 use crate::backend::WordBoundary;
 
@@ -40,7 +41,7 @@ pub(super) fn split_sentences(text: &str) -> Vec<String> {
 
 /// Uses ffprobe to estimate MP3 duration in milliseconds
 pub(super) fn get_audio_duration_ms(audio: &[u8]) -> u64 {
-    let tmp = std::env::temp_dir().join(format!("vox-dur-{}.mp3", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!("vox-dur-{}.mp3", Uuid::new_v4()));
     if let Ok(mut file) = std::fs::File::create(&tmp) {
         let _ = file.write_all(audio);
     }
@@ -72,7 +73,7 @@ pub(super) fn detect_sentence_boundaries(
     audio: &[u8],
     sentences: &[String],
 ) -> Result<Vec<WordBoundary>> {
-    let tmp = std::env::temp_dir().join(format!("vox-sil-{}.mp3", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!("vox-sil-{}.mp3", Uuid::new_v4()));
     {
         let mut file = std::fs::File::create(&tmp)?;
         file.write_all(audio)?;

@@ -129,16 +129,10 @@ pub async fn run(command: SynthCommand) -> Result<()> {
     }
     let out_path = out_dir.join(&filename);
 
-    // Cache lives next to `-d` regardless of subdir, so the same text+voice
-    // combo hits across flat and subdir invocations.
+    // Cache lives next to `-d` regardless of subdir, so identical synth inputs
+    // hit across flat and subdir invocations.
     let cache = Cache::new(dir)?;
-    let cache_key = Cache::key(
-        &text,
-        &params.voice,
-        &params.rate,
-        &params.pitch,
-        &params.volume,
-    );
+    let cache_key = Cache::key(&backend_name, &text, &params);
     if let Some(cached_path) = cache.get(&cache_key) {
         std::fs::copy(&cached_path, &out_path).with_context(|| {
             format!(

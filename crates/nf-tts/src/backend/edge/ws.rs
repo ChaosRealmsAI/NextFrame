@@ -1,6 +1,9 @@
 //! backend edge websocket transport
+use std::time::Duration;
+
 use anyhow::{anyhow, Result};
 use futures::{SinkExt, StreamExt};
+use tokio::time::timeout;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
@@ -11,6 +14,25 @@ use super::drm;
 use super::ssml;
 use super::{BASE_URL, TRUSTED_CLIENT_TOKEN};
 use crate::backend::{SynthParams, SynthResult, Voice, WordBoundary};
+
+const EDGE_WS_RECV_TIMEOUT: Duration = Duration::from_secs(10);
+
+#[derive(Debug)]
+enum TtsError {
+    RecvTimeout { timeout: Duration },
+}
+
+impl std::fmt::Display for TtsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RecvTimeout { timeout } => {
+                write!(f, "Edge TTS receive timeout after {}s", timeout.as_secs())
+            }
+        }
+    }
+}
+
+impl std::error::Error for TtsError {}
 
 fn connect_id() -> String {
     Uuid::new_v4().to_string().replace('-', "")
@@ -236,7 +258,12 @@ async fn synthesize_chunk(
     let mut audio_data = Vec::new();
     let mut boundaries = Vec::new();
 
-    while let Some(msg) = stream.next().await {
+    while let Some(msg) = timeout(EDGE_WS_RECV_TIMEOUT, stream.next())
+        .await
+        .map_err(|_| TtsError::RecvTimeout {
+            timeout: EDGE_WS_RECV_TIMEOUT,
+        })?
+    {
         match msg? {
             Message::Text(ref text) => {
                 let text_str = text.as_str();
