@@ -1,4 +1,5 @@
 use std::{
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::Arc,
     thread,
@@ -219,6 +220,96 @@ impl Tool for LoadSkillTool {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct VerifyOutputsTool {
+    skills: Arc<SkillRegistry>,
+    workspace: PathBuf,
+}
+
+impl VerifyOutputsTool {
+    pub fn new(skills: Arc<SkillRegistry>, workspace: impl Into<PathBuf>) -> Self {
+        Self {
+            skills,
+            workspace: workspace.into(),
+        }
+    }
+}
+
+#[async_trait]
+impl Tool for VerifyOutputsTool {
+    fn name(&self) -> &str {
+        "verify_outputs"
+    }
+
+    fn description(&self) -> &str {
+        "Verify expected outputs exist per skill. Returns present/missing lists."
+    }
+
+    fn input_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "skill": {
+                    "type": "string",
+                    "description": "Skill name to verify"
+                }
+            },
+            "required": ["skill"],
+            "additionalProperties": false
+        })
+    }
+
+    async fn call(&self, args: Value) -> Result<Value> {
+        let skill_name = required_string(&args, "skill")?;
+        let skill = self
+            .skills
+            .get(&skill_name)
+            .with_context(|| format!("skill not found: {skill_name}"))?;
+
+        let workspace = self.workspace.clone();
+        let expected_outputs = skill.expected_outputs.clone();
+        tokio::task::spawn_blocking(move || {
+            verify_outputs_for_patterns(&workspace, &skill_name, &expected_outputs)
+        })
+        .await
+        .context("verify_outputs worker task failed")?
+    }
+}
+
+pub fn verify_outputs_for_patterns(
+    workspace: &Path,
+    skill_name: &str,
+    expected_outputs: &[String],
+) -> Result<Value> {
+    let mut present = Vec::new();
+    let mut missing = Vec::new();
+
+    for pattern in expected_outputs {
+        let abs_pattern = workspace.join(pattern);
+        let pattern_text = abs_pattern.to_str().with_context(|| {
+            format!("glob pattern is not valid UTF-8: {}", abs_pattern.display())
+        })?;
+        let mut matches = glob::glob(pattern_text)
+            .with_context(|| format!("invalid glob pattern: {pattern}"))?
+            .filter_map(|path| path.ok())
+            .collect::<Vec<_>>();
+        matches.sort();
+
+        if matches.is_empty() {
+            missing.push(pattern.clone());
+        } else {
+            present.extend(matches.into_iter().map(|path| path.display().to_string()));
+        }
+    }
+
+    Ok(json!({
+        "skill": skill_name,
+        "present": present,
+        "missing": missing,
+        "all_present": missing.is_empty(),
+    }))
+}
+
 pub fn openai_tool_schema(tool: &dyn Tool) -> Value {
     json!({
         "type": "function",
@@ -239,4 +330,50 @@ fn required_string(args: &Value, key: &str) -> Result<String> {
 
 fn optional_u64(args: &Value, key: &str, default: u64) -> u64 {
     args.get(key).and_then(Value::as_u64).unwrap_or(default)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use super::*;
+
+    #[test]
+    fn verify_outputs_reports_present_and_missing_patterns() -> Result<()> {
+        let workspace = unique_temp_dir("nf-agent-verify-workspace")?;
+        fs::create_dir_all(workspace.join("outputs"))
+            .with_context(|| format!("failed to create {}", workspace.display()))?;
+        fs::write(workspace.join("outputs/index.html"), "")
+            .with_context(|| format!("failed to write {}", workspace.display()))?;
+
+        let expected_outputs = vec![
+            "**/outputs/index.html".to_owned(),
+            "**/outputs/item_*.json".to_owned(),
+        ];
+        let result = verify_outputs_for_patterns(&workspace, "demo", &expected_outputs)?;
+
+        assert_eq!(result["skill"].as_str(), Some("demo"));
+        assert_eq!(result["all_present"].as_bool(), Some(false));
+        assert_eq!(
+            result["missing"].as_array().and_then(|items| items.first()),
+            Some(&json!("**/outputs/item_*.json"))
+        );
+        let present = result["present"].as_array().cloned().unwrap_or_default();
+        assert_eq!(present.len(), 1);
+
+        fs::remove_dir_all(&workspace)
+            .with_context(|| format!("failed to remove {}", workspace.display()))?;
+        Ok(())
+    }
+
+    fn unique_temp_dir(prefix: &str) -> Result<PathBuf> {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .context("system time before unix epoch")?
+            .as_nanos();
+        Ok(std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id())))
+    }
 }

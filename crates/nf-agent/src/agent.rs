@@ -1,14 +1,16 @@
-use std::sync::Arc;
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use serde_json::{Value, json};
 
 use crate::{
     config::Config,
     provider::{LlmProvider, Message, ToolCall, Usage},
     skill::SkillRegistry,
-    tool::{BashTool, LoadSkillTool, ReadTool, Tool, openai_tool_schema},
+    tool::{BashTool, LoadSkillTool, ReadTool, Tool, VerifyOutputsTool, openai_tool_schema},
 };
+
+const FINAL_CHECK_MAX_RETRIES: usize = 3;
 
 pub struct Agent {
     provider: Box<dyn LlmProvider>,
@@ -23,15 +25,18 @@ pub struct AgentResult {
     pub iters: usize,
     pub stats: Usage,
     pub final_text: Option<String>,
+    pub forced_stop_missing_outputs: Vec<String>,
 }
 
 impl Agent {
     pub fn new(config: Config, skills: SkillRegistry, provider: Box<dyn LlmProvider>) -> Self {
         let skills = Arc::new(skills);
+        let workspace = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let tools: Vec<Box<dyn Tool>> = vec![
             Box::new(BashTool),
             Box::new(ReadTool),
             Box::new(LoadSkillTool::new(Arc::clone(&skills))),
+            Box::new(VerifyOutputsTool::new(Arc::clone(&skills), workspace)),
         ];
         Self {
             provider,
@@ -65,6 +70,8 @@ impl Agent {
             Message::user(task.to_owned()),
         ];
         let mut stats = Usage::default();
+        let mut active_skills = HashSet::new();
+        let mut final_check_retries = 0;
 
         for iter in 0..max_iters {
             let resp = self
@@ -74,12 +81,46 @@ impl Agent {
             stats.add(&resp.usage);
 
             if resp.tool_calls.is_empty() {
+                if self.config.final_check_enabled {
+                    let missing = self.check_active_skills_outputs(&active_skills)?;
+                    if !missing.is_empty() {
+                        if final_check_retries < FINAL_CHECK_MAX_RETRIES {
+                            final_check_retries += 1;
+                            log::warn!(
+                                "FAKE FINAL blocked ({final_check_retries}/{FINAL_CHECK_MAX_RETRIES}) · missing: {:?}",
+                                missing
+                            );
+                            messages.push(Message::Assistant {
+                                content: resp.content.clone(),
+                                tool_calls: Vec::new(),
+                            });
+                            messages.push(Message::user(format!(
+                                "你声明完成但产物缺失: {:?} · 继续调 tool 完成 · 不要 FINAL",
+                                missing
+                            )));
+                            continue;
+                        }
+
+                        log::warn!(
+                            "forced stop after {FINAL_CHECK_MAX_RETRIES} FINAL checks · missing: {:?}",
+                            missing
+                        );
+                        return Ok(AgentResult {
+                            completed: false,
+                            iters: iter + 1,
+                            stats,
+                            final_text: resp.content,
+                            forced_stop_missing_outputs: missing,
+                        });
+                    }
+                }
                 log::info!("FINAL: {}", resp.content.as_deref().unwrap_or(""));
                 return Ok(AgentResult {
                     completed: true,
                     iters: iter + 1,
                     stats,
                     final_text: resp.content,
+                    forced_stop_missing_outputs: Vec::new(),
                 });
             }
 
@@ -98,6 +139,14 @@ impl Agent {
                     }))
                 );
                 messages.push(Message::tool(tool_call.id.clone(), result));
+                if tool_call.name == "load_skill" {
+                    if let Some(skill_name) = messages
+                        .last()
+                        .and_then(extract_successful_loaded_skill_name)
+                    {
+                        active_skills.insert(skill_name);
+                    }
+                }
             }
         }
 
@@ -127,6 +176,49 @@ impl Agent {
             }),
         }
     }
+
+    fn check_active_skills_outputs(&self, active_skills: &HashSet<String>) -> Result<Vec<String>> {
+        let workspace = std::env::current_dir().context("failed to resolve current workspace")?;
+        let mut missing = Vec::new();
+
+        for skill_name in active_skills {
+            let Some(skill) = self.skills.get(skill_name) else {
+                continue;
+            };
+            for pattern in &skill.expected_outputs {
+                let abs_pattern = workspace.join(pattern);
+                let Some(pattern_text) = abs_pattern.to_str() else {
+                    missing.push(format!("{skill_name}: {pattern}"));
+                    continue;
+                };
+                let has_match = glob::glob(pattern_text)
+                    .with_context(|| {
+                        format!("invalid glob pattern for skill {skill_name}: {pattern}")
+                    })?
+                    .any(|path| path.is_ok());
+                if !has_match {
+                    missing.push(format!("{skill_name}: {pattern}"));
+                }
+            }
+        }
+
+        missing.sort();
+        Ok(missing)
+    }
+}
+
+fn extract_successful_loaded_skill_name(message: &Message) -> Option<String> {
+    let Message::Tool { content, .. } = message else {
+        return None;
+    };
+    let value = serde_json::from_str::<Value>(content).ok()?;
+    if value.get("ok").and_then(Value::as_bool) != Some(true) {
+        return None;
+    }
+    value
+        .get("skill")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned)
 }
 
 fn truncate(value: &str) -> String {

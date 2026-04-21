@@ -1,3 +1,5 @@
+final_check_enabled = true
+
 [provider]
 base_url = "https://api.siliconflow.cn/v1"
 api_key_env = "SILICONFLOW_API_KEY"

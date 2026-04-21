@@ -7,6 +7,8 @@ use serde::Deserialize;
 pub struct Config {
     pub provider: ProviderConfig,
     pub system_prompt: SystemPrompt,
+    #[serde(default = "default_final_check_enabled")]
+    pub final_check_enabled: bool,
     #[serde(default)]
     pub pricing: PricingTable,
     #[serde(default)]
@@ -26,6 +28,10 @@ pub type PricingTable = BTreeMap<String, [f64; 2]>;
 #[derive(Debug, Clone, Deserialize)]
 pub struct SystemPrompt {
     pub text: String,
+}
+
+fn default_final_check_enabled() -> bool {
+    true
 }
 
 impl Config {

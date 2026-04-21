@@ -51,14 +51,19 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             }
             let cost = config.estimate_cost_usd(&result.stats);
             log::info!(
-                "stats: completed={} iters={} prompt_tokens={} completion_tokens={} est_cost_usd={:.6}",
+                "stats: completed={} iters={} prompt_tokens={} completion_tokens={} est_cost_usd={:.6} forced_stop_missing_outputs={:?}",
                 result.completed,
                 result.iters,
                 result.stats.prompt_tokens,
                 result.stats.completion_tokens,
-                cost
+                cost,
+                result.forced_stop_missing_outputs
             );
-            Ok(ExitCode::SUCCESS)
+            if result.completed {
+                Ok(ExitCode::SUCCESS)
+            } else {
+                Ok(ExitCode::from(1))
+            }
         }
         Err(err) if err.to_string() == "max iters reached" => {
             eprintln!("{err}");
