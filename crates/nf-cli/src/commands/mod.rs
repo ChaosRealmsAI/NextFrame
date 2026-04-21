@@ -7,6 +7,7 @@ use crate::ipc_client::{self, IpcResponse};
 pub mod anchors;
 pub mod app;
 pub mod clips;
+pub mod doctor;
 pub mod episodes;
 pub mod log;
 pub mod projects;
@@ -182,7 +183,16 @@ pub struct HelpArgs {
 
 #[derive(Debug, Args)]
 pub struct DoctorArgs {
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Print a human-readable environment report instead of JSON"
+    )]
+    pub human: bool,
+    #[arg(
+        long,
+        hide = true,
+        help = "Deprecated: JSON is the default output format"
+    )]
     pub json: bool,
 }
 

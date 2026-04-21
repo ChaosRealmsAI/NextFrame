@@ -10,6 +10,11 @@ use tao::event::{Event, StartCause, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 
 fn main() {
+    if std::env::args().any(|arg| arg == "--version" || arg == "-V") {
+        println!("nf-shell {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
     let mut builder = EventLoopBuilder::<UserEvent>::with_user_event();
     let event_loop = builder.build();
     let proxy = event_loop.create_proxy();
