@@ -220,6 +220,13 @@ async fn dispatch(req: IpcRequest, proxy: &EventLoopProxy<UserEvent>) -> IpcResp
             })
             .await
         }
+        "devtools-query" => {
+            send_event(req, proxy, |request, ack| UserEvent::DevtoolsQuery {
+                request,
+                ack,
+            })
+            .await
+        }
         "quit" => send_event(req, proxy, |request, ack| UserEvent::Quit { request, ack }).await,
         _ => IpcResponse {
             req_id: req.req_id,

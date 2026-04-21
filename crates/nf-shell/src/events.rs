@@ -24,6 +24,14 @@ pub enum UserEvent {
         request: IpcRequest,
         ack: oneshot::Sender<IpcResponse>,
     },
+    DevtoolsQuery {
+        request: IpcRequest,
+        ack: oneshot::Sender<IpcResponse>,
+    },
+    IpcFromJs {
+        window_id: String,
+        body: String,
+    },
     Quit {
         request: IpcRequest,
         ack: oneshot::Sender<IpcResponse>,
