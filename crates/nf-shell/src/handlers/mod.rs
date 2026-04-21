@@ -16,6 +16,7 @@ pub mod log;
 pub mod projects;
 
 pub struct ComposeOpHandler {
+    storage: JsonStorage,
     handlers: Vec<Box<dyn OpHandler>>,
 }
 
@@ -26,6 +27,7 @@ impl ComposeOpHandler {
 
     pub fn new(storage: JsonStorage) -> Self {
         Self {
+            storage: storage.clone(),
             handlers: vec![
                 Box::new(projects::ProjectsOpHandler::new(storage.clone())),
                 Box::new(episodes::EpisodesOpHandler::new(storage.clone())),
@@ -42,7 +44,11 @@ impl OpHandler for ComposeOpHandler {
         for handler in &self.handlers {
             match handler.handle(req) {
                 Ok(None) => {}
-                handled => return handled,
+                Ok(Some(data)) => {
+                    let _log_result = log::append_auto(&self.storage, req);
+                    return Ok(Some(data));
+                }
+                Err(err) => return Err(err),
             }
         }
 
