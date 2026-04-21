@@ -8,20 +8,19 @@ AI 视频引擎 — 把结构化信息变成视频。输入 JSON，输出可播�
 
 > 版本进度 / 最近做了啥 / 当前 phase → 看 `git log` + `spec/roadmap.json` + `spec/overview.html`。**本文件不记版本日志**（rule `self-evolution-dna`）。
 
-## 已有能力（src/ 下活着的 crate）
+> 当前状态: **empty shell**（2026-04-21 v0.x 探索期全量归档物理删除 · v0.1.0 从零重走新模式）. src/ 空 · spec/ 空骨架（`devlog/01.md` + `roadmap.json` + `charter.json`）. 技术栈 / 模块 / 能力由 v0.1.0 kickoff 定.
 
-| Crate | 能力 |
-|---|---|
-| `nf-cli` | 命令行入口 · `nf build / validate / anchors / lint-track / schema / new / karaoke` |
-| `nf-core-engine` | 编译器 · source → resolved → bundle.html 三阶段 |
-| `nf-runtime` | 浏览器运行时 · boot + RAF + `getStateAt(t)` · play/edit/record 三模式 |
-| `nf-tracks` | Track 家族（scene / chart / video / audio / subtitle …）+ ABI lint gates |
-| `nf-tts` | TTS 合成 · Edge + Volcengine + whisperX 字级对齐 · 详见 `src/nf-tts/CLAUDE.md` |
-| `nf-guide` | AI agent 工具链分发器（clips / produce / audio / script …） |
-| `nf-recorder` | 外驱 runtime + 像素采样 → MP4（含时间切片并行） |
-| `nf-shell` | 跨平台桌面壳（wry + tao · macOS / Windows / Linux） |
-| `nf-shell-mac` | macOS 专属旧路径（保留历史 · 详见 roadmap history） |
-| `nf-publish` | 发布器（douyin / bilibili / youtube / wechat） |
+## worktree 规范
+
+每版本独立 worktree · main 不直接改版本代码:
+
+```bash
+SESSION_SHORT=${CLAUDE_SESSION_ID:0:8}
+git worktree add .worktrees/v{X}-${SESSION_SHORT} -b v{X}-${SESSION_SHORT}
+ln -s /Users/Zhuanz/bigbang/NextFrame/spec .worktrees/v{X}-${SESSION_SHORT}/spec
+```
+
+`spec/` 是独立仓（`ChaosRealmsAI/NextFrame-spec` · 主仓 gitignored）· symlink 共享 —— 所有 worktree 共用主仓一份 spec · 改 spec 零冲突. 完事 `git worktree remove` + `git branch -d` 清干净.
 
 ## 写代码前（强制）
 
