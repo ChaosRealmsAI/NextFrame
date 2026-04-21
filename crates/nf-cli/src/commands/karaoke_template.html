@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Clips · 中英字级卡拉OK</title>
+<style>
+  :root{--bg:#050507;--glass:rgba(0,0,0,0.35);--elev:rgba(255,255,255,0.04);
+    --accent:#a78bfa;--warm:#f97316;--border:rgba(255,255,255,0.13);--border-soft:rgba(255,255,255,0.06);
+    --text:rgba(255,255,255,0.96);--text-sub:rgba(255,255,255,0.80);--text-40:rgba(255,255,255,0.45)}
+  *{box-sizing:border-box}html,body{margin:0;padding:0;height:100%}
+  body{background:var(--bg);
+    background-image:radial-gradient(ellipse 80% 25% at 50% 0%,rgba(139,92,246,0.22),transparent 60%),
+      radial-gradient(ellipse 60% 20% at 50% 100%,rgba(249,115,22,0.10),transparent 60%);
+    background-attachment:fixed;color:var(--text-sub);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","SF Pro SC",sans-serif;
+    display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+  .side{background:var(--glass);backdrop-filter:blur(40px) saturate(2);
+    border-right:1px solid var(--border);padding:28px 20px}
+  .side h1{font-size:14px;color:var(--accent);letter-spacing:0.12em;text-transform:uppercase;margin:0 0 16px;font-weight:700}
+  .clip-item{background:var(--elev);border:1px solid var(--border-soft);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:all .15s}
+  .clip-item:hover{border-color:var(--accent);background:rgba(167,139,250,0.08)}
+  .clip-item.active{border-color:var(--accent);background:rgba(167,139,250,0.15);box-shadow:0 0 20px rgba(167,139,250,0.25)}
+  .clip-item .num{font-family:"SF Mono",monospace;font-size:11px;color:var(--accent);font-weight:700;letter-spacing:0.08em}
+  .clip-item .title{color:var(--text);font-size:14px;font-weight:600;margin:4px 0 6px;line-height:1.4}
+  .clip-item .meta{font-size:11px;color:var(--text-40);font-family:"SF Mono",monospace;display:flex;justify-content:space-between}
+  .main{padding:28px 32px;display:flex;flex-direction:column;max-width:1100px;margin:0 auto;width:100%}
+  video{width:100%;border-radius:14px;box-shadow:0 12px 48px rgba(0,0,0,0.55);background:#000}
+  .cue{margin-top:24px;padding:28px 32px;background:var(--glass);backdrop-filter:blur(40px) saturate(2);
+    border:1px solid var(--border);border-radius:16px;min-height:170px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+  .en{font-size:17px;color:var(--text-40);font-style:italic;line-height:1.6;margin-bottom:14px;letter-spacing:0.01em;max-width:850px}
+  .zh{font-size:28px;color:var(--text-sub);font-weight:600;line-height:1.5;letter-spacing:0.04em;max-width:850px}
+  .w{display:inline-block;transition:color .15s,text-shadow .15s,transform .15s;padding:0 1px}
+  .en .w{padding:0 3px}
+  .w.future{opacity:0.45}
+  .w.past{opacity:0.55}
+  .en .w.past{color:var(--warm)}
+  .en .w.active{color:#ffdab0;text-shadow:0 0 10px rgba(249,115,22,0.85);transform:scale(1.06);font-weight:700}
+  .zh .w.past{color:var(--accent)}
+  .zh .w.active{color:#fff;text-shadow:0 0 14px rgba(167,139,250,0.95),0 0 28px rgba(167,139,250,0.5);transform:scale(1.12);font-weight:800}
+  .tag{font-size:11px;color:var(--text-40);font-family:"SF Mono",monospace;margin-top:16px}
+  .info{margin-top:16px;font-size:12px;color:var(--text-40);font-family:"SF Mono",monospace;text-align:center;padding-top:12px;border-top:1px solid var(--border-soft)}
+</style></head>
+<body>
+<aside class="side"><h1>Clips · 切换</h1><div id="clipList"></div></aside>
+<main class="main">
+  <video id="vid" controls preload="auto"></video>
+  <div class="cue">
+    <div class="en" id="enLine">—</div>
+    <div class="zh" id="zhLine">选择左侧 clip 开始播放</div>
+    <div class="tag" id="tag"></div>
+  </div>
+  <div class="info" id="info">Space 播放/暂停 · ← → 跳 0.5s</div>
+</main>
+<script>
+// ============ Data (injected by `nf karaoke`) ============
+const __DATA = {{DATA_JSON}};
+const CLIPS = __DATA.clips.map(c=>({id:c.id,file:c.file,title:c.title,sub:c.sub,dur:c.duration_s}));
+const DATA = Object.fromEntries(__DATA.clips.map(c=>[c.id,c.segments]));
+
+const vid=document.getElementById('vid'),enLine=document.getElementById('enLine'),zhLine=document.getElementById('zhLine'),tag=document.getElementById('tag'),list=document.getElementById('clipList'),info=document.getElementById('info');
+let curSegs=null,curSegIdx=-1,rafId=null;
+
+CLIPS.forEach(c=>{
+  const el=document.createElement('div');el.className='clip-item';el.dataset.id=c.id;
+  el.innerHTML=`<div class="num">CLIP #${String(c.id).padStart(2,'0')}</div><div class="title">${c.title}</div><div class="meta"><span>${c.sub}</span><span>${c.dur.toFixed(1)}s</span></div>`;
+  el.onclick=()=>load(c);
+  list.appendChild(el);
+});
+
+function renderSegWords(seg){
+  enLine.innerHTML='';
+  seg.en_words.forEach((w,i)=>{
+    const s=document.createElement('span');s.className='w future';s.dataset.i=i;s.textContent=w.text;
+    enLine.appendChild(s);enLine.appendChild(document.createTextNode(' '));
+  });
+  zhLine.innerHTML='';
+  seg.zh_chars.forEach((c,i)=>{
+    const s=document.createElement('span');s.className='w future';s.dataset.i=i;s.textContent=c.text;
+    zhLine.appendChild(s);
+  });
+}
+
+function hlList(el,items,tMs){
+  el.querySelectorAll('.w').forEach((s,i)=>{
+    const w=items[i];s.classList.remove('past','active','future');
+    if(tMs<w.start_ms)s.classList.add('future');
+    else if(tMs<w.end_ms)s.classList.add('active');
+    else s.classList.add('past');
+  });
+}
+
+function load(c){
+  document.querySelectorAll('.clip-item').forEach(el=>el.classList.toggle('active',+el.dataset.id===c.id));
+  curSegs=DATA[c.id];curSegIdx=-1;
+  vid.src=c.file;vid.load();
+  info.textContent=`${c.title} · ${c.file} · ${curSegs.length} segs · ${curSegs.reduce((a,s)=>a+s.en_words.length,0)} en words · ${curSegs.reduce((a,s)=>a+s.zh_chars.length,0)} zh chars`;
+  // 初始渲染首 seg
+  if(curSegs[0]){curSegIdx=0;renderSegWords(curSegs[0]);tag.textContent=`seg 1/${curSegs.length} · 0ms~`;}
+  setTimeout(()=>tick(),100);
+}
+
+function tick(){
+  if(!curSegs)return;
+  const tMs=vid.currentTime*1000;
+  // find current seg
+  let idx=curSegs.findIndex(s=>tMs>=s.start_ms&&tMs<s.end_ms);
+  if(idx<0){
+    // 未到首 seg: 停首 seg; 过末 seg: 停末 seg (all past)
+    if(tMs<curSegs[0].start_ms)idx=0;
+    else idx=curSegs.length-1;
+  }
+  if(idx!==curSegIdx){
+    curSegIdx=idx;renderSegWords(curSegs[idx]);
+    tag.textContent=`seg ${idx+1}/${curSegs.length} · ${Math.round(curSegs[idx].start_ms/1000)}–${Math.round(curSegs[idx].end_ms/1000)}s`;
+  }
+  // 字级高亮
+  hlList(enLine,curSegs[idx].en_words,tMs);
+  hlList(zhLine,curSegs[idx].zh_chars,tMs);
+  if(!vid.paused&&!vid.ended)rafId=requestAnimationFrame(tick);
+}
+vid.addEventListener('play',()=>{cancelAnimationFrame(rafId);rafId=requestAnimationFrame(tick);});
+vid.addEventListener('seeked',tick);
+vid.addEventListener('pause',tick);
+document.addEventListener('keydown',e=>{
+  if(!curSegs)return;
+  if(e.key===' '){e.preventDefault();if(vid.paused)vid.play();else vid.pause();}
+  else if(e.key==='ArrowLeft')vid.currentTime=Math.max(0,vid.currentTime-0.5);
+  else if(e.key==='ArrowRight')vid.currentTime=Math.min(vid.duration||0,vid.currentTime+0.5);
+});
+load(CLIPS[0]);
+</script>
+</body>
+</html>
