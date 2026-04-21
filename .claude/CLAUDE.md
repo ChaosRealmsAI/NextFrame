@@ -49,9 +49,26 @@ FFI / `unsafe` 需 `#[allow(...)]` + 一句注释说明理由。
 - CSS 只用 `var(--token-*)`，禁硬编码色值 / 字号
 - 新建 UI 前查 `examples/`，没有对应 example 先跑 `design-system` skill 补
 
-## tmp / 临时文件
+## AI 自验:产品内建 CLI(`nf`)
 
-临时产出一律写项目根 `tmp/`，禁写系统 `/tmp`。已进 `.gitignore`。
+**人类能操作的 · 产品有对应 CLI**(见 rule `self-verification`)· 改 UI/视觉/窗口 chrome 必跑 · 不让用户当 QA。
+
+| 命令 | 干啥 |
+|---|---|
+| `nf capture --project=X --episode=Y --out=PATH.png` | **原生 window PNG**(含 chrome / titlebar / 🚦 / 阴影)· AI 视觉验证唯一出口 · 看"用户真实看到啥" |
+| `nf screenshot --project=X --episode=Y --out=PATH.png` | DOM-only 截图(看不到 chrome) |
+| `nf open --project=X --episode=Y` | 启动/聚焦窗口 |
+| `nf ps` | 列窗口 |
+| `nf state --key=KEY` | 读 UI state |
+| `nf click --selector=CSS` | 模拟点击 |
+| `nf devtools` | DOM 调试 |
+| `nf quit` | 关 app |
+
+**改 window chrome / traffic light / titlebar = 必 `nf capture` + Read PNG 肉眼量**。禁 `screencapture` 系统命令(违 self-verification rule)。禁只 `nf screenshot`(DOM-only 看不到 chrome 对齐)。
+
+## tmp / 临时文件(🔴 版本隔离)
+
+临时产出一律写 **`spec/versions/v{X}/tmp/`**(如 `spec/versions/v0.5.1/tmp/y34.png`)· **禁根目录 `tmp/`**(多 session 并行撞)· **禁系统 `/tmp`**。见 rule `project-structure`。`.gitignore` 已加 `spec/versions/*/tmp/`。
 
 ## 跨会话通讯
 
