@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.80"
 license = "MIT"
@@ -24,6 +24,19 @@ todo = "deny"
 wildcard_imports = "deny"
 
 [workspace.dependencies]
+wry = "0.55"
+tao = "0.35"
+interprocess = { version = "2.4", features = ["tokio"] }
+ctrlc = { version = "3", features = ["termination"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util"] }
+clap = { version = "4", features = ["derive", "cargo"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "2"
+directories = "6"
+once_cell = "1"
+regex = "1"
 
 [profile.release]
 lto = "thin"
