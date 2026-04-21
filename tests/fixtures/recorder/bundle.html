@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>nf-recorder test bundle (stub runtime)</title>
+<style>
+html,body{margin:0;padding:0;width:1920px;height:1080px;background:#0a0a12;color:#fff;font:96px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
+.stage{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:60px}
+h1{color:#a78bfa;margin:0;font-size:144px;letter-spacing:0.1em;text-shadow:0 0 40px rgba(167,139,250,0.5)}
+.clock{font-family:"SF Mono",monospace;font-size:180px;color:#e0b76c;font-weight:900;text-shadow:0 0 60px rgba(224,183,108,0.5)}
+.ball{position:fixed;top:100px;left:100px;width:80px;height:80px;background:radial-gradient(circle,#c084fc,#6d28d9);border-radius:50%;box-shadow:0 0 80px #a78bfa}
+</style>
+</head>
+<body>
+<div class="ball" id="ball"></div>
+<div class="stage">
+  <h1>NextFrame v0.4</h1>
+  <div class="clock" id="clock">t=0.0s</div>
+  <p style="font-size:48px;color:#7bc9b5">nf-recorder · WKWebView → IOSurface → VT → mp4</p>
+</div>
+<script>
+// stub runtime for nf-recorder · exposes window.__nf API that record_loop calls
+(function(){
+  let currentT = 0;
+  const ball = document.getElementById('ball');
+  const clock = document.getElementById('clock');
+
+  let seqCounter = 0;
+
+  function renderAt(t_ms) {
+    currentT = t_ms;
+    const t_s = t_ms / 1000;
+    clock.textContent = `t=${t_s.toFixed(3)}s`;
+    // bounce ball: period 1.5s · amplitude
+    const phase = (t_s / 1.5) % 1;
+    const y = 100 + Math.abs(Math.sin(phase * Math.PI)) * 600;
+    const x = 100 + (t_s / 3) * 1700;
+    ball.style.transform = `translate(${x}px, ${y}px)`;
+  }
+
+  // nf-recorder calls window.__nf.seek(t_ms) with MILLISECONDS · returns {t, frameReady, seq}
+  window.__nf = {
+    seek: async (t_ms) => {
+      renderAt(t_ms);
+      const seq = seqCounter++;
+      return { t: t_ms, frameReady: true, seq: seq };
+    },
+    play: async () => ({ ok: true }),
+    pause: async () => ({ ok: true }),
+    duration: async () => 3000,
+    getFrame: async () => ({ t: currentT })
+  };
+
+  renderAt(0);
+})();
+</script>
+</body>
+</html>

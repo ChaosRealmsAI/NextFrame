@@ -1,0 +1,72 @@
+[package]
+name = "nf-recorder"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "nf-recorder"
+path = "src/main.rs"
+
+[dependencies]
+nf-shell-mac = { path = "../nf-shell-mac" }
+# objc2 VT / AVFoundation
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSError", "NSString", "NSURL", "NSObject", "NSDictionary", "NSValue"] }
+objc2-av-foundation = { version = "0.3", features = [
+    "AVAssetWriter",
+    "AVAssetWriterInput",
+    "AVMediaFormat",
+    "AVVideoSettings",
+    "block2",
+    "objc2-core-media",
+] }
+objc2-video-toolbox = "0.3"
+objc2-core-video = "0.3"
+objc2-core-media = { version = "0.3", features = [
+    "CMBase",
+    "CMBlockBuffer",
+    "CMFormatDescription",
+    "CMSampleBuffer",
+    "CMTime",
+] }
+objc2-core-foundation = { version = "0.3", features = ["CFDictionary", "CFNumber", "CFString"] }
+objc2-io-surface = "0.3"
+objc2-core-graphics = "0.3"
+block2 = "0.6"
+# async + CLI
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+crossbeam = "0.8"  # SPSC ArrayQueue for FramePool
+png = "0.17"  # T-18 · snapshot PNG encode (BGRA → RGBA)
+
+[dev-dependencies]
+# T-18 snapshot test · needs AppKit + NSApplication + main-thread class for WKWebView/CARenderer
+objc2-app-kit = { version = "0.3", features = [
+    "NSApplication",
+    "NSEvent",
+    "NSResponder",
+    "NSGraphics",
+] }
+objc2-foundation = { version = "0.3", features = [
+    "NSError",
+    "NSString",
+    "NSURL",
+    "NSObject",
+    "NSDictionary",
+    "NSValue",
+    "NSGeometry",
+    "NSDate",
+    "NSRunLoop",
+] }
+
+[[test]]
+name = "snapshot"
+path = "tests/snapshot.rs"
+harness = false
+
+[lints]
+workspace = true
