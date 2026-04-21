@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/nf-cli",
+    "crates/nf-shell",
+    "crates/nf-engine",
+    "crates/nf-runtime",
+]
+
+[workspace.package]
+version = "0.1.1"
+edition = "2021"
+rust-version = "1.80"
+license = "MIT"
+repository = "https://github.com/ChaosRealmsAI/NextFrame"
+authors = ["NextFrame Contributors"]
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unreachable = "deny"
+todo = "deny"
+wildcard_imports = "deny"
+
+[workspace.dependencies]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

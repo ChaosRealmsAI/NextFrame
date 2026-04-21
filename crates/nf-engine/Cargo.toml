@@ -1,0 +1,14 @@
+[package]
+name = "nf-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "NextFrame engine · JSON → render core · frame pure (v0.3+ implements)"
+
+[dependencies]
+
+[lints]
+workspace = true
