@@ -96,6 +96,26 @@ button {
   position: relative;
 }
 
+html[data-nextframe-native="true"] body {
+  padding: 0;
+  overflow: hidden;
+}
+
+html[data-nextframe-native="true"] .outer,
+html[data-nextframe-native="true"] .caption,
+html[data-nextframe-native="true"] .foot {
+  display: none;
+}
+
+html[data-nextframe-native="true"] .app {
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  margin: 0;
+  border: none;
+  box-shadow: none;
+}
+
 .app::before {
   content: "";
   position: absolute;
@@ -241,6 +261,7 @@ button {
   font-size: 10px;
   font-weight: 600;
   transition: background 0.15s, color 0.15s;
+  -webkit-app-region: no-drag;
 }
 
 .playctl .btn:hover {
@@ -289,13 +310,13 @@ button {
 
 .playctl .scrub .fill {
   height: 100%;
-  width: 42%;
+  width: 0;
   background: var(--fg);
 }
 
 .playctl .scrub .head {
   position: absolute;
-  left: 42%;
+  left: 0;
   top: 50%;
   transform: translate(-50%, -50%);
   width: 10px;

@@ -1,8 +1,10 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use tao::dpi::LogicalSize;
+use tao::dpi::{LogicalPosition, LogicalSize};
 use tao::event_loop::{EventLoopProxy, EventLoopWindowTarget};
+#[cfg(target_os = "macos")]
+use tao::platform::macos::WindowBuilderExtMacOS;
 use tao::window::{Window, WindowBuilder};
 use wry::{
     http::{header::CONTENT_TYPE, Request, Response},
@@ -18,16 +20,26 @@ pub fn create_window(
     project: &str,
     episode: &str,
 ) -> Result<(Window, WebView), String> {
-    let title = format!("NextFrame · {project}/{episode} · {window_id}");
-    let window = WindowBuilder::new()
-        .with_title(&title)
+    let builder = WindowBuilder::new()
+        .with_title("NextFrame")
         .with_inner_size(LogicalSize::new(1440.0, 900.0))
+        .with_position(LogicalPosition::new(120.0, 80.0))
         .with_resizable(true)
+        .with_min_inner_size(LogicalSize::new(960.0, 600.0));
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .with_title_hidden(true)
+        .with_titlebar_transparent(true)
+        .with_fullsize_content_view(true)
+        .with_has_shadow(true)
+        .with_traffic_light_inset(LogicalPosition::new(18.0, 18.0));
+    let window = builder
         .build(target)
         .map_err(|err| format!("window build failed: {err}"))?;
 
     let frontend_root = frontend_root()?;
     let url = frontend_url(project, episode);
+    let session_script = initialization_script(project, episode);
     let ipc_window_id = window_id.to_string();
     let ipc_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
@@ -38,7 +50,7 @@ pub fn create_window(
             }
         })
         .with_url(url)
-        .with_initialization_script("window.NEXTFRAME_DPR = 1;")
+        .with_initialization_script(&session_script)
         .with_ipc_handler(move |req| {
             let body = req.body().to_string();
             let _send_result = ipc_proxy.send_event(UserEvent::IpcFromJs {
@@ -59,6 +71,27 @@ pub fn create_window(
 
 fn frontend_url(project: &str, episode: &str) -> String {
     format!("nextframe://frontend/index.html?project={project}&episode={episode}")
+}
+
+fn initialization_script(project: &str, episode: &str) -> String {
+    let session = serde_json::json!({
+        "project": project,
+        "episode": episode
+    });
+    format!(
+        r#"(() => {{
+  window.NEXTFRAME_DPR = 1;
+  window.NEXTFRAME_SESSION = {session};
+  const markNativeShell = () => {{
+    document.documentElement.setAttribute("data-nextframe-native", "true");
+  }};
+  if (document.documentElement) {{
+    markNativeShell();
+  }} else {{
+    document.addEventListener("DOMContentLoaded", markNativeShell, {{ once: true }});
+  }}
+}})();"#
+    )
 }
 
 fn frontend_root() -> Result<PathBuf, String> {

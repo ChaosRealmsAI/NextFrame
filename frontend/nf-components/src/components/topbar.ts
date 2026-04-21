@@ -16,6 +16,10 @@ const sheet = makeSheet(`
     color: var(--fg-2);
     font-family: var(--font);
   }
+  :host(.native) {
+    height: 48px;
+    -webkit-app-region: drag;
+  }
   button {
     appearance: none;
     border: none;
@@ -23,6 +27,7 @@ const sheet = makeSheet(`
     font: inherit;
     color: inherit;
     cursor: pointer;
+    -webkit-app-region: no-drag;
   }
   .topbar {
     height: 46px;
@@ -31,6 +36,12 @@ const sheet = makeSheet(`
     background: rgba(10, 10, 14, 0.65);
     border-bottom: 1px solid var(--bd);
     gap: 16px;
+  }
+  .topbar.native {
+    height: 48px;
+    padding: 0 18px 0 80px;
+    background: transparent;
+    -webkit-app-region: drag;
   }
   .tb-dots { display: flex; gap: 7px; flex-shrink: 0; }
   .tb-dots span {
@@ -126,6 +137,7 @@ const sheet = makeSheet(`
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
     z-index: 20;
     padding: 4px;
+    -webkit-app-region: no-drag;
   }
   .dropdown-menu.project { left: 52px; }
   .dropdown-menu.episode { left: 176px; }
@@ -183,17 +195,21 @@ export class NfTopbar extends NfBase {
   };
 
   private render(): void {
+    const nativeShell = isNativeShell();
+    this.classList.toggle("native", nativeShell);
     const data = getMockData();
     const episode = data.episodes.find((item) => item.id === this.getAttribute("episode-id")) ?? data.episodes[0]!;
     const episodeLabel = episode?.name ?? this.getAttribute("episode-id") ?? "EP";
-    const projectLabel = data.source === "ipc" ? data.project.name : "NextFrame";
+    const projectLabel = data.source === "ipc" ? data.project.id : "NextFrame";
+    const projectMenu = data.source === "ipc" && data.project.name !== data.project.id
+      ? `${data.project.id} · ${data.project.name}`
+      : data.project.name;
     const episodePrefix = data.source === "ipc"
       ? this.getAttribute("episode-id") ?? episode?.id ?? "ep"
       : "EP-01";
     this.root.innerHTML = `
-      <div class="topbar">
-        <div class="tb-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
-        <div class="tb-sep"></div>
+      <div class="topbar ${nativeShell ? "native" : ""}">
+        ${nativeShell ? "" : `<div class="tb-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div><div class="tb-sep"></div>`}
         <div class="tb-crumb">
           <button class="tb-home" type="button" title="返回首页" data-action="home">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -211,12 +227,12 @@ export class NfTopbar extends NfBase {
             <span>${episodePrefix} · ${episodeLabel}</span><span class="chev">˅</span>
           </button>
           <div class="dropdown-menu project ${this.openMenu === "project" ? "open" : ""}">
-            <div class="dropdown-item">${data.project.name}</div>
-            <div class="dropdown-item">NextFrame Demo</div>
+            <div class="dropdown-item">${projectMenu}</div>
+            ${data.source === "ipc" ? "" : `<div class="dropdown-item">NextFrame Demo</div>`}
           </div>
           <div class="dropdown-menu episode ${this.openMenu === "episode" ? "open" : ""}">
             <div class="dropdown-item">${episodePrefix} · ${episodeLabel}</div>
-            <div class="dropdown-item">EP-02 · 产品演示</div>
+            ${data.source === "ipc" ? "" : `<div class="dropdown-item">EP-02 · 产品演示</div>`}
           </div>
         </div>
         <div class="tb-sep"></div>
@@ -262,4 +278,8 @@ export class NfTopbar extends NfBase {
       this.emit<LangChangeDetail>("lang-change", { old, new: next });
     });
   }
+}
+
+function isNativeShell(): boolean {
+  return document.documentElement.getAttribute("data-nextframe-native") === "true";
 }

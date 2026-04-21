@@ -120,7 +120,7 @@ export class NfTimeline extends NfBase {
     const data = getMockData();
     const episode = getEpisode();
     const duration = Number(this.getAttribute("duration") ?? episode.duration);
-    const currentTime = Number(this.getAttribute("current-time") ?? 12.45);
+    const currentTime = Number(this.getAttribute("current-time") ?? (data.source === "ipc" ? 0 : 12));
     const sceneClips = episode.clips.filter((clip) => clip.kind === "scene");
     const textClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "text") : TEXT_CLIPS;
     const transClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "trans" || clip.kind === "transition") : TRANS_CLIPS;
@@ -148,7 +148,10 @@ export class NfTimeline extends NfBase {
         </div>
         <div class="tl-body">
           <nf-track kind="scene" label="画面">
-            ${sceneClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="scene" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${clip.id === "feat-2" ? "feat 2 · 18s" : clip.label}" ${clip.id === "feat-2" ? "active" : ""}></nf-clip>`).join("")}
+            ${sceneClips.map((clip) => {
+              const mockActive = data.source !== "ipc" && clip.id === "feat-2";
+              return `<nf-clip slot="clips" id="${clip.id}" kind="scene" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${mockActive ? "feat 2 · 18s" : clip.label}" ${mockActive ? "active" : ""}></nf-clip>`;
+            }).join("")}
           </nf-track>
           <nf-track kind="text" label="文字">
             ${textClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="text" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${clip.label}"></nf-clip>`).join("")}

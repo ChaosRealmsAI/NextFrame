@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::errors::NfError;
 
 static SLUG_RE: Lazy<Result<Regex, regex::Error>> =
-    Lazy::new(|| Regex::new(r"^[a-z][a-z0-9-]{0,63}$"));
+    Lazy::new(|| Regex::new(r"^[a-z][a-z0-9.-]{0,63}$"));
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Registry {
@@ -142,8 +142,9 @@ pub fn validate_slug(slug: &str) -> Result<(), NfError> {
 
     Err(NfError::SlugInvalid {
         slug: slug.to_string(),
-        hint: "use lowercase letters, numbers, and hyphens; start with a letter; max 64 chars"
-            .to_string(),
+        hint:
+            "use lowercase letters, numbers, dots, and hyphens; start with a letter; max 64 chars"
+                .to_string(),
     })
 }
 
@@ -233,6 +234,7 @@ mod tests {
     #[test]
     fn slug_validation_rejects_bad_values() {
         assert!(validate_slug("next-frame").is_ok());
+        assert!(validate_slug("demo-v0.5").is_ok());
         assert!(validate_slug("NextFrame").is_err());
         assert!(validate_slug("-bad").is_err());
         assert!(validate_slug("bad_slug").is_err());

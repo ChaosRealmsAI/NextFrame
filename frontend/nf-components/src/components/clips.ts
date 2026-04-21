@@ -103,7 +103,7 @@ export class NfClips extends NfBase {
 
   private render(): void {
     const episode = getEpisode(this.getAttribute("episode-id") ?? "ep-01");
-    const selectedId = this.getAttribute("selected-id") ?? "feat-2";
+    const selectedId = this.getAttribute("selected-id") ?? episode.clips.find((clip) => clip.kind === "scene")?.id ?? episode.clips[0]?.id;
     this.root.innerHTML = `
       <div class="panel-head">
         <span class="t">片段</span>

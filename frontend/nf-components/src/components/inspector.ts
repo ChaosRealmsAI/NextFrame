@@ -155,11 +155,12 @@ export class NfInspector extends NfBase {
   };
 
   private render(): void {
-    const clipId = this.getAttribute("clip-id") ?? "feat-2";
-    const clip = getClip(clipId) ?? getClip("feat-2");
     const episode = getEpisode();
+    const clipId = this.getAttribute("clip-id");
+    const fallbackClip = episode.clips.find((item) => item.kind === "scene") ?? episode.clips[0];
+    const clip = clipId ? getClip(clipId) ?? fallbackClip : fallbackClip;
     const fields = episode.inspector_fields;
-    const name = clip?.label ?? clipId;
+    const name = clip?.label ?? clipId ?? "未选择";
     const duration = clip ? clip.end - clip.start : fields.timing.duration;
     this.root.innerHTML = `
       <div class="insp">
