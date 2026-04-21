@@ -103,6 +103,7 @@ fn mock_chat(content: Option<String>, tool_calls: Vec<ToolCall>) -> ChatResponse
         usage: Usage {
             prompt_tokens: 10,
             completion_tokens: 5,
+            context_bytes: 0,
         },
     }
 }
@@ -118,6 +119,8 @@ fn make_config(final_check_enabled: bool) -> Config {
             text: "mock agent".to_owned(),
         },
         final_check_enabled,
+        max_tool_result_chars: 4_000,
+        max_history_chars: 200_000,
         pricing: BTreeMap::new(),
         providers: BTreeMap::new(),
     }

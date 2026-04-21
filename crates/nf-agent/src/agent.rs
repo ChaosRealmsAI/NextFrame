@@ -5,12 +5,13 @@ use serde_json::{Value, json};
 
 use crate::{
     config::Config,
-    provider::{LlmProvider, Message, ToolCall, Usage},
+    provider::{LlmProvider, Message, ToolCall, Usage, truncate_middle},
     skill::SkillRegistry,
     tool::{BashTool, LoadSkillTool, ReadTool, Tool, VerifyOutputsTool, openai_tool_schema},
 };
 
 const FINAL_CHECK_MAX_RETRIES: usize = 3;
+const COMPACTED_TOOL_RESULT_CHARS: usize = 512;
 
 pub struct Agent {
     provider: Box<dyn LlmProvider>,
@@ -98,6 +99,11 @@ impl Agent {
                                 "你声明完成但产物缺失: {:?} · 继续调 tool 完成 · 不要 FINAL",
                                 missing
                             )));
+                            stats.context_bytes = compact_history_if_needed(
+                                &mut messages,
+                                self.config.max_history_chars,
+                                COMPACTED_TOOL_RESULT_CHARS,
+                            );
                             continue;
                         }
 
@@ -105,6 +111,7 @@ impl Agent {
                             "forced stop after {FINAL_CHECK_MAX_RETRIES} FINAL checks · missing: {:?}",
                             missing
                         );
+                        stats.context_bytes = estimate_history_bytes(&messages);
                         return Ok(AgentResult {
                             completed: false,
                             iters: iter + 1,
@@ -115,6 +122,7 @@ impl Agent {
                     }
                 }
                 log::info!("FINAL: {}", resp.content.as_deref().unwrap_or(""));
+                stats.context_bytes = estimate_history_bytes(&messages);
                 return Ok(AgentResult {
                     completed: true,
                     iters: iter + 1,
@@ -138,16 +146,23 @@ impl Agent {
                         json!({"ok": false, "error": err.to_string()}).to_string()
                     }))
                 );
-                messages.push(Message::tool(tool_call.id.clone(), result));
                 if tool_call.name == "load_skill" {
-                    if let Some(skill_name) = messages
-                        .last()
-                        .and_then(extract_successful_loaded_skill_name)
-                    {
+                    if let Some(skill_name) = extract_successful_loaded_skill_name(&result) {
                         active_skills.insert(skill_name);
                     }
                 }
+                messages.push(Message::tool(
+                    tool_call.id.clone(),
+                    result,
+                    self.config.max_tool_result_chars,
+                ));
             }
+
+            stats.context_bytes = compact_history_if_needed(
+                &mut messages,
+                self.config.max_history_chars,
+                COMPACTED_TOOL_RESULT_CHARS,
+            );
         }
 
         Err(anyhow!("max iters reached"))
@@ -207,11 +222,7 @@ impl Agent {
     }
 }
 
-fn extract_successful_loaded_skill_name(message: &Message) -> Option<String> {
-    let Message::Tool { content, .. } = message else {
-        return None;
-    };
-    let value = serde_json::from_str::<Value>(content).ok()?;
+fn extract_successful_loaded_skill_name(value: &Value) -> Option<String> {
     if value.get("ok").and_then(Value::as_bool) != Some(true) {
         return None;
     }
@@ -219,6 +230,70 @@ fn extract_successful_loaded_skill_name(message: &Message) -> Option<String> {
         .get("skill")
         .and_then(Value::as_str)
         .map(ToOwned::to_owned)
+}
+
+fn compact_history_if_needed(
+    messages: &mut [Message],
+    max_history_chars: usize,
+    compacted_tool_result_chars: usize,
+) -> usize {
+    let total = estimate_history_bytes(messages);
+    if total <= max_history_chars {
+        return total;
+    }
+
+    compact_old_tool_results(messages, compacted_tool_result_chars);
+    let compacted = estimate_history_bytes(messages);
+    log::info!("context compacted · bytes now = {compacted}");
+    compacted
+}
+
+fn estimate_history_bytes(messages: &[Message]) -> usize {
+    serde_json::to_vec(messages)
+        .map(|bytes| bytes.len())
+        .unwrap_or_else(|_| {
+            messages
+                .iter()
+                .map(|message| match message {
+                    Message::System { content }
+                    | Message::User { content }
+                    | Message::Tool { content, .. } => content.len(),
+                    Message::Assistant {
+                        content,
+                        tool_calls,
+                    } => {
+                        content.as_deref().map_or(0, str::len)
+                            + tool_calls
+                                .iter()
+                                .map(|tool_call| {
+                                    tool_call.id.len()
+                                        + tool_call.function.name.len()
+                                        + tool_call.function.arguments.len()
+                                })
+                                .sum::<usize>()
+                    }
+                })
+                .sum()
+        })
+}
+
+fn compact_old_tool_results(messages: &mut [Message], max_chars: usize) {
+    let mut remaining_to_skip = messages
+        .iter()
+        .filter(|message| matches!(message, Message::Tool { .. }))
+        .count()
+        .saturating_sub(3);
+
+    for message in messages.iter_mut() {
+        if remaining_to_skip == 0 {
+            break;
+        }
+
+        if let Message::Tool { content, .. } = message {
+            *content = truncate_middle(content, max_chars);
+            remaining_to_skip = remaining_to_skip.saturating_sub(1);
+        }
+    }
 }
 
 fn truncate(value: &str) -> String {

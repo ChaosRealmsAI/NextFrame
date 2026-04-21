@@ -9,6 +9,10 @@ pub struct Config {
     pub system_prompt: SystemPrompt,
     #[serde(default = "default_final_check_enabled")]
     pub final_check_enabled: bool,
+    #[serde(default = "default_max_tool_result_chars")]
+    pub max_tool_result_chars: usize,
+    #[serde(default = "default_max_history_chars")]
+    pub max_history_chars: usize,
     #[serde(default)]
     pub pricing: PricingTable,
     #[serde(default)]
@@ -32,6 +36,14 @@ pub struct SystemPrompt {
 
 fn default_final_check_enabled() -> bool {
     true
+}
+
+fn default_max_tool_result_chars() -> usize {
+    4_000
+}
+
+fn default_max_history_chars() -> usize {
+    200_000
 }
 
 impl Config {

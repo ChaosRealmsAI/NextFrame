@@ -60,8 +60,8 @@ impl Message {
         }
     }
 
-    pub fn tool(tool_call_id: impl Into<String>, result: Value) -> Self {
-        let content = serde_json::to_string(&result).unwrap_or_else(|err| {
+    pub fn tool(tool_call_id: impl Into<String>, result: Value, max_chars: usize) -> Self {
+        let raw_content = serde_json::to_string(&result).unwrap_or_else(|err| {
             json!({
                 "ok": false,
                 "error": format!("failed to serialize tool result: {err}")
@@ -70,9 +70,36 @@ impl Message {
         });
         Self::Tool {
             tool_call_id: tool_call_id.into(),
-            content,
+            content: truncate_middle(&raw_content, max_chars),
         }
     }
+}
+
+pub fn truncate_middle(s: &str, max: usize) -> String {
+    let char_count = s.chars().count();
+    if char_count <= max {
+        return s.to_owned();
+    }
+    if max == 0 {
+        return String::new();
+    }
+
+    let placeholder_budget = 40usize;
+    let keep_chars = max.saturating_sub(placeholder_budget);
+    let head_chars = keep_chars / 2;
+    let tail_chars = keep_chars.saturating_sub(head_chars);
+    let truncated_chars = char_count.saturating_sub(head_chars + tail_chars);
+    let head = s.chars().take(head_chars).collect::<String>();
+    let tail = s
+        .chars()
+        .rev()
+        .take(tail_chars)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<String>();
+
+    format!("{head}\n... [truncated {truncated_chars} chars] ...\n{tail}")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,6 +149,8 @@ pub struct Usage {
     pub prompt_tokens: u64,
     #[serde(default)]
     pub completion_tokens: u64,
+    #[serde(default)]
+    pub context_bytes: usize,
 }
 
 impl Usage {
