@@ -1,221 +1,88 @@
 # NextFrame
 
-**AI-native video engine.** JSON in, video out. No timeline editors, no drag-and-drop — just structured data and pure functions.
+**AI-native video engine.** JSON in, video out. 让 AI agent 把结构化信息变成可播放视频 — 不是给人点按钮的 GUI,是给 LLM 调用的 CLI 状态机.
 
-NextFrame turns structured information into videos. Feed it a JSON timeline and scene components, and it produces playable HTML or MP4. Interview clips with bilingual subtitles, code tutorials with syntax highlighting, product demos with motion graphics — if it can be described as data, NextFrame can render it.
+场景:教育 · 产品演示 · 数据报告 · 访谈切片 · 开源项目介绍. 凡是"能描述成数据"的,都能渲染出来.
 
-## Why
+## 架构分层 (Cargo workspace · 12 crates)
 
-Existing video tools are built for humans clicking buttons. NextFrame is built for AI agents writing JSON. Every operation is a CLI command. Every visual element is a pure function `f(t) → frame`. Every design decision lives in a shared token system, not scattered across files.
+```
+crates/
+├─ 应用层 ─────────────────────────────────────────────────────────────
+│  ├─ nf-cli           入口 `nf` 命令 · clap + Karaoke subcommand
+│  └─ nf-shell         Mac 桌面外壳(wry + tao) · 🟡 v0.4+ 填实现
+│
+├─ 引擎层 ─────────────────────────────────────────────────────────────
+│  ├─ nf-engine        JSON → render 核心 · frame(t, json) = pixels · 🟡 v0.4+
+│  └─ nf-runtime       play/preview/export 3 模式 · 🟡 v0.4+
+│
+├─ Clips Pipeline ────────────────────────────────────────────────────
+│  ├─ nf-source        CLI 合一入口(download/transcribe/align/cut/preview)
+│  ├─ videocut-core    plan/srt/sentence/time/media/preview 共享
+│  ├─ videocut-download    yt-dlp 封装
+│  ├─ videocut-transcribe  whisperx 封装
+│  ├─ videocut-align       脚本对齐 + 模糊匹配
+│  └─ videocut-cut         ffmpeg 切片拼接
+│
+├─ TTS ───────────────────────────────────────────────────────────────
+│  └─ nf-tts           Edge/Volcengine TTS + WhisperX 字级对齐 + karaoke.html
+│
+└─ Prompt 状态机 ─────────────────────────────────────────────────────
+   └─ nf-guide         flows/{clips,audio,produce,script,component,design,shared}
+                       AI agent 读 md 一步步执行 · 不是 CLI wrapper · 是 prompt 库
+```
 
-The result: an AI model (even a less capable one) can walk a state machine, build scene components, assemble timelines, and produce broadcast-quality video — without human intervention.
+## 端到端 demo · 6 步 clips pipeline
 
-## Quick Start
+从 YouTube URL 到可播放 HTML(双行字级同步字幕):
 
 ```bash
-# Clone and install
-git clone https://github.com/anthropics/NextFrame.git
-cd NextFrame
+EPISODE=tmp/demo/projects/youtube/me-at-the-zoo
 
-# List all 40+ scene components
-node src/nf-cli/bin/nextframe.js scenes
+# Step 00 · 下载(真网络)
+yt-dlp -o $EPISODE/sources/src.mp4 "https://www.youtube.com/watch?v=jNQXAC9IVRw"
 
-# Inspect a specific scene contract (params, types, defaults)
-node src/nf-cli/bin/nextframe.js scenes interviewChrome
+# Step 01 · 转写(whisperx 词级)
+whisperx $EPISODE/sources/src.mp4 --output_dir $EPISODE/sources/ --output_format json
 
-# Create a new timeline
-node src/nf-cli/bin/nextframe.js new -o timeline.json --ratio=9:16 --duration=60
+# Step 02 · 规划 highlight(AI agent 自己读 sentences.json 挑 + 写 plan.json)
+cat crates/nf-guide/flows/clips/02-plan.md  # 给 AI 的 prompt
 
-# Add layers
-node src/nf-cli/bin/nextframe.js layer-add timeline.json --scene=interviewChrome --start=0 --dur=60
-node src/nf-cli/bin/nextframe.js layer-add timeline.json --scene=interviewBiSub --start=0 --dur=60
-
-# Validate (6 gates: format, scenes, params, overlap, audio, ratio)
-node src/nf-cli/bin/nextframe.js validate timeline.json
-
-# Build to single-file HTML
-node src/nf-cli/bin/nextframe.js build timeline.json -o output.html
-
-# Preview with screenshots for verification
-node src/nf-cli/bin/nextframe.js preview timeline.json
-
-# Record to MP4 (requires macOS + Rust toolchain)
-cargo run --release --features cli --bin nextframe-recorder -- slide output.html \
-  --out output.mp4 --width 1080 --height 1920 --fps 30 --dpr 2
+# Step 03 · ffmpeg 切
+# Step 04 · LLM 翻译(AI agent 自己翻 · 算字级时间)
+# Step 06 · 生成 index.html(clips pipeline 终点)
+cargo run -p nf-cli -- karaoke $EPISODE
+open $EPISODE/clips/index.html   # sidebar 切 + video 控件 + 双行字幕 + 字级高亮
 ```
 
-## Architecture
+**完整指南**: 每步读 `crates/nf-guide/flows/clips/0N-*.md` · AI agent 按 prompt 跑 bare CLI.
 
-Two languages, clear boundary:
+## AI 视角: "以 CLI 为本" 为啥
 
-```
-JSON Timeline ──→ JS Engine (nf-core) ──→ Single-file HTML ──→ Rust Recorder ──→ MP4
-                      │                                              │
-                 Scene components                           WKWebView + VideoToolbox
-                 (pure functions)                           (parallel frame capture)
-```
+- **弱模型盲测过** — Claude Haiku 4.5 按 prompt md 6 步无 stumble 跑通(端到端 19 min)
+- **每步 self-contained** — 输入输出 JSON · 下游不需懂上游实现
+- **产品代码内建自验** — `nf karaoke` 产物合规即 exit 0 · 不靠外部工具
+- **lint-denied** — workspace 禁 `unwrap/expect/panic/unreachable/todo/wildcard_imports` · AI 写不出烂代码
 
-**JavaScript side:**
-- `nf-core/` — Engine core: timeline, animation, scenes, build, validation
-- `nf-cli/` — 50+ CLI commands (timeline CRUD, scene dev, pipeline, source library)
-- `nf-runtime/` — Browser playback runtime
-
-**Rust side (12 crates):**
-- `nf-recorder` — WKWebView parallel recording → VideoToolbox → MP4
-- `nf-bridge` — JSON IPC between desktop shell and engine
-- `nf-shell-mac` — Native macOS app (objc2 + AppKit + WebKit)
-- `nf-tts` — TTS with Edge and Volcengine backends
-- `nf-publish` — Multi-platform publisher
-- `nf-source` — Source pipeline: download → transcribe → align → cut → translate
-- `nf-guide` — State machine prompts for AI-driven production
-
-## CLI Reference
-
-### Timeline
-
-| Command | Description |
-|---------|-------------|
-| `new` | Create an empty timeline JSON |
-| `validate` | Run 6-gate validation with fix hints |
-| `build` | Bundle timeline into single-file playable HTML |
-| `preview` | Render screenshots at key times for AI verification |
-| `frame` | Render a single frame PNG at any time t |
-| `render` | Record to MP4 via recorder backend |
-
-### Layer CRUD
-
-| Command | Description |
-|---------|-------------|
-| `layer-add` | Add a layer with scene, timing, and params |
-| `layer-move` | Move a layer to a new start time |
-| `layer-resize` | Change layer duration |
-| `layer-set` | Set arbitrary properties (params, animation, layout) |
-| `layer-remove` | Remove a layer |
-| `layer-list` | List all layers with timing info |
-
-### Scene Development
-
-| Command | Description |
-|---------|-------------|
-| `scenes` | List all scenes or inspect one scene's contract |
-| `scene-new` | Create a new scene skeleton |
-| `scene-preview` | Live preview with Play/Pause + scrubber |
-| `scene-validate` | Validate against ADR-008 contract (16 checks) |
-
-### Source Pipeline
-
-| Command | Description |
-|---------|-------------|
-| `source-download` | Download source video |
-| `source-transcribe` | Run ASR transcription |
-| `source-align` | Align SRT against source |
-| `source-cut` | Cut clips from source |
-| `source-translate` | Translate transcripts |
-| `source-list` | List sources with status |
-
-### Project Management
-
-| Command | Description |
-|---------|-------------|
-| `project-new` | Create project directory |
-| `episode-new` | Create episode with pipeline |
-| `segment-new` | Create segment timeline |
-| `pipeline-get` | Read pipeline state |
-| `audio-synth` | Generate TTS audio + subtitles |
-
-Run any command with `--help` for params, examples, and constraints.
-
-## Design System
-
-All visual decisions live in `src/nf-core/scenes/shared/design.js`:
-
-```javascript
-import { getPreset } from "../shared/design.js";
-const { colors, layout, type } = getPreset("interview-dark");
-// colors.primary, layout.video.top, type.title.size — all from one source
-```
-
-Two presets ship today:
-- **interview-dark** — 9:16 portrait, gold/orange palette, 1080x1920
-- **lecture-warm** — 16:9 landscape, warm gold palette, 1920x1080
-
-Adding a new visual style = adding a new preset. No code changes to scenes.
-
-## Scene Components
-
-Scenes are pure functions — no side effects, no state, no DOM manipulation:
-
-```javascript
-export const meta = {
-  id: "interviewBiSub",
-  name: "Bilingual Subtitles",
-  ratio: "9:16",
-  params: {
-    segments: { type: "array", required: true, description: "fine.json segments" }
-  }
-};
-
-export function render(t, params, vp) {
-  const sub = findActiveSub(params.segments, t);
-  // returns HTML string — pure function of time
-  return `<div>...</div>`;
-}
-```
-
-8 scene components ship today across 7 categories (backgrounds, typography, data, shapes, overlays, media, browser).
-
-## AI-Driven Production
-
-NextFrame includes `nf-guide`, a state machine that walks AI agents through video production step by step:
+## 开发
 
 ```bash
-# Get the production guide
-nf-guide produce
+# 检查全 workspace
+cargo check --workspace
+cargo clippy --workspace --all-targets   # lint deny 必过
 
-# Get a specific step
-nf-guide produce ratio     # Step 0: choose aspect ratio
-nf-guide produce scene     # Step 2: build missing components
-nf-guide produce timeline  # Step 3: assemble timeline JSON
-nf-guide produce pitfalls  # Known issues + fixes
+# 跑全链 demo
+cargo run -p nf-cli -- karaoke tmp/haiku-clips-v3/projects/youtube/me-at-the-zoo-v3
 ```
 
-The state machine enforces ordering: ratio → check → scene → timeline → validate → build → record. Each step outputs exactly what the AI needs to proceed. Known pitfalls are documented inline so the AI doesn't repeat mistakes.
+**toolchain**: rustc 1.86+ · edition 2024.
 
-## Build & Test
+## 版本进度
 
-```bash
-# Rust
-cargo check --workspace           # Compilation check (12 crates)
-cargo test --workspace            # Run all tests
-cargo clippy --workspace -- -D warnings
+看 `git log --oneline -30` + `spec/roadmap.json` + `spec/devlog/`.  CLAUDE.md 不记版本日志(rule `self-evolution-dna`).
 
-# Full lint (10 gates)
-bash scripts/lint-all.sh
-```
-
-## Tech Stack
-
-| Layer | Choice |
-|-------|--------|
-| Language | Rust + JavaScript |
-| Frontend | HTML + CSS (zero frameworks) |
-| Desktop | objc2 + AppKit + WebKit (native macOS) |
-| Recording | WKWebView + VideoToolbox hardware encoding |
-| Serialization | serde + JSON |
-| TTS | Edge + Volcengine backends |
-| Architecture | Layered crates + trait isolation |
-| Deployment | Single binary |
-
-No React. No Electron. No Tauri. No frameworks. Just libraries and platform APIs.
-
-## Project Stats
-
-- **62,000+ lines** of code (Rust 35k, JS 19k, HTML 5k, CSS 3k)
-- **1,067 commits**
-- **12 Rust crates**
-- **50+ CLI commands**
-- **100% AI-authored**
+**当前**: v0.3.0 done (归档 3 模块迁入 + clips 6 步打通 + haiku v3 盲测通过). 下版 v0.4.0 draft = JSON 引擎 + frame pure.
 
 ## License
 
-MIT
+MIT(code) · UNLICENSED(归档参考代码 · reference/ 仅本地不入构建).
