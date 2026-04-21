@@ -171,11 +171,28 @@ export class NfTopbar extends NfBase {
   connectedCallback(): void {
     this.render();
     document.addEventListener("nf-data-ready", this.handleDataReady);
+    this.root.addEventListener("mousedown", this.handleNativeDragStart);
   }
 
   disconnectedCallback(): void {
     document.removeEventListener("nf-data-ready", this.handleDataReady);
+    this.root.removeEventListener("mousedown", this.handleNativeDragStart);
   }
+
+  private readonly handleNativeDragStart = (e: Event): void => {
+    if (!isNativeShell()) return;
+    const event = e as MouseEvent;
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    if (target && target.closest("button, input, a, select, [role=button], .tb-drop, .tb-home, .dropdown-menu")) return;
+    const ipc = (window as unknown as { ipc?: { postMessage: (msg: string) => void } }).ipc;
+    if (!ipc) return;
+    if (event.detail === 2) {
+      ipc.postMessage("maximize_toggle");
+    } else {
+      ipc.postMessage("drag_window");
+    }
+  };
 
   attributeChangedCallback(): void {
     if (this.isConnected) this.render();

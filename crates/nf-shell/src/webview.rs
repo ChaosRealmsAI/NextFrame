@@ -32,7 +32,9 @@ pub fn create_window(
         .with_titlebar_transparent(true)
         .with_fullsize_content_view(true)
         .with_has_shadow(true)
-        .with_traffic_light_inset(LogicalPosition::new(18.0, 18.0));
+        // traffic light 按 48px topbar 居中:button 直径 ~14pt · y_inset = (48-14)/2 = 17
+        // x=20 让 3 按钮整组视觉平衡(close 中心 ≈ 20 · min ≈ 40 · zoom ≈ 60)· 跟 topbar 左 80px gutter 对齐
+        .with_traffic_light_inset(LogicalPosition::new(20.0, 17.0));
     let window = builder
         .build(target)
         .map_err(|err| format!("window build failed: {err}"))?;

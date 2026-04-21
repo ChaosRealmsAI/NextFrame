@@ -99,6 +99,20 @@ fn main() {
 }
 
 fn handle_js_ipc(manager: &WindowManager, handler: &ComposeOpHandler, window_id: &str, body: &str) {
+    let trimmed = body.trim();
+    if trimmed == "drag_window" {
+        if let Ok(window) = manager.window_by_id(window_id) {
+            let _ = window.drag_window();
+        }
+        return;
+    }
+    if trimmed == "maximize_toggle" {
+        if let Ok(window) = manager.window_by_id(window_id) {
+            let next = !window.is_maximized();
+            window.set_maximized(next);
+        }
+        return;
+    }
     let response = dispatch_js_ipc(handler, body);
     let Ok(response_json) = serde_json::to_string(&response) else {
         return;

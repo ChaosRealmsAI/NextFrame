@@ -168,6 +168,12 @@ impl WindowManager {
             .ok_or_else(|| format!("webview missing for {window_id}"))
     }
 
+    pub fn window_by_id(&self, window_id: &str) -> Result<&Window, String> {
+        self.windows
+            .get(window_id)
+            .ok_or_else(|| format!("no such window: {window_id}"))
+    }
+
     pub fn focus(&mut self, window_id: &str) -> Result<(), String> {
         let window = self
             .windows
