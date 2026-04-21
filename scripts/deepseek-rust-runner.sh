@@ -66,6 +66,7 @@ START=$(date +%s)
   --config "$WS/nf-agent.toml" \
   --skills-dir "$SKILLS_DIR" \
   --max-iters 80 \
+  --trace "$WS/trace.jsonl" \
   > "$WS/run.log" 2>&1
 code=$?
 END=$(date +%s)
