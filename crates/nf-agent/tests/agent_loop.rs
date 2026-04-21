@@ -20,8 +20,8 @@ use std::{
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use nf_agent::{
-    Agent, ChatResponse, Config, LlmProvider, Message, ProviderConfig, SkillRegistry, SystemPrompt,
-    ToolCall, Usage, provider::OpenAiToolCall,
+    Agent, BashPermissionConfig, ChatResponse, Config, LlmProvider, Message, ProviderConfig,
+    SkillRegistry, SystemPrompt, ToolCall, Usage, provider::OpenAiToolCall,
 };
 use serde_json::Value;
 
@@ -118,6 +118,7 @@ fn make_config(final_check_enabled: bool) -> Config {
             text: "mock agent".to_owned(),
         },
         bash_timeout_sec: 120,
+        bash_permission: BashPermissionConfig::default(),
         provider_max_retries: 5,
         provider_retry_base_ms: 1_000,
         final_check_enabled,

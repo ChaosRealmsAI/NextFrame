@@ -3,6 +3,11 @@ bash_timeout_sec = 120
 provider_max_retries = 5
 provider_retry_base_ms = 1000
 
+[bash_permission]
+blocklist = []
+allowlist_mode = "open"
+allowlist = []
+
 [provider]
 base_url = "https://api.siliconflow.cn/v1"
 api_key_env = "SILICONFLOW_API_KEY"

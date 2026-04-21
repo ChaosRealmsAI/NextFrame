@@ -9,6 +9,8 @@ pub struct Config {
     pub system_prompt: SystemPrompt,
     #[serde(default = "default_bash_timeout_sec")]
     pub bash_timeout_sec: u64,
+    #[serde(default)]
+    pub bash_permission: BashPermissionConfig,
     #[serde(default = "default_provider_max_retries")]
     pub provider_max_retries: usize,
     #[serde(default = "default_provider_retry_base_ms")]
@@ -36,8 +38,32 @@ pub type Model = String;
 pub type PricingTable = BTreeMap<String, [f64; 2]>;
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct BashPermissionConfig {
+    #[serde(default)]
+    pub blocklist: Vec<String>,
+    #[serde(default = "default_allowlist_mode")]
+    pub allowlist_mode: String,
+    #[serde(default)]
+    pub allowlist: Vec<String>,
+}
+
+impl Default for BashPermissionConfig {
+    fn default() -> Self {
+        Self {
+            blocklist: Vec::new(),
+            allowlist_mode: default_allowlist_mode(),
+            allowlist: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct SystemPrompt {
     pub text: String,
+}
+
+fn default_allowlist_mode() -> String {
+    "open".to_owned()
 }
 
 fn default_final_check_enabled() -> bool {

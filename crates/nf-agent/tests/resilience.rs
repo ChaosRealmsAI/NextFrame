@@ -11,8 +11,8 @@ use std::{
 
 use anyhow::Result;
 use nf_agent::{
-    Agent, BashTool, Config, LlmProvider, Message, OpenAiCompat, ProviderConfig, SkillRegistry,
-    SystemPrompt, Tool,
+    Agent, BashPermissionConfig, BashTool, Config, LlmProvider, Message, OpenAiCompat,
+    ProviderConfig, SkillRegistry, SystemPrompt, Tool,
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -90,6 +90,7 @@ fn make_config(max_retries: usize, retry_base_ms: u64) -> Config {
             text: "mock agent".to_owned(),
         },
         bash_timeout_sec: 120,
+        bash_permission: BashPermissionConfig::default(),
         provider_max_retries: max_retries,
         provider_retry_base_ms: retry_base_ms,
         final_check_enabled: false,

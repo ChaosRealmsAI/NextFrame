@@ -11,7 +11,10 @@ use crate::{
     config::Config,
     provider::{LlmProvider, Message, ToolCall, Usage, truncate_middle},
     skill::SkillRegistry,
-    tool::{BashTool, LoadSkillTool, ReadTool, Tool, VerifyOutputsTool, openai_tool_schema},
+    tool::{
+        BashPermission, BashTool, LoadSkillTool, ReadTool, Tool, VerifyOutputsTool,
+        openai_tool_schema,
+    },
 };
 
 const FINAL_CHECK_MAX_RETRIES: usize = 3;
@@ -36,10 +39,40 @@ pub struct AgentResult {
 
 impl Agent {
     pub fn new(config: Config, skills: SkillRegistry, provider: Box<dyn LlmProvider>) -> Self {
+        let permission = match BashPermission::from_config(&config.bash_permission) {
+            Ok(permission) => permission,
+            Err(err) => {
+                log::warn!("invalid bash permission config; denying all bash commands: {err:#}");
+                BashPermission::deny_all()
+            }
+        };
+        Self::new_with_bash_permission(config, skills, provider, permission)
+    }
+
+    pub fn try_new(
+        config: Config,
+        skills: SkillRegistry,
+        provider: Box<dyn LlmProvider>,
+    ) -> Result<Self> {
+        let permission = BashPermission::from_config(&config.bash_permission)?;
+        Ok(Self::new_with_bash_permission(
+            config, skills, provider, permission,
+        ))
+    }
+
+    fn new_with_bash_permission(
+        config: Config,
+        skills: SkillRegistry,
+        provider: Box<dyn LlmProvider>,
+        permission: BashPermission,
+    ) -> Self {
         let skills = Arc::new(skills);
         let workspace = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let tools: Vec<Box<dyn Tool>> = vec![
-            Box::new(BashTool::new(config.bash_timeout_sec)),
+            Box::new(BashTool::with_permission(
+                config.bash_timeout_sec,
+                permission,
+            )),
             Box::new(ReadTool),
             Box::new(LoadSkillTool::new(Arc::clone(&skills))),
             Box::new(VerifyOutputsTool::new(Arc::clone(&skills), workspace)),

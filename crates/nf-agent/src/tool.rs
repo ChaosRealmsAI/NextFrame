@@ -11,9 +11,10 @@ use std::os::unix::process::CommandExt;
 
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
+use regex::Regex;
 use serde_json::{Value, json};
 
-use crate::skill::SkillRegistry;
+use crate::{config::BashPermissionConfig, skill::SkillRegistry};
 
 #[async_trait]
 pub trait Tool: Send + Sync {
@@ -28,12 +29,18 @@ const DEFAULT_BASH_TIMEOUT_SEC: u64 = 120;
 #[derive(Debug, Clone)]
 pub struct BashTool {
     default_timeout_sec: u64,
+    permission: BashPermission,
 }
 
 impl BashTool {
     pub fn new(default_timeout_sec: u64) -> Self {
+        Self::with_permission(default_timeout_sec, BashPermission::default())
+    }
+
+    pub fn with_permission(default_timeout_sec: u64, permission: BashPermission) -> Self {
         Self {
             default_timeout_sec,
+            permission,
         }
     }
 }
@@ -75,11 +82,106 @@ impl Tool for BashTool {
 
     async fn call(&self, args: Value) -> Result<Value> {
         let command = required_string(&args, "command")?;
+        if let Err(reason) = self.permission.check(&command) {
+            log::warn!("bash denied: {reason} · cmd: {command}");
+            return Ok(json!({
+                "ok": false,
+                "denied": true,
+                "reason": reason,
+                "command": command,
+            }));
+        }
         let timeout_sec = optional_u64(&args, "timeout_sec", self.default_timeout_sec);
         tokio::task::spawn_blocking(move || run_bash(command, timeout_sec))
             .await
             .context("bash worker task failed")?
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct BashPermission {
+    blocklist: Vec<Regex>,
+    allowlist: Vec<Regex>,
+    strict: bool,
+}
+
+impl BashPermission {
+    pub fn default_blocklist() -> Vec<&'static str> {
+        vec![
+            r"^sudo\s",
+            r"rm\s+-rf\s+(/$|/\s|/\*|~|\$HOME)",
+            r"^dd\s+.*of=/dev/",
+            r"git\s+push\s+--force(-with-lease)?\s+.*\s+(main|master)",
+            r"curl\s+.*\|\s*(sh|bash)",
+            r"wget\s+.*\|\s*(sh|bash)",
+        ]
+    }
+
+    pub fn from_config(config: &BashPermissionConfig) -> Result<Self> {
+        let mut blocklist = Self::default_blocklist()
+            .into_iter()
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>();
+        blocklist.extend(config.blocklist.iter().cloned());
+
+        let strict = match config.allowlist_mode.as_str() {
+            "open" => false,
+            "strict" => true,
+            other => return Err(anyhow!("invalid bash_permission.allowlist_mode: {other}")),
+        };
+
+        Ok(Self {
+            blocklist: compile_regexes("bash_permission.blocklist", &blocklist)?,
+            allowlist: compile_regexes("bash_permission.allowlist", &config.allowlist)?,
+            strict,
+        })
+    }
+
+    pub fn check(&self, cmd: &str) -> Result<(), String> {
+        for pat in &self.blocklist {
+            if pat.is_match(cmd) {
+                return Err(format!("matched blocklist: {}", pat.as_str()));
+            }
+        }
+        if self.strict {
+            let allowed = self.allowlist.iter().any(|pat| pat.is_match(cmd));
+            if !allowed {
+                return Err("no allowlist match (strict mode)".to_owned());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn deny_all() -> Self {
+        Self {
+            blocklist: Vec::new(),
+            allowlist: Vec::new(),
+            strict: true,
+        }
+    }
+}
+
+impl Default for BashPermission {
+    fn default() -> Self {
+        let config = BashPermissionConfig::default();
+        match Self::from_config(&config) {
+            Ok(permission) => permission,
+            Err(err) => {
+                log::error!("failed to compile default bash permission rules: {err:#}");
+                Self::deny_all()
+            }
+        }
+    }
+}
+
+fn compile_regexes(label: &str, patterns: &[String]) -> Result<Vec<Regex>> {
+    patterns
+        .iter()
+        .map(|pattern| {
+            Regex::new(pattern)
+                .with_context(|| format!("invalid regex in {label}: {pattern}"))
+        })
+        .collect()
 }
 
 fn run_bash(command: String, timeout_sec: u64) -> Result<Value> {

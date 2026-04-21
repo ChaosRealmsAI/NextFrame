@@ -41,7 +41,7 @@ async fn run(cli: Cli) -> Result<ExitCode> {
     let config = Config::from_path(&cli.config)?;
     let skills = SkillRegistry::load(&cli.skills_dir)?;
     let provider = OpenAiCompat::from_config(&config)?;
-    let agent = Agent::new(config.clone(), skills, Box::new(provider));
+    let agent = Agent::try_new(config.clone(), skills, Box::new(provider))?;
 
     log::info!("loaded {} skills", agent.skill_count());
     match agent.run(&cli.task, cli.max_iters).await {

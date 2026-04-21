@@ -205,6 +205,7 @@ fn make_config(max_tool_result_chars: usize, max_history_chars: usize) -> Config
             text: "mock agent".to_owned(),
         },
         bash_timeout_sec: 120,
+        bash_permission: nf_agent::BashPermissionConfig::default(),
         provider_max_retries: 5,
         provider_retry_base_ms: 1_000,
         final_check_enabled: false,
