@@ -59,32 +59,43 @@ SYSTEM_PROMPT = """你是 NextFrame agent(Claude Code 风格).
 
 
 SKILLS: dict[str, str] = {
-    "clips": """# clips skill · 视频剪辑
+    "clips": """# clips skill · 视频剪辑(**必跑完 6 步 · 不允许中途 stop**)
 
-NextFrame 完整 clips pipeline(视频下载 → 转写 → 挑亮点 → 切片 → 翻译 → karaoke HTML)。
+NextFrame 完整 clips pipeline。**6 步全跑 · 每步 Bash 一次 tool · 一直走到 karaoke HTML**。
 
-## 推进状态机
+## 🔴 硬约束(违反 = 任务失败)
 
-第一步必做:
-```
-Bash("nf-guide clips")      # 读整体 state machine + 流程图 + 工作目录约定
-```
+- ❌ **不允许中途 FINAL 停** · translate 和 karaoke 必须跑完
+- ❌ **不允许在 plan 步输出完 plan.json 就停**
+- ❌ **不允许说"现在我需要翻译..." 然后不调 tool**
+- ✅ 每步调完 tool 立刻下一步
+- ✅ 只有 karaoke 产出 index.html 后才能 FINAL
 
-然后按 state machine 逐步走:
-1. `Bash("nf-guide clips download")` · 读 step prompt · 调 `nf-source download`
-2. `Bash("nf-guide clips transcribe")` · 读 prompt · 调 `nf-source transcribe`
-3. `Bash("nf-guide clips plan")` · 你(Agent)挑 highlight 写 plan.json
-4. `Bash("nf-guide clips cut")` · 调 `nf-source cut`
-5. `Bash("nf-guide clips translate")` · 翻译每 clip
-6. `Bash("nf-guide clips karaoke")` · 调 `nf karaoke` 产终点 HTML
+## 推进状态机(6 步 · 严格顺序)
 
-## 依赖
+1. `Bash("nf-guide clips download")` → 调 `nf-source download` · 产 source.mp4
+2. `Bash("nf-guide clips transcribe")` → 调 `whisperx --model base.en`(小模型 · 避免 1GB 下载)· 产 sentences.json + words.json
+3. `Bash("nf-guide clips plan")` → 你挑 1 个亮点写 plan.json(**只挑 1 个 · 省 translate 工作量**)
+4. `Bash("nf-guide clips cut")` → ffmpeg 切 · 产 clip_01.mp4 + cut_report.json
+5. `Bash("nf-guide clips translate")` → 翻译(**一次 Bash heredoc 写完整个 translations.zh.json · 不要逐句译**)· 产 clip_01.translations.zh.json
+6. `Bash("nf-guide clips karaoke")` → 产 index.html(终点)
 
-yt-dlp(下载) · whisperx(转写 · 首次下载 1GB 模型) · ffmpeg(切片)
+## 终点验收
 
-## 终点
+`ls <episode>/clips/` 必须有:
+- clip_01.mp4
+- cut_report.json
+- clip_01.translations.zh.json
+- index.html(karaoke · 字级同步)
 
-`projects/<project>/<episode>/clips/index.html`(karaoke · 字级同步 · 双击可播)
+## 反例(上次 agent 踩的坑)
+
+❌ 错:"现在我需要翻译这 4 个英文句子..."(输出纯文本后停)
+✅ 对:直接 `Bash("cat > <path>/clip_01.translations.zh.json <<EOF ... EOF")` 一次写完
+
+## 视频选择(agent 自主)
+
+用户让你**自主选**一个短视频(< 60s · 新鲜 · 不要 me-at-the-zoo)· 用 yt-dlp 下。建议挑:TED 短演讲 / 新闻片段 / 搞笑短剧 / 科技演示。
 """,
     "audio": """# audio skill · TTS + 词级对齐
 
