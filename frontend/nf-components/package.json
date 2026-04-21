@@ -1,0 +1,14 @@
+{
+  "name": "@nextframe/nf-components",
+  "version": "0.1.1",
+  "private": true,
+  "description": "NextFrame UI components (Web Components, zero framework). Scaffold only (v0.1.1); real components land in v0.2.",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

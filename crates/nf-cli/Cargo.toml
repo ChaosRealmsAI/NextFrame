@@ -1,0 +1,18 @@
+[package]
+name = "nf-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "NextFrame CLI · nf command entry · driver of the whole product"
+
+[[bin]]
+name = "nf"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints]
+workspace = true
