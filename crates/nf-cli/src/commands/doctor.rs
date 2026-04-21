@@ -1,4 +1,4 @@
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -27,6 +27,7 @@ const MACOS_MIN: Version = Version {
     major: 13,
     minor: 0,
 };
+const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -295,7 +296,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    command_stdout_timeout(program, args, Duration::from_secs(5))
+    command_stdout_timeout(program, args, PROBE_TIMEOUT)
 }
 
 fn command_stdout_timeout<I, S>(
@@ -307,7 +308,43 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let mut child = Command::new(program)
+    let program = program.as_ref().to_os_string();
+    let args = args
+        .into_iter()
+        .map(|arg| arg.as_ref().to_os_string())
+        .collect::<Vec<_>>();
+
+    command_stdout_timeout_once(&program, &args, timeout).or_else(|err| {
+        let Some(fallback) = locate_program(&program, timeout) else {
+            return Err(err);
+        };
+        if fallback.as_os_str() == program.as_os_str() {
+            return Err(err);
+        }
+
+        command_stdout_timeout_once(fallback.as_os_str(), &args, timeout).map_err(|fallback_err| {
+            format!(
+                "{err}; fallback {} failed: {fallback_err}",
+                fallback.display()
+            )
+        })
+    })
+}
+
+fn command_stdout_timeout_once(
+    program: &OsStr,
+    args: &[OsString],
+    timeout: Duration,
+) -> Result<String, String> {
+    let mut command = Command::new(program);
+    if let Some(path) = probe_path(
+        std::env::var_os("HOME").as_deref(),
+        std::env::var_os("PATH").as_deref(),
+    ) {
+        command.env("PATH", path);
+    }
+
+    let mut child = command
         .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -328,6 +365,47 @@ where
         }
 
         thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn locate_program(program: &OsStr, timeout: Duration) -> Option<PathBuf> {
+    let program_path = Path::new(program);
+    if program_path.components().count() != 1 {
+        return None;
+    }
+
+    let which_args = [program.to_os_string()];
+    if let Ok(output) = command_stdout_timeout_once(OsStr::new("which"), &which_args, timeout) {
+        let path = first_line(&output);
+        if !path.is_empty() {
+            return Some(PathBuf::from(path));
+        }
+    }
+
+    cargo_home_bin(program).filter(|path| path.exists())
+}
+
+fn cargo_home_bin(program: &OsStr) -> Option<PathBuf> {
+    std::env::var_os("HOME")
+        .filter(|home| !home.is_empty())
+        .map(|home| PathBuf::from(home).join(".cargo/bin").join(program))
+}
+
+fn probe_path(home: Option<&OsStr>, path: Option<&OsStr>) -> Option<OsString> {
+    let mut paths = Vec::new();
+
+    if let Some(home) = home.filter(|value| !value.is_empty()) {
+        paths.push(PathBuf::from(home).join(".cargo/bin"));
+    }
+
+    if let Some(path) = path.filter(|value| !value.is_empty()) {
+        paths.extend(std::env::split_paths(path));
+    }
+
+    if paths.is_empty() {
+        None
+    } else {
+        std::env::join_paths(paths).ok()
     }
 }
 
@@ -533,8 +611,12 @@ fn status_label(status: CheckStatus) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+    use std::time::Duration;
+
     use super::{
-        fail, overall_status, parse_version, pass, summarize, CheckResult, CheckStatus, Version,
+        fail, overall_status, parse_version, pass, probe_path, summarize, CheckResult, CheckStatus,
+        Version, PROBE_TIMEOUT,
     };
 
     #[test]
@@ -580,6 +662,29 @@ mod tests {
         assert_eq!(summary.passed, 1);
         assert_eq!(summary.failed, 1);
         assert_eq!(summary.warnings, 1);
+    }
+
+    #[test]
+    fn probe_path_prepends_cargo_bin() -> Result<(), Box<dyn std::error::Error>> {
+        let path = probe_path(
+            Some(std::ffi::OsStr::new("/tmp/fake-home")),
+            Some(std::ffi::OsStr::new("/usr/bin")),
+        )
+        .ok_or("probe path should be built")?;
+        let paths = std::env::split_paths(&path).collect::<Vec<_>>();
+
+        assert_eq!(
+            paths.first(),
+            Some(&PathBuf::from("/tmp/fake-home/.cargo/bin"))
+        );
+        assert_eq!(paths.get(1), Some(&PathBuf::from("/usr/bin")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn probe_timeout_is_15_seconds() {
+        assert_eq!(PROBE_TIMEOUT, Duration::from_secs(15));
     }
 
     #[test]
