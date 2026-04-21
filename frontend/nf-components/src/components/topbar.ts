@@ -158,6 +158,11 @@ export class NfTopbar extends NfBase {
 
   connectedCallback(): void {
     this.render();
+    document.addEventListener("nf-data-ready", this.handleDataReady);
+  }
+
+  disconnectedCallback(): void {
+    document.removeEventListener("nf-data-ready", this.handleDataReady);
   }
 
   attributeChangedCallback(): void {
@@ -173,9 +178,18 @@ export class NfTopbar extends NfBase {
     return this.getAttribute("current-lang") === "en" ? "en" : "zh";
   }
 
+  private readonly handleDataReady = (): void => {
+    this.render();
+  };
+
   private render(): void {
     const data = getMockData();
     const episode = data.episodes.find((item) => item.id === this.getAttribute("episode-id")) ?? data.episodes[0]!;
+    const episodeLabel = episode?.name ?? this.getAttribute("episode-id") ?? "EP";
+    const projectLabel = data.source === "ipc" ? data.project.name : "NextFrame";
+    const episodePrefix = data.source === "ipc"
+      ? this.getAttribute("episode-id") ?? episode?.id ?? "ep"
+      : "EP-01";
     this.root.innerHTML = `
       <div class="topbar">
         <div class="tb-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
@@ -190,18 +204,18 @@ export class NfTopbar extends NfBase {
           </button>
           <span class="slash">/</span>
           <button class="tb-drop ${this.openMenu === "project" ? "open" : ""}" type="button" title="切换项目" data-action="project">
-            <span>NextFrame</span><span class="chev">˅</span>
+            <span>${projectLabel}</span><span class="chev">˅</span>
           </button>
           <span class="slash">/</span>
           <button class="tb-drop ep ${this.openMenu === "episode" ? "open" : ""}" type="button" title="切换集" data-action="episode">
-            <span>EP-01 · ${episode.name}</span><span class="chev">˅</span>
+            <span>${episodePrefix} · ${episodeLabel}</span><span class="chev">˅</span>
           </button>
           <div class="dropdown-menu project ${this.openMenu === "project" ? "open" : ""}">
             <div class="dropdown-item">${data.project.name}</div>
             <div class="dropdown-item">NextFrame Demo</div>
           </div>
           <div class="dropdown-menu episode ${this.openMenu === "episode" ? "open" : ""}">
-            <div class="dropdown-item">EP-01 · ${episode.name}</div>
+            <div class="dropdown-item">${episodePrefix} · ${episodeLabel}</div>
             <div class="dropdown-item">EP-02 · 产品演示</div>
           </div>
         </div>

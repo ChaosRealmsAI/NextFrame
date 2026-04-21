@@ -1,11 +1,13 @@
 use std::io::Write;
 use std::sync::Arc;
 
+use nf_shell::errors::NfError;
 use nf_shell::events::UserEvent;
 use nf_shell::handlers::app::AppOpHandler;
 use nf_shell::handlers::ComposeOpHandler;
-use nf_shell::ipc_server::{self, ok_response};
+use nf_shell::ipc_server::{self, ok_response, IpcRequest, IpcResponse, OpHandler};
 use nf_shell::window_manager::WindowManager;
+use serde_json::json;
 use tao::event::{Event, StartCause, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 
@@ -21,7 +23,7 @@ fn main() {
         }
     };
 
-    if let Err(err) = ipc_server::spawn_server_thread(proxy.clone(), handler) {
+    if let Err(err) = ipc_server::spawn_server_thread(proxy.clone(), handler.clone()) {
         eprintln!("nf-shell IPC failed to start: {err}");
         std::process::exit(1);
     }
@@ -76,14 +78,7 @@ fn main() {
                     AppOpHandler::devtools_query(&manager, request, ack);
                 }
                 UserEvent::IpcFromJs { window_id, body } => {
-                    let mut stdout = std::io::stdout().lock();
-                    let event = serde_json::json!({
-                        "event": "ipc-from-js",
-                        "window_id": window_id,
-                        "body": body
-                    });
-                    let _write_result = writeln!(stdout, "{}", event);
-                    let _flush_result = stdout.flush();
+                    handle_js_ipc(&manager, handler.as_ref(), &window_id, &body);
                 }
                 UserEvent::Quit { request, ack } => {
                     manager.quit_all();
@@ -96,4 +91,79 @@ fn main() {
             _ => {}
         }
     });
+}
+
+fn handle_js_ipc(manager: &WindowManager, handler: &ComposeOpHandler, window_id: &str, body: &str) {
+    let response = dispatch_js_ipc(handler, body);
+    let Ok(response_json) = serde_json::to_string(&response) else {
+        return;
+    };
+    let script = format!(
+        "window.__NEXTFRAME_IPC_RESOLVE__ && window.__NEXTFRAME_IPC_RESOLVE__({response_json});"
+    );
+
+    if let Ok(webview) = manager.webview_by_window_id(window_id) {
+        if let Err(err) = webview.evaluate_script(&script) {
+            log_js_ipc_issue(window_id, format!("webview callback failed: {err}"));
+        }
+    } else {
+        log_js_ipc_issue(window_id, "webview missing for JS IPC response".to_string());
+    }
+}
+
+fn dispatch_js_ipc(handler: &dyn OpHandler, body: &str) -> IpcResponse {
+    let request = match serde_json::from_str::<IpcRequest>(body) {
+        Ok(request) => normalize_js_request(request),
+        Err(err) => {
+            return IpcResponse {
+                req_id: "parse-error".to_string(),
+                ok: false,
+                data: None,
+                error: Some(json!({
+                    "error": "validation failed",
+                    "detail": format!("invalid webview IPC request: {err}"),
+                    "hint": "send { req_id, op, params } as JSON",
+                    "exit_code": 2
+                })),
+            };
+        }
+    };
+
+    match handler.handle(&request) {
+        Ok(Some(data)) => ok_response(&request, data),
+        Ok(None) => IpcResponse {
+            req_id: request.req_id,
+            ok: false,
+            data: None,
+            error: Some(json!(NfError::ValidationFailed(format!(
+                "unknown op: {}",
+                request.op
+            ))
+            .to_record())),
+        },
+        Err(err) => IpcResponse {
+            req_id: request.req_id,
+            ok: false,
+            data: None,
+            error: Some(json!(err.to_record())),
+        },
+    }
+}
+
+fn normalize_js_request(mut request: IpcRequest) -> IpcRequest {
+    if let Some((prefix, rest)) = request.op.split_once('.') {
+        request.op = format!("{prefix}-{rest}");
+    }
+    request
+}
+
+fn log_js_ipc_issue(window_id: &str, detail: String) {
+    let mut stdout = std::io::stdout().lock();
+    let event = json!({
+        "event": "ipc-from-js-error",
+        "window_id": window_id,
+        "detail": detail
+    });
+    let _write_result = writeln!(stdout, "{}", event);
+    let _flush_result = stdout.flush();
 }

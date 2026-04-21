@@ -7,7 +7,7 @@ import { NfTimeline } from "./components/timeline.js";
 import { NfTopbar } from "./components/topbar.js";
 import { NfTrack } from "./components/track.js";
 import type { ClipSelectDetail, TimelineClipSelectDetail } from "./events.js";
-import { loadMockData } from "./storage.js";
+import { loadProjectData, type NfMockData } from "./storage.js";
 
 export const NF_COMPONENTS_VERSION = "0.2.0-w4";
 
@@ -43,14 +43,47 @@ function wireApp(): void {
   });
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    wireApp();
-    void loadMockData();
-  }, { once: true });
-} else {
+function routeFromUrl(): { project: string; episode: string; explicit: boolean } {
+  const params = new URLSearchParams(window.location.search);
+  const project = params.get("project") || "next-frame";
+  const episode = params.get("episode") || "ep-01";
+  return {
+    project,
+    episode,
+    explicit: params.has("project") || params.has("episode"),
+  };
+}
+
+function applyRoute(project: string, episode: string): void {
+  document.querySelector("nf-topbar")?.setAttribute("project-id", project);
+  document.querySelector("nf-topbar")?.setAttribute("episode-id", episode);
+  document.querySelector("nf-clips")?.setAttribute("episode-id", episode);
+}
+
+function applyData(data: NfMockData): void {
+  const episode = data.episodes[0];
+  if (!episode) return;
+  const selected = episode.clips.find((clip) => clip.kind === "scene") ?? episode.clips[0];
+  document.querySelector("nf-topbar")?.setAttribute("episode-id", episode.id);
+  document.querySelector("nf-clips")?.setAttribute("episode-id", episode.id);
+  document.querySelector("nf-timeline")?.setAttribute("duration", String(episode.duration));
+  if (selected) {
+    document.querySelector("nf-clips")?.setAttribute("selected-id", selected.id);
+    document.querySelector("nf-inspector")?.setAttribute("clip-id", selected.id);
+  }
+}
+
+function startApp(): void {
+  const route = routeFromUrl();
+  applyRoute(route.project, route.episode);
   wireApp();
-  void loadMockData();
+  void loadProjectData(route.project, route.episode, { explicitRoute: route.explicit }).then(applyData);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startApp, { once: true });
+} else {
+  startApp();
 }
 
 declare global {

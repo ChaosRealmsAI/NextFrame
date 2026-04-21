@@ -51,9 +51,11 @@ export interface NfEpisode {
 export interface NfMockData {
   project: NfProject;
   episodes: NfEpisode[];
+  source?: "mock" | "ipc" | "fallback";
 }
 
 export const DEFAULT_MOCK: NfMockData = {
+  source: "mock",
   project: { id: "next-frame", name: "NextFrame 产品介绍" },
   episodes: [
     {
@@ -108,6 +110,60 @@ export const DEFAULT_MOCK: NfMockData = {
 };
 
 let cached: NfMockData = DEFAULT_MOCK;
+let ipcSeq = 1;
+
+interface ShellIpc {
+  postMessage: (message: string) => void;
+}
+
+interface WebkitIpc {
+  messageHandlers?: {
+    ipc?: ShellIpc;
+  };
+}
+
+interface NfIpcErrorRecord {
+  error?: string;
+  detail?: string;
+  hint?: string;
+  exit_code?: number;
+}
+
+interface NfIpcResponse<T> {
+  req_id: string;
+  ok: boolean;
+  data?: T;
+  error?: NfIpcErrorRecord;
+}
+
+interface PendingIpc {
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
+  timer: number;
+}
+
+interface LoadProjectOptions {
+  explicitRoute?: boolean;
+}
+
+interface RealProject {
+  slug?: string;
+  id?: string;
+  name?: string;
+  episodes?: unknown[];
+}
+
+interface RealEpisode {
+  slug?: string;
+  id?: string;
+  name?: string;
+  duration?: number;
+  anchors?: Record<string, number>;
+  clips?: unknown[];
+  log?: unknown[];
+}
+
+const pendingIpc = new Map<string, PendingIpc>();
 
 export function getMockData(): NfMockData {
   return cached;
@@ -125,16 +181,275 @@ export async function loadMockData(): Promise<NfMockData> {
   try {
     const response = await fetch(new URL("../mock.json", import.meta.url));
     if (!response.ok) throw new Error(`mock.json ${response.status}`);
-    cached = await response.json() as NfMockData;
+    const loaded = await response.json() as NfMockData;
+    cached = { ...loaded, source: "mock" };
   } catch {
     cached = DEFAULT_MOCK;
   }
+  dispatchDataReady(cached);
+  return cached;
+}
+
+export async function loadProjectData(
+  projectSlug: string,
+  episodeSlug: string,
+  options: LoadProjectOptions = {},
+): Promise<NfMockData> {
+  if (!shellIpc()) {
+    const data = await loadMockData();
+    if (options.explicitRoute) {
+      showDataNotice("IPC 连接失败 · 已显示本地样例");
+    }
+    return data;
+  }
+
+  let project: RealProject;
+  try {
+    project = await shellRequest<RealProject>("projects.show", { project: projectSlug });
+  } catch (error) {
+    console.error("NextFrame project IPC failed", error);
+    showDataNotice(`项目未找到 · 可 nf projects create --slug=${projectSlug}`);
+    cached = fallbackData(projectSlug, episodeSlug, "fallback");
+    dispatchDataReady(cached);
+    return cached;
+  }
+
+  try {
+    const episode = await shellRequest<RealEpisode>("episodes.show", {
+      project: projectSlug,
+      episode: episodeSlug,
+    });
+    cached = normalizeData(project, episode);
+    dispatchDataReady(cached);
+    return cached;
+  } catch (error) {
+    console.error("NextFrame episode IPC failed", error);
+    showDataNotice("集不存在");
+    cached = fallbackData(projectId(project, projectSlug), episodeSlug, "fallback", projectName(project, projectSlug));
+    dispatchDataReady(cached);
+    return cached;
+  }
+}
+
+function shellRequest<T>(op: string, params: Record<string, unknown>): Promise<T> {
+  const ipc = shellIpc();
+  if (!ipc) {
+    return Promise.reject(new Error("shell IPC is unavailable"));
+  }
+
+  installIpcResolver();
+  const reqId = `ui-${Date.now()}-${ipcSeq++}`;
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      pendingIpc.delete(reqId);
+      reject(new Error(`${op} timed out`));
+    }, 10_000);
+    pendingIpc.set(reqId, {
+      timer,
+      resolve: (value) => resolve(value as T),
+      reject,
+    });
+    ipc.postMessage(JSON.stringify({ req_id: reqId, op, params }));
+  });
+}
+
+function shellIpc(): ShellIpc | undefined {
+  return window.webkit?.messageHandlers?.ipc ?? window.ipc;
+}
+
+function installIpcResolver(): void {
+  window.__NEXTFRAME_IPC_RESOLVE__ = (response: NfIpcResponse<unknown>) => {
+    const pending = pendingIpc.get(response.req_id);
+    if (!pending) return;
+    window.clearTimeout(pending.timer);
+    pendingIpc.delete(response.req_id);
+    if (response.ok) {
+      pending.resolve(response.data);
+    } else {
+      pending.reject(new Error(response.error?.detail ?? response.error?.error ?? "IPC failed"));
+    }
+  };
+}
+
+function normalizeData(project: RealProject, episode: RealEpisode): NfMockData {
+  const normalizedEpisode = normalizeEpisode(episode);
+  return {
+    source: "ipc",
+    project: {
+      id: projectId(project, "project"),
+      name: projectName(project, "Project"),
+    },
+    episodes: [normalizedEpisode],
+  };
+}
+
+function normalizeEpisode(episode: RealEpisode): NfEpisode {
+  const anchors = normalizeAnchors(episode.anchors);
+  const duration = finiteNumber(episode.duration, 60);
+  const clips = Array.isArray(episode.clips)
+    ? episode.clips.map((clip, index) => normalizeClip(clip, index, anchors, duration))
+    : [];
+  return {
+    id: episode.id ?? episode.slug ?? "ep-01",
+    name: episode.name ?? episode.slug ?? "Episode",
+    duration,
+    anchors,
+    clips,
+    log: Array.isArray(episode.log) ? episode.log.map(normalizeLogEntry) : [],
+    inspector_fields: defaultInspectorFields(clips),
+  };
+}
+
+function normalizeClip(value: unknown, index: number, anchors: Record<string, number>, duration: number): NfClip {
+  const object = asRecord(value);
+  const id = stringValue(object.slug) ?? stringValue(object.id) ?? stringValue(object.clip) ?? `clip-${index + 1}`;
+  const rawKind = stringValue(object.kind) ?? stringValue(object.track) ?? "scene";
+  const kind = normalizeKind(rawKind);
+  const start = resolveTime(object.start, anchors, 0);
+  const fallbackEnd = Math.min(duration, start + 1);
+  const end = Math.max(start, resolveTime(object.end, anchors, fallbackEnd));
+  return {
+    id,
+    label: stringValue(object.label) ?? id,
+    kind,
+    track: trackNumber(kind),
+    start,
+    end,
+    effects: stringArray(object.effects),
+  };
+}
+
+function normalizeLogEntry(value: unknown): NfLogEntry {
+  const object = asRecord(value);
+  const actor = stringValue(object.actor) === "human" ? "人" : "AI";
+  return {
+    time: stringValue(object.time) ?? "--:--:--",
+    actor,
+    desc: stringValue(object.desc) ?? "读取真实 JSON",
+    cli: stringValue(object.cli) ?? "nf read",
+    pending: object.pending === true || stringValue(object.status) === "pending",
+    accent: actor === "AI",
+  };
+}
+
+function defaultInspectorFields(clips: NfClip[]): NfInspectorFields {
+  const clip = clips.find((item) => item.kind === "scene") ?? clips[0];
+  const start = clip?.start ?? 0;
+  const duration = clip ? clip.end - clip.start : 0;
+  return {
+    position: { x: 0, y: 0 },
+    size: { w: 3840, h: 2160 },
+    timing: {
+      start,
+      duration,
+      expression: clip ? `${duration.toFixed(3)} 秒` : "无片段",
+      startAnchor: `${start.toFixed(3)}s`,
+    },
+    keyframes: [],
+    effects: clip?.effects ?? [],
+    color: "none",
+  };
+}
+
+function fallbackData(projectIdValue: string, episodeId: string, source: "fallback", projectLabel = projectIdValue): NfMockData {
+  return {
+    source,
+    project: { id: projectIdValue, name: projectLabel },
+    episodes: [{
+      id: episodeId,
+      name: episodeId,
+      duration: 60,
+      anchors: {},
+      clips: [],
+      log: [],
+      inspector_fields: defaultInspectorFields([]),
+    }],
+  };
+}
+
+function dispatchDataReady(data: NfMockData): void {
   document.dispatchEvent(new CustomEvent<NfMockData>("nf-data-ready", {
-    detail: cached,
+    detail: data,
     bubbles: true,
     composed: true,
   }));
-  return cached;
+}
+
+function showDataNotice(message: string): void {
+  const notice = document.querySelector<HTMLElement>("[data-nf-data-notice]")
+    ?? document.body.appendChild(document.createElement("div"));
+  notice.dataset.nfDataNotice = "true";
+  notice.textContent = message;
+  notice.setAttribute("style", [
+    "position:fixed",
+    "right:16px",
+    "bottom:16px",
+    "z-index:9999",
+    "max-width:360px",
+    "padding:10px 12px",
+    "background:rgba(10,10,14,0.92)",
+    "border:1px solid rgba(255,255,255,0.16)",
+    "color:#f6f7fb",
+    "font:12px system-ui,sans-serif",
+    "box-shadow:0 16px 40px rgba(0,0,0,0.38)",
+  ].join(";"));
+}
+
+function normalizeAnchors(value: unknown): Record<string, number> {
+  const object = asRecord(value);
+  return Object.fromEntries(
+    Object.entries(object)
+      .map(([name, time]) => [name, finiteNumber(time, Number.NaN)] as const)
+      .filter((entry): entry is readonly [string, number] => Number.isFinite(entry[1])),
+  );
+}
+
+function resolveTime(value: unknown, anchors: Record<string, number>, fallback: number): number {
+  if (typeof value === "number") return finiteNumber(value, fallback);
+  if (typeof value !== "string") return fallback;
+  if (Object.hasOwn(anchors, value)) return anchors[value]!;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeKind(value: string): ClipKind {
+  if (value === "audio") return "audio";
+  if (value === "text") return "text";
+  if (value === "trans" || value === "transition") return "trans";
+  return "scene";
+}
+
+function trackNumber(kind: ClipKind): number {
+  if (kind === "text") return 1;
+  if (kind === "trans" || kind === "transition") return 2;
+  if (kind === "audio") return 3;
+  return 0;
+}
+
+function projectId(project: RealProject, fallback: string): string {
+  return project.slug ?? project.id ?? fallback;
+}
+
+function projectName(project: RealProject, fallback: string): string {
+  return project.name ?? projectId(project, fallback);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 export function seconds(value: number): string {
@@ -151,4 +466,12 @@ export function escapeHtml(value: string): string {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+declare global {
+  interface Window {
+    ipc?: ShellIpc;
+    webkit?: WebkitIpc;
+    __NEXTFRAME_IPC_RESOLVE__?: (response: NfIpcResponse<unknown>) => void;
+  }
 }

@@ -77,7 +77,7 @@ const sheet = makeSheet(`
 
 export class NfClips extends NfBase {
   static get observedAttributes(): string[] {
-    return ["selected-id"];
+    return ["selected-id", "episode-id"];
   }
 
   constructor() {

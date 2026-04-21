@@ -1,35 +1,15 @@
-use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use tao::dpi::LogicalSize;
 use tao::event_loop::{EventLoopProxy, EventLoopWindowTarget};
 use tao::window::{Window, WindowBuilder};
-use wry::{WebView, WebViewBuilder};
+use wry::{
+    http::{header::CONTENT_TYPE, Request, Response},
+    WebView, WebViewBuilder,
+};
 
 use crate::events::UserEvent;
-
-const STUB_HTML: &str = r#"<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NextFrame</title>
-  <style>
-    html, body { margin: 0; width: 100%; height: 100%; background: #101014; color: #f6f7fb; font: 14px system-ui, sans-serif; }
-    .app { min-height: 100vh; -webkit-backdrop-filter: blur(50px) saturate(1.5); backdrop-filter: blur(50px) saturate(1.5); background: rgba(18, 18, 24, 0.82); }
-    .topbar { height: 52px; display: flex; align-items: center; padding: 0 18px; box-sizing: border-box; background: rgba(10, 10, 14, 0.65); border-bottom: 1px solid rgba(255,255,255,0.12); }
-    .stub { padding: 20px; color: rgba(246,247,251,0.72); }
-  </style>
-</head>
-<body>
-  <main class="app" data-nextframe-shell="stub">
-    <div class="topbar">nf-shell</div>
-    <div class="stub">nf-shell</div>
-  </main>
-</body>
-</html>
-"#;
 
 pub fn create_window(
     target: &EventLoopWindowTarget<UserEvent>,
@@ -46,11 +26,17 @@ pub fn create_window(
         .build(target)
         .map_err(|err| format!("window build failed: {err}"))?;
 
-    let html_path = ensure_stub_bundle().map_err(|err| format!("stub bundle failed: {err}"))?;
-    let url = format!("file://{}", html_path.display());
+    let frontend_root = frontend_root()?;
+    let url = frontend_url(project, episode);
     let ipc_window_id = window_id.to_string();
     let ipc_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
+        .with_custom_protocol("nextframe".into(), move |_webview_id, request| {
+            match frontend_protocol_response(&frontend_root, request) {
+                Ok(response) => response.map(Into::into),
+                Err(err) => plain_response(500, err.as_bytes().to_vec()).map(Into::into),
+            }
+        })
         .with_url(url)
         .with_initialization_script("window.NEXTFRAME_DPR = 1;")
         .with_ipc_handler(move |req| {
@@ -71,13 +57,73 @@ pub fn create_window(
     Ok((window, webview))
 }
 
-fn ensure_stub_bundle() -> Result<PathBuf, std::io::Error> {
-    let dir = std::env::temp_dir().join("nextframe-shell-bundle-v0_2");
-    fs::create_dir_all(&dir)?;
-    let html_path = dir.join("index.html");
-    match fs::read_to_string(&html_path) {
-        Ok(existing) if existing == STUB_HTML => {}
-        _ => fs::write(&html_path, STUB_HTML)?,
+fn frontend_url(project: &str, episode: &str) -> String {
+    format!("nextframe://frontend/index.html?project={project}&episode={episode}")
+}
+
+fn frontend_root() -> Result<PathBuf, String> {
+    let root = project_root()?.join("frontend/nf-components");
+    let index = root.join("index.html");
+    if !index.exists() {
+        return Err(format!("frontend bundle missing: {}", index.display()));
     }
-    Ok(html_path)
+    Ok(root)
+}
+
+fn project_root() -> Result<PathBuf, String> {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .parent()
+        .and_then(|path| path.parent())
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            format!(
+                "cannot resolve project root from {}",
+                manifest_dir.display()
+            )
+        })
+}
+
+fn frontend_protocol_response(
+    root: &Path,
+    request: Request<Vec<u8>>,
+) -> Result<Response<Vec<u8>>, String> {
+    let root = root
+        .canonicalize()
+        .map_err(|err| format!("frontend root failed: {err}"))?;
+    let path = request.uri().path().trim_start_matches('/');
+    let path = if path.is_empty() { "index.html" } else { path };
+    let file = root.join(path);
+    let file = file
+        .canonicalize()
+        .map_err(|err| format!("frontend asset missing: {path}: {err}"))?;
+    if !file.starts_with(&root) {
+        return Ok(plain_response(403, b"forbidden".to_vec()));
+    }
+    let content = std::fs::read(&file).map_err(|err| format!("frontend asset failed: {err}"))?;
+    let mime = mime_for_path(&file);
+    Response::builder()
+        .header(CONTENT_TYPE, mime)
+        .body(content)
+        .map_err(|err| err.to_string())
+}
+
+fn plain_response(status: u16, body: Vec<u8>) -> Response<Vec<u8>> {
+    Response::builder()
+        .status(status)
+        .header(CONTENT_TYPE, "text/plain; charset=utf-8")
+        .body(body)
+        .unwrap_or_else(|_| Response::new(Vec::new()))
+}
+
+fn mime_for_path(path: &Path) -> &'static str {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("html") => "text/html; charset=utf-8",
+        Some("css") => "text/css; charset=utf-8",
+        Some("js") => "text/javascript; charset=utf-8",
+        Some("json") => "application/json; charset=utf-8",
+        Some("png") => "image/png",
+        Some("svg") => "image/svg+xml",
+        _ => "application/octet-stream",
+    }
 }
