@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
+use futures::future::join_all;
 use serde_json::{Value, json};
 
 use crate::{
@@ -25,6 +26,12 @@ pub struct Agent {
     tools: Vec<Box<dyn Tool>>,
     skills: Arc<SkillRegistry>,
     config: Config,
+}
+
+struct DispatchedToolCall {
+    index: usize,
+    tool_call: ToolCall,
+    result: Value,
 }
 
 #[derive(Debug, Clone)]
@@ -212,23 +219,16 @@ impl Agent {
                 resp.tool_calls.clone(),
             ));
 
-            for tool_call in &resp.tool_calls {
-                log::info!("-> tool: {}({})", tool_call.name, tool_call.args);
-                let result = self.dispatch(tool_call).await;
-                log::info!(
-                    "<- result: {}",
-                    truncate(&serde_json::to_string(&result).unwrap_or_else(|err| {
-                        json!({"ok": false, "error": err.to_string()}).to_string()
-                    }))
-                );
-                if tool_call.name == "load_skill" {
-                    if let Some(skill_name) = extract_successful_loaded_skill_name(&result) {
+            let dispatched = self.dispatch_tool_calls(&resp.tool_calls).await;
+            for item in dispatched {
+                if item.tool_call.name == "load_skill" {
+                    if let Some(skill_name) = extract_successful_loaded_skill_name(&item.result) {
                         active_skills.insert(skill_name);
                     }
                 }
                 messages.push(Message::tool(
-                    tool_call.id.clone(),
-                    result,
+                    item.tool_call.id,
+                    item.result,
                     self.config.max_tool_result_chars,
                 ));
             }
@@ -248,6 +248,54 @@ impl Agent {
             .iter()
             .map(|tool| openai_tool_schema(tool.as_ref()))
             .collect()
+    }
+
+    async fn dispatch_tool_calls(&self, tool_calls: &[ToolCall]) -> Vec<DispatchedToolCall> {
+        let mut safe_calls = Vec::new();
+        let mut unsafe_calls = Vec::new();
+
+        for (index, tool_call) in tool_calls.iter().enumerate() {
+            let tool = self.tools.iter().find(|tool| tool.name() == tool_call.name);
+            if tool.is_some_and(|tool| tool.concurrency_safe()) {
+                safe_calls.push((index, tool_call));
+            } else {
+                unsafe_calls.push((index, tool_call));
+            }
+        }
+
+        log::info!(
+            "concurrent dispatch: {} safe + {} unsafe",
+            safe_calls.len(),
+            unsafe_calls.len()
+        );
+
+        let safe_futs = safe_calls
+            .iter()
+            .map(|(index, tool_call)| self.dispatch_indexed(*index, tool_call));
+        let mut results = join_all(safe_futs).await;
+
+        for (index, tool_call) in unsafe_calls {
+            results.push(self.dispatch_indexed(index, tool_call).await);
+        }
+
+        results.sort_by_key(|item| item.index);
+        results
+    }
+
+    async fn dispatch_indexed(&self, index: usize, tool_call: &ToolCall) -> DispatchedToolCall {
+        log::info!("-> tool: {}({})", tool_call.name, tool_call.args);
+        let result = self.dispatch(tool_call).await;
+        log::info!(
+            "<- result: {}",
+            truncate(&serde_json::to_string(&result).unwrap_or_else(|err| {
+                json!({"ok": false, "error": err.to_string()}).to_string()
+            }))
+        );
+        DispatchedToolCall {
+            index,
+            tool_call: tool_call.clone(),
+            result,
+        }
     }
 
     async fn dispatch(&self, tool_call: &ToolCall) -> Value {

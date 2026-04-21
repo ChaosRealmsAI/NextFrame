@@ -1194,6 +1194,7 @@ dependencies = [
  "clap",
  "dotenvy",
  "env_logger",
+ "futures",
  "glob",
  "log",
  "regex",

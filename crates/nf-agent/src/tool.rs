@@ -22,6 +22,9 @@ pub trait Tool: Send + Sync {
     fn description(&self) -> &str;
     fn input_schema(&self) -> Value;
     async fn call(&self, args: Value) -> Result<Value>;
+    fn concurrency_safe(&self) -> bool {
+        false
+    }
 }
 
 const DEFAULT_BASH_TIMEOUT_SEC: u64 = 120;
@@ -178,8 +181,7 @@ fn compile_regexes(label: &str, patterns: &[String]) -> Result<Vec<Regex>> {
     patterns
         .iter()
         .map(|pattern| {
-            Regex::new(pattern)
-                .with_context(|| format!("invalid regex in {label}: {pattern}"))
+            Regex::new(pattern).with_context(|| format!("invalid regex in {label}: {pattern}"))
         })
         .collect()
 }
@@ -301,6 +303,10 @@ impl Tool for ReadTool {
             .await
             .context("read worker task failed")?
     }
+
+    fn concurrency_safe(&self) -> bool {
+        true
+    }
 }
 
 fn read_file(path: String, max_chars: u64) -> Result<Value> {
@@ -371,6 +377,10 @@ impl Tool for LoadSkillTool {
             "content": skill.content
         }))
     }
+
+    fn concurrency_safe(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -426,6 +436,10 @@ impl Tool for VerifyOutputsTool {
         })
         .await
         .context("verify_outputs worker task failed")?
+    }
+
+    fn concurrency_safe(&self) -> bool {
+        true
     }
 }
 
