@@ -93,7 +93,7 @@ pub fn state(args: StateArgs) -> Result<(), NfError> {
 
 pub fn devtools(args: DevtoolsArgs) -> Result<(), NfError> {
     send_ipc(
-        "state-query",
+        "devtools-query",
         json!({
             "project": args.project,
             "episode": args.episode,

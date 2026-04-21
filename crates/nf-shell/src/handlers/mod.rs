@@ -9,6 +9,7 @@ use crate::ipc_server::{IpcRequest, OpHandler};
 use crate::storage::{validate_slug, JsonStorage, Project, Registry, RegistryProject, Storage};
 
 pub mod anchors;
+pub mod app;
 pub mod clips;
 pub mod episodes;
 pub mod log;

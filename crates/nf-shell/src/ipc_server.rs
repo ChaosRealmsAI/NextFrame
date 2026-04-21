@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use interprocess::local_socket::tokio::prelude::*;
@@ -109,6 +110,7 @@ pub fn install_ctrlc_cleanup(path: PathBuf) -> Result<(), NfError> {
 
 pub fn spawn_server_thread(
     proxy: EventLoopProxy<UserEvent>,
+    handler: Arc<dyn OpHandler>,
 ) -> Result<std::thread::JoinHandle<()>, NfError> {
     let path = socket_path();
     cleanup_stale_socket(&path)?;
@@ -127,7 +129,7 @@ pub fn spawn_server_thread(
             }
         };
         let _guard = guard;
-        if let Err(err) = runtime.block_on(serve(path, proxy)) {
+        if let Err(err) = runtime.block_on(serve_with_event_loop(path, proxy, handler)) {
             eprintln!("nf-shell IPC server failed: {err}");
         }
     });
@@ -136,14 +138,11 @@ pub fn spawn_server_thread(
 }
 
 pub async fn serve(path: PathBuf, proxy: EventLoopProxy<UserEvent>) -> Result<(), NfError> {
-    let handler = std::sync::Arc::new(ComposeOpHandler::from_default_storage()?);
+    let handler = Arc::new(ComposeOpHandler::from_default_storage()?);
     serve_with_event_loop(path, proxy, handler).await
 }
 
-pub async fn serve_handler(
-    path: PathBuf,
-    handler: std::sync::Arc<dyn OpHandler>,
-) -> Result<(), NfError> {
+pub async fn serve_handler(path: PathBuf, handler: Arc<dyn OpHandler>) -> Result<(), NfError> {
     cleanup_stale_socket(&path)?;
     let name = path
         .to_str()
@@ -170,7 +169,7 @@ pub async fn serve_handler(
 async fn serve_with_event_loop(
     path: PathBuf,
     proxy: EventLoopProxy<UserEvent>,
-    handler: std::sync::Arc<dyn OpHandler>,
+    handler: Arc<dyn OpHandler>,
 ) -> Result<(), NfError> {
     cleanup_stale_socket(&path)?;
     let name = path
@@ -301,10 +300,15 @@ async fn dispatch(
     proxy: &EventLoopProxy<UserEvent>,
     handler: &dyn OpHandler,
 ) -> IpcResponse {
-    match handler.handle(&req) {
-        Ok(Some(data)) => return ok_response(&req, data),
-        Ok(None) => {}
-        Err(err) => return error_response(&req, &err),
+    if is_crud_op(&req.op) {
+        return match handler.handle(&req) {
+            Ok(Some(data)) => ok_response(&req, data),
+            Ok(None) => error_response(
+                &req,
+                &NfError::ValidationFailed(format!("unknown op: {}", req.op)),
+            ),
+            Err(err) => error_response(&req, &err),
+        };
     }
 
     match req.op.as_str() {
@@ -343,19 +347,35 @@ async fn dispatch(
             })
             .await
         }
+        "devtools-query" => {
+            send_event(req, proxy, |request, ack| UserEvent::DevtoolsQuery {
+                request,
+                ack,
+            })
+            .await
+        }
         "quit" => send_event(req, proxy, |request, ack| UserEvent::Quit { request, ack }).await,
         _ => IpcResponse {
             req_id: req.req_id,
             ok: false,
             data: None,
-            error: Some(json!({
-                "error": "not implemented",
-                "detail": format!("unknown op: {}", req.op),
-                "hint": "run `nf help <command>` for supported operations",
-                "exit_code": 2
-            })),
+            error: Some(json!(NfError::ValidationFailed(format!(
+                "unknown op: {}",
+                req.op
+            ))
+            .to_record())),
         },
     }
+}
+
+fn is_crud_op(op: &str) -> bool {
+    let Some((prefix, _rest)) = op.split_once('-').or_else(|| op.split_once('.')) else {
+        return false;
+    };
+    matches!(
+        prefix,
+        "projects" | "episodes" | "clips" | "anchors" | "log"
+    )
 }
 
 async fn send_event(

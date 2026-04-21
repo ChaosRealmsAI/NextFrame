@@ -19,6 +19,7 @@ serde_json.workspace = true
 tao.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+wry.workspace = true
 
 [[bin]]
 name = "nf-shell"
