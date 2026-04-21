@@ -20,15 +20,21 @@ pub fn create_window(
     project: &str,
     episode: &str,
 ) -> Result<(Window, WebView), String> {
-    // Traffic light 按 topbar 高度居中(Electron / VSCode 业界公式):
-    //   y_inset = TOPBAR_HEIGHT / 2 - TRAFFIC_LIGHT_DIAMETER / 2
-    // macOS traffic light 按钮直径 ≈ 14pt(行业共识 · 不在 Apple 公开 docs 但 VSCode/Electron/Tauri 都用这值)
-    // 修改 TOPBAR_HEIGHT_PT 时 y_inset 自动重算 · 不再靠魔数
+    // Traffic light 位置 · tao 0.35 `with_traffic_light_inset(x, y)` 真实语义:
+    //   title_bar_container_h = button_h + y    // 见 tao view.rs:1168
+    //   button.origin.x = x + i * space_between
+    //   button.origin.y = 不动 · 靠 Cocoa 在容器内默认居中
+    //
+    // 所以要按钮跟 H px DOM topbar 垂直居中对齐 → 容器高度撑到 H:
+    //   y = H - button_h
+    // 数学直觉 (H - button_h) / 2 是 Electron 式"button 距顶 padding" 模型
+    // tao 不是那个模型 · 套错 · 结果偏上(v0.5.1 此前试过 17/20 皆偏)。
+    //
+    // button_h = 14pt 是系统定值(macOS 三色圆按钮 · NSWindowButton 默认)。
     const TOPBAR_HEIGHT_PT: f64 = 48.0;
-    const TRAFFIC_LIGHT_DIAMETER_PT: f64 = 14.0;
-    const TRAFFIC_LIGHT_X_PT: f64 = 20.0; // 左 margin · industry 15-20pt 主流
-    const TRAFFIC_LIGHT_Y_PT: f64 =
-        (TOPBAR_HEIGHT_PT - TRAFFIC_LIGHT_DIAMETER_PT) / 2.0; // = 17.0 at bar=48
+    const TRAFFIC_LIGHT_BUTTON_H_PT: f64 = 14.0;
+    const TRAFFIC_LIGHT_X_PT: f64 = 20.0;
+    const TRAFFIC_LIGHT_Y_PT: f64 = TOPBAR_HEIGHT_PT - TRAFFIC_LIGHT_BUTTON_H_PT; // = 34
 
     let builder = WindowBuilder::new()
         .with_title("NextFrame")
