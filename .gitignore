@@ -25,6 +25,9 @@ archive/
 legacy-v08/
 legacy-v10/
 
+# v0.x archived code pulled from git history for reference (not for build)
+reference/
+
 # Secrets / env
 .env
 *.env.local
