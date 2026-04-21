@@ -1201,6 +1201,7 @@ dependencies = [
  "anyhow",
  "clap",
  "serde_json",
+ "tempfile",
  "videocut-align",
  "videocut-core",
  "videocut-cut",

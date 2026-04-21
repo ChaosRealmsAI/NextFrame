@@ -18,5 +18,8 @@ videocut-transcribe = { path = "../videocut-transcribe" }
 videocut-align = { path = "../videocut-align" }
 videocut-cut = { path = "../videocut-cut" }
 
+[dev-dependencies]
+tempfile = "3.15"
+
 [lints]
 workspace = true
