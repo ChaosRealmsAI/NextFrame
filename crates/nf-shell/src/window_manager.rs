@@ -222,11 +222,19 @@ mod tests {
     }
 
     #[test]
-    fn close_missing_window_reports_error() {
+    fn close_missing_window_reports_error() -> Result<(), Box<dyn std::error::Error>> {
         let mut manager = WindowManager::new();
 
-        let error = manager.close("w-missing").expect_err("missing window");
+        let error = match manager.close("w-missing") {
+            Ok(()) => {
+                return Err(Box::new(std::io::Error::other(
+                    "missing window closed unexpectedly",
+                )));
+            }
+            Err(error) => error,
+        };
 
         assert_eq!(error, "no such window: w-missing");
+        Ok(())
     }
 }

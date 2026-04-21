@@ -550,10 +550,15 @@ mod tests {
     }
 
     #[test]
-    fn javascript_error_callback_maps_to_ipc_error() {
+    fn javascript_error_callback_maps_to_ipc_error() -> Result<(), Box<dyn std::error::Error>> {
         let response = js_callback_response("r-1", r#"{"ok":false,"error":"missing"}"#);
 
         assert!(!response.ok);
-        assert_eq!(response.error.as_deref(), Some("missing"));
+        let error = response
+            .error
+            .ok_or_else(|| std::io::Error::other("missing error record"))?;
+        assert_eq!(error["error"], "validation failed");
+        assert_eq!(error["detail"], "validation failed: missing");
+        Ok(())
     }
 }
