@@ -17,7 +17,7 @@ pub fn dispatch(args: EpisodeCommand) -> Result<(), NfError> {
             json!({
                 "project": args.project,
                 "slug": args.slug,
-                "name": args.name,
+                "name": args.name.unwrap_or_else(|| args.slug.clone()),
                 "duration": args.duration
             }),
         ),

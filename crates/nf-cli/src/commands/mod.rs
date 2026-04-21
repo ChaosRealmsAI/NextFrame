@@ -967,7 +967,7 @@ pub struct EpisodeCreateArgs {
     )]
     pub slug: String,
     #[arg(long, value_name = "NAME", help = "Human-readable episode name")]
-    pub name: String,
+    pub name: Option<String>,
     #[arg(
         long,
         default_value_t = 60.0,
