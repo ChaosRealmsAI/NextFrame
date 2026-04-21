@@ -23,19 +23,20 @@ use std::sync::{Arc, Mutex};
 
 use crossbeam::queue::SegQueue;
 use objc2_core_foundation::{
-    kCFBooleanTrue, CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFString, CFType, Type,
+    CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFString, CFType, Type, kCFBooleanTrue,
 };
 use objc2_core_media::{
-    kCMSampleAttachmentKey_NotSync, kCMTimeInvalid, kCMVideoCodecType_H264, kCMVideoCodecType_HEVC,
     CMBlockBuffer, CMSampleBuffer, CMTime, CMVideoFormatDescription,
+    kCMSampleAttachmentKey_NotSync, kCMTimeInvalid, kCMVideoCodecType_H264, kCMVideoCodecType_HEVC,
 };
 use objc2_core_video::{
-    kCVImageBufferColorPrimaries_ITU_R_709_2, kCVImageBufferTransferFunction_ITU_R_709_2,
-    kCVImageBufferYCbCrMatrix_ITU_R_709_2, kCVPixelBufferHeightKey,
-    kCVPixelBufferIOSurfacePropertiesKey, kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey,
-    kCVPixelFormatType_32BGRA, CVImageBuffer, CVPixelBuffer,
+    CVImageBuffer, CVPixelBuffer, kCVImageBufferColorPrimaries_ITU_R_709_2,
+    kCVImageBufferTransferFunction_ITU_R_709_2, kCVImageBufferYCbCrMatrix_ITU_R_709_2,
+    kCVPixelBufferHeightKey, kCVPixelBufferIOSurfacePropertiesKey,
+    kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey, kCVPixelFormatType_32BGRA,
 };
 use objc2_video_toolbox::{
+    VTCompressionSession, VTEncodeInfoFlags, VTSession, VTSessionSetProperty,
     kVTCompressionPropertyKey_AllowFrameReordering, kVTCompressionPropertyKey_AverageBitRate,
     kVTCompressionPropertyKey_ColorPrimaries, kVTCompressionPropertyKey_ConstantBitRate,
     kVTCompressionPropertyKey_DataRateLimits, kVTCompressionPropertyKey_ExpectedFrameRate,
@@ -44,8 +45,7 @@ use objc2_video_toolbox::{
     kVTCompressionPropertyKey_RealTime, kVTCompressionPropertyKey_TransferFunction,
     kVTCompressionPropertyKey_YCbCrMatrix, kVTEncodeFrameOptionKey_ForceKeyFrame,
     kVTProfileLevel_H264_Main_AutoLevel, kVTProfileLevel_HEVC_Main_AutoLevel,
-    kVTPropertyNotSupportedErr, VTCompressionSession, VTEncodeInfoFlags, VTSession,
-    VTSessionSetProperty,
+    kVTPropertyNotSupportedErr,
 };
 
 use super::{ColorSpec, PipelineError, VideoCodec};
@@ -758,11 +758,7 @@ fn cmtime_to_ms(t: CMTime) -> u64 {
         return 0;
     }
     let ms = num / den;
-    if ms < 0 {
-        0
-    } else {
-        ms as u64
-    }
+    if ms < 0 { 0 } else { ms as u64 }
 }
 
 fn is_sync_frame(sample: &CMSampleBuffer) -> bool {

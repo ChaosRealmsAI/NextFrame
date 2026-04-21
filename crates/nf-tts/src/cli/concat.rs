@@ -1,5 +1,5 @@
 //! cli audio concatenation command
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::path::Path;
 
 pub fn run(files: &[String], output: &str) -> Result<()> {

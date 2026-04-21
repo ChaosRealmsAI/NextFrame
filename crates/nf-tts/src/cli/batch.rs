@@ -3,7 +3,7 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 
 use crate::backend::{self, Backend, DEFAULT_VOICE};
 use crate::cache::Cache;
@@ -161,7 +161,7 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     #![allow(clippy::expect_used)]
 
-    use super::{ensure_batch_success, prepare_jobs, resolve_batch_options, BatchOptions};
+    use super::{BatchOptions, ensure_batch_success, prepare_jobs, resolve_batch_options};
     use crate::config::VoxConfig;
     use crate::output::manifest::Manifest;
     use crate::output::manifest::{ManifestEntry, ManifestFailure};

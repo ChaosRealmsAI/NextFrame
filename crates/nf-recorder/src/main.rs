@@ -14,9 +14,9 @@
 use std::process::ExitCode;
 
 use nf_recorder::cli::{self, Command};
-use nf_recorder::events::{emit, Event};
+use nf_recorder::events::{Event, emit};
 use nf_recorder::orchestrator;
-use nf_recorder::record_loop::{run, RecordError};
+use nf_recorder::record_loop::{RecordError, run};
 use nf_recorder::snapshot;
 use nf_recorder::verify_mp4;
 

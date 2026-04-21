@@ -28,8 +28,8 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::error::CliError;
-use crate::io_json;
+use crate::commands::print_json;
+use crate::errors::NfError;
 
 const TEMPLATE: &str = include_str!("karaoke_template.html");
 
@@ -130,13 +130,15 @@ struct CnCue {
 
 // ============ Entry ============
 
-pub fn run(episode_dir: &Path) -> Result<(), CliError> {
+pub fn run(episode_dir: &Path) -> Result<(), NfError> {
     if !episode_dir.is_dir() {
-        return Err(CliError::UserInput {
-            code: "E_EPISODE_MISSING",
-            message: format!("episode directory not found: {}", episode_dir.display()),
-            hint: Some("Pass a directory that contains sources/<slug>/words.json + clips/cut_report.json.".into()),
-        });
+        return Err(user_input(
+            format!("episode directory not found: {}", episode_dir.display()),
+            Some(
+                "Pass a directory that contains sources/<slug>/words.json + clips/cut_report.json."
+                    .into(),
+            ),
+        ));
     }
 
     let clips_dir = episode_dir.join("clips");
@@ -152,14 +154,13 @@ pub fn run(episode_dir: &Path) -> Result<(), CliError> {
     let cut_report = load_cut_report(&cut_report_path)?;
 
     if cut_report.success.is_empty() {
-        return Err(CliError::UserInput {
-            code: "E_NO_CLIPS",
-            message: format!(
+        return Err(user_input(
+            format!(
                 "cut_report.json at {} has empty `success` list",
                 cut_report_path.display()
             ),
-            hint: Some("Run the clip cutter first to produce clip_NN.mp4 + cut_report.json.".into()),
-        });
+            Some("Run the clip cutter first to produce clip_NN.mp4 + cut_report.json.".into()),
+        ));
     }
 
     // 3. For each clip: load translation, build segments
@@ -190,37 +191,30 @@ pub fn run(episode_dir: &Path) -> Result<(), CliError> {
     }
 
     let data = KaraokeData { clips };
-    let data_json = serde_json::to_string(&data).map_err(|e| CliError::Internal {
-        code: "E_SERIALIZE",
-        message: format!("failed to serialize karaoke data: {e}"),
-        hint: None,
-    })?;
+    let data_json = serde_json::to_string(&data)?;
 
     let html = TEMPLATE.replace("{{DATA_JSON}}", &data_json);
 
     let out_path = clips_dir.join("index.html");
-    std::fs::write(&out_path, &html)
-        .map_err(|e| CliError::io_write(&out_path.to_string_lossy(), e))?;
+    std::fs::write(&out_path, &html).map_err(|e| storage_failed("write", &out_path, e))?;
 
-    io_json::emit_ok(&serde_json::json!({
+    print_json(&serde_json::json!({
         "out": out_path.to_string_lossy(),
         "bytes": html.len(),
         "clips": data.clips.len(),
         "segments": data.clips.iter().map(|c| c.segments.len()).sum::<usize>(),
-    }));
-    Ok(())
+    }))
 }
 
 // ============ Helpers ============
 
 /// Auto-detect `<slug>` from `<episode>/plan.json` (field `source`) or fall back
 /// to the first `sources/*/` subdir containing `words.json`.
-fn detect_source_slug(episode_dir: &Path, sources_dir: &Path) -> Result<String, CliError> {
+fn detect_source_slug(episode_dir: &Path, sources_dir: &Path) -> Result<String, NfError> {
     // Primary: plan.json
     let plan_path = episode_dir.join("plan.json");
     if plan_path.is_file() {
-        let bytes = std::fs::read(&plan_path)
-            .map_err(|e| CliError::io_read(&plan_path.to_string_lossy(), e))?;
+        let bytes = std::fs::read(&plan_path).map_err(|e| storage_failed("read", &plan_path, e))?;
         if let Ok(v) = serde_json::from_slice::<Value>(&bytes) {
             if let Some(s) = v.get("source").and_then(|x| x.as_str()) {
                 if !s.is_empty() {
@@ -232,14 +226,13 @@ fn detect_source_slug(episode_dir: &Path, sources_dir: &Path) -> Result<String, 
 
     // Fallback: scan sources/
     if !sources_dir.is_dir() {
-        return Err(CliError::UserInput {
-            code: "E_SOURCES_MISSING",
-            message: format!("sources/ not found under {}", episode_dir.display()),
-            hint: Some("Expect <episode>/sources/<slug>/words.json.".into()),
-        });
+        return Err(user_input(
+            format!("sources/ not found under {}", episode_dir.display()),
+            Some("Expect <episode>/sources/<slug>/words.json.".into()),
+        ));
     }
-    let entries = std::fs::read_dir(sources_dir)
-        .map_err(|e| CliError::io_read(&sources_dir.to_string_lossy(), e))?;
+    let entries =
+        std::fs::read_dir(sources_dir).map_err(|e| storage_failed("read", sources_dir, e))?;
     for e in entries.flatten() {
         let p = e.path();
         if p.is_dir() && p.join("words.json").is_file() {
@@ -248,37 +241,41 @@ fn detect_source_slug(episode_dir: &Path, sources_dir: &Path) -> Result<String, 
             }
         }
     }
-    Err(CliError::UserInput {
-        code: "E_SOURCE_SLUG",
-        message: "could not detect source slug (no plan.json `source` field and no sources/<slug>/words.json found)".into(),
-        hint: Some("Create <episode>/plan.json with `source: <slug>` or place words.json under sources/<slug>/.".into()),
+    Err(user_input(
+        "could not detect source slug (no plan.json `source` field and no sources/<slug>/words.json found)",
+        Some("Create <episode>/plan.json with `source: <slug>` or place words.json under sources/<slug>/.".into()),
+    ))
+}
+
+fn load_words(path: &Path) -> Result<WordsFile, NfError> {
+    let bytes = std::fs::read(path).map_err(|e| storage_failed("read", path, e))?;
+    serde_json::from_slice(&bytes).map_err(|e| {
+        user_input(
+            format!("cannot parse {}: {e}", path.display()),
+            Some("Expect {total_words, words:[{text,start,end}]}.".into()),
+        )
     })
 }
 
-fn load_words(path: &Path) -> Result<WordsFile, CliError> {
-    let bytes = std::fs::read(path).map_err(|e| CliError::io_read(&path.to_string_lossy(), e))?;
-    serde_json::from_slice(&bytes).map_err(|e| CliError::UserInput {
-        code: "E_WORDS_PARSE",
-        message: format!("cannot parse {}: {e}", path.display()),
-        hint: Some("Expect {total_words, words:[{text,start,end}]}.".into()),
+fn load_cut_report(path: &Path) -> Result<CutReport, NfError> {
+    let bytes = std::fs::read(path).map_err(|e| storage_failed("read", path, e))?;
+    serde_json::from_slice(&bytes).map_err(|e| {
+        user_input(
+            format!("cannot parse {}: {e}", path.display()),
+            Some("Expect {success:[{clip_num,start,end,file,title,duration,...}]}.".into()),
+        )
     })
 }
 
-fn load_cut_report(path: &Path) -> Result<CutReport, CliError> {
-    let bytes = std::fs::read(path).map_err(|e| CliError::io_read(&path.to_string_lossy(), e))?;
-    serde_json::from_slice(&bytes).map_err(|e| CliError::UserInput {
-        code: "E_CUT_REPORT_PARSE",
-        message: format!("cannot parse {}: {e}", path.display()),
-        hint: Some("Expect {success:[{clip_num,start,end,file,title,duration,...}]}.".into()),
-    })
-}
-
-fn load_translation(path: &Path) -> Result<TranslationFile, CliError> {
-    let bytes = std::fs::read(path).map_err(|e| CliError::io_read(&path.to_string_lossy(), e))?;
-    serde_json::from_slice(&bytes).map_err(|e| CliError::UserInput {
-        code: "E_TRANSLATION_PARSE",
-        message: format!("cannot parse {}: {e}", path.display()),
-        hint: Some("Expect {clip_num,lang,segments:[{id,en,start,end,cn:[{text,start,end}]}]}.".into()),
+fn load_translation(path: &Path) -> Result<TranslationFile, NfError> {
+    let bytes = std::fs::read(path).map_err(|e| storage_failed("read", path, e))?;
+    serde_json::from_slice(&bytes).map_err(|e| {
+        user_input(
+            format!("cannot parse {}: {e}", path.display()),
+            Some(
+                "Expect {clip_num,lang,segments:[{id,en,start,end,cn:[{text,start,end}]}]}.".into(),
+            ),
+        )
     })
 }
 
@@ -369,7 +366,10 @@ fn to_clip_ms(src_s: f64, clip_start_s: f64) -> u32 {
 
 /// Best-effort sub-title extraction: first 32 chars of the preview (no newline).
 fn derive_sub(preview: &str) -> String {
-    let clean: String = preview.chars().filter(|c| *c != '\n' && *c != '\r').collect();
+    let clean: String = preview
+        .chars()
+        .filter(|c| *c != '\n' && *c != '\r')
+        .collect();
     let trimmed = clean.trim();
     if trimmed.chars().count() <= 32 {
         trimmed.to_string()
@@ -377,6 +377,18 @@ fn derive_sub(preview: &str) -> String {
         let take: String = trimmed.chars().take(32).collect();
         format!("{take}…")
     }
+}
+
+fn user_input(message: impl Into<String>, hint: Option<String>) -> NfError {
+    let message = message.into();
+    match hint {
+        Some(hint) => NfError::ValidationFailed(format!("{message} · hint: {hint}")),
+        None => NfError::ValidationFailed(message),
+    }
+}
+
+fn storage_failed(action: &str, path: &Path, err: std::io::Error) -> NfError {
+    NfError::StorageFailed(format!("cannot {action} {}: {err}", path.display()))
 }
 
 // ============ Tests ============
@@ -534,7 +546,10 @@ mod tests {
         assert!(!html.contains("{{DATA_JSON}}"));
         // Data inlined
         assert!(html.contains(r#""clips":["#));
-        assert!(html.contains(r#""file":"clip_01.mp4""#), "file should be relative");
+        assert!(
+            html.contains(r#""file":"clip_01.mp4""#),
+            "file should be relative"
+        );
         assert!(html.contains(r#""en":"Hello world.""#));
         assert!(html.contains("你好世界"));
         // Structure markers from template survive

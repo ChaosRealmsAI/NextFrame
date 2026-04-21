@@ -38,11 +38,7 @@ impl Cache {
     /// Check if cached audio exists, return path if so.
     pub fn get(&self, key: &str) -> Option<PathBuf> {
         let path = self.dir.join(format!("{key}.mp3"));
-        if path.exists() {
-            Some(path)
-        } else {
-            None
-        }
+        if path.exists() { Some(path) } else { None }
     }
 
     /// Store audio data in cache.

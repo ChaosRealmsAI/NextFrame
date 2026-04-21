@@ -12,8 +12,8 @@ use std::sync::mpsc::Sender;
 
 use objc2::rc::Retained;
 use objc2::runtime::{NSObject, ProtocolObject};
-use objc2::{define_class, msg_send, DefinedClass, MainThreadMarker, MainThreadOnly};
-use objc2_foundation::{ns_string, NSObjectProtocol};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
+use objc2_foundation::{NSObjectProtocol, ns_string};
 use objc2_web_kit::{
     WKNavigation, WKNavigationDelegate, WKScriptMessage, WKScriptMessageHandler,
     WKUserContentController, WKWebView, WKWebViewConfiguration, WKWebsiteDataStore,

@@ -9,6 +9,26 @@ authors.workspace = true
 description = "NextFrame Mac desktop shell · wry + tao (v0.2 implements)"
 
 [dependencies]
+ctrlc.workspace = true
+directories.workspace = true
+interprocess.workspace = true
+once_cell.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tao.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+wry.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSGeometry", "NSObject", "NSString"] }
+objc2-app-kit = { version = "0.3", features = ["NSButton", "NSControl", "NSResponder", "NSView", "NSWindow"] }
+
+[[bin]]
+name = "nf-shell"
+path = "src/main.rs"
 
 [lints]
 workspace = true

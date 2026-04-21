@@ -9,13 +9,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Instant;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use tempfile::tempdir;
 use videocut_core::{
-    extract_audio_to_wav, probe_duration, python_bin, split_into_sentences, SentenceSource,
-    Sentences, Word, WordsFile,
+    SentenceSource, Sentences, Word, WordsFile, extract_audio_to_wav, probe_duration, python_bin,
+    split_into_sentences,
 };
 
 use crate::chunk::build_chunks;

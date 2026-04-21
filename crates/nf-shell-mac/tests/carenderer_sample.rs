@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 
 use objc2::rc::Retained;
 use objc2::runtime::{NSObject, ProtocolObject};
-use objc2::{define_class, msg_send, DefinedClass, MainThreadMarker, MainThreadOnly};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSColor, NSWindow,
     NSWindowCollectionBehavior, NSWindowStyleMask,
@@ -33,7 +33,7 @@ use objc2_web_kit::{
     WKNavigation, WKNavigationDelegate, WKWebView, WKWebViewConfiguration, WKWebsiteDataStore,
 };
 
-use nf_shell_mac::carenderer::{read_center_rgba, CARendererSampler};
+use nf_shell_mac::carenderer::{CARendererSampler, read_center_rgba};
 
 /// 视口 · 跟 POC-04B 一致 · 1080p。
 const WIDTH: u32 = 1920;

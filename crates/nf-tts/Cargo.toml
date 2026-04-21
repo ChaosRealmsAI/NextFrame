@@ -1,14 +1,14 @@
 [package]
 name = "nf-tts"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "Multi-backend TTS CLI, agent-friendly"
 authors = ["i+1 <chaos.realms.ai@gmail.com>"]
 license = "UNLICENSED"
 repository = "https://github.com/Zhuanz/vox"
 keywords = ["tts", "cli", "speech", "audio", "edge"]
 categories = ["command-line-utilities", "multimedia::audio"]
-rust-version = "1.75"
+rust-version.workspace = true
 
 [lints]
 workspace = true

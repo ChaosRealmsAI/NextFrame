@@ -1,5 +1,5 @@
 //! cli preview rendering
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use tokio::process::Command;
 
 use crate::backend::{self, SynthParams};

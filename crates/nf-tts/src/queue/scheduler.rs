@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use tokio::sync::Semaphore;
 
 use crate::backend::Backend;
@@ -183,7 +183,7 @@ pub async fn run_batch(
 #[cfg(test)]
 mod tests {
     use super::run_batch;
-    use anyhow::{anyhow, Result};
+    use anyhow::{Result, anyhow};
     use async_trait::async_trait;
     use std::collections::HashMap;
     use std::path::PathBuf;

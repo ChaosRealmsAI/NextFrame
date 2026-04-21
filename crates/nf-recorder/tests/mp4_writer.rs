@@ -18,15 +18,15 @@ use std::ptr::NonNull;
 
 use objc2_core_foundation::{CFDictionary, CFNumber, CFRetained, CFType};
 use objc2_core_video::{
-    kCVPixelBufferHeightKey, kCVPixelBufferIOSurfacePropertiesKey,
-    kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey, kCVPixelFormatType_32BGRA,
     CVPixelBuffer, CVPixelBufferCreate, CVPixelBufferGetBaseAddress, CVPixelBufferGetBytesPerRow,
     CVPixelBufferLockBaseAddress, CVPixelBufferLockFlags, CVPixelBufferUnlockBaseAddress,
+    kCVPixelBufferHeightKey, kCVPixelBufferIOSurfacePropertiesKey,
+    kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey, kCVPixelFormatType_32BGRA,
 };
 
+use nf_recorder::pipeline::ColorSpec;
 use nf_recorder::pipeline::mp4_writer::Mp4Writer;
 use nf_recorder::pipeline::vt_wrap::{CompressedFrame, VtCompressor};
-use nf_recorder::pipeline::ColorSpec;
 
 const WIDTH: usize = 1920;
 const HEIGHT: usize = 1080;
@@ -82,7 +82,11 @@ fn writes_minimal_mp4_with_moov_front() {
     // Print a summary for the test runner / auto-report.
     println!(
         "writes_minimal_mp4_with_moov_front ok · frames={} · size_bytes={} · moov_front={} · duration_ms={} · path={}",
-        stats.frames, stats.size_bytes, stats.moov_front, stats.duration_ms, stats.path.display()
+        stats.frames,
+        stats.size_bytes,
+        stats.moov_front,
+        stats.duration_ms,
+        stats.path.display()
     );
 }
 

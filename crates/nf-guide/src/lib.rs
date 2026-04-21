@@ -54,7 +54,9 @@ pub fn default_flows_dir() -> PathBuf {
 pub fn discover_flows(flows_dir: impl AsRef<Path>) -> Result<Vec<(String, String)>, String> {
     let mut flows = Vec::new();
     let entries = fs::read_dir(flows_dir.as_ref()).map_err(|error| {
-        format!("failed to read flows dir: {error}. Fix: set NF_GUIDE_FLOWS or run from the repo root")
+        format!(
+            "failed to read flows dir: {error}. Fix: set NF_GUIDE_FLOWS or run from the repo root"
+        )
     })?;
 
     for entry in entries {
@@ -101,9 +103,7 @@ pub fn get_step_content(
 }
 
 fn step_matches(entry: &Step, query: &str) -> bool {
-    entry.id == query
-        || prompt_stem(&entry.prompt) == query
-        || entry.prompt == query
+    entry.id == query || prompt_stem(&entry.prompt) == query || entry.prompt == query
 }
 
 fn prompt_stem(prompt: &str) -> &str {

@@ -78,10 +78,17 @@ fn verify_battle_mp4_passes_all_six_assertions() {
     );
 
     // Dump for debug before asserting (so failure prints context).
-    eprintln!("verdict: codec={} fps={:.3} bitrate={} primaries={} transfer={} matrix={} duration_ms={} moov_front={}",
-        verdict.codec, verdict.frame_rate, verdict.bit_rate,
-        verdict.color_primaries, verdict.transfer, verdict.ycbcr_matrix,
-        verdict.duration_ms, verdict.moov_front);
+    eprintln!(
+        "verdict: codec={} fps={:.3} bitrate={} primaries={} transfer={} matrix={} duration_ms={} moov_front={}",
+        verdict.codec,
+        verdict.frame_rate,
+        verdict.bit_rate,
+        verdict.color_primaries,
+        verdict.transfer,
+        verdict.ycbcr_matrix,
+        verdict.duration_ms,
+        verdict.moov_front
+    );
     for a in &asserts {
         eprintln!(
             "  [{:<22}] expected={:<45} actual={:<45} pass={}",

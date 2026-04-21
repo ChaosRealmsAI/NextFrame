@@ -16,10 +16,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use clap::Parser;
-use nf_recorder::cli::{parse_bitrate, to_config, Cli};
-use nf_recorder::events::{emit, Event};
-use nf_recorder::orchestrator;
 use nf_recorder::VideoCodec;
+use nf_recorder::cli::{Cli, parse_bitrate, to_config};
+use nf_recorder::events::{Event, emit};
+use nf_recorder::orchestrator;
 use std::fs::File;
 use std::io::Write as _;
 use std::path::PathBuf;

@@ -25,7 +25,7 @@ use std::time::{Duration, Instant};
 
 use nf_shell_mac::{DesktopShell, MacHeadlessShell, ShellConfig, ShellError};
 
-use crate::events::{emit, Event};
+use crate::events::{Event, emit};
 use crate::frame_pool::FramePool;
 use crate::pipeline::h264::PipelineH264_1080p;
 use crate::pipeline::hevc::PipelineHevcMain;
@@ -435,7 +435,7 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
         });
 
         // 5.5 Progress event every N frames (skip seq 0 · we just announced).
-        if seq > 0 && seq.is_multiple_of(PROGRESS_EVERY) {
+        if seq > 0 && seq % PROGRESS_EVERY == 0 {
             let percent = (seq as f64) / (total_frames as f64) * 100.0;
             emit(Event::RecordEncodeProgress {
                 frames_encoded: seq,

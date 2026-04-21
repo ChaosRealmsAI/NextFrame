@@ -14,20 +14,19 @@
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Mutex;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use block2::RcBlock;
-use objc2::rc::{autoreleasepool, Retained};
+use objc2::rc::{Retained, autoreleasepool};
 use objc2::runtime::{AnyObject, ProtocolObject};
-use objc2::{msg_send, AnyThread, MainThreadMarker, MainThreadOnly};
+use objc2::{AnyThread, MainThreadMarker, MainThreadOnly, msg_send};
 use objc2_app_kit::{
-    NSApp, NSApplicationActivationPolicy, NSBackingStoreType, NSImage, NSWindow,
-    NSWindowStyleMask,
+    NSApp, NSApplicationActivationPolicy, NSBackingStoreType, NSImage, NSWindow, NSWindowStyleMask,
 };
 use objc2_core_foundation::{CFDictionary, CFRetained, CFString, CGPoint, CGRect, CGSize};
 use objc2_core_graphics::CGColorSpace;
@@ -37,8 +36,8 @@ use objc2_foundation::{
     NSProcessInfo, NSRect, NSSize, NSString, NSURL,
 };
 use objc2_io_surface::{
-    kIOSurfaceBytesPerElement, kIOSurfaceBytesPerRow, kIOSurfaceHeight, kIOSurfacePixelFormat,
-    kIOSurfaceWidth, IOSurfaceRef,
+    IOSurfaceRef, kIOSurfaceBytesPerElement, kIOSurfaceBytesPerRow, kIOSurfaceHeight,
+    kIOSurfacePixelFormat, kIOSurfaceWidth,
 };
 use objc2_quartz_core::CATransaction;
 use objc2_web_kit::{WKContentWorld, WKSnapshotConfiguration, WKWebView};
@@ -46,7 +45,7 @@ use objc2_web_kit::{WKContentWorld, WKSnapshotConfiguration, WKWebView};
 use crate::carenderer::CARendererSampler;
 use crate::iosurface::PIXEL_FORMAT_BGRA;
 use crate::webview::{
-    create_webview, pump_main_run_loop, NavigationDelegate, ScriptHandler, WebViewEvent,
+    NavigationDelegate, ScriptHandler, WebViewEvent, create_webview, pump_main_run_loop,
 };
 use crate::{DesktopShell, IOSurfaceHandle, ShellConfig, ShellError};
 
@@ -98,7 +97,7 @@ pub struct MacHeadlessShell {
     /// BGRA 色域 · 一次性创建 · 每帧 render 传入。
     color_space: CFRetained<CGColorSpace>,
     /// 输出 IOSurface · 预分配 1080p BGRA · 每帧 CIContext render 重写内容。
-    output_surface: IOSurfaceHandle,
+    _output_surface: IOSurfaceHandle,
     /// viewport · CIContext.render bounds 用。
     viewport: (u32, u32),
 }
@@ -299,6 +298,7 @@ impl DesktopShell for MacHeadlessShell {
         // 它现在位于屏幕内，但 alpha≈0 + ignoresMouseEvents，不抢交互。
         let app = NSApp(mtm);
         app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
+        #[allow(deprecated)]
         app.activateIgnoringOtherApps(true);
         window.makeKeyAndOrderFront(None);
 
@@ -348,7 +348,7 @@ impl DesktopShell for MacHeadlessShell {
             _sampler_legacy: Mutex::new(sampler),
             ci_context,
             color_space,
-            output_surface,
+            _output_surface: output_surface,
             viewport: (w, h),
         })
     }
@@ -822,7 +822,9 @@ fn take_snapshot_blocking(
     })
 }
 
-fn cg_image_from_ns_image(image: &NSImage) -> Result<Retained<objc2_core_graphics::CGImage>, ShellError> {
+fn cg_image_from_ns_image(
+    image: &NSImage,
+) -> Result<Retained<objc2_core_graphics::CGImage>, ShellError> {
     unsafe { image.CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None) }
         .ok_or_else(|| {
             ShellError::SnapshotFailed("NSImage.CGImageForProposedRect returned nil".into())

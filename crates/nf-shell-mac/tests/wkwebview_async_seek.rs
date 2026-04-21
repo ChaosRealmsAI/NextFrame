@@ -25,7 +25,7 @@ use std::task::{Context, Poll, Wake, Waker};
 
 use objc2::rc::Retained;
 use objc2::runtime::NSObject;
-use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadMarker, MainThreadOnly};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 use objc2_foundation::{NSObjectNSDelayedPerforming, NSObjectProtocol};
 
@@ -67,7 +67,7 @@ define_class!(
     impl Runner {
         #[unsafe(method(runTest))]
         fn run_test(&self) {
-            let outcome = execute_seek_trials().map_err(|e| format!("{e}"));
+            let outcome = execute_seek_trials().map_err(|e| e.to_string());
             *self.ivars().result.borrow_mut() = Some(outcome);
             if let Some(mtm) = MainThreadMarker::new() {
                 let app = NSApplication::sharedApplication(mtm);

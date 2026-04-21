@@ -3,9 +3,9 @@
 mod audio;
 mod client;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use async_trait::async_trait;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 use super::{Backend, SynthParams, SynthResult, Voice};
 use audio::{detect_sentence_boundaries, get_audio_duration_ms, split_sentences};

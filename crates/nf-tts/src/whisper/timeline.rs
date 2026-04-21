@@ -269,7 +269,7 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     #![allow(clippy::expect_used)]
 
-    use super::{build_timeline, content_count, detect_language, split_segments, Timeline};
+    use super::{Timeline, build_timeline, content_count, detect_language, split_segments};
     use crate::whisper::aligner::{FfaOutput, FfaUnit};
 
     fn unit(text: &str, start_ms: u64, end_ms: u64) -> FfaUnit {

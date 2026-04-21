@@ -1,7 +1,7 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use serde_json::to_string;
 use videocut_core::CutReport;
-use videocut_cut::{cut_plan, CutOptions};
+use videocut_cut::{CutOptions, cut_plan};
 
 use crate::cli::CutArgs;
 

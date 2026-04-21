@@ -30,9 +30,9 @@ use objc2_av_foundation::{
 };
 use objc2_core_foundation::{CFArray, CFBoolean, CFMutableDictionary, CFString};
 use objc2_core_media::{
-    kCMBlockBufferAssureMemoryNowFlag, kCMSampleAttachmentKey_NotSync, kCMTimeInvalid,
     CMBlockBuffer, CMFormatDescription, CMSampleBuffer, CMSampleTimingInfo, CMTime,
-    CMVideoFormatDescription,
+    CMVideoFormatDescription, kCMBlockBufferAssureMemoryNowFlag, kCMSampleAttachmentKey_NotSync,
+    kCMTimeInvalid,
 };
 use objc2_foundation::NSURL;
 
@@ -481,7 +481,7 @@ fn verify_moov_front(path: &Path) -> Result<bool, PipelineError> {
 // ===== libc 最小 FFI · malloc/free · 给 CMBlockBuffer 用 =====
 // 避免拉整个 libc crate 依赖 · 这两个 symbol 是 macOS libSystem 必有。
 
-extern "C" {
+unsafe extern "C" {
     fn malloc(size: usize) -> *mut core::ffi::c_void;
     fn free(ptr: *mut core::ffi::c_void);
 }

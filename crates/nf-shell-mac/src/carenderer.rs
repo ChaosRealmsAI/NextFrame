@@ -48,8 +48,8 @@ use objc2::runtime::ProtocolObject;
 use objc2_core_foundation::{CFDictionary, CFRetained, CFString, CGPoint, CGRect, CGSize};
 use objc2_foundation::{NSCopying, NSMutableDictionary, NSNumber, NSString};
 use objc2_io_surface::{
-    kIOSurfaceBytesPerElement, kIOSurfaceBytesPerRow, kIOSurfaceHeight, kIOSurfacePixelFormat,
-    kIOSurfaceWidth, IOSurfaceLockOptions, IOSurfaceRef,
+    IOSurfaceLockOptions, IOSurfaceRef, kIOSurfaceBytesPerElement, kIOSurfaceBytesPerRow,
+    kIOSurfaceHeight, kIOSurfacePixelFormat, kIOSurfaceWidth,
 };
 use objc2_metal::{
     MTLCreateSystemDefaultDevice, MTLDevice, MTLPixelFormat, MTLStorageMode, MTLTexture,
@@ -57,8 +57,8 @@ use objc2_metal::{
 };
 use objc2_quartz_core::{CALayer, CARenderer};
 
-use crate::iosurface::{IOSurfaceHandle, PIXEL_FORMAT_BGRA};
 use crate::ShellError;
+use crate::iosurface::{IOSurfaceHandle, PIXEL_FORMAT_BGRA};
 
 /// 每像素字节数 · BGRA8 = 4。
 const BYTES_PER_ELEMENT: usize = 4;

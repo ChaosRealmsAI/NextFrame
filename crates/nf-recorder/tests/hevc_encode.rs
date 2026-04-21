@@ -16,10 +16,10 @@ use nf_recorder::pipeline::vt_wrap::VtCompressor;
 use nf_recorder::pipeline::{ColorSpec, VideoCodec};
 use objc2_core_foundation::{CFDictionary, CFNumber, CFRetained, CFType};
 use objc2_core_video::{
-    kCVPixelBufferHeightKey, kCVPixelBufferIOSurfacePropertiesKey,
-    kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey, kCVPixelFormatType_32BGRA,
     CVPixelBuffer, CVPixelBufferCreate, CVPixelBufferGetBaseAddress, CVPixelBufferGetBytesPerRow,
     CVPixelBufferLockBaseAddress, CVPixelBufferLockFlags, CVPixelBufferUnlockBaseAddress,
+    kCVPixelBufferHeightKey, kCVPixelBufferIOSurfacePropertiesKey,
+    kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferWidthKey, kCVPixelFormatType_32BGRA,
 };
 use serde_json::Value;
 
