@@ -13,8 +13,12 @@ mkdir -p "$POC_ROOT"
 MODELS=(
   "Pro/MiniMaxAI/MiniMax-M2.5"
   "deepseek-ai/DeepSeek-V3.2"
-  "Pro/zai-org/GLM-4.7"
-  "Qwen/Qwen3-30B-A3B"
+  "deepseek-ai/DeepSeek-V3.1-Terminus"
+  "Pro/zai-org/GLM-5.1"
+  "Pro/zai-org/GLM-5"
+  "Qwen/Qwen3.6-35B-A3B"
+  "Qwen/Qwen3.5-35B-A3B"
+  "Qwen/Qwen3-Coder-30B-A3B-Instruct"
 )
 
 if [ -f "$WT/.env" ]; then
@@ -87,8 +91,8 @@ SUMMARY="$POC_ROOT/summary.md"
   echo ""
   echo "## 结果对比"
   echo ""
-  echo "| 模型 | 产物数 | hello.mp3 时长 | HTML 存在 | exit code |"
-  echo "|---|---|---|---|---|"
+  echo "| 模型 | 产物 | mp3时长 | HTML | iters | tokens in/out | 成本\$ | exit |"
+  echo "|---|---|---|---|---|---|---|---|"
   for model in "${MODELS[@]}"; do
     slug="${model//\//-}"
     ws="$POC_ROOT/$slug"
@@ -101,7 +105,16 @@ SUMMARY="$POC_ROOT/summary.md"
     html_ok="NO"
     [ -f "$ws/outputs/hello.html" ] && html_ok="YES"
     code=$(grep "=== runner exit code:" "$ws/run.log" 2>/dev/null | grep -oE '[0-9]+$' | head -1)
-    echo "| \`$model\` | $n | $mp3_dur | $html_ok | ${code:-?} |"
+    stats_line=$(grep "__NF_STATS__" "$ws/run.log" 2>/dev/null | tail -1 | sed 's|^__NF_STATS__ ||')
+    if [ -n "$stats_line" ]; then
+      iters=$(echo "$stats_line" | jq -r '.iters // "-"')
+      tin=$(echo "$stats_line" | jq -r '.prompt_tokens // 0')
+      tout=$(echo "$stats_line" | jq -r '.completion_tokens // 0')
+      cost=$(echo "$stats_line" | jq -r '.est_cost_usd // 0')
+    else
+      iters="-"; tin="-"; tout="-"; cost="-"
+    fi
+    echo "| \`$model\` | $n | $mp3_dur | $html_ok | $iters | ${tin}/${tout} | $cost | ${code:-?} |"
   done
   echo ""
   echo "## 每模型详情"

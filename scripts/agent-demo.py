@@ -13,6 +13,29 @@ from pathlib import Path
 from typing import Any
 
 
+PRICING: dict[str, tuple[float, float]] = {
+    "Pro/MiniMaxAI/MiniMax-M2.5": (0.80, 2.40),
+    "deepseek-ai/DeepSeek-V3.2": (0.28, 0.42),
+    "Pro/deepseek-ai/DeepSeek-V3.2": (0.28, 0.42),
+    "deepseek-ai/DeepSeek-V3.1-Terminus": (0.28, 0.42),
+    "deepseek-ai/DeepSeek-R1": (0.55, 2.19),
+    "Pro/zai-org/GLM-5.1": (1.00, 3.00),
+    "Pro/zai-org/GLM-5": (1.00, 3.00),
+    "Pro/zai-org/GLM-4.7": (0.80, 2.40),
+    "zai-org/GLM-4.6": (0.50, 1.50),
+    "Qwen/Qwen3.6-35B-A3B": (0.42, 0.84),
+    "Qwen/Qwen3.5-397B-A17B": (1.50, 3.00),
+    "Qwen/Qwen3.5-35B-A3B": (0.35, 0.70),
+    "Qwen/Qwen3.5-9B": (0.0, 0.0),
+    "Qwen/Qwen3-Coder-30B-A3B-Instruct": (0.0, 0.0),
+}
+
+
+def estimate_cost(model: str, in_tok: int, out_tok: int) -> float:
+    p_in, p_out = PRICING.get(model, (0.0, 0.0))
+    return round((in_tok / 1e6) * p_in + (out_tok / 1e6) * p_out, 6)
+
+
 TOOLS: list[dict[str, Any]] = [
     {"type": "function", "function": {"name": "Bash", "description": "Run any shell command. Use for ls / cat / ffprobe / file 等查询. Returns stdout+stderr+exit code.", "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "shell command to run"}, "timeout_sec": {"type": "integer", "default": 30}}, "required": ["command"]}}},
     {"type": "function", "function": {"name": "Read", "description": "Read file content. For text files (md/json/txt).", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "max_chars": {"type": "integer", "default": 10000}}, "required": ["path"]}}},
@@ -100,21 +123,41 @@ def agent_loop(task: str, max_iters: int = 10) -> str | None:
     client = make_client()
     messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
     model = os.getenv("SILICONFLOW_MODEL", "Pro/MiniMaxAI/MiniMax-M2.5")
+    total_in = 0
+    total_out = 0
+    iters = 0
+    final: str | None = None
     for _ in range(max_iters):
+        iters += 1
         resp = client.chat.completions.create(model=model, messages=messages, tools=TOOLS, tool_choice="auto")
+        if resp.usage:
+            total_in += resp.usage.prompt_tokens or 0
+            total_out += resp.usage.completion_tokens or 0
         msg = resp.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))
         if not msg.tool_calls:
             print("FINAL:", msg.content)
-            return msg.content
+            final = msg.content
+            break
         for tc in msg.tool_calls:
             args = json.loads(tc.function.arguments or "{}")
             print(f"→ tool: {tc.function.name}({args})")
             result = dispatch(tc.function.name, args)
             print(f"← result: {json.dumps(result, ensure_ascii=False)[:200]}")
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": json.dumps(result, ensure_ascii=False)})
-    print("max iters reached")
-    return None
+    else:
+        print("max iters reached")
+    stats = {
+        "model": model,
+        "iters": iters,
+        "prompt_tokens": total_in,
+        "completion_tokens": total_out,
+        "completed": final is not None,
+        "est_cost_usd": estimate_cost(model, total_in, total_out),
+        "note": "硅基实际价格可能不同 · est 按公开 2026-04 数据估算",
+    }
+    print(f"__NF_STATS__ {json.dumps(stats, ensure_ascii=False)}")
+    return final
 
 
 def dry_run() -> int:
