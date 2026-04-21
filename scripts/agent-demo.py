@@ -36,11 +36,97 @@ def estimate_cost(model: str, in_tok: int, out_tok: int) -> float:
     return round((in_tok / 1e6) * p_in + (out_tok / 1e6) * p_out, 6)
 
 
+SYSTEM_PROMPT = """你是 NextFrame agent(Claude Code 风格).
+
+## 工具
+- Bash: 跑任意 shell 命令
+- Read: 读文件
+- load_skill: 加载 NextFrame skill(告诉你怎么做某类任务 · 按需加载)
+
+## NextFrame 生态 CLI(都走 Bash)
+- nf-guide: 读流程 state machine md(关键 · 不懂咋做先 nf-guide)
+- nf-source: 视频剪辑链(download/transcribe/align/cut/preview 6 子命令)
+- nf-tts: TTS 合成 mp3
+
+## 工作流
+1. 用户给任务 · 你理解意图
+2. 不熟 → 先 `load_skill(name)` 加载对应 skill(返回 state machine 指令)
+3. 按 skill 走 · 一步步推进状态机 · 每步 `Bash("nf-guide <flow> <step>")` 读详细 prompt
+4. 按 prompt 调 nf-source / nf-tts
+5. 每步完验产物(Bash ls / ffprobe)· 再下一步
+6. 边做边反馈 · 卡住主动说(不瞎猜)
+"""
+
+
+SKILLS: dict[str, str] = {
+    "clips": """# clips skill · 视频剪辑
+
+NextFrame 完整 clips pipeline(视频下载 → 转写 → 挑亮点 → 切片 → 翻译 → karaoke HTML)。
+
+## 推进状态机
+
+第一步必做:
+```
+Bash("nf-guide clips")      # 读整体 state machine + 流程图 + 工作目录约定
+```
+
+然后按 state machine 逐步走:
+1. `Bash("nf-guide clips download")` · 读 step prompt · 调 `nf-source download`
+2. `Bash("nf-guide clips transcribe")` · 读 prompt · 调 `nf-source transcribe`
+3. `Bash("nf-guide clips plan")` · 你(Agent)挑 highlight 写 plan.json
+4. `Bash("nf-guide clips cut")` · 调 `nf-source cut`
+5. `Bash("nf-guide clips translate")` · 翻译每 clip
+6. `Bash("nf-guide clips karaoke")` · 调 `nf karaoke` 产终点 HTML
+
+## 依赖
+
+yt-dlp(下载) · whisperx(转写 · 首次下载 1GB 模型) · ffmpeg(切片)
+
+## 终点
+
+`projects/<project>/<episode>/clips/index.html`(karaoke · 字级同步 · 双击可播)
+""",
+    "audio": """# audio skill · TTS + 词级对齐
+
+NextFrame audio 流程(TTS 合成 → WhisperX 字级对齐 → karaoke.html)。
+
+## 推进状态机
+
+第一步必做:
+```
+Bash("nf-guide audio")      # 读 state machine
+```
+
+核心命令:
+- `Bash("nf-tts batch <batch.json> --dir <out_dir>")` · 批次合成 mp3 + timeline.json + srt
+- `Bash("nf-tts <text> -v <voice>")` · 单条合成
+
+voice 选:
+- edge 免费: zh-CN-XiaoxiaoNeural(晓晓) / YunxiNeural(云希) / YunyangNeural(云扬)
+- volcengine 付费(seed-tts-2.0): 需 `-b volcengine`
+
+## 产物
+
+- mp3 音频
+- timeline.json(whisperx 词级时间戳 · 卡拉 OK 字幕同步)
+- srt 字幕
+""",
+}
+
+
 TOOLS: list[dict[str, Any]] = [
-    {"type": "function", "function": {"name": "Bash", "description": "Run any shell command. Use for ls / cat / ffprobe / file 等查询. Returns stdout+stderr+exit code.", "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "shell command to run"}, "timeout_sec": {"type": "integer", "default": 30}}, "required": ["command"]}}},
+    {"type": "function", "function": {"name": "Bash", "description": "Run any shell command. Use for ls / cat / ffprobe / file / nf-guide / nf-source / nf-tts 等. Returns stdout+stderr+exit code.", "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "shell command to run"}, "timeout_sec": {"type": "integer", "default": 30}}, "required": ["command"]}}},
     {"type": "function", "function": {"name": "Read", "description": "Read file content. For text files (md/json/txt).", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "max_chars": {"type": "integer", "default": 10000}}, "required": ["path"]}}},
-    {"type": "function", "function": {"name": "nf_tts_synth", "description": "合成 TTS mp3. voice 可选 xiaoxiao/yunxi/yunyang(默认晓晓). 输出到 out_path.", "parameters": {"type": "object", "properties": {"text": {"type": "string", "description": "要合成的文本"}, "voice": {"type": "string", "enum": ["xiaoxiao", "yunxi", "yunyang"], "default": "xiaoxiao"}, "out_path": {"type": "string", "description": "mp3 输出绝对路径 · 如 /tmp/hello.mp3"}}, "required": ["text", "out_path"]}}},
+    {"type": "function", "function": {"name": "load_skill", "description": "按名加载 NextFrame skill · 返回 skill 的 state machine 指令. 不懂怎么做先加载 skill.", "parameters": {"type": "object", "properties": {"name": {"type": "string", "enum": ["clips", "audio"], "description": "skill 名: clips=视频剪辑 · audio=TTS"}}, "required": ["name"]}}},
+    {"type": "function", "function": {"name": "nf_tts_synth", "description": "便捷 TTS 合成 mp3(快速路径 · 不走完整 audio pipeline). voice 可选 xiaoxiao/yunxi/yunyang(默认晓晓). 输出到 out_path.", "parameters": {"type": "object", "properties": {"text": {"type": "string", "description": "要合成的文本"}, "voice": {"type": "string", "enum": ["xiaoxiao", "yunxi", "yunyang"], "default": "xiaoxiao"}, "out_path": {"type": "string", "description": "mp3 输出绝对路径"}}, "required": ["text", "out_path"]}}},
 ]
+
+
+def load_skill_tool(name: str) -> dict[str, Any]:
+    content = SKILLS.get(name)
+    if content is None:
+        return {"ok": False, "error": f"unknown skill: {name}", "available": list(SKILLS.keys())}
+    return {"ok": True, "skill": name, "content": content}
 
 
 def bash_tool(command: str, timeout_sec: int = 30) -> dict[str, Any]:
@@ -101,6 +187,8 @@ def dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:
             return bash_tool(str(args["command"]), int(args.get("timeout_sec", 30)))
         if name == "Read":
             return read_tool(str(args["path"]), int(args.get("max_chars", 10000)))
+        if name == "load_skill":
+            return load_skill_tool(str(args["name"]))
         if name == "nf_tts_synth":
             return nf_tts_synth(str(args["text"]), str(args["out_path"]), str(args.get("voice", "xiaoxiao")))
         return {"ok": False, "error": f"unknown tool: {name}"}
@@ -121,7 +209,10 @@ def make_client() -> Any:
 
 def agent_loop(task: str, max_iters: int = 10) -> str | None:
     client = make_client()
-    messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": task},
+    ]
     model = os.getenv("SILICONFLOW_MODEL", "Pro/MiniMaxAI/MiniMax-M2.5")
     total_in = 0
     total_out = 0
