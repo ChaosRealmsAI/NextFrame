@@ -61,10 +61,6 @@ pub struct Mp4Writer {
     // input 延迟到第一帧 append 时创建 (需要 format_description 作为 sourceFormatHint)
     input: Option<Retained<AVAssetWriterInput>>,
     output_path: PathBuf,
-    #[allow(dead_code)] // T-07 集成 / 日志用
-    width: u32,
-    #[allow(dead_code)]
-    height: u32,
     fps: u32,
     frames: u64,
     first_pts_ms: Option<u64>,
@@ -78,7 +74,7 @@ impl Mp4Writer {
     /// # 硬约束
     /// - 目标文件已存在会先删除 (AVAssetWriter 遇到 file-exists 直接报错)
     /// - `shouldOptimizeForNetworkUse = YES` + `movieFragmentInterval = 1s` = moov-front
-    pub fn new(output: &Path, width: u32, height: u32, fps: u32) -> Result<Self, PipelineError> {
+    pub fn new(output: &Path, _width: u32, _height: u32, fps: u32) -> Result<Self, PipelineError> {
         // AVAssetWriter 不接受已有文件 · 先清掉
         if output.exists() {
             std::fs::remove_file(output).map_err(|e| {
@@ -110,8 +106,6 @@ impl Mp4Writer {
             writer,
             input: None,
             output_path: output.to_path_buf(),
-            width,
-            height,
             fps,
             frames: 0,
             first_pts_ms: None,

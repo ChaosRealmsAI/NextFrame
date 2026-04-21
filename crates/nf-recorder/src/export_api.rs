@@ -1,4 +1,6 @@
-//! v1.44 · High-level export API · 从 source.json 直接产 MP4。
+//! High-level export API · 从 source.json 直接产 MP4。
+//!
+//! Historical: v1.44 high-level export API.
 //!
 //! 架构(ADR-064):
 //! - 输入:source.json 路径 + 输出 MP4 路径 + 持续时长(秒)
@@ -18,11 +20,13 @@ use crate::pipeline::VideoCodec;
 use crate::record_loop::{self, RecordConfig, RecordError};
 use crate::OutputStats;
 
-/// v1.44 · nf-runtime 浏览器端 IIFE 产物 · 编译时 inline · 跟 nf-shell preview 同源。
+/// nf-runtime 浏览器端 IIFE 产物 · 编译时 inline · 跟 nf-shell preview 同源。
+/// Historical: v1.44 runtime IIFE export source.
 const RUNTIME_IIFE: &str = include_str!("../../nf-runtime/dist/runtime-iife.js");
 
-/// v1.44 · 7 个官方 track 的 JS 源 · 编译时 inline · 喂给 runtime 解析
+/// 7 个官方 track 的 JS 源 · 编译时 inline · 喂给 runtime 解析
 /// `__NF_SOURCE__.tracks[].kind` 定位到对应代码。跟 nf-shell preview 同源。
+/// Historical: v1.44 official track source embedding.
 const TRACK_BG: &str = include_str!("../../nf-tracks/official/bg.js");
 const TRACK_SCENE: &str = include_str!("../../nf-tracks/official/scene.js");
 const TRACK_VIDEO: &str = include_str!("../../nf-tracks/official/video.js");
@@ -76,11 +80,13 @@ pub struct ExportOpts {
     pub fps: u32,
     /// VideoToolbox 目标比特率(bps)· 默认 20Mbps。
     pub bitrate_bps: u32,
-    /// v1.44.1 / v1.56 · 并行切片 N(ADR-061) · `None` = 按分辨率取默认
+    /// 并行切片 N(ADR-061) · `None` = 按分辨率取默认
     /// (1080p=1 / 4k=4) · `Some(1)` 可显式强制串行。
     /// duration < 6s 时 orchestrator 自动降级单进程(segment boot 开销吃掉收益)。
+    /// Historical: v1.44.1 / v1.56 parallel slicing.
     pub parallel: Option<usize>,
-    /// v1.55 · CLI `--resolution` 覆盖 `source.json meta.export.resolution`。
+    /// CLI `--resolution` 覆盖 `source.json meta.export.resolution`。
+    /// Historical: v1.55 resolution override.
     pub resolution_override: Option<ExportResolution>,
 }
 
@@ -149,7 +155,9 @@ struct ResolvedExportPreset {
     codec: VideoCodec,
 }
 
-/// v1.44 · 高层 lib API · 输入 source.json 路径 · 输出 MP4。
+/// 高层 lib API · 输入 source.json 路径 · 输出 MP4。
+///
+/// Historical: v1.44 high-level lib export API.
 ///
 /// 主调方(nf-shell):
 /// ```ignore
@@ -237,7 +245,7 @@ pub async fn run_export_from_source(
         preset.viewport.1,
     )?;
 
-    // v1.44.1 / v1.56 · parallel >= 2 走 orchestrator (spawn N 子进程 +
+    // Historical: v1.44.1 / v1.56 parallel >= 2 走 orchestrator (spawn N 子进程 +
     // ffmpeg concat) · 4k 未显式指定时默认 parallel=4。
     // 短视频(<6s) orchestrator 内部自动降级单进程 · duration 够长走真并行。
     // 单进程路径用 record_loop::run 拿 OutputStats · 并行路径 orchestrator 返 ()
@@ -382,7 +390,7 @@ window.__NF_TRACKS__ = {tracks_map_json};
     var REQUESTED_DURATION_MS = {requested_duration_ms};
     window.__nf = window.__nf || {{}};
     window.__nf_handle = handle;
-    // recorder 合约 (v1.14 FrameReadyContract):
+    // Historical: recorder 合约 (v1.14 FrameReadyContract):
     // - seek(t_ms) 返 {{t, frameReady:true, seq}} · t 在 0.01ms 容差内等于 t_ms · seq 单调递增
     // - 外部 t 纯驱动 (ADR-045) · 不依赖 RAF
     var _seq = 0;

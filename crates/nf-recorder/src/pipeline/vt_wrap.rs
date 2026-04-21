@@ -1,12 +1,14 @@
-//! VTCompressionSession wrapper · v1.14 T-07 + v1.55 HEVC Main 8-bit
+//! VTCompressionSession wrapper · H.264 / HEVC Main 8-bit compression.
 //!
+//! Historical: v1.14 T-07 + v1.55 HEVC Main 8-bit.
 //! Rust wrapper around `VTCompressionSession` producing compressed frames.
 //! The output callback pushes each `CompressedFrame` onto a lock-free `SegQueue`
 //! so `encode_pixel_buffer` never blocks on the encoder's queue. `finalize` drains
 //! pending frames via `VTCompressionSessionCompleteFrames(kCMTimeInvalid)`.
 //!
-//! Shape mirrors POC-02 (`poc/POC-02-vt-h264/src/main.rs`) and v1.53 4K POC:
+//! Shape mirrors POC-02 (`poc/POC-02-vt-h264/src/main.rs`) and the 4K POC:
 //! BT.709 triple, `AllowFrameReordering=false`, `MaxKeyFrameInterval=60`.
+//! Historical: v1.53 4K POC.
 //!
 //! ## Contract with T-08 (Mp4Writer)
 //! `CompressedFrame::data` is H.264 **AVCC** (length-prefixed NAL units — the
@@ -14,15 +16,14 @@
 //! attached to every frame for convenience (VT only re-creates it when the
 //! codec configuration changes, so typically the same instance is shared).
 
+use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex};
-use std::{collections::VecDeque};
 
 use crossbeam::queue::SegQueue;
 use objc2_core_foundation::{
-    kCFBooleanTrue, CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFString, CFType,
-    Type,
+    kCFBooleanTrue, CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFString, CFType, Type,
 };
 use objc2_core_media::{
     kCMSampleAttachmentKey_NotSync, kCMTimeInvalid, kCMVideoCodecType_H264, kCMVideoCodecType_HEVC,
@@ -42,8 +43,9 @@ use objc2_video_toolbox::{
     kVTCompressionPropertyKey_ProfileLevel, kVTCompressionPropertyKey_Quality,
     kVTCompressionPropertyKey_RealTime, kVTCompressionPropertyKey_TransferFunction,
     kVTCompressionPropertyKey_YCbCrMatrix, kVTEncodeFrameOptionKey_ForceKeyFrame,
-    kVTProfileLevel_H264_Main_AutoLevel, kVTProfileLevel_HEVC_Main_AutoLevel, VTCompressionSession,
-    VTEncodeInfoFlags, VTSession, VTSessionSetProperty, kVTPropertyNotSupportedErr,
+    kVTProfileLevel_H264_Main_AutoLevel, kVTProfileLevel_HEVC_Main_AutoLevel,
+    kVTPropertyNotSupportedErr, VTCompressionSession, VTEncodeInfoFlags, VTSession,
+    VTSessionSetProperty,
 };
 
 use super::{ColorSpec, PipelineError, VideoCodec};
@@ -189,13 +191,14 @@ impl VtCallbackState {
     }
 }
 
-/// VideoToolbox H.264 Main/AutoLevel compressor (v1.14 target: 1080p @ 30/60).
+/// VideoToolbox H.264 Main/AutoLevel compressor.
+/// Historical: v1.14 target was 1080p @ 30/60.
 pub struct VtCompressor {
     session: CFRetained<VTCompressionSession>,
     state: Arc<VtCallbackState>,
     /// Raw Arc pointer handed to VT as the callback refcon. Kept alive for the
     /// lifetime of the session; released implicitly when `state` is dropped.
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "VT callback refcon · FFI lifetime anchor")]
     callback_refcon: *const VtCallbackState,
     width: u32,
     height: u32,
@@ -212,7 +215,8 @@ unsafe impl Send for VtCompressor {}
 
 impl VtCompressor {
     /// Create a new H.264 VT compressor. Only `ColorSpec::BT709_SDR_8bit` is
-    /// supported in v1.14 (HDR10 lands in v1.24 per ADR-052).
+    /// supported by the current recorder pipeline.
+    /// Historical: v1.14 supported BT.709 SDR only; HDR10 was planned in v1.24 per ADR-052.
     pub fn new(
         width: u32,
         height: u32,
@@ -487,7 +491,8 @@ fn configure_session(
         },
         CFNumber::new_i32(fps).as_ref(),
     )?;
-    // v1.55 · one forced keyframe every 60 frames (1s @ 60fps / 2s @ 30fps).
+    // One forced keyframe every 60 frames (1s @ 60fps / 2s @ 30fps).
+    // Historical: v1.55 keyframe cadence.
     set_prop(
         session,
         #[allow(unsafe_code)]

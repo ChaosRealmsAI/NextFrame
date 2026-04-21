@@ -1,4 +1,6 @@
-//! v1.55 · HEVC Main 8-bit pipeline.
+//! HEVC Main 8-bit pipeline.
+//!
+//! Historical: v1.55 HEVC Main 8-bit pipeline.
 //!
 //! Mirrors the existing H.264 path but swaps VideoToolbox to
 //! `kCMVideoCodecType_HEVC` + `kVTProfileLevel_HEVC_Main_AutoLevel`.

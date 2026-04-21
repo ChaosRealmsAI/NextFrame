@@ -1,12 +1,13 @@
-//! `record_loop` · v1.14 T-09 main driver loop for `nf-recorder`.
+//! `record_loop` · frame-driven main driver loop for `nf-recorder`.
 //!
+//! Historical: v1.14 T-09 main driver loop.
 //! Wires together:
 //! - T-05 `MacHeadlessShell` (DesktopShell impl · WKWebView + CARenderer)
 //! - T-06 CARenderer-backed `snapshot() → IOSurfaceHandle`
 //! - T-07 `PipelineH264_1080p` (VT H.264 encoder)
 //! - T-08 `Mp4Writer` (AVAssetWriter · moov-front)
 //!
-//! Contract source: `spec/versions/v1.14/spec/interfaces-delta.json`
+//! Historical: contract source `spec/versions/v1.14/spec/interfaces-delta.json`
 //! → `additions.modules[nf-recorder].contracts`.
 //!
 //! ## Frame-driven contract (FM-ASYNC)
@@ -35,7 +36,8 @@ use crate::pipeline::{
 /// Per-frame seek await timeout · contract hard cap.
 const FRAME_SEEK_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// v1.14 keeps `worker_count = 1` · pool capacity is nominal.
+/// Pool capacity is nominal while the recorder runs as a single frame driver.
+/// Historical: v1.14 kept `worker_count = 1`.
 const FRAME_POOL_CAPACITY: usize = 3;
 
 /// Encode progress reporting cadence (every N frames).
@@ -55,23 +57,26 @@ pub struct RecordConfig {
     pub width: u32,
     /// Viewport height in pixels (1080 for `--res 1080p`).
     pub height: u32,
-    /// Frame rate · v1.14 ∈ {30, 60}.
+    /// Frame rate · ∈ {30, 60}.
+    /// Historical: v1.14 accepted 30 / 60 fps.
     pub fps: u32,
     /// VT target bitrate in bits per second.
     pub bitrate_bps: u32,
-    /// v1.55 · encoder codec preset.
+    /// Encoder codec preset.
+    /// Historical: v1.55 codec preset.
     pub codec: VideoCodec,
     /// Hard cap on recording duration in seconds · timeout → exit 2.
     pub max_duration_s: u32,
-    /// v1.15 · 子进程录制的 frame 子区间 `[start, end)` · None = 录整个 duration。
+    /// 子进程录制的 frame 子区间 `[start, end)` · None = 录整个 duration。
     /// orchestrator 父 probe duration 算 total_frames · 平分 N 段 · spawn 子进程各拿 (start, end)。
+    /// Historical: v1.15 frame-range worker slicing.
     pub frame_range: Option<(u64, u64)>,
 }
 
 /// Record loop fatal errors · mapped to interfaces-delta error codes.
 ///
 /// Variant naming aligns with the hard-constraint list in
-/// `spec/versions/v1.14/plan/prompts/task-10-cli-events.md`.
+/// Historical: `spec/versions/v1.14/plan/prompts/task-10-cli-events.md`.
 #[derive(Debug, thiserror::Error)]
 pub enum RecordError {
     /// CARenderer / sampler boot failure · exit 2.
@@ -236,7 +241,7 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
     }
 
     // 2.2 Flip runtime into record mode (RAF off · audio muted · per ADR-041).
-    // v1.14.4: 同时强制 viewport meta + body size. WKWebView off-screen 默认 desktop
+    // Historical: v1.14.4 同时强制 viewport meta + body size. WKWebView off-screen 默认 desktop
     // viewport 980px · CSS `100vh` 相对 980×?? 计算 · body flex layout 塌陷 ·
     // takeSnapshot 只截 stage 漏 controls + timeline UI (playhead/clip). 强制 1920×1080
     // 让 flex 计算对 · DOM 完整 layout · snapshot 拿全画面.
@@ -385,10 +390,10 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
         };
 
         // Validate frameReady handshake shape (f64 容差判 · 不严格整数相等).
-        verify_frame_ready(&result, t_exact_ms)?;
+        verify_frame_ready(&result, t_exact_ms, None)?;
 
-        // FM-COMPOSITOR-COMMIT-ASYNC (BUG-20260419-v1.14-compositor-commit):
-        // v1.14.3 fix · 真正的 commit barrier 在 `shell.snapshot()` 内部:
+        // Historical: FM-COMPOSITOR-COMMIT-ASYNC (BUG-20260419-v1.14-compositor-commit):
+        // Historical: v1.14.3 fix · 真正的 commit barrier 在 `shell.snapshot()` 内部:
         //   displayIfNeeded + CATransaction::flush + pump_main_run_loop(16ms)
         // (见 nf-shell-mac/src/headless/mac.rs `fn snapshot`)
         //
@@ -458,7 +463,7 @@ pub async fn run(cfg: RecordConfig) -> Result<OutputStats, RecordError> {
     Ok(stats)
 }
 
-async fn wait_for_video_state_ready(
+pub(crate) async fn wait_for_video_state_ready(
     shell: &MacHeadlessShell,
     expected_t: f64,
 ) -> Result<(), RecordError> {
@@ -484,7 +489,7 @@ async fn wait_for_video_state_ready(
     }
 }
 
-async fn wait_for_export_seek_ready(
+pub(crate) async fn wait_for_export_seek_ready(
     shell: &MacHeadlessShell,
     expected_t: f64,
     min_seq_exclusive: u64,
@@ -497,7 +502,7 @@ async fn wait_for_export_seek_ready(
         let value = parse_json_result(raw, "export seek result")?;
         let runtime_seq = js_number_as_u64(value.get("seq")).unwrap_or(0);
         if runtime_seq > min_seq_exclusive {
-            verify_frame_ready(&value, expected_t)?;
+            verify_frame_ready(&value, expected_t, Some(min_seq_exclusive))?;
             return Ok(value);
         }
         if started.elapsed() >= FRAME_SEEK_TIMEOUT {
@@ -517,13 +522,18 @@ async fn wait_for_export_seek_ready(
 /// - `t` must equal the `expected_t` (f64) we sent (within 0.01 ms tolerance ·
 ///   JSON round-trip is exact for IEEE-754 doubles in the range we care about,
 ///   but runtime.js may return slightly different float after its own math).
-/// - `seq` must be present as a number (monotonic checks live downstream).
+/// - `seq` must be present as a number.
+/// - when provided, `min_seq_exclusive` rejects stale export-poll results.
 ///
 /// Tolerance rationale: with FM-T-QUANTIZATION fix (f64 pass-through · no round),
 /// sent t values are `seq * 1000 / fps` which are generally not exactly representable
 /// (e.g. 16.666...). JSON emit + JS parse preserves 52-bit mantissa · any tolerance
 /// < 1e-10 is unnecessarily strict; 0.01ms is the explicit "integer-ms-era" compat.
-fn verify_frame_ready(value: &serde_json::Value, expected_t: f64) -> Result<(), RecordError> {
+pub(crate) fn verify_frame_ready(
+    value: &serde_json::Value,
+    expected_t: f64,
+    min_seq_exclusive: Option<u64>,
+) -> Result<(), RecordError> {
     let obj = value.as_object().ok_or_else(|| {
         RecordError::FrameReadyContract(format!(
             "expected object at expected_t={expected_t:.6} · got: {value}"
@@ -558,16 +568,21 @@ fn verify_frame_ready(value: &serde_json::Value, expected_t: f64) -> Result<(), 
         )));
     }
 
-    // seq must be present + numeric · specific value is not asserted here
-    // (monotonic / strictly-increasing checks are downstream verify tasks).
-    let _runtime_seq = js_number_as_u64(obj.get("seq")).ok_or_else(|| {
+    let runtime_seq = js_number_as_u64(obj.get("seq")).ok_or_else(|| {
         RecordError::FrameReadyContract(format!("missing seq at expected_t={expected_t:.6}"))
     })?;
+    if let Some(min_seq_exclusive) = min_seq_exclusive {
+        if runtime_seq <= min_seq_exclusive {
+            return Err(RecordError::FrameReadyContract(format!(
+                "stale seq: expected > {min_seq_exclusive} got {runtime_seq} at expected_t={expected_t:.6}"
+            )));
+        }
+    }
 
     Ok(())
 }
 
-fn parse_json_result(
+pub(crate) fn parse_json_result(
     value: serde_json::Value,
     context: &str,
 ) -> Result<serde_json::Value, RecordError> {
@@ -582,7 +597,10 @@ fn parse_json_result(
     }
 }
 
-fn video_state_is_ready(value: &serde_json::Value, expected_t: f64) -> Result<bool, RecordError> {
+pub(crate) fn video_state_is_ready(
+    value: &serde_json::Value,
+    expected_t: f64,
+) -> Result<bool, RecordError> {
     let Some(obj) = value.as_object() else {
         return Err(RecordError::FrameReadyContract(format!(
             "video-state expected object at expected_t={expected_t:.6} · got: {value}"
@@ -650,4 +668,66 @@ pub fn js_number_as_u64(v: Option<&serde_json::Value>) -> Option<u64> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parsed(payload: &str) -> Result<serde_json::Value, serde_json::Error> {
+        serde_json::from_str(payload)
+    }
+
+    #[test]
+    fn seek_result_frame_ready_false_rejected() -> Result<(), serde_json::Error> {
+        let payload = parsed(r#"{"t": 0, "frameReady": false, "seq": 0}"#)?;
+        let result = verify_frame_ready(&payload, 0.0, None);
+
+        assert!(matches!(result, Err(RecordError::FrameReadyContract(_))));
+        Ok(())
+    }
+
+    #[test]
+    fn seek_result_missing_seq_rejected() -> Result<(), serde_json::Error> {
+        let payload = parsed(r#"{"t": 0, "frameReady": true}"#)?;
+        let result = verify_frame_ready(&payload, 0.0, None);
+
+        assert!(matches!(result, Err(RecordError::FrameReadyContract(_))));
+        Ok(())
+    }
+
+    #[test]
+    fn seek_result_t_out_of_tolerance_rejected() -> Result<(), serde_json::Error> {
+        let payload = parsed(r#"{"t": 100, "frameReady": true, "seq": 1}"#)?;
+        let result = verify_frame_ready(&payload, 0.0, None);
+
+        assert!(matches!(result, Err(RecordError::FrameReadyContract(_))));
+        Ok(())
+    }
+
+    #[test]
+    fn parse_json_result_malformed_rejected() {
+        let raw = serde_json::Value::String("{not json".to_string());
+        let result = parse_json_result(raw, "seek result");
+
+        assert!(matches!(result, Err(RecordError::FrameReadyContract(_))));
+    }
+
+    #[test]
+    fn seek_result_stale_seq_rejected() -> Result<(), serde_json::Error> {
+        let payload = parsed(r#"{"t": 0, "frameReady": true, "seq": 3}"#)?;
+        let result = verify_frame_ready(&payload, 0.0, Some(5));
+
+        assert!(matches!(result, Err(RecordError::FrameReadyContract(_))));
+        Ok(())
+    }
+
+    #[test]
+    fn video_state_malformed_timeout() -> Result<(), serde_json::Error> {
+        let payload = parsed(r#"{"count": 1, "clips": {"bad": true}}"#)?;
+        let result = video_state_is_ready(&payload, 0.0);
+
+        assert!(matches!(result, Err(RecordError::FrameReadyContract(_))));
+        Ok(())
+    }
 }

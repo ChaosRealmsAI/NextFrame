@@ -2,7 +2,7 @@ use nf_shell_mac::IOSurfaceHandle;
 use std::path::PathBuf;
 
 pub mod h264; // T-07 填
-pub mod hevc; // v1.55 · HEVC Main 8-bit
+pub mod hevc; // Historical: v1.55 · HEVC Main 8-bit
 pub mod mp4_writer;
 pub mod vt_wrap; // T-07 填 // T-08 填
 

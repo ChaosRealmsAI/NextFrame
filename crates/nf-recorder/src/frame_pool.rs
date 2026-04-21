@@ -1,6 +1,9 @@
-//! `FramePool` · v1.14 T-09 placeholder.
+//! `FramePool` · Capacity + submission counter · NOT an SPSC pool.
 //!
-//! v1.14 runs with `worker_count = 1` (scope.json) · the recorder thread is
+//! True bounded in-flight control 留 v0.5 ADR.
+//! Historical: v1.14 T-09 placeholder.
+//!
+//! Historical: v1.14 ran with `worker_count = 1` (scope.json) · the recorder thread is
 //! the sole driver of the VT encoder which already owns a tiny internal
 //! reorder queue inside VideoToolbox. A classic multi-producer SPSC pool
 //! (crossbeam ArrayQueue) is over-engineered for this case: we never hold
@@ -8,8 +11,9 @@
 //! drains the compressor's output queue synchronously each iteration.
 //!
 //! This struct is kept as a named entry point so future versions can swap
-//! in a real pool (v1.19 multi-worker) without touching `record_loop.rs`.
+//! in a real pool without touching `record_loop.rs`.
 //! Today it only records statistics.
+//! Historical: v1.19 multi-worker pool was the planned expansion point.
 
 /// Simplified pool · counts submissions for telemetry.
 #[derive(Debug, Default)]
@@ -19,7 +23,8 @@ pub struct FramePool {
 }
 
 impl FramePool {
-    /// Construct an empty pool with a nominal `capacity` (v1.14 ignores it).
+    /// Construct an empty pool with a nominal `capacity`.
+    /// Historical: v1.14 ignored capacity.
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
@@ -40,7 +45,8 @@ impl FramePool {
         self.submitted
     }
 
-    /// Nominal capacity (unused in v1.14 · reserved for v1.19).
+    /// Nominal capacity.
+    /// Historical: unused in v1.14 · reserved for v1.19.
     #[must_use]
     pub fn capacity(&self) -> usize {
         self.capacity

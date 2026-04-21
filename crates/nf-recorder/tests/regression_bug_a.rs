@@ -1,4 +1,6 @@
-//! v1.67.1 Bug-A regression guard: 4K 10s serial export should stay alive.
+//! Bug-A regression guard: 4K 10s serial export should stay alive.
+//!
+//! Historical: v1.67.1 Bug-A regression guard.
 
 #![cfg(target_os = "macos")]
 #![allow(clippy::panic, clippy::unwrap_used)]
@@ -21,7 +23,7 @@ fn bug_a_4k_10s_serial_no_crash() {
 
     let output_path = workspace_root
         .join("target")
-        .join(format!("v1.67.1-bug-a-serial-{}.mp4", std::process::id()));
+        .join(format!("bug-a-serial-{}.mp4", std::process::id()));
     let _ = fs::remove_file(&output_path);
 
     let output = Command::new(&nf_shell)
@@ -43,7 +45,11 @@ fn bug_a_4k_10s_serial_no_crash() {
     let size = fs::metadata(&output_path)
         .unwrap_or_else(|err| panic!("metadata {} failed: {err}", output_path.display()))
         .len();
-    assert!(size > 0, "Bug-A regression output was empty at {}", output_path.display());
+    assert!(
+        size > 0,
+        "Bug-A regression output was empty at {}",
+        output_path.display()
+    );
 
     if !ffprobe_available() {
         eprintln!("[bug_a_4k_10s_serial_no_crash] ffprobe unavailable, skipping structural probe");
