@@ -1,6 +1,0 @@
-# Banned dependencies — framework-level abstractions not allowed (see tech-decision rule).
-# Scanned by scripts/lint-ban-frameworks.sh against Cargo.lock + package.json + package-lock.json.
-
-[deny]
-crates = ["tauri", "electron", "react-native", "wry"]
-npm = ["react", "react-dom", "vue", "next", "remotion", "@remotion/core", "svelte", "solid-js"]

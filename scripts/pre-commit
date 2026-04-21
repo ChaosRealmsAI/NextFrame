@@ -1,7 +1,0 @@
-#!/bin/bash
-# v2.0 rebuild in progress — legacy pre-commit checks disabled.
-# Old src archived to legacy-v08/ (not compiled). New src/ is empty skeleton.
-# This hook will be rebuilt as new crates are filled in.
-set -e
-echo "[pre-commit] v2.0 rebuild in progress — checks deferred until new src/ has content"
-exit 0

@@ -1,7 +1,0 @@
-{
-  "name": "hello-world",
-  "kind": "hello-world",
-  "version": "0.1.0",
-  "description": "Hello World user plugin example for nf-shell v1.65",
-  "entry": "track.js"
-}
