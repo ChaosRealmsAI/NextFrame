@@ -51,13 +51,16 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             }
             let cost = config.estimate_cost_usd(&result.stats);
             log::info!(
-                "stats: completed={} iters={} prompt_tokens={} completion_tokens={} context_bytes={} est_cost_usd={:.6} retries_by_status={:?} forced_stop_missing_outputs={:?}",
+                "stats: completed={} iters={} prompt_tokens={} completion_tokens={} context_bytes={} est_cost_usd={:.6} peak_cost_usd={:.6} exceeded_budget={} budget_hit_usd={:?} retries_by_status={:?} forced_stop_missing_outputs={:?}",
                 result.completed,
                 result.iters,
                 result.stats.prompt_tokens,
                 result.stats.completion_tokens,
                 result.stats.context_bytes,
                 cost,
+                result.stats.peak_cost_usd,
+                result.exceeded_budget,
+                result.budget_hit_usd,
                 result.retries_by_status,
                 result.forced_stop_missing_outputs
             );

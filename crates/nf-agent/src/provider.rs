@@ -162,6 +162,8 @@ pub struct Usage {
     pub completion_tokens: u64,
     #[serde(default)]
     pub context_bytes: usize,
+    #[serde(default)]
+    pub peak_cost_usd: f64,
 }
 
 impl Usage {

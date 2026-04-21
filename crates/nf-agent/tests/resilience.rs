@@ -11,8 +11,8 @@ use std::{
 
 use anyhow::Result;
 use nf_agent::{
-    Agent, BashPermissionConfig, BashTool, Config, LlmProvider, Message, OpenAiCompat,
-    ProviderConfig, SkillRegistry, SystemPrompt, Tool,
+    Agent, BashPermissionConfig, BashTool, Config, CostGuardConfig, LlmProvider, Message,
+    OpenAiCompat, ProviderConfig, SkillRegistry, SystemPrompt, Tool,
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -97,6 +97,7 @@ fn make_config(max_retries: usize, retry_base_ms: u64) -> Config {
         max_tool_result_chars: 4_000,
         max_history_chars: 200_000,
         pricing: BTreeMap::new(),
+        cost_guard: CostGuardConfig::default(),
         providers: BTreeMap::new(),
     }
 }

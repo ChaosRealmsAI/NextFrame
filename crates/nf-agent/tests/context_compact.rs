@@ -11,8 +11,8 @@ use std::{
 use anyhow::Result;
 use async_trait::async_trait;
 use nf_agent::{
-    Agent, ChatResponse, Config, LlmProvider, Message, ProviderConfig, SkillRegistry, SystemPrompt,
-    Tool, ToolCall, Usage, truncate_middle,
+    Agent, ChatResponse, Config, CostGuardConfig, LlmProvider, Message, ProviderConfig,
+    SkillRegistry, SystemPrompt, Tool, ToolCall, Usage, truncate_middle,
 };
 use serde_json::{Value, json};
 
@@ -212,6 +212,7 @@ fn make_config(max_tool_result_chars: usize, max_history_chars: usize) -> Config
         max_tool_result_chars,
         max_history_chars,
         pricing: BTreeMap::new(),
+        cost_guard: CostGuardConfig::default(),
         providers: BTreeMap::new(),
     }
 }
@@ -221,6 +222,7 @@ fn test_usage() -> Usage {
         prompt_tokens: 1,
         completion_tokens: 1,
         context_bytes: 0,
+        peak_cost_usd: 0.0,
     }
 }
 

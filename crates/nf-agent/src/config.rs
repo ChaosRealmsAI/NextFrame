@@ -24,6 +24,8 @@ pub struct Config {
     #[serde(default)]
     pub pricing: PricingTable,
     #[serde(default)]
+    pub cost_guard: CostGuardConfig,
+    #[serde(default)]
     pub providers: BTreeMap<String, ProviderConfig>,
 }
 
@@ -36,6 +38,23 @@ pub struct ProviderConfig {
 
 pub type Model = String;
 pub type PricingTable = BTreeMap<String, [f64; 2]>;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CostGuardConfig {
+    #[serde(default = "default_warn_usd")]
+    pub warn_usd: f64,
+    #[serde(default = "default_hard_stop_usd")]
+    pub hard_stop_usd: f64,
+}
+
+impl Default for CostGuardConfig {
+    fn default() -> Self {
+        Self {
+            warn_usd: default_warn_usd(),
+            hard_stop_usd: default_hard_stop_usd(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BashPermissionConfig {
@@ -88,6 +107,14 @@ fn default_max_tool_result_chars() -> usize {
 
 fn default_max_history_chars() -> usize {
     200_000
+}
+
+fn default_warn_usd() -> f64 {
+    0.10
+}
+
+fn default_hard_stop_usd() -> f64 {
+    0.50
 }
 
 impl Config {

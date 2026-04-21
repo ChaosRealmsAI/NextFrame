@@ -35,6 +35,8 @@ pub struct AgentResult {
     pub retries_by_status: HashMap<u16, u32>,
     pub final_text: Option<String>,
     pub forced_stop_missing_outputs: Vec<String>,
+    pub exceeded_budget: bool,
+    pub budget_hit_usd: Option<f64>,
 }
 
 impl Agent {
@@ -111,6 +113,7 @@ impl Agent {
         let mut stats = Usage::default();
         let mut active_skills = HashSet::new();
         let mut final_check_retries = 0;
+        let mut warned_cost = false;
 
         for iter in 0..max_iters {
             let resp = self
@@ -118,6 +121,34 @@ impl Agent {
                 .chat(self.config.model(), &messages, &self.tool_schemas())
                 .await?;
             stats.add(&resp.usage);
+            let cost = self.config.estimate_cost_usd(&stats);
+            stats.peak_cost_usd = stats.peak_cost_usd.max(cost);
+
+            if !warned_cost && cost >= self.config.cost_guard.warn_usd {
+                log::warn!(
+                    "cost warning: ${cost:.4} >= ${:.4} (warn threshold)",
+                    self.config.cost_guard.warn_usd
+                );
+                warned_cost = true;
+            }
+
+            if cost >= self.config.cost_guard.hard_stop_usd {
+                log::error!(
+                    "cost hard stop: ${cost:.4} >= ${:.4}",
+                    self.config.cost_guard.hard_stop_usd
+                );
+                stats.context_bytes = estimate_history_bytes(&messages);
+                return Ok(AgentResult {
+                    completed: false,
+                    iters: iter + 1,
+                    stats,
+                    retries_by_status: self.provider.retries_by_status(),
+                    final_text: None,
+                    forced_stop_missing_outputs: Vec::new(),
+                    exceeded_budget: true,
+                    budget_hit_usd: Some(cost),
+                });
+            }
 
             if resp.tool_calls.is_empty() {
                 if self.config.final_check_enabled {
@@ -157,6 +188,8 @@ impl Agent {
                             retries_by_status: self.provider.retries_by_status(),
                             final_text: resp.content,
                             forced_stop_missing_outputs: missing,
+                            exceeded_budget: false,
+                            budget_hit_usd: None,
                         });
                     }
                 }
@@ -169,6 +202,8 @@ impl Agent {
                     retries_by_status: self.provider.retries_by_status(),
                     final_text: resp.content,
                     forced_stop_missing_outputs: Vec::new(),
+                    exceeded_budget: false,
+                    budget_hit_usd: None,
                 });
             }
 

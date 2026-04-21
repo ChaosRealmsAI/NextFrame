@@ -20,8 +20,8 @@ use std::{
 use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use nf_agent::{
-    Agent, BashPermissionConfig, ChatResponse, Config, LlmProvider, Message, ProviderConfig,
-    SkillRegistry, SystemPrompt, ToolCall, Usage, provider::OpenAiToolCall,
+    Agent, BashPermissionConfig, ChatResponse, Config, CostGuardConfig, LlmProvider, Message,
+    ProviderConfig, SkillRegistry, SystemPrompt, ToolCall, Usage, provider::OpenAiToolCall,
 };
 use serde_json::Value;
 
@@ -103,6 +103,7 @@ fn mock_chat(content: Option<String>, tool_calls: Vec<ToolCall>) -> ChatResponse
             prompt_tokens: 10,
             completion_tokens: 5,
             context_bytes: 0,
+            peak_cost_usd: 0.0,
         },
     }
 }
@@ -125,6 +126,7 @@ fn make_config(final_check_enabled: bool) -> Config {
         max_tool_result_chars: 4_000,
         max_history_chars: 200_000,
         pricing: BTreeMap::new(),
+        cost_guard: CostGuardConfig::default(),
         providers: BTreeMap::new(),
     }
 }
