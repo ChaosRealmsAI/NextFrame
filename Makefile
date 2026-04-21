@@ -1,4 +1,4 @@
-.PHONY: help check check-rust check-ts clippy fmt fmt-check build clean install-frontend
+.PHONY: help check check-rust check-ts clippy fmt fmt-check build clean install-frontend blind-test
 
 help:
 	@echo "NextFrame · v0.1.1 scaffold targets"
@@ -12,6 +12,7 @@ help:
 	@echo "  make build              cargo build --release"
 	@echo "  make clean              cargo clean + rm -rf frontend/nf-components/node_modules"
 	@echo "  make install-frontend   npm install in frontend/nf-components"
+	@echo "  make blind-test         release build + sonnet blind-test harness"
 
 check: check-rust clippy check-ts
 
@@ -39,3 +40,6 @@ clean:
 
 install-frontend:
 	cd frontend/nf-components && npm install
+
+blind-test: build
+	@./scripts/blind-test-sonnet.sh $(or $(BACKEND),codex) $(or $(MODEL),gpt-5-mini)
