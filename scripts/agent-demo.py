@@ -140,12 +140,20 @@ def load_skill_tool(name: str) -> dict[str, Any]:
     return {"ok": True, "skill": name, "content": content}
 
 
+def _to_str(v: Any) -> str:
+    if v is None:
+        return ""
+    if isinstance(v, bytes):
+        return v.decode("utf-8", errors="replace")
+    return str(v)
+
+
 def bash_tool(command: str, timeout_sec: int = 30) -> dict[str, Any]:
     try:
-        p = subprocess.run(["bash", "-c", command], timeout=timeout_sec, capture_output=True, text=True)
-        return {"stdout": p.stdout, "stderr": p.stderr, "exit_code": p.returncode}
+        p = subprocess.run(["bash", "-c", command], timeout=timeout_sec, capture_output=True, text=True, errors="replace")
+        return {"stdout": _to_str(p.stdout), "stderr": _to_str(p.stderr), "exit_code": p.returncode}
     except subprocess.TimeoutExpired as e:
-        return {"stdout": e.stdout or "", "stderr": f"command timed out after {timeout_sec}s\n{e.stderr or ''}", "exit_code": 124}
+        return {"stdout": _to_str(e.stdout), "stderr": f"command timed out after {timeout_sec}s\n{_to_str(e.stderr)}", "exit_code": 124}
     except Exception as e:
         return {"stdout": "", "stderr": str(e), "exit_code": 1}
 
@@ -245,8 +253,8 @@ def agent_loop(task: str, max_iters: int = 10) -> str | None:
             args = json.loads(tc.function.arguments or "{}")
             print(f"→ tool: {tc.function.name}({args})")
             result = dispatch(tc.function.name, args)
-            print(f"← result: {json.dumps(result, ensure_ascii=False)[:200]}")
-            messages.append({"role": "tool", "tool_call_id": tc.id, "content": json.dumps(result, ensure_ascii=False)})
+            print(f"← result: {json.dumps(result, ensure_ascii=False, default=str)[:200]}")
+            messages.append({"role": "tool", "tool_call_id": tc.id, "content": json.dumps(result, ensure_ascii=False, default=str)})
     else:
         print("max iters reached")
     stats = {
@@ -266,7 +274,7 @@ def dry_run() -> int:
     args = {"text": "测试", "voice": "xiaoxiao", "out_path": "/tmp/_dryrun.mp3"}
     print(f"→ tool: nf_tts_synth({args})")
     result = dispatch("nf_tts_synth", args)
-    print(f"← result: {json.dumps(result, ensure_ascii=False)[:200]}")
+    print(f"← result: {json.dumps(result, ensure_ascii=False, default=str)[:200]}")
     return 0 if result.get("ok") else 1
 
 
