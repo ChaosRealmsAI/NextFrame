@@ -5,12 +5,20 @@ members = [
     "crates/nf-shell",
     "crates/nf-engine",
     "crates/nf-runtime",
+    "crates/nf-source",
+    "crates/videocut-core",
+    "crates/videocut-download",
+    "crates/videocut-transcribe",
+    "crates/videocut-align",
+    "crates/videocut-cut",
+    "crates/nf-tts",
+    "crates/nf-guide",
 ]
 
 [workspace.package]
-version = "0.1.1"
-edition = "2021"
-rust-version = "1.80"
+version = "0.3.0"
+edition = "2024"
+rust-version = "1.86"
 license = "MIT"
 repository = "https://github.com/ChaosRealmsAI/NextFrame"
 authors = ["NextFrame Contributors"]

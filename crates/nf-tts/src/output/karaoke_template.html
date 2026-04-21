@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>nf-tts · Karaoke · 字级同步播放</title>
+<style>
+  :root{
+    --bg:#050507;--bg-glass:rgba(0,0,0,0.30);--bg-elev:rgba(255,255,255,0.04);
+    --accent:#a78bfa;--accent-strong:#c084fc;
+    --accent-12:rgba(167,139,250,0.12);--accent-20:rgba(167,139,250,0.20);
+    --warm:#f97316;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--blue:#38bdf8;--pink:#f472b6;
+    --green-12:rgba(52,211,153,0.12);
+    --border:rgba(255,255,255,0.13);--border-soft:rgba(255,255,255,0.06);
+    --text:rgba(255,255,255,0.96);--text-sub:rgba(255,255,255,0.80);--text-60:rgba(255,255,255,0.60);--text-40:rgba(255,255,255,0.40)
+  }
+  *{box-sizing:border-box} html,body{margin:0;padding:0}
+  body{background:var(--bg);
+    background-image:
+      radial-gradient(ellipse 80% 25% at 50% 0%,rgba(139,92,246,0.28),transparent 65%),
+      radial-gradient(ellipse 50% 20% at 80% 0%,rgba(167,139,250,0.16),transparent 60%),
+      radial-gradient(ellipse 60% 20% at 50% 100%,rgba(124,58,237,0.14),transparent 60%),
+      radial-gradient(ellipse 40% 15% at 20% 100%,rgba(249,115,22,0.10),transparent 60%);
+    background-attachment:fixed;color:var(--text-sub);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC",sans-serif;
+    font-size:18px;line-height:1.65;-webkit-font-smoothing:antialiased;min-height:100vh;
+    display:flex;align-items:center;justify-content:center;padding:40px 20px}
+
+  .stage{max-width:1100px;width:100%;background:var(--bg-glass);
+    backdrop-filter:blur(50px) saturate(2);-webkit-backdrop-filter:blur(50px) saturate(2);
+    border:1px solid var(--border);border-radius:28px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),inset 0 -1px 0 rgba(0,0,0,0.30),0 16px 64px rgba(0,0,0,0.55);
+    padding:52px 64px;position:relative;overflow:hidden}
+  .stage::before{content:"";position:absolute;top:-100px;left:-100px;width:300px;height:300px;
+    background:radial-gradient(circle,rgba(167,139,250,0.25),transparent 70%);
+    filter:blur(40px);pointer-events:none;z-index:0;animation:float1 8s ease-in-out infinite}
+  .stage::after{content:"";position:absolute;bottom:-100px;right:-100px;width:320px;height:320px;
+    background:radial-gradient(circle,rgba(249,115,22,0.18),transparent 70%);
+    filter:blur(50px);pointer-events:none;z-index:0;animation:float2 9s ease-in-out infinite}
+  @keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,30px)}}
+  @keyframes float2{0%,100%{transform:translate(0,0)}50%{transform:translate(-30px,-40px)}}
+  .stage > *{position:relative;z-index:1}
+
+  .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--border-soft);flex-wrap:wrap;gap:12px}
+  .header .title{font-size:20px;color:var(--text);font-weight:700;letter-spacing:-0.01em;display:flex;align-items:center;gap:10px}
+  .header .title .logo{font-size:24px}
+  .header .meta{display:flex;gap:10px;flex-wrap:wrap}
+  .pill{background:var(--bg-elev);border:1px solid var(--border-soft);color:var(--text-60);padding:4px 12px;border-radius:999px;font-size:12px;font-family:"SF Mono",Menlo,monospace;letter-spacing:0.04em}
+  .pill.a{background:var(--accent-12);color:var(--accent);border-color:var(--accent-20)}
+  .pill.g{background:var(--green-12);color:var(--green);border-color:rgba(52,211,153,0.3)}
+
+  .banner{background:var(--green-12);border:1px solid rgba(52,211,153,0.3);border-left:3px solid var(--green);color:var(--green);
+    padding:10px 18px;border-radius:10px;font-size:13px;margin-bottom:20px;display:flex;gap:10px;align-items:center;line-height:1.5}
+  .banner .ico{font-size:16px;flex-shrink:0}
+  .banner b{color:var(--text)}
+
+  .lyrics{padding:60px 20px;min-height:260px;display:flex;align-items:center;justify-content:center;text-align:center;margin-bottom:24px}
+  .lyrics-inner{font-size:42px;font-weight:700;line-height:1.5;color:var(--text-40);letter-spacing:-0.01em;word-break:keep-all}
+  .word{display:inline-block;transition:color 0.22s ease,text-shadow 0.22s ease,transform 0.22s ease,opacity 0.22s ease;padding:0 2px;will-change:transform}
+  .word.past{color:var(--accent);opacity:0.7}
+  .word.active{color:#fff;opacity:1;transform:scale(1.18) translateY(-4px);
+    text-shadow:0 0 14px rgba(167,139,250,0.95),0 0 28px rgba(167,139,250,0.55),0 0 48px rgba(167,139,250,0.3);font-weight:800}
+  .word.future{color:var(--text-60);opacity:0.55}
+
+  .progress-row{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+  .time{font-family:"SF Mono",Menlo,monospace;font-size:14px;color:var(--text-60);min-width:58px;font-variant-numeric:tabular-nums}
+  .time.right{text-align:right}
+  .progress-track{flex:1;height:8px;background:var(--bg-elev);border-radius:999px;overflow:hidden;position:relative;cursor:pointer}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-strong),var(--pink));border-radius:999px;width:0%;box-shadow:0 0 20px rgba(167,139,250,0.6)}
+  .progress-head{position:absolute;top:50%;width:18px;height:18px;background:#fff;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 20px rgba(167,139,250,0.8),0 2px 8px rgba(0,0,0,0.4);pointer-events:none;left:0%}
+
+  .controls{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:20px}
+  .btn{background:var(--bg-elev);border:1px solid var(--border-soft);color:var(--text);border-radius:999px;padding:14px 22px;font-size:16px;cursor:pointer;font-weight:600;transition:transform 0.12s ease,background 0.12s ease,box-shadow 0.12s ease;display:flex;align-items:center;gap:8px}
+  .btn:hover{background:var(--accent-12);border-color:var(--accent-20);color:var(--accent)}
+  .btn:active{transform:scale(0.96)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-strong));border-color:transparent;color:#fff;padding:18px 32px;font-size:18px;
+    box-shadow:0 8px 24px rgba(167,139,250,0.4),inset 0 1px 0 rgba(255,255,255,0.2)}
+  .btn.primary:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(167,139,250,0.5)}
+  .btn .ico{font-size:18px}
+
+  .footer{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px;padding-top:18px;border-top:1px solid var(--border-soft)}
+  .info-cell{background:var(--bg-elev);border:1px solid var(--border-soft);border-radius:10px;padding:12px 16px;text-align:center}
+  .info-cell .k{font-size:10.5px;color:var(--text-40);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px}
+  .info-cell .v{font-size:14px;color:var(--text);font-family:"SF Mono",Menlo,monospace;font-weight:600}
+  .info-cell .v.accent{color:var(--accent)}
+
+  .hint{font-size:12px;color:var(--text-40);text-align:center;margin-top:16px}
+  .hint kbd{background:var(--bg-elev);border:1px solid var(--border);border-radius:4px;padding:1px 7px;font-family:"SF Mono",Menlo,monospace;font-size:11.5px;color:var(--text)}
+
+  @media (max-width: 700px){
+    .stage{padding:36px 28px}
+    .lyrics-inner{font-size:28px}
+    .footer{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+
+  <div class="header">
+    <div class="title">
+      <span class="logo">🎤</span>
+      <span>nf-tts · Karaoke · 字级同步播放</span>
+    </div>
+    <div class="meta">
+      <span class="pill g">✓ REAL</span>
+      <span class="pill" id="voicePill">voice: …</span>
+      <span class="pill a" id="statusPill">READY</span>
+    </div>
+  </div>
+
+  <div class="banner">
+    <span class="ico">✨</span>
+    <span><b>Edge TTS + whisperX 字级对齐</b> · <span id="bannerStats">加载中…</span></span>
+  </div>
+
+  <div class="lyrics">
+    <div class="lyrics-inner" id="lyrics"></div>
+  </div>
+
+  <div class="progress-row">
+    <span class="time" id="timeCur">0:00.00</span>
+    <div class="progress-track" id="progressTrack">
+      <div class="progress-fill" id="progressFill"></div>
+      <div class="progress-head" id="progressHead"></div>
+    </div>
+    <span class="time right" id="timeTotal">0:00.00</span>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnReset"><span class="ico">⏮</span><span>重播</span></button>
+    <button class="btn primary" id="btnPlay"><span class="ico" id="playIcon">▶</span><span id="playLabel">播放</span></button>
+    <button class="btn" id="btnJump"><span class="ico">⏭</span><span>跳 +1s</span></button>
+  </div>
+
+  <div class="footer">
+    <div class="info-cell"><div class="k">mp3</div><div class="v" id="mp3Info">…</div></div>
+    <div class="info-cell"><div class="k">duration</div><div class="v" id="durInfo">…</div></div>
+    <div class="info-cell"><div class="k">words</div><div class="v accent" id="wordsInfo">…</div></div>
+    <div class="info-cell"><div class="k">source</div><div class="v">nf-tts</div></div>
+  </div>
+
+  <div class="hint">
+    <kbd>Space</kbd> 播放/暂停 · <kbd>←</kbd>/<kbd>→</kbd> 前后 0.5s · <kbd>0</kbd> 重播 · <kbd>E</kbd> 到末尾<br>
+    生成自 <code>nf-tts synth --voice … -o audio.mp3</code> · 自包含 HTML · 可直接本地播放
+  </div>
+
+</div>
+
+<audio id="realAudio" preload="auto" src="{{AUDIO_SRC}}"></audio>
+
+<script>
+// ============ Timeline data (injected by nf-tts) ============
+const TIMELINE = {{TIMELINE_JSON}};
+
+// ============ Audio reference & DOM ============
+const lyricsEl = document.getElementById("lyrics");
+const timeCurEl = document.getElementById("timeCur");
+const timeTotalEl = document.getElementById("timeTotal");
+const progressFill = document.getElementById("progressFill");
+const progressHead = document.getElementById("progressHead");
+const progressTrack = document.getElementById("progressTrack");
+const btnPlay = document.getElementById("btnPlay");
+const btnReset = document.getElementById("btnReset");
+const btnJump = document.getElementById("btnJump");
+const playIcon = document.getElementById("playIcon");
+const playLabel = document.getElementById("playLabel");
+const statusPill = document.getElementById("statusPill");
+const voicePill = document.getElementById("voicePill");
+const bannerStats = document.getElementById("bannerStats");
+const mp3Info = document.getElementById("mp3Info");
+const durInfo = document.getElementById("durInfo");
+const wordsInfo = document.getElementById("wordsInfo");
+const audio = document.getElementById("realAudio");
+
+function isCJK(s){ return /[\u4e00-\u9fff]/.test(s); }
+
+function renderLyrics(){
+  lyricsEl.innerHTML = "";
+  TIMELINE.words.forEach((w, i) => {
+    const span = document.createElement("span");
+    span.className = "word future";
+    span.dataset.idx = i;
+    span.textContent = w.text;
+    if (i > 0) {
+      const prevCJK = isCJK(TIMELINE.words[i-1].text);
+      const curCJK = isCJK(w.text);
+      if (prevCJK !== curCJK) {
+        const sp = document.createElement("span");
+        sp.innerHTML = "&nbsp;";
+        sp.style.display = "inline-block";
+        sp.style.width = "8px";
+        lyricsEl.appendChild(sp);
+      }
+    }
+    lyricsEl.appendChild(span);
+  });
+}
+
+function updateHighlight(tMs){
+  const spans = lyricsEl.querySelectorAll(".word");
+  spans.forEach((span, i) => {
+    const w = TIMELINE.words[i];
+    span.classList.remove("past","active","future");
+    if (tMs < w.start_ms) span.classList.add("future");
+    else if (tMs >= w.start_ms && tMs < w.end_ms) span.classList.add("active");
+    else span.classList.add("past");
+  });
+}
+
+function fmt(ms){
+  const total = Math.max(0, ms);
+  const m = Math.floor(total/60000);
+  const s = (total%60000)/1000;
+  return m + ":" + s.toFixed(2).padStart(5,"0");
+}
+
+function setTimeUI(ms){
+  const t = Math.max(0, Math.min(TIMELINE.duration_ms, ms));
+  timeCurEl.textContent = fmt(t);
+  const pct = (t/TIMELINE.duration_ms)*100;
+  progressFill.style.width = pct + "%";
+  progressHead.style.left = pct + "%";
+  updateHighlight(t);
+}
+
+let rafId = null;
+function tick(){
+  const t = audio.currentTime * 1000;
+  setTimeUI(t);
+  if (!audio.paused && !audio.ended) rafId = requestAnimationFrame(tick);
+}
+
+audio.addEventListener("play", () => {
+  playIcon.textContent = "⏸";
+  playLabel.textContent = "暂停";
+  statusPill.textContent = "PLAYING";
+  statusPill.className = "pill a";
+  rafId = requestAnimationFrame(tick);
+});
+audio.addEventListener("pause", () => {
+  playIcon.textContent = "▶";
+  playLabel.textContent = "播放";
+  statusPill.textContent = audio.ended ? "DONE" : "PAUSED";
+  statusPill.className = "pill g";
+  if (rafId) cancelAnimationFrame(rafId);
+});
+audio.addEventListener("ended", () => {
+  playIcon.textContent = "▶";
+  playLabel.textContent = "播放";
+  statusPill.textContent = "DONE";
+  statusPill.className = "pill g";
+  setTimeUI(TIMELINE.duration_ms);
+});
+audio.addEventListener("loadedmetadata", () => {
+  if (audio.duration && isFinite(audio.duration)) {
+    TIMELINE.duration_ms = Math.max(TIMELINE.duration_ms, Math.round(audio.duration*1000));
+    timeTotalEl.textContent = fmt(TIMELINE.duration_ms);
+    durInfo.textContent = (TIMELINE.duration_ms/1000).toFixed(2) + "s";
+  }
+});
+
+btnPlay.addEventListener("click", () => { if (audio.paused) audio.play(); else audio.pause(); });
+btnReset.addEventListener("click", () => { audio.pause(); audio.currentTime = 0; setTimeUI(0); });
+btnJump.addEventListener("click", () => {
+  audio.currentTime = Math.min(audio.duration || TIMELINE.duration_ms/1000, audio.currentTime + 1);
+  setTimeUI(audio.currentTime*1000);
+});
+progressTrack.addEventListener("click", (e) => {
+  const rect = progressTrack.getBoundingClientRect();
+  const frac = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = frac * (audio.duration || TIMELINE.duration_ms/1000);
+  setTimeUI(audio.currentTime*1000);
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === " ") { e.preventDefault(); if (audio.paused) audio.play(); else audio.pause(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); audio.currentTime = Math.max(0, audio.currentTime - 0.5); setTimeUI(audio.currentTime*1000); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); audio.currentTime = Math.min(audio.duration||TIMELINE.duration_ms/1000, audio.currentTime + 0.5); setTimeUI(audio.currentTime*1000); }
+  else if (e.key === "0") { e.preventDefault(); audio.pause(); audio.currentTime=0; setTimeUI(0); }
+  else if (e.key === "e"||e.key === "E") { e.preventDefault(); audio.pause(); audio.currentTime = audio.duration||TIMELINE.duration_ms/1000; setTimeUI(TIMELINE.duration_ms); }
+});
+
+// Fill metadata dynamically from TIMELINE
+voicePill.textContent = "voice: " + (TIMELINE.voice || "…");
+mp3Info.textContent = audio.getAttribute("src") || "…";
+durInfo.textContent = (TIMELINE.duration_ms/1000).toFixed(2) + "s";
+wordsInfo.textContent = TIMELINE.words.length;
+bannerStats.textContent = `${TIMELINE.words.length} 字级时间戳 · ${(TIMELINE.duration_ms/1000).toFixed(1)}s`;
+
+renderLyrics();
+setTimeUI(0);
+timeTotalEl.textContent = fmt(TIMELINE.duration_ms);
+</script>
+
+</body>
+</html>
