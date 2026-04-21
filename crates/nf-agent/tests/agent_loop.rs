@@ -21,8 +21,7 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use nf_agent::{
     Agent, ChatResponse, Config, LlmProvider, Message, ProviderConfig, SkillRegistry, SystemPrompt,
-    ToolCall, Usage,
-    provider::OpenAiToolCall,
+    ToolCall, Usage, provider::OpenAiToolCall,
 };
 use serde_json::Value;
 
@@ -118,6 +117,9 @@ fn make_config(final_check_enabled: bool) -> Config {
         system_prompt: SystemPrompt {
             text: "mock agent".to_owned(),
         },
+        bash_timeout_sec: 120,
+        provider_max_retries: 5,
+        provider_retry_base_ms: 1_000,
         final_check_enabled,
         max_tool_result_chars: 4_000,
         max_history_chars: 200_000,
@@ -127,9 +129,7 @@ fn make_config(final_check_enabled: bool) -> Config {
 }
 
 fn unique_workspace(prefix: &str) -> Result<PathBuf> {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)?
-        .as_nanos();
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let pid = std::process::id();
     let workspace = std::env::temp_dir().join(format!("{prefix}-{pid}-{nanos}"));
     fs::create_dir_all(&workspace)?;
@@ -198,7 +198,9 @@ async fn fake_final_is_blocked_until_forced_stop() -> Result<()> {
     );
     let user_messages = calls_ref.last_user_messages();
     assert!(
-        user_messages.iter().any(|msg| msg.contains("产物") || msg.contains("缺失")),
+        user_messages
+            .iter()
+            .any(|msg| msg.contains("产物") || msg.contains("缺失")),
         "engine must inject a continue message when outputs are missing"
     );
     // 1 load_skill + 1 FINAL attempt + 3 forced retries = 5 provider calls.

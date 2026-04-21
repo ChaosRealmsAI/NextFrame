@@ -7,6 +7,12 @@ use serde::Deserialize;
 pub struct Config {
     pub provider: ProviderConfig,
     pub system_prompt: SystemPrompt,
+    #[serde(default = "default_bash_timeout_sec")]
+    pub bash_timeout_sec: u64,
+    #[serde(default = "default_provider_max_retries")]
+    pub provider_max_retries: usize,
+    #[serde(default = "default_provider_retry_base_ms")]
+    pub provider_retry_base_ms: u64,
     #[serde(default = "default_final_check_enabled")]
     pub final_check_enabled: bool,
     #[serde(default = "default_max_tool_result_chars")]
@@ -36,6 +42,18 @@ pub struct SystemPrompt {
 
 fn default_final_check_enabled() -> bool {
     true
+}
+
+fn default_bash_timeout_sec() -> u64 {
+    120
+}
+
+fn default_provider_max_retries() -> usize {
+    5
+}
+
+fn default_provider_retry_base_ms() -> u64 {
+    1_000
 }
 
 fn default_max_tool_result_chars() -> usize {

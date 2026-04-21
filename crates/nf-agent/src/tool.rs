@@ -1,10 +1,13 @@
 use std::{
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     sync::Arc,
     thread,
     time::{Duration, Instant},
 };
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
@@ -20,8 +23,26 @@ pub trait Tool: Send + Sync {
     async fn call(&self, args: Value) -> Result<Value>;
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct BashTool;
+const DEFAULT_BASH_TIMEOUT_SEC: u64 = 120;
+
+#[derive(Debug, Clone)]
+pub struct BashTool {
+    default_timeout_sec: u64,
+}
+
+impl BashTool {
+    pub fn new(default_timeout_sec: u64) -> Self {
+        Self {
+            default_timeout_sec,
+        }
+    }
+}
+
+impl Default for BashTool {
+    fn default() -> Self {
+        Self::new(DEFAULT_BASH_TIMEOUT_SEC)
+    }
+}
 
 #[async_trait]
 impl Tool for BashTool {
@@ -44,7 +65,7 @@ impl Tool for BashTool {
                 "timeout_sec": {
                     "type": "integer",
                     "description": "Timeout in seconds",
-                    "default": 30
+                    "default": self.default_timeout_sec
                 }
             },
             "required": ["command"],
@@ -54,7 +75,7 @@ impl Tool for BashTool {
 
     async fn call(&self, args: Value) -> Result<Value> {
         let command = required_string(&args, "command")?;
-        let timeout_sec = optional_u64(&args, "timeout_sec", 30);
+        let timeout_sec = optional_u64(&args, "timeout_sec", self.default_timeout_sec);
         tokio::task::spawn_blocking(move || run_bash(command, timeout_sec))
             .await
             .context("bash worker task failed")?
@@ -63,15 +84,21 @@ impl Tool for BashTool {
 
 fn run_bash(command: String, timeout_sec: u64) -> Result<Value> {
     let timeout = Duration::from_secs(timeout_sec);
-    let mut child = Command::new("bash")
-        .arg("-c")
+    let started = Instant::now();
+    let mut cmd = Command::new("bash");
+    cmd.arg("-c")
         .arg(&command)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    #[cfg(unix)]
+    {
+        cmd.process_group(0);
+    }
+    let mut child = cmd
         .spawn()
         .with_context(|| format!("failed to spawn bash for command: {command}"))?;
 
-    let deadline = Instant::now() + timeout;
+    let deadline = started + timeout;
     loop {
         if child
             .try_wait()
@@ -82,14 +109,17 @@ fn run_bash(command: String, timeout_sec: u64) -> Result<Value> {
                 .wait_with_output()
                 .context("failed to collect bash output")?;
             return Ok(json!({
+                "ok": output.status.success(),
+                "timed_out": false,
                 "stdout": String::from_utf8_lossy(&output.stdout).into_owned(),
                 "stderr": String::from_utf8_lossy(&output.stderr).into_owned(),
-                "exit_code": output.status.code().unwrap_or(1)
+                "exit_code": output.status.code().unwrap_or(1),
+                "elapsed_sec": started.elapsed().as_secs()
             }));
         }
 
         if Instant::now() >= deadline {
-            let _ = child.kill();
+            kill_bash_child(&mut child);
             let output = child
                 .wait_with_output()
                 .context("failed to collect timed out bash output")?;
@@ -99,6 +129,11 @@ fn run_bash(command: String, timeout_sec: u64) -> Result<Value> {
             }
             stderr.push_str(&format!("command timed out after {timeout_sec}s"));
             return Ok(json!({
+                "ok": false,
+                "timed_out": true,
+                "timeout_sec": timeout_sec,
+                "elapsed_sec": started.elapsed().as_secs().max(timeout_sec),
+                "command": command,
                 "stdout": String::from_utf8_lossy(&output.stdout).into_owned(),
                 "stderr": stderr,
                 "exit_code": 124
@@ -107,6 +142,22 @@ fn run_bash(command: String, timeout_sec: u64) -> Result<Value> {
 
         thread::sleep(Duration::from_millis(20));
     }
+}
+
+fn kill_bash_child(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        let pid = child.id();
+        let status = Command::new("kill")
+            .arg("-KILL")
+            .arg(format!("-{pid}"))
+            .status();
+        if matches!(status, Ok(exit) if exit.success()) {
+            return;
+        }
+    }
+
+    let _ = child.kill();
 }
 
 #[derive(Debug, Clone, Default)]

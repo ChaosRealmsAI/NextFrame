@@ -204,6 +204,9 @@ fn make_config(max_tool_result_chars: usize, max_history_chars: usize) -> Config
         system_prompt: SystemPrompt {
             text: "mock agent".to_owned(),
         },
+        bash_timeout_sec: 120,
+        provider_max_retries: 5,
+        provider_retry_base_ms: 1_000,
         final_check_enabled: false,
         max_tool_result_chars,
         max_history_chars,

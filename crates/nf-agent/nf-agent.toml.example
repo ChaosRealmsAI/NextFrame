@@ -1,4 +1,7 @@
 final_check_enabled = true
+bash_timeout_sec = 120
+provider_max_retries = 5
+provider_retry_base_ms = 1000
 
 [provider]
 base_url = "https://api.siliconflow.cn/v1"

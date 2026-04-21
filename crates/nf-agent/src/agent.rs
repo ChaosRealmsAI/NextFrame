@@ -1,4 +1,8 @@
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::Arc,
+};
 
 use anyhow::{Context, Result, anyhow};
 use serde_json::{Value, json};
@@ -25,6 +29,7 @@ pub struct AgentResult {
     pub completed: bool,
     pub iters: usize,
     pub stats: Usage,
+    pub retries_by_status: HashMap<u16, u32>,
     pub final_text: Option<String>,
     pub forced_stop_missing_outputs: Vec<String>,
 }
@@ -34,7 +39,7 @@ impl Agent {
         let skills = Arc::new(skills);
         let workspace = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let tools: Vec<Box<dyn Tool>> = vec![
-            Box::new(BashTool),
+            Box::new(BashTool::new(config.bash_timeout_sec)),
             Box::new(ReadTool),
             Box::new(LoadSkillTool::new(Arc::clone(&skills))),
             Box::new(VerifyOutputsTool::new(Arc::clone(&skills), workspace)),
@@ -116,6 +121,7 @@ impl Agent {
                             completed: false,
                             iters: iter + 1,
                             stats,
+                            retries_by_status: self.provider.retries_by_status(),
                             final_text: resp.content,
                             forced_stop_missing_outputs: missing,
                         });
@@ -127,6 +133,7 @@ impl Agent {
                     completed: true,
                     iters: iter + 1,
                     stats,
+                    retries_by_status: self.provider.retries_by_status(),
                     final_text: resp.content,
                     forced_stop_missing_outputs: Vec::new(),
                 });
