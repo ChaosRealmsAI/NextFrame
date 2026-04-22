@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>nf-agent trace viewer</title>
+  <style>
+    :root {
+      --bg: #f6f3ed;
+      --text: #1c1d1f;
+      --muted: #5d6673;
+      --line: #d8d2c7;
+      --panel: #ffffff;
+      --blue: #2f6fed;
+      --green: #178a57;
+      --gold: #b7791f;
+      --red: #c7362f;
+      --orange: #dd6b20;
+      --gray: #68707d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    header {
+      padding: 28px 32px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfaf7;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .source-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+    }
+
+    input,
+    button {
+      font: inherit;
+      font-size: 18px;
+    }
+
+    input[type="file"] {
+      max-width: 100%;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 24px;
+      padding: 24px 32px 36px;
+      align-items: start;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .stat .label {
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .stat .value {
+      font-size: 30px;
+      line-height: 1.1;
+      font-weight: 800;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 0 0 12px;
+    }
+
+    .section-title h2,
+    aside h2 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .timeline {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .event-row {
+      display: grid;
+      grid-template-columns: 180px minmax(220px, 1fr) 120px;
+      gap: 16px;
+      padding: 14px 16px;
+      border-top: 1px solid var(--line);
+      cursor: pointer;
+    }
+
+    .event-row:first-child {
+      border-top: 0;
+    }
+
+    .event-row:hover {
+      background: #f9f7f2;
+    }
+
+    .event-label {
+      font-weight: 800;
+    }
+
+    .event-meta {
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bar-track {
+      position: relative;
+      height: 26px;
+      border-radius: 4px;
+      background: #ebe7df;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      min-width: 8px;
+      border-radius: 4px;
+    }
+
+    .bar.chat_request { background: var(--blue); }
+    .bar.tool_call { background: var(--green); }
+    .bar.final { background: var(--gold); }
+    .bar.budget_hit { background: var(--red); }
+    .bar.forced_stop { background: var(--orange); }
+    .bar.retry { background: var(--gray); }
+
+    .json-panel {
+      display: none;
+      padding: 0 16px 16px;
+      border-top: 1px solid var(--line);
+      background: #fffdf8;
+    }
+
+    .json-panel.open {
+      display: block;
+    }
+
+    pre {
+      margin: 14px 0 0;
+      padding: 14px;
+      overflow: auto;
+      background: #1f2329;
+      color: #f5f0e6;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 18px;
+      line-height: 1.45;
+    }
+
+    aside {
+      position: sticky;
+      top: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+    }
+
+    .legend,
+    .retry-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .legend-item,
+    .retry-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .empty,
+    .error {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+    }
+
+    .error {
+      border-color: #d9867f;
+      color: #8a241f;
+    }
+
+    @media (max-width: 920px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 18px;
+      }
+
+      header {
+        padding: 22px 18px 16px;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+      }
+
+      aside {
+        position: static;
+      }
+
+      .event-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>这次 agent 跑了什么</h1>
+    <div class="source-line">
+      <span id="sourceLabel">正在读取 trace...</span>
+      <input id="fileInput" type="file" accept=".jsonl,.txt,application/jsonl">
+      <button id="reloadButton" type="button">重新读取</button>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="stats" aria-label="Trace summary">
+        <div class="stat">
+          <div class="label">轮数</div>
+          <div class="value" id="statIters">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">估算花费</div>
+          <div class="value" id="statCost">$0.0000</div>
+        </div>
+        <div class="stat">
+          <div class="label">最大上下文</div>
+          <div class="value" id="statContext">0 B</div>
+        </div>
+        <div class="stat">
+          <div class="label">重试</div>
+          <div class="value" id="statRetries">0</div>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <h2>时间线</h2>
+        <span id="eventCount">0 条记录</span>
+      </div>
+      <div id="message"></div>
+      <div id="timeline" class="timeline" aria-live="polite"></div>
+    </section>
+
+    <aside>
+      <h2>颜色说明</h2>
+      <div class="legend">
+        <div class="legend-item"><span><span class="swatch" style="background: var(--blue)"></span>发给模型</span><strong>chat</strong></div>
+        <div class="legend-item"><span><span class="swatch" style="background: var(--green)"></span>调用工具</span><strong>tool</strong></div>
+        <div class="legend-item"><span><span class="swatch" style="background: var(--gold)"></span>正常结束</span><strong>final</strong></div>
+        <div class="legend-item"><span><span class="swatch" style="background: var(--red)"></span>预算挡停</span><strong>budget</strong></div>
+        <div class="legend-item"><span><span class="swatch" style="background: var(--orange)"></span>强制停止</span><strong>stop</strong></div>
+      </div>
+
+      <h2 style="margin-top: 26px;">重试分布</h2>
+      <div id="retryList" class="retry-list"></div>
+    </aside>
+  </main>
+
+  <script>
+    const EVENT_LABELS = {
+      chat_request: "发给模型",
+      tool_call: "调用工具",
+      final: "正常结束",
+      budget_hit: "预算挡停",
+      forced_stop: "强制停止",
+      retry: "模型重试"
+    };
+
+    const source = new URLSearchParams(location.search).get("src");
+    const sourceLabel = document.getElementById("sourceLabel");
+    const fileInput = document.getElementById("fileInput");
+    const reloadButton = document.getElementById("reloadButton");
+
+    reloadButton.addEventListener("click", () => {
+      if (source) {
+        loadFromSource(source);
+      } else {
+        showEmpty("没有看到 src 参数，可以选择一个 JSONL 文件。");
+      }
+    });
+
+    fileInput.addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      sourceLabel.textContent = `本地文件：${file.name}`;
+      renderTrace(parseJsonl(await file.text()));
+    });
+
+    if (source) {
+      loadFromSource(source);
+    } else {
+      showEmpty("打开方式：trace-viewer.html?src=run.jsonl，或直接选择 JSONL 文件。");
+    }
+
+    async function loadFromSource(src) {
+      sourceLabel.textContent = `读取：${src}`;
+      try {
+        const response = await fetch(src, { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        renderTrace(parseJsonl(await response.text()));
+      } catch (error) {
+        showError(`没读到 ${src}。如果浏览器拦住本地文件读取，请用上面的文件选择器打开同一个 JSONL。错误：${error.message}`);
+      }
+    }
+
+    function parseJsonl(text) {
+      return text
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map((line, index) => {
+          try {
+            return JSON.parse(line);
+          } catch (error) {
+            throw new Error(`第 ${index + 1} 行不是合法 JSON：${error.message}`);
+          }
+        });
+    }
+
+    function renderTrace(events) {
+      document.getElementById("message").innerHTML = "";
+      document.getElementById("eventCount").textContent = `${events.length} 条记录`;
+      renderStats(events);
+      renderTimeline(events);
+      renderRetries(events);
+    }
+
+    function renderStats(events) {
+      const totalIters = Math.max(0, ...events.map(event => Number(event.iter) || 0));
+      const totalCost = Math.max(0, ...events.map(event => Number(event.cost_usd) || 0));
+      const peakContext = Math.max(0, ...events.map(event => Number(event.context_bytes) || 0));
+      const totalRetries = Math.max(0, ...events.map(retryTotal));
+      document.getElementById("statIters").textContent = String(totalIters);
+      document.getElementById("statCost").textContent = `$${totalCost.toFixed(4)}`;
+      document.getElementById("statContext").textContent = formatBytes(peakContext);
+      document.getElementById("statRetries").textContent = String(totalRetries);
+    }
+
+    function renderTimeline(events) {
+      const timeline = document.getElementById("timeline");
+      timeline.innerHTML = "";
+      if (events.length === 0) {
+        showEmpty("这个 trace 是空的。");
+        return;
+      }
+
+      const maxDuration = Math.max(1, ...events.map(event => Number(event.duration_ms) || 1));
+      events.forEach((event, index) => {
+        const eventName = String(event.event || "unknown");
+        const duration = Number(event.duration_ms) || 1;
+        const row = document.createElement("div");
+        row.className = "event-row";
+        row.title = `${EVENT_LABELS[eventName] || eventName} · ${duration} ms`;
+        row.innerHTML = `
+          <div>
+            <div class="event-label">${escapeHtml(EVENT_LABELS[eventName] || eventName)}</div>
+            <div class="event-meta">第 ${event.iter || "-"} 轮 · ${formatTime(event.t)}</div>
+          </div>
+          <div class="bar-track" aria-label="${escapeHtml(eventName)}">
+            <div class="bar ${cssClass(eventName)}" style="width: ${Math.max(4, Math.round((duration / maxDuration) * 100))}%"></div>
+          </div>
+          <div class="event-meta">${event.name ? escapeHtml(String(event.name)) : `${duration} ms`}</div>
+        `;
+
+        const panel = document.createElement("div");
+        panel.className = "json-panel";
+        const pre = document.createElement("pre");
+        pre.textContent = JSON.stringify(event, null, 2);
+        panel.appendChild(pre);
+
+        row.addEventListener("click", () => {
+          panel.classList.toggle("open");
+        });
+
+        timeline.appendChild(row);
+        timeline.appendChild(panel);
+      });
+    }
+
+    function renderRetries(events) {
+      const totals = new Map();
+      events.forEach(event => {
+        const byStatus = event.retries_by_status || {};
+        Object.keys(byStatus).forEach(status => {
+          totals.set(status, Math.max(totals.get(status) || 0, Number(byStatus[status] || 0)));
+        });
+      });
+
+      const retryList = document.getElementById("retryList");
+      retryList.innerHTML = "";
+      if (totals.size === 0) {
+        retryList.innerHTML = `<div class="retry-item"><span>没有重试</span><strong>0</strong></div>`;
+        return;
+      }
+
+      [...totals.entries()].sort().forEach(([status, count]) => {
+        const item = document.createElement("div");
+        item.className = "retry-item";
+        item.innerHTML = `<span>HTTP ${escapeHtml(status)}</span><strong>${count}</strong>`;
+        retryList.appendChild(item);
+      });
+    }
+
+    function showEmpty(text) {
+      document.getElementById("message").innerHTML = `<div class="empty">${escapeHtml(text)}</div>`;
+      document.getElementById("timeline").innerHTML = "";
+    }
+
+    function showError(text) {
+      document.getElementById("message").innerHTML = `<div class="error">${escapeHtml(text)}</div>`;
+      document.getElementById("timeline").innerHTML = "";
+    }
+
+    function formatBytes(value) {
+      if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+      if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
+      return `${value} B`;
+    }
+
+    function retryTotal(event) {
+      const byStatus = event.retries_by_status || {};
+      const values = Object.values(byStatus);
+      if (values.length > 0) {
+        return values.reduce((sum, value) => sum + (Number(value) || 0), 0);
+      }
+      return Number(event.retries) || 0;
+    }
+
+    function formatTime(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number) || number <= 0) return "-";
+      return new Date(number).toLocaleString();
+    }
+
+    function cssClass(eventName) {
+      return /^[a-z_]+$/.test(eventName) ? eventName : "retry";
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
+</body>
+</html>

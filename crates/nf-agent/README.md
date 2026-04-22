@@ -48,7 +48,7 @@ Exit codes:
 
 ## Builtin Tools
 
-- `Bash`: runs `bash -c <command>`, captures stdout/stderr/exit code, and times out after 30 seconds by default.
+- `Bash`: runs `bash -c <command>`, captures stdout/stderr/exit code, and times out after `bash_timeout_sec` seconds (120 by default).
 - `Read`: reads a text file with UTF-8 replacement and returns at most 10,000 characters by default.
 - `load_skill`: loads an external `SKILL.md` by name. The allowed names are generated from the skills directory at startup.
 

@@ -22,6 +22,8 @@ struct Cli {
     max_iters: usize,
     #[arg(long, help = "Log output path. Defaults to stderr")]
     log: Option<String>,
+    #[arg(long, help = "Write JSONL trace events to this path")]
+    trace: Option<String>,
 }
 
 #[tokio::main]
@@ -38,10 +40,13 @@ async fn main() -> ExitCode {
 
 async fn run(cli: Cli) -> Result<ExitCode> {
     init_logger(cli.log.as_deref())?;
-    let config = Config::from_path(&cli.config)?;
+    let mut config = Config::from_path(&cli.config)?;
+    if let Some(trace_path) = cli.trace {
+        config.trace.path = Some(trace_path);
+    }
     let skills = SkillRegistry::load(&cli.skills_dir)?;
-    let provider = OpenAiCompat::from_config(&config.provider)?;
-    let agent = Agent::new(config.clone(), skills, Box::new(provider));
+    let provider = OpenAiCompat::from_config(&config)?;
+    let agent = Agent::try_new(config.clone(), skills, Box::new(provider))?;
 
     log::info!("loaded {} skills", agent.skill_count());
     match agent.run(&cli.task, cli.max_iters).await {
@@ -51,14 +56,24 @@ async fn run(cli: Cli) -> Result<ExitCode> {
             }
             let cost = config.estimate_cost_usd(&result.stats);
             log::info!(
-                "stats: completed={} iters={} prompt_tokens={} completion_tokens={} est_cost_usd={:.6}",
+                "stats: completed={} iters={} prompt_tokens={} completion_tokens={} context_bytes={} est_cost_usd={:.6} peak_cost_usd={:.6} exceeded_budget={} budget_hit_usd={:?} retries_by_status={:?} forced_stop_missing_outputs={:?}",
                 result.completed,
                 result.iters,
                 result.stats.prompt_tokens,
                 result.stats.completion_tokens,
-                cost
+                result.stats.context_bytes,
+                cost,
+                result.stats.peak_cost_usd,
+                result.exceeded_budget,
+                result.budget_hit_usd,
+                result.retries_by_status,
+                result.forced_stop_missing_outputs
             );
-            Ok(ExitCode::SUCCESS)
+            if result.completed {
+                Ok(ExitCode::SUCCESS)
+            } else {
+                Ok(ExitCode::from(1))
+            }
         }
         Err(err) if err.to_string() == "max iters reached" => {
             eprintln!("{err}");

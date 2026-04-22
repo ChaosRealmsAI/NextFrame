@@ -7,8 +7,26 @@ use serde::Deserialize;
 pub struct Config {
     pub provider: ProviderConfig,
     pub system_prompt: SystemPrompt,
+    #[serde(default = "default_bash_timeout_sec")]
+    pub bash_timeout_sec: u64,
+    #[serde(default)]
+    pub bash_permission: BashPermissionConfig,
+    #[serde(default = "default_provider_max_retries")]
+    pub provider_max_retries: usize,
+    #[serde(default = "default_provider_retry_base_ms")]
+    pub provider_retry_base_ms: u64,
+    #[serde(default = "default_final_check_enabled")]
+    pub final_check_enabled: bool,
+    #[serde(default = "default_max_tool_result_chars")]
+    pub max_tool_result_chars: usize,
+    #[serde(default = "default_max_history_chars")]
+    pub max_history_chars: usize,
     #[serde(default)]
     pub pricing: PricingTable,
+    #[serde(default)]
+    pub cost_guard: CostGuardConfig,
+    #[serde(default)]
+    pub trace: TraceConfig,
     #[serde(default)]
     pub providers: BTreeMap<String, ProviderConfig>,
 }
@@ -23,9 +41,88 @@ pub struct ProviderConfig {
 pub type Model = String;
 pub type PricingTable = BTreeMap<String, [f64; 2]>;
 
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct TraceConfig {
+    #[serde(default)]
+    pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CostGuardConfig {
+    #[serde(default = "default_warn_usd")]
+    pub warn_usd: f64,
+    #[serde(default = "default_hard_stop_usd")]
+    pub hard_stop_usd: f64,
+}
+
+impl Default for CostGuardConfig {
+    fn default() -> Self {
+        Self {
+            warn_usd: default_warn_usd(),
+            hard_stop_usd: default_hard_stop_usd(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct BashPermissionConfig {
+    #[serde(default)]
+    pub blocklist: Vec<String>,
+    #[serde(default = "default_allowlist_mode")]
+    pub allowlist_mode: String,
+    #[serde(default)]
+    pub allowlist: Vec<String>,
+}
+
+impl Default for BashPermissionConfig {
+    fn default() -> Self {
+        Self {
+            blocklist: Vec::new(),
+            allowlist_mode: default_allowlist_mode(),
+            allowlist: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct SystemPrompt {
     pub text: String,
+}
+
+fn default_allowlist_mode() -> String {
+    "open".to_owned()
+}
+
+fn default_final_check_enabled() -> bool {
+    true
+}
+
+fn default_bash_timeout_sec() -> u64 {
+    120
+}
+
+fn default_provider_max_retries() -> usize {
+    5
+}
+
+fn default_provider_retry_base_ms() -> u64 {
+    1_000
+}
+
+fn default_max_tool_result_chars() -> usize {
+    4_000
+}
+
+fn default_max_history_chars() -> usize {
+    200_000
+}
+
+fn default_warn_usd() -> f64 {
+    0.10
+}
+
+fn default_hard_stop_usd() -> f64 {
+    0.50
 }
 
 impl Config {
