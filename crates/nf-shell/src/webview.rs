@@ -7,8 +7,8 @@ use tao::event_loop::{EventLoopProxy, EventLoopWindowTarget};
 use tao::platform::macos::WindowBuilderExtMacOS;
 use tao::window::{Window, WindowBuilder};
 use wry::{
+    http::{header::CONTENT_TYPE, Request, Response},
     WebView, WebViewBuilder,
-    http::{Request, Response, header::CONTENT_TYPE},
 };
 
 use crate::events::UserEvent;
@@ -41,17 +41,20 @@ pub fn create_window(
         .build(target)
         .map_err(|err| format!("window build failed: {err}"))?;
 
-    // 系统按钮度量 · 拿到才能生成 init script 里的 `window.__nfTrafficLight`
+    // 安装 traffic light 对齐 · Rust 主动 setFrame 按钮到 DOM topbar 中心 +
+    // 挂 NSNotificationCenter observer 处理 resize/activate/fullscreen reset
+    // (参考 bigbang/MediaAgentTeam/automedia/src/ui.rs:104)
     #[cfg(target_os = "macos")]
-    let tl_init_js = crate::traffic_light::TrafficLightMetrics::read_from_tao(&window)
-        .map(|m| m.to_init_script())
-        .unwrap_or_default();
-    #[cfg(not(target_os = "macos"))]
-    let tl_init_js = String::new();
+    let _tl_observer = crate::traffic_light::install_from_tao(&window);
+    // observer 通过 window_manager 侧面保活 · 见 WindowState.traffic_light_observer
+    #[cfg(target_os = "macos")]
+    if let Some(observer) = _tl_observer {
+        std::mem::forget(observer);
+    }
 
     let frontend_root = frontend_root()?;
     let url = frontend_url(project, episode);
-    let session_script = initialization_script(project, episode, &tl_init_js);
+    let session_script = initialization_script(project, episode);
     let ipc_window_id = window_id.to_string();
     let ipc_proxy = proxy.clone();
     let webview_builder = WebViewBuilder::new()
@@ -86,7 +89,7 @@ fn frontend_url(project: &str, episode: &str) -> String {
     format!("nextframe://frontend/index.html?project={project}&episode={episode}")
 }
 
-fn initialization_script(project: &str, episode: &str, tl_init_js: &str) -> String {
+fn initialization_script(project: &str, episode: &str) -> String {
     let session = serde_json::json!({
         "project": project,
         "episode": episode
@@ -103,7 +106,6 @@ fn initialization_script(project: &str, episode: &str, tl_init_js: &str) -> Stri
   }} else {{
     document.addEventListener("DOMContentLoaded", markNativeShell, {{ once: true }});
   }}
-  {tl_init_js}
 }})();"#
     )
 }
