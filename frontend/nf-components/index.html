@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NextFrame · Editor</title>
+  <link rel="preload" href="tokens.css" as="style">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="shell.css">
+  <script src="dist/index.js"></script>
+</head>
+<body>
+  <div class="outer">
+    <div class="brand"><b>NextFrame</b> · 编辑器原型 · v0.1</div>
+    <div class="meta">极简 · 玻璃 · 直角</div>
+  </div>
+
+  <div class="app">
+    <nf-topbar current-tab="edit" current-lang="zh"></nf-topbar>
+    <div class="body">
+      <aside class="panel">
+        <nf-clips></nf-clips>
+        <nf-log reversed="true" count="14"></nf-log>
+      </aside>
+      <div class="stage">
+        <div class="preview">
+          <div class="frame">
+            <div class="tc" data-nf-preview-time>00:00.000 · T=0.0000</div>
+            <div class="cn" data-nf-preview-clip>clip</div>
+            <div class="brand">NextFrame</div>
+            <div class="sub">AI-FIRST &nbsp; CLI-DRIVEN &nbsp; FRAME PURE</div>
+          </div>
+        </div>
+        <div class="playctl">
+          <button class="btn" type="button">◀◀</button>
+          <button class="btn main" type="button">▶</button>
+          <button class="btn" type="button">▶▶</button>
+          <div class="tc"><span class="cur" data-nf-current-time>00:00.000</span><span class="dim" data-nf-total-time> / 00:00.000</span></div>
+          <div class="scrub"><div class="fill" data-nf-scrub-fill></div><div class="head" data-nf-scrub-head></div></div>
+          <div class="rate">1×</div>
+        </div>
+        <nf-timeline zoom="1"></nf-timeline>
+      </div>
+      <aside class="panel right">
+        <nf-inspector></nf-inspector>
+      </aside>
+    </div>
+  </div>
+
+  <div class="caption">
+    <div class="l">图例</div>
+    <div class="item"><span class="sw v"></span> 画面</div>
+    <div class="item"><span class="sw t"></span> 文字</div>
+    <div class="item"><span class="sw a"></span> 音频</div>
+    <div class="item"><span class="sw tr"></span> 转场</div>
+    <div class="item"><span class="sw anch"></span> 时间锚点</div>
+    <div class="item"><span class="sw pl"></span> 播放头</div>
+  </div>
+
+  <div class="foot">
+    <span>NextFrame · 编辑器原型 · v0.1</span>
+    <span>spec/design/prototypes/editor-v0.1.html</span>
+  </div>
+</body>
+</html>

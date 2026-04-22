@@ -1,4 +1,10 @@
-//! nf-shell — NextFrame Mac desktop shell.
-//!
-//! Wraps wry + tao to host the product's WebView UI.
-//! Scaffold only (v0.1.1). Window/IPC implementation lands in v0.2.
+pub mod capture;
+pub mod errors;
+pub mod events;
+pub mod handlers;
+pub mod ipc_server;
+pub mod storage;
+#[cfg(target_os = "macos")]
+pub mod traffic_light;
+pub mod webview;
+pub mod window_manager;

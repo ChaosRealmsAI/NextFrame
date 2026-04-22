@@ -1,3 +1,13 @@
+---
+name: clips
+description: 视频剪辑全链(download → transcribe → plan → cut → translate → karaoke)
+expected_outputs:
+  - "**/clips/index.html"
+  - "**/clips/clip_*.mp4"
+  - "**/clips/cut_report.json"
+  - "**/clips/*.translations.*.json"
+---
+
 # clips · 视频剪辑(**必跑完 6 步 · 不允许中途 stop**)
 
 NextFrame 完整 clips pipeline。**6 步全跑 · 每步 Bash 一次 tool · 一直走到 karaoke HTML**。

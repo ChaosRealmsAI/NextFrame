@@ -1,3 +1,10 @@
+---
+name: audio
+description: TTS + 词级对齐
+expected_outputs:
+  - "**/*.mp3"
+---
+
 # audio · TTS + 词级对齐
 
 NextFrame audio 流程(TTS 合成 → WhisperX 字级对齐 → karaoke.html)。
