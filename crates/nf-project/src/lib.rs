@@ -311,12 +311,7 @@ pub fn compile_episode_source(
             },
             "overlay" => overlay_params(object, title, accent, position),
             "audio" => match audio_params(object) {
-                Some(params) => {
-                    warnings.push(format!(
-                        "audio clip '{id}' is compiled for runtime preview/source but MP4 audio muxing is not implemented"
-                    ));
-                    params
-                }
+                Some(params) => params,
                 None => {
                     warnings.push(format!(
                         "ignored audio clip '{id}' without file:// or data: src"

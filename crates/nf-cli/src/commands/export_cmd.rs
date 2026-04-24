@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use nf_project::{JsonStorage, Storage, compile_episode_source};
 use nf_recorder::{ExportOpts, ExportResolution};
@@ -16,6 +17,7 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
     let compiled = compile_episode_source(&args.project, &episode)?;
     let source_path = source_path_for_output(&args.out);
     write_json_file(&source_path, &compiled.source)?;
+    let mut warnings = compiled.warnings;
 
     if let Some(parent) = args.out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         fs::create_dir_all(parent).map_err(|err| NfError::StorageFailed(err.to_string()))?;
@@ -39,14 +41,202 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
         ))
         .map_err(record_error)?;
 
+    let audio_muxed = match mux_audio_tracks(&compiled.source, &args.out, episode.duration) {
+        Ok(muxed) => muxed,
+        Err(err) => {
+            warnings.push(err);
+            false
+        }
+    };
+
     print_json(&json!({
         "out": args.out.display().to_string(),
         "source": source_path.display().to_string(),
         "bytes": stats.size_bytes,
         "frames": stats.frames,
         "duration_ms": stats.duration_ms,
-        "warnings": compiled.warnings
+        "audio_muxed": audio_muxed,
+        "warnings": warnings
     }))
+}
+
+#[derive(Debug, Clone)]
+struct AudioClip {
+    src: String,
+    begin_ms: u64,
+    volume: f64,
+}
+
+fn mux_audio_tracks(
+    source: &serde_json::Value,
+    video_path: &Path,
+    duration_s: f64,
+) -> Result<bool, String> {
+    let audio = collect_audio_clips(source);
+    if audio.is_empty() {
+        return Ok(false);
+    }
+    let ffmpeg = resolve_ffmpeg().ok_or_else(|| {
+        "audio tracks found, but ffmpeg is unavailable; exported MP4 is video-only".to_string()
+    })?;
+    let mut audio_paths = Vec::new();
+    for clip in &audio {
+        match audio_src_to_path(&clip.src) {
+            Some(path) if path.exists() => audio_paths.push((clip.clone(), path)),
+            _ => {}
+        }
+    }
+    if audio_paths.is_empty() {
+        return Ok(false);
+    }
+
+    let muxed_path = video_path.with_extension("with-audio.mp4");
+    let mut command = Command::new(ffmpeg);
+    command
+        .arg("-y")
+        .arg("-i")
+        .arg(video_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (_clip, path) in &audio_paths {
+        command.arg("-i").arg(path);
+    }
+
+    let filter = audio_filter(&audio_paths, duration_s);
+    command
+        .arg("-filter_complex")
+        .arg(filter)
+        .arg("-map")
+        .arg("0:v:0")
+        .arg("-map")
+        .arg("[aout]")
+        .arg("-c:v")
+        .arg("copy")
+        .arg("-c:a")
+        .arg("aac")
+        .arg("-b:a")
+        .arg("192k")
+        .arg("-t")
+        .arg(format!("{duration_s:.3}"))
+        .arg("-movflags")
+        .arg("+faststart")
+        .arg(&muxed_path);
+
+    let output = command
+        .output()
+        .map_err(|err| format!("spawn ffmpeg for audio mux failed: {err}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("ffmpeg audio mux failed: {}", stderr.trim()));
+    }
+    fs::rename(&muxed_path, video_path)
+        .map_err(|err| format!("replace video with audio mux failed: {err}"))?;
+    Ok(true)
+}
+
+fn collect_audio_clips(source: &serde_json::Value) -> Vec<AudioClip> {
+    source
+        .get("tracks")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|track| track.get("kind").and_then(serde_json::Value::as_str) == Some("audio"))
+        .filter_map(|track| track.get("clips").and_then(serde_json::Value::as_array))
+        .flatten()
+        .filter_map(|clip| {
+            let params = clip.get("params")?;
+            let src = params.get("src").and_then(serde_json::Value::as_str)?;
+            let begin_ms = clip.get("begin").and_then(serde_json::Value::as_u64).unwrap_or(0);
+            let volume = params
+                .get("volume")
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or(1.0);
+            Some(AudioClip {
+                src: src.to_string(),
+                begin_ms,
+                volume,
+            })
+        })
+        .collect()
+}
+
+fn audio_filter(audio_paths: &[(AudioClip, PathBuf)], duration_s: f64) -> String {
+    let mut parts = Vec::new();
+    let mut labels = Vec::new();
+    for (index, (clip, _path)) in audio_paths.iter().enumerate() {
+        let input = index + 1;
+        let label = format!("a{index}");
+        parts.push(format!(
+            "[{input}:a]adelay={}:all=1,volume={:.3}[{label}]",
+            clip.begin_ms, clip.volume
+        ));
+        labels.push(format!("[{label}]"));
+    }
+    if labels.len() == 1 {
+        parts.push(format!(
+            "{}apad,atrim=0:{duration_s:.3}[aout]",
+            labels.join("")
+        ));
+    } else {
+        parts.push(format!(
+            "{}amix=inputs={}:duration=longest:dropout_transition=0,apad,atrim=0:{duration_s:.3}[aout]",
+            labels.join(""),
+            labels.len()
+        ));
+    }
+    parts.join(";")
+}
+
+fn audio_src_to_path(src: &str) -> Option<PathBuf> {
+    let raw = src.strip_prefix("file://")?;
+    Some(PathBuf::from(percent_decode(raw).ok()?))
+}
+
+fn percent_decode(value: &str) -> Result<String, String> {
+    let bytes = value.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' if index + 2 < bytes.len() => {
+                let hi = hex_value(bytes[index + 1])?;
+                let lo = hex_value(bytes[index + 2])?;
+                out.push((hi << 4) | lo);
+                index += 3;
+            }
+            byte => {
+                out.push(byte);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8(out).map_err(|err| err.to_string())
+}
+
+fn hex_value(byte: u8) -> Result<u8, String> {
+    match byte {
+        b'0'..=b'9' => Ok(byte - b'0'),
+        b'a'..=b'f' => Ok(byte - b'a' + 10),
+        b'A'..=b'F' => Ok(byte - b'A' + 10),
+        _ => Err("invalid percent encoding".to_string()),
+    }
+}
+
+fn resolve_ffmpeg() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("FFMPEG_BIN") {
+        return Some(PathBuf::from(path));
+    }
+    for candidate in ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "ffmpeg"] {
+        let path = PathBuf::from(candidate);
+        if candidate.contains('/') {
+            if path.exists() {
+                return Some(path);
+            }
+        } else {
+            return Some(path);
+        }
+    }
+    None
 }
 
 struct RecorderEventQuietGuard;

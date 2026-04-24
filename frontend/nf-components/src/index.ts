@@ -34,6 +34,7 @@ let playbackStartTime = 0;
 let playing = false;
 let previewAudio: HTMLAudioElement | undefined;
 let previewAudioClipId = "";
+const autoVoiceStarted = new Set<string>();
 
 const DEFINITIONS: Array<[string, CustomElementConstructor]> = [
   ["nf-topbar", NfTopbar],
@@ -270,8 +271,29 @@ function applyData(data: NfMockData, preferredClipId = selectedClipId): void {
   if (selected) {
     selectedClipId = selected.id;
     selectClip(selected.id, selected);
+    maybeAutoGenerateVoice(data.project.id, episode.id, selected);
   }
   applyShellChrome(data, selected, selected?.start ?? 0);
+}
+
+function maybeAutoGenerateVoice(project: string, episode: string, clip: NfDataClip): void {
+  if (clip.kind !== "scene" || !clip.tts?.text) return;
+  if (hasGeneratedAudioForClip(clip.id)) return;
+  const key = `${project}/${episode}/${clip.id}`;
+  if (autoVoiceStarted.has(key)) return;
+  const inspector = document.querySelector("nf-inspector");
+  if (!inspector) return;
+  autoVoiceStarted.add(key);
+  startVoiceFlow(project, episode, clip.id, { ...clip.tts, text: clip.tts.text }, inspector);
+}
+
+function hasGeneratedAudioForClip(clipId: string): boolean {
+  const episode = getMockData().episodes[0];
+  const expectedAudioId = `voice-${clipId}`;
+  return episode?.clips.some((clip) => {
+    if (clip.kind !== "audio" || !clip.src) return false;
+    return clip.id === expectedAudioId || clip.tts?.audio_clip === expectedAudioId || clip.tts?.text != null;
+  }) ?? false;
 }
 
 function selectClip(clipId: string, clip?: NfDataClip): void {
@@ -507,9 +529,10 @@ function syncPreviewAudio(data: NfMockData, time: number): void {
     previewAudio = new Audio();
     previewAudio.preload = "auto";
   }
-  if (previewAudioClipId !== clip.id || previewAudio.src !== clip.src) {
+  const src = playableAudioSrc(clip.src);
+  if (previewAudioClipId !== clip.id || previewAudio.src !== src) {
     previewAudio.pause();
-    previewAudio.src = clip.src;
+    previewAudio.src = src;
     previewAudioClipId = clip.id;
   }
   previewAudio.volume = Math.min(1, Math.max(0, clip.volume ?? 1));
@@ -528,6 +551,16 @@ function syncPreviewAudio(data: NfMockData, time: number): void {
 
 function pausePreviewAudio(): void {
   previewAudio?.pause();
+}
+
+function playableAudioSrc(src: string): string {
+  if (!src.startsWith("file://")) return src;
+  try {
+    const path = decodeURIComponent(new URL(src).pathname);
+    return `nextframe://media/?path=${encodeURIComponent(path)}`;
+  } catch {
+    return src;
+  }
 }
 
 function validColor(value: string | undefined): boolean {

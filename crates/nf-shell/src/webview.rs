@@ -59,7 +59,7 @@ pub fn create_window(
     let ipc_proxy = proxy.clone();
     let webview_builder = WebViewBuilder::new()
         .with_custom_protocol("nextframe".into(), move |_webview_id, request| {
-            match frontend_protocol_response(&frontend_root, request) {
+            match protocol_response(&frontend_root, request) {
                 Ok(response) => response.map(Into::into),
                 Err(err) => plain_response(500, err.as_bytes().to_vec()).map(Into::into),
             }
@@ -157,6 +157,78 @@ fn frontend_protocol_response(
         .map_err(|err| err.to_string())
 }
 
+fn protocol_response(root: &Path, request: Request<Vec<u8>>) -> Result<Response<Vec<u8>>, String> {
+    if request.uri().host() == Some("media") {
+        return media_protocol_response(request);
+    }
+    frontend_protocol_response(root, request)
+}
+
+fn media_protocol_response(request: Request<Vec<u8>>) -> Result<Response<Vec<u8>>, String> {
+    let path = media_path_from_query(request.uri().query().unwrap_or(""))?;
+    let storage_root = crate::storage::JsonStorage::default_root()
+        .map_err(|err| format!("storage root unavailable: {err}"))?
+        .canonicalize()
+        .map_err(|err| format!("storage root failed: {err}"))?;
+    let file = PathBuf::from(path)
+        .canonicalize()
+        .map_err(|err| format!("media file missing: {err}"))?;
+    if !file.starts_with(&storage_root) {
+        return Ok(plain_response(403, b"forbidden".to_vec()));
+    }
+    let content = std::fs::read(&file).map_err(|err| format!("media read failed: {err}"))?;
+    Response::builder()
+        .header(CONTENT_TYPE, mime_for_path(&file))
+        .body(content)
+        .map_err(|err| err.to_string())
+}
+
+fn media_path_from_query(query: &str) -> Result<String, String> {
+    for part in query.split('&') {
+        let Some((key, value)) = part.split_once('=') else {
+            continue;
+        };
+        if key == "path" {
+            return percent_decode(value);
+        }
+    }
+    Err("missing media path".to_string())
+}
+
+fn percent_decode(value: &str) -> Result<String, String> {
+    let bytes = value.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' if index + 2 < bytes.len() => {
+                let hi = hex_value(bytes[index + 1])?;
+                let lo = hex_value(bytes[index + 2])?;
+                out.push((hi << 4) | lo);
+                index += 3;
+            }
+            b'+' => {
+                out.push(b' ');
+                index += 1;
+            }
+            byte => {
+                out.push(byte);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8(out).map_err(|err| format!("media path is not UTF-8: {err}"))
+}
+
+fn hex_value(byte: u8) -> Result<u8, String> {
+    match byte {
+        b'0'..=b'9' => Ok(byte - b'0'),
+        b'a'..=b'f' => Ok(byte - b'a' + 10),
+        b'A'..=b'F' => Ok(byte - b'A' + 10),
+        _ => Err("invalid percent encoding".to_string()),
+    }
+}
+
 fn plain_response(status: u16, body: Vec<u8>) -> Response<Vec<u8>> {
     Response::builder()
         .status(status)
@@ -173,6 +245,10 @@ fn mime_for_path(path: &Path) -> &'static str {
         Some("json") => "application/json; charset=utf-8",
         Some("png") => "image/png",
         Some("svg") => "image/svg+xml",
+        Some("mp3") => "audio/mpeg",
+        Some("wav") => "audio/wav",
+        Some("m4a") => "audio/mp4",
+        Some("aac") => "audio/aac",
         _ => "application/octet-stream",
     }
 }
