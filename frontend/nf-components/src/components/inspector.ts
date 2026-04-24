@@ -164,6 +164,29 @@ const sheet = makeSheet(`
   }
   .status.ok { color: var(--teal); }
   .status.err { color: #fb7185; }
+  .export-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    margin: -4px 0 12px;
+  }
+  .export-actions .status {
+    margin-top: 0;
+    min-width: 0;
+  }
+  .open-btn {
+    padding: 7px 10px;
+    background: rgba(123, 201, 181, 0.16);
+    border: 1px solid rgba(123, 201, 181, 0.45);
+    color: var(--teal);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .open-btn:hover {
+    background: rgba(123, 201, 181, 0.26);
+  }
   .progress {
     height: 3px;
     margin: -6px 0 10px;
@@ -185,7 +208,15 @@ const sheet = makeSheet(`
 
 export class NfInspector extends NfBase {
   static get observedAttributes(): string[] {
-    return ["clip-id", "save-status", "save-error", "export-status", "export-path", "export-error"];
+    return [
+      "clip-id",
+      "save-status",
+      "save-error",
+      "export-status",
+      "export-path",
+      "export-error",
+      "export-open-status",
+    ];
   }
 
   constructor() {
@@ -223,6 +254,7 @@ export class NfInspector extends NfBase {
     const exportStatus = this.getAttribute("export-status") ?? "idle";
     const exportPath = this.getAttribute("export-path") ?? "";
     const exportError = this.getAttribute("export-error") ?? "";
+    const exportOpenStatus = this.getAttribute("export-open-status") ?? "";
     this.root.innerHTML = `
       <div class="insp">
         <button class="export-btn" type="button" data-field="export">
@@ -230,7 +262,12 @@ export class NfInspector extends NfBase {
           <span class="sub">1080p · H264</span>
         </button>
         ${exportStatus === "running" ? `<div class="progress" aria-label="export progress"><div class="bar"></div></div>` : ""}
-        ${exportStatus === "succeeded" ? `<div class="status ok">${exportPath}</div>` : ""}
+        ${exportStatus === "succeeded" ? `
+          <div class="export-actions">
+            <div class="status ok">${escapeHtml(exportOpenStatus === "opened" ? "已打开 · " : "")}${escapeHtml(exportPath)}</div>
+            <button class="open-btn" type="button" data-action="open-export">打开视频</button>
+          </div>
+        ` : ""}
         ${exportStatus === "failed" ? `<div class="status err">${exportError || "导出失败"}</div>` : ""}
         <div class="insp-sel">
           <span class="l">已选片段</span>
@@ -314,6 +351,9 @@ export class NfInspector extends NfBase {
     this.root.querySelector(".export-btn")?.addEventListener("click", () => {
       this.emit<FieldEditDetail>("field-edit", { field: "export", value: "1080p H264" });
     });
+    this.root.querySelector("[data-action='open-export']")?.addEventListener("click", () => {
+      this.emit<FieldEditDetail>("field-edit", { field: "open-export", value: exportPath });
+    });
   }
 
   private readPosition(fallback: { x: number; y: number }): { x: number; y: number } {
@@ -324,6 +364,13 @@ export class NfInspector extends NfBase {
       y: clampPercent(y),
     };
   }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
 function escapeAttr(value: string): string {

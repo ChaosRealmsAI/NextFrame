@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 
@@ -154,6 +154,30 @@ impl ExportOpHandler {
             "error": job.error
         }))
     }
+
+    fn open(&self, params: &Value) -> Result<Value, NfError> {
+        let path = required_str(params, "path")?;
+        let path = PathBuf::from(path);
+        validate_export_path(&self.storage, &path)?;
+        if !path.exists() {
+            return Err(NfError::ValidationFailed(format!(
+                "export file does not exist: {}",
+                path.display()
+            )));
+        }
+
+        Command::new("open")
+            .arg(&path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|err| NfError::SocketFailed(format!("open export failed: {err}")))?;
+
+        Ok(json!({
+            "opened": true,
+            "path": path.display().to_string()
+        }))
+    }
 }
 
 impl OpHandler for ExportOpHandler {
@@ -161,11 +185,35 @@ impl OpHandler for ExportOpHandler {
         let data = match req.op.as_str() {
             "export-start" | "export.start" => self.start(&req.params)?,
             "export-status" | "export.status" => self.status(&req.params)?,
+            "export-open" | "export.open" => self.open(&req.params)?,
             _ => return Ok(None),
         };
 
         Ok(Some(data))
     }
+}
+
+fn validate_export_path(storage: &JsonStorage, path: &Path) -> Result<(), NfError> {
+    let canonical_root = storage.root().canonicalize().map_err(|err| {
+        NfError::StorageFailed(format!(
+            "storage root is unavailable: {} · {err}",
+            storage.root().display()
+        ))
+    })?;
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|err| NfError::ValidationFailed(format!("invalid export path: {err}")))?;
+    if !canonical_path.starts_with(&canonical_root) {
+        return Err(NfError::ValidationFailed(
+            "export path must be inside the NextFrame storage root".to_string(),
+        ));
+    }
+    if canonical_path.extension().and_then(|value| value.to_str()) != Some("mp4") {
+        return Err(NfError::ValidationFailed(
+            "export path must point to an mp4 file".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn export_job_id(project: &str, episode: &str) -> String {

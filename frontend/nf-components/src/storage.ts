@@ -151,6 +151,11 @@ export interface NfExportStatus {
   error?: string | null;
 }
 
+export interface NfExportOpen {
+  opened: boolean;
+  path: string;
+}
+
 interface PendingIpc {
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
@@ -298,6 +303,12 @@ export function exportEpisode(projectSlug: string, episodeSlug: string): Promise
 export function exportStatus(jobId: string): Promise<NfExportStatus> {
   return shellRequest<NfExportStatus>("export.status", {
     job_id: jobId,
+  });
+}
+
+export function openExport(path: string): Promise<NfExportOpen> {
+  return shellRequest<NfExportOpen>("export.open", {
+    path,
   });
 }
 

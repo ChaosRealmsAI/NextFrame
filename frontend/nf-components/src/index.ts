@@ -12,6 +12,7 @@ import {
   exportStatus,
   getMockData,
   loadProjectData,
+  openExport,
   patchClip,
   updateClipLabel,
   updateClipPosition,
@@ -99,6 +100,19 @@ function wireApp(): void {
     if (detail.field === "export") {
       startExportFlow(route.project, route.episode, inspector);
     }
+    if (detail.field === "open-export") {
+      const path = typeof detail.value === "string" && detail.value.length > 0
+        ? detail.value
+        : inspector.getAttribute("export-path") ?? "";
+      if (!path) return;
+      inspector.setAttribute("export-open-status", "opening");
+      void openExport(path)
+        .then(() => inspector.setAttribute("export-open-status", "opened"))
+        .catch((error) => {
+          inspector.setAttribute("export-open-status", "failed");
+          inspector.setAttribute("export-error", error instanceof Error ? error.message : String(error));
+        });
+    }
   });
 
   wirePreviewDrag(route.project, route.episode);
@@ -106,6 +120,7 @@ function wireApp(): void {
 
 function startExportFlow(project: string, episode: string, inspector: Element): void {
   inspector.setAttribute("export-status", "running");
+  inspector.removeAttribute("export-open-status");
   inspector.removeAttribute("export-error");
   void exportEpisode(project, episode)
     .then((started) => {
