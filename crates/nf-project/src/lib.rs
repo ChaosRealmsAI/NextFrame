@@ -248,6 +248,7 @@ pub fn compile_episode_source(
             .and_then(Value::as_str)
             .filter(|value| !value.is_empty())
             .unwrap_or(id);
+        let position = clip_position(object);
         let start_ms = resolve_time_ms(object.get("start"), &episode.anchors, "start")?;
         let end_ms = resolve_time_ms(object.get("end"), &episode.anchors, "end")?;
         if end_ms <= start_ms {
@@ -269,7 +270,9 @@ pub fn compile_episode_source(
                 "layout": "hero",
                 "title": label,
                 "subtitle": id,
-                "accent_color": "#bc8cff"
+                "accent_color": "#bc8cff",
+                "title_x": position.0,
+                "title_y": position.1
             }
         }));
     }
@@ -313,6 +316,21 @@ pub fn compile_episode_source(
     });
 
     Ok(SourceCompileResult { source, warnings })
+}
+
+fn clip_position(object: &serde_json::Map<String, Value>) -> (f64, f64) {
+    let position = object.get("position").and_then(Value::as_object);
+    let x = position
+        .and_then(|value| value.get("x"))
+        .and_then(Value::as_f64)
+        .unwrap_or(50.0)
+        .clamp(5.0, 95.0);
+    let y = position
+        .and_then(|value| value.get("y"))
+        .and_then(Value::as_f64)
+        .unwrap_or(50.0)
+        .clamp(5.0, 95.0);
+    (x, y)
 }
 
 fn resolve_time_ms(
@@ -451,7 +469,8 @@ mod tests {
                 "label": "Hello NextFrame",
                 "track": "scene",
                 "start": "0",
-                "end": "5"
+                "end": "5",
+                "position": {"x": 42.0, "y": 58.0}
             })],
             log: Vec::new(),
         };
@@ -462,6 +481,14 @@ mod tests {
         assert_eq!(
             compiled.source["tracks"][0]["clips"][0]["params"]["title"],
             "Hello NextFrame"
+        );
+        assert_eq!(
+            compiled.source["tracks"][0]["clips"][0]["params"]["title_x"],
+            42.0
+        );
+        assert_eq!(
+            compiled.source["tracks"][0]["clips"][0]["params"]["title_y"],
+            58.0
         );
         Ok(())
     }

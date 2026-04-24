@@ -107,6 +107,9 @@ impl ClipsOpHandler {
         if let Some(label) = optional_str(params, "label") {
             object.insert("label".to_string(), Value::String(label));
         }
+        if let Some(position) = optional_position(params)? {
+            object.insert("position".to_string(), json!(position));
+        }
         if params.get("effects").is_some_and(|value| !value.is_null()) {
             object.insert("effects".to_string(), json!(string_list(params, "effects")));
         }
@@ -142,6 +145,42 @@ impl ClipsOpHandler {
             "clip": slug
         }))
     }
+}
+
+fn optional_position(params: &Value) -> Result<Option<Map<String, Value>>, NfError> {
+    let Some(position) = params.get("position") else {
+        return Ok(None);
+    };
+    if position.is_null() {
+        return Ok(None);
+    }
+    let Some(object) = position.as_object() else {
+        return Err(NfError::ValidationFailed(
+            "`position` must be an object with x and y numbers".to_string(),
+        ));
+    };
+    let x = object
+        .get("x")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| NfError::ValidationFailed("`position.x` must be a number".to_string()))?;
+    let y = object
+        .get("y")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| NfError::ValidationFailed("`position.y` must be a number".to_string()))?;
+    if !(0.0..=100.0).contains(&x) || !(0.0..=100.0).contains(&y) {
+        return Err(NfError::ValidationFailed(
+            "`position.x` and `position.y` must be between 0 and 100".to_string(),
+        ));
+    }
+
+    let mut normalized = Map::new();
+    normalized.insert("x".to_string(), json!(round_position(x)));
+    normalized.insert("y".to_string(), json!(round_position(y)));
+    Ok(Some(normalized))
+}
+
+fn round_position(value: f64) -> f64 {
+    (value * 100.0).round() / 100.0
 }
 
 impl OpHandler for ClipsOpHandler {
@@ -291,6 +330,44 @@ mod tests {
         };
 
         assert_eq!(err.exit_code(), 5);
+        cleanup(&storage)?;
+        Ok(())
+    }
+
+    #[test]
+    fn updates_clip_position() -> Result<(), Box<dyn std::error::Error>> {
+        let storage = test_storage("clips-position")?;
+        create_episode(&storage)?;
+        let handler = ClipsOpHandler::new(storage.clone());
+        handler.handle(&IpcRequest {
+            req_id: "3".to_string(),
+            op: "clips-create".to_string(),
+            params: json!({
+                "project": "demo-video",
+                "episode": "ep-01",
+                "slug": "intro",
+                "label": "Intro",
+                "track": "scene",
+                "start": "0",
+                "end": "5"
+            }),
+        })?;
+
+        let shown = handler
+            .handle(&IpcRequest {
+                req_id: "4".to_string(),
+                op: "clips-update".to_string(),
+                params: json!({
+                    "project": "demo-video",
+                    "episode": "ep-01",
+                    "clip": "intro",
+                    "position": {"x": 42.345, "y": 58.0}
+                }),
+            })?
+            .unwrap_or_else(|| json!({}));
+
+        assert_eq!(shown["position"]["x"], 42.35);
+        assert_eq!(shown["position"]["y"], 58.0);
         cleanup(&storage)?;
         Ok(())
     }

@@ -18,6 +18,7 @@ export interface NfClip {
   start: number;
   end: number;
   effects: string[];
+  position: { x: number; y: number };
 }
 
 export interface NfLogEntry {
@@ -69,13 +70,13 @@ export const DEFAULT_MOCK: NfMockData = {
         "outro-start": 55,
       },
       clips: [
-        { id: "intro", label: "intro", kind: "scene", track: 0, start: 0, end: 5, effects: ["fade-in"] },
-        { id: "feat-1", label: "feat 1", kind: "scene", track: 0, start: 5, end: 12, effects: ["glass-flip"] },
-        { id: "feat-2", label: "feat 2", kind: "scene", track: 0, start: 12, end: 30, effects: ["glass-flip", "blur · 8px", "scale · 1.05", "color-cinematic"] },
-        { id: "feat-3", label: "feat 3", kind: "scene", track: 0, start: 30, end: 48, effects: ["push-in"] },
-        { id: "outro", label: "outro", kind: "scene", track: 0, start: 55, end: 60, effects: ["fade"] },
-        { id: "bgm-electric", label: "bgm-electric", kind: "audio", track: 3, start: 0, end: 58.2, effects: ["normalize · -14 LUFS"] },
-        { id: "narration-v2", label: "narration-v2", kind: "audio", track: 3, start: 0, end: 60, effects: ["voice-clean"] },
+        { id: "intro", label: "intro", kind: "scene", track: 0, start: 0, end: 5, effects: ["fade-in"], position: { x: 50, y: 50 } },
+        { id: "feat-1", label: "feat 1", kind: "scene", track: 0, start: 5, end: 12, effects: ["glass-flip"], position: { x: 50, y: 50 } },
+        { id: "feat-2", label: "feat 2", kind: "scene", track: 0, start: 12, end: 30, effects: ["glass-flip", "blur · 8px", "scale · 1.05", "color-cinematic"], position: { x: 50, y: 50 } },
+        { id: "feat-3", label: "feat 3", kind: "scene", track: 0, start: 30, end: 48, effects: ["push-in"], position: { x: 50, y: 50 } },
+        { id: "outro", label: "outro", kind: "scene", track: 0, start: 55, end: 60, effects: ["fade"], position: { x: 50, y: 50 } },
+        { id: "bgm-electric", label: "bgm-electric", kind: "audio", track: 3, start: 0, end: 58.2, effects: ["normalize · -14 LUFS"], position: { x: 50, y: 50 } },
+        { id: "narration-v2", label: "narration-v2", kind: "audio", track: 3, start: 0, end: 60, effects: ["voice-clean"], position: { x: 50, y: 50 } },
       ],
       log: [
         { time: "12:03:00", actor: "AI", desc: "读取 <b>project.json</b> · 解析视频结构", cli: "nf read project.json --format=json", accent: true },
@@ -259,6 +260,34 @@ export async function updateClipLabel(
   });
 }
 
+export async function updateClipPosition(
+  projectSlug: string,
+  episodeSlug: string,
+  clipId: string,
+  position: { x: number; y: number },
+): Promise<void> {
+  await shellRequest("clips.update", {
+    project: projectSlug,
+    episode: episodeSlug,
+    clip: clipId,
+    position,
+  });
+}
+
+export function patchClip(
+  clipId: string,
+  patch: Partial<Pick<NfClip, "label" | "position">>,
+  options: { notify?: boolean } = {},
+): NfClip | undefined {
+  const episode = getEpisode();
+  const clip = episode.clips.find((item) => item.id === clipId);
+  if (!clip) return undefined;
+  if (patch.label !== undefined) clip.label = patch.label;
+  if (patch.position) clip.position = normalizePosition(patch.position);
+  if (options.notify) dispatchDataReady(cached);
+  return clip;
+}
+
 export function exportEpisode(projectSlug: string, episodeSlug: string): Promise<NfExportStart> {
   return shellRequest<NfExportStart>("export.start", {
     project: projectSlug,
@@ -357,6 +386,7 @@ function normalizeClip(value: unknown, index: number, anchors: Record<string, nu
     start,
     end,
     effects: stringArray(object.effects),
+    position: normalizePosition(asRecord(object.position)),
   };
 }
 
@@ -378,7 +408,7 @@ function defaultInspectorFields(clips: NfClip[]): NfInspectorFields {
   const start = clip?.start ?? 0;
   const duration = clip ? clip.end - clip.start : 0;
   return {
-    position: { x: 0, y: 0 },
+    position: clip?.position ?? { x: 50, y: 50 },
     size: { w: 3840, h: 2160 },
     timing: {
       start,
@@ -491,6 +521,18 @@ function stringArray(value: unknown): string[] {
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizePosition(value: unknown): { x: number; y: number } {
+  const object = asRecord(value);
+  return {
+    x: clampPercent(finiteNumber(object.x, 50)),
+    y: clampPercent(finiteNumber(object.y, 50)),
+  };
+}
+
+function clampPercent(value: number): number {
+  return Math.min(95, Math.max(5, value));
 }
 
 export function seconds(value: number): string {

@@ -107,7 +107,7 @@ export class NfClip extends NfBase {
     this.style.setProperty("--nf-left", `${left}%`);
     this.style.setProperty("--nf-width", `${width}%`);
     const kind = (this.getAttribute("kind") ?? "scene") as ClipKind;
-    const label = this.getAttribute("label") ?? this.getAttribute("id") ?? "clip";
+    const label = escapeHtml(this.getAttribute("label") ?? this.getAttribute("id") ?? "clip");
     this.root.innerHTML = `
       <div class="clip">
         ${kind === "audio" ? `${this.wave()}<span class="lbl">${label}</span>` : label}
@@ -125,4 +125,11 @@ export class NfClip extends NfBase {
   private wave(): string {
     return `<div class="wave">${Array.from({ length: 75 }, () => "<b></b>").join("")}</div>`;
   }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

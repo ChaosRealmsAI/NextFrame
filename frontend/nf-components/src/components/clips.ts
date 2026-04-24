@@ -113,7 +113,7 @@ export class NfClips extends NfBase {
         ${episode.clips.map((clip) => `
           <div class="clip-row ${clip.id === selectedId ? "active" : ""}" data-id="${clip.id}">
             <div class="mk ${clip.kind === "audio" ? "audio" : ""}"></div>
-            <div class="nm">${clip.label}</div>
+            <div class="nm">${escapeHtml(clip.label)}</div>
             <div class="dur">${seconds(clip.end - clip.start)}</div>
           </div>
         `).join("")}
@@ -132,4 +132,11 @@ export class NfClips extends NfBase {
       });
     });
   }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

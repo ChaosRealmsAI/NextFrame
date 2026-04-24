@@ -34,7 +34,7 @@ export interface AnchorHoverDetail {
 
 export interface FieldEditDetail {
   field: string;
-  value: string;
+  value: string | Record<string, unknown>;
 }
 
 export const nfBus = new EventTarget();

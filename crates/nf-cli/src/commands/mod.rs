@@ -1160,11 +1160,12 @@ COMMON ERRORS:
         long_about = r#"Update only the clip fields supplied on the command line.
 
 USAGE:
-    nf clips update --project=<slug> --episode=<slug> --clip=<slug> [--start=<expr>] [--end=<expr>] [--label=<str>] [--effects=<csv>]
+    nf clips update --project=<slug> --episode=<slug> --clip=<slug> [--start=<expr>] [--end=<expr>] [--label=<str>] [--effects=<csv>] [--x=<percent> --y=<percent>]
 
 EXAMPLES:
     nf clips update --project=next-frame --episode=ep-01 --clip=intro --label='Opening'
     nf clips update --project=next-frame --episode=ep-01 --clip=intro --start=1.0 --end='intro-end'
+    nf clips update --project=next-frame --episode=ep-01 --clip=intro --x=42 --y=58
 
 EXPECTED JSON:
     {"slug":"intro","label":"Opening","start":1.0,"end":5.0}
@@ -1313,6 +1314,10 @@ pub struct ClipUpdateArgs {
         help = "Optional replacement comma-separated effects"
     )]
     pub effects: Option<String>,
+    #[arg(long, value_name = "PERCENT", help = "Optional title X position in percent")]
+    pub x: Option<f64>,
+    #[arg(long, value_name = "PERCENT", help = "Optional title Y position in percent")]
+    pub y: Option<f64>,
 }
 
 #[derive(Debug, Args)]

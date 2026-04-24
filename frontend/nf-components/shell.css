@@ -199,23 +199,53 @@ html[data-nextframe-native="true"] .app {
   pointer-events: none;
 }
 
+.frame .preview-copy {
+  --nf-title-x: 50%;
+  --nf-title-y: 50%;
+  position: absolute;
+  left: var(--nf-title-x);
+  top: var(--nf-title-y);
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: move;
+  z-index: 3;
+  max-width: min(86%, 920px);
+  padding: 10px 14px;
+  touch-action: none;
+}
+
+.frame .preview-copy:hover,
+.frame .preview-copy.dragging {
+  outline: 1px solid rgba(188, 140, 255, 0.75);
+  outline-offset: 6px;
+}
+
 .frame .brand {
   font-size: 54px;
   font-weight: 800;
   color: var(--fg);
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   position: relative;
   z-index: 2;
+  text-align: center;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
 }
 
 .frame .sub {
   font-size: 10.5px;
   color: var(--fg-3);
-  letter-spacing: 0.5em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   font-weight: 500;
   position: relative;
   z-index: 2;
+  text-align: center;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .frame .tc {

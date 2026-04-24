@@ -35,7 +35,11 @@ pub fn dispatch(args: ClipCommand) -> Result<(), NfError> {
                 "start": args.start,
                 "end": args.end,
                 "label": args.label,
-                "effects": args.effects.map(split_csv)
+                "effects": args.effects.map(split_csv),
+                "position": match (args.x, args.y) {
+                    (Some(x), Some(y)) => Some(json!({"x": x, "y": y})),
+                    _ => None,
+                }
             }),
         ),
         ClipSubcommand::Delete(args) => send_ipc(

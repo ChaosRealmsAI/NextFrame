@@ -37,6 +37,8 @@ export function describe() {
           type: "string",
           pattern: "^#[0-9a-fA-F]{6}$",
         },
+        title_x: { type: "number", minimum: 0, maximum: 100 },
+        title_y: { type: "number", minimum: 0, maximum: 100 },
         bg_color: {
           type: "string",
           pattern: "^#[0-9a-fA-F]{6}$",
@@ -52,6 +54,8 @@ export function sample() {
     title: "NextFrame",
     subtitle: "AI 视频引擎 · v1.1",
     accent_color: "#bc8cff",
+    title_x: 50,
+    title_y: 50,
   };
 }
 
@@ -109,12 +113,19 @@ function renderHero(t, p, vp) {
   const titleSize = Math.round(vp.h * 0.1);
   const subSize = Math.round(vp.h * 0.035);
   const gap = Math.round(vp.h * 0.02);
+  const titleX = clamp(typeof p.title_x === "number" ? p.title_x : 50, 5, 95);
+  const titleY = clamp(typeof p.title_y === "number" ? p.title_y : 50, 5, 95);
 
   const title = escapeHtml(p.title || "");
   const subtitle = escapeHtml(p.subtitle || "");
 
   return (
     '<div data-layout="hero" style="' + stageStyle(vp, accent, opacity, scale) + '">' +
+      '<div style="' +
+        'position:absolute;left:' + titleX.toFixed(2) + '%;top:' + titleY.toFixed(2) + '%;' +
+        'transform:translate(-50%,-50%);max-width:86%;' +
+        'display:flex;flex-direction:column;align-items:center;' +
+      '">' +
       '<div style="' +
         'font-size:' + titleSize + 'px;font-weight:700;letter-spacing:-0.02em;' +
         'line-height:1.05;text-align:center;' +
@@ -130,6 +141,7 @@ function renderHero(t, p, vp) {
             'opacity:' + opacity.toFixed(2) + ';' +
           '">' + subtitle + '</div>'
         : "") +
+      '</div>' +
     '</div>'
   );
 }

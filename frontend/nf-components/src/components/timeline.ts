@@ -92,7 +92,7 @@ const sheet = makeSheet(`
 
 export class NfTimeline extends NfBase {
   static get observedAttributes(): string[] {
-    return ["duration", "current-time", "zoom"];
+    return ["duration", "current-time", "zoom", "selected-id"];
   }
 
   constructor() {
@@ -122,6 +122,7 @@ export class NfTimeline extends NfBase {
     const duration = Number(this.getAttribute("duration") ?? episode.duration);
     const currentTime = Number(this.getAttribute("current-time") ?? (data.source === "ipc" ? 0 : 12));
     const sceneClips = episode.clips.filter((clip) => clip.kind === "scene");
+    const selectedId = this.getAttribute("selected-id") ?? sceneClips[0]?.id ?? "";
     const textClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "text") : TEXT_CLIPS;
     const transClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "trans" || clip.kind === "transition") : TRANS_CLIPS;
     const audioClips = data.source === "ipc"
@@ -150,17 +151,18 @@ export class NfTimeline extends NfBase {
           <nf-track kind="scene" label="画面">
             ${sceneClips.map((clip) => {
               const mockActive = data.source !== "ipc" && clip.id === "feat-2";
-              return `<nf-clip slot="clips" id="${clip.id}" kind="scene" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${mockActive ? "feat 2 · 18s" : clip.label}" ${mockActive ? "active" : ""}></nf-clip>`;
+              const active = clip.id === selectedId || mockActive;
+              return `<nf-clip slot="clips" id="${clip.id}" kind="scene" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(mockActive ? "feat 2 · 18s" : clip.label)}" ${active ? "active" : ""}></nf-clip>`;
             }).join("")}
           </nf-track>
           <nf-track kind="text" label="文字">
-            ${textClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="text" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${clip.label}"></nf-clip>`).join("")}
+            ${textClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="text" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
           </nf-track>
           <nf-track kind="trans" label="转场">
-            ${transClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="trans" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${clip.label}"></nf-clip>`).join("")}
+            ${transClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="trans" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
           </nf-track>
           <nf-track kind="audio" label="音频">
-            ${audioClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="audio" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${data.source === "ipc" ? clip.label : "bgm · -6dB"}"></nf-clip>`).join("")}
+            ${audioClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="audio" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(data.source === "ipc" ? clip.label : "bgm · -6dB")}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
           </nf-track>
           <div class="playhead" style="left: calc(100px + ${pct(currentTime, duration)});"></div>
           ${anchors.map(([name, time]) => `<nf-anchor name="${name}" time="${time}" duration="${duration}"></nf-anchor>`).join("")}
@@ -193,4 +195,12 @@ export class NfTimeline extends NfBase {
       this.emit<AnchorHoverDetail>("anchor-hover", detail);
     });
   }
+}
+
+function escapeAttr(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

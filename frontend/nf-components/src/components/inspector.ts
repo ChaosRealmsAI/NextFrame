@@ -129,6 +129,11 @@ const sheet = makeSheet(`
   .edit-row {
     display: flex; gap: 6px;
   }
+  .pos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 6px;
+  }
   .edit-input {
     min-width: 0; flex: 1;
     padding: 7px 9px;
@@ -136,6 +141,11 @@ const sheet = makeSheet(`
     border: 1px solid var(--bd);
     color: var(--fg);
     font: 11.5px var(--font);
+  }
+  .pos-grid .edit-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: var(--mono);
   }
   .mini-btn {
     padding: 0 10px;
@@ -206,6 +216,7 @@ export class NfInspector extends NfBase {
     const clip = clipId ? getClip(clipId) ?? fallbackClip : fallbackClip;
     const fields = episode.inspector_fields;
     const name = clip?.label ?? clipId ?? "未选择";
+    const position = clip?.position ?? fields.position;
     const duration = clip ? clip.end - clip.start : fields.timing.duration;
     const saveStatus = this.getAttribute("save-status") ?? "";
     const saveError = this.getAttribute("save-error") ?? "";
@@ -235,6 +246,14 @@ export class NfInspector extends NfBase {
               <button class="mini-btn" type="button" data-action="save-label">保存</button>
             </div>
             ${saveStatus === "failed" ? `<div class="status err">${saveError}</div>` : ""}
+          </div>
+          <div class="insp-f insp-field">
+            <div class="k"><span>位置</span><span class="tag">%</span></div>
+            <div class="pos-grid">
+              <input class="edit-input" data-field="pos-x" type="number" min="5" max="95" step="1" value="${position.x.toFixed(0)}">
+              <input class="edit-input" data-field="pos-y" type="number" min="5" max="95" step="1" value="${position.y.toFixed(0)}">
+              <button class="mini-btn" type="button" data-action="save-position">保存</button>
+            </div>
           </div>
           <div class="insp-f insp-field">
             <div class="k"><span>类型</span></div>
@@ -280,9 +299,30 @@ export class NfInspector extends NfBase {
       const input = this.root.querySelector<HTMLInputElement>("[data-field='label']");
       this.emit<FieldEditDetail>("field-edit", { field: "label", value: input?.value ?? name });
     });
+    this.root.querySelector<HTMLInputElement>("[data-field='label']")?.addEventListener("input", (event) => {
+      const input = event.currentTarget as HTMLInputElement;
+      this.emit<FieldEditDetail>("field-edit", { field: "label-preview", value: input.value });
+    });
+    this.root.querySelector("[data-action='save-position']")?.addEventListener("click", () => {
+      this.emit<FieldEditDetail>("field-edit", { field: "position", value: this.readPosition(position) });
+    });
+    this.root.querySelectorAll<HTMLInputElement>("[data-field='pos-x'], [data-field='pos-y']").forEach((input) => {
+      input.addEventListener("input", () => {
+        this.emit<FieldEditDetail>("field-edit", { field: "position-preview", value: this.readPosition(position) });
+      });
+    });
     this.root.querySelector(".export-btn")?.addEventListener("click", () => {
       this.emit<FieldEditDetail>("field-edit", { field: "export", value: "1080p H264" });
     });
+  }
+
+  private readPosition(fallback: { x: number; y: number }): { x: number; y: number } {
+    const x = Number(this.root.querySelector<HTMLInputElement>("[data-field='pos-x']")?.value ?? fallback.x);
+    const y = Number(this.root.querySelector<HTMLInputElement>("[data-field='pos-y']")?.value ?? fallback.y);
+    return {
+      x: clampPercent(x),
+      y: clampPercent(y),
+    };
   }
 }
 
@@ -292,4 +332,8 @@ function escapeAttr(value: string): string {
     .replaceAll('"', "&quot;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
+}
+
+function clampPercent(value: number): number {
+  return Number.isFinite(value) ? Math.min(95, Math.max(5, value)) : 50;
 }
