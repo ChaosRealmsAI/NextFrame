@@ -20,19 +20,21 @@
   <div class="grid" id="grid"></div>
 </main>
 <script>
-const META={currentVersion:"v0.13.0",updatedAt:"2026-04-24"};
+const META={currentVersion:"v0.14.0",updatedAt:"2026-04-24"};
 const GROUPS=[
   {id:"done",title:"已达成",items:[
     {v:"v0.10.0",title:"JSON 到在线编辑到导出闭环",date:"2026-04-24"},
     {v:"v0.11.0",title:"导出档位、真实进度、打开视频按钮",date:"2026-04-24"},
-    {v:"v0.12.0",title:"低资源导出保护和取消导出",date:"2026-04-24"}
+    {v:"v0.12.0",title:"低资源导出保护和取消导出",date:"2026-04-24"},
+    {v:"v0.13.0",title:"项目骨架治理和 spec 合入主仓",date:"2026-04-24"},
+    {v:"v0.13.1",title:"V2 showreel 恢复真实音频导出",date:"2026-04-24"}
   ]},
   {id:"current",title:"进行中",items:[
-    {v:"v0.13.0",title:"项目骨架治理和 spec 合入主仓",date:"2026-04-24"}
+    {v:"v0.14.0",title:"V2 语音字幕预览编辑导出闭环",date:"2026-04-24"}
   ]},
   {id:"planned",title:"未来规划",items:[
-    {v:"v0.14.x",title:"代码边界重构和 crate 职责瘦身",date:"planned"},
-    {v:"v0.15.x",title:"更高上限的 JSON/component authoring",date:"planned"}
+    {v:"v0.15.x",title:"代码边界重构和 crate 职责瘦身",date:"planned"},
+    {v:"v0.16.x",title:"更高上限的 JSON/component authoring",date:"planned"}
   ]}
 ];
 document.querySelector("#meta").textContent=`current ${META.currentVersion} · updated ${META.updatedAt}`;

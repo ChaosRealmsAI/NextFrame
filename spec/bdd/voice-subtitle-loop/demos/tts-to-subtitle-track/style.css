@@ -1,0 +1,19 @@
+@import "../../../../design/tokens.css";
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #080b0f; color: #f7f7fb; font: 14px/1.5 Inter, system-ui, sans-serif; }
+.demo-shell { width: min(900px, 94vw); padding: 18px; border: 1px solid rgba(112, 255, 201, .28); background: #101319; position: relative; }
+.grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 16px; min-height: 360px; }
+.panel { border: 1px solid rgba(255,255,255,.1); padding: 20px; background: rgba(255,255,255,.035); }
+h1 { margin: 0 0 18px; font-size: 14px; color: #a8f2d3; text-transform: uppercase; letter-spacing: .08em; }
+p { font-size: 24px; line-height: 1.35; margin: 0; font-weight: 750; }
+.wave { height: 110px; margin-top: 20px; background: repeating-linear-gradient(90deg, #70ffc9 0 6px, transparent 6px 18px); clip-path: polygon(0 45%, 6% 22%, 12% 62%, 18% 28%, 25% 70%, 34% 20%, 44% 64%, 52% 30%, 63% 76%, 72% 24%, 81% 60%, 90% 32%, 100% 52%, 100% 100%, 0 100%); animation: glow 10s infinite; }
+.words { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.word { padding: 7px 10px; background: rgba(177,140,255,.18); border: 1px solid rgba(177,140,255,.45); }
+.word.active { background: #f7f3ff; color: #151018; }
+.progress { height: 4px; margin-top: 16px; background: rgba(255,255,255,.12); }
+.progress span { display: block; height: 100%; width: 0; background: #70ffc9; animation: bar 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 34px; opacity: 0; background: #f7f3ff; color: #181221; padding: 9px 12px; font-weight: 700; animation: toast 10s infinite; }
+@keyframes bar { to { width: 100%; } }
+@keyframes glow { 30%, 70% { filter: drop-shadow(0 0 22px rgba(112,255,201,.55)); } }
+@keyframes toast { 82%, 96% { opacity: 1; transform: translateY(0); } 0%, 80%, 100% { opacity: 0; transform: translateY(8px); } }

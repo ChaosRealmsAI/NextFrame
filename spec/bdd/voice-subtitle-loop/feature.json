@@ -1,0 +1,17 @@
+{
+  "feature": "voice-subtitle-loop",
+  "name": "语音字幕预览编辑导出闭环",
+  "summary": "v2 composition 中 audio/subtitle 轨道成对进入桌面端，播放时能听到语音并看到同步字幕，编辑后保存到 JSON，导出 MP4 与预览一致。",
+  "status": "spec",
+  "scenarios": [
+    "paired-tracks-visible",
+    "tts-to-subtitle-track",
+    "playback-sync",
+    "edit-subtitle-live",
+    "export-audio-subtitle"
+  ],
+  "completion": {
+    "total": 5,
+    "done": 0
+  }
+}

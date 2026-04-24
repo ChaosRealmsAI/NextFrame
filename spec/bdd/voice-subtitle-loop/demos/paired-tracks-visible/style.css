@@ -1,0 +1,21 @@
+@import "../../../../design/tokens.css";
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #090911; color: #f5f0ff; font: 14px/1.4 Inter, system-ui, sans-serif; }
+.demo-shell { width: min(960px, 94vw); border: 1px solid rgba(166, 126, 255, .32); background: #101018; padding: 18px; position: relative; overflow: hidden; }
+.stage { display: grid; grid-template-columns: 1fr 250px; gap: 14px; min-height: 280px; }
+.preview { display: grid; place-items: center; background: linear-gradient(135deg, #071011, #121331); border: 1px solid rgba(255,255,255,.08); font-size: 28px; font-weight: 700; }
+.inspector { border-left: 2px solid #a77dff; background: rgba(255,255,255,.04); padding: 18px; display: grid; gap: 12px; align-content: start; }
+.inspector span { color: #b9afd7; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+.inspector code { color: #70ffc9; white-space: normal; }
+.timeline { margin-top: 18px; display: grid; gap: 8px; }
+.row { height: 32px; display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 10px; }
+.label { color: #d9d0ff; font-weight: 700; }
+.clip { height: 100%; border: 1px solid #aa90ff; background: rgba(76, 192, 168, .42); padding: 7px 10px; animation: pulse 9s infinite; }
+.row:nth-child(4) .clip, .row:nth-child(5) .clip { background: rgba(255, 202, 102, .32); }
+.progress { height: 4px; margin-top: 16px; background: rgba(255,255,255,.12); }
+.progress span { display: block; height: 100%; width: 0; background: #b18cff; animation: bar 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 34px; opacity: 0; background: #f7f3ff; color: #181221; padding: 9px 12px; font-weight: 700; animation: toast 10s infinite; }
+@keyframes bar { to { width: 100%; } }
+@keyframes toast { 82%, 96% { opacity: 1; transform: translateY(0); } 0%, 80%, 100% { opacity: 0; transform: translateY(8px); } }
+@keyframes pulse { 35%, 55% { filter: brightness(1.35); } }

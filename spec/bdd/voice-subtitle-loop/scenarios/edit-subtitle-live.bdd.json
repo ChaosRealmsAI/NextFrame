@@ -1,0 +1,31 @@
+{
+  "id": "edit-subtitle-live",
+  "given": "用户选中了 subtitle-main 轨，右侧 inspector 展示字幕文本、样式和时间字段。",
+  "when": "用户修改一句字幕、调整 y 位置或时间点，并保存 composition。",
+  "then": "预览字幕立即更新，保存后的 JSON 包含新文本/样式/时间；再次导出时使用保存后的字幕。",
+  "human_actions": [
+    "select subtitle track",
+    "edit text",
+    "edit style y",
+    "save composition",
+    "reopen and verify"
+  ],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition patch --project v2-showcase --composition showreel-24s --track subtitle-main --field params.words.0.text --value 'JSON edits become live captions'",
+      "expected": "composition JSON is patched"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition patch --project v2-showcase --composition showreel-24s --track subtitle-main --field style.y --value 82",
+      "expected": "subtitle y position is saved"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-stage::shadow [data-subtitle-active]' --get outerHTML",
+      "expected": "preview text reflects saved subtitle edit"
+    }
+  ],
+  "demo": "spec/bdd/voice-subtitle-loop/demos/edit-subtitle-live/index.html"
+}

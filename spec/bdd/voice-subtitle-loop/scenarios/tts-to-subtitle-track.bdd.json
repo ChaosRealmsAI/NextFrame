@@ -1,0 +1,25 @@
+{
+  "id": "tts-to-subtitle-track",
+  "given": "AI 生成一段旁白文本，并拿到 TTS 音频路径与词级/句级时间轴。",
+  "when": "composition JSON 写入一个 audio track 和一个 subtitle track，二者通过同一组 anchors 或相同 start/end 对齐。",
+  "then": "桌面端能从 JSON 加载出音频轨、字幕轨和每个 word/cue 的时间点，不需要额外手工配置。",
+  "human_actions": [
+    "generate narration",
+    "load composition",
+    "select subtitle track",
+    "verify cue list"
+  ],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --field tracks",
+      "expected": "tracks include paired audio/subtitle entries with matching timing"
+    },
+    {
+      "tool": "state",
+      "command": "jq '.tracks[] | select(.id==\"subtitle-main\") | .params.words | length' ~/.nextframe/v2-showcase/compositions/showreel-24s.json",
+      "expected": "word/cue count is greater than 0"
+    }
+  ],
+  "demo": "spec/bdd/voice-subtitle-loop/demos/tts-to-subtitle-track/index.html"
+}

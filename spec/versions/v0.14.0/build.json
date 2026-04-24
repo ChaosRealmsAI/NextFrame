@@ -1,0 +1,89 @@
+{
+  "$type": "version-build",
+  "version": "v0.14.0",
+  "title": "Voice and subtitle preview edit export loop",
+  "session": "codex-2026-04-24-v014-spec",
+  "status": "ready",
+  "inputs": {
+    "spec": "spec/versions/v0.14.0/spec.json",
+    "bdd": "spec/bdd/voice-subtitle-loop/feature.json"
+  },
+  "tasks": [
+    {
+      "id": "T-01",
+      "title": "Compile audio and subtitle tracks from v2 JSON",
+      "owner": "composition-runtime",
+      "status": "pending",
+      "paths": [
+        "crates/nf-project/src/lib.rs",
+        "crates/nf-cli/src/commands/compositions.rs"
+      ],
+      "verify": [
+        "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track voice-main",
+        "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track subtitle-main"
+      ]
+    },
+    {
+      "id": "T-02",
+      "title": "Represent TTS output as paired voice/subtitle tracks in showreel JSON",
+      "owner": "example-content",
+      "status": "pending",
+      "paths": [
+        "examples/v2-showcase/compositions/showreel-24s.json",
+        "examples/v2-showcase/project.json"
+      ],
+      "verify": [
+        "jq '.tracks[] | select(.id==\"subtitle-main\") | .params.words | length' examples/v2-showcase/compositions/showreel-24s.json"
+      ]
+    },
+    {
+      "id": "T-03",
+      "title": "Render synced subtitle overlay during desktop playback",
+      "owner": "frontend-preview",
+      "status": "pending",
+      "paths": [
+        "frontend/nf-components/src/index.ts",
+        "frontend/nf-components/src/components/timeline.ts"
+      ],
+      "verify": [
+        "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-stage::shadow [data-subtitle-active]' --get outerHTML"
+      ]
+    },
+    {
+      "id": "T-04",
+      "title": "Edit subtitle text/time/style live and save to JSON",
+      "owner": "frontend-editor",
+      "status": "pending",
+      "paths": [
+        "frontend/nf-components/src/components/inspector.ts",
+        "frontend/nf-components/src/storage.ts",
+        "crates/nf-shell/src/handlers/compositions.rs"
+      ],
+      "verify": [
+        "target/debug/nf composition patch --project v2-showcase --composition showreel-24s --track subtitle-main --field params.words.0.text --value 'JSON edits become live captions'"
+      ]
+    },
+    {
+      "id": "T-05",
+      "title": "Export audible subtitled MP4 from saved composition",
+      "owner": "export-verification",
+      "status": "pending",
+      "paths": [
+        "crates/nf-cli/src/commands/export_cmd.rs",
+        "crates/nf-project/src/lib.rs"
+      ],
+      "verify": [
+        "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events --out tmp/v0.14.0/showreel-subtitle-audio.mp4",
+        "ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,duration,bit_rate -of json tmp/v0.14.0/showreel-subtitle-audio.mp4",
+        "ffmpeg -y -ss 00:00:04 -i tmp/v0.14.0/showreel-subtitle-audio.mp4 -frames:v 1 tmp/v0.14.0/showreel-subtitle-frame.png"
+      ]
+    }
+  ],
+  "closeout_required": [
+    "Update spec/versions/v0.14.0/build.json task statuses with evidence",
+    "Update CLAUDE.md if new AI verification commands are added",
+    "Append devlog Execute/Retro entries",
+    "Run structure gate and key build checks",
+    "Commit and push"
+  ]
+}

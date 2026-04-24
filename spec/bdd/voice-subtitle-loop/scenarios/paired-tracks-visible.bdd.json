@@ -1,0 +1,31 @@
+{
+  "id": "paired-tracks-visible",
+  "given": "v2-showcase/showreel-24s 已包含 html/canvas/svg 视觉轨和成对 voice/subtitle 轨。",
+  "when": "用户在桌面端打开 composition 并查看底部时间线。",
+  "then": "时间线按一行一个轨道展示 voice/subtitle 轨，选中后右侧 inspector 能看到 audio src、subtitle words、time、style 等字段。",
+  "human_actions": [
+    "open composition",
+    "look at timeline",
+    "select voice track",
+    "select subtitle track",
+    "inspect editable fields"
+  ],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track voice-main",
+      "expected": "JSON contains type audio, src, time.start, time.end"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track subtitle-main",
+      "expected": "JSON contains type subtitle, params.words, style, time"
+    },
+    {
+      "tool": "screenshot",
+      "command": "target/debug/nf screenshot --project v2-showcase --episode showreel-24s --region editor --out tmp/v0.14.0/paired-tracks-visible.png",
+      "expected": "timeline contains separate voice and subtitle lanes"
+    }
+  ],
+  "demo": "spec/bdd/voice-subtitle-loop/demos/paired-tracks-visible/index.html"
+}

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tts to subtitle track</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="demo-shell">
+      <section class="grid">
+        <div class="panel">
+          <h1>TTS text</h1>
+          <p id="script"></p>
+        </div>
+        <div class="panel">
+          <h1>composition tracks</h1>
+          <div class="wave"></div>
+          <div class="words" id="words"></div>
+        </div>
+      </section>
+      <div class="progress"><span></span></div>
+      <div class="toast">本轮完成</div>
+    </main>
+    <script type="module" src="./animation.js"></script>
+  </body>
+</html>

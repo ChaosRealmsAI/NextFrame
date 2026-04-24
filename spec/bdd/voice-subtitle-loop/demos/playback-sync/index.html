@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>playback sync</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="demo-shell">
+      <section class="stage">
+        <div class="signal"></div>
+        <div class="subtitle" id="subtitle"></div>
+      </section>
+      <section class="transport">
+        <button>▶</button>
+        <div class="rail"><span class="playhead"></span></div>
+      </section>
+      <div class="progress"><span></span></div>
+      <div class="toast">本轮完成</div>
+    </main>
+    <script type="module" src="./animation.js"></script>
+  </body>
+</html>

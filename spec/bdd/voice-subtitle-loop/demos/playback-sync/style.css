@@ -1,0 +1,19 @@
+@import "../../../../design/tokens.css";
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #090914; color: #fff; font: 14px/1.4 Inter, system-ui, sans-serif; }
+.demo-shell { width: min(900px, 94vw); padding: 18px; border: 1px solid rgba(255,255,255,.12); background: #0f101a; position: relative; }
+.stage { height: 420px; position: relative; overflow: hidden; background: linear-gradient(135deg, #080d14, #171434); border: 1px solid rgba(255,255,255,.08); }
+.signal { width: 140px; height: 86px; background: #70ffc9; position: absolute; left: 16%; top: 24%; animation: drift 10s ease-in-out infinite; box-shadow: 0 0 45px rgba(112,255,201,.45); }
+.subtitle { position: absolute; left: 50%; bottom: 42px; transform: translateX(-50%); min-width: 520px; text-align: center; font-size: 30px; font-weight: 800; padding: 12px 18px; background: rgba(0,0,0,.52); border: 1px solid rgba(255,255,255,.18); }
+.transport { display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: center; margin-top: 14px; }
+button { height: 42px; border: 0; background: #f7f3ff; color: #151018; font-weight: 900; }
+.rail { height: 6px; background: rgba(255,255,255,.16); position: relative; }
+.playhead { position: absolute; top: -7px; width: 4px; height: 20px; background: #ffca66; animation: scrub 10s linear infinite; }
+.progress { height: 4px; margin-top: 16px; background: rgba(255,255,255,.12); }
+.progress span { display: block; height: 100%; width: 0; background: #ffca66; animation: bar 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 34px; opacity: 0; background: #f7f3ff; color: #181221; padding: 9px 12px; font-weight: 700; animation: toast 10s infinite; }
+@keyframes drift { 50% { left: 70%; transform: scale(1.22); } }
+@keyframes scrub { to { left: calc(100% - 4px); } }
+@keyframes bar { to { width: 100%; } }
+@keyframes toast { 82%, 96% { opacity: 1; transform: translateY(0); } 0%, 80%, 100% { opacity: 0; transform: translateY(8px); } }

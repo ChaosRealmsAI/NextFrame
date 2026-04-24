@@ -1,0 +1,31 @@
+{
+  "id": "export-audio-subtitle",
+  "given": "composition 已保存最新 audio/subtitle 轨道和字幕编辑。",
+  "when": "用户点击导出视频或 CLI 运行 draft/final 导出。",
+  "then": "导出的 MP4 有 AAC 音轨，画面中烧进最新字幕；source sidecar 与保存后的 JSON 一致。",
+  "human_actions": [
+    "click export",
+    "watch progress",
+    "open exported video",
+    "hear narration",
+    "see edited subtitles"
+  ],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events --out tmp/v0.14.0/showreel-subtitle-audio.mp4",
+      "expected": "export summary reports audio_muxed=true"
+    },
+    {
+      "tool": "state",
+      "command": "ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,duration,bit_rate -of json tmp/v0.14.0/showreel-subtitle-audio.mp4",
+      "expected": "codec_name is aac and duration is close to composition duration"
+    },
+    {
+      "tool": "state",
+      "command": "ffmpeg -y -ss 00:00:04 -i tmp/v0.14.0/showreel-subtitle-audio.mp4 -frames:v 1 tmp/v0.14.0/showreel-subtitle-frame.png",
+      "expected": "captured frame contains the current subtitle text"
+    }
+  ],
+  "demo": "spec/bdd/voice-subtitle-loop/demos/export-audio-subtitle/index.html"
+}

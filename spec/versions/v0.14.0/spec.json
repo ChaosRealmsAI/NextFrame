@@ -1,0 +1,199 @@
+{
+  "$type": "version-spec",
+  "version": "v0.14.0",
+  "title": "Voice and subtitle preview edit export loop",
+  "created_at": "2026-04-24 21:01",
+  "session": "codex-2026-04-24-v014-spec",
+  "phase": "spec",
+  "status": "ready-for-build",
+  "inputs": {
+    "kickoff": "spec/versions/v0.14.0/kickoff/version-level.json",
+    "bdd": "spec/bdd/voice-subtitle-loop/feature.json",
+    "previous_evidence": "spec/devlog/02.md#v0.13.1"
+  },
+  "scope": {
+    "do": [
+      "v2 composition 支持成对 audio/subtitle 轨道，并继续从保存后的 JSON 编译预览和导出 source",
+      "TTS 产物以 audio src + subtitle words/cues 的形式进入 composition JSON",
+      "桌面端播放时能听到语音，并在 preview stage 中显示当前时间对应字幕",
+      "subtitle 轨可在 inspector 中编辑文本、时间和样式，改动能保存回 JSON 并实时预览",
+      "导出 MP4 同时包含 AAC 音轨和烧进画面的最新字幕",
+      "showreel-24s 作为本版端到端样例，展示 voice/subtitle 轨道和导出闭环"
+    ],
+    "do_not": [
+      "不做云导出",
+      "不做字幕模板市场",
+      "不重做 export recorder 架构",
+      "不引入 iframe",
+      "不引入 React、Vue、Electron 或新的前端框架",
+      "不把生成音频文件纳入 git 跟踪"
+    ]
+  },
+  "verify_points": [
+    {
+      "id": "V-01",
+      "text": "桌面端打开 showreel-24s 后，底部时间线能看到 voice/subtitle 独立轨道，选中后 inspector 能读到对应字段。",
+      "scenario": "spec/bdd/voice-subtitle-loop/scenarios/paired-tracks-visible.bdd.json"
+    },
+    {
+      "id": "V-02",
+      "text": "TTS 文本、音频路径、词级/句级时间轴能进入同一份 composition JSON，并形成成对 audio/subtitle 轨。",
+      "scenario": "spec/bdd/voice-subtitle-loop/scenarios/tts-to-subtitle-track.bdd.json"
+    },
+    {
+      "id": "V-03",
+      "text": "桌面端点击播放时能听到语音，预览字幕随 playhead 或 scrub 当前时间同步变化。",
+      "scenario": "spec/bdd/voice-subtitle-loop/scenarios/playback-sync.bdd.json"
+    },
+    {
+      "id": "V-04",
+      "text": "用户在线修改字幕文本、位置或时间后，预览立即更新，保存后的 JSON 也同步更新。",
+      "scenario": "spec/bdd/voice-subtitle-loop/scenarios/edit-subtitle-live.bdd.json"
+    },
+    {
+      "id": "V-05",
+      "text": "导出的 MP4 有 AAC 音轨，画面中包含最新字幕，source sidecar 与保存后的 JSON 一致。",
+      "scenario": "spec/bdd/voice-subtitle-loop/scenarios/export-audio-subtitle.bdd.json"
+    }
+  ],
+  "items": [
+    {
+      "id": "S-01",
+      "kind": "composition-runtime",
+      "title": "Compile audio and subtitle tracks from v2 JSON",
+      "status": "pending",
+      "verify_point": "V-01",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track voice-main",
+          "expected": "audio track contains src and timing"
+        },
+        {
+          "tool": "state",
+          "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track subtitle-main",
+          "expected": "subtitle track contains words/cues and timing"
+        }
+      ],
+      "citations": [
+        { "path": "crates/nf-project/src/lib.rs", "commit": null },
+        { "path": "crates/nf-cli/src/commands/compositions.rs", "commit": null }
+      ],
+      "evidence": null
+    },
+    {
+      "id": "S-02",
+      "kind": "tts-json-contract",
+      "title": "Represent TTS output as paired voice/subtitle tracks",
+      "status": "pending",
+      "verify_point": "V-02",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "jq '.tracks[] | select(.id==\"subtitle-main\") | .params.words | length' examples/v2-showcase/compositions/showreel-24s.json",
+          "expected": "word/cue count is greater than 0"
+        }
+      ],
+      "citations": [
+        { "path": "examples/v2-showcase/compositions/showreel-24s.json", "commit": null },
+        { "path": "examples/v2-showcase/project.json", "commit": null }
+      ],
+      "evidence": null
+    },
+    {
+      "id": "S-03",
+      "kind": "preview",
+      "title": "Render synced subtitle overlay during desktop playback",
+      "status": "pending",
+      "verify_point": "V-03",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf open --project v2-showcase --composition showreel-24s --t 2",
+          "expected": "desktop preview opens at a subtitle-bearing timestamp"
+        },
+        {
+          "tool": "state",
+          "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-stage::shadow [data-subtitle-active]' --get outerHTML",
+          "expected": "active subtitle text changes with playback time"
+        }
+      ],
+      "citations": [
+        { "path": "frontend/nf-components/src/index.ts", "commit": null },
+        { "path": "frontend/nf-components/src/components/timeline.ts", "commit": null }
+      ],
+      "evidence": null
+    },
+    {
+      "id": "S-04",
+      "kind": "editor",
+      "title": "Edit subtitle fields live and save back to JSON",
+      "status": "pending",
+      "verify_point": "V-04",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf composition patch --project v2-showcase --composition showreel-24s --track subtitle-main --field params.words.0.text --value 'JSON edits become live captions'",
+          "expected": "saved composition contains the edited caption"
+        },
+        {
+          "tool": "screenshot",
+          "command": "target/debug/nf screenshot --project v2-showcase --episode showreel-24s --region preview --out tmp/v0.14.0/edit-subtitle-live.png",
+          "expected": "preview shows edited subtitle text"
+        }
+      ],
+      "citations": [
+        { "path": "frontend/nf-components/src/components/inspector.ts", "commit": null },
+        { "path": "frontend/nf-components/src/storage.ts", "commit": null },
+        { "path": "crates/nf-shell/src/handlers/compositions.rs", "commit": null }
+      ],
+      "evidence": null
+    },
+    {
+      "id": "S-05",
+      "kind": "export",
+      "title": "Export saved voice/subtitle composition to audible subtitled MP4",
+      "status": "pending",
+      "verify_point": "V-05",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events --out tmp/v0.14.0/showreel-subtitle-audio.mp4",
+          "expected": "export succeeds and summary includes audio_muxed=true"
+        },
+        {
+          "tool": "state",
+          "command": "ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,duration,bit_rate -of json tmp/v0.14.0/showreel-subtitle-audio.mp4",
+          "expected": "codec_name is aac"
+        }
+      ],
+      "citations": [
+        { "path": "crates/nf-cli/src/commands/export_cmd.rs", "commit": null },
+        { "path": "crates/nf-project/src/lib.rs", "commit": null }
+      ],
+      "evidence": null
+    }
+  ],
+  "poc_topics": [],
+  "poc_decision": "N/A: v0.13.1 already proved local audio can be resolved from v2 JSON and muxed into exported MP4. v0.14.0 is a product integration build: add subtitle track contract, preview sync, editor save path, and export verification.",
+  "fixed_docs_review": {
+    "spec/charter.md": "no change; core product principle remains JSON composition to preview/edit/export",
+    "spec/architecture.md": "no structural change at spec time; build may update if subtitle renderer introduces a new named module boundary",
+    "spec/milestones.html": "updated current version to v0.14.0 and moved v0.13.x product skeleton/audio proof into completed milestones",
+    "spec/design/DESIGN.md": "no change; existing track colors/inspector language cover audio and subtitle lanes",
+    "README.md": "no change until implementation exposes verified user-facing behavior",
+    "CLAUDE.md": "no new CLI contract in spec; build must update if new verification commands are added"
+  },
+  "quality_review": {
+    "standards": "spec/standards/00-index.md",
+    "decision": "不新增质量维度。现有 G3(AI 可操作)、P2(预览/导出一致)、P3(设计 token)、P4(零框架)覆盖本版风险。",
+    "required_before_close": "必须跑 JSON schema/basic validation、cargo check/build key crates、frontend npm check/build、desktop preview smoke、ffprobe 音轨检查、导出帧截图字幕检查。"
+  },
+  "status_flags": {
+    "kickoff_done": true,
+    "bdd_done": true,
+    "spec_done": true,
+    "poc_done": true,
+    "ready_for_build": true
+  }
+}

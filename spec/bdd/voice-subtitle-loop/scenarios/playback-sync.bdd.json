@@ -1,0 +1,31 @@
+{
+  "id": "playback-sync",
+  "given": "桌面端已经打开带 voice/subtitle 轨的 v2 composition。",
+  "when": "用户点击播放并拖动到 2s、8s、16s 附近。",
+  "then": "WebView 中能听到语音，预览画面显示当前时间对应字幕；暂停/拖动后字幕状态跟随 playhead 更新。",
+  "human_actions": [
+    "click play",
+    "listen to narration",
+    "watch active subtitle",
+    "scrub timeline",
+    "verify subtitle changes"
+  ],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf open --project v2-showcase --composition showreel-24s --t 2",
+      "expected": "desktop preview opens at a subtitle-bearing timestamp"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-stage::shadow [data-subtitle-active]' --get outerHTML",
+      "expected": "active subtitle text is not empty during playback"
+    },
+    {
+      "tool": "screenshot",
+      "command": "target/debug/nf screenshot --project v2-showcase --episode showreel-24s --region preview --out tmp/v0.14.0/playback-sync.png",
+      "expected": "preview shows a subtitle over the video stage"
+    }
+  ],
+  "demo": "spec/bdd/voice-subtitle-loop/demos/playback-sync/index.html"
+}
