@@ -482,6 +482,7 @@ function activeClipsAt(data: NfMockData, time: number, kind: NfDataClip["kind"])
 function applyPreviewFrame(data: NfMockData, time: number, scene: NfDataClip | undefined): void {
   const frame = document.querySelector<HTMLElement>("[data-nf-preview-frame]");
   if (!frame) return;
+  frame.classList.toggle("v2-composition", compositionSource != null);
   const accent = validColor(scene?.accent_color) ? scene!.accent_color! : "#5eead4";
   const bg = validColor(scene?.bg_color) ? scene!.bg_color! : "#07080d";
   frame.style.setProperty("--nf-preview-accent", accent);
@@ -552,6 +553,16 @@ function renderCompositionPreview(root: HTMLElement, source: NfRuntimeSource, ti
   const timeMs = timeSeconds * 1000;
   const active = activeCompositionTracks(source, timeMs);
   const activeKeys = new Set(active.map((item) => item.key));
+  const viewport = compositionViewport(source);
+  const rootRect = root.getBoundingClientRect();
+  const scale = Math.min(
+    rootRect.width / viewport.w,
+    rootRect.height / viewport.h,
+  );
+  const scaledWidth = viewport.w * scale;
+  const scaledHeight = viewport.h * scale;
+  const left = (rootRect.width - scaledWidth) / 2;
+  const top = (rootRect.height - scaledHeight) / 2;
   for (const [key, mounted] of Array.from(mountedComposition.entries())) {
     if (activeKeys.has(key)) continue;
     try { mounted.api.destroy?.(mounted.root); } catch (error) { console.error(error); }
@@ -569,7 +580,6 @@ function renderCompositionPreview(root: HTMLElement, source: NfRuntimeSource, ti
       el.dataset.nfComponentTrack = item.trackId;
       el.dataset.nfComponent = item.component;
       el.style.position = "absolute";
-      el.style.inset = "0";
       el.style.zIndex = String(item.z);
       el.style.overflow = "hidden";
       el.style.pointerEvents = "auto";
@@ -578,9 +588,22 @@ function renderCompositionPreview(root: HTMLElement, source: NfRuntimeSource, ti
       mountedComposition.set(item.key, mounted);
       try { api.mount?.(el, item.ctx); } catch (error) { console.error(error); }
     }
+    mounted.root.style.left = `${left}px`;
+    mounted.root.style.top = `${top}px`;
+    mounted.root.style.width = `${viewport.w}px`;
+    mounted.root.style.height = `${viewport.h}px`;
+    mounted.root.style.transformOrigin = "top left";
+    mounted.root.style.transform = `scale(${scale})`;
     mounted.root.style.zIndex = String(item.z);
     try { api.update?.(mounted.root, item.ctx); } catch (error) { console.error(error); }
   }
+}
+
+function compositionViewport(source: NfRuntimeSource): { w: number; h: number } {
+  const raw = source.viewport ?? {};
+  const w = typeof raw.w === "number" && Number.isFinite(raw.w) && raw.w > 0 ? raw.w : 1920;
+  const h = typeof raw.h === "number" && Number.isFinite(raw.h) && raw.h > 0 ? raw.h : 1080;
+  return { w, h };
 }
 
 function activeCompositionTracks(source: NfRuntimeSource, timeMs: number): Array<{

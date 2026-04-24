@@ -173,7 +173,9 @@ html[data-nextframe-native="true"] .app {
 .frame {
   --nf-preview-bg: #0b0b10;
   --nf-preview-accent: #5eead4;
-  width: 82%;
+  width: min(92%, calc((100vh - 360px) * 16 / 9));
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
   aspect-ratio: 16 / 9;
   background:
     radial-gradient(ellipse 60% 60% at 50% 50%, color-mix(in srgb, var(--nf-preview-accent) 18%, transparent), transparent 70%),
@@ -194,6 +196,16 @@ html[data-nextframe-native="true"] .app {
   inset: 0;
   pointer-events: none;
   z-index: 4;
+}
+
+.frame.v2-composition {
+  background: #05070a;
+}
+
+.frame.v2-composition .preview-copy,
+.frame.v2-composition .tc,
+.frame.v2-composition .cn {
+  display: none;
 }
 
 .preview-text-layer,

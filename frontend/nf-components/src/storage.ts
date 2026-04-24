@@ -15,6 +15,8 @@ export interface NfClip {
   label: string;
   kind: ClipKind;
   track: number;
+  track_id?: string | undefined;
+  component?: string | undefined;
   start: number;
   end: number;
   effects: string[];
@@ -560,8 +562,10 @@ function normalizeCompositionData(project: RealProject, compositionSlug: string,
       clips.push({
         id,
         label: stringValue(componentParams.title) ?? stringValue(params.component) ?? id,
-        kind: track.kind === "audio" ? "audio" : track.kind === "subtitle" ? "subtitle" : "scene",
+        kind: track.kind === "audio" ? "audio" : track.kind === "subtitle" ? "subtitle" : track.kind === "component" ? "component" : "scene",
         track: finiteNumber(track.z, clips.length),
+        track_id: stringValue(track.id) ?? id,
+        component: stringValue(params.component),
         start: begin / 1000,
         end: end / 1000,
         effects: track.kind === "component" ? ["v2 component"] : [],
@@ -728,6 +732,7 @@ function resolveTime(value: unknown, anchors: Record<string, number>, fallback: 
 }
 
 function normalizeKind(value: string): ClipKind {
+  if (value === "component") return "component";
   if (value === "audio") return "audio";
   if (value === "subtitle") return "subtitle";
   if (value === "text") return "text";
