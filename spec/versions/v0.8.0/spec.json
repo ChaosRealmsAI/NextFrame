@@ -1,0 +1,111 @@
+{
+  "version": "v0.8.0",
+  "title": "Timeline v0.8 · 轨道承载一切 · scene track 最小闭环",
+  "phase": "spec",
+  "status": "draft",
+
+  "inputs": {
+    "kickoff": "spec/versions/v0.8.0/kickoff/version-level.json",
+    "bdd": "spec/bdd/timeline-v08/feature.json",
+    "schema": "spec/contracts/timeline-v08.schema.json",
+    "reference_src": "reference/v0.x-final/src/nf-tracks/community/"
+  },
+
+  "outputs": {
+    "sample_json": "spec/versions/v0.8.0/samples/sample-3-scene.json",
+    "new_crate": "crates/nf-timeline/ (Rust parser + anchor resolver)",
+    "frontend_runtime": "frontend/nf-runtime/src/timeline/ (TS · track lifecycle)",
+    "migrated_scenes": "frontend/nf-tracks/community/{hero-centered.js, quote.js, metric-grid.js}",
+    "cli_cmds": "nf timeline {parse, lint, open, seek} + nf capture(已有)"
+  },
+
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "schema + JSON Schema 校验器",
+      "deliverable": "spec/contracts/timeline-v08.schema.json(已定 · 待锁)· crates/nf-timeline/src/schema.rs 用 jsonschema crate 加载 + validate",
+      "deps": [],
+      "ai_tools": ["cargo test -p nf-timeline --lib schema::"],
+      "status": "pending"
+    },
+    {
+      "id": "T2",
+      "title": "timeline parser + anchor resolver",
+      "deliverable": "crates/nf-timeline/src/{parser.rs, resolver.rs} · parse JSON → typed · resolve anchorRef('demo.begin') → u64 ms · 禁表达式",
+      "deps": ["T1"],
+      "ai_tools": ["cargo test -p nf-timeline --lib resolver::", "nf timeline parse sample.json --json"],
+      "status": "pending"
+    },
+    {
+      "id": "T3",
+      "title": "3 scene 组件迁移(community · zero-import Track ABI v1.1)",
+      "deliverable": "frontend/nf-tracks/community/ · hero-centered.js / quote.js / metric-grid.js · 从 reference/v0.x-final/src/nf-tracks/community/ 搬 · 保持 {describe, sample, render} 3 export · render pure",
+      "deps": [],
+      "ai_tools": ["node scripts/check-abi.mjs frontend/nf-tracks/community/*.js"],
+      "status": "pending"
+    },
+    {
+      "id": "T4",
+      "title": "frontend runtime · playhead 驱动 Track lifecycle",
+      "deliverable": "frontend/nf-runtime/src/timeline/{runtime.ts, track-loader.ts} · mount/update/compose 3 阶 · diffAndMount 按 playhead 切 clip",
+      "deps": ["T2", "T3"],
+      "ai_tools": ["npm test -- frontend/nf-runtime/timeline.test.ts"],
+      "status": "pending"
+    },
+    {
+      "id": "T5",
+      "title": "nf CLI · timeline 子命令",
+      "deliverable": "crates/nf-cli 加 `nf timeline {parse, lint, open, seek}` · parse/lint 调 nf-timeline crate · open/seek 经 IPC 给 nf-shell",
+      "deps": ["T2", "T4"],
+      "ai_tools": ["nf timeline --help | grep -c 'parse\\|lint\\|open\\|seek'"],
+      "status": "pending"
+    },
+    {
+      "id": "T6",
+      "title": "sample timeline.json + fixtures(invalid 3 份)",
+      "deliverable": "spec/versions/v0.8.0/samples/sample-3-scene.json(3 clip · 3 scene)+ spec/bdd/timeline-v08/fixtures/invalid-{a,b,c}.json",
+      "deps": ["T1"],
+      "ai_tools": ["nf timeline lint spec/versions/v0.8.0/samples/sample-3-scene.json"],
+      "status": "pending"
+    },
+    {
+      "id": "T7",
+      "title": "端到端自验 · 跑 BDD sc-01..sc-06",
+      "deliverable": "每 scenario ai_tools 跑过 · 截图放 tmp/v0.8.0/captures/ · dev_must 4 scenario + tested_must 6 scenario 全 passed",
+      "deps": ["T3", "T4", "T5", "T6"],
+      "ai_tools": ["bash spec/bdd/timeline-v08/run-all.sh"],
+      "status": "pending"
+    }
+  ],
+
+  "dag": {
+    "wave_1": ["T1", "T3"],
+    "wave_2": ["T2", "T6"],
+    "wave_3": ["T4"],
+    "wave_4": ["T5"],
+    "wave_5": ["T7"]
+  },
+
+  "poc_topics": [
+    {
+      "id": "poc-scene-abi-port",
+      "title": "reference/v0.x-final/nf-tracks/community/ 3 scene 能否直接 copy 到 frontend/nf-tracks/ 不改代码跑通?",
+      "why": "Track ABI v1.1 是 zero-import + 3 export · 按理可 drop-in · 但 render 调用签名 + WebView host 环境可能 drift · 先验"
+    },
+    {
+      "id": "poc-rust-schema-lib",
+      "title": "Rust 端 JSON Schema 校验用 jsonschema vs 手写 vs schemars · 哪个最轻?",
+      "why": "parser 想轻 · 不引大依赖"
+    }
+  ],
+
+  "open_questions": [
+    "crates/nf-timeline/ 独立 crate vs 放 nf-core-engine 子模块?→ 建议独立 · 跨版本复用",
+    "frontend 里 timeline runtime 跟 v0.5.0 的 mock-html 播放器怎么共存?→ 新 runtime 纯 JS schema-driven · mock-html 保留作 fallback(UnsupportedKind 降级路径)"
+  ],
+
+  "dev_must_before_build": [
+    "demos/*.html 帧模式(按 bdd-scaffold skill 铁律)· sc-05 scene-switch 帧需带真 mockup · 未产",
+    "poc_topics 2 个任选 1 验完(主推 poc-scene-abi-port · AI 尺度 15min)"
+  ]
+}

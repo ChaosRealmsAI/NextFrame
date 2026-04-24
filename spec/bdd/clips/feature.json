@@ -1,0 +1,72 @@
+{
+  "$type": "feature",
+  "feature": "clips",
+  "name": "Clips 剪切流水线",
+  "version": "v0.3.0",
+  "status": "active",
+  "design_version": "v0.1.0",
+  "plan": "归档迁 · 不重写",
+  "summary": "输入本地 mp4 → 转写/对齐 → 规划 highlight → ffmpeg 切出 highlight-*.mp4. subagent haiku 按 nf-guide/flows/clips/*.md prompt 跑 nf-source CLI 系列命令 · 全链产可播 mp4.",
+  "overview": "5 步链: download(本地兜底) → transcribe(whisperx · 可能简化) → align → plan → cut. 每步一 CLI 子命令 · prompt md 告诉 AI 怎么跑 · AI 跑 CLI · 产品代码真干活.",
+  "rules": {
+    "R1": {
+      "name": "CLI first",
+      "text": "每步都有 nf-source 子命令 · 人类能做的 AI 都能做 · 不依赖 GUI",
+      "why": "haiku 盲测必需 · subagent 只能命令行",
+      "impl": { "crate": "nf-source", "subcommands": ["download", "transcribe", "align", "plan", "cut", "preview"] }
+    },
+    "R2": {
+      "name": "本地 mp4 兜底",
+      "text": "yt-dlp 网络下载失败时 · 支持 --local-mp4 path 直接用本地文件跳过下载步",
+      "why": "haiku 不能装 yt-dlp · 用户机本地 fixture 兜底",
+      "impl": { "cli_flag": "--local-mp4 <path>", "fixture_dir": "tests/fixtures/clips/" }
+    },
+    "R3": {
+      "name": "产物内建自验",
+      "text": "nf-source verify --file output/highlight-N.mp4 exit 0 = 通过(内建 ffmpeg probe 判 duration/codec/audio)",
+      "why": "feedback_product_self_verify_builtin · 不调外部 mediainfo/ffprobe",
+      "impl": { "cli": "nf-source verify", "checks": ["duration>0", "video_codec=h264|hevc", "audio_stream_exists"] }
+    },
+    "R4": {
+      "name": "whisperx 可跳",
+      "text": "whisperx 装不上时 · --transcript path 直接用本地 srt fixture 跳过转写 · 下游步按 srt 继续",
+      "why": "whisperx 依赖 python + PyTorch 大 · haiku 装不了",
+      "impl": { "cli_flag": "--transcript <path>", "fixture_dir": "tests/fixtures/clips/" }
+    },
+    "R5": {
+      "name": "输出目录固定",
+      "text": "所有产物写 output/ 根 · 文件命名约定: highlight-{N}.mp4 / transcript.srt / plan.json",
+      "why": "主 agent 验: 固定 ls output/ 判产物齐",
+      "impl": { "output_dir": "output/", "naming": "highlight-{N}.mp4" }
+    }
+  },
+  "visual": {},
+  "chapters": {
+    "4.1 正常流程": ["clips-01"],
+    "4.2 边界情况": ["clips-02", "clips-03"]
+  },
+  "completion": {
+    "scenarios_total": 3,
+    "dev_done": 0,
+    "tested_done": 0,
+    "acceptance_done": 0,
+    "percentage": { "dev": "0%", "tested": "0%", "acceptance": "0%" }
+  },
+  "outOfScope": [
+    "yt-dlp 真网络下载(兜底本地 mp4)",
+    "多 URL 批量",
+    "GPU 硬编(用 ffmpeg 默认 CPU)",
+    "翻译步(04-translate.md prompt 有 · 本版不验)",
+    "karaoke 产出(留 TTS feature)"
+  ],
+  "openQuestions": [
+    {
+      "q": "whisperx 能不能跑起来(python 依赖)? 若否全链用 transcript fixture 绕开",
+      "resolved": false,
+      "resolve_in_phase": "POC"
+    }
+  ],
+  "changelog": [
+    { "version": "v0.3.0", "note": "feature 首建 · 归档迁 · 3 scenarios(1 正常 + 2 边界)" }
+  ]
+}

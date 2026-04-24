@@ -1,0 +1,37 @@
+{
+  "version": "v0.13.0",
+  "type": "refactor",
+  "chosen": "Project skeleton governance: make the repository one-screen understandable and merge specs into the product repository.",
+  "why": "The product loop is now proven, so the next bottleneck is maintainability: local artifacts, historical references, and a nested spec repository obscure the actual product surface.",
+  "changed_from": "v0.12.0 stabilized local export resource usage.",
+  "constraints": {
+    "no_vanity": "The visible result is a clean root directory, current entry docs, and a structure gate that catches future drift.",
+    "no_overreach": "This version governs repository skeleton, docs, spec ownership, and artifact boundaries; it does not rewrite editor/export business logic or reshape public CLI behavior.",
+    "no_rush": "Archive before moving, preserve spec history as a bundle, and verify product build paths after the restructure.",
+    "must_verify": "Acceptance is `find . -maxdepth 2`, structure checks, cargo/frontend checks, and a short desktop open smoke."
+  },
+  "success_picture": "A new engineer or AI opens the root and can immediately see code, frontend, examples, scripts, tests, and spec without tmp/reference/episodes noise.",
+  "cost_estimate": "AI scale: 2-4 hours for migration, docs, checks, and lightweight verification.",
+  "risks": [
+    "Nested spec git history can be lost if not bundled before removing spec/.git.",
+    "Accidentally tracking generated media or POC build artifacts would bloat the main repository.",
+    "Over-cleaning reference material could remove useful context, so local archive is required."
+  ],
+  "candidates": [
+    {
+      "id": "skeleton-governance",
+      "selected": true,
+      "summary": "Clean root layout, merge spec, archive local artifacts, add structure gate."
+    },
+    {
+      "id": "code-boundary-refactor",
+      "selected": false,
+      "summary": "Reshape crates and frontend code boundaries after repository skeleton is stable."
+    },
+    {
+      "id": "report-only",
+      "selected": false,
+      "summary": "Produce an audit report without moving files; rejected because the user asked to implement."
+    }
+  ]
+}

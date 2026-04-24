@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POC P-03 · WC tokens penetration + isolation</title>
+  <link rel="stylesheet" href="tokens.css" />
+  <style>
+    /* main-doc styles — shadow should ignore these for isolation test (Test B) */
+    .main-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--fg-3);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin: 18px 0 6px;
+    }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 15px; margin: 18px 0 6px; color: var(--fg-3); font-weight: 600; }
+    .row { display: flex; gap: 24px; flex-wrap: wrap; }
+    .row > section { flex: 1 1 380px; min-width: 320px; }
+    .hud {
+      position: fixed;
+      right: 12px; top: 12px;
+      padding: 10px 12px;
+      font-family: var(--mono); font-size: 11px;
+      background: rgba(14,14,19,0.85);
+      border: 1px solid var(--bd);
+      color: var(--fg);
+      max-width: 340px;
+      z-index: 1000;
+    }
+    .hud pre { margin: 4px 0 0; white-space: pre-wrap; }
+    button {
+      padding: 6px 10px;
+      font-family: var(--mono); font-size: 12px;
+      background: var(--panel);
+      color: var(--fg);
+      border: 1px solid var(--bd);
+      cursor: pointer;
+      margin: 2px 4px 2px 0;
+    }
+    button:hover { border-color: var(--accent); }
+    .perf-host {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+      max-height: 240px;
+      overflow: auto;
+      border: 1px solid var(--bd);
+      padding: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud" id="hud">
+    <div><strong>POC P-03 · HUD</strong></div>
+    <pre id="hud-out">(waiting for tests)</pre>
+  </div>
+
+  <h1>POC P-03 · Web Components + tokens penetration</h1>
+  <div class="main-label">main document · reads :root tokens</div>
+
+  <div class="row">
+    <section>
+      <h2>Test A · tokens 穿透 · &lt;nf-demo&gt;</h2>
+      <nf-demo id="d1"></nf-demo>
+      <button onclick="runA_initial()">A-1 read initial</button>
+      <button onclick="runA_flip()">A-2 flip --accent red</button>
+      <button onclick="runA_reset()">A-3 reset --accent</button>
+    </section>
+
+    <section>
+      <h2>Test B · 主文档污染隔离</h2>
+      <button onclick="runB_inject()">B-1 inject * red</button>
+      <button onclick="runB_check()">B-2 check tab color</button>
+      <button onclick="runB_clean()">B-3 clean</button>
+    </section>
+  </div>
+
+  <h2>Test C · :host([kind]) 属性选择器 · &lt;nf-track&gt;</h2>
+  <nf-track kind="scene">Scene · 画面轨</nf-track>
+  <nf-track kind="text">Text · 文字轨</nf-track>
+  <nf-track kind="audio">Audio · 音频轨</nf-track>
+  <button onclick="runC_check()">C check 3 stripe colors</button>
+
+  <h2>Test D · adoptedStyleSheets vs inline &lt;style&gt;</h2>
+  <div class="row">
+    <section>
+      <div class="main-label">inline &lt;style&gt; per component</div>
+      <div class="perf-host" id="perf-host-inline"></div>
+    </section>
+    <section>
+      <div class="main-label">shared CSSStyleSheet (adoptedStyleSheets)</div>
+      <div class="perf-host" id="perf-host-adopted"></div>
+    </section>
+  </div>
+  <button onclick="runD(10)">D-10 bench n=10</button>
+  <button onclick="runD(100)">D-100 bench n=100</button>
+  <button onclick="runD(500)">D-500 bench n=500</button>
+  <button onclick="runD_repaint()">D-repaint bench</button>
+
+  <script type="module" src="../dist/index.js"></script>
+  <script>
+    const out = document.getElementById("hud-out");
+    const lines = [];
+    function log(msg) {
+      const ts = new Date().toISOString().slice(11, 19);
+      lines.push(`[${ts}] ${msg}`);
+      while (lines.length > 18) lines.shift();
+      out.textContent = lines.join("\n");
+      console.log(msg);
+    }
+    window.__log = log;
+
+    function runA_initial() {
+      const bg = window.__POC__.readAccentFromShadow();
+      log(`A-1 initial .box bg = ${bg}`);
+    }
+    function runA_flip() {
+      window.__POC__.flipAccent("#ff0000");
+      const bg = window.__POC__.readAccentFromShadow();
+      log(`A-2 after flip(#ff0000) .box bg = ${bg}`);
+    }
+    function runA_reset() {
+      window.__POC__.flipAccent("#a78bfa");
+      const bg = window.__POC__.readAccentFromShadow();
+      log(`A-3 after reset(#a78bfa) .box bg = ${bg}`);
+    }
+    function runB_inject() {
+      window.__POC__.injectRedAll();
+      log("B-1 injected * { color: red !important }");
+    }
+    function runB_check() {
+      const c = window.__POC__.readTabColor();
+      const mainH = getComputedStyle(document.querySelector("h1")).color;
+      log(`B-2 shadow .tab.cur color = ${c} | main <h1> color = ${mainH}`);
+    }
+    function runB_clean() {
+      window.__POC__.removeRedAll();
+      log("B-3 cleaned * rule");
+    }
+    function runC_check() {
+      const s = window.__POC__.readStripeBg("scene");
+      const t = window.__POC__.readStripeBg("text");
+      const a = window.__POC__.readStripeBg("audio");
+      log(`C scene=${s} text=${t} audio=${a}`);
+    }
+    function runD(n) {
+      const i = window.__POC__.benchInline(n);
+      const a = window.__POC__.benchAdopted(n);
+      log(`D n=${n} inline=${i.toFixed(2)}ms adopted=${a.toFixed(2)}ms ratio=${(i/a).toFixed(2)}x`);
+    }
+    function runD_repaint() {
+      const r = window.__POC__.benchRepaint();
+      log(`D-repaint flip --accent → ${r.toFixed(3)}ms (sync measure)`);
+    }
+
+    // expose for playwright / console
+    window.runA_initial = runA_initial;
+    window.runA_flip = runA_flip;
+    window.runA_reset = runA_reset;
+    window.runB_inject = runB_inject;
+    window.runB_check = runB_check;
+    window.runB_clean = runB_clean;
+    window.runC_check = runC_check;
+    window.runD = runD;
+    window.runD_repaint = runD_repaint;
+  </script>
+</body>
+</html>

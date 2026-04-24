@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh">
+<meta charset="utf-8">
+<title>NextFrame Milestones</title>
+<style>
+  body{margin:0;background:#0a0a0d;color:#f5f5f7;font:14px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+  main{max-width:1040px;margin:0 auto;padding:36px 24px}
+  h1{margin:0 0 8px;font-size:34px}p{color:rgba(255,255,255,.72)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:24px}
+  section{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.045);padding:16px}
+  h2{margin:0 0 12px;font-size:13px;color:#a78bfa;text-transform:uppercase;letter-spacing:.14em}
+  article{border-top:1px solid rgba(255,255,255,.1);padding:12px 0}
+  article:first-of-type{border-top:0}
+  b{display:block;font-size:15px}.meta{font:12px/1.4 "SF Mono",Menlo,monospace;color:#e0b76c;margin-top:4px}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}}
+</style>
+<main>
+  <h1>NextFrame Milestones</h1>
+  <p id="meta"></p>
+  <div class="grid" id="grid"></div>
+</main>
+<script>
+const META={currentVersion:"v0.13.0",updatedAt:"2026-04-24"};
+const GROUPS=[
+  {id:"done",title:"已达成",items:[
+    {v:"v0.10.0",title:"JSON 到在线编辑到导出闭环",date:"2026-04-24"},
+    {v:"v0.11.0",title:"导出档位、真实进度、打开视频按钮",date:"2026-04-24"},
+    {v:"v0.12.0",title:"低资源导出保护和取消导出",date:"2026-04-24"}
+  ]},
+  {id:"current",title:"进行中",items:[
+    {v:"v0.13.0",title:"项目骨架治理和 spec 合入主仓",date:"2026-04-24"}
+  ]},
+  {id:"planned",title:"未来规划",items:[
+    {v:"v0.14.x",title:"代码边界重构和 crate 职责瘦身",date:"planned"},
+    {v:"v0.15.x",title:"更高上限的 JSON/component authoring",date:"planned"}
+  ]}
+];
+document.querySelector("#meta").textContent=`current ${META.currentVersion} · updated ${META.updatedAt}`;
+document.querySelector("#grid").innerHTML=GROUPS.map(group=>`<section><h2>${group.title}</h2>${group.items.map(item=>`<article><b>${item.title}</b><div class="meta">${item.v} · ${item.date}</div></article>`).join("")}</section>`).join("");
+</script>
+</html>

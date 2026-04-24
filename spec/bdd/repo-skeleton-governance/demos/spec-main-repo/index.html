@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh">
+<meta charset="utf-8">
+<title>BDD · spec main repo</title>
+<style>
+  body{margin:0;background:#101318;color:#edf2f7;font:15px/1.5 system-ui,sans-serif}.stage{height:100vh;display:grid;place-items:center}
+  .panel{width:min(860px,86vw)}h1{margin:0 0 18px;font-size:28px}.flow{display:grid;grid-template-columns:1fr 80px 1fr;align-items:center;gap:14px}
+  .box{padding:22px;border:1px solid #394150;background:#171c24}.arrow{text-align:center;color:#7dd3fc;font-size:32px;animation:pulse 8s infinite}
+  .old{color:#fb7185;animation:dim 8s infinite}.new{color:#86efac;animation:bright 8s infinite}
+  .bar{height:5px;background:#334155;margin-top:28px;overflow:hidden}.bar i{display:block;height:100%;background:#86efac;animation:run 8s linear infinite}
+  .toast{margin-top:14px;color:#86efac;opacity:0;animation:done 8s infinite}
+  @keyframes run{from{width:0}to{width:100%}}@keyframes pulse{50%{transform:translateX(8px)}}@keyframes dim{50%,100%{opacity:.35}}@keyframes bright{0%,40%{opacity:.4}70%,100%{opacity:1}}@keyframes done{80%,100%{opacity:1}}
+</style>
+<body><main class="stage"><section class="panel">
+  <h1>spec 从独立仓合入产品仓</h1>
+  <div class="flow"><div class="box old">spec/.git<br>单独提交，容易漂移</div><div class="arrow">→</div><div class="box new">spec/<br>跟代码同一 commit</div></div>
+  <div class="bar"><i></i></div><div class="toast">本轮完成</div>
+</section></main></body></html>

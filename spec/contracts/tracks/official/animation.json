@@ -1,0 +1,44 @@
+{
+  "kind": "animation",
+  "name": "Animation Track",
+  "description": "动画轨道 · 驱动别 track 某 param 随时间变 · 非独立可视 · 通过 target 字段指向 'trackId.clips[i].params.path'",
+  "use_cases": ["参数过渡", "淡入淡出", "位置平移"],
+  "t0_visibility": 1.0,
+  "z_order_hint": 0,
+  "visual_channels": [],
+
+  "params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["target", "from", "to"],
+    "additionalProperties": false,
+    "properties": {
+      "target": {
+        "type": "string",
+        "pattern": "^[a-zA-Z][\\w-]*\\.clips\\[\\d+\\]\\.params(\\.[a-zA-Z][\\w]*)+$",
+        "description": "引用路径 · 例 'scene-title.clips[0].params.opacity'"
+      },
+      "from": {"description": "起始值(number / string)"},
+      "to": {"description": "结束值(number / string)"},
+      "ease": {
+        "type": "string",
+        "enum": ["linear", "ease-in", "ease-out", "ease-in-out", "cubic-bezier"],
+        "default": "ease-out"
+      },
+      "cubic_bezier": {
+        "type": "array",
+        "description": "ease=cubic-bezier 时必填 · [x1,y1,x2,y2]",
+        "items": {"type": "number"},
+        "minItems": 4,
+        "maxItems": 4
+      }
+    }
+  },
+
+  "sample": {
+    "target": "scene-title.clips[0].params.opacity",
+    "from": 0,
+    "to": 1,
+    "ease": "ease-out"
+  }
+}

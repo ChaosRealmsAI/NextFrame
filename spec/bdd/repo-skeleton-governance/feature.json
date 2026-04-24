@@ -1,0 +1,19 @@
+{
+  "feature": "repo-skeleton-governance",
+  "version": "v0.13.0",
+  "rules": [
+    "Root directory must show product code, frontend, examples, scripts, tests, and spec without local artifact noise.",
+    "Spec must live in the main repository, not as an independent nested git repository.",
+    "Generated media, run outputs, and historical code snapshots must stay outside git-tracked source.",
+    "Structure drift must be checked by a product script."
+  ],
+  "completion": {
+    "scenarios": [
+      "root-one-screen",
+      "spec-main-repo",
+      "archive-boundary",
+      "structure-gate",
+      "docs-entry"
+    ]
+  }
+}

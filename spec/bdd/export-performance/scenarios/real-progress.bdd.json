@@ -1,0 +1,26 @@
+{
+  "id": "real-progress",
+  "title": "导出中显示真实帧进度和阶段",
+  "given": "用户已选择 draft profile，并点击导出。",
+  "when": "recorder 输出 record.start、record.encode_progress、record.done 等事件。",
+  "then": "桌面 export.status 返回 progress.percent、frames_encoded、total_frames、stage、eta_seconds；前端进度条跟随这些字段更新。",
+  "human_actions": ["click export", "watch progress bar", "read frame count", "wait until succeeded"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --out tmp/v0.11.0/draft-progress.mp4 --events",
+      "expected": "stdout includes record.encode_progress JSON lines"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf export-status --job-id <job>",
+      "expected": "running response contains progress.percent and stage"
+    },
+    {
+      "tool": "screenshot",
+      "command": "target/debug/nf screenshot --project v2-showcase --composition showreel-24s --out tmp/v0.11.0/progress-ui.png",
+      "expected": "inspector shows numeric percent, frames and stage"
+    }
+  ],
+  "done": false
+}

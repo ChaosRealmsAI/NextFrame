@@ -1,0 +1,17 @@
+{
+  "id": "archive-boundary",
+  "given": "tmp, episodes, reference, and spec git history contain useful but non-product artifacts.",
+  "when": "The restructure archives local artifacts.",
+  "then": "The artifacts exist under ../NextFrame.archive and are absent from the repository root.",
+  "human_actions": ["open archive directory", "scan root again"],
+  "ai_tools": [
+    {
+      "tool": "shell",
+      "command": "test -d ../NextFrame.archive"
+    },
+    {
+      "tool": "shell",
+      "command": "test ! -d tmp && test ! -d episodes && test ! -d reference"
+    }
+  ]
+}

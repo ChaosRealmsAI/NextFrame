@@ -1,0 +1,98 @@
+{
+  "kind": "data",
+  "name": "Data Ranking Track",
+  "description": "数据排名轨道 · 动态排序条形图 · 名次变化动画 · 榜单 / 竞赛 / 趋势",
+  "use_cases": ["排行榜", "竞赛榜单", "趋势对比"],
+  "t0_visibility": 0.95,
+  "z_order_hint": 3,
+  "visual_channels": ["scene"],
+
+  "params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Track.data params · discriminated union by 'type'",
+    "type": "object",
+    "required": ["type"],
+    "oneOf": [
+      {
+        "title": "ranking variant · Top-N 排行榜",
+        "type": "object",
+        "required": ["type", "rows"],
+        "additionalProperties": false,
+        "properties": {
+          "type": {"const": "ranking"},
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "required": ["label", "value"],
+              "additionalProperties": false,
+              "properties": {
+                "label": {"type": "string", "maxLength": 80},
+                "value": {"type": "number"},
+                "delta": {"type": "number", "description": "正数涨绿 · 负数跌红 · 省略不显示"}
+              }
+            }
+          },
+          "highlight_top": {"type": "integer", "minimum": 0, "maximum": 5, "default": 3},
+          "value_format": {"enum": ["integer", "decimal", "percent", "currency"], "default": "integer"},
+          "title": {"type": "string", "maxLength": 120},
+          "stagger_ms": {"type": "number", "minimum": 0, "maximum": 150, "default": 80},
+          "interpolate_ms": {"type": "number", "minimum": 100, "maximum": 2000, "default": 600}
+        }
+      },
+      {
+        "title": "finance variant · 多列表",
+        "type": "object",
+        "required": ["type", "columns", "rows"],
+        "additionalProperties": false,
+        "properties": {
+          "type": {"const": "finance"},
+          "columns": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {"type": "string", "maxLength": 40}
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "array",
+              "description": "长度 = columns.length · 元素 string | number"
+            }
+          },
+          "title": {"type": "string", "maxLength": 120}
+        }
+      },
+      {
+        "title": "comparison variant · 左右对比",
+        "type": "object",
+        "required": ["type", "left", "right"],
+        "additionalProperties": false,
+        "properties": {
+          "type": {"const": "comparison"},
+          "left": {"type": "object", "required": ["label", "value"]},
+          "right": {"type": "object", "required": ["label", "value"]},
+          "title": {"type": "string", "maxLength": 120}
+        }
+      }
+    ]
+  },
+
+  "sample": {
+    "type": "ranking",
+    "title": "2026 Top 5 Demo",
+    "rows": [
+      {"label": "Alpha", "value": 1000, "delta": 8.2},
+      {"label": "Bravo", "value": 820, "delta": 5.1},
+      {"label": "Charlie", "value": 640, "delta": -2.3},
+      {"label": "Delta", "value": 510, "delta": 12.0},
+      {"label": "Echo", "value": 380, "delta": 3.4}
+    ],
+    "highlight_top": 3,
+    "value_format": "integer"
+  }
+}

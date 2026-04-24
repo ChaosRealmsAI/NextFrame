@@ -1,0 +1,33 @@
+{
+  "$type": "scenario",
+  "scenario_type": "e2e",
+  "id": "tts-02",
+  "title": "边界 · WhisperX 装不上时 --timeline fixture 兜底仍能产 karaoke",
+  "chapter": "4.2 边界情况",
+  "added_in_version": "v0.3.0",
+  "verify_point": "V-2b",
+  "rules": ["R4", "R5"],
+  "visual": ["V1"],
+
+  "steps_human": [
+    {"type": "Given", "text": "WhisperX 未装 / python torch 装不上"},
+    {"type": "When", "text": "subagent 跳 align 步 · 用 tests/fixtures/tts/demo.timeline.json 直接喂 karaoke"},
+    {"type": "Then", "text": "产 karaoke.html 打开 · 字级高亮仍按 fixture timeline 同步"}
+  ],
+
+  "steps_ai": [
+    {"type": "Given", "text": "subagent 跑 which whisperx && python -c 'import torch' · exit != 0"},
+    {"type": "When", "text": "nf-tts karaoke --mp3 output/tts.mp3 --timeline tests/fixtures/tts/demo.timeline.json --out output/karaoke.html"},
+    {"type": "Then", "text": "output/karaoke.html 存在 · grep 'word' 返回字级标记"}
+  ],
+
+  "ai_tools": [
+    {"tool": "check-whisperx", "command": "which whisperx && python -c 'import torch' 2>&1 || echo 'unavailable'", "output": "ok / 'unavailable'"},
+    {"tool": "karaoke-with-fixture", "command": "nf-tts karaoke --mp3 output/tts.mp3 --timeline tests/fixtures/tts/demo.timeline.json --out output/karaoke.html", "output": "exit 0 + karaoke.html"},
+    {"tool": "check-karaoke-html", "command": "grep -c 'class=\"word' output/karaoke.html", "output": "数字 · 期望 > 0"}
+  ],
+
+  "dev": "pending",
+  "tested": "pending",
+  "acceptance": "pending"
+}

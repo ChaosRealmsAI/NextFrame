@@ -1,0 +1,21 @@
+{
+  "_comment": "非法案例 C · 顶层缺 meta · 应报 required meta missing",
+
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "10000"}},
+  "tracks": [
+    {
+      "id": "t1",
+      "kind": "scene",
+      "clips": [
+        {
+          "id": "c1",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {"layout": "hero", "title": "缺 meta"}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+[
+  {"id": 1, "voice": "zh-CN-XiaoxiaoNeural", "text": "欢迎看 NextFrame 的产品宪法。十一条原则 定死整个产品的底线。任何版本做啥 不做啥 都拿它过一遍。我带你一条一条过。", "filename": "slide-01.mp3"},
+  {"id": 2, "voice": "zh-CN-XiaoxiaoNeural", "text": "第一条 AI 是第一用户。产品不是给人做的剪辑软件。第一用户是 AI agent 比如 Claude Code。人是监督。接口 文档 输出 都按 AI 一眼看懂 一跑即对 设计。判断尺：新 AI 接触五分钟能不能自己用对 不能就是接口没设计好 不是模型不聪明。", "filename": "slide-02.mp3"},
+  {"id": 3, "voice": "zh-CN-XiaoxiaoNeural", "text": "第二条 CLI 驱动。整个产品命令行化。写 JSON build preview export 每一步都有命令。人 AI 定时任务 走同一份代码路径。桌面端只是 CLI 的 UI 外壳 不是一等公民。", "filename": "slide-03.mp3"},
+  {"id": 4, "voice": "zh-CN-XiaoxiaoNeural", "text": "第三条 frame pure。核心架构不变式：给定时间 t 和 JSON 渲染的像素百分之百确定。同一个 t 永远同一像素。无副作用。禁直接用当前时间 禁未 seeded 的随机 禁未缓存的网络。这是跟不稳定视频产品划清界限的那条线。", "filename": "slide-04.mp3"},
+  {"id": 5, "voice": "zh-CN-XiaoxiaoNeural", "text": "第四条 三模式像素级一致。播放 预览 导出 三种运行模式 同一帧像素必须完全相同。视频产品最常踩的坑就是 编辑器里好好的 导出就变样。这条就是为此刻死。", "filename": "slide-05.mp3"},
+  {"id": 6, "voice": "zh-CN-XiaoxiaoNeural", "text": "第五条 桌面端是预览加可选编辑。不是主操作入口。展示 AI 产出 提供轻量编辑 改位置 改时间范围。人完全可以跳过不看 命令行也能从头跑到尾。", "filename": "slide-06.mp3"},
+  {"id": 7, "voice": "zh-CN-XiaoxiaoNeural", "text": "第六条 高质量视频产出。4K 十比特 HDR 六十帧每秒 硬件 HEVC 编码。目标直达 Mac 平台性能上限。不做能用版。禁先 1080p 后面加 4K 这种说法 一开始就冲上限。", "filename": "slide-07.mp3"},
+  {"id": 8, "voice": "zh-CN-XiaoxiaoNeural", "text": "第七条 HTML 生态满表达力。凡是浏览器能做的视觉效果 NextFrame 都要能用。CSS 动画 滤镜 Canvas WebGL 视频 SVG 全部支持。不自限 不阉割。判断尺：浏览器开发者工具里能写出来 就必须支持。", "filename": "slide-08.mp3"},
+  {"id": 9, "voice": "zh-CN-XiaoxiaoNeural", "text": "第八条 JSON 是单一真理源。一切状态都在 JSON 里。桌面端看的 CLI 跑的 运行时渲染的 导出的 MP4 全部从 JSON 派生。改只改 JSON 其他自动重算。禁撤销栈 禁临时 state 禁本地数据。", "filename": "slide-09.mp3"},
+  {"id": 10, "voice": "zh-CN-XiaoxiaoNeural", "text": "第九条 外接 AI 控制 不内置 AI 界面。不做对话框 不集成 LLM SDK。AI 能力全靠外部 比如 Claude Code 通过 CLI 加 JSON 接入。任何 agent 都能驱动 不锁生态。", "filename": "slide-10.mp3"},
+  {"id": 11, "voice": "zh-CN-XiaoxiaoNeural", "text": "第十条 全自动是终态。终极目标 人一次都不用点。AI 写 JSON 命令行自动 build preview export upload。桌面端编辑只是 fallback。所有操作必有 CLI 对应。禁必须点按钮才能继续的设计。", "filename": "slide-11.mp3"},
+  {"id": 12, "voice": "zh-CN-XiaoxiaoNeural", "text": "第十一条 新加的：锚点驱动轨道时间。JSON 里单独声明时间锚点 比如开场结束在第五秒 功能一结束在第十二秒。轨道上的片段 起止时间用锚点加减偏移表达 比如开始时间等于开场结束减零点五秒。好处：改一个锚点 所有引用它的片段自动跟着走。不用一条条改。对 AI 特别友好 改一个数字 整段节奏变。这就是锚点加轨道加减模式。", "filename": "slide-12.mp3"},
+  {"id": 13, "voice": "zh-CN-XiaoxiaoNeural", "text": "十一条宪法定死。接下来版本 v0.2 开始 我们一条一条落地。第一个要做的 是 frame pure 核心架构 POC 加最小运行时。视频工具的未来 从这里开始。", "filename": "slide-13.mp3"}
+]

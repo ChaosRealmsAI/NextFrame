@@ -1,0 +1,37 @@
+{
+  "$type": "scenario",
+  "scenario_type": "e2e",
+  "id": "clips-01",
+  "title": "subagent haiku 跑通 clips 链 · 本地 mp4 → highlight mp4",
+  "chapter": "4.1 正常流程",
+  "added_in_version": "v0.3.0",
+  "verify_point": "V-1",
+  "rules": ["R1", "R2", "R3", "R4", "R5"],
+  "visual": [],
+
+  "steps_human": [
+    {"type": "Given", "text": "主 agent 派 subagent · model=haiku · prompt 从 src/nf-guide/flows/clips/*.md 读"},
+    {"type": "Given", "text": "tests/fixtures/clips/ 有 demo.mp4(本地短片 1-2 分钟) + demo.srt(本地字幕兜底 whisperx 装不上时)"},
+    {"type": "When", "text": "subagent haiku 按 prompt 依次跑 nf-source download/transcribe(或 --transcript)/align/plan/cut"},
+    {"type": "Then", "text": "主 agent ls output/ 见至少 1 个 highlight-N.mp4 文件"},
+    {"type": "Then", "text": "主 agent open output/highlight-1.mp4 · 系统播放器打开 · 视频能播 · 有声音 · 时长合理(>2s)"}
+  ],
+
+  "steps_ai": [
+    {"type": "Given", "text": "subagent 任务: 读 src/nf-guide/flows/clips/00-download.md 起 · 按 prompt 5 步跑命令 · 用 --local-mp4 tests/fixtures/clips/demo.mp4 兜底"},
+    {"type": "When", "text": "subagent 逐步 Bash 执行: nf-source download --local-mp4 ... → nf-source transcribe --transcript ... → nf-source align → nf-source plan → nf-source cut"},
+    {"type": "Then", "text": "主 agent 跑 nf-source verify --file output/highlight-1.mp4 · exit 0 = 通过"},
+    {"type": "Then", "text": "主 agent ls output/ | grep highlight · 至少 1 个 .mp4 文件"}
+  ],
+
+  "ai_tools": [
+    {"tool": "dispatch-subagent", "command": "Task(subagent_type='general-purpose', model='haiku-4-5-20251001', prompt='读 src/nf-guide/flows/clips/00-download.md 到 03-cut.md · 按 prompt 跑 nf-source 系列命令 · 用 --local-mp4 tests/fixtures/clips/demo.mp4 兜底 · 产物写 output/')", "output": "subagent 回传日志 + 自己判断是否产物齐"},
+    {"tool": "verify-mp4", "command": "nf-source verify --file output/highlight-1.mp4", "output": "exit 0 = pass / exit != 0 = fail + stderr"},
+    {"tool": "ls-output", "command": "ls output/*.mp4 2>/dev/null | wc -l", "output": "数字 · 期望 >= 1"},
+    {"tool": "open-verify", "command": "open output/highlight-1.mp4  # 主 agent 亲 open 验可播", "output": "主 agent 肉眼看"}
+  ],
+
+  "dev": "pending",
+  "tested": "pending",
+  "acceptance": "pending"
+}

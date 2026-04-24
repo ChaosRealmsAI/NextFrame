@@ -1,0 +1,91 @@
+{
+  "_meta": {
+    "title": "NextFrame POC 跨版本索引",
+    "schema_version": "1.0",
+    "last_updated": "2026-04-21",
+    "note": "每 POC 入条 · status=pending(派遣中)→ running(subagent 工作) → valid(主 agent 亲验过 + merged.md 齐) · 跨版本累积 · jq 可查"
+  },
+
+  "entries": [
+    {
+      "id": "P-01",
+      "topic": "wry WebView 玻璃质感跨 macOS",
+      "slug": "wry-glass",
+      "version": "v0.2",
+      "status": "valid",
+      "approaches": ["wry-default", "wry-transparent", "safari-baseline"],
+      "affects_scenarios": ["S-01", "S-07", "S-08", "S-09", "S-10", "S-11"],
+      "dispatched_at": "2026-04-21 15:25",
+      "verified_at": "2026-04-21 16:55",
+      "opus_agent_id": "adedbf7df57539ff5",
+      "ally_session": "poc-p01-ally-redispatched",
+      "opus_result": {"status": "valid", "duration_min": 55, "pixel_diff_default": "0.000%", "pixel_diff_transparent": "15.5% (full window · 含透明 desktop 复合)", "fps_default": 92.3, "fps_transparent": 96.9},
+      "ally_result": {"status": "partial", "duration_min": 42, "pixel_diff_default": "0.000%", "pixel_diff_transparent": "0.500% (topbar only)", "fps_default": 60.08, "note": "macOS 14/15 未跨版本验 · ipc.postMessage 桥未通(用 document.title 替代)"},
+      "merged_conclusion": "PASS · wry=WKWebView=Safari 同引擎 · 0% pixel diff · v0.2 UI 视觉风险 unblock · 两方都发现 .topbar 无 blur · 实际 blur 在 .app 层(影响 S-07 ai_tools 断言微调)",
+      "merged_path": "spec/poc/P-01-wry-glass/merged.md",
+      "adr_ref": ["A-0011-pending", "A-0012-pending", "A-0013-pending"],
+      "confidence": 0.92,
+      "risk_if_failed": "(未触发)V-2 视觉 === hifi 验不过 · 5 visual scenarios 全挂"
+    },
+    {
+      "id": "P-02",
+      "topic": "tao 多窗 + Unix socket IPC 双向",
+      "slug": "tao-ipc",
+      "version": "v0.2",
+      "status": "valid",
+      "approaches": ["tao-eventloop-routing", "interprocess-tokio", "last-window-keep-alive", "sigterm-cleanup"],
+      "affects_scenarios": ["S-01", "S-02", "S-03", "S-04", "S-05", "S-06"],
+      "dispatched_at": "2026-04-21 15:25",
+      "verified_at": "2026-04-21 16:05",
+      "opus_agent_id": "ab856ad1efebd3bfe",
+      "ally_session": "poc-p02-ally-299177e4",
+      "opus_result": {"status": "valid", "duration_min": 45, "tests": "4/4 PASS", "open_latency_ms": 40, "ipc_concurrent_demux": "10/10"},
+      "ally_result": {"status": "pass", "duration_min": 31, "tests": "4/4 PASS", "open_latency_ms": 5, "ipc_concurrent_demux": "10/10"},
+      "merged_conclusion": "PASS · 两 agent 独立验证 100% 一致 · tao 0.30 + interprocess 2.4 tokio + ctrlc 3 termination 组合稳 · v0.2 S-01~S-06 unblock",
+      "merged_path": "spec/poc/P-02-tao-ipc/merged.md",
+      "adr_ref": ["A-0006-pending", "A-0007-pending"],
+      "confidence": 0.95,
+      "risk_if_failed": "(未触发)6 启动 + 多窗 scenarios 全挂 · 可能要限 1 window 为 v0.2 边界"
+    },
+    {
+      "id": "P-03",
+      "topic": "Web Components + tokens.css :root vars 穿透 + 样式隔离",
+      "slug": "wc-tokens",
+      "version": "v0.2",
+      "status": "valid",
+      "approaches": ["root-vars-link", "adopted-style-sheets", "host-attr-selectors", "global-injection-test"],
+      "affects_scenarios": ["S-07", "S-08", "S-09", "S-10", "S-11", "S-12", "S-13", "S-14"],
+      "dispatched_at": "2026-04-21 15:25",
+      "opus_agent_id": "a3ef5db60f53f5a44",
+      "ally_session": "poc-p03-ally-redispatched",
+      "opus_result": {
+        "status": "valid",
+        "duration_min": 25,
+        "conclusion": "tokens 穿透 OK · shadow 隔离 OK · :host([kind]) OK · adoptedStyleSheets 快 1.8-2x(n=100 · 1.5ms vs 3ms)· 4/4 测试 PASS",
+        "perf_scale": "n=100 detail measure"
+      },
+      "ally_result": {
+        "status": "passed",
+        "duration_min": 20,
+        "conclusion": "同 opus · RGB 值精确重合(紫 167,139,250 / 琥珀 224,183,108 / 青 123,201,181) · adoptedStyleSheets 支持",
+        "perf_scale": "n=10 median of 12 samples"
+      },
+      "merged_conclusion": "PASS · 两 agent 独立验证一致 · RGB 值精确重合 · tokens.css 挂 :root + NfBase adoptedStyleSheets 单例 sheet + 每组件 base sheet 塞直角 reset + FOUC 用 preload 解",
+      "merged_path": "spec/poc/P-03-wc-tokens/merged.md",
+      "verified_at": "2026-04-21 16:25",
+      "adr_ref": ["A-0008-pending", "A-0009-pending", "A-0010-pending"],
+      "confidence": 0.95,
+      "status": "valid",
+      "risk_if_failed": "(未触发)8 visual + 架构 scenarios 全挂 · 组件化方案要推翻"
+    }
+  ],
+
+  "stats": {
+    "total": 3,
+    "by_version": {"v0.2": 3},
+    "by_status": {"running": 0, "valid": 3, "invalid": 0},
+    "valid_ids": ["P-01", "P-02", "P-03"],
+    "avg_confidence": 0.94,
+    "all_poc_done_at": "2026-04-21 16:55"
+  }
+}

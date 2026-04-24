@@ -1,0 +1,32 @@
+{
+  "kind": "scene-quote",
+  "category": "community",
+  "level": 1,
+  "name": "Scene Quote",
+  "description": "金句展示 · 中央大号金句 + 左上装饰双引号 + 下方作者署名 · 留白克制 · 作者延迟入场 · 名言 / 章节收束 / 客户证言",
+  "use_cases": ["名言引用", "客户证言", "章节收束", "开场引句"],
+  "t0_visibility": 0.95,
+  "z_order_hint": 3,
+  "visual_channels": ["scene"],
+  "duration_hint_ms": 4000,
+
+  "src_hint": "frontend/nf-tracks/community/scene-quote.js",
+
+  "params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["quote"],
+    "additionalProperties": false,
+    "properties": {
+      "quote": {"type": "string", "maxLength": 400},
+      "author": {"type": "string", "maxLength": 120},
+      "accent_color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "default": "#a78bfa"}
+    }
+  },
+
+  "sample": {
+    "quote": "设计不是它看起来怎样或者它感觉怎样 · 设计是它如何工作。",
+    "author": "— Steve Jobs",
+    "accent_color": "#a78bfa"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "kind": "scene-hero-centered",
+  "category": "community",
+  "level": 1,
+  "name": "Hero Centered",
+  "description": "居中 Hero · 超大标题 + 可选副标题 · 紫粉 radial gradient 辐射背景 · 入场淡入 stagger · 品牌发布 / 章节起始",
+  "use_cases": ["品牌开场", "章节起始", "关键宣言"],
+  "t0_visibility": 0.95,
+  "z_order_hint": 3,
+  "visual_channels": ["scene"],
+  "duration_hint_ms": 3000,
+
+  "src_hint": "frontend/nf-tracks/community/scene-hero-centered.js",
+
+  "params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["title"],
+    "additionalProperties": false,
+    "properties": {
+      "title": {"type": "string", "maxLength": 100},
+      "subtitle": {"type": "string", "maxLength": 200},
+      "accent_color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "default": "#a78bfa"}
+    }
+  },
+
+  "sample": {
+    "title": "NextFrame",
+    "subtitle": "AI 视频引擎 · 让数据说话",
+    "accent_color": "#a78bfa"
+  }
+}

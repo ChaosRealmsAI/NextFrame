@@ -1,0 +1,17 @@
+{
+  "id": "spec-main-repo",
+  "given": "Spec files are required for every version and must stay synchronized with code.",
+  "when": "The main repository checks ownership of spec files.",
+  "then": "spec/.git is absent, and main git tracks spec devlog, BDD, version, standards, and design files.",
+  "human_actions": ["inspect spec folder", "inspect git status"],
+  "ai_tools": [
+    {
+      "tool": "shell",
+      "command": "test ! -d spec/.git"
+    },
+    {
+      "tool": "shell",
+      "command": "git ls-files spec/devlog spec/bdd spec/versions spec/standards spec/design | head"
+    }
+  ]
+}

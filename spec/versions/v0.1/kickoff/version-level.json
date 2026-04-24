@@ -1,0 +1,50 @@
+{
+  "version": "v0.1.0",
+  "type": "strategy",
+  "chosen": "产品宪法 10 条 + 基于用户故事全流程的高保真原型图(带 TTS 讲解) + 桌面端视频编辑器 hifi · 0 代码",
+  "why": "empty shell 重启第一版 · 先定位再实施 · 技术栈 / 代码 / POC 全留 v0.2+ · 本版目标是把 '产品是啥 · 怎么用 · 长啥样' 定死 · 避免跟 v0.x 一样走一步改一步",
+
+  "changed_from": {
+    "round_1": "原议 frame pure 地基版 → 用户拒 · 改战略版",
+    "round_3_6_8": "3 次产品定位反转: AI 为主/HTML 生态/外接 CC/CLI 驱动 全流程整合进 charter"
+  },
+
+  "constraints": {
+    "no_vanity": "4 张 hifi + 用户故事全流程 PPT PM 肉眼可看 · 桌面端编辑器是最高保真一张(多轨道 · 紫色 aurora + 玻璃 · 三面板布局)",
+    "no_overreach": "本版只做: charter(10 条原则) + user-story PPT(11 帧带 TTS) + 桌面端 hifi(嵌入 PPT 第 6 帧) · 不做: 代码 / POC / runtime / 真 CLI 实现 / BDD",
+    "no_rush": "charter 10 条 + glossary 6 词 + 桌面端 hifi 视觉 全部终版 · 禁 'v2 再完善' · 未来版本扩不改 semantics",
+    "must_verify": "PM 打开 user-story-hifi/index.html · 点开始 · 语音讲解 + 滚动翻页走 11 帧 · 能复述产品定位 + 桌面端长啥样 + CLI 驱动啥意思 = 通过"
+  },
+
+  "success_picture": "PM 打开 spec/read-for-human/v0.1-user-story-hifi/index.html · 看到紫色玻璃风 intro · 点开始播放 · 晓晓声音讲解 · 滚动翻 11 帧: 封面→痛点→开 CC→写 JSON→nf build→桌面端(核心大图)→人轻编辑→nf export→MP4→全自动→10 条宪法回顾 · PM 能对产品定位点头 + 判断 v0.2 该做啥",
+
+  "cost_estimate": "AI 尺度 2-3 小时 · 实际 autopilot 1 小时内完成(TTS 11 段 ≈ 2 min / hifi 设计+编码 ≈ 40 min / 其他 ≈ 15 min)",
+
+  "risks": [
+    "whisperX 对齐脚本缺 (VOX_ALIGN_SCRIPT) → 字级 timeline 无 · 已降级到字符均匀分配 fallback · 字幕大致跟上但不精准",
+    "桌面端 hifi 是 HTML mockup 不是真 app · 后续 v0.2+ 代码实现视觉可能有 delta",
+    "产品定位 3 次反转 (HTML 拒→接受 · AI UI 有→无 · 桌面端主→辅) · 已记 dialogue.json changed_from 防漂"
+  ],
+
+  "candidates_considered": [
+    { "id": "A", "name": "frame pure 地基版+预览", "type": "architecture/feature", "outcome": "拒 · 用户原话 '第一个版本做产品规划'" },
+    { "id": "B", "name": "A + AI 写 JSON", "type": "feature", "outcome": "同上 拒" },
+    { "id": "C", "name": "桌面壳 + 编辑器 UI", "type": "feature", "outcome": "同上 拒" },
+    { "id": "D", "name": "charter + glossary 先行", "type": "strategy", "outcome": "部分采纳 · 并进本版 chosen 的 charter 部分" },
+    { "id": "E", "name": "战略版: charter + 用户故事 hifi", "type": "strategy", "outcome": "采纳 · 用户明确 '做产品设计 规划 高保真原型图'" }
+  ],
+
+  "deliverables": [
+    { "path": "spec/charter.json", "desc": "10 条宪法 + glossary 6 词 + 能力地图 + 假设", "status": "done" },
+    { "path": "spec/principles.html + principles-frames.js", "desc": "宪法 B 档 11 帧逐帧", "status": "done" },
+    { "path": "spec/read-for-human/v0.1-user-story-hifi/", "desc": "A 档滚动 PPT · 11 帧 · 带 TTS 讲解 · 紫色玻璃 · 桌面端多轨道编辑器嵌入第 6 帧", "status": "done" },
+    { "path": "spec/versions/v0.1/kickoff/version-level.json", "desc": "本文件 · Phase 2 spec 读", "status": "done" },
+    { "path": "spec/versions/v0.1/kickoff/dialogue.json", "desc": "9 轮访谈原始沉淀 + 3 个 changed_from", "status": "done" }
+  ],
+
+  "next_phase": {
+    "phase": "v0.2 kickoff",
+    "candidate_topic": "frame pure 核心架构 POC + 最小 runtime · 纯函数 frame(t, json) = pixels 实现 + 最小浏览器预览",
+    "why": "v0.1 把产品定死 · v0.2 开始地基技术 · frame pure 是所有能力的不变式 · 先做它最稳"
+  }
+}

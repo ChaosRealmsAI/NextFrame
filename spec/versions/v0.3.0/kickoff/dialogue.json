@@ -1,0 +1,75 @@
+{
+  "version": "v0.3.0",
+  "session": "0912b6e2",
+  "started_at": "2026-04-21 15:10",
+  "confirmed_at": "2026-04-21 15:20",
+  "rounds": [
+    {
+      "round": 1,
+      "timestamp": "2026-04-21 15:10",
+      "question": "这版的一件事选哪个?(有量级差别 · 1h vs 10h+)",
+      "options": [
+        "A · 最小端到端 · URL→mp4(2h)",
+        "B · clips pipeline 骨架(5h)",
+        "C · 全链(10-15h · 违约束)",
+        "D · 先 spec 后 build(AI 推)"
+      ],
+      "answer": "我觉得都有已有代码了。 就 以前的那个 代码复制过来 调试通过就好。",
+      "interpreted_as": "用户反对 A/B/C/D 任一 · 主张直接复制 reference 代码调通 · 不重写不深度 spec · scope 未定 · 继续挖"
+    },
+    {
+      "round": 2,
+      "timestamp": "2026-04-21 15:15",
+      "question_1": "复制哪几块 · scope 锁多大?",
+      "options_1": [
+        "只 clips-pipeline(6 crate · 164K)",
+        "clips-pipeline + nf-tts(加 4800 行)",
+        "3 块全要 + nf-guide prompt md",
+        "最小验证包(1 crate 先跑通)"
+      ],
+      "answer_1": "3 块全要 + nf-guide prompt md",
+      "question_2": "'haiku 走通' 具体验收画面 · 看到什么算过?",
+      "options_2": [
+        "1 个 URL → 1 个可播 mp4",
+        "指定每步产物都对",
+        "haiku 能拉起 nf-source CLI 即算过"
+      ],
+      "answer_2": "tts 可以 视频剪切可以",
+      "interpreted_as": "scope = 3 块全要. 验收 = TTS 能用 + 视频剪切能用(2 独立模块 · 不强求串联)"
+    },
+    {
+      "round": 3,
+      "timestamp": "2026-04-21 15:18",
+      "question_1": "版本号落哪? (roadmap 原 v0.3.0 draft = JSON 引擎 · 跟本版不对路)",
+      "options_1": [
+        "v0.3.0 (改原来的 JSON 引擎 → clips+TTS 复原)",
+        "v0.4.0 (新开一号 · JSON 引擎 v0.3 保留)",
+        "和其他(你定)"
+      ],
+      "answer_1": "v0.3.0",
+      "question_2": "'haiku 走通' 怎么验?",
+      "options_2": [
+        "用 ally haiku backend 直跑实测",
+        "只保证 prompt 清晰 + CLI 可跑 · 不真拉 haiku",
+        "两档都上: ally haiku 1 条实测 + prompt 人工看"
+      ],
+      "answer_2": "subagent haiku",
+      "interpreted_as": "版本号 v0.3.0(顶替原 JSON 引擎 draft). 验证 = Claude Code Agent tool 派 subagent 指定 model=haiku 跑 prompt 真产物"
+    },
+    {
+      "round": 4,
+      "timestamp": "2026-04-21 15:20",
+      "question_1": "scope(做什么 + 不做什么) · OK?",
+      "options_1": ["OK · 这就是 v0.3.0", "改 · 我有补充"],
+      "answer_1": "OK · 这就是 v0.3.0",
+      "question_2": "成功画面(主 agent 见 3 个产物文件) · OK?",
+      "options_2": ["OK · 3 产物齐即过", "改 · 我要换东西验"],
+      "answer_2": "OK · 3 产物(mp4 + mp3 + karaoke.html)齐即过",
+      "interpreted_as": "kickoff 点头 · 进阶段 3 产 JSON/HTML · 交棒 version-spec"
+    }
+  ],
+  "pre_kickoff_notes": [
+    "用户最初说 '开一个新版本。走自动化模式' · 先加载 version-kickoff skill 按流程走 Phase 1 · autopilot 前置硬门槛是 kickoff 锁清 scope / 约束",
+    "用户提到 '确保调通 可用 · haiku走通 · 全自动模式' · 按 feedback_version_autopilot memory: kickoff 点头后 Phase 2/3/4 自动推不阻塞"
+  ]
+}

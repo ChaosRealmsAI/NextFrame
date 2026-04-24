@@ -1,0 +1,81 @@
+{
+  "kind": "subtitle",
+  "name": "Subtitle Track",
+  "description": "字幕轨道 · 每字独立 span · 三态(read / active / unread)· 演讲 / 教学 / 翻译",
+  "use_cases": ["演讲字幕", "教学课程", "翻译视频"],
+  "t0_visibility": 1.0,
+  "z_order_hint": 10,
+  "visual_channels": ["subtitle"],
+
+  "params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["source"],
+    "additionalProperties": false,
+    "properties": {
+      "source": {
+        "description": "三种来源 · 运行时 bundler 统一归一到 words 形式再渲染",
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["audio_track_id"],
+            "additionalProperties": false,
+            "properties": {
+              "audio_track_id": {"type": "string", "description": "指向某 audio track 的 id · 运行时从该 track 拉 timeline.json"}
+            }
+          },
+          {
+            "type": "object",
+            "required": ["timeline_path"],
+            "additionalProperties": false,
+            "properties": {
+              "timeline_path": {"type": "string", "description": "vox 产的 timeline.json 路径"}
+            }
+          },
+          {
+            "type": "object",
+            "required": ["words"],
+            "additionalProperties": false,
+            "properties": {
+              "words": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["text", "start_ms", "end_ms"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "text": {"type": "string"},
+                    "start_ms": {"type": "number", "minimum": 0},
+                    "end_ms": {"type": "number", "minimum": 0}
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "style": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "active_color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+          "size_px": {"type": "number", "minimum": 12, "maximum": 120},
+          "position": {"type": "string", "enum": ["top", "middle", "bottom"]},
+          "padding": {"type": "number", "minimum": 0}
+        }
+      }
+    }
+  },
+
+  "sample": {
+    "source": {
+      "words": [
+        {"text": "你", "start_ms": 0, "end_ms": 300},
+        {"text": "好", "start_ms": 300, "end_ms": 600},
+        {"text": "字", "start_ms": 600, "end_ms": 900},
+        {"text": "幕", "start_ms": 900, "end_ms": 1200}
+      ]
+    },
+    "style": {"active_color": "#fbbf24", "size_px": 36, "position": "bottom", "padding": 12}
+  }
+}

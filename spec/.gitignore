@@ -1,0 +1,17 @@
+# nf-tts 产出的缓存 · 冗余不入仓
+**/.vox-cache/
+
+# 临时
+tmp/
+
+# POC 编译产物(不入仓 · 可从 Cargo.lock / package.json 重建)
+poc/**/target/
+poc/**/node_modules/
+poc/**/dist/
+poc/**/.cargo/
+
+# 通用 build artifacts
+**/target/
+**/node_modules/
+**/dist/
+**/.DS_Store

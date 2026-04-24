@@ -1,0 +1,21 @@
+{
+  "id": "parallel-final",
+  "title": "高速最终档使用多个 headless WebView 分片导出",
+  "given": "showreel-24s 时长超过并行阈值，用户选择高速最终 profile。",
+  "when": "用户开始导出，shell 调用 nf export 并传入 parallel=4。",
+  "then": "recorder 进入 parallel start/segment/concat 流程；最终 MP4 是 1080p/60fps，导出不会退回黑盒单进程。",
+  "human_actions": ["choose fast final", "click export", "watch parallel stage", "verify mp4"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile final-fast --parallel 4 --out tmp/v0.11.0/showreel-final-fast.mp4 --events",
+      "expected": "stdout includes record.parallel.start or explicit downgrade reason"
+    },
+    {
+      "tool": "state",
+      "command": "ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate -of json tmp/v0.11.0/showreel-final-fast.mp4",
+      "expected": "width=1920 height=1080 r_frame_rate=60/1"
+    }
+  ],
+  "done": false
+}

@@ -1,0 +1,30 @@
+{
+  "id": "sc-06",
+  "title": "audio/subtitle/animation/bg/video/chart/data 7 kind 未实现 · runtime 警告不崩",
+  "type": "observable",
+  "chapter": "ch-unsupported",
+
+  "given": "timeline.json 含 1 scene track(实现)+ 1 audio track(未实现)· schema 合法",
+  "when": "nf timeline open 跑",
+  "then": [
+    "scene 正常渲染",
+    "stderr 警告:'UnsupportedKind: audio (v0.8 only implements scene · scheduled: v0.9 audio)'",
+    "runtime 不崩 · app 不退出"
+  ],
+
+  "ai_tools": [
+    {
+      "tool": "open-with-audio",
+      "command": "nf timeline open --file=spec/versions/v0.8.0/samples/sample-scene-plus-audio.json 2>&1 | grep -c UnsupportedKind",
+      "output": ">= 1(至少一条警告)"
+    },
+    {
+      "tool": "state-check",
+      "command": "nf state --key=app_running",
+      "output": "true(app 没崩)"
+    }
+  ],
+
+  "dev": "pending",
+  "tested": "pending"
+}

@@ -1,0 +1,97 @@
+{
+  "version": "v0.11.0",
+  "status": "waiting-review",
+  "drafts": {
+    "proposals": [
+      {
+        "by": "main-agent-local",
+        "path": "spec/versions/v0.11.0/drafts/merged.md"
+      }
+    ],
+    "merged": "spec/versions/v0.11.0/drafts/merged.md"
+  },
+  "tasks": [
+    {
+      "id": "T-01",
+      "title": "CLI export profiles and options",
+      "bdd_scenarios": ["select-profile", "real-progress"],
+      "deps": [],
+      "wave": 1,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "target/debug/nf export --help lists --profile/--fps/--resolution/--parallel/--events; launch-open draft exported 1280x720 30fps 8.000s MP4.",
+      "retry_count": 0,
+      "worktree": null
+    },
+    {
+      "id": "T-02",
+      "title": "Shell export streaming progress state",
+      "bdd_scenarios": ["real-progress", "open-output"],
+      "deps": ["T-01"],
+      "wave": 2,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "Desktop export-status returned progress {stage:done, percent:100, frames_encoded:240, total_frames:240}; running inspector state captured percent=75, frames=180/240, stage=render, eta≈5s.",
+      "retry_count": 0,
+      "worktree": null
+    },
+    {
+      "id": "T-03",
+      "title": "Frontend profile controls and progress UI",
+      "bdd_scenarios": ["select-profile", "real-progress", "open-output"],
+      "deps": ["T-02"],
+      "wave": 3,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "nf-inspector shadow DOM shows four profile buttons and data-export-selected-profile=draft; tmp/v0.11.0/export-ui.png captured export UI.",
+      "retry_count": 0,
+      "worktree": null
+    },
+    {
+      "id": "T-04",
+      "title": "Final-fast parallel export path",
+      "bdd_scenarios": ["parallel-final"],
+      "deps": ["T-01", "T-02"],
+      "wave": 4,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "launch-open final-fast --parallel 2 emitted record.parallel.start/segment.start/segment.done/concat/done and produced 1920x1080 60fps MP4.",
+      "retry_count": 0,
+      "worktree": null
+    },
+    {
+      "id": "T-05",
+      "title": "Saved JSON consistency and open-output regression",
+      "bdd_scenarios": ["json-sync", "open-output"],
+      "deps": ["T-01", "T-02", "T-03"],
+      "wave": 5,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "showreel-24s draft exported 24.000s 1280x720 30fps MP4 in 1:04.95; open button click set export-open-status=opened.",
+      "retry_count": 0,
+      "worktree": null
+    }
+  ],
+  "waves": [
+    { "id": 1, "tasks": ["T-01"], "reviewed": true },
+    { "id": 2, "tasks": ["T-02"], "reviewed": true },
+    { "id": 3, "tasks": ["T-03"], "reviewed": true },
+    { "id": 4, "tasks": ["T-04"], "reviewed": true },
+    { "id": 5, "tasks": ["T-05"], "reviewed": true }
+  ],
+  "redteam": {
+    "opus_report": null,
+    "new_scenarios": []
+  },
+  "failures": []
+}

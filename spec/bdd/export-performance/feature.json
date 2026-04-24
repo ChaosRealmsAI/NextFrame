@@ -1,0 +1,17 @@
+{
+  "feature": "export-performance",
+  "name": "导出档位、并行与真实进度",
+  "summary": "桌面端导出从黑盒单档变成可选档位、真实进度、可并行的本地导出，同时保持保存后的 JSON 与最终 MP4 一致。",
+  "status": "spec",
+  "scenarios": [
+    "select-profile",
+    "real-progress",
+    "parallel-final",
+    "json-sync",
+    "open-output"
+  ],
+  "completion": {
+    "total": 5,
+    "done": 0
+  }
+}

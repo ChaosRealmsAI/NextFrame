@@ -1,0 +1,26 @@
+{
+  "id": "json-sync",
+  "title": "导出档位优化不破坏保存 JSON 与 MP4 一致性",
+  "given": "用户把 final-title.params.title 改成 NEXTFRAME EXPORT SYNC 并保存。",
+  "when": "用户用 draft 或 final-fast profile 导出。",
+  "then": "导出 source JSON 包含保存后的 title；MP4 来自同一份 source，不读取编辑器 DOM 临时状态。",
+  "human_actions": ["edit title", "save", "choose profile", "export", "inspect source json"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition patch --project v2-showcase --composition showreel-24s --track final-title --field params.title --value 'NEXTFRAME EXPORT SYNC'",
+      "expected": "composition JSON updated"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --out tmp/v0.11.0/sync-draft.mp4",
+      "expected": "source sidecar contains NEXTFRAME EXPORT SYNC"
+    },
+    {
+      "tool": "state",
+      "command": "jq -r '.tracks[] | select(.id==\"final-title\") | .params.title' tmp/v0.11.0/sync-draft.mp4.source.json",
+      "expected": "NEXTFRAME EXPORT SYNC"
+    }
+  ],
+  "done": false
+}

@@ -1,0 +1,1233 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>NextFrame · Editor</title>
+<style>
+  /* ============================================================
+     NextFrame Editor Prototype · v0.1
+     Linear 极简 · 直角风 · Mac 玻璃质感 · 单色(紫 + 灰) · 无 emoji
+     跨平台 CSS: system font stack · backdrop-filter + -webkit 前缀
+     ============================================================ */
+
+  :root {
+    --bg:        #0a0a0d;
+    --panel:     #0e0e13;
+    --panel-2:  rgba(14, 14, 19, 0.68);
+    --surf:      rgba(255, 255, 255, 0.025);
+    --surf-2:    rgba(255, 255, 255, 0.045);
+    --bd:        rgba(255, 255, 255, 0.07);
+    --bd-2:      rgba(255, 255, 255, 0.04);
+    --accent:    #a78bfa;
+    --accent-d:  #7c3aed;
+    --accent-l:  #c4b5fd;
+    --accent-t:  rgba(167, 139, 250, 0.1);
+    --accent-b:  rgba(167, 139, 250, 0.25);
+    --amber:     #e0b76c;
+    --amber-l:   #eacb90;
+    --amber-t:   rgba(224, 183, 108, 0.12);
+    --amber-b:   rgba(224, 183, 108, 0.3);
+    --teal:      #7bc9b5;
+    --teal-l:    #a3d9ca;
+    --gray:      rgba(255, 255, 255, 0.18);
+    --gray-l:    rgba(255, 255, 255, 0.32);
+    --fg:        #f4f4f8;
+    --fg-2:      rgba(255, 255, 255, 0.88);
+    --fg-3:      rgba(255, 255, 255, 0.72);
+    --fg-4:      rgba(255, 255, 255, 0.56);
+    --ok:        #4ade80;
+    --mono:      "SF Mono", "JetBrains Mono", "Monaco", Menlo, Consolas, monospace;
+    --font:      -apple-system, BlinkMacSystemFont, "Inter", "PingFang SC", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+  }
+
+  /* Reset */
+  *, *::before, *::after { box-sizing: border-box; border-radius: 0; }
+  html, body { margin: 0; padding: 0; width: 100%; min-height: 100vh; }
+  button { font: inherit; cursor: pointer; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--fg-2);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-size: 13px; line-height: 1.5;
+    padding: 32px;
+    position: relative;
+    overflow-x: hidden;
+  }
+  /* aurora · 多层紫 + 极少 teal 变奏 · 增加玻璃后景层次 */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 45% at 30% 0%, rgba(167, 139, 250, 0.18), transparent 70%),
+      radial-gradient(ellipse 50% 40% at 80% 20%, rgba(124, 58, 237, 0.14), transparent 70%),
+      radial-gradient(ellipse 40% 30% at 70% 80%, rgba(94, 234, 212, 0.04), transparent 70%),
+      radial-gradient(ellipse 50% 40% at 30% 100%, rgba(124, 58, 237, 0.08), transparent 70%);
+    z-index: -2;
+    pointer-events: none;
+  }
+  /* 极细 grain/noise · SVG 数据 URI · 跨平台 · 增加玻璃质感 */
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    opacity: 0.35;
+    mix-blend-mode: overlay;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /* ===== Outer · 顶部 brand meta ===== */
+  .outer {
+    max-width: 1720px; margin: 0 auto 18px;
+    padding: 0 4px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .outer .brand {
+    font-size: 11px; color: var(--fg-3);
+    letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600;
+  }
+  .outer .brand b { color: var(--fg); font-weight: 700; letter-spacing: 0.08em; }
+  .outer .meta {
+    font-family: var(--mono); font-size: 10.5px; color: var(--fg-4);
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* ===== App Shell · 多层玻璃 · 顶部光晕 · 内高光 ===== */
+  .app {
+    max-width: 1720px; margin: 0 auto;
+    height: min(90vh, 940px);
+    background: rgba(14, 14, 19, 0.55);
+    backdrop-filter: blur(50px) saturate(1.5);
+    -webkit-backdrop-filter: blur(50px) saturate(1.5);
+    border: 1px solid var(--bd);
+    box-shadow:
+      0 30px 90px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 0 0 0.5px rgba(255, 255, 255, 0.03);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  /* 顶部光晕 · 玻璃反光 */
+  .app::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 180px;
+    background: radial-gradient(ellipse 60% 100% at 50% 0%, rgba(255, 255, 255, 0.04), transparent 70%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* ===== Topbar · 一行: 红绿灯 / breadcrumb / tabs / status ===== */
+  .topbar {
+    height: 46px; flex-shrink: 0;
+    display: flex; align-items: center;
+    padding: 0 18px;
+    background: rgba(10, 10, 14, 0.65);
+    border-bottom: 1px solid var(--bd);
+    gap: 16px;
+  }
+
+  .tb-dots { display: flex; gap: 7px; flex-shrink: 0; }
+  .tb-dots span {
+    width: 11px; height: 11px; border-radius: 50%;
+  }
+  .tb-dots .r { background: #ff5f57; }
+  .tb-dots .y { background: #febc2e; }
+  .tb-dots .g { background: #28c840; }
+
+  .tb-sep { width: 1px; height: 18px; background: var(--bd); flex-shrink: 0; }
+
+  .tb-crumb {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12.5px; flex-shrink: 0;
+  }
+  .tb-crumb .slash { color: var(--fg-4); font-weight: 300; padding: 0 2px; }
+  /* Home · SVG 线框图标 */
+  .tb-home {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px;
+    color: var(--fg-3);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+  }
+  .tb-home:hover { color: var(--fg); background: rgba(255, 255, 255, 0.05); }
+  .tb-home svg { width: 15px; height: 15px; }
+  /* Breadcrumb 下拉 · 玻璃风 · hover 显玻璃底 */
+  .tb-drop {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 8px;
+    color: var(--fg-2);
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .tb-drop:hover {
+    color: var(--fg);
+    background: rgba(255, 255, 255, 0.045);
+    border-color: var(--bd);
+  }
+  .tb-drop.ep { color: var(--fg); font-weight: 600; }
+  .tb-drop .chev {
+    font-size: 10px; color: var(--fg-4);
+    font-family: var(--mono); margin-top: 1px;
+  }
+  .tb-drop:hover .chev { color: var(--fg-2); }
+
+  .tb-tabs {
+    display: flex; align-items: stretch;
+    height: 100%;
+    margin-left: 2px;
+  }
+  .tb-tab {
+    display: inline-flex; align-items: center;
+    padding: 0 14px;
+    color: var(--fg-3);
+    font-size: 12.5px; font-weight: 500;
+    letter-spacing: 0.01em;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tb-tab:hover { color: var(--fg-2); }
+  .tb-tab.cur {
+    color: var(--fg);
+    border-bottom-color: var(--accent);
+  }
+
+  .tb-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+  }
+  /* 语言切换 · 玻璃下拉 */
+  .tb-lang {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 10px 4px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--bd);
+    color: var(--fg);
+    font-size: 11.5px; font-weight: 500;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  .tb-lang:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+  .tb-lang .chev {
+    font-size: 10px; color: var(--fg-3);
+    font-family: var(--mono); margin-top: 1px;
+  }
+
+  /* ===== Body · 3 栏 grid ===== */
+  .body {
+    flex: 1;
+    display: grid; grid-template-columns: 300px 1fr 300px;
+    min-height: 0;
+  }
+
+  .panel {
+    background: rgba(8, 8, 12, 0.42);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    border-right: 1px solid var(--bd);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .panel.right { border-right: none; border-left: 1px solid var(--bd); }
+  /* 中间 stage 更透 · 形成纵深 */
+  .stage {
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  .panel-head {
+    height: 38px; flex-shrink: 0;
+    padding: 0 16px;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--bd);
+    background: rgba(0, 0, 0, 0.22);
+  }
+  .panel-head .live {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ok);
+  }
+  .panel-head .t {
+    font-size: 10.5px; font-weight: 700;
+    color: var(--fg); letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .panel-head .c {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--amber-l); letter-spacing: 0.05em;
+  }
+
+  /* ===== Left panel · 2 sections: clips (top) + ops log (bottom) ===== */
+  .clips-section {
+    flex-shrink: 0;
+    height: 252px;
+    display: flex; flex-direction: column;
+    border-bottom: 1px solid var(--bd);
+  }
+  .clips-list {
+    flex: 1; overflow-y: auto;
+    padding: 8px 10px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+  }
+  .clips-list::-webkit-scrollbar { width: 3px; }
+  .clips-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); }
+
+  .clip-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--bd);
+    color: var(--fg);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .clip-row:hover {
+    background: rgba(255, 255, 255, 0.045);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  .clip-row.active {
+    background: rgba(167, 139, 250, 0.14);
+    border-color: var(--accent-b);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .clip-row .mk {
+    width: 3px; height: 14px;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .clip-row .mk.audio { background: rgba(167, 139, 250, 0.5); }
+  .clip-row .nm {
+    font-size: 11.5px; font-weight: 600;
+    color: var(--fg);
+    flex: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .clip-row .dur {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--amber); letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .clip-row.active .dur { color: var(--amber-l); }
+
+  .ops-section {
+    flex: 1;
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
+
+  /* ===== Ops Log · 极简 3 行: kind+time / desc / cli ===== */
+  .ops-log {
+    flex: 1; overflow-y: auto;
+    padding: 10px 14px 16px;
+    display: flex; flex-direction: column-reverse; gap: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+  }
+  .ops-log::-webkit-scrollbar { width: 3px; }
+  .ops-log::-webkit-scrollbar-track { background: transparent; }
+  .ops-log::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); }
+
+  .log {
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--bd);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+    display: flex; flex-direction: column; gap: 7px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .log:hover {
+    background: rgba(255, 255, 255, 0.038);
+    border-color: rgba(255, 255, 255, 0.11);
+  }
+
+  .log-hd {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--fg-2); letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .log-kind {
+    font-weight: 700;
+    padding: 1px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--fg-2);
+    letter-spacing: 0.12em;
+  }
+  .log-kind.ai {
+    color: var(--accent-l);
+    border-color: rgba(167, 139, 250, 0.3);
+    background: rgba(167, 139, 250, 0.06);
+  }
+  .log-time { margin-left: auto; color: var(--amber); opacity: 0.75; }
+
+  .log-desc {
+    font-size: 12px; color: var(--fg); line-height: 1.55;
+  }
+  .log-desc b { color: var(--fg); font-weight: 600; }
+  .log-desc code {
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--accent-l);
+    padding: 0 4px;
+    background: var(--accent-t);
+    border: 1px solid var(--bd-2);
+  }
+
+  .log-cli {
+    font-family: var(--mono); font-size: 10.5px;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.38);
+    border: 1px solid var(--bd-2);
+    color: var(--fg-2);
+    overflow-x: auto; white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .log-cli::-webkit-scrollbar { display: none; }
+  .log-cli::before { content: "$ "; color: var(--amber); }
+  .log-cli .c { color: var(--accent-l); font-weight: 500; }
+  .log-cli .f { color: var(--fg-3); }
+
+  .log.pending {
+    border-color: var(--amber-b);
+    background: var(--amber-t);
+  }
+  .log.pending .log-cli::before { color: var(--amber); }
+  .log.pending .log-time { color: var(--amber-l); opacity: 1; }
+
+  /* ===== Stage · preview + play + timeline ===== */
+  .stage {
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
+
+  .preview {
+    flex: 1; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .frame {
+    width: 82%; aspect-ratio: 16 / 9;
+    background:
+      radial-gradient(ellipse 60% 60% at 50% 50%, rgba(167, 139, 250, 0.15), transparent 70%),
+      #0b0b10;
+    border: 1px solid var(--bd);
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px;
+    overflow: hidden;
+  }
+  .frame::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000, transparent);
+            mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000, transparent);
+    pointer-events: none;
+  }
+  .frame .brand {
+    font-size: 54px; font-weight: 800;
+    color: var(--fg); letter-spacing: -0.04em;
+    position: relative; z-index: 2;
+  }
+  .frame .sub {
+    font-size: 10.5px; color: var(--fg-3);
+    letter-spacing: 0.5em; text-transform: uppercase;
+    font-weight: 500; position: relative; z-index: 2;
+  }
+  .frame .tc {
+    position: absolute; bottom: 14px; left: 16px;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--amber); letter-spacing: 0.1em;
+  }
+  .frame .cn {
+    position: absolute; bottom: 14px; right: 16px;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--accent-l); letter-spacing: 0.1em;
+  }
+
+  /* ===== Play Controls ===== */
+  .playctl {
+    height: 46px; flex-shrink: 0;
+    display: flex; align-items: center;
+    padding: 0 20px; gap: 14px;
+    background: rgba(0, 0, 0, 0.28);
+    border-top: 1px solid var(--bd);
+  }
+  .playctl .btn {
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--bd);
+    color: var(--fg-2);
+    font-size: 10px; font-weight: 600;
+    transition: background 0.15s, color 0.15s;
+  }
+  .playctl .btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--fg); }
+  .playctl .btn.main {
+    width: 30px; height: 30px;
+    background: var(--fg); color: var(--bg);
+    border-color: var(--fg);
+    font-size: 10px;
+  }
+  .playctl .btn.main:hover { background: var(--accent-l); border-color: var(--accent-l); }
+  .playctl .tc {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--fg-2); letter-spacing: 0.06em;
+  }
+  .playctl .tc .cur { color: var(--amber); font-weight: 600; }
+  .playctl .tc .dim { color: var(--fg-4); }
+  .playctl .scrub {
+    flex: 1; max-width: 420px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    position: relative;
+    margin: 0 6px;
+  }
+  .playctl .scrub .fill { height: 100%; width: 42%; background: var(--fg); }
+  .playctl .scrub .head {
+    position: absolute; left: 42%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--fg);
+  }
+  .playctl .rate {
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--amber); letter-spacing: 0.1em;
+  }
+
+  /* ===== Timeline ===== */
+  .timeline {
+    height: 250px; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: rgba(0, 0, 0, 0.3);
+    border-top: 1px solid var(--bd);
+  }
+  .tl-top {
+    height: 32px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--bd);
+    background: rgba(0, 0, 0, 0.2);
+  }
+  .tl-top .t {
+    font-size: 10px; font-weight: 600;
+    color: var(--fg-3); letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .tl-top .anchors {
+    display: flex; gap: 12px;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--fg-4); letter-spacing: 0.04em;
+  }
+  .tl-top .anchors span b { color: var(--accent-l); font-weight: 500; }
+  .tl-top .zoom {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--fg-4); letter-spacing: 0.06em;
+  }
+
+  .tl-ruler {
+    height: 26px; flex-shrink: 0;
+    position: relative;
+    padding-left: 100px;
+    border-bottom: 1px solid var(--bd-2);
+    background: rgba(0, 0, 0, 0.15);
+  }
+  .tl-ruler .tick {
+    position: absolute; bottom: 0;
+    width: 1px; height: 5px;
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .tl-ruler .tick.maj { height: 9px; background: rgba(255, 255, 255, 0.28); }
+  .tl-ruler .tick .n {
+    position: absolute; bottom: 10px; left: 3px;
+    font-family: var(--mono); font-size: 9px;
+    color: var(--amber); opacity: 0.7;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  /* 锚点 · 在轨道底部 · 琥珀倒三角(▲ 从下向上指) */
+  .anchor-tri {
+    position: absolute; bottom: 0;
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 8px solid var(--amber);
+    transform: translateX(-50%);
+    z-index: 12; pointer-events: none;
+  }
+  .anchor-tri::after {
+    content: attr(data-l);
+    position: absolute; bottom: 9px; left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono); font-size: 8.5px;
+    color: var(--amber);
+    white-space: nowrap; letter-spacing: 0.04em;
+    padding: 1px 5px;
+    background: rgba(10, 10, 14, 0.85);
+    border: 1px solid var(--amber-b);
+  }
+
+  .tl-body {
+    flex: 1; position: relative; overflow: hidden;
+  }
+  .tl-row {
+    height: 36px; display: flex;
+    border-bottom: 1px solid var(--bd-2);
+  }
+  .tl-row .tl-head-col {
+    width: 100px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 12px;
+    font-size: 10.5px; font-weight: 500;
+    color: var(--fg-2);
+    border-right: 1px solid var(--bd-2);
+    background: rgba(0, 0, 0, 0.18);
+    letter-spacing: 0.06em;
+  }
+  .tl-row .tl-head-col .d {
+    width: 8px; height: 8px;
+    flex-shrink: 0;
+  }
+  .tl-row .tl-head-col .d.scene { background: var(--accent); }
+  .tl-row .tl-head-col .d.text  { background: var(--amber); }
+  .tl-row .tl-head-col .d.trans { background: var(--gray-l); }
+  .tl-row .tl-head-col .d.audio { background: var(--teal); }
+  .tl-row .tl-lane { flex: 1; position: relative; }
+
+  /* ===== Clips · 每轨一色 · 纯方块无左竖线 · 协调紫/琥珀/青/灰 ===== */
+  .clip {
+    position: absolute; top: 4px; bottom: 4px;
+    padding: 0 9px;
+    display: flex; align-items: center;
+    font-size: 10.5px; font-weight: 600;
+    color: var(--fg);
+    background: rgba(167, 139, 250, 0.38);
+    border: 1px solid var(--accent);
+    overflow: hidden;
+    transition: background 0.15s, transform 0.1s;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  }
+  .clip:hover { background: rgba(167, 139, 250, 0.55); }
+  .clip.active {
+    background: rgba(167, 139, 250, 0.7);
+    border-color: var(--accent-l);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+  .clip.text {
+    background: rgba(224, 183, 108, 0.35);
+    border-color: var(--amber);
+    color: var(--fg);
+  }
+  .clip.text:hover { background: rgba(224, 183, 108, 0.5); }
+  .clip.trans {
+    padding: 0 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--gray-l);
+    font-size: 9.5px;
+    color: var(--fg);
+  }
+  .clip.trans:hover { background: rgba(255, 255, 255, 0.18); }
+  .clip.audio {
+    background: rgba(123, 201, 181, 0.28);
+    border-color: var(--teal);
+    color: var(--fg);
+    position: relative;
+  }
+  .clip.audio:hover { background: rgba(123, 201, 181, 0.38); }
+  .clip.audio .wave {
+    position: absolute; inset: 5px 8px;
+    display: flex; align-items: center; gap: 1.5px;
+    pointer-events: none;
+  }
+  .clip.audio .wave b {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.18);
+  }
+  .clip.audio .wave b:nth-child(3n) { height: 48%; }
+  .clip.audio .wave b:nth-child(3n+1) { height: 26%; }
+  .clip.audio .wave b:nth-child(3n+2) { height: 72%; }
+  .clip.audio .wave b:nth-child(5n+1) { height: 38%; }
+  .clip.audio .wave b:nth-child(7n+1) { height: 66%; }
+  .clip.audio .lbl {
+    position: relative; z-index: 2;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 1px 5px;
+    font-size: 9.5px;
+    font-family: var(--mono);
+  }
+
+  .playhead {
+    position: absolute; top: 0; bottom: 0;
+    width: 1px;
+    background: var(--fg);
+    z-index: 10; pointer-events: none;
+  }
+  .playhead::before {
+    content: ""; position: absolute; top: -3px; left: 50%;
+    transform: translateX(-50%);
+    width: 7px; height: 7px;
+    background: var(--fg);
+  }
+
+  /* ===== Inspector ===== */
+  .insp {
+    flex: 1; overflow-y: auto;
+    padding: 14px 14px 20px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+  }
+  .insp::-webkit-scrollbar { width: 3px; }
+  .insp::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); }
+
+  .export-btn {
+    width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    background: var(--fg);
+    color: var(--bg);
+    border: 1px solid var(--fg);
+    font-size: 12.5px; font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .export-btn:hover {
+    background: var(--accent-l);
+    border-color: var(--accent-l);
+  }
+  .export-btn .sub {
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 500;
+    opacity: 0.6; letter-spacing: 0.08em;
+    padding-left: 10px;
+    border-left: 1px solid currentColor;
+  }
+
+  .insp-sel {
+    padding: 8px 12px; margin-bottom: 14px;
+    background: rgba(167, 139, 250, 0.06);
+    border: 1px solid rgba(167, 139, 250, 0.2);
+    border-left: 2px solid var(--accent);
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px;
+  }
+  .insp-sel .l {
+    font-family: var(--mono); font-size: 9.5px;
+    color: var(--fg-4); letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .insp-sel .n { color: var(--fg); font-weight: 600; }
+  .insp-sel .m {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--fg-4); letter-spacing: 0.05em;
+  }
+
+  .insp-card {
+    padding: 14px 0;
+    border-top: 1px solid var(--bd);
+  }
+  .insp-card:first-of-type { border-top: none; padding-top: 4px; }
+  .insp-card h4 {
+    margin: 0 0 12px;
+    font-size: 10px; font-weight: 700;
+    color: var(--accent-l); letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .insp-f { margin-bottom: 10px; }
+  .insp-f:last-child { margin-bottom: 0; }
+  .insp-f .k {
+    font-size: 10px; color: var(--accent-l);
+    margin-bottom: 5px; opacity: 0.75;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .insp-f .k .tag {
+    font-family: var(--mono); text-transform: none;
+    font-size: 9.5px; color: var(--accent-l);
+    letter-spacing: 0.02em;
+  }
+  .insp-f .v {
+    font-family: var(--mono); font-size: 11.5px;
+    color: var(--fg);
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--bd);
+    letter-spacing: 0.01em;
+  }
+  .insp-f .v.accent { color: var(--accent-l); }
+
+  .insp-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+  .insp-tags .tg {
+    padding: 3px 8px;
+    font-family: var(--mono); font-size: 9.5px;
+    color: var(--fg-2);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--bd);
+    letter-spacing: 0.02em;
+  }
+
+  .insp-kf {
+    position: relative; height: 32px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--bd);
+    padding: 0 10px;
+  }
+  .insp-kf .line {
+    position: absolute; top: 50%; left: 10px; right: 10px;
+    height: 1px; background: rgba(255, 255, 255, 0.12);
+  }
+  .insp-kf .kk {
+    position: absolute; top: 50%;
+    transform: translate(-50%, -50%) rotate(45deg);
+    width: 7px; height: 7px;
+    background: var(--accent);
+  }
+  .insp-kf .cur {
+    position: absolute; top: 3px; bottom: 3px; width: 1px;
+    background: var(--fg);
+  }
+
+  /* ===== Outer footer ===== */
+  .caption {
+    max-width: 1720px; margin: 18px auto 0;
+    padding: 12px 18px;
+    display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+    background: rgba(14, 14, 19, 0.4);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--bd);
+    font-size: 11px; color: var(--fg-3);
+  }
+  .caption .l {
+    font-size: 10px; font-weight: 700;
+    color: var(--fg-2); letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .caption .item { display: flex; align-items: center; gap: 7px; }
+  .caption .sw { width: 14px; height: 10px; border: 1px solid var(--bd); }
+  .caption .sw.v { background: rgba(167, 139, 250, 0.4); border-color: var(--accent); }
+  .caption .sw.t { background: rgba(224, 183, 108, 0.4); border-color: var(--amber); }
+  .caption .sw.a { background: rgba(123, 201, 181, 0.32); border-color: var(--teal); }
+  .caption .sw.tr { background: rgba(255, 255, 255, 0.12); border-color: var(--gray-l); }
+  .caption .sw.anch {
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 8px solid var(--amber);
+    background: none; border-top: none;
+  }
+  .caption .sw.pl { width: 1px; height: 12px; background: var(--fg); border: none; }
+
+  .foot {
+    max-width: 1720px; margin: 12px auto 40px;
+    padding: 0 4px;
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--fg-4); letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="outer">
+  <div class="brand"><b>NextFrame</b> · 编辑器原型 · v0.1</div>
+  <div class="meta">极简 · 玻璃 · 直角</div>
+</div>
+
+<div class="app">
+
+  <!-- ===== Topbar · 一行 ===== -->
+  <div class="topbar">
+    <div class="tb-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    <div class="tb-sep"></div>
+    <div class="tb-crumb">
+      <a class="tb-home" title="返回首页">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 11 L12 3 L21 11"/>
+          <path d="M5 10 V21 H19 V10"/>
+          <path d="M10 21 V14 H14 V21"/>
+        </svg>
+      </a>
+      <span class="slash">/</span>
+      <div class="tb-drop" title="切换项目">
+        <span>NextFrame</span>
+        <span class="chev">˅</span>
+      </div>
+      <span class="slash">/</span>
+      <div class="tb-drop ep" title="切换集">
+        <span>EP-01 · 产品介绍</span>
+        <span class="chev">˅</span>
+      </div>
+    </div>
+    <div class="tb-sep"></div>
+    <div class="tb-tabs">
+      <div class="tb-tab">脚本</div>
+      <div class="tb-tab">视频切片</div>
+      <div class="tb-tab">语音生成</div>
+      <div class="tb-tab cur">视频制作</div>
+    </div>
+    <div class="tb-right">
+      <div class="tb-lang">
+        <span>中文</span>
+        <span class="chev">˅</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Body ===== -->
+  <div class="body">
+
+    <!-- Left · Clips (top) + Ops log (bottom) -->
+    <aside class="panel">
+
+      <!-- Top: Clips -->
+      <div class="clips-section">
+        <div class="panel-head">
+          <span class="t">片段</span>
+          <span class="c">7 条</span>
+        </div>
+        <div class="clips-list">
+          <div class="clip-row">
+            <div class="mk"></div>
+            <div class="nm">intro</div>
+            <div class="dur">5.0s</div>
+          </div>
+          <div class="clip-row">
+            <div class="mk"></div>
+            <div class="nm">feat 1</div>
+            <div class="dur">7.0s</div>
+          </div>
+          <div class="clip-row active">
+            <div class="mk"></div>
+            <div class="nm">feat 2</div>
+            <div class="dur">18.0s</div>
+          </div>
+          <div class="clip-row">
+            <div class="mk"></div>
+            <div class="nm">feat 3</div>
+            <div class="dur">18.0s</div>
+          </div>
+          <div class="clip-row">
+            <div class="mk"></div>
+            <div class="nm">outro</div>
+            <div class="dur">5.0s</div>
+          </div>
+          <div class="clip-row">
+            <div class="mk audio"></div>
+            <div class="nm">bgm-electric</div>
+            <div class="dur">58.2s</div>
+          </div>
+          <div class="clip-row">
+            <div class="mk audio"></div>
+            <div class="nm">narration-v2</div>
+            <div class="dur">60.0s</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom: Ops log -->
+      <div class="ops-section">
+      <div class="panel-head">
+        <span class="live"></span>
+        <span class="t">AI 操作日志</span>
+        <span class="c">24 条</span>
+      </div>
+      <div class="ops-log">
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind ai">AI</span><span class="log-time">12:03:00</span></div>
+          <div class="log-desc">读取 <b>project.json</b> · 解析视频结构</div>
+          <div class="log-cli"><span class="c">nf read</span> project.json <span class="f">--format</span>=json</div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind ai">AI</span><span class="log-time">12:03:01</span></div>
+          <div class="log-desc">写入 <b>4 个时间锚点</b></div>
+          <div class="log-cli"><span class="c">nf anchors</span> <span class="f">--set</span> intro-end=5 <span class="f">--set</span> feat-1-end=12 <span class="f">--set</span> feat-2-end=30</div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind ai">AI</span><span class="log-time">12:03:02</span></div>
+          <div class="log-desc">生成 <b>4 轨道 · 7 clips</b></div>
+          <div class="log-cli"><span class="c">nf tracks</span> <span class="f">--gen</span> scene,text,trans,audio <span class="f">--anchors</span></div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind">AI</span><span class="log-time">12:03:04</span></div>
+          <div class="log-desc">编译项目 · 生成 bundle</div>
+          <div class="log-cli"><span class="c">nf build</span> project.json</div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind">AI</span><span class="log-time">12:03:07</span></div>
+          <div class="log-desc">桌面端启动 · WebSocket 就绪</div>
+          <div class="log-cli"><span class="c">nf preview</span> <span class="f">--port</span> 7443 <span class="f">--mode</span> live</div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind">人</span><span class="log-time">12:03:12</span></div>
+          <div class="log-desc">拖动 <b>feat-2</b> 右边界 · 16.4s → <b>18.0s</b></div>
+          <div class="log-cli"><span class="c">nf clip edit</span> feat-2 <span class="f">--end</span> 18.0s</div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind ai">AI</span><span class="log-time">12:03:12</span></div>
+          <div class="log-desc">联动锚点 <code>feat-2-end</code> 28.4 → <b>30.0s</b> · 3 clips 重算</div>
+          <div class="log-cli"><span class="c">nf anchors</span> <span class="f">--set</span> feat-2-end=30.0 <span class="f">--cascade</span></div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind">AI</span><span class="log-time">12:03:13</span></div>
+          <div class="log-desc">增量 rebuild</div>
+          <div class="log-cli"><span class="c">nf build</span> <span class="f">--incremental</span></div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind">AI</span><span class="log-time">12:03:13</span></div>
+          <div class="log-desc">frame pure 一致性校验</div>
+          <div class="log-cli"><span class="c">nf verify</span> <span class="f">--modes</span> play,preview,export</div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind">人</span><span class="log-time">12:03:18</span></div>
+          <div class="log-desc">playhead 移至 <code>12.450s</code></div>
+          <div class="log-cli"><span class="c">nf cursor</span> <span class="f">--set</span> 12.450</div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind ai">AI</span><span class="log-time">12:03:20</span></div>
+          <div class="log-desc">建议 <b>feat-2</b> 应用 <code>color-cinematic</code> LUT</div>
+          <div class="log-cli"><span class="c">nf suggest</span> <span class="f">--clip</span> feat-2 <span class="f">--type</span> color-grade</div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind">人</span><span class="log-time">12:03:22</span></div>
+          <div class="log-desc">接受建议 · 应用 LUT</div>
+          <div class="log-cli"><span class="c">nf clip apply</span> feat-2 <span class="f">--effect</span> color-cinematic</div>
+        </div>
+
+        <div class="log">
+          <div class="log-hd"><span class="log-kind ai">AI</span><span class="log-time">12:03:24</span></div>
+          <div class="log-desc">BGM 音量归一化 · LUFS −14 标准</div>
+          <div class="log-cli"><span class="c">nf audio</span> normalize <span class="f">--clip</span> bgm <span class="f">--lufs</span> -14</div>
+        </div>
+
+        <div class="log pending">
+          <div class="log-hd"><span class="log-kind">AI</span><span class="log-time">12:03:25</span></div>
+          <div class="log-desc">导出视频 · 4K HEVC HDR10</div>
+          <div class="log-cli"><span class="c">nf export</span> <span class="f">-o</span> out.mp4 <span class="f">--codec</span> hevc <span class="f">--quality</span> 4K</div>
+        </div>
+
+      </div>
+      </div>
+    </aside>
+
+    <!-- Center · Stage -->
+    <div class="stage">
+
+      <div class="preview">
+        <div class="frame">
+          <div class="tc">00:12.450 · T=0.2075</div>
+          <div class="cn">feat · 2</div>
+          <div class="brand">NextFrame</div>
+          <div class="sub">AI-FIRST &nbsp; CLI-DRIVEN &nbsp; FRAME PURE</div>
+        </div>
+      </div>
+
+      <div class="playctl">
+        <button class="btn">◀◀</button>
+        <button class="btn main">▶</button>
+        <button class="btn">▶▶</button>
+        <div class="tc"><span class="cur">00:12.450</span><span class="dim"> / 01:00.000</span></div>
+        <div class="scrub"><div class="fill"></div><div class="head"></div></div>
+        <div class="rate">1×</div>
+      </div>
+
+      <div class="timeline">
+        <div class="tl-top">
+          <div class="t">时间轴 · 4 轨 · 7 片段</div>
+          <div class="anchors">
+            <span><b>intro-end</b> 5.0</span>
+            <span><b>feat-1-end</b> 12.0</span>
+            <span><b>feat-2-end</b> 30.0</span>
+            <span><b>outro-start</b> 55.0</span>
+          </div>
+          <div class="zoom">1× · fit</div>
+        </div>
+
+        <div class="tl-ruler">
+          <div class="tick" style="left:calc(100px + 0%);"><span class="n">0</span></div>
+          <div class="tick maj" style="left:calc(100px + 8.33%);"><span class="n">5</span></div>
+          <div class="tick" style="left:calc(100px + 16.67%);"><span class="n">10</span></div>
+          <div class="tick maj" style="left:calc(100px + 25%);"><span class="n">15</span></div>
+          <div class="tick" style="left:calc(100px + 33.33%);"><span class="n">20</span></div>
+          <div class="tick maj" style="left:calc(100px + 41.67%);"><span class="n">25</span></div>
+          <div class="tick" style="left:calc(100px + 50%);"><span class="n">30</span></div>
+          <div class="tick maj" style="left:calc(100px + 58.33%);"><span class="n">35</span></div>
+          <div class="tick" style="left:calc(100px + 66.67%);"><span class="n">40</span></div>
+          <div class="tick maj" style="left:calc(100px + 75%);"><span class="n">45</span></div>
+          <div class="tick" style="left:calc(100px + 83.33%);"><span class="n">50</span></div>
+          <div class="tick maj" style="left:calc(100px + 91.67%);"><span class="n">55</span></div>
+          <div class="tick" style="left:calc(100px + 100%);"><span class="n">60</span></div>
+        </div>
+
+        <div class="tl-body">
+          <div class="tl-row">
+            <div class="tl-head-col"><div class="d scene"></div><span>画面</span></div>
+            <div class="tl-lane">
+              <div class="clip" style="left:0%; width:8.3%;">intro</div>
+              <div class="clip" style="left:8.3%; width:11.7%;">feat 1</div>
+              <div class="clip active" style="left:20%; width:30%;">feat 2 · 18s</div>
+              <div class="clip" style="left:50%; width:30%;">feat 3</div>
+              <div class="clip" style="left:91.7%; width:8.3%;">outro</div>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-head-col"><div class="d text"></div><span>文字</span></div>
+            <div class="tl-lane">
+              <div class="clip text" style="left:1.67%; width:6.67%;">title</div>
+              <div class="clip text" style="left:9%; width:10.5%;">sub 1</div>
+              <div class="clip text" style="left:21%; width:28%;">sub 2</div>
+              <div class="clip text" style="left:51%; width:28%;">sub 3</div>
+              <div class="clip text" style="left:92.5%; width:7%;">CTA</div>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-head-col"><div class="d trans"></div><span>转场</span></div>
+            <div class="tl-lane">
+              <div class="clip trans" style="left:7.5%; width:1.67%;">flip</div>
+              <div class="clip trans" style="left:19.3%; width:1.4%;">in</div>
+              <div class="clip trans" style="left:49.3%; width:1.4%;">in</div>
+              <div class="clip trans" style="left:90.5%; width:2.2%;">fade</div>
+            </div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-head-col"><div class="d audio"></div><span>音频</span></div>
+            <div class="tl-lane">
+              <div class="clip audio" style="left:0%; width:97%;">
+                <div class="wave"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+                <span class="lbl">bgm · −6dB</span>
+              </div>
+            </div>
+          </div>
+          <div class="playhead" style="left: calc(100px + 20.75%);"></div>
+
+          <!-- 锚点 · 轨道底部倒三角 · 琥珀色 -->
+          <div class="anchor-tri" data-l="intro-end"   style="left: calc(100px + 8.33%);"></div>
+          <div class="anchor-tri" data-l="feat-1-end"  style="left: calc(100px + 20%);"></div>
+          <div class="anchor-tri" data-l="feat-2-end"  style="left: calc(100px + 50%);"></div>
+          <div class="anchor-tri" data-l="outro-start" style="left: calc(100px + 91.7%);"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right · Inspector -->
+    <aside class="panel right">
+      <div class="insp">
+
+        <button class="export-btn">
+          导出视频
+          <span class="sub">4K · HEVC</span>
+        </button>
+
+        <div class="insp-sel">
+          <span class="l">已选片段</span>
+          <span class="n">feat-2</span>
+          <span class="m">画面 · 18.0s</span>
+        </div>
+
+        <div class="insp-card">
+          <h4>属性</h4>
+          <div class="insp-f">
+            <div class="k"><span>类型</span></div>
+            <div class="v">画面 · 视频</div>
+          </div>
+          <div class="insp-f">
+            <div class="k"><span>起点</span><span class="tag">锚点</span></div>
+            <div class="v accent">feat-1-end</div>
+          </div>
+          <div class="insp-f">
+            <div class="k"><span>时长</span><span class="tag">表达式</span></div>
+            <div class="v accent">feat-2-end − feat-1-end</div>
+          </div>
+          <div class="insp-f">
+            <div class="k"><span>实际</span></div>
+            <div class="v">18.000 秒</div>
+          </div>
+        </div>
+
+        <div class="insp-card">
+          <h4>效果</h4>
+          <div class="insp-f">
+            <div class="k"><span>特效</span></div>
+            <div class="insp-tags">
+              <span class="tg">glass-flip</span>
+              <span class="tg">blur · 8px</span>
+              <span class="tg">scale · 1.05</span>
+            </div>
+          </div>
+          <div class="insp-f">
+            <div class="k"><span>调色</span><span class="tag">LUT</span></div>
+            <div class="v">cinematic-night</div>
+          </div>
+          <div class="insp-f">
+            <div class="k"><span>不透明度 · 3 个关键帧</span></div>
+            <div class="insp-kf">
+              <div class="line"></div>
+              <div class="kk" style="left:12%;"></div>
+              <div class="kk" style="left:50%;"></div>
+              <div class="kk" style="left:88%;"></div>
+              <div class="cur" style="left:23%;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<!-- ===== Caption ===== -->
+<div class="caption">
+  <div class="l">图例</div>
+  <div class="item"><span class="sw v"></span> 画面</div>
+  <div class="item"><span class="sw t"></span> 文字</div>
+  <div class="item"><span class="sw a"></span> 音频</div>
+  <div class="item"><span class="sw tr"></span> 转场</div>
+  <div class="item"><span class="sw anch"></span> 时间锚点</div>
+  <div class="item"><span class="sw pl"></span> 播放头</div>
+</div>
+
+<div class="foot">
+  <span>NextFrame · 编辑器原型 · v0.1</span>
+  <span>spec/design/prototypes/editor-v0.1.html</span>
+</div>
+
+</body>
+</html>

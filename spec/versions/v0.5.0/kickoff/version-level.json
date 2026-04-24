@@ -1,0 +1,55 @@
+{
+  "version": "v0.5.0",
+  "type": "feature",
+  "opened_at": "2026-04-21 17:45",
+  "scope_revised_at": "2026-04-21 17:55",
+  "phase": "kickoff",
+  "status": "in-progress",
+  "title": "真 Mac 桌面 app · 原生 traffic light + 真数据驱动 UI + v0.2 bug 修",
+  "kickoff_mode": "skipped-fast-track · 用户明确小步骤 · 4 约束自推",
+
+  "chosen": "让 v0.2 真成 Mac 桌面 app(不是原型嵌入)· 原生 traffic light 对齐 + 真数据 UI + 修 log/doctor 2 bug",
+  "why": "v0.2 close 后用户一眼识破\"只原型嵌入\"· 本版小步骤收窄:只做 Mac 真桌面 app 核心(traffic light + 真数据驱动)+ 修暴露 bug · 不加 HTML 播 / clip 切 / 红队 / workspace 融合(那些留后续版本)",
+  "changed_from": "原 v0.5.0(4 件事 · workspace 融合 + HTML 播 + clip 切 + 红队 P0)· 2026-04-21 17:55 用户改口\"算了小步骤\" · 收窄到 3 件事",
+  "supersedes": "原 future_versions v0.3.0 draft(号被占)",
+
+  "scope_in": [
+    "**Mac traffic light 原生对齐**:抄 reference/nf-shell-mac-v1.21/NOTE.md 配方 · `with_titlebar_transparent + with_title_hidden + with_fullsize_content_view + with_traffic_light_inset(18,18) + with_resizable(true)` · HTML topbar 48px + 80px 左 gutter · app-region:drag/no-drag",
+    "**真数据驱动 UI**:wry URL 参数 / IPC 初始化 · window.location.search parse + setAttribute 落 DOM · UI 真显 project.slug + episode.slug + duration + clips 列表 · 不显 'next-frame/12.45' 硬编码",
+    "**v0.2 bug 修**:log auto-hook(CRUD op 成功后自动 append log entry · compose.rs middleware)+ doctor rust/cargo probe(PATH 扩 ~/.cargo/bin + timeout 5→15s + fallback cargo --version)"
+  ],
+
+  "scope_out": [
+    "HTML 可播放 mock · 留 v0.6 或 v0.7",
+    "clip 列表点击切换 · 留 v0.6+",
+    "v0.2 红队 P0(socket peer-cred · webview CSP · devtools production-off) · 留 v0.6 patch 版",
+    "workspace 融合(v0.2-integration → main) · 留下版 · 本版在 v0.2-integration 基础上开分支接着做",
+    "真 frame pure 渲染 · export · AI 生成 · 锚点时间计算"
+  ],
+
+  "constraints": {
+    "no_vanity": "3 件事 PM 肉眼验:打开 app 看红绿灯可点 + topbar 真显 demo-v0.5 slug + log tail 真有 CRUD 条目",
+    "no_overreach": "只修已暴露问题 + 做真 traffic light · 不加播放 / 切换 / 红队 / 融合 · 一版一件事(原生桌面 app 体验)",
+    "no_rush": "traffic light 抄 v1.21 稳态(不新写不试别的坐标值)· 真数据驱动一步到位(不 fallback 硬编码)· bug 修到根(不补丁绕开)",
+    "must_verify": "验收:nf open → Mac 窗口弹 → 红绿灯 3 按钮可点(关/小/大)+ 拖 topbar 移窗 + 双击 zoom · topbar 显 'demo-v0.5/ep-01' 真 slug · nf log tail 返 ≥ 3 条自动记录 · nf doctor 无假 fail"
+  },
+
+  "success_picture": "PM 跑:\n  nf projects create --slug=demo-v0.5 --name='v0.5 演示'\n  nf episodes create --project=demo-v0.5 --slug=ep-01 --duration=60\n  nf open --project=demo-v0.5 --episode=ep-01\n看到:Mac 窗口左上角红黄绿 3 按钮真能点 · 拖 topbar 窗口跟手 · 双击 topbar zoom · 右下角可 resize · topbar 显 'demo-v0.5 / ep-01'(非 next-frame)· nf log tail --project=demo-v0.5 --episode=ep-01 返 ≥ 3 条 {actor:'AI', op:'projects.create'/'episodes.create'/'open'} · nf doctor 9/9 pass 零假 fail",
+
+  "cost_estimate": "2-3h AI 尺度 · 3 波:(1)traffic light + 真数据驱动 ally(主菜)· (2)log auto-hook + doctor probe ally(并行)· (3)红队 opus 轻扫(可选)",
+
+  "risks": [
+    "tao `with_traffic_light_inset` 是 tao 0.35 API · v0.2 用的版本可能不支持 · 需 verify(reference/v1.21 用这 API 成功过)",
+    "真数据驱动 wry URL search 在 custom_protocol 下行为未定(T-18 踩过)· 备方案:IPC postMessage 初始化拉数据(index.ts wireApp 后调)",
+    "log auto-hook 嵌 compose.rs 要小心不影响现有 18 测试 · 单测优先"
+  ],
+
+  "reference_code": {
+    "traffic_light_recipe": "reference/nf-shell-mac-v1.21/main.rs + reference/nf-shell-mac-v1.21/NOTE.md · 4 硬约束清单 + 5 次踩坑对照",
+    "v02_integration_base": "branch v0.2-integration @ 32a39252 · v0.5 基于此开分支"
+  },
+
+  "worktree": ".worktrees/v0.5.0-299177e4",
+  "branch": "v0.5.0-299177e4 · 基于 main(非 v0.2-integration · 主 agent 先 cherry-pick v0.2-integration 到新 branch · 避免跟 main 的 v0.3/v0.4 session workspace 冲突)",
+  "parallel_with": "v0.4.0 (另 session · export pipeline · 独立不冲突)"
+}

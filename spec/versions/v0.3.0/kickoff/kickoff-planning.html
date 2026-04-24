@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<!--
+  kickoff-planning.html · 模板 · C 档(左侧版本目录 + 右侧每版讲解)
+
+  位置约定: `spec/versions/v{X}/kickoff/kickoff-planning.html`
+
+  作者工作流:
+    1. cp skills/version-kickoff/references/kickoff-planning.html.template spec/versions/v{X}/kickoff/kickoff-planning.html
+    2. 填 TODO-1 项目信息(标题 / 副标题 / 统计数)
+    3. 填 TODO-2 版本卡(复制"版本卡模板块" N 次 · 改数据)
+    4. 填 TODO-3 DAG SVG(手画或删掉如非必需)
+    5. open
+
+  ⚠️ 禁改区(每项目都一样 · 不项目特化):
+    - CSS / JS(结构逻辑锁死)
+    - 4 约束卡(别自嗨 / 别大力度 / 别着急 / 别做不能验证的 · kickoff 双身份的约束者核心)
+    - 灵魂双身份 banner(AI 专家 + 约束者 · 跨项目通用)
+
+  脚本自动从 <section data-v-id="..." data-v-label="..." data-v-kind="..." data-v-type="..." data-v-parallel="..."> 扫描生成左侧 TOC.
+
+  section 属性:
+    data-v-id       唯一 id · 对应 section id · 如 "v01"
+    data-v-label    左栏显示名 · 如 "基础架构"
+    data-v-kind     normal | quality | stable | overview | dag (控制颜色 · normal 紫 / quality 橙 / stable 绿)
+    data-v-type     类型 tag · 软件工程全原子 · 自由文本 · 常见:
+                    · 需求挖掘 · 用户调研 · 场景拆解 · 故事书写
+                    · 架构设计 · 方案讨论 · 技术选型 · ADR 决策
+                    · 原型图 · 视觉设计 · 交互设计 · 信息架构 · design-system
+                    · POC · spike · 技术验证
+                    · feature · 模块开发 · 功能开发
+                    · bug · hotfix · 补丁
+                    · refactor · 重构 · 清理 · 拆分
+                    · reviewer · 代码审查 · audit · quality
+                    · 测试补齐 · BDD · e2e · 回归
+                    · integrate · 模块对接 · 联调
+                    · perf · 性能优化 · 压测
+                    · security · 安全审计 · 威胁模型
+                    · docs · 文档 · PM 文档
+                    · infra · 基建 · 工具链 · CI
+                    · release · 稳定化 · 上线
+                    · retro · 复盘
+                    · ... 自由扩展
+    data-v-parallel "none" | "solo" | "block" | "vXX,vYY" (左栏 tag · block=阻断业务, none/solo=不可并行, vXX,vYY=可与这些并行)
+    data-v-state   版本状态(**支持多 active 并行**):
+                   · "planned" (默认 · 前瞻草案)
+                   · "active"  (当前在跑 · 可多个并行)⚡
+                   · "done"    (已完成)✓
+                   · "blocked" (被阻等依赖)⏸
+-->
+
+
+
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Kickoff Planning</title>
+<style>
+:root {
+  --bg: #050507;
+  --glass: rgba(0, 0, 0, 0.3);
+  --elevated: rgba(255, 255, 255, 0.04);
+  --accent: #a78bfa;
+  --accent-strong: #8b5cf6;
+  --accent-12: rgba(167, 139, 250, 0.12);
+  --accent-20: rgba(167, 139, 250, 0.2);
+  --warm: #f97316;
+  --warm-12: rgba(249, 115, 22, 0.12);
+  --green: #34d399;
+  --green-12: rgba(52, 211, 153, 0.12);
+  --red: #f87171;
+  --red-12: rgba(248, 113, 113, 0.12);
+  --blue: #38bdf8;
+  --yellow: #fbbf24;
+  --pink: #f472b6;
+  --border: rgba(255, 255, 255, 0.13);
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --text: rgba(255, 255, 255, 0.96);
+  --sub: rgba(255, 255, 255, 0.78);
+  --t-60: rgba(255, 255, 255, 0.6);
+  --t-40: rgba(255, 255, 255, 0.4);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 25% at 50% 0%, rgba(139, 92, 246, 0.22), transparent 60%),
+    radial-gradient(ellipse 50% 20% at 80% 0%, rgba(167, 139, 250, 0.12), transparent 60%),
+    radial-gradient(ellipse 60% 20% at 50% 100%, rgba(124, 58, 237, 0.1), transparent 60%),
+    radial-gradient(ellipse 40% 15% at 20% 100%, rgba(249, 115, 22, 0.06), transparent 60%);
+  background-attachment: fixed;
+  color: var(--sub);
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  font-size: 18px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* =========== 左栏 · 版本目录 =========== */
+.sidebar {
+  flex: 0 0 280px;
+  background: var(--glass);
+  backdrop-filter: blur(40px) saturate(2);
+  -webkit-backdrop-filter: blur(40px) saturate(2);
+  border-right: 1px solid var(--border);
+  padding: 24px 0 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar-head {
+  padding: 0 24px 20px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 12px;
+}
+.sidebar-head .eyebrow {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.sidebar-head h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+.sidebar-head .meta {
+  font-size: 12px;
+  color: var(--t-60);
+  line-height: 1.5;
+}
+.sidebar-head .stats {
+  display: flex;
+  gap: 14px;
+  margin-top: 14px;
+  font-size: 11px;
+}
+.sidebar-head .stat-n {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+.sidebar-head .stat-q .stat-n { color: var(--warm); }
+.sidebar-head .stat-s .stat-n { color: var(--green); }
+.sidebar-head .stat-l { color: var(--t-60); margin-top: 3px; }
+
+.toc-section {
+  padding: 8px 12px 4px 24px;
+  font-size: 10px;
+  color: var(--t-40);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 12px;
+}
+.toc-item {
+  display: block;
+  padding: 8px 24px 9px 24px;
+  font-size: 14px;
+  color: var(--sub);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.toc-item:hover { background: var(--elevated); color: var(--text); }
+.toc-item.active {
+  background: var(--accent-12);
+  border-left-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+.toc-item .toc-line1 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.toc-item .v-num {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 700;
+}
+.toc-item .v-label {
+  flex: 1;
+}
+.toc-item .toc-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 3px;
+  margin-left: calc(13px + 8px);  /* 对齐 label */
+  font-size: 10px;
+  color: var(--t-40);
+  font-family: "SF Mono", Menlo, monospace;
+  letter-spacing: 0.04em;
+}
+.toc-item .toc-tag {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.toc-item .toc-tag.type {
+  background: var(--accent-12);
+  color: var(--accent);
+}
+.toc-item .toc-tag.parallel {
+  background: var(--green-12);
+  color: var(--green);
+}
+.toc-item .toc-tag.block {
+  background: var(--warm-12);
+  color: var(--warm);
+}
+.toc-item .toc-tag.solo {
+  background: var(--elevated);
+  color: var(--t-60);
+}
+.toc-item[data-kind="quality"] .v-num { color: var(--warm); }
+.toc-item[data-kind="quality"].active { background: var(--warm-12); border-left-color: var(--warm); }
+.toc-item[data-kind="quality"] .toc-tag.type { background: var(--warm-12); color: var(--warm); }
+.toc-item[data-kind="stable"] .v-num { color: var(--green); }
+.toc-item[data-kind="stable"].active { background: var(--green-12); border-left-color: var(--green); }
+.toc-item[data-kind="stable"] .toc-tag.type { background: var(--green-12); color: var(--green); }
+
+/* =========== 右栏 · 主内容 =========== */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  scroll-behavior: smooth;
+}
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 48px 48px 120px;
+}
+
+/* Hero */
+.hero {
+  padding: 40px 0 24px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 40px;
+}
+.hero .eyebrow {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.hero h1 {
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 14px;
+}
+.hero p {
+  font-size: 20px;
+  color: var(--sub);
+  max-width: 720px;
+  margin: 0;
+}
+.hero .soul {
+  margin-top: 24px;
+  padding: 18px 22px;
+  background: var(--accent-12);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  font-size: 15px;
+  color: var(--sub);
+}
+.hero .soul b { color: var(--text); }
+
+/* 4 约束 */
+.constraints {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 48px;
+}
+.constraint {
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.constraint .c-icon { font-size: 20px; margin-bottom: 6px; }
+.constraint .c-name { font-size: 13px; color: var(--text); font-weight: 700; }
+.constraint .c-def { font-size: 12px; color: var(--t-60); margin-top: 3px; line-height: 1.5; }
+
+/* 版本卡 */
+.version {
+  background: var(--glass);
+  backdrop-filter: blur(40px) saturate(2);
+  -webkit-backdrop-filter: blur(40px) saturate(2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 40px;
+  margin-bottom: 32px;
+  scroll-margin-top: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+.version[data-kind="quality"] { border-left: 4px solid var(--warm); }
+.version[data-kind="stable"] { border-left: 4px solid var(--green); }
+
+/* ===== 版本状态(支持多 active 并行) ===== */
+.version[data-state="active"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    0 0 0 2px var(--accent),
+    0 0 60px rgba(167, 139, 250, 0.35);
+}
+.version[data-state="done"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(52, 211, 153, 0.4);
+}
+.version[data-state="blocked"] {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* 状态 badge · 右上角 */
+.v-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: "SF Mono", Menlo, monospace;
+  letter-spacing: 0.04em;
+  margin-left: auto;
+}
+.v-state-badge.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(167, 139, 250, 0.5);
+  animation: active-pulse 2.4s ease-in-out infinite;
+}
+@keyframes active-pulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(167, 139, 250, 0.5); }
+  50% { box-shadow: 0 0 24px rgba(167, 139, 250, 0.8); }
+}
+.v-state-badge.done {
+  background: var(--green-12);
+  color: var(--green);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+}
+.v-state-badge.blocked {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--t-60);
+  border: 1px dashed var(--border);
+}
+
+/* TOC 状态 · 加 icon 前缀 + 描边 */
+.toc-item[data-state="active"] {
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--accent-12) 0%, transparent 100%);
+  border-left-width: 4px;
+  border-left-color: var(--accent);
+}
+.toc-item[data-state="active"] .v-num { color: var(--accent); }
+.toc-item[data-state="done"] { color: var(--t-60); }
+.toc-item[data-state="done"] .v-num { color: var(--green); }
+.toc-item[data-state="blocked"] {
+  border-left-style: dashed;
+  border-left-color: var(--border);
+}
+.toc-item[data-state="blocked"] .v-num { color: var(--t-60); }
+.toc-state-ico {
+  display: inline-block;
+  margin-right: 4px;
+  font-size: 11px;
+}
+
+/* 顶部状态统计 */
+.state-summary {
+  display: flex;
+  gap: 10px;
+  padding: 0 24px 16px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-soft);
+}
+.state-summary .ss-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: "SF Mono", Menlo, monospace;
+  font-weight: 600;
+}
+.state-summary .ss-item.active { background: var(--accent-12); color: var(--accent); }
+.state-summary .ss-item.done { background: var(--green-12); color: var(--green); }
+.state-summary .ss-item.blocked { background: rgba(255, 255, 255, 0.06); color: var(--t-60); }
+.state-summary .ss-item.planned { background: var(--elevated); color: var(--t-60); }
+
+.v-head {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.v-badge {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-12);
+  border: 1px solid var(--accent-20);
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+.version[data-kind="quality"] .v-badge { color: var(--warm); background: var(--warm-12); border-color: rgba(249, 115, 22, 0.25); }
+.version[data-kind="stable"] .v-badge { color: var(--green); background: var(--green-12); border-color: rgba(52, 211, 153, 0.25); }
+.v-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.v-type {
+  font-size: 12px;
+  color: var(--t-60);
+  padding: 3px 10px;
+  background: var(--elevated);
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+.v-desc {
+  font-size: 16px;
+  color: var(--sub);
+  margin: 8px 0 16px;
+  line-height: 1.6;
+}
+
+/* 架构 tags · 依赖/可并行/阻断 */
+.v-tags {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 22px;
+  padding: 12px 16px;
+  background: var(--elevated);
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+}
+.v-tag-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.v-tag-label {
+  font-size: 11px;
+  color: var(--t-60);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 2px;
+}
+.v-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: "SF Mono", Menlo, monospace;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid;
+  text-decoration: none;
+}
+.v-tag:hover { transform: translateY(-1px); filter: brightness(1.15); }
+.v-tag.parallel {
+  background: var(--green-12);
+  color: var(--green);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+.v-tag.depend {
+  background: var(--accent-12);
+  color: var(--accent);
+  border-color: var(--accent-20);
+}
+.v-tag.block {
+  background: var(--warm-12);
+  color: var(--warm);
+  border-color: rgba(249, 115, 22, 0.35);
+  cursor: default;
+}
+.v-tag.none {
+  background: var(--elevated);
+  color: var(--t-60);
+  border-color: var(--border-soft);
+  cursor: default;
+}
+.v-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-soft);
+  margin: 0 4px;
+}
+
+/* 3 列格子(做啥 / 约束 / 成本) */
+.v-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.v-grid .cell {
+  background: var(--elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.v-grid .cell-label {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+.v-grid .cell-val {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.55;
+}
+.v-grid .cell-val .num {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 2px;
+}
+.version[data-kind="quality"] .v-grid .cell-val .num { color: var(--warm); }
+.version[data-kind="stable"] .v-grid .cell-val .num { color: var(--green); }
+
+/* 图示 */
+.v-figure {
+  background: var(--elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.v-figure .fig-label {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 14px;
+}
+.v-figure pre {
+  background: #010409;
+  color: #c9d1d9;
+  border: 1px solid var(--border);
+  padding: 18px 22px;
+  border-radius: 8px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.75;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0;
+}
+.v-figure .mock {
+  background: #0a0a10;
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--sub);
+}
+.v-figure .mock b { color: var(--text); }
+
+/* DAG section */
+.dag-section {
+  background: var(--glass);
+  backdrop-filter: blur(40px) saturate(2);
+  -webkit-backdrop-filter: blur(40px) saturate(2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 40px;
+  margin-top: 40px;
+  scroll-margin-top: 20px;
+}
+.dag-section h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+.dag-section p {
+  font-size: 15px;
+  color: var(--t-60);
+  margin: 0 0 24px;
+}
+.dag-canvas {
+  background: var(--elevated);
+  border-radius: 12px;
+  padding: 24px 20px;
+  overflow: auto;
+}
+.dag-legend {
+  display: flex;
+  gap: 20px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--t-60);
+  flex-wrap: wrap;
+}
+.dag-legend .lg { display: flex; align-items: center; gap: 6px; }
+.dag-legend .sw { width: 16px; height: 10px; border-radius: 3px; }
+.dag-legend .sw.biz { background: var(--accent-12); border: 1px solid var(--accent); }
+.dag-legend .sw.qu { background: var(--warm-12); border: 1px dashed var(--warm); }
+.dag-legend .sw.st { background: var(--green-12); border: 1px solid var(--green); }
+
+.section-anchor {
+  display: block;
+  height: 0;
+  visibility: hidden;
+  scroll-margin-top: 0;
+}
+
+/* 响应 */
+@media (max-width: 900px) {
+  body { flex-direction: column; height: auto; overflow: visible; }
+  .sidebar { flex: none; width: 100%; border-right: 0; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  .main { overflow-y: visible; }
+}
+</style>
+</head>
+<body>
+
+<!-- 左栏 · 版本目录 · 从 <section data-v-id>自动生成 -->
+<aside class="sidebar">
+  <div class="sidebar-head">
+    <div class="eyebrow">KICKOFF · VERSION PLAN</div>
+    <h1 data-project-name>NextFrame · v0.3.0</h1>
+    <div class="meta" data-project-tagline>迁 v0.x 归档 3 模块到新骨架 · 调通 2 独立链 · subagent haiku 验证</div>
+    <div class="stats" data-stats>
+      <!-- JS 自动填(从 section 扫描 · 统计 total / quality / business) -->
+    </div>
+  </div>
+  <div class="state-summary" data-state-summary>
+    <!-- JS 自动填:⚡ 在跑 N · ✓ 完成 N · ⏸ 等 N · ○ 计划 N -->
+  </div>
+  <div id="toc">
+    <!-- JS 自动生成 -->
+  </div>
+</aside>
+
+<!-- 右栏 · 主内容 -->
+<main class="main" id="main">
+  <div class="wrap">
+
+    <!-- 概览锚点 -->
+    <section id="top" data-v-id="top" data-v-label="项目基调" data-v-kind="overview" class="section-anchor"></section>
+
+    <!-- Hero · v0.3.0 本版基调 -->
+    <div class="hero">
+      <div class="eyebrow">KICKOFF · v0.3.0 VERSION-LEVEL PLAN</div>
+      <h1>把归档 3 模块接回新骨架 · 调通 2 链 · haiku 能跑</h1>
+      <p>用户原话:"以前代码不错 · 就复制过来调试通过就好 · 确保 haiku 都能生成好结果 · 全自动模式". 砍掉 v1.x 堆积的端到端串联 / editor GUI / 跨平台 · 本版只做: 3 模块迁入 + 2 独立链(clips 剪切 + TTS) + subagent haiku 盲测.</p>
+      <div class="soul">
+        <b>灵魂双身份</b>:AI 编程专家 → 代码已在 reference/ 成熟 · 迁移 ≫ 重写 + 用户约束者 → 2 链独立不强求串联 · scope 砍到 1 件事
+      </div>
+    </div>
+
+    <!-- ⚠️ 4 约束卡 · 通用铁律 · 禁改! 这 4 条是 kickoff 双身份(约束者)的核心 · 每项目都一样 · 不项目特化 -->
+    <div class="constraints">
+      <div class="constraint">
+        <div class="c-icon">🎯</div>
+        <div class="c-name">别自嗨</div>
+        <div class="c-def">PM 肉眼可见效果</div>
+      </div>
+      <div class="constraint">
+        <div class="c-icon">🎚</div>
+        <div class="c-name">别大力度</div>
+        <div class="c-def">一版一件事</div>
+      </div>
+      <div class="constraint">
+        <div class="c-icon">💎</div>
+        <div class="c-name">别着急</div>
+        <div class="c-def">质量一步到位</div>
+      </div>
+      <div class="constraint">
+        <div class="c-icon">✅</div>
+        <div class="c-name">别做不能验证的</div>
+        <div class="c-def">有验收画面</div>
+      </div>
+    </div>
+    <!-- ⚠️ 4 约束卡到此结束 · 上面 4 条禁改 -->
+
+
+    <!-- ===== v0.1.0 已完成 · 战略 / 宪法 / 设计系统 ===== -->
+    <section id="v010" data-v-id="v010" data-v-label="v0.1.0 · 战略 + 宪法 + 设计" data-v-kind="normal" data-v-type="strategy" data-v-parallel="none" data-v-state="done" class="section-anchor"></section>
+    <div class="version" data-kind="normal">
+      <div class="v-head">
+        <span class="v-badge">v0.1.0 ✓</span>
+        <h2 class="v-title">新模式第一版 · 战略定位 + 宪法 + hifi + 设计系统</h2>
+        <span class="v-type">strategy</span>
+      </div>
+      <p class="v-desc">v0.x 67 版归档后从 0 重走 · 9+ 轮访谈沉淀 · 11 条宪法(P1-P11 含锚点驱动轨道时间)· editor-v0.1.html canonical hifi · DESIGN.md + tokens.css 跨版本.</p>
+      <div class="v-tags">
+        <div class="v-tag-group"><span class="v-tag-label">依赖</span><span class="v-tag none">起点 · v0.x 归档</span></div>
+        <div class="v-divider"></div>
+        <div class="v-tag-group"><span class="v-tag-label">可并行</span><span class="v-tag none">无(本版是基础)</span></div>
+      </div>
+      <div class="v-grid">
+        <div class="cell"><div class="cell-label">交付</div><div class="cell-val">charter.json · editor-v0.1.html · DESIGN.md · tokens.css · TTS PPT 讲解</div></div>
+        <div class="cell"><div class="cell-label">4 约束</div><div class="cell-val">全过 ✓</div></div>
+        <div class="cell"><div class="cell-label">状态</div><div class="cell-val"><span class="num">done</span> · 2026-04-21 14:30</div></div>
+      </div>
+    </div>
+
+    <!-- ===== v0.1.1 代码骨架 · in-progress(另会话) ===== -->
+    <section id="v011" data-v-id="v011" data-v-label="v0.1.1 · 代码骨架" data-v-kind="normal" data-v-type="foundation" data-v-parallel="v020" data-v-state="active" class="section-anchor"></section>
+    <div class="version" data-kind="normal">
+      <div class="v-head">
+        <span class="v-badge">v0.1.1 ⚡</span>
+        <h2 class="v-title">代码骨架 · Cargo workspace + 4 crates + frontend TS</h2>
+        <span class="v-type">foundation</span>
+      </div>
+      <p class="v-desc">Cargo workspace 4 crate 空 stub(nf-cli · nf-shell · nf-engine · nf-runtime) · rust-toolchain · lint deny 6 条 · Makefile · CI · tsc --noEmit. 另会话在跑.</p>
+      <div class="v-tags">
+        <div class="v-tag-group"><span class="v-tag-label">依赖</span><a class="v-tag depend" data-jump="v010">v0.1.0</a></div>
+        <div class="v-divider"></div>
+        <div class="v-tag-group"><span class="v-tag-label">可并行</span><a class="v-tag parallel" data-jump="v020">v0.2.0</a><a class="v-tag parallel" data-jump="v030">v0.3.0</a></div>
+      </div>
+      <div class="v-grid">
+        <div class="cell"><div class="cell-label">验收</div><div class="cell-val">cargo check --workspace + tsc --noEmit 双绿</div></div>
+        <div class="cell"><div class="cell-label">4 约束</div><div class="cell-val">全过 ✓</div></div>
+        <div class="cell"><div class="cell-label">状态</div><div class="cell-val"><span class="num">in-progress</span> · 另会话跑</div></div>
+      </div>
+    </div>
+
+    <!-- ===== v0.2.0 Mac 桌面外壳 · in-progress(另会话) ===== -->
+    <section id="v020" data-v-id="v020" data-v-label="v0.2.0 · Mac shell + UI 组件化" data-v-kind="normal" data-v-type="feature" data-v-parallel="v011,v030" data-v-state="active" class="section-anchor"></section>
+    <div class="version" data-kind="normal">
+      <div class="v-head">
+        <span class="v-badge">v0.2.0 ⚡</span>
+        <h2 class="v-title">Mac 桌面 app 外壳 + UI hifi 组件化</h2>
+        <span class="v-type">feature</span>
+      </div>
+      <p class="v-desc">wry + tao Mac 外壳 · CLI <code>nf open</code> 启动 · 单进程多窗口 IPC · topbar + 3 栏 body 像素级复刻 editor-v0.1.html · Web Components · mock.json 静态假数据. 另会话在跑.</p>
+      <div class="v-tags">
+        <div class="v-tag-group"><span class="v-tag-label">依赖</span><a class="v-tag depend" data-jump="v010">v0.1.0</a></div>
+        <div class="v-divider"></div>
+        <div class="v-tag-group"><span class="v-tag-label">可并行</span><a class="v-tag parallel" data-jump="v011">v0.1.1</a><a class="v-tag parallel" data-jump="v030">v0.3.0</a></div>
+      </div>
+      <div class="v-grid">
+        <div class="cell"><div class="cell-label">交付</div><div class="cell-val">Mac app 外壳 + Web Components 组件化</div></div>
+        <div class="cell"><div class="cell-label">4 约束</div><div class="cell-val">全过 ✓</div></div>
+        <div class="cell"><div class="cell-label">状态</div><div class="cell-val"><span class="num">in-progress</span> · 另会话</div></div>
+      </div>
+    </div>
+
+    <!-- ===== v0.3.0 归档迁移 · 本版 · active 详细展开 ===== -->
+    <section id="v030" data-v-id="v030" data-v-label="v0.3.0 · 归档迁移 · 2 链调通 ⭐ 本版" data-v-kind="normal" data-v-type="feature" data-v-parallel="v011,v020" data-v-state="active" class="section-anchor"></section>
+    <div class="version" data-kind="normal" style="border: 2px solid var(--accent); box-shadow: 0 0 40px rgba(167,139,250,0.25);">
+      <div class="v-head">
+        <span class="v-badge">v0.3.0 ⭐</span>
+        <h2 class="v-title">归档 3 模块接新骨架 · clips + TTS 独立 2 链调通 · haiku 盲测</h2>
+        <span class="v-type">feature · 本版</span>
+      </div>
+      <p class="v-desc"><b>本版一件事</b>: 把 reference/ 里的 3 块 v0.x 成熟代码(clips-pipeline 6 crate · nf-tts 4800 行 · nf-guide prompt md)复制到主仓 src/ · 接 Cargo workspace · lint 过 · <b>subagent haiku</b> 按 nf-guide prompt 跑 2 条独立链 · 主 agent 亲验 3 产物(mp4 / mp3 / karaoke.html).</p>
+      <div class="v-tags">
+        <div class="v-tag-group"><span class="v-tag-label">依赖</span><a class="v-tag depend" data-jump="v010">v0.1.0</a><span class="v-tag none" style="margin-left:6px">(DESIGN/宪法已锁)</span></div>
+        <div class="v-divider"></div>
+        <div class="v-tag-group"><span class="v-tag-label">可并行</span><a class="v-tag parallel" data-jump="v011">v0.1.1</a><a class="v-tag parallel" data-jump="v020">v0.2.0</a></div>
+      </div>
+      <div class="v-grid">
+        <div class="cell"><div class="cell-label">做啥</div><div class="cell-val">
+          ① 复制 <code>reference/{clips-pipeline,nf-tts,nf-guide}</code> → <code>src/</code><br>
+          ② Cargo workspace 扩 · 依赖冲突解<br>
+          ③ lint deny 6 条过<br>
+          ④ 派 subagent(model=haiku) × 2 盲测 clips 链 + TTS 链<br>
+          ⑤ 主 agent 亲 <code>open</code> 验 3 产物
+        </div></div>
+        <div class="cell"><div class="cell-label">不做</div><div class="cell-val">
+          × 端到端串联(clips 喂 TTS)<br>
+          × editor GUI(nf-shell/nf-runtime)<br>
+          × Windows / Linux<br>
+          × JSON 引擎(原 v0.3 推 v0.4)
+        </div></div>
+        <div class="cell"><div class="cell-label">成本估</div><div class="cell-val">
+          <span class="num">6-10h</span> AI 尺度<br>
+          复制 1h · 集成 2h · lint 2h<br>
+          haiku 盲测 4h · 主验 1h
+        </div></div>
+      </div>
+
+      <div class="v-figure">
+        <div class="fig-label">验收流程图</div>
+        <pre>
+主 agent (opus) · 调度者
+  │
+  ├──▶ Task(subagent, model="haiku", prompt=nf-guide/flows/clips/*.md)
+  │       ▶ nf-source download --local-mp4 fixtures/demo.mp4
+  │       ▶ nf-source transcribe --out transcript.srt
+  │       ▶ nf-source align
+  │       ▶ nf-source cut --plan highlights.json
+  │       └── 产物: output/highlight-1.mp4 ───────────┐
+  │                                                    │
+  └──▶ Task(subagent, model="haiku", prompt=nf-guide/flows/audio/*.md)
+          ▶ nf-tts synth --text "..." --voice zh-CN
+          └── 产物: output/tts.mp3 + karaoke.html ─────┤
+                                                       │
+主 agent 亲: ls output/ → open → 肉眼验 ◀─────────────┘
+  ✓ mp4 可播        ✓ mp3 能听        ✓ karaoke 字级同步
+        </pre>
+      </div>
+
+      <div class="v-figure">
+        <div class="fig-label">4 约束自查</div>
+        <pre>
+🎯 别自嗨   → 产物 3 文件 PM 肉眼可验(可播/能听/能开)
+🎚 别大力度 → 砍了端到端串 · 砍了 editor GUI · 只 2 链独立
+💎 别着急   → reference 用 v1.67.1 最新版 · lint deny 过 · 不造 MVP
+✅ 别不能验 → subagent haiku 真跑 + 主 agent 亲 open 验
+        </pre>
+      </div>
+
+      <div class="v-figure">
+        <div class="fig-label">风险</div>
+        <pre>
+⚠️ yt-dlp/whisperx/ffmpeg 外部依赖  →  兜底: 用本地 mp4 fixture · prompt 改成不走网络
+⚠️ 3 crate 依赖版本冲突(tokio/serde/clap)  →  手 align 版本 · 以 reference/nf-tts Cargo.lock 为基准
+⚠️ nf-guide 已知 5 个 prompt 漏洞(v1.13.x)  →  haiku 踩新坑时就地修 prompt
+⚠️ reference edition/rustc 可能跟 rust-toolchain.toml 漂  →  提前跑 cargo check 验
+        </pre>
+      </div>
+    </div>
+
+    <!-- 并行 DAG · 当前阶段 v0.1 - v0.3 -->
+    <section id="dag" data-v-id="dag" data-v-label="并行 DAG" data-v-kind="dag" class="section-anchor"></section>
+    <div class="dag-section">
+      <h2>并行依赖 DAG · 当前 4 版</h2>
+      <p>v0.1.0 完成后 · v0.1.1 / v0.2.0 / v0.3.0 三版可同层并行 · 各自独立 worktree · 共享 spec/ symlink</p>
+      <div class="dag-canvas">
+        <svg width="100%" height="380" viewBox="0 0 1020 380" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrBiz" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+              <path d="M0 0 L9 4.5 L0 9 Z" fill="#a78bfa"/>
+            </marker>
+          </defs>
+          <!-- v0.1.0 起点 -->
+          <rect x="40" y="150" width="150" height="80" rx="12" fill="rgba(52,211,153,0.18)" stroke="#34d399" stroke-width="2"/>
+          <text x="115" y="185" text-anchor="middle" fill="#34d399" font-size="16" font-weight="700">v0.1.0 ✓</text>
+          <text x="115" y="208" text-anchor="middle" fill="#e8e8ec" font-size="12">战略 / 宪法 / 设计</text>
+
+          <!-- v0.1.1 上 -->
+          <rect x="360" y="30" width="180" height="80" rx="12" fill="rgba(167,139,250,0.18)" stroke="#a78bfa" stroke-width="2"/>
+          <text x="450" y="65" text-anchor="middle" fill="#a78bfa" font-size="16" font-weight="700">v0.1.1 ⚡</text>
+          <text x="450" y="88" text-anchor="middle" fill="#e8e8ec" font-size="12">代码骨架(另会话)</text>
+
+          <!-- v0.2.0 中 -->
+          <rect x="360" y="150" width="180" height="80" rx="12" fill="rgba(167,139,250,0.18)" stroke="#a78bfa" stroke-width="2"/>
+          <text x="450" y="185" text-anchor="middle" fill="#a78bfa" font-size="16" font-weight="700">v0.2.0 ⚡</text>
+          <text x="450" y="208" text-anchor="middle" fill="#e8e8ec" font-size="12">Mac shell(另会话)</text>
+
+          <!-- v0.3.0 下 · 本版高亮 -->
+          <rect x="360" y="270" width="180" height="80" rx="12" fill="rgba(224,183,108,0.25)" stroke="#e0b76c" stroke-width="2.5"/>
+          <text x="450" y="305" text-anchor="middle" fill="#e0b76c" font-size="16" font-weight="700">v0.3.0 ⭐ 本版</text>
+          <text x="450" y="328" text-anchor="middle" fill="#e8e8ec" font-size="12">归档迁 + 2 链调通</text>
+
+          <!-- v0.4.0 预留 -->
+          <rect x="720" y="150" width="180" height="80" rx="12" fill="rgba(160,160,170,0.12)" stroke="#6b6b75" stroke-width="1.5" stroke-dasharray="6 3"/>
+          <text x="810" y="185" text-anchor="middle" fill="#8a8a95" font-size="15" font-weight="700">v0.4.0 ○</text>
+          <text x="810" y="208" text-anchor="middle" fill="#8a8a95" font-size="12">JSON 引擎(v0.3 推迟)</text>
+
+          <!-- 依赖箭头 -->
+          <path d="M190 190 Q270 150 360 70" stroke="#a78bfa" stroke-width="1.8" fill="none" marker-end="url(#arrBiz)"/>
+          <path d="M190 190 L360 190" stroke="#a78bfa" stroke-width="1.8" fill="none" marker-end="url(#arrBiz)"/>
+          <path d="M190 190 Q270 230 360 310" stroke="#e0b76c" stroke-width="2" fill="none" marker-end="url(#arrBiz)"/>
+
+          <path d="M540 70 Q630 110 720 180" stroke="#6b6b75" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+          <path d="M540 190 L720 190" stroke="#6b6b75" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+          <path d="M540 310 Q630 270 720 200" stroke="#6b6b75" stroke-width="1.5" fill="none" stroke-dasharray="4 3"/>
+        </svg>
+      </div>
+      <div class="dag-legend">
+        <div class="lg"><div class="sw biz"></div>业务版(可并行)</div>
+        <div class="lg"><div class="sw qu"></div>质量版(阻断业务 · 必须停)</div>
+        <div class="lg"><div class="sw st"></div>稳定 release 版</div>
+        <div class="lg">→ 箭头 = 依赖</div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+(function() {
+  const mainEl = document.getElementById('main');
+  const tocEl = document.getElementById('toc');
+  const statsEl = document.querySelector('[data-stats]');
+
+  // 扫描 section · 生成 TOC
+  const sections = Array.from(document.querySelectorAll('section[data-v-id]'));
+  const overview = sections.filter(s => s.dataset.vKind === 'overview');
+  const versions = sections.filter(s => ['normal', 'quality', 'stable'].includes(s.dataset.vKind));
+  const dag = sections.filter(s => s.dataset.vKind === 'dag');
+
+  const STATE_ICON = { active: '⚡', done: '✓', blocked: '⏸', planned: '' };
+
+  function renderTocMeta(s) {
+    const type = s.dataset.vType;
+    const parallel = s.dataset.vParallel;
+    const parts = [];
+    if (type) parts.push(`<span class="toc-tag type">${type}</span>`);
+    if (parallel === 'block') {
+      parts.push('<span class="toc-tag block">⛔ 阻断</span>');
+    } else if (parallel === 'solo' || parallel === 'none' || !parallel) {
+      parts.push('<span class="toc-tag solo">∥ 无</span>');
+    } else {
+      const list = parallel.split(',').map(v => v.trim()).filter(Boolean);
+      if (list.length > 0) parts.push(`<span class="toc-tag parallel">∥ ${list.length}</span>`);
+    }
+    return parts.length ? `<div class="toc-meta">${parts.join('')}</div>` : '';
+  }
+
+  function buildToc() {
+    const parts = [];
+    if (overview.length) {
+      parts.push('<div class="toc-section">概览</div>');
+      overview.forEach(s => {
+        parts.push(`<a class="toc-item" data-target="${s.id}" data-kind="${s.dataset.vKind}"><div class="toc-line1"><span class="v-num">#</span><span class="v-label">${s.dataset.vLabel || s.id}</span></div></a>`);
+      });
+    }
+    if (versions.length) {
+      parts.push('<div class="toc-section">版本顺序</div>');
+      versions.forEach(s => {
+        const num = s.id;
+        const quality = s.dataset.vKind === 'quality' ? ' ⭐' : '';
+        const state = s.dataset.vState || 'planned';
+        const icon = STATE_ICON[state] ? `<span class="toc-state-ico">${STATE_ICON[state]}</span>` : '';
+        parts.push(`<a class="toc-item" data-target="${s.id}" data-kind="${s.dataset.vKind}" data-state="${state}"><div class="toc-line1">${icon}<span class="v-num">${num}${quality}</span><span class="v-label">${s.dataset.vLabel || ''}</span></div>${renderTocMeta(s)}</a>`);
+      });
+    }
+    if (dag.length) {
+      parts.push('<div class="toc-section">依赖关系</div>');
+      dag.forEach(s => {
+        parts.push(`<a class="toc-item" data-target="${s.id}" data-kind="${s.dataset.vKind}"><div class="toc-line1"><span class="v-num">→</span><span class="v-label">${s.dataset.vLabel || s.id}</span></div></a>`);
+      });
+    }
+    tocEl.innerHTML = parts.join('');
+  }
+
+  // 把 section 的 data-v-state 同步到紧跟的 .version div + 注入状态 badge
+  function syncVersionStates() {
+    versions.forEach(s => {
+      const state = s.dataset.vState || 'planned';
+      // 找紧跟 section 的 .version · 通过 nextElementSibling 链
+      let el = s.nextElementSibling;
+      while (el && !el.classList.contains('version')) el = el.nextElementSibling;
+      if (!el) return;
+      el.setAttribute('data-state', state);
+      // 注入 badge(如已有则不重复)
+      if (state !== 'planned' && !el.querySelector('.v-state-badge')) {
+        const head = el.querySelector('.v-head');
+        if (head) {
+          const badge = document.createElement('span');
+          badge.className = `v-state-badge ${state}`;
+          const labels = { active: '⚡ 在跑', done: '✓ 完成', blocked: '⏸ 等依赖' };
+          badge.textContent = labels[state] || state;
+          head.appendChild(badge);
+        }
+      }
+    });
+  }
+
+  // 顶部状态统计(若 sidebar 有 [data-state-summary] 容器)
+  function buildStateSummary() {
+    const container = document.querySelector('[data-state-summary]');
+    if (!container) return;
+    const counts = { active: 0, done: 0, blocked: 0, planned: 0 };
+    versions.forEach(s => {
+      const st = s.dataset.vState || 'planned';
+      if (counts[st] !== undefined) counts[st]++;
+    });
+    const parts = [];
+    if (counts.active)  parts.push(`<span class="ss-item active">⚡ ${counts.active}</span>`);
+    if (counts.done)    parts.push(`<span class="ss-item done">✓ ${counts.done}</span>`);
+    if (counts.blocked) parts.push(`<span class="ss-item blocked">⏸ ${counts.blocked}</span>`);
+    if (counts.planned) parts.push(`<span class="ss-item planned">○ ${counts.planned}</span>`);
+    container.innerHTML = parts.join('');
+  }
+
+  function buildStats() {
+    if (!statsEl) return;
+    const total = versions.length;
+    const quality = versions.filter(s => s.dataset.vKind === 'quality').length;
+    const biz = versions.filter(s => s.dataset.vKind === 'normal').length;
+    statsEl.innerHTML = `
+      <div class="stat"><div class="stat-n">${total}</div><div class="stat-l">总版本</div></div>
+      ${quality > 0 ? `<div class="stat stat-q"><div class="stat-n">${quality}</div><div class="stat-l">质量穿插</div></div>` : ''}
+      <div class="stat"><div class="stat-n">${biz}</div><div class="stat-l">业务版</div></div>
+    `;
+  }
+
+  function jumpTo(targetId) {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const mainRect = mainEl.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    mainEl.scrollTo({
+      top: mainEl.scrollTop + targetRect.top - mainRect.top - 20,
+      behavior: 'smooth'
+    });
+  }
+
+  buildToc();
+  buildStats();
+  syncVersionStates();
+  buildStateSummary();
+
+  // 左栏目录点击
+  tocEl.querySelectorAll('.toc-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      jumpTo(item.dataset.target);
+    });
+  });
+
+  // 版本卡内架构 tag 点击
+  document.querySelectorAll('.v-tag[data-jump]').forEach(tag => {
+    tag.addEventListener('click', (e) => {
+      e.preventDefault();
+      jumpTo(tag.dataset.jump);
+    });
+  });
+
+  // 滚动监听自动高亮 TOC
+  const tocItems = tocEl.querySelectorAll('.toc-item');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        tocItems.forEach(i => i.classList.toggle('active', i.dataset.target === id));
+      }
+    });
+  }, { root: mainEl, rootMargin: '-20% 0px -60% 0px', threshold: 0 });
+
+  sections.forEach(s => observer.observe(s));
+  if (tocItems[0]) tocItems[0].classList.add('active');
+})();
+</script>
+</body>
+</html>

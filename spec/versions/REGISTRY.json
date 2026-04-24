@@ -1,0 +1,32 @@
+{
+  "project": "NextFrame",
+  "versions": [
+    {
+      "version": "v0.13.0",
+      "title": "项目骨架治理 · root 一屏清楚 + spec 合入主仓 + 结构门禁",
+      "status": "waiting-review",
+      "owner_session": "codex-2026-04-24-v013-structure",
+      "claimed_at": "2026-04-24T18:50:00+08:00",
+      "closed_at": null,
+      "merge_commit": null
+    },
+    {
+      "version": "v0.10.0",
+      "title": "V2 composition 真实编辑器 · 轨道点选 + 参数/时间编辑 + 保存导出闭环",
+      "status": "waiting-review",
+      "owner_session": "codex-2026-04-24-v010-kickoff",
+      "claimed_at": "2026-04-24T16:00:00+08:00",
+      "closed_at": null,
+      "merge_commit": null
+    },
+    {
+      "version": "v0.9.0",
+      "title": "main drift 修复 · v0.6.1 shell 族 + v0.7.1 agent engine 整合",
+      "status": "done",
+      "owner_session": "7719498f-8898-48be-93fa-3c22b11a6ad0",
+      "claimed_at": "2026-04-22T11:45:00+08:00",
+      "closed_at": "2026-04-22T12:15:00+08:00",
+      "merge_commit": "f73357b8"
+    }
+  ]
+}

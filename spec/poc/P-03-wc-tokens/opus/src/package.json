@@ -1,0 +1,16 @@
+{
+  "name": "p03-wc-tokens",
+  "version": "0.0.1",
+  "private": true,
+  "description": "POC P-03 · Web Components + tokens.css :root vars 穿透 + 样式隔离",
+  "scripts": {
+    "build": "esbuild index.ts --bundle --format=esm --target=es2022 --outfile=../dist/index.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "playwright": "^1.59.1"
+  }
+}

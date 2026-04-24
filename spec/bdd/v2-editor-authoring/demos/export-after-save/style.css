@@ -1,0 +1,25 @@
+@import "../../../../design/tokens.css";
+
+html, body { margin: 0; min-height: 100%; font-family: var(--font); color: var(--fg); }
+body { display: grid; place-items: center; padding: 32px; overflow: hidden; }
+.app { width: min(1120px, 96vw); height: min(640px, 86vh); background: rgba(14,14,19,.64); border: 1px solid var(--bd); display: grid; grid-template-rows: 46px 1fr 4px; position: relative; box-shadow: 0 30px 90px rgba(0,0,0,.55); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--bd); font-size: 12px; letter-spacing: .12em; color: var(--accent-l); }
+.top span { color: var(--amber); font-family: var(--mono); letter-spacing: 0; }
+.body { display: grid; grid-template-columns: 1fr 300px; min-height: 0; }
+.preview { display: grid; place-items: center; position: relative; overflow: hidden; }
+.preview h1 { font-size: clamp(38px, 5vw, 76px); letter-spacing: -.03em; z-index: 1; }
+.scan { position: absolute; left: 12%; right: 12%; height: 2px; background: var(--amber); box-shadow: 0 0 22px rgba(224,183,108,.55); animation: scan 10s infinite; }
+aside { padding: 18px; border-left: 1px solid var(--bd); background: rgba(8,8,12,.36); display: grid; gap: 12px; align-content: start; }
+button { height: 42px; border: 1px solid var(--bd); background: rgba(255,255,255,.025); color: var(--fg); font-weight: 700; }
+.save { border-color: rgba(74,222,128,.35); color: var(--ok); }
+.export { border-color: var(--accent-b); color: var(--accent-l); }
+.open { opacity: 0; border-color: var(--amber-b); color: var(--amber); animation: openButton 10s infinite; }
+.bar { height: 12px; border: 1px solid var(--bd); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); transform-origin: left; animation: exportBar 10s infinite; }
+.progress { background: var(--accent); transform-origin: left; animation: progress 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 18px; padding: 10px 14px; border: 1px solid var(--amber-b); background: rgba(224,183,108,.1); color: var(--amber-l); opacity: 0; animation: toast 10s infinite; }
+@keyframes exportBar { 0%,30% { transform: scaleX(0); } 82%,100% { transform: scaleX(1); } }
+@keyframes openButton { 0%,78% { opacity: 0; } 84%,100% { opacity: 1; } }
+@keyframes scan { 0% { top: 12%; } 100% { top: 88%; } }
+@keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes toast { 0%,82% { opacity: 0; } 88%,96% { opacity: 1; } 100% { opacity: 0; } }

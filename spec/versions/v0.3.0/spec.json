@@ -1,0 +1,172 @@
+{
+  "$type": "version-spec",
+  "version": "v0.3.0",
+  "created_at": "2026-04-21 15:35",
+  "session": "0912b6e2",
+  "mode": "autopilot",
+
+  "verify_points": [
+    {
+      "id": "V-1",
+      "text": "subagent haiku 跑通 clips 链 · output/highlight-1.mp4 可播",
+      "scenario": "spec/bdd/clips/scenarios/clips-01.bdd.json"
+    },
+    {
+      "id": "V-1b",
+      "text": "yt-dlp 缺失时 --local-mp4 兜底",
+      "scenario": "spec/bdd/clips/scenarios/clips-02.bdd.json"
+    },
+    {
+      "id": "V-1c",
+      "text": "whisperx 装不上时 --transcript fixture 兜底",
+      "scenario": "spec/bdd/clips/scenarios/clips-03.bdd.json"
+    },
+    {
+      "id": "V-2",
+      "text": "subagent haiku 跑通 TTS 链 · output/tts.mp3 + karaoke.html 齐",
+      "scenario": "spec/bdd/tts/scenarios/tts-01.bdd.json"
+    },
+    {
+      "id": "V-2b",
+      "text": "whisperx 装不上时 --timeline fixture 兜底 karaoke 仍可产",
+      "scenario": "spec/bdd/tts/scenarios/tts-02.bdd.json"
+    }
+  ],
+
+  "todolist": [
+    {
+      "id": "T-POC-1",
+      "phase": "poc",
+      "status": "pending",
+      "title": "集成可行性 POC · videocut-core 小 crate 先接 Cargo workspace",
+      "goal": "验 edition/rustc/deps 兼容 · 失败暴露在 cargo check",
+      "success": "cargo check --workspace 绿 + 所有 deny lint 过",
+      "dispatch": "主 agent 亲做(仅 1 个 crate 小快) 或 ally gpt 单份",
+      "output": "spec/poc/INDEX.json 追条目 · 结论 merged.md"
+    },
+    {
+      "id": "T-POC-2",
+      "phase": "poc",
+      "status": "pending",
+      "title": "nf-guide prompt 自包含性 POC · 给 haiku subagent 读 flows/clips/00-download.md 能否独立跑通第 1 步",
+      "goal": "agent-usability rule 盲测 · 弱模型不读源码能按 prompt 跑命令",
+      "success": "subagent 回传含 'exit 0' 或 '产出 output/source.mp4' 的证据",
+      "dispatch": "派 subagent(model=haiku) · main 跑完即回"
+    },
+    {
+      "id": "T-BUILD-1",
+      "phase": "build",
+      "status": "pending",
+      "title": "复制 reference/clips-pipeline/ 6 crate → src/",
+      "dispatch": "ally 单份(机械复制 + Cargo.toml 路径调)",
+      "success": "src/{nf-source,videocut-core,videocut-download,videocut-transcribe,videocut-align,videocut-cut}/ 目录齐 + cargo check 对 6 个 crate 分别绿"
+    },
+    {
+      "id": "T-BUILD-2",
+      "phase": "build",
+      "status": "pending",
+      "title": "复制 reference/nf-tts/ → src/nf-tts/",
+      "dispatch": "ally 单份",
+      "success": "src/nf-tts/ 目录齐 + cargo check 绿"
+    },
+    {
+      "id": "T-BUILD-3",
+      "phase": "build",
+      "status": "pending",
+      "title": "复制 reference/nf-guide/ → src/nf-guide/",
+      "dispatch": "ally 单份",
+      "success": "src/nf-guide/ 目录齐(尤其 flows/clips + flows/audio 2 个 prompt md 目录) · cargo check 绿"
+    },
+    {
+      "id": "T-BUILD-4",
+      "phase": "build",
+      "status": "pending",
+      "title": "主 Cargo.toml workspace.members 扩 + 依赖版本手 align",
+      "dispatch": "主 agent 亲做(决策 · 冲突可能要判断)",
+      "success": "cargo check --workspace 全绿 + 所有 lint deny 6 条不违规"
+    },
+    {
+      "id": "T-BUILD-5",
+      "phase": "build",
+      "status": "pending",
+      "title": "内建 verify 子命令 · 确认 nf-source verify / nf-tts verify 已有或补齐",
+      "dispatch": "主 agent 检查 + 必要时 ally 补",
+      "success": "nf-source verify --help + nf-tts verify --help 都有输出"
+    },
+    {
+      "id": "T-BUILD-6",
+      "phase": "build",
+      "status": "pending",
+      "title": "fixtures 准备",
+      "dispatch": "主 agent 亲做(选文件 · 不多)",
+      "success": "tests/fixtures/clips/{demo.mp4,demo.srt} + tests/fixtures/tts/{demo.txt,demo.timeline.json} 齐"
+    },
+    {
+      "id": "T-BUILD-7",
+      "phase": "build",
+      "status": "pending",
+      "title": "subagent(model=haiku) clips 链盲测",
+      "dispatch": "派 subagent · 按 clips-01 ai_tools.dispatch-subagent command",
+      "success": "output/highlight-1.mp4 可播 · nf-source verify exit 0"
+    },
+    {
+      "id": "T-BUILD-8",
+      "phase": "build",
+      "status": "pending",
+      "title": "subagent(model=haiku) TTS 链盲测",
+      "dispatch": "派 subagent · 按 tts-01 ai_tools.dispatch-subagent command",
+      "success": "output/tts.mp3 能听 + karaoke.html 字级同步 · nf-tts verify exit 0"
+    },
+    {
+      "id": "T-BUILD-9",
+      "phase": "build",
+      "status": "pending",
+      "title": "主 agent 亲 open 验 3 产物",
+      "dispatch": "主 agent 亲做(feedback_user_quality_bar 硬约束)",
+      "success": "3 产物 open 后肉眼过关: mp4 可播 + mp3 能听 + karaoke 字级同步 · 不齐回上步修"
+    },
+    {
+      "id": "T-CLOSE-1",
+      "phase": "close",
+      "status": "pending",
+      "title": "commit + merge 回 main + worktree 清",
+      "dispatch": "主 agent 亲做",
+      "success": "main 含 v0.3.0 全部代码 + .worktrees/v0.3.0-* 删 + branch -d"
+    },
+    {
+      "id": "T-CLOSE-2",
+      "phase": "close",
+      "status": "pending",
+      "title": "devlog Retro + roadmap v0.3.0 → done + 飞书 done",
+      "dispatch": "主 agent",
+      "success": "spec 仓 commit · roadmap.versions[0].status=done · 飞书 done 1 次"
+    }
+  ],
+
+  "dispatch_rules": {
+    "default": "ally gpt 单份(机械复制 / 标准 CLI 接入)",
+    "opus_subagent": "Cargo workspace 集成决策 / 依赖冲突判断 / verify 子命令验证 / 主 agent 亲 open",
+    "ally_parallel": "BUILD-1/2/3 三个复制可并行(各复制一块)",
+    "haiku_subagent": "BUILD-7/8 haiku 盲测 · agent-usability rule 核心"
+  },
+
+  "ai_tools_summary": {
+    "list": "所有 ai_tools 见 spec/bdd/{clips,tts}/scenarios/*.bdd.json",
+    "key_cli": [
+      "nf-source download --local-mp4 <path> --out <out>",
+      "nf-source transcribe --transcript <path> --out <out>",
+      "nf-source verify --file <mp4>",
+      "nf-tts synth --text-file <txt> --voice <v> --out <mp3>",
+      "nf-tts karaoke --mp3 <mp3> --timeline <json> --out <html>",
+      "nf-tts verify --mp3 <mp3> --timeline <json>"
+    ]
+  },
+
+  "status": {
+    "phase": "spec",
+    "spec_done": true,
+    "poc_done": false,
+    "build_done": false,
+    "close_done": false
+  }
+}

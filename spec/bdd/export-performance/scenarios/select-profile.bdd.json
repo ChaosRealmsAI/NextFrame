@@ -1,0 +1,26 @@
+{
+  "id": "select-profile",
+  "title": "用户在导出前选择清晰的导出档位",
+  "given": "桌面编辑器打开 v2-showcase/showreel-24s，右侧 inspector 显示导出区域。",
+  "when": "用户展开或切换导出档位，选择草稿、标准、最终或高速最终。",
+  "then": "导出按钮旁显示所选 profile 的分辨率、fps、并行度；点击导出时 shell 收到同样的 profile 参数。",
+  "human_actions": ["open editor", "choose export profile", "read profile summary", "click export"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf export --help",
+      "expected": "help lists --profile, --fps, --resolution and --parallel"
+    },
+    {
+      "tool": "click",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --click 'nf-inspector::shadow [data-export-profile=\"draft\"]'",
+      "expected": "inspector selected export profile becomes draft"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query 'nf-inspector::shadow [data-export-selected-profile]' --get outerHTML",
+      "expected": "outerHTML contains draft profile settings"
+    }
+  ],
+  "done": false
+}

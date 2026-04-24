@@ -1,0 +1,34 @@
+{
+  "$type": "scenario",
+  "scenario_type": "e2e",
+  "id": "clips-02",
+  "title": "边界 · yt-dlp 缺失时 --local-mp4 兜底",
+  "chapter": "4.2 边界情况",
+  "added_in_version": "v0.3.0",
+  "verify_point": "V-1b",
+  "rules": ["R2"],
+  "visual": [],
+
+  "steps_human": [
+    {"type": "Given", "text": "机器上没装 yt-dlp (which yt-dlp 找不到)"},
+    {"type": "When", "text": "subagent haiku 按 prompt 跑 nf-source download · 检测到 yt-dlp 缺 · 自动走 --local-mp4 回退"},
+    {"type": "Then", "text": "主 agent 见 prompt md 第 00-download 步有清晰说明兜底路径 · haiku 能读懂"},
+    {"type": "Then", "text": "最终产出 highlight 仍然齐 · 链完整不中断"}
+  ],
+
+  "steps_ai": [
+    {"type": "Given", "text": "subagent 先跑 which yt-dlp · 若 exit != 0 · 按 prompt 改用 --local-mp4"},
+    {"type": "When", "text": "nf-source download --local-mp4 tests/fixtures/clips/demo.mp4 --out output/source.mp4"},
+    {"type": "Then", "text": "ls output/source.mp4 存在 · 且 md5 跟 fixture 一致(纯拷贝)"}
+  ],
+
+  "ai_tools": [
+    {"tool": "check-ytdlp", "command": "which yt-dlp || echo 'missing'", "output": "路径 or 'missing'"},
+    {"tool": "download-fallback", "command": "nf-source download --local-mp4 tests/fixtures/clips/demo.mp4 --out output/source.mp4", "output": "exit 0 + output/source.mp4"},
+    {"tool": "verify-copy", "command": "md5 -q output/source.mp4 tests/fixtures/clips/demo.mp4", "output": "两行 md5 应相同"}
+  ],
+
+  "dev": "pending",
+  "tested": "pending",
+  "acceptance": "pending"
+}

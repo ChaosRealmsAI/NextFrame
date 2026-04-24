@@ -1,0 +1,393 @@
+{
+  "version": "v0.2.0",
+  "type": "feature",
+  "title": "Mac 桌面 app 外壳 + UI hifi 组件化 · CLI 系统 · 假页面",
+  "status": "done",
+  "created_at": "2026-04-21",
+  "started_at": "2026-04-21 17:20",
+  "note": "Phase 4 build · POC 3/3 valid 返回 · drafts/merged.md 锁定(2026-04-21 17:15) · status running · W-1 tasks 准备派遣",
+  "inputs": {
+    "spec_json": "spec/versions/v0.2/spec.json(27 items locked)",
+    "poc_index": "spec/poc/INDEX.json(3 running · 等 valid)",
+    "interfaces": "spec/contracts/interfaces.json(37 CLI 命令契约)",
+    "hifi_ref": "spec/design/prototypes/editor-v0.1.html(visual golden reference)",
+    "workspace": "Cargo.toml + crates/{nf-cli,nf-shell,nf-engine,nf-runtime}/ + frontend/nf-components/(v0.1.1 scaffold · v0.1.2 reference)"
+  },
+  "drafts": {
+    "note": "方案阶段产出 · 关键架构决策 · POC 结论整合",
+    "proposals": [
+      {
+        "topic": "wry+tao 封装层",
+        "by": "P-01 POC merged.md",
+        "path": "spec/poc/P-01-wry-glass/merged.md",
+        "status": "valid"
+      },
+      {
+        "topic": "IPC 协议 + 多窗管理",
+        "by": "P-02 POC merged.md",
+        "path": "spec/poc/P-02-tao-ipc/merged.md",
+        "status": "valid"
+      },
+      {
+        "topic": "Web Components 基类 + tokens 方案",
+        "by": "P-03 POC merged.md",
+        "path": "spec/poc/P-03-wc-tokens/merged.md",
+        "status": "valid"
+      }
+    ],
+    "merged": {
+      "path": "spec/versions/v0.2/drafts/merged.md",
+      "status": "locked",
+      "locked_at": "2026-04-21 17:15"
+    }
+  },
+  "waves": [
+    {
+      "id": "W-1",
+      "title": "基础 · CLI + IPC + 存储",
+      "parallelism": "≥ 4 tasks 并发",
+      "precondition": "drafts/merged.md locked",
+      "tasks": [
+        {
+          "id": "T-01",
+          "title": "nf-cli clap 框架 + 37 subcommand dispatcher",
+          "bdd_scenarios": [
+            "S-01"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-02",
+          "title": "IPC Unix socket server + NDJSON protocol + req_id demux",
+          "bdd_scenarios": [
+            "S-01",
+            "S-02",
+            "S-03"
+          ],
+          "executor": "ally+opus parallel",
+          "status": "done"
+        },
+        {
+          "id": "T-03",
+          "title": "存储层 · serde_json 原子写 + ~/.nextframe/ layout",
+          "bdd_scenarios": [
+            "S-19",
+            "S-20",
+            "S-21",
+            "S-22"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-04",
+          "title": "错误体系 · structured stderr + hint 字段",
+          "bdd_scenarios": [
+            "S-25"
+          ],
+          "executor": "ally",
+          "status": "done"
+        }
+      ],
+      "status": "done"
+    },
+    {
+      "id": "W-2",
+      "title": "CRUD · 5 族 25 命令",
+      "parallelism": "≥ 5 tasks 并发",
+      "precondition": "W-1 done · storage + error 就绪",
+      "tasks": [
+        {
+          "id": "T-05",
+          "title": "projects 族 6 命令(list/show/create/rename/archive/delete)",
+          "bdd_scenarios": [
+            "S-19"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-06",
+          "title": "episodes 族 6 命令",
+          "bdd_scenarios": [
+            "S-20"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-07",
+          "title": "clips 族 5 命令 + anchor expression 字符串存",
+          "bdd_scenarios": [
+            "S-21"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-08",
+          "title": "anchors 族 3 命令 + 引用校验(exit 8)",
+          "bdd_scenarios": [
+            "S-22"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-09",
+          "title": "log 族 3 命令 tail/show/create",
+          "bdd_scenarios": [
+            "S-23"
+          ],
+          "executor": "ally",
+          "status": "done"
+        }
+      ],
+      "status": "done"
+    },
+    {
+      "id": "W-3",
+      "title": "app shell · wry + tao + 多窗",
+      "parallelism": "≥ 3 tasks 并发",
+      "precondition": "W-1 IPC 就绪",
+      "tasks": [
+        {
+          "id": "T-10",
+          "title": "nf-shell 主进程 · tao EventLoop + wry WebView(复用 P-01 方案)",
+          "bdd_scenarios": [
+            "S-01"
+          ],
+          "executor": "ally+opus parallel",
+          "status": "done"
+        },
+        {
+          "id": "T-11",
+          "title": "多窗 · WindowManager · open/new-window/close/quit lifecycle",
+          "bdd_scenarios": [
+            "S-02",
+            "S-03",
+            "S-04",
+            "S-05",
+            "S-06"
+          ],
+          "executor": "ally+opus parallel",
+          "status": "done"
+        },
+        {
+          "id": "T-12",
+          "title": "nf CLI app 控制族 · open/ps/close/quit + screenshot/click/state/devtools",
+          "bdd_scenarios": [
+            "S-01",
+            "S-15",
+            "S-16",
+            "S-17",
+            "S-18"
+          ],
+          "executor": "ally",
+          "status": "done"
+        }
+      ],
+      "status": "done"
+    },
+    {
+      "id": "W-4",
+      "title": "Web Components · 8 tags + shell.css",
+      "parallelism": "≥ 5 tasks 并发",
+      "precondition": "W-3 WebView 就绪 · P-03 tokens 方案定",
+      "tasks": [
+        {
+          "id": "T-13",
+          "title": "shell.css 抽自 editor-v0.1.html + tokens.css 共享挂载(复用 P-03 方案)",
+          "bdd_scenarios": [
+            "S-14"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-14",
+          "title": "NfComponent 基类 · shadow DOM + tokens penetration",
+          "bdd_scenarios": [
+            "S-12",
+            "S-13",
+            "S-14"
+          ],
+          "executor": "opus",
+          "status": "done"
+        },
+        {
+          "id": "T-15",
+          "title": "nf-topbar + nf-clips + nf-log 组件(左上)",
+          "bdd_scenarios": [
+            "S-07",
+            "S-08",
+            "S-09",
+            "S-15",
+            "S-16"
+          ],
+          "executor": "ally+opus parallel",
+          "status": "done"
+        },
+        {
+          "id": "T-16",
+          "title": "nf-timeline + nf-track + nf-clip + nf-anchor 组件(中下)",
+          "bdd_scenarios": [
+            "S-10",
+            "S-17",
+            "S-18"
+          ],
+          "executor": "ally+opus parallel",
+          "status": "done"
+        },
+        {
+          "id": "T-17",
+          "title": "nf-inspector 组件(右)",
+          "bdd_scenarios": [
+            "S-11",
+            "S-17"
+          ],
+          "executor": "ally",
+          "status": "done"
+        }
+      ],
+      "status": "done"
+    },
+    {
+      "id": "W-5",
+      "title": "集成 + help + sonnet 盲测",
+      "parallelism": "≥ 3 tasks 并发",
+      "precondition": "W-2 + W-4 齐 · app 能 open + CRUD 都通",
+      "tasks": [
+        {
+          "id": "T-18",
+          "title": "UI ↔ JSON 联动 · mock data 从 ~/.nextframe/ 加载",
+          "bdd_scenarios": [
+            "S-07",
+            "S-08",
+            "S-09",
+            "S-10",
+            "S-11"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-19",
+          "title": "nf help 自包含 · 37 命令 USAGE+FLAGS+EXAMPLES+COMMON ERRORS+RELATED 模板",
+          "bdd_scenarios": [
+            "S-24",
+            "S-27"
+          ],
+          "executor": "opus",
+          "status": "done"
+        },
+        {
+          "id": "T-20",
+          "title": "nf doctor 环境自检",
+          "bdd_scenarios": [
+            "S-27"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-21",
+          "title": "**sonnet 盲测 S-26**(v0.2 核心 acceptance)· 派 sonnet + gpt-4o-mini 双 agent · 1-3-5 失败重试 · ≥3 次 error",
+          "bdd_scenarios": [
+            "S-26"
+          ],
+          "executor": "opus (dispatch sonnet subagent)",
+          "status": "done"
+        }
+      ],
+      "status": "done"
+    },
+    {
+      "id": "W-6",
+      "title": "红队 + 收尾",
+      "parallelism": "2 tasks 并发",
+      "precondition": "W-5 sonnet 过",
+      "tasks": [
+        {
+          "id": "T-22",
+          "title": "红队 · opus 黑客视角漏洞扫描",
+          "bdd_scenarios": [
+            "ALL"
+          ],
+          "executor": "opus",
+          "status": "done"
+        },
+        {
+          "id": "T-23",
+          "title": "红队 · ally OWASP + CLI fuzz(slug typo / 并发 / 编码)",
+          "bdd_scenarios": [
+            "ALL"
+          ],
+          "executor": "ally",
+          "status": "done"
+        },
+        {
+          "id": "T-24",
+          "title": "补漏 scenarios 回 spec.json · mistakes.json 追教训",
+          "bdd_scenarios": [
+            "new"
+          ],
+          "executor": "main-agent",
+          "status": "done"
+        },
+        {
+          "id": "T-25",
+          "title": "cargo check --workspace + npx tsc --noEmit + 27 scenarios ai_tools 全跑",
+          "bdd_scenarios": [
+            "ALL"
+          ],
+          "executor": "main-agent",
+          "status": "done"
+        }
+      ],
+      "status": "done"
+    }
+  ],
+  "redteam": {
+    "opus_report": "spec/versions/v0.2/redteam/opus.md",
+    "ally_report": "spec/versions/v0.2/redteam/ally.md",
+    "new_scenarios": [],
+    "status": "pending"
+  },
+  "status_flow": {
+    "pending": "task 未派遣",
+    "in-progress": "executor 接收工作 · subagent 跑中",
+    "waiting-review": "executor 报完 · 主 agent 亲验中",
+    "done": "主 agent 验过 · verify_evidence 齐 · 可入 next wave",
+    "blocked": "failed ≥ 3 次同根因 · error 通知 · 等人介入"
+  },
+  "retry_policy": {
+    "same_root_max": 3,
+    "escalation": "2 次同根因 → 停查根因 + mistakes.json · 3 次 → error 叫人"
+  },
+  "stats": {
+    "waves": 6,
+    "total_tasks": 25,
+    "by_executor": {
+      "ally": 10,
+      "opus": 3,
+      "ally+opus-parallel": 4,
+      "main-agent": 2,
+      "opus-dispatch-sonnet": 1,
+      "ally+opus": 5
+    },
+    "pending": 25,
+    "in-progress": 0,
+    "done": 0
+  },
+  "next_phase": {
+    "phase": "v0.2 retro (Phase 5)",
+    "skill": "version-overview",
+    "outputs": [
+      "spec/read-for-human/v0.2-retro.html",
+      "spec/roadmap.json update"
+    ]
+  },
+  "closed_at": "2026-04-21 17:10"
+}

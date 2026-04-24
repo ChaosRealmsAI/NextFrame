@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh">
+<meta charset="utf-8">
+<title>BDD · structure gate</title>
+<style>
+  body{margin:0;background:#101318;color:#edf2f7;font:15px/1.5 system-ui,sans-serif}.stage{height:100vh;display:grid;place-items:center}
+  .panel{width:min(820px,86vw)}h1{margin:0 0 18px;font-size:28px}.check{display:grid;gap:10px}
+  .line{padding:13px 16px;background:#171c24;border:1px solid #394150}.line:before{content:"✓";color:#86efac;margin-right:12px}
+  .line{animation:tick 8s infinite}.line:nth-child(2){animation-delay:.5s}.line:nth-child(3){animation-delay:1s}.line:nth-child(4){animation-delay:1.5s}
+  .bar{height:5px;background:#334155;margin-top:28px;overflow:hidden}.bar i{display:block;height:100%;background:#86efac;animation:run 8s linear infinite}.toast{margin-top:14px;color:#86efac;opacity:0;animation:done 8s infinite}
+  @keyframes run{from{width:0}to{width:100%}}@keyframes tick{0%,25%{opacity:.35}45%,100%{opacity:1}}@keyframes done{80%,100%{opacity:1}}
+</style>
+<body><main class="stage"><section class="panel">
+  <h1>结构门禁挡住未来漂移</h1>
+  <div class="check"><div class="line">根目录 allowlist</div><div class="line">禁止 spec/.git</div><div class="line">禁止追踪 tmp/episodes/reference</div><div class="line">禁止大媒体和 POC build artifacts</div></div>
+  <div class="bar"><i></i></div><div class="toast">本轮完成</div>
+</section></main></body></html>

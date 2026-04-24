@@ -1,0 +1,31 @@
+{
+  "id": "sc-02",
+  "title": "非法 timeline.v08.json 被拒(裸数字 begin / 未知 kind / 缺字段)",
+  "type": "api",
+  "chapter": "ch-schema",
+
+  "given": "非法 timeline.json · 3 种典型错误一份:A clip.begin 写裸数字 500(违 ADR-017)· B track.kind 写 'unknown'(不在 8 枚举)· C 顶层缺 meta",
+  "when": "nf timeline lint 3 份错误 json",
+  "then": "exit 非 0 · stderr 每种错类型分别指出行号 + 字段 · A 报 'anchorRef pattern mismatch' · B 报 'kind enum mismatch' · C 报 'required meta missing'",
+
+  "ai_tools": [
+    {
+      "tool": "lint-a",
+      "command": "nf timeline lint spec/bdd/timeline-v08/fixtures/invalid-a-numeric-begin.json",
+      "output": "exit non-zero · stderr mentions anchorRef"
+    },
+    {
+      "tool": "lint-b",
+      "command": "nf timeline lint spec/bdd/timeline-v08/fixtures/invalid-b-unknown-kind.json",
+      "output": "exit non-zero · stderr mentions kind enum"
+    },
+    {
+      "tool": "lint-c",
+      "command": "nf timeline lint spec/bdd/timeline-v08/fixtures/invalid-c-missing-meta.json",
+      "output": "exit non-zero · stderr mentions required meta"
+    }
+  ],
+
+  "dev": "pending",
+  "tested": "pending"
+}

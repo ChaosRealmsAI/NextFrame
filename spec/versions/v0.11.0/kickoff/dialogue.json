@@ -1,0 +1,55 @@
+{
+  "version": "v0.11.0",
+  "session": "codex-2026-04-24-v011-kickoff",
+  "started_at": "2026-04-24 17:25",
+  "rounds": [
+    {
+      "at": "2026-04-24 17:17",
+      "speaker": "user",
+      "question": "你看看我们的导出模式 能否 优化 是否有优化大空间。",
+      "answer": "导出性能和进度是下一版本的主要瓶颈。"
+    },
+    {
+      "at": "2026-04-24 17:20",
+      "speaker": "user",
+      "question": "录制的速度效果上有什么优化空间？我们主要优化哪里。",
+      "answer": "优先做导出档位、并行分片和真实进度；组件缓存放后面。"
+    },
+    {
+      "at": "2026-04-24 17:22",
+      "speaker": "user",
+      "question": "前端按钮选项多点。然后并行以前好像做过多个 webview 并行？",
+      "answer": "确认底层 recorder 已有多个 headless WebView 分片并行，但当前 nf export 强制 parallel=1，桌面路径未接上。"
+    },
+    {
+      "at": "2026-04-24 17:24",
+      "speaker": "user",
+      "question": "嗯 开新版本 做这个。",
+      "answer": "开 v0.11.0，目标收口为 Export profiles, parallel export, and real desktop progress。"
+    }
+  ],
+  "confirmed": {
+    "do": [
+      "前端导出按钮增加多个档位选项",
+      "nf export 暴露 profile/fps/resolution/parallel 参数",
+      "桌面 export.start/status 传递并返回导出 profile/progress/stage/eta",
+      "接入 recorder 并行分片能力，至少支持 final parallel=2/4 的可测路径",
+      "导出仍以保存后的 composition JSON 为唯一 source"
+    ],
+    "do_not": [
+      "不做云导出",
+      "不做组件缓存",
+      "不改渲染架构",
+      "不引入 iframe 或前端框架",
+      "不改变 v2 JSON 轨道语法"
+    ],
+    "success_picture": "桌面端选择导出档位，看到真实进度，导出完成后打开 MP4，视频内容与保存后的 JSON edits 一致。",
+    "self_verify": [
+      "target/debug/nf export --help 显示新增参数",
+      "target/debug/nf export --profile draft/final 输出不同 fps/resolution MP4",
+      "export.status 在运行中返回 progress.percent/frames/stage",
+      "前端 inspector 显示档位按钮和真实进度文本",
+      "ffprobe 验证导出分辨率、fps、duration"
+    ]
+  }
+}

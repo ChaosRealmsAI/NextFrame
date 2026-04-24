@@ -1,0 +1,55 @@
+{
+  "version": "v0.10.0",
+  "type": "feature",
+  "chosen": "V2 composition 真实编辑器：点选多轨道、编辑组件参数和时间、保存后预览与导出一致",
+  "why": "AI 视角：v2 JSON/组件/导出链路已经证明上限，下一步必须把它从演示能力变成可操作产品能力；用户视角：PM 能在桌面端直接点 showreel 的某一轨，改标题/位置/时间，立即看到变化，再导出同一条 timeline。",
+  "changed_from": "上一轮已完成 v2 HTML showreel composition，多轨道能力可见但编辑器仍缺少 track-level authoring。",
+  "constraints": {
+    "no_vanity": "本版看得见的效果 = 桌面端打开 showreel-24s 后，底部 10 条轨道可逐行点选，右侧 inspector 显示该组件参数，修改后预览立即变化并可保存导出。",
+    "no_overreach": "本版只做 v2 composition 编辑闭环；不做 TTS/字幕 v2 化，不做云导出，不做插件市场，不重做视觉主题。",
+    "no_rush": "编辑要一步到位：选中态、参数类型、保存状态、失败提示、导出复用同一 source；不能只做临时 DOM patch。",
+    "must_verify": "验收画面 = 选择 code-terminal 轨改 x/y 或标题参数，预览跟随变化，保存后重新打开仍保留，导出 MP4 反映修改；自验方法 = devtools 数据属性 + JSON 文件 diff + 一次导出抽帧。"
+  },
+  "success_picture": "用户在桌面编辑器里看到 showreel 的 10 条轨道；点击任意组件轨，右侧出现真实 JSON params 表单；改文字/位置/时间后中间预览同步，点保存写回 composition JSON，点导出得到带修改的 MP4。",
+  "cost_estimate": "AI 尺度 3-5 小时；主要风险在前端状态模型和 composition JSON patch 保存。",
+  "risks": [
+    "当前 inspector 基于旧 NfClip，v2 params 是任意 JSON，需要先做通用 JSON/字段编辑而不是写死组件类型。",
+    "拖动位置已能改 x/y，但保存路径只覆盖 params，时间表达式和非 x/y 字段需要补 patch API。",
+    "组件 JS 无 iframe，错误会污染预览；本版只做基础错误展示，不做完整隔离。",
+    "如果把 add/delete track 也纳入会过大，本版只做已有 track 的编辑。"
+  ],
+  "candidates": [
+    {
+      "id": "v2-editor-authoring",
+      "title": "V2 composition 真实编辑器",
+      "do": "轨道点选、组件 params/style/time 编辑、保存、预览、导出闭环",
+      "constraints_check": "PM 肉眼能验；一版一件事；编辑质量一步到位；可用 JSON diff + 导出抽帧验证",
+      "cost": "3-5h",
+      "selected": true
+    },
+    {
+      "id": "v2-voice-subtitle",
+      "title": "V2 语音字幕轨",
+      "do": "把 TTS/subtitle/audio 作为 v2 track 接入 showreel",
+      "constraints_check": "可验但不是当前最大短板；会和编辑器状态模型抢 scope",
+      "cost": "2-4h",
+      "selected": false
+    },
+    {
+      "id": "v2-component-diagnostics",
+      "title": "组件错误诊断与校验",
+      "do": "组件加载错误 overlay、schema 校验、runtime log 面板",
+      "constraints_check": "质量基建候选，用户未主动提但必要；肉眼效果弱，适合编辑器之后做",
+      "cost": "2-3h",
+      "selected": false
+    },
+    {
+      "id": "desktop-launch-focus",
+      "title": "桌面启动/聚焦可靠性",
+      "do": "解决 nf-shell 后台启动易退出/窗口不前置的问题",
+      "constraints_check": "真实痛点，但不直接推进视频制作能力；可作为 patch，不作为主版本",
+      "cost": "1-2h",
+      "selected": false
+    }
+  ]
+}

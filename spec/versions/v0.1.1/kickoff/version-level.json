@@ -1,0 +1,84 @@
+{
+  "version": "v0.1.1",
+  "type": "foundation-patch",
+  "kickoff_mode": "skipped-fast-track",
+  "kickoff_note": "用户明确 patch · 纯空骨架 · 串行(v0.2 另 worktree 做 BDD 不动) · 跳访谈直接进 build",
+
+  "chosen": "Cargo workspace + 4 crates 空 stub + frontend/nf-components TS 空 stub + tooling (Makefile + scripts + CI)",
+  "why": "v0.1.0 定死宪法+hifi+设计系统(spec-only · 无代码) · v0.2 进 spec 做 Mac 壳+UI · 但代码层 workspace 根还没搭 · 本版把骨架立起来 · 后续版本往里填",
+  "changed_from": null,
+
+  "scope_in": [
+    "Cargo.toml workspace 根 · 带 workspace.lints.clippy deny(unwrap/expect/panic/unreachable/todo/wildcard_imports)",
+    "rust-toolchain.toml 锁 Rust 版本",
+    "crates/nf-cli/ · binary stub · `fn main()` 占位",
+    "crates/nf-shell/ · lib stub",
+    "crates/nf-engine/ · lib stub",
+    "crates/nf-runtime/ · lib stub",
+    "frontend/nf-components/ · package.json + tsconfig.json + src/index.ts 占位",
+    "Makefile · check / build / clean / dev target",
+    "scripts/check.sh · cargo check + clippy + tsc --noEmit",
+    ".github/workflows/ci.yml · check + clippy deny + tsc"
+  ],
+
+  "scope_out": [
+    "任何实际业务实现(CLI 命令解析 / wry 窗口 / engine JSON 解析 / runtime 渲染 / 组件真实现)",
+    "wry/tao 依赖引入(占位 crate 只有 lib.rs stub · 不加 deps)",
+    "esbuild/bundler 集成(先 tsc --noEmit 过即可 · bundler v0.2 加)",
+    "pre-commit hook(v0.2 或后续补)",
+    "测试(骨架阶段零测试 · 各 crate 后续版本加)",
+    "BDD scenario(patch 版不走 BDD)"
+  ],
+
+  "tech_stack": {
+    "workspace": "cargo workspace · resolver=2 · lints.clippy deny 6 条",
+    "rust_edition": "2021",
+    "rust_version": "1.80+",
+    "frontend": "TypeScript 5.x · 零框架 · Web Components 预留",
+    "ci": "GitHub Actions · ubuntu-latest(先跑 check/clippy/tsc · macOS-only wry 集成 v0.2 加)"
+  },
+
+  "constraints": {
+    "no_vanity": "看得见效果 = `cargo check --workspace` 零 warning 过 + `cd frontend/nf-components && npx tsc --noEmit` 零 error 过",
+    "no_overreach": "纯目录 + 最小 stub · 禁 '顺便加点实现' / '先把 CLI 跑起来'(那是 v0.2 工作)",
+    "no_rush": "Cargo.toml 里所有 crate 入 workspace · 禁 'nf-shell 先不加 workspace v2 再加'",
+    "must_verify": "AI 自验 = `cargo check --workspace && (cd frontend/nf-components && npx tsc --noEmit)` 双绿 · 不靠用户点开看"
+  },
+
+  "success_picture": [
+    "git clone 空环境 → `cargo check --workspace` 零 warning 过",
+    "`cd frontend/nf-components && npm install && npx tsc --noEmit` 零 error 过",
+    "`make check` 一键跑完上面两步",
+    "v0.2 worktree 合回 main 后 · 往 nf-shell/nf-components 填实现 · 不用动 workspace 根",
+    "v0.3 开 JSON 引擎 · 往 nf-engine/nf-runtime 填 · 直接写不用先建 crate"
+  ],
+
+  "cost_estimate": "AI 尺度 30-60 min(Cargo.toml + 4 crate Cargo.toml + 各 lib.rs + frontend package.json + tsconfig + Makefile + CI · 验 10 min)",
+
+  "risks": [
+    "workspace lint deny 太严(clippy 对空 stub 可能误报) · 必要时 allow 特定 crate",
+    "frontend 位置 `frontend/` vs `ts/` vs `packages/` · 项目首次 · 定了就别改",
+    "rust-toolchain 版本锁太死 · CI 拉不到(已知可控)"
+  ],
+
+  "candidates": [],
+
+  "deliverables_planned": [
+    "Cargo.toml",
+    "rust-toolchain.toml",
+    "crates/nf-cli/{Cargo.toml, src/main.rs}",
+    "crates/nf-shell/{Cargo.toml, src/lib.rs}",
+    "crates/nf-engine/{Cargo.toml, src/lib.rs}",
+    "crates/nf-runtime/{Cargo.toml, src/lib.rs}",
+    "frontend/nf-components/{package.json, tsconfig.json, src/index.ts}",
+    "Makefile",
+    "scripts/{check.sh, dev.sh, build.sh}",
+    ".github/workflows/ci.yml"
+  ],
+
+  "next_phase": {
+    "phase": "v0.1.1 build (直接 · 跳 spec/poc)",
+    "skill": "none · 主 agent 亲做",
+    "focus": "单会话串行跑完 · ≤ 1h · merge 回 main · v0.2 worktree 拿到骨架继续"
+  }
+}

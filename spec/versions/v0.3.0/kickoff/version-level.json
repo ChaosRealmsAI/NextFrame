@@ -1,0 +1,65 @@
+{
+  "version": "v0.3.0",
+  "type": "feature",
+  "title": "迁归档 3 模块接入新骨架 · 调通独立 2 链(clips + TTS) · subagent haiku 验证",
+  "chosen": "把 reference/ 里的 3 块 v0.x 归档代码(clips-pipeline 6 crate · nf-tts · nf-guide) 复制到主仓 src/ 接入 Cargo workspace · lint 过 · 调通 2 条独立链路: subagent haiku 按 prompt 跑 clips 链(URL→mp4) + TTS 链(文本→mp3+karaoke.html)",
+  "why": "AI 视角: 3 块 reference 代码成熟 · 重写成本 >> 迁移 · 直接复制 + 集成是最快路径 · subagent haiku 盲测是 agent-usability rule 的标准应用(弱模型跑产品接口验证自包含性). 用户视角: '以前代码不错,就复制过来调试通过' · '确保 haiku 都能生成好结果'. 2 链独立不强求端到端串联(砍 scope · 避免大力度).",
+  "changed_from": null,
+  "roadmap_impact": {
+    "original_v0.3.0": "draft · JSON 引擎 + frame pure 核心架构",
+    "new_v0.3.0": "归档迁移 + 独立 2 链 (本版)",
+    "json_engine_pushed_to": "v0.4.0 (下版重新规划)"
+  },
+  "constraints": {
+    "no_vanity": "3 产物 PM 肉眼可验: output/highlight-1.mp4 可播(视频 + 音轨正常) · output/tts.mp3 能听(中文清晰) · output/karaoke.html 能开(字级高亮同步). 代码复制 / lint 本身不算产出 · 必看到 3 产物文件齐",
+    "no_overreach": "只做 3 模块迁移 + 2 链独立调通. 不做: ① clips 产物喂 TTS 端到端串联 ② nf-shell editor GUI 集成(另 4800+ 行 · 留 v0.5+) ③ nf-runtime 视觉 track ④ Windows / Linux(只 macOS) ⑤ JSON 引擎(原 v0.3 推到 v0.4)",
+    "no_rush": "代码用 reference/ 最新版(v1.67.1 for nf-tts / v0.5 for clips-pipeline) · 不另造 MVP 版. Cargo workspace lint deny 6 条必过(unwrap/expect/panic/unreachable/todo/wildcard_imports). 依赖版本不凑合(锁 rustc 1.94.1 兼容). 不留'先占位 v0.4 再填'的坑",
+    "must_verify": "2 条自验链: (A) subagent(model=haiku) 按 reference/nf-guide/flows/clips/ prompt 跑 nf-source 系列命令 · 输入 1 个本地 mp4(yt-dlp 依赖跳过用户机装) · 输出 highlight-*.mp4 + *.srt · (B) subagent(model=haiku) 按 reference/nf-guide/flows/audio/ prompt 跑 nf-tts · 输入 1 段中文文本 · 输出 *.mp3 + karaoke.html + *.timeline.json. 主 agent 亲 `open` 验 3 产物"
+  },
+  "success_picture": "主 agent 命令: 派 subagent (model=haiku) 两次 → 亲 `ls output/` 见 3 个文件(mp4 + mp3 + karaoke.html) → 亲 `open` 逐个验(mp4 能播 · mp3 能听 · karaoke 字级同步) = done",
+  "cost_estimate": "AI 尺度 6-10h: 代码复制 1h · Cargo workspace 集成 2h · lint deny 修 2h · subagent haiku 盲测 2 链各 2h · 主验 1h",
+  "risks": [
+    "yt-dlp / whisperx / ffmpeg 外部依赖 · haiku subagent 不能装系统工具 → 用户本地装 OR 改 prompt 用本地 mp4 绕开下载",
+    "3 crate(共 10+ 子 crate) 集成 · 同名依赖版本冲突(tokio / serde / clap 等) · 需手 align",
+    "nf-guide 里 v1.13.x 发现过 5 个 prompt 漏洞(bug 20260419-nf-guide-clips-prompts) · haiku 更弱可能踩新坑 · 需就地修 prompt",
+    "reference 代码用的旧 edition/rustc · 跟主仓 rust-toolchain.toml 可能版本漂"
+  ],
+  "candidates": [
+    {
+      "id": "A",
+      "label": "最小端到端 URL→mp4 (2h)",
+      "status": "rejected",
+      "reason": "太窄 · 只剪切不含 TTS"
+    },
+    {
+      "id": "B",
+      "label": "clips pipeline 骨架(5h) · 下载+转写+对齐+剪切",
+      "status": "rejected",
+      "reason": "砍了 TTS / nf-guide · 不符合用户 '3 块全要'"
+    },
+    {
+      "id": "C",
+      "label": "全链 end-to-end + 翻译 + TTS + karaoke(10-15h)",
+      "status": "rejected",
+      "reason": "违 no_overreach · 一口气做 3-4 版的活 · 砍了 '端到端串联'"
+    },
+    {
+      "id": "D",
+      "label": "先 spec 后 build · Phase 2 spec + Phase 3 POC + Phase 4 Rust(正常 4-phase)",
+      "status": "rejected",
+      "reason": "用户明确说 '代码都有了,复制调通即可' · 不重写 · 接受跳 spec/POC 深度设计 · autopilot 走简化 Phase 2/3"
+    },
+    {
+      "id": "E-chosen",
+      "label": "3 模块全迁 · 2 链独立调通 · subagent haiku 盲测",
+      "status": "chosen"
+    }
+  ],
+  "kickoff_meta": {
+    "session": "0912b6e2",
+    "confirmed_at": "2026-04-21 15:20",
+    "confirmed_by": "user",
+    "autopilot_requested": true,
+    "mode": "kickoff 手动 · Phase 2/3/4 autopilot 自动推"
+  }
+}

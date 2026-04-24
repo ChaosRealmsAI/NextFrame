@@ -1,0 +1,10 @@
+[
+  {"id": 1, "voice": "zh-CN-XiaoxiaoNeural", "text": "再收敛一版. Tool 只要两样. 第一 Bash. 一个万能后门. 第二我们自家的业务 tool. 就这. Read Write Glob Grep 这些通用的全砍. agent 用 Bash 调 ls cat find 一样能干.", "filename": "slide-01.mp3"},
+  {"id": 2, "voice": "zh-CN-XiaoxiaoNeural", "text": "tool 层就两层. 上层 Bash. 跑任意 shell 命令. 下层 NextFrame 业务 tool. 包 schema 给 AI 看. nf-tts, ffmpeg cut, whisperx, 这些. 一共不超过 10 个.", "filename": "slide-02.mp3"},
+  {"id": 3, "voice": "zh-CN-XiaoxiaoNeural", "text": "Bash 能干所有通用活. 查文件用 ls. 看内容用 cat. 搜字用 grep. 找文件用 find. 组合用 pipe. 跟你终端敲命令一模一样. 不用给 agent 专门的文件操作 tool.", "filename": "slide-03.mp3"},
+  {"id": 4, "voice": "zh-CN-XiaoxiaoNeural", "text": "业务 tool 精包装. nf-tts synth 一个 tool. ffmpeg cut 一个 tool. 每个带明确 schema. 参数类型必填选填都写死. agent 调用更准. 不会瞎填参数.", "filename": "slide-04.mp3"},
+  {"id": 5, "voice": "zh-CN-XiaoxiaoNeural", "text": "状态机怎么办. 也是 CLI. 写成 nf flow state 和 nf flow verify. agent 用 Bash 调就行. 不需要专门 tool. 相当于 agent 跟终端里敲命令问状态一样自然.", "filename": "slide-05.mp3"},
+  {"id": 6, "voice": "zh-CN-XiaoxiaoNeural", "text": "这是我第五次收敛. v1 硬锁, v2 软 flow, v3 元 tool, v4 Claude Code 5 基础 tool, v5 砍到 Bash 加业务. 每次你打断都在纠正我过度设计. 这版最简.", "filename": "slide-06.mp3"},
+  {"id": 7, "voice": "zh-CN-XiaoxiaoNeural", "text": "骨架更简. 一百五十行 Python. 一个 Bash tool 函数. 10 个业务 tool schema. 主循环就 30 行. while 调 LLM, 拿 tool use, subprocess 跑, 结果塞回. 完事.", "filename": "slide-07.mp3"},
+  {"id": 8, "voice": "zh-CN-XiaoxiaoNeural", "text": "v0.5 落地更快. 写 Bash tool 包装, 10 行. 包一个业务 tool nf-tts, 15 行. 写 nf flow state 和 verify CLI, 各 20 行. 主循环 30 行. 总不到 100 行. 端到端跑通一轮.", "filename": "slide-08.mp3"}
+]

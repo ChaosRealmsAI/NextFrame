@@ -1,0 +1,24 @@
+@import "../../../../design/tokens.css";
+
+html, body { margin: 0; width: 100%; min-height: 100%; font-family: var(--font); color: var(--fg); }
+body { display: grid; place-items: center; padding: 32px; overflow: hidden; }
+.app { width: min(1180px, 96vw); height: min(720px, 86vh); background: rgba(14,14,19,.64); border: 1px solid var(--bd); display: grid; grid-template-rows: 46px 1fr 4px; position: relative; box-shadow: 0 30px 90px rgba(0,0,0,.55); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--bd); font-size: 12px; letter-spacing: .12em; color: var(--accent-l); }
+.top span { color: var(--amber); font-family: var(--mono); }
+.body { display: grid; grid-template-columns: 260px 1fr 300px; min-height: 0; }
+.tracks, .inspector { padding: 14px; border-right: 1px solid var(--bd); display: grid; gap: 8px; align-content: start; background: rgba(8,8,12,.36); }
+.inspector { border-right: 0; border-left: 1px solid var(--bd); opacity: .42; transform: translateX(20px); transition: .8s ease; }
+.inspector h2 { margin: 0 0 8px; font-size: 18px; }
+.inspector label { display: block; padding: 9px; border: 1px solid var(--bd); color: var(--fg-2); font-family: var(--mono); font-size: 12px; }
+.track { height: 34px; border: 1px solid var(--bd); background: rgba(255,255,255,.025); color: var(--fg-2); text-align: left; padding: 0 10px; font-family: var(--mono); }
+.track.target { animation: selectRow 10s infinite; }
+.preview { position: relative; display: grid; place-items: center; overflow: hidden; }
+.terminal { width: 58%; padding: 22px; border: 1px solid rgba(167,139,250,.32); color: var(--teal-l); font-family: var(--mono); line-height: 1.8; opacity: .82; }
+.cursor { position: absolute; left: 105px; top: 446px; width: 18px; height: 18px; border: 2px solid var(--amber); transform: translateY(0); animation: cursor 10s infinite; }
+.progress { background: var(--accent); transform-origin: left; animation: progress 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 18px; padding: 10px 14px; border: 1px solid var(--amber-b); background: rgba(224,183,108,.1); color: var(--amber-l); opacity: 0; animation: toast 10s infinite; }
+.play .inspector { opacity: 1; transform: translateX(0); transition-delay: 4s; }
+@keyframes cursor { 0%,25% { transform: translateY(0); } 45%,100% { transform: translateY(360px); } }
+@keyframes selectRow { 0%,42% { border-color: var(--bd); background: rgba(255,255,255,.025); } 48%,100% { border-color: var(--accent); background: rgba(167,139,250,.16); color: var(--fg); } }
+@keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes toast { 0%,82% { opacity: 0; } 88%,96% { opacity: 1; } 100% { opacity: 0; } }

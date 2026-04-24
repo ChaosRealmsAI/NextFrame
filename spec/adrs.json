@@ -1,0 +1,458 @@
+{
+  "_meta": {
+    "title": "NextFrame 架构决策记录(ADR)索引",
+    "schema_version": "1.0",
+    "last_updated": "2026-04-21",
+    "note": "每个 ADR = 一条 entry · 指向 commit hash + devlog_ref · jq 按 tag / version / status 过滤",
+    "how_to_add": "做 POC / 改架构前查 · 决策定后追加 entry · status=proposed → valid → superseded"
+  },
+  "entries": [
+    {
+      "id": "A-0001",
+      "version": "v0.1",
+      "title": "配色系统 · 紫 + 琥珀 + 青 + 灰 4 色主轴",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "tokens.css 定义 --accent(紫#a78bfa) · --amber(#e0b76c) · --teal(#7bc9b5) · --gray(白光谱 4 档) · 禁其他散色",
+      "alternatives_considered": [
+        "多彩商业感(reject: PM 反馈 'too low')",
+        "纯单色(reject: 无层次)",
+        "紫+琥珀 2 色(reject: audio 轨道需第三色)"
+      ],
+      "why": "15+ 轮 hifi 迭代收敛到 4 色 · 每次改都减色不加色 · 符 Linear less-is-more + PM 审美",
+      "supersedes": null,
+      "commit": "437e533",
+      "devlog_ref": "devlog/01.md · v0.1 Retro 条目",
+      "tags": [
+        "design",
+        "color",
+        "cross-version"
+      ]
+    },
+    {
+      "id": "A-0002",
+      "version": "v0.1",
+      "title": "直角风 · 全局 border-radius: 0",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "*, *::before, *::after { border-radius: 0 } · 只圆点标记 / 头像保留 50%",
+      "alternatives_considered": [
+        "小圆角 4-8px(reject: 普通)",
+        "混合(reject: 不一致)"
+      ],
+      "why": "直角 = 工程感 + Linear 风 · 跟 Mac 系统自带的圆角形成对比",
+      "supersedes": null,
+      "commit": "437e533",
+      "devlog_ref": "devlog/01.md · v0.1 Retro",
+      "tags": [
+        "design",
+        "geometry",
+        "cross-version"
+      ]
+    },
+    {
+      "id": "A-0003",
+      "version": "v0.2",
+      "title": "技术栈 · Rust + wry + tao + TS + 原生 Web Components · 零框架",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "主进程 Rust + wry(薄 wrapper · 系统 WKWebView)+ tao · 前端 TypeScript + 原生 Web Components(Shadow DOM)· 无 React/Vue/Svelte/Tauri/Electron",
+      "alternatives_considered": [
+        "AppKit / SwiftUI(reject: v1.19 AppKit 失败教训 · 非 Rust 栈)",
+        "Tauri(reject: tech-decision rule 禁胖框架)",
+        "Electron(reject: 打包 Chromium · binary > 100MB)",
+        "React/Vue(reject: 零框架原则)"
+      ],
+      "why": "wry+tao 是薄 wrapper rule 允许 · v1.x 有 wry 经验 · Web Components 是 W3C 标准零依赖 · Rust 单 binary 可控",
+      "supersedes": null,
+      "commit": "79ade2e",
+      "devlog_ref": "devlog/01.md · v0.2 Kickoff",
+      "tags": [
+        "tech-stack",
+        "webview",
+        "components"
+      ]
+    },
+    {
+      "id": "A-0004",
+      "version": "v0.2",
+      "title": "数据层真 · JSON 文件原子写 · 无数据库",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "~/.nextframe/<project>/project.json + episodes/<ep>.json · serde_json 原子写(tmpfile + rename)· registry.json 列所有项目",
+      "alternatives_considered": [
+        "SQLite(reject: 数据量小 · 增依赖)",
+        "内存只存(reject: 关 app 丢)",
+        "YAML(reject: 增解析复杂度)"
+      ],
+      "why": "符 charter P8 JSON 单一真理源 · 人肉眼可读 · git 可版本化 · CLI + UI 同一份数据",
+      "supersedes": null,
+      "commit": "4d520f5",
+      "devlog_ref": "devlog/01.md · v0.2 Spec",
+      "tags": [
+        "storage",
+        "json",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0005",
+      "version": "v0.2",
+      "title": "CLI 面向 AI 第一用户 · slug 定位 · JSON I/O · 自包含 help",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "所有命令 --project=<slug> --episode=<slug> 定位 · --json 默认输出 · --help 含 2+ 例子 + 1+ 常见错 + hint · 错误 stderr 结构化 JSON 含 hint 字段",
+      "alternatives_considered": [
+        "位置参数(reject: AI 难记序)",
+        "仅 window_id 定位(reject: AI 要查 id)",
+        "人话文本错误(reject: AI 难 parse)"
+      ],
+      "why": "符 charter P1 AI 第一用户 + P2 CLI 驱动 · agent-usability rule · sonnet 盲测通是 v0.2 核心 acceptance",
+      "supersedes": null,
+      "commit": "4644046",
+      "devlog_ref": "devlog/01.md · v0.2 Spec",
+      "tags": [
+        "cli",
+        "ai-first",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0006",
+      "version": "v0.2",
+      "title": "IPC 协议 · NDJSON over Unix socket + req_id correlation + EventLoopProxy ack",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "Unix socket `~/.nextframe/nf-$UID.sock`(或 `/tmp/nextframe-$UID.sock`) · NDJSON 双向 · req_id 每行 correlation · tokio 子线程跑 listener · 每 conn 独立 task · 通过 EventLoopProxy<UserEvent> 注入主线程 · oneshot::channel 拿 ack",
+      "alternatives_considered": [
+        "TCP localhost(reject: 端口冲突 + 不安全)",
+        "gRPC(reject: 过重 · 增依赖)",
+        "mpsc channel 全局(reject: 并发 demux 复杂 · 不如 per-conn oneshot)"
+      ],
+      "why": "P-02 POC 实测:10 并发 req_id 全对齐 · 0 丢包 · 34ms 回合 · 两 agent 独立验证一致",
+      "poc_ref": "spec/poc/P-02-tao-ipc/merged.md",
+      "supersedes": null,
+      "commit": "TBD-build",
+      "devlog_ref": "devlog/01.md · v0.2 POC",
+      "tags": [
+        "ipc",
+        "protocol",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0007",
+      "version": "v0.2",
+      "title": "socket 清理三层兜底 · SocketGuard Drop + ctrlc termination + stale clean",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "层 1:`SocketGuard: Drop` 正常退出删 · 层 2:`ctrlc::set_handler` features=['termination'] 抓 SIGTERM/SIGINT(macOS 默认不抓 SIGTERM · 必加 feature)· 层 3:启动时 `if sock.exists() { remove_file }` 清 stale",
+      "alternatives_considered": [
+        "只 Drop(reject: SIGTERM 不触发)",
+        "只 ctrlc(reject: panic 漏)",
+        "不清(reject: 下次 bind EADDRINUSE)"
+      ],
+      "why": "P-02 test4 验证 · 两 agent 都踩 ctrlc termination feature 缺失导致 test4 首跑失败 · 三层防御确保任何退出路径 socket 都清",
+      "poc_ref": "spec/poc/P-02-tao-ipc/merged.md",
+      "supersedes": null,
+      "commit": "TBD-build",
+      "devlog_ref": "devlog/01.md · v0.2 POC",
+      "tags": [
+        "ipc",
+        "lifecycle",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0008",
+      "version": "v0.2",
+      "title": "Web Components 基类 · NfBase + attachShadow + adoptedStyleSheets 单例 sheet",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "`class NfBase extends HTMLElement` 带 `attachShadow({mode:'open'})` + `root.adoptedStyleSheets = [moduleSheet]` · 每组件类 module-level 单例 `CSSStyleSheet`(所有实例共享)· 8 组件(nf-topbar / clips / log / timeline / track / clip / anchor / inspector)全继承 NfBase",
+      "alternatives_considered": [
+        "inline <style> in shadow(reject: n=100 慢 2x · 每实例 parse)",
+        "Shadow closed mode(reject: nf devtools 需 ::shadow 查验 · closed 不可穿)"
+      ],
+      "why": "P-03 POC 实测:n=100 adoptedStyleSheets 1.5ms vs inline 3ms · 1.8-2x 快 · 代码减量",
+      "poc_ref": "spec/poc/P-03-wc-tokens/merged.md",
+      "supersedes": null,
+      "commit": "TBD-build",
+      "devlog_ref": "devlog/01.md · v0.2 POC",
+      "tags": [
+        "web-components",
+        "shadow-dom",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0009",
+      "version": "v0.2",
+      "title": "tokens.css 挂载方式 · :root on main document · shadow 内 var(--*) 穿透",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "主文档 `<link rel=stylesheet href=tokens.css>` 一次 · `:root { --accent: #a78bfa; ... }` · 所有组件 shadow 内直接 `var(--accent)` 读到(W3C Custom Properties §3.2 继承机制 · shadow host 是 shadow tree 的 flat-tree parent · 天然穿透)· 改 :root 瞬时联动所有 shadow",
+      "alternatives_considered": [
+        "每组件 adoptedStyleSheets 挂 tokens sheet(reject: 修改需 replaceSync · 复杂无收益)",
+        "CSS-in-JS 传 tokens(reject: 违零框架原则)"
+      ],
+      "why": "P-03 POC 测试 A 验证:紫→红→紫 RGB 完美切换 · 机制基于 CSS 规范保证 · 两 agent RGB 值精确重合",
+      "poc_ref": "spec/poc/P-03-wc-tokens/merged.md",
+      "supersedes": null,
+      "commit": "TBD-build",
+      "devlog_ref": "devlog/01.md · v0.2 POC",
+      "tags": [
+        "tokens",
+        "css",
+        "shadow-dom",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0010",
+      "version": "v0.2",
+      "title": "Shadow DOM 直角 reset · 每组件 base sheet 必塞 `:host, *, *::before, *::after { border-radius: 0 }`",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "Shadow DOM 不跨 main `*` reset · 主文档 `*, *::before, *::after { border-radius: 0 }` 不影响 shadow 内部。每组件的 base sheet 默认塞直角 reset 条 · 所有组件自动继承",
+      "alternatives_considered": [
+        "每组件各写 border-radius 0(reject: 易漏)",
+        "放弃直角原则(reject: 违 v0.1 A-0002 设计决策)"
+      ],
+      "why": "P-03 POC opus 独有洞察 · 测试 B 验证 shadow 硬边界 · 对应 BDD S-10 直角风验证",
+      "poc_ref": "spec/poc/P-03-wc-tokens/merged.md",
+      "supersedes": null,
+      "commit": "TBD-build",
+      "devlog_ref": "devlog/01.md · v0.2 POC",
+      "tags": [
+        "shadow-dom",
+        "design",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0011",
+      "version": "v0.2",
+      "title": "wry + tao 版本 · wry 0.55 + tao 0.35 · 非 transparent 默认 · transparent 可选实验",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "`wry = \"0.55\"` + `tao = \"0.35\"`(crates.io 最新稳定)· 默认 WebView 不开 transparent · tao 标准 decorations · editor-v0.1.html 自带 `.outer` + `.app` chrome · transparent + decorations=false 作可选实验开关(保留代码 · 默认关)",
+      "alternatives_considered": [
+        "Tauri(reject: tech-decision rule 禁胖框架 · allowlist/isolation 复杂)",
+        "Electron(reject: > 100MB · 包 Chromium)",
+        "AppKit 原生(reject: v1.19 失败教训 · 非 Rust 栈)"
+      ],
+      "why": "P-01 POC 双 agent 独立验证 · wry=WKWebView=Safari 同引擎 · pixel diff 0.000% · FPS 60-92 · aurora + grain + backdrop-filter 全生效",
+      "poc_ref": "spec/poc/P-01-wry-glass/merged.md",
+      "supersedes": null,
+      "commit": "TBD-build",
+      "devlog_ref": "devlog/01.md · v0.2 POC",
+      "tags": [
+        "webview",
+        "wry",
+        "tao",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0012",
+      "version": "v0.2",
+      "title": "Rust↔JS IPC 桥 · `with_ipc_handler(|req|)` + stdout flush · 不用 document.title 桥",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "wry `WebViewBuilder::with_ipc_handler(|req| ...)` 接 `window.ipc.postMessage(json)` · 后台 shell 场景必 `stdout.flush()`(否则 buffer 不 flush)· **不用** `document.title` 桥(ally 验过 transparent 路径超时 · 且有 ~1000 字符限制)",
+      "alternatives_considered": [
+        "document.title(reject: 长度限 + transparent 不稳)",
+        "localStorage 轮询(reject: 低效 · 无事件)",
+        "postMessage via onMessage(wry 不 native)"
+      ],
+      "why": "P-01 POC opus 验 stable · ally 踩过 title 桥超时 · 双 agent 结论一致:ipc_handler 才稳",
+      "poc_ref": "spec/poc/P-01-wry-glass/merged.md",
+      "supersedes": null,
+      "commit": "TBD-build",
+      "devlog_ref": "devlog/01.md · v0.2 POC",
+      "tags": [
+        "ipc",
+        "wry",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0013",
+      "version": "v0.2",
+      "title": "nf-shell 内建 probe + screenshot CLI(禁用 host screencapture)",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "`nf shell --probe --selector=<css> --get=<prop>` 读 computed style via wry evaluate_script · `nf shell --screenshot --region=<area> --out=<path>` 用 wry canvas toBlob 或 tao window capture(不调 host `screencapture`)· 走同 DOM 路径 · self-verification rule 铁律",
+      "alternatives_considered": [
+        "host screencapture(POC 期用 · 产品禁 · 因需权限 + 跨平台不一致)",
+        "playwright(reject: 外部依赖 · 不内建)"
+      ],
+      "why": "self-verification rule:验证能力必须内建进产品代码 · 走同 DOM 路径 · AI 可自验 · POC 用 host 工具是因为 POC 是实验不是产品",
+      "poc_ref": "spec/poc/P-01-wry-glass/merged.md",
+      "supersedes": null,
+      "commit": "TBD-build",
+      "devlog_ref": "devlog/01.md · v0.2 POC",
+      "tags": [
+        "cli",
+        "verification",
+        "self-verification",
+        "v0.2"
+      ]
+    },
+    {
+      "id": "A-0014",
+      "version": "v0.1.3",
+      "title": "AI 接口事实标准 = OpenAI chat/completions + MCP(两层正交)",
+      "date": "2026-04-21",
+      "status": "tentative",
+      "decision": "NextFrame 未来做 agent 相关能力时 · 模型接入层统一走 OpenAI /v1/chat/completions 格式(嘴层)· 产品 tool 能力通过 MCP 协议暴露(手层)。两层正交 · 不冲突 · 用户接入门槛 = 3 字段(base_url + api_key + model)。",
+      "alternatives_considered": [
+        "绑定 LiteLLM 库(reject · NextFrame 只发 HTTP 不绑 SDK · 避免锁定)",
+        "绑定 Vercel AI SDK(reject · 同上 · 且 TS only)",
+        "只用 Anthropic 原生 tool_use 协议(reject · 生态窄 · OpenAI chat 已是事实标准 Claude/Gemini/Ollama 都主动兼容)",
+        "不做 MCP(reject · 2026 已是生态入场券 · 10000+ public servers)"
+      ],
+      "why": "8 份调研一致指向:OpenAI chat/completions 被 Claude/Gemini/Ollama/vLLM/LM Studio/DeepSeek/Qwen 全行业主动兼容 = 事实标准。MCP(Anthropic 2024-11 推 · OpenAI/Google 2026-03 加入)解决 tool 层跨家差异。两层解耦 = 模型可换 / tool 复用。NextFrame 不绑 SDK 不依赖库 = 最高自由度。",
+      "poc_ref": null,
+      "supersedes": null,
+      "commit": "TBD",
+      "devlog_ref": "devlog/01.md · 2026-04-21 16:40 v0.1.3 Retro",
+      "tags": [
+        "ai-interface",
+        "protocol",
+        "openai-compat",
+        "mcp",
+        "tentative",
+        "v0.1.3-research"
+      ]
+    },
+    {
+      "id": "A-0015",
+      "version": "v0.1.3",
+      "title": "NextFrame agentloop 起步架构 = workflow + 步内 agent loop(Anthropic 建议)",
+      "date": "2026-04-21",
+      "status": "tentative",
+      "decision": "未来做 NextFrame agent 能力时 · 起步用方案 A(固定 workflow JSON→HTML→MP4)+ 每步内部小 agent loop · 不上全自主 agent(方案 B)· 也不上 Orchestrator-Workers(方案 C)。核心路径物理流水线(JSON→HTML→MP4)写死 · agent 只用在步内决策(如选素材/写文案)。骨架 ~200 行(抄 PocketFlow 100 行 + smolagents code-action 思想)· 不依赖 LangChain/CrewAI/AutoGen 重量框架。双挡模型:DeepSeek V3.2 主力 + Claude Haiku 4.5 精工挡 + Qwen 3.5 9B 本地挡。",
+      "alternatives_considered": [
+        "方案 B · 单 agent 全自主(reject · Anthropic 原话 agent 不可预测 + 贵 + AutoGPT Classic 教训)",
+        "方案 C · Orchestrator-Workers(reject · 开发复杂度高 · 视频剪辑 v1 用不上 · v5+ 多任务时再考虑)",
+        "抄 gptme 完整架构(考虑 · 但 gptme 偏通用 · NextFrame 视频场景更窄 · 抄骨架更灵活)",
+        "用 LangGraph / CrewAI / AutoGen(reject · 抽象层过重 · CLI 剪视频场景火箭筒打蚊子 · 违反零框架原则)"
+      ],
+      "why": "Anthropic Building Effective Agents 原话:先用 workflow · workflow 真做不到才上 agent(因 agent 不可预测 + 贵)。NextFrame 核心路径固定(JSON→HTML→MP4 · 物理流水线)· PM 要可预测 · 出错知道卡在哪 · 成本可控。质量瓶颈不在流程在每步内容 · agent 用在步内小循环最合适。呼应用户教训 feedback_v1_pacing 打通流程优先于做宽。",
+      "poc_ref": null,
+      "supersedes": null,
+      "commit": "TBD",
+      "devlog_ref": "devlog/01.md · 2026-04-21 16:40 v0.1.3 Retro",
+      "tags": [
+        "agentloop",
+        "architecture",
+        "workflow-first",
+        "lightweight",
+        "tentative",
+        "v0.1.3-research",
+        "deepseek",
+        "haiku"
+      ]
+    },
+    {
+      "id": "A-0016",
+      "version": "v0.5.1",
+      "title": "tao traffic light y inset 是容器高度增量 · 非 button 距顶 padding",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "nf-shell 用 tao WindowBuilderExtMacOS::with_traffic_light_inset(x, y) 时 y = TOPBAR_HEIGHT - button_h(14pt);此处 48px topbar 故 y=34 · x=20(macOS 原生间距)",
+      "alternatives_considered": [
+        "套 Electron/Tauri 公式 y=(H-button_h)/2=17(reject: tao 模型不同 · 实测偏上 · devlog/02.md 前 session dc58b18f 标'唯一正解'实为错解)",
+        "经验值 y=23/24(charrondev gist · ItsEeleeya plugin 默认)(reject: 经验值假设 48px 以外的 titlebar · 对 48px 仍偏)",
+        "B 方案 · 绕 tao · objc2 挂 NSWindowDelegate.windowDidResize 自管 button.origin(defer: resize/fullscreen 更稳 · 但当前 topbar 固定 48px · A 公式足够)"
+      ],
+      "why": "读 tao 0.35 view.rs:1152-1182 inset_traffic_lights() 源码搞清 y 真实语义 —— title_bar_container_h = button_h + y · button origin.y 不动靠 Cocoa 默认居中。zed/tauri-plugin/Hoppscotch 都绕过 tao 走 objc2 自管(credits to zed)· 但他们面对 DOM 高度可变 + fullscreen 场景 · 本项目 topbar 固定 48 · A 公式 + 截图亲验(tmp/y34-top.png 3 圆与 🏠/NextFrame/EP-01 文字垂直中线一致)已收。",
+      "supersedes": null,
+      "commit": "30a4f2d2",
+      "devlog_ref": "devlog/02.md · v0.5.1 bug-fix traffic-light-offset 条目",
+      "tags": [
+        "mac",
+        "nf-shell",
+        "traffic-light",
+        "tao",
+        "window-chrome"
+      ],
+      "superseded_by": "A-0017"
+    },
+    {
+      "id": "A-0017",
+      "version": "v0.5.1",
+      "title": "Traffic light 对齐走 automedia/Zed 方案 · Rust 主动 setFrame + NSNotificationCenter observer",
+      "date": "2026-04-21",
+      "status": "valid",
+      "decision": "不用 tao `with_traffic_light_inset` 任何固定值。新 `crates/nf-shell/src/traffic_light.rs` 做 3 件事:(1) 读 `window.frame.h - contentLayoutRect.h` 算真实 titlebar_h · 撑 `title_bar_container` 到 `max(real_titlebar_h, 48)` 紧贴窗顶;(2) 3 颗系统按钮 `setFrame:`(**非** setFrameOrigin · 系统会重置)到 `y = (container_h - btn_h)/2` Cocoa 左下居中 · x 从 20 起按系统原生 spacing 递进;(3) `NSNotificationCenter.defaultCenter().addObserver:selector:name:object:` 挂 7 事件(resize / BecomeKey / ResignKey / EnterFullScreen / ExitFullScreen / Miniaturize / Deminiaturize)· selector 回调重跑 apply。`TrafficLightObserver` 用 `define_class!` 建 NSObject subclass · MainThreadOnly · 避开覆盖 tao 默认 NSWindowDelegate。",
+      "alternatives_considered": [
+        "A-0016(tao with_traffic_light_inset(20, 34) 容器高度方案):reject · container 模型管不到 button origin.y · 按钮在系统 ~28pt titlebar 默认中心 · 相对 DOM 48px topbar 偏上 10pt",
+        "MVP DOM-driven(读 close.frame.midY · IPC 注入 CSS 变量 · topbar 高度 = center_y * 2):reject · min-height:48px 兜底跟 center_y*2 冲突 · 按钮永远偏上",
+        "swizzle tao NSWindowDelegate 的 windowDidResize::reject · 丑且破坏 tao 自有事件链 · NSNotificationCenter 是干净通路"
+      ],
+      "why": "前三轮方案反复猜值(17/20/34/44)+ DOM 自适配都失败。distill --search-global 'traffic light' 挖到 2026-04-14 session 57600966 已跑通源码 `bigbang/MediaAgentTeam/automedia/src/ui.rs:104 move_traffic_lights` · 3 条关键教训:(a) setFrameOrigin 系统会 reset;(b) titlebar_h 必须读 contentLayoutRect 不能硬编码;(c) 必须挂 notification observer 每次事件重跑。抄过来 · nf capture 截图(tmp/automedia.png)肉眼验居中 + topbar 48px 保持不膨胀 · topbar.ts 撤回 CSS 变量依赖。",
+      "supersedes": "A-0016",
+      "commit": "07274894",
+      "devlog_ref": "devlog/02.md · v0.5.1 bug-fix automedia 方案条目",
+      "tags": [
+        "mac",
+        "nf-shell",
+        "traffic-light",
+        "objc2",
+        "window-chrome",
+        "notification-observer",
+        "cross-project-lesson"
+      ]
+    },
+    {
+      "id": "A-0018",
+      "version": "v0.6",
+      "title": "Composition JSON v2 · 一个 JSON 是一个片段 · 内部多轨道 + 主题目录 + 组件化渲染",
+      "date": "2026-04-24",
+      "status": "proposed",
+      "decision": "下一代 JSON 模型不再使用 episode.clips[]。一个 composition JSON 本身就是一个可渲染片段/shot，内部只有 tracks[]。每条 track 负责 time(component 生命周期)、component(JS/TS 渲染单元)、params(组件参数)、style/theme 引用、motion/timeline 控制。组件本体用 JS/TS 实现，组件可渲染 HTML/SVG/Canvas/WebGL/Three.js/audio/subtitle；JSON 只声明选哪个组件和传什么参数，不内嵌大段 HTML/CSS。样式单独成层：theme 按目录组织，每个 theme 目录内共享 tokens.css / theme.css / component overrides；composition 通过 style.theme / style.variant / style.tokens 引用主题。AI 生成新风格时优先生成一个新 theme 目录，而不是污染全局 CSS。",
+      "alternatives_considered": [
+        "继续沿用 episode.clips[] 模型(reject · 外层 clip 和内部多轨道语义冲突 · 不适合一个片段内部做复杂 Web composition)",
+        "JSON 里直接写大段 HTML/CSS(reject · 难校验、难编辑、难复用、难生成 inspector · 只能作为高级 escape hatch)",
+        "组件只用纯 HTML 模板(reject · Canvas/WebGL/Three.js 和 timeline update 需要 JS/TS 生命周期)",
+        "全局一个 CSS 主题(reject · AI 生成多套视觉时容易互相污染 · 主题目录隔离更稳)",
+        "每个组件完全自带孤立 CSS(reject · 同一主题内的字体、色彩、动效曲线需要共享)"
+      ],
+      "why": "用户明确要求高上限：多轨道、锚点定时间轴、HTML 能做的这里都能做，并且一个 JSON 就是一个片段。最佳边界是 JSON=声明层，JS/TS component=渲染逻辑，theme directory=视觉系统。这样 AI 可以按目录生成独立主题，主题内共享 CSS/tokens，组件仍可复用；runtime 只需要按 timeline 给 component 注入 timeMs/localTimeMs/progress/mode，就能统一预览和导出。",
+      "poc_ref": null,
+      "supersedes": null,
+      "commit": "TBD",
+      "devlog_ref": "chat · 2026-04-24 JSON v2 composition discussion",
+      "tags": [
+        "json-v2",
+        "composition",
+        "tracks",
+        "components",
+        "themes",
+        "css",
+        "ai-generation",
+        "proposed"
+      ]
+    }
+  ],
+  "pending_from_pocs": [],
+  "stats": {
+    "total": 18,
+    "by_version": {
+      "v0.1": 2,
+      "v0.1.3": 2,
+      "v0.2": 11,
+      "v0.5.1": 2,
+      "v0.6": 1
+    },
+    "by_status": {
+      "valid": 15,
+      "proposed": 1,
+      "tentative": 2
+    },
+    "pending_from_pocs": 0
+  }
+}

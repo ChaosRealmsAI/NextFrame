@@ -1,0 +1,36 @@
+{
+  "version": "v0.4.0",
+  "session": "0912b6e2",
+  "started_at": "2026-04-21 16:35",
+  "confirmed_at": "2026-04-21 16:40",
+  "re_created_at": "2026-04-21 17:25",
+  "re_create_reason": "17:08 别 session 清 spec · v0.4 kickoff 产物丢 · 从本 session 记忆重建",
+  "rounds": [
+    {
+      "round": 1,
+      "question": "下版 v0.4 做哪个?",
+      "answer": "A · 迁 nf-recorder(v0.3 同模式续)"
+    },
+    {
+      "round": 2,
+      "question_1": "v0.4 验收 · 谁跑录屏?",
+      "answer_1": "主 agent 跑 · 用户接权限框",
+      "question_2": "scope 边界?",
+      "answer_2": "只迁 + cargo check 绿 + 1 条 record mp4"
+    },
+    {
+      "round": 3,
+      "question": "点头 autopilot?",
+      "answer": "OK · 锁 v0.4 autopilot"
+    },
+    {
+      "round": 4,
+      "timestamp": "2026-04-21 16:50",
+      "question": "发现 nf-recorder 依赖 nf-shell-mac(未迁)· scope 调?",
+      "answer": "用户 '以前思路是输入 html 就搞录制' · 印证是 export pipeline",
+      "options": ["A 扩 scope 3 crate", "B ScreenCaptureKit 重写", "C POC 查", "D 废 v0.4"],
+      "user_choice": "2 crate 迁(shell-mac + recorder) · html→mp4 闭环 · 继续 autopilot",
+      "interpreted_as": "scope 从 1 crate 升 2 crate + JS assets(nf-tracks + runtime-iife)· 保 nf-runtime stub"
+    }
+  ]
+}

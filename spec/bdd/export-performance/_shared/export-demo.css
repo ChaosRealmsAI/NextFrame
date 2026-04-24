@@ -1,0 +1,39 @@
+html, body { margin: 0; min-height: 100%; font-family: var(--font); color: var(--fg); background: #090b10; }
+body { display: grid; place-items: center; padding: 28px; overflow: hidden; }
+.app { width: min(1120px, 96vw); height: min(640px, 88vh); display: grid; grid-template-rows: 48px 1fr 4px; border: 1px solid var(--bd); background: rgba(13, 16, 22, .86); box-shadow: 0 26px 80px rgba(0,0,0,.52); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--bd); font-size: 12px; color: var(--accent-l); }
+.top strong { color: var(--fg); font-size: 13px; }
+.top span { font-family: var(--mono); color: var(--amber); }
+.body { display: grid; grid-template-columns: 1fr 330px; min-height: 0; }
+.preview { position: relative; overflow: hidden; padding: 28px; display: grid; align-content: center; gap: 22px; }
+.scene-title { max-width: 720px; font-size: clamp(34px, 5vw, 72px); line-height: .96; font-weight: 800; }
+.scene-sub { max-width: 620px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.timeline { height: 96px; border: 1px solid var(--bd); background: rgba(255,255,255,.025); display: grid; gap: 8px; padding: 12px; }
+.track { position: relative; height: 14px; background: rgba(255,255,255,.06); overflow: hidden; }
+.clip { position: absolute; top: 0; bottom: 0; border: 1px solid rgba(125, 211, 252, .42); background: rgba(56, 189, 248, .24); animation: clipPulse 10s infinite; }
+.clip.a { left: 4%; width: 30%; }
+.clip.b { left: 28%; width: 48%; animation-delay: -2s; border-color: rgba(224, 183, 108, .45); background: rgba(224, 183, 108, .2); }
+.clip.c { left: 62%; width: 30%; animation-delay: -5s; border-color: rgba(74, 222, 128, .4); background: rgba(74, 222, 128, .18); }
+aside { border-left: 1px solid var(--bd); padding: 18px; display: grid; align-content: start; gap: 14px; background: rgba(7, 9, 13, .48); }
+.label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; }
+.profiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.profile { min-height: 58px; border: 1px solid var(--bd); background: rgba(255,255,255,.025); color: var(--fg); padding: 9px; display: grid; align-content: center; gap: 4px; }
+.profile strong { font-size: 13px; }
+.profile span { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.profile.active { border-color: var(--accent-b); background: rgba(72, 166, 255, .14); animation: activeProfile 10s infinite; }
+.button { height: 40px; border: 1px solid var(--accent-b); background: rgba(72, 166, 255, .12); color: var(--accent-l); font-weight: 800; display: grid; place-items: center; }
+.progressBox { display: grid; gap: 7px; opacity: 0; animation: showProgress 10s infinite; }
+.meter { height: 9px; border: 1px solid var(--bd); background: rgba(255,255,255,.04); overflow: hidden; }
+.fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--amber)); animation: fillRun 10s infinite; }
+.stats { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.status { border: 1px solid var(--bd); background: rgba(255,255,255,.03); padding: 10px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.open { opacity: 0; border-color: var(--amber-b); color: var(--amber); animation: openReady 10s infinite; }
+.toast { position: absolute; right: 18px; bottom: 18px; border: 1px solid rgba(74,222,128,.42); background: rgba(15, 40, 28, .92); color: var(--ok); padding: 10px 13px; font-size: 12px; opacity: 0; animation: toast 10s infinite; }
+.loopbar { height: 4px; background: var(--accent); width: 0; animation: loop 10s linear infinite; }
+@keyframes clipPulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.7); } }
+@keyframes activeProfile { 0%,18% { transform: none; } 25%,55% { transform: translateY(-2px); } 100% { transform: none; } }
+@keyframes showProgress { 0%,24% { opacity: 0; } 32%,88% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fillRun { 0%,28% { width: 0; } 76% { width: var(--target, 84%); } 100% { width: 100%; } }
+@keyframes openReady { 0%,72% { opacity: 0; } 80%,96% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes toast { 0%,78% { opacity: 0; transform: translateY(8px); } 84%,94% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes loop { from { width: 0; } to { width: 100%; } }

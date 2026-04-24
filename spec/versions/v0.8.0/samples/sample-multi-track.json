@@ -1,0 +1,113 @@
+{
+  "meta": {
+    "name": "多轨道 · 真实视频场景(bg + video + scene + subtitle + audio)",
+    "description": "30s · 5 条并行轨道 · 底层 gradient bg · 中层全屏 video · 上层 scene 标题 · 字幕同步 + 背景音乐",
+    "version": "v0.8",
+    "created": "2026-04-21"
+  },
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+
+  "anchors": {
+    "demo": {"begin": "0", "end": "30000"}
+  },
+
+  "tracks": [
+    {
+      "id": "bg-base",
+      "kind": "bg",
+      "clips": [
+        {
+          "id": "bg-0",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "type": "gradient",
+            "gradient": "linear",
+            "angle": 135,
+            "stops": [
+              {"offset": 0, "color": "#0f172a"},
+              {"offset": 1, "color": "#1e1b4b"}
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "video-hero",
+      "kind": "video",
+      "clips": [
+        {
+          "id": "v-0",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "src": "file:///tmp/sample-clip.mp4",
+            "from_ms": 0,
+            "to_ms": 30000,
+            "fit": "cover",
+            "muted_in_record": true,
+            "x": 0, "y": 0, "w": 100, "h": 85,
+            "radius": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "title",
+      "kind": "scene-hero-centered",
+      "src": "frontend/nf-tracks/community/scene-hero-centered.js",
+      "clips": [
+        {
+          "id": "t-0",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "title": "NextFrame 演示",
+            "subtitle": "多轨道并行",
+            "accent_color": "#a78bfa"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cap",
+      "kind": "subtitle",
+      "clips": [
+        {
+          "id": "cap-0",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "source": {
+              "audio_track_id": "bgm"
+            },
+            "style": {
+              "active_color": "#fbbf24",
+              "size_px": 36,
+              "position": "bottom",
+              "padding": 12
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "bgm",
+      "kind": "audio",
+      "clips": [
+        {
+          "id": "a-0",
+          "begin": "demo.begin",
+          "end": "demo.end",
+          "params": {
+            "src": "file:///tmp/narration.mp3",
+            "from_ms": 0,
+            "to_ms": 30000,
+            "volume": 0.8
+          }
+        }
+      ]
+    }
+  ]
+}

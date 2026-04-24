@@ -1,0 +1,26 @@
+@import "../../../../design/tokens.css";
+
+html, body { margin: 0; min-height: 100%; font-family: var(--font); color: var(--fg); }
+body { display: grid; place-items: center; padding: 32px; overflow: hidden; }
+.app { width: min(1100px, 96vw); height: min(640px, 86vh); background: rgba(14,14,19,.64); border: 1px solid var(--bd); display: grid; grid-template-rows: 46px 1fr 4px; position: relative; box-shadow: 0 30px 90px rgba(0,0,0,.55); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--bd); font-size: 12px; letter-spacing: .12em; color: var(--accent-l); }
+.top span { color: var(--amber); font-family: var(--mono); }
+.body { display: grid; grid-template-columns: 1fr 320px; min-height: 0; }
+.preview { display: grid; place-items: center; align-content: center; gap: 14px; position: relative; overflow: hidden; }
+.preview::before { content: ""; position: absolute; inset: 18%; border: 1px solid rgba(167,139,250,.18); transform: skewY(-6deg); }
+.title { margin: 0; font-size: clamp(42px, 6vw, 82px); letter-spacing: -.03em; transition: .7s ease; }
+.preview p { margin: 0; color: var(--fg-3); font-family: var(--mono); }
+.inspector { padding: 18px; border-left: 1px solid var(--bd); background: rgba(8,8,12,.36); display: grid; gap: 12px; align-content: start; }
+label { color: var(--accent-l); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+input { height: 42px; border: 1px solid var(--amber-b); background: rgba(224,183,108,.08); color: var(--fg); padding: 0 12px; font: 12px var(--mono); animation: inputPulse 10s infinite; }
+button { height: 40px; border: 1px solid var(--accent-b); background: rgba(167,139,250,.1); color: var(--fg); font-weight: 700; }
+.state { font: 12px var(--mono); color: var(--fg-3); }
+.play .title { animation: titleSwap 10s infinite; }
+.play .state { animation: dirty 10s infinite; }
+.progress { background: var(--accent); transform-origin: left; animation: progress 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 18px; padding: 10px 14px; border: 1px solid var(--amber-b); background: rgba(224,183,108,.1); color: var(--amber-l); opacity: 0; animation: toast 10s infinite; }
+@keyframes titleSwap { 0%,42% { opacity: .7; } 48%,100% { opacity: 1; text-shadow: 0 0 28px rgba(167,139,250,.28); } }
+@keyframes dirty { 0%,42% { color: var(--fg-3); } 48%,100% { color: var(--amber); } }
+@keyframes inputPulse { 0%,42% { border-color: var(--bd); } 48%,100% { border-color: var(--amber); } }
+@keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes toast { 0%,82% { opacity: 0; } 88%,96% { opacity: 1; } 100% { opacity: 0; } }

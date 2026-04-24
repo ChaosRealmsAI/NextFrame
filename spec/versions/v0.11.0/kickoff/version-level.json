@@ -1,0 +1,55 @@
+{
+  "version": "v0.11.0",
+  "type": "feature",
+  "chosen": "Export profiles, parallel export, and real desktop progress",
+  "why": "AI view: v0.10.0 proved the JSON-to-editor-to-export architecture, but full showreel export is now the visible bottleneck. The recorder already has parallel slicing and progress events, so the highest-ROI version is to expose those capabilities through CLI, shell IPC, and the editor UI. User view: PM needs a button-level experience where draft/final export choices are visible, progress is trustworthy, and the exported video still reflects saved JSON edits.",
+  "changed_from": "v0.10.0 proved saved composition export correctness but left showreel-24s debug export blocked by speed and black-box progress.",
+  "constraints": {
+    "no_vanity": "本版看得见的效果 = 导出按钮有草稿/标准/最终/并行选项，导出时看到真实百分比/帧数/阶段，完成后能打开视频。",
+    "no_overreach": "本版只做桌面本地导出体验和性能路径；不做云导出、不换渲染架构、不做组件缓存、不做新 JSON 轨道语法。",
+    "no_rush": "质量一步到位：导出仍必须从保存后的同一 composition JSON 编译 source，不能为了快牺牲预览/导出一致性。",
+    "must_verify": "验收画面 = 桌面端选择不同导出档位并看到真实进度；自验方法 = CLI 导出参数、IPC export.status、前端按钮状态、ffprobe 输出、showreel/draft 基线数据。"
+  },
+  "success_picture": "用户打开 v2-showcase/showreel-24s，右侧导出区可以选择草稿/标准/最终/高速最终；点击后进度条显示 percent、frames、stage 和 ETA；导出完成后点击打开视频，视频内容反映当前保存后的 JSON edits。",
+  "cost_estimate": "AI 尺度 2-5 小时，取决于并行 stdout 聚合和 release/debug benchmark 结果。",
+  "risks": [
+    "多个 headless WebView 并行可能抢 GPU/VideoToolbox 资源，parallel=4 未必线性加速。",
+    "并行 orchestrator 当前子进程 stdout 被丢弃，需要补事件透传或至少父进程阶段聚合。",
+    "草稿档位降低 fps/resolution 会提升速度，但 UI 必须明确这是预览质量，不替代最终导出。",
+    "导出参数增加后，CLI help、CLAUDE AI 验证接口和前端 storage types 必须同步，否则新 session 不会用。"
+  ],
+  "candidates": [
+    {
+      "id": "C-1",
+      "title": "Export profiles + progress + parallel",
+      "selected": true,
+      "what": "把 recorder 已有 parallel/progress 能力接到 nf export、shell export.start/status 和编辑器按钮。",
+      "constraint_check": "可肉眼验；一版一件事；不降低导出一致性；CLI/ffprobe 可自验。",
+      "cost": "2-5h"
+    },
+    {
+      "id": "C-2",
+      "title": "Component-level render cache",
+      "selected": false,
+      "what": "给静态/低频组件增加 cacheKey/render_fps，减少每帧 DOM/Canvas 更新。",
+      "constraint_check": "性能潜力大，但容易影响 HTML/CSS/JS 高上限和导出一致性，应该等 profile/parallel 数据出来后再做。",
+      "cost": "4-8h"
+    },
+    {
+      "id": "C-3",
+      "title": "Cloud export architecture",
+      "selected": false,
+      "what": "把导出任务放到云端队列和 macOS worker。",
+      "constraint_check": "战略价值高，但本地产品链路还没把进度/档位/并行打通，当前开云端会过大。",
+      "cost": "1 day+"
+    },
+    {
+      "id": "C-4",
+      "title": "Export reliability audit",
+      "selected": false,
+      "what": "只审查导出错误处理、临时文件清理、音频 mux 边界。",
+      "constraint_check": "用户体感不如 C-1 强，适合本版红队或后续 patch。",
+      "cost": "1-2h"
+    }
+  ]
+}

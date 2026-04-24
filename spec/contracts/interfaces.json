@@ -1,0 +1,617 @@
+{
+  "_meta": {
+    "title": "NextFrame v0.2 外部契约",
+    "added_in_version": "v0.2",
+    "last_modified": "2026-04-21",
+    "note": "CLI · IPC · Web Components · mock.json schema 统一收口 · 跨版本稳定契约 · 修改需同步更新 added_in_version / modified_in_version"
+  },
+
+  "cli": {
+    "binary_name": "nf",
+    "install_path": "/usr/local/bin/nf (或 ~/.cargo/bin/nf via cargo install)",
+    "audience": "AI agent 第一用户(charter P1)· 人监督。所有命令面向 AI 设计:slug 定位 / 结构化 JSON I/O / 无交互 prompt / exit code 严格语义 / --help 自包含。",
+    "global_conventions": {
+      "positioning": "所有命令用 --project=<slug> + --episode=<slug> 定位一个 window。多窗口 disambiguate 用 --window=<id>。Slug 来自 ~/.nextframe/registry.json 或当前目录 project.json。",
+      "io": "stdin 为空 · stdout 纯 JSON(单对象或数组)· stderr 错误消息。非 0 exit = 失败 · 结构化错误进 stderr。",
+      "no_interactive": "禁交互 prompt / 禁彩色终端(除非 --pretty)· 方便 AI 管道。",
+      "strict_validation": "slug 不存在 → exit 5 + stderr {\"error\": \"unknown project\", \"hint\": \"nf projects list\"} · AI 可据 hint 自救。"
+    },
+    "commands": [
+      {
+        "name": "open",
+        "usage": "nf open --project=<slug> --episode=<slug> [--clip=<slug>] [--t=<sec>] [--new-window]",
+        "desc": "启动 NextFrame 桌面 app · 精确到项目/集 · 可选直达 clip + playhead 秒数。首次起进程 + 首 window · 已起则 IPC 现有进程开/聚焦 window。",
+        "args": [],
+        "flags": [
+          {"name": "--project", "type": "slug", "required": true, "desc": "项目 slug (如 next-frame)· 从 ~/.nextframe/registry.json 读可用列表"},
+          {"name": "--episode", "type": "slug", "required": true, "desc": "集 slug (如 ep-01) · 项目内唯一"},
+          {"name": "--clip", "type": "slug", "required": false, "desc": "启动时选中的 clip slug (如 feat-2) · 同时 inspector 显示该 clip"},
+          {"name": "--t", "type": "float", "required": false, "desc": "启动 playhead 秒数 · 覆盖 clip 默认 start"},
+          {"name": "--new-window", "type": "bool", "default": false, "desc": "强制新 window(即使已有 window 指向同 project+episode)"}
+        ],
+        "exit_codes": {
+          "0": "成功 · stdout 含 window_id/pid/project/episode",
+          "1": "IPC socket 失败 / 权限问题",
+          "2": "app 启动失败 / window 创建失败",
+          "5": "slug 不存在(unknown project / episode / clip)"
+        },
+        "stdout_format": "json · {window_id, pid, project, episode, clip?, t?, is_new: bool}",
+        "example": "nf open --project=next-frame --episode=ep-01 --clip=feat-2 --t=12.45",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "ps",
+        "usage": "nf ps [--project=<slug>] [--episode=<slug>]",
+        "desc": "列 NextFrame 进程 + 所有 window · 可按 project/episode 过滤",
+        "flags": [
+          {"name": "--project", "type": "slug", "required": false, "desc": "只列此项目的 window"},
+          {"name": "--episode", "type": "slug", "required": false, "desc": "只列此集的 window(需配 --project)"}
+        ],
+        "stdout_format": "json array · [{pid, window_id, project, episode, clip, t, width, height, visible, focused}]",
+        "example": "nf ps  |  nf ps --project=next-frame",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "projects",
+        "usage": "nf projects list  |  nf projects episodes --project=<slug>  |  nf projects clips --project=<slug> --episode=<slug>",
+        "desc": "查询项目/集/clip 清单 · AI 探索用 · 无需打开 window",
+        "subcommands": [
+          {"name": "list", "stdout": "json array · [{project, name, episodes_count}]"},
+          {"name": "episodes", "flags": ["--project"], "stdout": "json array · [{episode, name, duration, clips_count}]"},
+          {"name": "clips", "flags": ["--project", "--episode"], "stdout": "json array · [{clip, label, kind, start, end, track}]"}
+        ],
+        "example": "nf projects clips --project=next-frame --episode=ep-01",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "screenshot",
+        "usage": "nf screenshot --project=<slug> --episode=<slug> [--region=<area>] [--out=<path>] [--window=<id>]",
+        "desc": "截图指定 window(project+episode 定位)· 可指定 region · 默认 stdout PNG base64",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--region", "type": "enum", "default": "full", "values": ["topbar", "clips", "log", "timeline", "inspector", "preview", "full"]},
+          {"name": "--out", "type": "path", "default": "-", "desc": "- = stdout base64 · 或 tmp/xxx.png"},
+          {"name": "--window", "type": "string", "required": false, "desc": "disambiguate 同 project+episode 多 window"}
+        ],
+        "example": "nf screenshot --project=next-frame --episode=ep-01 --region=timeline --out=tmp/tl.png",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "click",
+        "usage": "nf click --project=<slug> --episode=<slug> --selector=<css> [--window=<id>]",
+        "desc": "模拟点击 · 走真 DOM click 路径(不 mock) · selector 支持 shadow 贯穿 'nf-topbar::shadow .tab[data-tab=script]'",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--selector", "type": "string", "required": true, "desc": "CSS · 支持 ::shadow 贯穿子 Shadow DOM"}
+        ],
+        "exit_codes": {"0": "点击成功", "3": "selector 未找到", "4": "元素不可点击", "5": "slug 错"},
+        "example": "nf click --project=next-frame --episode=ep-01 --selector='nf-clips::shadow .c-row[data-id=intro]'",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "select",
+        "usage": "nf select --project=<slug> --episode=<slug> --clip=<slug>",
+        "desc": "语义级选中 clip(比 click 更 AI 友好 · 不用写 selector)· 等价 nf click 但用 slug · 触发 clip-select event + inspector 切显",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--clip", "type": "slug", "required": true}
+        ],
+        "example": "nf select --project=next-frame --episode=ep-01 --clip=intro",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "tab",
+        "usage": "nf tab --project=<slug> --episode=<slug> --switch=<script|slice|voice|edit>",
+        "desc": "切换 topbar tab(语义级 · 比 click selector 更稳)",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--switch", "type": "enum", "values": ["script", "slice", "voice", "edit"], "required": true}
+        ],
+        "example": "nf tab --project=next-frame --episode=ep-01 --switch=script",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "state",
+        "usage": "nf state --project=<slug> --episode=<slug> --key=<path> [--window=<id>]",
+        "desc": "查询 UI 状态 · key 点分路径(topbar.current-tab / clips.selected-id / timeline.current-time / inspector.clip-id)",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--key", "type": "string", "required": true}
+        ],
+        "stdout_format": "json · {key, value, type}",
+        "example": "nf state --project=next-frame --episode=ep-01 --key=topbar.current-tab",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "devtools",
+        "usage": "nf devtools --project=<slug> --episode=<slug> --query=<sel> --get=<prop>",
+        "desc": "DOM 查询工具 · 查组件 shadowRoot / attributes / 计算样式 / bounding-rect · 视觉 + 架构验证",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--query", "type": "string", "required": true, "desc": "CSS selector · 支持 ::shadow 贯穿"},
+          {"name": "--get", "type": "string", "default": "outerHTML", "values": ["outerHTML", "shadowRoot", "attributes", "computed-style", "bounding-rect", "custom-elements"]},
+          {"name": "--action", "type": "string", "required": false, "values": ["append-style", "remove", "set-css-var"], "desc": "修改动作(用于架构场景实验 · 如 tokens 穿透验证)"},
+          {"name": "--value", "type": "string", "required": false, "desc": "配合 --action 的值"}
+        ],
+        "stdout_format": "json · 内容按 --get 类型",
+        "example": "nf devtools --project=next-frame --episode=ep-01 --query='nf-topbar' --get=shadowRoot",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "close",
+        "usage": "nf close --project=<slug> --episode=<slug> [--window=<id>]",
+        "desc": "关闭指定 window(不退进程 · Mac 标准 · 等价点红叉)",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true}
+        ],
+        "example": "nf close --project=next-frame --episode=ep-01",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "quit",
+        "usage": "nf quit",
+        "desc": "退出整个 app 进程(等价 cmd+q)· 清理 socket",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "version",
+        "usage": "nf version",
+        "desc": "打印版本",
+        "stdout_format": "json · {version, git_hash, build_date}",
+        "added_in_version": "v0.2"
+      },
+
+      {
+        "_group": "=== CRUD · projects 族(项目管理 · 改真 JSON) ===",
+        "name": "projects list",
+        "usage": "nf projects list",
+        "desc": "列所有项目 · AI 第一步发现 · 无需 open window",
+        "flags": [],
+        "stdout_format": "json array · [{slug, name, episodes_count, last_modified, description?, tags?}]",
+        "example": "nf projects list  |  jq '.[] | .slug'",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "projects show",
+        "usage": "nf projects show --project=<slug>",
+        "desc": "显示项目详情 · 含 episodes 清单 + metadata",
+        "flags": [{"name": "--project", "type": "slug", "required": true}],
+        "stdout_format": "json · {slug, name, description, episodes: [...], created, modified, tags}",
+        "exit_codes": {"0": "成功", "5": "项目不存在 · stderr hint 'nf projects list'"},
+        "example": "nf projects show --project=next-frame",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "projects create",
+        "usage": "nf projects create --slug=<id> --name=<name> [--description=<text>] [--tags=<tag1,tag2>]",
+        "desc": "创建新项目 · 在 ~/.nextframe/<slug>/ 建 project.json + episodes/ 空目录 · registry.json 追加",
+        "flags": [
+          {"name": "--slug", "type": "slug", "required": true, "desc": "项目 slug(唯一 · 小写 · 连字符)"},
+          {"name": "--name", "type": "string", "required": true, "desc": "人看的项目名"},
+          {"name": "--description", "type": "string", "required": false},
+          {"name": "--tags", "type": "csv", "required": false}
+        ],
+        "exit_codes": {"0": "成功", "6": "slug 已存在 · stderr hint 'nf projects show --project=...'"},
+        "stdout_format": "json · {slug, name, path: '~/.nextframe/<slug>/project.json', created}",
+        "example": "nf projects create --slug=demo-video --name='Demo Video' --description='产品演示'",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "projects rename",
+        "usage": "nf projects rename --project=<slug> --name=<new-name>",
+        "desc": "改项目名(不改 slug · slug 是 id · 永久稳定)",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--name", "required": true}
+        ],
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "projects archive",
+        "usage": "nf projects archive --project=<slug>",
+        "desc": "软删 · 移到 ~/.nextframe/.archive/<slug>/ · 可 unarchive 恢复",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "projects delete",
+        "usage": "nf projects delete --project=<slug> --confirm",
+        "desc": "硬删 · 物理删除目录 · **--confirm 必加**(防误操作)",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--confirm", "type": "bool", "required": true, "desc": "确认硬删 · 不可恢复"}
+        ],
+        "exit_codes": {"7": "缺 --confirm · stderr 'rerun with --confirm'"},
+        "added_in_version": "v0.2"
+      },
+
+      {
+        "_group": "=== CRUD · episodes 族(集管理 · 项目下) ===",
+        "name": "episodes list",
+        "usage": "nf episodes list --project=<slug>",
+        "desc": "列项目下所有集",
+        "flags": [{"name": "--project", "required": true}],
+        "stdout_format": "json array · [{slug, name, duration, clips_count, anchors_count, last_modified}]",
+        "example": "nf episodes list --project=next-frame",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "episodes show",
+        "usage": "nf episodes show --project=<slug> --episode=<slug>",
+        "desc": "显示集详情 · 含 clips + anchors + log",
+        "flags": [{"name": "--project", "required": true}, {"name": "--episode", "required": true}],
+        "stdout_format": "json · {slug, name, duration, anchors: {...}, clips: [...], log: [...]}",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "episodes create",
+        "usage": "nf episodes create --project=<slug> --slug=<id> --name=<name> [--duration=<sec>]",
+        "desc": "创建新集 · 在 ~/.nextframe/<project>/episodes/<ep-slug>.json 建初始结构",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--slug", "type": "slug", "required": true},
+          {"name": "--name", "required": true},
+          {"name": "--duration", "type": "float", "required": false, "default": 60.0, "desc": "总时长秒"}
+        ],
+        "example": "nf episodes create --project=next-frame --slug=ep-02 --name='技术深入' --duration=90",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "episodes rename",
+        "usage": "nf episodes rename --project --episode --name=<new>",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "episodes archive",
+        "usage": "nf episodes archive --project --episode",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "episodes delete",
+        "usage": "nf episodes delete --project --episode --confirm",
+        "added_in_version": "v0.2"
+      },
+
+      {
+        "_group": "=== CRUD · clips 族(clip 管理 · 集下 · 对应 timeline 上一个方块) ===",
+        "name": "clips list",
+        "usage": "nf clips list --project=<slug> --episode=<slug> [--track=<scene|text|audio|trans>]",
+        "desc": "列集下所有 clip · 可按 track 过滤",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--track", "type": "enum", "values": ["scene", "text", "audio", "trans"], "required": false}
+        ],
+        "stdout_format": "json array · [{slug, label, track, start, end, duration, effects}]",
+        "example": "nf clips list --project=next-frame --episode=ep-01 --track=scene",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "clips show",
+        "usage": "nf clips show --project --episode --clip=<slug>",
+        "desc": "clip 详情 · 含 keyframes + effects + position + size",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "clips create",
+        "usage": "nf clips create --project --episode --slug=<id> --label=<str> --track=<enum> --start=<sec> --end=<sec> [--effects=<csv>]",
+        "desc": "加新 clip 到 timeline",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--slug", "type": "slug", "required": true},
+          {"name": "--label", "type": "string", "required": true},
+          {"name": "--track", "type": "enum", "values": ["scene", "text", "audio", "trans"], "required": true},
+          {"name": "--start", "type": "float_or_anchor_expr", "required": true, "desc": "秒数 · 或 'intro-end + 0.5'(锚点表达式 · charter P11)"},
+          {"name": "--end", "type": "float_or_anchor_expr", "required": true},
+          {"name": "--effects", "type": "csv", "required": false}
+        ],
+        "example": "nf clips create --project=next-frame --episode=ep-01 --slug=feat-4 --label='功能 4' --track=scene --start='feat-3-end' --end='feat-3-end + 12.0'",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "clips update",
+        "usage": "nf clips update --project --episode --clip [--start] [--end] [--label] [--effects]",
+        "desc": "改 clip 属性 · 只改指定字段 · 其他不动",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "clips delete",
+        "usage": "nf clips delete --project --episode --clip --confirm",
+        "added_in_version": "v0.2"
+      },
+
+      {
+        "_group": "=== CRUD · anchors 族(时间锚点 · charter P11) ===",
+        "name": "anchors list",
+        "usage": "nf anchors list --project --episode",
+        "desc": "列所有锚点",
+        "stdout_format": "json · {\"intro-end\": 5.0, \"feat-1-end\": 12.0, ...}",
+        "example": "nf anchors list --project=next-frame --episode=ep-01",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "anchors set",
+        "usage": "nf anchors set --project --episode --name=<id> --time=<sec>",
+        "desc": "设 / 改锚点 · 不存在则创建 · 存在则更新 · 改一个锚点所有引用它的 clip 自动重算(v0.3+ 真重算 · v0.2 只改 JSON 值)",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--name", "type": "slug", "required": true, "desc": "锚点名(如 intro-end)"},
+          {"name": "--time", "type": "float", "required": true, "desc": "秒数"}
+        ],
+        "example": "nf anchors set --project=next-frame --episode=ep-01 --name=feat-1-end --time=14.5",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "anchors unset",
+        "usage": "nf anchors unset --project --episode --name=<id>",
+        "desc": "删锚点 · 引用它的 clip 要先改 start/end(不然报错 · 保数据一致)",
+        "exit_codes": {"8": "还有 clip 引用 · stderr 列出 · hint 'nf clips update 先改'"},
+        "added_in_version": "v0.2"
+      },
+
+      {
+        "_group": "=== log 族(操作日志 · AI + human 双视角) ===",
+        "name": "log tail",
+        "usage": "nf log tail --project --episode [--limit=20] [--actor=AI|human] [--since=<iso>]",
+        "desc": "查最近操作日志 · 可按 actor / 时间过滤",
+        "flags": [
+          {"name": "--project", "required": true},
+          {"name": "--episode", "required": true},
+          {"name": "--limit", "type": "int", "default": 20},
+          {"name": "--actor", "type": "enum", "values": ["AI", "human"], "required": false},
+          {"name": "--since", "type": "iso-datetime", "required": false}
+        ],
+        "stdout_format": "json array · [{id, time, actor, desc, cli, status}]",
+        "example": "nf log tail --project=next-frame --episode=ep-01 --limit=5 --actor=AI",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "log show",
+        "usage": "nf log show --project --episode --id=<entry-id>",
+        "desc": "单条日志详情",
+        "added_in_version": "v0.2"
+      },
+      {
+        "name": "log create",
+        "usage": "nf log create --project --episode --actor=<AI|human> --desc=<str> --cli=<str> [--status=<pending|done|failed>]",
+        "desc": "手动追加日志(AI 开发期调试 / 测试用 · 生产期日志应由产品 CLI 自动追加)",
+        "added_in_version": "v0.2"
+      },
+
+      {
+        "_group": "=== 辅助 · help / doctor(AI 自学 + 自检) ===",
+        "name": "help",
+        "usage": "nf help [<command>]",
+        "desc": "打印自包含 help · 不带 cmd 显示全命令 · 带 cmd 显示详细(用法 + flags + 例子 + 常见错 + related)",
+        "example": "nf help projects create  |  nf help  (all)",
+        "stdout_format": "text (默认彩色) · `--json` 结构化",
+        "added_in_version": "v0.2",
+        "ai_usability_note": "**每命令 help 必含至少 2 个实用例子 + 1 个常见错 + hint 如何修**(agent-usability rule 硬要求)"
+      },
+      {
+        "name": "doctor",
+        "usage": "nf doctor [--json]",
+        "desc": "环境自检 · 输出 nf binary 路径 / IPC socket 路径 / registry.json 路径 / 所有项目 slug / 所有集 slug / 进程状态",
+        "stdout_format": "json · {binary, version, socket, registry, projects: [...], app_running: bool, warnings: [...]}",
+        "example": "nf doctor  |  nf doctor --json | jq .warnings",
+        "added_in_version": "v0.2"
+      }
+    ]
+  },
+
+  "ipc": {
+    "transport": "Unix domain socket",
+    "socket_path": "${XDG_RUNTIME_DIR:-/tmp}/nextframe-$UID.sock",
+    "protocol": "newline-delimited JSON (NDJSON) · 双向 req/resp · 每条消息带 req_id",
+    "message_schema": {
+      "request": {
+        "req_id": "string · UUID",
+        "op": "enum · open-window | state-query | click-sim | screenshot | quit",
+        "params": "object · op 相关 · 见下"
+      },
+      "response": {
+        "req_id": "string · 对应 request.req_id",
+        "ok": "bool",
+        "data": "object · ok=true 时 · op 相关",
+        "error": "string · ok=false 时"
+      }
+    },
+    "ops": [
+      {"op": "open-window", "params": {"project_id": "string"}, "data": {"window_id": "string", "pid": "number"}},
+      {"op": "state-query", "params": {"key": "string", "window_id": "string?"}, "data": {"value": "any"}},
+      {"op": "click-sim", "params": {"selector": "string", "window_id": "string?"}, "data": {"clicked": "bool"}},
+      {"op": "screenshot", "params": {"window_id": "string?", "region": "string"}, "data": {"png_base64": "string"}},
+      {"op": "quit", "params": {}, "data": {}}
+    ],
+    "added_in_version": "v0.2"
+  },
+
+  "components": [
+    {
+      "tag": "nf-topbar",
+      "desc": "顶部栏 · 红黄绿灯 + home + 项目/集下拉 + 4 tabs + 语言切换",
+      "attributes": [
+        {"name": "project-id", "type": "string", "default": "default"},
+        {"name": "episode-id", "type": "string"},
+        {"name": "current-tab", "type": "enum", "values": ["script", "slice", "voice", "edit"], "default": "edit"},
+        {"name": "current-lang", "type": "enum", "values": ["zh", "en"], "default": "zh"}
+      ],
+      "events": [
+        {"name": "tab-change", "detail": "{old, new}"},
+        {"name": "lang-change", "detail": "{old, new}"},
+        {"name": "home-click", "detail": "{}"},
+        {"name": "project-dropdown-open", "detail": "{}"},
+        {"name": "episode-dropdown-open", "detail": "{}"}
+      ],
+      "slots": [],
+      "shadow_dom": true,
+      "added_in_version": "v0.2"
+    },
+    {
+      "tag": "nf-clips",
+      "desc": "左上 · clips 列表 · 显示 scene clips + audio clips",
+      "attributes": [
+        {"name": "selected-id", "type": "string", "desc": "当前选中 clip id"}
+      ],
+      "events": [
+        {"name": "clip-select", "detail": "{id, kind, duration}"}
+      ],
+      "slots": [],
+      "shadow_dom": true,
+      "added_in_version": "v0.2"
+    },
+    {
+      "tag": "nf-log",
+      "desc": "左下 · AI 操作日志 · 倒序",
+      "attributes": [
+        {"name": "reversed", "type": "bool", "default": true, "desc": "true=倒序(最新在上)"},
+        {"name": "count", "type": "number", "desc": "显示条数 · 由 nf-log 内部读 mock"}
+      ],
+      "events": [],
+      "slots": [],
+      "shadow_dom": true,
+      "added_in_version": "v0.2"
+    },
+    {
+      "tag": "nf-timeline",
+      "desc": "中下 · 4 轨道 timeline + playhead + 锚点底部倒三角 + 刻度",
+      "attributes": [
+        {"name": "duration", "type": "number", "desc": "总时长秒"},
+        {"name": "current-time", "type": "number", "desc": "playhead 位置"},
+        {"name": "zoom", "type": "number", "default": 1}
+      ],
+      "events": [
+        {"name": "playhead-move", "detail": "{time}"},
+        {"name": "anchor-hover", "detail": "{name, time}"},
+        {"name": "clip-select", "detail": "{track, clip-id}"}
+      ],
+      "slots": [],
+      "shadow_dom": true,
+      "added_in_version": "v0.2"
+    },
+    {
+      "tag": "nf-track",
+      "desc": "单轨道 · 画面/文字/音频/转场 四色区分",
+      "attributes": [
+        {"name": "kind", "type": "enum", "values": ["scene", "text", "audio", "transition"], "required": true},
+        {"name": "label", "type": "string"}
+      ],
+      "events": [],
+      "slots": ["clips"],
+      "shadow_dom": true,
+      "added_in_version": "v0.2"
+    },
+    {
+      "tag": "nf-clip",
+      "desc": "单 clip · 轨道上一个方块",
+      "attributes": [
+        {"name": "id", "type": "string", "required": true},
+        {"name": "start", "type": "number"},
+        {"name": "end", "type": "number"},
+        {"name": "label", "type": "string"},
+        {"name": "kind", "type": "enum", "values": ["scene", "text", "audio", "transition"]}
+      ],
+      "events": [{"name": "clip-click", "detail": "{id}"}],
+      "shadow_dom": true,
+      "added_in_version": "v0.2"
+    },
+    {
+      "tag": "nf-anchor",
+      "desc": "时间锚点 · timeline 底部倒三角",
+      "attributes": [
+        {"name": "name", "type": "string", "required": true},
+        {"name": "time", "type": "number", "required": true},
+        {"name": "color", "type": "enum", "values": ["amber", "accent"], "default": "amber"}
+      ],
+      "events": [{"name": "anchor-hover", "detail": "{name, time}"}],
+      "shadow_dom": true,
+      "added_in_version": "v0.2"
+    },
+    {
+      "tag": "nf-inspector",
+      "desc": "右栏 · 当前选中 clip 属性(位置 / 时长 / 关键帧 / 效果)",
+      "attributes": [
+        {"name": "clip-id", "type": "string", "desc": "当前查看的 clip · 空则显示空态"}
+      ],
+      "events": [
+        {"name": "field-edit", "detail": "{field, value}"}
+      ],
+      "shadow_dom": true,
+      "added_in_version": "v0.2"
+    }
+  ],
+
+  "mock_schema": {
+    "file_path": "src/nf-components/mock.json",
+    "schema": {
+      "project": {
+        "id": "string",
+        "name": "string",
+        "episodes": [{"id": "string", "name": "string"}]
+      },
+      "episode": {
+        "id": "string",
+        "name": "string",
+        "duration": "number · 总时长秒",
+        "anchors": {"<name>": "number · 时间秒"},
+        "clips": [
+          {"id": "string", "label": "string", "kind": "scene|text|audio|transition", "track": "number", "start": "number", "end": "number", "effects": ["string"]}
+        ],
+        "log": [
+          {"time": "string · HH:MM:SS", "actor": "AI|人", "desc": "string · 可含 HTML b/code", "cli": "string · CLI 命令"}
+        ],
+        "inspector_fields": {
+          "position": {"x": "number", "y": "number"},
+          "size": {"w": "number", "h": "number"},
+          "timing": {"start": "number", "duration": "number"},
+          "keyframes": [{"t": "number", "value": "any"}],
+          "effects": ["string"]
+        }
+      }
+    },
+    "example_data_source": "直接抽自 spec/design/prototypes/editor-v0.1.html 的 7 clips + 14 log · 不造新数据",
+    "added_in_version": "v0.2"
+  },
+
+  "crates": [
+    {
+      "name": "nf-cli",
+      "path": "src/nf-cli/",
+      "kind": "binary",
+      "deps": ["clap", "serde_json", "tokio", "interprocess"],
+      "responsibility": "CLI binary nf · 解析命令 · 连 IPC socket · 或启动 nf-shell 主进程",
+      "added_in_version": "v0.2"
+    },
+    {
+      "name": "nf-shell",
+      "path": "src/nf-shell/",
+      "kind": "binary",
+      "deps": ["wry", "tao", "tokio", "interprocess", "serde_json"],
+      "responsibility": "app 主进程 · tao window 管理 · wry WebView 加载前端 · IPC server · 多窗口调度",
+      "added_in_version": "v0.2"
+    },
+    {
+      "name": "nf-components",
+      "path": "src/nf-components/",
+      "kind": "npm-like TS package (non-cargo)",
+      "deps": ["typescript", "esbuild"],
+      "responsibility": "前端 TS + Web Components · 产 dist/index.js + index.html + shell.css · 由 nf-shell embed 加载",
+      "build": "esbuild src/index.ts --bundle --format=esm --outfile=dist/index.js",
+      "added_in_version": "v0.2"
+    }
+  ],
+
+  "build_targets": {
+    "dev": "cargo run --bin nf-shell (or nf open after cargo install)",
+    "release": "cargo build --release --bin nf-cli --bin nf-shell · strip · binary size < 25MB goal",
+    "install": "cargo install --path src/nf-cli (装 nf 到 ~/.cargo/bin)"
+  }
+}

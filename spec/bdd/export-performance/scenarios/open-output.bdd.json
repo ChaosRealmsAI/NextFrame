@@ -1,0 +1,21 @@
+{
+  "id": "open-output",
+  "title": "导出完成后保留打开视频动作",
+  "given": "任一 profile 导出成功，export.status 返回 succeeded 和 out path。",
+  "when": "用户点击打开视频按钮。",
+  "then": "桌面端调用 export.open 打开输出 MP4；按钮状态显示 opening/opened，不需要开发者手动 open。",
+  "human_actions": ["wait export done", "click open video", "watch opened state"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf export --project v2-showcase --composition launch-open --profile draft --out tmp/v0.11.0/open-output.mp4",
+      "expected": "export succeeds"
+    },
+    {
+      "tool": "click",
+      "command": "target/debug/nf devtools --project v2-showcase --composition launch-open --click 'nf-inspector::shadow [data-action=\"open-export\"]'",
+      "expected": "open button dispatches export.open"
+    }
+  ],
+  "done": false
+}

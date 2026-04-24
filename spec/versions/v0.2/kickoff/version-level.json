@@ -1,0 +1,111 @@
+{
+  "version": "v0.2.0",
+  "type": "feature",
+  "kickoff_mode": "skipped-fast-track",
+  "kickoff_note": "用户明确跳过访谈 · 基于 v0.1 retro + 自主拍板技术栈 + 下面 4 决策点 · 直接进 Phase 2 spec",
+
+  "chosen": "完整 CLI 系统(让 AI sonnet 级可用) + Mac 桌面 app 外壳 + UI hifi 组件化(假页面)· **CLI 独立可用 · 改真 JSON · UI 读同 JSON 展示**",
+  "why": "v0.1 定死产品宪法 + hifi · v0.2 做两层:**(a) CLI 让 AI 能发现/管理/打开一切 · 符 P1 AI 第一用户 + P2 CLI 驱动** · (b) UI 假页面展示数据(无 frame pure 真渲染)· 数据层真(JSON 文件持久)· UI 层假(视觉 + 交互反馈 OK 但无业务计算)",
+  "changed_from": {
+    "original": "v0.2 = Mac 外壳 + UI hifi 组件化(所有业务逻辑占位)",
+    "expanded": "v0.2 = 完整 CRUD CLI(projects / episodes / clips / anchors / log) + Mac 外壳 + UI 假页面",
+    "trigger": "用户 2026-04-21 15:xx: '直接把 项目和分集的系统的 cli 都做了吧 以及 list · 让 ai 可通过 cli 操作一切打开一切 · 目的让 sonnet 可用 · 编辑器我们就做假页面'",
+    "rationale": "让 v0.2 有实质能力 · 不只是空壳 · AI 能通过 CLI 完整完成任务(发现 → 管理 → 打开 → 观察)· 未来 v0.3+ 只需加 frame pure 真渲染"
+  },
+
+  "scope_in": [
+    "🔴 **完整 CLI CRUD 系统**(AI-first · sonnet 可用 · 让 AI 操作一切):",
+    "  - `nf projects list/show/create/rename/archive/delete` · 项目管理",
+    "  - `nf episodes list/show/create/rename/archive/delete --project=<slug>` · 集管理",
+    "  - `nf clips list/show/create/update/delete --project --episode --clip` · clip 管理",
+    "  - `nf anchors list/set/unset --project --episode --name --time` · 锚点管理(charter P11)",
+    "  - `nf log tail/show --project --episode [--actor=AI|human] [--limit]` · 操作日志",
+    "  - `nf open/ps/close/quit/select/tab/click/state/devtools/screenshot` · app 控制(前一版已有)",
+    "  - `nf help [<cmd>]` · 自包含 help · AI 读一眼就会用",
+    "  - `nf doctor` · 环境自检(binary 路径 / socket / registry 健康)",
+    "  - 铁律:所有命令 `--json` 默认 · `--help` 自包含例子 + 常见错 · 错误 stderr 带 hint 字段(AI 自救)",
+    "🔴 **数据层真**(符 charter P8 JSON 单一真理源):",
+    "  - 存储路径:`~/.nextframe/<project-slug>/project.json + episodes/<ep-slug>.json`",
+    "  - CLI 每次 CRUD 原子写磁盘(tmpfile + rename)· 可查 git log 审计",
+    "  - registry `~/.nextframe/registry.json` 列所有项目 slug",
+    "🔴 **agent-usability 硬验收**:sonnet 盲测走通完整流程 —— 创建项目 → 加集 → 加 clip → 加锚点 → `nf open` 看 UI → screenshot → 干净退出 · 全程不读源码只靠 `--help`",
+    "Mac app 外壳(wry + tao)· 单进程多窗口 · Mac 标准(关最后 window 不退 app)",
+    "topbar hifi 1:1(红黄绿灯 + home + 项目/集下拉 + tabs + 语言切换 + 导出按钮占位)",
+    "3 栏 body hifi 1:1(左 Clips + Log · 中 preview 区域占位 + timeline · 右 inspector)",
+    "Web Components 组件化 8 tags(nf-topbar / nf-clips / nf-log / nf-timeline / nf-track / nf-clip / nf-anchor / nf-inspector)· 读 JSON 文件驱动",
+    "交互视觉反馈(tabs 切 · 下拉展开 · clip 选中 · 锚点 hover) · 真改 JSON 再重渲染"
+  ],
+
+  "scope_out": [
+    "frame pure 渲染引擎 · preview 区域仍纯视觉占位(v0.3+)",
+    "export MP4 / nf build / nf export 真实现(按钮存在但点击 noop)",
+    "真 AI agent 接入触发(日志可手动 `nf log create` · 但不跑真 Claude Code)",
+    "锚点时间计算引擎(锚点能设 · 但 clip start/end 不自动联动重算 · v0.3+)",
+    "多用户 / 权限 / 网络 / 云同步",
+    "任何业务逻辑 · 任何视频处理 · 任何 AI 推理"
+  ],
+
+  "tech_stack": {
+    "language_main": "Rust 1.80+",
+    "language_frontend": "TypeScript 5.x",
+    "webview": "wry + tao (薄 wrapper · 系统 WebView · 按 tech-decision rule)",
+    "framework_frontend": "零框架 · 原生 HTML/CSS/TS",
+    "componentization": "Web Components (自定义 elements + Shadow DOM · 零依赖)",
+    "styles": "tokens.css (from spec/design/tokens.css) + shell.css (抽自 editor-v0.1.html) + 各 component Shadow DOM 局部样式",
+    "build": "cargo workspace (Rust) + esbuild/tsc (TS 打 bundle)",
+    "cli": "`nf` binary · clap crate · 30+ subcommands · 5 族 CRUD + 11 app 控制 + help/doctor/version · 发布 /usr/local/bin",
+    "storage": "~/.nextframe/<project-slug>/project.json + episodes/<ep-slug>.json + ~/.nextframe/registry.json · serde_json 原子写(tmpfile + rename)· 无数据库 · 人可肉眼读 · git 可版本化",
+    "ipc_multi_window": "单进程 · tao 多 window · CLI 用 Unix socket / named pipe 给现有进程发 'open-new-window' 请求",
+    "rejected_options": {
+      "AppKit/SwiftUI": "v1.19 原生 AppKit 失败教训 · 且项目主语言 Rust",
+      "Tauri": "tech-decision rule 禁 · 胖框架 · allowlist / isolation 复杂",
+      "Electron": "tech-decision rule 禁 · 打包 Chromium · > 100MB",
+      "React/Vue/Svelte": "tech-decision rule 禁 · 零框架原则",
+      "SQLite": "数据量小 · JSON 文件够用 · 人可读 · 避免依赖"
+    }
+  },
+
+  "constraints": {
+    "no_vanity": "看得见效果 = `nf open` 弹 Mac app 窗口 · 视觉跟 editor-v0.1.html 像素一致 · 跑 2 次 nf open --new-window 有 2 个窗口",
+    "no_overreach": "本版只做外壳 + 组件化 UI · 不碰 JSON 引擎 / frame pure / export / AI 触发",
+    "no_rush": "组件化从第一行代码终版 · 禁 '先 index.html 大坨 v2 再拆' · Web Components 从开始就用",
+    "must_verify": "自验方法 = CLI 启动 + 截图 + 对比 editor-v0.1.html · 多窗口自验 = 2 次 nf open --new-window 后 tao 实例数 = 2 + 关 1 个不退进程"
+  },
+
+  "success_picture": [
+    "终端跑 `nf open` · 0.5s 内 Mac 窗口弹出 · 标题 'NextFrame' · 红黄绿灯在左上",
+    "窗口内视觉 = editor-v0.1.html 截图对比像素差 < 5%(除 WebView 渲染微差 · 字体 / 色 / 玻璃 / 布局完全一致)",
+    "点顶部 tab 切 · 下拉展开 · clip 选中 · hover 锚点 · 都有视觉响应",
+    "跑 `nf open --new-window` · 第二个窗口弹出 · 独立移动 / resize · 关第一个不影响第二个",
+    "关所有窗口 · app 保活(dock 图标在)· 再 `nf open` 秒起新窗口",
+    "`cmd+q` 退 app 才真退进程"
+  ],
+
+  "cost_estimate": "AI 尺度 6-10 小时(wry/tao 集成 2h + CLI 1h + 组件化 UI 移植 3-5h + 多窗口 IPC 1-2h + 自验 1h)",
+
+  "risks": [
+    "wry WebView 对 backdrop-filter / 玻璃效果支持度(v1.x 验证过可行 · 但跨 macOS 版本可能 delta)",
+    "tao 多 window + IPC 复杂度(单进程 window 管理 · 信号传递)",
+    "editor-v0.1.html CSS 抽到 shell.css + Shadow DOM · 样式隔离可能破原视觉"
+  ],
+
+  "candidates": [],
+
+  "deliverables_planned": [
+    "src/Cargo.toml · workspace · crates: nf-cli / nf-shell / nf-components",
+    "src/nf-cli/ · `nf` binary · open / new-window 命令",
+    "src/nf-shell/ · wry + tao main loop · window 管理 · IPC server",
+    "src/nf-components/ · TS + Web Components · dist bundle",
+    "src/nf-components/src/topbar.ts / clips.ts / log.ts / timeline.ts / track.ts / clip.ts / anchor.ts / inspector.ts",
+    "src/nf-components/mock.json · 静态假数据",
+    "src/nf-components/shell.css · 从 editor-v0.1.html 抽的全局 CSS(import tokens.css)",
+    "spec/versions/v0.2/plan.md · Phase 3 产",
+    "spec/bdd/mac-shell/ · Phase 2 产 · scenarios 覆盖 CLI 启动 / 多窗口 / 视觉一致"
+  ],
+
+  "next_phase": {
+    "phase": "v0.2 spec (Phase 2)",
+    "skill": "version-spec",
+    "focus": "BDD scenarios (interactive + visual + metric) · interfaces (CLI 契约 · IPC 协议 · 组件 API) · spec-lock.html for PM review"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "version": "v0.4.1",
+  "type": "audit-patch",
+  "title": "nf-recorder 6 维度质量审查 + 修复(reviewer 穿插版)",
+  "chosen": "派 6 ally gpt 并发审查 nf-recorder(5527 行) · 6 维度独立 md 报告 · 主 agent 汇总 REVIEW.md · 按 P0/P1/P2 排 findings · 派 ally 修(元改允许 · 重结构在所不惜 · 只改 crate 内部不碰上游接口) · cargo check+clippy 双绿 · 4K HEVC 回归录制过 · close",
+  "why": "v0.4 done 后加 3 个新模块(nf-recorder + nf-shell-mac + nf-tracks)共 ~10k 行 · AI 主推'业务版本之间穿插质量审查版' · 用户 override scope 到元改级.",
+  "source_version": "v0.4.0 (commit 8384057b)",
+  "changed_from": null,
+
+  "constraints": {
+    "no_vanity": "产出 REVIEW.md(汇总) + 若干修复 commit · cargo check+clippy 双绿可验 · 4K HEVC 回归录制 5s mp4 3.2MB h265",
+    "no_overreach": "只审+改 nf-recorder/ 内部 · 不改 pub API 给上游 · 不重写(降复杂度/减重复/修 lint 允许 · 架构重想拒) · 不碰 nf-shell-mac/nf-runtime/nf-tracks",
+    "no_rush": "v1.67.1 rate-control + async flush patch 必保留 · lint deny 6 条不放水 · 违规找根因",
+    "must_verify": "cargo check+clippy --workspace --all-targets 双绿 · cargo run --release -p nf-recorder 跑 bundle.html → 4K HEVC mp4 · ffprobe + open 亲验回归"
+  },
+
+  "success_picture": "REVIEW.md 按 P0/P1/P2 排 findings · 修完后 cargo check+clippy 绿 · 4K 录制 mp4 跟 v0.4 一致(3840x2160 hevc ~5Mbps 5s · open QuickTime 播放 html 动画正常)",
+  "cost_estimate": "AI 尺度 2-4h · 6 ally 并发审 20min · 汇总 + 决策 30min · 派 ally 修 1-2h · 验 30min",
+
+  "dimensions": {
+    "D1": "模块拆分 · 循环依赖 · lib.rs 导出面",
+    "D2": "代码质量 · panic/unwrap · error handling · FFI · thread safety",
+    "D3": "测试覆盖 · 7 tests vs 5527 源 · 关键路径",
+    "D4": "清洁度 · dead code · 过时 v1.x 引用 · 废抽象",
+    "D5": "维护性 · 文档密度 · unsafe 注释率 · 新人可读性",
+    "D6": "性能风险 · hotpath 分配 · FFI 生命周期 · v1.67.1 4K patch 保留度"
+  },
+
+  "risks": [
+    "ally 报'重写建议' · 主 agent 裁决 · 拒过激改",
+    "4K 回归编译慢(~55s)· 每次验一次",
+    "spec-lost 事故(17:08 发生过)· 每 commit push 双仓"
+  ],
+
+  "kickoff_meta": {
+    "session": "0912b6e2",
+    "opened_at": "2026-04-21 18:00",
+    "autopilot_mode": "用户离开 · 主 agent 自驱到 close",
+    "user_override": "元改允许 · 重结构在所不惜(本版 scope 内)"
+  }
+}

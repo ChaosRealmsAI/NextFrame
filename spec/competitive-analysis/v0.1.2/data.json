@@ -1,0 +1,398 @@
+{
+  "version": "v0.1.2",
+  "generated_at": "2026-04-21",
+  "scope": "AI 写 HTML / DSL → 视频 赛道",
+  "method": "6 个 subagent 并行 · web research 8 维度 · 主 agent 整合",
+  "competitors": [
+    {
+      "id": "hyperframes",
+      "name": "Hyperframes",
+      "tier": "Tier-1 镜像竞品 (主威胁)",
+      "tagline": "HeyGen 出品的开源 HTML→MP4 渲染框架 · agent 用 HTML+CSS+GSAP 写视频",
+      "born": "2026-03-10",
+      "stars": 8205,
+      "forks": 630,
+      "license": "Apache-2.0",
+      "company": "HeyGen ($500M valuation · 157-332 人 · Benchmark 领投 $60M A 轮)",
+      "tech": {
+        "language": "TypeScript",
+        "renderer": "Puppeteer + headless Chrome (beginFrame 逐帧 seek) → FFmpeg image2pipe",
+        "deployment": "Bun monorepo · 7 packages · npm + Docker",
+        "node_required": true,
+        "rust_native": false
+      },
+      "ai_integration": {
+        "type": "agent-native (一级卖点)",
+        "channels": ["Claude Code skills", "Cursor", "Gemini CLI", "Codex skills", "MCP", "slash commands"],
+        "agent_first_cli": true,
+        "embedded_llm": false
+      },
+      "output": {
+        "formats": ["mp4 h264", "mov", "webm vp9 alpha"],
+        "max_resolution": "4K+ (claimed)",
+        "hdr": false,
+        "deterministic": "100% deterministic frame capture · 0 dropped frames"
+      },
+      "business": "纯开源 · 零收费 · HeyGen 主 SaaS 导流",
+      "dx": {
+        "docs_quality": "优秀",
+        "examples_count": "50+ blocks catalog · Studio 可视编辑 · web component player",
+        "onboarding": "npx hyperframes init · 极低门槛"
+      },
+      "strengths": [
+        "1.5 月已 8.2k stars + 630 forks · HeyGen 品牌+渠道",
+        "agent skills + MCP + slash commands 一站式",
+        "Apache 2.0 (打 Remotion source-available 痛点)",
+        "50+ blocks catalog 生态厚",
+        "deterministic frame capture 硬承诺"
+      ],
+      "weaknesses": [
+        "无 HDR (1080p 主 · 4K+ claimed 无 pipeline 细节)",
+        "纯 TS + Node + Chrome 性能天花板",
+        "无 macOS 桌面壳 (CLI + Studio 网页)",
+        "Headless Chrome drift 长期维护成本",
+        "场景定位混 (TikTok/bar chart/产品 intro 全做 · 无垂类深)"
+      ],
+      "url": "https://hyperframes.heygen.com/",
+      "github": "https://github.com/heygen-com/hyperframes",
+      "verdict": "🔴 主威胁 · 1:1 镜像 · NextFrame 必须靠 4K HDR + Rust + macOS 壳 + 垂类深做才能立"
+    },
+    {
+      "id": "remotion",
+      "name": "Remotion",
+      "tier": "Tier-1 龙头 (生态老大)",
+      "tagline": "React + TSX 描述视频 · Puppeteer headless Chrome 逐帧渲染",
+      "born": "2020",
+      "stars": 44100,
+      "license": "source-available (非真开源 · 商业条款)",
+      "company": "Remotion Inc (独立)",
+      "tech": {
+        "language": "TypeScript (74%)",
+        "renderer": "headless Chromium (Puppeteer) + FFmpeg",
+        "deployment": "本地 CLI / 服务端 / AWS Lambda 模板",
+        "node_required": true,
+        "rust_native": false,
+        "third_party_rust": "rustymotion (社区想替 Chrome)"
+      },
+      "ai_integration": {
+        "type": "外接 agent skills (2026-01 发布)",
+        "channels": ["Claude Code", "Gemini CLI", "Cursor", "OpenCode", "Codex"],
+        "install_count_8wk": "150K+ skills installs",
+        "ai_native_docs": "AI-first · .md URL 后缀 + Accept header 内容协商"
+      },
+      "output": {
+        "formats": ["mp4", "webm", "gif", "png seq", "audio-only"],
+        "max_resolution": "4K (scale factor)",
+        "hdr": false,
+        "hdr_official_stance": "明确不做 HDR (架构限制)",
+        "live_preview": "Remotion Studio + Player 组件"
+      },
+      "business": "免费 ≤3 人 · Creators $25/seat/月 · Automators $0.01/render+$100 min · Enterprise $500+/月",
+      "dx": {
+        "docs_quality": "优秀 (AI-first)",
+        "examples_count": "官方 examples + av/remotion-bits + 社区模板多",
+        "onboarding": "React 开发者 10 分钟 · 非 React 有门槛"
+      },
+      "strengths": [
+        "44.1k stars · 170k npm 周下载 · 龙头地位",
+        "AI-native 文档基础设施 (.md 后缀 + Accept header)",
+        "Agent Skills 发行通道 (5 agent · 各 90-108K 装机)",
+        "Player + Studio live preview 标杆",
+        "商业分层清晰 + Lambda Serverless 模板"
+      ],
+      "weaknesses": [
+        "无 HDR (Chrome headless 只 sRGB)",
+        "Puppeteer 逐帧 screenshot 性能慢 (rustymotion 第三方因此诞生)",
+        "强绑 React + Node (PM/设计师进不来)",
+        "source-available 不是真开源 (团队规模限制)",
+        "定位偏开发者 (打 React 工程师手艺 · 不打 agent 生产力)"
+      ],
+      "url": "https://remotion.dev",
+      "github": "https://github.com/remotion-dev/remotion",
+      "verdict": "🟡 龙头但架构天花板已定 · NextFrame 该学 AI-native docs + Agent Skills 发行 + live preview · 别学绑 React"
+    },
+    {
+      "id": "revideo",
+      "name": "Revideo",
+      "tier": "Tier-2 (半维护 · 已 pivot)",
+      "tagline": "motion-canvas 的 fork · YC W24/S24 · TS + Canvas 2D + ffmpeg · 已 pivot 闭源 Midrender",
+      "born": "2024-04",
+      "stars": 3700,
+      "license": "MIT",
+      "tech": {
+        "language": "TypeScript",
+        "renderer": "Canvas 2D (继承 motion-canvas) · headless browser + ffmpeg",
+        "fork_of": "motion-canvas",
+        "rust_native": false
+      },
+      "ai_integration": {
+        "type": "Revideo 本体 0 AI · 团队 pivot 闭源 Midrender (内置 MCP)",
+        "open_source_status": "半维护 · upstream 落后闭源分支"
+      },
+      "output": {
+        "formats": ["mp4", "webm"],
+        "max_resolution": "1080p 典型 (无 4K HDR 声明)",
+        "hdr": false
+      },
+      "business": "开源免费 (MIT) · 闭源 Midrender SaaS 变现 · YC 背书",
+      "dx": {
+        "docs_quality": "好",
+        "onboarding": "TS 程序员 5 min · 非 TS 不友好"
+      },
+      "strengths": [
+        "YC 背书 + 3.7k stars · 验证赛道需求真实",
+        "motion-canvas generator 协程时序模型继承"
+      ],
+      "weaknesses": [
+        "Canvas 2D 天花板 (无 HDR · 无 10-bit · 4K 慢到不可用)",
+        "AI 集成全在闭源 Midrender · 开源仓被架空",
+        "TS + generator 思维绑定 · LLM 生成 TS 比 HTML/CSS 难",
+        "无桌面壳 · 用户自己搭前端"
+      ],
+      "url": "https://revideo.org",
+      "github": "https://github.com/redotvideo/revideo",
+      "verdict": "🟡 验证商业路径 (开源引擎 + 闭源 SaaS) · 但 NextFrame 选 HTML/CSS+Rust+4K HDR 是精准差异化打击"
+    },
+    {
+      "id": "motion-canvas",
+      "name": "Motion Canvas",
+      "tier": "Tier-2 (程序员 YouTuber 圈)",
+      "tagline": "TS generator-based 动画库 + 实时预览编辑器 · Aarthificial 自用工具开源版",
+      "born": "2023-02 公开",
+      "stars": 18400,
+      "license": "MIT",
+      "tech": {
+        "language": "TypeScript",
+        "renderer": "浏览器 Canvas 2D + 自研 2D scene graph · FFmpeg exporter",
+        "deployment": "纯 web · 无桌面 app",
+        "rust_native": false
+      },
+      "ai_integration": {
+        "type": "完全零 AI",
+        "stance": "定位就是程序员手写"
+      },
+      "output": {
+        "formats": ["mp4 (via FFmpeg)", "PNG sequence"],
+        "max_resolution": "可配但无 4K 专项 · 教程都 1080p",
+        "hdr": false,
+        "live_preview": "编辑器实时预览 + scrub (核心卖点)"
+      },
+      "business": "MIT · GitHub Sponsors + YouTube 频道收入",
+      "dx": {
+        "docs_quality": "中上",
+        "examples_count": "Aarthificial YouTube 教程超多",
+        "onboarding": "陡 (要会 TS + generator + scene API + signal)"
+      },
+      "strengths": [
+        "18.4k stars · YouTube 带流量",
+        "generator API 时序表达力极优 (yield* tween/all/waitFor)",
+        "live preview + scrub 标杆开发闭环",
+        "signal 响应式 + scene graph 分离",
+        "作者自家 dogfood 出圈视频是最强 demo"
+      ],
+      "weaknesses": [
+        "零 AI 集成",
+        "Canvas 2D · 无 HDR · 无 GPU shader · 无真 3D",
+        "无桌面壳",
+        "定位窄 (只技术讲解动画 + 配画外音)",
+        "非程序员无法用"
+      ],
+      "url": "https://motioncanvas.io",
+      "github": "https://github.com/motion-canvas/motion-canvas",
+      "verdict": "🟢 该偷:generator/signal API 时序表达力 + live preview 闭环 · 该避:程序员窄圈 + Canvas 上限"
+    },
+    {
+      "id": "editly",
+      "name": "Editly",
+      "tier": "Tier-3 (半停滞 · 上一代思路)",
+      "tagline": "Node.js + ffmpeg 声明式视频编辑器 · JSON5 spec 描述剪辑",
+      "born": "2020-04",
+      "stars": 5380,
+      "license": "MIT",
+      "tech": {
+        "language": "TypeScript (87.7%)",
+        "renderer": "ffmpeg + Canvas + Fabric.js + headless-gl (GLSL)",
+        "deployment": "npm 包 · Linux 需 headless-gl",
+        "rust_native": false
+      },
+      "ai_integration": {
+        "type": "完全无"
+      },
+      "output": {
+        "formats": ["mp4", "mkv", "gif"],
+        "max_resolution": "任意 (无 4K 专项)",
+        "hdr": false
+      },
+      "business": "MIT · PayPal 捐赠 · 单一作者 (mifi)",
+      "dx": {
+        "docs_quality": "好 (README 详细)",
+        "onboarding": "低 (npm + json5 即可跑)"
+      },
+      "strengths": [
+        "JSON spec 思路早验证 (5.4K stars)",
+        "layer types 丰富 (含 GLSL shader · gl-transitions 复用)",
+        "MIT + 单文件 spec 上手低"
+      ],
+      "weaknesses": [
+        "图层栈模型 vs HTML/CSS = 上一代思路",
+        "无 4K HDR pipeline",
+        "无 AI 集成",
+        "半停滞 · 最后 commit 2025-02-20 · v0.15.0-rc.1 未转正",
+        "依赖链重 (Node + ffmpeg + headless-gl Linux 坑)"
+      ],
+      "url": "https://github.com/mifi/editly",
+      "github": "https://github.com/mifi/editly",
+      "verdict": "⚪ 半停滞 · 验证 JSON 路线市场 · NextFrame HTML/CSS+Rust+AI agent 是代差超越"
+    },
+    {
+      "id": "etro-js",
+      "name": "Etro.js",
+      "tier": "Tier-3 (浏览器 WebGL · 非直接竞品)",
+      "tagline": "TS 浏览器视频编辑框架 · WebGL+GLSL 特效 · 给你搭编辑器工具",
+      "born": "~2020",
+      "stars": 1100,
+      "license": "GPL-3.0",
+      "tech": {
+        "language": "TypeScript (94%)",
+        "renderer": "浏览器内 WebGL + GLSL + Web Audio",
+        "deployment": "纯浏览器 · 无服务端",
+        "rust_native": false
+      },
+      "ai_integration": {
+        "type": "无"
+      },
+      "output": {
+        "formats": ["MediaRecorder (WebM/VP9/H.264 视浏览器)"],
+        "max_resolution": "无 4K 声明",
+        "hdr": false
+      },
+      "business": "GPL-3.0 开源 · 无 SaaS",
+      "dx": {
+        "docs_quality": "中",
+        "onboarding": "JS API 手写"
+      },
+      "strengths": [
+        "WebGL shader 特效成熟",
+        "纯浏览器零后端 + 实时预览"
+      ],
+      "weaknesses": [
+        "无 AI / 无 CLI / 非 agent-friendly",
+        "MediaRecorder 输出不可控",
+        "无桌面壳"
+      ],
+      "url": "https://etrojs.dev",
+      "github": "https://github.com/etro-js/etro",
+      "verdict": "⚪ AE 编辑器零件库 · 非直接竞品 · 同赛道底层能力参照物"
+    },
+    {
+      "id": "claude-code-video-toolkit",
+      "name": "Claude Code Video Toolkit",
+      "tier": "Tier-2 (分发形态参照)",
+      "tagline": "Claude Code 专属视频生产 skills 包 · Remotion 底座 + Python 工具链",
+      "born": "2026 (v0.14.2 · 2026-04-09)",
+      "stars": 926,
+      "forks": 146,
+      "license": "MIT",
+      "company": "digitalsamba (视频会议厂)",
+      "tech": {
+        "language": "Python 55.7% + TypeScript 42.3% + Dockerfile",
+        "renderer": "Remotion (React + Headless Chrome) + FFmpeg + Playwright",
+        "external_ai": ["Qwen3-TTS", "ElevenLabs", "FLUX.2 (图)", "ACE-Step (音乐)", "LTX-2 (AI 视频片段)"]
+      },
+      "ai_integration": {
+        "type": "Claude Code skills 包 (即装即用)",
+        "form": "slash commands + templates"
+      },
+      "output": {
+        "formats": ["mp4 (FFmpeg)"],
+        "max_resolution": "可配 · 非 4K HDR 卖点",
+        "hdr": false
+      },
+      "business": "MIT 开源 · 母公司主业 SaaS",
+      "strengths": [
+        "**分发形态聪明** (Claude skills 包即装即用)",
+        "外接 AI 生态广 (TTS+图+音乐+AI 视频片段一条龙)",
+        "Remotion 成熟底座 + 926 stars 增长快"
+      ],
+      "weaknesses": [
+        "React/Remotion 底座 = JS 性能天花板",
+        "非 4K HDR 专业向",
+        "多语言 stack (Py+TS+Docker) 维护复杂",
+        "无桌面壳"
+      ],
+      "url": "https://github.com/digitalsamba/claude-code-video-toolkit",
+      "github": "https://github.com/digitalsamba/claude-code-video-toolkit",
+      "verdict": "🟢 分发形态值得抄 · NextFrame 该出 Claude Code skills 包 · 不是直接竞品"
+    }
+  ],
+  "nextframe_position": {
+    "current_state": "v0.1.0 strategy + v0.1.1 scaffold (2026-04-21 · empty shell 起步 1 天)",
+    "tagline": "Rust + 4K HDR + macOS 桌面壳 + 外接 AI agent 的视频引擎",
+    "core_principles_relevant": ["P3 frame pure", "P4 3 模式像素", "P6 4K HDR 60fps", "P7 HTML 满表达力", "P9 外接 AI"],
+    "differentiation": [
+      {
+        "axis": "Rust 原生栈",
+        "vs": "全部竞品 TS/Node/Chrome",
+        "value": "性能 / 确定性 / 单二进制分发"
+      },
+      {
+        "axis": "4K HDR 60fps",
+        "vs": "Hyperframes (4K claimed 无 pipeline) · Remotion (明确不做 HDR) · 其他 Canvas 2D 天花板",
+        "value": "高端场景 (教育 / 产品 / 4K 屏播) 唯一可选"
+      },
+      {
+        "axis": "macOS 原生桌面壳",
+        "vs": "全部竞品纯 web/CLI",
+        "value": "PM/设计/创作者上手 · 系统字体/文件/性能优势"
+      },
+      {
+        "axis": "外接 AI agent (P9)",
+        "vs": "Hyperframes 同路 · Remotion 已发 skills · NextFrame 起步晚",
+        "value": "需要立刻补 Claude skills 发行通道 · 否则没生态"
+      },
+      {
+        "axis": "垂类深做 (待选)",
+        "vs": "全部竞品 generalist",
+        "value": "教育讲解 / 产品演示 / 数据报告 / 4K HDR 高端 任挑 1-2 深做"
+      }
+    ]
+  },
+  "time_warning": {
+    "alert": "差异化窗口正在关闭",
+    "facts": [
+      "Hyperframes 2026-03-10 开源 · 1.5 月达 8.2k stars",
+      "NextFrame 2026-04-21 v0.1.0 empty shell 起步 · 落后 42 天",
+      "若只做通用 HTML→MP4 已被降维打击 (品牌/生态/时间三维度全输)",
+      "Remotion Agent Skills 8 周 150K 装机 · 占住 agent 心智"
+    ],
+    "must_act": "4K HDR + Rust + 桌面壳 + 垂类深 · 4 个差异化点至少拿下 2 个才能立"
+  },
+  "strategic_recommendations": [
+    {
+      "priority": "P0",
+      "action": "立刻确立 4K HDR + Rust 性能优势硬指标",
+      "why": "唯一所有竞品都没的能力 · 4K HDR 是 NextFrame charter P6 死约束 · v0.3 engine 建立时 day-1 上 deterministic frame capture + HDR 验证"
+    },
+    {
+      "priority": "P0",
+      "action": "出 NextFrame Claude Code skills 包 (抄 Hyperframes / Claude Code Video Toolkit 分发形态)",
+      "why": "P9 外接 AI 但分发通道空缺 · 起步落后 42 天必须靠 agent 心智占位 · agent skills 是低成本传播"
+    },
+    {
+      "priority": "P1",
+      "action": "挑 1-2 垂类深做 · 拒绝 generalist 定位",
+      "why": "Hyperframes/Remotion generalist 已占 · NextFrame 起步晚需垂类切入 · 候选: 教育讲解 / 产品演示 / 数据报告 / 4K 屏播"
+    },
+    {
+      "priority": "P1",
+      "action": "学 motion-canvas 的 generator/signal API + Remotion 的 live preview",
+      "why": "DX 标杆 · NextFrame TS describe 层应该可读 · 桌面壳 preview 应该 < 1s 反馈"
+    },
+    {
+      "priority": "P2",
+      "action": "AI-native 文档 (md URL 后缀 + Accept header) 从 day-1 上",
+      "why": "Remotion 验证 agent 友好文档是关键基础设施 · NextFrame 文档应该一开始就 agent 可抓"
+    }
+  ],
+  "verdict_one_line": "NextFrame 已被 Hyperframes 镜像 + Remotion 龙头夹击 · 唯一活路 = 4K HDR + Rust + 桌面壳 + 垂类深做 · 必须 v0.3 立刻显出真差异化否则窗口关闭"
+}

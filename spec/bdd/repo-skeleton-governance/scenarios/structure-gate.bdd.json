@@ -1,0 +1,17 @@
+{
+  "id": "structure-gate",
+  "given": "Future agents may accidentally reintroduce generated directories or nested git repositories.",
+  "when": "The structure gate runs.",
+  "then": "It fails on nested spec git, tracked generated artifacts, tracked large media, or unexpected root directories.",
+  "human_actions": ["run structure check"],
+  "ai_tools": [
+    {
+      "tool": "shell",
+      "command": "./scripts/check-structure.sh"
+    },
+    {
+      "tool": "shell",
+      "command": "./scripts/audit.sh --gate-only"
+    }
+  ]
+}

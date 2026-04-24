@@ -1,0 +1,39 @@
+{
+  "version": "v0.8.0",
+  "title": "Timeline v0.8 · 轨道承载一切 · scene track 最小闭环",
+  "type": "feature",
+  "status": "claimed",
+  "owner_session": "d1a2d7ff-1737-4d4a-beea-36c155016d2b",
+  "claimed_at": "2026-04-21T20:04:20+08:00",
+  "closed_at": null,
+
+  "chosen": "定 timeline.v08 JSON schema(anchors + tracks · 4 kind 全列) · 实现 scene track + 3 scene 落地 · PM 写 timeline.json 切换 scene 真播",
+
+  "why": "承接 v0.x-final 归档 nf-tracks 思路(17 组件 / 20 真 demo JSON 齐) · 当前 app 播的 mock-html 写死 改不了 · 这版上 JSON 驱动数据模型",
+
+  "changed_from": null,
+
+  "constraints": {
+    "no_vanity": "PM 肉眼验:写 timeline.json → app 按 playhead 切换 scene · nf capture 截图肉眼比对",
+    "no_overreach": "只做 scene track + 3 scene(hero-centered / quote / metric-grid) · audio / subtitle / animation track 下版 · 不做 recorder 导出 / AI 自动生 JSON",
+    "no_rush": "schema 4 kind 全列定死(不留'v2 再填') · anchor 两形态(at 硬写 + whisper-ref 软写)schema 定完整 · 即使这版 whisper-ref 实现先不做 · schema 字段留齐",
+    "must_verify": "PM 流程:写 timeline.json → nf open → preview 按 scene 切换 → nf capture 截图 → 肉眼验 3 scene 切换对 · ai_tools 全内建"
+  },
+
+  "success_picture": "PM 编辑 spec/versions/v0.8.0/samples/scene-demo.json(3 clip on 1 scene track · 每 clip 指向不同 scene)→ nf open → preview 按 anchor 时间 切换 3 scene → 肉眼 + nf capture PNG 验",
+
+  "cost_estimate": "AI 尺度 2-3h(并发 subagent + ally · schema 方案 + runtime 实现 + 3 scene 移植 + CLI 自验)",
+
+  "risks": [
+    "scene 组件从 v0.x-final nf-tracks community 迁过来 · 依赖 DOM + CSS · WebView runtime 需对齐 Track ABI(L1/L2/L3)",
+    "anchor resolve 逻辑 · 只做 {at:N} 硬写形态(whisper-ref 下版 + audio track 一起做)",
+    "timeline.json schema 定得不对 · 下版 audio/subtitle 加上时要改 · 所以这版必把 4 kind 结构全列"
+  ],
+
+  "candidates": [
+    {"label": "A · 最小闭环(选中)", "why": "scope 收窄 · schema 一步到位 · 质量不降"},
+    {"label": "B · 加 audio track", "why": "走 audio 要对接 vox · 增加 4h 工时 · 违一版一件事"},
+    {"label": "C · POC 先", "why": "reference/v0.x-final/ 样本已充分 · 直接用比 POC 更快 · 弃"},
+    {"label": "D · 4 kind 一步到位", "why": "4 件事并一版 · 违约束"}
+  ]
+}

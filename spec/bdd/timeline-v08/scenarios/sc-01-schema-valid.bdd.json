@@ -1,0 +1,26 @@
+{
+  "id": "sc-01",
+  "title": "合法 timeline.v08.json 解析成功",
+  "type": "api",
+  "chapter": "ch-schema",
+
+  "given": "合法 timeline.v08.json · meta/viewport/duration/anchors/tracks 齐 · scene kind · anchor 用 'demo.begin' 命名",
+  "when": "调用 parser:`nf timeline parse sample-3-scene.json`",
+  "then": "exit 0 · stdout JSON 含 `{anchors_resolved: {...ms...}, tracks_count: 1, clips_count: 3}` · 无 error",
+
+  "ai_tools": [
+    {
+      "tool": "parse",
+      "command": "nf timeline parse spec/versions/v0.8.0/samples/sample-3-scene.json --json",
+      "output": "JSON · anchors 全 resolved 成 ms · tracks normalized"
+    },
+    {
+      "tool": "schema-check",
+      "command": "nf timeline lint spec/versions/v0.8.0/samples/sample-3-scene.json",
+      "output": "exit 0 = 合法 · 非 0 带行号错误"
+    }
+  ],
+
+  "dev": "pending",
+  "tested": "pending"
+}

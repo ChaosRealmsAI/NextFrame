@@ -1,0 +1,179 @@
+{
+  "version": "v0.1.0",
+  "kickoff_started_at": "2026-04-21 10:47",
+  "mode": "new-mode-first-version",
+  "rounds": [
+    {
+      "round": 1,
+      "timestamp": "2026-04-21 10:50",
+      "questions": [
+        {
+          "question": "v0.1 主题 · 这版往哪走？",
+          "options": ["A. frame pure 地基+预览", "B. A + AI 写 JSON", "C. 桌面壳+编辑器 UI", "D. charter + glossary 先行"],
+          "answer": "【其他】拒绝先打造 mac 桌面端 · 拒绝 HTML（以前就这个坑）· 第一个版本要想好我们要做的是啥 · 把原型+需求+高保真+大方向都定好"
+        }
+      ],
+      "ai_takeaway": "用户换主题 · 自定义为战略版 · 产品规划 + 需求 + 原型 + hifi + 大方向 4 件"
+    },
+    {
+      "round": 2,
+      "timestamp": "2026-04-21 11:00",
+      "questions": [
+        {
+          "question": "以前 HTML 就这个坑 具体哪个坑？(多选)",
+          "options": ["性能/4K 爆", "视觉达不到", "架构复杂 bug 多", "其他/我说不清 你调查"],
+          "answer": "别关注这个了 · 第一个版本做产品规划"
+        },
+        {
+          "question": "v0.1 scope · 4 件一起还是拆几版？",
+          "options": ["一起·本质 1 件事", "拆 2 版", "拆 3 版", "你裁定"],
+          "answer": "做产品设计 规划 高保真原型图"
+        }
+      ],
+      "ai_takeaway": "用户回避 HTML 坑具体化 · scope 收敛为 3 件：产品规划 + 产品设计 + hifi 原型图"
+    },
+    {
+      "round": 3,
+      "timestamp": "2026-04-21 11:05",
+      "questions": [
+        {
+          "question": "核心用户 / 场景 · 解决谁啥问题？",
+          "options": ["PM 产品展示", "教师知识视频", "创作者短视频", "通用不限"],
+          "answer": "AI 为主 做视频 · 我要做 AI 可以剪辑 · 基于 HTML 生态 · 做大部分视频 · 转场 动效等等 · 高上限 · 以后可以结合 AI 能力"
+        },
+        {
+          "question": "最终产出是啥？",
+          "options": ["MP4", "在线 URL", "两者都", "暂不定"],
+          "answer": "MP4 视频文件"
+        }
+      ],
+      "ai_takeaway": "产品定位清晰化：AI 为主 + 基于 HTML 生态 + 高上限 + AI 可剪辑 · 出 MP4",
+      "changed_from": {
+        "field": "技术栈态度",
+        "round_1_said": "拒绝 HTML（以前就这个坑）",
+        "round_3_said": "基于 HTML 生态",
+        "constraint_logged": "这是反转 · dialogue 保留演变"
+      }
+    },
+    {
+      "round": 4,
+      "timestamp": "2026-04-21 11:10",
+      "questions": [
+        {
+          "question": "AI 参与剪辑方式 · 谁主导？",
+          "options": ["AI 全自动人审", "AI+人协作", "AI 当助手人主导", "多模式切"],
+          "answer": "AI 自动 · 但人可以轻度编辑 · 比如改改位置 改改每个轨道的时间范围"
+        },
+        {
+          "question": "视频时长/节奏？",
+          "options": ["短 15-60s", "中 1-5 分钟", "长 5+ 分钟", "不限都支持"],
+          "answer": "不限 · 都支持"
+        }
+      ],
+      "ai_takeaway": "编辑模式：AI 主 + 人轻度（改位置/时间范围） · 时长不限"
+    },
+    {
+      "round": 5,
+      "timestamp": "2026-04-21 11:15",
+      "questions": [
+        {
+          "question": "hifi 原型图先画哪几张核心页？(多选)",
+          "options": ["首页 dashboard", "AI 对话+预览", "Timeline 轻编辑", "导出/分享"],
+          "answer": "全做 · 我们以前有原型图和设计方案的 · 玻璃紫色风格 · 视频桌面端编辑器 多轨道 · 你找找"
+        },
+        {
+          "question": "AI 核心输入形式？",
+          "options": ["自然语言 prompt", "结构化表单", "prompt+素材", "多轮 chat"],
+          "answer": "纯自然语言 prompt"
+        }
+      ],
+      "ai_takeaway": "hifi 全做 4 张 · 复用历史 v2.0/v0.7 的玻璃紫色多轨道设计"
+    },
+    {
+      "round": 6,
+      "timestamp": "2026-04-21 11:18",
+      "user_self_initiated": "注意：我们现在打造的不是 带 ai 输入框的。是 外接，比如用你 CLAUDE code 控制实现",
+      "ai_takeaway": "产品定位反转：NextFrame 不含内置 AI UI · 外接 Claude Code 控制",
+      "changed_from": {
+        "field": "AI 交互入口",
+        "round_5_said": "纯自然语言 prompt（暗含 NextFrame 内置输入框）",
+        "round_6_said": "外接 Claude Code 控制 · NextFrame 不做 AI UI",
+        "constraint_logged": "产品架构级反转"
+      }
+    },
+    {
+      "round": 7,
+      "timestamp": "2026-04-21 11:20",
+      "questions": [
+        {
+          "question": "人用户身份 · AI 为主但人是谁？(多选)",
+          "options": ["PM", "内容创作者", "教师", "开发者"],
+          "answer": "都有 · 只要是用户"
+        },
+        {
+          "question": "v0.1 成功画面 · 做完 PM 看到啥算过？",
+          "options": ["4 张 hifi+charter", "Clickable prototype", "Walkthrough HTML", "你定"],
+          "answer": "就用户故事为单位 全流程 · 从视频的 跟 CLAUDEcode 聊 到输出 JSON 到桌面端界面 到导出视频"
+        }
+      ],
+      "ai_takeaway": "成功画面 = 用户故事全流程可视化（CC 聊 → JSON → 桌面端 → 导出）· 用户不聚焦（都是）"
+    },
+    {
+      "round": 8,
+      "timestamp": "2026-04-21 11:25",
+      "user_self_initiated": "整个产品是 CLI 驱动的 · 写 JSON · build · 展示 · 桌面端预览 · 人类操作（可以不操作）· 然后导出",
+      "ai_takeaway": "核心架构：CLI-driven 全流程 · 桌面端是预览+可选编辑 · 不是主操作入口",
+      "changed_from": {
+        "field": "产品架构层次",
+        "round_6_said": "外接 Claude Code",
+        "round_8_said": "整个产品 CLI 驱动 · CLI 是一等公民 · 桌面端是 CLI 展示层",
+        "constraint_logged": "架构级关键决策"
+      }
+    },
+    {
+      "round": 9,
+      "timestamp": "2026-04-21 11:28",
+      "questions": [
+        {
+          "question": "v0.7 WYSIWYG 就是你说的那份 hifi 吗？",
+          "options": ["就是这份", "差不多要改", "不是"],
+          "answer": "不是这个 · v2.0 有过 · 你找找"
+        },
+        {
+          "question": "CC → NextFrame 怎么交接 JSON？",
+          "options": ["文件监听", "CLI 启动参数", "剪贴板", "组合"],
+          "answer": "都是 · 你主动 · 都是 CLI 整个产品是 CLI 驱动的"
+        }
+      ],
+      "ai_takeaway": "历史 hifi 还要继续找 v2.0 期间的 · CLI 交接方式由 AI 裁定（都支持 · CLI 驱动）"
+    }
+  ],
+  "summary_of_understanding": {
+    "product_definition": "NextFrame = CLI 驱动的 AI 视频编辑/渲染桌面端",
+    "architecture": "CC 写 JSON → nf build → nf preview (桌面端展示) → 可选人编辑 (位置/时间范围) → nf export MP4",
+    "tech_stack": "基于 HTML 生态 + 高上限 + 外接 AI 控制（不含内置 AI UI）",
+    "desktop_role": "预览 + 可选轻度编辑 · 非主操作入口",
+    "visual_style": "玻璃 + 紫色 aurora + 多轨道 editor（参考 v2.0/v0.7 历史）",
+    "target_users": "不聚焦 · 所有用户 · AI 主产 · 人轻度介入",
+    "output_format": "MP4 · 不限时长 · 支持转场/动效/高级功能"
+  },
+  "v01_scope_proposal": {
+    "1_charter": "产品宪章 7 条定位写死（JSON schema charter.json）",
+    "2_user_story": "用户故事全流程图（CC → CLI → preview → edit 可选 → export）",
+    "3_cli_sketch": "CLI 接口草案（命令/参数/输出示例）",
+    "4_json_schema_sketch": "JSON schema v0 草案（CC 要写出啥）",
+    "5_hifi": "hifi 桌面端 4 张（首页/JSON 载入态/多轨道编辑器/导出）",
+    "essence": "本质 1 件事=把产品定清 · 但工作量 5 维度 · AI 尺度 1.5-2 天"
+  },
+  "constraints_preview": {
+    "no_vanity": "hifi + 用户故事 PM 可视可读 · 不是纯技术文档",
+    "no_overreach": "0 代码 · 不做 POC / runtime / 实际 CLI 实现 · 只做规划+设计",
+    "no_rush": "定位一步到位 · charter/glossary 不留 v2 再填 · hifi 终稿",
+    "must_verify": "PM 读完能复述产品定位 + 按 hifi 点着讲完用户故事 + 判断下版该做啥"
+  },
+  "pending_resolutions": [
+    "v2.0 期间 hifi 设计（agent 后台搜中）",
+    "阶段 3 scope 确认（5 件是否违别大力度）",
+    "阶段 3 逐项点头"
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "$type": "feature",
+  "feature": "tts",
+  "name": "TTS 合成 + 字级 karaoke",
+  "version": "v0.3.0",
+  "status": "active",
+  "design_version": "v0.1.0",
+  "plan": "归档迁 · 不重写",
+  "summary": "输入中文文本 → Edge/Volcengine TTS 合成 mp3 → WhisperX 字级对齐 → 产 karaoke.html(自包含播放器 · 字级高亮). subagent haiku 按 nf-guide/flows/audio/*.md prompt 跑 nf-tts CLI.",
+  "overview": "3 步链: synth(文本→mp3) → align(mp3→timeline.json 字级时间戳) → karaoke(mp3+timeline→自包含 html). 每步一 nf-tts 子命令.",
+  "rules": {
+    "R1": {
+      "name": "CLI first",
+      "text": "nf-tts 子命令: synth / batch / voices / align / karaoke · 全可命令行",
+      "why": "haiku 盲测必需",
+      "impl": { "crate": "nf-tts", "subcommands": ["synth", "batch", "align", "karaoke", "voices"] }
+    },
+    "R2": {
+      "name": "Edge TTS 默认",
+      "text": "默认 backend=edge(免费·不需 key)· voice=zh-CN-YunxiNeural",
+      "why": "haiku 能直接用 · 不需配 API key",
+      "impl": { "default_backend": "edge", "default_voice": "zh-CN-YunxiNeural" }
+    },
+    "R3": {
+      "name": "产物内建自验",
+      "text": "nf-tts verify --mp3 output/tts.mp3 --timeline output/tts.timeline.json 内建判 mp3 可解 + timeline 条数对得上",
+      "why": "feedback_product_self_verify_builtin",
+      "impl": { "cli": "nf-tts verify", "checks": ["mp3_decodable", "timeline_word_count > 0", "karaoke_html_valid"] }
+    },
+    "R4": {
+      "name": "WhisperX 可跳",
+      "text": "WhisperX 装不上 · --timeline fixture 兜底 · karaoke 步仍可产",
+      "why": "whisperx 重依赖 · haiku 装不了",
+      "impl": { "cli_flag": "--timeline <path>", "fixture_dir": "tests/fixtures/tts/" }
+    },
+    "R5": {
+      "name": "karaoke 自包含",
+      "text": "产出 karaoke.html 含 <audio> + 字级数据内联 · 无外部 CSS/JS 依赖 · 双击打开即播",
+      "why": "主 agent open 验最方便",
+      "impl": { "file": "karaoke.html", "inline": ["audio_base64_or_ref", "timeline_json", "css", "js"] }
+    }
+  },
+  "visual": {
+    "V1": {
+      "name": "karaoke 字级高亮",
+      "selector": ".word.active",
+      "css": "color: var(--accent); font-weight: 700",
+      "states": ["active(当前词)", "passed(已读过)", "upcoming(未读)"]
+    }
+  },
+  "chapters": {
+    "4.1 正常流程": ["tts-01"],
+    "4.2 边界情况": ["tts-02"]
+  },
+  "completion": {
+    "scenarios_total": 2,
+    "dev_done": 0,
+    "tested_done": 0,
+    "acceptance_done": 0,
+    "percentage": { "dev": "0%", "tested": "0%", "acceptance": "0%" }
+  },
+  "outOfScope": [
+    "Volcengine backend(需 API key · 本版不验)",
+    "英文 TTS(本版只中文)",
+    "多 voice 对比",
+    "视觉 track 渲染"
+  ],
+  "openQuestions": [
+    {
+      "q": "WhisperX 装不上时 karaoke 字级同步精度(fixture 可能不准)",
+      "resolved": false,
+      "resolve_in_phase": "POC 或 build"
+    }
+  ],
+  "changelog": [
+    { "version": "v0.3.0", "note": "feature 首建 · 归档迁 nf-tts 4800 行 · 2 scenarios" }
+  ]
+}

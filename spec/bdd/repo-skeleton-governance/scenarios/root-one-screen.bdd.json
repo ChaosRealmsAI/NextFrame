@@ -1,0 +1,17 @@
+{
+  "id": "root-one-screen",
+  "given": "NextFrame root contains product code plus historical/local directories.",
+  "when": "A maintainer lists the root directories.",
+  "then": "The visible skeleton is limited to current product surfaces: crates, frontend, examples, scripts, tests, spec, and CI/support files.",
+  "human_actions": ["open repository root", "scan directory names"],
+  "ai_tools": [
+    {
+      "tool": "shell",
+      "command": "find . -maxdepth 2 -type d | sort"
+    },
+    {
+      "tool": "shell",
+      "command": "./scripts/check-structure.sh"
+    }
+  ]
+}

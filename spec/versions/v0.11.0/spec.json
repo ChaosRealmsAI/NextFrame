@@ -1,0 +1,187 @@
+{
+  "$type": "version-spec",
+  "version": "v0.11.0",
+  "title": "Export profiles, parallel export, and real progress",
+  "created_at": "2026-04-24 17:32",
+  "session": "codex-2026-04-24-v011-spec",
+  "phase": "spec",
+  "status": "ready-for-build",
+  "inputs": {
+    "kickoff": "spec/versions/v0.11.0/kickoff/version-level.json",
+    "bdd": "spec/bdd/export-performance/feature.json",
+    "previous_blocker": "spec/versions/v0.10.0/build.json#failures/F-01"
+  },
+  "scope": {
+    "do": [
+      "导出区提供草稿、标准、最终、高速最终 profile，并显示分辨率/fps/parallel 摘要",
+      "nf export 暴露 --profile、--fps、--resolution、--parallel、--events 参数",
+      "shell export.start 接收 profile/fps/resolution/parallel，并把参数传给 nf export",
+      "shell export.status 返回 progress.percent、frames_encoded、total_frames、stage、eta_seconds、profile",
+      "前端 inspector 使用真实 progress 字段显示进度条、帧数、阶段和 ETA",
+      "最终导出仍从保存后的 composition JSON 编译 source sidecar"
+    ],
+    "do_not": [
+      "不做云导出",
+      "不做 component-level cache/static/render_fps",
+      "不换 WebView/CARenderer/VideoToolbox 截图导出架构",
+      "不改 v2 composition JSON 轨道语法",
+      "不引入 iframe、React、Vue 或 Electron"
+    ]
+  },
+  "verify_points": [
+    {
+      "id": "V-1",
+      "text": "桌面端导出区能选择多个 profile，并显示每个 profile 的 resolution/fps/parallel。",
+      "scenario": "spec/bdd/export-performance/scenarios/select-profile.bdd.json"
+    },
+    {
+      "id": "V-2",
+      "text": "导出运行中 export.status 和前端 UI 显示真实 percent/frames/stage/ETA。",
+      "scenario": "spec/bdd/export-performance/scenarios/real-progress.bdd.json"
+    },
+    {
+      "id": "V-3",
+      "text": "高速最终档把 parallel 参数传到 recorder，并能触发 parallel 或明确短视频降级原因。",
+      "scenario": "spec/bdd/export-performance/scenarios/parallel-final.bdd.json"
+    },
+    {
+      "id": "V-4",
+      "text": "任一 profile 导出都使用保存后的 composition JSON source，导出 sidecar 能看到最新编辑。",
+      "scenario": "spec/bdd/export-performance/scenarios/json-sync.bdd.json"
+    },
+    {
+      "id": "V-5",
+      "text": "导出成功后桌面端继续显示输出路径和打开视频按钮。",
+      "scenario": "spec/bdd/export-performance/scenarios/open-output.bdd.json"
+    }
+  ],
+  "items": [
+    {
+      "id": "S-01",
+      "kind": "cli-contract",
+      "title": "Export options and event stream",
+      "status": "pending",
+      "verify_point": "V-1",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf export --help",
+          "expected": "--profile, --fps, --resolution, --parallel, --events are documented"
+        },
+        {
+          "tool": "state",
+          "command": "target/debug/nf export --project v2-showcase --composition launch-open --profile draft --out tmp/v0.11.0/launch-draft.mp4",
+          "expected": "MP4 exported with draft profile"
+        }
+      ],
+      "citations": [
+        { "path": "crates/nf-cli/src/commands/mod.rs", "commit": null },
+        { "path": "crates/nf-cli/src/commands/export_cmd.rs", "commit": null }
+      ],
+      "evidence": null
+    },
+    {
+      "id": "S-02",
+      "kind": "shell-ipc",
+      "title": "Stream export progress into shell job state",
+      "status": "pending",
+      "verify_point": "V-2",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --click 'nf-inspector::shadow [data-action=\"export-video\"]'",
+          "expected": "export job starts and status includes running progress"
+        },
+        {
+          "tool": "state",
+          "command": "target/debug/nf export-status --job-id <job>",
+          "expected": "JSON contains progress.percent, frames_encoded, total_frames, stage"
+        }
+      ],
+      "citations": [
+        { "path": "crates/nf-shell/src/handlers/export.rs", "commit": null },
+        { "path": "frontend/nf-components/src/storage.ts", "commit": null }
+      ],
+      "evidence": null
+    },
+    {
+      "id": "S-03",
+      "kind": "ui",
+      "title": "Inspector export profile controls and progress UI",
+      "status": "pending",
+      "verify_point": "V-1",
+      "ai_tools": [
+        {
+          "tool": "screenshot",
+          "command": "target/debug/nf screenshot --project v2-showcase --composition showreel-24s --out tmp/v0.11.0/export-ui.png",
+          "expected": "right inspector shows profile controls and numeric progress text"
+        }
+      ],
+      "citations": [
+        { "path": "frontend/nf-components/src/components/inspector.ts", "commit": null },
+        { "path": "frontend/nf-components/src/index.ts", "commit": null }
+      ],
+      "evidence": null
+    },
+    {
+      "id": "S-04",
+      "kind": "parallel",
+      "title": "Wire final-fast profile to recorder parallel slicing",
+      "status": "pending",
+      "verify_point": "V-3",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile final-fast --parallel 4 --out tmp/v0.11.0/showreel-final-fast.mp4 --events",
+          "expected": "stdout shows record.parallel.start or a structured downgrade reason"
+        }
+      ],
+      "citations": [
+        { "path": "crates/nf-recorder/src/export_api.rs", "commit": null },
+        { "path": "crates/nf-recorder/src/orchestrator.rs", "commit": null }
+      ],
+      "evidence": null
+    },
+    {
+      "id": "S-05",
+      "kind": "consistency",
+      "title": "Saved JSON remains the only export source",
+      "status": "pending",
+      "verify_point": "V-4",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "jq -r '.tracks[] | select(.id==\"final-title\") | .params.title' tmp/v0.11.0/sync-draft.mp4.source.json",
+          "expected": "matches the saved composition title"
+        }
+      ],
+      "citations": [
+        { "path": "crates/nf-project/src/lib.rs", "commit": null },
+        { "path": "crates/nf-cli/src/commands/export_cmd.rs", "commit": null }
+      ],
+      "evidence": null
+    }
+  ],
+  "poc_topics": [],
+  "poc_decision": "N/A: recorder parallel slicing and stdout events already exist in nf-recorder. This version wires existing capabilities into nf export, shell IPC, and frontend UI, with benchmark verification during build.",
+  "fixed_docs_review": {
+    "spec/charter.md": "missing-existing-debt; no product principle change in this version",
+    "spec/architecture.md": "missing-existing-debt; implementation must update root CLAUDE.md for new CLI and may add architecture notes if export contract changes materially",
+    "spec/milestones.html": "missing-existing-debt; no milestone UI update during spec",
+    "spec/design/DESIGN.md": "no change; export controls use existing tokens and inspector visual language",
+    "README.md": "stale-existing-debt; no public install/run command changes beyond CLI help",
+    "CLAUDE.md": "must update AI verification interface with new export flags/status fields during build"
+  },
+  "quality_review": {
+    "standards": "spec/standards/00-index.md",
+    "decision": "不新增质量维度。现有 G3(AI 可操作)、P2(三模式一致)、P3(视觉 token)、P4(零框架)覆盖本版风险；性能数据作为 build verification evidence。",
+    "required_before_close": "必须跑 npm build、cargo build/check、export help、至少一个 draft 导出、至少一个 progress/status 验证、ffprobe 验证。"
+  },
+  "status_flags": {
+    "kickoff_done": true,
+    "bdd_done": true,
+    "spec_done": true,
+    "poc_done": true,
+    "ready_for_build": true
+  }
+}

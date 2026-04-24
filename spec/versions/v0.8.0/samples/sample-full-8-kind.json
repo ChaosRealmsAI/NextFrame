@@ -1,0 +1,162 @@
+{
+  "meta": {
+    "name": "全 8 kind 覆盖 · schema 能力演示",
+    "description": "45s · scene / audio / subtitle / animation / bg / video / chart / data · 每 kind 至少 1 clip · 证明 schema 容得下所有",
+    "version": "v0.8",
+    "created": "2026-04-21"
+  },
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "full.end",
+
+  "anchors": {
+    "full":  {"begin": "0",     "end": "45000"},
+    "intro": {"begin": "0",     "end": "10000"},
+    "data":  {"begin": "10000", "end": "25000"},
+    "chart": {"begin": "25000", "end": "40000"},
+    "outro": {"begin": "40000", "end": "45000"}
+  },
+
+  "tracks": [
+    {
+      "id": "bg-layer",
+      "kind": "bg",
+      "clips": [{
+        "id": "bg-0",
+        "begin": "full.begin", "end": "full.end",
+        "params": {"type": "solid", "color": "#050507"}
+      }]
+    },
+
+    {
+      "id": "video-pip",
+      "kind": "video",
+      "clips": [{
+        "id": "v-0",
+        "begin": "intro.begin", "end": "intro.end",
+        "params": {
+          "src": "file:///tmp/demo-clip.mp4",
+          "from_ms": 0, "to_ms": 10000,
+          "fit": "cover",
+          "muted_in_record": true,
+          "x": 60, "y": 60, "w": 35, "h": 35,
+          "radius": 16
+        }
+      }]
+    },
+
+    {
+      "id": "scene-title",
+      "kind": "scene",
+      "clips": [{
+        "id": "sc-0",
+        "begin": "intro.begin", "end": "intro.end",
+        "params": {
+          "layout": "hero",
+          "title": "全轨道演示",
+          "subtitle": "8 kind · 一次到位",
+          "accent_color": "#a78bfa"
+        }
+      }]
+    },
+
+    {
+      "id": "data-rank",
+      "kind": "data",
+      "clips": [{
+        "id": "d-0",
+        "begin": "data.begin", "end": "data.end",
+        "params": {
+          "type": "ranking",
+          "title": "Top 3 Tracks",
+          "rows": [
+            {"label": "scene",  "value": 100, "delta": 0},
+            {"label": "audio",  "value": 85,  "delta": 12},
+            {"label": "chart",  "value": 70,  "delta": 8}
+          ],
+          "highlight_top": 3
+        }
+      }]
+    },
+
+    {
+      "id": "chart-bar",
+      "kind": "chart",
+      "clips": [{
+        "id": "ch-0",
+        "begin": "chart.begin", "end": "chart.end",
+        "params": {
+          "chart_type": "bar",
+          "categories": ["scene", "audio", "subtitle", "animation", "bg", "video", "chart", "data"],
+          "series": [
+            {"name": "implemented", "color": "#34d399", "data": [1, 0, 0, 0, 0, 0, 0, 0]},
+            {"name": "scheduled",   "color": "#f97316", "data": [0, 1, 1, 1, 1, 1, 1, 1]}
+          ],
+          "title": "v0.8 kind 实现进度"
+        }
+      }]
+    },
+
+    {
+      "id": "subtitle-words",
+      "kind": "subtitle",
+      "clips": [{
+        "id": "sub-0",
+        "begin": "full.begin", "end": "full.end",
+        "params": {
+          "source": {
+            "words": [
+              {"text": "8", "start_ms": 500, "end_ms": 1000},
+              {"text": "种",  "start_ms": 1000, "end_ms": 1500},
+              {"text": "轨道", "start_ms": 1500, "end_ms": 2500},
+              {"text": "·",   "start_ms": 2500, "end_ms": 2700},
+              {"text": "一次到位", "start_ms": 3000, "end_ms": 5000}
+            ]
+          },
+          "style": {"active_color": "#a78bfa", "size_px": 42, "position": "bottom", "padding": 20}
+        }
+      }]
+    },
+
+    {
+      "id": "bgm-track",
+      "kind": "audio",
+      "clips": [{
+        "id": "a-0",
+        "begin": "full.begin", "end": "full.end",
+        "params": {
+          "src": "file:///tmp/bgm.mp3",
+          "volume": 0.6
+        }
+      }]
+    },
+
+    {
+      "id": "title-fade",
+      "kind": "animation",
+      "clips": [
+        {
+          "id": "anim-0",
+          "begin": "intro.begin",
+          "end": "intro.begin",
+          "params": {
+            "target": "scene-title.clips[0].params.opacity",
+            "from": 0,
+            "to": 1,
+            "ease": "ease-out"
+          }
+        },
+        {
+          "id": "anim-1",
+          "begin": "intro.end",
+          "end": "intro.end",
+          "params": {
+            "target": "scene-title.clips[0].params.opacity",
+            "from": 1,
+            "to": 0,
+            "ease": "ease-in"
+          }
+        }
+      ]
+    }
+  ]
+}

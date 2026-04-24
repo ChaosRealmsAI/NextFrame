@@ -1,0 +1,334 @@
+{
+  "project": "NextFrame",
+  "reset_at": "2026-04-21",
+  "reset_from": "v0.x-final (v0.5 ~ v1.67.x archived + deleted)",
+  "current": "v0.13.0",
+  "versions": [
+    {
+      "version": "v0.4.2",
+      "type": "audit-patch",
+      "status": "done",
+      "opened_at": "2026-04-21 18:30",
+      "phase": "done",
+      "title": "clips pipeline + nf-tts 双模块 6 维度并发质量审查 + 修",
+      "execution_mode": "autopilot · 12 ally gpt 并发(6 clips + 6 tts)",
+      "source_version": "v0.4.1 (fa8f273e + 5af2f4d)",
+      "scope_in": [
+        "6 clips ally: nf-source + videocut-{core,download,transcribe,align,cut}",
+        "6 tts ally: nf-tts 整 crate",
+        "主 agent 汇总 2 REVIEW.md",
+        "派 fix ally 修 P0",
+        "回归验 CLI(nf-source download/cut · nf-tts synth)",
+        "batch merge + close"
+      ],
+      "scope_out": [
+        "改 pub API",
+        "改其他 crate",
+        "重写架构",
+        "添新 feature"
+      ],
+      "worktree": ".worktrees/v0.4.2-0912b6e2",
+      "branch": "v0.4.2-0912b6e2",
+      "closed_at": "2026-04-21 19:10",
+      "final": {
+        "commit": "4021d787",
+        "changes": "11 files 602+ 41-",
+        "tests_passed": 87,
+        "fixes": [
+          "Fix-A tts cache key(全 SynthParams 字段)",
+          "Fix-B tts Edge WS timeout(10s)",
+          "Fix-C tts Volcengine uuid 临时文件",
+          "Fix-D clips hermetic smoke tests + env hint 修"
+        ],
+        "deferred_to_v05_adr": [
+          "clips-D6-1 transcribe Python helper 冷启动",
+          "clips-D6-2 sentences.json 内存倍增"
+        ]
+      }
+    },
+    {
+      "version": "v0.4.1",
+      "type": "audit-patch",
+      "status": "done",
+      "opened_at": "2026-04-21 18:00",
+      "phase": "done",
+      "title": "nf-recorder 6 维度质量审查 + 修(reviewer 穿插)",
+      "execution_mode": "autopilot · 6 ally gpt 并发审 + 主 agent 汇总 + 派 ally 修",
+      "source_version": "v0.4.0 (8384057b)",
+      "scope_in": [
+        "6 ally 并发审(D1 模块 / D2 质量 / D3 覆盖 / D4 清洁 / D5 维护 / D6 性能)",
+        "汇总 REVIEW.md",
+        "派 ally 修(元改允许 · crate 内部不碰上游)",
+        "cargo check+clippy 双绿",
+        "4K HEVC 回归录制验收"
+      ],
+      "scope_out": [
+        "改 pub API 给上游",
+        "改其他 crate",
+        "重写 architecture",
+        "添新 feature"
+      ],
+      "worktree": ".worktrees/v0.4.1-0912b6e2",
+      "branch": "v0.4.1-0912b6e2",
+      "closed_at": "2026-04-21 18:25",
+      "final": {
+        "commit": "fa8f273e",
+        "changes": "18 files 305+ 112-",
+        "tests_passed": 10,
+        "regression": "3200211 bytes 字节级一致 v0.4",
+        "fixes_applied": [
+          "Fix-1 stdout→null",
+          "Fix-2 seek 6 path tests",
+          "Fix-3 orchestrator 4 range tests",
+          "Fix-4 v1.x 注释清"
+        ],
+        "deferred_to_v05": [
+          "P0-D6-2 bounded pool ADR",
+          "P0-D3-3 frame_pool SPSC 规格"
+        ]
+      }
+    },
+    {
+      "version": "v0.4.0",
+      "type": "feature",
+      "status": "done",
+      "opened_at": "2026-04-21 16:40",
+      "phase": "done",
+      "title": "迁 nf-recorder + nf-shell-mac · html→mp4 export pipeline(v1.67.1)",
+      "execution_mode": "autopilot · 主 agent 亲跑录屏(TCC)",
+      "source_commit": "6b5e5d02 v1.67.1",
+      "scope_in": [
+        "crates/nf-shell-mac(120K 迁自 reference)",
+        "crates/nf-recorder(316K 迁 · 带 4K quality patch)",
+        "crates/nf-tracks(JS assets 200K · include_str!)",
+        "crates/nf-runtime/dist/runtime-iife.js(JS · include_str!)",
+        "Cargo workspace 12→14 members · cargo check + clippy 双绿",
+        "主 agent 亲跑 cargo run -p nf-recorder -- record · 用户接 TCC · 产 output/*.mp4 · open 亲验"
+      ],
+      "scope_out": [
+        "nf-runtime Rust crate 实现(保 v0.1 stub)",
+        "nf-cli record 子命令(v0.5)",
+        "跨平台 · HDR · 多场景录制",
+        "haiku 盲测(TCC N/A)"
+      ],
+      "worktree": ".worktrees/v0.4.0-0912b6e2",
+      "branch": "v0.4.0-0912b6e2",
+      "spec_lost_incident": "17:08 别 session 清 spec 事故 · v0.4 产物丢 · 17:25 本 session 重建",
+      "closed_at": "2026-04-21 17:45",
+      "final": {
+        "mp4_1080p": "389KB h264 1.04Mbps",
+        "mp4_4k": "3.2MB hevc 5.12Mbps",
+        "pipeline": "html → WKWebView → IOSurface → VT → fMP4 · v1.67.1 rate-control/async flush patch 生效"
+      }
+    },
+    {
+      "version": "v0.3.0",
+      "type": "feature",
+      "status": "done",
+      "opened_at": "2026-04-21 15:20",
+      "phase": "kickoff-done",
+      "title": "归档 3 模块接新骨架 · clips + TTS 独立 2 链调通 · subagent haiku 盲测",
+      "kickoff_mode": "version-kickoff skill · 4 轮访谈",
+      "execution_mode": "autopilot · Phase 2/3/4 自动推",
+      "parallel_with": "v0.1.1 (骨架 · 另会话) · v0.2.0 (Mac shell · 另会话)",
+      "scope_in": [
+        "复制 reference/clips-pipeline (6 crate · 下载/转写/对齐/剪切) → src/",
+        "复制 reference/nf-tts (4800 行 · TTS + WhisperX + karaoke) → src/",
+        "复制 reference/nf-guide (prompt md · clips + audio flows) → src/",
+        "Cargo workspace 接入 · 依赖冲突手 align",
+        "lint deny 6 条全过(unwrap/expect/panic/unreachable/todo/wildcard_imports)",
+        "subagent(model=haiku) × 2 盲测 · clips 链(本地 mp4→highlight mp4) + TTS 链(中文文本→mp3+karaoke.html)",
+        "主 agent 亲 open 验 3 产物(mp4 可播 · mp3 能听 · karaoke 字级同步)"
+      ],
+      "scope_out": [
+        "端到端串联(clips 产物喂 TTS)",
+        "editor GUI 集成(nf-shell · nf-runtime · 留 v0.5+)",
+        "视觉 track / 运行时 DOM 渲染",
+        "Windows / Linux(只 macOS)",
+        "JSON 引擎 / frame pure(原 v0.3 推到 v0.4)"
+      ],
+      "success_criteria": "ls output/ 见 3 产物(*.mp4 · *.mp3 · karaoke.html) · 主 agent 亲 open 逐个验通过",
+      "worktree": ".worktrees/v0.3.0-0912b6e2",
+      "branch": "v0.3.0-0912b6e2",
+      "closed_at": "2026-04-21 16:30",
+      "extras": "override 加 nf-cli karaoke 子命令 · clips pipeline 真终点 · haiku v3 6 步 0 stumble"
+    },
+    {
+      "version": "v0.1.2",
+      "type": "research-patch",
+      "status": "done",
+      "opened_at": "2026-04-21 14:52",
+      "closed_at": "2026-04-21 15:30",
+      "phase": "done",
+      "title": "竞品分析 · AI 写 HTML/DSL → 视频 赛道(8 玩家)",
+      "kickoff_mode": "skipped-fast-track",
+      "execution_mode": "autopilot · 6 subagent 并行",
+      "deliverables": [
+        "spec/competitive-analysis/v0.1.2/report.html (7 帧 B 档讲解)",
+        "spec/competitive-analysis/v0.1.2/data.json (8 竞品 × 8 维度)",
+        "spec/competitive-analysis/v0.1.2/raw/*.md (6 份 subagent 原始)",
+        "spec/competitive-analysis/v0.1.2/README.md (汇总入口)"
+      ],
+      "key_findings": [
+        "🔴 Hyperframes (HeyGen 8.2k stars 1.5 月) = NextFrame 1:1 镜像主威胁 · 落后 42 天",
+        "🟡 Remotion (44.1k stars · Agent Skills 150K 装机) = 龙头但绑 React + 无 HDR · 架构天花板已定",
+        "🟢 NextFrame 真差异化窗口: Rust + 4K HDR + macOS 壳 + 垂类深做 · 至少 2 个才能立",
+        "P0 立即: v0.3 engine 上 4K HDR + Rust 硬指标 · 出 Claude skills 包"
+      ]
+    },
+    {
+      "version": "v0.1.1",
+      "type": "foundation-patch",
+      "status": "in-progress",
+      "opened_at": "2026-04-21 14:25",
+      "phase": "build",
+      "title": "项目代码骨架 · Cargo workspace + 4 crates + frontend TS + tooling",
+      "kickoff_mode": "skipped-fast-track",
+      "parallel_with": "v0.2.0 (另 worktree · 串行不冲突) · v0.3.0 (另 worktree)",
+      "scope_in": [
+        "Cargo workspace + lint deny 6 条",
+        "rust-toolchain.toml",
+        "crates/nf-cli + nf-shell + nf-engine + nf-runtime 空 stub",
+        "frontend/nf-components 空 TS stub",
+        "Makefile + scripts/ + CI"
+      ],
+      "scope_out": [
+        "任何实际业务实现",
+        "wry/tao 依赖集成",
+        "bundler",
+        "测试",
+        "BDD"
+      ],
+      "success_criteria": "cargo check --workspace + tsc --noEmit 双绿"
+    },
+    {
+      "version": "v0.2.0",
+      "type": "feature",
+      "status": "done",
+      "opened_at": "2026-04-21 15:10",
+      "phase": "done",
+      "title": "Mac 桌面 app 外壳 + UI hifi 组件化 · CLI 启动 + 多窗口",
+      "kickoff_mode": "skipped-fast-track",
+      "scope_in": [
+        "Mac app 外壳 (wry + tao)",
+        "CLI `nf open [--new-window] [project-id]`",
+        "单进程多窗口 · IPC 协作",
+        "topbar + 3 栏 body hifi 1:1 (editor-v0.1.html 像素级)",
+        "Web Components 组件化",
+        "mock.json 静态假数据"
+      ],
+      "scope_out": [
+        "JSON 真联动",
+        "frame pure 渲染",
+        "真 preview / 真 export",
+        "真 AI 触发",
+        "锚点时间计算",
+        "持久化"
+      ],
+      "tech_stack_chosen": "Rust + wry + tao + TS + Web Components (零框架 · 按 tech-decision rule)",
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "version": "v0.1.0",
+      "type": "strategy",
+      "status": "done",
+      "closed_at": "2026-04-21 14:30",
+      "title": "新模式第一版 · 战略定位 + 宪法 + hifi + 设计系统",
+      "deliverables": [
+        "spec/charter.json (11 principles · glossary · capabilities · assumptions)",
+        "spec/read-for-human/v0.1-principles/ (A 档 TTS PPT 13 帧)",
+        "spec/read-for-human/v0.1-user-story-hifi/ (A 档 TTS PPT 11 帧 · 桌面端 hifi 嵌第 6)",
+        "spec/design/prototypes/editor-v0.1.html (canonical hifi · 15+ 轮迭代)",
+        "spec/design/DESIGN.md + tokens.css (项目设计系统 · 跨版本)",
+        "spec/versions/v0.1/kickoff/dialogue.json (9+ 轮访谈原始)",
+        "spec/versions/v0.1/kickoff/version-level.json"
+      ],
+      "key_decisions": [
+        "产品定位: CLI 驱动 AI 视频编辑器 · 外接 Claude Code · 桌面端是预览+可选编辑",
+        "11 条宪法 (P1-P11 · 含 P11 新加锚点驱动轨道时间)",
+        "配色: 紫 #a78bfa + 琥珀 #e0b76c + 青 #7bc9b5 + 灰白 4 档",
+        "直角风 · Linear 极简 · Mac 玻璃 · 零 emoji"
+      ]
+    },
+    {
+      "version": "v0.1.3",
+      "type": "research-patch",
+      "status": "done",
+      "opened_at": "2026-04-21 15:17",
+      "closed_at": "2026-04-21 15:50",
+      "phase": "done",
+      "title": "竞品技术深挖 · 5 活跃项目代码层(续 v0.1.2 战略层 → 战术层)",
+      "kickoff_mode": "skipped-fast-track · autopilot",
+      "execution_mode": "autopilot · 5 subagent 并行 + 主整合",
+      "deliverables": [
+        "spec/competitive-analysis/v0.1.3/deep-tech.html (7 帧 B 档 · 已 open 自检)",
+        "spec/competitive-analysis/v0.1.3/data.json (5 项目技术决策矩阵 + cross-cut + action plan)",
+        "spec/competitive-analysis/v0.1.3/raw/*.md (5 份 deep-dive · 共 2882 行)",
+        "spec/competitive-analysis/v0.1.3/README.md"
+      ],
+      "key_findings": [
+        "🟢 CC Toolkit = NextFrame Day-1 Skills 包蓝本 (双层入口 + registry.json + 极简 frontmatter)",
+        "🟣 Hyperframes 工程化必抄 (CDP beginFrame + deterministic-mode + PreToolUse hook)",
+        "🔴 Revideo 死亡范式警示 (MIT 裸+闭源 SaaS 在 video 赛道 = 死 · 9月零 commit)",
+        "P0 立即: 出 nextframe-skills 独立仓 + PreToolUse hook + v0.4 上 CDP+wgpu+真HDR"
+      ],
+      "continues": "v0.1.2",
+      "blocks": "v0.4 charter (license 策略 + skills 包发布)"
+    },
+    {
+      "version": "v0.5.0",
+      "type": "feature",
+      "status": "done",
+      "opened_at": "2026-04-21 17:45",
+      "phase": "done",
+      "title": "v0.2 真桌面 app + 可播 HTML + 切 clip + 红队 workspace 融合",
+      "supersedes": "原 future_versions v0.3.0-draft(红队修复)· 号被占 · 并入 v0.5.0",
+      "closed_at": "2026-04-21 18:13",
+      "tag": "v0.5.0 @ 693ee8cb",
+      "known_issues": [
+        "A3 doctor rust probe 主 agent 环境 timeout · ally 环境过 · 留 follow-up"
+      ]
+    },
+    {
+      "version": "v0.5.1",
+      "type": "patch",
+      "status": "done",
+      "opened_at": "2026-04-21 17:45",
+      "closed_at": "2026-04-21 19:25",
+      "title": "drag IPC + traffic light + nf capture 整窗截图 · v0.5 bug 修",
+      "tag": "v0.5.1 @ 30a4f2d2",
+      "key_delivery": [
+        "nf capture 产品内建整窗截图(CoreGraphics含chrome)",
+        "drag via IPC window.drag_window(",
+        "traffic light (20,20) 经验值",
+        "A2 log auto-hook + A3 doctor probe fix 带着"
+      ]
+    },
+    {
+      "version": "v0.6.0",
+      "type": "integrate",
+      "status": "done",
+      "opened_at": "2026-04-21 19:30",
+      "title": "workspace 融合 · v0.5.1 + main 14 crates · 解孤岛",
+      "base": "main 14 crates",
+      "merges_from": "v0.5.1 @ 30a4f2d2",
+      "closed_at": "2026-04-21 20:25",
+      "phase": "done",
+      "tag": "v0.6.0",
+      "key_delivery": [
+        "workspace 14 crates 统一",
+        "nf CLI 27 命令 + karaoke 一 binary",
+        "93 tests pass 零 warning",
+        "v0.5.1 traffic_light ADR A-0017 carry"
+      ]
+    }
+  ],
+  "future_versions": [
+    {
+      "version": "v0.6.0",
+      "status": "draft",
+      "title": "frame pure 真渲染 + 真 AI 生成 HTML",
+      "notes": "v0.5 HTML 可播 mock 后 · 接入 AI(sonnet/opus)生成 HTML · wgpu / canvas 真 compositor · 从 JSON 单一真理源驱动"
+    }
+  ]
+}

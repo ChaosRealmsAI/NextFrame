@@ -1,0 +1,22 @@
+{
+  "_comment": "非法案例 A · clip.begin 写裸数字 500 · 违 ADR-017 · 应报 anchorRef pattern mismatch",
+
+  "meta": {"name": "invalid-a", "version": "v0.8"},
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "10000"}},
+  "tracks": [
+    {
+      "id": "t1",
+      "kind": "scene",
+      "clips": [
+        {
+          "id": "c1",
+          "begin": 500,
+          "end": "demo.end",
+          "params": {"layout": "hero", "title": "裸数字 begin"}
+        }
+      ]
+    }
+  ]
+}

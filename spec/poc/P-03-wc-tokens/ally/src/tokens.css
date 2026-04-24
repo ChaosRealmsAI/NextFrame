@@ -1,0 +1,74 @@
+/* NextFrame Design Tokens reference copy for POC P-03.
+ * Source: /spec/design/tokens.css
+ */
+
+:root {
+  --accent:    #a78bfa;
+  --accent-d:  #7c3aed;
+  --accent-l:  #c4b5fd;
+  --accent-t:  rgba(167, 139, 250, 0.1);
+  --accent-b:  rgba(167, 139, 250, 0.25);
+
+  --amber:     #e0b76c;
+  --amber-l:   #eacb90;
+  --amber-t:   rgba(224, 183, 108, 0.12);
+  --amber-b:   rgba(224, 183, 108, 0.3);
+
+  --teal:      #7bc9b5;
+  --teal-l:    #a3d9ca;
+
+  --gray:      rgba(255, 255, 255, 0.18);
+  --gray-l:    rgba(255, 255, 255, 0.32);
+
+  --fg:        #f4f4f8;
+  --fg-2:      rgba(255, 255, 255, 0.88);
+  --fg-3:      rgba(255, 255, 255, 0.72);
+  --fg-4:      rgba(255, 255, 255, 0.56);
+
+  --bg:        #0a0a0d;
+  --panel:     #0e0e13;
+  --panel-2:   rgba(14, 14, 19, 0.55);
+  --surf:      rgba(255, 255, 255, 0.025);
+  --surf-2:    rgba(255, 255, 255, 0.045);
+
+  --bd:        rgba(255, 255, 255, 0.07);
+  --bd-2:      rgba(255, 255, 255, 0.04);
+
+  --ok:        #4ade80;
+
+  --font:      -apple-system, BlinkMacSystemFont, "Inter", "PingFang SC",
+               "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+  --mono:      "SF Mono", "JetBrains Mono", "Monaco", Menlo, Consolas, monospace;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  border-radius: 0;
+}
+
+body.nf-bg {
+  background: var(--bg);
+  position: relative;
+}
+
+body.nf-bg::before {
+  content: "";
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 60% 45% at 30% 0%, rgba(167, 139, 250, 0.18), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 20%, rgba(124, 58, 237, 0.14), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 70% 80%, rgba(94, 234, 212, 0.04), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 30% 100%, rgba(124, 58, 237, 0.08), transparent 70%);
+  z-index: -2;
+  pointer-events: none;
+}
+
+body.nf-bg::after {
+  content: "";
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+  z-index: -1;
+  pointer-events: none;
+}

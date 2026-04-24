@@ -1,0 +1,118 @@
+{
+  "version": "v0.10.0",
+  "status": "waiting-review",
+  "drafts": {
+    "proposals": [
+      {
+        "by": "main-agent-local",
+        "path": "spec/versions/v0.10.0/drafts/merged.md"
+      }
+    ],
+    "merged": "spec/versions/v0.10.0/drafts/merged.md"
+  },
+  "tasks": [
+    {
+      "id": "T-01",
+      "title": "v2 timeline track selection",
+      "bdd_scenarios": ["select-track"],
+      "deps": [],
+      "wave": 1,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "nf-timeline outerHTML: data-track-count=10, selected-id=final-title",
+      "retry_count": 0,
+      "worktree": null
+    },
+    {
+      "id": "T-02",
+      "title": "generic composition inspector",
+      "bdd_scenarios": ["select-track", "edit-params", "edit-timing"],
+      "deps": ["T-01"],
+      "wave": 2,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "nf-inspector shadow DOM: data-inspector-track-id=code-terminal and data-field-path=params.lines",
+      "retry_count": 0,
+      "worktree": null
+    },
+    {
+      "id": "T-03",
+      "title": "composition patch API and CLI",
+      "bdd_scenarios": ["edit-params", "drag-position", "edit-timing"],
+      "deps": [],
+      "wave": 1,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "nf composition patch/show: final-title params.title persisted as NEXTFRAME LIVE EDIT; style.x persisted as 62",
+      "retry_count": 0,
+      "worktree": null
+    },
+    {
+      "id": "T-04",
+      "title": "live preview patch and drag position",
+      "bdd_scenarios": ["edit-params", "drag-position"],
+      "deps": ["T-02", "T-03"],
+      "wave": 3,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "tmp/v0.10.0/editor-after-edit.png shows preview title NEXTFRAME LIVE EDIT and final-title left=62%",
+      "retry_count": 0,
+      "worktree": null
+    },
+    {
+      "id": "T-05",
+      "title": "export saved composition with open button",
+      "bdd_scenarios": ["export-after-save"],
+      "deps": ["T-03"],
+      "wave": 4,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "done",
+      "verify_evidence": "tmp/v0.10.0/launch-open-test.mp4 exported 1920x1080 60fps; inspector keeps open-output UI after export-status=succeeded",
+      "retry_count": 0,
+      "worktree": null
+    },
+    {
+      "id": "T-06",
+      "title": "run all BDD verification",
+      "bdd_scenarios": ["select-track", "edit-params", "drag-position", "edit-timing", "export-after-save"],
+      "deps": ["T-01", "T-02", "T-03", "T-04", "T-05"],
+      "wave": 5,
+      "parallel_impl": false,
+      "executor": "main-agent-local",
+      "prompt": null,
+      "status": "blocked",
+      "verify_evidence": "Full showreel-24s export wrote source JSON with 10 tracks and edited final-title, but debug MP4 render exceeded 4 minutes and was killed; export performance needs a follow-up fix.",
+      "retry_count": 0,
+      "worktree": null
+    }
+  ],
+  "waves": [
+    { "id": 1, "tasks": ["T-01", "T-03"], "reviewed": true },
+    { "id": 2, "tasks": ["T-02"], "reviewed": true },
+    { "id": 3, "tasks": ["T-04"], "reviewed": true },
+    { "id": 4, "tasks": ["T-05"], "reviewed": true },
+    { "id": 5, "tasks": ["T-06"], "reviewed": false }
+  ],
+  "redteam": {
+    "opus_report": null,
+    "new_scenarios": []
+  },
+  "failures": [
+    {
+      "id": "F-01",
+      "task": "T-06",
+      "summary": "showreel-24s full MP4 export is too slow in debug build",
+      "evidence": "target/debug/nf export --project v2-showcase --composition showreel-24s exceeded 4 minutes; source JSON was written and contained the edited final-title, but MP4 stayed 0B when killed."
+    }
+  ]
+}

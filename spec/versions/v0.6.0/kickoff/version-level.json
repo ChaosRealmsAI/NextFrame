@@ -1,0 +1,55 @@
+{
+  "version": "v0.6.0",
+  "type": "integrate",
+  "opened_at": "2026-04-21 19:30",
+  "phase": "kickoff",
+  "status": "in-progress",
+  "title": "workspace 融合 · v0.5.1 + main 12 crates · 解两支孤岛 · 一 binary 全功能",
+  "kickoff_mode": "skipped-fast-track · 用户明确 A 方案 · integrate 版本",
+
+  "chosen": "把 v0.5.1 的 desktop app + CRUD CLI 代码(nf-cli 3653 行 + nf-shell 2003 行)merge 到 main 的 14-crate workspace(含 clips-pipeline / nf-tts / nf-guide / videocut-* / nf-shell-mac / nf-recorder)· 解孤岛",
+
+  "why": "v0.2/v0.5/v0.5.1 都从 v0.1.1 scaffold 分支出来 · main 吸收了 v0.1.7/v0.3.0/v0.4.x 另 session 的 12 crates · 两边 workspace 完全不同 · v0.5.1 代码永远接不到 main · 债越欠越大 · v0.6 必须合。合完后 `nf` 一 binary 覆盖 CLI CRUD + desktop app + clips pipeline + TTS + karaoke · 产品形态成一",
+
+  "scope_in": [
+    "**workspace Cargo.toml 合并**:以 main 14 members 为底(保留 videocut-core/download/transcribe/align/cut + nf-tts + nf-guide + nf-source + nf-shell-mac + nf-recorder + nf-tracks)· nf-cli/nf-shell/nf-engine/nf-runtime 4 个用 v0.5.1 内容覆盖",
+    "**nf-cli 覆盖 + karaoke 保留**:v0.5.1 的 nf-cli(27 命令 + doctor + capture)覆盖 main 的 · 但 main 的 karaoke subcommand(546 行 karaoke.rs)要加回 v0.5.1 的 clap tree · 让 `nf karaoke <episode>` 仍可用",
+    "**nf-shell 覆盖**:v0.5.1 的 tao+wry+IPC+capture 覆盖 main 的 4 行 stub",
+    "**edition 2021 → 2024 · rust-version 1.80 → 1.86**:v0.5.1 所有代码适配 main workspace package 设置",
+    "**Cargo.lock regenerate**:cargo build 自然重生 · 所有依赖版本对齐",
+    "**cargo check/clippy -D warnings 零 warning** · workspace 全绿",
+    "**cargo test --workspace --lib** · ≥28 pass(v0.5.1 原有 28 + main 侧 karaoke tests)",
+    "**e2e 双验证**:(1) nf capture 整窗截图含 chrome(v0.5.1 验证过)(2) nf karaoke <episode> 产 index.html(v0.3.0 验证过)"
+  ],
+
+  "scope_out": [
+    "红队 P0 修复(socket peer-cred / webview CSP)· v0.6.1 或 v0.7 patch",
+    "HTML 可播放 mock + clip 切换 · v0.6.1 做",
+    "真 AI 生成 HTML · v0.7+",
+    "新功能 · 纯合并不加新 scope"
+  ],
+
+  "constraints": {
+    "no_vanity": "合并前后的 binary 都能跑:v0.5.1 e2e(nf capture / 真窗口)+ v0.3.0 e2e(nf karaoke)双验",
+    "no_overreach": "只合 · 不加新功能 · scope_out 红队 / HTML 播放 / clip 切 / AI 生成",
+    "no_rush": "不 fallback (feature flag 隔离 karaoke 等)· edition 统一 2024 · workspace 单一真理源",
+    "must_verify": "cargo check/clippy/test 全绿 · nf capture 真 PNG + nf karaoke 真 HTML 两个 e2e 亲跑"
+  },
+
+  "success_picture": "PM 跑:\n  cd .worktrees/v0.6.0-...\n  cargo build --release --bins\n  ./target/release/nf-shell &\n  ./target/release/nf projects create --slug=x --name=X\n  ./target/release/nf episodes create --project=x --slug=e1 --duration=10\n  ./target/release/nf open --project=x --episode=e1\n  ./target/release/nf capture --project=x --episode=e1 --out=tmp/a.png  # v0.5.1 能力\n  ./target/release/nf karaoke <episode-dir>  # v0.3.0 能力\n  ./target/release/nf quit\n都 exit 0 · workspace 14 crates cargo check 零 warning",
+
+  "cost_estimate": "1-2h AI 尺度 · 主要工作是 Cargo.toml workspace 合并 + karaoke subcommand 接入 v0.5.1 clap + edition 升级 + Cargo.lock regen + 验证",
+
+  "risks": [
+    "main 14 crates 依赖(objc2 / tao / wry / reqwest / tokio / serde 等)跟 v0.5.1 版本冲突",
+    "edition 2021→2024 小数变化(某些 rust 语法 / macro 行为)",
+    "karaoke subcommand 依赖 main 里的 videocut-* / nf-tts · 接入 v0.5.1 clap 要拿这些依赖",
+    "clippy deny 6 条 · main 老代码可能有 unwrap/expect/panic 违规 · 要修或 #[allow] + 注释",
+    "cargo test 可能在 main 侧有老 karaoke tests · 兼容 or skip"
+  ],
+
+  "worktree": ".worktrees/v0.6.0-299177e4",
+  "branch": "v0.6.0-299177e4",
+  "base": "main(含 v0.1.7 + v0.3.0 + v0.4.x 融合版 · 14 crates)",
+  "merges_from": ["v0.5.1 @ 30a4f2d2(4 crates 覆盖)"]
+}

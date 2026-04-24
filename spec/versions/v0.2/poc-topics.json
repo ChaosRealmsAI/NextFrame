@@ -1,0 +1,75 @@
+{
+  "version": "v0.2.0",
+  "created_at": "2026-04-21",
+  "_meta": "Phase 3 入口 · 每 topic 待 version-poc skill 派 subagent 并行做 · POC done 回填 merged.md + 入 spec/poc/INDEX.json",
+
+  "topics": [
+    {
+      "id": "P-01",
+      "topic": "wry WebView 玻璃质感跨 macOS 版本",
+      "question": "wry + tao 在 macOS 15 (Sequoia) / 14 (Sonoma) 上 · `backdrop-filter: blur(50px) saturate(1.5)` 渲染效果是否跟 Safari 一致?aurora radial-gradient + SVG grain noise + 玻璃面板反光 能全部还原?有没有性能瓶颈?",
+      "approaches": [
+        "wry 默认 WKWebView · 直接跑 editor-v0.1.html",
+        "wry + transparent=true + decorations=false · 跑自定义玻璃 effect",
+        "对比 Safari 直接打开 editor-v0.1.html(baseline)"
+      ],
+      "acceptance": [
+        "backdrop-filter blur 可见(不是 fallback 纯色)",
+        "aurora 4 层渐变全渲染(不撞色)",
+        "SVG grain 噪点可见(mix-blend-mode: overlay 支持)",
+        "60fps 滚动不卡顿",
+        "macOS 15 + 14 都能跑"
+      ],
+      "affects_scenarios": ["S-01", "S-07", "S-08", "S-09", "S-10", "S-11"],
+      "tags": ["webview", "glass", "wry", "macos-compat"],
+      "expected_output": "spec/poc/P-01-wry-glass/report.md + src/ · 结论:wry 能否原生支持 editor-v0.1.html 视觉 · 或需要哪些 workaround",
+      "risk_if_skip": "视觉不一致导致 V-2 全挂 · 整个 UI 组件化白做"
+    },
+
+    {
+      "id": "P-02",
+      "topic": "tao 多 window + Unix socket IPC 双向",
+      "question": "tao 单进程管理多 Window 是否稳(关一个不影响其他)?Unix socket 双向 NDJSON 消息(req/resp with req_id correlation)能稳定走通?socket path 清理 · EWOULDBLOCK / EPIPE 处理 · 怎么做?",
+      "approaches": [
+        "tao EventLoop · 多 WindowId 路由 event · IPC 请求映射到对应 Window",
+        "interprocess crate for Unix socket · tokio async read/write",
+        "每个 Window 独立 WebView + 独立 JS context(验组件实例不共享)",
+        "关最后一个 Window 时 · 进程不退 · 下次 IPC 'open-window' 新建"
+      ],
+      "acceptance": [
+        "启 2 个 Window · close 第 1 个 · 第 2 个正常",
+        "close 所有 Window · 进程保活 · 下次 IPC open 能在 0.2s 内新建",
+        "IPC 并发 10 个 req · 所有按 req_id 正确返回 · 无丢消息",
+        "socket 文件在 app 退出时自动清理(SIGTERM / panic / normal quit 都清)"
+      ],
+      "affects_scenarios": ["S-01", "S-02", "S-03", "S-04", "S-05", "S-06"],
+      "tags": ["tao", "multi-window", "ipc", "unix-socket"],
+      "expected_output": "spec/poc/P-02-tao-ipc/report.md + src/ · 结论:架构代码片段 + 验过的消息流",
+      "risk_if_skip": "多窗口架构没验 · 上来就写正式 nf-shell 可能推倒重来"
+    },
+
+    {
+      "id": "P-03",
+      "topic": "Web Components + tokens.css :root vars 穿透 + 样式隔离",
+      "question": "把 editor-v0.1.html 的 CSS(tokens + 组件局部)拆分:tokens.css 留主文档 :root(全局 var)+ shell.css 留全局布局 + 每 nf-* 组件 shadowRoot 内有独立 <style>(只管组件内部) · 能否做到 (a) tokens 穿透所有 shadow root 可用 var(--accent) 等 (b) 组件样式不互相污染 (c) 加 :host(:focus) / :host([kind='scene']) 属性选择器能按 attr 切样式?",
+      "approaches": [
+        "主文档 <link rel=stylesheet href=tokens.css> · :root 定义所有 --var",
+        "每 component 构造时 shadow <style> 引用 var(--accent) 等",
+        "对比:component Shadow DOM 用 adoptedStyleSheets 批量挂 tokens(Chromium / Safari 支持情况)",
+        "主文档注 global * { color: red !important } 验组件不穿透"
+      ],
+      "acceptance": [
+        "8 个 nf-* 组件都能 var(--accent) 读到紫色",
+        "主文档注 * { color: red } 不影响 shadow DOM 内部",
+        ":host([kind='scene']) 能切 background-color",
+        "tokens.css 一改 · 所有组件联动变色(S-14 的验证基础)"
+      ],
+      "affects_scenarios": ["S-07", "S-08", "S-09", "S-10", "S-11", "S-12", "S-13", "S-14"],
+      "tags": ["web-components", "shadow-dom", "css-vars", "tokens"],
+      "expected_output": "spec/poc/P-03-wc-tokens/report.md + src/ · 含 8 组件 skeleton 代码 + tokens 穿透 demo",
+      "risk_if_skip": "组件化决策没验 · 可能发现 tokens 不穿透要改架构"
+    }
+  ],
+
+  "dispatch_plan": "3 POC 可完全并行(无依赖)· Phase 3 派 3 ally/opus subagent · 各产独立 report.md + src/ · 主 agent 整合 merged.md"
+}

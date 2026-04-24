@@ -1,0 +1,39 @@
+{
+  "$type": "scenario",
+  "scenario_type": "e2e",
+  "id": "tts-01",
+  "title": "subagent haiku 跑通 TTS 链 · 中文文本 → mp3 + karaoke.html",
+  "chapter": "4.1 正常流程",
+  "added_in_version": "v0.3.0",
+  "verify_point": "V-2",
+  "rules": ["R1", "R2", "R3", "R4", "R5"],
+  "visual": ["V1"],
+
+  "steps_human": [
+    {"type": "Given", "text": "主 agent 派 subagent · model=haiku · prompt 从 src/nf-guide/flows/audio/*.md 读"},
+    {"type": "Given", "text": "tests/fixtures/tts/ 有 demo.txt(短中文段 2-5 句) + demo.timeline.json(兜底 whisperx 装不上)"},
+    {"type": "When", "text": "subagent haiku 按 prompt 跑 nf-tts synth → nf-tts align(或 --timeline 兜底) → nf-tts karaoke"},
+    {"type": "Then", "text": "主 agent ls output/ 见 tts.mp3 + tts.timeline.json + karaoke.html 三件"},
+    {"type": "Then", "text": "主 agent open output/tts.mp3 · 播放器开 · 中文清晰能听"},
+    {"type": "Then", "text": "主 agent open output/karaoke.html · 浏览器开 · 点播放 · 字级高亮跟音频同步"}
+  ],
+
+  "steps_ai": [
+    {"type": "Given", "text": "subagent 读 src/nf-guide/flows/audio/00-voice.md 到 02-review.md · 按 prompt 跑 · 用 tests/fixtures/tts/demo.txt 输入"},
+    {"type": "When", "text": "subagent Bash: nf-tts synth --text-file ... --voice zh-CN-YunxiNeural --out output/tts.mp3 → nf-tts align --mp3 ... --out output/tts.timeline.json → nf-tts karaoke --mp3 ... --timeline ... --out output/karaoke.html"},
+    {"type": "Then", "text": "主 agent nf-tts verify --mp3 output/tts.mp3 --timeline output/tts.timeline.json · exit 0 = 通过"},
+    {"type": "Then", "text": "主 agent ls output/{tts.mp3,tts.timeline.json,karaoke.html} 三文件齐"}
+  ],
+
+  "ai_tools": [
+    {"tool": "dispatch-subagent", "command": "Task(subagent_type='general-purpose', model='haiku-4-5-20251001', prompt='读 src/nf-guide/flows/audio/*.md · 按 prompt 跑 nf-tts · 输入 tests/fixtures/tts/demo.txt · 若 whisperx 装不上用 --timeline tests/fixtures/tts/demo.timeline.json 兜底 · 产物写 output/')", "output": "subagent 日志"},
+    {"tool": "verify-tts", "command": "nf-tts verify --mp3 output/tts.mp3 --timeline output/tts.timeline.json", "output": "exit 0 = pass"},
+    {"tool": "ls-products", "command": "ls output/{tts.mp3,tts.timeline.json,karaoke.html} 2>&1", "output": "3 路径 · 缺一报错"},
+    {"tool": "open-mp3", "command": "open output/tts.mp3", "output": "主 agent 亲听 · 中文清晰判"},
+    {"tool": "open-karaoke", "command": "open output/karaoke.html", "output": "主 agent 亲看 · 字级同步判"}
+  ],
+
+  "dev": "pending",
+  "tested": "pending",
+  "acceptance": "pending"
+}

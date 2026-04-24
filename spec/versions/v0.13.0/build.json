@@ -1,0 +1,46 @@
+{
+  "version": "v0.13.0",
+  "status": "waiting-review",
+  "drafts": {
+    "proposals": [],
+    "merged": "spec/versions/v0.13.0/spec.json"
+  },
+  "tasks": [
+    {
+      "id": "T-01",
+      "title": "Archive untracked local noise",
+      "bdd_scenarios": ["archive-boundary"],
+      "status": "done",
+      "verify_evidence": "../NextFrame.archive/v0.13.0-20260424-structure"
+    },
+    {
+      "id": "T-02",
+      "title": "Merge spec into main repository safely",
+      "bdd_scenarios": ["spec-main-repo"],
+      "status": "done",
+      "verify_evidence": "test ! -d spec/.git && git ls-files spec/devlog spec/bdd spec/versions | head"
+    },
+    {
+      "id": "T-03",
+      "title": "Refresh current entry documents",
+      "bdd_scenarios": ["docs-entry"],
+      "status": "done",
+      "verify_evidence": "README.md, CLAUDE.md, spec/charter.md, spec/architecture.md, spec/milestones.html"
+    },
+    {
+      "id": "T-04",
+      "title": "Add root structure gate",
+      "bdd_scenarios": ["root-one-screen", "structure-gate"],
+      "status": "done",
+      "verify_evidence": "./scripts/check-structure.sh; ./scripts/audit.sh --gate-only"
+    }
+  ],
+  "waves": [
+    {
+      "id": 1,
+      "tasks": ["T-01", "T-02", "T-03", "T-04"],
+      "reviewed": true
+    }
+  ],
+  "failures": []
+}

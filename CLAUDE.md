@@ -23,12 +23,24 @@ Example projects live under `examples/`; runtime projects are copied to `~/.next
 `target/debug/nf export --project=<slug> --composition=<slug> --fps=30|60 --resolution=720p|1080p|4k --parallel=<1-8> --events --out=<mp4>` — override export settings and stream recorder progress JSONL before the final summary JSON.
 `target/debug/nf export-status --job-id=<id>` — read desktop export job status, including `progress.percent`, frames, stage, and ETA.
 `target/debug/nf export-cancel --job-id=<id>` — cancel a running desktop export job and stop its recorder process group.
+`./scripts/check-structure.sh` — verify repository skeleton: root allowlist, no nested spec git, no tracked generated artifacts.
+
+## Directory Boundaries
+
+- `crates/`: Rust product code.
+- `frontend/nf-components/`: zero-framework editor Web Components.
+- `examples/`: source examples for local product runs.
+- `scripts/`: checks and maintenance utilities.
+- `tests/`: cross-module fixtures.
+- `spec/`: BDD, version records, devlog, standards, design, architecture.
+
+Do not write generated videos, screenshots, node_modules, Cargo targets, or one-off research output into tracked source. Use `tmp/` only as ignored scratch; long-lived local archives belong in `../NextFrame.archive/`.
 
 ## Current Focus
 
-v0.11.0 is the export performance UX version: visible export profiles, real progress, and local parallel export while preserving saved JSON → source → MP4 consistency.
+v0.13.0 is the project skeleton governance version: clean root layout, spec in the main repo, archived generated artifacts, refreshed entry docs, and a structure gate.
 
 Specs and acceptance scenarios:
 
-- `spec/versions/v0.11.0/spec.json`
-- `spec/bdd/export-performance/feature.json`
+- `spec/versions/v0.13.0/spec.json`
+- `spec/bdd/repo-skeleton-governance/feature.json`

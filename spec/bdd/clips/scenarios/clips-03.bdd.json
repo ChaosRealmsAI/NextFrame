@@ -1,0 +1,33 @@
+{
+  "$type": "scenario",
+  "scenario_type": "e2e",
+  "id": "clips-03",
+  "title": "边界 · whisperx 装不上时 --transcript fixture 跳过",
+  "chapter": "4.2 边界情况",
+  "added_in_version": "v0.3.0",
+  "verify_point": "V-1c",
+  "rules": ["R4"],
+  "visual": [],
+
+  "steps_human": [
+    {"type": "Given", "text": "whisperx 未装 / python 环境无 torch"},
+    {"type": "When", "text": "subagent 按 prompt 检测到 whisperx 不可用 · 改用 tests/fixtures/clips/demo.srt 跳过 transcribe 步"},
+    {"type": "Then", "text": "下游 align/plan/cut 步基于 fixture srt 继续 · 最终 highlight 齐"}
+  ],
+
+  "steps_ai": [
+    {"type": "Given", "text": "subagent 跑 which whisperx · exit != 0 或跑起来 import torch 失败"},
+    {"type": "When", "text": "nf-source transcribe --transcript tests/fixtures/clips/demo.srt --out output/transcript.srt"},
+    {"type": "Then", "text": "output/transcript.srt 存在 + 行数 >= 5(有效 srt)"}
+  ],
+
+  "ai_tools": [
+    {"tool": "check-whisperx", "command": "which whisperx && python -c 'import torch' 2>&1 || echo 'whisperx-unavailable'", "output": "路径+torch ok / 'whisperx-unavailable'"},
+    {"tool": "transcribe-fallback", "command": "nf-source transcribe --transcript tests/fixtures/clips/demo.srt --out output/transcript.srt", "output": "exit 0 + output/transcript.srt"},
+    {"tool": "verify-srt", "command": "wc -l output/transcript.srt", "output": "数字 · 期望 >= 5"}
+  ],
+
+  "dev": "pending",
+  "tested": "pending",
+  "acceptance": "pending"
+}

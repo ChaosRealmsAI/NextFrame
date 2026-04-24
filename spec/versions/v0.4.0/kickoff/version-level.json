@@ -1,0 +1,51 @@
+{
+  "version": "v0.4.0",
+  "type": "feature",
+  "title": "迁 nf-recorder(macOS · html→mp4 export pipeline v1.67.1) + nf-shell-mac · 主 agent 亲跑",
+  "chosen": "复制 reference/nf-shell-mac/(120K · WKWebView+Metal+IOSurface 封装) + reference/nf-recorder/(316K · SCStream 可去 · 重用 headless shell 抓帧 → VT 编码 mp4) → crates/ · Cargo workspace 接入 · 主 agent 亲跑 cargo run -p nf-recorder 录一个 html 页面到 mp4 · 用户接 TCC 权限",
+  "why": "v0.3 同模式续 · 用户 '以前 recorder 思路是 输入 html 就搞录制' 确认 = export pipeline(非 OS 屏幕录制)· v1.67.1 opus 已验过 · 带 4K quality patch · 重写成本 >> 迁.",
+  "changed_from": {
+    "origin": "v0.4.0 原 scope = 只迁 nf-recorder(1 crate)",
+    "reason_to_change": "check Cargo.toml 发现 nf-recorder 7 个源文件硬依赖 nf-shell-mac(DesktopShell/MacHeadlessShell/IOSurfaceHandle) · export_api.rs include_str! 依赖 nf-tracks/ + nf-runtime/dist/",
+    "final_scope": "2 crate(shell-mac + recorder) + nf-tracks JS assets + runtime dist/runtime-iife.js · 约 440K Rust + 220K JS · 不碰 runtime Rust crate(保 stub)"
+  },
+  "source_commit": "6b5e5d02 v1.67.1 merge(含 fc95c334 4K quality patch)",
+
+  "constraints": {
+    "no_vanity": "产 output/page.mp4 · PM 肉眼可验(html 渲染 · 画面对 · 时长对)",
+    "no_overreach": "只迁 shell-mac + recorder · 不接 nf-runtime Rust 实现(保 stub)· 不加 nf-cli record 子命令(v0.5)· 不串 clips pipeline",
+    "no_rush": "v1.67.1 最新 · 不砍 4K patch · lint deny 6 条不放水 · 遇 clippy 违规找根因不 allow",
+    "must_verify": "主 agent 跑 cargo run -p nf-recorder -- record --html <url> · 用户接 TCC 弹框 · ffprobe mp4(duration/codec) + open 亲验"
+  },
+
+  "success_picture": "主 agent 跑 cargo run → macOS 弹'允许屏幕录制'(首次)→ 3s 后产 output/page.mp4 · ffprobe codec h264/hevc + duration ~3s · open mp4 看到 html 渲染内容",
+  "cost_estimate": "AI 尺度 8-12h · 2 crate 复制 2h · Cargo 集成 + JS assets 2h · lint 修 1-2h · 跑录屏 + 用户 TCC + 亲验 2h · buffer 2h",
+
+  "risks": [
+    "nf-recorder 依赖链深: nf-shell-mac(crate) + nf-tracks(JS) + nf-runtime/dist/runtime-iife.js(JS) · 迁缺一个就 compile 失败",
+    "macOS TCC 首次弹框 · 用户必在场(autopilot 到 T7 停 · 发 warning)",
+    "objc2 0.6 + objc2-* 0.3 · block2 0.6 · 跟 edition 2024 + rust 1.86 兼容性已 cargo check 验过 ✓",
+    "别 session 清 spec 事故(17:08 发生)· v0.4 spec 产物丢 · 本文件是第二次重建"
+  ],
+
+  "candidates": [
+    { "id": "A-v1", "label": "只迁 nf-recorder(1 crate)", "status": "rejected", "reason": "发现依赖 nf-shell-mac + nf-tracks + runtime-iife.js · 不可行" },
+    { "id": "A-v2-chosen", "label": "迁 2 crate + JS assets · 保留 nf-runtime stub", "status": "chosen" },
+    { "id": "B", "label": "JSON 引擎(原 roadmap draft)", "status": "rejected", "reason": "用户选 recorder" },
+    { "id": "C", "label": "迁 + 实现 nf-runtime", "status": "rejected", "reason": "违 no_overreach · 推 v0.5+" },
+    { "id": "D", "label": "ScreenCaptureKit 重写", "status": "rejected", "reason": "违 no_rush · 不如直接迁" }
+  ],
+
+  "verification_model": {
+    "haiku_blind_test": "本版 N/A · TCC 屏幕录制权限 subagent 拿不到 · 改主 agent 亲跑",
+    "user_in_loop": "T7 跑录屏时发 warning · 用户在 Mac 前接权限框(首次一次)"
+  },
+
+  "kickoff_meta": {
+    "session": "0912b6e2",
+    "confirmed_at": "2026-04-21 16:40",
+    "autopilot_requested": true,
+    "re_created_at": "2026-04-21 17:25",
+    "re_create_reason": "17:08 别 session 清 spec · v0.4 产物丢 · 从本 session 记忆重建"
+  }
+}

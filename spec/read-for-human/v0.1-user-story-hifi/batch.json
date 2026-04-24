@@ -1,0 +1,13 @@
+[
+  {"id": 1, "voice": "zh-CN-XiaoxiaoNeural", "text": "欢迎来看 NextFrame 的用户故事。一句话：让 AI 帮你做视频。整个流程我带你过一遍。看完你就知道 这个产品到底是啥 和市面上的视频工具有啥不一样。", "filename": "slide-01.mp3"},
+  {"id": 2, "voice": "zh-CN-XiaoxiaoNeural", "text": "场景很常见。产品经理小王 想做一个六十秒的产品介绍视频。按以前 他得找视频剪辑同学 排期两周。但现在 他打开 Claude Code 聊两句就搞定。", "filename": "slide-02.mp3"},
+  {"id": 3, "voice": "zh-CN-XiaoxiaoNeural", "text": "他在 Claude Code 里打一句话。帮我做个六十秒的产品介绍视频 讲 NextFrame 的三个核心功能。就这一句。没有下拉菜单 没有模板选择 没有填表单。", "filename": "slide-03.mp3"},
+  {"id": 4, "voice": "zh-CN-XiaoxiaoNeural", "text": "Claude Code 开始思考 读产品文档 然后自动写出一份 project.json 文件。这份 JSON 描述了整个视频的每一秒。画面长啥样 配什么文字 什么音效 全在里面。", "filename": "slide-04.mp3"},
+  {"id": 5, "voice": "zh-CN-XiaoxiaoNeural", "text": "接下来跑一条命令。nf build project.json。这是 NextFrame 的命令行工具。它解析 JSON 预渲染一次 准备就绪。终端打印编译进度 就像写代码时 cargo build 一样清晰。", "filename": "slide-05.mp3"},
+  {"id": 6, "voice": "zh-CN-XiaoxiaoNeural", "text": "然后是重头戏 nf preview。NextFrame 桌面端弹出来。这是整个产品的核心界面 紫色玻璃风 三面板布局。左边是素材和属性面板 中间是大预览窗 下面是多轨道时间线。每个轨道一个元素 视觉 文字 音频 转场 层层叠上去。你看到的 就是 AI 做的视频 实时渲染。", "filename": "slide-06.mp3"},
+  {"id": 7, "voice": "zh-CN-XiaoxiaoNeural", "text": "小王看了一眼 觉得第三段说得太快。他拖一下时间线上的片段 把它拉长两秒。就这么简单。他不需要学什么专业工具 只改位置和时间。其他全让 AI 搞定。更多的时候 他甚至不用打开桌面端 AI 做的就够好。", "filename": "slide-07.mp3"},
+  {"id": 8, "voice": "zh-CN-XiaoxiaoNeural", "text": "满意了 跑 nf export。NextFrame 开始编码 硬件加速 4K 10bit HDR 60fps。终端的进度条慢慢爬满 几十秒就出来一个专业级视频文件。", "filename": "slide-08.mp3"},
+  {"id": 9, "voice": "zh-CN-XiaoxiaoNeural", "text": "拿到 out.mp4。直接发微信 传 YouTube 上传飞书 都能用。质量是剪映比不上的那种 专业级输出。", "filename": "slide-09.mp3"},
+  {"id": 10, "voice": "zh-CN-XiaoxiaoNeural", "text": "讲到这里你会想 这不是跟人一样操作吗。重点来了。所有步骤都有命令行。AI 可以全自动跑完 不用打开桌面端 不用人点任何按钮。想看就看 不想看就跑定时任务 自动产视频。", "filename": "slide-10.mp3"},
+  {"id": 11, "voice": "zh-CN-XiaoxiaoNeural", "text": "这就是 NextFrame 十条宪法落地的样子。AI 是第一用户。命令行驱动全流程。frame pure 保证每一帧确定。三模式像素级一致。桌面端是可选预览。高质量视频是目标。HTML 生态做渲染。JSON 是单一真理。外接 AI 不内置对话框。全自动是终极形态。接下来的版本 我们会一个一个把这十条做实。", "filename": "slide-11.mp3"}
+]

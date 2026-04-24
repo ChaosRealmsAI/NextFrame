@@ -1,0 +1,27 @@
+{
+  "id": "drag-position",
+  "title": "在预览中拖动元素位置并写回 x/y",
+  "given": "用户已选中 hero-title 轨道，预览中对应元素有可拖动选框。",
+  "when": "用户在预览里拖动 hero-title 元素向右下移动。",
+  "then": "元素跟手移动，inspector 的 x/y 数值同步变化，保存后 composition JSON 中该 track 的 x/y 被更新。",
+  "human_actions": ["select hero-title row", "grab preview bounding box", "drag right and down", "release", "click save"],
+  "ai_tools": [
+    {
+      "tool": "drag",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --drag '[data-nf-component-root=\"hero-title\"]' --dx 96 --dy 42"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-field-path=\"style.x\"]' --get value"
+    },
+    {
+      "tool": "click",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --click '[data-action=\"save-composition\"]'"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track hero-title --field style.x"
+    }
+  ],
+  "done": false
+}

@@ -1,0 +1,27 @@
+[workspace]
+# Standalone — exclude from parent workspace
+
+[package]
+name = "poc-wry-glass"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wry = "0.55"
+tao = "0.35"
+
+[[bin]]
+name = "wry-default"
+path = "src/wry_default.rs"
+
+[[bin]]
+name = "wry-transparent"
+path = "src/wry_transparent.rs"
+
+[[bin]]
+name = "baseline-open"
+path = "src/baseline_open.rs"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

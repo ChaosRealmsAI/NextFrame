@@ -1,0 +1,183 @@
+{
+  "$type": "version-spec",
+  "version": "v0.10.0",
+  "title": "V2 composition 真实编辑器",
+  "created_at": "2026-04-24 16:35",
+  "session": "codex-2026-04-24-v010-spec",
+  "phase": "spec",
+  "status": "ready-for-build",
+  "inputs": {
+    "kickoff": "spec/versions/v0.10.0/kickoff/version-level.json",
+    "bdd": "spec/bdd/v2-editor-authoring/feature.json",
+    "demo_composition": "examples/v2-showcase/compositions/showreel-24s.json"
+  },
+  "scope": {
+    "do": [
+      "timeline 一行一个 v2 track，可点选并保持选中态",
+      "右侧 inspector 显示选中 track 的 component、time、style、params 真实字段",
+      "编辑 params/style/time 后预览立即更新，保存写回 composition JSON",
+      "预览拖动组件位置时同步 style.x/style.y 并可保存",
+      "导出按钮使用保存后的同一 composition source，导出完成后提供打开按钮"
+    ],
+    "do_not": [
+      "不做新增/删除 track",
+      "不做 TTS/字幕 v2 化",
+      "不做云导出",
+      "不重做 showreel 主题视觉",
+      "不引入 iframe 或 React/Vue/Electron"
+    ]
+  },
+  "verify_points": [
+    {
+      "id": "V-1",
+      "text": "打开 showreel-24s 后 timeline 显示 10 行 v2 track，并且每行可点选。",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/select-track.bdd.json"
+    },
+    {
+      "id": "V-2",
+      "text": "选中 component track 后 inspector 显示真实 JSON 字段，不是旧 NfClip 占位字段。",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/select-track.bdd.json"
+    },
+    {
+      "id": "V-3",
+      "text": "修改 params.title 后中间预览立即变化，并进入 dirty 状态。",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/edit-params.bdd.json"
+    },
+    {
+      "id": "V-4",
+      "text": "在预览里拖动 hero-title 后，style.x/style.y 同步到 inspector 并能保存进 JSON。",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/drag-position.bdd.json"
+    },
+    {
+      "id": "V-5",
+      "text": "编辑 begin/end 锚点后，timeline row 和预览 active window 使用同一解析结果。",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/edit-timing.bdd.json"
+    },
+    {
+      "id": "V-6",
+      "text": "保存后导出的 MP4 反映修改内容，导出完成后桌面端有打开输出按钮。",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/export-after-save.bdd.json"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "phase": "build",
+      "status": "pending",
+      "title": "v2 timeline selection model",
+      "deliverable": "frontend/nf-components 的 timeline row 暴露 data-track-id / selected 状态；点击行更新 selectedTrackId；旧 episode aggregation 不受影响。",
+      "deps": [],
+      "ai_tools": [
+        "target/debug/nf devtools --project v2-showcase --composition showreel-24s --click '[data-track-id=\"code-terminal\"]'",
+        "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-selected-track-id]' --get textContent"
+      ]
+    },
+    {
+      "id": "T2",
+      "phase": "build",
+      "status": "pending",
+      "title": "generic v2 inspector",
+      "deliverable": "inspector 根据 selected track 渲染 component/time/style/params 字段；字符串、数字、布尔、数组、对象有基础编辑 UI；不可编辑复杂对象以 JSON textarea 呈现。",
+      "deps": ["T1"],
+      "ai_tools": [
+        "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-field-path=\"params.lines\"]' --get textContent",
+        "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-field-path=\"time.begin\"]' --get value"
+      ]
+    },
+    {
+      "id": "T3",
+      "phase": "build",
+      "status": "pending",
+      "title": "live preview patching",
+      "deliverable": "inspector 改字段后 patch compositionSource 内存对象并 renderCompositionPreview，同步 dirty/saved/error 状态。",
+      "deps": ["T2"],
+      "ai_tools": [
+        "target/debug/nf devtools --project v2-showcase --composition showreel-24s --fill '[data-field-path=\"params.title\"]' 'NEXTFRAME LIVE EDIT'",
+        "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-preview-root]' --contains 'NEXTFRAME LIVE EDIT'",
+        "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-save-state]' --get textContent"
+      ]
+    },
+    {
+      "id": "T4",
+      "phase": "build",
+      "status": "pending",
+      "title": "composition patch API",
+      "deliverable": "shell IPC 和 CLI 支持按 track + field path patch v2 composition；保存后重新 compile source 并返回最新 JSON/source。",
+      "deps": ["T2"],
+      "ai_tools": [
+        "target/debug/nf composition patch --project v2-showcase --composition showreel-24s --track final-title --field params.title --value 'NEXTFRAME LIVE EDIT'",
+        "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track final-title --field params.title"
+      ]
+    },
+    {
+      "id": "T5",
+      "phase": "build",
+      "status": "pending",
+      "title": "preview drag writes style.x/y through same authoring path",
+      "deliverable": "预览拖动不再只写 params x/y；统一写 style.x/style.y 或 track position 字段，并复用 T3/T4 保存状态。",
+      "deps": ["T3", "T4"],
+      "ai_tools": [
+        "target/debug/nf devtools --project v2-showcase --composition showreel-24s --drag '[data-nf-component-root=\"hero-title\"]' --dx 96 --dy 42",
+        "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track hero-title --field style.x"
+      ]
+    },
+    {
+      "id": "T6",
+      "phase": "build",
+      "status": "pending",
+      "title": "export from saved v2 source + open output button",
+      "deliverable": "导出流程沿用 composition source；导出进度完成后 UI 显示 output path 和 Open output 按钮。",
+      "deps": ["T4"],
+      "ai_tools": [
+        "target/debug/nf export --project v2-showcase --composition showreel-24s --dry-run --field source.track_count",
+        "ffprobe -v error -show_entries stream=width,height,r_frame_rate -of json ~/.nextframe/v2-showcase/exports/showreel-24s.mp4"
+      ]
+    },
+    {
+      "id": "T7",
+      "phase": "verify",
+      "status": "pending",
+      "title": "run v2-editor-authoring BDD",
+      "deliverable": "5 个 BDD scenario 的 ai_tools 全跑；保存前后 JSON diff、桌面截图、导出抽帧放 tmp/v0.10.0/。",
+      "deps": ["T1", "T2", "T3", "T4", "T5", "T6"],
+      "ai_tools": [
+        "jq '.completion' spec/bdd/v2-editor-authoring/feature.json",
+        "target/debug/nf screenshot --project v2-showcase --composition showreel-24s --region editor --out tmp/v0.10.0/editor.png"
+      ]
+    }
+  ],
+  "dag": {
+    "wave_1": ["T1", "T4"],
+    "wave_2": ["T2"],
+    "wave_3": ["T3", "T5"],
+    "wave_4": ["T6"],
+    "wave_5": ["T7"]
+  },
+  "poc_topics": [],
+  "poc_decision": "N/A：v2 composition 编译、无 iframe component runtime、桌面预览和导出链路已在 v0.9.x 证明；本版是编辑器状态模型和保存路径，不引入新底层技术。",
+  "fixed_docs_review": {
+    "spec/charter.md": "missing-existing-debt",
+    "spec/architecture.md": "missing-existing-debt",
+    "spec/milestones.html": "missing-existing-debt",
+    "spec/design/DESIGN.md": "no change; 本版沿用现有 NextFrame 产品视觉系统",
+    "README.md": "stale-existing-debt; 不在本版范围内重写",
+    "CLAUDE.md": "missing root AI entry; 实现新增 CLI 时必须补 AI 验证接口索引"
+  },
+  "quality_review": {
+    "standards": "spec/standards/00-index.md",
+    "decision": "不新增质量维度。现有 G3(AI 可操作)、P2(三模式一致)、P3(视觉 token)、P4(零框架)覆盖本版风险。",
+    "required_before_close": "实现收尾必须跑 ./scripts/audit.sh 或至少 ./scripts/audit.sh --gate-only，并把新增 nf composition/devtools CLI 写入 root AI 入口文档。"
+  },
+  "dev_must_before_build": [
+    "实现期如果新增 `nf composition` CLI，必须让 `nf composition --help` 自包含，并更新 AI 验证接口索引。",
+    "保存/导出验证必须用临时 copy 或可恢复 fixture，避免污染 examples/v2-showcase canonical JSON。",
+    "所有 v2 编辑都走 composition JSON patch；禁止只改 DOM 或只改预览内存。"
+  ],
+  "status_flags": {
+    "kickoff_done": true,
+    "bdd_done": true,
+    "spec_done": true,
+    "poc_done": true,
+    "ready_for_build": true
+  }
+}

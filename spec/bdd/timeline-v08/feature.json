@@ -1,0 +1,46 @@
+{
+  "feature": "timeline-v08",
+  "title": "Timeline v0.8 · 轨道承载一切 · scene track 最小闭环",
+  "design_version": "v0.8.0",
+
+  "rules": [
+    "schema 4 kind 全列:scene / audio / subtitle / animation / bg / video / chart / data(v0.8 版本号扩 8 kind 对齐 v1.26)",
+    "v0.8 只实现 scene track · 其他 kind runtime 报 'UnsupportedKind' 警告不崩",
+    "anchor 值只支持:数字 ms 字符串('0' / '1500')或命名引用('anchorName.begin' / '.end')· 禁表达式(下版加 '+30s')",
+    "Track ABI v1.1:每 scene 组件单文件 · 零 import · export {describe, sample, render} · render(t, params, viewport) 为纯函数产 HTML",
+    "clip begin/end 只能引用 anchor 名 · 禁裸数字(ADR-017 · 承接)"
+  ],
+
+  "chapters": [
+    {
+      "id": "ch-schema",
+      "title": "Schema 合法性",
+      "scenarios": ["sc-01-schema-valid", "sc-02-schema-invalid-reject"]
+    },
+    {
+      "id": "ch-anchor",
+      "title": "Anchor 解析",
+      "scenarios": ["sc-03-anchor-absolute", "sc-04-anchor-named-ref"]
+    },
+    {
+      "id": "ch-scene",
+      "title": "Scene Track 实现",
+      "scenarios": ["sc-05-scene-switch-3-clips"]
+    },
+    {
+      "id": "ch-unsupported",
+      "title": "未实现 kind 降级",
+      "scenarios": ["sc-06-audio-kind-warn"]
+    }
+  ],
+
+  "completion": {
+    "dev_must": ["sc-01", "sc-03", "sc-04", "sc-05"],
+    "tested_must": ["sc-01", "sc-02", "sc-03", "sc-04", "sc-05", "sc-06"]
+  },
+
+  "visual": {
+    "preview_entry": "demos/timeline-v08.html",
+    "mockup_dir": "demos/"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "sc-03",
+  "title": "Anchor 值 · 绝对 ms 字符串解析",
+  "type": "api",
+  "chapter": "ch-anchor",
+
+  "given": "timeline.json 含 anchors: {\"demo\": {\"begin\": \"0\", \"end\": \"30000\"}}",
+  "when": "nf timeline parse 跑 resolver",
+  "then": "输出 anchors_resolved: {\"demo.begin\": 0, \"demo.end\": 30000} · 数字 ms",
+
+  "ai_tools": [
+    {
+      "tool": "parse-absolute",
+      "command": "echo '{\"meta\":{\"name\":\"t\",\"version\":\"v0.8\"},\"viewport\":{\"ratio\":\"16:9\",\"w\":1920,\"h\":1080},\"duration\":\"demo.end\",\"anchors\":{\"demo\":{\"begin\":\"0\",\"end\":\"30000\"}},\"tracks\":[{\"id\":\"t1\",\"kind\":\"scene\",\"clips\":[{\"id\":\"c1\",\"begin\":\"demo.begin\",\"end\":\"demo.end\"}]}]}' | nf timeline parse - --json | jq '.anchors_resolved'",
+      "output": "{\"demo.begin\": 0, \"demo.end\": 30000}"
+    }
+  ],
+
+  "dev": "pending",
+  "tested": "pending"
+}

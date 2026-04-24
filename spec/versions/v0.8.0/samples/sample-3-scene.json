@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "name": "3 Scene 切换 · v0.8 最小闭环 demo",
+    "description": "1 条 scene-family track · 3 clip 指向 3 个 community scene · 15s 视频",
+    "version": "v0.8",
+    "created": "2026-04-21"
+  },
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+
+  "anchors": {
+    "demo":   {"begin": "0",     "end": "15000"},
+    "seg0":   {"begin": "0",     "end": "5000"},
+    "seg1":   {"begin": "5000",  "end": "10000"},
+    "seg2":   {"begin": "10000", "end": "15000"}
+  },
+
+  "tracks": [
+    {
+      "id": "scenes",
+      "kind": "scene-hero-centered",
+      "src": "frontend/nf-tracks/community/scene-hero-centered.js",
+      "clips": [
+        {
+          "id": "sc-0",
+          "begin": "seg0.begin",
+          "end": "seg0.end",
+          "params": {
+            "title": "NextFrame",
+            "subtitle": "轨道承载一切",
+            "accent_color": "#a78bfa"
+          }
+        }
+      ]
+    },
+    {
+      "id": "scenes-quote",
+      "kind": "scene-quote",
+      "src": "frontend/nf-tracks/community/scene-quote.js",
+      "clips": [
+        {
+          "id": "sc-1",
+          "begin": "seg1.begin",
+          "end": "seg1.end",
+          "params": {
+            "quote": "数据变视频 · 一行 JSON 搞定。",
+            "author": "— NextFrame Team",
+            "accent_color": "#a78bfa"
+          }
+        }
+      ]
+    },
+    {
+      "id": "scenes-metric",
+      "kind": "scene-metric-grid",
+      "src": "frontend/nf-tracks/community/scene-metric-grid.js",
+      "clips": [
+        {
+          "id": "sc-2",
+          "begin": "seg2.begin",
+          "end": "seg2.end",
+          "params": {
+            "items": [
+              {"label": "版本", "value": "0.8", "unit": ""},
+              {"label": "轨道数", "value": 8,    "unit": "kind"},
+              {"label": "Scene",  "value": 3,    "unit": "个"},
+              {"label": "代码",   "value": 0,    "unit": "LOC"}
+            ],
+            "accent_color": "#a78bfa"
+          }
+        }
+      ]
+    }
+  ]
+}

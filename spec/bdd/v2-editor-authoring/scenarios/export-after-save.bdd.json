@@ -1,0 +1,27 @@
+{
+  "id": "export-after-save",
+  "title": "保存后的修改用于最终导出视频",
+  "given": "用户已修改 final-title.title 并点击保存，桌面端显示 saved 状态。",
+  "when": "用户点击导出按钮并等待进度完成。",
+  "then": "导出完成后出现打开按钮，MP4 抽帧能看到修改后的标题，导出源 track_count 仍是 10。",
+  "human_actions": ["edit final-title title", "click save", "click export", "watch progress", "click open output"],
+  "ai_tools": [
+    {
+      "tool": "click",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --click '[data-action=\"export-video\"]'"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --dry-run --field source.track_count"
+    },
+    {
+      "tool": "state",
+      "command": "ffprobe -v error -show_entries stream=width,height,r_frame_rate -of json ~/.nextframe/v2-showcase/exports/showreel-24s.mp4"
+    },
+    {
+      "tool": "screenshot",
+      "command": "target/debug/nf export frame --project v2-showcase --composition showreel-24s --at 22.0 --out /tmp/nextframe-v010-final-title.png"
+    }
+  ],
+  "done": false
+}

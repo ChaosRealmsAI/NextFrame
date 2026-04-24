@@ -1,0 +1,50 @@
+{
+  "version": "v0.10.0",
+  "session": "codex-2026-04-24-v010-kickoff",
+  "started_at": "2026-04-24T15:59:00+08:00",
+  "turns": [
+    {
+      "timestamp": "2026-04-24T15:55:00+08:00",
+      "speaker": "user",
+      "text": "嗯，你把应用也打开我看看"
+    },
+    {
+      "timestamp": "2026-04-24T15:58:00+08:00",
+      "speaker": "user",
+      "text": "好，你提交，然后继续  提交之后开始下一个版本"
+    },
+    {
+      "timestamp": "2026-04-24T15:59:00+08:00",
+      "speaker": "assistant",
+      "text": "当前版本已提交到 1d08d4db；下一版主推 v2 composition 真实编辑器，不继续堆演示。"
+    },
+    {
+      "timestamp": "2026-04-24T16:00:00+08:00",
+      "speaker": "assistant",
+      "question": "下版在 4 个候选里选择哪一个？",
+      "options": [
+        "V2 composition 真实编辑器",
+        "V2 语音字幕轨",
+        "组件错误诊断与校验",
+        "桌面启动/聚焦可靠性"
+      ],
+      "answer": "按用户要求继续推进，AI 侧选择最能带来实际感受的 V2 composition 真实编辑器。"
+    }
+  ],
+  "final_scope": {
+    "do": [
+      "v2 timeline 一行一轨可点选",
+      "右侧 inspector 显示真实 component params/style/time",
+      "修改参数后预览即时更新",
+      "保存写回 composition JSON",
+      "导出使用修改后的同一 source"
+    ],
+    "do_not": [
+      "不做 TTS/字幕 v2 化",
+      "不做云导出",
+      "不新增 track 创建/删除",
+      "不重做 showreel 视觉主题"
+    ],
+    "success_picture": "用户能在 showreel-24s 中点选任意轨道，改参数保存，重开仍保留，导出视频反映修改。"
+  }
+}

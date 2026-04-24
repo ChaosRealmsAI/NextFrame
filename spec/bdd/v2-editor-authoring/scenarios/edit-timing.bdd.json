@@ -1,0 +1,27 @@
+{
+  "id": "edit-timing",
+  "title": "编辑轨道时间后 timeline 与预览 active window 一致",
+  "given": "用户已选中 timeline-ribbon 轨道，inspector 显示 begin/end 时间字段。",
+  "when": "用户把 begin 从 intro.mid 改为 proof.begin，把 end 从 outro.end 改为 proof.end。",
+  "then": "timeline 上该轨道条缩放到 proof 段，播放头进入 proof 前不会显示，进入 proof 后正常显示。",
+  "human_actions": ["select timeline-ribbon row", "edit begin", "edit end", "scrub before proof", "scrub inside proof"],
+  "ai_tools": [
+    {
+      "tool": "click",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --click '[data-track-id=\"timeline-ribbon\"]'"
+    },
+    {
+      "tool": "type",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --fill '[data-field-path=\"time.begin\"]' 'proof.begin'"
+    },
+    {
+      "tool": "type",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --fill '[data-field-path=\"time.end\"]' 'proof.end'"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-track-id=\"timeline-ribbon\"]' --get dataset.timeWindow"
+    }
+  ],
+  "done": false
+}

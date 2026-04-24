@@ -1,0 +1,1589 @@
+{
+  "version": "v0.2.0",
+  "type": "feature",
+  "title": "Mac 桌面 app 外壳 + UI hifi 组件化 · CLI 启动 + 多窗口",
+  "created_at": "2026-04-21",
+  "status": "done",
+  "kickoff_ref": "spec/versions/v0.2/kickoff/version-level.json",
+  "verify_points": [
+    {
+      "id": "V-1",
+      "desc": "`nf open` 冷启动 0.5s 内 Mac 窗口弹出 · 标题 'NextFrame'"
+    },
+    {
+      "id": "V-2",
+      "desc": "同 WebView + 同 tokens.css + 同 DOM 结构 → v0.2 app 启动视觉 === editor-v0.1.html(**golden reference**)· pixel diff < 1%(容忍字体 hint 浮动)· 关键 computed-style 精准匹配(颜色/字号/边距/玻璃模糊值)· DOM 层级对齐(组件产 DOM 等价 mockup DOM)"
+    },
+    {
+      "id": "V-3",
+      "desc": "交互视觉反馈:tab 切 / 项目 & 集下拉 / clip 选中 / 锚点 hover 都有视觉响应"
+    },
+    {
+      "id": "V-4",
+      "desc": "`nf open --project=next-frame --episode=ep-02 --new-window` 多窗口:独立移动/resize · 关 1 不影响 2 · 共用同一进程"
+    },
+    {
+      "id": "V-5",
+      "desc": "Mac 标准行为:关最后一个 window 不退 app(dock 保活) · `cmd+q` 真退进程"
+    },
+    {
+      "id": "V-6",
+      "desc": "已有进程时 `nf open --project=next-frame --episode=ep-02 --new-window` 0.2s 内弹新 window(快路径 · 不冷启)"
+    },
+    {
+      "id": "V-7",
+      "desc": "Web Components 组件化:每个 nf-* 自定义 element 有 shadowRoot · 样式隔离 · tokens.css 通过 :root 变量穿透"
+    },
+    {
+      "id": "V-8",
+      "desc": "CRUD CLI 改真 JSON(~/.nextframe/<project>/project.json + episodes/<ep>.json)· 原子写 · 宪法 P8 JSON 单一真理源 · 关 app 数据不丢 · `nf projects list` 反映 CLI 改动"
+    },
+    {
+      "id": "V-9",
+      "desc": "**sonnet 盲测**(v0.2 核心 acceptance):新 sonnet 会话只读 `nf help` / `nf doctor` / `nf projects list` 输出 · 完整跑通 '创建项目 → 加集 → 加 clip → 加锚点 → nf open → screenshot → quit' · 不看源码不看 spec"
+    },
+    {
+      "id": "V-10",
+      "desc": "`nf help <cmd>` 自包含:每命令 help 含 2+ 实用例子 + 1+ 常见错 + hint · 错误 stderr 带 hint 字段(AI 自救)· agent-usability rule 硬要求"
+    }
+  ],
+  "items": [
+    {
+      "id": "S-01",
+      "kind": "bdd-scenario",
+      "title": "CLI 冷启动打开 app",
+      "description": "新装的系统 · 终端跑 `nf open` · 主进程启起 + 首个 tao window 弹出 + 加载 Web Components + 显示完整 UI",
+      "status": "done",
+      "verify_point": "V-1",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "nf binary 装在 ~/.cargo/bin · 无 app 进程在跑 · IPC socket 不存在",
+      "when": "终端执行 `nf open`",
+      "then": [
+        "0.5s 内 Mac 窗口弹出(标题 'NextFrame' · 大小 1440x900 默认)",
+        "window 内 topbar + 3 栏 body + caption 全部渲染完(JS exec done)",
+        "`nf ps` 显示 1 个 pid + 1 个 window",
+        "IPC socket 文件已创建",
+        "stdout 打印 {\"window_id\": \"...\", \"pid\": ..., \"project_id\": \"default\"}"
+      ],
+      "ai_tools": [
+        {
+          "tool": "start",
+          "command": "nf open --project=next-frame --episode=ep-01",
+          "expected": "exit 0 · stdout json 含 window_id+pid+project+episode"
+        },
+        {
+          "tool": "ps",
+          "command": "nf ps",
+          "expected": "json array length=1 · window title='NextFrame'"
+        },
+        {
+          "tool": "socket-exists",
+          "command": "test -S ${XDG_RUNTIME_DIR:-/tmp}/nextframe-$UID.sock",
+          "expected": "exit 0"
+        },
+        {
+          "tool": "state",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=app.ready",
+          "expected": "{value: true}"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-cli/src/main.rs",
+          "commit": null
+        },
+        {
+          "path": "src/nf-shell/src/main.rs",
+          "commit": null
+        },
+        {
+          "path": "src/nf-components/src/index.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.9,
+      "evidence": null,
+      "human_frames": [
+        "终端空白 · 光标闪",
+        "输入 `nf open` · enter",
+        "0.3s 后 Mac 窗口弹出(红黄绿灯在左上 · 标题栏 'NextFrame')",
+        "0.5s 内 topbar + body 内容全部 rendered · 玻璃质感可见"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-02",
+      "kind": "bdd-scenario",
+      "title": "已有进程时 open 走快路径",
+      "description": "app 已在跑 · 再跑 `nf open` · IPC 转发给现有进程 · 不新起 window(聚焦已有)· 也不新起进程",
+      "status": "done",
+      "verify_point": "V-6",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "app 进程运行中 · 有 1 个 window(project=default)",
+      "when": "终端执行 `nf open` (不带 --new-window)",
+      "then": [
+        "无新进程启起(pid 不变)",
+        "无新 window 创建(window 数 = 1)",
+        "现有 window 聚焦到前台(AXUIElementPerformAction raise)",
+        "0.2s 内返回 · stdout 返回已有 window_id"
+      ],
+      "ai_tools": [
+        {
+          "tool": "precondition",
+          "command": "nf ps --project=next-frame | jq '.[0].pid'",
+          "expected": "number"
+        },
+        {
+          "tool": "start-again",
+          "command": "nf open --project=next-frame --episode=ep-01",
+          "expected": "exit 0 · stdout window_id = 已有"
+        },
+        {
+          "tool": "ps-after",
+          "command": "nf ps --project=next-frame | jq 'length'",
+          "expected": "1"
+        },
+        {
+          "tool": "pid-unchanged",
+          "command": "nf ps --project=next-frame | jq '.[0].pid'",
+          "expected": "= 前次 pid"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-cli/src/ipc_client.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.85,
+      "evidence": null,
+      "human_frames": [
+        "app 已在 dock · 1 个 window 可见",
+        "终端再跑 `nf open`",
+        "现有 window 被抬到前台(无新窗口)",
+        "终端返回 {window_id: '...'} · 0.2s 内"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-03",
+      "kind": "bdd-scenario",
+      "title": "多窗口:--new-window 开第二个",
+      "description": "app 已有 1 window · `nf open --project=next-frame --episode=ep-02 --new-window` 让现有进程再开一个 tao window · 独立实例 · 同进程",
+      "status": "done",
+      "verify_point": "V-4",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "app 进程运行中 · 有 1 个 window",
+      "when": "终端执行 `nf open --project=next-frame --episode=ep-02 --new-window`",
+      "then": [
+        "新 tao window 创建(pid 不变 · window 数 = 2)",
+        "新 window 位置不跟第一个重叠(系统 cascading)",
+        "新 window 内 Web Components 独立实例(不共享 DOM)",
+        "stdout 返回新 window_id(≠ 首 window)"
+      ],
+      "ai_tools": [
+        {
+          "tool": "pre-count",
+          "command": "nf ps --project=next-frame | jq 'length'",
+          "expected": "1"
+        },
+        {
+          "tool": "open-new",
+          "command": "nf open --project=next-frame --episode=ep-02 --new-window",
+          "expected": "exit 0 · 新 window_id"
+        },
+        {
+          "tool": "post-count",
+          "command": "nf ps --project=next-frame | jq 'length'",
+          "expected": "2"
+        },
+        {
+          "tool": "same-pid",
+          "command": "nf ps --project=next-frame | jq '[.[].pid] | unique | length'",
+          "expected": "1"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-shell/src/window_manager.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.85,
+      "evidence": null,
+      "human_frames": [
+        "1 个 window 可见",
+        "终端 `nf open --project=next-frame --episode=ep-02 --new-window`",
+        "第二个 window 弹出(位置偏移避免重叠)",
+        "两个 window 都可见 · 内容一样(都显示同 mock)"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-04",
+      "kind": "bdd-scenario",
+      "title": "多窗口独立移动 + resize",
+      "description": "2 个 window 拖动 / resize 不互相影响 · 各自状态独立(currentTab / selectedClip)",
+      "status": "done",
+      "verify_point": "V-4",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "app 有 2 个 window",
+      "when": "window A 拖到屏幕左 · window B 拖到屏幕右 · window A 切 tab 到'脚本'",
+      "then": [
+        "A 位置变 · B 位置不变",
+        "A tab 切 · B tab 保持'视频制作'",
+        "A 上 `nf click` 不触发 B"
+      ],
+      "ai_tools": [
+        {
+          "tool": "move-a",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=window.position",
+          "expected": "{x: 0, y: 0}"
+        },
+        {
+          "tool": "move-b-verify",
+          "command": "nf state --project=next-frame --episode=ep-02 --key=window.position",
+          "expected": "{x: >600, y: ...}"
+        },
+        {
+          "tool": "click-tab-a",
+          "command": "nf tab --project=next-frame --episode=ep-01 --switch=script"
+        },
+        {
+          "tool": "state-a",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=topbar.current-tab",
+          "expected": "{value: 'script'}"
+        },
+        {
+          "tool": "state-b",
+          "command": "nf state --project=next-frame --episode=ep-02 --key=topbar.current-tab",
+          "expected": "{value: 'edit'}"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-shell/src/window_state.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.8,
+      "evidence": null,
+      "human_frames": [
+        "A 和 B 两 window 重叠",
+        "拖 A 到左 · 拖 B 到右",
+        "A 切 tab 到脚本 · B 保持视频制作",
+        "两 window 独立 state"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-05",
+      "kind": "bdd-scenario",
+      "title": "Mac 标准:关最后一个 window 不退 app",
+      "description": "关所有 window 后 · app 进程保活 · dock 图标在 · `nf open` 秒起新 window(不冷启)",
+      "status": "done",
+      "verify_point": "V-5",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "app 有 1 个 window 运行",
+      "when": "点红叉关窗 / `nf click --selector=':root' --window=X --key=close` 关最后一个 window",
+      "then": [
+        "进程保活(`nf ps` 返回 pid 但 window 数 = 0)",
+        "dock 图标仍在",
+        "再跑 `nf open` · 0.2s 内新 window 弹出(不是冷启 0.5s)"
+      ],
+      "ai_tools": [
+        {
+          "tool": "close-window",
+          "command": "nf close --project=next-frame --episode=ep-01",
+          "expected": "closed"
+        },
+        {
+          "tool": "process-alive",
+          "command": "nf ps --project=next-frame | jq '[.[].window_id] | length'",
+          "expected": "0(但 pid 在)"
+        },
+        {
+          "tool": "reopen-fast",
+          "command": "time nf open --project=next-frame --episode=ep-01",
+          "expected": "real < 0.3s"
+        },
+        {
+          "tool": "count-after",
+          "command": "nf ps --project=next-frame | jq 'length'",
+          "expected": "1"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-shell/src/lifecycle.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.8,
+      "evidence": null,
+      "human_frames": [
+        "1 个 window 在",
+        "点红叉关窗",
+        "窗口消失但 dock 图标在",
+        "再 `nf open` · 瞬间弹新 window(快路径)"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-06",
+      "kind": "bdd-scenario",
+      "title": "Mac 标准:cmd+q 真退进程",
+      "description": "cmd+q 或 `nf quit` · 进程真退 · socket 清理 · dock 图标消失",
+      "status": "done",
+      "verify_point": "V-5",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "app 进程运行中",
+      "when": "执行 `nf quit`(等价 cmd+q)",
+      "then": [
+        "进程退出(`nf ps` 返回空或报 socket 不存在)",
+        "IPC socket 文件删除",
+        "dock 图标消失"
+      ],
+      "ai_tools": [
+        {
+          "tool": "quit",
+          "command": "nf quit",
+          "expected": "exit 0"
+        },
+        {
+          "tool": "ps-empty",
+          "command": "nf ps --project=next-frame 2>&1 | head -1",
+          "expected": "'no running instance' 或 exit 1"
+        },
+        {
+          "tool": "socket-gone",
+          "command": "test ! -S ${XDG_RUNTIME_DIR:-/tmp}/nextframe-$UID.sock",
+          "expected": "exit 0"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-shell/src/lifecycle.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.9,
+      "evidence": null,
+      "human_frames": [
+        "app 运行中",
+        "cmd+q 或 `nf quit`",
+        "dock 图标 fade out · 进程消失",
+        "再 `nf ps` 报 'no instance'"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-07",
+      "kind": "bdd-scenario",
+      "title": "视觉:topbar 像素级一致",
+      "description": "启动后 topbar 区域(0-46px) 跟 editor-v0.1.html 同 region 截图像素 diff < 5%",
+      "status": "done",
+      "verify_point": "V-2",
+      "feature": "mac-shell",
+      "scenario_type": "visual",
+      "given": "app 已启 · 窗口大小 1440x900",
+      "when": "`nf screenshot --project=next-frame --episode=ep-01 --region=topbar --out=tmp/topbar-app.png` + 浏览器截 editor-v0.1.html 同区域 tmp/topbar-ref.png",
+      "then": [
+        "两图 pixel diff < 1% (使用 pixelmatch 或 ImageMagick compare)",
+        "红黄绿灯颜色/位置匹配",
+        "home icon + '/' + 项目下拉 + '/' + 集下拉 + tabs + 语言切换 全部位置一致",
+        "玻璃背景 + 顶部高光可见"
+      ],
+      "ai_tools": [
+        {
+          "tool": "app-shot",
+          "command": "nf screenshot --project=next-frame --episode=ep-01 --region=topbar --out=tmp/topbar-app.png"
+        },
+        {
+          "tool": "ref-shot",
+          "command": "playwright screenshot --selector='.topbar' spec/design/prototypes/editor-v0.1.html tmp/topbar-ref.png"
+        },
+        {
+          "tool": "diff",
+          "command": "pixelmatch tmp/topbar-ref.png tmp/topbar-app.png tmp/topbar-diff.png 0.1",
+          "expected": "< 1% pixels differ(同 WebView 本应 ≈ 0)"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/topbar.ts",
+          "commit": null
+        },
+        {
+          "path": "src/nf-components/src/shell.css",
+          "commit": null
+        }
+      ],
+      "confidence": 0.75,
+      "evidence": null,
+      "human_frames": [
+        "打开 editor-v0.1.html 看 topbar",
+        "打开 app · 看 topbar",
+        "肉眼对比:红黄绿灯 / home / 下拉 / tabs / 中文 位置色全一致",
+        "玻璃反光 + 分隔线全对"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-08",
+      "kind": "bdd-scenario",
+      "title": "视觉:左栏 Clips 列表像素一致",
+      "description": "左栏上半 Clips(7 条 · 5 scene + 2 audio)跟 hifi 一致 · active 高亮紫色边 + 音频 teal 色块",
+      "status": "done",
+      "verify_point": "V-2",
+      "feature": "mac-shell",
+      "scenario_type": "visual",
+      "given": "app 启动 · mock.json 含 7 个 clip(5 scene + 2 audio)· feat-2 是 active",
+      "when": "`nf screenshot --project=next-frame --episode=ep-01 --region=clips --out=tmp/clips-app.png`",
+      "then": [
+        "7 条 clip 行渲染(intro / feat 1 / feat 2 · active / feat 3 / outro / bgm-electric / narration-v2)",
+        "feat-2 active 有紫色左 border + 浅紫背",
+        "bgm/narration 的 mk 是青色(teal · audio)",
+        "时长数字紫色 · 'clip 名'白色 · pixel diff < 1%"
+      ],
+      "ai_tools": [
+        {
+          "tool": "shot",
+          "command": "nf screenshot --project=next-frame --episode=ep-01 --region=clips --out=tmp/clips-app.png"
+        },
+        {
+          "tool": "count",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-clips::shadow .clip-row' --get=outerHTML | jq '. | length'",
+          "expected": "7"
+        },
+        {
+          "tool": "active",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=clips.active-id",
+          "expected": "{value: 'feat-2'}"
+        },
+        {
+          "tool": "computed-active",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-clips::shadow .clip-row.active' --get=computed-style:box-shadow",
+          "expected": "含 'rgb(167, 139, 250)' (var(--accent) 左 2px inset)"
+        },
+        {
+          "tool": "pixel-diff",
+          "command": "pixelmatch tmp/editor-v0.1-clips.png tmp/clips-app.png tmp/clips-diff.png 0.05",
+          "expected": "< 1% pixels differ"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/clips.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.75,
+      "evidence": null,
+      "human_frames": [
+        "左栏上半 7 条 clip",
+        "feat-2 高亮(紫色边 + 浅紫背)",
+        "bgm / narration 前面是青色小方",
+        "时长数字 5.0s / 7.0s / 18.0s..."
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-09",
+      "kind": "bdd-scenario",
+      "title": "视觉:左栏 AI 日志像素一致",
+      "description": "左栏下半 AI 操作日志 · 14 条(倒序 · 最新在上)· 每条 3 行(kind+time / desc / cli) · 内部可滚动",
+      "status": "done",
+      "verify_point": "V-2",
+      "feature": "mac-shell",
+      "scenario_type": "visual",
+      "given": "app 启动 · mock.json 含 14 条 log(AI + 人混 · 最新 12:03:25)",
+      "when": "`nf screenshot --project=next-frame --episode=ep-01 --region=log --out=tmp/log-app.png`",
+      "then": [
+        "顶条是最新(12:03:25 · 导出视频 pending)",
+        "倒数是 12:03:00(读取 project.json)",
+        "每条 3 行格式一致 · cli 行等宽字体紫色",
+        "内部可滚动 · 不撑爆外部"
+      ],
+      "ai_tools": [
+        {
+          "tool": "shot",
+          "command": "nf screenshot --project=next-frame --episode=ep-01 --region=log --out=tmp/log-app.png"
+        },
+        {
+          "tool": "count",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-log::shadow .log' --get=outerHTML | jq 'length'",
+          "expected": "14"
+        },
+        {
+          "tool": "latest-top",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-log::shadow .log:first-child .log-time' --get=outerHTML",
+          "expected": "包含 '12:03:25'"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/log.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.75,
+      "evidence": null,
+      "human_frames": [
+        "左栏下半 · 标题 'AI 操作日志 · 14 条' · live 绿点闪",
+        "顶条 12:03:25 导出视频(pending 淡色)",
+        "底条 12:03:00 读取 project.json",
+        "scroll 可上下 · 外部容器不变"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-10",
+      "kind": "bdd-scenario",
+      "title": "视觉:timeline 4 轨道 + 锚点 + playhead",
+      "description": "中下 timeline · 4 轨道(画面紫 / 文字琥珀 / 音频青 / 转场灰)· 7 clips 分布 · 4 个锚点底部倒三角 · playhead 竖线",
+      "status": "done",
+      "verify_point": "V-2",
+      "feature": "mac-shell",
+      "scenario_type": "visual",
+      "given": "app 启动 · mock.json 含 4 anchors(intro-end=5 / feat-1-end=12 / feat-2-end=30 / feat-3-end=48)· duration=60",
+      "when": "`nf screenshot --project=next-frame --episode=ep-01 --region=timeline --out=tmp/timeline-app.png`",
+      "then": [
+        "4 轨道独立色条(紫/琥珀/青/灰)· 间距一致",
+        "7 clips 位置按 start/end 秒比例分布",
+        "4 个琥珀色倒三角锚点在底部",
+        "playhead(白竖线)在 12.45s 位置"
+      ],
+      "ai_tools": [
+        {
+          "tool": "shot",
+          "command": "nf screenshot --project=next-frame --episode=ep-01 --region=timeline --out=tmp/timeline-app.png"
+        },
+        {
+          "tool": "anchor-count",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-anchor' --get=outerHTML | jq 'length'",
+          "expected": "4"
+        },
+        {
+          "tool": "track-count",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-track' --get=outerHTML | jq 'length'",
+          "expected": "4"
+        },
+        {
+          "tool": "playhead",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=timeline.current-time",
+          "expected": "{value: 12.45}"
+        },
+        {
+          "tool": "anchor-color",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-anchor:first-of-type::shadow .tri' --get=computed-style:border-bottom-color",
+          "expected": "rgb(224, 183, 108)(var(--amber))"
+        },
+        {
+          "tool": "track-colors",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-track[kind=scene]::shadow .clip' --get=computed-style:border-color",
+          "expected": "含 'rgb(167, 139, 250)'(紫)"
+        },
+        {
+          "tool": "pixel-diff",
+          "command": "pixelmatch tmp/editor-v0.1-timeline.png tmp/timeline-app.png tmp/timeline-diff.png 0.05",
+          "expected": "< 1%"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/timeline.ts",
+          "commit": null
+        },
+        {
+          "path": "src/nf-components/src/track.ts",
+          "commit": null
+        },
+        {
+          "path": "src/nf-components/src/anchor.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.7,
+      "evidence": null,
+      "human_frames": [
+        "timeline 占底部 · 4 条横轨",
+        "每轨颜色不同(紫/琥珀/青/灰)",
+        "底部 4 个琥珀小三角锚点",
+        "playhead 白竖线在中间偏左"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-11",
+      "kind": "bdd-scenario",
+      "title": "视觉:右栏 inspector 像素一致",
+      "description": "右栏 inspector · 显示 feat-2 clip 属性:position / size / timing / keyframes / effects",
+      "status": "done",
+      "verify_point": "V-2",
+      "feature": "mac-shell",
+      "scenario_type": "visual",
+      "given": "app 启动 · feat-2 selected",
+      "when": "`nf screenshot --project=next-frame --episode=ep-01 --region=inspector --out=tmp/insp-app.png`",
+      "then": [
+        "inspector 标题 'feat 2' + kind badge 'scene'",
+        "4 段:位置 / 大小 / 时间 / 关键帧 / 效果",
+        "keyframe 小紫方块在时间轴上 + 当前 playhead 竖线",
+        "effects 列 'color-cinematic' pill(橙色?待定)"
+      ],
+      "ai_tools": [
+        {
+          "tool": "shot",
+          "command": "nf screenshot --project=next-frame --episode=ep-01 --region=inspector --out=tmp/insp-app.png"
+        },
+        {
+          "tool": "clip-id",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=inspector.clip-id",
+          "expected": "{value: 'feat-2'}"
+        },
+        {
+          "tool": "fields",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-inspector::shadow .insp-field' --get=outerHTML | jq 'length'",
+          "expected": ">= 5"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/inspector.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.7,
+      "evidence": null,
+      "human_frames": [
+        "右栏标题 feat 2",
+        "位置 x/y · 大小 w/h",
+        "时间 start=7.0 duration=18.0",
+        "关键帧轨 + 效果标签"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-12",
+      "kind": "architecture-decision",
+      "title": "架构:Web Components 注册完整",
+      "description": "8 个 nf-* 自定义 element 全部在 customElements.registry 注册 · 每个都有 shadowRoot",
+      "status": "done",
+      "verify_point": "V-7",
+      "feature": "mac-shell",
+      "scenario_type": "observable",
+      "given": "app 启动 · Web Components entry 加载完",
+      "when": "通过 nf devtools 查 customElements",
+      "then": [
+        "所有 8 tag(nf-topbar/clips/log/timeline/track/clip/anchor/inspector) 在 registry",
+        "每个 element 实例有非空 shadowRoot",
+        "shadowRoot 内有局部 <style> · 不依赖全局 css 定义(tokens 是 :root var 允许穿透)"
+      ],
+      "ai_tools": [
+        {
+          "tool": "registered",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='*' --get=custom-elements",
+          "expected": "8 tags 全 defined"
+        },
+        {
+          "tool": "shadowroot",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-topbar' --get=shadowRoot",
+          "expected": "非空 · mode='open'"
+        },
+        {
+          "tool": "local-style",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-topbar::shadow style' --get=outerHTML",
+          "expected": "有 <style> · 不为空"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/index.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.95,
+      "evidence": null,
+      "human_frames": [
+        "DevTools Elements 面板",
+        "每个 nf-* tag 展开可见 #shadow-root (open)",
+        "shadow root 内有 <style> + DOM",
+        "主文档 DOM 只有 8 个 nf-* tag + body"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-13",
+      "kind": "architecture-decision",
+      "title": "架构:Shadow DOM 样式隔离",
+      "description": "主文档定义 `.clip { color: red }` 不污染 nf-clips shadowRoot 内部 .clip-row · 反之组件内部 .clip-row 样式不泄漏主文档",
+      "status": "done",
+      "verify_point": "V-7",
+      "feature": "mac-shell",
+      "scenario_type": "observable",
+      "given": "app 启动 · 正常 mock 数据",
+      "when": "向主文档临时注入 `<style>* { color: red !important }</style>` · 重查组件内部计算样式",
+      "then": [
+        "主文档外所有文字变红(如果有)",
+        "nf-clips / nf-topbar / nf-log 内部文字不变红(shadow DOM 隔离 · !important 也不穿透)",
+        "移除注入样式后验证正常"
+      ],
+      "ai_tools": [
+        {
+          "tool": "inject",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='head' --action=append-style --value='* { color: red !important }'"
+        },
+        {
+          "tool": "inner-color",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-topbar::shadow .tb-tab' --get=computed-style:color",
+          "expected": "不为 red (保持原色)"
+        },
+        {
+          "tool": "cleanup",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='head style:last-child' --action=remove"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/index.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.95,
+      "evidence": null,
+      "human_frames": [
+        "组件内部 .tb-tab 紫色",
+        "注 CSS 大锤(主文档 * 强制红)",
+        "主文档若有字变红 · 组件内仍紫色",
+        "shadow DOM 隔离验证"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-14",
+      "kind": "architecture-decision",
+      "title": "架构:tokens.css :root vars 穿透 Shadow DOM",
+      "description": "tokens.css 定义在主文档 :root · 所有组件 shadowRoot 内通过 var(--accent) 等能读到 · 主文档改 :root var 值 · 所有组件联动更新",
+      "status": "done",
+      "verify_point": "V-7",
+      "feature": "mac-shell",
+      "scenario_type": "observable",
+      "given": "app 启动 · :root 定义 --accent=#a78bfa",
+      "when": "JS 改 document.documentElement.style.setProperty('--accent', '#ff0000')",
+      "then": [
+        "nf-topbar 内 .tb-tab.cur 的下划线变红",
+        "nf-clips 内 .clip-row.active 左 border 变红",
+        "nf-timeline 内紫色轨道条变红",
+        "所有引用 var(--accent) 的地方联动更新"
+      ],
+      "ai_tools": [
+        {
+          "tool": "set-var",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --action=set-css-var --key='--accent' --value='#ff0000'"
+        },
+        {
+          "tool": "check-topbar",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-topbar::shadow .tb-tab.cur' --get=computed-style:borderBottomColor",
+          "expected": "rgb(255, 0, 0)"
+        },
+        {
+          "tool": "check-clips",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-clips::shadow .clip-row.active' --get=computed-style:borderLeftColor",
+          "expected": "rgb(255, 0, 0)"
+        },
+        {
+          "tool": "reset",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --action=set-css-var --key='--accent' --value='#a78bfa'"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/shell.css",
+          "commit": null
+        }
+      ],
+      "confidence": 0.9,
+      "evidence": null,
+      "human_frames": [
+        "正常紫色 app",
+        "改 --accent 为红",
+        "topbar tab / clips active / timeline 轨道 全部变红",
+        "再改回紫 · 全部联动回紫"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-15",
+      "kind": "bdd-scenario",
+      "title": "交互:切换 tabs",
+      "description": "点 topbar 上 '脚本' tab · current-tab 变 'script' · 发 tab-change 事件 · 视觉 active 下划线移动",
+      "status": "done",
+      "verify_point": "V-3",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "app 启动 · current-tab='edit'(视频制作)",
+      "when": "`nf tab --project=next-frame --episode=ep-01 --switch=script`",
+      "then": [
+        "topbar.current-tab = 'script'",
+        "视觉 '脚本' tab 紫色下划线出现 · '视频制作' 下划线消失",
+        "tab-change event 触发(desc: {old: 'edit', new: 'script'})"
+      ],
+      "ai_tools": [
+        {
+          "tool": "pre-state",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=topbar.current-tab",
+          "expected": "{value: 'edit'}"
+        },
+        {
+          "tool": "click",
+          "command": "nf tab --project=next-frame --episode=ep-01 --switch=script"
+        },
+        {
+          "tool": "post-state",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=topbar.current-tab",
+          "expected": "{value: 'script'}"
+        },
+        {
+          "tool": "visual",
+          "command": "nf screenshot --project=next-frame --episode=ep-01 --region=topbar --out=tmp/tab-switched.png"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/topbar.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.9,
+      "evidence": null,
+      "human_frames": [
+        "topbar '视频制作' 紫色下划线",
+        "点 '脚本'",
+        "紫色下划线移到 '脚本'",
+        "'视频制作' 回灰"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-16",
+      "kind": "bdd-scenario",
+      "title": "交互:项目下拉展开",
+      "description": "点项目下拉 · 弹 dropdown 浮层 · 列可选项目 · 再点外空关",
+      "status": "done",
+      "verify_point": "V-3",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "app 启动 · 项目 dropdown 关闭",
+      "when": "`nf click --project=next-frame --episode=ep-01 --selector='nf-topbar::shadow .tb-drop:first-of-type'`",
+      "then": [
+        "dropdown 浮层出现(玻璃底 · 下方 offset 8px)",
+        "列 2 个 mock 项目(NextFrame / 另一个)",
+        "project-dropdown-open event 触发",
+        "`nf click --project=next-frame --episode=ep-01 --selector='body'` 后 dropdown 关"
+      ],
+      "ai_tools": [
+        {
+          "tool": "open",
+          "command": "nf click --project=next-frame --episode=ep-01 --selector='nf-topbar::shadow .tb-drop:first-of-type'"
+        },
+        {
+          "tool": "visible",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-topbar::shadow .dropdown-menu' --get=computed-style:visibility",
+          "expected": "visible"
+        },
+        {
+          "tool": "items",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-topbar::shadow .dropdown-item' --get=outerHTML | jq 'length'",
+          "expected": ">= 2"
+        },
+        {
+          "tool": "close",
+          "command": "nf click --project=next-frame --episode=ep-01 --selector='body'"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/topbar.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.85,
+      "evidence": null,
+      "human_frames": [
+        "topbar 项目 'NextFrame ˅'",
+        "点下拉",
+        "弹出玻璃底浮层 · 列 2 项",
+        "点空白 · 浮层消失"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-17",
+      "kind": "bdd-scenario",
+      "title": "交互:clip 选中",
+      "description": "点左栏 clips 列表任意 clip · 该 clip active 紫边 + inspector 显示该 clip 属性",
+      "status": "done",
+      "verify_point": "V-3",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "app 启动 · feat-2 active",
+      "when": "`nf select --project=next-frame --episode=ep-01 --clip=intro`",
+      "then": [
+        "clips.active-id = 'intro'(clips 发 clip-select event · timeline + inspector 监听换选中)",
+        "intro 行出现紫左 border · feat-2 回常态",
+        "inspector 换显示 intro 属性(title/timing/effects)"
+      ],
+      "ai_tools": [
+        {
+          "tool": "pre",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=clips.active-id",
+          "expected": "{value: 'feat-2'}"
+        },
+        {
+          "tool": "click",
+          "command": "nf select --project=next-frame --episode=ep-01 --clip=intro"
+        },
+        {
+          "tool": "post-clips",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=clips.active-id",
+          "expected": "{value: 'intro'}"
+        },
+        {
+          "tool": "post-insp",
+          "command": "nf state --project=next-frame --episode=ep-01 --key=inspector.clip-id",
+          "expected": "{value: 'intro'}"
+        },
+        {
+          "tool": "visual",
+          "command": "nf screenshot --project=next-frame --episode=ep-01 --region=full --out=tmp/clip-intro-selected.png"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/clips.ts",
+          "commit": null
+        },
+        {
+          "path": "src/nf-components/src/inspector.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.85,
+      "evidence": null,
+      "human_frames": [
+        "feat-2 紫边 · inspector 显 feat-2",
+        "点 intro 行",
+        "紫边移到 intro · feat-2 常态",
+        "inspector 切显 intro 的属性"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-18",
+      "kind": "bdd-scenario",
+      "title": "交互:锚点 hover",
+      "description": "hover timeline 底部锚点三角 · 弹 tooltip 显示锚点名 + 秒 · anchor-hover event",
+      "status": "done",
+      "verify_point": "V-3",
+      "feature": "mac-shell",
+      "scenario_type": "interactive",
+      "given": "app 启动 · 4 个锚点可见",
+      "when": "`nf hover --selector='nf-anchor[name=\"feat-1-end\"]'`(或 `nf click` 兼容 hover)",
+      "then": [
+        "tooltip 弹出:'feat-1-end · 12.00s'",
+        "锚点倒三角稍放大(1.2x)",
+        "anchor-hover event 触发"
+      ],
+      "ai_tools": [
+        {
+          "tool": "hover",
+          "command": "nf click --project=next-frame --episode=ep-01 --selector='nf-anchor[name=\"feat-1-end\"]'"
+        },
+        {
+          "tool": "tooltip",
+          "command": "nf devtools --project=next-frame --episode=ep-01 --query='nf-anchor[name=\"feat-1-end\"]::shadow .tooltip' --get=outerHTML",
+          "expected": "含 'feat-1-end' + '12.00'"
+        },
+        {
+          "tool": "visual",
+          "command": "nf screenshot --project=next-frame --episode=ep-01 --region=timeline --out=tmp/anchor-hover.png"
+        }
+      ],
+      "citations": [
+        {
+          "path": "src/nf-components/src/anchor.ts",
+          "commit": null
+        }
+      ],
+      "confidence": 0.8,
+      "evidence": null,
+      "human_frames": [
+        "4 个琥珀小三角静态",
+        "hover feat-1-end 三角",
+        "三角稍放大 · 上方弹 tooltip 'feat-1-end · 12.00s'",
+        "离开 · tooltip 消失"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-19",
+      "kind": "bdd-scenario",
+      "title": "CRUD · projects 族 · list + show + create(AI 发现 + 管理)",
+      "description": "AI 通过 nf projects CLI 发现项目清单 · 查项目详情 · 创建新项目 · 改真 JSON 文件(~/.nextframe/registry.json + <slug>/project.json)· 符 charter P8",
+      "status": "done",
+      "verify_point": "V-8",
+      "feature": "cli-projects",
+      "scenario_type": "interactive",
+      "given": "~/.nextframe/ 已有 registry.json(含 next-frame 项目)· 无 demo-video",
+      "when": "AI 跑 3 CLI:nf projects list → nf projects show → nf projects create",
+      "then": [
+        "nf projects list 输出 json array [{slug, name, episodes_count, last_modified}] · 至少 next-frame 在",
+        "nf projects show --project=next-frame 输出 {slug, name, description, episodes: [...], created, modified, tags}",
+        "nf projects create --slug=demo-video --name='Demo Video' · stdout {slug, name, path: '~/.nextframe/demo-video/project.json', created}",
+        "执行后 ~/.nextframe/demo-video/ 目录建好 · project.json 原子写(tmpfile + rename)· registry.json 追加 demo-video",
+        "再 nf projects list · demo-video 在输出里"
+      ],
+      "ai_tools": [
+        {
+          "tool": "list-before",
+          "command": "nf projects list | jq '[.[] | .slug]'",
+          "expected": "含 'next-frame' · 不含 'demo-video'"
+        },
+        {
+          "tool": "show",
+          "command": "nf projects show --project=next-frame | jq '{slug, episodes: [.episodes[].slug]}'",
+          "expected": "slug=next-frame · episodes 含 ep-01"
+        },
+        {
+          "tool": "create",
+          "command": "nf projects create --slug=demo-video --name='Demo Video' --description='演示'",
+          "expected": "exit 0 · stdout json 含 path"
+        },
+        {
+          "tool": "fs-check",
+          "command": "test -f ~/.nextframe/demo-video/project.json && jq '.slug' ~/.nextframe/demo-video/project.json",
+          "expected": "exit 0 · slug='demo-video'"
+        },
+        {
+          "tool": "list-after",
+          "command": "nf projects list | jq '[.[] | .slug] | contains([\"demo-video\"])'",
+          "expected": "true"
+        },
+        {
+          "tool": "registry-check",
+          "command": "jq '.projects | map(.slug)' ~/.nextframe/registry.json",
+          "expected": "含 'demo-video'"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/projects.rs",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-cli/src/storage.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.9,
+      "evidence": null,
+      "human_frames": [
+        "终端 nf projects list · 表格列 next-frame",
+        "nf projects show --project=next-frame · 详情 + episodes",
+        "nf projects create --slug=demo-video --name='Demo Video' · 返回 path",
+        "文件系统 ~/.nextframe/demo-video/ 建好 · 再 list 两个项目都在"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-20",
+      "kind": "bdd-scenario",
+      "title": "CRUD · episodes 族 · 项目下集管理",
+      "description": "AI 在已有项目下创建新集 · list 过滤 · show 详情 · 改项目 JSON 文件结构",
+      "status": "done",
+      "verify_point": "V-8",
+      "feature": "cli-episodes",
+      "scenario_type": "interactive",
+      "given": "next-frame 项目存在 · 已有 ep-01",
+      "when": "AI 跑:nf episodes list → nf episodes create ep-02 → nf episodes show ep-02",
+      "then": [
+        "nf episodes list --project=next-frame 输出 [{slug:'ep-01',...}]",
+        "nf episodes create --project=next-frame --slug=ep-02 --name='技术深入' --duration=90 · 建 episodes/ep-02.json",
+        "ep-02.json 初始结构 {slug, name, duration, anchors: {}, clips: [], log: []}",
+        "nf episodes show --project=next-frame --episode=ep-02 返回完整 episode json"
+      ],
+      "ai_tools": [
+        {
+          "tool": "list",
+          "command": "nf episodes list --project=next-frame | jq '[.[] | .slug]'",
+          "expected": "['ep-01']"
+        },
+        {
+          "tool": "create",
+          "command": "nf episodes create --project=next-frame --slug=ep-02 --name='技术深入' --duration=90",
+          "expected": "exit 0"
+        },
+        {
+          "tool": "show",
+          "command": "nf episodes show --project=next-frame --episode=ep-02 | jq '{slug, duration, clips: (.clips | length)}'",
+          "expected": "{slug:'ep-02', duration:90, clips:0}"
+        },
+        {
+          "tool": "fs",
+          "command": "test -f ~/.nextframe/next-frame/episodes/ep-02.json",
+          "expected": "exit 0"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/episodes.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.85,
+      "evidence": null,
+      "human_frames": [
+        "nf episodes list · 1 条 ep-01",
+        "nf episodes create --slug=ep-02 · 新文件建好",
+        "nf episodes show --episode=ep-02 · 完整结构",
+        "list 再跑 · 2 条"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-21",
+      "kind": "bdd-scenario",
+      "title": "CRUD · clips 族 · 含锚点表达式 start/end",
+      "description": "AI 加 clip 到 timeline · start/end 支持锚点表达式(如 'feat-1-end + 0.5')· 存原始字符串不 eval(v0.3+ eval)· 绑定 charter P11",
+      "status": "done",
+      "verify_point": "V-8",
+      "feature": "cli-clips",
+      "scenario_type": "interactive",
+      "given": "ep-01 存在 · 已有锚点 intro-end=5 · feat-1-end=12",
+      "when": "AI 跑:nf clips create feat-4(start=锚点表达式) → list --track=scene → show",
+      "then": [
+        "nf clips create --slug=feat-4 --label='功能 4' --track=scene --start='feat-3-end' --end='feat-3-end + 12.0' · 成功",
+        "ep-01.json clips 数组追加 {slug:'feat-4', track:'scene', start:'feat-3-end', end:'feat-3-end + 12.0'} · 原样存 不 eval",
+        "nf clips list --project=next-frame --episode=ep-01 --track=scene · 含 feat-4",
+        "nf clips show --clip=feat-4 · 完整字段 + keyframes=[] + effects=[]"
+      ],
+      "ai_tools": [
+        {
+          "tool": "create",
+          "command": "nf clips create --project=next-frame --episode=ep-01 --slug=feat-4 --label='功能 4' --track=scene --start='feat-3-end' --end='feat-3-end + 12.0'",
+          "expected": "exit 0"
+        },
+        {
+          "tool": "list",
+          "command": "nf clips list --project=next-frame --episode=ep-01 --track=scene | jq '[.[] | .slug]'",
+          "expected": "含 'feat-4'"
+        },
+        {
+          "tool": "show-expr",
+          "command": "nf clips show --project=next-frame --episode=ep-01 --clip=feat-4 | jq .start",
+          "expected": "\"feat-3-end\"(字符串原样存 · 未 eval)"
+        },
+        {
+          "tool": "update",
+          "command": "nf clips update --project=next-frame --episode=ep-01 --clip=feat-4 --label='功能四'",
+          "expected": "exit 0 · 其他字段不变"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/clips.rs",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-cli/src/anchor_expr.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.8,
+      "evidence": null,
+      "human_frames": [
+        "已有 5 clip · 加 feat-4",
+        "nf clips create 带 --start='feat-3-end'",
+        "list 6 条 · feat-4 在",
+        "show 字段 start 是字符串表达式 · v0.3+ 才 eval 成秒数"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-22",
+      "kind": "bdd-scenario",
+      "title": "CRUD · anchors 族 · set/unset(charter P11)",
+      "description": "AI 设 / 改 / 删锚点 · 改 ep-01.json.anchors 对象 · unset 时 reject 有 clip 引用的(保一致)",
+      "status": "done",
+      "verify_point": "V-8",
+      "feature": "cli-anchors",
+      "scenario_type": "interactive",
+      "given": "ep-01 有锚点 intro-end=5 · feat-1-end=12 · feat-2-end=30",
+      "when": "AI 跑:list → set 新锚点 → unset 无引用的 → 尝 unset 被引用的(reject)",
+      "then": [
+        "nf anchors list → {'intro-end': 5.0, 'feat-1-end': 12.0, 'feat-2-end': 30.0}",
+        "nf anchors set --name=mid --time=18.0 · ep-01.json.anchors 加 mid=18.0",
+        "nf anchors unset --name=mid · 删掉 · list 不再有",
+        "nf anchors unset --name=intro-end · **reject exit=8** · stderr 列出引用 clip · hint 'nf clips update 先改 start/end'"
+      ],
+      "ai_tools": [
+        {
+          "tool": "list",
+          "command": "nf anchors list --project=next-frame --episode=ep-01 | jq 'keys'",
+          "expected": "['feat-1-end', 'feat-2-end', 'intro-end']"
+        },
+        {
+          "tool": "set",
+          "command": "nf anchors set --project=next-frame --episode=ep-01 --name=mid --time=18.0",
+          "expected": "exit 0"
+        },
+        {
+          "tool": "verify-set",
+          "command": "nf anchors list --project=next-frame --episode=ep-01 | jq '.mid'",
+          "expected": "18.0"
+        },
+        {
+          "tool": "unset-ok",
+          "command": "nf anchors unset --project=next-frame --episode=ep-01 --name=mid",
+          "expected": "exit 0"
+        },
+        {
+          "tool": "unset-reject",
+          "command": "nf anchors unset --project=next-frame --episode=ep-01 --name=intro-end 2>&1",
+          "expected": "exit 8 · stderr 含 'referenced by' + 'hint: nf clips update'"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/anchors.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.85,
+      "evidence": null,
+      "human_frames": [
+        "list 3 锚点",
+        "set mid=18 · 成功",
+        "unset mid · 成功",
+        "unset intro-end · reject · 错误带 hint"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-23",
+      "kind": "bdd-scenario",
+      "title": "CRUD · log 族 · AI 操作日志 tail/show/create",
+      "description": "AI 查最近操作日志(倒序)· 按 actor 过滤 · 查单条 · 手动 create(调试用)",
+      "status": "done",
+      "verify_point": "V-8",
+      "feature": "cli-log",
+      "scenario_type": "interactive",
+      "given": "ep-01.log 有 14 条记录(mock 数据)",
+      "when": "AI 跑 log tail / filter --actor=AI / show / create",
+      "then": [
+        "nf log tail --limit=5 · 输出最新 5 条(倒序)· 每条 {id, time, actor, desc, cli, status}",
+        "nf log tail --actor=AI --limit=10 · 仅 AI 产生的 · 不含 human",
+        "nf log show --id=<entry-id> · 单条详情",
+        "nf log create --actor=AI --desc='测试' --cli='nf clips list' · 新条目追加到 ep-01.log"
+      ],
+      "ai_tools": [
+        {
+          "tool": "tail",
+          "command": "nf log tail --project=next-frame --episode=ep-01 --limit=5 | jq 'length'",
+          "expected": "5"
+        },
+        {
+          "tool": "filter-ai",
+          "command": "nf log tail --project=next-frame --episode=ep-01 --actor=AI | jq '[.[] | .actor] | unique'",
+          "expected": "['AI']"
+        },
+        {
+          "tool": "create",
+          "command": "nf log create --project=next-frame --episode=ep-01 --actor=AI --desc='test log' --cli='nf clips list'",
+          "expected": "exit 0 · stdout new entry id"
+        },
+        {
+          "tool": "verify-create",
+          "command": "nf log tail --project=next-frame --episode=ep-01 --limit=1 | jq '.[0].desc'",
+          "expected": "'test log'"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/log.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.85,
+      "evidence": null,
+      "human_frames": [
+        "log tail --limit=5 · 最新 5 条",
+        "filter --actor=AI · 只看 AI 操作",
+        "show --id · 详情",
+        "create · 手动追加一条"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-24",
+      "kind": "bdd-scenario",
+      "title": "help 自包含 · AI 读 --help 就会(agent-usability)",
+      "description": "每命令 --help 输出必含 2+ 实用例子 + 1+ 常见错 + hint · sonnet 级 AI 读一次就能正确用 · 不读源码",
+      "status": "done",
+      "verify_point": "V-10",
+      "feature": "cli-help",
+      "scenario_type": "content",
+      "given": "nf binary 已装 · 不给 AI 任何文档",
+      "when": "AI 跑 nf help + nf help <cmd> 对 5 个关键命令",
+      "then": [
+        "nf help · 列全 37 命令 + 分族(projects/episodes/clips/anchors/log/app/utility)",
+        "nf help projects create · 输出含 usage + flags + 2+ 例子 + 1+ 常见错(如 slug 已存在 · hint 'nf projects list')",
+        "nf help clips create · 含锚点表达式例子 + common errors",
+        "nf help doctor · 例子 + 输出含义",
+        "所有 help 文本可被 grep 解析 · 例子一行一个 · hint 标记清晰"
+      ],
+      "ai_tools": [
+        {
+          "tool": "help-global",
+          "command": "nf help | grep -c '^  nf '",
+          "expected": ">= 30(命令数)"
+        },
+        {
+          "tool": "help-cmd",
+          "command": "nf help projects create | grep -c -E '^(Example|例子)'",
+          "expected": ">= 2"
+        },
+        {
+          "tool": "help-errors",
+          "command": "nf help projects create | grep -c -E '(错误|Error|hint)'",
+          "expected": ">= 1"
+        },
+        {
+          "tool": "help-clips-anchor",
+          "command": "nf help clips create | grep 'feat-.*-end'",
+          "expected": "含锚点表达式例子"
+        },
+        {
+          "tool": "help-json",
+          "command": "nf help projects create --json | jq '.examples | length'",
+          "expected": ">= 2"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/help.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.75,
+      "evidence": null,
+      "human_frames": [
+        "nf help · 37 命令总览",
+        "nf help <cmd> · 详细(usage + 例子 + hint)",
+        "sonnet 读 help 就能跑 · 不看源码"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-25",
+      "kind": "bdd-scenario",
+      "title": "错误 hint flow · slug typo AI 自救",
+      "description": "AI 输错 slug 时 stderr 返回结构化错误 + hint 字段 · AI 据 hint 再跑查询命令自救 · 不用停等用户",
+      "status": "done",
+      "verify_point": "V-10",
+      "feature": "cli-error-hint",
+      "scenario_type": "interactive",
+      "given": "next-frame 项目存在 · nonexist 不存在",
+      "when": "AI 先误输 slug · 读 hint · 自救后成功",
+      "then": [
+        "nf projects show --project=nonexist · exit 5 · stderr json {error:'unknown project', slug:'nonexist', hint:'nf projects list'}",
+        "AI 读 hint → 跑 nf projects list → 看到正确 slug 'next-frame'",
+        "重新 nf projects show --project=next-frame · exit 0",
+        "所有 slug 不存在错误都有 hint 字段 · AI 可机器解析"
+      ],
+      "ai_tools": [
+        {
+          "tool": "error",
+          "command": "nf projects show --project=nonexist 2>&1 | jq .",
+          "expected": "exit 5 · {error, slug, hint:'nf projects list'}"
+        },
+        {
+          "tool": "hint-parse",
+          "command": "nf projects show --project=nonexist 2>&1 | jq -r .hint",
+          "expected": "'nf projects list'"
+        },
+        {
+          "tool": "recover-list",
+          "command": "$(nf projects show --project=nonexist 2>&1 | jq -r .hint) | jq '[.[] | .slug]'",
+          "expected": "['next-frame']"
+        },
+        {
+          "tool": "recover-retry",
+          "command": "nf projects show --project=next-frame",
+          "expected": "exit 0"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/errors.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.85,
+      "evidence": null,
+      "human_frames": [
+        "AI 拼错 slug · 错误 with hint",
+        "AI 读 hint 跑下一命令",
+        "查到正确 slug",
+        "重跑成功 · 无需停"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-26",
+      "kind": "bdd-scenario",
+      "title": "**sonnet 盲测**:完整流程 AI 第一用户 acceptance",
+      "description": "新 sonnet subagent 给任务 '创建项目 + 集 + clip + 锚点 + nf open + screenshot + quit' · 只有 `nf --help` 可读 · 不给源码 / 不给 spec · 必须全通 · agent-usability rule 铁律 2",
+      "status": "done",
+      "verify_point": "V-9",
+      "feature": "sonnet-blind-test",
+      "scenario_type": "compliance",
+      "given": "nf binary 装好 · ~/.nextframe/ 空 · sonnet 会话启动 · 禁读 spec/ crates/ README",
+      "when": "给 sonnet 任务清单 · 让它自走",
+      "then": [
+        "sonnet 用 nf help 发现命令",
+        "跑 nf projects create --slug=demo --name='Demo' 成功",
+        "跑 nf episodes create --project=demo --slug=ep-01 --name='第一集' --duration=30 成功",
+        "跑 nf clips create --project=demo --episode=ep-01 --slug=intro --label='开场' --track=scene --start=0 --end=5 成功",
+        "跑 nf anchors set --project=demo --episode=ep-01 --name=intro-end --time=5 成功",
+        "跑 nf open --project=demo --episode=ep-01 成功 · Mac 窗口弹出",
+        "跑 nf screenshot --project=demo --episode=ep-01 --out=tmp/sonnet-blind.png 成功 · 文件存在",
+        "跑 nf quit 成功 · 进程干净退出",
+        "全程 7 命令全 exit 0 · 无卡壳无求助 · 无需用户介入"
+      ],
+      "ai_tools": [
+        {
+          "tool": "blind-dispatch",
+          "command": "ally run --backend codex --model gpt-5.4 --prompt-file spec/versions/v0.2/prompts/sonnet-blind-test.md --no-context",
+          "expected": "sonnet 完成全 7 步 · exit 0"
+        },
+        {
+          "tool": "fs-verify",
+          "command": "test -d ~/.nextframe/demo && test -f ~/.nextframe/demo/episodes/ep-01.json && test -f tmp/sonnet-blind.png",
+          "expected": "exit 0 · 三文件都在"
+        },
+        {
+          "tool": "content-verify",
+          "command": "jq '.clips | length' ~/.nextframe/demo/episodes/ep-01.json && jq '.anchors | keys' ~/.nextframe/demo/episodes/ep-01.json",
+          "expected": "1 clip + ['intro-end']"
+        },
+        {
+          "tool": "screenshot-size",
+          "command": "file tmp/sonnet-blind.png | grep -c 'PNG'",
+          "expected": "1(真 PNG)"
+        }
+      ],
+      "citations": [
+        {
+          "path": "spec/versions/v0.2/prompts/sonnet-blind-test.md",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-cli/src/help.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.7,
+      "evidence": null,
+      "human_frames": [
+        "新 sonnet 会话 · 给任务 + nf --help 可读",
+        "sonnet 跑 7 命令 · 全 exit 0",
+        "~/.nextframe/demo/ 建好 · 3 文件齐",
+        "tmp/sonnet-blind.png 真 PNG · 证 sonnet 级可用"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    },
+    {
+      "id": "S-27",
+      "kind": "bdd-scenario",
+      "title": "nf doctor · 环境自检输出",
+      "description": "AI 第一次接触 nf 时跑 doctor 了解环境 · 返回 binary 路径 / socket / registry / 项目 / 进程状态 · 发现问题带 warnings",
+      "status": "done",
+      "verify_point": "V-10",
+      "feature": "cli-doctor",
+      "scenario_type": "observable",
+      "given": "nf 装好 · 有 1 个项目 · app 没运行",
+      "when": "AI 跑 nf doctor",
+      "then": [
+        "输出 json · {binary: '~/.cargo/bin/nf', version: '0.2.0', socket: '/tmp/nextframe-501.sock', registry: '~/.nextframe/registry.json', projects: ['next-frame'], app_running: false, warnings: []}",
+        "socket 不存在时(app 没跑)warnings 为空 · 因为这是 normal state",
+        "registry 损坏 / 权限错 · warnings 非空 · 带 hint",
+        "AI 可据输出判断用不用先 nf open"
+      ],
+      "ai_tools": [
+        {
+          "tool": "doctor",
+          "command": "nf doctor | jq '{app_running, projects: (.projects | length), warnings: (.warnings | length)}'",
+          "expected": "{app_running:false, projects:1, warnings:0}"
+        },
+        {
+          "tool": "doctor-json-schema",
+          "command": "nf doctor | jq 'has(\"binary\") and has(\"socket\") and has(\"registry\")'",
+          "expected": "true"
+        },
+        {
+          "tool": "doctor-normal-clean",
+          "command": "nf doctor | jq '.warnings'",
+          "expected": "[]"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/doctor.rs",
+          "commit": null
+        }
+      ],
+      "confidence": 0.9,
+      "evidence": null,
+      "human_frames": [
+        "nf doctor · json 输出",
+        "binary / socket / registry 路径显示",
+        "projects 列表 + app_running 状态",
+        "warnings 为空说明环境 OK"
+      ],
+      "closed_at": "2026-04-21 17:10"
+    }
+  ],
+  "stats": {
+    "total_items": 27,
+    "by_kind": {
+      "bdd-scenario": 23,
+      "architecture-decision": 3,
+      "compliance": 1
+    },
+    "by_verify_point": {
+      "V-1": 1,
+      "V-2": 5,
+      "V-3": 4,
+      "V-4": 2,
+      "V-5": 2,
+      "V-6": 1,
+      "V-7": 3,
+      "V-8": 5,
+      "V-9": 1,
+      "V-10": 3
+    }
+  },
+  "next_phase": {
+    "phase": "v0.2 poc (Phase 3)",
+    "skill": "version-poc",
+    "poc_topics_file": "spec/versions/v0.2/poc-topics.json"
+  },
+  "closed_at": "2026-04-21 17:10"
+}

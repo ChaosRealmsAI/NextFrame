@@ -1,0 +1,57 @@
+{
+  "version": "v0.13.0",
+  "title": "Project Skeleton Governance",
+  "type": "refactor",
+  "summary": "Make NextFrame's repository maintainable after the product loop is proven: clean root, spec in main repo, artifact archive, current docs, and a structure gate.",
+  "items": [
+    {
+      "id": "root-one-screen",
+      "title": "Root directory is one-screen understandable",
+      "verify": "find . -maxdepth 2 -type d excludes tmp, episodes, reference noise"
+    },
+    {
+      "id": "spec-main-repo",
+      "title": "Spec is owned by the main repository",
+      "verify": "spec/.git is absent and git tracks spec/devlog, bdd, versions, standards"
+    },
+    {
+      "id": "archive-boundary",
+      "title": "Generated artifacts and history references are outside the repo",
+      "verify": "../NextFrame.archive contains migrated tmp, episodes, reference, and spec history bundle"
+    },
+    {
+      "id": "structure-gate",
+      "title": "Future structure drift is machine-checked",
+      "verify": "./scripts/check-structure.sh passes and audit gate calls it"
+    },
+    {
+      "id": "docs-entry",
+      "title": "README and CLAUDE explain current product skeleton",
+      "verify": "README.md and CLAUDE.md describe current v2 JSON editor/export loop and directory map"
+    }
+  ],
+  "out_of_scope": [
+    "Rewriting editor/export business logic",
+    "Changing public CLI behavior",
+    "Moving Rust crates into new package names",
+    "Long export or high-parallel performance benchmarking"
+  ],
+  "ai_tools": [
+    {
+      "tool": "shell",
+      "command": "./scripts/check-structure.sh"
+    },
+    {
+      "tool": "shell",
+      "command": "cargo check -p nf-cli -p nf-shell -p nf-project -p nf-recorder"
+    },
+    {
+      "tool": "shell",
+      "command": "cd frontend/nf-components && npm run check && npm run build"
+    },
+    {
+      "tool": "shell",
+      "command": "target/debug/nf open --project v2-showcase --composition launch-open"
+    }
+  ]
+}

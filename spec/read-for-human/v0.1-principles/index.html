@@ -1,0 +1,819 @@
+<!doctype html>
+<!--
+=============================================================
+  PPT · 滚动 + 语音 + 卡拉OK 字幕 + 时间聚焦 · 固定基座
+  版本: v0.1 · 2026-04
+
+  【开箱即用】
+  1. 把本文件 copy 到你的 tmp/ 目录(或项目目录)
+  2. 准备讲稿 → 生成 batch.json → 跑 nf-tts → 得到 mp3 + timeline.json
+     (详见 references/tts-workflow.md)
+  3. 用 python 把 timeline 合并成 inline-timelines.js(见 tts-workflow.md)
+  4. 改 3 处就能跑:
+     - 下面 【TODO-1: SLIDES】 — 填你的 slides 内容
+     - 下面 【TODO-2: FOCUS_MAP】 — 填时间轨聚焦映射 (可选)
+     - 下面 【TODO-3: 配音路径】 — 确认 data-audio + inline-timelines.js 路径
+
+  【保留不动】
+  - <style> 全部 (aurora / slide / subtitle / focused / controls)
+  - <script> 主逻辑 (IntersectionObserver / renderSub / updateFocus / 控件)
+=============================================================
+-->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>NextFrame · 产品宪法 11 条</title>
+<style>
+/* ============================================================
+   固定 CSS · 不动 · 所有讲解类 PPT 共用
+============================================================ */
+:root {
+  --bg:#050507; --accent:#a78bfa; --accent-strong:#8b5cf6;
+  --warm:#f97316; --green:#34d399; --red:#f87171;
+  --yellow:#fbbf24; --blue:#38bdf8; --pink:#f472b6;
+  --border:rgba(255,255,255,0.13); --text:rgba(255,255,255,0.98);
+  --text-sub:rgba(255,255,255,0.82); --text-60:rgba(255,255,255,0.60);
+  --text-40:rgba(255,255,255,0.40);
+}
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; scroll-snap-type:y mandatory; }
+body {
+  margin:0;
+  background:var(--bg);
+  background-image:
+    radial-gradient(ellipse 80% 35% at 50% 0%, rgba(139,92,246,0.30), transparent 60%),
+    radial-gradient(ellipse 50% 25% at 80% 20%, rgba(167,139,250,0.16), transparent 60%),
+    radial-gradient(ellipse 60% 25% at 50% 100%, rgba(124,58,237,0.12), transparent 60%);
+  background-attachment:fixed;
+  color:var(--text-sub);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;
+  -webkit-font-smoothing:antialiased;
+  font-size:22px; line-height:1.5;
+}
+
+/* 每张 slide 占满一屏, 滚动吸附 */
+.slide {
+  min-height:100vh; scroll-snap-align:start; scroll-snap-stop:always;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:40px 60px 180px; position:relative;
+}
+.slide .num { font-size:13px; color:var(--accent); letter-spacing:0.25em; font-weight:700; text-transform:uppercase; margin-bottom:18px; }
+.slide h1 { font-size:72px; font-weight:900; letter-spacing:-0.03em; line-height:1.0; color:var(--text); margin:0 0 20px; text-align:center; }
+.slide h2 { font-size:48px; font-weight:800; letter-spacing:-0.02em; color:var(--text); margin:0 0 18px; text-align:center; }
+.slide .tagline { font-size:24px; color:var(--text-60); font-weight:400; text-align:center; max-width:900px; margin:0 0 32px; line-height:1.5; }
+.slide .visual { width:100%; max-width:1100px; display:flex; justify-content:center; }
+.slide .visual svg { width:100%; height:auto; max-height:55vh; }
+.slide .footer-hint { position:absolute; bottom:200px; font-size:16px; color:var(--text-40); font-style:italic; }
+
+.cover-badge { display:inline-block; padding:8px 18px; background:rgba(167,139,250,0.14); border:1px solid rgba(167,139,250,0.3); border-radius:999px; color:var(--accent); font-size:14px; letter-spacing:0.15em; font-weight:700; margin-bottom:28px; }
+
+/* 时间轨聚焦: SVG g[id].focused 发光 · 其他保持亮度不降暗 */
+svg g[id] { transition: filter .4s ease; }
+svg g[id].focused {
+  filter: drop-shadow(0 0 24px rgba(167,139,250,0.95)) brightness(1.18);
+}
+
+/* 底部卡拉OK 字幕条 (固定吸底) */
+.subtitle-bar {
+  position:fixed; bottom:0; left:0; right:0; z-index:50;
+  background:rgba(0,0,0,0.72); backdrop-filter:blur(28px) saturate(1.8);
+  -webkit-backdrop-filter:blur(28px) saturate(1.8);
+  border-top:1px solid var(--border);
+  padding:26px 40px 30px;
+  min-height:130px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:10px;
+}
+.subtitle-bar #subtitle {
+  max-width:1100px; text-align:center;
+  font-size:28px; line-height:1.55; font-weight:500;
+  letter-spacing:0.02em; min-height:44px;
+}
+.subtitle-bar .word { transition:color .12s ease, text-shadow .12s ease; display:inline; }
+.subtitle-bar .word.past { color:rgba(255,255,255,0.32); }
+.subtitle-bar .word.current { color:var(--accent); font-weight:800; text-shadow:0 0 20px rgba(167,139,250,0.55); }
+.subtitle-bar .word.future { color:rgba(255,255,255,0.55); }
+.subtitle-bar .hint-row { display:flex; gap:20px; align-items:center; color:var(--text-40); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; }
+.subtitle-bar .slide-num { color:var(--accent); font-family:monospace; font-weight:700; }
+
+/* 右下悬浮播放控件 */
+.float-ctrl {
+  position:fixed; right:28px; bottom:170px; z-index:60;
+  display:flex; flex-direction:column; gap:10px;
+}
+.float-ctrl button {
+  background:rgba(0,0,0,0.55); backdrop-filter:blur(24px);
+  color:var(--accent); border:1px solid rgba(167,139,250,0.35);
+  border-radius:999px; padding:14px 18px; font-size:18px; cursor:pointer; font-weight:700;
+  min-width:56px; min-height:56px;
+  display:inline-flex; align-items:center; justify-content:center;
+  transition:background 0.2s;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
+}
+.float-ctrl button:hover { background:rgba(167,139,250,0.2); }
+.float-ctrl button.play-main {
+  background:var(--accent); color:white; font-size:22px;
+  min-width:64px; min-height:64px; border-color:var(--accent-strong);
+}
+.float-ctrl button.play-main:hover { background:var(--accent-strong); }
+
+/* 开场 overlay (点开始才启动播放 · 浏览器要求 user gesture) */
+.intro-overlay {
+  position:fixed; inset:0; z-index:100;
+  background:rgba(5,5,7,0.88); backdrop-filter:blur(24px);
+  display:flex; align-items:center; justify-content:center;
+  transition:opacity 0.5s ease;
+}
+.intro-overlay.hidden { opacity:0; pointer-events:none; }
+.intro-inner { text-align:center; padding:50px 60px; max-width:620px; }
+.intro-inner h1 { font-size:64px; font-weight:900; letter-spacing:-0.03em; color:var(--text); margin:0 0 20px; }
+.intro-inner p { font-size:19px; color:var(--text-sub); line-height:1.6; margin:10px 0 30px; }
+.intro-inner .features { display:flex; gap:26px; justify-content:center; margin:20px 0 40px; }
+.intro-inner .feat { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.intro-inner .feat-icon { font-size:32px; }
+.intro-inner .feat-lbl { font-size:13px; color:var(--text-60); }
+.intro-inner button {
+  background:var(--accent); color:white; border:none;
+  padding:18px 44px; font-size:20px; cursor:pointer; font-weight:800;
+  border-radius:999px; letter-spacing:0.05em;
+  box-shadow:0 8px 40px rgba(167,139,250,0.4);
+  transition:all 0.2s;
+}
+.intro-inner button:hover { background:var(--accent-strong); transform:translateY(-2px); box-shadow:0 12px 48px rgba(167,139,250,0.5); }
+
+/* 首屏滚动提示 · bounce 动画 */
+.scroll-hint {
+  position:absolute; bottom:160px; left:50%; transform:translateX(-50%);
+  color:var(--text-60); font-size:14px; text-align:center;
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  animation:bounce 2s ease-in-out infinite;
+}
+.scroll-hint .arrow { font-size:24px; }
+@keyframes bounce { 0%,100% { transform:translate(-50%, 0); opacity:0.7; } 50% { transform:translate(-50%, 8px); opacity:1; } }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     开场 overlay · 只改顶部 h1 + p 内容即可
+============================================================ -->
+<div class="intro-overlay" id="intro">
+  <div class="intro-inner">
+    <h1>NextFrame · 产品宪法</h1>
+    <p>11 条原则 · 定死整个产品的底线 · 语音讲解 + 滚动翻页 · 约 5 分钟</p>
+    <div class="features">
+      <div class="feat"><div class="feat-icon">🎧</div><div class="feat-lbl">语音讲</div></div>
+      <div class="feat"><div class="feat-icon">📜</div><div class="feat-lbl">字幕跟</div></div>
+      <div class="feat"><div class="feat-icon">🖼️</div><div class="feat-lbl">图讲解</div></div>
+      <div class="feat"><div class="feat-icon">⬇️</div><div class="feat-lbl">滚动翻</div></div>
+    </div>
+    <button id="start-btn">▶︎ 开始播放</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     【TODO-1: SLIDES】 · 按需增删 section
+     每个 slide 必带属性:
+       class="slide"
+       data-audio="audio/slide-0N.mp3"
+       data-idx="N"
+     SVG 元素想被时间轨 focus 的, 给 <g> 加 id="..."
+============================================================ -->
+
+<style>
+/* 本 PPT 追加样式 */
+.mockup-term { background:#010409; border:1px solid var(--border); border-radius:12px; padding:24px 28px; font-family:"SF Mono",Menlo,monospace; font-size:17px; line-height:1.75; color:#c9d1d9; text-align:left; width:100%; max-width:920px; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+.mockup-term .prompt { color:#ff7b72; }
+.mockup-term .key { color:#79c0ff; }
+.mockup-term .cmt { color:#6e7681; }
+.mockup-term .ok { color:#34d399; }
+.mockup-term .warn { color:#fbbf24; }
+.mockup-term .pulse { animation:blinkcur 1s steps(2) infinite; }
+@keyframes blinkcur { 50% { opacity:0; } }
+.compare-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; width:100%; max-width:1000px; }
+.compare-card { padding:28px; border-radius:16px; background:rgba(255,255,255,0.03); border:1px solid var(--border); backdrop-filter:blur(24px); }
+.compare-card.bad { background:rgba(248,113,113,0.08); border-color:rgba(248,113,113,0.3); }
+.compare-card.good { background:rgba(52,211,153,0.08); border-color:rgba(52,211,153,0.3); }
+.compare-card h3 { font-size:22px; margin:0 0 14px; color:var(--text); }
+.compare-card .big { font-size:48px; font-weight:900; letter-spacing:-0.02em; margin:10px 0; }
+.compare-card.bad .big { color:#fca5a5; }
+.compare-card.good .big { color:#6ee7b7; }
+
+/* 桌面端 mockup · 核心帧 */
+.app-mockup { width:100%; max-width:1240px; aspect-ratio:16/10; background:rgba(5,5,10,0.85); border:1px solid rgba(167,139,250,0.3); border-radius:16px; overflow:hidden; box-shadow:0 40px 100px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06); backdrop-filter:blur(60px) saturate(2); display:flex; flex-direction:column; }
+.app-titlebar { height:32px; background:linear-gradient(to bottom, rgba(30,30,40,0.6), rgba(20,20,28,0.6)); border-bottom:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; padding:0 14px; gap:6px; }
+.app-titlebar .dot { width:12px; height:12px; border-radius:50%; }
+.app-titlebar .dot.red { background:#ff5f57; }
+.app-titlebar .dot.yellow { background:#febc2e; }
+.app-titlebar .dot.green { background:#28c840; }
+.app-titlebar .title { margin-left:12px; color:var(--text-60); font-size:12px; font-family:-apple-system,sans-serif; }
+.app-toolbar { height:40px; background:rgba(0,0,0,0.3); border-bottom:1px solid rgba(255,255,255,0.05); display:flex; align-items:center; padding:0 14px; gap:12px; font-size:12px; color:var(--text-60); }
+.app-toolbar .btn { padding:5px 10px; background:rgba(167,139,250,0.12); border:1px solid rgba(167,139,250,0.25); border-radius:6px; color:#c4b5fd; font-weight:600; cursor:pointer; font-size:11px; letter-spacing:0.05em; }
+.app-toolbar .btn.primary { background:var(--accent); color:white; border-color:var(--accent-strong); }
+.app-toolbar .spacer { flex:1; }
+.app-body { flex:1; display:grid; grid-template-columns:200px 1fr 220px; min-height:0; }
+.app-panel { background:rgba(0,0,0,0.25); border-right:1px solid rgba(255,255,255,0.05); padding:14px; overflow:hidden; }
+.app-panel.right { border-right:none; border-left:1px solid rgba(255,255,255,0.05); }
+.app-panel h4 { font-size:10px; letter-spacing:0.15em; text-transform:uppercase; color:var(--accent); margin:0 0 10px; font-weight:700; }
+.app-panel .asset { display:flex; align-items:center; gap:8px; padding:6px 8px; background:rgba(167,139,250,0.08); border:1px solid rgba(167,139,250,0.18); border-radius:6px; margin-bottom:6px; font-size:11px; color:var(--text-sub); }
+.app-panel .asset .icon { font-size:14px; }
+.app-panel .field { margin-bottom:10px; }
+.app-panel .field .lbl { font-size:10px; color:var(--text-40); margin-bottom:4px; letter-spacing:0.05em; }
+.app-panel .field .val { font-size:12px; color:var(--text); font-family:"SF Mono",monospace; padding:5px 8px; background:rgba(255,255,255,0.04); border-radius:4px; border:1px solid rgba(255,255,255,0.06); }
+.app-preview { display:flex; flex-direction:column; background:rgba(0,0,0,0.15); }
+.app-preview-stage { flex:1; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #1a0b2e 0%, #2d1b3e 40%, #0f0a1e 100%); position:relative; overflow:hidden; }
+.app-preview-stage .vframe { width:72%; aspect-ratio:16/9; background:radial-gradient(ellipse at 30% 40%, rgba(167,139,250,0.35), transparent 60%), linear-gradient(135deg, #0f0a1e 0%, #1e1433 100%); border-radius:8px; border:1px solid rgba(167,139,250,0.3); position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; }
+.app-preview-stage .vframe .logo-b { font-size:28px; font-weight:900; background:linear-gradient(135deg, #a78bfa, #f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:-0.03em; }
+.app-preview-stage .vframe .sub-b { font-size:11px; color:rgba(255,255,255,0.7); letter-spacing:0.12em; text-transform:uppercase; }
+.app-preview-stage .vframe .dots { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); display:flex; gap:6px; }
+.app-preview-stage .vframe .dots span { width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,0.25); }
+.app-preview-stage .vframe .dots span.on { background:#a78bfa; }
+.app-preview-stage .playhead { position:absolute; top:0; bottom:0; width:2px; background:#f97316; box-shadow:0 0 12px #f97316; }
+.app-preview-stage .ruler { position:absolute; top:8px; left:50%; transform:translateX(-50%); font-family:"SF Mono",monospace; font-size:11px; color:var(--text-60); padding:3px 8px; background:rgba(0,0,0,0.5); border-radius:4px; border:1px solid rgba(255,255,255,0.08); }
+.app-playctl { height:34px; background:rgba(0,0,0,0.4); border-top:1px solid rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; gap:10px; font-size:11px; color:var(--text-60); }
+.app-playctl .pbtn { width:26px; height:26px; border-radius:50%; background:rgba(167,139,250,0.2); border:1px solid rgba(167,139,250,0.3); display:flex; align-items:center; justify-content:center; color:#c4b5fd; font-size:10px; }
+.app-timeline { height:30%; min-height:160px; background:rgba(5,5,10,0.5); border-top:1px solid rgba(255,255,255,0.06); display:flex; flex-direction:column; overflow:hidden; }
+.app-timeline .tl-ruler { height:22px; background:rgba(0,0,0,0.3); display:flex; align-items:center; padding:0 12px; font-family:"SF Mono",monospace; font-size:9px; color:var(--text-40); letter-spacing:0.5em; border-bottom:1px solid rgba(255,255,255,0.04); }
+.app-timeline .tl-tracks { flex:1; overflow:hidden; position:relative; }
+.app-timeline .tl-row { height:28px; display:flex; align-items:center; border-bottom:1px solid rgba(255,255,255,0.03); padding:0 10px 0 0; }
+.app-timeline .tl-row .tl-head { width:80px; flex-shrink:0; padding:0 10px; font-size:10px; color:var(--text-60); font-weight:600; letter-spacing:0.05em; border-right:1px solid rgba(255,255,255,0.06); }
+.app-timeline .tl-row .tl-lane { flex:1; height:100%; position:relative; }
+.app-timeline .tl-clip { position:absolute; top:4px; bottom:4px; border-radius:4px; padding:2px 8px; font-size:10px; display:flex; align-items:center; color:white; font-weight:600; box-shadow:inset 0 1px 0 rgba(255,255,255,0.15); cursor:pointer; }
+.app-timeline .tl-clip.video { background:linear-gradient(135deg,#7c6aef,#a78bfa); }
+.app-timeline .tl-clip.text { background:linear-gradient(135deg,#f472b6,#ec4899); }
+.app-timeline .tl-clip.audio { background:linear-gradient(135deg,#38bdf8,#0ea5e9); }
+.app-timeline .tl-clip.trans { background:linear-gradient(135deg,#f97316,#fb923c); }
+.app-timeline .tl-playhead { position:absolute; top:0; bottom:0; width:2px; background:#f97316; box-shadow:0 0 8px rgba(249,115,22,0.8); z-index:5; }
+
+/* 时间轴演示 · 跟流程同步 */
+.flow-diag { width:100%; max-width:1000px; padding:30px; }
+.flow-diag .nodes { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+.flow-diag .node { flex:1; min-width:110px; text-align:center; }
+.flow-diag .node .emoji { font-size:38px; margin-bottom:8px; }
+.flow-diag .node .lbl { font-size:13px; color:var(--text-sub); font-weight:600; }
+.flow-diag .node .sub { font-size:11px; color:var(--text-40); }
+.flow-diag .arrow { color:var(--accent); font-size:20px; }
+
+.badge-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; max-width:1100px; width:100%; }
+.badge-card { padding:18px 12px; background:rgba(167,139,250,0.12); border:1px solid rgba(167,139,250,0.35); border-radius:14px; text-align:center; }
+.badge-card .n { font-size:14px; font-weight:900; color:#a78bfa; margin-bottom:4px; }
+.badge-card .t { font-size:13px; font-weight:700; color:var(--text); line-height:1.25; }
+</style>
+
+<style>
+/* principles PPT 追加样式 */
+.p-hero { text-align:center; }
+.p-big-num { font-size:120px; font-weight:900; background:linear-gradient(135deg, #a78bfa 0%, #f472b6 60%, #f97316 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; line-height:1; letter-spacing:-0.04em; margin-bottom:12px; }
+.p-tag { display:inline-block; padding:6px 16px; background:rgba(167,139,250,0.14); border:1px solid rgba(167,139,250,0.3); border-radius:999px; color:#c4b5fd; font-size:14px; letter-spacing:0.1em; font-weight:700; margin-bottom:20px; }
+.p-2col { display:grid; grid-template-columns:1fr 1fr; gap:24px; width:100%; max-width:1000px; }
+.p-card { padding:28px; border-radius:16px; background:rgba(255,255,255,0.03); border:1px solid var(--border); backdrop-filter:blur(24px); }
+.p-card.accent { background:rgba(167,139,250,0.1); border-color:rgba(167,139,250,0.35); }
+.p-card.warm { background:rgba(249,115,22,0.08); border-color:rgba(249,115,22,0.3); }
+.p-card.green { background:rgba(52,211,153,0.08); border-color:rgba(52,211,153,0.3); }
+.p-card.red { background:rgba(248,113,113,0.08); border-color:rgba(248,113,113,0.3); }
+.p-card h3 { font-size:20px; margin:0 0 12px; color:var(--text); }
+.p-term { font-family:"SF Mono",Menlo,monospace; background:#010409; border:1px solid var(--border); border-radius:10px; padding:20px 26px; font-size:16px; line-height:1.85; color:#c9d1d9; max-width:900px; width:100%; text-align:left; box-shadow:0 20px 60px rgba(0,0,0,0.45); }
+.p-term .cmt { color:#6e7681; }
+.p-term .k { color:#79c0ff; }
+.p-term .s { color:#34d399; }
+.p-term .w { color:#fbbf24; }
+.p-term .r { color:#ff7b72; }
+.p-term .p { color:#f472b6; }
+.p-pill-row { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; max-width:1000px; }
+.p-pill { padding:8px 16px; border-radius:999px; border:1px solid rgba(167,139,250,0.3); background:rgba(167,139,250,0.1); color:#c4b5fd; font-size:14px; font-weight:600; }
+.p-pill.warm { background:rgba(249,115,22,0.12); border-color:rgba(249,115,22,0.35); color:#fdba74; }
+.p-pill.green { background:rgba(52,211,153,0.1); border-color:rgba(52,211,153,0.35); color:#6ee7b7; }
+.p-pill.pink { background:rgba(244,114,182,0.1); border-color:rgba(244,114,182,0.35); color:#f9a8d4; }
+.p-pill.blue { background:rgba(56,189,248,0.1); border-color:rgba(56,189,248,0.35); color:#7dd3fc; }
+.p-pill.yellow { background:rgba(251,191,36,0.1); border-color:rgba(251,191,36,0.35); color:#fcd34d; }
+.p-rule { padding:20px 26px; border-left:3px solid var(--accent); background:rgba(167,139,250,0.08); border-radius:0 10px 10px 0; font-size:16px; line-height:1.7; max-width:900px; color:rgba(232,232,236,0.85); }
+.p-rule.warm { border-left-color:#f97316; background:rgba(249,115,22,0.08); }
+.p-rule.red { border-left-color:#f87171; background:rgba(248,113,113,0.08); }
+.p-rule.green { border-left-color:#34d399; background:rgba(52,211,153,0.08); }
+.p-formula { font-family:"SF Mono",Menlo,monospace; font-size:30px; font-weight:700; padding:30px 40px; background:linear-gradient(135deg, rgba(167,139,250,0.12), rgba(52,211,153,0.12)); border:1px solid rgba(167,139,250,0.3); border-radius:16px; color:var(--text); text-align:center; letter-spacing:0.02em; }
+.p-anchor-demo { display:grid; grid-template-columns:1.2fr 1fr; gap:20px; width:100%; max-width:1100px; align-items:stretch; }
+.p-anchor-bars { padding:20px; background:rgba(0,0,0,0.3); border:1px solid var(--border); border-radius:12px; }
+.p-anchor-bar { display:flex; align-items:center; height:32px; margin-bottom:8px; }
+.p-anchor-bar .lbl { width:85px; font-size:12px; color:var(--text-60); text-align:right; padding-right:10px; font-family:"SF Mono",monospace; }
+.p-anchor-bar .track { flex:1; height:22px; position:relative; background:rgba(255,255,255,0.04); border-radius:4px; }
+.p-anchor-bar .clip { position:absolute; top:0; bottom:0; border-radius:4px; padding:0 8px; display:flex; align-items:center; font-size:10px; color:white; font-weight:600; }
+.p-anchor-bar .clip.v { background:linear-gradient(135deg,#7c6aef,#a78bfa); }
+.p-anchor-bar .clip.t { background:linear-gradient(135deg,#f472b6,#ec4899); }
+.p-anchor-bar .clip.a { background:linear-gradient(135deg,#38bdf8,#0ea5e9); }
+.p-anchor-bar .mark { position:absolute; top:-6px; bottom:-6px; width:2px; background:#f97316; box-shadow:0 0 8px #f97316; z-index:2; }
+.p-anchor-bar .mark::after { content:attr(data-lbl); position:absolute; top:-22px; left:50%; transform:translateX(-50%); font-size:10px; color:#f97316; white-space:nowrap; font-weight:700; font-family:"SF Mono",monospace; }
+</style>
+
+<!-- ===== Slide 1 · 封面 ===== -->
+<section class="slide" data-audio="audio/slide-01.mp3" data-idx="1">
+  <div class="cover-badge">🎧 语音讲解 · 13 帧 · 约 5 分钟</div>
+  <h1>NextFrame 产品宪法</h1>
+  <div class="tagline">11 条原则 · 定死整个产品的底线 · 任何版本做啥 / 不做啥 / 怎么选 都过这把尺</div>
+
+  <div class="visual p-pill-row" style="margin-top:20px;">
+    <span class="p-pill">P1 · AI 第一</span>
+    <span class="p-pill">P2 · CLI 驱动</span>
+    <span class="p-pill">P3 · frame pure</span>
+    <span class="p-pill">P4 · 3 模式像素一致</span>
+    <span class="p-pill">P5 · 桌面端是预览</span>
+    <span class="p-pill warm">P6 · 高质量</span>
+    <span class="p-pill warm">P7 · HTML 满表达力</span>
+    <span class="p-pill green">P8 · JSON 单一真理</span>
+    <span class="p-pill green">P9 · 外接 AI</span>
+    <span class="p-pill green">P10 · 全自动终态</span>
+    <span class="p-pill pink">P11 · 锚点驱动 🆕</span>
+  </div>
+
+  <div class="scroll-hint">
+    <div>向下滚动开始</div>
+    <div class="arrow">↓</div>
+  </div>
+</section>
+
+<!-- ===== Slide 2 · P1 AI 是第一用户 ===== -->
+<section class="slide" data-audio="audio/slide-02.mp3" data-idx="2">
+  <div class="num">第 1 条</div>
+  <h2>AI 是第一用户</h2>
+  <div class="tagline">产品为 AI agent 设计 · 人是监督 / 最终审批</div>
+
+  <div class="visual">
+    <div class="p-2col">
+      <div class="p-card accent" style="text-align:center;">
+        <div style="font-size:64px; margin-bottom:10px;">🤖</div>
+        <h3>AI · 第一用户</h3>
+        <div style="font-size:14px; color:rgba(232,232,236,0.7); line-height:1.7;">CC 写 JSON · 跑 CLI · 读 schema · 看结构化日志 · 自动化决策</div>
+      </div>
+      <div class="p-card">
+        <div style="font-size:64px; margin-bottom:10px; text-align:center;">👤</div>
+        <h3 style="color:var(--text-60); text-align:center;">人 · 监督者</h3>
+        <div style="font-size:14px; color:rgba(232,232,236,0.55); line-height:1.7; text-align:center;">看 AI 产出 · 点头 / 驳回 · 可选轻度调 · 不必操作也能跑完</div>
+      </div>
+    </div>
+  </div>
+  <div class="p-rule" style="margin-top:26px;"><b style="color:#a78bfa;">判断尺:</b> 新 AI agent 接触 5 分钟能不能自己用对? 不能 → 接口没设计好 · 不是模型不够聪明.</div>
+</section>
+
+<!-- ===== Slide 3 · P2 CLI 驱动 ===== -->
+<section class="slide" data-audio="audio/slide-03.mp3" data-idx="3">
+  <div class="num">第 2 条</div>
+  <h2>CLI 驱动</h2>
+  <div class="tagline">整个产品命令行化 · 桌面端只是 UI 外壳</div>
+
+  <div class="visual p-term">
+    <div class="cmt"># 全流程 CLI · 人 / AI / CI 走同一代码路径</div>
+    <div><span class="r">$</span> cc chat <span class="s">"30s 产品介绍视频"</span>        <span class="cmt">→ AI 输出 JSON</span></div>
+    <div><span class="r">$</span> <span class="k">nf build</span> project.json            <span class="cmt">→ 解析 + 预渲染</span></div>
+    <div><span class="r">$</span> <span class="k">nf preview</span> project.json          <span class="cmt">→ 桌面端弹出</span></div>
+    <div><span class="r">$</span> <span class="k">nf export</span> project.json -o out.mp4 <span class="cmt">→ 4K MP4 导出</span></div>
+  </div>
+</section>
+
+<!-- ===== Slide 4 · P3 frame pure ===== -->
+<section class="slide" data-audio="audio/slide-04.mp3" data-idx="4">
+  <div class="num">第 3 条</div>
+  <h2>frame pure</h2>
+  <div class="tagline">核心架构不变式 · 同一 t 永远同一像素</div>
+
+  <div class="visual" style="flex-direction:column; gap:22px;">
+    <div class="p-formula">frame(t, json) = pixels</div>
+    <div class="p-2col" style="max-width:900px;">
+      <div class="p-card red">
+        <h3 style="color:#fca5a5;">❌ 反面</h3>
+        <div style="font-size:14px; color:rgba(232,232,236,0.75); line-height:1.7;">第 1 次 render 这一帧是 A 色 · 第 2 次变 B 色 · 播放抖 · 录屏乱 · 调试崩溃</div>
+      </div>
+      <div class="p-card green">
+        <h3 style="color:#6ee7b7;">✅ frame pure</h3>
+        <div style="font-size:14px; color:rgba(232,232,236,0.75); line-height:1.7;">t=3.7s 喂进去 永远是同一张像素 · 预览 / 编辑 / 录制 / CI 都对得上</div>
+      </div>
+    </div>
+  </div>
+  <div class="p-rule warm" style="margin-top:22px;"><b style="color:#f97316;">实现代价:</b> 禁 <code>Date.now()</code> 直接用 · 禁未 seeded 的 <code>Math.random()</code> · 禁未缓存的网络</div>
+</section>
+
+<!-- ===== Slide 5 · P4 3 模式像素一致 ===== -->
+<section class="slide" data-audio="audio/slide-05.mp3" data-idx="5">
+  <div class="num">第 4 条</div>
+  <h2>3 模式像素级一致</h2>
+  <div class="tagline">play · preview · export 三模式同一帧必须像素相同</div>
+
+  <div class="visual" style="flex-direction:column; gap:20px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; width:100%; max-width:900px;">
+      <div class="p-card accent" style="text-align:center;"><div style="font-size:40px; margin-bottom:8px;">▶️</div><h3 style="margin:0;">play</h3><div style="font-size:12px; color:var(--text-60);">用户点播放</div></div>
+      <div class="p-card accent" style="text-align:center;"><div style="font-size:40px; margin-bottom:8px;">✏️</div><h3 style="margin:0;">preview</h3><div style="font-size:12px; color:var(--text-60);">编辑器里看</div></div>
+      <div class="p-card accent" style="text-align:center;"><div style="font-size:40px; margin-bottom:8px;">🎬</div><h3 style="margin:0;">export</h3><div style="font-size:12px; color:var(--text-60);">导出 MP4</div></div>
+    </div>
+    <div class="p-formula" style="max-width:900px;">pixels(play) == pixels(preview) == pixels(export)</div>
+  </div>
+  <div class="p-rule red" style="margin-top:22px;"><b style="color:#f87171;">常见坑:</b> preview 正常 / export 黑屏 / 颜色错 / 帧错位 —— 都因为三模式没从地基对齐 · v0.1 起防死</div>
+</section>
+
+<!-- ===== Slide 6 · P5 桌面端是预览 ===== -->
+<section class="slide" data-audio="audio/slide-06.mp3" data-idx="6">
+  <div class="num">第 5 条</div>
+  <h2>桌面端是预览 + 可选编辑</h2>
+  <div class="tagline">不是主操作入口 · 人可跳过 · CLI 也能跑完</div>
+
+  <div class="visual">
+    <div class="p-2col">
+      <div class="p-card green">
+        <h3 style="color:#6ee7b7;">✅ 桌面端该做</h3>
+        <div style="font-size:14px; color:rgba(232,232,236,0.8); line-height:1.85;">• 可视化 JSON → 视频<br>• 多轨道展示<br>• 改 clip 位置(拖拽)<br>• 改时间范围 (in/out)<br>• 导出按钮</div>
+      </div>
+      <div class="p-card red">
+        <h3 style="color:#fca5a5;">❌ 桌面端不该做</h3>
+        <div style="font-size:14px; color:rgba(232,232,236,0.8); line-height:1.85;">• 内置 AI 对话框<br>• 复杂剪辑 (Premiere 那种)<br>• 模板市场 / 素材库<br>• 资产管理中心<br>• 账号 / 登录</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Slide 7 · P6 高质量 ===== -->
+<section class="slide" data-audio="audio/slide-07.mp3" data-idx="7">
+  <div class="num">第 6 条</div>
+  <h2>高质量视频产出</h2>
+  <div class="tagline">4K · HDR · 60fps · HEVC · 直达 Mac 平台上限</div>
+
+  <div class="visual">
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px; width:100%; max-width:860px;">
+      <div style="padding:22px 12px; background:linear-gradient(135deg,rgba(249,115,22,0.2),rgba(249,115,22,0.05)); border:1px solid rgba(249,115,22,0.4); border-radius:14px; text-align:center;"><div style="font-size:38px; font-weight:900; color:#f97316; letter-spacing:-0.02em;">4K</div><div style="font-size:11px; color:rgba(232,232,236,0.7); margin-top:6px;">3840 × 2160</div></div>
+      <div style="padding:22px 12px; background:linear-gradient(135deg,rgba(249,115,22,0.2),rgba(249,115,22,0.05)); border:1px solid rgba(249,115,22,0.4); border-radius:14px; text-align:center;"><div style="font-size:38px; font-weight:900; color:#f97316; letter-spacing:-0.02em;">10bit</div><div style="font-size:11px; color:rgba(232,232,236,0.7); margin-top:6px;">HDR 色深</div></div>
+      <div style="padding:22px 12px; background:linear-gradient(135deg,rgba(249,115,22,0.2),rgba(249,115,22,0.05)); border:1px solid rgba(249,115,22,0.4); border-radius:14px; text-align:center;"><div style="font-size:38px; font-weight:900; color:#f97316; letter-spacing:-0.02em;">60fps</div><div style="font-size:11px; color:rgba(232,232,236,0.7); margin-top:6px;">流畅帧率</div></div>
+      <div style="padding:22px 12px; background:linear-gradient(135deg,rgba(249,115,22,0.2),rgba(249,115,22,0.05)); border:1px solid rgba(249,115,22,0.4); border-radius:14px; text-align:center;"><div style="font-size:38px; font-weight:900; color:#f97316; letter-spacing:-0.02em;">HEVC</div><div style="font-size:11px; color:rgba(232,232,236,0.7); margin-top:6px;">硬件加速</div></div>
+    </div>
+  </div>
+  <div class="p-rule warm" style="margin-top:24px;"><b style="color:#f97316;">禁话术:</b> 先 1080p · 4K 后面加 / 先 8bit · HDR v2 做 / 先 30fps · 上限后加 — <b>一开始就冲上限</b></div>
+</section>
+
+<!-- ===== Slide 8 · P7 HTML 满表达力 ===== -->
+<section class="slide" data-audio="audio/slide-08.mp3" data-idx="8">
+  <div class="num">第 7 条</div>
+  <h2>HTML 生态满表达力</h2>
+  <div class="tagline">浏览器能做的视觉效果 · NextFrame 都能用</div>
+
+  <div class="visual">
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px; width:100%; max-width:900px;">
+      <div class="p-card" style="padding:18px;"><div style="font-size:28px; margin-bottom:6px;">🎨</div><div style="font-size:14px; font-weight:700; color:#c4b5fd;">CSS</div><div style="font-size:12px; color:rgba(232,232,236,0.7);">animation / transform / filter / gradient / backdrop-filter</div></div>
+      <div class="p-card" style="padding:18px;"><div style="font-size:28px; margin-bottom:6px;">🖼️</div><div style="font-size:14px; font-weight:700; color:#7dd3fc;">Canvas 2D</div><div style="font-size:12px; color:rgba(232,232,236,0.7);">图表 / 自由绘制 / 粒子 / 动态生成</div></div>
+      <div class="p-card" style="padding:18px;"><div style="font-size:28px; margin-bottom:6px;">🎮</div><div style="font-size:14px; font-weight:700; color:#f9a8d4;">WebGL / Three</div><div style="font-size:12px; color:rgba(232,232,236,0.7);">3D · 着色器 · 粒子系统</div></div>
+      <div class="p-card" style="padding:18px;"><div style="font-size:28px; margin-bottom:6px;">🎥</div><div style="font-size:14px; font-weight:700; color:#6ee7b7;">video / img</div><div style="font-size:12px; color:rgba(232,232,236,0.7);">外部视频 / 图片 · 时间同步</div></div>
+      <div class="p-card" style="padding:18px;"><div style="font-size:28px; margin-bottom:6px;">🔤</div><div style="font-size:14px; font-weight:700; color:#fcd34d;">SVG / 字体</div><div style="font-size:12px; color:rgba(232,232,236,0.7);">矢量 · 字形动画 · 路径绘制</div></div>
+      <div class="p-card" style="padding:18px;"><div style="font-size:28px; margin-bottom:6px;">🧩</div><div style="font-size:14px; font-weight:700; color:#fdba74;">Web API</div><div style="font-size:12px; color:rgba(232,232,236,0.7);">Audio / IntersectionObserver / FontFace 等</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Slide 9 · P8 JSON 单一真理 ===== -->
+<section class="slide" data-audio="audio/slide-09.mp3" data-idx="9">
+  <div class="num">第 8 条</div>
+  <h2>JSON 是单一真理源</h2>
+  <div class="tagline">一切状态在 JSON · 其他全派生</div>
+
+  <div class="visual" style="flex-direction:column; gap:24px;">
+    <div style="padding:28px 40px; background:linear-gradient(135deg,rgba(52,211,153,0.2),rgba(167,139,250,0.15)); border:2px solid #34d399; border-radius:18px; text-align:center;">
+      <div style="font-size:13px; color:#6ee7b7; letter-spacing:0.15em; font-weight:700; margin-bottom:8px;">SINGLE SOURCE OF TRUTH</div>
+      <div style="font-size:44px; font-weight:800; color:var(--text); font-family:'SF Mono',Menlo,monospace;">project.json</div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; width:100%; max-width:900px;">
+      <div class="p-card" style="padding:14px; text-align:center;"><div style="font-size:22px;">📝</div><div style="font-size:13px; font-weight:700;">Claude Code</div><div style="font-size:11px; color:var(--text-60);">读/写</div></div>
+      <div class="p-card" style="padding:14px; text-align:center;"><div style="font-size:22px;">⚙️</div><div style="font-size:13px; font-weight:700;">nf CLI</div><div style="font-size:11px; color:var(--text-60);">build/preview/export</div></div>
+      <div class="p-card" style="padding:14px; text-align:center;"><div style="font-size:22px;">🖥️</div><div style="font-size:13px; font-weight:700;">桌面端</div><div style="font-size:11px; color:var(--text-60);">只改 JSON</div></div>
+      <div class="p-card" style="padding:14px; text-align:center;"><div style="font-size:22px;">🎞️</div><div style="font-size:13px; font-weight:700;">runtime</div><div style="font-size:11px; color:var(--text-60);">纯函数派生</div></div>
+    </div>
+  </div>
+  <div class="p-rule red" style="margin-top:22px;"><b style="color:#f87171;">禁:</b> 撤销栈 / 临时编辑 state / UI 独立本地数据 · 所有变更 = 生成新 JSON → 保存 → 全局重算</div>
+</section>
+
+<!-- ===== Slide 10 · P9 外接 AI ===== -->
+<section class="slide" data-audio="audio/slide-10.mp3" data-idx="10">
+  <div class="num">第 9 条</div>
+  <h2>外接 AI · 不内置 UI</h2>
+  <div class="tagline">不做对话框 · 不集成 LLM SDK · 任何 agent 都能驱动</div>
+
+  <div class="visual" style="flex-direction:column; gap:20px;">
+    <div style="display:flex; justify-content:center; align-items:center; gap:18px; flex-wrap:wrap;">
+      <div style="text-align:center;"><div style="font-size:36px;">🤖</div><div style="font-size:13px; color:#c4b5fd; font-weight:700;">Claude Code</div></div>
+      <div style="text-align:center;"><div style="font-size:36px;">🤖</div><div style="font-size:13px; color:#c4b5fd; font-weight:700;">Cursor</div></div>
+      <div style="text-align:center;"><div style="font-size:36px;">🤖</div><div style="font-size:13px; color:#c4b5fd; font-weight:700;">自写 Agent</div></div>
+      <div style="font-size:28px; color:var(--text-40);">→</div>
+      <div style="padding:16px 22px; background:rgba(52,211,153,0.15); border:2px solid #34d399; border-radius:14px;"><div style="font-family:'SF Mono',Menlo,monospace; font-size:16px; color:#6ee7b7;">nf CLI + JSON</div><div style="font-size:11px; color:rgba(232,232,236,0.7);">统一接口</div></div>
+    </div>
+    <div class="p-2col">
+      <div class="p-card green"><h3 style="color:#6ee7b7;">✅ 干</h3><div style="font-size:14px; line-height:1.8;">• JSON schema 清晰<br>• AI 友好的 CLI<br>• AI 参考文档<br>• 结构化日志</div></div>
+      <div class="p-card red"><h3 style="color:#fca5a5;">❌ 不干</h3><div style="font-size:14px; line-height:1.8;">• 产品内建 prompt 框<br>• 集成 OpenAI / Claude SDK<br>• 做 LLM 账号 / 计费<br>• 绑定特定 AI 厂商</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Slide 11 · P10 全自动终态 ===== -->
+<section class="slide" data-audio="audio/slide-11.mp3" data-idx="11">
+  <div class="num">第 10 条</div>
+  <h2>全自动是终态</h2>
+  <div class="tagline">人 0 次点击 · CLI 跑完 · 桌面端编辑只是 fallback</div>
+
+  <div class="visual">
+    <div class="p-term">
+      <div class="cmt"># crontab · 每天早上 7 点自动产视频</div>
+      <div style="color:var(--text-60);">0 7 * * * cd /work/daily && claude-code run <span class="s">"读昨日数据 · 60s 总结视频"</span> --auto</div>
+      <div style="margin-top:16px;">
+        <div class="cmt">[07:00:00]</div>
+        <div>→ CC 启动 · 读昨日数据</div>
+        <div>→ CC 写 <span class="k">daily.json</span> (13 tracks · 78s)</div>
+        <div>→ <span class="r">$</span> nf build daily.json <span class="s">ok</span></div>
+        <div>→ <span class="r">$</span> nf export daily.json <span class="s">ok</span></div>
+        <div>→ <span class="r">$</span> nf publish daily.mp4 --youtube <span class="s">uploaded</span></div>
+        <div class="cmt">[07:04:22] ✓ 整条链路 · 0 人工 · 跑通</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Slide 12 · P11 锚点驱动 (新 · 核心展示) ===== -->
+<section class="slide" data-audio="audio/slide-12.mp3" data-idx="12">
+  <div class="num">第 11 条 🆕</div>
+  <h2>锚点驱动轨道时间</h2>
+  <div class="tagline">声明时间锚点 · 轨道正负加减 · 改一个 · 全局跟着走</div>
+
+  <div class="visual" style="flex-direction:column; gap:22px;">
+    <!-- JSON 代码示例 -->
+    <div class="p-term" style="max-width:1000px;">
+      <div class="cmt">// JSON 里声明锚点</div>
+      <div>{</div>
+      <div>&nbsp;&nbsp;<span class="k">"anchors"</span>: { <span class="s">"intro-end"</span>: <span class="w">5.0</span>, <span class="s">"feat-1-end"</span>: <span class="w">12.0</span>, <span class="s">"feat-2-end"</span>: <span class="w">30.0</span> },</div>
+      <div>&nbsp;&nbsp;<span class="k">"tracks"</span>: [{</div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">"clips"</span>: [</div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ <span class="k">"start"</span>: <span class="s">"0"</span>, <span class="k">"end"</span>: <span class="s">"intro-end"</span> },            <span class="cmt">// 片段 A</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ <span class="k">"start"</span>: <span class="p">"intro-end - 0.5"</span>, <span class="k">"end"</span>: <span class="p">"feat-1-end + 0.3"</span> }, <span class="cmt">// 片段 B · 用偏移</span></div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ <span class="k">"start"</span>: <span class="s">"feat-1-end"</span>, <span class="k">"duration"</span>: <span class="p">"feat-2-end - feat-1-end"</span> }</div>
+      <div>&nbsp;&nbsp;&nbsp;&nbsp;]</div>
+      <div>&nbsp;&nbsp;}]</div>
+      <div>}</div>
+    </div>
+    <!-- 可视化 · 多轨道 + 锚点 -->
+    <div class="p-anchor-bars" style="max-width:1000px;">
+      <div class="p-anchor-bar">
+        <div class="lbl">scene</div>
+        <div class="track">
+          <div class="clip v" style="left:0%; width:16%;">A · intro</div>
+          <div class="clip v" style="left:14%; width:26%;">B · feat 1</div>
+          <div class="clip v" style="left:40%; width:60%;">C · feat 2</div>
+          <div class="mark" data-lbl="intro-end" style="left:16%;"></div>
+          <div class="mark" data-lbl="feat-1-end" style="left:40%;"></div>
+          <div class="mark" data-lbl="feat-2-end" style="left:100%;"></div>
+        </div>
+      </div>
+      <div class="p-anchor-bar">
+        <div class="lbl">text</div>
+        <div class="track">
+          <div class="clip t" style="left:1%; width:14%;">title</div>
+          <div class="clip t" style="left:16%; width:24%;">sub 1</div>
+          <div class="clip t" style="left:41%; width:58%;">sub 2</div>
+        </div>
+      </div>
+      <div class="p-anchor-bar">
+        <div class="lbl">audio</div>
+        <div class="track">
+          <div class="clip a" style="left:0%; width:99%;">bgm</div>
+        </div>
+      </div>
+    </div>
+    <div class="p-rule green" style="max-width:1000px;"><b style="color:#34d399;">改一个锚点 · 联动重算全部:</b> 把 <code>feat-1-end</code> 从 12s 改到 15s · 片段 B 自动延长 · 片段 C 自动后移 · text/audio 全跟上 — 不用一条条改 clip.</div>
+  </div>
+</section>
+
+<!-- ===== Slide 13 · 收尾 ===== -->
+<section class="slide" data-audio="audio/slide-13.mp3" data-idx="13">
+  <div class="num">收尾 · 下一步</div>
+  <h2>11 条宪法 · 定死</h2>
+  <div class="tagline">接下来版本 v0.2 开始 · 一条一条落地</div>
+
+  <div class="visual" style="flex-direction:column; gap:24px;">
+    <div class="p-pill-row">
+      <span class="p-pill">P1 AI 第一</span><span class="p-pill">P2 CLI 驱动</span><span class="p-pill">P3 frame pure</span><span class="p-pill">P4 3 模式一致</span><span class="p-pill">P5 桌面端预览</span><span class="p-pill warm">P6 高质量</span><span class="p-pill warm">P7 HTML 满表达</span><span class="p-pill green">P8 JSON 单一真理</span><span class="p-pill green">P9 外接 AI</span><span class="p-pill green">P10 全自动终态</span><span class="p-pill pink">P11 锚点驱动 🆕</span>
+    </div>
+    <div style="padding:28px 36px; background:rgba(167,139,250,0.14); border:1px solid rgba(167,139,250,0.4); border-radius:16px; max-width:720px; text-align:center;">
+      <div style="font-size:13px; color:#c4b5fd; font-weight:700; letter-spacing:0.15em; margin-bottom:10px;">NEXT · v0.2 候选</div>
+      <div style="font-size:22px; color:var(--text); font-weight:700; line-height:1.4;">frame pure 核心架构 POC + 最小 runtime</div>
+      <div style="font-size:14px; color:var(--text-60); margin-top:10px;">纯函数 frame(t, json) = pixels 实现 · 最小浏览器预览</div>
+    </div>
+  </div>
+</section>
+
+<!-- 13 slide 完 -->
+
+
+<!-- ============================================================
+     底部控件 · 不动
+============================================================ -->
+<div class="float-ctrl">
+  <button id="replay-btn" title="重听当前 (R)">🔁</button>
+  <button id="play-btn" class="play-main" title="播放 / 暂停 (空格)">⏸</button>
+</div>
+
+<div class="subtitle-bar">
+  <div id="subtitle"></div>
+  <div class="hint-row">
+    <span>滚动翻页 ↕</span><span>·</span>
+    <span>空格=播放/暂停</span><span>·</span>
+    <span class="slide-num" id="slide-num">- / -</span>
+  </div>
+</div>
+
+<audio id="player" preload="auto"></audio>
+
+<!-- ============================================================
+     【TODO-3】 确认 inline-timelines.js 路径对(相对本 HTML)
+     生成方法见 references/tts-workflow.md
+     文件内容: window.TIMELINES = { 1: {...}, 2: {...}, ... }
+============================================================ -->
+<script src="inline-timelines.js"></script>
+
+<script>
+/* ============================================================
+   【TODO-2: FOCUS_MAP】 · 时间轨 → SVG 元素聚焦
+   格式: { slideIdx: [ { s: startMs, e: endMs, ids: ['svg-g-id'] }, ... ] }
+   时间 ms 从 whisperX timeline 读 (audio/slide-0N.timeline.json 的 segments[].start_ms / words[].start_ms)
+   没有 focus 需求的 slide 不写或空数组 [].
+============================================================ */
+const FOCUS_MAP = {
+  // 示例: slide 2 的 4 张卡依次聚焦
+  2: [
+    { s: 1000, e: 3000, ids: ['s2-card1'] },
+    { s: 3000, e: 5000, ids: ['s2-card2'] },
+    { s: 5000, e: 7000, ids: ['s2-card3'] },
+    { s: 7000, e: 9000, ids: ['s2-card4'] },
+  ],
+  // 更多 slide: 3: [...], 4: [...], ...
+};
+
+/* ============================================================
+   固定 JS 主逻辑 · 不动
+   · IntersectionObserver 检测哪张 slide 在视野 → 切 audio
+   · renderSub 每 frame 卡拉OK 字幕渲染 (nf-tts ms 格式)
+   · updateFocus 每 frame 查 FOCUS_MAP 更新 .focused class
+   · 控件 + 键盘 + onended 自动滚下
+============================================================ */
+(function() {
+  const slides = document.querySelectorAll('.slide');
+  const player = document.getElementById('player');
+  const subtitleEl = document.getElementById('subtitle');
+  const slideNumEl = document.getElementById('slide-num');
+  const intro = document.getElementById('intro');
+  const startBtn = document.getElementById('start-btn');
+  const playBtn = document.getElementById('play-btn');
+  const replayBtn = document.getElementById('replay-btn');
+
+  let currentSlide = null;
+  let currentTimeline = null;
+  let currentFocusedIds = [];
+  let started = false;
+
+  // ===== Focus 更新 =====
+  function updateFocus() {
+    if (!currentSlide) return;
+    const zones = FOCUS_MAP[currentSlide.dataset.idx];
+    const tMs = player.currentTime * 1000;
+    let targetIds = [];
+    if (zones) {
+      for (const z of zones) {
+        if (tMs >= z.s && tMs < z.e) { targetIds = z.ids; break; }
+      }
+    }
+    if (JSON.stringify(targetIds) !== JSON.stringify(currentFocusedIds)) {
+      currentFocusedIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('focused');
+      });
+      targetIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('focused');
+      });
+      currentFocusedIds = targetIds;
+    }
+  }
+
+  // ===== 切换 slide =====
+  async function switchSlide(slide) {
+    if (slide === currentSlide) return;
+    currentFocusedIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('focused');
+    });
+    currentFocusedIds = [];
+    currentSlide = slide;
+    const audio = slide.dataset.audio;
+    const idx = slide.dataset.idx;
+    player.src = audio;
+    currentTimeline = (window.TIMELINES && window.TIMELINES[idx]) || null;
+    slideNumEl.textContent = idx + ' / ' + slides.length;
+    try { await player.play(); } catch(e) {}
+  }
+
+  // ===== 字幕展开单位 (含标点 · 按 segment.text 重建) =====
+  // whisperX 只在 words[] 返回字/词 · 标点在 segment.text 里保留.
+  // 本函数合并: word 按时间 · 标点继承前字 end_ms, 让字幕看着像"人说话分句"不是"字一个个喷".
+  function extractDisplayUnits(tl) {
+    if (!tl) return [];
+    // fallback: 扁平 array 或 tl.words 直接返回
+    if (Array.isArray(tl) || tl.words) {
+      const arr = Array.isArray(tl) ? tl : tl.words;
+      return arr.map(w => ({
+        text: w.word || w.text || w.char || '',
+        start_ms: w.start_ms ?? (w.start != null ? w.start * 1000 : 0),
+        end_ms: w.end_ms ?? (w.end != null ? w.end * 1000 : 0),
+      }));
+    }
+    if (!tl.segments) return [];
+    const units = [];
+    for (const seg of tl.segments) {
+      const txt = seg.text || '';
+      const words = seg.words || [];
+      let wi = 0, lastEnd = seg.start_ms ?? 0;
+      for (let i = 0; i < txt.length; i++) {
+        if (wi < words.length && txt.startsWith(words[wi].word, i)) {
+          const w = words[wi];
+          units.push({ text: w.word, start_ms: w.start_ms, end_ms: w.end_ms });
+          i += w.word.length - 1;
+          lastEnd = w.end_ms;
+          wi++;
+        } else {
+          // 标点 / 空格 / 不匹配字符 · 继承前字 end_ms
+          units.push({ text: txt[i], start_ms: lastEnd, end_ms: lastEnd });
+        }
+      }
+    }
+    return units;
+  }
+
+  // ===== 字幕 + focus 每 frame 渲染 =====
+  function renderSub() {
+    if (!currentTimeline) {
+      subtitleEl.innerHTML = currentSlide ? '<span class="word future">...</span>' : '';
+    } else {
+      const units = extractDisplayUnits(currentTimeline);
+      const tMs = player.currentTime * 1000;
+      let html = '';
+      units.forEach(u => {
+        let cls = 'future';
+        if (u.end_ms > 0 && tMs >= u.end_ms) cls = 'past';
+        else if (tMs >= u.start_ms) cls = 'current';
+        html += `<span class="word ${cls}">${escapeHTML(u.text)}</span>`;
+      });
+      subtitleEl.innerHTML = html;
+    }
+    updateFocus();
+    requestAnimationFrame(renderSub);
+  }
+
+  function escapeHTML(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ===== IntersectionObserver · 滚动切 slide =====
+  const obs = new IntersectionObserver(entries => {
+    if (!started) return;
+    let bestEntry = null, bestRatio = 0.5;
+    entries.forEach(e => {
+      if (e.isIntersecting && e.intersectionRatio > bestRatio) {
+        bestEntry = e; bestRatio = e.intersectionRatio;
+      }
+    });
+    if (bestEntry) switchSlide(bestEntry.target);
+  }, { threshold: [0.5, 0.75] });
+  slides.forEach(s => obs.observe(s));
+
+  // ===== Intro 启动 =====
+  startBtn.onclick = () => {
+    started = true;
+    intro.classList.add('hidden');
+    setTimeout(() => { intro.style.display = 'none'; }, 500);
+    switchSlide(slides[0]);
+    requestAnimationFrame(renderSub);
+  };
+
+  // ===== 控件 =====
+  function togglePlay() {
+    if (player.paused) { player.play().catch(()=>{}); }
+    else { player.pause(); }
+  }
+  playBtn.onclick = togglePlay;
+  player.onplay = () => { playBtn.textContent = '⏸'; };
+  player.onpause = () => { playBtn.textContent = '▶'; };
+  replayBtn.onclick = () => { player.currentTime = 0; player.play().catch(()=>{}); };
+
+  document.addEventListener('keydown', e => {
+    if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+    else if (e.key === 'r' || e.key === 'R') replayBtn.click();
+  });
+
+  // ===== 讲完自动滚下一屏 =====
+  player.onended = () => {
+    if (!currentSlide) return;
+    const idx = parseInt(currentSlide.dataset.idx, 10);
+    if (idx < slides.length) {
+      slides[idx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+})();
+</script>
+</body>
+</html>

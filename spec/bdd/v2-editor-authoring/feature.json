@@ -1,0 +1,17 @@
+{
+  "feature": "v2-editor-authoring",
+  "name": "V2 composition 真实编辑器",
+  "summary": "桌面端打开 v2 composition 后，用户能点选多轨道、编辑组件参数/位置/时间，保存后预览与导出一致。",
+  "status": "spec",
+  "scenarios": [
+    "select-track",
+    "edit-params",
+    "drag-position",
+    "edit-timing",
+    "export-after-save"
+  ],
+  "completion": {
+    "total": 5,
+    "done": 0
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "docs-entry",
+  "given": "The product has moved beyond the old clips-pipeline README.",
+  "when": "A human or AI reads the entry documents.",
+  "then": "README and CLAUDE describe the current JSON composition editor/export product, directory map, and verification commands.",
+  "human_actions": ["open README.md", "open CLAUDE.md"],
+  "ai_tools": [
+    {
+      "tool": "shell",
+      "command": "rg -n \"JSON|composition|desktop|export|Directory|AI 验证接口\" README.md CLAUDE.md"
+    }
+  ]
+}

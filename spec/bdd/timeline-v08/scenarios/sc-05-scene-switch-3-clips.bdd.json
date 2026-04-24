@@ -1,0 +1,62 @@
+{
+  "id": "sc-05",
+  "title": "3 clip on scene track · playhead 切换 3 scene · 真验收出口",
+  "type": "interactive",
+  "chapter": "ch-scene",
+
+  "given": "timeline.json · 1 条 scene track · 3 clip 各指向不同 scene(hero-centered / quote / metric-grid)· anchors 分 3 段 [0, 5000] / [5000, 10000] / [10000, 15000]",
+
+  "when": [
+    "PM 跑:nf timeline open --file=sample-3-scene.json --project=demo-v0.8",
+    "app 启动 · preview iframe 加载 runtime",
+    "PM 按播放 · playhead 分别到 2500 / 7500 / 12500 ms",
+    "AI 跑 nf capture 分别截 3 张 PNG"
+  ],
+
+  "then": [
+    "每张 PNG 显示对应 scene:2500ms = hero-centered 大标题 · 7500ms = quote 引用卡 · 12500ms = metric-grid 数据卡",
+    "切换不闪烁 · scene 间无残留",
+    "playhead 值跟截图时 nf state --key=playhead_ms 一致"
+  ],
+
+  "ai_tools": [
+    {
+      "tool": "open",
+      "command": "nf timeline open --file=spec/versions/v0.8.0/samples/sample-3-scene.json --project=demo-v0.8 --episode=ep-01",
+      "output": "app 进程 · preview 加载完 · exit 0"
+    },
+    {
+      "tool": "seek-2500",
+      "command": "nf timeline seek --ms=2500",
+      "output": "JSON {playhead_ms: 2500, current_scene: 'hero-centered'}"
+    },
+    {
+      "tool": "capture-hero",
+      "command": "nf capture --project=demo-v0.8 --episode=ep-01 --out=tmp/v0.8.0/cap-hero.png",
+      "output": "PNG 文件 · 含 hero-centered 大标题"
+    },
+    {
+      "tool": "seek-7500",
+      "command": "nf timeline seek --ms=7500",
+      "output": "JSON {playhead_ms: 7500, current_scene: 'quote'}"
+    },
+    {
+      "tool": "capture-quote",
+      "command": "nf capture --out=tmp/v0.8.0/cap-quote.png",
+      "output": "PNG · quote 引用卡"
+    },
+    {
+      "tool": "seek-12500",
+      "command": "nf timeline seek --ms=12500",
+      "output": "JSON {playhead_ms: 12500, current_scene: 'metric-grid'}"
+    },
+    {
+      "tool": "capture-metric",
+      "command": "nf capture --out=tmp/v0.8.0/cap-metric.png",
+      "output": "PNG · metric-grid 数据卡"
+    }
+  ],
+
+  "dev": "pending",
+  "tested": "pending"
+}

@@ -6,11 +6,11 @@ out/
 
 # Temporary / scratch (project-structure rule)
 tmp/
+episodes/
 
 # Private / internal
-spec/
-poc/
-projects/
+/poc/
+/projects/
 .autopilot/
 .ally/
 .cache/
@@ -19,7 +19,7 @@ projects/
 
 # Local archive (history snapshots, tar.gz)
 # Persistence is user's responsibility (Time Machine / iCloud / rsync)
-archive/
+/archive/
 
 # Legacy (moved to archive/ as of v2.1-cleanup 2026-04-17)
 legacy-v08/
@@ -51,21 +51,27 @@ test-results/
 -o
 
 # Media (large binary files)
+*.png
 *.mp4
 *.mp3
 *.wav
 *.jpg
 *.jpeg
-
-# Allow scene preview thumbnails
-# (tracked PNGs in src/nf-cli/preview/thumbs/ are intentional)
+*.webm
+*.mov
 
 # Example outputs (generated, not source)
 src/nf-cli/examples/out/
+frontend/nf-components/tmp-w4/
 
 # Build artifacts
 src/nf-cli/dist/
 src/nf-source/**/fixtures/*.mp4
+spec/**/target/
+spec/**/node_modules/
+spec/**/dist/
+spec/**/screenshots/
+spec/**/audio/
 
 # Auto-generated scene gallery previews
 gallery-*.html

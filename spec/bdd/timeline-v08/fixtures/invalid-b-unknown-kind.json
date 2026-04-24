@@ -1,0 +1,21 @@
+{
+  "_comment": "非法案例 B · track.kind = 'unknown' 带空格不满足 pattern · 应报 kind pattern mismatch",
+
+  "meta": {"name": "invalid-b", "version": "v0.8"},
+  "viewport": {"ratio": "16:9", "w": 1920, "h": 1080},
+  "duration": "demo.end",
+  "anchors": {"demo": {"begin": "0", "end": "10000"}},
+  "tracks": [
+    {
+      "id": "t1",
+      "kind": "Unknown Kind With Space",
+      "clips": [
+        {
+          "id": "c1",
+          "begin": "demo.begin",
+          "end": "demo.end"
+        }
+      ]
+    }
+  ]
+}

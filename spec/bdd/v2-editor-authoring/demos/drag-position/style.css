@@ -1,0 +1,22 @@
+@import "../../../../design/tokens.css";
+
+html, body { margin: 0; min-height: 100%; font-family: var(--font); color: var(--fg); }
+body { display: grid; place-items: center; padding: 32px; overflow: hidden; }
+.app { width: min(1120px, 96vw); height: min(650px, 86vh); background: rgba(14,14,19,.64); border: 1px solid var(--bd); display: grid; grid-template-columns: 1fr 280px; grid-template-rows: 46px 1fr 4px; position: relative; box-shadow: 0 30px 90px rgba(0,0,0,.55); }
+.top { grid-column: 1 / 3; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--bd); font-size: 12px; letter-spacing: .12em; color: var(--accent-l); }
+.top span { color: var(--amber); font-family: var(--mono); }
+.preview { position: relative; overflow: hidden; background: linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px); background-size: 48px 48px; }
+.box { position: absolute; left: 28%; top: 34%; width: 320px; height: 150px; border: 1px solid var(--accent); background: rgba(167,139,250,.1); padding: 24px; animation: moveBox 10s infinite; }
+.box h1 { margin: 0 0 10px; font-size: 34px; }
+.box p { margin: 0; color: var(--fg-3); font-family: var(--mono); }
+.cursor { position: absolute; left: 35%; top: 43%; width: 20px; height: 20px; border: 2px solid var(--amber); animation: cursor 10s infinite; }
+aside { padding: 18px; border-left: 1px solid var(--bd); background: rgba(8,8,12,.36); display: grid; gap: 10px; align-content: start; }
+label { color: var(--accent-l); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+output { height: 42px; border: 1px solid var(--bd); padding: 12px; color: var(--amber); font: 13px var(--mono); }
+button { height: 40px; border: 1px solid var(--accent-b); background: rgba(167,139,250,.1); color: var(--fg); font-weight: 700; margin-top: 8px; }
+.progress { grid-column: 1 / 3; background: var(--accent); transform-origin: left; animation: progress 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 18px; padding: 10px 14px; border: 1px solid var(--amber-b); background: rgba(224,183,108,.1); color: var(--amber-l); opacity: 0; animation: toast 10s infinite; }
+@keyframes moveBox { 0%,35% { transform: translate(0,0); } 58%,100% { transform: translate(96px,42px); } }
+@keyframes cursor { 0%,32% { transform: translate(0,0); } 58%,100% { transform: translate(96px,42px); } }
+@keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes toast { 0%,82% { opacity: 0; } 88%,96% { opacity: 1; } 100% { opacity: 0; } }

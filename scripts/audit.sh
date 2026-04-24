@@ -27,6 +27,13 @@ OUT_DIR="$ROOT/spec/quality-reports"
 OUT="$OUT_DIR/${TS}.md"
 mkdir -p "$OUT_DIR"
 
+if [ "$MODE" != "report" ]; then
+  ./scripts/check-structure.sh >/dev/null || {
+    echo "structure gate failed · run ./scripts/check-structure.sh" >&2
+    exit 1
+  }
+fi
+
 VERSION=$(jq -r '.current // "unknown"' spec/roadmap.json 2>/dev/null || echo "unknown")
 
 # Per-dim grade + note (bash 3.2 compatible · no assoc arrays)

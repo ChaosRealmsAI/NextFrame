@@ -1,0 +1,44 @@
+{
+  "kind": "video",
+  "name": "Video Track",
+  "description": "视频轨道 · PIP 画中画 · file:// / http:// · 起止时间裁剪 · 产品演示",
+  "use_cases": ["产品演示", "画中画", "采访剪辑"],
+  "t0_visibility": 0.95,
+  "z_order_hint": 0,
+  "visual_channels": ["scene"],
+
+  "params": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["src"],
+    "additionalProperties": false,
+    "properties": {
+      "src": {"type": "string", "pattern": "^(file://|data:|https?://)"},
+      "from_ms": {"type": "number", "minimum": 0},
+      "to_ms": {"type": "number", "minimum": 0},
+      "fit": {"type": "string", "enum": ["contain", "cover"]},
+      "muted_in_record": {"const": true},
+
+      "x": {"type": "number", "minimum": 0, "maximum": 100, "description": "viewport % · 0-100"},
+      "y": {"type": "number", "minimum": 0, "maximum": 100},
+      "w": {"type": "number", "minimum": 0, "maximum": 100},
+      "h": {"type": "number", "minimum": 0, "maximum": 100},
+
+      "radius": {"type": "number", "minimum": 0},
+      "border": {"type": "string"},
+      "shadow": {"type": "string"}
+    }
+  },
+
+  "sample": {
+    "src": "file:///tmp/sample-clip.mp4",
+    "from_ms": 2000,
+    "to_ms": 7000,
+    "fit": "cover",
+    "muted_in_record": true,
+    "x": 55, "y": 55, "w": 40, "h": 40,
+    "radius": 16,
+    "border": "2px solid rgba(255,255,255,0.25)",
+    "shadow": "0 12px 40px rgba(0,0,0,0.5)"
+  }
+}
