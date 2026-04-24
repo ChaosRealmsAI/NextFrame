@@ -9,6 +9,7 @@ import { NfTrack } from "./components/track.js";
 import type { ClipSelectDetail, FieldEditDetail, PlayheadMoveDetail, TimelineClipSelectDetail } from "./events.js";
 import {
   escapeHtml,
+  exportCancel,
   exportComposition,
   exportEpisode,
   exportStatus,
@@ -145,7 +146,7 @@ function wireApp(): void {
     }
     if (detail.field === "composition-preview") {
       const patch = compositionFieldValue(detail.value);
-      if (!composition || !compositionSource || !patch) return;
+      if (!route.composition || !compositionSource || !patch) return;
       patchCompositionTrackField(patch.track, patch.field, patch.value);
       patchCompositionSourceField(compositionSource, patch.track, patch.field, patch.value);
       renderCurrentCompositionPreview();
@@ -153,8 +154,8 @@ function wireApp(): void {
     }
     if (detail.field === "composition-save") {
       const patch = compositionFieldValue(detail.value);
-      if (!composition || !compositionSource || !patch) return;
-      saveCompositionField(route.project, composition, patch.track, patch.field, patch.value);
+      if (!route.composition || !compositionSource || !patch) return;
+      saveCompositionField(route.project, route.composition, patch.track, patch.field, patch.value);
     }
     if (detail.field === "export") {
       startExportFlow(route.project, route.episode, inspector, route.composition);
@@ -162,6 +163,22 @@ function wireApp(): void {
     if (detail.field === "export-profile" && typeof detail.value === "string") {
       inspector.setAttribute("export-profile", detail.value);
       inspector.removeAttribute("export-progress");
+    }
+    if (detail.field === "export-cancel") {
+      const jobId = typeof detail.value === "string" && detail.value.length > 0
+        ? detail.value
+        : inspector.getAttribute("export-job-id") ?? "";
+      if (!jobId) return;
+      inspector.setAttribute("export-status", "cancelling");
+      void exportCancel(jobId)
+        .then((cancelled) => {
+          inspector.setAttribute("export-status", cancelled.status);
+          inspector.setAttribute("export-progress", JSON.stringify({ stage: cancelled.cancelled ? "cancelled" : cancelled.status, percent: 0 }));
+        })
+        .catch((error) => {
+          inspector.setAttribute("export-status", "failed");
+          inspector.setAttribute("export-error", error instanceof Error ? error.message : String(error));
+        });
     }
     if (detail.field === "voice") {
       const clipId = inspector.getAttribute("clip-id");
@@ -271,12 +288,14 @@ function startExportFlow(project: string, episode: string, inspector: Element, c
   inspector.setAttribute("export-status", "running");
   inspector.removeAttribute("export-open-status");
   inspector.removeAttribute("export-error");
+  inspector.removeAttribute("export-job-id");
   inspector.setAttribute("export-progress", JSON.stringify({ stage: "queued", percent: 0 }));
   const profile = inspector.getAttribute("export-profile") || "final";
   const options = { profile };
   const start = composition ? exportComposition(project, composition, options) : exportEpisode(project, episode, options);
   void start
     .then((started) => {
+      inspector.setAttribute("export-job-id", started.job_id);
       inspector.setAttribute("export-path", started.out);
       if (started.profile) inspector.setAttribute("export-profile", started.profile);
       setExportProgress(inspector, started.progress);

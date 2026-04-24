@@ -27,6 +27,10 @@ fn run() -> Result<(), NfError> {
             "export.status",
             serde_json::json!({ "job_id": args.job_id }),
         ),
+        Command::ExportCancel(args) => commands::send_ipc(
+            "export.cancel",
+            serde_json::json!({ "job_id": args.job_id }),
+        ),
         Command::Click(args) => commands::app::click(args),
         Command::Select(args) => commands::app::select(args),
         Command::Tab(args) => commands::app::tab(args),

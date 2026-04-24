@@ -187,7 +187,7 @@ export interface NfExportStart {
 
 export interface NfExportStatus {
   job_id: string;
-  status: "running" | "succeeded" | "failed";
+  status: "running" | "succeeded" | "failed" | "cancelled";
   out: string;
   profile?: string;
   progress?: NfExportProgress;
@@ -213,6 +213,12 @@ export interface NfExportOptions {
 export interface NfExportOpen {
   opened: boolean;
   path: string;
+}
+
+export interface NfExportCancel {
+  job_id: string;
+  status: "running" | "succeeded" | "failed" | "cancelled";
+  cancelled: boolean;
 }
 
 export interface NfRuntimeSource {
@@ -507,6 +513,12 @@ export function patchCompositionTrackField(trackId: string, field: string, value
 
 export function exportStatus(jobId: string): Promise<NfExportStatus> {
   return shellRequest<NfExportStatus>("export.status", {
+    job_id: jobId,
+  });
+}
+
+export function exportCancel(jobId: string): Promise<NfExportCancel> {
+  return shellRequest<NfExportCancel>("export.cancel", {
     job_id: jobId,
   });
 }

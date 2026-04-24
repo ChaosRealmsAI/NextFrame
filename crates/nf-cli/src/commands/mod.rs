@@ -146,7 +146,7 @@ USAGE:
 
 EXAMPLES:
     nf export --project=demo-video --episode=ep-01 --out=tmp/demo.mp4
-    nf export --project=v2-showcase --composition=showreel-24s --profile=final-fast --parallel=4 --events --out=tmp/showreel.mp4
+    nf export --project=v2-showcase --composition=showreel-24s --profile=final-fast --parallel=2 --events --out=tmp/showreel.mp4
 
 EXPECTED JSON:
     {"out":"tmp/demo.mp4","source":"tmp/demo.mp4.source.json","profile":"draft","resolution":"720p","fps":30,"parallel":1,"bytes":12345,"frames":300,"duration_ms":5000,"warnings":[]}
@@ -155,7 +155,7 @@ PROFILES:
     draft      720p  · 30fps · parallel 1
     standard   1080p · 30fps · parallel 1
     final      1080p · 60fps · parallel 1
-    final-fast 1080p · 60fps · parallel 4
+    final-fast 1080p · 60fps · parallel 2
 
 COMMON ERRORS:
     - unknown project or episode -> exit 5 · hint: create or list projects first
@@ -179,6 +179,22 @@ COMMON ERRORS:
     - socket failed -> exit 1 · hint: start nf-shell"#
     )]
     ExportStatus(ExportStatusArgs),
+    #[command(
+        name = "export-cancel",
+        about = "Cancel a running desktop export job",
+        long_about = r#"Cancel a running export job through the nf-shell IPC server.
+
+USAGE:
+    nf export-cancel --job-id=<id>
+
+EXPECTED JSON:
+    {"job_id":"...","status":"cancelled","cancelled":true}
+
+COMMON ERRORS:
+    - unknown job -> exit 2 · hint: check `nf export-status --job-id=<id>`
+    - job already finished -> returns cancelled=false"#
+    )]
+    ExportCancel(ExportStatusArgs),
     #[command(
         about = "Click a DOM element in a NextFrame window",
         long_about = r#"Click a DOM element through the real app path. Selectors may use ::shadow to cross web component shadow roots.
