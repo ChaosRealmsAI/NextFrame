@@ -181,14 +181,33 @@ export interface NfExportStart {
   job_id: string;
   status: "running";
   out: string;
+  profile?: string;
+  progress?: NfExportProgress;
 }
 
 export interface NfExportStatus {
   job_id: string;
   status: "running" | "succeeded" | "failed";
   out: string;
+  profile?: string;
+  progress?: NfExportProgress;
   result?: unknown;
   error?: string | null;
+}
+
+export interface NfExportProgress {
+  stage?: string;
+  percent?: number;
+  frames_encoded?: number;
+  total_frames?: number;
+  eta_seconds?: number | null;
+}
+
+export interface NfExportOptions {
+  profile?: string;
+  fps?: number;
+  resolution?: string;
+  parallel?: number;
 }
 
 export interface NfExportOpen {
@@ -414,17 +433,19 @@ export function patchClip(
   return clip;
 }
 
-export function exportEpisode(projectSlug: string, episodeSlug: string): Promise<NfExportStart> {
+export function exportEpisode(projectSlug: string, episodeSlug: string, options: NfExportOptions = {}): Promise<NfExportStart> {
   return shellRequest<NfExportStart>("export.start", {
     project: projectSlug,
     episode: episodeSlug,
+    ...options,
   });
 }
 
-export function exportComposition(projectSlug: string, compositionSlug: string): Promise<NfExportStart> {
+export function exportComposition(projectSlug: string, compositionSlug: string, options: NfExportOptions = {}): Promise<NfExportStart> {
   return shellRequest<NfExportStart>("export.start", {
     project: projectSlug,
     composition: compositionSlug,
+    ...options,
   });
 }
 

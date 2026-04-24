@@ -26,6 +26,7 @@ import {
   type NfClip as NfDataClip,
   type NfRuntimeSource,
   type NfMockData,
+  type NfExportProgress,
   type NfTtsSpec,
 } from "./storage.js";
 
@@ -158,6 +159,10 @@ function wireApp(): void {
     if (detail.field === "export") {
       startExportFlow(route.project, route.episode, inspector, route.composition);
     }
+    if (detail.field === "export-profile" && typeof detail.value === "string") {
+      inspector.setAttribute("export-profile", detail.value);
+      inspector.removeAttribute("export-progress");
+    }
     if (detail.field === "voice") {
       const clipId = inspector.getAttribute("clip-id");
       const voice = voiceValue(detail.value);
@@ -266,10 +271,15 @@ function startExportFlow(project: string, episode: string, inspector: Element, c
   inspector.setAttribute("export-status", "running");
   inspector.removeAttribute("export-open-status");
   inspector.removeAttribute("export-error");
-  const start = composition ? exportComposition(project, composition) : exportEpisode(project, episode);
+  inspector.setAttribute("export-progress", JSON.stringify({ stage: "queued", percent: 0 }));
+  const profile = inspector.getAttribute("export-profile") || "final";
+  const options = { profile };
+  const start = composition ? exportComposition(project, composition, options) : exportEpisode(project, episode, options);
   void start
     .then((started) => {
       inspector.setAttribute("export-path", started.out);
+      if (started.profile) inspector.setAttribute("export-profile", started.profile);
+      setExportProgress(inspector, started.progress);
       pollExport(started.job_id, inspector);
     })
     .catch((error) => {
@@ -284,6 +294,8 @@ function pollExport(jobId: string, inspector: Element): void {
       .then((status) => {
         inspector.setAttribute("export-status", status.status);
         inspector.setAttribute("export-path", status.out);
+        if (status.profile) inspector.setAttribute("export-profile", status.profile);
+        setExportProgress(inspector, status.progress);
         if (status.error) inspector.setAttribute("export-error", status.error);
         if (status.status === "running") {
           pollExport(jobId, inspector);
@@ -294,6 +306,11 @@ function pollExport(jobId: string, inspector: Element): void {
         inspector.setAttribute("export-error", error instanceof Error ? error.message : String(error));
       });
   }, 1000);
+}
+
+function setExportProgress(inspector: Element, progress?: NfExportProgress): void {
+  if (!progress) return;
+  inspector.setAttribute("export-progress", JSON.stringify(progress));
 }
 
 function routeFromUrl(): { project: string; episode: string; composition?: string; explicit: boolean } {

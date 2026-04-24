@@ -45,6 +45,36 @@ const sheet = makeSheet(`
     padding-left: 10px;
     border-left: 1px solid currentColor;
   }
+  .export-profiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin: -4px 0 10px;
+  }
+  .profile-btn {
+    min-height: 46px;
+    padding: 7px 8px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid var(--bd);
+    color: var(--fg-2);
+    text-align: left;
+    font-size: 10.5px;
+    display: grid;
+    gap: 3px;
+  }
+  .profile-btn strong {
+    font-size: 11px;
+    color: var(--fg);
+  }
+  .profile-btn span {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--fg-4);
+  }
+  .profile-btn.active {
+    border-color: rgba(125,211,252,0.55);
+    background: rgba(125,211,252,0.12);
+  }
   .insp-sel {
     padding: 8px 12px; margin-bottom: 14px;
     background: rgba(167, 139, 250, 0.06);
@@ -205,17 +235,26 @@ const sheet = makeSheet(`
     background: rgba(251, 191, 36, 0.22);
   }
   .progress {
-    height: 3px;
-    margin: -6px 0 10px;
+    height: 7px;
+    margin: -6px 0 6px;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
   .progress .bar {
-    width: 42%;
+    width: var(--export-progress, 0%);
     height: 100%;
     background: linear-gradient(90deg, var(--accent), var(--teal));
-    animation: export-run 1s linear infinite;
+    transition: width 0.2s ease;
+  }
+  .progress-text {
+    margin: 0 0 12px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--fg-4);
   }
   @keyframes export-run {
     from { transform: translateX(-110%); }
@@ -233,6 +272,8 @@ export class NfInspector extends NfBase {
       "export-path",
       "export-error",
       "export-open-status",
+      "export-profile",
+      "export-progress",
       "voice-status",
       "voice-error",
       "voice-audio",
@@ -275,6 +316,8 @@ export class NfInspector extends NfBase {
     const exportPath = this.getAttribute("export-path") ?? "";
     const exportError = this.getAttribute("export-error") ?? "";
     const exportOpenStatus = this.getAttribute("export-open-status") ?? "";
+    const exportProfile = this.getAttribute("export-profile") ?? "final";
+    const exportProgress = exportProgressValue(this.getAttribute("export-progress"));
     const voiceStatus = this.getAttribute("voice-status") ?? "idle";
     const voiceError = this.getAttribute("voice-error") ?? "";
     const voiceAudio = this.getAttribute("voice-audio") ?? "";
@@ -292,16 +335,14 @@ export class NfInspector extends NfBase {
         exportPath,
         exportError,
         exportOpenStatus,
+        exportProfile,
+        exportProgress,
       });
       return;
     }
     this.root.innerHTML = `
       <div class="insp">
-        <button class="export-btn" type="button" data-field="export">
-          ${exportStatus === "running" ? "导出中" : exportStatus === "succeeded" ? "导出完成" : "导出视频"}
-          <span class="sub">1080p · H264</span>
-        </button>
-        ${exportStatus === "running" ? `<div class="progress" aria-label="export progress"><div class="bar"></div></div>` : ""}
+        ${renderExportPanel({ exportStatus, exportPath, exportError, exportOpenStatus, exportProfile, exportProgress })}
         ${exportStatus === "succeeded" ? `
           <div class="export-actions">
             <div class="status ok">${escapeHtml(exportOpenStatus === "opened" ? "已打开 · " : "")}${escapeHtml(exportPath)}</div>
@@ -398,7 +439,12 @@ export class NfInspector extends NfBase {
       });
     });
     this.root.querySelector(".export-btn")?.addEventListener("click", () => {
-      this.emit<FieldEditDetail>("field-edit", { field: "export", value: "1080p H264" });
+      this.emit<FieldEditDetail>("field-edit", { field: "export", value: this.getAttribute("export-profile") ?? "final" });
+    });
+    this.root.querySelectorAll<HTMLElement>("[data-export-profile]").forEach((button) => {
+      button.addEventListener("click", () => {
+        this.emit<FieldEditDetail>("field-edit", { field: "export-profile", value: button.dataset.exportProfile ?? "final" });
+      });
     });
     this.root.querySelector("[data-action='open-export']")?.addEventListener("click", () => {
       this.emit<FieldEditDetail>("field-edit", { field: "open-export", value: exportPath });
@@ -428,6 +474,8 @@ export class NfInspector extends NfBase {
     exportPath: string;
     exportError: string;
     exportOpenStatus: string;
+    exportProfile: string;
+    exportProgress: ExportProgressState;
   }): void {
     const component = stringValue(state.track.component) ?? "component";
     const time = recordValue(state.track.time);
@@ -435,11 +483,7 @@ export class NfInspector extends NfBase {
     const style = recordValue(state.track.style);
     this.root.innerHTML = `
       <div class="insp" data-inspector-track-id="${escapeAttr(state.trackId)}">
-        <button class="export-btn" type="button" data-field="export" data-action="export-video">
-          ${state.exportStatus === "running" ? "导出中" : state.exportStatus === "succeeded" ? "导出完成" : "导出视频"}
-          <span class="sub">composition</span>
-        </button>
-        ${state.exportStatus === "running" ? `<div class="progress" aria-label="export progress"><div class="bar"></div></div>` : ""}
+        ${renderExportPanel(state)}
         ${state.exportStatus === "succeeded" ? `
           <div class="export-actions">
             <div class="status ok">${escapeHtml(state.exportOpenStatus === "opened" ? "已打开 · " : "")}${escapeHtml(state.exportPath)}</div>
@@ -499,7 +543,12 @@ export class NfInspector extends NfBase {
       });
     });
     this.root.querySelector(".export-btn")?.addEventListener("click", () => {
-      this.emit<FieldEditDetail>("field-edit", { field: "export", value: "composition" });
+      this.emit<FieldEditDetail>("field-edit", { field: "export", value: this.getAttribute("export-profile") ?? "final" });
+    });
+    this.root.querySelectorAll<HTMLElement>("[data-export-profile]").forEach((button) => {
+      button.addEventListener("click", () => {
+        this.emit<FieldEditDetail>("field-edit", { field: "export-profile", value: button.dataset.exportProfile ?? "final" });
+      });
     });
     this.root.querySelector("[data-action='open-export']")?.addEventListener("click", () => {
       this.emit<FieldEditDetail>("field-edit", { field: "open-export", value: state.exportPath });
@@ -519,6 +568,74 @@ export class NfInspector extends NfBase {
       </div>
     `;
   }
+}
+
+interface ExportProgressState {
+  stage: string;
+  percent: number;
+  framesEncoded: number;
+  totalFrames: number;
+  etaSeconds: number | null;
+}
+
+const EXPORT_PROFILES = [
+  { id: "draft", label: "草稿", meta: "720p · 30fps · x1" },
+  { id: "standard", label: "标准", meta: "1080p · 30fps · x1" },
+  { id: "final", label: "最终", meta: "1080p · 60fps · x1" },
+  { id: "final-fast", label: "高速最终", meta: "1080p · 60fps · x4" },
+];
+
+function renderExportPanel(state: {
+  exportStatus: string;
+  exportProfile: string;
+  exportProgress: ExportProgressState;
+}): string {
+  const active = EXPORT_PROFILES.find((profile) => profile.id === state.exportProfile) ?? EXPORT_PROFILES[2];
+  const percent = Math.max(0, Math.min(100, state.exportProgress.percent));
+  const frames = state.exportProgress.totalFrames > 0
+    ? `${state.exportProgress.framesEncoded}/${state.exportProgress.totalFrames}`
+    : state.exportProgress.stage;
+  const eta = state.exportProgress.etaSeconds == null
+    ? "--"
+    : `${Math.max(0, Math.round(state.exportProgress.etaSeconds))}s`;
+  return `
+    <div class="export-profiles" data-export-selected-profile="${escapeAttr(active.id)}">
+      ${EXPORT_PROFILES.map((profile) => `
+        <button class="profile-btn ${profile.id === active.id ? "active" : ""}" type="button" data-export-profile="${escapeAttr(profile.id)}">
+          <strong>${escapeHtml(profile.label)}</strong>
+          <span>${escapeHtml(profile.meta)}</span>
+        </button>
+      `).join("")}
+    </div>
+    <button class="export-btn" type="button" data-field="export" data-action="export-video">
+      ${state.exportStatus === "running" ? "导出中" : state.exportStatus === "succeeded" ? "导出完成" : "导出视频"}
+      <span class="sub">${escapeHtml(active.meta)}</span>
+    </button>
+    ${state.exportStatus === "running" ? `
+      <div class="progress" aria-label="export progress" style="--export-progress:${percent.toFixed(1)}%"><div class="bar"></div></div>
+      <div class="progress-text"><span>${escapeHtml(state.exportProgress.stage)} · ${percent.toFixed(0)}%</span><span>${escapeHtml(frames)} · ETA ${escapeHtml(eta)}</span></div>
+    ` : ""}
+  `;
+}
+
+function exportProgressValue(raw: string | null): ExportProgressState {
+  if (!raw) return { stage: "idle", percent: 0, framesEncoded: 0, totalFrames: 0, etaSeconds: null };
+  try {
+    const value = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      stage: typeof value.stage === "string" ? value.stage : "running",
+      percent: numberOr(value.percent, 0),
+      framesEncoded: numberOr(value.frames_encoded, 0),
+      totalFrames: numberOr(value.total_frames, 0),
+      etaSeconds: value.eta_seconds == null ? null : numberOr(value.eta_seconds, 0),
+    };
+  } catch {
+    return { stage: "running", percent: 0, framesEncoded: 0, totalFrames: 0, etaSeconds: null };
+  }
+}
+
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function escapeHtml(value: string): string {

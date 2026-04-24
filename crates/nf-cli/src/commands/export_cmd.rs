@@ -10,6 +10,7 @@ use crate::commands::{ExportArgs, print_json};
 use crate::errors::NfError;
 
 pub fn run(args: ExportArgs) -> Result<(), NfError> {
+    let preset = ExportProfile::resolve(&args)?;
     let storage = JsonStorage::new(JsonStorage::default_root()?);
     ensure_project_exists(&storage, &args.project)?;
     let (compiled, duration_s) = if let Some(composition) = args.composition.as_deref() {
@@ -36,7 +37,11 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
     write_json_file(&source_path, &compiled.source)?;
     let mut warnings = compiled.warnings;
 
-    if let Some(parent) = args.out.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+    if let Some(parent) = args
+        .out
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
         fs::create_dir_all(parent).map_err(|err| NfError::StorageFailed(err.to_string()))?;
     }
 
@@ -44,15 +49,21 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
         .enable_all()
         .build()
         .map_err(|err| NfError::SocketFailed(err.to_string()))?;
-    let _quiet = RecorderEventQuietGuard::new();
+    let _quiet = if args.events {
+        None
+    } else {
+        Some(RecorderEventQuietGuard::new())
+    };
     let stats = runtime
         .block_on(nf_recorder::run_export_from_source(
             &source_path,
             &args.out,
             ExportOpts {
                 duration_s,
-                resolution_override: Some(ExportResolution::P1080),
-                parallel: Some(1),
+                fps: preset.fps,
+                bitrate_bps: preset.resolution.bitrate_bps(),
+                resolution_override: Some(preset.resolution),
+                parallel: Some(preset.parallel),
                 ..Default::default()
             },
         ))
@@ -69,12 +80,85 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
     print_json(&json!({
         "out": args.out.display().to_string(),
         "source": source_path.display().to_string(),
+        "profile": preset.name,
+        "resolution": preset.resolution.as_str(),
+        "fps": preset.fps,
+        "parallel": preset.parallel,
         "bytes": stats.size_bytes,
         "frames": stats.frames,
         "duration_ms": stats.duration_ms,
         "audio_muxed": audio_muxed,
         "warnings": warnings
     }))
+}
+
+#[derive(Debug, Clone)]
+struct ExportProfile {
+    name: &'static str,
+    resolution: ExportResolution,
+    fps: u32,
+    parallel: usize,
+}
+
+impl ExportProfile {
+    fn resolve(args: &ExportArgs) -> Result<Self, NfError> {
+        let mut profile = match args.profile.trim().to_ascii_lowercase().as_str() {
+            "draft" => Self {
+                name: "draft",
+                resolution: ExportResolution::P720,
+                fps: 30,
+                parallel: 1,
+            },
+            "standard" => Self {
+                name: "standard",
+                resolution: ExportResolution::P1080,
+                fps: 30,
+                parallel: 1,
+            },
+            "final" => Self {
+                name: "final",
+                resolution: ExportResolution::P1080,
+                fps: 60,
+                parallel: 1,
+            },
+            "final-fast" | "fast-final" => Self {
+                name: "final-fast",
+                resolution: ExportResolution::P1080,
+                fps: 60,
+                parallel: 4,
+            },
+            other => {
+                return Err(NfError::ValidationFailed(format!(
+                    "--profile must be draft, standard, final or final-fast (got '{other}')"
+                )));
+            }
+        };
+
+        if let Some(raw) = args.resolution.as_deref() {
+            profile.resolution = ExportResolution::parse_str(raw).ok_or_else(|| {
+                NfError::ValidationFailed(format!(
+                    "--resolution must be 720p, 1080p or 4k (got '{raw}')"
+                ))
+            })?;
+        }
+        if let Some(fps) = args.fps {
+            if fps != 30 && fps != 60 {
+                return Err(NfError::ValidationFailed(format!(
+                    "--fps must be 30 or 60 (got {fps})"
+                )));
+            }
+            profile.fps = fps;
+        }
+        if let Some(parallel) = args.parallel {
+            if parallel == 0 || parallel > 8 {
+                return Err(NfError::ValidationFailed(format!(
+                    "--parallel must be between 1 and 8 (got {parallel})"
+                )));
+            }
+            profile.parallel = parallel;
+        }
+        Ok(profile)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -163,7 +247,10 @@ fn collect_audio_clips(source: &serde_json::Value) -> Vec<AudioClip> {
         .filter_map(|clip| {
             let params = clip.get("params")?;
             let src = params.get("src").and_then(serde_json::Value::as_str)?;
-            let begin_ms = clip.get("begin").and_then(serde_json::Value::as_u64).unwrap_or(0);
+            let begin_ms = clip
+                .get("begin")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0);
             let volume = params
                 .get("volume")
                 .and_then(serde_json::Value::as_f64)
@@ -243,7 +330,11 @@ fn resolve_ffmpeg() -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("FFMPEG_BIN") {
         return Some(PathBuf::from(path));
     }
-    for candidate in ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "ffmpeg"] {
+    for candidate in [
+        "/opt/homebrew/bin/ffmpeg",
+        "/usr/local/bin/ffmpeg",
+        "ffmpeg",
+    ] {
         let path = PathBuf::from(candidate);
         if candidate.contains('/') {
             if path.exists() {
@@ -278,7 +369,10 @@ fn source_path_for_output(out: &Path) -> PathBuf {
 }
 
 fn write_json_file(path: &Path, value: &serde_json::Value) -> Result<(), NfError> {
-    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
         fs::create_dir_all(parent).map_err(|err| NfError::StorageFailed(err.to_string()))?;
     }
     let bytes = serde_json::to_vec_pretty(value)?;
@@ -296,7 +390,11 @@ fn ensure_project_exists(storage: &JsonStorage, project: &str) -> Result<(), NfE
     })
 }
 
-fn ensure_episode_exists(storage: &JsonStorage, project: &str, episode: &str) -> Result<(), NfError> {
+fn ensure_episode_exists(
+    storage: &JsonStorage,
+    project: &str,
+    episode: &str,
+) -> Result<(), NfError> {
     let path = storage
         .root()
         .join(project)

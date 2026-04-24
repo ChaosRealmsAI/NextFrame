@@ -15,10 +15,10 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::OutputStats;
 use crate::orchestrator;
 use crate::pipeline::VideoCodec;
 use crate::record_loop::{self, RecordConfig, RecordError};
-use crate::OutputStats;
 
 /// nf-runtime 浏览器端 IIFE 产物 · 编译时 inline · 跟 nf-shell preview 同源。
 /// Historical: v1.44 runtime IIFE export source.
@@ -111,6 +111,7 @@ impl Default for ExportOpts {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportResolution {
+    P720,
     P1080,
     K4,
 }
@@ -118,6 +119,7 @@ pub enum ExportResolution {
 impl ExportResolution {
     pub fn parse_str(s: &str) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
+            "720p" => Some(Self::P720),
             "1080p" => Some(Self::P1080),
             "4k" => Some(Self::K4),
             _ => None,
@@ -126,6 +128,7 @@ impl ExportResolution {
 
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::P720 => "720p",
             Self::P1080 => "1080p",
             Self::K4 => "4k",
         }
@@ -133,6 +136,7 @@ impl ExportResolution {
 
     pub fn viewport(self) -> (u32, u32) {
         match self {
+            Self::P720 => (1280, 720),
             Self::P1080 => (1920, 1080),
             Self::K4 => (3840, 2160),
         }
@@ -140,6 +144,7 @@ impl ExportResolution {
 
     pub fn bitrate_bps(self) -> u32 {
         match self {
+            Self::P720 => 8_000_000,
             Self::P1080 => 20_000_000,
             Self::K4 => 80_000_000,
         }
@@ -148,6 +153,7 @@ impl ExportResolution {
     pub fn codec(self) -> VideoCodec {
         match self {
             // Keep the default 1080p path on H.264 for regression parity.
+            Self::P720 => VideoCodec::H264,
             Self::P1080 => VideoCodec::H264,
             Self::K4 => VideoCodec::HevcMain8,
         }
@@ -293,12 +299,13 @@ fn resolve_export_preset(
     {
         ExportResolution::parse_str(raw).ok_or_else(|| {
             RecordError::BundleLoadFailed(format!(
-                "meta.export.resolution must be '1080p' or '4k' (got '{raw}')"
+                "meta.export.resolution must be '720p', '1080p' or '4k' (got '{raw}')"
             ))
         })?
     } else {
         match opts.viewport {
             (3840, 2160) => ExportResolution::K4,
+            (1280, 720) => ExportResolution::P720,
             _ => ExportResolution::P1080,
         }
     };

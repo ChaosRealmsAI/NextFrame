@@ -19,13 +19,15 @@ Example projects live under `examples/`; runtime projects are copied to `~/.next
 `target/debug/nf devtools --project=<slug> --episode=<slug> --query=<css> --get=<prop>` — inspect live DOM, including shadow DOM selectors.
 `target/debug/nf composition show --project=<slug> --composition=<slug> [--track=<id>] [--field=<path>]` — read raw v2 composition JSON or one track field.
 `target/debug/nf composition patch --project=<slug> --composition=<slug> --track=<id> --field=<path> --value=<json-or-string>` — patch one v2 track field such as `params.title`, `style.x`, or `time.start`.
-`target/debug/nf export --project=<slug> --composition=<slug> --out=<mp4>` — export a v2 composition to MP4.
+`target/debug/nf export --project=<slug> --composition=<slug> --profile=draft|standard|final|final-fast --out=<mp4>` — export a v2 composition to MP4 with a named quality/speed profile.
+`target/debug/nf export --project=<slug> --composition=<slug> --fps=30|60 --resolution=720p|1080p|4k --parallel=<1-8> --events --out=<mp4>` — override export settings and stream recorder progress JSONL before the final summary JSON.
+`target/debug/nf export-status --job-id=<id>` — read desktop export job status, including `progress.percent`, frames, stage, and ETA.
 
 ## Current Focus
 
-v0.10.0 is the v2 composition authoring version: timeline track selection, real JSON inspector, live preview edits, save persistence, and export parity.
+v0.11.0 is the export performance UX version: visible export profiles, real progress, and local parallel export while preserving saved JSON → source → MP4 consistency.
 
 Specs and acceptance scenarios:
 
-- `spec/versions/v0.10.0/spec.json`
-- `spec/bdd/v2-editor-authoring/feature.json`
+- `spec/versions/v0.11.0/spec.json`
+- `spec/bdd/export-performance/feature.json`

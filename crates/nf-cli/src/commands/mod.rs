@@ -138,22 +138,47 @@ COMMON ERRORS:
     Karaoke(KaraokeArgs),
     #[command(
         about = "Export an episode JSON timeline to MP4",
-        long_about = r#"Export the current project episode to an MP4 through the NextFrame recorder runtime.
+        long_about = r#"Export the current project episode or v2 composition to MP4 through the NextFrame recorder runtime.
 
 USAGE:
     nf export --project=<slug> --episode=<slug> --out=<path.mp4>
+    nf export --project=<slug> --composition=<slug> --profile=draft --out=<path.mp4>
 
 EXAMPLES:
     nf export --project=demo-video --episode=ep-01 --out=tmp/demo.mp4
+    nf export --project=v2-showcase --composition=showreel-24s --profile=final-fast --parallel=4 --events --out=tmp/showreel.mp4
 
 EXPECTED JSON:
-    {"out":"tmp/demo.mp4","source":"tmp/demo.mp4.source.json","bytes":12345,"frames":300,"duration_ms":5000,"warnings":[]}
+    {"out":"tmp/demo.mp4","source":"tmp/demo.mp4.source.json","profile":"draft","resolution":"720p","fps":30,"parallel":1,"bytes":12345,"frames":300,"duration_ms":5000,"warnings":[]}
+
+PROFILES:
+    draft      720p  · 30fps · parallel 1
+    standard   1080p · 30fps · parallel 1
+    final      1080p · 60fps · parallel 1
+    final-fast 1080p · 60fps · parallel 4
 
 COMMON ERRORS:
     - unknown project or episode -> exit 5 · hint: create or list projects first
-    - invalid timeline -> exit 2 · hint: ensure at least one scene clip has valid start/end times"#
+    - invalid timeline -> exit 2 · hint: ensure at least one scene clip has valid start/end times
+    - invalid profile/resolution/fps/parallel -> exit 2 · hint: run `nf export --help`"#
     )]
     Export(ExportArgs),
+    #[command(
+        name = "export-status",
+        about = "Read a running desktop export job status",
+        long_about = r#"Read export.status from the running nf-shell IPC server.
+
+USAGE:
+    nf export-status --job-id=<id>
+
+EXPECTED JSON:
+    {"job_id":"...","status":"running","progress":{"percent":42.0,"stage":"render","frames_encoded":120,"total_frames":720,"eta_seconds":12.3}}
+
+COMMON ERRORS:
+    - unknown job -> exit 2 · hint: start an export from the desktop app first
+    - socket failed -> exit 1 · hint: start nf-shell"#
+    )]
+    ExportStatus(ExportStatusArgs),
     #[command(
         about = "Click a DOM element in a NextFrame window",
         long_about = r#"Click a DOM element through the real app path. Selectors may use ::shadow to cross web component shadow roots.
@@ -605,6 +630,42 @@ pub struct ExportArgs {
     pub composition: Option<String>,
     #[arg(long, value_name = "PATH", help = "Output MP4 path")]
     pub out: std::path::PathBuf,
+    #[arg(
+        long,
+        value_name = "PROFILE",
+        default_value = "final",
+        help = "Export profile: draft, standard, final, final-fast"
+    )]
+    pub profile: String,
+    #[arg(
+        long,
+        value_name = "RES",
+        help = "Override profile resolution: 720p, 1080p or 4k"
+    )]
+    pub resolution: Option<String>,
+    #[arg(long, value_name = "FPS", help = "Override profile fps: 30 or 60")]
+    pub fps: Option<u32>,
+    #[arg(
+        long,
+        value_name = "N",
+        help = "Override profile parallel workers; 1 disables recorder slicing"
+    )]
+    pub parallel: Option<usize>,
+    #[arg(
+        long,
+        help = "Print recorder JSONL progress events before the final summary JSON"
+    )]
+    pub events: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ExportStatusArgs {
+    #[arg(
+        long = "job-id",
+        value_name = "ID",
+        help = "Export job id returned by export.start"
+    )]
+    pub job_id: String,
 }
 
 #[derive(Debug, Args)]
@@ -713,7 +774,11 @@ pub struct DevtoolsArgs {
     pub action: Option<String>,
     #[arg(long, value_name = "VALUE", help = "Value used with --action")]
     pub value: Option<String>,
-    #[arg(long, value_name = "VALUE", help = "Shortcut for --action=fill --value=<VALUE>")]
+    #[arg(
+        long,
+        value_name = "VALUE",
+        help = "Shortcut for --action=fill --value=<VALUE>"
+    )]
     pub fill: Option<String>,
     #[arg(long, value_name = "ID", help = "Optional window id from `nf ps`")]
     pub window: Option<String>,
@@ -783,27 +848,55 @@ pub enum CompositionSubcommand {
 
 #[derive(Debug, Args)]
 pub struct CompositionShowArgs {
-    #[arg(long, value_name = "SLUG", help = "Project slug, for example v2-showcase")]
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Project slug, for example v2-showcase"
+    )]
     pub project: String,
-    #[arg(long, value_name = "SLUG", help = "Composition slug, for example showreel-24s")]
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Composition slug, for example showreel-24s"
+    )]
     pub composition: String,
     #[arg(long, value_name = "ID", help = "Optional track id to return")]
     pub track: Option<String>,
-    #[arg(long, value_name = "PATH", help = "Optional field path inside the track")]
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Optional field path inside the track"
+    )]
     pub field: Option<String>,
 }
 
 #[derive(Debug, Args)]
 pub struct CompositionPatchArgs {
-    #[arg(long, value_name = "SLUG", help = "Project slug, for example v2-showcase")]
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Project slug, for example v2-showcase"
+    )]
     pub project: String,
-    #[arg(long, value_name = "SLUG", help = "Composition slug, for example showreel-24s")]
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Composition slug, for example showreel-24s"
+    )]
     pub composition: String,
     #[arg(long, value_name = "ID", help = "Track id to patch")]
     pub track: String,
-    #[arg(long, value_name = "PATH", help = "Field path, for example params.title or style.x")]
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Field path, for example params.title or style.x"
+    )]
     pub field: String,
-    #[arg(long, value_name = "VALUE", help = "JSON scalar/object or raw string value")]
+    #[arg(
+        long,
+        value_name = "VALUE",
+        help = "JSON scalar/object or raw string value"
+    )]
     pub value: String,
 }
 
@@ -1397,9 +1490,17 @@ pub struct ClipUpdateArgs {
         help = "Optional replacement comma-separated effects"
     )]
     pub effects: Option<String>,
-    #[arg(long, value_name = "PERCENT", help = "Optional title X position in percent")]
+    #[arg(
+        long,
+        value_name = "PERCENT",
+        help = "Optional title X position in percent"
+    )]
     pub x: Option<f64>,
-    #[arg(long, value_name = "PERCENT", help = "Optional title Y position in percent")]
+    #[arg(
+        long,
+        value_name = "PERCENT",
+        help = "Optional title Y position in percent"
+    )]
     pub y: Option<f64>,
 }
 
