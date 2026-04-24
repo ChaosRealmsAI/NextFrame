@@ -2,11 +2,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use nf_project::{JsonStorage, Storage, compile_composition_source, compile_episode_source};
+use nf_project::{compile_composition_source, compile_episode_source, JsonStorage, Storage};
 use nf_recorder::{ExportOpts, ExportResolution};
 use serde_json::json;
 
-use crate::commands::{ExportArgs, print_json};
+use crate::commands::{print_json, ExportArgs};
 use crate::errors::NfError;
 
 pub fn run(args: ExportArgs) -> Result<(), NfError> {
@@ -125,7 +125,7 @@ impl ExportProfile {
                 name: "final-fast",
                 resolution: ExportResolution::P1080,
                 fps: 60,
-                parallel: 4,
+                parallel: 2,
             },
             other => {
                 return Err(NfError::ValidationFailed(format!(

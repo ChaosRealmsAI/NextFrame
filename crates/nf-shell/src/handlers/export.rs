@@ -5,12 +5,14 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 use crate::errors::NfError;
 use crate::handlers::{now_iso, required_str};
 use crate::ipc_server::{IpcRequest, OpHandler};
-use crate::storage::{JsonStorage, validate_slug};
+use crate::storage::{validate_slug, JsonStorage};
 
 #[derive(Debug, Clone)]
 pub struct ExportOpHandler {
@@ -24,6 +26,7 @@ struct ExportJob {
     out: PathBuf,
     profile: String,
     progress: ExportProgress,
+    pid: Option<u32>,
     result: Option<Value>,
     error: Option<String>,
 }
@@ -42,6 +45,7 @@ enum ExportStatus {
     Running,
     Succeeded,
     Failed,
+    Cancelled,
 }
 
 impl ExportStatus {
@@ -50,6 +54,7 @@ impl ExportStatus {
             Self::Running => "running",
             Self::Succeeded => "succeeded",
             Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
         }
     }
 }
@@ -97,6 +102,14 @@ impl ExportOpHandler {
                 .jobs
                 .lock()
                 .map_err(|err| NfError::SocketFailed(format!("export jobs lock failed: {err}")))?;
+            if let Some((running_id, _)) = jobs
+                .iter()
+                .find(|(_, job)| job.status == ExportStatus::Running)
+            {
+                return Err(NfError::ValidationFailed(format!(
+                    "another export is already running: {running_id}"
+                )));
+            }
             jobs.insert(
                 job_id.clone(),
                 ExportJob {
@@ -104,6 +117,7 @@ impl ExportOpHandler {
                     out: out.clone(),
                     profile: profile.clone(),
                     progress: ExportProgress::new("queued"),
+                    pid: None,
                     result: None,
                     error: None,
                 },
@@ -118,7 +132,7 @@ impl ExportOpHandler {
         let out_for_thread = out.clone();
         let profile_for_thread = profile.clone();
         std::thread::spawn(move || {
-            let mut command = Command::new(nf_bin);
+            let mut command = export_command(nf_bin);
             command
                 .arg("export")
                 .arg("--project")
@@ -142,6 +156,10 @@ impl ExportOpHandler {
                 command.arg("--parallel").arg(parallel.to_string());
             }
             command.arg("--out").arg(&out_for_thread);
+            #[cfg(unix)]
+            {
+                command.process_group(0);
+            }
 
             let mut child = match command
                 .stdout(Stdio::piped())
@@ -160,6 +178,7 @@ impl ExportOpHandler {
                     return;
                 }
             };
+            set_export_pid(&jobs, &job_id_for_thread, child.id());
 
             let stderr = child.stderr.take();
             let stderr_handle = stderr.map(|mut stderr| {
@@ -230,6 +249,41 @@ impl ExportOpHandler {
             "out": out.display().to_string(),
             "profile": profile,
             "progress": ExportProgress::new("queued").to_json()
+        }))
+    }
+
+    fn cancel(&self, params: &Value) -> Result<Value, NfError> {
+        let job_id = required_str(params, "job_id")?;
+        let pid = {
+            let mut jobs = self
+                .jobs
+                .lock()
+                .map_err(|err| NfError::SocketFailed(format!("export jobs lock failed: {err}")))?;
+            let job = jobs.get_mut(&job_id).ok_or_else(|| {
+                NfError::ValidationFailed(format!("unknown export job: {job_id}"))
+            })?;
+            if job.status != ExportStatus::Running {
+                return Ok(json!({
+                    "job_id": job_id,
+                    "status": job.status.as_str(),
+                    "cancelled": false
+                }));
+            }
+            job.status = ExportStatus::Cancelled;
+            job.progress.stage = "cancelled".to_string();
+            job.progress.eta_seconds = Some(0.0);
+            job.error = Some("cancelled by user".to_string());
+            job.pid.take()
+        };
+
+        if let Some(pid) = pid {
+            terminate_export_process(pid)?;
+        }
+
+        Ok(json!({
+            "job_id": job_id,
+            "status": ExportStatus::Cancelled.as_str(),
+            "cancelled": true
         }))
     }
 
@@ -318,7 +372,15 @@ fn finish_export_job(
 ) {
     if let Ok(mut jobs) = jobs.lock() {
         if let Some(job) = jobs.get_mut(job_id) {
+            if job.status == ExportStatus::Cancelled {
+                job.pid = None;
+                if let Some(result) = result {
+                    job.result = Some(result);
+                }
+                return;
+            }
             job.status = status;
+            job.pid = None;
             if let Some(result) = result {
                 job.result = Some(result);
             }
@@ -327,6 +389,7 @@ fn finish_export_job(
                 ExportStatus::Running => job.progress.stage.clone(),
                 ExportStatus::Succeeded => "done".to_string(),
                 ExportStatus::Failed => "failed".to_string(),
+                ExportStatus::Cancelled => "cancelled".to_string(),
             };
             if status == ExportStatus::Succeeded {
                 job.progress.percent = 100.0;
@@ -353,6 +416,9 @@ fn apply_export_event(
         let Some(job) = jobs.get_mut(job_id) else {
             return;
         };
+        if job.status != ExportStatus::Running {
+            return;
+        }
         match event {
             "record.start" => {
                 job.progress.stage = "render".to_string();
@@ -441,11 +507,61 @@ impl OpHandler for ExportOpHandler {
         let data = match req.op.as_str() {
             "export-start" | "export.start" => self.start(&req.params)?,
             "export-status" | "export.status" => self.status(&req.params)?,
+            "export-cancel" | "export.cancel" => self.cancel(&req.params)?,
             "export-open" | "export.open" => self.open(&req.params)?,
             _ => return Ok(None),
         };
 
         Ok(Some(data))
+    }
+}
+
+fn set_export_pid(jobs: &Arc<Mutex<BTreeMap<String, ExportJob>>>, job_id: &str, pid: u32) {
+    if let Ok(mut jobs) = jobs.lock() {
+        if let Some(job) = jobs.get_mut(job_id) {
+            if job.status == ExportStatus::Running {
+                job.pid = Some(pid);
+                job.progress.stage = "render".to_string();
+            }
+        }
+    }
+}
+
+fn export_command(nf_bin: PathBuf) -> Command {
+    if Path::new("/usr/bin/nice").exists() {
+        let mut command = Command::new("/usr/bin/nice");
+        command.arg("-n").arg("10").arg(nf_bin);
+        command
+    } else {
+        Command::new(nf_bin)
+    }
+}
+
+fn terminate_export_process(pid: u32) -> Result<(), NfError> {
+    #[cfg(unix)]
+    {
+        let group = format!("-{pid}");
+        let group_status = Command::new("kill")
+            .arg("-TERM")
+            .arg(&group)
+            .status()
+            .map_err(|err| NfError::SocketFailed(format!("cancel export failed: {err}")))?;
+        if group_status.success() {
+            return Ok(());
+        }
+    }
+
+    let status = Command::new("kill")
+        .arg("-TERM")
+        .arg(pid.to_string())
+        .status()
+        .map_err(|err| NfError::SocketFailed(format!("cancel export failed: {err}")))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(NfError::SocketFailed(format!(
+            "cancel export failed for process {pid}"
+        )))
     }
 }
 

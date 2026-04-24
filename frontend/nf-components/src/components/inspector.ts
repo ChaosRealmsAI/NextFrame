@@ -269,6 +269,7 @@ export class NfInspector extends NfBase {
       "save-status",
       "save-error",
       "export-status",
+      "export-job-id",
       "export-path",
       "export-error",
       "export-open-status",
@@ -313,6 +314,7 @@ export class NfInspector extends NfBase {
     const saveStatus = this.getAttribute("save-status") ?? "";
     const saveError = this.getAttribute("save-error") ?? "";
     const exportStatus = this.getAttribute("export-status") ?? "idle";
+    const exportJobId = this.getAttribute("export-job-id") ?? "";
     const exportPath = this.getAttribute("export-path") ?? "";
     const exportError = this.getAttribute("export-error") ?? "";
     const exportOpenStatus = this.getAttribute("export-open-status") ?? "";
@@ -332,6 +334,7 @@ export class NfInspector extends NfBase {
         saveStatus,
         saveError,
         exportStatus,
+        exportJobId,
         exportPath,
         exportError,
         exportOpenStatus,
@@ -342,7 +345,7 @@ export class NfInspector extends NfBase {
     }
     this.root.innerHTML = `
       <div class="insp">
-        ${renderExportPanel({ exportStatus, exportPath, exportError, exportOpenStatus, exportProfile, exportProgress })}
+        ${renderExportPanel({ exportStatus, exportJobId, exportPath, exportError, exportOpenStatus, exportProfile, exportProgress })}
         ${exportStatus === "succeeded" ? `
           <div class="export-actions">
             <div class="status ok">${escapeHtml(exportOpenStatus === "opened" ? "已打开 · " : "")}${escapeHtml(exportPath)}</div>
@@ -449,6 +452,9 @@ export class NfInspector extends NfBase {
     this.root.querySelector("[data-action='open-export']")?.addEventListener("click", () => {
       this.emit<FieldEditDetail>("field-edit", { field: "open-export", value: exportPath });
     });
+    this.root.querySelector("[data-action='cancel-export']")?.addEventListener("click", () => {
+      this.emit<FieldEditDetail>("field-edit", { field: "export-cancel", value: this.getAttribute("export-job-id") ?? "" });
+    });
     this.root.querySelector("[data-action='synth-voice']")?.addEventListener("click", () => {
       this.emit<FieldEditDetail>("field-edit", { field: "voice", value: voicePayload(clip) });
     });
@@ -471,6 +477,7 @@ export class NfInspector extends NfBase {
     saveStatus: string;
     saveError: string;
     exportStatus: string;
+    exportJobId: string;
     exportPath: string;
     exportError: string;
     exportOpenStatus: string;
@@ -553,6 +560,9 @@ export class NfInspector extends NfBase {
     this.root.querySelector("[data-action='open-export']")?.addEventListener("click", () => {
       this.emit<FieldEditDetail>("field-edit", { field: "open-export", value: state.exportPath });
     });
+    this.root.querySelector("[data-action='cancel-export']")?.addEventListener("click", () => {
+      this.emit<FieldEditDetail>("field-edit", { field: "export-cancel", value: this.getAttribute("export-job-id") ?? state.exportJobId });
+    });
   }
 
   private compositionField(path: string, value: unknown, label: string): string {
@@ -582,11 +592,15 @@ const EXPORT_PROFILES = [
   { id: "draft", label: "草稿", meta: "720p · 30fps · x1" },
   { id: "standard", label: "标准", meta: "1080p · 30fps · x1" },
   { id: "final", label: "最终", meta: "1080p · 60fps · x1" },
-  { id: "final-fast", label: "高速最终", meta: "1080p · 60fps · x4" },
+  { id: "final-fast", label: "高速最终", meta: "1080p · 60fps · x2" },
 ];
 
 function renderExportPanel(state: {
   exportStatus: string;
+  exportJobId?: string;
+  exportPath?: string;
+  exportError?: string;
+  exportOpenStatus?: string;
   exportProfile: string;
   exportProgress: ExportProgressState;
 }): string {
@@ -607,13 +621,17 @@ function renderExportPanel(state: {
         </button>
       `).join("")}
     </div>
-    <button class="export-btn" type="button" data-field="export" data-action="export-video">
-      ${state.exportStatus === "running" ? "导出中" : state.exportStatus === "succeeded" ? "导出完成" : "导出视频"}
+    <button class="export-btn" type="button" data-field="export" data-action="export-video" ${state.exportStatus === "running" || state.exportStatus === "cancelling" ? "disabled" : ""}>
+      ${state.exportStatus === "running" ? "导出中" : state.exportStatus === "cancelling" ? "取消中" : state.exportStatus === "succeeded" ? "导出完成" : state.exportStatus === "cancelled" ? "已取消" : "导出视频"}
       <span class="sub">${escapeHtml(active.meta)}</span>
     </button>
-    ${state.exportStatus === "running" ? `
+    ${state.exportStatus === "running" || state.exportStatus === "cancelling" ? `
       <div class="progress" aria-label="export progress" style="--export-progress:${percent.toFixed(1)}%"><div class="bar"></div></div>
       <div class="progress-text"><span>${escapeHtml(state.exportProgress.stage)} · ${percent.toFixed(0)}%</span><span>${escapeHtml(frames)} · ETA ${escapeHtml(eta)}</span></div>
+      <button class="open-btn" type="button" data-action="cancel-export" data-export-job="${escapeAttr(state.exportJobId ?? "")}">取消导出</button>
+    ` : ""}
+    ${state.exportStatus === "cancelled" ? `
+      <div class="status err">导出已取消</div>
     ` : ""}
   `;
 }

@@ -22,6 +22,7 @@ Example projects live under `examples/`; runtime projects are copied to `~/.next
 `target/debug/nf export --project=<slug> --composition=<slug> --profile=draft|standard|final|final-fast --out=<mp4>` — export a v2 composition to MP4 with a named quality/speed profile.
 `target/debug/nf export --project=<slug> --composition=<slug> --fps=30|60 --resolution=720p|1080p|4k --parallel=<1-8> --events --out=<mp4>` — override export settings and stream recorder progress JSONL before the final summary JSON.
 `target/debug/nf export-status --job-id=<id>` — read desktop export job status, including `progress.percent`, frames, stage, and ETA.
+`target/debug/nf export-cancel --job-id=<id>` — cancel a running desktop export job and stop its recorder process group.
 
 ## Current Focus
 
