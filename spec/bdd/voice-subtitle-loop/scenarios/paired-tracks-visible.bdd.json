@@ -13,7 +13,7 @@
   "ai_tools": [
     {
       "tool": "state",
-      "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track voice-main",
+      "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track voice-intro",
       "expected": "JSON contains type audio, src, time.start, time.end"
     },
     {
@@ -23,7 +23,7 @@
     },
     {
       "tool": "screenshot",
-      "command": "target/debug/nf screenshot --project v2-showcase --episode showreel-24s --region editor --out tmp/v0.14.0/paired-tracks-visible.png",
+      "command": "target/debug/nf screenshot --project v2-showcase --episode showreel-24s --region editor --out ../NextFrame.archive/v0.14.0-verify/paired-tracks-visible.png",
       "expected": "timeline contains separate voice and subtitle lanes"
     }
   ],

@@ -1,0 +1,54 @@
+{
+  "schema": "nextframe.composition.v2",
+  "id": "voice-subtitle-smoke",
+  "name": "Voice Subtitle Smoke",
+  "duration": "4s",
+  "viewport": { "w": 1920, "h": 1080, "ratio": "16:9" },
+  "theme": "launch.dark",
+  "export": { "resolution": "720p" },
+  "anchors": {
+    "intro": "0s",
+    "out": "4s"
+  },
+  "tracks": [
+    {
+      "id": "stage-bg",
+      "kind": "component",
+      "component": "html.stage-background",
+      "z": 0,
+      "time": { "start": "intro", "end": "out" },
+      "params": {
+        "pulse": 0.95
+      }
+    },
+    {
+      "id": "subtitle-main",
+      "kind": "subtitle",
+      "z": 80,
+      "time": { "start": "intro", "end": "out" },
+      "style": {
+        "active_color": "#ffca66",
+        "color": "#ffffff",
+        "size_px": 42,
+        "position": "bottom",
+        "padding": 68
+      },
+      "params": {
+        "words": [
+          { "text": "JSON", "start_ms": 0, "end_ms": 600 },
+          { "text": "edits", "start_ms": 600, "end_ms": 1180 },
+          { "text": "become", "start_ms": 1180, "end_ms": 1780 },
+          { "text": "live", "start_ms": 1780, "end_ms": 2280 },
+          { "text": "captions.", "start_ms": 2280, "end_ms": 3400 }
+        ]
+      }
+    },
+    {
+      "id": "voice-main",
+      "kind": "audio",
+      "time": { "start": "intro", "end": "out" },
+      "src": "audio/showreel-narration.mp3",
+      "volume": 1
+    }
+  ]
+}

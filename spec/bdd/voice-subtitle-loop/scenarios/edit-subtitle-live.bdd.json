@@ -23,7 +23,7 @@
     },
     {
       "tool": "state",
-      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-stage::shadow [data-subtitle-active]' --get outerHTML",
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query '[data-subtitle-active]' --get outerHTML",
       "expected": "preview text reflects saved subtitle edit"
     }
   ],

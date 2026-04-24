@@ -13,17 +13,17 @@
   "ai_tools": [
     {
       "tool": "state",
-      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events --out tmp/v0.14.0/showreel-subtitle-audio.mp4",
+      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events --out ../NextFrame.archive/v0.14.0-verify/showreel-subtitle-audio.mp4",
       "expected": "export summary reports audio_muxed=true"
     },
     {
       "tool": "state",
-      "command": "ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,duration,bit_rate -of json tmp/v0.14.0/showreel-subtitle-audio.mp4",
+      "command": "ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,duration,bit_rate -of json ../NextFrame.archive/v0.14.0-verify/showreel-subtitle-audio.mp4",
       "expected": "codec_name is aac and duration is close to composition duration"
     },
     {
       "tool": "state",
-      "command": "ffmpeg -y -ss 00:00:04 -i tmp/v0.14.0/showreel-subtitle-audio.mp4 -frames:v 1 tmp/v0.14.0/showreel-subtitle-frame.png",
+      "command": "ffmpeg -y -ss 00:00:04 -i ../NextFrame.archive/v0.14.0-verify/showreel-subtitle-audio.mp4 -frames:v 1 ../NextFrame.archive/v0.14.0-verify/showreel-subtitle-frame.png",
       "expected": "captured frame contains the current subtitle text"
     }
   ],

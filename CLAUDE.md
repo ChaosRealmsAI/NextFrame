@@ -15,7 +15,8 @@ Example projects live under `examples/`; runtime projects are copied to `~/.next
 ## AI 验证接口
 
 `target/debug/nf open --project=<slug> --composition=<slug>` — open a v2 composition in the desktop editor.
-`target/debug/nf screenshot --project=<slug> --episode=<slug> --region=editor --out=<png>` — capture a desktop editor region.
+`target/debug/nf screenshot --project=<slug> --episode=<slug> --region=editor --out=<png>` — probe a desktop editor region and write a size stub PNG; use `capture` for visual evidence.
+`target/debug/nf capture --project=<slug> --episode=<slug> --out=<png>` — capture the native macOS window PNG for real visual verification.
 `target/debug/nf devtools --project=<slug> --episode=<slug> --query=<css> --get=<prop>` — inspect live DOM, including shadow DOM selectors.
 `target/debug/nf composition show --project=<slug> --composition=<slug> [--track=<id>] [--field=<path>]` — read raw v2 composition JSON or one track field.
 `target/debug/nf composition patch --project=<slug> --composition=<slug> --track=<id> --field=<path> --value=<json-or-string>` — patch one v2 track field such as `params.title`, `style.x`, or `time.start`.
@@ -38,9 +39,9 @@ Do not write generated videos, screenshots, node_modules, Cargo targets, or one-
 
 ## Current Focus
 
-v0.13.0 is the project skeleton governance version: clean root layout, spec in the main repo, archived generated artifacts, refreshed entry docs, and a structure gate.
+v0.14.0 is the voice/subtitle loop version: JSON carries paired voice and subtitle tracks, the desktop editor previews and edits subtitles, and smoke export proves AAC audio plus burned-in captions. Full 24s showreel export is still blocked by recorder performance near the finale.
 
 Specs and acceptance scenarios:
 
-- `spec/versions/v0.13.0/spec.json`
-- `spec/bdd/repo-skeleton-governance/feature.json`
+- `spec/versions/v0.14.0/spec.json`
+- `spec/bdd/voice-subtitle-loop/feature.json`

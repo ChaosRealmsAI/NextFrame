@@ -18,12 +18,12 @@
     },
     {
       "tool": "state",
-      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-stage::shadow [data-subtitle-active]' --get outerHTML",
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query '[data-subtitle-active]' --get outerHTML",
       "expected": "active subtitle text is not empty during playback"
     },
     {
       "tool": "screenshot",
-      "command": "target/debug/nf screenshot --project v2-showcase --episode showreel-24s --region preview --out tmp/v0.14.0/playback-sync.png",
+      "command": "target/debug/nf screenshot --project v2-showcase --episode showreel-24s --region preview --out ../NextFrame.archive/v0.14.0-verify/playback-sync.png",
       "expected": "preview shows a subtitle over the video stage"
     }
   ],

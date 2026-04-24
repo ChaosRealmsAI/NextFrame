@@ -66,7 +66,7 @@
       "ai_tools": [
         {
           "tool": "state",
-          "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track voice-main",
+          "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track voice-intro",
           "expected": "audio track contains src and timing"
         },
         {
@@ -114,7 +114,7 @@
         },
         {
           "tool": "state",
-          "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-stage::shadow [data-subtitle-active]' --get outerHTML",
+          "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query '[data-subtitle-active]' --get outerHTML",
           "expected": "active subtitle text changes with playback time"
         }
       ],
@@ -138,7 +138,7 @@
         },
         {
           "tool": "screenshot",
-          "command": "target/debug/nf screenshot --project v2-showcase --episode showreel-24s --region preview --out tmp/v0.14.0/edit-subtitle-live.png",
+          "command": "target/debug/nf screenshot --project v2-showcase --episode showreel-24s --region preview --out ../NextFrame.archive/v0.14.0-verify/edit-subtitle-live.png",
           "expected": "preview shows edited subtitle text"
         }
       ],
@@ -158,12 +158,12 @@
       "ai_tools": [
         {
           "tool": "state",
-          "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events --out tmp/v0.14.0/showreel-subtitle-audio.mp4",
+          "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events --out ../NextFrame.archive/v0.14.0-verify/showreel-subtitle-audio.mp4",
           "expected": "export succeeds and summary includes audio_muxed=true"
         },
         {
           "tool": "state",
-          "command": "ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,duration,bit_rate -of json tmp/v0.14.0/showreel-subtitle-audio.mp4",
+          "command": "ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,duration,bit_rate -of json ../NextFrame.archive/v0.14.0-verify/showreel-subtitle-audio.mp4",
           "expected": "codec_name is aac"
         }
       ],

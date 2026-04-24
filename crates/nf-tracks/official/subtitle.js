@@ -333,7 +333,7 @@ export function render(t, params, viewport) {
     containerStyle +
     '">' +
     _vpTag +
-    spanParts.join("") +
+    spanParts.join(" ") +
     "</div>"
   );
 }

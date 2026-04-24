@@ -123,7 +123,11 @@ fn select_composition_value(composition: &Value, params: &Value) -> Result<Value
 fn get_field_path<'a>(value: &'a Value, field: &str) -> Option<&'a Value> {
     let mut current = value;
     for part in field.split('.').map(str::trim).filter(|part| !part.is_empty()) {
-        current = current.get(part)?;
+        if let Some(index) = path_index(part) {
+            current = current.as_array()?.get(index)?;
+        } else {
+            current = current.get(part)?;
+        }
     }
     Some(current)
 }
@@ -137,17 +141,73 @@ fn set_field_path(target: &mut Value, field: &str, value: Value) -> Result<(), N
     if parts.is_empty() {
         return Err(NfError::ValidationFailed("field path is required".to_string()));
     }
-    let mut current = target;
-    for part in &parts[..parts.len() - 1] {
-        if !current.get(part).is_some_and(Value::is_object) {
-            current[part] = json!({});
+    set_path_part(target, &parts, value, field)
+}
+
+fn set_path_part(target: &mut Value, parts: &[&str], value: Value, field: &str) -> Result<(), NfError> {
+    let Some((part, rest)) = parts.split_first() else {
+        *target = value;
+        return Ok(());
+    };
+    if rest.is_empty() {
+        if let Some(index) = path_index(part) {
+            ensure_array(target);
+            let array = target
+                .as_array_mut()
+                .ok_or_else(|| NfError::ValidationFailed(format!("invalid array path: {field}")))?;
+            if array.len() <= index {
+                array.resize(index + 1, Value::Null);
+            }
+            array[index] = value;
+            return Ok(());
         }
-        current = current
-            .get_mut(part)
-            .ok_or_else(|| NfError::ValidationFailed(format!("invalid field path: {field}")))?;
+        ensure_object(target);
+        target[*part] = value;
+        return Ok(());
     }
-    current[parts[parts.len() - 1]] = value;
-    Ok(())
+
+    let next_is_array = path_index(rest[0]).is_some();
+    if let Some(index) = path_index(part) {
+        ensure_array(target);
+        let array = target
+            .as_array_mut()
+            .ok_or_else(|| NfError::ValidationFailed(format!("invalid array path: {field}")))?;
+        if array.len() <= index {
+            array.resize(index + 1, Value::Null);
+        }
+        if !array[index].is_object() && !array[index].is_array() {
+            array[index] = if next_is_array { json!([]) } else { json!({}) };
+        }
+        return set_path_part(&mut array[index], rest, value, field);
+    }
+
+    ensure_object(target);
+    if !target.get(part).is_some_and(|item| item.is_object() || item.is_array()) {
+        target[*part] = if next_is_array { json!([]) } else { json!({}) };
+    }
+    let child = target
+        .get_mut(part)
+        .ok_or_else(|| NfError::ValidationFailed(format!("invalid field path: {field}")))?;
+    set_path_part(child, rest, value, field)
+}
+
+fn ensure_object(value: &mut Value) {
+    if !value.is_object() {
+        *value = json!({});
+    }
+}
+
+fn ensure_array(value: &mut Value) {
+    if !value.is_array() {
+        *value = json!([]);
+    }
+}
+
+fn path_index(part: &str) -> Option<usize> {
+    if part.is_empty() || (part.len() > 1 && part.starts_with('0')) {
+        return None;
+    }
+    part.parse::<usize>().ok()
 }
 
 impl OpHandler for CompositionsOpHandler {

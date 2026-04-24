@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use directories::BaseDirs;
 use once_cell::sync::Lazy;
@@ -231,7 +232,7 @@ pub fn atomic_write<T: Serialize>(path: &Path, value: &T) -> Result<(), ProjectE
         fs::create_dir_all(parent).map_err(|err| ProjectError::StorageFailed(err.to_string()))?;
     }
 
-    let tmp_path = path.with_extension("tmp");
+    let tmp_path = unique_tmp_path(path);
     let result = (|| -> Result<(), ProjectError> {
         let json = serde_json::to_string_pretty(value)?;
         let mut tmp = fs::File::create(&tmp_path)?;
@@ -247,6 +248,18 @@ pub fn atomic_write<T: Serialize>(path: &Path, value: &T) -> Result<(), ProjectE
     }
 
     result
+}
+
+fn unique_tmp_path(path: &Path) -> PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("nextframe.json");
+    path.with_file_name(format!("{file_name}.tmp-{}-{nonce}", std::process::id()))
 }
 
 fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, ProjectError> {

@@ -630,13 +630,19 @@ function normalizeCompositionData(project: RealProject, compositionSlug: string,
       const params = asRecord(clip.params);
       const componentParams = asRecord(params.params);
       const componentStyle = asRecord(params.style);
+      const sourceParams = asRecord(params.source);
       const id = stringValue(clip.id) ?? stringValue(track.id) ?? `track-${clips.length + 1}`;
       const begin = finiteNumber(clip.begin, 0);
       const end = finiteNumber(clip.end, begin + 1000);
+      const kind = track.kind === "audio" ? "audio" : track.kind === "subtitle" ? "subtitle" : track.kind === "component" ? "component" : "scene";
+      const words = subtitleWords(sourceParams.words) ?? subtitleWords(componentParams.words);
+      const label = kind === "subtitle"
+        ? subtitleLabel(words, id)
+        : stringValue(componentParams.title) ?? stringValue(params.component) ?? id;
       clips.push({
         id,
-        label: stringValue(componentParams.title) ?? stringValue(params.component) ?? id,
-        kind: track.kind === "audio" ? "audio" : track.kind === "subtitle" ? "subtitle" : track.kind === "component" ? "component" : "scene",
+        label,
+        kind,
         track: finiteNumber(track.z, clips.length),
         track_id: stringValue(track.id) ?? id,
         component: stringValue(params.component),
@@ -649,6 +655,11 @@ function normalizeCompositionData(project: RealProject, compositionSlug: string,
         }),
         src: stringValue(params.src),
         volume: numberValue(params.volume),
+        words,
+        accent_color: stringValue(componentStyle.active_color),
+        color: stringValue(componentStyle.color),
+        size_px: numberValue(componentStyle.size_px),
+        style: stringValue(componentStyle.position),
       });
     }
   }
@@ -670,18 +681,32 @@ function normalizeCompositionData(project: RealProject, compositionSlug: string,
   };
 }
 
-function setFieldPath(target: Record<string, unknown>, field: string, value: unknown): void {
+function setFieldPath(target: Record<string, unknown> | unknown[], field: string, value: unknown): void {
   const parts = field.split(".").map((part) => part.trim()).filter(Boolean);
   if (parts.length === 0) return;
-  let current: Record<string, unknown> = target;
-  for (const part of parts.slice(0, -1)) {
-    const next = current[part];
-    if (next == null || typeof next !== "object" || Array.isArray(next)) {
-      current[part] = {};
+  let current: Record<string, unknown> | unknown[] = target;
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const part = parts[index]!;
+    const nextPart = parts[index + 1]!;
+    const fallback: Record<string, unknown> | unknown[] = numericPathPart(nextPart) == null ? {} : [];
+    if (Array.isArray(current)) {
+      const arrayIndex = numericPathPart(part);
+      if (arrayIndex == null) return;
+      if (current[arrayIndex] == null || typeof current[arrayIndex] !== "object") current[arrayIndex] = fallback;
+      current = current[arrayIndex] as Record<string, unknown> | unknown[];
+    } else {
+      const next = current[part];
+      if (next == null || typeof next !== "object") current[part] = fallback;
+      current = current[part] as Record<string, unknown> | unknown[];
     }
-    current = current[part] as Record<string, unknown>;
   }
-  current[parts[parts.length - 1]!] = value;
+  const last = parts[parts.length - 1]!;
+  if (Array.isArray(current)) {
+    const arrayIndex = numericPathPart(last);
+    if (arrayIndex != null) current[arrayIndex] = value;
+  } else {
+    current[last] = value;
+  }
 }
 
 function normalizeClip(value: unknown, index: number, anchors: Record<string, number>, duration: number): NfClip {
@@ -874,6 +899,17 @@ function subtitleWords(value: unknown): NfSubtitleWord[] | undefined {
     })
     .filter((word): word is NfSubtitleWord => word !== undefined);
   return words.length > 0 ? words : undefined;
+}
+
+function subtitleLabel(words: NfSubtitleWord[] | undefined, fallback: string): string {
+  if (!words || words.length === 0) return fallback;
+  return words.slice(0, 5).map((word) => word.text).join(" ");
+}
+
+function numericPathPart(value: string): number | undefined {
+  if (!/^(0|[1-9]\d*)$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
 function ttsSpec(value: unknown): NfTtsSpec | undefined {

@@ -687,6 +687,12 @@ function renderCompositionPreview(root: HTMLElement, source: NfRuntimeSource, ti
     mounted.root.style.zIndex = String(item.z);
     try { api.update?.(mounted.root, item.ctx); } catch (error) { console.error(error); }
   }
+  renderCompositionSubtitles(root, source, timeMs, {
+    left,
+    top,
+    width: scaledWidth,
+    height: scaledHeight,
+  });
 }
 
 function renderCurrentCompositionPreview(): void {
@@ -747,6 +753,111 @@ function activeCompositionTracks(source: NfRuntimeSource, timeMs: number): Array
   return out.sort((a, b) => a.z - b.z);
 }
 
+function renderCompositionSubtitles(
+  root: HTMLElement,
+  source: NfRuntimeSource,
+  timeMs: number,
+  box: { left: number; top: number; width: number; height: number },
+): void {
+  let layer = root.querySelector<HTMLElement>("[data-nf-composition-subtitles]");
+  if (!layer) {
+    layer = document.createElement("div");
+    layer.dataset.nfCompositionSubtitles = "true";
+    layer.style.position = "absolute";
+    layer.style.pointerEvents = "none";
+    root.appendChild(layer);
+  }
+  layer.style.left = `${box.left}px`;
+  layer.style.top = `${box.top}px`;
+  layer.style.width = `${box.width}px`;
+  layer.style.height = `${box.height}px`;
+  layer.style.zIndex = "999";
+
+  const active = activeCompositionSubtitles(source, timeMs);
+  if (active.length === 0) {
+    layer.innerHTML = "";
+    layer.removeAttribute("data-subtitle-active");
+    return;
+  }
+  const html = active.map((item) => renderCompositionSubtitle(item.words, item.localTimeMs, item.style)).join("");
+  layer.innerHTML = html;
+  const activeText = active
+    .map((item) => item.words.find((word) => item.localTimeMs >= word.start_ms && item.localTimeMs < word.end_ms)?.text)
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+  if (activeText) {
+    layer.dataset.subtitleActive = activeText;
+  } else {
+    layer.removeAttribute("data-subtitle-active");
+  }
+}
+
+function activeCompositionSubtitles(source: NfRuntimeSource, timeMs: number): Array<{
+  words: Array<{ text: string; start_ms: number; end_ms: number }>;
+  style: Record<string, unknown>;
+  localTimeMs: number;
+}> {
+  const out = [];
+  for (const track of source.tracks ?? []) {
+    if (track.kind !== "subtitle") continue;
+    for (const clip of track.clips ?? []) {
+      const begin = Number(clip.begin ?? 0);
+      const end = Number(clip.end ?? 0);
+      if (!Number.isFinite(begin) || !Number.isFinite(end) || timeMs < begin || timeMs >= end) continue;
+      const params = recordValue(clip.params);
+      const sourceParams = recordValue(params.source);
+      const words = compositionSubtitleWords(sourceParams.words);
+      if (words.length === 0) continue;
+      out.push({
+        words,
+        style: recordValue(params.style),
+        localTimeMs: timeMs - begin,
+      });
+    }
+  }
+  return out;
+}
+
+function renderCompositionSubtitle(
+  words: Array<{ text: string; start_ms: number; end_ms: number }>,
+  localTimeMs: number,
+  style: Record<string, unknown>,
+): string {
+  const activeColor = typeof style.active_color === "string" && validColor(style.active_color) ? style.active_color : "#fbbf24";
+  const color = typeof style.color === "string" && validColor(style.color) ? style.color : "#ffffff";
+  const size = typeof style.size_px === "number" && Number.isFinite(style.size_px) ? Math.max(12, Math.min(72, style.size_px)) : 36;
+  const padding = typeof style.padding === "number" && Number.isFinite(style.padding) ? Math.max(0, Math.min(240, style.padding)) : 52;
+  const position = typeof style.position === "string" ? style.position : "bottom";
+  const vertical = position === "top"
+    ? `top:${padding}px;bottom:auto;transform:none;`
+    : position === "middle"
+      ? "top:50%;bottom:auto;transform:translateY(-50%);"
+      : `bottom:${padding}px;top:auto;transform:none;`;
+  const spans = words.map((word) => {
+    const active = localTimeMs >= word.start_ms && localTimeMs < word.end_ms;
+    const read = word.end_ms <= localTimeMs;
+    const state = active ? "active" : read ? "read" : "unread";
+    const wordColor = active ? activeColor : read ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.42)";
+    return `<span data-nf-subtitle-state="${state}" style="color:${wordColor};font-weight:${active ? 800 : 520};">${escapeHtml(word.text)}</span>`;
+  }).join(" ");
+  return `<div class="preview-subtitle-layer" data-subtitle-active style="left:32px;right:32px;${vertical}font-size:${size}px;color:${color};--nf-preview-accent:${activeColor};">${spans}</div>`;
+}
+
+function compositionSubtitleWords(value: unknown): Array<{ text: string; start_ms: number; end_ms: number }> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const object = recordValue(item);
+      const text = typeof object.text === "string" ? object.text : "";
+      const start = typeof object.start_ms === "number" ? object.start_ms : Number.NaN;
+      const end = typeof object.end_ms === "number" ? object.end_ms : Number.NaN;
+      return text && Number.isFinite(start) && Number.isFinite(end) && end >= start
+        ? { text, start_ms: start, end_ms: end }
+        : undefined;
+    })
+    .filter((word): word is { text: string; start_ms: number; end_ms: number } => word !== undefined);
+}
+
 function renderTextPreview(clip: NfDataClip, fallbackAccent: string): string {
   const style = clip.style === "label" || clip.style === "headline" ? clip.style : "caption";
   const size = Math.max(10, Math.min(44, clip.size_px ?? (style === "label" ? 14 : 20)));
@@ -793,7 +904,7 @@ function renderSubtitlePreview(clip: NfDataClip, time: number, fallbackAccent: s
         ? "read"
         : "";
     return `<span class="${state}">${escapeHtml(word.text)}</span>`;
-  }).join("");
+  }).join(" ");
   return `<div class="preview-subtitle-layer" style="--nf-preview-accent:${accent};">${spans}</div>`;
 }
 
@@ -964,7 +1075,17 @@ function patchCompositionSourceField(source: NfRuntimeSource, trackId: string, f
     if (track.id !== trackId) continue;
     for (const clip of track.clips ?? []) {
       const params = recordValue(clip.params);
-      if (field.startsWith("params.")) {
+      if (track.kind === "subtitle" && field === "params.words") {
+        const nested = recordValue(params.source);
+        nested.words = value;
+        params.source = nested;
+      } else if (track.kind === "subtitle" && field.startsWith("params.words.")) {
+        const nested = recordValue(params.source);
+        const words = Array.isArray(nested.words) ? nested.words : [];
+        setFieldPath(words, field.slice("params.words.".length), value);
+        nested.words = words;
+        params.source = nested;
+      } else if (field.startsWith("params.")) {
         const nested = recordValue(params.params);
         setFieldPath(nested, field.slice("params.".length), value);
         params.params = nested;
@@ -982,16 +1103,32 @@ function patchCompositionSourceField(source: NfRuntimeSource, trackId: string, f
   }
 }
 
-function setFieldPath(target: Record<string, unknown>, field: string, value: unknown): void {
+function setFieldPath(target: Record<string, unknown> | unknown[], field: string, value: unknown): void {
   const parts = field.split(".").map((part) => part.trim()).filter(Boolean);
   if (parts.length === 0) return;
-  let current = target;
-  for (const part of parts.slice(0, -1)) {
-    const next = current[part];
-    if (next == null || typeof next !== "object" || Array.isArray(next)) current[part] = {};
-    current = current[part] as Record<string, unknown>;
+  let current: Record<string, unknown> | unknown[] = target;
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const part = parts[index]!;
+    const nextPart = parts[index + 1]!;
+    const fallback: Record<string, unknown> | unknown[] = numericPathPart(nextPart) == null ? {} : [];
+    if (Array.isArray(current)) {
+      const arrayIndex = numericPathPart(part);
+      if (arrayIndex == null) return;
+      if (current[arrayIndex] == null || typeof current[arrayIndex] !== "object") current[arrayIndex] = fallback;
+      current = current[arrayIndex] as Record<string, unknown> | unknown[];
+    } else {
+      const next = current[part];
+      if (next == null || typeof next !== "object") current[part] = fallback;
+      current = current[part] as Record<string, unknown> | unknown[];
+    }
   }
-  current[parts[parts.length - 1]!] = value;
+  const last = parts[parts.length - 1]!;
+  if (Array.isArray(current)) {
+    const arrayIndex = numericPathPart(last);
+    if (arrayIndex != null) current[arrayIndex] = value;
+  } else {
+    current[last] = value;
+  }
 }
 
 function compositionFieldValue(value: string | Record<string, unknown>): { track: string; field: string; value: unknown } | undefined {
@@ -1018,6 +1155,12 @@ function recordValue(value: unknown): Record<string, unknown> {
 
 function clampPercent(value: number): number {
   return Math.min(95, Math.max(5, value));
+}
+
+function numericPathPart(value: string): number | undefined {
+  if (!/^(0|[1-9]\d*)$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
 function setText(selector: string, text: string): void {

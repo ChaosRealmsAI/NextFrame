@@ -324,7 +324,7 @@ export class NfInspector extends NfBase {
     const voiceError = this.getAttribute("voice-error") ?? "";
     const voiceAudio = this.getAttribute("voice-audio") ?? "";
     const compositionTrackId = clip?.track_id ?? clip?.id ?? clipId ?? "";
-    const compositionTrack = clip?.kind === "component" ? getCompositionTrack(compositionTrackId) : undefined;
+    const compositionTrack = compositionTrackId ? getCompositionTrack(compositionTrackId) : undefined;
     if (compositionTrack) {
       this.renderCompositionTrack({
         trackId: compositionTrackId,
@@ -484,10 +484,15 @@ export class NfInspector extends NfBase {
     exportProfile: string;
     exportProgress: ExportProgressState;
   }): void {
-    const component = stringValue(state.track.component) ?? "component";
+    const kind = stringValue(state.track.kind) ?? "component";
+    const component = stringValue(state.track.component) ?? kind;
     const time = recordValue(state.track.time);
     const params = recordValue(state.track.params);
     const style = recordValue(state.track.style);
+    const topLevelFields = [
+      state.track.src !== undefined ? this.compositionField("src", state.track.src, "src") : "",
+      state.track.volume !== undefined ? this.compositionField("volume", state.track.volume, "volume") : "",
+    ].join("");
     this.root.innerHTML = `
       <div class="insp" data-inspector-track-id="${escapeAttr(state.trackId)}">
         ${renderExportPanel(state)}
@@ -503,6 +508,12 @@ export class NfInspector extends NfBase {
           <span class="n">${escapeHtml(state.trackId)}</span>
           <span class="m">${escapeHtml(component)} · ${state.duration.toFixed(1)}s</span>
         </div>
+        ${topLevelFields ? `
+          <div class="insp-card">
+            <h4>轨道</h4>
+            ${topLevelFields}
+          </div>
+        ` : ""}
         <div class="insp-card">
           <h4>时间</h4>
           ${this.compositionField("time.start", time.start ?? "", "start")}
