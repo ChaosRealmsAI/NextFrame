@@ -171,11 +171,14 @@ html[data-nextframe-native="true"] .app {
 }
 
 .frame {
+  --nf-preview-bg: #0b0b10;
+  --nf-preview-accent: #5eead4;
   width: 82%;
   aspect-ratio: 16 / 9;
   background:
-    radial-gradient(ellipse 60% 60% at 50% 50%, rgba(167, 139, 250, 0.15), transparent 70%),
-    #0b0b10;
+    radial-gradient(ellipse 60% 60% at 50% 50%, color-mix(in srgb, var(--nf-preview-accent) 18%, transparent), transparent 70%),
+    linear-gradient(135deg, color-mix(in srgb, var(--nf-preview-accent) 15%, transparent), transparent 38%),
+    var(--nf-preview-bg);
   border: 1px solid var(--bd);
   position: relative;
   display: flex;
@@ -184,6 +187,93 @@ html[data-nextframe-native="true"] .app {
   justify-content: center;
   gap: 10px;
   overflow: hidden;
+}
+
+.preview-layers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.preview-text-layer,
+.preview-overlay-layer {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-family: var(--font);
+  color: var(--fg);
+  text-shadow: 0 14px 44px rgba(0, 0, 0, 0.62);
+  line-height: 1.22;
+  overflow-wrap: anywhere;
+}
+
+.preview-text-layer.caption {
+  max-width: 64%;
+  text-align: center;
+  font-weight: 580;
+}
+
+.preview-text-layer.label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(7, 8, 13, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-weight: 650;
+}
+
+.preview-text-layer.label::before,
+.preview-overlay-layer.badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--nf-preview-accent);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.preview-overlay-layer.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(7, 8, 13, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.preview-overlay-progress {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  bottom: 28px;
+  font-family: var(--font);
+  color: rgba(247, 244, 237, 0.72);
+}
+
+.preview-overlay-progress .meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.preview-overlay-progress .bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.preview-overlay-progress .fill {
+  height: 100%;
+  background: var(--nf-preview-accent);
 }
 
 .frame::before {

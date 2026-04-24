@@ -6,8 +6,9 @@ import { NfLog } from "./components/log.js";
 import { NfTimeline } from "./components/timeline.js";
 import { NfTopbar } from "./components/topbar.js";
 import { NfTrack } from "./components/track.js";
-import type { ClipSelectDetail, FieldEditDetail, TimelineClipSelectDetail } from "./events.js";
+import type { ClipSelectDetail, FieldEditDetail, PlayheadMoveDetail, TimelineClipSelectDetail } from "./events.js";
 import {
+  escapeHtml,
   exportEpisode,
   exportStatus,
   getMockData,
@@ -23,6 +24,7 @@ import {
 export const NF_COMPONENTS_VERSION = "0.2.0-w4";
 
 let selectedClipId = "";
+let currentPreviewTime = 0;
 
 const DEFINITIONS: Array<[string, CustomElementConstructor]> = [
   ["nf-topbar", NfTopbar],
@@ -55,6 +57,20 @@ function wireApp(): void {
     selectClip(detail["clip-id"]);
   });
 
+  timeline?.addEventListener("playhead-move", (event) => {
+    const detail = (event as CustomEvent<PlayheadMoveDetail>).detail;
+    currentPreviewTime = detail.time;
+    const data = getMockData();
+    const activeScene = activeClipAt(data, detail.time, "scene") ?? data.episodes[0]?.clips[0];
+    if (activeScene) {
+      selectedClipId = activeScene.id;
+      document.querySelector("nf-clips")?.setAttribute("selected-id", activeScene.id);
+      document.querySelector("nf-inspector")?.setAttribute("clip-id", activeScene.id);
+      document.querySelector("nf-timeline")?.setAttribute("selected-id", activeScene.id);
+    }
+    applyShellChrome(data, activeScene, detail.time);
+  });
+
   inspector?.addEventListener("field-edit", (event) => {
     const detail = (event as CustomEvent<FieldEditDetail>).detail;
     if (detail.field === "label") {
@@ -74,7 +90,7 @@ function wireApp(): void {
       const clipId = inspector.getAttribute("clip-id");
       if (!clipId || typeof detail.value !== "string") return;
       const clip = patchClip(clipId, { label: detail.value }, { notify: false });
-      if (clip) applyShellChrome(getMockData(), clip);
+      if (clip) applyShellChrome(getMockData(), clip, currentPreviewTime);
     }
     if (detail.field === "position") {
       const clipId = inspector.getAttribute("clip-id");
@@ -95,7 +111,7 @@ function wireApp(): void {
       const position = positionValue(detail.value);
       if (!clipId || !position) return;
       const clip = patchClip(clipId, { position }, { notify: false });
-      if (clip) applyShellChrome(getMockData(), clip);
+      if (clip) applyShellChrome(getMockData(), clip, currentPreviewTime);
     }
     if (detail.field === "export") {
       startExportFlow(route.project, route.episode, inspector);
@@ -190,7 +206,7 @@ function applyData(data: NfMockData, preferredClipId = selectedClipId): void {
     selectedClipId = selected.id;
     selectClip(selected.id, selected);
   }
-  applyShellChrome(data, selected);
+  applyShellChrome(data, selected, selected?.start ?? 0);
 }
 
 function selectClip(clipId: string, clip?: NfDataClip): void {
@@ -200,28 +216,101 @@ function selectClip(clipId: string, clip?: NfDataClip): void {
   document.querySelector("nf-timeline")?.setAttribute("selected-id", clipId);
   const selected = clip ?? getMockData().episodes[0]?.clips.find((item) => item.id === clipId);
   if (selected) {
-    document.querySelector("nf-timeline")?.setAttribute("current-time", String(selected.start));
-    applyShellChrome(getMockData(), selected);
+    currentPreviewTime = selected.start;
+    document.querySelector("nf-timeline")?.setAttribute("current-time", String(currentPreviewTime));
+    applyShellChrome(getMockData(), selected, currentPreviewTime);
   }
 }
 
-function applyShellChrome(data: NfMockData, selected: NfDataClip | undefined): void {
+function applyShellChrome(data: NfMockData, selected: NfDataClip | undefined, time?: number): void {
   const episode = data.episodes[0];
   if (!episode) return;
-  const currentTime = data.source === "ipc" ? selected?.start ?? 0 : 12.45;
+  const currentTime = Number.isFinite(time) ? Math.max(0, time ?? 0) : data.source === "ipc" ? selected?.start ?? 0 : 12.45;
+  currentPreviewTime = currentTime;
+  const activeScene = activeClipAt(data, currentTime, "scene") ?? selected;
   const pct = episode.duration > 0 ? Math.min(100, Math.max(0, currentTime / episode.duration * 100)) : 0;
   setText("[data-nf-preview-time]", `${formatTime(currentTime)} · T=${(episode.duration > 0 ? currentTime / episode.duration : 0).toFixed(4)}`);
-  setText("[data-nf-preview-clip]", selected?.label ?? episode.id);
-  setText("[data-nf-preview-title]", selected?.label ?? episode.name);
-  setText("[data-nf-preview-subtitle]", selected?.id ?? episode.id);
-  const position = selected?.position ?? { x: 50, y: 50 };
+  setText("[data-nf-preview-clip]", activeScene?.label ?? selected?.label ?? episode.id);
+  setText("[data-nf-preview-title]", activeScene?.label ?? selected?.label ?? episode.name);
+  setText("[data-nf-preview-subtitle]", activeScene?.subtitle ?? activeScene?.id ?? selected?.id ?? episode.id);
+  const position = activeScene?.position ?? selected?.position ?? { x: 50, y: 50 };
   const copy = document.querySelector<HTMLElement>("[data-nf-preview-copy]");
   copy?.style.setProperty("--nf-title-x", `${position.x}%`);
   copy?.style.setProperty("--nf-title-y", `${position.y}%`);
+  applyPreviewFrame(data, currentTime, activeScene ?? selected);
   setText("[data-nf-current-time]", formatTime(currentTime));
   setText("[data-nf-total-time]", ` / ${formatTime(episode.duration)}`);
   document.querySelector<HTMLElement>("[data-nf-scrub-fill]")?.style.setProperty("width", `${pct}%`);
   document.querySelector<HTMLElement>("[data-nf-scrub-head]")?.style.setProperty("left", `${pct}%`);
+}
+
+function activeClipAt(data: NfMockData, time: number, kind?: NfDataClip["kind"]): NfDataClip | undefined {
+  const episode = data.episodes[0];
+  return episode?.clips.find((clip) => {
+    if (kind && clip.kind !== kind) return false;
+    return time >= clip.start && time < clip.end;
+  });
+}
+
+function activeClipsAt(data: NfMockData, time: number, kind: NfDataClip["kind"]): NfDataClip[] {
+  const episode = data.episodes[0];
+  return episode?.clips.filter((clip) => clip.kind === kind && time >= clip.start && time < clip.end) ?? [];
+}
+
+function applyPreviewFrame(data: NfMockData, time: number, scene: NfDataClip | undefined): void {
+  const frame = document.querySelector<HTMLElement>("[data-nf-preview-frame]");
+  if (!frame) return;
+  const accent = validColor(scene?.accent_color) ? scene!.accent_color! : "#5eead4";
+  const bg = validColor(scene?.bg_color) ? scene!.bg_color! : "#07080d";
+  frame.style.setProperty("--nf-preview-accent", accent);
+  frame.style.setProperty("--nf-preview-bg", bg);
+  renderPreviewLayers(data, time, accent);
+}
+
+function renderPreviewLayers(data: NfMockData, time: number, fallbackAccent: string): void {
+  const root = document.querySelector<HTMLElement>("[data-nf-preview-layers]");
+  if (!root) return;
+  const textLayers = activeClipsAt(data, time, "text").map((clip) => renderTextPreview(clip, fallbackAccent));
+  const overlays = activeClipsAt(data, time, "overlay").map((clip) => renderOverlayPreview(clip, fallbackAccent));
+  root.innerHTML = [...textLayers, ...overlays].join("");
+}
+
+function renderTextPreview(clip: NfDataClip, fallbackAccent: string): string {
+  const style = clip.style === "label" || clip.style === "headline" ? clip.style : "caption";
+  const size = Math.max(10, Math.min(44, clip.size_px ?? (style === "label" ? 14 : 20)));
+  const color = validColor(clip.color) ? clip.color! : "#f7f4ed";
+  const accent = validColor(clip.accent_color) ? clip.accent_color! : fallbackAccent;
+  const align = clip.align === "left" || clip.align === "right" ? clip.align : "center";
+  const x = clampPercent(clip.position.x);
+  const y = clampPercent(clip.position.y);
+  const tx = align === "left" ? "0" : align === "right" ? "-100%" : "-50%";
+  return `
+    <div class="preview-text-layer ${style}" style="left:${x}%;top:${y}%;transform:translate(${tx}, -50%);font-size:${size}px;color:${color};--nf-preview-accent:${accent};text-align:${align};">
+      ${escapeHtml(clip.text ?? clip.label)}
+    </div>
+  `;
+}
+
+function renderOverlayPreview(clip: NfDataClip, fallbackAccent: string): string {
+  const accent = validColor(clip.accent_color) ? clip.accent_color! : fallbackAccent;
+  if (clip.variant === "progress") {
+    const progress = Math.min(1, Math.max(0, clip.progress ?? 0.5));
+    return `
+      <div class="preview-overlay-progress" style="--nf-preview-accent:${accent};">
+        <div class="meta"><span>${escapeHtml(clip.text ?? clip.label)}</span><span>${Math.round(progress * 100)}%</span></div>
+        <div class="bar"><div class="fill" style="width:${(progress * 100).toFixed(2)}%;"></div></div>
+      </div>
+    `;
+  }
+  return `
+    <div class="preview-overlay-layer badge" style="left:${clampPercent(clip.position.x)}%;top:${clampPercent(clip.position.y)}%;transform:none;--nf-preview-accent:${accent};">
+      ${escapeHtml(clip.text ?? clip.label)}
+    </div>
+  `;
+}
+
+function validColor(value: string | undefined): boolean {
+  return value != null && /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
 function wirePreviewDrag(project: string, episode: string): void {

@@ -19,6 +19,22 @@ export interface NfClip {
   end: number;
   effects: string[];
   position: { x: number; y: number };
+  layout?: string | undefined;
+  title?: string | undefined;
+  subtitle?: string | undefined;
+  eyebrow?: string | undefined;
+  description?: string | undefined;
+  big_number?: string | undefined;
+  sublabel?: string | undefined;
+  text?: string | undefined;
+  variant?: string | undefined;
+  progress?: number | undefined;
+  accent_color?: string | undefined;
+  bg_color?: string | undefined;
+  style?: string | undefined;
+  align?: string | undefined;
+  color?: string | undefined;
+  size_px?: number | undefined;
 }
 
 export interface NfLogEntry {
@@ -399,6 +415,22 @@ function normalizeClip(value: unknown, index: number, anchors: Record<string, nu
     end,
     effects: stringArray(object.effects),
     position: normalizePosition(asRecord(object.position)),
+    layout: stringValue(object.layout),
+    title: stringValue(object.title),
+    subtitle: stringValue(object.subtitle),
+    eyebrow: stringValue(object.eyebrow),
+    description: stringValue(object.description),
+    big_number: stringValue(object.big_number),
+    sublabel: stringValue(object.sublabel),
+    text: stringValue(object.text),
+    variant: stringValue(object.variant),
+    progress: numberValue(object.progress),
+    accent_color: stringValue(object.accent_color),
+    bg_color: stringValue(object.bg_color),
+    style: stringValue(object.style),
+    align: stringValue(object.align),
+    color: stringValue(object.color),
+    size_px: numberValue(object.size_px),
   };
 }
 
@@ -535,6 +567,10 @@ function stringArray(value: unknown): string[] {
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function numberValue(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function normalizePosition(value: unknown): { x: number; y: number } {
