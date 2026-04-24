@@ -1,0 +1,145 @@
+{
+  "schema": "nextframe.composition.v2",
+  "id": "showreel-24s",
+  "name": "HTML Capability Showreel",
+  "duration": "24s",
+  "viewport": { "w": 1920, "h": 1080, "ratio": "16:9" },
+  "theme": "launch.dark",
+  "anchors": {
+    "intro": "0s",
+    "layers": "3.2s",
+    "code": "7.2s",
+    "data": "11.6s",
+    "browser": "15.6s",
+    "finale": "19.2s",
+    "out": "24s"
+  },
+  "export": { "resolution": "1080p" },
+  "tracks": [
+    {
+      "id": "stage-bg",
+      "kind": "component",
+      "component": "html.stage-background",
+      "z": 0,
+      "time": { "start": "intro", "end": "out" },
+      "params": { "pulse": 0.95 }
+    },
+    {
+      "id": "particle-field",
+      "kind": "component",
+      "component": "canvas.particle-field",
+      "z": 6,
+      "time": { "start": "intro", "end": "out" },
+      "params": { "density": 72, "energy": 0.86 }
+    },
+    {
+      "id": "main-title",
+      "kind": "component",
+      "component": "html.sequence-title",
+      "z": 32,
+      "time": { "start": "intro", "end": "layers + 2.4s" },
+      "params": {
+        "eyebrow": "NEXTFRAME V2 SHOWREEL",
+        "title": "One JSON controls a live HTML video",
+        "subtitle": "DOM, SVG, Canvas, CSS motion and export share the same component timeline.",
+        "x": 47,
+        "y": 43,
+        "align": "left"
+      }
+    },
+    {
+      "id": "layer-stack",
+      "kind": "component",
+      "component": "html.layer-stack",
+      "z": 28,
+      "time": { "start": "layers", "end": "code + 1.2s" },
+      "params": {
+        "x": 69,
+        "y": 52,
+        "layers": ["JSON", "Theme CSS", "Component JS", "Runtime DOM", "Recorder"]
+      }
+    },
+    {
+      "id": "circuit-map",
+      "kind": "component",
+      "component": "svg.circuit-map",
+      "z": 18,
+      "time": { "start": "layers + 1s", "end": "browser" },
+      "params": { "x": 31, "y": 60 }
+    },
+    {
+      "id": "code-terminal",
+      "kind": "component",
+      "component": "html.code-terminal",
+      "z": 36,
+      "time": { "start": "code", "end": "data + 2.4s" },
+      "params": {
+        "x": 34,
+        "y": 50,
+        "lines": [
+          "export function update(root, ctx) {",
+          "  root.style.transform = `scale(${ctx.progress})`;",
+          "  drawCanvas(ctx.timeMs);",
+          "  syncSvgPath(ctx.progress);",
+          "}"
+        ]
+      }
+    },
+    {
+      "id": "data-dashboard",
+      "kind": "component",
+      "component": "html.data-dashboard",
+      "z": 30,
+      "time": { "start": "data", "end": "finale + 1.8s" },
+      "params": {
+        "x": 68,
+        "y": 52,
+        "metrics": [
+          { "label": "Tracks", "value": "10" },
+          { "label": "Runtime", "value": "DOM" },
+          { "label": "Export", "value": "MP4" }
+        ]
+      }
+    },
+    {
+      "id": "browser-frame",
+      "kind": "component",
+      "component": "html.browser-frame",
+      "z": 34,
+      "time": { "start": "browser", "end": "out" },
+      "params": {
+        "x": 50,
+        "y": 48,
+        "title": "desktop-preview://showreel",
+        "tabs": ["Preview", "Edit", "Export"]
+      }
+    },
+    {
+      "id": "final-title",
+      "kind": "component",
+      "component": "html.sequence-title",
+      "z": 42,
+      "time": { "start": "finale", "end": "out" },
+      "params": {
+        "eyebrow": "END TO END",
+        "title": "Edit it live, export the same timeline",
+        "subtitle": "This is still one JSON clip: tracks, anchors, CSS and JS travel together.",
+        "x": 50,
+        "y": 27,
+        "align": "center",
+        "title_size": 58,
+        "subtitle_size": 24
+      }
+    },
+    {
+      "id": "status-ribbon",
+      "kind": "component",
+      "component": "html.timeline-ribbon",
+      "z": 52,
+      "time": { "start": "intro", "end": "out" },
+      "params": {
+        "steps": ["JSON", "DOM", "SVG", "Canvas", "Edit", "Export"]
+      }
+    }
+  ]
+}
