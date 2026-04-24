@@ -140,6 +140,28 @@
       "params": {
         "steps": ["JSON", "DOM", "SVG", "Canvas", "Edit", "Export"]
       }
+    },
+    {
+      "id": "voice-intro",
+      "kind": "audio",
+      "time": { "start": "intro", "end": "data" },
+      "src": "audio/showreel-narration.mp3",
+      "volume": 1,
+      "tts": {
+        "voice": "en-US-AriaNeural",
+        "text": "NextFrame V2 showreel. One JSON controls live HTML components, SVG, canvas, editor changes, and final video export."
+      }
+    },
+    {
+      "id": "voice-outro",
+      "kind": "audio",
+      "time": { "start": "data", "end": "out" },
+      "src": "audio/showreel-narration-2.mp3",
+      "volume": 1,
+      "tts": {
+        "voice": "en-US-AriaNeural",
+        "text": "The second half keeps the same JSON timeline alive. You can move tracks in the editor, save the composition, and export the exact same result."
+      }
     }
   ]
 }

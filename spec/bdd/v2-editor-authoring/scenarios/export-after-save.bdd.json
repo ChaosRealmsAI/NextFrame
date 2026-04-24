@@ -3,7 +3,7 @@
   "title": "保存后的修改用于最终导出视频",
   "given": "用户已修改 final-title.title 并点击保存，桌面端显示 saved 状态。",
   "when": "用户点击导出按钮并等待进度完成。",
-  "then": "导出完成后出现打开按钮，MP4 抽帧能看到修改后的标题，导出源 track_count 仍是 10。",
+  "then": "导出完成后出现打开按钮，MP4 抽帧能看到修改后的标题，导出源 track_count 仍包含 10 条视觉轨和 2 条音频轨。",
   "human_actions": ["edit final-title title", "click save", "click export", "watch progress", "click open output"],
   "ai_tools": [
     {

@@ -7,7 +7,7 @@ use directories::BaseDirs;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use thiserror::Error;
 
 static SLUG_RE: Lazy<Result<Regex, regex::Error>> =
@@ -79,7 +79,7 @@ pub trait Storage {
     fn load_project(&self, slug: &str) -> Result<Project, ProjectError>;
     fn save_project(&self, project: &Project) -> Result<(), ProjectError>;
     fn load_episode(&self, project_slug: &str, episode_slug: &str)
-    -> Result<Episode, ProjectError>;
+        -> Result<Episode, ProjectError>;
     fn save_episode(&self, project_slug: &str, episode: &Episode) -> Result<(), ProjectError>;
 }
 
@@ -297,7 +297,9 @@ pub fn compile_composition_source(
     let tracks = object
         .get("tracks")
         .and_then(Value::as_array)
-        .ok_or_else(|| ProjectError::ValidationFailed("composition.tracks must be an array".to_string()))?;
+        .ok_or_else(|| {
+            ProjectError::ValidationFailed("composition.tracks must be an array".to_string())
+        })?;
 
     let mut warnings = Vec::new();
     let mut source_tracks = Vec::new();
@@ -349,7 +351,8 @@ pub fn compile_composition_source(
                     components.insert(component_id.to_string(), Value::String(src));
                 }
                 params.insert("component".to_string(), json!(component_id));
-                let mut component_params = track.get("params").cloned().unwrap_or_else(|| json!({}));
+                let mut component_params =
+                    track.get("params").cloned().unwrap_or_else(|| json!({}));
                 if let (Some(target), Some(style)) = (
                     component_params.as_object_mut(),
                     track.get("style").and_then(Value::as_object),
@@ -365,11 +368,14 @@ pub fn compile_composition_source(
                     "style".to_string(),
                     track.get("style").cloned().unwrap_or_else(|| json!({})),
                 );
-                params.insert("track".to_string(), json!({
-                    "id": track_id,
-                    "z": track.get("z").and_then(Value::as_i64).unwrap_or(index as i64),
-                    "kind": kind
-                }));
+                params.insert(
+                    "track".to_string(),
+                    json!({
+                        "id": track_id,
+                        "z": track.get("z").and_then(Value::as_i64).unwrap_or(index as i64),
+                        "kind": kind
+                    }),
+                );
                 has_visual = true;
             }
             "audio" => {
@@ -377,7 +383,10 @@ pub fn compile_composition_source(
                     warnings.push(format!("ignored audio track '{track_id}' without src"));
                     continue;
                 };
-                params.insert("src".to_string(), json!(src));
+                params.insert(
+                    "src".to_string(),
+                    json!(composition_audio_src(storage.root(), project_slug, src)),
+                );
                 copy_number_param(track, &mut params, "from_ms");
                 copy_number_param(track, &mut params, "to_ms");
                 copy_number_param(track, &mut params, "volume");
@@ -806,6 +815,31 @@ fn audio_params(object: &serde_json::Map<String, Value>) -> Option<serde_json::M
     Some(params)
 }
 
+fn composition_audio_src(root: &Path, project_slug: &str, src: &str) -> String {
+    if src.starts_with("file://") || src.starts_with("data:") {
+        return src.to_string();
+    }
+    let path = if Path::new(src).is_absolute() {
+        PathBuf::from(src)
+    } else {
+        root.join(project_slug).join(src)
+    };
+    file_url(&path)
+}
+
+fn file_url(path: &Path) -> String {
+    let mut encoded = String::new();
+    for byte in path.to_string_lossy().as_bytes() {
+        match *byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                encoded.push(char::from(*byte))
+            }
+            other => encoded.push_str(&format!("%{other:02X}")),
+        }
+    }
+    format!("file://{encoded}")
+}
+
 fn copy_string_param(
     source: &serde_json::Map<String, Value>,
     target: &mut serde_json::Map<String, Value>,
@@ -994,7 +1028,11 @@ fn track_time_ms(
         .and_then(|value| value.get("end"))
         .or_else(|| track.get("end"))
         .unwrap_or(&end_default);
-    let start = time_value_ms(Some(start_value), anchors, &format!("track '{track_id}' start"))?;
+    let start = time_value_ms(
+        Some(start_value),
+        anchors,
+        &format!("track '{track_id}' start"),
+    )?;
     let end = time_value_ms(Some(end_value), anchors, &format!("track '{track_id}' end"))?;
     Ok((start.min(duration_ms), end.min(duration_ms)))
 }
@@ -1073,7 +1111,10 @@ fn load_theme_css(root: &Path, project_slug: &str, theme_id: &str) -> Result<Str
         let path = theme_dir.join(file);
         if path.exists() {
             let raw = fs::read_to_string(&path).map_err(|err| {
-                ProjectError::StorageFailed(format!("theme CSS read failed: {}: {err}", path.display()))
+                ProjectError::StorageFailed(format!(
+                    "theme CSS read failed: {}: {err}",
+                    path.display()
+                ))
             })?;
             css.push_str(&raw);
             css.push('\n');
@@ -1117,8 +1158,8 @@ fn copy_number_param(
 #[cfg(test)]
 mod tests {
     use super::{
-        Episode, JsonStorage, Project, Registry, RegistryProject, Storage,
-        compile_composition_source,
+        compile_composition_source, Episode, JsonStorage, Project, Registry, RegistryProject,
+        Storage,
     };
 
     #[test]
@@ -1250,6 +1291,12 @@ mod tests {
                 "component": "html.hero-title",
                 "time": { "start": "in", "end": "out" },
                 "params": { "title": "Hello" }
+            }, {
+                "id": "voice",
+                "kind": "audio",
+                "time": { "start": "in", "end": "out" },
+                "src": "audio/demo.mp3",
+                "volume": 0.8
             }]
         });
 
@@ -1257,22 +1304,27 @@ mod tests {
 
         assert_eq!(compiled.source["duration"], 4000);
         assert_eq!(compiled.source["tracks"][0]["kind"], "component");
+        assert_eq!(compiled.source["tracks"][1]["kind"], "audio");
+        assert!(compiled.source["tracks"][1]["clips"][0]["params"]["src"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("file://"));
+        assert!(compiled.source["tracks"][1]["clips"][0]["params"]["src"]
+            .as_str()
+            .unwrap_or_default()
+            .ends_with("/demo/audio/demo.mp3"));
         assert_eq!(
             compiled.source["tracks"][0]["clips"][0]["params"]["component"],
             "html.hero-title"
         );
-        assert!(
-            compiled.source["components"]["html.hero-title"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("update")
-        );
-        assert!(
-            compiled.source["theme"]["css"]
-                .as_str()
-                .unwrap_or_default()
-                .contains("--accent")
-        );
+        assert!(compiled.source["components"]["html.hero-title"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("update"));
+        assert!(compiled.source["theme"]["css"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("--accent"));
         cleanup(storage.root())?;
         Ok(())
     }

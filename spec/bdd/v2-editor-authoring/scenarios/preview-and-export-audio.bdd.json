@@ -1,0 +1,31 @@
+{
+  "id": "preview-and-export-audio",
+  "title": "V2 composition 的 audio 轨道在预览和导出中都有声音",
+  "given": "showreel-24s JSON 包含两条 audio 轨，src 使用项目内相对路径 audio/showreel-narration*.mp3。",
+  "when": "用户在桌面端打开 showreel-24s，点击播放；随后用 draft profile 导出视频。",
+  "then": "桌面预览的运行态数据包含 active audio clip；导出的 MP4 至少有一条 AAC audio stream，且 source JSON 保留 audio track。",
+  "human_actions": ["open composition", "click play", "hear narration", "export draft", "open output"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s | jq '.source.tracks[] | select(.kind==\"audio\") | .clips[0].params.src'",
+      "output": "两条 file:// audio src"
+    },
+    {
+      "tool": "click",
+      "command": "target/debug/nf click --project v2-showcase --episode showreel-24s --selector='[data-nf-play]'",
+      "output": "播放按钮触发同一预览链路"
+    },
+    {
+      "tool": "export",
+      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --out tmp/v0.13.1/showreel-audio.mp4",
+      "output": "audio_muxed=true"
+    },
+    {
+      "tool": "probe",
+      "command": "ffprobe -v error -select_streams a -show_entries stream=codec_name,duration,bit_rate -of json tmp/v0.13.1/showreel-audio.mp4",
+      "output": "codec_name=aac 且 duration > 0"
+    }
+  ],
+  "done": false
+}

@@ -8,10 +8,11 @@
     "edit-params",
     "drag-position",
     "edit-timing",
-    "export-after-save"
+    "export-after-save",
+    "preview-and-export-audio"
   ],
   "completion": {
-    "total": 5,
+    "total": 6,
     "done": 0
   }
 }
