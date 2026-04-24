@@ -1,5 +1,5 @@
 import { makeSheet, NfBase } from "../_base.js";
-import type { AnchorHoverDetail, ClipSelectDetail, PlayheadMoveDetail, TimelineClipSelectDetail } from "../events.js";
+import type { AnchorHoverDetail, ClipSelectDetail, PlayheadMoveDetail, TimelineClipSelectDetail, TimelineTrackSelectDetail } from "../events.js";
 import { getEpisode, getMockData, pct } from "../storage.js";
 
 const TEXT_CLIPS = [
@@ -163,8 +163,8 @@ export class NfTimeline extends NfBase {
         </div>
         <div class="tl-body">
           ${v2Rows.length > 0 ? v2Rows.map((row) => `
-            <nf-track kind="${row.kind}" label="${escapeAttr(row.label)}">
-              ${row.clips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="${clip.kind}" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
+            <nf-track kind="${row.kind}" label="${escapeAttr(row.label)}" track-id="${escapeAttr(row.id)}" data-track-id="${escapeAttr(row.id)}" ${row.id === selectedId ? "selected" : ""}>
+              ${row.clips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" data-track-id="${escapeAttr(row.id)}" kind="${clip.kind}" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId || row.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
             </nf-track>
           `).join("") : `
             <nf-track kind="scene" label="画面">
@@ -214,6 +214,23 @@ export class NfTimeline extends NfBase {
       this.emit<TimelineClipSelectDetail>("clip-select", {
         track: detail.kind,
         "clip-id": detail.id,
+      });
+    });
+    this.root.addEventListener("track-select", (event) => {
+      const detail = (event as CustomEvent<TimelineTrackSelectDetail>).detail;
+      this.emit<TimelineClipSelectDetail>("clip-select", {
+        track: detail.track,
+        "clip-id": detail["track-id"],
+      });
+    });
+    this.root.querySelectorAll<HTMLElement>("nf-track[data-track-id]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const trackId = row.dataset.trackId ?? "";
+        if (!trackId) return;
+        this.emit<TimelineClipSelectDetail>("clip-select", {
+          track: (row.getAttribute("kind") ?? "component") as TimelineClipSelectDetail["track"],
+          "clip-id": trackId,
+        });
       });
     });
     this.root.addEventListener("anchor-hover", (event) => {

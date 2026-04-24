@@ -33,6 +33,7 @@ fn run() -> Result<(), NfError> {
         Command::Projects(args) => commands::projects::dispatch(args),
         Command::Episodes(args) => commands::episodes::dispatch(args),
         Command::Clips(args) => commands::clips::dispatch(args),
+        Command::Composition(args) => commands::compositions::dispatch(args),
         Command::Anchors(args) => commands::anchors::dispatch(args),
         Command::Log(args) => commands::log::dispatch(args),
         Command::Help(args) => commands::utility::help(args),

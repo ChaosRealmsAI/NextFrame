@@ -7,6 +7,7 @@ use crate::ipc_client::{self, IpcResponse};
 pub mod anchors;
 pub mod app;
 pub mod clips;
+pub mod compositions;
 pub mod doctor;
 pub mod episodes;
 pub mod export_cmd;
@@ -341,6 +342,26 @@ COMMON ERRORS:
     - invalid anchor expression -> exit 2 · hint: run `nf anchors list --project=<slug> --episode=<slug>`"#
     )]
     Clips(ClipCommand),
+    #[command(
+        about = "Inspect or patch v2 composition JSON tracks",
+        long_about = r#"Inspect or patch one v2 composition track without scraping the editor DOM.
+
+USAGE:
+    nf composition show --project=<slug> --composition=<slug> [--track=<id>] [--field=<path>]
+    nf composition patch --project=<slug> --composition=<slug> --track=<id> --field=<path> --value=<json-or-string>
+
+EXAMPLES:
+    nf composition show --project=v2-showcase --composition=showreel-24s --track=final-title --field=params.title
+    nf composition patch --project=v2-showcase --composition=showreel-24s --track=final-title --field=params.title --value='NEXTFRAME LIVE EDIT'
+
+EXPECTED JSON:
+    {"composition":{...},"source":{...},"warnings":[]}
+
+COMMON ERRORS:
+    - unknown track -> exit 2 · hint: run `nf composition show --project=<slug> --composition=<slug>`
+    - invalid field path -> exit 2 · hint: use dot paths such as params.title, style.x, or time.start"#
+    )]
+    Composition(CompositionCommand),
     #[command(
         about = "Manage named time anchors for an episode",
         long_about = r#"List, set, or unset named time anchors used by clip start and end expressions.
@@ -687,11 +708,13 @@ pub struct DevtoolsArgs {
     #[arg(
         long,
         value_name = "ACTION",
-        help = "Optional mutation action: append-style, remove, or set-css-var"
+        help = "Optional mutation action: append-style, remove, set-css-var, or fill"
     )]
     pub action: Option<String>,
     #[arg(long, value_name = "VALUE", help = "Value used with --action")]
     pub value: Option<String>,
+    #[arg(long, value_name = "VALUE", help = "Shortcut for --action=fill --value=<VALUE>")]
+    pub fill: Option<String>,
     #[arg(long, value_name = "ID", help = "Optional window id from `nf ps`")]
     pub window: Option<String>,
 }
@@ -742,6 +765,46 @@ pub struct SlugProjectEpisodeArgs {
     pub project: String,
     #[arg(long, value_name = "SLUG", help = "Episode slug, for example ep-01")]
     pub episode: String,
+}
+
+#[derive(Debug, Args)]
+pub struct CompositionCommand {
+    #[command(subcommand)]
+    pub command: CompositionSubcommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CompositionSubcommand {
+    #[command(about = "Show a v2 composition, track, or field")]
+    Show(CompositionShowArgs),
+    #[command(about = "Patch one v2 composition track field by dot path")]
+    Patch(CompositionPatchArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct CompositionShowArgs {
+    #[arg(long, value_name = "SLUG", help = "Project slug, for example v2-showcase")]
+    pub project: String,
+    #[arg(long, value_name = "SLUG", help = "Composition slug, for example showreel-24s")]
+    pub composition: String,
+    #[arg(long, value_name = "ID", help = "Optional track id to return")]
+    pub track: Option<String>,
+    #[arg(long, value_name = "PATH", help = "Optional field path inside the track")]
+    pub field: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct CompositionPatchArgs {
+    #[arg(long, value_name = "SLUG", help = "Project slug, for example v2-showcase")]
+    pub project: String,
+    #[arg(long, value_name = "SLUG", help = "Composition slug, for example showreel-24s")]
+    pub composition: String,
+    #[arg(long, value_name = "ID", help = "Track id to patch")]
+    pub track: String,
+    #[arg(long, value_name = "PATH", help = "Field path, for example params.title or style.x")]
+    pub field: String,
+    #[arg(long, value_name = "VALUE", help = "JSON scalar/object or raw string value")]
+    pub value: String,
 }
 
 #[derive(Debug, Subcommand)]

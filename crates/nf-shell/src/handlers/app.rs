@@ -299,7 +299,14 @@ fn callback_for_shared(req_id: String, shared_ack: SharedAck) -> impl Fn(String)
 }
 
 fn js_callback_response(req_id: &str, raw: &str) -> IpcResponse {
-    match serde_json::from_str::<Value>(raw) {
+    let parsed = serde_json::from_str::<Value>(raw).and_then(|value| {
+        if let Some(inner) = value.as_str() {
+            serde_json::from_str::<Value>(inner)
+        } else {
+            Ok(value)
+        }
+    });
+    match parsed {
         Ok(value) if value.get("ok").and_then(Value::as_bool) == Some(false) => IpcResponse {
             req_id: req_id.to_string(),
             ok: false,
@@ -339,15 +346,27 @@ fn click_script(selector: &str) -> String {
     let selector_json = json_string(selector);
     format!(
         r#"(function() {{
+  function reply(value) {{ return JSON.stringify(value); }}
+  function queryDeep(selector) {{
+    const parts = selector.split("::shadow").map((part) => part.trim()).filter(Boolean);
+    let root = document;
+    let el = null;
+    for (const part of parts) {{
+      el = root.querySelector(part);
+      if (!el) return null;
+      root = el.shadowRoot || el;
+    }}
+    return el;
+  }}
   const selector = {selector_json};
-  const el = document.querySelector(selector);
-  if (!el) return {{ ok: false, error: "selector not found: " + selector }};
+  const el = queryDeep(selector);
+  if (!el) return reply({{ ok: false, error: "selector not found: " + selector }});
   const rect = el.getBoundingClientRect();
   const eventInit = {{ bubbles: true, cancelable: true, view: window, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }};
   el.dispatchEvent(new MouseEvent("mousedown", eventInit));
   el.dispatchEvent(new MouseEvent("mouseup", eventInit));
   el.dispatchEvent(new MouseEvent("click", eventInit));
-  return {{ ok: true, selector, rect: {{ x: rect.x, y: rect.y, width: rect.width, height: rect.height }} }};
+  return reply({{ ok: true, selector, rect: {{ x: rect.x, y: rect.y, width: rect.width, height: rect.height }} }});
 }})()"#
     )
 }
@@ -359,12 +378,24 @@ fn devtools_script(query: &str, get: &str, action: Option<&str>, value: Option<&
     let value_json = json_string(value.unwrap_or(""));
     format!(
         r#"(function() {{
+  function reply(value) {{ return JSON.stringify(value); }}
+  function queryDeep(selector) {{
+    const parts = selector.split("::shadow").map((part) => part.trim()).filter(Boolean);
+    let root = document;
+    let el = null;
+    for (const part of parts) {{
+      el = root.querySelector(part);
+      if (!el) return null;
+      root = el.shadowRoot || el;
+    }}
+    return el;
+  }}
   const selector = {query_json};
   const get = {get_json};
   const action = {action_json};
   const actionValue = {value_json};
-  const el = document.querySelector(selector);
-  if (!el) return {{ ok: false, error: "selector not found: " + selector }};
+  const el = queryDeep(selector);
+  if (!el) return reply({{ ok: false, error: "selector not found: " + selector }});
   if (action === "append-style") {{
     const style = document.createElement("style");
     style.setAttribute("data-nextframe-devtools", "true");
@@ -375,6 +406,19 @@ fn devtools_script(query: &str, get: &str, action: Option<&str>, value: Option<&
   }} else if (action === "set-css-var") {{
     const parts = actionValue.split("=");
     if (parts.length >= 2) document.documentElement.style.setProperty(parts[0].trim(), parts.slice(1).join("=").trim());
+  }} else if (action === "fill") {{
+    el.value = actionValue;
+    el.dispatchEvent(new Event("input", {{ bubbles: true, composed: true }}));
+    el.dispatchEvent(new Event("change", {{ bubbles: true, composed: true }}));
+    const rootNode = el.getRootNode && el.getRootNode();
+    const host = rootNode && rootNode.host;
+    const trackRoot = el.closest && el.closest("[data-inspector-track-id]");
+    if (host && host.tagName === "NF-INSPECTOR" && el.dataset && el.dataset.fieldPath && trackRoot) {{
+      const payload = {{ track: trackRoot.dataset.inspectorTrackId, field: el.dataset.fieldPath, value: actionValue }};
+      host.dispatchEvent(new CustomEvent("field-edit", {{ detail: {{ field: "composition-preview", value: payload }}, bubbles: true, composed: true }}));
+      host.dispatchEvent(new CustomEvent("field-edit", {{ detail: {{ field: "composition-save", value: payload }}, bubbles: true, composed: true }}));
+      if (window.__NF_COMPOSITION_FIELD__) window.__NF_COMPOSITION_FIELD__(payload.track, payload.field, payload.value);
+    }}
   }}
   let result;
   if (get.startsWith("computed-style:")) {{
@@ -387,7 +431,7 @@ fn devtools_script(query: &str, get: &str, action: Option<&str>, value: Option<&
   }} else {{
     result = el[get];
   }}
-  return {{ ok: true, selector, get, value: result }};
+  return reply({{ ok: true, selector, get, value: result }});
 }})()"#
     )
 }

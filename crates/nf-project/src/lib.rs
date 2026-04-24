@@ -349,10 +349,18 @@ pub fn compile_composition_source(
                     components.insert(component_id.to_string(), Value::String(src));
                 }
                 params.insert("component".to_string(), json!(component_id));
-                params.insert(
-                    "params".to_string(),
-                    track.get("params").cloned().unwrap_or_else(|| json!({})),
-                );
+                let mut component_params = track.get("params").cloned().unwrap_or_else(|| json!({}));
+                if let (Some(target), Some(style)) = (
+                    component_params.as_object_mut(),
+                    track.get("style").and_then(Value::as_object),
+                ) {
+                    for key in ["x", "y"] {
+                        if let Some(value) = style.get(key) {
+                            target.insert(key.to_string(), value.clone());
+                        }
+                    }
+                }
+                params.insert("params".to_string(), component_params);
                 params.insert(
                     "style".to_string(),
                     track.get("style").cloned().unwrap_or_else(|| json!({})),

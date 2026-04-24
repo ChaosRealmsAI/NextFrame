@@ -150,6 +150,7 @@ export const DEFAULT_MOCK: NfMockData = {
 };
 
 let cached: NfMockData = DEFAULT_MOCK;
+let cachedComposition: Record<string, unknown> | null = null;
 let ipcSeq = 1;
 
 interface ShellIpc {
@@ -302,6 +303,7 @@ export async function loadProjectData(
   episodeSlug: string,
   options: LoadProjectOptions = {},
 ): Promise<NfMockData> {
+  cachedComposition = null;
   if (!shellIpc()) {
     const data = await loadMockData();
     if (options.explicitRoute) {
@@ -356,6 +358,7 @@ export async function loadCompositionData(
       composition: compositionSlug,
     });
     const data = normalizeCompositionData(project, compositionSlug, loaded.source);
+    cachedComposition = loaded.composition;
     cached = data;
     dispatchDataReady(cached);
     return { ...loaded, data };
@@ -439,9 +442,46 @@ export async function updateCompositionTrackParams(
   });
   const project = await shellRequest<RealProject>("projects.show", { project: projectSlug });
   const data = normalizeCompositionData(project, compositionSlug, loaded.source);
+  cachedComposition = loaded.composition;
   cached = data;
   dispatchDataReady(cached);
   return { ...loaded, data };
+}
+
+export async function updateCompositionTrackField(
+  projectSlug: string,
+  compositionSlug: string,
+  trackId: string,
+  field: string,
+  value: unknown,
+): Promise<NfCompositionLoad> {
+  const loaded = await shellRequest<Omit<NfCompositionLoad, "data">>("compositions.updateTrack", {
+    project: projectSlug,
+    composition: compositionSlug,
+    track: trackId,
+    field,
+    value,
+  });
+  const project = await shellRequest<RealProject>("projects.show", { project: projectSlug });
+  const data = normalizeCompositionData(project, compositionSlug, loaded.source);
+  cachedComposition = loaded.composition;
+  cached = data;
+  dispatchDataReady(cached);
+  return { ...loaded, data };
+}
+
+export function getCompositionTrack(trackId: string): Record<string, unknown> | undefined {
+  const tracks = Array.isArray(cachedComposition?.tracks) ? cachedComposition.tracks : [];
+  return tracks
+    .filter((item): item is Record<string, unknown> => item != null && typeof item === "object" && !Array.isArray(item))
+    .find((track) => stringValue(track.id) === trackId);
+}
+
+export function patchCompositionTrackField(trackId: string, field: string, value: unknown): Record<string, unknown> | undefined {
+  const track = getCompositionTrack(trackId);
+  if (!track) return undefined;
+  setFieldPath(track, field, value);
+  return track;
 }
 
 export function exportStatus(jobId: string): Promise<NfExportStatus> {
@@ -556,6 +596,7 @@ function normalizeCompositionData(project: RealProject, compositionSlug: string,
     for (const clip of track.clips ?? []) {
       const params = asRecord(clip.params);
       const componentParams = asRecord(params.params);
+      const componentStyle = asRecord(params.style);
       const id = stringValue(clip.id) ?? stringValue(track.id) ?? `track-${clips.length + 1}`;
       const begin = finiteNumber(clip.begin, 0);
       const end = finiteNumber(clip.end, begin + 1000);
@@ -570,8 +611,8 @@ function normalizeCompositionData(project: RealProject, compositionSlug: string,
         end: end / 1000,
         effects: track.kind === "component" ? ["v2 component"] : [],
         position: normalizePosition({
-          x: componentParams.x,
-          y: componentParams.y,
+          x: componentStyle.x ?? componentParams.x,
+          y: componentStyle.y ?? componentParams.y,
         }),
         src: stringValue(params.src),
         volume: numberValue(params.volume),
@@ -594,6 +635,20 @@ function normalizeCompositionData(project: RealProject, compositionSlug: string,
       inspector_fields: defaultInspectorFields(clips),
     }],
   };
+}
+
+function setFieldPath(target: Record<string, unknown>, field: string, value: unknown): void {
+  const parts = field.split(".").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) return;
+  let current: Record<string, unknown> = target;
+  for (const part of parts.slice(0, -1)) {
+    const next = current[part];
+    if (next == null || typeof next !== "object" || Array.isArray(next)) {
+      current[part] = {};
+    }
+    current = current[part] as Record<string, unknown>;
+  }
+  current[parts[parts.length - 1]!] = value;
 }
 
 function normalizeClip(value: unknown, index: number, anchors: Record<string, number>, duration: number): NfClip {

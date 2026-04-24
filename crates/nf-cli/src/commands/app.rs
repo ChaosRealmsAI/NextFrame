@@ -105,6 +105,8 @@ pub fn state(args: StateArgs) -> Result<(), NfError> {
 }
 
 pub fn devtools(args: DevtoolsArgs) -> Result<(), NfError> {
+    let action = args.action.or_else(|| args.fill.as_ref().map(|_| "fill".to_string()));
+    let value = args.value.or(args.fill);
     send_ipc(
         "devtools-query",
         json!({
@@ -112,8 +114,8 @@ pub fn devtools(args: DevtoolsArgs) -> Result<(), NfError> {
             "episode": args.episode,
             "query": args.query,
             "get": args.get,
-            "action": args.action,
-            "value": args.value,
+            "action": action,
+            "value": value,
             "window": args.window,
             "tool": "devtools"
         }),

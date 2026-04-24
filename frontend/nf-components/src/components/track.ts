@@ -1,4 +1,5 @@
 import { makeSheet, NfBase } from "../_base.js";
+import type { ClipKind, TimelineTrackSelectDetail } from "../events.js";
 
 const sheet = makeSheet(`
   :host {
@@ -9,6 +10,15 @@ const sheet = makeSheet(`
   .tl-row {
     height: 36px; display: flex;
     border-bottom: 1px solid var(--bd-2);
+    cursor: pointer;
+  }
+  :host([selected]) .tl-row {
+    background: rgba(167, 139, 250, 0.08);
+  }
+  :host([selected]) .tl-head-col {
+    color: var(--fg);
+    background: rgba(167, 139, 250, 0.14);
+    border-right-color: rgba(167, 139, 250, 0.28);
   }
   .tl-head-col {
     width: 100px; flex-shrink: 0;
@@ -52,7 +62,7 @@ const LABELS: Record<string, string> = {
 
 export class NfTrack extends NfBase {
   static get observedAttributes(): string[] {
-    return ["kind", "label"];
+    return ["kind", "label", "track-id", "selected"];
   }
 
   constructor() {
@@ -69,12 +79,29 @@ export class NfTrack extends NfBase {
 
   private render(): void {
     const kind = this.getAttribute("kind") ?? "scene";
+    const trackId = this.getAttribute("track-id") ?? "";
     const label = this.getAttribute("label") ?? LABELS[kind] ?? "轨道";
     this.root.innerHTML = `
-      <div class="tl-row">
+      <div class="tl-row" data-track-id="${escapeAttr(trackId)}">
         <div class="tl-head-col"><div class="stripe"></div><span>${label}</span></div>
         <div class="tl-lane"><slot name="clips"></slot></div>
       </div>
     `;
+    this.root.querySelector(".tl-row")?.addEventListener("click", (event) => {
+      if (!trackId) return;
+      this.emit<TimelineTrackSelectDetail>("track-select", {
+        track: kind as ClipKind,
+        "track-id": trackId,
+      });
+      if ((event.target as Element | null)?.closest("slot")) return;
+    });
   }
+}
+
+function escapeAttr(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

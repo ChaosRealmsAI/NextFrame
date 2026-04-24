@@ -17,8 +17,9 @@ import {
   loadProjectData,
   openExport,
   patchClip,
+  patchCompositionTrackField,
   synthesizeVoice,
-  updateCompositionTrackParams,
+  updateCompositionTrackField,
   updateClipLabel,
   updateClipPosition,
   voiceStatus,
@@ -141,6 +142,19 @@ function wireApp(): void {
       const clip = patchClip(clipId, { position }, { notify: false });
       if (clip) applyShellChrome(getMockData(), clip, currentPreviewTime);
     }
+    if (detail.field === "composition-preview") {
+      const patch = compositionFieldValue(detail.value);
+      if (!composition || !compositionSource || !patch) return;
+      patchCompositionTrackField(patch.track, patch.field, patch.value);
+      patchCompositionSourceField(compositionSource, patch.track, patch.field, patch.value);
+      renderCurrentCompositionPreview();
+      inspector.setAttribute("save-status", "dirty");
+    }
+    if (detail.field === "composition-save") {
+      const patch = compositionFieldValue(detail.value);
+      if (!composition || !compositionSource || !patch) return;
+      saveCompositionField(route.project, composition, patch.track, patch.field, patch.value);
+    }
     if (detail.field === "export") {
       startExportFlow(route.project, route.episode, inspector, route.composition);
     }
@@ -167,6 +181,28 @@ function wireApp(): void {
 
   wirePreviewDrag(route.project, route.episode, route.composition);
   wirePlaybackControls();
+}
+
+function saveCompositionField(project: string, composition: string, track: string, field: string, value: unknown): void {
+  const inspector = document.querySelector("nf-inspector");
+  if (!compositionSource || !inspector) return;
+  patchCompositionTrackField(track, field, value);
+  patchCompositionSourceField(compositionSource, track, field, value);
+  renderCurrentCompositionPreview();
+  inspector.setAttribute("save-status", "saving");
+  void updateCompositionTrackField(project, composition, track, field, value)
+    .then((loaded) => applyComposition(loaded.source, loaded.data, track))
+    .then(() => inspector.setAttribute("save-status", "saved"))
+    .catch((error) => {
+      inspector.setAttribute("save-status", "failed");
+      inspector.setAttribute("save-error", error instanceof Error ? error.message : String(error));
+    });
+}
+
+function saveCompositionFieldFromRoute(track: string, field: string, value: unknown): void {
+  const route = routeFromUrl();
+  if (!route.composition) return;
+  saveCompositionField(route.project, route.composition, track, field, value);
 }
 
 function startVoiceFlow(project: string, episode: string, clipId: string, voice: NfTtsSpec & { text: string }, inspector: Element): void {
@@ -338,6 +374,7 @@ function selectClip(clipId: string, clip?: NfDataClip): void {
   document.querySelector("nf-clips")?.setAttribute("selected-id", clipId);
   document.querySelector("nf-inspector")?.setAttribute("clip-id", clipId);
   document.querySelector("nf-timeline")?.setAttribute("selected-id", clipId);
+  document.querySelector("nf-timeline")?.setAttribute("data-selected-track-id", clipId);
   const selected = clip ?? getMockData().episodes[0]?.clips.find((item) => item.id === clipId);
   if (selected) {
     currentPreviewTime = selected.start;
@@ -410,6 +447,18 @@ function updatePlayButton(): void {
 }
 
 function seekPreviewTime(time: number, options: { syncTimeline: boolean }): void {
+  if (compositionSource) {
+    const data = getMockData();
+    const episode = data.episodes[0];
+    if (!episode) return;
+    const safeTime = Math.min(episode.duration, Math.max(0, time));
+    currentPreviewTime = safeTime;
+    if (options.syncTimeline) {
+      document.querySelector("nf-timeline")?.setAttribute("current-time", safeTime.toFixed(3));
+    }
+    applyShellChrome(data, getClipById(selectedClipId) ?? episode.clips[0], safeTime);
+    return;
+  }
   const data = getMockData();
   const episode = data.episodes[0];
   if (!episode) return;
@@ -425,6 +474,10 @@ function seekPreviewTime(time: number, options: { syncTimeline: boolean }): void
     document.querySelector("nf-timeline")?.setAttribute("current-time", safeTime.toFixed(3));
   }
   applyShellChrome(data, activeScene, safeTime);
+}
+
+function getClipById(id: string): NfDataClip | undefined {
+  return getMockData().episodes[0]?.clips.find((clip) => clip.id === id || clip.track_id === id);
 }
 
 function adjacentClipTime(direction: "next" | "prev"): number {
@@ -577,6 +630,7 @@ function renderCompositionPreview(root: HTMLElement, source: NfRuntimeSource, ti
     if (!mounted) {
       const el = document.createElement("div");
       el.dataset.nfComponentRoot = "true";
+      el.dataset.nfComponentRoot = item.trackId;
       el.dataset.nfComponentTrack = item.trackId;
       el.dataset.nfComponent = item.component;
       el.style.position = "absolute";
@@ -597,6 +651,12 @@ function renderCompositionPreview(root: HTMLElement, source: NfRuntimeSource, ti
     mounted.root.style.zIndex = String(item.z);
     try { api.update?.(mounted.root, item.ctx); } catch (error) { console.error(error); }
   }
+}
+
+function renderCurrentCompositionPreview(): void {
+  const layers = document.querySelector<HTMLElement>("[data-nf-preview-layers]");
+  if (!layers || !compositionSource) return;
+  renderCompositionPreview(layers, compositionSource, currentPreviewTime);
 }
 
 function compositionViewport(source: NfRuntimeSource): { w: number; h: number } {
@@ -807,7 +867,8 @@ function wirePreviewDrag(project: string, episode: string, composition?: string)
     compositionDragTrack = "";
     patchCompositionParams(compositionSource, track, position);
     inspector.setAttribute("save-status", "saving");
-    void updateCompositionTrackParams(project, composition, track, position)
+    void updateCompositionTrackField(project, composition, track, "style.x", position.x)
+      .then(() => updateCompositionTrackField(project, composition, track, "style.y", position.y))
       .then((loaded) => applyComposition(loaded.source, loaded.data, track))
       .then(() => inspector.setAttribute("save-status", "saved"))
       .catch((error) => {
@@ -854,17 +915,55 @@ function wirePreviewDrag(project: string, episode: string, composition?: string)
 }
 
 function patchCompositionParams(source: NfRuntimeSource, trackId: string, position: { x: number; y: number }): void {
+  patchCompositionTrackField(trackId, "style.x", position.x);
+  patchCompositionTrackField(trackId, "style.y", position.y);
+  patchCompositionSourceField(source, trackId, "style.x", position.x);
+  patchCompositionSourceField(source, trackId, "style.y", position.y);
+  patchCompositionSourceField(source, trackId, "params.x", position.x);
+  patchCompositionSourceField(source, trackId, "params.y", position.y);
+}
+
+function patchCompositionSourceField(source: NfRuntimeSource, trackId: string, field: string, value: unknown): void {
   for (const track of source.tracks ?? []) {
     if (track.id !== trackId) continue;
     for (const clip of track.clips ?? []) {
       const params = recordValue(clip.params);
-      const nested = recordValue(params.params);
-      nested.x = position.x;
-      nested.y = position.y;
-      params.params = nested;
+      if (field.startsWith("params.")) {
+        const nested = recordValue(params.params);
+        setFieldPath(nested, field.slice("params.".length), value);
+        params.params = nested;
+      } else if (field.startsWith("style.")) {
+        const nested = recordValue(params.style);
+        setFieldPath(nested, field.slice("style.".length), value);
+        params.style = nested;
+      } else if (field === "z") {
+        track.z = Number(value);
+      } else if (field.startsWith("time.")) {
+        // Raw authoring time fields are saved through IPC; compiled source keeps numeric begin/end until reload.
+      }
       clip.params = params;
     }
   }
+}
+
+function setFieldPath(target: Record<string, unknown>, field: string, value: unknown): void {
+  const parts = field.split(".").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) return;
+  let current = target;
+  for (const part of parts.slice(0, -1)) {
+    const next = current[part];
+    if (next == null || typeof next !== "object" || Array.isArray(next)) current[part] = {};
+    current = current[part] as Record<string, unknown>;
+  }
+  current[parts[parts.length - 1]!] = value;
+}
+
+function compositionFieldValue(value: string | Record<string, unknown>): { track: string; field: string; value: unknown } | undefined {
+  if (typeof value === "string") return undefined;
+  const track = typeof value.track === "string" ? value.track : "";
+  const field = typeof value.field === "string" ? value.field : "";
+  if (!track || !field) return undefined;
+  return { track, field, value: value.value };
 }
 
 function positionValue(value: string | Record<string, unknown>): { x: number; y: number } | undefined {
@@ -927,6 +1026,7 @@ declare global {
       tags: string[];
       defined: () => boolean;
     };
+    __NF_COMPOSITION_FIELD__?: (track: string, field: string, value: unknown) => void;
   }
 }
 
@@ -934,3 +1034,4 @@ window.__NF_W4__ = {
   tags: DEFINITIONS.map(([tag]) => tag),
   defined: () => DEFINITIONS.every(([tag]) => customElements.get(tag) != null),
 };
+window.__NF_COMPOSITION_FIELD__ = saveCompositionFieldFromRoute;

@@ -1,6 +1,6 @@
 import { makeSheet, NfBase } from "../_base.js";
 import type { FieldEditDetail } from "../events.js";
-import { getClip, getEpisode } from "../storage.js";
+import { getClip, getCompositionTrack, getEpisode } from "../storage.js";
 
 const sheet = makeSheet(`
   :host {
@@ -142,6 +142,11 @@ const sheet = makeSheet(`
     color: var(--fg);
     font: 11.5px var(--font);
   }
+  textarea.edit-input {
+    min-height: 74px;
+    resize: vertical;
+    line-height: 1.45;
+  }
   .pos-grid .edit-input {
     width: 100%;
     box-sizing: border-box;
@@ -273,6 +278,23 @@ export class NfInspector extends NfBase {
     const voiceStatus = this.getAttribute("voice-status") ?? "idle";
     const voiceError = this.getAttribute("voice-error") ?? "";
     const voiceAudio = this.getAttribute("voice-audio") ?? "";
+    const compositionTrackId = clip?.track_id ?? clip?.id ?? clipId ?? "";
+    const compositionTrack = clip?.kind === "component" ? getCompositionTrack(compositionTrackId) : undefined;
+    if (compositionTrack) {
+      this.renderCompositionTrack({
+        trackId: compositionTrackId,
+        track: compositionTrack,
+        clipName: name,
+        duration,
+        saveStatus,
+        saveError,
+        exportStatus,
+        exportPath,
+        exportError,
+        exportOpenStatus,
+      });
+      return;
+    }
     this.root.innerHTML = `
       <div class="insp">
         <button class="export-btn" type="button" data-field="export">
@@ -394,6 +416,109 @@ export class NfInspector extends NfBase {
       y: clampPercent(y),
     };
   }
+
+  private renderCompositionTrack(state: {
+    trackId: string;
+    track: Record<string, unknown>;
+    clipName: string;
+    duration: number;
+    saveStatus: string;
+    saveError: string;
+    exportStatus: string;
+    exportPath: string;
+    exportError: string;
+    exportOpenStatus: string;
+  }): void {
+    const component = stringValue(state.track.component) ?? "component";
+    const time = recordValue(state.track.time);
+    const params = recordValue(state.track.params);
+    const style = recordValue(state.track.style);
+    this.root.innerHTML = `
+      <div class="insp" data-inspector-track-id="${escapeAttr(state.trackId)}">
+        <button class="export-btn" type="button" data-field="export" data-action="export-video">
+          ${state.exportStatus === "running" ? "导出中" : state.exportStatus === "succeeded" ? "导出完成" : "导出视频"}
+          <span class="sub">composition</span>
+        </button>
+        ${state.exportStatus === "running" ? `<div class="progress" aria-label="export progress"><div class="bar"></div></div>` : ""}
+        ${state.exportStatus === "succeeded" ? `
+          <div class="export-actions">
+            <div class="status ok">${escapeHtml(state.exportOpenStatus === "opened" ? "已打开 · " : "")}${escapeHtml(state.exportPath)}</div>
+            <button class="open-btn" type="button" data-action="open-export">打开视频</button>
+          </div>
+        ` : ""}
+        ${state.exportStatus === "failed" ? `<div class="status err">${escapeHtml(state.exportError || "导出失败")}</div>` : ""}
+        <div class="insp-sel">
+          <span class="l">已选轨道</span>
+          <span class="n">${escapeHtml(state.trackId)}</span>
+          <span class="m">${escapeHtml(component)} · ${state.duration.toFixed(1)}s</span>
+        </div>
+        <div class="insp-card">
+          <h4>时间</h4>
+          ${this.compositionField("time.start", time.start ?? "", "start")}
+          ${this.compositionField("time.end", time.end ?? "", "end")}
+          ${this.compositionField("z", state.track.z ?? 0, "z")}
+        </div>
+        <div class="insp-card">
+          <h4>样式</h4>
+          ${this.compositionField("style.x", style.x ?? params.x ?? 50, "x")}
+          ${this.compositionField("style.y", style.y ?? params.y ?? 50, "y")}
+          ${Object.entries(style)
+            .filter(([key]) => key !== "x" && key !== "y")
+            .map(([key, value]) => this.compositionField(`style.${key}`, value, key))
+            .join("")}
+        </div>
+        <div class="insp-card">
+          <h4>参数</h4>
+          ${Object.entries(params)
+            .map(([key, value]) => this.compositionField(`params.${key}`, value, key))
+            .join("")}
+        </div>
+        ${state.saveStatus ? `<div class="status ${state.saveStatus === "failed" ? "err" : state.saveStatus === "saved" ? "ok" : ""}" data-save-state>${escapeHtml(state.saveStatus)}${state.saveError ? ` · ${escapeHtml(state.saveError)}` : ""}</div>` : `<div class="status" data-save-state>clean</div>`}
+      </div>
+    `;
+    this.root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("[data-field-path]").forEach((input) => {
+      input.addEventListener("input", () => {
+        this.emit<FieldEditDetail>("field-edit", {
+          field: "composition-preview",
+          value: {
+            track: state.trackId,
+            field: input.dataset.fieldPath ?? "",
+            value: readInputValue(input),
+          },
+        });
+      });
+      input.addEventListener("change", () => {
+        this.emit<FieldEditDetail>("field-edit", {
+          field: "composition-save",
+          value: {
+            track: state.trackId,
+            field: input.dataset.fieldPath ?? "",
+            value: readInputValue(input),
+          },
+        });
+      });
+    });
+    this.root.querySelector(".export-btn")?.addEventListener("click", () => {
+      this.emit<FieldEditDetail>("field-edit", { field: "export", value: "composition" });
+    });
+    this.root.querySelector("[data-action='open-export']")?.addEventListener("click", () => {
+      this.emit<FieldEditDetail>("field-edit", { field: "open-export", value: state.exportPath });
+    });
+  }
+
+  private compositionField(path: string, value: unknown, label: string): string {
+    const encodedPath = escapeAttr(path);
+    const text = fieldString(value);
+    const isComplex = value != null && typeof value === "object";
+    return `
+      <div class="insp-f insp-field">
+        <div class="k"><span>${escapeHtml(label)}</span><span class="tag">${escapeHtml(path)}</span></div>
+        ${isComplex
+          ? `<textarea class="edit-input" data-field-path="${encodedPath}">${escapeHtml(text)}</textarea>`
+          : `<input class="edit-input" data-field-path="${encodedPath}" value="${escapeAttr(text)}">`}
+      </div>
+    `;
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -413,6 +538,37 @@ function escapeAttr(value: string): string {
 
 function clampPercent(value: number): number {
   return Number.isFinite(value) ? Math.min(95, Math.max(5, value)) : 50;
+}
+
+function readInputValue(input: HTMLInputElement | HTMLTextAreaElement): unknown {
+  const value = input.value.trim();
+  if (input instanceof HTMLTextAreaElement) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  if (value === "true") return true;
+  if (value === "false") return false;
+  if (value !== "" && Number.isFinite(Number(value))) return Number(value);
+  return input.value;
+}
+
+function fieldString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  return String(value);
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function kindLabel(kind: string): string {

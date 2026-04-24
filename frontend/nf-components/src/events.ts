@@ -23,6 +23,11 @@ export interface TimelineClipSelectDetail {
   "clip-id": string;
 }
 
+export interface TimelineTrackSelectDetail {
+  track: ClipKind;
+  "track-id": string;
+}
+
 export interface PlayheadMoveDetail {
   time: number;
 }

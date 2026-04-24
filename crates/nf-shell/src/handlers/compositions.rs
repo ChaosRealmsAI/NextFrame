@@ -53,9 +53,11 @@ impl CompositionsOpHandler {
             )));
         }
         let value = self.storage.load_composition(&project, &composition)?;
+        let selected = select_composition_value(&value, params)?;
         let compiled = compile_composition_source(&self.storage, &project, &value)?;
         Ok(json!({
             "composition": value,
+            "selected": selected,
             "source": compiled.source,
             "warnings": compiled.warnings
         }))
@@ -83,15 +85,69 @@ impl CompositionsOpHandler {
         if let Some(patch) = params.get("style").and_then(Value::as_object) {
             merge_object(track, "style", patch);
         }
+        if let Some(field) = params.get("field").and_then(Value::as_str) {
+            let value = params.get("value").cloned().unwrap_or(Value::Null);
+            set_field_path(track, field, value)?;
+        }
         self.storage
             .save_composition(&project, &composition, &value)?;
         let compiled = compile_composition_source(&self.storage, &project, &value)?;
+        let selected = select_composition_value(&value, params)?;
         Ok(json!({
             "composition": value,
+            "selected": selected,
             "source": compiled.source,
             "warnings": compiled.warnings
         }))
     }
+}
+
+fn select_composition_value(composition: &Value, params: &Value) -> Result<Value, NfError> {
+    let Some(track_id) = params.get("track").and_then(Value::as_str).filter(|value| !value.is_empty()) else {
+        return Ok(Value::Null);
+    };
+    let tracks = composition
+        .get("tracks")
+        .and_then(Value::as_array)
+        .ok_or_else(|| NfError::ValidationFailed("composition.tracks must be an array".to_string()))?;
+    let track = tracks
+        .iter()
+        .find(|item| item.get("id").and_then(Value::as_str) == Some(track_id))
+        .ok_or_else(|| NfError::ValidationFailed(format!("unknown track: {track_id}")))?;
+    let Some(field) = params.get("field").and_then(Value::as_str).filter(|value| !value.is_empty()) else {
+        return Ok(track.clone());
+    };
+    Ok(get_field_path(track, field).cloned().unwrap_or(Value::Null))
+}
+
+fn get_field_path<'a>(value: &'a Value, field: &str) -> Option<&'a Value> {
+    let mut current = value;
+    for part in field.split('.').map(str::trim).filter(|part| !part.is_empty()) {
+        current = current.get(part)?;
+    }
+    Some(current)
+}
+
+fn set_field_path(target: &mut Value, field: &str, value: Value) -> Result<(), NfError> {
+    let parts = field
+        .split('.')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+    if parts.is_empty() {
+        return Err(NfError::ValidationFailed("field path is required".to_string()));
+    }
+    let mut current = target;
+    for part in &parts[..parts.len() - 1] {
+        if !current.get(part).is_some_and(Value::is_object) {
+            current[part] = json!({});
+        }
+        current = current
+            .get_mut(part)
+            .ok_or_else(|| NfError::ValidationFailed(format!("invalid field path: {field}")))?;
+    }
+    current[parts[parts.len() - 1]] = value;
+    Ok(())
 }
 
 impl OpHandler for CompositionsOpHandler {
@@ -99,9 +155,10 @@ impl OpHandler for CompositionsOpHandler {
         let data = match req.op.as_str() {
             "compositions-list" | "compositions.list" => self.list(&req.params)?,
             "compositions-show" | "compositions.show" => self.show(&req.params)?,
-            "compositions-update-track" | "compositions.updateTrack" | "compositions.update-track" => {
-                self.update_track(&req.params)?
-            }
+            "compositions-update-track"
+            | "compositions-updateTrack"
+            | "compositions.updateTrack"
+            | "compositions.update-track" => self.update_track(&req.params)?,
             _ => return Ok(None),
         };
         Ok(Some(data))
