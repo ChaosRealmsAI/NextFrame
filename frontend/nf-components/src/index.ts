@@ -364,8 +364,10 @@ function renderPreviewLayers(data: NfMockData, time: number, fallbackAccent: str
   const root = document.querySelector<HTMLElement>("[data-nf-preview-layers]");
   if (!root) return;
   const textLayers = activeClipsAt(data, time, "text").map((clip) => renderTextPreview(clip, fallbackAccent));
+  const subtitles = activeClipsAt(data, time, "subtitle").map((clip) => renderSubtitlePreview(clip, time, fallbackAccent));
   const overlays = activeClipsAt(data, time, "overlay").map((clip) => renderOverlayPreview(clip, fallbackAccent));
-  root.innerHTML = [...textLayers, ...overlays].join("");
+  const audio = activeClipsAt(data, time, "audio").map(renderAudioIndicator);
+  root.innerHTML = [...textLayers, ...subtitles, ...overlays, ...audio].join("");
 }
 
 function renderTextPreview(clip: NfDataClip, fallbackAccent: string): string {
@@ -400,6 +402,27 @@ function renderOverlayPreview(clip: NfDataClip, fallbackAccent: string): string 
       ${escapeHtml(clip.text ?? clip.label)}
     </div>
   `;
+}
+
+function renderSubtitlePreview(clip: NfDataClip, time: number, fallbackAccent: string): string {
+  const words = clip.words ?? [];
+  if (words.length === 0) return "";
+  const localMs = Math.max(0, (time - clip.start) * 1000);
+  const accent = validColor(clip.accent_color) ? clip.accent_color! : fallbackAccent;
+  const spans = words.map((word) => {
+    const state = localMs >= word.start_ms && localMs < word.end_ms
+      ? "active"
+      : word.end_ms <= localMs
+        ? "read"
+        : "";
+    return `<span class="${state}">${escapeHtml(word.text)}</span>`;
+  }).join("");
+  return `<div class="preview-subtitle-layer" style="--nf-preview-accent:${accent};">${spans}</div>`;
+}
+
+function renderAudioIndicator(clip: NfDataClip): string {
+  const state = clip.src ? "AUDIO PREVIEW" : "AUDIO PLACEHOLDER";
+  return `<div class="preview-audio-indicator">${escapeHtml(state)} · ${escapeHtml(clip.label)}</div>`;
 }
 
 function validColor(value: string | undefined): boolean {

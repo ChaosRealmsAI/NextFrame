@@ -1,6 +1,6 @@
 export type TabId = "script" | "slice" | "voice" | "edit";
 export type LangId = "zh" | "en";
-export type ClipKind = "scene" | "text" | "overlay" | "audio" | "trans" | "transition";
+export type ClipKind = "scene" | "text" | "subtitle" | "overlay" | "audio" | "trans" | "transition";
 
 export interface TabChangeDetail {
   old: TabId;

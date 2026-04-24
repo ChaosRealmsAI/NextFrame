@@ -5,7 +5,7 @@ use crate::handlers::{ensure_episode, optional_bool, optional_str, required_str,
 use crate::ipc_server::{IpcRequest, OpHandler};
 use crate::storage::{JsonStorage, Storage, validate_slug};
 
-const TRACKS: &[&str] = &["scene", "text", "overlay", "audio", "trans"];
+const TRACKS: &[&str] = &["scene", "text", "subtitle", "overlay", "audio", "trans"];
 
 #[derive(Debug, Clone)]
 pub struct ClipsOpHandler {

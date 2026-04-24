@@ -27,6 +27,7 @@ export interface NfClip {
   big_number?: string | undefined;
   sublabel?: string | undefined;
   text?: string | undefined;
+  words?: NfSubtitleWord[] | undefined;
   variant?: string | undefined;
   progress?: number | undefined;
   accent_color?: string | undefined;
@@ -35,6 +36,16 @@ export interface NfClip {
   align?: string | undefined;
   color?: string | undefined;
   size_px?: number | undefined;
+  src?: string | undefined;
+  from_ms?: number | undefined;
+  to_ms?: number | undefined;
+  volume?: number | undefined;
+}
+
+export interface NfSubtitleWord {
+  text: string;
+  start_ms: number;
+  end_ms: number;
 }
 
 export interface NfLogEntry {
@@ -423,6 +434,7 @@ function normalizeClip(value: unknown, index: number, anchors: Record<string, nu
     big_number: stringValue(object.big_number),
     sublabel: stringValue(object.sublabel),
     text: stringValue(object.text),
+    words: subtitleWords(object.words),
     variant: stringValue(object.variant),
     progress: numberValue(object.progress),
     accent_color: stringValue(object.accent_color),
@@ -431,6 +443,10 @@ function normalizeClip(value: unknown, index: number, anchors: Record<string, nu
     align: stringValue(object.align),
     color: stringValue(object.color),
     size_px: numberValue(object.size_px),
+    src: stringValue(object.src),
+    from_ms: numberValue(object.from_ms),
+    to_ms: numberValue(object.to_ms),
+    volume: numberValue(object.volume),
   };
 }
 
@@ -529,6 +545,7 @@ function resolveTime(value: unknown, anchors: Record<string, number>, fallback: 
 
 function normalizeKind(value: string): ClipKind {
   if (value === "audio") return "audio";
+  if (value === "subtitle") return "subtitle";
   if (value === "text") return "text";
   if (value === "overlay") return "overlay";
   if (value === "trans" || value === "transition") return "trans";
@@ -537,6 +554,7 @@ function normalizeKind(value: string): ClipKind {
 
 function trackNumber(kind: ClipKind): number {
   if (kind === "text") return 1;
+  if (kind === "subtitle") return 2;
   if (kind === "overlay") return 2;
   if (kind === "trans" || kind === "transition") return 2;
   if (kind === "audio") return 3;
@@ -563,6 +581,22 @@ function stringValue(value: unknown): string | undefined {
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function subtitleWords(value: unknown): NfSubtitleWord[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const words = value
+    .map((item) => {
+      const object = asRecord(item);
+      const text = stringValue(object.text);
+      const start = numberValue(object.start_ms);
+      const end = numberValue(object.end_ms);
+      return text && start !== undefined && end !== undefined && end >= start
+        ? { text, start_ms: start, end_ms: end }
+        : undefined;
+    })
+    .filter((word): word is NfSubtitleWord => word !== undefined);
+  return words.length > 0 ? words : undefined;
 }
 
 function finiteNumber(value: unknown, fallback: number): number {

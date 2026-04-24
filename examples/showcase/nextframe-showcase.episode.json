@@ -110,6 +110,40 @@
       "effects": ["text-overlay"]
     },
     {
+      "slug": "subtitle-open",
+      "label": "Word-level subtitle",
+      "track": "subtitle",
+      "start": "0",
+      "end": "4",
+      "accent_color": "#fbbf24",
+      "words": [
+        { "text": "JSON", "start_ms": 0, "end_ms": 520 },
+        { "text": " drives", "start_ms": 520, "end_ms": 1040 },
+        { "text": " the", "start_ms": 1040, "end_ms": 1320 },
+        { "text": " whole", "start_ms": 1320, "end_ms": 1880 },
+        { "text": " video", "start_ms": 1880, "end_ms": 2480 },
+        { "text": " pipeline.", "start_ms": 2480, "end_ms": 3600 }
+      ],
+      "effects": ["word-highlight"]
+    },
+    {
+      "slug": "subtitle-edit",
+      "label": "Editor subtitle",
+      "track": "subtitle",
+      "start": "4",
+      "end": "8",
+      "accent_color": "#ffcf5b",
+      "words": [
+        { "text": "Edit", "start_ms": 0, "end_ms": 440 },
+        { "text": " once,", "start_ms": 440, "end_ms": 980 },
+        { "text": " preview", "start_ms": 980, "end_ms": 1580 },
+        { "text": " live,", "start_ms": 1580, "end_ms": 2200 },
+        { "text": " export", "start_ms": 2200, "end_ms": 2860 },
+        { "text": " clean.", "start_ms": 2860, "end_ms": 3700 }
+      ],
+      "effects": ["word-highlight"]
+    },
+    {
       "slug": "badge",
       "label": "NextFrame",
       "track": "overlay",
@@ -177,6 +211,8 @@
       "slug": "music-bed",
       "label": "music-bed",
       "track": "audio",
+      "src": "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=",
+      "volume": 0.35,
       "start": "0",
       "end": "16",
       "effects": ["placeholder", "not-mixed-yet"]

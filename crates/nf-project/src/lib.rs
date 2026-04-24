@@ -78,11 +78,8 @@ pub trait Storage {
     fn save_registry(&self, registry: &Registry) -> Result<(), ProjectError>;
     fn load_project(&self, slug: &str) -> Result<Project, ProjectError>;
     fn save_project(&self, project: &Project) -> Result<(), ProjectError>;
-    fn load_episode(
-        &self,
-        project_slug: &str,
-        episode_slug: &str,
-    ) -> Result<Episode, ProjectError>;
+    fn load_episode(&self, project_slug: &str, episode_slug: &str)
+    -> Result<Episode, ProjectError>;
     fn save_episode(&self, project_slug: &str, episode: &Episode) -> Result<(), ProjectError>;
 }
 
@@ -119,7 +116,11 @@ impl JsonStorage {
         Ok(self.root.join(slug).join("project.json"))
     }
 
-    fn episode_path(&self, project_slug: &str, episode_slug: &str) -> Result<PathBuf, ProjectError> {
+    fn episode_path(
+        &self,
+        project_slug: &str,
+        episode_slug: &str,
+    ) -> Result<PathBuf, ProjectError> {
         validate_slug(project_slug)?;
         validate_slug(episode_slug)?;
         Ok(self
@@ -148,7 +149,11 @@ impl Storage for JsonStorage {
         atomic_write(&self.project_path(&project.slug)?, project)
     }
 
-    fn load_episode(&self, project_slug: &str, episode_slug: &str) -> Result<Episode, ProjectError> {
+    fn load_episode(
+        &self,
+        project_slug: &str,
+        episode_slug: &str,
+    ) -> Result<Episode, ProjectError> {
         read_json(&self.episode_path(project_slug, episode_slug)?)
     }
 
@@ -220,7 +225,9 @@ pub fn compile_episode_source(
     let duration_ms = seconds_to_ms(episode.duration, "episode.duration")?;
     let mut scene_clips = Vec::new();
     let mut text_clips = Vec::new();
+    let mut subtitle_clips = Vec::new();
     let mut overlay_clips = Vec::new();
+    let mut audio_clips = Vec::new();
     let mut ignored_tracks = BTreeMap::<String, usize>::new();
 
     for clip in &episode.clips {
@@ -235,8 +242,10 @@ pub fn compile_episode_source(
             .unwrap_or("scene");
         let normalized_track = match track {
             "scene" => "scene",
-            "text" | "subtitle" => "text",
+            "text" => "text",
+            "subtitle" => "subtitle",
             "overlay" => "overlay",
+            "audio" => "audio",
             other => {
                 *ignored_tracks.entry(other.to_string()).or_insert(0) += 1;
                 continue;
@@ -290,12 +299,37 @@ pub fn compile_episode_source(
             ));
         }
 
-        let params = if normalized_track == "scene" {
-            scene_params(object, title, subtitle, layout, accent, bg_color, position)
-        } else if normalized_track == "text" {
-            text_params(object, title, accent, position)
-        } else {
-            overlay_params(object, title, accent, position)
+        let params = match normalized_track {
+            "scene" => scene_params(object, title, subtitle, layout, accent, bg_color, position),
+            "text" => text_params(object, title, accent, position),
+            "subtitle" => match subtitle_params(object, accent) {
+                Some(params) => params,
+                None => {
+                    warnings.push(format!("ignored subtitle clip '{id}' without valid words"));
+                    continue;
+                }
+            },
+            "overlay" => overlay_params(object, title, accent, position),
+            "audio" => match audio_params(object) {
+                Some(params) => {
+                    warnings.push(format!(
+                        "audio clip '{id}' is compiled for runtime preview/source but MP4 audio muxing is not implemented"
+                    ));
+                    params
+                }
+                None => {
+                    warnings.push(format!(
+                        "ignored audio clip '{id}' without file:// or data: src"
+                    ));
+                    continue;
+                }
+            },
+            _ => {
+                *ignored_tracks
+                    .entry(normalized_track.to_string())
+                    .or_insert(0) += 1;
+                continue;
+            }
         };
 
         let compiled_clip = json!({
@@ -308,6 +342,10 @@ pub fn compile_episode_source(
             scene_clips.push(compiled_clip);
         } else if normalized_track == "text" {
             text_clips.push(compiled_clip);
+        } else if normalized_track == "subtitle" {
+            subtitle_clips.push(compiled_clip);
+        } else if normalized_track == "audio" {
+            audio_clips.push(compiled_clip);
         } else {
             overlay_clips.push(compiled_clip);
         }
@@ -319,7 +357,11 @@ pub fn compile_episode_source(
         ));
     }
 
-    if scene_clips.is_empty() && text_clips.is_empty() && overlay_clips.is_empty() {
+    if scene_clips.is_empty()
+        && text_clips.is_empty()
+        && subtitle_clips.is_empty()
+        && overlay_clips.is_empty()
+    {
         return Err(ProjectError::ValidationFailed(
             "episode has no visual clips to export".to_string(),
         ));
@@ -340,11 +382,25 @@ pub fn compile_episode_source(
             "clips": text_clips
         }));
     }
+    if !subtitle_clips.is_empty() {
+        tracks.push(json!({
+            "id": "subtitle-main",
+            "kind": "subtitle",
+            "clips": subtitle_clips
+        }));
+    }
     if !overlay_clips.is_empty() {
         tracks.push(json!({
             "id": "overlay-main",
             "kind": "overlay",
             "clips": overlay_clips
+        }));
+    }
+    if !audio_clips.is_empty() {
+        tracks.push(json!({
+            "id": "audio-main",
+            "kind": "audio",
+            "clips": audio_clips
         }));
     }
 
@@ -447,6 +503,68 @@ fn overlay_params(
         params.insert("progress".to_string(), json!(progress.clamp(0.0, 1.0)));
     }
     params
+}
+
+fn subtitle_params(
+    object: &serde_json::Map<String, Value>,
+    accent: &str,
+) -> Option<serde_json::Map<String, Value>> {
+    let words = subtitle_words(object.get("words")?)?;
+    let mut style = serde_json::Map::new();
+    style.insert("active_color".to_string(), json!(accent));
+    style.insert("position".to_string(), json!("bottom"));
+    style.insert("size_px".to_string(), json!(38));
+    style.insert("padding".to_string(), json!(58));
+    if let Some(size) = object.get("size_px").and_then(Value::as_f64) {
+        style.insert("size_px".to_string(), json!(size));
+    }
+    copy_string_param(object, &mut style, "active_color");
+    copy_string_param(object, &mut style, "position");
+
+    let mut source = serde_json::Map::new();
+    source.insert("words".to_string(), Value::Array(words));
+
+    let mut params = serde_json::Map::new();
+    params.insert("source".to_string(), Value::Object(source));
+    params.insert("style".to_string(), Value::Object(style));
+    Some(params)
+}
+
+fn subtitle_words(value: &Value) -> Option<Vec<Value>> {
+    let words = value.as_array()?;
+    let normalized: Vec<Value> = words
+        .iter()
+        .filter_map(|word| {
+            let object = word.as_object()?;
+            let text = object.get("text").and_then(Value::as_str)?.trim();
+            let start_ms = object.get("start_ms").and_then(Value::as_f64)?;
+            let end_ms = object.get("end_ms").and_then(Value::as_f64)?;
+            if text.is_empty() || end_ms < start_ms {
+                return None;
+            }
+            Some(json!({
+                "text": text,
+                "start_ms": start_ms,
+                "end_ms": end_ms
+            }))
+        })
+        .collect();
+    (!normalized.is_empty()).then_some(normalized)
+}
+
+fn audio_params(object: &serde_json::Map<String, Value>) -> Option<serde_json::Map<String, Value>> {
+    let src = object
+        .get("src")
+        .and_then(Value::as_str)
+        .filter(|value| value.starts_with("file://") || value.starts_with("data:"))?;
+    let mut params = serde_json::Map::new();
+    params.insert("src".to_string(), json!(src));
+    for key in ["from_ms", "to_ms", "volume"] {
+        if let Some(value) = object.get(key).and_then(Value::as_f64) {
+            params.insert(key.to_string(), json!(value));
+        }
+    }
+    Some(params)
 }
 
 fn copy_string_param(
@@ -615,21 +733,24 @@ mod tests {
             name: "Episode 01".to_string(),
             duration: 5.0,
             anchors: Default::default(),
-            clips: vec![serde_json::json!({
-                "slug": "intro",
-                "label": "Hello NextFrame",
-                "track": "scene",
-                "start": "0",
-                "end": "5",
-                "position": {"x": 42.0, "y": 58.0}
-            }), serde_json::json!({
-                "slug": "caption",
-                "label": "Text overlay",
-                "track": "text",
-                "start": "0",
-                "end": "5",
-                "position": {"x": 50.0, "y": 82.0}
-            })],
+            clips: vec![
+                serde_json::json!({
+                    "slug": "intro",
+                    "label": "Hello NextFrame",
+                    "track": "scene",
+                    "start": "0",
+                    "end": "5",
+                    "position": {"x": 42.0, "y": 58.0}
+                }),
+                serde_json::json!({
+                    "slug": "caption",
+                    "label": "Text overlay",
+                    "track": "text",
+                    "start": "0",
+                    "end": "5",
+                    "position": {"x": 50.0, "y": 82.0}
+                }),
+            ],
             log: Vec::new(),
         };
 

@@ -27,6 +27,8 @@ const sheet = makeSheet(`
   }
   :host([kind="scene"]) .stripe { background: var(--accent); }
   :host([kind="text"]) .stripe { background: var(--amber); }
+  :host([kind="subtitle"]) .stripe { background: var(--amber); }
+  :host([kind="overlay"]) .stripe { background: var(--teal); }
   :host([kind="audio"]) .stripe { background: var(--teal); }
   :host([kind="trans"]) .stripe,
   :host([kind="transition"]) .stripe { background: var(--gray-l); }
@@ -39,7 +41,9 @@ const sheet = makeSheet(`
 const LABELS: Record<string, string> = {
   scene: "画面",
   text: "文字",
+  overlay: "叠加",
   audio: "音频",
+  subtitle: "字幕",
   trans: "转场",
   transition: "转场",
 };

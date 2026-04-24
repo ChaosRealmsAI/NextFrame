@@ -124,6 +124,7 @@ export class NfTimeline extends NfBase {
     const sceneClips = episode.clips.filter((clip) => clip.kind === "scene");
     const selectedId = this.getAttribute("selected-id") ?? sceneClips[0]?.id ?? "";
     const textClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "text") : TEXT_CLIPS;
+    const subtitleClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "subtitle") : [];
     const overlayClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "overlay") : [];
     const transClips = data.source === "ipc" ? episode.clips.filter((clip) => clip.kind === "trans" || clip.kind === "transition") : TRANS_CLIPS;
     const audioClips = data.source === "ipc"
@@ -158,6 +159,9 @@ export class NfTimeline extends NfBase {
           </nf-track>
           <nf-track kind="text" label="文字">
             ${textClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="text" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
+          </nf-track>
+          <nf-track kind="subtitle" label="字幕">
+            ${subtitleClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="subtitle" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
           </nf-track>
           <nf-track kind="overlay" label="叠加">
             ${overlayClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="overlay" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
