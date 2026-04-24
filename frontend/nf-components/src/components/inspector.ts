@@ -382,7 +382,7 @@ export class NfInspector extends NfBase {
       this.emit<FieldEditDetail>("field-edit", { field: "open-export", value: exportPath });
     });
     this.root.querySelector("[data-action='synth-voice']")?.addEventListener("click", () => {
-      this.emit<FieldEditDetail>("field-edit", { field: "voice", value: voiceText(clip) });
+      this.emit<FieldEditDetail>("field-edit", { field: "voice", value: voicePayload(clip) });
     });
   }
 
@@ -427,12 +427,18 @@ function kindLabel(kind: string): string {
   return labels[kind] ?? kind;
 }
 
-function voiceText(clip: ReturnType<typeof getClip> | undefined): string {
-  return [
+function voicePayload(clip: ReturnType<typeof getClip> | undefined): Record<string, unknown> {
+  const text = clip?.tts?.text ?? [
     clip?.title,
     clip?.subtitle,
     clip?.description,
     clip?.text,
     clip?.label,
   ].filter((value): value is string => Boolean(value && value.trim().length > 0)).join("，");
+  return {
+    text,
+    voice: clip?.tts?.voice,
+    backend: clip?.tts?.backend,
+    rate: clip?.tts?.rate,
+  };
 }

@@ -261,6 +261,13 @@ fn update_episode_with_voice(
         "end": end,
         "src": file_url(&request.audio),
         "volume": 1.0,
+        "tts": {
+            "text": request.text,
+            "voice": request.voice,
+            "backend": request.backend,
+            "rate": request.rate,
+            "timeline_clip": subtitle_slug
+        },
         "effects": ["tts-generated"]
     }));
     episode.clips.push(json!({
@@ -270,6 +277,10 @@ fn update_episode_with_voice(
         "start": "0",
         "end": end,
         "accent_color": "#fbbf24",
+        "tts": {
+            "audio_clip": request.base_slug,
+            "source": "timeline"
+        },
         "words": words,
         "effects": ["tts-timeline"]
     }));

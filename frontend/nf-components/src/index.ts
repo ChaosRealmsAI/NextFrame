@@ -21,6 +21,7 @@ import {
   voiceStatus,
   type NfClip as NfDataClip,
   type NfMockData,
+  type NfTtsSpec,
 } from "./storage.js";
 
 export const NF_COMPONENTS_VERSION = "0.2.0-w4";
@@ -118,8 +119,9 @@ function wireApp(): void {
     }
     if (detail.field === "voice") {
       const clipId = inspector.getAttribute("clip-id");
-      if (!clipId || typeof detail.value !== "string" || detail.value.trim().length === 0) return;
-      startVoiceFlow(route.project, route.episode, clipId, detail.value, inspector);
+      const voice = voiceValue(detail.value);
+      if (!clipId || !voice) return;
+      startVoiceFlow(route.project, route.episode, clipId, voice, inspector);
     }
     if (detail.field === "open-export") {
       const path = typeof detail.value === "string" && detail.value.length > 0
@@ -140,11 +142,11 @@ function wireApp(): void {
   wirePlaybackControls();
 }
 
-function startVoiceFlow(project: string, episode: string, clipId: string, text: string, inspector: Element): void {
+function startVoiceFlow(project: string, episode: string, clipId: string, voice: NfTtsSpec & { text: string }, inspector: Element): void {
   inspector.setAttribute("voice-status", "running");
   inspector.removeAttribute("voice-error");
   inspector.removeAttribute("voice-audio");
-  void synthesizeVoice(project, episode, clipId, text)
+  void synthesizeVoice(project, episode, clipId, voice.text, voice)
     .then((started) => {
       inspector.setAttribute("voice-audio", started.audio);
       pollVoice(started.job_id, project, episode, clipId, inspector);
@@ -180,6 +182,21 @@ function pollVoice(jobId: string, project: string, episode: string, clipId: stri
         inspector.setAttribute("voice-error", error instanceof Error ? error.message : String(error));
       });
   }, 1000);
+}
+
+function voiceValue(value: string | Record<string, unknown>): (NfTtsSpec & { text: string }) | undefined {
+  if (typeof value === "string") {
+    const text = value.trim();
+    return text ? { text } : undefined;
+  }
+  const text = typeof value.text === "string" ? value.text.trim() : "";
+  if (!text) return undefined;
+  return {
+    text,
+    voice: typeof value.voice === "string" ? value.voice : undefined,
+    backend: typeof value.backend === "string" ? value.backend : undefined,
+    rate: typeof value.rate === "string" ? value.rate : undefined,
+  };
 }
 
 function startExportFlow(project: string, episode: string, inspector: Element): void {

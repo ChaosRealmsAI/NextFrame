@@ -16,6 +16,12 @@
       "end": "4",
       "accent_color": "#5eead4",
       "bg_color": "#07080d",
+      "tts": {
+        "text": "JSON becomes motion. A desktop editor where structured video can be edited, previewed, exported, and opened without leaving the app.",
+        "voice": "zh-CN-XiaoxiaoNeural",
+        "backend": "edge",
+        "rate": "-8%"
+      },
       "position": { "x": 50, "y": 49 },
       "effects": ["editorial-grid", "live-preview"]
     },
@@ -32,6 +38,12 @@
       "end": "8",
       "accent_color": "#ff8a5b",
       "bg_color": "#0d0b10",
+      "tts": {
+        "text": "Edit the frame, not a form. Titles and positions stay connected across inspector, preview, timeline JSON, and final MP4.",
+        "voice": "zh-CN-YunxiNeural",
+        "backend": "edge",
+        "rate": "-6%"
+      },
       "position": { "x": 43, "y": 52 },
       "effects": ["drag-position", "instant-preview"]
     },
@@ -46,6 +58,12 @@
       "sublabel": "Export jobs run through nf export, return a real MP4, then open directly from the editor.",
       "accent_color": "#9ad65c",
       "bg_color": "#08100d",
+      "tts": {
+        "text": "One click moves the project from online edit to a real exported video file.",
+        "voice": "zh-CN-XiaoxiaoNeural",
+        "backend": "edge",
+        "rate": "-6%"
+      },
       "position": { "x": 50, "y": 50 },
       "effects": ["h264", "open-export"]
     },
@@ -61,6 +79,12 @@
       "end": "16",
       "accent_color": "#7dd3fc",
       "bg_color": "#070a12",
+      "tts": {
+        "text": "The loop is the product. JSON, online edit, preview, export, and open.",
+        "voice": "zh-CN-YunxiNeural",
+        "backend": "edge",
+        "rate": "-8%"
+      },
       "position": { "x": 50, "y": 50 },
       "effects": ["final-frame"]
     },
@@ -116,6 +140,10 @@
       "start": "0",
       "end": "4",
       "accent_color": "#fbbf24",
+      "tts": {
+        "audio_clip": "voice-open",
+        "source": "json-timeline"
+      },
       "words": [
         { "text": "JSON", "start_ms": 0, "end_ms": 520 },
         { "text": " drives", "start_ms": 520, "end_ms": 1040 },
@@ -133,6 +161,10 @@
       "start": "4",
       "end": "8",
       "accent_color": "#ffcf5b",
+      "tts": {
+        "audio_clip": "voice-edit",
+        "source": "json-timeline"
+      },
       "words": [
         { "text": "Edit", "start_ms": 0, "end_ms": 440 },
         { "text": " once,", "start_ms": 440, "end_ms": 980 },

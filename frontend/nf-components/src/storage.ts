@@ -40,12 +40,21 @@ export interface NfClip {
   from_ms?: number | undefined;
   to_ms?: number | undefined;
   volume?: number | undefined;
+  tts?: NfTtsSpec | undefined;
 }
 
 export interface NfSubtitleWord {
   text: string;
   start_ms: number;
   end_ms: number;
+}
+
+export interface NfTtsSpec {
+  text?: string | undefined;
+  voice?: string | undefined;
+  backend?: string | undefined;
+  rate?: string | undefined;
+  audio_clip?: string | undefined;
 }
 
 export interface NfLogEntry {
@@ -365,12 +374,16 @@ export function synthesizeVoice(
   episodeSlug: string,
   clipId: string,
   text: string,
+  options: Pick<NfTtsSpec, "voice" | "backend" | "rate"> = {},
 ): Promise<NfVoiceStart> {
   return shellRequest<NfVoiceStart>("voice.start", {
     project: projectSlug,
     episode: episodeSlug,
     clip: clipId,
     text,
+    voice: options.voice,
+    backend: options.backend,
+    rate: options.rate,
   });
 }
 
@@ -487,6 +500,7 @@ function normalizeClip(value: unknown, index: number, anchors: Record<string, nu
     from_ms: numberValue(object.from_ms),
     to_ms: numberValue(object.to_ms),
     volume: numberValue(object.volume),
+    tts: ttsSpec(object.tts),
   };
 }
 
@@ -637,6 +651,19 @@ function subtitleWords(value: unknown): NfSubtitleWord[] | undefined {
     })
     .filter((word): word is NfSubtitleWord => word !== undefined);
   return words.length > 0 ? words : undefined;
+}
+
+function ttsSpec(value: unknown): NfTtsSpec | undefined {
+  const object = asRecord(value);
+  if (Object.keys(object).length === 0) return undefined;
+  const spec: NfTtsSpec = {
+    text: stringValue(object.text),
+    voice: stringValue(object.voice),
+    backend: stringValue(object.backend),
+    rate: stringValue(object.rate),
+    audio_clip: stringValue(object.audio_clip),
+  };
+  return Object.values(spec).some((item) => item !== undefined) ? spec : undefined;
 }
 
 function finiteNumber(value: unknown, fallback: number): number {

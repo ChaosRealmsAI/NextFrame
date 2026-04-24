@@ -527,6 +527,9 @@ fn subtitle_params(
     let mut params = serde_json::Map::new();
     params.insert("source".to_string(), Value::Object(source));
     params.insert("style".to_string(), Value::Object(style));
+    if let Some(tts) = object.get("tts").filter(|value| value.is_object()) {
+        params.insert("tts".to_string(), tts.clone());
+    }
     Some(params)
 }
 
@@ -563,6 +566,9 @@ fn audio_params(object: &serde_json::Map<String, Value>) -> Option<serde_json::M
         if let Some(value) = object.get(key).and_then(Value::as_f64) {
             params.insert(key.to_string(), json!(value));
         }
+    }
+    if let Some(tts) = object.get("tts").filter(|value| value.is_object()) {
+        params.insert("tts".to_string(), tts.clone());
     }
     Some(params)
 }
