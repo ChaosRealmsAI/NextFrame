@@ -1934,6 +1934,8 @@ dependencies = [
  "clap",
  "directories",
  "interprocess",
+ "nf-project",
+ "nf-recorder",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1950,6 +1952,18 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "nf-project"
+version = "0.4.0"
+dependencies = [
+ "directories",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1988,6 +2002,7 @@ dependencies = [
  "ctrlc",
  "directories",
  "interprocess",
+ "nf-project",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",

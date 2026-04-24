@@ -98,7 +98,7 @@ pub struct MacHeadlessShell {
     /// BGRA 色域 · 一次性创建 · 每帧 render 传入。
     color_space: CFRetained<CGColorSpace>,
     /// 输出 IOSurface · 预分配 1080p BGRA · 每帧 CIContext render 重写内容。
-    output_surface: IOSurfaceHandle,
+    _output_surface: IOSurfaceHandle,
     /// viewport · CIContext.render bounds 用。
     viewport: (u32, u32),
 }
@@ -299,6 +299,7 @@ impl DesktopShell for MacHeadlessShell {
         // 它现在位于屏幕内，但 alpha≈0 + ignoresMouseEvents，不抢交互。
         let app = NSApp(mtm);
         app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
+        #[allow(deprecated)]
         app.activateIgnoringOtherApps(true);
         window.makeKeyAndOrderFront(None);
 
@@ -348,7 +349,7 @@ impl DesktopShell for MacHeadlessShell {
             _sampler_legacy: Mutex::new(sampler),
             ci_context,
             color_space,
-            output_surface,
+            _output_surface: output_surface,
             viewport: (w, h),
         })
     }

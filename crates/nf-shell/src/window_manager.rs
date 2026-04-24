@@ -141,8 +141,8 @@ impl WindowManager {
         let mut statuses: Vec<WindowStatus> = self
             .metadata
             .iter()
-            .filter(|(_, meta)| project.map_or(true, |value| value == meta.project))
-            .filter(|(_, meta)| episode.map_or(true, |value| value == meta.episode))
+            .filter(|(_, meta)| project.is_none_or(|value| value == meta.project))
+            .filter(|(_, meta)| episode.is_none_or(|value| value == meta.episode))
             .map(|(window_id, meta)| WindowStatus {
                 window_id: window_id.clone(),
                 project: meta.project.clone(),

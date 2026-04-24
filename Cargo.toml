@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/nf-cli",
     "crates/nf-shell",
+    "crates/nf-project",
     "crates/nf-engine",
     "crates/nf-runtime",
     "crates/nf-source",

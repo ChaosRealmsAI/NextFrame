@@ -126,11 +126,56 @@ const sheet = makeSheet(`
     position: absolute; top: 3px; bottom: 3px; width: 1px;
     background: var(--fg);
   }
+  .edit-row {
+    display: flex; gap: 6px;
+  }
+  .edit-input {
+    min-width: 0; flex: 1;
+    padding: 7px 9px;
+    background: rgba(0, 0, 0, 0.32);
+    border: 1px solid var(--bd);
+    color: var(--fg);
+    font: 11.5px var(--font);
+  }
+  .mini-btn {
+    padding: 0 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--bd);
+    color: var(--fg);
+    font-size: 11px;
+  }
+  .status {
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-4);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .status.ok { color: var(--teal); }
+  .status.err { color: #fb7185; }
+  .progress {
+    height: 3px;
+    margin: -6px 0 10px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .progress .bar {
+    width: 42%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--teal));
+    animation: export-run 1s linear infinite;
+  }
+  @keyframes export-run {
+    from { transform: translateX(-110%); }
+    to { transform: translateX(260%); }
+  }
 `);
 
 export class NfInspector extends NfBase {
   static get observedAttributes(): string[] {
-    return ["clip-id"];
+    return ["clip-id", "save-status", "save-error", "export-status", "export-path", "export-error"];
   }
 
   constructor() {
@@ -162,12 +207,20 @@ export class NfInspector extends NfBase {
     const fields = episode.inspector_fields;
     const name = clip?.label ?? clipId ?? "未选择";
     const duration = clip ? clip.end - clip.start : fields.timing.duration;
+    const saveStatus = this.getAttribute("save-status") ?? "";
+    const saveError = this.getAttribute("save-error") ?? "";
+    const exportStatus = this.getAttribute("export-status") ?? "idle";
+    const exportPath = this.getAttribute("export-path") ?? "";
+    const exportError = this.getAttribute("export-error") ?? "";
     this.root.innerHTML = `
       <div class="insp">
         <button class="export-btn" type="button" data-field="export">
-          导出视频
-          <span class="sub">4K · HEVC</span>
+          ${exportStatus === "running" ? "导出中" : exportStatus === "succeeded" ? "导出完成" : "导出视频"}
+          <span class="sub">1080p · H264</span>
         </button>
+        ${exportStatus === "running" ? `<div class="progress" aria-label="export progress"><div class="bar"></div></div>` : ""}
+        ${exportStatus === "succeeded" ? `<div class="status ok">${exportPath}</div>` : ""}
+        ${exportStatus === "failed" ? `<div class="status err">${exportError || "导出失败"}</div>` : ""}
         <div class="insp-sel">
           <span class="l">已选片段</span>
           <span class="n">${name}</span>
@@ -175,6 +228,14 @@ export class NfInspector extends NfBase {
         </div>
         <div class="insp-card">
           <h4>属性</h4>
+          <div class="insp-f insp-field">
+            <div class="k"><span>标题</span><span class="tag">${saveStatus}</span></div>
+            <div class="edit-row">
+              <input class="edit-input" data-field="label" value="${escapeAttr(name)}">
+              <button class="mini-btn" type="button" data-action="save-label">保存</button>
+            </div>
+            ${saveStatus === "failed" ? `<div class="status err">${saveError}</div>` : ""}
+          </div>
           <div class="insp-f insp-field">
             <div class="k"><span>类型</span></div>
             <div class="v">画面 · 视频</div>
@@ -215,8 +276,20 @@ export class NfInspector extends NfBase {
         </div>
       </div>
     `;
+    this.root.querySelector("[data-action='save-label']")?.addEventListener("click", () => {
+      const input = this.root.querySelector<HTMLInputElement>("[data-field='label']");
+      this.emit<FieldEditDetail>("field-edit", { field: "label", value: input?.value ?? name });
+    });
     this.root.querySelector(".export-btn")?.addEventListener("click", () => {
-      this.emit<FieldEditDetail>("field-edit", { field: "export", value: "4K HEVC" });
+      this.emit<FieldEditDetail>("field-edit", { field: "export", value: "1080p H264" });
     });
   }
+}
+
+function escapeAttr(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

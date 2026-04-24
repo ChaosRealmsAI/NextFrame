@@ -406,8 +406,10 @@ fn parse_moov(body: &[u8]) -> Result<MoovInfo, VerifyError> {
     Ok(info)
 }
 
+type Mp4Child<'a> = ([u8; 4], &'a [u8]);
+
 /// Iterate direct children of a container (list of `(type, body)`).
-fn iter_children(body: &[u8]) -> Result<Vec<([u8; 4], &[u8])>, VerifyError> {
+fn iter_children(body: &[u8]) -> Result<Vec<Mp4Child<'_>>, VerifyError> {
     let mut out = Vec::new();
     let mut i = 0usize;
     while i + 8 <= body.len() {
@@ -913,10 +915,8 @@ fn parse_sps_vui(rbsp: &[u8], info: &mut MoovInfo) {
         Some(v) => v,
         None => return,
     };
-    if frame_mbs_only == 0 {
-        if r.read_bit().is_none() {
-            return;
-        } // mb_adaptive_frame_field_flag
+    if frame_mbs_only == 0 && r.read_bit().is_none() {
+        return; // mb_adaptive_frame_field_flag
     }
     // direct_8x8_inference_flag u1
     if r.read_bit().is_none() {
@@ -975,10 +975,8 @@ fn parse_sps_vui(rbsp: &[u8], info: &mut MoovInfo) {
         Some(v) => v,
         None => return,
     };
-    if ov == 1 {
-        if r.read_bit().is_none() {
-            return;
-        } // overscan_appropriate_flag
+    if ov == 1 && r.read_bit().is_none() {
+        return; // overscan_appropriate_flag
     }
     // video_signal_type_present_flag
     let vs = match r.read_bit() {

@@ -169,7 +169,7 @@ fn append_to_episode(
         );
     }
     episode.log.push(entry);
-    storage.save_episode(project, &episode)
+    Ok(storage.save_episode(project, &episode)?)
 }
 
 fn push_pending_project_entry(
@@ -179,7 +179,7 @@ fn push_pending_project_entry(
 ) -> Result<(), NfError> {
     let mut entries = read_pending_project_entries(storage, project)?;
     entries.push(entry);
-    atomic_write(&pending_project_log_path(storage, project), &entries)
+    Ok(atomic_write(&pending_project_log_path(storage, project), &entries)?)
 }
 
 fn take_pending_project_entries(

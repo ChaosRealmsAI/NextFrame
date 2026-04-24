@@ -166,6 +166,18 @@ impl From<serde_json::Error> for NfError {
     }
 }
 
+impl From<nf_project::ProjectError> for NfError {
+    fn from(value: nf_project::ProjectError) -> Self {
+        match value {
+            nf_project::ProjectError::StorageFailed(detail) => Self::StorageFailed(detail),
+            nf_project::ProjectError::SlugInvalid { slug, hint } => {
+                Self::SlugInvalid { slug, hint }
+            }
+            nf_project::ProjectError::ValidationFailed(detail) => Self::ValidationFailed(detail),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::NfError;

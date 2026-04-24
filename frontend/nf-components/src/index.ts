@@ -6,8 +6,15 @@ import { NfLog } from "./components/log.js";
 import { NfTimeline } from "./components/timeline.js";
 import { NfTopbar } from "./components/topbar.js";
 import { NfTrack } from "./components/track.js";
-import type { ClipSelectDetail, TimelineClipSelectDetail } from "./events.js";
-import { loadProjectData, type NfClip as NfDataClip, type NfMockData } from "./storage.js";
+import type { ClipSelectDetail, FieldEditDetail, TimelineClipSelectDetail } from "./events.js";
+import {
+  exportEpisode,
+  exportStatus,
+  loadProjectData,
+  updateClipLabel,
+  type NfClip as NfDataClip,
+  type NfMockData,
+} from "./storage.js";
 
 export const NF_COMPONENTS_VERSION = "0.2.0-w4";
 
@@ -30,6 +37,7 @@ function wireApp(): void {
   const clips = document.querySelector("nf-clips");
   const inspector = document.querySelector("nf-inspector");
   const timeline = document.querySelector("nf-timeline");
+  const route = routeFromUrl();
 
   clips?.addEventListener("clip-select", (event) => {
     const detail = (event as CustomEvent<ClipSelectDetail>).detail;
@@ -41,6 +49,58 @@ function wireApp(): void {
     clips?.setAttribute("selected-id", detail["clip-id"]);
     inspector?.setAttribute("clip-id", detail["clip-id"]);
   });
+
+  inspector?.addEventListener("field-edit", (event) => {
+    const detail = (event as CustomEvent<FieldEditDetail>).detail;
+    if (detail.field === "label") {
+      const clipId = inspector.getAttribute("clip-id");
+      if (!clipId) return;
+      inspector.setAttribute("save-status", "saving");
+      void updateClipLabel(route.project, route.episode, clipId, detail.value)
+        .then(() => loadProjectData(route.project, route.episode, { explicitRoute: true }))
+        .then(applyData)
+        .then(() => inspector.setAttribute("save-status", "saved"))
+        .catch((error) => {
+          inspector.setAttribute("save-status", "failed");
+          inspector.setAttribute("save-error", error instanceof Error ? error.message : String(error));
+        });
+    }
+    if (detail.field === "export") {
+      startExportFlow(route.project, route.episode, inspector);
+    }
+  });
+}
+
+function startExportFlow(project: string, episode: string, inspector: Element): void {
+  inspector.setAttribute("export-status", "running");
+  inspector.removeAttribute("export-error");
+  void exportEpisode(project, episode)
+    .then((started) => {
+      inspector.setAttribute("export-path", started.out);
+      pollExport(started.job_id, inspector);
+    })
+    .catch((error) => {
+      inspector.setAttribute("export-status", "failed");
+      inspector.setAttribute("export-error", error instanceof Error ? error.message : String(error));
+    });
+}
+
+function pollExport(jobId: string, inspector: Element): void {
+  window.setTimeout(() => {
+    void exportStatus(jobId)
+      .then((status) => {
+        inspector.setAttribute("export-status", status.status);
+        inspector.setAttribute("export-path", status.out);
+        if (status.error) inspector.setAttribute("export-error", status.error);
+        if (status.status === "running") {
+          pollExport(jobId, inspector);
+        }
+      })
+      .catch((error) => {
+        inspector.setAttribute("export-status", "failed");
+        inspector.setAttribute("export-error", error instanceof Error ? error.message : String(error));
+      });
+  }, 1000);
 }
 
 function routeFromUrl(): { project: string; episode: string; explicit: boolean } {

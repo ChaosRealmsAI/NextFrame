@@ -12,6 +12,7 @@ pub mod anchors;
 pub mod app;
 pub mod clips;
 pub mod episodes;
+pub mod export;
 pub mod log;
 pub mod projects;
 
@@ -33,6 +34,7 @@ impl ComposeOpHandler {
                 Box::new(episodes::EpisodesOpHandler::new(storage.clone())),
                 Box::new(clips::ClipsOpHandler::new(storage.clone())),
                 Box::new(anchors::AnchorsOpHandler::new(storage.clone())),
+                Box::new(export::ExportOpHandler::new(storage.clone())),
                 Box::new(log::LogOpHandler::new(storage)),
             ],
         }
@@ -135,7 +137,7 @@ pub(crate) fn load_registry_or_empty(storage: &JsonStorage) -> Result<Registry, 
         });
     }
 
-    storage.load_registry()
+    Ok(storage.load_registry()?)
 }
 
 pub(crate) fn save_registry_project(
@@ -154,13 +156,13 @@ pub(crate) fn save_registry_project(
         last_modified: modified.to_string(),
     });
     registry.projects.sort_by(|a, b| a.slug.cmp(&b.slug));
-    storage.save_registry(&registry)
+    Ok(storage.save_registry(&registry)?)
 }
 
 pub(crate) fn remove_registry_project(storage: &JsonStorage, slug: &str) -> Result<(), NfError> {
     let mut registry = load_registry_or_empty(storage)?;
     registry.projects.retain(|project| project.slug != slug);
-    storage.save_registry(&registry)
+    Ok(storage.save_registry(&registry)?)
 }
 
 pub(crate) fn ensure_project(storage: &JsonStorage, slug: &str) -> Result<Project, NfError> {
@@ -173,7 +175,7 @@ pub(crate) fn ensure_project(storage: &JsonStorage, slug: &str) -> Result<Projec
         });
     }
 
-    storage.load_project(slug)
+    Ok(storage.load_project(slug)?)
 }
 
 pub(crate) fn ensure_episode(
@@ -191,7 +193,7 @@ pub(crate) fn ensure_episode(
         });
     }
 
-    storage.load_episode(project_slug, episode_slug)
+    Ok(storage.load_episode(project_slug, episode_slug)?)
 }
 
 pub(crate) fn registry_path(storage: &JsonStorage) -> PathBuf {

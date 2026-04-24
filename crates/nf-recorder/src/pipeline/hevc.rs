@@ -51,7 +51,7 @@ impl RecordPipeline for PipelineHevcMain {
             .as_cv_pixel_buffer()
             .map_err(|e| PipelineError::IoError(format!("{e}")))?;
 
-        let force_keyframe = self.frames_pushed == 0 || self.frames_pushed % 60 == 0;
+        let force_keyframe = self.frames_pushed == 0 || self.frames_pushed.is_multiple_of(60);
         self.compressor
             .encode_pixel_buffer_with_options(&pixel_buffer, pts_ms, force_keyframe)?;
 

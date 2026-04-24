@@ -1,27 +1,20 @@
 [package]
-name = "nf-cli"
+name = "nf-project"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-description = "NextFrame CLI · nf command entry · driver of the whole product"
-
-[[bin]]
-name = "nf"
-path = "src/main.rs"
+description = "NextFrame project storage and episode source compiler"
 
 [dependencies]
-clap.workspace = true
 directories.workspace = true
-interprocess.workspace = true
-nf-project = { path = "../nf-project" }
-nf-recorder = { path = "../nf-recorder" }
+once_cell.workspace = true
+regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
 
 [lints]
 workspace = true

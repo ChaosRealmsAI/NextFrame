@@ -136,6 +136,20 @@ interface NfIpcResponse<T> {
   error?: NfIpcErrorRecord;
 }
 
+export interface NfExportStart {
+  job_id: string;
+  status: "running";
+  out: string;
+}
+
+export interface NfExportStatus {
+  job_id: string;
+  status: "running" | "succeeded" | "failed";
+  out: string;
+  result?: unknown;
+  error?: string | null;
+}
+
 interface PendingIpc {
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
@@ -229,6 +243,33 @@ export async function loadProjectData(
     dispatchDataReady(cached);
     return cached;
   }
+}
+
+export async function updateClipLabel(
+  projectSlug: string,
+  episodeSlug: string,
+  clipId: string,
+  label: string,
+): Promise<void> {
+  await shellRequest("clips.update", {
+    project: projectSlug,
+    episode: episodeSlug,
+    clip: clipId,
+    label,
+  });
+}
+
+export function exportEpisode(projectSlug: string, episodeSlug: string): Promise<NfExportStart> {
+  return shellRequest<NfExportStart>("export.start", {
+    project: projectSlug,
+    episode: episodeSlug,
+  });
+}
+
+export function exportStatus(jobId: string): Promise<NfExportStatus> {
+  return shellRequest<NfExportStatus>("export.status", {
+    job_id: jobId,
+  });
 }
 
 function shellRequest<T>(op: string, params: Record<string, unknown>): Promise<T> {

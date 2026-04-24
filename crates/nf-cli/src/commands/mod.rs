@@ -9,6 +9,7 @@ pub mod app;
 pub mod clips;
 pub mod doctor;
 pub mod episodes;
+pub mod export_cmd;
 pub mod karaoke;
 pub mod log;
 pub mod projects;
@@ -134,6 +135,24 @@ COMMON ERRORS:
     - missing translations -> hint: create clips/clip_NN.translations.zh.json for each cut clip"#
     )]
     Karaoke(KaraokeArgs),
+    #[command(
+        about = "Export an episode JSON timeline to MP4",
+        long_about = r#"Export the current project episode to an MP4 through the NextFrame recorder runtime.
+
+USAGE:
+    nf export --project=<slug> --episode=<slug> --out=<path.mp4>
+
+EXAMPLES:
+    nf export --project=demo-video --episode=ep-01 --out=tmp/demo.mp4
+
+EXPECTED JSON:
+    {"out":"tmp/demo.mp4","source":"tmp/demo.mp4.source.json","bytes":12345,"frames":300,"duration_ms":5000,"warnings":[]}
+
+COMMON ERRORS:
+    - unknown project or episode -> exit 5 · hint: create or list projects first
+    - invalid timeline -> exit 2 · hint: ensure at least one scene clip has valid start/end times"#
+    )]
+    Export(ExportArgs),
     #[command(
         about = "Click a DOM element in a NextFrame window",
         long_about = r#"Click a DOM element through the real app path. Selectors may use ::shadow to cross web component shadow roots.
@@ -535,6 +554,16 @@ pub struct KaraokeArgs {
         value_name = "EPISODE_DIR"
     )]
     pub episode_dir: std::path::PathBuf,
+}
+
+#[derive(Debug, Args)]
+pub struct ExportArgs {
+    #[arg(long, value_name = "SLUG", help = "Project slug to export")]
+    pub project: String,
+    #[arg(long, value_name = "SLUG", help = "Episode slug to export")]
+    pub episode: String,
+    #[arg(long, value_name = "PATH", help = "Output MP4 path")]
+    pub out: std::path::PathBuf,
 }
 
 #[derive(Debug, Args)]

@@ -265,7 +265,7 @@ pub fn parse_bitrate(s: &str) -> Result<u32, String> {
 /// dimensions. Rejects zero / overflow.
 pub fn parse_viewport(s: &str) -> Result<(u32, u32), String> {
     let trimmed = s.trim();
-    let parts: Vec<&str> = trimmed.splitn(2, |c| c == 'x' || c == 'X').collect();
+    let parts: Vec<&str> = trimmed.splitn(2, ['x', 'X']).collect();
     if parts.len() != 2 {
         return Err(format!("viewport: expected <W>x<H>, got '{trimmed}'"));
     }

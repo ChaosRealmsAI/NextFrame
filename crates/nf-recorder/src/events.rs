@@ -16,6 +16,9 @@
 use serde::Serialize;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static QUIET: AtomicBool = AtomicBool::new(false);
 
 /// Recorder stdout events · tagged by `event` field.
 /// Historical: v1.14 recorder stdout event schema.
@@ -128,6 +131,9 @@ pub enum Event {
 ///
 /// Never panics · serialization or io errors degrade to a stderr notice.
 pub fn emit(e: Event) {
+    if QUIET.load(Ordering::Relaxed) {
+        return;
+    }
     match serde_json::to_string(&e) {
         Ok(line) => {
             let stdout = std::io::stdout();
@@ -139,4 +145,8 @@ pub fn emit(e: Event) {
             eprintln!("nf-recorder: event serialize error: {err}");
         }
     }
+}
+
+pub fn set_quiet(quiet: bool) {
+    QUIET.store(quiet, Ordering::Relaxed);
 }

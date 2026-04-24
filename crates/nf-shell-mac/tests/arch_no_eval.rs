@@ -51,7 +51,7 @@ fn collect_hits(dir: &Path, needle: &str, out: &mut Vec<(PathBuf, usize, String)
         let p = entry.path();
         if p.is_dir() {
             collect_hits(&p, needle, out);
-        } else if p.extension().map_or(false, |x| x == "rs") {
+        } else if p.extension().is_some_and(|x| x == "rs") {
             let Ok(content) = fs::read_to_string(&p) else {
                 continue;
             };

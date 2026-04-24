@@ -62,7 +62,7 @@ define_class!(
     impl Runner {
         #[unsafe(method(runTest))]
         fn run_test(&self) {
-            let outcome = execute_test().map_err(|e| format!("{e}"));
+            let outcome = execute_test().map_err(|e| e.to_string());
             *self.ivars().result.borrow_mut() = Some(outcome);
             if let Some(mtm) = MainThreadMarker::new() {
                 let app = NSApplication::sharedApplication(mtm);

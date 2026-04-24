@@ -87,7 +87,7 @@ impl RecordPipeline for PipelineH264_1080p {
         //    v1.15 · force IDR on the very first frame of this pipeline instance · so each
         //    segment MP4 (including parallel subprocess segments) starts with a keyframe ·
         //    enabling `ffmpeg -f concat -c copy` without re-encoding at merge time.
-        let force_keyframe = self.frames_pushed == 0 || self.frames_pushed % 60 == 0;
+        let force_keyframe = self.frames_pushed == 0 || self.frames_pushed.is_multiple_of(60);
         self.compressor
             .encode_pixel_buffer_with_options(&pixel_buffer, pts_ms, force_keyframe)?;
 

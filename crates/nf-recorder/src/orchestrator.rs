@@ -356,11 +356,7 @@ fn resolve_recorder_binary() -> Result<PathBuf, RecordError> {
         }
     }
     // v1.15 兼容 · 若当前就是 nf-recorder 自己 · 直接用。
-    if current
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .map_or(false, |n| n == "nf-recorder")
-    {
+    if current.file_stem().and_then(|s| s.to_str()) == Some("nf-recorder") {
         return Ok(current);
     }
     Err(RecordError::PipelineError(format!(
