@@ -1,0 +1,41 @@
+{
+  "version": "v0.14.0",
+  "session": "codex-2026-04-24-v014-kickoff",
+  "started_at": "2026-04-24T20:51:34+0800",
+  "turns": [
+    {
+      "at": "2026-04-24T20:49:00+0800",
+      "speaker": "user",
+      "text": "好  下一个版本做啥",
+      "assistant_response": "Recommended v0.14.0: voice + subtitle track loop from JSON to desktop preview to MP4 export."
+    },
+    {
+      "at": "2026-04-24T20:51:00+0800",
+      "speaker": "user",
+      "text": "可以 继续吧",
+      "assistant_response": "Start v0.14.0 kickoff with the chosen voice + subtitle authoring loop."
+    }
+  ],
+  "decision": {
+    "chosen": "voice-subtitle-loop",
+    "do": [
+      "V2 JSON supports paired audio/subtitle tracks for narrated compositions.",
+      "TTS/timeline output can become subtitle words used by preview and export.",
+      "Desktop editor renders and edits subtitle text/style/timing.",
+      "Exported MP4 contains real AAC audio and burned-in subtitles from the same saved source."
+    ],
+    "not_do": [
+      "Cloud export",
+      "Caption animation marketplace",
+      "Broad export performance changes",
+      "Unrelated component-theme expansion"
+    ],
+    "success_picture": "Hear narration and see synced subtitles in desktop preview; edit one subtitle; export and open MP4 with the same audio/subtitle result.",
+    "verify_method": [
+      "target/debug/nf composition show --project v2-showcase --composition showreel-24s",
+      "target/debug/nf devtools/click/screenshot on the desktop editor playback path",
+      "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --out <archive-path>",
+      "ffprobe audio stream check and exported frame subtitle check"
+    ]
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "version": "v0.14.0",
+  "type": "feature",
+  "chosen": "V2 composition voice + subtitle authoring loop: JSON text becomes synced audio/subtitle tracks that preview and export together.",
+  "why": "AI perspective: v0.13.1 proved audio can exist in v2 source and export, but video production still lacks the visible companion to voice: timed subtitles. User perspective: this is the next thing a PM can immediately feel in the editor and final MP4, because the product stops being a silent/visual renderer and starts behaving like a real narrated video tool.",
+  "changed_from": "v0.13.1 restored showreel audio by adding audio tracks and relative audio path compilation. v0.14.0 builds the higher-level voice + subtitle workflow on that foundation.",
+  "constraints": {
+    "no_vanity": "This version's visible effect is: open showreel-24s, click play, hear narration and see subtitles advance in sync; edit one subtitle line/style/timing in the inspector; export and see/hear the same result in MP4.",
+    "no_overreach": "Only do v2 voice/subtitle track authoring and preview/export consistency. Do not build cloud export, a full caption template marketplace, advanced karaoke animation packs, or broad export performance changes.",
+    "no_rush": "The workflow must use real composition JSON and real TTS/timeline data, not hardcoded demo DOM. Subtitle rendering, editing, and export must share the same compiled source.",
+    "must_verify": "Acceptance is a desktop and CLI path: composition show proves audio+subtitle tracks exist, desktop screenshot/DOM proves active subtitle rendering, MP4 ffprobe proves AAC audio, and exported frames prove subtitles are burned into video."
+  },
+  "success_picture": "PM opens the desktop editor on v2-showcase/showreel-24s, sees 10 visual tracks plus voice/subtitle tracks, presses play, hears narration while subtitles appear on the video, edits one subtitle text/style/timing field, saves, exports, and opens an MP4 where the same subtitle and audio are present.",
+  "cost_estimate": "AI scale: 2-5 hours for spec + implementation + focused verification, assuming no external TTS service outage.",
+  "risks": [
+    "Existing TTS timeline formats may differ from v2 subtitle source expectations; normalize at compile or storage boundary.",
+    "Preview audio autoplay can still depend on WebView user gesture; verification must click play through the real UI path.",
+    "Burned-in subtitle style can drift between desktop preview and recorder if not rendered from the same source track.",
+    "Do not let generated audio/timeline artifacts pollute root structure; durable examples live under examples/ and runtime copies under ~/.nextframe/."
+  ],
+  "candidates": [
+    {
+      "id": "voice-subtitle-loop",
+      "title": "语音 + 字幕轨道闭环",
+      "do": "JSON text/voice/timeline generate or reference audio and subtitle tracks; preview and export render both.",
+      "constraints_check": "High PM visibility, one coherent feature, verifiable through desktop and ffprobe.",
+      "cost_estimate": "2-5h",
+      "selected": true
+    },
+    {
+      "id": "showcase-component-polish",
+      "title": "更炫的 HTML/SVG/Canvas 组件主题",
+      "do": "Add a richer v2 showreel with more expressive component scenes.",
+      "constraints_check": "Visually strong but less foundational than voice/subtitle; risks vanity if subtitle gap remains.",
+      "cost_estimate": "2-4h",
+      "selected": false
+    },
+    {
+      "id": "media-qa-panel",
+      "title": "媒体 QA 面板",
+      "do": "Show audio/video/subtitle health checks in the editor: file exists, duration, codec, mux status.",
+      "constraints_check": "Useful quality candidate the user did not explicitly ask for; lower immediate product feel than subtitles.",
+      "cost_estimate": "1-3h",
+      "selected": false
+    },
+    {
+      "id": "composition-schema-lint",
+      "title": "V2 JSON schema/lint",
+      "do": "Reject broken track paths, invalid timing, unsupported src, and missing component files before preview/export.",
+      "constraints_check": "High maintenance value, but less PM-visible than voice/subtitle authoring.",
+      "cost_estimate": "2-4h",
+      "selected": false
+    }
+  ]
+}
