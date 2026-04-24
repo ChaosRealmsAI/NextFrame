@@ -184,6 +184,26 @@ export interface NfExportOpen {
   path: string;
 }
 
+export interface NfVoiceStart {
+  job_id: string;
+  status: "running";
+  audio: string;
+  timeline: string;
+}
+
+export interface NfVoiceStatus {
+  job_id: string;
+  status: "running" | "succeeded" | "failed";
+  audio: string;
+  timeline: string;
+  result?: {
+    audio_clip?: string;
+    subtitle_clip?: string;
+    duration_ms?: number;
+  } | null;
+  error?: string | null;
+}
+
 interface PendingIpc {
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
@@ -337,6 +357,26 @@ export function exportStatus(jobId: string): Promise<NfExportStatus> {
 export function openExport(path: string): Promise<NfExportOpen> {
   return shellRequest<NfExportOpen>("export.open", {
     path,
+  });
+}
+
+export function synthesizeVoice(
+  projectSlug: string,
+  episodeSlug: string,
+  clipId: string,
+  text: string,
+): Promise<NfVoiceStart> {
+  return shellRequest<NfVoiceStart>("voice.start", {
+    project: projectSlug,
+    episode: episodeSlug,
+    clip: clipId,
+    text,
+  });
+}
+
+export function voiceStatus(jobId: string): Promise<NfVoiceStatus> {
+  return shellRequest<NfVoiceStatus>("voice.status", {
+    job_id: jobId,
   });
 }
 

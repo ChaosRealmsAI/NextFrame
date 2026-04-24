@@ -187,6 +187,18 @@ const sheet = makeSheet(`
   .open-btn:hover {
     background: rgba(123, 201, 181, 0.26);
   }
+  .voice-btn {
+    width: 100%;
+    padding: 9px 10px;
+    background: rgba(251, 191, 36, 0.14);
+    border: 1px solid rgba(251, 191, 36, 0.42);
+    color: #fbbf24;
+    font-size: 11.5px;
+    font-weight: 650;
+  }
+  .voice-btn:hover {
+    background: rgba(251, 191, 36, 0.22);
+  }
   .progress {
     height: 3px;
     margin: -6px 0 10px;
@@ -216,6 +228,9 @@ export class NfInspector extends NfBase {
       "export-path",
       "export-error",
       "export-open-status",
+      "voice-status",
+      "voice-error",
+      "voice-audio",
     ];
   }
 
@@ -255,6 +270,9 @@ export class NfInspector extends NfBase {
     const exportPath = this.getAttribute("export-path") ?? "";
     const exportError = this.getAttribute("export-error") ?? "";
     const exportOpenStatus = this.getAttribute("export-open-status") ?? "";
+    const voiceStatus = this.getAttribute("voice-status") ?? "idle";
+    const voiceError = this.getAttribute("voice-error") ?? "";
+    const voiceAudio = this.getAttribute("voice-audio") ?? "";
     this.root.innerHTML = `
       <div class="insp">
         <button class="export-btn" type="button" data-field="export">
@@ -293,8 +311,17 @@ export class NfInspector extends NfBase {
             </div>
           </div>
           <div class="insp-f insp-field">
+            <div class="k"><span>语音</span><span class="tag">${voiceStatus === "running" ? "生成中" : voiceStatus === "succeeded" ? "已接入" : ""}</span></div>
+            <button class="voice-btn" type="button" data-action="synth-voice">
+              ${voiceStatus === "running" ? "生成语音字幕中" : voiceStatus === "succeeded" ? "重新生成语音字幕" : "生成语音字幕"}
+            </button>
+            ${voiceStatus === "running" ? `<div class="progress" aria-label="voice progress"><div class="bar"></div></div>` : ""}
+            ${voiceStatus === "succeeded" ? `<div class="status ok">${escapeHtml(voiceAudio || "已写入 audio/subtitle 轨道")}</div>` : ""}
+            ${voiceStatus === "failed" ? `<div class="status err">${escapeHtml(voiceError || "语音生成失败")}</div>` : ""}
+          </div>
+          <div class="insp-f insp-field">
             <div class="k"><span>类型</span></div>
-            <div class="v">画面 · 视频</div>
+            <div class="v">${kindLabel(clip?.kind ?? "scene")}</div>
           </div>
           <div class="insp-f insp-field">
             <div class="k"><span>起点</span><span class="tag">锚点</span></div>
@@ -354,6 +381,9 @@ export class NfInspector extends NfBase {
     this.root.querySelector("[data-action='open-export']")?.addEventListener("click", () => {
       this.emit<FieldEditDetail>("field-edit", { field: "open-export", value: exportPath });
     });
+    this.root.querySelector("[data-action='synth-voice']")?.addEventListener("click", () => {
+      this.emit<FieldEditDetail>("field-edit", { field: "voice", value: voiceText(clip) });
+    });
   }
 
   private readPosition(fallback: { x: number; y: number }): { x: number; y: number } {
@@ -383,4 +413,26 @@ function escapeAttr(value: string): string {
 
 function clampPercent(value: number): number {
   return Number.isFinite(value) ? Math.min(95, Math.max(5, value)) : 50;
+}
+
+function kindLabel(kind: string): string {
+  const labels: Record<string, string> = {
+    scene: "画面 · 视频",
+    text: "文字",
+    subtitle: "字幕",
+    overlay: "叠加",
+    audio: "音频",
+    trans: "转场",
+  };
+  return labels[kind] ?? kind;
+}
+
+function voiceText(clip: ReturnType<typeof getClip> | undefined): string {
+  return [
+    clip?.title,
+    clip?.subtitle,
+    clip?.description,
+    clip?.text,
+    clip?.label,
+  ].filter((value): value is string => Boolean(value && value.trim().length > 0)).join("，");
 }

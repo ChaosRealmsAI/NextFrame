@@ -15,8 +15,10 @@ import {
   loadProjectData,
   openExport,
   patchClip,
+  synthesizeVoice,
   updateClipLabel,
   updateClipPosition,
+  voiceStatus,
   type NfClip as NfDataClip,
   type NfMockData,
 } from "./storage.js";
@@ -29,6 +31,8 @@ let playbackRaf = 0;
 let playbackStartedAt = 0;
 let playbackStartTime = 0;
 let playing = false;
+let previewAudio: HTMLAudioElement | undefined;
+let previewAudioClipId = "";
 
 const DEFINITIONS: Array<[string, CustomElementConstructor]> = [
   ["nf-topbar", NfTopbar],
@@ -112,6 +116,11 @@ function wireApp(): void {
     if (detail.field === "export") {
       startExportFlow(route.project, route.episode, inspector);
     }
+    if (detail.field === "voice") {
+      const clipId = inspector.getAttribute("clip-id");
+      if (!clipId || typeof detail.value !== "string" || detail.value.trim().length === 0) return;
+      startVoiceFlow(route.project, route.episode, clipId, detail.value, inspector);
+    }
     if (detail.field === "open-export") {
       const path = typeof detail.value === "string" && detail.value.length > 0
         ? detail.value
@@ -129,6 +138,48 @@ function wireApp(): void {
 
   wirePreviewDrag(route.project, route.episode);
   wirePlaybackControls();
+}
+
+function startVoiceFlow(project: string, episode: string, clipId: string, text: string, inspector: Element): void {
+  inspector.setAttribute("voice-status", "running");
+  inspector.removeAttribute("voice-error");
+  inspector.removeAttribute("voice-audio");
+  void synthesizeVoice(project, episode, clipId, text)
+    .then((started) => {
+      inspector.setAttribute("voice-audio", started.audio);
+      pollVoice(started.job_id, project, episode, clipId, inspector);
+    })
+    .catch((error) => {
+      inspector.setAttribute("voice-status", "failed");
+      inspector.setAttribute("voice-error", error instanceof Error ? error.message : String(error));
+    });
+}
+
+function pollVoice(jobId: string, project: string, episode: string, clipId: string, inspector: Element): void {
+  window.setTimeout(() => {
+    void voiceStatus(jobId)
+      .then((status) => {
+        inspector.setAttribute("voice-status", status.status);
+        inspector.setAttribute("voice-audio", status.audio);
+        if (status.error) inspector.setAttribute("voice-error", status.error);
+        if (status.status === "running") {
+          pollVoice(jobId, project, episode, clipId, inspector);
+          return;
+        }
+        if (status.status === "succeeded") {
+          void loadProjectData(project, episode, { explicitRoute: true })
+            .then((data) => applyData(data, clipId))
+            .catch((error) => {
+              inspector.setAttribute("voice-status", "failed");
+              inspector.setAttribute("voice-error", error instanceof Error ? error.message : String(error));
+            });
+        }
+      })
+      .catch((error) => {
+        inspector.setAttribute("voice-status", "failed");
+        inspector.setAttribute("voice-error", error instanceof Error ? error.message : String(error));
+      });
+  }, 1000);
 }
 
 function startExportFlow(project: string, episode: string, inspector: Element): void {
@@ -245,6 +296,7 @@ function startPlayback(): void {
   playbackStartedAt = performance.now();
   playbackStartTime = currentPreviewTime;
   updatePlayButton();
+  syncPreviewAudio(getMockData(), currentPreviewTime);
   playbackRaf = window.requestAnimationFrame(playbackTick);
 }
 
@@ -271,6 +323,7 @@ function stopPlayback(options: { keepButtonState: boolean }): void {
     playbackRaf = 0;
   }
   playing = false;
+  pausePreviewAudio();
   if (!options.keepButtonState) updatePlayButton();
 }
 
@@ -331,6 +384,7 @@ function applyShellChrome(data: NfMockData, selected: NfDataClip | undefined, ti
   copy?.style.setProperty("--nf-title-x", `${position.x}%`);
   copy?.style.setProperty("--nf-title-y", `${position.y}%`);
   applyPreviewFrame(data, currentTime, activeScene ?? selected);
+  syncPreviewAudio(data, currentTime);
   setText("[data-nf-current-time]", formatTime(currentTime));
   setText("[data-nf-total-time]", ` / ${formatTime(episode.duration)}`);
   document.querySelector<HTMLElement>("[data-nf-scrub-fill]")?.style.setProperty("width", `${pct}%`);
@@ -423,6 +477,40 @@ function renderSubtitlePreview(clip: NfDataClip, time: number, fallbackAccent: s
 function renderAudioIndicator(clip: NfDataClip): string {
   const state = clip.src ? "AUDIO PREVIEW" : "AUDIO PLACEHOLDER";
   return `<div class="preview-audio-indicator">${escapeHtml(state)} · ${escapeHtml(clip.label)}</div>`;
+}
+
+function syncPreviewAudio(data: NfMockData, time: number): void {
+  const clip = activeClipsAt(data, time, "audio").find((item) => item.src);
+  if (!clip?.src) {
+    pausePreviewAudio();
+    previewAudioClipId = "";
+    return;
+  }
+  if (!previewAudio) {
+    previewAudio = new Audio();
+    previewAudio.preload = "auto";
+  }
+  if (previewAudioClipId !== clip.id || previewAudio.src !== clip.src) {
+    previewAudio.pause();
+    previewAudio.src = clip.src;
+    previewAudioClipId = clip.id;
+  }
+  previewAudio.volume = Math.min(1, Math.max(0, clip.volume ?? 1));
+  const targetTime = Math.max(0, time - clip.start + (clip.from_ms ?? 0) / 1000);
+  if (Number.isFinite(targetTime) && Math.abs(previewAudio.currentTime - targetTime) > 0.25) {
+    previewAudio.currentTime = targetTime;
+  }
+  if (playing) {
+    void previewAudio.play().catch(() => {
+      // WebView audio may require a fresh user gesture; the next play click retries.
+    });
+  } else {
+    previewAudio.pause();
+  }
+}
+
+function pausePreviewAudio(): void {
+  previewAudio?.pause();
 }
 
 function validColor(value: string | undefined): boolean {

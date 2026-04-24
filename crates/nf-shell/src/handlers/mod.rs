@@ -15,6 +15,7 @@ pub mod episodes;
 pub mod export;
 pub mod log;
 pub mod projects;
+pub mod voice;
 
 pub struct ComposeOpHandler {
     storage: JsonStorage,
@@ -35,6 +36,7 @@ impl ComposeOpHandler {
                 Box::new(clips::ClipsOpHandler::new(storage.clone())),
                 Box::new(anchors::AnchorsOpHandler::new(storage.clone())),
                 Box::new(export::ExportOpHandler::new(storage.clone())),
+                Box::new(voice::VoiceOpHandler::new(storage.clone())),
                 Box::new(log::LogOpHandler::new(storage)),
             ],
         }
