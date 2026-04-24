@@ -32,8 +32,7 @@ let playbackRaf = 0;
 let playbackStartedAt = 0;
 let playbackStartTime = 0;
 let playing = false;
-let previewAudio: HTMLAudioElement | undefined;
-let previewAudioClipId = "";
+const previewAudio = new Map<string, HTMLAudioElement>();
 const autoVoiceStarted = new Set<string>();
 
 const DEFINITIONS: Array<[string, CustomElementConstructor]> = [
@@ -519,38 +518,41 @@ function renderAudioIndicator(clip: NfDataClip): string {
 }
 
 function syncPreviewAudio(data: NfMockData, time: number): void {
-  const clip = activeClipsAt(data, time, "audio").find((item) => item.src);
-  if (!clip?.src) {
-    pausePreviewAudio();
-    previewAudioClipId = "";
-    return;
+  const active = activeClipsAt(data, time, "audio").filter((item) => item.src);
+  const activeIds = new Set(active.map((clip) => clip.id));
+  for (const [clipId, audio] of previewAudio) {
+    if (!activeIds.has(clipId)) audio.pause();
   }
-  if (!previewAudio) {
-    previewAudio = new Audio();
-    previewAudio.preload = "auto";
-  }
-  const src = playableAudioSrc(clip.src);
-  if (previewAudioClipId !== clip.id || previewAudio.src !== src) {
-    previewAudio.pause();
-    previewAudio.src = src;
-    previewAudioClipId = clip.id;
-  }
-  previewAudio.volume = Math.min(1, Math.max(0, clip.volume ?? 1));
-  const targetTime = Math.max(0, time - clip.start + (clip.from_ms ?? 0) / 1000);
-  if (Number.isFinite(targetTime) && Math.abs(previewAudio.currentTime - targetTime) > 0.25) {
-    previewAudio.currentTime = targetTime;
-  }
-  if (playing) {
-    void previewAudio.play().catch(() => {
-      // WebView audio may require a fresh user gesture; the next play click retries.
-    });
-  } else {
-    previewAudio.pause();
+  for (const clip of active) {
+    if (!clip.src) continue;
+    let audio = previewAudio.get(clip.id);
+    if (!audio) {
+      audio = new Audio();
+      audio.preload = "auto";
+      previewAudio.set(clip.id, audio);
+    }
+    const src = playableAudioSrc(clip.src);
+    if (audio.src !== src) {
+      audio.pause();
+      audio.src = src;
+    }
+    audio.volume = Math.min(1, Math.max(0, clip.volume ?? 1));
+    const targetTime = Math.max(0, time - clip.start + (clip.from_ms ?? 0) / 1000);
+    if (Number.isFinite(targetTime) && Math.abs(audio.currentTime - targetTime) > 0.25) {
+      audio.currentTime = targetTime;
+    }
+    if (playing) {
+      void audio.play().catch(() => {
+        // WebView audio may require a fresh user gesture; the next play click retries.
+      });
+    } else {
+      audio.pause();
+    }
   }
 }
 
 function pausePreviewAudio(): void {
-  previewAudio?.pause();
+  for (const audio of previewAudio.values()) audio.pause();
 }
 
 function playableAudioSrc(src: string): string {
