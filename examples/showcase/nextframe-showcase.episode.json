@@ -1,0 +1,69 @@
+{
+  "slug": "launch-film",
+  "name": "NextFrame Launch Film",
+  "duration": 16.0,
+  "anchors": {},
+  "clips": [
+    {
+      "slug": "open",
+      "label": "JSON becomes motion",
+      "title": "JSON becomes motion",
+      "subtitle": "A desktop editor where structured video can be edited, previewed, exported, and opened without leaving the app.",
+      "eyebrow": "NextFrame · Live pipeline",
+      "layout": "hero",
+      "track": "scene",
+      "start": "0",
+      "end": "4",
+      "accent_color": "#5eead4",
+      "bg_color": "#07080d",
+      "position": { "x": 50, "y": 49 },
+      "effects": ["editorial-grid", "live-preview"]
+    },
+    {
+      "slug": "edit",
+      "label": "Edit the frame, not a form",
+      "title": "Edit the frame, not a form",
+      "subtitle": "Titles and positions stay connected across the inspector, preview, timeline JSON, and final MP4.",
+      "description": "Every visible change is stored as project JSON, compiled into runtime source, rendered by the same scene track, and exported through the recorder.",
+      "eyebrow": "Online editing",
+      "layout": "split",
+      "track": "scene",
+      "start": "4",
+      "end": "8",
+      "accent_color": "#ff8a5b",
+      "bg_color": "#0d0b10",
+      "position": { "x": 43, "y": 52 },
+      "effects": ["drag-position", "instant-preview"]
+    },
+    {
+      "slug": "export",
+      "label": "One click from edit to export",
+      "layout": "stat",
+      "track": "scene",
+      "start": "8",
+      "end": "12",
+      "big_number": "1",
+      "sublabel": "Export jobs run through nf export, return a real MP4, then open directly from the editor.",
+      "accent_color": "#9ad65c",
+      "bg_color": "#08100d",
+      "position": { "x": 50, "y": 50 },
+      "effects": ["h264", "open-export"]
+    },
+    {
+      "slug": "close",
+      "label": "The loop is the product",
+      "title": "The loop is the product.",
+      "subtitle": "JSON · online edit · preview · export · open",
+      "eyebrow": "Full chain",
+      "layout": "quote",
+      "track": "scene",
+      "start": "12",
+      "end": "16",
+      "accent_color": "#7dd3fc",
+      "bg_color": "#070a12",
+      "position": { "x": 50, "y": 50 },
+      "effects": ["final-frame"]
+    }
+  ],
+  "log": []
+}

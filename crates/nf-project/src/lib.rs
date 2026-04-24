@@ -243,11 +243,37 @@ pub fn compile_episode_source(
             .and_then(Value::as_str)
             .filter(|value| !value.is_empty())
             .ok_or_else(|| ProjectError::ValidationFailed("scene clip missing slug".to_string()))?;
-        let label = object
-            .get("label")
+        let title = object
+            .get("title")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .or_else(|| {
+                object
+                    .get("label")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.is_empty())
+            })
+            .unwrap_or(id);
+        let subtitle = object
+            .get("subtitle")
             .and_then(Value::as_str)
             .filter(|value| !value.is_empty())
             .unwrap_or(id);
+        let layout = object
+            .get("layout")
+            .and_then(Value::as_str)
+            .filter(|value| matches!(*value, "hero" | "stat" | "split" | "quote"))
+            .unwrap_or("hero");
+        let accent = object
+            .get("accent_color")
+            .and_then(Value::as_str)
+            .filter(|value| is_hex_color(value))
+            .unwrap_or("#5eead4");
+        let bg_color = object
+            .get("bg_color")
+            .and_then(Value::as_str)
+            .filter(|value| is_hex_color(value))
+            .unwrap_or("#07080d");
         let position = clip_position(object);
         let start_ms = resolve_time_ms(object.get("start"), &episode.anchors, "start")?;
         let end_ms = resolve_time_ms(object.get("end"), &episode.anchors, "end")?;
@@ -262,18 +288,25 @@ pub fn compile_episode_source(
             ));
         }
 
+        let mut params = serde_json::Map::new();
+        params.insert("layout".to_string(), json!(layout));
+        params.insert("title".to_string(), json!(title));
+        params.insert("subtitle".to_string(), json!(subtitle));
+        params.insert("accent_color".to_string(), json!(accent));
+        params.insert("bg_color".to_string(), json!(bg_color));
+        params.insert("title_x".to_string(), json!(position.0));
+        params.insert("title_y".to_string(), json!(position.1));
+        copy_string_param(object, &mut params, "eyebrow");
+        copy_string_param(object, &mut params, "description");
+        copy_string_param(object, &mut params, "big_number");
+        copy_string_param(object, &mut params, "label");
+        copy_string_param(object, &mut params, "sublabel");
+
         scene_clips.push(json!({
             "id": id,
             "begin": start_ms,
             "end": end_ms,
-            "params": {
-                "layout": "hero",
-                "title": label,
-                "subtitle": id,
-                "accent_color": "#bc8cff",
-                "title_x": position.0,
-                "title_y": position.1
-            }
+            "params": Value::Object(params)
         }));
     }
 
@@ -316,6 +349,26 @@ pub fn compile_episode_source(
     });
 
     Ok(SourceCompileResult { source, warnings })
+}
+
+fn copy_string_param(
+    source: &serde_json::Map<String, Value>,
+    target: &mut serde_json::Map<String, Value>,
+    key: &str,
+) {
+    if let Some(value) = source
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    {
+        target.insert(key.to_string(), json!(value));
+    }
+}
+
+fn is_hex_color(value: &str) -> bool {
+    value.len() == 7
+        && value.starts_with('#')
+        && value.chars().skip(1).all(|ch| ch.is_ascii_hexdigit())
 }
 
 fn clip_position(object: &serde_json::Map<String, Value>) -> (f64, f64) {
