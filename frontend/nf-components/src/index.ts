@@ -25,6 +25,10 @@ export const NF_COMPONENTS_VERSION = "0.2.0-w4";
 
 let selectedClipId = "";
 let currentPreviewTime = 0;
+let playbackRaf = 0;
+let playbackStartedAt = 0;
+let playbackStartTime = 0;
+let playing = false;
 
 const DEFINITIONS: Array<[string, CustomElementConstructor]> = [
   ["nf-topbar", NfTopbar],
@@ -59,16 +63,8 @@ function wireApp(): void {
 
   timeline?.addEventListener("playhead-move", (event) => {
     const detail = (event as CustomEvent<PlayheadMoveDetail>).detail;
-    currentPreviewTime = detail.time;
-    const data = getMockData();
-    const activeScene = activeClipAt(data, detail.time, "scene") ?? data.episodes[0]?.clips[0];
-    if (activeScene) {
-      selectedClipId = activeScene.id;
-      document.querySelector("nf-clips")?.setAttribute("selected-id", activeScene.id);
-      document.querySelector("nf-inspector")?.setAttribute("clip-id", activeScene.id);
-      document.querySelector("nf-timeline")?.setAttribute("selected-id", activeScene.id);
-    }
-    applyShellChrome(data, activeScene, detail.time);
+    stopPlayback({ keepButtonState: false });
+    seekPreviewTime(detail.time, { syncTimeline: false });
   });
 
   inspector?.addEventListener("field-edit", (event) => {
@@ -132,6 +128,7 @@ function wireApp(): void {
   });
 
   wirePreviewDrag(route.project, route.episode);
+  wirePlaybackControls();
 }
 
 function startExportFlow(project: string, episode: string, inspector: Element): void {
@@ -210,6 +207,7 @@ function applyData(data: NfMockData, preferredClipId = selectedClipId): void {
 }
 
 function selectClip(clipId: string, clip?: NfDataClip): void {
+  stopPlayback({ keepButtonState: false });
   selectedClipId = clipId;
   document.querySelector("nf-clips")?.setAttribute("selected-id", clipId);
   document.querySelector("nf-inspector")?.setAttribute("clip-id", clipId);
@@ -220,6 +218,101 @@ function selectClip(clipId: string, clip?: NfDataClip): void {
     document.querySelector("nf-timeline")?.setAttribute("current-time", String(currentPreviewTime));
     applyShellChrome(getMockData(), selected, currentPreviewTime);
   }
+}
+
+function wirePlaybackControls(): void {
+  document.querySelector<HTMLElement>("[data-nf-play]")?.addEventListener("click", () => {
+    if (playing) {
+      stopPlayback({ keepButtonState: false });
+    } else {
+      startPlayback();
+    }
+  });
+  document.querySelectorAll<HTMLElement>("[data-nf-skip]").forEach((button) => {
+    button.addEventListener("click", () => {
+      stopPlayback({ keepButtonState: false });
+      const direction = button.dataset.nfSkip === "next" ? "next" : "prev";
+      seekPreviewTime(adjacentClipTime(direction), { syncTimeline: true });
+    });
+  });
+}
+
+function startPlayback(): void {
+  const episode = getMockData().episodes[0];
+  if (!episode || episode.duration <= 0) return;
+  if (currentPreviewTime >= episode.duration - 0.001) currentPreviewTime = 0;
+  playing = true;
+  playbackStartedAt = performance.now();
+  playbackStartTime = currentPreviewTime;
+  updatePlayButton();
+  playbackRaf = window.requestAnimationFrame(playbackTick);
+}
+
+function playbackTick(now: number): void {
+  if (!playing) return;
+  const episode = getMockData().episodes[0];
+  if (!episode) {
+    stopPlayback({ keepButtonState: false });
+    return;
+  }
+  const elapsed = (now - playbackStartedAt) / 1000;
+  const nextTime = Math.min(episode.duration, playbackStartTime + elapsed);
+  seekPreviewTime(nextTime, { syncTimeline: true });
+  if (nextTime >= episode.duration) {
+    stopPlayback({ keepButtonState: false });
+    return;
+  }
+  playbackRaf = window.requestAnimationFrame(playbackTick);
+}
+
+function stopPlayback(options: { keepButtonState: boolean }): void {
+  if (playbackRaf) {
+    window.cancelAnimationFrame(playbackRaf);
+    playbackRaf = 0;
+  }
+  playing = false;
+  if (!options.keepButtonState) updatePlayButton();
+}
+
+function updatePlayButton(): void {
+  const button = document.querySelector<HTMLElement>("[data-nf-play]");
+  if (!button) return;
+  button.textContent = playing ? "Ⅱ" : "▶";
+  button.setAttribute("aria-label", playing ? "pause preview" : "play preview");
+}
+
+function seekPreviewTime(time: number, options: { syncTimeline: boolean }): void {
+  const data = getMockData();
+  const episode = data.episodes[0];
+  if (!episode) return;
+  const safeTime = Math.min(episode.duration, Math.max(0, time));
+  const activeScene = activeClipAt(data, safeTime, "scene") ?? episode.clips.find((clip) => clip.kind === "scene") ?? episode.clips[0];
+  if (activeScene && activeScene.id !== selectedClipId) {
+    selectedClipId = activeScene.id;
+    document.querySelector("nf-clips")?.setAttribute("selected-id", activeScene.id);
+    document.querySelector("nf-inspector")?.setAttribute("clip-id", activeScene.id);
+    document.querySelector("nf-timeline")?.setAttribute("selected-id", activeScene.id);
+  }
+  if (options.syncTimeline) {
+    document.querySelector("nf-timeline")?.setAttribute("current-time", safeTime.toFixed(3));
+  }
+  applyShellChrome(data, activeScene, safeTime);
+}
+
+function adjacentClipTime(direction: "next" | "prev"): number {
+  const episode = getMockData().episodes[0];
+  if (!episode) return 0;
+  const sceneStarts = episode.clips
+    .filter((clip) => clip.kind === "scene")
+    .map((clip) => clip.start)
+    .sort((a, b) => a - b);
+  if (sceneStarts.length === 0) return 0;
+  if (direction === "next") {
+    return sceneStarts.find((time) => time > currentPreviewTime + 0.05) ?? sceneStarts[0] ?? 0;
+  }
+  return sceneStarts.slice().reverse().find((time) => time < currentPreviewTime - 0.05)
+    ?? sceneStarts.at(-1)
+    ?? 0;
 }
 
 function applyShellChrome(data: NfMockData, selected: NfDataClip | undefined, time?: number): void {
