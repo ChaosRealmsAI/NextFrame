@@ -219,6 +219,8 @@ pub fn compile_episode_source(
     let mut warnings = Vec::new();
     let duration_ms = seconds_to_ms(episode.duration, "episode.duration")?;
     let mut scene_clips = Vec::new();
+    let mut text_clips = Vec::new();
+    let mut overlay_clips = Vec::new();
     let mut ignored_tracks = BTreeMap::<String, usize>::new();
 
     for clip in &episode.clips {
@@ -231,10 +233,15 @@ pub fn compile_episode_source(
             .and_then(Value::as_str)
             .or_else(|| object.get("kind").and_then(Value::as_str))
             .unwrap_or("scene");
-        if track != "scene" {
-            *ignored_tracks.entry(track.to_string()).or_insert(0) += 1;
-            continue;
-        }
+        let normalized_track = match track {
+            "scene" => "scene",
+            "text" | "subtitle" => "text",
+            "overlay" => "overlay",
+            other => {
+                *ignored_tracks.entry(other.to_string()).or_insert(0) += 1;
+                continue;
+            }
+        };
 
         let id = object
             .get("slug")
@@ -244,15 +251,10 @@ pub fn compile_episode_source(
             .filter(|value| !value.is_empty())
             .ok_or_else(|| ProjectError::ValidationFailed("scene clip missing slug".to_string()))?;
         let title = object
-            .get("title")
+            .get("label")
             .and_then(Value::as_str)
             .filter(|value| !value.is_empty())
-            .or_else(|| {
-                object
-                    .get("label")
-                    .and_then(Value::as_str)
-                    .filter(|value| !value.is_empty())
-            })
+            .or_else(|| object.get("title").and_then(Value::as_str))
             .unwrap_or(id);
         let subtitle = object
             .get("subtitle")
@@ -288,26 +290,27 @@ pub fn compile_episode_source(
             ));
         }
 
-        let mut params = serde_json::Map::new();
-        params.insert("layout".to_string(), json!(layout));
-        params.insert("title".to_string(), json!(title));
-        params.insert("subtitle".to_string(), json!(subtitle));
-        params.insert("accent_color".to_string(), json!(accent));
-        params.insert("bg_color".to_string(), json!(bg_color));
-        params.insert("title_x".to_string(), json!(position.0));
-        params.insert("title_y".to_string(), json!(position.1));
-        copy_string_param(object, &mut params, "eyebrow");
-        copy_string_param(object, &mut params, "description");
-        copy_string_param(object, &mut params, "big_number");
-        copy_string_param(object, &mut params, "label");
-        copy_string_param(object, &mut params, "sublabel");
+        let params = if normalized_track == "scene" {
+            scene_params(object, title, subtitle, layout, accent, bg_color, position)
+        } else if normalized_track == "text" {
+            text_params(object, title, accent, position)
+        } else {
+            overlay_params(object, title, accent, position)
+        };
 
-        scene_clips.push(json!({
+        let compiled_clip = json!({
             "id": id,
             "begin": start_ms,
             "end": end_ms,
             "params": Value::Object(params)
-        }));
+        });
+        if normalized_track == "scene" {
+            scene_clips.push(compiled_clip);
+        } else if normalized_track == "text" {
+            text_clips.push(compiled_clip);
+        } else {
+            overlay_clips.push(compiled_clip);
+        }
     }
 
     for (track, count) in ignored_tracks {
@@ -316,10 +319,33 @@ pub fn compile_episode_source(
         ));
     }
 
-    if scene_clips.is_empty() {
+    if scene_clips.is_empty() && text_clips.is_empty() && overlay_clips.is_empty() {
         return Err(ProjectError::ValidationFailed(
-            "episode has no scene clips to export".to_string(),
+            "episode has no visual clips to export".to_string(),
         ));
+    }
+
+    let mut tracks = Vec::new();
+    if !scene_clips.is_empty() {
+        tracks.push(json!({
+            "id": "scene-main",
+            "kind": "scene",
+            "clips": scene_clips
+        }));
+    }
+    if !text_clips.is_empty() {
+        tracks.push(json!({
+            "id": "text-main",
+            "kind": "text",
+            "clips": text_clips
+        }));
+    }
+    if !overlay_clips.is_empty() {
+        tracks.push(json!({
+            "id": "overlay-main",
+            "kind": "overlay",
+            "clips": overlay_clips
+        }));
     }
 
     let source = json!({
@@ -339,16 +365,88 @@ pub fn compile_episode_source(
         },
         "duration": duration_ms,
         "anchors": {},
-        "tracks": [
-            {
-                "id": "scene-main",
-                "kind": "scene",
-                "clips": scene_clips
-            }
-        ]
+        "tracks": tracks
     });
 
     Ok(SourceCompileResult { source, warnings })
+}
+
+fn scene_params(
+    object: &serde_json::Map<String, Value>,
+    title: &str,
+    subtitle: &str,
+    layout: &str,
+    accent: &str,
+    bg_color: &str,
+    position: (f64, f64),
+) -> serde_json::Map<String, Value> {
+    let mut params = serde_json::Map::new();
+    params.insert("layout".to_string(), json!(layout));
+    params.insert("title".to_string(), json!(title));
+    params.insert("subtitle".to_string(), json!(subtitle));
+    params.insert("accent_color".to_string(), json!(accent));
+    params.insert("bg_color".to_string(), json!(bg_color));
+    params.insert("title_x".to_string(), json!(position.0));
+    params.insert("title_y".to_string(), json!(position.1));
+    copy_string_param(object, &mut params, "eyebrow");
+    copy_string_param(object, &mut params, "description");
+    copy_string_param(object, &mut params, "big_number");
+    copy_string_param(object, &mut params, "label");
+    copy_string_param(object, &mut params, "sublabel");
+    params
+}
+
+fn text_params(
+    object: &serde_json::Map<String, Value>,
+    label: &str,
+    accent: &str,
+    position: (f64, f64),
+) -> serde_json::Map<String, Value> {
+    let mut params = serde_json::Map::new();
+    let text = object
+        .get("text")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(label);
+    params.insert("text".to_string(), json!(text));
+    params.insert("x".to_string(), json!(position.0));
+    params.insert("y".to_string(), json!(position.1));
+    params.insert("accent_color".to_string(), json!(accent));
+    copy_string_param(object, &mut params, "style");
+    copy_string_param(object, &mut params, "color");
+    copy_string_param(object, &mut params, "align");
+    if let Some(size) = object.get("size_px").and_then(Value::as_f64) {
+        params.insert("size_px".to_string(), json!(size));
+    }
+    params
+}
+
+fn overlay_params(
+    object: &serde_json::Map<String, Value>,
+    label: &str,
+    accent: &str,
+    position: (f64, f64),
+) -> serde_json::Map<String, Value> {
+    let mut params = serde_json::Map::new();
+    let variant = object
+        .get("variant")
+        .and_then(Value::as_str)
+        .filter(|value| matches!(*value, "badge" | "progress"))
+        .unwrap_or("badge");
+    let text = object
+        .get("text")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(label);
+    params.insert("variant".to_string(), json!(variant));
+    params.insert("text".to_string(), json!(text));
+    params.insert("x".to_string(), json!(position.0));
+    params.insert("y".to_string(), json!(position.1));
+    params.insert("accent_color".to_string(), json!(accent));
+    if let Some(progress) = object.get("progress").and_then(Value::as_f64) {
+        params.insert("progress".to_string(), json!(progress.clamp(0.0, 1.0)));
+    }
+    params
 }
 
 fn copy_string_param(
@@ -524,6 +622,13 @@ mod tests {
                 "start": "0",
                 "end": "5",
                 "position": {"x": 42.0, "y": 58.0}
+            }), serde_json::json!({
+                "slug": "caption",
+                "label": "Text overlay",
+                "track": "text",
+                "start": "0",
+                "end": "5",
+                "position": {"x": 50.0, "y": 82.0}
             })],
             log: Vec::new(),
         };
@@ -542,6 +647,11 @@ mod tests {
         assert_eq!(
             compiled.source["tracks"][0]["clips"][0]["params"]["title_y"],
             58.0
+        );
+        assert_eq!(compiled.source["tracks"][1]["kind"], "text");
+        assert_eq!(
+            compiled.source["tracks"][1]["clips"][0]["params"]["text"],
+            "Text overlay"
         );
         Ok(())
     }

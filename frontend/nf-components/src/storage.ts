@@ -75,6 +75,7 @@ export const DEFAULT_MOCK: NfMockData = {
         { id: "feat-2", label: "feat 2", kind: "scene", track: 0, start: 12, end: 30, effects: ["glass-flip", "blur · 8px", "scale · 1.05", "color-cinematic"], position: { x: 50, y: 50 } },
         { id: "feat-3", label: "feat 3", kind: "scene", track: 0, start: 30, end: 48, effects: ["push-in"], position: { x: 50, y: 50 } },
         { id: "outro", label: "outro", kind: "scene", track: 0, start: 55, end: 60, effects: ["fade"], position: { x: 50, y: 50 } },
+        { id: "badge", label: "badge", kind: "overlay", track: 2, start: 0, end: 60, effects: ["brand"], position: { x: 8, y: 8 } },
         { id: "bgm-electric", label: "bgm-electric", kind: "audio", track: 3, start: 0, end: 58.2, effects: ["normalize · -14 LUFS"], position: { x: 50, y: 50 } },
         { id: "narration-v2", label: "narration-v2", kind: "audio", track: 3, start: 0, end: 60, effects: ["voice-clean"], position: { x: 50, y: 50 } },
       ],
@@ -497,12 +498,14 @@ function resolveTime(value: unknown, anchors: Record<string, number>, fallback: 
 function normalizeKind(value: string): ClipKind {
   if (value === "audio") return "audio";
   if (value === "text") return "text";
+  if (value === "overlay") return "overlay";
   if (value === "trans" || value === "transition") return "trans";
   return "scene";
 }
 
 function trackNumber(kind: ClipKind): number {
   if (kind === "text") return 1;
+  if (kind === "overlay") return 2;
   if (kind === "trans" || kind === "transition") return 2;
   if (kind === "audio") return 3;
   return 0;

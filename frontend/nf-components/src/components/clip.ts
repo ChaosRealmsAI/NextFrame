@@ -36,6 +36,12 @@ const sheet = makeSheet(`
     color: var(--fg);
   }
   :host([kind="text"]) .clip:hover { background: rgba(224, 183, 108, 0.5); }
+  :host([kind="overlay"]) .clip {
+    background: rgba(123, 201, 181, 0.3);
+    border-color: var(--teal);
+    color: var(--fg);
+  }
+  :host([kind="overlay"]) .clip:hover { background: rgba(123, 201, 181, 0.44); }
   :host([kind="trans"]) .clip,
   :host([kind="transition"]) .clip {
     padding: 0 6px;

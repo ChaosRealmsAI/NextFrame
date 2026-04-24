@@ -61,6 +61,7 @@ const sheet = makeSheet(`
     flex-shrink: 0;
   }
   .clip-row .mk.audio { background: var(--teal); }
+  .clip-row .mk.overlay { background: var(--teal); }
   .clip-row .nm {
     font-size: 11.5px; font-weight: 600;
     color: var(--fg);
@@ -112,7 +113,7 @@ export class NfClips extends NfBase {
       <div class="clips-list">
         ${episode.clips.map((clip) => `
           <div class="clip-row ${clip.id === selectedId ? "active" : ""}" data-id="${clip.id}">
-            <div class="mk ${clip.kind === "audio" ? "audio" : ""}"></div>
+            <div class="mk ${clip.kind === "audio" ? "audio" : clip.kind === "overlay" ? "overlay" : ""}"></div>
             <div class="nm">${escapeHtml(clip.label)}</div>
             <div class="dur">${seconds(clip.end - clip.start)}</div>
           </div>
