@@ -33,6 +33,7 @@ let playbackStartedAt = 0;
 let playbackStartTime = 0;
 let playing = false;
 const previewAudio = new Map<string, HTMLAudioElement>();
+const previewAudioSrc = new Map<string, string>();
 const autoVoiceStarted = new Set<string>();
 
 const DEFINITIONS: Array<[string, CustomElementConstructor]> = [
@@ -532,13 +533,16 @@ function syncPreviewAudio(data: NfMockData, time: number): void {
       previewAudio.set(clip.id, audio);
     }
     const src = playableAudioSrc(clip.src);
-    if (audio.src !== src) {
+    const srcChanged = previewAudioSrc.get(clip.id) !== src;
+    if (srcChanged) {
       audio.pause();
       audio.src = src;
+      previewAudioSrc.set(clip.id, src);
     }
     audio.volume = Math.min(1, Math.max(0, clip.volume ?? 1));
     const targetTime = Math.max(0, time - clip.start + (clip.from_ms ?? 0) / 1000);
-    if (Number.isFinite(targetTime) && Math.abs(audio.currentTime - targetTime) > 0.25) {
+    const drift = Math.abs(audio.currentTime - targetTime);
+    if (Number.isFinite(targetTime) && (srcChanged || !playing || drift > 1.25)) {
       audio.currentTime = targetTime;
     }
     if (playing) {

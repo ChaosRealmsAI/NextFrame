@@ -17,10 +17,10 @@
       "accent_color": "#5eead4",
       "bg_color": "#07080d",
       "tts": {
-        "text": "JSON becomes motion. A desktop editor where structured video can be edited, previewed, exported, and opened without leaving the app.",
+        "text": "用 JSON 描述画面、字幕和语音，桌面端可以在线编辑，实时预览，并导出成完整视频。",
         "voice": "zh-CN-XiaoxiaoNeural",
         "backend": "edge",
-        "rate": "-8%"
+        "rate": "-4%"
       },
       "position": { "x": 50, "y": 49 },
       "effects": ["editorial-grid", "live-preview"]
@@ -39,10 +39,10 @@
       "accent_color": "#ff8a5b",
       "bg_color": "#0d0b10",
       "tts": {
-        "text": "Edit the frame, not a form. Titles and positions stay connected across inspector, preview, timeline JSON, and final MP4.",
+        "text": "每一次标题和位置的修改，都会回写到同一个项目 JSON，并立刻联动预览和时间线。",
         "voice": "zh-CN-YunxiNeural",
         "backend": "edge",
-        "rate": "-6%"
+        "rate": "-4%"
       },
       "position": { "x": 43, "y": 52 },
       "effects": ["drag-position", "instant-preview"]
@@ -59,10 +59,10 @@
       "accent_color": "#9ad65c",
       "bg_color": "#08100d",
       "tts": {
-        "text": "One click moves the project from online edit to a real exported video file.",
+        "text": "编辑完成后，一次导出，就能得到带画面、字幕和语音的真实视频文件。",
         "voice": "zh-CN-XiaoxiaoNeural",
         "backend": "edge",
-        "rate": "-6%"
+        "rate": "-4%"
       },
       "position": { "x": 50, "y": 50 },
       "effects": ["h264", "open-export"]
@@ -80,10 +80,10 @@
       "accent_color": "#7dd3fc",
       "bg_color": "#070a12",
       "tts": {
-        "text": "The loop is the product. JSON, online edit, preview, export, and open.",
+        "text": "这个闭环，就是产品本身，从 JSON 到编辑，到预览，再到最终导出。",
         "voice": "zh-CN-YunxiNeural",
         "backend": "edge",
-        "rate": "-8%"
+        "rate": "-4%"
       },
       "position": { "x": 50, "y": 50 },
       "effects": ["final-frame"]
