@@ -1,0 +1,40 @@
+{
+  "version": "v0.15.0",
+  "type": "perf",
+  "chosen": "完整 showreel 导出稳定版",
+  "why": "v0.14.0 已证明 JSON 语音字幕短闭环成立，但完整 24 秒 showreel 在 19s 附近掉到约 6100ms/frame；不先关导出，后续 JSON 和组件能力都会被最终成片卡住。",
+  "changed_from": "v0.14.0 voice/subtitle preview edit export loop",
+  "constraints": {
+    "no_vanity": "本版看得见的效果 = showreel-24s 完整导出成有声有字幕 MP4。",
+    "no_overreach": "本版只修完整导出稳定性和字幕渲染成本；不做云导出、不新增组件市场、不扩展 JSON 语法。",
+    "no_rush": "质量一步到位：预览和导出共用窗口化字幕策略，完整 words 数据仍保留在 JSON。",
+    "must_verify": "验收画面 = 完整 24 秒 MP4 可打开播放；自验方法 = nf export + ffprobe + 抽帧 + 进程清理检查。"
+  },
+  "success_picture": "用户点击导出 showreel-24s 后，进度能走完，打开按钮打开的 MP4 有声音、有字幕、有多轨道画面，导出结束后电脑不残留高负载进程。",
+  "cost_estimate": "AI 尺度 2-4h",
+  "risks": [
+    "19s 附近慢帧可能不只来自字幕，也可能来自 browser/finale 组件叠加。",
+    "降低字幕渲染成本不能破坏编辑器里完整 words 的可编辑性。",
+    "完整导出验证耗时较长，默认使用 draft 低资源路径。"
+  ],
+  "candidates": [
+    {
+      "id": "C-01",
+      "title": "完整 showreel 导出稳定版",
+      "selected": true,
+      "reason": "当前最大 blocker，PM 肉眼能验。"
+    },
+    {
+      "id": "C-02",
+      "title": "高上限 JSON 组件工程化",
+      "selected": false,
+      "reason": "导出不稳前继续扩展表达能力会放大问题。"
+    },
+    {
+      "id": "C-03",
+      "title": "代码边界重构和 crate 职责瘦身",
+      "selected": false,
+      "reason": "必要但当前 PM 体感弱，排在完整导出后。"
+    }
+  ]
+}

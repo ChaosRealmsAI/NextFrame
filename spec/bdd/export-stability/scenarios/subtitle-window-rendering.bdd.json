@@ -1,0 +1,25 @@
+{
+  "id": "subtitle-window-rendering",
+  "given": "subtitle-main 保存了完整 words 列表。",
+  "when": "预览或导出渲染任意一帧字幕。",
+  "then": "画面只显示当前时间附近的一小段字幕，但 JSON/source 仍保留完整 words 供编辑和导出。",
+  "human_actions": [
+    "scrub to 19s",
+    "look at subtitle line",
+    "confirm subtitle is readable",
+    "inspect saved JSON"
+  ],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query '[data-nf-composition-subtitles]' --get outerHTML",
+      "expected": "visible subtitle span count is bounded"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track subtitle-main | jq '.selected.params.words | length'",
+      "expected": "full words count remains greater than visible span count"
+    }
+  ],
+  "demo": "spec/bdd/export-stability/demos/subtitle-window-rendering/index.html"
+}

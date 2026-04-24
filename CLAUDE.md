@@ -39,9 +39,9 @@ Do not write generated videos, screenshots, node_modules, Cargo targets, or one-
 
 ## Current Focus
 
-v0.14.0 is the voice/subtitle loop version: JSON carries paired voice and subtitle tracks, the desktop editor previews and edits subtitles, and smoke export proves AAC audio plus burned-in captions. Full 24s showreel export is still blocked by recorder performance near the finale.
+v0.15.0 is the full showreel export stability version: `showreel-24s` now exports a complete 24s MP4 with AAC audio and burned-in subtitles under the draft low-resource profile.
 
 Specs and acceptance scenarios:
 
-- `spec/versions/v0.14.0/spec.json`
-- `spec/bdd/voice-subtitle-loop/feature.json`
+- `spec/versions/v0.15.0/spec.json`
+- `spec/bdd/export-stability/feature.json`

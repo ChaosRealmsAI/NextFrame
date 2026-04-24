@@ -1,0 +1,112 @@
+{
+  "version": "v0.15.0",
+  "type": "perf",
+  "title": "Full showreel export stability",
+  "status": "done",
+  "verify_points": [
+    {
+      "id": "V-01",
+      "desc": "showreel-24s draft export completes as a 24s MP4 with AAC audio and burned-in subtitles."
+    },
+    {
+      "id": "V-02",
+      "desc": "Subtitle rendering keeps the full words source but only paints the active word window in preview/export."
+    },
+    {
+      "id": "V-03",
+      "desc": "After export or cancellation there are no lingering NextFrame recorder/export processes."
+    }
+  ],
+  "items": [
+    {
+      "id": "S-01",
+      "kind": "metric",
+      "title": "Complete full showreel export",
+      "status": "done",
+      "verify_point": "V-01",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events --out ../NextFrame.archive/v0.15.0-verify/showreel-24s-draft.mp4",
+          "expected": "final summary reports duration_ms=24000 and audio_muxed=true"
+        },
+        {
+          "tool": "state",
+          "command": "ffprobe -v error -show_entries format=duration -select_streams a:0 -show_entries stream=codec_name -of json ../NextFrame.archive/v0.15.0-verify/showreel-24s-draft.mp4",
+          "expected": "duration is close to 24s and audio codec is aac"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-recorder/src/record_loop.rs",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-tracks/official/subtitle.js",
+          "commit": null
+        }
+      ],
+      "evidence": "../NextFrame.archive/v0.15.0-verify/showreel-24s-draft.mp4 exported with duration 24.000000 and AAC audio"
+    },
+    {
+      "id": "S-02",
+      "kind": "rendering",
+      "title": "Window subtitle rendering",
+      "status": "done",
+      "verify_point": "V-02",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query '[data-nf-composition-subtitles]' --get outerHTML",
+          "expected": "preview subtitle DOM contains a bounded number of word spans"
+        },
+        {
+          "tool": "state",
+          "command": "ffmpeg -y -ss 00:00:19 -i ../NextFrame.archive/v0.15.0-verify/showreel-24s-draft.mp4 -frames:v 1 ../NextFrame.archive/v0.15.0-verify/showreel-24s-frame-19s.png",
+          "expected": "captured frame contains readable subtitle text, not all 43 words"
+        }
+      ],
+      "citations": [
+        {
+          "path": "frontend/nf-components/src/index.ts",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-tracks/official/subtitle.js",
+          "commit": null
+        }
+      ],
+      "evidence": "../NextFrame.archive/v0.15.0-verify/showreel-24s-frame-19s.png shows windowed subtitles over the showreel"
+    },
+    {
+      "id": "S-03",
+      "kind": "cleanup",
+      "title": "No residual export processes",
+      "status": "done",
+      "verify_point": "V-03",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "pgrep -fl 'nf-shell|nf-recorder|nf export|ffmpeg' || true",
+          "expected": "no NextFrame export/recorder process remains after quit"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-shell/src/handlers/export.rs",
+          "commit": null
+        }
+      ],
+      "evidence": "pgrep found no nf-shell/nf-recorder/nf export/ffmpeg process after export"
+    }
+  ],
+  "poc_topics": [],
+  "fixed_docs_check": {
+    "spec/charter.md": "no change",
+    "spec/architecture.md": "no new module boundary; no change",
+    "spec/milestones.html": "update at closeout",
+    "spec/design/DESIGN.md": "no token change",
+    "README.md": "no user command change",
+    "CLAUDE.md": "no new CLI expected"
+  }
+}

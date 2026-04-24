@@ -833,14 +833,16 @@ function renderCompositionSubtitle(
     : position === "middle"
       ? "top:50%;bottom:auto;transform:translateY(-50%);"
       : `bottom:${padding}px;top:auto;transform:none;`;
-  const spans = words.map((word) => {
+  const windowRange = subtitleVisibleWindow(words, localTimeMs);
+  const spans = words.slice(windowRange.start, windowRange.end).map((word, index) => {
+    const absoluteIndex = windowRange.start + index;
     const active = localTimeMs >= word.start_ms && localTimeMs < word.end_ms;
     const read = word.end_ms <= localTimeMs;
     const state = active ? "active" : read ? "read" : "unread";
     const wordColor = active ? activeColor : read ? "rgba(255,255,255,0.78)" : "rgba(255,255,255,0.42)";
-    return `<span data-nf-subtitle-state="${state}" style="color:${wordColor};font-weight:${active ? 800 : 520};">${escapeHtml(word.text)}</span>`;
+    return `<span data-nf-subtitle-word-idx="${absoluteIndex}" data-nf-subtitle-state="${state}" style="color:${wordColor};font-weight:${active ? 800 : 520};">${escapeHtml(word.text)}</span>`;
   }).join(" ");
-  return `<div class="preview-subtitle-layer" data-subtitle-active style="left:32px;right:32px;${vertical}font-size:${size}px;color:${color};--nf-preview-accent:${activeColor};">${spans}</div>`;
+  return `<div class="preview-subtitle-layer" data-subtitle-active data-nf-subtitle-window="${windowRange.start}-${windowRange.end}" style="left:32px;right:32px;${vertical}font-size:${size}px;color:${color};--nf-preview-accent:${activeColor};">${spans}</div>`;
 }
 
 function compositionSubtitleWords(value: unknown): Array<{ text: string; start_ms: number; end_ms: number }> {
@@ -856,6 +858,27 @@ function compositionSubtitleWords(value: unknown): Array<{ text: string; start_m
         : undefined;
     })
     .filter((word): word is { text: string; start_ms: number; end_ms: number } => word !== undefined);
+}
+
+function subtitleVisibleWindow(
+  words: Array<{ text: string; start_ms: number; end_ms: number }>,
+  localTimeMs: number,
+): { start: number; end: number } {
+  const maxVisible = 9;
+  if (words.length <= maxVisible) return { start: 0, end: words.length };
+  const activeIndex = words.findIndex((word) => localTimeMs >= word.start_ms && localTimeMs < word.end_ms);
+  let anchor = activeIndex;
+  if (anchor < 0) {
+    anchor = words.findIndex((word) => word.start_ms > localTimeMs);
+    if (anchor < 0) anchor = words.length - 1;
+  }
+  let start = Math.max(0, anchor - 4);
+  let end = start + maxVisible;
+  if (end > words.length) {
+    end = words.length;
+    start = Math.max(0, end - maxVisible);
+  }
+  return { start, end };
 }
 
 function renderTextPreview(clip: NfDataClip, fallbackAccent: string): string {
@@ -897,7 +920,8 @@ function renderSubtitlePreview(clip: NfDataClip, time: number, fallbackAccent: s
   if (words.length === 0) return "";
   const localMs = Math.max(0, (time - clip.start) * 1000);
   const accent = validColor(clip.accent_color) ? clip.accent_color! : fallbackAccent;
-  const spans = words.map((word) => {
+  const windowRange = subtitleVisibleWindow(words, localMs);
+  const spans = words.slice(windowRange.start, windowRange.end).map((word) => {
     const state = localMs >= word.start_ms && localMs < word.end_ms
       ? "active"
       : word.end_ms <= localMs

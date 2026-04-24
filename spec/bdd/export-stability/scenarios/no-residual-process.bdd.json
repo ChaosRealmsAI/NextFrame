@@ -1,0 +1,19 @@
+{
+  "id": "no-residual-process",
+  "given": "完整导出已经成功或被取消。",
+  "when": "用户关闭桌面端或导出进程结束。",
+  "then": "本机没有残留 nf-shell、nf-recorder、nf export 或 ffmpeg 高负载进程。",
+  "human_actions": [
+    "finish export",
+    "quit app",
+    "check activity monitor"
+  ],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf quit || true; pgrep -fl 'nf-shell|nf-recorder|nf export|ffmpeg' || true",
+      "expected": "no matching process remains"
+    }
+  ],
+  "demo": "spec/bdd/export-stability/demos/no-residual-process/index.html"
+}

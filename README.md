@@ -42,7 +42,7 @@ Local generated artifacts do not belong in the repository root. Historical snaps
 ./scripts/check-structure.sh
 cargo check -p nf-cli -p nf-shell -p nf-project -p nf-recorder
 cd frontend/nf-components && npm run check && npm run build
-target/debug/nf export --project v2-showcase --composition launch-open --profile draft --out /tmp/launch-open.mp4
+target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --out /tmp/showreel-24s.mp4
 ```
 
 ## Core Modules

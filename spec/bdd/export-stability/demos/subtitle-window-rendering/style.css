@@ -1,0 +1,15 @@
+@import "../../../design/tokens.css";
+
+body { margin:0; background:#08070d; color:#f7f4ed; font:14px/1.4 var(--font-sans); }
+.demo-shell { min-height:100vh; display:grid; place-items:center; padding:32px; box-sizing:border-box; }
+.stage { width:min(920px, 94vw); aspect-ratio:16/9; border:1px solid rgba(255,255,255,.12); background:#111722; position:relative; overflow:hidden; }
+.full, .visible { position:absolute; left:54px; right:54px; text-align:center; }
+.full { top:90px; color:rgba(255,255,255,.22); font-size:24px; line-height:1.7; }
+.visible { bottom:82px; font-size:42px; font-weight:800; }
+.visible span { color:rgba(255,255,255,.42); }
+.visible .active { color:#ffca66; }
+.progress { position:fixed; left:0; right:0; bottom:0; height:4px; background:#181521; }
+.progress span { display:block; height:100%; background:#ffca66; animation:bar 10s linear infinite; }
+.toast { position:fixed; right:24px; bottom:24px; opacity:0; animation:toast 10s linear infinite; background:#f7f4ed; color:#08070d; padding:10px 14px; font-weight:700; }
+@keyframes bar { from { width:0; } 90%,to { width:100%; } }
+@keyframes toast { 0%,82%{opacity:0;transform:translateY(8px)} 88%,100%{opacity:1;transform:none} }

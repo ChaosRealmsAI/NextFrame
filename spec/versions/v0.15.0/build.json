@@ -1,0 +1,68 @@
+{
+  "$type": "version-build",
+  "version": "v0.15.0",
+  "title": "Full showreel export stability",
+  "session": "codex-2026-04-24-v015",
+  "status": "done",
+  "drafts": {
+    "proposals": [],
+    "merged": "spec/versions/v0.15.0/drafts/merged.md"
+  },
+  "inputs": {
+    "spec": "spec/versions/v0.15.0/spec.json",
+    "bdd": "spec/bdd/export-stability/feature.json"
+  },
+  "tasks": [
+    {
+      "id": "T-01",
+      "title": "Window subtitle render output in export and preview",
+      "bdd_scenarios": [
+        "subtitle-window-rendering",
+        "complete-showreel-export"
+      ],
+      "wave": 1,
+      "status": "done",
+      "verify_evidence": [
+        "official subtitle render now emits a bounded 9-word window while preserving 43 source words",
+        "desktop preview subtitle render uses the same windowing rule",
+        "browser-frame/data-dashboard/timeline-ribbon now mount static DOM and update only text/class/style per frame"
+      ]
+    },
+    {
+      "id": "T-02",
+      "title": "Verify full showreel export and cleanup",
+      "bdd_scenarios": [
+        "complete-showreel-export",
+        "no-residual-process"
+      ],
+      "wave": 2,
+      "status": "done",
+      "verify_evidence": [
+        "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events completed",
+        "final export summary: audio_muxed=true, duration_ms=24000, frames=720, warnings=[]",
+        "ffprobe reported duration=24.000000 and audio codec aac",
+        "../NextFrame.archive/v0.15.0-verify/showreel-24s-frame-19s.png shows readable windowed subtitles",
+        "pgrep found no residual nf-shell/nf-recorder/nf export/ffmpeg process"
+      ]
+    }
+  ],
+  "waves": [
+    {
+      "id": 1,
+      "tasks": ["T-01"],
+      "reviewed": true
+    },
+    {
+      "id": 2,
+      "tasks": ["T-02"],
+      "reviewed": true
+    }
+  ],
+  "failures": [
+    {
+      "id": "F-01",
+      "status": "fixed",
+      "summary": "v0.14.0 full showreel export degraded near 19s to about 6100ms/frame and was interrupted. Fixed by windowing subtitles and removing per-frame DOM rebuilds from heavy showreel components."
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "id": "complete-showreel-export",
+  "given": "v2-showcase/showreel-24s 已包含多轨道、语音和字幕。",
+  "when": "用户以 draft 低资源档导出完整 showreel。",
+  "then": "导出完成，MP4 时长约 24 秒，包含 AAC 音轨和烧进画面的字幕。",
+  "human_actions": [
+    "open composition",
+    "click export video",
+    "wait for progress to reach 100%",
+    "open exported video",
+    "hear narration and see captions"
+  ],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --events --out ../NextFrame.archive/v0.15.0-verify/showreel-24s-draft.mp4",
+      "expected": "export summary reports audio_muxed=true and duration_ms=24000"
+    },
+    {
+      "tool": "state",
+      "command": "ffprobe -v error -show_entries format=duration -select_streams a:0 -show_entries stream=codec_name -of json ../NextFrame.archive/v0.15.0-verify/showreel-24s-draft.mp4",
+      "expected": "duration is close to 24s and codec_name is aac"
+    }
+  ],
+  "demo": "spec/bdd/export-stability/demos/complete-showreel-export/index.html"
+}

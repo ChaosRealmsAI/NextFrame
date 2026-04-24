@@ -1,0 +1,27 @@
+{
+  "feature": "export-stability",
+  "name": "完整导出稳定性",
+  "summary": "完整 showreel 能稳定导出，有声音字幕，结束后不残留高负载进程。",
+  "status": "active",
+  "scenarios": [
+    {
+      "id": "complete-showreel-export",
+      "path": "scenarios/complete-showreel-export.bdd.json",
+      "demo": "demos/complete-showreel-export/index.html"
+    },
+    {
+      "id": "subtitle-window-rendering",
+      "path": "scenarios/subtitle-window-rendering.bdd.json",
+      "demo": "demos/subtitle-window-rendering/index.html"
+    },
+    {
+      "id": "no-residual-process",
+      "path": "scenarios/no-residual-process.bdd.json",
+      "demo": "demos/no-residual-process/index.html"
+    }
+  ],
+  "completion": {
+    "total": 3,
+    "done": 3
+  }
+}

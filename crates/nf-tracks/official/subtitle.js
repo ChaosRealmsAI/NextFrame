@@ -239,6 +239,31 @@ function colorForWord(word, t, activeIdx, idx, activeColor) {
   return activeColor;
 }
 
+function visibleWindow(words, t, activeIdx) {
+  const maxVisible = 9;
+  if (words.length <= maxVisible) return { start: 0, end: words.length };
+
+  let anchor = activeIdx;
+  if (anchor < 0) {
+    anchor = words.length - 1;
+    for (let i = 0; i < words.length; i++) {
+      if (words[i].start_ms > t) {
+        anchor = i;
+        break;
+      }
+    }
+  }
+
+  let start = anchor - 4;
+  if (start < 0) start = 0;
+  let end = start + maxVisible;
+  if (end > words.length) {
+    end = words.length;
+    start = Math.max(0, end - maxVisible);
+  }
+  return { start, end };
+}
+
 function emptyPlaceholder() {
   return (
     '<div data-layout="subtitle-empty" style="opacity:0.95;"></div>'
@@ -279,10 +304,11 @@ export function render(t, params, viewport) {
 
   const tNum = typeof t === "number" ? t : 0;
   const activeIdx = findActiveIndex(words, tNum);
+  const windowRange = visibleWindow(words, tNum, activeIdx);
 
   // Build word spans.
   const spanParts = [];
-  for (let i = 0; i < words.length; i++) {
+  for (let i = windowRange.start; i < windowRange.end; i++) {
     const w = words[i];
     const color = colorForWord(w, tNum, activeIdx, i, activeColor);
     const isActive = i === activeIdx;
@@ -331,6 +357,10 @@ export function render(t, params, viewport) {
   return (
     '<div data-layout="subtitle" data-nf-track="subtitle" style="' +
     containerStyle +
+    '" data-nf-subtitle-window="' +
+    windowRange.start +
+    "-" +
+    windowRange.end +
     '">' +
     _vpTag +
     spanParts.join(" ") +
