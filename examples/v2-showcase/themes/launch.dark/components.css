@@ -1,0 +1,82 @@
+.nfv2-hero {
+  position: absolute;
+  max-width: 900px;
+  transform: translate(-50%, -50%);
+}
+
+.nfv2-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(5,7,10,0.54);
+  color: var(--nfv2-cyan);
+  font-size: 15px;
+  font-weight: 760;
+}
+
+.nfv2-title {
+  margin-top: 28px;
+  font-size: 74px;
+  line-height: 0.96;
+  font-weight: 820;
+}
+
+.nfv2-subtitle {
+  margin-top: 26px;
+  max-width: 760px;
+  color: var(--nfv2-muted);
+  font-size: 27px;
+  line-height: 1.28;
+}
+
+.nfv2-cards {
+  position: absolute;
+  display: grid;
+  grid-template-columns: repeat(3, 240px);
+  gap: 18px;
+  transform: translate(-50%, -50%);
+}
+
+.nfv2-card {
+  height: 112px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(5,7,10,0.58);
+  backdrop-filter: blur(18px);
+}
+
+.nfv2-card .value {
+  font-size: 34px;
+  font-weight: 780;
+}
+
+.nfv2-card .label {
+  margin-top: 12px;
+  color: var(--nfv2-muted);
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+.nfv2-strip {
+  position: absolute;
+  left: 72px;
+  right: 72px;
+  bottom: 48px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.nfv2-step {
+  height: 42px;
+  border-top: 2px solid rgba(255,255,255,0.2);
+  color: var(--nfv2-muted);
+  font-size: 16px;
+}
+
+.nfv2-step.active {
+  border-color: var(--nfv2-lime);
+  color: var(--nfv2-text);
+}

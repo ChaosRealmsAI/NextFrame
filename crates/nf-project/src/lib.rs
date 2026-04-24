@@ -129,6 +129,50 @@ impl JsonStorage {
             .join("episodes")
             .join(format!("{episode_slug}.json")))
     }
+
+    fn composition_path(
+        &self,
+        project_slug: &str,
+        composition_slug: &str,
+    ) -> Result<PathBuf, ProjectError> {
+        validate_slug(project_slug)?;
+        validate_slug(composition_slug)?;
+        Ok(self
+            .root
+            .join(project_slug)
+            .join("compositions")
+            .join(format!("{composition_slug}.json")))
+    }
+
+    pub fn load_composition(
+        &self,
+        project_slug: &str,
+        composition_slug: &str,
+    ) -> Result<Value, ProjectError> {
+        read_json(&self.composition_path(project_slug, composition_slug)?)
+    }
+
+    pub fn save_composition(
+        &self,
+        project_slug: &str,
+        composition_slug: &str,
+        composition: &Value,
+    ) -> Result<(), ProjectError> {
+        atomic_write(
+            &self.composition_path(project_slug, composition_slug)?,
+            composition,
+        )
+    }
+
+    pub fn composition_exists(
+        &self,
+        project_slug: &str,
+        composition_slug: &str,
+    ) -> Result<bool, ProjectError> {
+        Ok(self
+            .composition_path(project_slug, composition_slug)?
+            .exists())
+    }
 }
 
 impl Storage for JsonStorage {
@@ -215,6 +259,192 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, ProjectErro
 pub struct SourceCompileResult {
     pub source: Value,
     pub warnings: Vec<String>,
+}
+
+pub fn compile_composition_source(
+    storage: &JsonStorage,
+    project_slug: &str,
+    composition: &Value,
+) -> Result<SourceCompileResult, ProjectError> {
+    let object = composition.as_object().ok_or_else(|| {
+        ProjectError::ValidationFailed("composition must be a JSON object".to_string())
+    })?;
+    let id = object
+        .get("id")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| ProjectError::ValidationFailed("composition.id is required".to_string()))?;
+    validate_slug(id)?;
+    let name = object
+        .get("name")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(id);
+    let duration_ms = time_value_ms(object.get("duration"), &BTreeMap::new(), "duration")?;
+    if duration_ms == 0 {
+        return Err(ProjectError::ValidationFailed(
+            "composition.duration must be greater than zero".to_string(),
+        ));
+    }
+    let anchors = resolve_composition_anchors(object.get("anchors"), duration_ms)?;
+    let viewport = composition_viewport(object.get("viewport"));
+    let theme_id = object
+        .get("theme")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("default");
+    let theme_css = load_theme_css(storage.root(), project_slug, theme_id)?;
+    let tracks = object
+        .get("tracks")
+        .and_then(Value::as_array)
+        .ok_or_else(|| ProjectError::ValidationFailed("composition.tracks must be an array".to_string()))?;
+
+    let mut warnings = Vec::new();
+    let mut source_tracks = Vec::new();
+    let mut components = serde_json::Map::new();
+    let mut has_visual = false;
+
+    for (index, track_value) in tracks.iter().enumerate() {
+        let Some(track) = track_value.as_object() else {
+            warnings.push(format!("ignored non-object track at index {index}"));
+            continue;
+        };
+        let track_id = track
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| format!("track-{}", index + 1));
+        let kind = track
+            .get("kind")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("component");
+        let (begin, end) = track_time_ms(track, &anchors, duration_ms, &track_id)?;
+        if end <= begin {
+            return Err(ProjectError::ValidationFailed(format!(
+                "track '{track_id}' end must be greater than start"
+            )));
+        }
+
+        let clip_id = track
+            .get("clip_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .unwrap_or(&track_id);
+        let mut params = serde_json::Map::new();
+        match kind {
+            "component" => {
+                let component_id = track
+                    .get("component")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        ProjectError::ValidationFailed(format!(
+                            "component track '{track_id}' missing component"
+                        ))
+                    })?;
+                if !components.contains_key(component_id) {
+                    let src = load_component_js(storage.root(), project_slug, component_id)?;
+                    components.insert(component_id.to_string(), Value::String(src));
+                }
+                params.insert("component".to_string(), json!(component_id));
+                params.insert(
+                    "params".to_string(),
+                    track.get("params").cloned().unwrap_or_else(|| json!({})),
+                );
+                params.insert(
+                    "style".to_string(),
+                    track.get("style").cloned().unwrap_or_else(|| json!({})),
+                );
+                params.insert("track".to_string(), json!({
+                    "id": track_id,
+                    "z": track.get("z").and_then(Value::as_i64).unwrap_or(index as i64),
+                    "kind": kind
+                }));
+                has_visual = true;
+            }
+            "audio" => {
+                let Some(src) = track.get("src").and_then(Value::as_str) else {
+                    warnings.push(format!("ignored audio track '{track_id}' without src"));
+                    continue;
+                };
+                params.insert("src".to_string(), json!(src));
+                copy_number_param(track, &mut params, "from_ms");
+                copy_number_param(track, &mut params, "to_ms");
+                copy_number_param(track, &mut params, "volume");
+                if let Some(tts) = track.get("tts").filter(|value| value.is_object()) {
+                    params.insert("tts".to_string(), tts.clone());
+                }
+            }
+            "subtitle" => {
+                let Some(words) = subtitle_words(
+                    track
+                        .get("words")
+                        .or_else(|| track.get("params").and_then(|p| p.get("words")))
+                        .unwrap_or(&Value::Null),
+                ) else {
+                    warnings.push(format!("ignored subtitle track '{track_id}' without words"));
+                    continue;
+                };
+                params.insert("source".to_string(), json!({ "words": words }));
+                params.insert(
+                    "style".to_string(),
+                    track.get("style").cloned().unwrap_or_else(|| json!({})),
+                );
+                has_visual = true;
+            }
+            other => {
+                params = track
+                    .get("params")
+                    .and_then(Value::as_object)
+                    .cloned()
+                    .unwrap_or_default();
+                if other != "audio" {
+                    has_visual = true;
+                }
+            }
+        }
+
+        source_tracks.push(json!({
+            "id": track_id,
+            "kind": kind,
+            "z": track.get("z").cloned().unwrap_or_else(|| json!(index)),
+            "clips": [{
+                "id": clip_id,
+                "begin": begin,
+                "end": end,
+                "params": Value::Object(params)
+            }]
+        }));
+    }
+
+    if !has_visual {
+        return Err(ProjectError::ValidationFailed(
+            "composition has no visual tracks".to_string(),
+        ));
+    }
+
+    let source = json!({
+        "meta": {
+            "name": name,
+            "project": project_slug,
+            "composition": id,
+            "version": "v2",
+            "export": object.get("export").cloned().unwrap_or_else(|| json!({ "resolution": "1080p" }))
+        },
+        "viewport": viewport,
+        "duration": duration_ms,
+        "anchors": {},
+        "theme": {
+            "id": theme_id,
+            "css": theme_css
+        },
+        "components": Value::Object(components),
+        "tracks": source_tracks
+    });
+
+    Ok(SourceCompileResult { source, warnings })
 }
 
 pub fn compile_episode_source(
@@ -674,9 +904,214 @@ fn seconds_to_ms(seconds: f64, field: &str) -> Result<u64, ProjectError> {
     Ok(ms as u64)
 }
 
+fn composition_viewport(value: Option<&Value>) -> Value {
+    let object = value.and_then(Value::as_object);
+    let w = object
+        .and_then(|item| item.get("w"))
+        .and_then(Value::as_u64)
+        .filter(|value| *value > 0)
+        .unwrap_or(1920);
+    let h = object
+        .and_then(|item| item.get("h"))
+        .and_then(Value::as_u64)
+        .filter(|value| *value > 0)
+        .unwrap_or(1080);
+    let ratio = object
+        .and_then(|item| item.get("ratio"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("16:9");
+    json!({ "w": w, "h": h, "ratio": ratio })
+}
+
+fn resolve_composition_anchors(
+    value: Option<&Value>,
+    duration_ms: u64,
+) -> Result<BTreeMap<String, f64>, ProjectError> {
+    let mut anchors = BTreeMap::new();
+    anchors.insert("start".to_string(), 0.0);
+    anchors.insert("end".to_string(), duration_ms as f64 / 1000.0);
+    let Some(object) = value.and_then(Value::as_object) else {
+        return Ok(anchors);
+    };
+
+    for _ in 0..object.len().max(1) {
+        let mut changed = false;
+        for (name, raw) in object {
+            if anchors.contains_key(name) {
+                continue;
+            }
+            match time_value_ms(Some(raw), &anchors, &format!("anchor '{name}'")) {
+                Ok(ms) => {
+                    anchors.insert(name.clone(), ms as f64 / 1000.0);
+                    changed = true;
+                }
+                Err(ProjectError::ValidationFailed(_)) => {}
+                Err(err) => return Err(err),
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+
+    let unresolved: Vec<String> = object
+        .keys()
+        .filter(|name| !anchors.contains_key(*name))
+        .cloned()
+        .collect();
+    if !unresolved.is_empty() {
+        return Err(ProjectError::ValidationFailed(format!(
+            "unresolved composition anchors: {}",
+            unresolved.join(", ")
+        )));
+    }
+    Ok(anchors)
+}
+
+fn track_time_ms(
+    track: &serde_json::Map<String, Value>,
+    anchors: &BTreeMap<String, f64>,
+    duration_ms: u64,
+    track_id: &str,
+) -> Result<(u64, u64), ProjectError> {
+    let time = track.get("time").and_then(Value::as_object);
+    let start_default = Value::String("start".to_string());
+    let end_default = Value::String("end".to_string());
+    let start_value = time
+        .and_then(|value| value.get("start"))
+        .or_else(|| track.get("start"))
+        .unwrap_or(&start_default);
+    let end_value = time
+        .and_then(|value| value.get("end"))
+        .or_else(|| track.get("end"))
+        .unwrap_or(&end_default);
+    let start = time_value_ms(Some(start_value), anchors, &format!("track '{track_id}' start"))?;
+    let end = time_value_ms(Some(end_value), anchors, &format!("track '{track_id}' end"))?;
+    Ok((start.min(duration_ms), end.min(duration_ms)))
+}
+
+fn time_value_ms(
+    value: Option<&Value>,
+    anchors: &BTreeMap<String, f64>,
+    field: &str,
+) -> Result<u64, ProjectError> {
+    match value {
+        Some(Value::Number(number)) => {
+            let seconds = number.as_f64().ok_or_else(|| {
+                ProjectError::ValidationFailed(format!("{field} must be a finite number"))
+            })?;
+            seconds_to_ms(seconds, field)
+        }
+        Some(Value::String(raw)) => time_expr_ms(raw, anchors, field),
+        _ => Err(ProjectError::ValidationFailed(format!(
+            "{field} must be a number or time expression"
+        ))),
+    }
+}
+
+fn time_expr_ms(
+    raw: &str,
+    anchors: &BTreeMap<String, f64>,
+    field: &str,
+) -> Result<u64, ProjectError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(ProjectError::ValidationFailed(format!("{field} is empty")));
+    }
+    let without_unit = trimmed
+        .strip_suffix("ms")
+        .and_then(|value| value.trim().parse::<f64>().ok())
+        .map(|value| value / 1000.0)
+        .or_else(|| {
+            trimmed
+                .strip_suffix('s')
+                .and_then(|value| value.trim().parse::<f64>().ok())
+        });
+    if let Some(seconds) = without_unit {
+        return seconds_to_ms(seconds, field);
+    }
+    if let Ok(seconds) = trimmed.parse::<f64>() {
+        return seconds_to_ms(seconds, field);
+    }
+    if let Some(seconds) = anchors.get(trimmed).copied() {
+        return seconds_to_ms(seconds, field);
+    }
+
+    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+    if parts.len() == 3 && (parts[1] == "+" || parts[1] == "-") {
+        let base = anchors.get(parts[0]).copied().ok_or_else(|| {
+            ProjectError::ValidationFailed(format!("unknown anchor '{}' in {field}", parts[0]))
+        })?;
+        let delta_ms = time_expr_ms(parts[2], anchors, field)?;
+        let delta = delta_ms as f64 / 1000.0;
+        let seconds = if parts[1] == "+" {
+            base + delta
+        } else {
+            base - delta
+        };
+        return seconds_to_ms(seconds, field);
+    }
+
+    Err(ProjectError::ValidationFailed(format!(
+        "unsupported time expression for {field}: '{trimmed}'"
+    )))
+}
+
+fn load_theme_css(root: &Path, project_slug: &str, theme_id: &str) -> Result<String, ProjectError> {
+    let theme_dir = root.join(project_slug).join("themes").join(theme_id);
+    let mut css = String::new();
+    for file in ["tokens.css", "theme.css", "components.css"] {
+        let path = theme_dir.join(file);
+        if path.exists() {
+            let raw = fs::read_to_string(&path).map_err(|err| {
+                ProjectError::StorageFailed(format!("theme CSS read failed: {}: {err}", path.display()))
+            })?;
+            css.push_str(&raw);
+            css.push('\n');
+        }
+    }
+    Ok(css)
+}
+
+fn load_component_js(
+    root: &Path,
+    project_slug: &str,
+    component_id: &str,
+) -> Result<String, ProjectError> {
+    if component_id.contains('/') || component_id.contains('\\') || component_id.contains("..") {
+        return Err(ProjectError::ValidationFailed(format!(
+            "invalid component id: {component_id}"
+        )));
+    }
+    let path = root
+        .join(project_slug)
+        .join("components")
+        .join(format!("{component_id}.js"));
+    fs::read_to_string(&path).map_err(|err| {
+        ProjectError::StorageFailed(format!(
+            "component source read failed: {}: {err}",
+            path.display()
+        ))
+    })
+}
+
+fn copy_number_param(
+    source: &serde_json::Map<String, Value>,
+    target: &mut serde_json::Map<String, Value>,
+    key: &str,
+) {
+    if let Some(value) = source.get(key).and_then(Value::as_f64) {
+        target.insert(key.to_string(), json!(value));
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Episode, JsonStorage, Project, Registry, RegistryProject, Storage};
+    use super::{
+        Episode, JsonStorage, Project, Registry, RegistryProject, Storage,
+        compile_composition_source,
+    };
 
     #[test]
     fn registry_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
@@ -775,6 +1210,62 @@ mod tests {
             compiled.source["tracks"][1]["clips"][0]["params"]["text"],
             "Text overlay"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn compiles_v2_composition_components() -> Result<(), Box<dyn std::error::Error>> {
+        let storage = test_storage("composition")?;
+        let project_dir = storage.root().join("demo");
+        std::fs::create_dir_all(project_dir.join("components"))?;
+        std::fs::create_dir_all(project_dir.join("themes").join("launch.dark"))?;
+        std::fs::write(
+            project_dir.join("components").join("html.hero-title.js"),
+            "export function mount() {}\nexport function update() {}\n",
+        )?;
+        std::fs::write(
+            project_dir
+                .join("themes")
+                .join("launch.dark")
+                .join("tokens.css"),
+            ":root { --accent: #62f5d2; }\n",
+        )?;
+        let composition = serde_json::json!({
+            "id": "launch-open",
+            "name": "Launch Open",
+            "duration": "4s",
+            "theme": "launch.dark",
+            "anchors": { "in": "0s", "out": "4s" },
+            "tracks": [{
+                "id": "hero",
+                "kind": "component",
+                "component": "html.hero-title",
+                "time": { "start": "in", "end": "out" },
+                "params": { "title": "Hello" }
+            }]
+        });
+
+        let compiled = compile_composition_source(&storage, "demo", &composition)?;
+
+        assert_eq!(compiled.source["duration"], 4000);
+        assert_eq!(compiled.source["tracks"][0]["kind"], "component");
+        assert_eq!(
+            compiled.source["tracks"][0]["clips"][0]["params"]["component"],
+            "html.hero-title"
+        );
+        assert!(
+            compiled.source["components"]["html.hero-title"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("update")
+        );
+        assert!(
+            compiled.source["theme"]["css"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("--accent")
+        );
+        cleanup(storage.root())?;
         Ok(())
     }
 

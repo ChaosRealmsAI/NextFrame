@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use nf_project::{JsonStorage, Storage, compile_episode_source};
+use nf_project::{JsonStorage, Storage, compile_composition_source, compile_episode_source};
 use nf_recorder::{ExportOpts, ExportResolution};
 use serde_json::json;
 
@@ -12,9 +12,26 @@ use crate::errors::NfError;
 pub fn run(args: ExportArgs) -> Result<(), NfError> {
     let storage = JsonStorage::new(JsonStorage::default_root()?);
     ensure_project_exists(&storage, &args.project)?;
-    ensure_episode_exists(&storage, &args.project, &args.episode)?;
-    let episode = storage.load_episode(&args.project, &args.episode)?;
-    let compiled = compile_episode_source(&args.project, &episode)?;
+    let (compiled, duration_s) = if let Some(composition) = args.composition.as_deref() {
+        ensure_composition_exists(&storage, &args.project, composition)?;
+        let composition_json = storage.load_composition(&args.project, composition)?;
+        let compiled = compile_composition_source(&storage, &args.project, &composition_json)?;
+        let duration_s = compiled
+            .source
+            .get("duration")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(0.0)
+            / 1000.0;
+        (compiled, duration_s)
+    } else {
+        let episode_slug = args.episode.as_deref().ok_or_else(|| {
+            NfError::ValidationFailed("missing --episode or --composition".to_string())
+        })?;
+        ensure_episode_exists(&storage, &args.project, episode_slug)?;
+        let episode = storage.load_episode(&args.project, episode_slug)?;
+        let compiled = compile_episode_source(&args.project, &episode)?;
+        (compiled, episode.duration)
+    };
     let source_path = source_path_for_output(&args.out);
     write_json_file(&source_path, &compiled.source)?;
     let mut warnings = compiled.warnings;
@@ -33,7 +50,7 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
             &source_path,
             &args.out,
             ExportOpts {
-                duration_s: episode.duration,
+                duration_s,
                 resolution_override: Some(ExportResolution::P1080),
                 parallel: Some(1),
                 ..Default::default()
@@ -41,7 +58,7 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
         ))
         .map_err(record_error)?;
 
-    let audio_muxed = match mux_audio_tracks(&compiled.source, &args.out, episode.duration) {
+    let audio_muxed = match mux_audio_tracks(&compiled.source, &args.out, duration_s) {
         Ok(muxed) => muxed,
         Err(err) => {
             warnings.push(err);
@@ -292,6 +309,24 @@ fn ensure_episode_exists(storage: &JsonStorage, project: &str, episode: &str) ->
         slug: episode.to_string(),
         hint: format!("nf episodes list --project={project}"),
     })
+}
+
+fn ensure_composition_exists(
+    storage: &JsonStorage,
+    project: &str,
+    composition: &str,
+) -> Result<(), NfError> {
+    let path = storage
+        .root()
+        .join(project)
+        .join("compositions")
+        .join(format!("{composition}.json"));
+    if path.exists() {
+        return Ok(());
+    }
+    Err(NfError::ValidationFailed(format!(
+        "composition not found: {project}/{composition}"
+    )))
 }
 
 fn record_error(err: nf_recorder::record_loop::RecordError) -> NfError {

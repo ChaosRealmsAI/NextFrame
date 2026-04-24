@@ -12,6 +12,7 @@ pub fn open(args: OpenArgs) -> Result<(), NfError> {
         json!({
             "project": args.project,
             "episode": args.episode,
+            "composition": args.composition,
             "clip": args.clip,
             "t": args.t,
             "new_window": args.new_window

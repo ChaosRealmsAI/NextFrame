@@ -36,6 +36,7 @@ const TRACK_DATA: &str = include_str!("../../nf-tracks/official/data.js");
 const TRACK_SUBTITLE: &str = include_str!("../../nf-tracks/official/subtitle.js");
 const TRACK_TEXT: &str = include_str!("../../nf-tracks/official/text.js");
 const TRACK_OVERLAY: &str = include_str!("../../nf-tracks/official/overlay.js");
+const TRACK_COMPONENT: &str = include_str!("../../nf-tracks/official/component.js");
 const TRACK_WEBGL_PARTICLES: &str = include_str!("../../nf-tracks/community/webgl-particles.js");
 
 fn track_source_for(kind: &str) -> Option<&'static str> {
@@ -49,6 +50,7 @@ fn track_source_for(kind: &str) -> Option<&'static str> {
         "subtitle" => Some(TRACK_SUBTITLE),
         "text" => Some(TRACK_TEXT),
         "overlay" => Some(TRACK_OVERLAY),
+        "component" => Some(TRACK_COMPONENT),
         "webgl-particles" => Some(TRACK_WEBGL_PARTICLES),
         _ => None,
     }

@@ -379,7 +379,7 @@ fn is_crud_op(op: &str) -> bool {
     };
     matches!(
         prefix,
-        "projects" | "episodes" | "clips" | "anchors" | "log" | "export" | "voice"
+        "projects" | "episodes" | "compositions" | "clips" | "anchors" | "log" | "export" | "voice"
     )
 }
 

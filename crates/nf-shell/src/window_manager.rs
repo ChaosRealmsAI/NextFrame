@@ -13,6 +13,7 @@ pub struct WindowStatus {
     pub window_id: String,
     pub project: String,
     pub episode: String,
+    pub composition: Option<String>,
     pub focused: bool,
 }
 
@@ -20,6 +21,7 @@ pub struct WindowStatus {
 struct WindowMeta {
     project: String,
     episode: String,
+    composition: Option<String>,
 }
 
 pub struct WindowManager {
@@ -51,13 +53,14 @@ impl WindowManager {
         proxy: &EventLoopProxy<UserEvent>,
         project: &str,
         episode: &str,
+        composition: Option<&str>,
     ) -> Result<String, String> {
         if let Some(window_id) = self.find_by_project_episode(project, episode, None) {
             self.focus(&window_id)?;
             return Ok(window_id);
         }
 
-        self.open_new(target, proxy, project, episode)
+        self.open_new(target, proxy, project, episode, composition)
     }
 
     pub fn open_new(
@@ -66,10 +69,17 @@ impl WindowManager {
         proxy: &EventLoopProxy<UserEvent>,
         project: &str,
         episode: &str,
+        composition: Option<&str>,
     ) -> Result<String, String> {
         let window_id = self.allocate_window_id();
-        let (window, webview) =
-            webview::create_window(target, proxy.clone(), &window_id, project, episode)?;
+        let (window, webview) = webview::create_window(
+            target,
+            proxy.clone(),
+            &window_id,
+            project,
+            episode,
+            composition,
+        )?;
         if let Some(window_number) = native_window_number(&window) {
             self.window_numbers.insert(window_id.clone(), window_number);
         }
@@ -79,6 +89,7 @@ impl WindowManager {
             WindowMeta {
                 project: project.to_string(),
                 episode: episode.to_string(),
+                composition: composition.map(ToString::to_string),
             },
         );
         self.webviews.insert(window_id.clone(), webview);
@@ -147,6 +158,7 @@ impl WindowManager {
                 window_id: window_id.clone(),
                 project: meta.project.clone(),
                 episode: meta.episode.clone(),
+                composition: meta.composition.clone(),
                 focused: self.focused_window_id.as_deref() == Some(window_id.as_str()),
             })
             .collect();

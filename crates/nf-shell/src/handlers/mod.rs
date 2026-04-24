@@ -11,6 +11,7 @@ use crate::storage::{JsonStorage, Project, Registry, RegistryProject, Storage, v
 pub mod anchors;
 pub mod app;
 pub mod clips;
+pub mod compositions;
 pub mod episodes;
 pub mod export;
 pub mod log;
@@ -33,6 +34,7 @@ impl ComposeOpHandler {
             handlers: vec![
                 Box::new(projects::ProjectsOpHandler::new(storage.clone())),
                 Box::new(episodes::EpisodesOpHandler::new(storage.clone())),
+                Box::new(compositions::CompositionsOpHandler::new(storage.clone())),
                 Box::new(clips::ClipsOpHandler::new(storage.clone())),
                 Box::new(anchors::AnchorsOpHandler::new(storage.clone())),
                 Box::new(export::ExportOpHandler::new(storage.clone())),

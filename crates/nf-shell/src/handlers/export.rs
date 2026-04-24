@@ -51,7 +51,20 @@ impl ExportOpHandler {
 
     fn start(&self, params: &Value) -> Result<Value, NfError> {
         let project = required_str(params, "project")?;
-        let episode = required_str(params, "episode")?;
+        let composition = params
+            .get("composition")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string);
+        let episode = params
+            .get("episode")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string)
+            .or_else(|| composition.clone())
+            .ok_or_else(|| {
+                NfError::ValidationFailed("missing episode or composition".to_string())
+            })?;
         validate_slug(&project)?;
         validate_slug(&episode)?;
         let job_id = export_job_id(&project, &episode);
@@ -78,14 +91,17 @@ impl ExportOpHandler {
         let job_id_for_thread = job_id.clone();
         let project_for_thread = project.clone();
         let episode_for_thread = episode.clone();
+        let composition_for_thread = composition.clone();
         let out_for_thread = out.clone();
         std::thread::spawn(move || {
-            let output = Command::new(nf_bin)
-                .arg("export")
-                .arg("--project")
-                .arg(project_for_thread)
-                .arg("--episode")
-                .arg(episode_for_thread)
+            let mut command = Command::new(nf_bin);
+            command.arg("export").arg("--project").arg(project_for_thread);
+            if let Some(composition) = composition_for_thread {
+                command.arg("--composition").arg(composition);
+            } else {
+                command.arg("--episode").arg(episode_for_thread);
+            }
+            let output = command
                 .arg("--out")
                 .arg(&out_for_thread)
                 .stdout(Stdio::piped())

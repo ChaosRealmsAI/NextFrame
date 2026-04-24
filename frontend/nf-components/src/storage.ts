@@ -193,6 +193,34 @@ export interface NfExportOpen {
   path: string;
 }
 
+export interface NfRuntimeSource {
+  meta?: Record<string, unknown>;
+  viewport?: { w?: number; h?: number; ratio?: string };
+  duration?: number;
+  theme?: { id?: string; css?: string };
+  components?: Record<string, string>;
+  tracks?: NfRuntimeTrack[];
+}
+
+export interface NfRuntimeTrack {
+  id?: string;
+  kind?: string;
+  z?: number;
+  clips?: Array<{
+    id?: string;
+    begin?: number;
+    end?: number;
+    params?: Record<string, unknown>;
+  }>;
+}
+
+export interface NfCompositionLoad {
+  composition: Record<string, unknown>;
+  source: NfRuntimeSource;
+  warnings: string[];
+  data: NfMockData;
+}
+
 export interface NfVoiceStart {
   job_id: string;
   status: "running";
@@ -308,6 +336,37 @@ export async function loadProjectData(
   }
 }
 
+export async function loadCompositionData(
+  projectSlug: string,
+  compositionSlug: string,
+  options: LoadProjectOptions = {},
+): Promise<NfCompositionLoad> {
+  if (!shellIpc()) {
+    const data = await loadMockData();
+    if (options.explicitRoute) showDataNotice("IPC 连接失败 · 已显示本地样例");
+    return { composition: {}, source: {}, warnings: ["IPC unavailable"], data };
+  }
+
+  try {
+    const project = await shellRequest<RealProject>("projects.show", { project: projectSlug });
+    const loaded = await shellRequest<Omit<NfCompositionLoad, "data">>("compositions.show", {
+      project: projectSlug,
+      composition: compositionSlug,
+    });
+    const data = normalizeCompositionData(project, compositionSlug, loaded.source);
+    cached = data;
+    dispatchDataReady(cached);
+    return { ...loaded, data };
+  } catch (error) {
+    console.error("NextFrame composition IPC failed", error);
+    showDataNotice("Composition 不存在或编译失败");
+    const data = fallbackData(projectSlug, compositionSlug, "fallback");
+    cached = data;
+    dispatchDataReady(cached);
+    return { composition: {}, source: {}, warnings: [String(error)], data };
+  }
+}
+
 export async function updateClipLabel(
   projectSlug: string,
   episodeSlug: string,
@@ -355,6 +414,32 @@ export function exportEpisode(projectSlug: string, episodeSlug: string): Promise
     project: projectSlug,
     episode: episodeSlug,
   });
+}
+
+export function exportComposition(projectSlug: string, compositionSlug: string): Promise<NfExportStart> {
+  return shellRequest<NfExportStart>("export.start", {
+    project: projectSlug,
+    composition: compositionSlug,
+  });
+}
+
+export async function updateCompositionTrackParams(
+  projectSlug: string,
+  compositionSlug: string,
+  trackId: string,
+  params: Record<string, unknown>,
+): Promise<NfCompositionLoad> {
+  const loaded = await shellRequest<Omit<NfCompositionLoad, "data">>("compositions.updateTrack", {
+    project: projectSlug,
+    composition: compositionSlug,
+    track: trackId,
+    params,
+  });
+  const project = await shellRequest<RealProject>("projects.show", { project: projectSlug });
+  const data = normalizeCompositionData(project, compositionSlug, loaded.source);
+  cached = data;
+  dispatchDataReady(cached);
+  return { ...loaded, data };
 }
 
 export function exportStatus(jobId: string): Promise<NfExportStatus> {
@@ -459,6 +544,51 @@ function normalizeEpisode(episode: RealEpisode): NfEpisode {
     clips,
     log: Array.isArray(episode.log) ? episode.log.map(normalizeLogEntry) : [],
     inspector_fields: defaultInspectorFields(clips),
+  };
+}
+
+function normalizeCompositionData(project: RealProject, compositionSlug: string, source: NfRuntimeSource): NfMockData {
+  const duration = finiteNumber(source.duration, 60_000) / 1000;
+  const clips: NfClip[] = [];
+  for (const track of source.tracks ?? []) {
+    for (const clip of track.clips ?? []) {
+      const params = asRecord(clip.params);
+      const componentParams = asRecord(params.params);
+      const id = stringValue(clip.id) ?? stringValue(track.id) ?? `track-${clips.length + 1}`;
+      const begin = finiteNumber(clip.begin, 0);
+      const end = finiteNumber(clip.end, begin + 1000);
+      clips.push({
+        id,
+        label: stringValue(componentParams.title) ?? stringValue(params.component) ?? id,
+        kind: track.kind === "audio" ? "audio" : track.kind === "subtitle" ? "subtitle" : "scene",
+        track: finiteNumber(track.z, clips.length),
+        start: begin / 1000,
+        end: end / 1000,
+        effects: track.kind === "component" ? ["v2 component"] : [],
+        position: normalizePosition({
+          x: componentParams.x,
+          y: componentParams.y,
+        }),
+        src: stringValue(params.src),
+        volume: numberValue(params.volume),
+      });
+    }
+  }
+  return {
+    source: "ipc",
+    project: {
+      id: projectId(project, "project"),
+      name: projectName(project, "Project"),
+    },
+    episodes: [{
+      id: compositionSlug,
+      name: stringValue(source.meta?.name) ?? compositionSlug,
+      duration,
+      anchors: {},
+      clips,
+      log: [],
+      inspector_fields: defaultInspectorFields(clips),
+    }],
   };
 }
 

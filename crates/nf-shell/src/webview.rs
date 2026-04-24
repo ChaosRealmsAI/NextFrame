@@ -19,6 +19,7 @@ pub fn create_window(
     window_id: &str,
     project: &str,
     episode: &str,
+    composition: Option<&str>,
 ) -> Result<(Window, WebView), String> {
     // Traffic light 对齐策略 · FM-TL-SYSTEM-ANCHOR(ADR A-0017):
     // 不调 `with_traffic_light_inset` 让系统按默认放红绿灯 · Rust 读 close.frame.midY
@@ -53,8 +54,8 @@ pub fn create_window(
     }
 
     let frontend_root = frontend_root()?;
-    let url = frontend_url(project, episode);
-    let session_script = initialization_script(project, episode);
+    let url = frontend_url(project, episode, composition);
+    let session_script = initialization_script(project, episode, composition);
     let ipc_window_id = window_id.to_string();
     let ipc_proxy = proxy.clone();
     let webview_builder = WebViewBuilder::new()
@@ -85,14 +86,18 @@ pub fn create_window(
     Ok((window, webview))
 }
 
-fn frontend_url(project: &str, episode: &str) -> String {
+fn frontend_url(project: &str, episode: &str, composition: Option<&str>) -> String {
+    if let Some(composition) = composition {
+        return format!("nextframe://frontend/index.html?project={project}&composition={composition}");
+    }
     format!("nextframe://frontend/index.html?project={project}&episode={episode}")
 }
 
-fn initialization_script(project: &str, episode: &str) -> String {
+fn initialization_script(project: &str, episode: &str, composition: Option<&str>) -> String {
     let session = serde_json::json!({
         "project": project,
-        "episode": episode
+        "episode": episode,
+        "composition": composition
     });
     format!(
         r#"(() => {{

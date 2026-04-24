@@ -9,17 +9,21 @@ import { NfTrack } from "./components/track.js";
 import type { ClipSelectDetail, FieldEditDetail, PlayheadMoveDetail, TimelineClipSelectDetail } from "./events.js";
 import {
   escapeHtml,
+  exportComposition,
   exportEpisode,
   exportStatus,
   getMockData,
+  loadCompositionData,
   loadProjectData,
   openExport,
   patchClip,
   synthesizeVoice,
+  updateCompositionTrackParams,
   updateClipLabel,
   updateClipPosition,
   voiceStatus,
   type NfClip as NfDataClip,
+  type NfRuntimeSource,
   type NfMockData,
   type NfTtsSpec,
 } from "./storage.js";
@@ -35,6 +39,28 @@ let playing = false;
 const previewAudio = new Map<string, HTMLAudioElement>();
 const previewAudioSrc = new Map<string, string>();
 const autoVoiceStarted = new Set<string>();
+let compositionSource: NfRuntimeSource | null = null;
+const compositionComponents = new Map<string, NfComponentApi>();
+const mountedComposition = new Map<string, { root: HTMLElement; api: NfComponentApi }>();
+
+interface NfComponentContext {
+  timeMs: number;
+  localTimeMs: number;
+  progress: number;
+  durationMs: number;
+  params: Record<string, unknown>;
+  style: Record<string, unknown>;
+  track: Record<string, unknown>;
+  theme: Record<string, unknown>;
+  viewport: Record<string, unknown>;
+  mode: string;
+}
+
+interface NfComponentApi {
+  mount?: (root: HTMLElement, ctx: NfComponentContext) => void;
+  update?: (root: HTMLElement, ctx: NfComponentContext) => void;
+  destroy?: (root: HTMLElement) => void;
+}
 
 const DEFINITIONS: Array<[string, CustomElementConstructor]> = [
   ["nf-topbar", NfTopbar],
@@ -116,7 +142,7 @@ function wireApp(): void {
       if (clip) applyShellChrome(getMockData(), clip, currentPreviewTime);
     }
     if (detail.field === "export") {
-      startExportFlow(route.project, route.episode, inspector);
+      startExportFlow(route.project, route.episode, inspector, route.composition);
     }
     if (detail.field === "voice") {
       const clipId = inspector.getAttribute("clip-id");
@@ -139,7 +165,7 @@ function wireApp(): void {
     }
   });
 
-  wirePreviewDrag(route.project, route.episode);
+  wirePreviewDrag(route.project, route.episode, route.composition);
   wirePlaybackControls();
 }
 
@@ -200,11 +226,12 @@ function voiceValue(value: string | Record<string, unknown>): (NfTtsSpec & { tex
   };
 }
 
-function startExportFlow(project: string, episode: string, inspector: Element): void {
+function startExportFlow(project: string, episode: string, inspector: Element, composition?: string): void {
   inspector.setAttribute("export-status", "running");
   inspector.removeAttribute("export-open-status");
   inspector.removeAttribute("export-error");
-  void exportEpisode(project, episode)
+  const start = composition ? exportComposition(project, composition) : exportEpisode(project, episode);
+  void start
     .then((started) => {
       inspector.setAttribute("export-path", started.out);
       pollExport(started.job_id, inspector);
@@ -233,15 +260,17 @@ function pollExport(jobId: string, inspector: Element): void {
   }, 1000);
 }
 
-function routeFromUrl(): { project: string; episode: string; explicit: boolean } {
+function routeFromUrl(): { project: string; episode: string; composition?: string; explicit: boolean } {
   const params = routeParams();
   const session = window.NEXTFRAME_SESSION;
   const project = params.get("project") || session?.project || "next-frame";
-  const episode = params.get("episode") || session?.episode || "ep-01";
+  const composition = params.get("composition") || session?.composition || undefined;
+  const episode = params.get("episode") || session?.episode || composition || "ep-01";
   return {
     project,
     episode,
-    explicit: params.has("project") || params.has("episode") || session != null,
+    explicit: params.has("project") || params.has("episode") || params.has("composition") || session != null,
+    ...(composition ? { composition } : {}),
   };
 }
 
@@ -274,6 +303,13 @@ function applyData(data: NfMockData, preferredClipId = selectedClipId): void {
     maybeAutoGenerateVoice(data.project.id, episode.id, selected);
   }
   applyShellChrome(data, selected, selected?.start ?? 0);
+}
+
+function applyComposition(source: NfRuntimeSource, data: NfMockData, preferredClipId = selectedClipId): void {
+  compositionSource = source;
+  compileCompositionComponents(source);
+  installCompositionTheme(source);
+  applyData(data, preferredClipId);
 }
 
 function maybeAutoGenerateVoice(project: string, episode: string, clip: NfDataClip): void {
@@ -456,11 +492,140 @@ function applyPreviewFrame(data: NfMockData, time: number, scene: NfDataClip | u
 function renderPreviewLayers(data: NfMockData, time: number, fallbackAccent: string): void {
   const root = document.querySelector<HTMLElement>("[data-nf-preview-layers]");
   if (!root) return;
+  if (compositionSource) {
+    renderCompositionPreview(root, compositionSource, time);
+    syncPreviewAudio(data, time);
+    return;
+  }
   const textLayers = activeClipsAt(data, time, "text").map((clip) => renderTextPreview(clip, fallbackAccent));
   const subtitles = activeClipsAt(data, time, "subtitle").map((clip) => renderSubtitlePreview(clip, time, fallbackAccent));
   const overlays = activeClipsAt(data, time, "overlay").map((clip) => renderOverlayPreview(clip, fallbackAccent));
   const audio = activeClipsAt(data, time, "audio").map(renderAudioIndicator);
   root.innerHTML = [...textLayers, ...subtitles, ...overlays, ...audio].join("");
+}
+
+function compileCompositionComponents(source: NfRuntimeSource): void {
+  compositionComponents.clear();
+  for (const [id, code] of Object.entries(source.components ?? {})) {
+    try {
+      compositionComponents.set(id, loadComponentApi(code));
+    } catch (error) {
+      console.error("NextFrame component load failed", id, error);
+    }
+  }
+}
+
+function loadComponentApi(code: string): NfComponentApi {
+  const names: string[] = [];
+  const rewritten = code.replace(
+    /^(\s*)export\s+function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm,
+    (_match, indent: string, name: string) => {
+      names.push(name);
+      return `${indent}function ${name}(`;
+    },
+  );
+  const body = [
+    "\"use strict\";",
+    "const module = { exports: {} };",
+    "const exports = module.exports;",
+    rewritten,
+    ";const __nfExports = {};",
+    ...names.map((name) => `if (typeof ${name} === 'function') __nfExports.${name} = ${name};`),
+    "if (module.exports && Object.keys(module.exports).length > 0) return module.exports;",
+    "return __nfExports;",
+  ].join("\n");
+  return new Function(body)() as NfComponentApi;
+}
+
+function installCompositionTheme(source: NfRuntimeSource): void {
+  const css = source.theme?.css ?? "";
+  let style = document.getElementById("nf-theme-v2");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "nf-theme-v2";
+    document.head.appendChild(style);
+  }
+  style.textContent = css;
+}
+
+function renderCompositionPreview(root: HTMLElement, source: NfRuntimeSource, timeSeconds: number): void {
+  const timeMs = timeSeconds * 1000;
+  const active = activeCompositionTracks(source, timeMs);
+  const activeKeys = new Set(active.map((item) => item.key));
+  for (const [key, mounted] of Array.from(mountedComposition.entries())) {
+    if (activeKeys.has(key)) continue;
+    try { mounted.api.destroy?.(mounted.root); } catch (error) { console.error(error); }
+    mounted.root.remove();
+    mountedComposition.delete(key);
+  }
+
+  for (const item of active) {
+    const api = compositionComponents.get(item.component);
+    if (!api) continue;
+    let mounted = mountedComposition.get(item.key);
+    if (!mounted) {
+      const el = document.createElement("div");
+      el.dataset.nfComponentRoot = "true";
+      el.dataset.nfComponentTrack = item.trackId;
+      el.dataset.nfComponent = item.component;
+      el.style.position = "absolute";
+      el.style.inset = "0";
+      el.style.zIndex = String(item.z);
+      el.style.overflow = "hidden";
+      el.style.pointerEvents = "auto";
+      root.appendChild(el);
+      mounted = { root: el, api };
+      mountedComposition.set(item.key, mounted);
+      try { api.mount?.(el, item.ctx); } catch (error) { console.error(error); }
+    }
+    mounted.root.style.zIndex = String(item.z);
+    try { api.update?.(mounted.root, item.ctx); } catch (error) { console.error(error); }
+  }
+}
+
+function activeCompositionTracks(source: NfRuntimeSource, timeMs: number): Array<{
+  key: string;
+  trackId: string;
+  component: string;
+  z: number;
+  ctx: NfComponentContext;
+}> {
+  const viewport = recordValue(source.viewport ?? { w: 1920, h: 1080, ratio: "16:9" });
+  const theme = recordValue(source.theme ?? {});
+  const out = [];
+  for (const track of source.tracks ?? []) {
+    if (track.kind !== "component") continue;
+    const trackId = track.id ?? "component";
+    const z = Number.isFinite(track.z) ? Number(track.z) : 10;
+    for (const clip of track.clips ?? []) {
+      const begin = Number(clip.begin ?? 0);
+      const end = Number(clip.end ?? 0);
+      if (!Number.isFinite(begin) || !Number.isFinite(end) || timeMs < begin || timeMs >= end) continue;
+      const clipParams = recordValue(clip.params);
+      const component = typeof clipParams.component === "string" ? clipParams.component : "";
+      if (!component) continue;
+      const span = Math.max(1, end - begin);
+      out.push({
+        key: `component:${trackId}:${component}`,
+        trackId,
+        component,
+        z,
+        ctx: {
+          timeMs,
+          localTimeMs: timeMs - begin,
+          progress: Math.max(0, Math.min(1, (timeMs - begin) / span)),
+          durationMs: span,
+          params: recordValue(clipParams.params),
+          style: recordValue(clipParams.style),
+          track: recordValue(clipParams.track),
+          theme,
+          viewport,
+          mode: "preview",
+        },
+      });
+    }
+  }
+  return out.sort((a, b) => a.z - b.z);
 }
 
 function renderTextPreview(clip: NfDataClip, fallbackAccent: string): string {
@@ -573,13 +738,15 @@ function validColor(value: string | undefined): boolean {
   return value != null && /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
-function wirePreviewDrag(project: string, episode: string): void {
+function wirePreviewDrag(project: string, episode: string, composition?: string): void {
   const copy = document.querySelector<HTMLElement>("[data-nf-preview-copy]");
   const frame = document.querySelector<HTMLElement>("[data-nf-preview-frame]");
+  const layers = document.querySelector<HTMLElement>("[data-nf-preview-layers]");
   const inspector = document.querySelector("nf-inspector");
   if (!copy || !frame || !inspector) return;
 
   let dragging = false;
+  let compositionDragTrack = "";
   const moveTo = (event: PointerEvent): { x: number; y: number } => {
     const rect = frame.getBoundingClientRect();
     const x = clampPercent((event.clientX - rect.left) / Math.max(1, rect.width) * 100);
@@ -589,7 +756,45 @@ function wirePreviewDrag(project: string, episode: string): void {
     return { x, y };
   };
 
+  layers?.addEventListener("pointerdown", (event) => {
+    if (!composition || !compositionSource) return;
+    const target = (event.target as Element | null)?.closest<HTMLElement>("[data-nf-component-root]");
+    if (!target) return;
+    compositionDragTrack = target.dataset.nfComponentTrack ?? "";
+    if (!compositionDragTrack) return;
+    selectedClipId = compositionDragTrack;
+    dragging = true;
+    target.setPointerCapture(event.pointerId);
+    target.classList.add("dragging");
+    event.preventDefault();
+  });
+  layers?.addEventListener("pointermove", (event) => {
+    if (!composition || !compositionSource || !dragging || !compositionDragTrack) return;
+    const position = moveTo(event);
+    patchCompositionParams(compositionSource, compositionDragTrack, position);
+    renderCompositionPreview(layers, compositionSource, currentPreviewTime);
+  });
+  layers?.addEventListener("pointerup", (event) => {
+    if (!composition || !compositionSource || !dragging || !compositionDragTrack) return;
+    const target = event.target as HTMLElement;
+    dragging = false;
+    target.classList.remove("dragging");
+    const position = moveTo(event);
+    const track = compositionDragTrack;
+    compositionDragTrack = "";
+    patchCompositionParams(compositionSource, track, position);
+    inspector.setAttribute("save-status", "saving");
+    void updateCompositionTrackParams(project, composition, track, position)
+      .then((loaded) => applyComposition(loaded.source, loaded.data, track))
+      .then(() => inspector.setAttribute("save-status", "saved"))
+      .catch((error) => {
+        inspector.setAttribute("save-status", "failed");
+        inspector.setAttribute("save-error", error instanceof Error ? error.message : String(error));
+      });
+  });
+
   copy.addEventListener("pointerdown", (event) => {
+    if (compositionSource) return;
     if (!selectedClipId) return;
     dragging = true;
     copy.setPointerCapture(event.pointerId);
@@ -597,11 +802,13 @@ function wirePreviewDrag(project: string, episode: string): void {
     moveTo(event);
   });
   copy.addEventListener("pointermove", (event) => {
+    if (compositionSource) return;
     if (!dragging || !selectedClipId) return;
     const position = moveTo(event);
     patchClip(selectedClipId, { position }, { notify: false });
   });
   copy.addEventListener("pointerup", (event) => {
+    if (compositionSource) return;
     if (!dragging || !selectedClipId) return;
     dragging = false;
     copy.classList.remove("dragging");
@@ -623,12 +830,32 @@ function wirePreviewDrag(project: string, episode: string): void {
   });
 }
 
+function patchCompositionParams(source: NfRuntimeSource, trackId: string, position: { x: number; y: number }): void {
+  for (const track of source.tracks ?? []) {
+    if (track.id !== trackId) continue;
+    for (const clip of track.clips ?? []) {
+      const params = recordValue(clip.params);
+      const nested = recordValue(params.params);
+      nested.x = position.x;
+      nested.y = position.y;
+      params.params = nested;
+      clip.params = params;
+    }
+  }
+}
+
 function positionValue(value: string | Record<string, unknown>): { x: number; y: number } | undefined {
   if (typeof value === "string") return undefined;
   const x = Number(value.x);
   const y = Number(value.y);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return undefined;
   return { x: clampPercent(x), y: clampPercent(y) };
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
 function clampPercent(value: number): number {
@@ -652,7 +879,12 @@ function startApp(): void {
   const route = routeFromUrl();
   applyRoute(route.project, route.episode);
   wireApp();
-  void loadProjectData(route.project, route.episode, { explicitRoute: route.explicit }).then(applyData);
+  if (route.composition) {
+    void loadCompositionData(route.project, route.composition, { explicitRoute: route.explicit })
+      .then((loaded) => applyComposition(loaded.source, loaded.data));
+  } else {
+    void loadProjectData(route.project, route.episode, { explicitRoute: route.explicit }).then(applyData);
+  }
 }
 
 if (document.readyState === "loading") {
@@ -666,6 +898,7 @@ declare global {
     NEXTFRAME_SESSION?: {
       project: string;
       episode: string;
+      composition?: string;
     };
     __NF_W4__?: {
       tags: string[];

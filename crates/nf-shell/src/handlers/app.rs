@@ -22,21 +22,25 @@ impl AppOpHandler {
     ) -> IpcResponse {
         let result = (|| {
             let project = required_string(&request.params, "project")?;
-            let episode = required_string(&request.params, "episode")?;
+            let composition = optional_string(&request.params, "composition");
+            let episode = optional_string(&request.params, "episode")
+                .or_else(|| composition.clone())
+                .ok_or_else(|| "missing required parameter: episode or composition".to_string())?;
             let new_window = request
                 .params
                 .get("new_window")
                 .and_then(Value::as_bool)
                 .unwrap_or(false);
             let window_id = if new_window {
-                manager.open_new(target, proxy, &project, &episode)?
+                manager.open_new(target, proxy, &project, &episode, composition.as_deref())?
             } else {
-                manager.open(target, proxy, &project, &episode)?
+                manager.open(target, proxy, &project, &episode, composition.as_deref())?
             };
             Ok(json!({
                 "window_id": window_id,
                 "project": project,
                 "episode": episode,
+                "composition": composition,
                 "pid": std::process::id()
             }))
         })();

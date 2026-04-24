@@ -161,6 +161,7 @@ function liteResolve(source) {
   if (source.meta !== undefined) out.meta = source.meta;
   if (source.data !== undefined) out.data = source.data;
   if (source.theme !== undefined) out.theme = source.theme;
+  if (source.components !== undefined) out.components = source.components;
   return out;
 }
 
@@ -540,6 +541,58 @@ function loadTrack(src) {
     throw new Error("track: missing describe() or render() export");
   }
   return api;
+}
+
+function loadComponent(src) {
+  if (typeof src !== "string" || src.length === 0) {
+    throw new Error("component: source must be non-empty string");
+  }
+  const names = [];
+  const rewritten = src.replace(
+    /^(\s*)export\s+function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/gm,
+    (_m, indent, name) => { names.push(name); return indent + "function " + name + "("; },
+  );
+  const body =
+    '"use strict";\n' +
+    "const module = { exports: {} };\n" +
+    "const exports = module.exports;\n" +
+    rewritten +
+    "\n;const __nfExports = {};\n" +
+    names.map((n) => "if (typeof " + n + " === 'function') __nfExports." + n + " = " + n + ";").join("\n") +
+    "\nif (module.exports && Object.keys(module.exports).length > 0) return module.exports;\n" +
+    "\nreturn __nfExports;\n";
+  const fn = new Function(body);
+  const api = fn();
+  if (!api || (typeof api.mount !== "function" && typeof api.update !== "function")) {
+    throw new Error("component: missing mount() or update() export");
+  }
+  return api;
+}
+
+function _installThemeStyle(doc, resolved) {
+  const css = resolved && resolved.theme && typeof resolved.theme.css === "string"
+    ? resolved.theme.css
+    : "";
+  if (!doc || !css) return;
+  let style = doc.getElementById("nf-theme-v2");
+  if (!style) {
+    style = doc.createElement("style");
+    style.id = "nf-theme-v2";
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+  if (style.textContent !== css) style.textContent = css;
+}
+
+function _decodeJsonAttr(el, name) {
+  if (!el || typeof el.getAttribute !== "function") return {};
+  const raw = el.getAttribute(name);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_err) {
+    return {};
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -939,6 +992,20 @@ function boot(options) {
       }));
     }
   }
+  _installThemeStyle(doc, resolved);
+
+  const componentRegistry = new Map();
+  const componentSources = (resolved && resolved.components) || {};
+  for (const key of Object.keys(componentSources)) {
+    try {
+      componentRegistry.set(key, loadComponent(componentSources[key]));
+    } catch (err) {
+      console.log(JSON.stringify({
+        ts: _ts(), level: "error", source: "nf-runtime",
+        msg: "component_load_failed", data: { component: key, error: String(err) },
+      }));
+    }
+  }
 
   const stage = doc.querySelector(stageSelector);
   if (!stage) throw new Error(`boot: stage '${stageSelector}' not found`);
@@ -955,6 +1022,7 @@ function boot(options) {
   const duration_ms = (resolved && typeof resolved.duration_ms === "number")
     ? resolved.duration_ms
     : 0;
+  const mountedComponents = new Map();
 
   function currentTMs() {
     if (!playing) return pausedAtMs;
@@ -970,6 +1038,80 @@ function boot(options) {
           msg: "onTimeUpdate_cb_failed", data: { error: String(err) },
         }));
       }
+    }
+  }
+
+  function componentRootFor(trackId, componentId) {
+    const roots = stage.querySelectorAll("[data-nf-component-root='1']");
+    for (let i = 0; i < roots.length; i++) {
+      const root = roots[i];
+      if (
+        root.getAttribute("data-nf-component-track") === trackId &&
+        root.getAttribute("data-nf-component") === componentId
+      ) {
+        return root;
+      }
+    }
+    return null;
+  }
+
+  function syncComponents(state) {
+    const activeKeys = new Set();
+    for (const ac of state.activeClips) {
+      const resolvedTrack = resolvedTrackById.get(ac.trackId);
+      if (!resolvedTrack || resolvedTrack.kind !== "component") continue;
+      const p = ac.params || {};
+      const componentId = typeof p.component === "string" ? p.component : "";
+      if (!componentId) continue;
+      const api = componentRegistry.get(componentId);
+      if (!api) continue;
+      const root = componentRootFor(ac.trackId, componentId);
+      if (!root) continue;
+      const clip = (resolvedTrack.clips || [])[ac.clipIdx] || {};
+      const span = Math.max(1, (clip.end_ms || 0) - (clip.begin_ms || 0));
+      const key = root.getAttribute("data-nf-persist") || `${ac.trackId}:${ac.clipId}:${componentId}`;
+      activeKeys.add(key);
+      const ctx = {
+        timeMs: state.t_ms,
+        localTimeMs: ac.localT,
+        progress: Math.max(0, Math.min(1, ac.localT / span)),
+        durationMs: span,
+        params: p.params || _decodeJsonAttr(root, "data-nf-component-params"),
+        style: p.style || _decodeJsonAttr(root, "data-nf-component-style"),
+        track: p.track || { id: ac.trackId },
+        theme: (resolved && resolved.theme) || {},
+        viewport: state.viewport,
+        mode,
+      };
+      if (!mountedComponents.has(key)) {
+        try {
+          if (typeof api.mount === "function") api.mount(root, ctx);
+          mountedComponents.set(key, { root, api, componentId });
+        } catch (err) {
+          console.log(JSON.stringify({ ts: _ts(), level: "error", source: "nf-runtime",
+            msg: "component_mount_failed", data: { component: componentId, error: String(err) } }));
+          continue;
+        }
+      }
+      try {
+        if (typeof api.update === "function") api.update(root, ctx);
+      } catch (err) {
+        console.log(JSON.stringify({ ts: _ts(), level: "error", source: "nf-runtime",
+          msg: "component_update_failed", data: { component: componentId, error: String(err) } }));
+      }
+    }
+
+    for (const [key, mounted] of Array.from(mountedComponents.entries())) {
+      if (activeKeys.has(key)) continue;
+      try {
+        if (mounted.api && typeof mounted.api.destroy === "function") {
+          mounted.api.destroy(mounted.root);
+        }
+      } catch (err) {
+        console.log(JSON.stringify({ ts: _ts(), level: "error", source: "nf-runtime",
+          msg: "component_destroy_failed", data: { component: mounted.componentId, error: String(err) } }));
+      }
+      mountedComponents.delete(key);
     }
   }
 
@@ -994,6 +1136,7 @@ function boot(options) {
     }
     // ADR-047 · stateful-element-safe mount (replaces stage.innerHTML = html).
     const mountResult = diffAndMount(stage, html, commitToken);
+    syncComponents(state);
 
     if (mountResult && mountResult.removedPersistEls) {
       for (const removed of mountResult.removedPersistEls) {

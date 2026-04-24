@@ -485,9 +485,17 @@ pub struct OpenArgs {
     #[arg(
         long,
         value_name = "SLUG",
+        required_unless_present = "composition",
         help = "Episode slug inside the project, for example ep-01"
     )]
-    pub episode: String,
+    pub episode: Option<String>,
+    #[arg(
+        long,
+        value_name = "SLUG",
+        required_unless_present = "episode",
+        help = "V2 composition slug inside the project, for example launch-open"
+    )]
+    pub composition: Option<String>,
     #[arg(
         long,
         value_name = "SLUG",
@@ -560,8 +568,20 @@ pub struct KaraokeArgs {
 pub struct ExportArgs {
     #[arg(long, value_name = "SLUG", help = "Project slug to export")]
     pub project: String,
-    #[arg(long, value_name = "SLUG", help = "Episode slug to export")]
-    pub episode: String,
+    #[arg(
+        long,
+        value_name = "SLUG",
+        required_unless_present = "composition",
+        help = "Episode slug to export"
+    )]
+    pub episode: Option<String>,
+    #[arg(
+        long,
+        value_name = "SLUG",
+        required_unless_present = "episode",
+        help = "V2 composition slug to export"
+    )]
+    pub composition: Option<String>,
     #[arg(long, value_name = "PATH", help = "Output MP4 path")]
     pub out: std::path::PathBuf,
 }

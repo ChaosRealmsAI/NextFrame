@@ -1,0 +1,72 @@
+{
+  "schema": "nextframe.composition.v2",
+  "id": "launch-open",
+  "name": "Launch Open",
+  "duration": "8s",
+  "viewport": { "w": 1920, "h": 1080, "ratio": "16:9" },
+  "theme": "launch.dark",
+  "anchors": {
+    "intro": "0s",
+    "reveal": "1.1s",
+    "proof": "3.2s",
+    "handoff": "5.8s",
+    "out": "8s"
+  },
+  "export": { "resolution": "1080p" },
+  "tracks": [
+    {
+      "id": "stage-bg",
+      "kind": "component",
+      "component": "html.stage-background",
+      "z": 0,
+      "time": { "start": "intro", "end": "out" },
+      "params": { "pulse": 0.72 }
+    },
+    {
+      "id": "hero-title",
+      "kind": "component",
+      "component": "html.hero-title",
+      "z": 20,
+      "time": { "start": "intro", "end": "handoff + 1.4s" },
+      "params": {
+        "eyebrow": "JSON V2 COMPOSITION",
+        "title": "Build the video like a real interface",
+        "subtitle": "Tracks, anchors, shared theme CSS and live component code run in one desktop preview.",
+        "x": 50,
+        "y": 43
+      }
+    },
+    {
+      "id": "signal-cards",
+      "kind": "component",
+      "component": "html.signal-cards",
+      "z": 30,
+      "time": { "start": "reveal", "end": "out" },
+      "params": {
+        "x": 50,
+        "y": 74,
+        "items": [
+          { "label": "DOM", "value": "HTML" },
+          { "label": "Motion", "value": "CSS + JS" },
+          { "label": "Export", "value": "MP4" }
+        ]
+      }
+    },
+    {
+      "id": "timeline-graph",
+      "kind": "component",
+      "component": "svg.timeline-graph",
+      "z": 14,
+      "time": { "start": "proof", "end": "out" },
+      "params": { "x": 80, "y": 44 }
+    },
+    {
+      "id": "status-strip",
+      "kind": "component",
+      "component": "html.status-strip",
+      "z": 40,
+      "time": { "start": "intro", "end": "out" },
+      "params": { "steps": ["JSON", "Preview", "Edit", "Export"] }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+:root {
+  --nfv2-bg: #05070a;
+  --nfv2-panel: rgba(255, 255, 255, 0.08);
+  --nfv2-panel-strong: rgba(255, 255, 255, 0.14);
+  --nfv2-text: #f6f7f2;
+  --nfv2-muted: #a8b0b7;
+  --nfv2-cyan: #62f5d2;
+  --nfv2-lime: #c8ff5d;
+  --nfv2-red: #ff6b6b;
+  --nfv2-blue: #78a7ff;
+}
