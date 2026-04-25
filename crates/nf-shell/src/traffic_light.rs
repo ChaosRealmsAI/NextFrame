@@ -15,9 +15,9 @@
 use objc2::define_class;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol};
-use objc2::{msg_send, sel, DefinedClass, MainThreadMarker, MainThreadOnly};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, msg_send, sel};
 use objc2_app_kit::{NSWindow, NSWindowButton};
-use objc2_foundation::{ns_string, NSNotification, NSNotificationCenter, NSRect, NSString};
+use objc2_foundation::{NSNotification, NSNotificationCenter, NSRect, NSString, ns_string};
 
 /// DOM topbar 高度(与 frontend `.topbar.native` CSS height 一致 · 改 CSS 必同步)
 pub const TOPBAR_HEIGHT_PT: f64 = 48.0;
@@ -117,7 +117,10 @@ define_class!(
 /// - `NSWindowDidBecomeKeyNotification` / `NSWindowDidResignKeyNotification` — focus 切换
 /// - `NSWindowDidEnterFullScreenNotification` / `NSWindowDidExitFullScreenNotification`
 /// - `NSWindowDidMiniaturizeNotification` / `NSWindowDidDeminiaturizeNotification`
-pub fn install(mtm: MainThreadMarker, window: Retained<NSWindow>) -> Retained<TrafficLightObserver> {
+pub fn install(
+    mtm: MainThreadMarker,
+    window: Retained<NSWindow>,
+) -> Retained<TrafficLightObserver> {
     // 初始 apply
     apply(&window);
 
@@ -147,7 +150,8 @@ pub fn install(mtm: MainThreadMarker, window: Retained<NSWindow>) -> Retained<Tr
         #[allow(unsafe_code)]
         unsafe {
             let window_any: &AnyObject = std::mem::transmute::<&NSWindow, &AnyObject>(&*window);
-            let obs_any: &AnyObject = std::mem::transmute::<&TrafficLightObserver, &AnyObject>(&*observer);
+            let obs_any: &AnyObject =
+                std::mem::transmute::<&TrafficLightObserver, &AnyObject>(&*observer);
             let _: () = msg_send![
                 &*center,
                 addObserver: obs_any,
@@ -162,9 +166,7 @@ pub fn install(mtm: MainThreadMarker, window: Retained<NSWindow>) -> Retained<Tr
 }
 
 /// 从 tao Window 拿 NSWindow · 安装。只在 macOS 生效。
-pub fn install_from_tao(
-    window: &tao::window::Window,
-) -> Option<Retained<TrafficLightObserver>> {
+pub fn install_from_tao(window: &tao::window::Window) -> Option<Retained<TrafficLightObserver>> {
     use tao::platform::macos::WindowExtMacOS;
     let ptr = window.ns_window();
     if ptr.is_null() {

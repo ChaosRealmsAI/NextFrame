@@ -1,0 +1,149 @@
+{
+  "version": "v0.19.0",
+  "type": "feature",
+  "title": "AI JSON self-verification loop",
+  "status": "done",
+  "verify_points": [
+    {
+      "id": "V-01",
+      "desc": "One command verifies a v2 composition and emits machine-readable ok/errors/warnings.",
+      "scenario": "spec/bdd/ai-json-verification/scenarios/one-command-verify.bdd.json"
+    },
+    {
+      "id": "V-02",
+      "desc": "The report includes an ASCII timeline that lets AI inspect track timing without screenshots.",
+      "scenario": "spec/bdd/ai-json-verification/scenarios/ascii-timeline.bdd.json"
+    },
+    {
+      "id": "V-03",
+      "desc": "The report flags layout/text risks such as missing x/y, out-of-bounds layout, long text, and estimated overlap.",
+      "scenario": "spec/bdd/ai-json-verification/scenarios/layout-lint.bdd.json"
+    },
+    {
+      "id": "V-04",
+      "desc": "The report produces typical screenshot capture points so visual review is repeatable.",
+      "scenario": "spec/bdd/ai-json-verification/scenarios/typical-screenshots.bdd.json"
+    }
+  ],
+  "items": [
+    {
+      "id": "S-01",
+      "kind": "bdd-scenario",
+      "title": "Verify command emits JSON report",
+      "status": "done",
+      "verify_point": "V-01",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-24s --out ../NextFrame.archive/v0.19.0-verify/showreel-verify.json | jq '.ok, .summary.errors'",
+          "expected": "true and 0"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/commands/verify.rs",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-24s --out ../NextFrame.archive/v0.19.0-verify/showreel-verify.json --screenshot-dir ../NextFrame.archive/v0.19.0-verify/shots | jq '.ok, .summary.errors, .summary.warnings'"
+        ],
+        "result": "returned true, 0 errors, 7 warnings"
+      }
+    },
+    {
+      "id": "S-02",
+      "kind": "bdd-scenario",
+      "title": "ASCII timeline is present",
+      "status": "done",
+      "verify_point": "V-02",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "jq -r '.timeline.ascii[]' ../NextFrame.archive/v0.19.0-verify/showreel-verify.json",
+          "expected": "includes time header and track bars"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/commands/verify.rs",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "jq -r '.timeline.ascii[]' ../NextFrame.archive/v0.19.0-verify/showreel-verify.json"
+        ],
+        "result": "returned 14 ASCII lines including time header and 13 track bars"
+      }
+    },
+    {
+      "id": "S-03",
+      "kind": "bdd-scenario",
+      "title": "Layout and text lint becomes AI-readable checks",
+      "status": "done",
+      "verify_point": "V-03",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "jq -r '.checks[] | select(.id | startswith(\"layout.\") or startswith(\"text.\")) | [.level, .id, .track, .message] | @tsv' ../NextFrame.archive/v0.19.0-verify/showreel-verify.json",
+          "expected": "layout/text checks are listed as warn/error records"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/commands/verify.rs",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "jq -r '.checks[] | select(.id | startswith(\"layout.\") or startswith(\"text.\")) | [.level, .id, .track, .message] | @tsv' ../NextFrame.archive/v0.19.0-verify/showreel-verify.json"
+        ],
+        "result": "reported layout.missing, text.long, and layout.overlap warning rows with track ids"
+      }
+    },
+    {
+      "id": "S-04",
+      "kind": "bdd-scenario",
+      "title": "Typical screenshot plan is generated",
+      "status": "done",
+      "verify_point": "V-04",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "jq -r '.screenshot_plan[] | [.label, .t_ms, .open_command, .capture_command] | @tsv' ../NextFrame.archive/v0.19.0-verify/showreel-verify.json",
+          "expected": "start/quarter/middle/three-quarter/end commands"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/commands/verify.rs",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "jq -r '.screenshot_plan[] | [.label, .t_ms, .open_command, .capture_command] | @tsv' ../NextFrame.archive/v0.19.0-verify/showreel-verify.json",
+          "NEXTFRAME_HOME=examples target/debug/nf open --project v2-showcase --composition showreel-24s --t <point>",
+          "NEXTFRAME_HOME=examples target/debug/nf capture --project v2-showcase --episode showreel-24s --out /Users/Zhuanz/workspace/NextFrame.archive/v0.19.0-verify/shots/<point>.png"
+        ],
+        "result": "screenshot_plan contained 5 points and all 5 capture commands wrote PNG files"
+      }
+    }
+  ],
+  "fixed_docs_check": {
+    "spec/charter.md": "update to state atomic JSON + self-verification as product principle",
+    "spec/architecture.md": "update CLI verification pipeline",
+    "spec/milestones.html": "update v0.19 title from TTS tab direction to AI JSON self-verification",
+    "spec/design/DESIGN.md": "no new product UI or tokens",
+    "README.md": "add `nf verify` to common commands",
+    "CLAUDE.md": "add `nf verify` to AI verification interface and current focus"
+  },
+  "quality_review": {
+    "standards": "spec/standards/00-index.md",
+    "decision": "No new quality dimension. This directly strengthens G3 AI operability and P2 preview/export consistency.",
+    "required_before_close": "Run cargo check/build, `nf verify` on showreel-24s, jq report checks, structure gate, and audit gate."
+  }
+}

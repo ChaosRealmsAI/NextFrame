@@ -1,0 +1,16 @@
+{
+  "id": "layout-lint",
+  "title": "报告暴露 layout/text 风险",
+  "given": "composition 含 component、subtitle、audio 多类型轨道。",
+  "when": "AI 读取 checks[] 中 layout.* 和 text.* 项。",
+  "then": "报告列出 missing layout、越界、长文案、估算重叠等 warning/error，下一轮 AI 能按 track id 修 JSON。",
+  "human_actions": ["read warning list", "inspect affected track ids", "request AI fix JSON"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "jq -r '.checks[] | select(.id | startswith(\"layout.\") or startswith(\"text.\")) | [.level, .id, .track, .message] | @tsv' ../NextFrame.archive/v0.19.0-verify/showreel-verify.json",
+      "expected": "AI-readable check rows"
+    }
+  ],
+  "done": true
+}

@@ -1,0 +1,19 @@
+@import "../../../../design/tokens.css";
+
+html, body { margin: 0; min-height: 100%; font-family: var(--font); color: var(--fg); }
+body { display: grid; place-items: center; padding: 32px; overflow: hidden; }
+.app { width: min(1120px, 96vw); height: min(650px, 84vh); border: 1px solid var(--bd); background: rgba(10,10,14,.72); display: grid; grid-template-rows: 44px 1fr 4px; position: relative; box-shadow: 0 28px 80px rgba(0,0,0,.5); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--bd); font: 12px/1 var(--mono); color: var(--accent-l); }
+.body { display: grid; place-items: center; padding: 28px; }
+.terminal { width: min(860px, 92%); border: 1px solid rgba(94,234,212,.32); padding: 24px; background: rgba(0,0,0,.24); font: 14px/1.75 var(--mono); color: var(--fg-2); }
+.line { white-space: pre; opacity: 0; animation: line 10s infinite; }
+.line:nth-child(1) { animation-delay: .2s; color: var(--amber-l); }
+.line:nth-child(2) { animation-delay: 1s; }
+.line:nth-child(3) { animation-delay: 1.8s; }
+.line:nth-child(4) { animation-delay: 2.6s; }
+.line:nth-child(5) { animation-delay: 3.4s; }
+.progress { background: var(--accent); transform-origin: left; animation: progress 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 18px; padding: 10px 14px; border: 1px solid var(--amber-b); color: var(--amber-l); background: rgba(224,183,108,.1); opacity: 0; animation: toast 10s infinite; }
+@keyframes line { 0%,8% { opacity: 0; transform: translateX(-8px); } 18%,100% { opacity: 1; transform: translateX(0); } }
+@keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes toast { 0%,82% { opacity: 0; } 88%,96% { opacity: 1; } 100% { opacity: 0; } }

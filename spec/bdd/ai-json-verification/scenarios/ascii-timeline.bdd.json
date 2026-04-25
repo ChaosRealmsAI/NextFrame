@@ -1,0 +1,16 @@
+{
+  "id": "ascii-timeline",
+  "title": "报告展示 ASCII 轨道图",
+  "given": "verify report 已生成。",
+  "when": "AI 读取 timeline.ascii。",
+  "then": "每条轨道用 # 或 ~ 展示开始结束区间，AI 不看截图也能发现时间层级。",
+  "human_actions": ["scan timeline bars", "compare visual/audio/subtitle duration"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "jq -r '.timeline.ascii[]' ../NextFrame.archive/v0.19.0-verify/showreel-verify.json",
+      "expected": "time header plus track bars"
+    }
+  ],
+  "done": true
+}

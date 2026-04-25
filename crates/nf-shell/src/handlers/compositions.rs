@@ -73,7 +73,9 @@ impl CompositionsOpHandler {
         let tracks = value
             .get_mut("tracks")
             .and_then(Value::as_array_mut)
-            .ok_or_else(|| NfError::ValidationFailed("composition.tracks must be an array".to_string()))?;
+            .ok_or_else(|| {
+                NfError::ValidationFailed("composition.tracks must be an array".to_string())
+            })?;
         let track = tracks
             .iter_mut()
             .find(|item| item.get("id").and_then(Value::as_str) == Some(track_id.as_str()))
@@ -103,18 +105,28 @@ impl CompositionsOpHandler {
 }
 
 fn select_composition_value(composition: &Value, params: &Value) -> Result<Value, NfError> {
-    let Some(track_id) = params.get("track").and_then(Value::as_str).filter(|value| !value.is_empty()) else {
+    let Some(track_id) = params
+        .get("track")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    else {
         return Ok(Value::Null);
     };
     let tracks = composition
         .get("tracks")
         .and_then(Value::as_array)
-        .ok_or_else(|| NfError::ValidationFailed("composition.tracks must be an array".to_string()))?;
+        .ok_or_else(|| {
+            NfError::ValidationFailed("composition.tracks must be an array".to_string())
+        })?;
     let track = tracks
         .iter()
         .find(|item| item.get("id").and_then(Value::as_str) == Some(track_id))
         .ok_or_else(|| NfError::ValidationFailed(format!("unknown track: {track_id}")))?;
-    let Some(field) = params.get("field").and_then(Value::as_str).filter(|value| !value.is_empty()) else {
+    let Some(field) = params
+        .get("field")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    else {
         return Ok(track.clone());
     };
     Ok(get_field_path(track, field).cloned().unwrap_or(Value::Null))
@@ -122,7 +134,11 @@ fn select_composition_value(composition: &Value, params: &Value) -> Result<Value
 
 fn get_field_path<'a>(value: &'a Value, field: &str) -> Option<&'a Value> {
     let mut current = value;
-    for part in field.split('.').map(str::trim).filter(|part| !part.is_empty()) {
+    for part in field
+        .split('.')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+    {
         if let Some(index) = path_index(part) {
             current = current.as_array()?.get(index)?;
         } else {
@@ -139,12 +155,19 @@ fn set_field_path(target: &mut Value, field: &str, value: Value) -> Result<(), N
         .filter(|part| !part.is_empty())
         .collect::<Vec<_>>();
     if parts.is_empty() {
-        return Err(NfError::ValidationFailed("field path is required".to_string()));
+        return Err(NfError::ValidationFailed(
+            "field path is required".to_string(),
+        ));
     }
     set_path_part(target, &parts, value, field)
 }
 
-fn set_path_part(target: &mut Value, parts: &[&str], value: Value, field: &str) -> Result<(), NfError> {
+fn set_path_part(
+    target: &mut Value,
+    parts: &[&str],
+    value: Value,
+    field: &str,
+) -> Result<(), NfError> {
     let Some((part, rest)) = parts.split_first() else {
         *target = value;
         return Ok(());
@@ -182,7 +205,10 @@ fn set_path_part(target: &mut Value, parts: &[&str], value: Value, field: &str) 
     }
 
     ensure_object(target);
-    if !target.get(part).is_some_and(|item| item.is_object() || item.is_array()) {
+    if !target
+        .get(part)
+        .is_some_and(|item| item.is_object() || item.is_array())
+    {
         target[*part] = if next_is_array { json!([]) } else { json!({}) };
     }
     let child = target

@@ -7,8 +7,8 @@ use tao::event_loop::{EventLoopProxy, EventLoopWindowTarget};
 use tao::platform::macos::WindowBuilderExtMacOS;
 use tao::window::{Window, WindowBuilder};
 use wry::{
-    http::{header::CONTENT_TYPE, Request, Response},
     WebView, WebViewBuilder,
+    http::{Request, Response, header::CONTENT_TYPE},
 };
 
 use crate::events::UserEvent;
@@ -88,7 +88,9 @@ pub fn create_window(
 
 fn frontend_url(project: &str, episode: &str, composition: Option<&str>) -> String {
     if let Some(composition) = composition {
-        return format!("nextframe://frontend/index.html?project={project}&composition={composition}");
+        return format!(
+            "nextframe://frontend/index.html?project={project}&composition={composition}"
+        );
     }
     format!("nextframe://frontend/index.html?project={project}&episode={episode}")
 }

@@ -123,9 +123,8 @@ pub async fn run(command: SynthCommand) -> Result<()> {
     // so mp3 + timeline.json + srt stay grouped per invocation.
     let out_dir = naming::resolve_output_dir(dir, &filename, subdir);
     if subdir {
-        std::fs::create_dir_all(&out_dir).with_context(|| {
-            format!("failed to create output directory {}", out_dir.display())
-        })?;
+        std::fs::create_dir_all(&out_dir)
+            .with_context(|| format!("failed to create output directory {}", out_dir.display()))?;
     }
     let out_path = out_dir.join(&filename);
 
@@ -153,9 +152,7 @@ pub async fn run(command: SynthCommand) -> Result<()> {
                         Ok(karaoke_path) => crate::output::write_stderr_line(format_args!(
                             "[karaoke] {karaoke_path}"
                         )),
-                        Err(e) => {
-                            crate::output::write_stderr_line(format_args!("[karaoke] {e}"))
-                        }
+                        Err(e) => crate::output::write_stderr_line(format_args!("[karaoke] {e}")),
                     }
                 }
                 Ok(None) => {
@@ -188,9 +185,9 @@ pub async fn run(command: SynthCommand) -> Result<()> {
                 let srt_path = srt::write_srt(&out_path, &timeline.to_boundaries())?;
                 crate::output::write_stderr_line(format_args!("[whisper] srt: {srt_path}"));
                 match crate::output::karaoke::write_karaoke_html(&out_path, &timeline) {
-                    Ok(karaoke_path) => crate::output::write_stderr_line(format_args!(
-                        "[karaoke] {karaoke_path}"
-                    )),
+                    Ok(karaoke_path) => {
+                        crate::output::write_stderr_line(format_args!("[karaoke] {karaoke_path}"))
+                    }
                     Err(e) => crate::output::write_stderr_line(format_args!("[karaoke] {e}")),
                 }
             }
@@ -247,7 +244,10 @@ mod tests {
 
         let base = PathBuf::from("/tmp/nftts-flat");
         let out_dir = resolve_output_dir(&base, "fb.mp3", cmd.subdir);
-        assert_eq!(out_dir.join("fb.mp3"), PathBuf::from("/tmp/nftts-flat/fb.mp3"));
+        assert_eq!(
+            out_dir.join("fb.mp3"),
+            PathBuf::from("/tmp/nftts-flat/fb.mp3")
+        );
     }
 
     #[test]

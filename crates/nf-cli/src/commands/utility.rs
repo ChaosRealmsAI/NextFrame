@@ -1,8 +1,8 @@
 use std::process::Command as ProcessCommand;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use crate::commands::{print_json, HelpArgs};
+use crate::commands::{HelpArgs, print_json};
 use crate::errors::NfError;
 
 const COMMANDS: &[&str] = &[

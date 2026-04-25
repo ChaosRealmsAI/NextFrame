@@ -1,0 +1,16 @@
+{
+  "id": "typical-screenshots",
+  "title": "报告给出典型截图点",
+  "given": "composition duration 已解析。",
+  "when": "AI 读取 screenshot_plan。",
+  "then": "报告给出 start、quarter、middle、three-quarter、end 的 open/capture 命令，视觉复核可重复。",
+  "human_actions": ["open report", "run capture commands if needed", "compare screenshots"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "jq -r '.screenshot_plan[] | [.label, .t_ms, .open_command, .capture_command] | @tsv' ../NextFrame.archive/v0.19.0-verify/showreel-verify.json",
+      "expected": "five repeatable screenshot points"
+    }
+  ],
+  "done": true
+}

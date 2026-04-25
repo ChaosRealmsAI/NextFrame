@@ -6,6 +6,7 @@
 examples/*/compositions/*.json
   -> nf-project validates component registry
   -> nf-project compiles source
+  -> nf-cli verify reports JSON/component/timeline/layout risks
   -> nf-shell opens desktop editor
   -> frontend/nf-components previews and edits
   -> nf-cli/nf-shell saves composition patches
@@ -14,7 +15,7 @@ examples/*/compositions/*.json
 
 ## Module Map
 
-- `crates/nf-cli`: AI-facing command surface. It opens projects, inspects DOM, patches and validates compositions, starts export, checks export status, and cancels export jobs.
+- `crates/nf-cli`: AI-facing command surface. It opens projects, inspects DOM, patches, validates and verifies compositions, starts export, checks export status, and cancels export jobs.
 - `crates/nf-shell`: desktop app shell. It owns windows, WebView IPC, project handlers, export job state, and process cleanup.
 - `crates/nf-project`: storage, component registry validation, and compiler for projects, episodes, and v2 compositions.
 - `crates/nf-recorder`: export engine that drives the runtime and encodes MP4.
@@ -57,6 +58,21 @@ examples/{project}/components/{component-id}.js
 - `nf composition validate` emits structured JSON with available components, used components, track usage, observed params, warnings, and errors.
 
 The compiler still embeds source into `source.components`; preview and recorder load that same compiled source so validation, preview, and export stay on one contract.
+
+## AI Verification Contract
+
+`nf verify --project --composition` is the composition-level QA entry for AI-authored JSON.
+
+It runs without opening the editor:
+
+- loads the project and v2 composition from storage.
+- runs `nf-project` component validation.
+- compiles the same source used by preview/export.
+- emits `timeline.ascii` so AI can inspect timing without screenshots.
+- emits `checks[]` with `ok` / `warn` / `error` levels for component, timeline, layout, and text risks.
+- emits `screenshot_plan[]` with deterministic open/capture commands for visual review.
+
+The verifier does not mutate composition JSON and does not replace real pixel review. Its job is to catch machine-readable JSON problems first and point AI to the exact track/clip that needs repair.
 
 ## Repository Skeleton
 
