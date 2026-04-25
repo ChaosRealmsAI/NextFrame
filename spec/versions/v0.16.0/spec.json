@@ -1,0 +1,160 @@
+{
+  "version": "v0.16.0",
+  "type": "perf",
+  "title": "Export diagnostics and performance map",
+  "status": "done",
+  "verify_points": [
+    {
+      "id": "V-01",
+      "desc": "Diagnostics-enabled showreel export writes a structured JSON report with duration, frame count, average ms/frame, slow spans, top frames, warnings, and artifact paths.",
+      "scenario": "spec/bdd/export-diagnostics/scenarios/perf-json.bdd.json"
+    },
+    {
+      "id": "V-02",
+      "desc": "Desktop inspector shows a 24s performance map with slow spans highlighted and selectable.",
+      "scenario": "spec/bdd/export-diagnostics/scenarios/slow-span-map.bdd.json"
+    },
+    {
+      "id": "V-03",
+      "desc": "Export status/result UI includes diagnostics summary and report path while preserving the open video action.",
+      "scenario": "spec/bdd/export-diagnostics/scenarios/export-report-ui.bdd.json"
+    },
+    {
+      "id": "V-04",
+      "desc": "Diagnostics mode does not regress normal export: MP4 remains 24s with AAC audio, burned-in subtitles, and no residual export processes.",
+      "scenario": "spec/bdd/export-diagnostics/scenarios/diagnostics-regression.bdd.json"
+    }
+  ],
+  "items": [
+    {
+      "id": "S-01",
+      "kind": "metric",
+      "title": "Recorder and nf export diagnostics JSON",
+      "status": "done",
+      "verify_point": "V-01",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --diagnostics --out ../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.mp4",
+          "expected": "export succeeds and final JSON includes diagnostics_path"
+        },
+        {
+          "tool": "state",
+          "command": "jq '.duration_ms, .frames, .avg_ms_per_frame, (.slow_spans | length), (.top_frames | length)' ../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.json",
+          "expected": "diagnostics report has non-empty timing fields and arrays"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-recorder/src/record_loop.rs",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-cli/src/commands/export_cmd.rs",
+          "commit": null
+        }
+      ],
+      "evidence": "../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.json reports duration_ms=24000, frames=720, avg_ms_per_frame=134.29, slow_spans=7, top_frames=10"
+    },
+    {
+      "id": "S-02",
+      "kind": "shell-ipc",
+      "title": "Export status carries diagnostics summary",
+      "status": "done",
+      "verify_point": "V-03",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf export-status --job-id <job>",
+          "expected": "succeeded response includes diagnostics.summary and diagnostics.path"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-shell/src/handlers/export.rs",
+          "commit": null
+        },
+        {
+          "path": "frontend/nf-components/src/storage.ts",
+          "commit": null
+        }
+      ],
+      "evidence": "target/debug/nf export-status --job-id v2-showcase-showreel-24s-2026-04-25T00-16-55Z returned diagnostics.summary and diagnostics.path"
+    },
+    {
+      "id": "S-03",
+      "kind": "ui",
+      "title": "Inspector performance map and diagnostics summary",
+      "status": "done",
+      "verify_point": "V-02",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query 'nf-inspector::shadow [data-export-performance-map]' --get outerHTML",
+          "expected": "outerHTML contains performance map segments and report path"
+        },
+        {
+          "tool": "screenshot",
+          "command": "target/debug/nf capture --project v2-showcase --episode showreel-24s --out ../NextFrame.archive/v0.16.0-verify/performance-map.png",
+          "expected": "desktop PNG shows export diagnostics summary and slow span map"
+        }
+      ],
+      "citations": [
+        {
+          "path": "frontend/nf-components/src/components/inspector.ts",
+          "commit": null
+        },
+        {
+          "path": "frontend/nf-components/src/index.ts",
+          "commit": null
+        }
+      ],
+      "evidence": "devtools found nf-inspector::shadow [data-export-performance-map]; capture saved ../NextFrame.archive/v0.16.0-verify/performance-map.png showing the performance map"
+    },
+    {
+      "id": "S-04",
+      "kind": "regression",
+      "title": "Diagnostics mode export regression guard",
+      "status": "done",
+      "verify_point": "V-04",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "ffprobe -v error -show_entries format=duration -select_streams a:0 -show_entries stream=codec_name -of json ../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.mp4",
+          "expected": "duration is close to 24s and audio codec is aac"
+        },
+        {
+          "tool": "state",
+          "command": "ffmpeg -y -ss 00:00:19 -i ../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.mp4 -frames:v 1 ../NextFrame.archive/v0.16.0-verify/diagnostics-frame-19s.png",
+          "expected": "captured frame contains burned-in subtitle text"
+        },
+        {
+          "tool": "state",
+          "command": "pgrep -fl 'nf-shell|nf-recorder|nf export|ffmpeg' || true",
+          "expected": "no residual export or recorder process remains"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-shell/src/handlers/export.rs",
+          "commit": null
+        }
+      ],
+      "evidence": "ffprobe reported duration=24.000000 and audio codec aac; extracted frame saved ../NextFrame.archive/v0.16.0-verify/diagnostics-frame-19s.png; pgrep found no residual export processes"
+    }
+  ],
+  "poc_topics": [],
+  "fixed_docs_check": {
+    "spec/charter.md": "no change; north star remains JSON to editable/exportable video",
+    "spec/architecture.md": "no new module boundary expected; diagnostics flows through existing nf-recorder, nf-cli, nf-shell, frontend",
+    "spec/milestones.html": "already marks v0.16.0 as current from v0.15.0 closeout; update to done at version close",
+    "spec/design/DESIGN.md": "no new tokens; inspector map uses existing accent/amber/ok semantics",
+    "README.md": "no user entry change during spec; build may update if diagnostics becomes public command surface",
+    "CLAUDE.md": "must update AI verification interface during build if --diagnostics or report command is added"
+  },
+  "quality_review": {
+    "standards": "spec/standards/00-index.md",
+    "decision": "No new quality dimension. Existing G3 AI operability and P2 preview/export consistency cover diagnostics CLI and UI; performance evidence is captured in this version's verify artifacts.",
+    "required_before_close": "Run cargo build/check, frontend npm check/build, JSON validation, diagnostics export, ffprobe/frame extraction, structure gate, and audit gate."
+  }
+}

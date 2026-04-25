@@ -1,0 +1,26 @@
+{
+  "id": "slow-span-map",
+  "title": "桌面端显示 24 秒性能地图",
+  "given": "一次 showreel-24s 导出已经完成并带有 diagnostics report。",
+  "when": "用户回到 inspector 的导出结果区域。",
+  "then": "用户看到按时间分布的性能地图，慢区间以 warning 色高亮，并显示最慢区间的开始/结束时间和 ms/frame。",
+  "human_actions": ["wait export done", "scan performance map", "click slow span", "read slow span metrics"],
+  "ai_tools": [
+    {
+      "tool": "click",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --click 'nf-inspector::shadow [data-diagnostics-slow-span]'",
+      "expected": "slow span can be selected in inspector"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query 'nf-inspector::shadow [data-export-performance-map]' --get outerHTML",
+      "expected": "outerHTML contains slow span metrics and diagnostics report path"
+    },
+    {
+      "tool": "screenshot",
+      "command": "target/debug/nf capture --project v2-showcase --episode showreel-24s --out ../NextFrame.archive/v0.16.0-verify/performance-map.png",
+      "expected": "PNG shows export succeeded plus a colored performance map"
+    }
+  ],
+  "done": true
+}

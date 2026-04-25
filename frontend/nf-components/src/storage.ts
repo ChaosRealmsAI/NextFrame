@@ -191,6 +191,7 @@ export interface NfExportStatus {
   out: string;
   profile?: string;
   progress?: NfExportProgress;
+  diagnostics?: NfExportDiagnostics;
   result?: unknown;
   error?: string | null;
 }
@@ -208,6 +209,35 @@ export interface NfExportOptions {
   fps?: number;
   resolution?: string;
   parallel?: number;
+  diagnostics?: boolean;
+}
+
+export interface NfExportDiagnostics {
+  path?: string;
+  summary?: {
+    duration_ms?: number;
+    frames?: number;
+    avg_ms_per_frame?: number;
+    max_ms_per_frame?: number;
+    slow_threshold_ms?: number;
+    slow_spans?: number;
+    top_frames?: number;
+  };
+  slow_spans?: Array<{
+    start_frame?: number;
+    end_frame?: number;
+    start_ms?: number;
+    end_ms?: number;
+    frames?: number;
+    avg_ms_per_frame?: number;
+    max_ms_per_frame?: number;
+  }>;
+  top_frames?: Array<{
+    seq?: number;
+    t_ms?: number;
+    t_exact_ms?: number;
+    encode_ms?: number;
+  }>;
 }
 
 export interface NfExportOpen {

@@ -28,6 +28,7 @@ struct ExportJob {
     progress: ExportProgress,
     pid: Option<u32>,
     result: Option<Value>,
+    diagnostics: Option<Value>,
     error: Option<String>,
 }
 
@@ -93,6 +94,10 @@ impl ExportOpHandler {
             .filter(|value| !value.is_empty())
             .map(ToString::to_string);
         let parallel = params.get("parallel").and_then(Value::as_u64);
+        let diagnostics = params
+            .get("diagnostics")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         let job_id = export_job_id(&project, &episode);
         let out = export_output_path(&self.storage, &project, &episode, &job_id);
         let nf_bin = nf_cli_binary();
@@ -119,6 +124,7 @@ impl ExportOpHandler {
                     progress: ExportProgress::new("queued"),
                     pid: None,
                     result: None,
+                    diagnostics: None,
                     error: None,
                 },
             );
@@ -154,6 +160,9 @@ impl ExportOpHandler {
             }
             if let Some(parallel) = parallel {
                 command.arg("--parallel").arg(parallel.to_string());
+            }
+            if diagnostics {
+                command.arg("--diagnostics");
             }
             command.arg("--out").arg(&out_for_thread);
             #[cfg(unix)]
@@ -303,6 +312,7 @@ impl ExportOpHandler {
             "profile": job.profile,
             "progress": job.progress.to_json(),
             "result": job.result,
+            "diagnostics": job.diagnostics,
             "error": job.error
         }))
     }
@@ -375,6 +385,7 @@ fn finish_export_job(
             if job.status == ExportStatus::Cancelled {
                 job.pid = None;
                 if let Some(result) = result {
+                    job.diagnostics = result.get("diagnostics").cloned();
                     job.result = Some(result);
                 }
                 return;
@@ -382,6 +393,7 @@ fn finish_export_job(
             job.status = status;
             job.pid = None;
             if let Some(result) = result {
+                job.diagnostics = result.get("diagnostics").cloned();
                 job.result = Some(result);
             }
             job.error = error;

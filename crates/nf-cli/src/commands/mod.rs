@@ -672,6 +672,11 @@ pub struct ExportArgs {
         help = "Print recorder JSONL progress events before the final summary JSON"
     )]
     pub events: bool,
+    #[arg(
+        long,
+        help = "Write a structured export diagnostics JSON next to the MP4 and include its path in the final summary"
+    )]
+    pub diagnostics: bool,
 }
 
 #[derive(Debug, Args)]

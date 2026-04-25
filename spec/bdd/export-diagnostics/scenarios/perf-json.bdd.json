@@ -1,0 +1,21 @@
+{
+  "id": "perf-json",
+  "title": "导出产出结构化性能诊断 JSON",
+  "given": "用户要导出 v2-showcase/showreel-24s，并开启 diagnostics。",
+  "when": "recorder 完成逐帧捕获、编码和音频 mux。",
+  "then": "导出旁边生成 diagnostics JSON，包含 duration_ms、frames、avg_ms_per_frame、slow_spans、top_frames、warnings 和 artifact paths。",
+  "human_actions": ["choose draft export", "enable diagnostics", "click export", "wait succeeded", "open diagnostics report"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --diagnostics --out ../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.mp4",
+      "expected": "final JSON contains diagnostics_path and export succeeds"
+    },
+    {
+      "tool": "state",
+      "command": "jq '.duration_ms, .frames, .avg_ms_per_frame, (.slow_spans | length), (.top_frames | length)' ../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.json",
+      "expected": "duration is 24000, frames is 720, and slow_spans/top_frames arrays exist"
+    }
+  ],
+  "done": true
+}

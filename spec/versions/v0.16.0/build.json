@@ -1,0 +1,67 @@
+{
+  "version": "v0.16.0",
+  "title": "Export diagnostics and performance map",
+  "session": "codex-2026-04-25-v016",
+  "status": "done",
+  "drafts": {
+    "proposals": [],
+    "merged": "spec/versions/v0.16.0/drafts/merged.md"
+  },
+  "inputs": {
+    "spec": "spec/versions/v0.16.0/spec.json",
+    "bdd": "spec/bdd/export-diagnostics/feature.json"
+  },
+  "tasks": [
+    {
+      "id": "T-01",
+      "title": "CLI diagnostics JSON",
+      "bdd_scenarios": ["perf-json", "diagnostics-regression"],
+      "wave": 1,
+      "status": "done",
+      "verify_evidence": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --diagnostics completed and wrote ../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.json"
+    },
+    {
+      "id": "T-02",
+      "title": "Shell export status diagnostics",
+      "bdd_scenarios": ["export-report-ui"],
+      "wave": 1,
+      "status": "done",
+      "verify_evidence": "export-status for job v2-showcase-showreel-24s-2026-04-25T00-16-55Z returned diagnostics.summary and diagnostics.path"
+    },
+    {
+      "id": "T-03",
+      "title": "Inspector performance map",
+      "bdd_scenarios": ["slow-span-map", "export-report-ui"],
+      "wave": 1,
+      "status": "done",
+      "verify_evidence": "devtools found [data-export-performance-map] and capture saved ../NextFrame.archive/v0.16.0-verify/performance-map.png"
+    },
+    {
+      "id": "T-04",
+      "title": "Export regression verification",
+      "bdd_scenarios": ["diagnostics-regression"],
+      "wave": 2,
+      "status": "done",
+      "verify_evidence": "ffprobe reported 24.000000s and AAC audio; frame extraction at 19s succeeded; pgrep found no residual nf-shell/nf-recorder/nf export/ffmpeg"
+    }
+  ],
+  "waves": [
+    {
+      "id": 1,
+      "tasks": ["T-01", "T-02", "T-03"],
+      "reviewed": true
+    },
+    {
+      "id": 2,
+      "tasks": ["T-04"],
+      "reviewed": true
+    }
+  ],
+  "failures": [
+    {
+      "id": "F-01",
+      "status": "external-cancel",
+      "summary": "First desktop export verification was cancelled by user at about 33%; rerun completed successfully."
+    }
+  ]
+}

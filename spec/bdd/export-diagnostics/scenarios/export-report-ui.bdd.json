@@ -1,0 +1,21 @@
+{
+  "id": "export-report-ui",
+  "title": "导出完成后显示诊断摘要和报告路径",
+  "given": "导出成功且 shell export.status 拿到 diagnostics summary。",
+  "when": "前端轮询 export-status 返回 succeeded。",
+  "then": "inspector 展示总耗时、平均帧耗时、最慢帧、慢区间数量和 diagnostics report path；打开视频按钮仍可用。",
+  "human_actions": ["wait export done", "read diagnostics summary", "copy/open report path", "click open video"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "target/debug/nf export-status --job-id <job>",
+      "expected": "succeeded response includes diagnostics.summary and diagnostics.path"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query 'nf-inspector::shadow [data-export-diagnostics-summary]' --get textContent",
+      "expected": "text contains avg, slow spans, and report path"
+    }
+  ],
+  "done": true
+}

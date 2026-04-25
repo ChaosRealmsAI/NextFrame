@@ -17,8 +17,10 @@ use serde::Serialize;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 static QUIET: AtomicBool = AtomicBool::new(false);
+static CAPTURE: OnceLock<Mutex<Option<Vec<serde_json::Value>>>> = OnceLock::new();
 
 /// Recorder stdout events · tagged by `event` field.
 /// Historical: v1.14 recorder stdout event schema.
@@ -131,11 +133,12 @@ pub enum Event {
 ///
 /// Never panics · serialization or io errors degrade to a stderr notice.
 pub fn emit(e: Event) {
-    if QUIET.load(Ordering::Relaxed) {
-        return;
-    }
     match serde_json::to_string(&e) {
         Ok(line) => {
+            capture_event(&line);
+            if QUIET.load(Ordering::Relaxed) {
+                return;
+            }
             let stdout = std::io::stdout();
             let mut lock = stdout.lock();
             let _ = writeln!(lock, "{line}");
@@ -149,4 +152,53 @@ pub fn emit(e: Event) {
 
 pub fn set_quiet(quiet: bool) {
     QUIET.store(quiet, Ordering::Relaxed);
+}
+
+pub struct EventCaptureGuard;
+
+impl EventCaptureGuard {
+    pub fn finish(self) -> Vec<serde_json::Value> {
+        let captured = finish_capture();
+        std::mem::forget(self);
+        captured
+    }
+}
+
+impl Drop for EventCaptureGuard {
+    fn drop(&mut self) {
+        let _ = finish_capture();
+    }
+}
+
+pub fn start_capture() -> EventCaptureGuard {
+    let lock = CAPTURE.get_or_init(|| Mutex::new(None));
+    if let Ok(mut capture) = lock.lock() {
+        *capture = Some(Vec::new());
+    }
+    EventCaptureGuard
+}
+
+fn capture_event(line: &str) {
+    let Some(lock) = CAPTURE.get() else {
+        return;
+    };
+    let Ok(mut capture) = lock.lock() else {
+        return;
+    };
+    let Some(events) = capture.as_mut() else {
+        return;
+    };
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
+        events.push(value);
+    }
+}
+
+fn finish_capture() -> Vec<serde_json::Value> {
+    let Some(lock) = CAPTURE.get() else {
+        return Vec::new();
+    };
+    match lock.lock() {
+        Ok(mut capture) => capture.take().unwrap_or_default(),
+        Err(_) => Vec::new(),
+    }
 }

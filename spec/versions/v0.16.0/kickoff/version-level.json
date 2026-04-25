@@ -1,0 +1,62 @@
+{
+  "version": "v0.16.0",
+  "type": "perf",
+  "chosen": "Export diagnostics and performance map",
+  "why": "v0.15.0 proved the complete 24s audible captioned showreel export, but the blocking slowdown was still discovered from raw logs and manual investigation. Before adding more authoring or generation power, export needs a product-visible diagnosis surface that shows where time is spent and which spans are slow.",
+  "changed_from": "v0.15.0 full showreel export stability",
+  "constraints": {
+    "no_vanity": "Visible effect = after export, PM can see a 24s performance map with slow spans and top timing numbers instead of reading raw recorder logs.",
+    "no_overreach": "This version only adds export diagnostics data, CLI verification, shell status/report plumbing, and inspector performance map UI. It does not add cloud export, new component syntax, new TTS generation, or broad editor redesign.",
+    "no_rush": "The diagnostics schema, CLI help, UI state, and verification evidence must be stable enough for future versions to rely on.",
+    "must_verify": "Acceptance = export showreel-24s with diagnostics enabled, inspect the JSON report, see the inspector performance map, and confirm normal export still succeeds with audio/subtitles."
+  },
+  "success_picture": "User exports showreel-24s and sees export succeeded plus a 24s performance map. Slow regions are highlighted, top slow frames/spans are listed, and the report path can be inspected by AI tools.",
+  "cost_estimate": "AI scale: 2-5h",
+  "risks": [
+    "Recorder timing data may be too coarse unless frame capture and encode timing are separated enough for useful diagnosis.",
+    "Inspector UI can become noisy if it shows every frame instead of grouped slow spans.",
+    "Diagnostics must not slow draft export enough to create a new performance regression."
+  ],
+  "candidates": [
+    {
+      "id": "C-01",
+      "title": "Export diagnostics and performance map",
+      "selected": true,
+      "why": "Direct continuation from v0.15.0 blocker. It makes future slowdowns product-visible and AI-verifiable.",
+      "constraints_check": "Visible, one version, testable by CLI and screenshot, no unrelated feature work.",
+      "cost_estimate": "2-5h"
+    },
+    {
+      "id": "C-02",
+      "title": "High-ceiling JSON component engineering",
+      "selected": false,
+      "why": "Important for future component growth, but it should come after export observability so new components cannot hide performance regressions.",
+      "constraints_check": "Visible only indirectly unless paired with new component UI; defer.",
+      "cost_estimate": "3-6h"
+    },
+    {
+      "id": "C-03",
+      "title": "Make online editing truly usable",
+      "selected": false,
+      "why": "Strong PM-facing value, but it expands editor interaction surface before export diagnosis is reliable.",
+      "constraints_check": "Too broad for the immediate post-stability bottleneck; defer.",
+      "cost_estimate": "4-8h"
+    },
+    {
+      "id": "C-04",
+      "title": "TTS and subtitle generation loop",
+      "selected": false,
+      "why": "High product value, but it increases audio/subtitle/render complexity and should ride on diagnostics.",
+      "constraints_check": "Would combine generation and export risks; defer.",
+      "cost_estimate": "4-8h"
+    },
+    {
+      "id": "C-05",
+      "title": "Quality debt only: lift G1 from C to A",
+      "selected": false,
+      "why": "Useful but PM-visible value is weaker. Keep quality gate in v0.16 closeout instead of making it the whole version.",
+      "constraints_check": "Verifiable but not the best next product slice.",
+      "cost_estimate": "1-3h"
+    }
+  ]
+}
