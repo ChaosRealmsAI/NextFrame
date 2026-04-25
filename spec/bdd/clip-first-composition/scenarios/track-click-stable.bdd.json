@@ -1,0 +1,13 @@
+{
+  "id": "track-click-stable",
+  "given": "A clip-first composition is open and one local clip is selected.",
+  "when": "The user clicks a timeline track row or a clip item inside the selected local clip.",
+  "then": "The editor does not perform a redundant whole-card reselection or preview remount.",
+  "human_actions": ["select Intro", "click local timeline row", "click local timeline item"],
+  "ai_tools": [
+    { "tool": "open", "command": "NEXTFRAME_HOME=examples target/debug/nf open --project v2-showcase --composition showreel-clip-first --t 0" },
+    { "tool": "click", "command": "NEXTFRAME_HOME=examples target/debug/nf click --project v2-showcase --episode showreel-clip-first --selector 'nf-clips::shadow .clip-row[data-id=\"intro\"]'" },
+    { "tool": "click", "command": "NEXTFRAME_HOME=examples target/debug/nf click --project v2-showcase --episode showreel-clip-first --selector 'nf-timeline::shadow nf-track[data-track-id=\"stage\"]::shadow .tl-row'" },
+    { "tool": "capture", "command": "NEXTFRAME_HOME=examples target/debug/nf capture --project v2-showcase --episode showreel-clip-first --out ../NextFrame.archive/v0.21.0-verify/track-click-stable.png" }
+  ]
+}
