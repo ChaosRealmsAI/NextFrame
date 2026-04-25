@@ -7,10 +7,13 @@
     "one-command-verify",
     "ascii-timeline",
     "layout-lint",
-    "typical-screenshots"
+    "typical-screenshots",
+    "overlap-allowed",
+    "anchor-contract",
+    "raw-time-warning"
   ],
   "completion": {
-    "total": 4,
-    "done": 4
+    "total": 7,
+    "done": 7
   }
 }

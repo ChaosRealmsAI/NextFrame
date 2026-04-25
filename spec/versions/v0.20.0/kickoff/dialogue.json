@@ -1,0 +1,15 @@
+{
+  "version": "v0.20.0",
+  "session": "41256e05",
+  "turns": [
+    {
+      "at": "2026-04-25 11:20",
+      "user": "重叠是可以的，轨道设计可以重叠。重要的是自动发现不符合预期的错误。还有时间锚点要设计好，确保 AI 会用，全自动。",
+      "interpreted_as": "Do not repair/flag overlap by default. Build intent-aware verification and anchor guidance."
+    },
+    {
+      "at": "2026-04-25 11:24",
+      "assistant_decision": "v0.20 scope: remove naive overlap warning, add report intent policy, add anchor_guide, warn on raw track times."
+    }
+  ]
+}

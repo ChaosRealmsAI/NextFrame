@@ -1,0 +1,102 @@
+{
+  "version": "v0.20.0",
+  "type": "feature",
+  "title": "Intent-aware verification and anchor contract",
+  "status": "done",
+  "verify_points": [
+    {
+      "id": "V-01",
+      "desc": "Verifier says overlap is allowed by default and no longer emits layout.overlap for normal layered compositions.",
+      "scenario": "spec/bdd/ai-json-verification/scenarios/overlap-allowed.bdd.json"
+    },
+    {
+      "id": "V-02",
+      "desc": "Verifier emits anchor_guide with named anchors and per-track anchor usage.",
+      "scenario": "spec/bdd/ai-json-verification/scenarios/anchor-contract.bdd.json"
+    },
+    {
+      "id": "V-03",
+      "desc": "Verifier warns when a track uses raw numeric time instead of anchor expressions.",
+      "scenario": "spec/bdd/ai-json-verification/scenarios/raw-time-warning.bdd.json"
+    }
+  ],
+  "items": [
+    {
+      "id": "S-01",
+      "kind": "bdd-scenario",
+      "title": "Overlap allowed by intent",
+      "status": "done",
+      "verify_point": "V-01",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-24s --out ../NextFrame.archive/v0.20.0-verify/showreel-verify.json | jq '{overlap_policy: .intent.overlap_policy, overlap_checks: [.checks[] | select(.id==\"layout.overlap\")]}'",
+          "expected": "overlap_policy is allowed-by-default and overlap_checks is empty"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/commands/verify.rs",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "result": "showreel returned overlap_policy=allowed-by-default and no layout.overlap checks"
+      }
+    },
+    {
+      "id": "S-02",
+      "kind": "bdd-scenario",
+      "title": "Anchor guide teaches AI time editing",
+      "status": "done",
+      "verify_point": "V-02",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "jq '{anchors: .anchor_guide.anchors, tracks: .anchor_guide.tracks[0:3], anchor_checks: [.checks[] | select(.id|startswith(\"anchor.\"))]}' ../NextFrame.archive/v0.20.0-verify/showreel-verify.json",
+          "expected": "anchors are listed and anchor.contract is ok"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/commands/verify.rs",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "result": "showreel reported 7 anchors and anchor.contract ok for 13 track ranges"
+      }
+    },
+    {
+      "id": "S-03",
+      "kind": "bdd-scenario",
+      "title": "Raw numeric track time is warned",
+      "status": "done",
+      "verify_point": "V-03",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "NEXTFRAME_HOME=/Users/Zhuanz/workspace/NextFrame.archive/v0.20.0-verify/raw-time-home target/debug/nf verify --project v2-showcase --composition showreel-24s --out /Users/Zhuanz/workspace/NextFrame.archive/v0.20.0-verify/raw-time-report.json | jq '[.checks[] | select(.id==\"anchor.raw-time\")]'",
+          "expected": "contains anchor.raw-time for main-title"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/commands/verify.rs",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "result": "raw-time fixture reported anchor.raw-time on main-title"
+      }
+    }
+  ],
+  "fixed_docs_check": {
+    "spec/charter.md": "no change; v0.19 already established atomic JSON self-verification",
+    "spec/architecture.md": "update AI Verification Contract with overlap policy and anchor contract",
+    "spec/milestones.html": "mark v0.20.0 done and move next slot to visual unexpected-error detection",
+    "spec/design/DESIGN.md": "no new product UI or tokens",
+    "README.md": "no command surface change beyond existing nf verify",
+    "CLAUDE.md": "update nf verify line with intent/anchor semantics"
+  }
+}

@@ -1,0 +1,11 @@
+@import "../../../../design/tokens.css";
+html,body{margin:0;min-height:100%;font-family:var(--font);color:var(--fg)}
+body{display:grid;place-items:center;padding:32px;overflow:hidden}
+.app{width:min(1100px,96vw);height:min(620px,84vh);border:1px solid var(--bd);background:rgba(10,10,14,.72);display:grid;grid-template-rows:44px 1fr 4px;position:relative;box-shadow:0 28px 80px rgba(0,0,0,.5)}
+.top{display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--bd);font:12px/1 var(--mono);color:var(--accent-l)}
+.stage{position:relative;margin:24px;border:1px solid var(--bd);background:radial-gradient(circle,rgba(167,139,250,.16),transparent 58%)}
+.layer{position:absolute;padding:18px;border:1px solid rgba(94,234,212,.55);background:rgba(94,234,212,.08);font:14px/1 var(--mono);animation:layer 10s infinite}
+.a{left:25%;top:36%;width:34%;height:16%}.b{left:40%;top:42%;width:34%;height:16%;border-color:var(--amber-b);color:var(--amber-l)}
+.policy{position:absolute;left:24px;bottom:24px;padding:12px;border:1px solid var(--bd);font:13px/1.5 var(--mono);color:var(--teal-l)}
+.progress{background:var(--accent);transform-origin:left;animation:progress 10s linear infinite}.toast{position:absolute;right:18px;bottom:18px;padding:10px 14px;border:1px solid var(--amber-b);color:var(--amber-l);background:rgba(224,183,108,.1);opacity:0;animation:toast 10s infinite}
+@keyframes layer{0%,25%{opacity:.45}45%,100%{opacity:1}}@keyframes progress{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes toast{0%,82%{opacity:0}88%,96%{opacity:1}100%{opacity:0}}

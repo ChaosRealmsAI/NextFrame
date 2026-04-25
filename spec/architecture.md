@@ -69,10 +69,12 @@ It runs without opening the editor:
 - runs `nf-project` component validation.
 - compiles the same source used by preview/export.
 - emits `timeline.ascii` so AI can inspect timing without screenshots.
+- emits `intent.overlap_policy=allowed-by-default`; multi-track overlap is normal video design and is not a verifier error by itself.
+- emits `anchor_guide` so AI edits time with named anchors such as `intro`, `layers + 1s`, and `out` instead of raw numeric track times.
 - emits `checks[]` with `ok` / `warn` / `error` levels for component, timeline, layout, and text risks.
 - emits `screenshot_plan[]` with deterministic open/capture commands for visual review.
 
-The verifier does not mutate composition JSON and does not replace real pixel review. Its job is to catch machine-readable JSON problems first and point AI to the exact track/clip that needs repair.
+The verifier does not mutate composition JSON and does not replace real pixel review. Its job is to catch machine-readable JSON problems first, avoid false positives from normal layered design, and point AI to the exact track/clip that needs repair.
 
 ## Repository Skeleton
 

@@ -1,0 +1,15 @@
+{
+  "id": "raw-time-warning",
+  "title": "裸数字时间会提醒 AI 改用锚点",
+  "given": "测试 composition 把 main-title 的 time.start/time.end 改成裸数字。",
+  "when": "AI 运行 nf verify。",
+  "then": "报告输出 anchor.raw-time warning，指向 main-title。",
+  "human_actions": ["read warning", "ask AI to replace raw time with anchor expression"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=/Users/Zhuanz/workspace/NextFrame.archive/v0.20.0-verify/raw-time-home target/debug/nf verify --project v2-showcase --composition showreel-24s --out /Users/Zhuanz/workspace/NextFrame.archive/v0.20.0-verify/raw-time-report.json | jq '[.checks[] | select(.id==\"anchor.raw-time\")]'"
+    }
+  ],
+  "done": true
+}
