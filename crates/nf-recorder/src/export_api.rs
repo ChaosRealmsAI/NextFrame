@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use crate::orchestrator;
 use crate::pipeline::VideoCodec;
 use crate::record_loop::{self, RecordConfig, RecordError};
+use crate::snapshot::{self, SnapshotError};
 use crate::OutputStats;
 
 /// nf-runtime 浏览器端 IIFE 产物 · 编译时 inline · 跟 nf-shell preview 同源。
@@ -38,6 +39,7 @@ const TRACK_TEXT: &str = include_str!("../../nf-tracks/official/text.js");
 const TRACK_OVERLAY: &str = include_str!("../../nf-tracks/official/overlay.js");
 const TRACK_COMPONENT: &str = include_str!("../../nf-tracks/official/component.js");
 const TRACK_WEBGL_PARTICLES: &str = include_str!("../../nf-tracks/community/webgl-particles.js");
+const RENDER_SOURCE_SCHEMA_VERSION: &str = "nf.render_source.v1";
 
 fn track_source_for(kind: &str) -> Option<&'static str> {
     match kind {
@@ -167,6 +169,153 @@ struct ResolvedExportPreset {
     codec: VideoCodec,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct RenderSourceSummary {
+    pub schema_version: String,
+    pub duration_ms: u64,
+    pub viewport: (u32, u32),
+    pub tracks: usize,
+    pub clips: usize,
+    pub components: usize,
+    pub visual_tracks: usize,
+    pub audio_tracks: usize,
+    pub background: String,
+    pub warnings: Vec<String>,
+}
+
+pub fn validate_render_source_file(source_path: &Path) -> Result<RenderSourceSummary, String> {
+    let source_text = std::fs::read_to_string(source_path)
+        .map_err(|err| format!("read source {}: {err}", source_path.display()))?;
+    let source_json: serde_json::Value =
+        serde_json::from_str(&source_text).map_err(|err| format!("source JSON: {err}"))?;
+    validate_render_source(&source_json)
+}
+
+pub fn validate_render_source(
+    source_json: &serde_json::Value,
+) -> Result<RenderSourceSummary, String> {
+    let root = source_json
+        .as_object()
+        .ok_or_else(|| "render source must be a JSON object".to_string())?;
+    let schema_version = root
+        .get("schema_version")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "schema_version is required".to_string())?;
+    if schema_version != RENDER_SOURCE_SCHEMA_VERSION {
+        return Err(format!(
+            "schema_version must be {RENDER_SOURCE_SCHEMA_VERSION} (got {schema_version})"
+        ));
+    }
+    let duration_ms = root
+        .get("duration_ms")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| "duration_ms is required".to_string())?;
+    if duration_ms == 0 {
+        return Err("duration_ms must be > 0".to_string());
+    }
+    let viewport = root
+        .get("viewport")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| "viewport object is required".to_string())?;
+    let vp_w = viewport
+        .get("w")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| "viewport.w is required".to_string())?;
+    let vp_h = viewport
+        .get("h")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| "viewport.h is required".to_string())?;
+    if vp_w == 0 || vp_h == 0 || vp_w > u64::from(u32::MAX) || vp_h > u64::from(u32::MAX) {
+        return Err(format!(
+            "viewport must be a positive u32 size (got {vp_w}x{vp_h})"
+        ));
+    }
+    let tracks = root
+        .get("tracks")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| "tracks array is required".to_string())?;
+    if tracks.is_empty() {
+        return Err("tracks must not be empty".to_string());
+    }
+    let components = root
+        .get("components")
+        .and_then(serde_json::Value::as_object)
+        .map(serde_json::Map::len)
+        .unwrap_or(0);
+    let background = resolve_stage_background(source_json);
+    let mut warnings = Vec::new();
+    let mut clips = 0_usize;
+    let mut visual_tracks = 0_usize;
+    let mut audio_tracks = 0_usize;
+
+    for track in tracks {
+        let track_id = track
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("<missing>");
+        let kind = track
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| format!("track '{track_id}' kind is required"))?;
+        if kind == "audio" {
+            audio_tracks += 1;
+        } else {
+            visual_tracks += 1;
+        }
+        let track_clips = track
+            .get("clips")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| format!("track '{track_id}' clips array is required"))?;
+        if track_clips.is_empty() {
+            warnings.push(format!("track '{track_id}' has no clips"));
+        }
+        for clip in track_clips {
+            clips += 1;
+            let clip_id = clip
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("<missing>");
+            let begin = clip
+                .get("begin_ms")
+                .or_else(|| clip.get("begin"))
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| format!("clip '{track_id}.{clip_id}' begin_ms is required"))?;
+            let end = clip
+                .get("end_ms")
+                .or_else(|| clip.get("end"))
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| format!("clip '{track_id}.{clip_id}' end_ms is required"))?;
+            if end <= begin {
+                return Err(format!(
+                    "clip '{track_id}.{clip_id}' end_ms must be greater than begin_ms"
+                ));
+            }
+            if end > duration_ms {
+                warnings.push(format!(
+                    "clip '{track_id}.{clip_id}' ends after source duration"
+                ));
+            }
+        }
+    }
+
+    if visual_tracks == 0 {
+        return Err("at least one non-audio visual track is required".to_string());
+    }
+
+    Ok(RenderSourceSummary {
+        schema_version: schema_version.to_string(),
+        duration_ms,
+        viewport: (vp_w as u32, vp_h as u32),
+        tracks: tracks.len(),
+        clips,
+        components,
+        visual_tracks,
+        audio_tracks,
+        background,
+        warnings,
+    })
+}
+
 /// 高层 lib API · 输入 source.json 路径 · 输出 MP4。
 ///
 /// Historical: v1.44 high-level lib export API.
@@ -208,6 +357,8 @@ pub async fn run_export_from_source(
     // Parse 一次拿到 viewport · 同时用于构建 tracks map / 应用 resolution preset。
     let mut source_json: serde_json::Value = serde_json::from_str(&source_text)
         .map_err(|e| RecordError::BundleLoadFailed(format!("source.json not valid JSON: {e}")))?;
+    validate_render_source(&source_json)
+        .map_err(|err| RecordError::BundleLoadFailed(format!("invalid render source: {err}")))?;
     let preset = resolve_export_preset(&source_json, &opts)?;
     override_source_viewport(&mut source_json, preset.viewport);
     let tracks_map_json = build_tracks_map_json(&source_json);
@@ -286,6 +437,62 @@ pub async fn run_export_from_source(
     // 清临时文件 · 不管 result 成功与否。
     let _ = std::fs::remove_file(&tmp_html);
 
+    result
+}
+
+pub async fn snapshot_from_source(
+    source_path: &Path,
+    output: &Path,
+    t_ms: u64,
+    viewport_override: Option<ExportResolution>,
+) -> Result<(), SnapshotError> {
+    let source_text = std::fs::read_to_string(source_path).map_err(|err| {
+        SnapshotError::BundleLoad(format!("read source.json {}: {err}", source_path.display()))
+    })?;
+    let mut source_json: serde_json::Value = serde_json::from_str(&source_text)
+        .map_err(|err| SnapshotError::BundleLoad(format!("source.json not valid JSON: {err}")))?;
+    validate_render_source(&source_json)
+        .map_err(|err| SnapshotError::BundleLoad(format!("invalid render source: {err}")))?;
+    let opts = ExportOpts {
+        duration_s: source_json
+            .get("duration_ms")
+            .and_then(serde_json::Value::as_f64)
+            .unwrap_or(1000.0)
+            / 1000.0,
+        resolution_override: viewport_override,
+        ..Default::default()
+    };
+    let preset = resolve_export_preset(&source_json, &opts)
+        .map_err(|err| SnapshotError::BundleLoad(format!("{err}")))?;
+    override_source_viewport(&mut source_json, preset.viewport);
+    let tracks_map_json = build_tracks_map_json(&source_json);
+    let stage_background = resolve_stage_background(&source_json);
+    let source_text = serde_json::to_string(&source_json)
+        .map_err(|err| SnapshotError::BundleLoad(format!("serialize source.json: {err}")))?;
+    let requested_duration_ms = source_json
+        .get("duration_ms")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(t_ms.max(1));
+    let (vp_w, vp_h) = preset.viewport;
+    let html = build_export_html(
+        &source_text,
+        &tracks_map_json,
+        vp_w,
+        vp_h,
+        requested_duration_ms,
+        &stage_background,
+    );
+    let pid = std::process::id();
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    let tmp_html: PathBuf =
+        std::env::temp_dir().join(format!("nf-source-snapshot-{pid}-{nanos}.html"));
+    std::fs::write(&tmp_html, html.as_bytes())
+        .map_err(|err| SnapshotError::BundleLoad(format!("write tmp html: {err}")))?;
+    let result = snapshot::snapshot(&tmp_html, t_ms, output, vp_w, vp_h).await;
+    let _ = std::fs::remove_file(&tmp_html);
     result
 }
 
@@ -611,5 +818,35 @@ mod tests {
         });
 
         assert_eq!(resolve_stage_background(&source), "#000");
+    }
+
+    #[test]
+    fn validates_render_source_v1_contract() {
+        let source = json!({
+            "schema_version": "nf.render_source.v1",
+            "duration_ms": 1000,
+            "viewport": { "w": 1280, "h": 720 },
+            "theme": { "background": "#05070a" },
+            "components": {},
+            "tracks": [{
+                "id": "intro.stage",
+                "kind": "component",
+                "clips": [{
+                    "id": "intro.stage.main",
+                    "begin_ms": 0,
+                    "end_ms": 1000,
+                    "params": {}
+                }]
+            }],
+            "assets": []
+        });
+
+        let result = validate_render_source(&source);
+        assert!(result.is_ok(), "valid render_source.v1: {result:?}");
+        if let Ok(summary) = result {
+            assert_eq!(summary.duration_ms, 1000);
+            assert_eq!(summary.visual_tracks, 1);
+            assert_eq!(summary.background, "#05070a");
+        }
     }
 }

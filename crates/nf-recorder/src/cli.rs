@@ -12,7 +12,14 @@
 //!    ```
 //!    Still works · dispatcher falls through to `record_loop::run`.
 //!
-//! 2. **Snapshot** (T-18 · product-internal pixel sampling)
+//! 2. **Source export / validation** (v0.22 · stable render_source.v1 contract)
+//!    ```bash
+//!    nf-recorder validate-source --source render_source.json
+//!    nf-recorder export --source render_source.json --profile draft -o out.mp4
+//!    nf-recorder snapshot-source --source render_source.json --t-ms 2500 -o frame.png
+//!    ```
+//!
+//! 3. **Snapshot** (T-18 · product-internal pixel sampling)
 //!    ```bash
 //!    nf-recorder snapshot <bundle> --t-ms 2500 -o frame.png [--viewport 1920x1080]
 //!    ```
@@ -84,6 +91,59 @@ pub struct Cli {
 /// Subcommands · T-18 adds `Snapshot` · T-17 adds `Verify`.
 #[derive(Subcommand, Debug)]
 pub enum Command {
+    /// Validate stable render_source.v1 JSON before recording.
+    #[command(name = "validate-source")]
+    ValidateSource {
+        /// Path to render_source.v1 JSON.
+        #[arg(long = "source")]
+        source: PathBuf,
+    },
+
+    /// Export MP4 from stable render_source.v1 JSON.
+    Export {
+        /// Path to render_source.v1 JSON.
+        #[arg(long = "source")]
+        source: PathBuf,
+        /// Named preset: draft, standard, final, final-fast.
+        #[arg(long = "profile", default_value = "draft")]
+        profile: String,
+        /// Output MP4 path.
+        #[arg(short = 'o', long = "output")]
+        output: PathBuf,
+        /// Optional diagnostics JSON path.
+        #[arg(long = "diagnostics")]
+        diagnostics: Option<PathBuf>,
+        /// Stream recorder progress JSONL to stdout/stderr.
+        #[arg(long)]
+        events: bool,
+        /// Optional resolution override: 720p, 1080p, 4k.
+        #[arg(long = "resolution")]
+        resolution: Option<String>,
+        /// Optional fps override: 30 or 60.
+        #[arg(long = "fps")]
+        fps: Option<u32>,
+        /// Optional parallel slice count: 1..8.
+        #[arg(long = "parallel")]
+        parallel: Option<usize>,
+    },
+
+    /// Snapshot one frame from stable render_source.v1 JSON.
+    #[command(name = "snapshot-source")]
+    SnapshotSource {
+        /// Path to render_source.v1 JSON.
+        #[arg(long = "source")]
+        source: PathBuf,
+        /// Time `t` in milliseconds.
+        #[arg(long = "t-ms")]
+        t_ms: u64,
+        /// Output PNG path.
+        #[arg(short = 'o', long = "output")]
+        output: PathBuf,
+        /// Optional resolution override: 720p, 1080p, 4k.
+        #[arg(long = "resolution")]
+        resolution: Option<String>,
+    },
+
     /// Snapshot a single frame at `t_ms` · writes PNG via same CARenderer path
     /// as record (VP-4 pixel-diff relies on identical pixel provenance).
     Snapshot {

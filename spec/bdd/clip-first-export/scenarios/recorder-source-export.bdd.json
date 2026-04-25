@@ -7,11 +7,11 @@
   "ai_tools": [
     {
       "tool": "export",
-      "command": "target/debug/nf-recorder export --source=/tmp/showreel.render_source.json --profile=draft --out=/tmp/showreel.video.mp4 --diagnostics=/tmp/showreel.diagnostics.json"
+      "command": "target/debug/nf-recorder export --source=/tmp/showreel.render_source.json --profile=draft --output=/tmp/showreel.video.mp4 --diagnostics=/tmp/showreel.diagnostics.json"
     },
     {
       "tool": "diagnostics",
-      "command": "jq '.schema_version,.frames,.duration_ms,.warnings' /tmp/showreel.diagnostics.json"
+      "command": "jq '.schema_version,.stats.frames,.stats.duration_ms,.source_summary.warnings' /tmp/showreel.diagnostics.json"
     }
   ]
 }

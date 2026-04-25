@@ -25,6 +25,7 @@ fn run() -> Result<(), NfError> {
         Command::Export(args) => commands::export_cmd::run(args),
         Command::Verify(args) => commands::verify::run(args),
         Command::PosterImport(args) => commands::poster_import::run(args),
+        Command::VerifyExport(args) => commands::verify_export::run(args),
         Command::ExportStatus(args) => commands::send_ipc(
             "export.status",
             serde_json::json!({ "job_id": args.job_id }),

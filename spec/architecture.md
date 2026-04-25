@@ -45,12 +45,13 @@ pending → running → done | failed | cancelled
 ```text
 examples/*/compositions/*.json
   -> nf-project validates component registry and clip-local track structure
-  -> nf-project compiles clip-first authoring JSON into runtime source
+  -> nf-project compiles clip-first authoring JSON into render_source.v1
+  -> nf-recorder validates render_source.v1 and renders MP4
   -> nf-cli verify reports JSON/component/timeline/layout risks
   -> nf-shell opens desktop editor
   -> frontend/nf-components previews and edits
   -> nf-cli/nf-shell saves composition patches
-  -> nf-recorder renders source to MP4
+  -> nf-cli verify-export samples final MP4 frames against clip windows
 ```
 
 ## Module Map
@@ -112,6 +113,36 @@ examples/{project}/components/{component-id}.js
 - `nf composition validate` emits structured JSON with available components, used components, track usage, observed params, warnings, and errors.
 
 The compiler still embeds source into `source.components`; preview and recorder load that same compiled source so validation, preview, and export stay on one contract.
+
+## Export Contracts
+
+There are two JSON contracts, and they must not be blurred:
+
+```text
+composition.json          # creative authoring protocol; AI writes this
+  -> nf composition compile
+render_source.json        # render protocol; recorder accepts this only
+  -> nf-recorder export
+video.mp4 + diagnostics
+  -> nf verify-export
+report.json
+```
+
+`composition.json` can contain clips, local anchors, tracks, TTS metadata, and subtitle timelines. It is allowed to be human/AI-friendly.
+
+`render_source.v1` is resolved and machine-only:
+
+- `schema_version = "nf.render_source.v1"`
+- `duration_ms`
+- numeric `begin_ms` / `end_ms` on every runtime clip
+- `viewport.w` / `viewport.h`
+- `theme.background` used behind transparent components
+- `components` source registry
+- `assets[]`
+
+`nf-recorder` does not read project storage, desktop selection, composition JSON, or unresolved anchors. `nf export --project --composition` remains a compatible wrapper: it compiles composition JSON, writes the sibling source file, invokes recorder from source, then muxes audio where needed.
+
+`nf verify-export --source --video --out` is the final MP4 guard. It samples clip midpoint frames from the MP4 and fails obvious visual regressions such as magenta canary background leakage or blank frames. This specifically protects the multi-clip export path where later clips can otherwise render with the wrong stage state.
 
 ## AI Verification Contract
 

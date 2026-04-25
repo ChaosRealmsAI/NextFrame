@@ -11,7 +11,7 @@
     },
     {
       "tool": "report",
-      "command": "jq '.ok,.checks[] | select(.status != \"passed\")' /tmp/showreel.verify-export.json"
+      "command": "jq '.ok,.checks[] | select(.status != \"pass\")' /tmp/showreel.verify-export.json"
     }
   ]
 }

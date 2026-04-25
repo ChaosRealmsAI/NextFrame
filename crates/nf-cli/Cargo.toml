@@ -19,6 +19,7 @@ directories.workspace = true
 interprocess.workspace = true
 nf-project = { path = "../nf-project" }
 nf-recorder = { path = "../nf-recorder" }
+png = "0.17"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

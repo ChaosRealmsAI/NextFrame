@@ -10,5 +10,8 @@ pub mod record_loop; // T-09 填
 pub mod snapshot; // T-18 · product-internal single-frame PNG
 pub mod verify_mp4; // T-17 · product-internal MP4 atom verifier // Historical: v1.44 · high-level lib API · 从 source.json 直接导出 MP4
 
-pub use export_api::{run_export_from_source, ExportOpts, ExportResolution};
+pub use export_api::{
+    run_export_from_source, snapshot_from_source, validate_render_source,
+    validate_render_source_file, ExportOpts, ExportResolution, RenderSourceSummary,
+};
 pub use pipeline::{ColorSpec, OutputStats, PipelineError, RecordOpts, RecordPipeline, VideoCodec};
