@@ -2,7 +2,7 @@
   "feature": "export-diagnostics",
   "name": "导出诊断和性能地图",
   "summary": "完整导出不再是黑盒。导出过程产出结构化诊断报告，桌面端显示时间轴性能地图，AI 可以用 CLI 读取慢帧、慢区间和导出健康状态。",
-  "status": "spec",
+  "status": "active",
   "scenarios": [
     {
       "id": "perf-json",
@@ -27,6 +27,6 @@
   ],
   "completion": {
     "total": 4,
-    "done": 0
+    "done": 4
   }
 }

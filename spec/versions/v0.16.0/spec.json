@@ -2,7 +2,7 @@
   "version": "v0.16.0",
   "type": "perf",
   "title": "Export diagnostics and performance map",
-  "status": "locked",
+  "status": "done",
   "verify_points": [
     {
       "id": "V-01",
@@ -30,7 +30,7 @@
       "id": "S-01",
       "kind": "metric",
       "title": "Recorder and nf export diagnostics JSON",
-      "status": "pending",
+      "status": "done",
       "verify_point": "V-01",
       "ai_tools": [
         {
@@ -54,13 +54,13 @@
           "commit": null
         }
       ],
-      "evidence": null
+      "evidence": "../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.json reports duration_ms=24000, frames=720, avg_ms_per_frame=134.29, slow_spans=7, top_frames=10"
     },
     {
       "id": "S-02",
       "kind": "shell-ipc",
       "title": "Export status carries diagnostics summary",
-      "status": "pending",
+      "status": "done",
       "verify_point": "V-03",
       "ai_tools": [
         {
@@ -79,13 +79,13 @@
           "commit": null
         }
       ],
-      "evidence": null
+      "evidence": "target/debug/nf export-status --job-id v2-showcase-showreel-24s-2026-04-25T00-16-55Z returned diagnostics.summary and diagnostics.path"
     },
     {
       "id": "S-03",
       "kind": "ui",
       "title": "Inspector performance map and diagnostics summary",
-      "status": "pending",
+      "status": "done",
       "verify_point": "V-02",
       "ai_tools": [
         {
@@ -109,13 +109,13 @@
           "commit": null
         }
       ],
-      "evidence": null
+      "evidence": "devtools found nf-inspector::shadow [data-export-performance-map]; capture saved ../NextFrame.archive/v0.16.0-verify/performance-map.png showing the performance map"
     },
     {
       "id": "S-04",
       "kind": "regression",
       "title": "Diagnostics mode export regression guard",
-      "status": "pending",
+      "status": "done",
       "verify_point": "V-04",
       "ai_tools": [
         {
@@ -140,7 +140,7 @@
           "commit": null
         }
       ],
-      "evidence": null
+      "evidence": "ffprobe reported duration=24.000000 and audio codec aac; extracted frame saved ../NextFrame.archive/v0.16.0-verify/diagnostics-frame-19s.png; pgrep found no residual export processes"
     }
   ],
   "poc_topics": [],

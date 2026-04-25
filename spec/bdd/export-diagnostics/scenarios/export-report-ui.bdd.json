@@ -17,5 +17,5 @@
       "expected": "text contains avg, slow spans, and report path"
     }
   ],
-  "done": false
+  "done": true
 }

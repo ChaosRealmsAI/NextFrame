@@ -17,5 +17,5 @@
       "expected": "duration is 24000, frames is 720, and slow_spans/top_frames arrays exist"
     }
   ],
-  "done": false
+  "done": true
 }

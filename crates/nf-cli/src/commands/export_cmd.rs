@@ -83,16 +83,16 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
 
     let diagnostics = if args.diagnostics {
         let diagnostics_path = diagnostics_path_for_output(&args.out);
-        let report = build_diagnostics_report(
-            &captured_events,
-            &args.out,
-            &source_path,
-            &diagnostics_path,
-            &stats,
-            &preset,
+        let report = build_diagnostics_report(DiagnosticsReportInput {
+            events: &captured_events,
+            out: &args.out,
+            source_path: &source_path,
+            diagnostics_path: &diagnostics_path,
+            stats: &stats,
+            preset: &preset,
             audio_muxed,
-            &warnings,
-        );
+            warnings: &warnings,
+        });
         write_json_file(&diagnostics_path, &report)?;
         Some((diagnostics_path, report))
     } else {
@@ -404,17 +404,20 @@ fn diagnostics_path_for_output(out: &Path) -> PathBuf {
     out.with_extension("json")
 }
 
-fn build_diagnostics_report(
-    events: &[Value],
-    out: &Path,
-    source_path: &Path,
-    diagnostics_path: &Path,
-    stats: &nf_recorder::OutputStats,
-    preset: &ExportProfile,
+struct DiagnosticsReportInput<'a> {
+    events: &'a [Value],
+    out: &'a Path,
+    source_path: &'a Path,
+    diagnostics_path: &'a Path,
+    stats: &'a nf_recorder::OutputStats,
+    preset: &'a ExportProfile,
     audio_muxed: bool,
-    warnings: &[String],
-) -> Value {
-    let mut frames = events
+    warnings: &'a [String],
+}
+
+fn build_diagnostics_report(input: DiagnosticsReportInput<'_>) -> Value {
+    let mut frames = input
+        .events
         .iter()
         .filter(|event| event.get("event").and_then(Value::as_str) == Some("record.frame"))
         .filter_map(frame_diagnostic)
@@ -429,30 +432,30 @@ fn build_diagnostics_report(
         .iter()
         .map(|frame| frame.encode_ms)
         .fold(0.0_f64, f64::max);
-    let frame_budget = 1000.0 / f64::from(preset.fps);
+    let frame_budget = 1000.0 / f64::from(input.preset.fps);
     let slow_threshold = frame_budget.mul_add(1.5, 0.0).max(avg * 1.5).max(50.0);
     let top_frames = top_frames(&frames, 10);
     let slow_spans = slow_spans(&frames, slow_threshold);
     json!({
         "schema": "nextframe.export.diagnostics.v1",
-        "out": out.display().to_string(),
-        "source": source_path.display().to_string(),
-        "diagnostics_path": diagnostics_path.display().to_string(),
-        "profile": preset.name,
-        "resolution": preset.resolution.as_str(),
-        "fps": preset.fps,
-        "parallel": preset.parallel,
-        "duration_ms": stats.duration_ms,
-        "frames": stats.frames,
-        "size_bytes": stats.size_bytes,
-        "audio_muxed": audio_muxed,
+        "out": input.out.display().to_string(),
+        "source": input.source_path.display().to_string(),
+        "diagnostics_path": input.diagnostics_path.display().to_string(),
+        "profile": input.preset.name,
+        "resolution": input.preset.resolution.as_str(),
+        "fps": input.preset.fps,
+        "parallel": input.preset.parallel,
+        "duration_ms": input.stats.duration_ms,
+        "frames": input.stats.frames,
+        "size_bytes": input.stats.size_bytes,
+        "audio_muxed": input.audio_muxed,
         "avg_ms_per_frame": round2(avg),
         "max_ms_per_frame": round2(max),
         "frame_budget_ms": round2(frame_budget),
         "slow_threshold_ms": round2(slow_threshold),
         "slow_spans": slow_spans,
         "top_frames": top_frames,
-        "warnings": warnings
+        "warnings": input.warnings
     })
 }
 
@@ -504,25 +507,29 @@ fn slow_spans(frames: &[FrameDiagnostic], threshold: f64) -> Vec<Value> {
         if frame.encode_ms >= threshold {
             current.push(frame);
         } else if !current.is_empty() {
-            spans.push(span_json(&current));
+            if let Some(span) = span_json(&current) {
+                spans.push(span);
+            }
             current.clear();
         }
     }
     if !current.is_empty() {
-        spans.push(span_json(&current));
+        if let Some(span) = span_json(&current) {
+            spans.push(span);
+        }
     }
     spans
 }
 
-fn span_json(frames: &[&FrameDiagnostic]) -> Value {
-    let first = frames.first().expect("slow span must have first frame");
-    let last = frames.last().expect("slow span must have last frame");
+fn span_json(frames: &[&FrameDiagnostic]) -> Option<Value> {
+    let first = frames.first()?;
+    let last = frames.last()?;
     let avg = frames.iter().map(|frame| frame.encode_ms).sum::<f64>() / frames.len() as f64;
     let max = frames
         .iter()
         .map(|frame| frame.encode_ms)
         .fold(0.0_f64, f64::max);
-    json!({
+    Some(json!({
         "start_frame": first.seq,
         "end_frame": last.seq,
         "start_ms": first.t_ms,
@@ -530,7 +537,7 @@ fn span_json(frames: &[&FrameDiagnostic]) -> Value {
         "frames": frames.len(),
         "avg_ms_per_frame": round2(avg),
         "max_ms_per_frame": round2(max)
-    })
+    }))
 }
 
 fn diagnostics_summary(report: &Value) -> Value {
