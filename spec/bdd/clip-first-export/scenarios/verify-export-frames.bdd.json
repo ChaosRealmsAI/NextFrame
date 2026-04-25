@@ -1,0 +1,17 @@
+{
+  "id": "verify-export-frames",
+  "given": "A clip-first export MP4 exists with source metadata.",
+  "when": "Verify-export samples clip midpoints and boundary frames.",
+  "then": "No sampled frame exposes the magenta canary, no frame is blank, and the report maps failures to clip id and t_ms.",
+  "human_actions": ["open verification report", "inspect failing keyframes if any"],
+  "ai_tools": [
+    {
+      "tool": "verify",
+      "command": "target/debug/nf verify-export --source=/tmp/showreel.render_source.json --video=/tmp/showreel.video.mp4 --out=/tmp/showreel.verify-export.json"
+    },
+    {
+      "tool": "report",
+      "command": "jq '.ok,.checks[] | select(.status != \"passed\")' /tmp/showreel.verify-export.json"
+    }
+  ]
+}

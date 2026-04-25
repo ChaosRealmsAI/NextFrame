@@ -1,0 +1,56 @@
+{
+  "schema_version": "nf.composition.v1",
+  "id": "clip-first-export-fixture",
+  "title": "Clip First Export Fixture",
+  "sequence": ["intro", "proof", "outro"],
+  "theme": {
+    "background": "#05070a"
+  },
+  "clips": [
+    {
+      "id": "intro",
+      "title": "Intro",
+      "duration_ms": 5200,
+      "anchors": { "in": 0, "out": 5200, "title-in": 400 },
+      "tracks": [
+        {
+          "id": "stage",
+          "kind": "component",
+          "items": [
+            { "id": "bg", "component": "html.stage-background", "begin": "in", "end": "out" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "proof",
+      "title": "Local Tracks",
+      "duration_ms": 6200,
+      "anchors": { "in": 0, "out": 6200 },
+      "tracks": [
+        {
+          "id": "particles",
+          "kind": "component",
+          "items": [
+            { "id": "particles", "component": "canvas.particle-field", "begin": "in", "end": "out" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "title": "Voice Timeline",
+      "duration_ms": 5000,
+      "anchors": { "in": 0, "out": 5000 },
+      "tracks": [
+        {
+          "id": "title",
+          "kind": "component",
+          "items": [
+            { "id": "final", "component": "html.sequence-title", "begin": "in", "end": "out" }
+          ]
+        }
+      ]
+    }
+  ]
+}

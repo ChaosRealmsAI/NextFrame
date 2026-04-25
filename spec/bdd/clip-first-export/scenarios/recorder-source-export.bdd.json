@@ -1,0 +1,17 @@
+{
+  "id": "recorder-source-export",
+  "given": "A valid render_source JSON exists for the clip-first video.",
+  "when": "Recorder exports the source directly without reading desktop state or composition JSON.",
+  "then": "Recorder produces a video-only MP4 and diagnostics JSON from the source contract.",
+  "human_actions": ["start export", "watch job progress", "inspect diagnostics"],
+  "ai_tools": [
+    {
+      "tool": "export",
+      "command": "target/debug/nf-recorder export --source=/tmp/showreel.render_source.json --profile=draft --out=/tmp/showreel.video.mp4 --diagnostics=/tmp/showreel.diagnostics.json"
+    },
+    {
+      "tool": "diagnostics",
+      "command": "jq '.schema_version,.frames,.duration_ms,.warnings' /tmp/showreel.diagnostics.json"
+    }
+  ]
+}

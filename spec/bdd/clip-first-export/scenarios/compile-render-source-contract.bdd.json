@@ -1,0 +1,17 @@
+{
+  "id": "compile-render-source-contract",
+  "given": "AI-authored composition JSON contains multiple ordered clips, local anchors, component tracks, TTS, and subtitles.",
+  "when": "The compiler converts it to render_source JSON.",
+  "then": "The output is resolved, ordered, deterministic, and includes duration, viewport, theme background, tracks, components, assets, and schema_version.",
+  "human_actions": ["review composition fixture", "review expected render source fixture"],
+  "ai_tools": [
+    {
+      "tool": "compile",
+      "command": "target/debug/nf composition compile --project=v2-showcase --composition=showreel-clip-first --out=/tmp/showreel.render_source.json"
+    },
+    {
+      "tool": "validate",
+      "command": "target/debug/nf-recorder validate-source --source=/tmp/showreel.render_source.json"
+    }
+  ]
+}

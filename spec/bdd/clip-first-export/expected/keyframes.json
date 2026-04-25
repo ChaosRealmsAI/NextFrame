@@ -1,0 +1,22 @@
+{
+  "frames": [
+    {
+      "id": "intro-mid",
+      "clip_id": "intro",
+      "t_ms": 2600,
+      "expect": "Stage background is visible with title elements; no magenta canary."
+    },
+    {
+      "id": "proof-mid",
+      "clip_id": "proof",
+      "t_ms": 8300,
+      "expect": "Transparent particle component sits on theme background; no magenta canary."
+    },
+    {
+      "id": "outro-mid",
+      "clip_id": "outro",
+      "t_ms": 13900,
+      "expect": "Outro title sits on theme background with subtitle layer; no magenta canary."
+    }
+  ]
+}

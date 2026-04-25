@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#05070a"/>
+  <path d="M0 0h1280v720H0z" fill="url(#g)"/>
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop stop-color="#a78bfa" stop-opacity=".18"/>
+      <stop offset=".52" stop-color="#11151c"/>
+      <stop offset="1" stop-color="#7bc9b5" stop-opacity=".12"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="#ffffff" stroke-opacity=".08">
+    <path d="M0 96h1280M0 192h1280M0 288h1280M0 384h1280M0 480h1280M0 576h1280"/>
+    <path d="M96 0v720M192 0v720M288 0v720M384 0v720M480 0v720M576 0v720M672 0v720M768 0v720M864 0v720M960 0v720M1056 0v720M1152 0v720"/>
+  </g>
+  <rect x="560" y="188" width="160" height="34" fill="#05070a" stroke="#ffffff" stroke-opacity=".16"/>
+  <text x="640" y="210" text-anchor="middle" fill="#7bc9b5" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="15" font-weight="800">CLIP FIRST</text>
+  <text x="560" y="330" fill="#f4f4f8" fill-opacity=".62" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="72" font-weight="820">AI writes one video</text>
+  <text x="560" y="410" fill="#f4f4f8" fill-opacity=".62" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="72" font-weight="820">segment at a time</text>
+  <text x="640" y="640" text-anchor="middle" fill="#f4f4f8" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="32">A clip is one video segment.</text>
+</svg>
