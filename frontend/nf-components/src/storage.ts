@@ -73,7 +73,6 @@ export interface NfTtsSpec {
   voice?: string | undefined;
   backend?: string | undefined;
   rate?: string | undefined;
-  audio_clip?: string | undefined;
 }
 
 export interface NfLogEntry {
@@ -310,8 +309,11 @@ export interface NfVoiceStatus {
   audio: string;
   timeline: string;
   result?: {
-    audio_clip?: string;
-    subtitle_clip?: string;
+    audio_track?: string;
+    tts_track?: string;
+    subtitle_timeline_track?: string;
+    subtitle_track?: string;
+    clip?: string;
     duration_ms?: number;
   } | null;
   error?: string | null;
@@ -582,11 +584,12 @@ export function synthesizeVoice(
   episodeSlug: string,
   clipId: string,
   text: string,
-  options: Pick<NfTtsSpec, "voice" | "backend" | "rate"> = {},
+  options: Pick<NfTtsSpec, "voice" | "backend" | "rate"> & { composition?: string } = {},
 ): Promise<NfVoiceStart> {
   return shellRequest<NfVoiceStart>("voice.start", {
     project: projectSlug,
     episode: episodeSlug,
+    composition: options.composition,
     clip: clipId,
     text,
     voice: options.voice,
@@ -822,7 +825,7 @@ function normalizeCompositionTrack(
     const start = resolveLocalTime(object, track, anchors, "start", 0);
     const end = resolveLocalTime(object, track, anchors, "end", duration);
     const clipKind = kind === "tts" ? "audio" : kind === "subtitle_timeline" ? "subtitle" : kind;
-    const words = subtitleWords(object.words) ?? subtitleWords(params.words);
+    const words = subtitleWords(object.words) ?? subtitleWords(params["words"]);
     return {
       id: itemId,
       label: stringValue(object.label)
@@ -1141,7 +1144,6 @@ function ttsSpec(value: unknown): NfTtsSpec | undefined {
     voice: stringValue(object.voice),
     backend: stringValue(object.backend),
     rate: stringValue(object.rate),
-    audio_clip: stringValue(object.audio_clip),
   };
   return Object.values(spec).some((item) => item !== undefined) ? spec : undefined;
 }

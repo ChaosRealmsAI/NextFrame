@@ -24,7 +24,7 @@ Example projects live under `examples/`; runtime projects are copied to `~/.next
 `target/debug/nf composition patch --project=<slug> --composition=<slug> [--clip=<id>] --track=<id> [--item=<id>] --field=<path> --value=<json-or-string>` — patch one track or clip item field such as `params.title`, `style.x`, or `time.start`.
 `target/debug/nf composition validate --project=<slug> --composition=<slug>` — validate component registry, files, mount/update exports, import-free ABI, used tracks, and observed params.
 `target/debug/nf verify --project=<slug> --composition=<slug> [--out=<json>] [--screenshot-dir=<dir>]` — verify AI-authored composition JSON: component ABI, compiled source, overlap intent, anchor guide, ASCII timeline, layout/text checks, and typical screenshot commands.
-`target/debug/nf export --project=<slug> --composition=<slug> --profile=draft|standard|final|final-fast --out=<mp4>` — export a v2 composition to MP4 with a named quality/speed profile.
+`target/debug/nf export --project=<slug> --composition=<slug> --profile=draft|standard|final|final-fast --out=<mp4>` — export a composition to MP4 with a named quality/speed profile.
 `target/debug/nf export --project=<slug> --composition=<slug> --profile=draft --diagnostics --out=<mp4>` — export and write a sibling diagnostics JSON with frame timings, slow spans, and top slow frames.
 `target/debug/nf export --project=<slug> --composition=<slug> --fps=30|60 --resolution=720p|1080p|4k --parallel=<1-8> --events --out=<mp4>` — override export settings and stream recorder progress JSONL before the final summary JSON.
 `target/debug/nf export-status --job-id=<id>` — read desktop export job status, including progress and diagnostics summary/path when available.

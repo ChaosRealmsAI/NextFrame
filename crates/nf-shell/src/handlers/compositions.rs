@@ -103,6 +103,17 @@ fn select_composition_value(composition: &Value, params: &Value) -> Result<Value
     {
         return Ok(select_clip_first_value(composition, params)?.clone());
     }
+    if composition.get("clips").and_then(Value::as_array).is_some() {
+        if let Some((clip, track)) = inferred_clip_track(params) {
+            let inferred = json!({
+                "clip": clip,
+                "track": track,
+                "item": params.get("item").cloned().unwrap_or(Value::Null),
+                "field": params.get("field").cloned().unwrap_or(Value::Null)
+            });
+            return Ok(select_clip_first_value(composition, &inferred)?.clone());
+        }
+    }
     let Some(track_id) = params
         .get("track")
         .and_then(Value::as_str)
@@ -214,6 +225,17 @@ fn select_composition_value_mut<'a>(
     {
         return select_clip_first_value_mut(composition, params);
     }
+    if composition.get("clips").and_then(Value::as_array).is_some() {
+        if let Some((clip, track)) = inferred_clip_track(params) {
+            let inferred = json!({
+                "clip": clip,
+                "track": track,
+                "item": params.get("item").cloned().unwrap_or(Value::Null),
+                "field": params.get("field").cloned().unwrap_or(Value::Null)
+            });
+            return select_clip_first_value_mut(composition, &inferred);
+        }
+    }
     let track_id = required_str(params, "track")?;
     let tracks = composition
         .get_mut("tracks")
@@ -225,6 +247,14 @@ fn select_composition_value_mut<'a>(
         .iter_mut()
         .find(|item| item.get("id").and_then(Value::as_str) == Some(track_id.as_str()))
         .ok_or_else(|| NfError::ValidationFailed(format!("unknown track: {track_id}")))
+}
+
+fn inferred_clip_track(params: &Value) -> Option<(&str, &str)> {
+    let track_id = params
+        .get("track")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())?;
+    track_id.split_once('.')
 }
 
 fn select_clip_first_value_mut<'a>(

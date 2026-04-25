@@ -154,6 +154,8 @@ export class NfTimeline extends NfBase {
       : ["scene", "text", "subtitle", "overlay", "trans", "audio"];
     this.dataset.trackCount = String(trackCount);
     this.dataset.trackIds = renderedTrackIds.join(",");
+    this.dataset.mode = clipFirstRows.length > 0 ? "clip-first" : "flat";
+    this.dataset.selectedClipId = selectedCompositionClip?.id ?? "";
     this.root.innerHTML = `
       <div class="timeline">
         <div class="tl-top">
@@ -224,6 +226,15 @@ export class NfTimeline extends NfBase {
     });
     this.root.addEventListener("clip-click", (event) => {
       const detail = (event as CustomEvent<ClipSelectDetail>).detail;
+      if (this.dataset.mode === "clip-first") {
+        const clipId = this.dataset.selectedClipId;
+        if (!clipId) return;
+        this.emit<TimelineClipSelectDetail>("clip-select", {
+          track: detail.kind,
+          "clip-id": clipId,
+        });
+        return;
+      }
       this.emit<TimelineClipSelectDetail>("clip-select", {
         track: detail.kind,
         "clip-id": detail.id,
@@ -238,6 +249,15 @@ export class NfTimeline extends NfBase {
     });
     this.root.querySelectorAll<HTMLElement>("nf-track[data-track-id]").forEach((row) => {
       row.addEventListener("click", () => {
+        if (this.dataset.mode === "clip-first") {
+          const clipId = this.dataset.selectedClipId;
+          if (!clipId) return;
+          this.emit<TimelineClipSelectDetail>("clip-select", {
+            track: (row.getAttribute("kind") ?? "component") as TimelineClipSelectDetail["track"],
+            "clip-id": clipId,
+          });
+          return;
+        }
         const trackId = row.dataset.trackId ?? "";
         if (!trackId) return;
         this.emit<TimelineClipSelectDetail>("clip-select", {
