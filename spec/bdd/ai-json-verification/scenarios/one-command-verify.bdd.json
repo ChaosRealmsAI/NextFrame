@@ -1,0 +1,16 @@
+{
+  "id": "one-command-verify",
+  "title": "AI 一条命令验证 composition JSON",
+  "given": "AI 已生成或修改 v2-showcase/showreel-24s composition JSON。",
+  "when": "AI 运行 nf verify。",
+  "then": "命令输出 JSON report，包含 ok、summary、checks、timeline 和 screenshot_plan；有 error 时退出非零。",
+  "human_actions": ["read report summary", "open checks", "decide pass or fix JSON"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-24s --out ../NextFrame.archive/v0.19.0-verify/showreel-verify.json | jq '.ok, .summary.errors'",
+      "expected": "true and 0"
+    }
+  ],
+  "done": true
+}

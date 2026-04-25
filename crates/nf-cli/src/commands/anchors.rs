@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::commands::{send_ipc, AnchorCommand, AnchorSubcommand};
+use crate::commands::{AnchorCommand, AnchorSubcommand, send_ipc};
 use crate::errors::NfError;
 
 pub fn dispatch(args: AnchorCommand) -> Result<(), NfError> {

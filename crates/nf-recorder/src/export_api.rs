@@ -15,10 +15,10 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::OutputStats;
 use crate::orchestrator;
 use crate::pipeline::VideoCodec;
 use crate::record_loop::{self, RecordConfig, RecordError};
+use crate::OutputStats;
 
 /// nf-runtime 浏览器端 IIFE 产物 · 编译时 inline · 跟 nf-shell preview 同源。
 /// Historical: v1.44 runtime IIFE export source.

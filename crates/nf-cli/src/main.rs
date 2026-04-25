@@ -23,6 +23,7 @@ fn run() -> Result<(), NfError> {
         Command::Capture(args) => commands::app::capture(args),
         Command::Karaoke(args) => commands::karaoke::run(&args.episode_dir),
         Command::Export(args) => commands::export_cmd::run(args),
+        Command::Verify(args) => commands::verify::run(args),
         Command::ExportStatus(args) => commands::send_ipc(
             "export.status",
             serde_json::json!({ "job_id": args.job_id }),

@@ -1,0 +1,15 @@
+{
+  "version": "v0.19.0",
+  "session": "41256e05",
+  "turns": [
+    {
+      "at": "2026-04-25 10:18",
+      "user": "不需要单独的 TTS tab；产品是原子的。重要的是 AI 做 JSON 自己验证，截图、ASCII 轨道、lint、发现重叠，自动给典型截图页面。",
+      "interpreted_as": "Shift v0.19 from TTS UI to AI JSON self-verification."
+    },
+    {
+      "at": "2026-04-25 10:23",
+      "assistant_decision": "Use `nf verify` as the product-facing contract: offline JSON/component/source validation first, with ASCII timeline and screenshot plan; real pixel overlap can build on this later."
+    }
+  ]
+}

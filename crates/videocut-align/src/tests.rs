@@ -3,9 +3,9 @@
 use anyhow::Result;
 use std::sync::{Mutex, OnceLock};
 
+use super::AlignUnit;
 use super::script::align_script_path;
 use super::text::{build_sentences, normalize_language_arg, parse_plain_text, rebuild_words};
-use super::AlignUnit;
 
 fn env_lock() -> &'static Mutex<()> {
     static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();

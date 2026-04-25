@@ -1,0 +1,46 @@
+{
+  "version": "v0.19.0",
+  "type": "feature",
+  "chosen": "AI JSON self-verification loop",
+  "why": "NextFrame should stay atomic: AI edits composition JSON, then the product proves the JSON is renderable, inspectable, and safe enough to preview/export. A separate TTS tab would split the model by feature instead of strengthening the JSON atom loop.",
+  "changed_from": "The previous milestone said TTS and subtitle generation loop. User clarified that TTS should not become a separate product tab; verification of AI-authored JSON is more important.",
+  "constraints": {
+    "no_vanity": "本版看得见的效果 = 一条 `nf verify` 命令输出 JSON report、ASCII 轨道、layout/text lint、典型截图点。",
+    "no_overreach": "本版只做验证闭环 · 不做 TTS tab、不做新 canvas 编辑功能、不做云端 agent。",
+    "no_rush": "验证输出必须机器可读，错误和 warning 要能直接给下一个 AI 修 JSON。",
+    "must_verify": "验收画面 = `nf verify --project v2-showcase --composition showreel-24s` 得到 ok/report/ascii/screenshot_plan · 自验方法 = jq 检查 summary、timeline.ascii、checks、screenshot_plan。"
+  },
+  "success_picture": "PM 能看到一份报告: JSON 通过组件校验，轨道像条形码一样展开，潜在重叠/长文案被标 warning，典型截图时间点明确可执行。",
+  "cost_estimate": "AI 尺度 2-4 小时",
+  "risks": [
+    "纯 JSON layout lint 无法替代真实像素检测，只能先给估算 warning 和截图计划。",
+    "长字幕和背景组件可能产生合理 warning，需要报告区分 error 和 warning。",
+    "如果命令依赖桌面进程会降低自动化稳定性，所以第一版离线读取 JSON。"
+  ],
+  "candidates": [
+    {
+      "id": "chosen",
+      "title": "AI JSON self-verification loop",
+      "why": "最高杠杆：每个后续 AI 改 JSON 都先过机器质检。",
+      "constraints_pass": true
+    },
+    {
+      "id": "rejected-tts-tab",
+      "title": "Dedicated TTS/subtitle tab",
+      "why": "违背原子 JSON 产品方向，容易把生成能力做成孤立页面。",
+      "constraints_pass": false
+    },
+    {
+      "id": "later-pixel-overlap",
+      "title": "Real pixel overlap detector",
+      "why": "应该做，但需要渲染/截图基础更重；本版先产典型截图点和 JSON-level lint。",
+      "constraints_pass": true
+    },
+    {
+      "id": "later-agent-autofix",
+      "title": "AI auto-fix loop after verify",
+      "why": "报告稳定后再让 AI 自动修 JSON，否则闭环不可控。",
+      "constraints_pass": true
+    }
+  ]
+}

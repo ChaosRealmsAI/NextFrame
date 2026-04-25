@@ -5,7 +5,7 @@ NextFrame is an AI-native video editor and runtime. Structured JSON compositions
 The current product loop is:
 
 ```text
-JSON composition -> desktop editor -> live edit -> saved source -> MP4 export
+JSON composition -> AI verify -> desktop editor -> live edit -> saved source -> MP4 export
 ```
 
 ## Run
@@ -43,12 +43,13 @@ Local generated artifacts do not belong in the repository root. Historical snaps
 cargo check -p nf-cli -p nf-shell -p nf-project -p nf-recorder
 cd frontend/nf-components && npm run check && npm run build
 NEXTFRAME_HOME=examples target/debug/nf composition validate --project v2-showcase --composition showreel-24s
+NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-24s --out /tmp/showreel-verify.json
 target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --diagnostics --out /tmp/showreel-24s.mp4
 ```
 
 ## Core Modules
 
-- `nf-cli`: AI-facing command entry, JSON output, editor/export verification commands.
+- `nf-cli`: AI-facing command entry, JSON output, composition verification, editor/export verification commands.
 - `nf-shell`: macOS desktop shell, WebView, IPC, editor window lifecycle.
 - `nf-project`: project storage, v2 composition compilation, and component registry validation.
 - `nf-recorder`: HTML/runtime capture and MP4 export.

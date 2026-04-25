@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use serde_json::Value;
 
@@ -15,6 +17,7 @@ pub mod karaoke;
 pub mod log;
 pub mod projects;
 pub mod utility;
+pub mod verify;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -163,6 +166,28 @@ COMMON ERRORS:
     - invalid profile/resolution/fps/parallel -> exit 2 · hint: run `nf export --help`"#
     )]
     Export(ExportArgs),
+    #[command(
+        about = "Verify a v2 composition JSON for AI-generated edits",
+        long_about = r#"Verify a v2 composition without opening the editor.
+
+The verifier compiles the composition, runs component ABI validation, emits an ASCII timeline,
+checks basic machine-readable layout/text risks, and returns commands for typical screenshot frames.
+
+USAGE:
+    nf verify --project=<slug> --composition=<slug> [--out=<report.json>]
+
+EXAMPLES:
+    nf verify --project=v2-showcase --composition=showreel-24s
+    nf verify --project=v2-showcase --composition=showreel-24s --out=tmp/verify/showreel.json --screenshot-dir=tmp/verify/shots
+
+EXPECTED JSON:
+    {"ok":true,"summary":{"duration_ms":24000,"tracks":11,"errors":0,"warnings":3},"timeline":{"ascii":["time ..."]},"checks":[...]}
+
+COMMON ERRORS:
+    - component validation failed -> exit 2 · hint: run `nf composition validate --project=<slug> --composition=<slug>`
+    - invalid composition JSON -> exit 2 · hint: inspect `checks[]` and `timeline.ascii`"#
+    )]
+    Verify(VerifyArgs),
     #[command(
         name = "export-status",
         about = "Read a running desktop export job status",
@@ -680,6 +705,36 @@ pub struct ExportArgs {
         help = "Write a structured export diagnostics JSON next to the MP4 and include its path in the final summary"
     )]
     pub diagnostics: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct VerifyArgs {
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Project slug, for example v2-showcase"
+    )]
+    pub project: String,
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Composition slug, for example showreel-24s"
+    )]
+    pub composition: String,
+    #[arg(long, value_name = "PATH", help = "Optional JSON report path to write")]
+    pub out: Option<PathBuf>,
+    #[arg(
+        long,
+        value_name = "DIR",
+        help = "Directory used in generated typical screenshot capture commands"
+    )]
+    pub screenshot_dir: Option<PathBuf>,
+    #[arg(
+        long,
+        value_name = "N",
+        help = "ASCII timeline width, clamped to 24..96"
+    )]
+    pub ascii_width: Option<u16>,
 }
 
 #[derive(Debug, Args)]

@@ -1,0 +1,16 @@
+{
+  "feature": "ai-json-verification",
+  "name": "AI JSON 自验证闭环",
+  "summary": "AI 生成或修改 composition JSON 后，产品用一条命令输出机器可读报告、ASCII 轨道、layout/text lint 和典型截图点。",
+  "status": "active",
+  "scenarios": [
+    "one-command-verify",
+    "ascii-timeline",
+    "layout-lint",
+    "typical-screenshots"
+  ],
+  "completion": {
+    "total": 4,
+    "done": 4
+  }
+}

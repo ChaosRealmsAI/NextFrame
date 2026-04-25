@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::commands::{send_ipc, ProjectCommand, ProjectSubcommand};
+use crate::commands::{ProjectCommand, ProjectSubcommand, send_ipc};
 use crate::errors::NfError;
 
 pub fn dispatch(args: ProjectCommand) -> Result<(), NfError> {

@@ -5,9 +5,9 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde_json::Value;
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 struct Harness {
     root: TempDir,

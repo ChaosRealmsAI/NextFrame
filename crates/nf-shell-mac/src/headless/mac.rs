@@ -26,8 +26,7 @@ use objc2::rc::{autoreleasepool, Retained};
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{msg_send, AnyThread, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
-    NSApp, NSApplicationActivationPolicy, NSBackingStoreType, NSImage, NSWindow,
-    NSWindowStyleMask,
+    NSApp, NSApplicationActivationPolicy, NSBackingStoreType, NSImage, NSWindow, NSWindowStyleMask,
 };
 use objc2_core_foundation::{CFDictionary, CFRetained, CFString, CGPoint, CGRect, CGSize};
 use objc2_core_graphics::CGColorSpace;
@@ -823,7 +822,9 @@ fn take_snapshot_blocking(
     })
 }
 
-fn cg_image_from_ns_image(image: &NSImage) -> Result<Retained<objc2_core_graphics::CGImage>, ShellError> {
+fn cg_image_from_ns_image(
+    image: &NSImage,
+) -> Result<Retained<objc2_core_graphics::CGImage>, ShellError> {
     unsafe { image.CGImageForProposedRect_context_hints(std::ptr::null_mut(), None, None) }
         .ok_or_else(|| {
             ShellError::SnapshotFailed("NSImage.CGImageForProposedRect returned nil".into())

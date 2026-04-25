@@ -179,7 +179,10 @@ fn push_pending_project_entry(
 ) -> Result<(), NfError> {
     let mut entries = read_pending_project_entries(storage, project)?;
     entries.push(entry);
-    Ok(atomic_write(&pending_project_log_path(storage, project), &entries)?)
+    Ok(atomic_write(
+        &pending_project_log_path(storage, project),
+        &entries,
+    )?)
 }
 
 fn take_pending_project_entries(

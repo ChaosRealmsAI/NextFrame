@@ -1,0 +1,20 @@
+@import "../../../../design/tokens.css";
+
+html, body { margin: 0; min-height: 100%; font-family: var(--font); color: var(--fg); }
+body { display: grid; place-items: center; padding: 32px; overflow: hidden; }
+.app { width: min(1120px, 96vw); height: min(650px, 84vh); border: 1px solid var(--bd); background: rgba(10,10,14,.72); display: grid; grid-template-rows: 44px 1fr 4px; position: relative; box-shadow: 0 28px 80px rgba(0,0,0,.5); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--bd); font: 12px/1 var(--mono); color: var(--accent-l); }
+.body { display: grid; grid-template-columns: 1fr 330px; min-height: 0; }
+.canvas { position: relative; margin: 24px; border: 1px solid var(--bd); background: radial-gradient(circle at center, rgba(167,139,250,.12), transparent 55%); overflow: hidden; }
+.box { position: absolute; border: 1px solid rgba(94,234,212,.65); color: var(--teal-l); font: 12px/1 var(--mono); padding: 8px; background: rgba(94,234,212,.08); animation: scan 10s infinite; }
+.a { left: 26%; top: 36%; width: 34%; height: 14%; }
+.b { left: 38%; top: 42%; width: 34%; height: 14%; border-color: var(--amber-b); color: var(--amber-l); background: rgba(224,183,108,.1); }
+.checks { border-left: 1px solid var(--bd); padding: 22px; font: 13px/1.55 var(--mono); }
+.check { padding: 10px; margin-bottom: 10px; border: 1px solid var(--bd); opacity: 0; animation: reveal 10s infinite; }
+.warn { color: var(--amber-l); }
+.progress { background: var(--accent); transform-origin: left; animation: progress 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 18px; padding: 10px 14px; border: 1px solid var(--amber-b); color: var(--amber-l); background: rgba(224,183,108,.1); opacity: 0; animation: toast 10s infinite; }
+@keyframes scan { 0%,28% { opacity: .35; } 44%,100% { opacity: 1; } }
+@keyframes reveal { 0%,44% { opacity: 0; transform: translateY(12px); } 54%,100% { opacity: 1; transform: translateY(0); } }
+@keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes toast { 0%,82% { opacity: 0; } 88%,96% { opacity: 1; } 100% { opacity: 0; } }

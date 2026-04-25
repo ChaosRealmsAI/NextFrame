@@ -1,0 +1,19 @@
+@import "../../../../design/tokens.css";
+
+html, body { margin: 0; min-height: 100%; font-family: var(--font); color: var(--fg); }
+body { display: grid; place-items: center; padding: 32px; overflow: hidden; }
+.app { width: min(1120px, 96vw); height: min(650px, 84vh); border: 1px solid var(--bd); background: rgba(10,10,14,.72); display: grid; grid-template-rows: 44px 1fr 4px; position: relative; box-shadow: 0 28px 80px rgba(0,0,0,.5); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--bd); font: 12px/1 var(--mono); color: var(--accent-l); }
+.body { display: grid; grid-template-columns: 42% 58%; min-height: 0; }
+.json, .report { padding: 22px; border-right: 1px solid var(--bd); overflow: hidden; }
+.report { border-right: 0; background: rgba(255,255,255,.025); }
+pre { margin: 0; font: 13px/1.7 var(--mono); color: var(--fg-2); white-space: pre-wrap; }
+.cmd { margin: 16px 0; padding: 12px; border: 1px solid rgba(167,139,250,.36); color: var(--teal-l); font: 13px/1.5 var(--mono); animation: pulse 10s infinite; }
+.check { margin-top: 10px; padding: 10px; border: 1px solid var(--bd); opacity: 0; animation: reveal 10s infinite; }
+.ok { color: var(--teal-l); }
+.progress { background: var(--accent); transform-origin: left; animation: progress 10s linear infinite; }
+.toast { position: absolute; right: 18px; bottom: 18px; padding: 10px 14px; border: 1px solid var(--amber-b); color: var(--amber-l); background: rgba(224,183,108,.1); opacity: 0; animation: toast 10s infinite; }
+@keyframes pulse { 0%,24% { opacity: .45; } 36%,100% { opacity: 1; } }
+@keyframes reveal { 0%,42% { opacity: 0; transform: translateY(12px); } 52%,100% { opacity: 1; transform: translateY(0); } }
+@keyframes progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes toast { 0%,82% { opacity: 0; } 88%,96% { opacity: 1; } 100% { opacity: 0; } }
