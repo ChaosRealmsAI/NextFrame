@@ -1,0 +1,15 @@
+{
+  "id": "clip-first-composition",
+  "name": "Clip-first composition JSON",
+  "rules": [
+    "A composition is the whole video.",
+    "A clip is one video segment and the AI authoring unit.",
+    "Each clip owns local anchors, tracks, and track items.",
+    "TTS, subtitle_timeline, and subtitle are explicit track kinds.",
+    "Subtitles reuse the TTS timeline instead of inventing a separate word timeline."
+  ],
+  "completion": {
+    "scenarios": ["clip-list", "clip-local-tracks", "tts-subtitle-timeline", "export-clip-first"],
+    "status": "implemented"
+  }
+}

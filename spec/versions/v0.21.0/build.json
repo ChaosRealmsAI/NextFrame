@@ -1,0 +1,13 @@
+{
+  "version": "v0.21.0",
+  "status": "verified",
+  "tasks": [
+    { "id": "spec", "status": "completed", "output": "spec/versions/v0.21.0/spec.json" },
+    { "id": "schema", "status": "completed", "output": "examples/v2-showcase/compositions/showreel-clip-first.json" },
+    { "id": "compiler", "status": "completed", "output": "crates/nf-project/src/lib.rs" },
+    { "id": "cli", "status": "completed", "output": "composition clip/track/item selectors" },
+    { "id": "editor", "status": "completed", "output": "clip-first timeline rows" },
+    { "id": "docs", "status": "completed", "output": "fixed docs" },
+    { "id": "verify", "status": "completed", "output": "../NextFrame.archive/v0.21.0-verify/showreel-clip-first-verify.json" }
+  ]
+}

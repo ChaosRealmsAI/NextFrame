@@ -4,8 +4,8 @@
 
 ```text
 examples/*/compositions/*.json
-  -> nf-project validates component registry
-  -> nf-project compiles source
+  -> nf-project validates component registry and clip-local track structure
+  -> nf-project compiles clip-first authoring JSON into runtime source
   -> nf-cli verify reports JSON/component/timeline/layout risks
   -> nf-shell opens desktop editor
   -> frontend/nf-components previews and edits
@@ -17,7 +17,7 @@ examples/*/compositions/*.json
 
 - `crates/nf-cli`: AI-facing command surface. It opens projects, inspects DOM, patches, validates and verifies compositions, starts export, checks export status, and cancels export jobs.
 - `crates/nf-shell`: desktop app shell. It owns windows, WebView IPC, project handlers, export job state, and process cleanup.
-- `crates/nf-project`: storage, component registry validation, and compiler for projects, episodes, and v2 compositions.
+- `crates/nf-project`: storage, component registry validation, and compiler for projects, episodes, and compositions.
 - `crates/nf-recorder`: export engine that drives the runtime and encodes MP4.
 - `crates/nf-shell-mac`: macOS capture bridge used by recorder and shell capture paths.
 - `frontend/nf-components`: zero-framework Web Components for topbar, timeline, preview, inspector, and editing events.
@@ -41,9 +41,23 @@ Forbidden directions:
 - export must not use a different source than preview/editor save paths.
 - generated artifacts must not become source dependencies.
 
-## Component Contract
+## Composition Contract
 
-V2 component tracks reference project-local source files:
+The current authoring model is clip-first:
+
+```text
+composition
+  clips[]                 # top-level video segments
+    anchors{}             # local names such as in, out, title-in
+    tracks[]              # component / tts / subtitle_timeline / subtitle / audio
+      items[]             # timed units inside the track
+```
+
+AI writes JSON at clip granularity. A clip is one video segment; it is not a small component fragment. The compiler then flattens clip-local tracks into the existing runtime `source.tracks[]` so preview and export keep one renderer path.
+
+`tts` and `subtitle_timeline` are data tracks. `tts` points at generated audio and may declare the nftts metadata. `subtitle_timeline` points at the nftts word timeline. `subtitle` renders those words and should not carry a duplicated hand-written word timeline unless there is no TTS source.
+
+Component tracks reference project-local source files:
 
 ```text
 examples/{project}/components/{component-id}.js
@@ -65,12 +79,12 @@ The compiler still embeds source into `source.components`; preview and recorder 
 
 It runs without opening the editor:
 
-- loads the project and v2 composition from storage.
+- loads the project and composition from storage.
 - runs `nf-project` component validation.
 - compiles the same source used by preview/export.
 - emits `timeline.ascii` so AI can inspect timing without screenshots.
 - emits `intent.overlap_policy=allowed-by-default`; multi-track overlap is normal video design and is not a verifier error by itself.
-- emits `anchor_guide` so AI edits time with named anchors such as `intro`, `layers + 1s`, and `out` instead of raw numeric track times.
+- emits `anchor_guide` so AI edits clip-local time with named anchors such as `in`, `title-in + 0.4s`, and `out` instead of raw numeric times.
 - emits `checks[]` with `ok` / `warn` / `error` levels for component, timeline, layout, and text risks.
 - emits `screenshot_plan[]` with deterministic open/capture commands for visual review.
 

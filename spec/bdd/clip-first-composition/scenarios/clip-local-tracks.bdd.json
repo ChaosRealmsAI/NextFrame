@@ -1,0 +1,11 @@
+{
+  "id": "clip-local-tracks",
+  "given": "The proof clip has local anchors and component, tts, subtitle_timeline, and subtitle tracks.",
+  "when": "The user selects the proof clip.",
+  "then": "The timeline shows tracks inside proof with local in/out anchor timing.",
+  "human_actions": ["select proof clip", "inspect timeline rows"],
+  "ai_tools": [
+    { "tool": "show", "command": "target/debug/nf composition show --project v2-showcase --composition showreel-clip-first --clip proof" },
+    { "tool": "show-track", "command": "target/debug/nf composition show --project v2-showcase --composition showreel-clip-first --clip proof --track stack" }
+  ]
+}

@@ -25,8 +25,10 @@ Secondary user: AI coding agents that need stable CLI verification and clear rep
 ## Terms
 
 - Composition: one JSON video document under `examples/*/compositions/`.
-- Track: one top-level v2 composition lane with time, z, component, params, and style.
-- Atom: one independently timed and inspectable JSON unit, usually represented as a track or clip.
+- Clip: one video segment inside a composition. This is the AI authoring unit.
+- Anchor: a named time point scoped to one clip unless explicitly documented otherwise.
+- Track: one lane inside a clip. Tracks have `kind` values such as `component`, `tts`, `subtitle_timeline`, `subtitle`, or `audio`.
+- Item: one timed unit inside a track.
 - Component: HTML/SVG/Canvas/JS module mounted by the runtime.
 - Source: compiled export/preview JSON consumed by the runtime and recorder.
 - Archive: local non-source material stored outside the repo at `../NextFrame.archive/`.

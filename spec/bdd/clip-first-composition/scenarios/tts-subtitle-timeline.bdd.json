@@ -1,0 +1,11 @@
+{
+  "id": "tts-subtitle-timeline",
+  "given": "nftts has produced audio/proof-main.timeline.json.",
+  "when": "The clip compiler sees subtitle_timeline and subtitle tracks.",
+  "then": "The subtitle runtime track receives word timings from the timeline file.",
+  "human_actions": ["inspect subtitle track", "preview karaoke subtitles"],
+  "ai_tools": [
+    { "tool": "validate", "command": "target/debug/nf composition validate --project v2-showcase --composition showreel-clip-first" },
+    { "tool": "verify", "command": "target/debug/nf verify --project v2-showcase --composition showreel-clip-first --out ../NextFrame.archive/v0.21.0-verify/showreel-clip-first-verify.json" }
+  ]
+}

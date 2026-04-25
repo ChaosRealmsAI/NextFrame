@@ -1,0 +1,11 @@
+{
+  "version": "v0.21.0",
+  "type": "minor",
+  "theme": "clip-first composition model",
+  "constraints": [
+    "composition is the whole video",
+    "clip is one video segment and the AI authoring unit",
+    "each clip owns local anchors and tracks",
+    "tts and subtitles are track kinds; subtitle_timeline reuses TTS word timings"
+  ]
+}

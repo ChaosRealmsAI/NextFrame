@@ -13,7 +13,7 @@ JSON composition -> AI verify -> desktop editor -> live edit -> saved source -> 
 ```bash
 cargo build -p nf-shell -p nf-cli
 target/debug/nf-shell
-target/debug/nf open --project v2-showcase --composition showreel-24s
+target/debug/nf open --project v2-showcase --composition showreel-clip-first
 ```
 
 Example projects live in `examples/`. Runtime copies live under `~/.nextframe/`.
@@ -42,16 +42,16 @@ Local generated artifacts do not belong in the repository root. Historical snaps
 ./scripts/check-structure.sh
 cargo check -p nf-cli -p nf-shell -p nf-project -p nf-recorder
 cd frontend/nf-components && npm run check && npm run build
-NEXTFRAME_HOME=examples target/debug/nf composition validate --project v2-showcase --composition showreel-24s
-NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-24s --out /tmp/showreel-verify.json
-target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --diagnostics --out /tmp/showreel-24s.mp4
+NEXTFRAME_HOME=examples target/debug/nf composition validate --project v2-showcase --composition showreel-clip-first
+NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-clip-first --out /tmp/showreel-verify.json
+target/debug/nf export --project v2-showcase --composition showreel-clip-first --profile draft --diagnostics --out /tmp/showreel-clip-first.mp4
 ```
 
 ## Core Modules
 
 - `nf-cli`: AI-facing command entry, JSON output, composition verification, editor/export verification commands.
 - `nf-shell`: macOS desktop shell, WebView, IPC, editor window lifecycle.
-- `nf-project`: project storage, v2 composition compilation, and component registry validation.
+- `nf-project`: project storage, clip-first composition compilation, and component registry validation.
 - `nf-recorder`: HTML/runtime capture and MP4 export.
 - `nf-shell-mac`: macOS WebKit/CoreAnimation capture layer.
 - `frontend/nf-components`: editor UI, timeline, inspector, preview wiring.

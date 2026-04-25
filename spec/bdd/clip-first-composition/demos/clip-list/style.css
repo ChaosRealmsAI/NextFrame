@@ -1,0 +1,11 @@
+body { margin: 0; background: #111318; color: #f7f3ea; font: 14px system-ui, sans-serif; }
+.shell { height: 100vh; display: grid; grid-template-columns: 220px 1fr; }
+aside { padding: 24px; border-right: 1px solid #323844; display: grid; gap: 12px; align-content: start; }
+.clip { padding: 14px; border: 1px solid #3b4654; background: #1c222b; border-radius: 6px; }
+.c1 { animation: select 10s infinite; }
+.stage { position: relative; background: #151922; }
+.cursor { position: absolute; left: 90px; top: 108px; width: 18px; height: 18px; background: #ffca66; border-radius: 50%; animation: move 10s infinite; }
+.toast { position: absolute; right: 24px; bottom: 24px; padding: 10px 12px; background: #1f6f52; border-radius: 6px; opacity: 0; animation: done 10s infinite; }
+@keyframes select { 0%,35% { outline: 0 solid transparent; } 45%,100% { outline: 2px solid #ffca66; } }
+@keyframes move { 0% { transform: translateY(0); } 45%,100% { transform: translateY(74px); } }
+@keyframes done { 0%,75% { opacity: 0; } 82%,100% { opacity: 1; } }

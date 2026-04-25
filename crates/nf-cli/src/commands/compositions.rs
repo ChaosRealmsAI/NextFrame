@@ -11,7 +11,9 @@ pub fn dispatch(args: CompositionCommand) -> Result<(), NfError> {
             json!({
                 "project": args.project,
                 "composition": args.composition,
+                "clip": args.clip,
                 "track": args.track,
+                "item": args.item,
                 "field": args.field
             }),
         ),
@@ -20,7 +22,9 @@ pub fn dispatch(args: CompositionCommand) -> Result<(), NfError> {
             json!({
                 "project": args.project,
                 "composition": args.composition,
+                "clip": args.clip,
                 "track": args.track,
+                "item": args.item,
                 "field": args.field,
                 "value": parse_value(&args.value)
             }),

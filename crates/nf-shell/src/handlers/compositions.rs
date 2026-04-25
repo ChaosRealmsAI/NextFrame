@@ -66,30 +66,20 @@ impl CompositionsOpHandler {
     fn update_track(&self, params: &Value) -> Result<Value, NfError> {
         let project = required_str(params, "project")?;
         let composition = required_str(params, "composition")?;
-        let track_id = required_str(params, "track")?;
         ensure_project(&self.storage, &project)?;
         validate_slug(&composition)?;
         let mut value = self.storage.load_composition(&project, &composition)?;
-        let tracks = value
-            .get_mut("tracks")
-            .and_then(Value::as_array_mut)
-            .ok_or_else(|| {
-                NfError::ValidationFailed("composition.tracks must be an array".to_string())
-            })?;
-        let track = tracks
-            .iter_mut()
-            .find(|item| item.get("id").and_then(Value::as_str) == Some(track_id.as_str()))
-            .ok_or_else(|| NfError::ValidationFailed(format!("unknown track: {track_id}")))?;
+        let target = select_composition_value_mut(&mut value, params)?;
 
         if let Some(patch) = params.get("params").and_then(Value::as_object) {
-            merge_object(track, "params", patch);
+            merge_object(target, "params", patch);
         }
         if let Some(patch) = params.get("style").and_then(Value::as_object) {
-            merge_object(track, "style", patch);
+            merge_object(target, "style", patch);
         }
         if let Some(field) = params.get("field").and_then(Value::as_str) {
             let value = params.get("value").cloned().unwrap_or(Value::Null);
-            set_field_path(track, field, value)?;
+            set_field_path(target, field, value)?;
         }
         self.storage
             .save_composition(&project, &composition, &value)?;
@@ -105,6 +95,14 @@ impl CompositionsOpHandler {
 }
 
 fn select_composition_value(composition: &Value, params: &Value) -> Result<Value, NfError> {
+    if params
+        .get("clip")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .is_some()
+    {
+        return Ok(select_clip_first_value(composition, params)?.clone());
+    }
     let Some(track_id) = params
         .get("track")
         .and_then(Value::as_str)
@@ -130,6 +128,152 @@ fn select_composition_value(composition: &Value, params: &Value) -> Result<Value
         return Ok(track.clone());
     };
     Ok(get_field_path(track, field).cloned().unwrap_or(Value::Null))
+}
+
+fn select_clip_first_value<'a>(
+    composition: &'a Value,
+    params: &Value,
+) -> Result<&'a Value, NfError> {
+    let clip_id = required_str(params, "clip")?;
+    let clips = composition
+        .get("clips")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            NfError::ValidationFailed("composition.clips must be an array".to_string())
+        })?;
+    let clip = clips
+        .iter()
+        .find(|item| {
+            item.get("id")
+                .or_else(|| item.get("slug"))
+                .and_then(Value::as_str)
+                == Some(clip_id.as_str())
+        })
+        .ok_or_else(|| NfError::ValidationFailed(format!("unknown clip: {clip_id}")))?;
+    let Some(track_id) = params
+        .get("track")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    else {
+        return select_field_or_self(clip, params);
+    };
+    let tracks = clip
+        .get("tracks")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            NfError::ValidationFailed(format!("clip '{clip_id}' tracks must be an array"))
+        })?;
+    let track = tracks
+        .iter()
+        .find(|item| item.get("id").and_then(Value::as_str) == Some(track_id))
+        .ok_or_else(|| NfError::ValidationFailed(format!("unknown track: {clip_id}/{track_id}")))?;
+    let Some(item_id) = params
+        .get("item")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    else {
+        return select_field_or_self(track, params);
+    };
+    let items = track
+        .get("items")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            NfError::ValidationFailed(format!(
+                "track '{clip_id}/{track_id}' items must be an array"
+            ))
+        })?;
+    let item = items
+        .iter()
+        .find(|value| value.get("id").and_then(Value::as_str) == Some(item_id))
+        .ok_or_else(|| {
+            NfError::ValidationFailed(format!("unknown item: {clip_id}/{track_id}/{item_id}"))
+        })?;
+    select_field_or_self(item, params)
+}
+
+fn select_field_or_self<'a>(target: &'a Value, params: &Value) -> Result<&'a Value, NfError> {
+    let Some(field) = params
+        .get("field")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(target);
+    };
+    Ok(get_field_path(target, field).unwrap_or(&Value::Null))
+}
+
+fn select_composition_value_mut<'a>(
+    composition: &'a mut Value,
+    params: &Value,
+) -> Result<&'a mut Value, NfError> {
+    if params
+        .get("clip")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .is_some()
+    {
+        return select_clip_first_value_mut(composition, params);
+    }
+    let track_id = required_str(params, "track")?;
+    let tracks = composition
+        .get_mut("tracks")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| {
+            NfError::ValidationFailed("composition.tracks must be an array".to_string())
+        })?;
+    tracks
+        .iter_mut()
+        .find(|item| item.get("id").and_then(Value::as_str) == Some(track_id.as_str()))
+        .ok_or_else(|| NfError::ValidationFailed(format!("unknown track: {track_id}")))
+}
+
+fn select_clip_first_value_mut<'a>(
+    composition: &'a mut Value,
+    params: &Value,
+) -> Result<&'a mut Value, NfError> {
+    let clip_id = required_str(params, "clip")?;
+    let tracks = composition
+        .get_mut("clips")
+        .and_then(Value::as_array_mut)
+        .and_then(|clips| {
+            clips.iter_mut().find(|item| {
+                item.get("id")
+                    .or_else(|| item.get("slug"))
+                    .and_then(Value::as_str)
+                    == Some(clip_id.as_str())
+            })
+        })
+        .and_then(|clip| clip.get_mut("tracks"))
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| {
+            NfError::ValidationFailed(format!("clip '{clip_id}' tracks must be an array"))
+        })?;
+    let track_id = required_str(params, "track")?;
+    let track = tracks
+        .iter_mut()
+        .find(|item| item.get("id").and_then(Value::as_str) == Some(track_id.as_str()))
+        .ok_or_else(|| NfError::ValidationFailed(format!("unknown track: {clip_id}/{track_id}")))?;
+    let Some(item_id) = params
+        .get("item")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(track);
+    };
+    let items = track
+        .get_mut("items")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| {
+            NfError::ValidationFailed(format!(
+                "track '{clip_id}/{track_id}' items must be an array"
+            ))
+        })?;
+    items
+        .iter_mut()
+        .find(|value| value.get("id").and_then(Value::as_str) == Some(item_id))
+        .ok_or_else(|| {
+            NfError::ValidationFailed(format!("unknown item: {clip_id}/{track_id}/{item_id}"))
+        })
 }
 
 fn get_field_path<'a>(value: &'a Value, field: &str) -> Option<&'a Value> {

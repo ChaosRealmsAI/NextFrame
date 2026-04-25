@@ -1,0 +1,11 @@
+{
+  "id": "clip-list",
+  "given": "A composition JSON contains composition.clips[] with intro, proof, and outro.",
+  "when": "The editor opens the composition.",
+  "then": "The left list shows those top-level video clips, not flattened runtime tracks.",
+  "human_actions": ["open composition", "scan left clip list", "select proof"],
+  "ai_tools": [
+    { "tool": "open", "command": "target/debug/nf open --project v2-showcase --composition showreel-clip-first" },
+    { "tool": "verify", "command": "target/debug/nf verify --project v2-showcase --composition showreel-clip-first" }
+  ]
+}
