@@ -16,7 +16,8 @@
       "export-clip-first",
       "voice-preview-audible",
       "clip-all-and-local-preview",
-      "track-click-stable"
+      "track-click-stable",
+      "export-stage-background"
     ],
     "status": "implemented"
   }

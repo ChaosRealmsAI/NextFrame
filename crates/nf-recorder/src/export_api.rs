@@ -211,6 +211,7 @@ pub async fn run_export_from_source(
     let preset = resolve_export_preset(&source_json, &opts)?;
     override_source_viewport(&mut source_json, preset.viewport);
     let tracks_map_json = build_tracks_map_json(&source_json);
+    let stage_background = resolve_stage_background(&source_json);
     let source_text = serde_json::to_string(&source_json).map_err(|e| {
         RecordError::BundleLoadFailed(format!("serialize source.json for export HTML: {e}"))
     })?;
@@ -223,6 +224,7 @@ pub async fn run_export_from_source(
         vp_w,
         vp_h,
         requested_duration_ms,
+        &stage_background,
     );
 
     // 写 tmp file · macOS /tmp 没 gitignore 问题 · 独占进程 pid + nanos 防撞。
@@ -363,6 +365,56 @@ fn override_source_viewport(source_json: &mut serde_json::Value, viewport: (u32,
     );
 }
 
+fn resolve_stage_background(source_json: &serde_json::Value) -> String {
+    let theme = source_json.get("theme").unwrap_or(&serde_json::Value::Null);
+    for pointer in ["/background", "/bg", "/colors/background", "/colors/bg"] {
+        if let Some(raw) = theme.pointer(pointer).and_then(serde_json::Value::as_str) {
+            if let Some(value) = sanitize_stage_background(raw) {
+                return value;
+            }
+        }
+    }
+
+    if let Some(css) = theme.get("css").and_then(serde_json::Value::as_str) {
+        if let Some(raw) = extract_css_custom_property(css, "--nfv2-bg") {
+            if let Some(value) = sanitize_stage_background(raw) {
+                return value;
+            }
+        }
+    }
+
+    "#000".to_string()
+}
+
+fn extract_css_custom_property<'a>(css: &'a str, name: &str) -> Option<&'a str> {
+    let start = css.find(name)?;
+    let rest = &css[start + name.len()..];
+    let colon = rest.find(':')?;
+    let rest = &rest[colon + 1..];
+    let end = rest.find(';')?;
+    Some(rest[..end].trim())
+}
+
+fn sanitize_stage_background(raw: &str) -> Option<String> {
+    let value = raw.trim();
+    if value.is_empty() || value.len() > 96 || value.contains([';', '{', '}']) {
+        return None;
+    }
+    let lower = value.to_ascii_lowercase();
+    let named = matches!(
+        lower.as_str(),
+        "black" | "white" | "transparent" | "canvas" | "currentcolor"
+    );
+    let functional = lower.starts_with("rgb(")
+        || lower.starts_with("rgba(")
+        || lower.starts_with("hsl(")
+        || lower.starts_with("hsla(");
+    let hex = lower.starts_with('#')
+        && matches!(lower.len(), 4 | 5 | 7 | 9)
+        && lower[1..].chars().all(|ch| ch.is_ascii_hexdigit());
+    (named || functional || hex).then(|| value.to_string())
+}
+
 /// 构造自包含 export HTML · 含 runtime + __NF_SOURCE__ + mount。
 ///
 /// 关键点(ADR-064):
@@ -377,6 +429,7 @@ fn build_export_html(
     vp_w: u32,
     vp_h: u32,
     requested_duration_ms: u64,
+    stage_background: &str,
 ) -> String {
     format!(
         r#"<!DOCTYPE html>
@@ -387,7 +440,7 @@ fn build_export_html(
 <title>nf-export</title>
 <style>
 html,body{{margin:0;padding:0;background:#000;width:{vp_w}px;height:{vp_h}px;overflow:hidden}}
-#nf-stage{{position:absolute;top:0;left:0;width:{vp_w}px;height:{vp_h}px;transform-origin:top left}}
+#nf-stage{{position:absolute;top:0;left:0;width:{vp_w}px;height:{vp_h}px;transform-origin:top left;background:{stage_background}}}
 </style>
 </head>
 <body>
@@ -531,4 +584,32 @@ window.__NF_TRACKS__ = {tracks_map_json};
 "#,
         runtime = RUNTIME_IIFE,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn stage_background_uses_theme_css_var() {
+        let source = json!({
+            "theme": {
+                "css": ":root { --nfv2-bg: #05070a; --nfv2-text: #fff; }"
+            }
+        });
+
+        assert_eq!(resolve_stage_background(&source), "#05070a");
+    }
+
+    #[test]
+    fn stage_background_rejects_css_injection() {
+        let source = json!({
+            "theme": {
+                "background": "#000; } body { background: red"
+            }
+        });
+
+        assert_eq!(resolve_stage_background(&source), "#000");
+    }
 }

@@ -1,0 +1,21 @@
+{
+  "id": "export-stage-background",
+  "given": "A clip-first composition stitches transparent component clips after the first clip.",
+  "when": "The user exports a draft MP4 and inspects frames after clip boundaries.",
+  "then": "Later clips render on the composition stage background instead of exposing the recorder magenta canary.",
+  "human_actions": ["export draft", "inspect second clip frame", "inspect third clip frame"],
+  "ai_tools": [
+    {
+      "tool": "export",
+      "command": "NEXTFRAME_HOME=examples target/debug/nf export --project=v2-showcase --composition=showreel-clip-first --profile=draft --diagnostics --out=/tmp/nextframe-clip-first-stage-bg.mp4"
+    },
+    {
+      "tool": "frame",
+      "command": "ffmpeg -y -ss 6 -i /tmp/nextframe-clip-first-stage-bg.mp4 -frames:v 1 /tmp/nextframe-clip-first-stage-bg-06s.png"
+    },
+    {
+      "tool": "pixel",
+      "command": "magick /tmp/nextframe-clip-first-stage-bg-06s.png -format '%[pixel:p{640,360}]' info: # expected srgb(3,5,9), not srgb(255,0,255)"
+    }
+  ]
+}
