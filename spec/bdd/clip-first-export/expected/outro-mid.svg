@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#05070a"/>
+  <rect x="563" y="211" width="154" height="34" fill="#0d1018" stroke="#ffffff" stroke-opacity=".12"/>
+  <text x="640" y="233" text-anchor="middle" fill="#7bc9b5" fill-opacity=".64" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="14" font-weight="800">NFTTS TIMELINE</text>
+  <text x="640" y="336" text-anchor="middle" fill="#f4f4f8" fill-opacity=".42" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="70" font-weight="820">Subtitles reuse</text>
+  <text x="640" y="410" text-anchor="middle" fill="#f4f4f8" fill-opacity=".42" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="70" font-weight="820">the TTS timeline</text>
+  <text x="640" y="468" text-anchor="middle" fill="#f4f4f8" fill-opacity=".26" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="27">The clip does not invent another word timeline.</text>
+  <text x="640" y="696" text-anchor="middle" fill="#f4f4f8" fill-opacity=".82" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="32">Voice creates the subtitle timeline.</text>
+</svg>

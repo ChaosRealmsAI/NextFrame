@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#05070a"/>
+  <g opacity=".75">
+    <circle cx="442" cy="196" r="4" fill="#e0b76c"/>
+    <circle cx="642" cy="166" r="4" fill="#e0b76c"/>
+    <circle cx="948" cy="172" r="5" fill="#7bc9b5"/>
+    <circle cx="596" cy="284" r="5" fill="#78a7ff"/>
+    <circle cx="740" cy="306" r="5" fill="#7bc9b5"/>
+    <circle cx="1064" cy="258" r="4" fill="#7bc9b5"/>
+    <circle cx="638" cy="485" r="5" fill="#7bc9b5"/>
+    <circle cx="784" cy="570" r="4" fill="#7bc9b5"/>
+    <circle cx="1146" cy="340" r="5" fill="#78a7ff"/>
+    <path d="M700 646c144-36 283-68 422-92" stroke="#7bc9b5" stroke-opacity=".12"/>
+  </g>
+  <rect x="700" y="575" width="430" height="92" fill="#11151c" fill-opacity=".58" stroke="#ffffff" stroke-opacity=".08" transform="rotate(-11 915 621)"/>
+  <text x="640" y="694" text-anchor="middle" fill="#f4f4f8" font-family="-apple-system,BlinkMacSystemFont,sans-serif" font-size="32">Inside <tspan fill="#e0b76c" font-weight="800">that</tspan> clip, tracks stay local.</text>
+</svg>

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>clip-first-export expectation pack</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="nf-bg">
+  <main class="app" aria-label="Clip first export expectation pack">
+    <header class="topbar">
+      <div class="dots"><span></span><span></span><span></span></div>
+      <strong>NextFrame / clip-first-export</strong>
+      <nav><span>预期动画</span><span class="active">验收</span><span>Contract</span></nav>
+    </header>
+    <section class="workspace">
+      <aside class="panel left"><h2>功能验收点</h2><div id="checks"></div></aside>
+      <section class="preview"><div id="stage"></div><div id="caption"></div></section>
+      <aside class="panel right"><h2>模块契约</h2><div id="contracts"></div></aside>
+    </section>
+    <footer class="timeline"><button id="voiceBtn">播放语音</button><div id="tracks"></div><div class="playhead"></div></footer>
+    <div id="toast">本轮完成</div>
+    <audio id="voice" src="./voice.aac" preload="auto"></audio>
+  </main>
+  <script type="module" src="./animation.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+AGENTVOX="$(command -v agentvox || echo /Users/Zhuanz/workspace/doubao-tts-poc/rust/target/release/agentvox)"
+"$AGENTVOX" "$(cat spec/bdd/clip-first-export/voice/overview.txt)"

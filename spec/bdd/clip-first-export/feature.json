@@ -1,0 +1,17 @@
+{
+  "feature": "clip-first-export",
+  "name": "Clip-first export expectation workflow",
+  "summary": "A PM-visible expectation pack for proving that clip-first authoring compiles, previews, exports, and verifies as one feature before recorder implementation changes.",
+  "status": "expectation-pack",
+  "scenarios": [
+    "expectation-pack-review",
+    "compile-render-source-contract",
+    "recorder-source-export",
+    "verify-export-frames"
+  ],
+  "completion": {
+    "total": 4,
+    "done": 4,
+    "next": "Use these acceptance points to drive v0.22 recorder/source contract implementation."
+  }
+}

@@ -1,0 +1,1 @@
+这版不是先写 recorder 代码，而是先确认 clip first export 这个功能最终长什么样。你会看到一个完整流程：AI 写 composition JSON，以 clip 为单位表达视频；compiler 把它变成 render source JSON；recorder 只吃 render source，不读桌面端状态；导出后 verify export 会抽每个 clip 的关键帧，检查不能粉屏，不能空画面。你验收的是这个功能是否成立。我实现时再把它拆成 compiler、recorder、verifier 三个模块契约。这样功能是组织单位，模块是实现边界，动画和语音先让你看到终点，BDD 和测试再把终点固化下来。

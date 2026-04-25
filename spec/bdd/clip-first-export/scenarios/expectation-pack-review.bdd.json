@@ -1,0 +1,17 @@
+{
+  "id": "expectation-pack-review",
+  "given": "The PM needs to understand the final clip-first export behavior before implementation starts.",
+  "when": "The expectation pack animation and voice walkthrough are opened.",
+  "then": "The PM sees the full feature outcome: clip authoring, compiled render source, recorder export, and visual verification in one concrete flow.",
+  "human_actions": ["open expectation animation", "listen to voice walkthrough", "confirm or reject expected outcome"],
+  "ai_tools": [
+    {
+      "tool": "open",
+      "command": "open spec/bdd/clip-first-export/demos/expectation-pack/index.html"
+    },
+    {
+      "tool": "tts",
+      "command": "agentvox \"$(cat spec/bdd/clip-first-export/voice/overview.txt)\""
+    }
+  ]
+}
