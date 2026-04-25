@@ -4,6 +4,7 @@
 
 ```text
 examples/*/compositions/*.json
+  -> nf-project validates component registry
   -> nf-project compiles source
   -> nf-shell opens desktop editor
   -> frontend/nf-components previews and edits
@@ -13,9 +14,9 @@ examples/*/compositions/*.json
 
 ## Module Map
 
-- `crates/nf-cli`: AI-facing command surface. It opens projects, inspects DOM, patches compositions, starts export, checks export status, and cancels export jobs.
+- `crates/nf-cli`: AI-facing command surface. It opens projects, inspects DOM, patches and validates compositions, starts export, checks export status, and cancels export jobs.
 - `crates/nf-shell`: desktop app shell. It owns windows, WebView IPC, project handlers, export job state, and process cleanup.
-- `crates/nf-project`: storage and compiler for projects, episodes, and v2 compositions.
+- `crates/nf-project`: storage, component registry validation, and compiler for projects, episodes, and v2 compositions.
 - `crates/nf-recorder`: export engine that drives the runtime and encodes MP4.
 - `crates/nf-shell-mac`: macOS capture bridge used by recorder and shell capture paths.
 - `frontend/nf-components`: zero-framework Web Components for topbar, timeline, preview, inspector, and editing events.
@@ -38,6 +39,24 @@ Forbidden directions:
 - recorder must not mutate composition JSON.
 - export must not use a different source than preview/editor save paths.
 - generated artifacts must not become source dependencies.
+
+## Component Contract
+
+V2 component tracks reference project-local source files:
+
+```text
+examples/{project}/components/{component-id}.js
+```
+
+`nf-project` owns the registry contract before preview/export:
+
+- component ids use lowercase letters, numbers, dots, and hyphens.
+- each referenced component file must exist under `components/`.
+- component source must export `mount` and `update`.
+- component source must remain single-file and import-free.
+- `nf composition validate` emits structured JSON with available components, used components, track usage, observed params, warnings, and errors.
+
+The compiler still embeds source into `source.components`; preview and recorder load that same compiled source so validation, preview, and export stay on one contract.
 
 ## Repository Skeleton
 

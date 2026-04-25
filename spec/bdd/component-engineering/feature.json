@@ -1,0 +1,43 @@
+{
+  "feature": "component-engineering",
+  "name": "JSON 组件工程化",
+  "summary": "组件不再只是 compositions 里引用的隐式 JS 文件。NextFrame 提供机器可读 registry 和 CLI 校验，提前发现缺文件、坏导出、非法 import 和参数覆盖，保证 preview/export 共用同一条组件契约。",
+  "status": "done",
+  "rules": [
+    "component id only uses lowercase letters, numbers, dots, and hyphens",
+    "component source is one JS file under project/components/{id}.js",
+    "component source must export mount and update functions",
+    "component source cannot import other modules",
+    "validation output must be structured JSON for AI tools"
+  ],
+  "visual": {
+    "demo_style": "self-playing state transition, 8-12 seconds, progress bar and done toast",
+    "product_style": "no new editor panel in this version"
+  },
+  "scenarios": [
+    {
+      "id": "registry-visible",
+      "path": "scenarios/registry-visible.bdd.json",
+      "demo": "demos/registry-visible/index.html"
+    },
+    {
+      "id": "validate-cli",
+      "path": "scenarios/validate-cli.bdd.json",
+      "demo": "demos/validate-cli/index.html"
+    },
+    {
+      "id": "bad-component-blocked",
+      "path": "scenarios/bad-component-blocked.bdd.json",
+      "demo": "demos/bad-component-blocked/index.html"
+    },
+    {
+      "id": "preview-export-contract",
+      "path": "scenarios/preview-export-contract.bdd.json",
+      "demo": "demos/preview-export-contract/index.html"
+    }
+  ],
+  "completion": {
+    "total": 4,
+    "done": 4
+  }
+}

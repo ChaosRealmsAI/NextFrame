@@ -1,0 +1,21 @@
+{
+  "id": "preview-export-contract",
+  "title": "预览和导出共用同一组件契约",
+  "given": "showreel-24s component validation 通过。",
+  "when": "composition source 被 compile 后传给 preview/export runtime。",
+  "then": "source.components 中包含同一组组件源码，draft export 仍能生成完整 MP4。",
+  "human_actions": ["validate composition", "open/export composition", "confirm output"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=examples target/debug/nf composition validate --project=v2-showcase --composition=showreel-24s",
+      "expected": "ok=true before rendering"
+    },
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=examples target/debug/nf export --project=v2-showcase --composition=showreel-24s --profile=draft --out=../NextFrame.archive/v0.17.0-verify/showreel-24s.mp4",
+      "expected": "export succeeds and writes MP4"
+    }
+  ],
+  "done": true
+}

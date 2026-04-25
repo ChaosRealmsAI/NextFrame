@@ -1,6 +1,7 @@
-use serde_json::{json, Value};
+use nf_project::{JsonStorage, Storage, validate_composition_components};
+use serde_json::{Value, json};
 
-use crate::commands::{send_ipc, CompositionCommand, CompositionSubcommand};
+use crate::commands::{CompositionCommand, CompositionSubcommand, print_json, send_ipc};
 use crate::errors::NfError;
 
 pub fn dispatch(args: CompositionCommand) -> Result<(), NfError> {
@@ -24,6 +25,27 @@ pub fn dispatch(args: CompositionCommand) -> Result<(), NfError> {
                 "value": parse_value(&args.value)
             }),
         ),
+        CompositionSubcommand::Validate(args) => validate(args.project, args.composition),
+    }
+}
+
+fn validate(project: String, composition: String) -> Result<(), NfError> {
+    let storage = JsonStorage::new(JsonStorage::default_root()?);
+    storage.load_project(&project)?;
+    if !storage.composition_exists(&project, &composition)? {
+        return Err(NfError::ValidationFailed(format!(
+            "composition not found: {project}/{composition}"
+        )));
+    }
+    let composition_json = storage.load_composition(&project, &composition)?;
+    let report = validate_composition_components(&storage, &project, &composition_json)?;
+    print_json(&serde_json::to_value(&report)?)?;
+    if report.ok {
+        Ok(())
+    } else {
+        Err(NfError::ValidationFailed(format!(
+            "composition component validation failed: {project}/{composition}"
+        )))
     }
 }
 

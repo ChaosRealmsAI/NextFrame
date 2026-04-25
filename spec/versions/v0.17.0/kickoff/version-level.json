@@ -1,0 +1,35 @@
+{
+  "version": "v0.17.0",
+  "title": "High-ceiling JSON component engineering",
+  "type": "feature",
+  "status": "active",
+  "focus": "Turn project component JS from implicit files into a discoverable, machine-validated registry shared by preview, export, CLI, and AI verification.",
+  "one_version_one_thing": "Only component registry and validation contract. No new editor panel, no new visual components, no cloud export, no TTS generation.",
+  "from_previous_version": {
+    "baseline": "v0.16.0 made showreel export diagnosable with performance JSON and inspector map.",
+    "new_bottleneck": "JSON compositions can reference arbitrary component files, but there is no registry or static contract check before preview/export."
+  },
+  "success_picture": "A composition can be checked before rendering. The user sees whether every component exists and exports mount/update; AI can read one JSON report and know exactly which track/component is unsafe.",
+  "verify_points": [
+    {
+      "id": "V-01",
+      "desc": "The project component registry lists available component JS files and the subset used by a composition.",
+      "scenario": "spec/bdd/component-engineering/scenarios/registry-visible.bdd.json"
+    },
+    {
+      "id": "V-02",
+      "desc": "A local CLI validates component IDs, files, required mount/update exports, import-free single-file ABI, track usage, and observed params.",
+      "scenario": "spec/bdd/component-engineering/scenarios/validate-cli.bdd.json"
+    },
+    {
+      "id": "V-03",
+      "desc": "A bad component is blocked with structured JSON errors instead of silently disappearing in preview or export.",
+      "scenario": "spec/bdd/component-engineering/scenarios/bad-component-blocked.bdd.json"
+    },
+    {
+      "id": "V-04",
+      "desc": "The same validated component source still compiles into preview/export runtime source without changing the existing showreel output path.",
+      "scenario": "spec/bdd/component-engineering/scenarios/preview-export-contract.bdd.json"
+    }
+  ]
+}

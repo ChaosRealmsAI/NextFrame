@@ -8,7 +8,7 @@ use directories::BaseDirs;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use thiserror::Error;
 
 static SLUG_RE: Lazy<Result<Regex, regex::Error>> =
@@ -80,7 +80,7 @@ pub trait Storage {
     fn load_project(&self, slug: &str) -> Result<Project, ProjectError>;
     fn save_project(&self, project: &Project) -> Result<(), ProjectError>;
     fn load_episode(&self, project_slug: &str, episode_slug: &str)
-        -> Result<Episode, ProjectError>;
+    -> Result<Episode, ProjectError>;
     fn save_episode(&self, project_slug: &str, episode: &Episode) -> Result<(), ProjectError>;
 }
 
@@ -272,6 +272,182 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T, ProjectErro
 pub struct SourceCompileResult {
     pub source: Value,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ComponentValidationReport {
+    pub ok: bool,
+    pub project: String,
+    pub composition: String,
+    pub available_components: Vec<String>,
+    pub components: Vec<ComponentValidationComponent>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ComponentValidationComponent {
+    pub id: String,
+    pub path: String,
+    pub exists: bool,
+    pub bytes: usize,
+    pub exports: ComponentExports,
+    pub params: Vec<String>,
+    pub used_by: Vec<ComponentUsage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct ComponentExports {
+    pub mount: bool,
+    pub update: bool,
+    pub destroy: bool,
+    pub imports: bool,
+    pub dynamic_imports: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ComponentUsage {
+    pub track: String,
+    pub start_ms: u64,
+    pub end_ms: u64,
+}
+
+pub fn validate_composition_components(
+    storage: &JsonStorage,
+    project_slug: &str,
+    composition: &Value,
+) -> Result<ComponentValidationReport, ProjectError> {
+    let object = composition.as_object().ok_or_else(|| {
+        ProjectError::ValidationFailed("composition must be a JSON object".to_string())
+    })?;
+    let composition_id = object
+        .get("id")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| ProjectError::ValidationFailed("composition.id is required".to_string()))?;
+    let duration_ms = time_value_ms(object.get("duration"), &BTreeMap::new(), "duration")?;
+    let anchors = resolve_composition_anchors(object.get("anchors"), duration_ms)?;
+    let tracks = object
+        .get("tracks")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            ProjectError::ValidationFailed("composition.tracks must be an array".to_string())
+        })?;
+
+    let mut components: BTreeMap<String, ComponentValidationComponent> = BTreeMap::new();
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+
+    for (index, track_value) in tracks.iter().enumerate() {
+        let Some(track) = track_value.as_object() else {
+            warnings.push(format!("ignored non-object track at index {index}"));
+            continue;
+        };
+        let track_id = track
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| format!("track-{}", index + 1));
+        let kind = track
+            .get("kind")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("component");
+        if kind != "component" {
+            continue;
+        }
+
+        let component_id = match track
+            .get("component")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+        {
+            Some(value) => value,
+            None => {
+                errors.push(format!("component track '{track_id}' missing component"));
+                continue;
+            }
+        };
+
+        if let Err(err) = validate_component_id(component_id) {
+            errors.push(format!("track '{track_id}' {err}"));
+            continue;
+        }
+
+        let (start_ms, end_ms) = match track_time_ms(track, &anchors, duration_ms, &track_id) {
+            Ok((start, end)) if end > start => (start, end),
+            Ok((_start, _end)) => {
+                errors.push(format!("track '{track_id}' end must be greater than start"));
+                (0, 0)
+            }
+            Err(err) => {
+                errors.push(err.to_string());
+                (0, 0)
+            }
+        };
+
+        let entry = components
+            .entry(component_id.to_string())
+            .or_insert_with(|| {
+                inspect_component_source(storage.root(), project_slug, component_id, &mut errors)
+            });
+        entry.used_by.push(ComponentUsage {
+            track: track_id,
+            start_ms,
+            end_ms,
+        });
+        if let Some(params) = track.get("params").and_then(Value::as_object) {
+            for key in params.keys() {
+                if !entry.params.contains(key) {
+                    entry.params.push(key.to_string());
+                }
+            }
+        }
+        if let Some(style) = track.get("style").and_then(Value::as_object) {
+            for key in style.keys().filter(|key| *key == "x" || *key == "y") {
+                if !entry.params.contains(key) {
+                    entry.params.push(key.to_string());
+                }
+            }
+        }
+    }
+
+    let mut component_list: Vec<_> = components.into_values().collect();
+    for component in &mut component_list {
+        component.params.sort();
+        component
+            .used_by
+            .sort_by(|left, right| left.track.cmp(&right.track));
+        if component.exists && !component.exports.mount {
+            errors.push(format!(
+                "component '{}' missing export function mount",
+                component.id
+            ));
+        }
+        if component.exists && !component.exports.update {
+            errors.push(format!(
+                "component '{}' missing export function update",
+                component.id
+            ));
+        }
+        if component.exports.imports || component.exports.dynamic_imports {
+            errors.push(format!(
+                "component '{}' must be single-file and cannot use import",
+                component.id
+            ));
+        }
+    }
+
+    Ok(ComponentValidationReport {
+        ok: errors.is_empty(),
+        project: project_slug.to_string(),
+        composition: composition_id.to_string(),
+        available_components: list_project_components(storage.root(), project_slug)?,
+        components: component_list,
+        warnings,
+        errors,
+    })
 }
 
 pub fn compile_composition_source(
@@ -1141,21 +1317,121 @@ fn load_component_js(
     project_slug: &str,
     component_id: &str,
 ) -> Result<String, ProjectError> {
-    if component_id.contains('/') || component_id.contains('\\') || component_id.contains("..") {
-        return Err(ProjectError::ValidationFailed(format!(
-            "invalid component id: {component_id}"
-        )));
-    }
-    let path = root
-        .join(project_slug)
-        .join("components")
-        .join(format!("{component_id}.js"));
+    validate_component_id(component_id)?;
+    let path = component_source_path(root, project_slug, component_id);
     fs::read_to_string(&path).map_err(|err| {
         ProjectError::StorageFailed(format!(
             "component source read failed: {}: {err}",
             path.display()
         ))
     })
+}
+
+fn validate_component_id(component_id: &str) -> Result<(), ProjectError> {
+    let mut chars = component_id.chars();
+    let Some(first) = chars.next() else {
+        return Err(ProjectError::ValidationFailed(
+            "invalid component id: empty".to_string(),
+        ));
+    };
+    if !first.is_ascii_lowercase() {
+        return Err(ProjectError::ValidationFailed(format!(
+            "invalid component id '{component_id}': must start with lowercase letter"
+        )));
+    }
+    if component_id.len() > 128
+        || component_id.contains("..")
+        || component_id
+            .chars()
+            .any(|ch| !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '.' || ch == '-'))
+    {
+        return Err(ProjectError::ValidationFailed(format!(
+            "invalid component id '{component_id}': use lowercase letters, numbers, dots, and hyphens"
+        )));
+    }
+    Ok(())
+}
+
+fn component_source_path(root: &Path, project_slug: &str, component_id: &str) -> PathBuf {
+    root.join(project_slug)
+        .join("components")
+        .join(format!("{component_id}.js"))
+}
+
+fn inspect_component_source(
+    root: &Path,
+    project_slug: &str,
+    component_id: &str,
+    errors: &mut Vec<String>,
+) -> ComponentValidationComponent {
+    let path = component_source_path(root, project_slug, component_id);
+    let display_path = path.display().to_string();
+    let Ok(source) = fs::read_to_string(&path) else {
+        errors.push(format!(
+            "component source missing: {project_slug}/components/{component_id}.js"
+        ));
+        return ComponentValidationComponent {
+            id: component_id.to_string(),
+            path: display_path,
+            exists: false,
+            bytes: 0,
+            exports: ComponentExports::default(),
+            params: Vec::new(),
+            used_by: Vec::new(),
+        };
+    };
+    let exports = inspect_component_exports(&source);
+    ComponentValidationComponent {
+        id: component_id.to_string(),
+        path: display_path,
+        exists: true,
+        bytes: source.len(),
+        exports,
+        params: Vec::new(),
+        used_by: Vec::new(),
+    }
+}
+
+fn inspect_component_exports(source: &str) -> ComponentExports {
+    ComponentExports {
+        mount: source.contains("export function mount(")
+            || source.contains("export async function mount("),
+        update: source.contains("export function update(")
+            || source.contains("export async function update("),
+        destroy: source.contains("export function destroy(")
+            || source.contains("export async function destroy("),
+        imports: source
+            .lines()
+            .map(str::trim_start)
+            .any(|line| line.starts_with("import ")),
+        dynamic_imports: source.contains("import("),
+    }
+}
+
+fn list_project_components(root: &Path, project_slug: &str) -> Result<Vec<String>, ProjectError> {
+    let dir = root.join(project_slug).join("components");
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut components = Vec::new();
+    for entry in fs::read_dir(&dir)
+        .map_err(|err| ProjectError::StorageFailed(format!("components read failed: {err}")))?
+    {
+        let entry = entry.map_err(|err| {
+            ProjectError::StorageFailed(format!("components entry read failed: {err}"))
+        })?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("js") {
+            continue;
+        }
+        if let Some(id) = path.file_stem().and_then(|value| value.to_str()) {
+            if validate_component_id(id).is_ok() {
+                components.push(id.to_string());
+            }
+        }
+    }
+    components.sort();
+    Ok(components)
 }
 
 fn copy_number_param(
@@ -1171,8 +1447,8 @@ fn copy_number_param(
 #[cfg(test)]
 mod tests {
     use super::{
-        compile_composition_source, Episode, JsonStorage, Project, Registry, RegistryProject,
-        Storage,
+        Episode, JsonStorage, Project, Registry, RegistryProject, Storage,
+        compile_composition_source, validate_composition_components,
     };
 
     #[test]
@@ -1318,26 +1594,103 @@ mod tests {
         assert_eq!(compiled.source["duration"], 4000);
         assert_eq!(compiled.source["tracks"][0]["kind"], "component");
         assert_eq!(compiled.source["tracks"][1]["kind"], "audio");
-        assert!(compiled.source["tracks"][1]["clips"][0]["params"]["src"]
-            .as_str()
-            .unwrap_or_default()
-            .starts_with("file://"));
-        assert!(compiled.source["tracks"][1]["clips"][0]["params"]["src"]
-            .as_str()
-            .unwrap_or_default()
-            .ends_with("/demo/audio/demo.mp3"));
+        assert!(
+            compiled.source["tracks"][1]["clips"][0]["params"]["src"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("file://")
+        );
+        assert!(
+            compiled.source["tracks"][1]["clips"][0]["params"]["src"]
+                .as_str()
+                .unwrap_or_default()
+                .ends_with("/demo/audio/demo.mp3")
+        );
         assert_eq!(
             compiled.source["tracks"][0]["clips"][0]["params"]["component"],
             "html.hero-title"
         );
-        assert!(compiled.source["components"]["html.hero-title"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("update"));
-        assert!(compiled.source["theme"]["css"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("--accent"));
+        assert!(
+            compiled.source["components"]["html.hero-title"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("update")
+        );
+        assert!(
+            compiled.source["theme"]["css"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("--accent")
+        );
+        cleanup(storage.root())?;
+        Ok(())
+    }
+
+    #[test]
+    fn validates_component_registry_contract() -> Result<(), Box<dyn std::error::Error>> {
+        let storage = test_storage("component-contract")?;
+        let project_dir = storage.root().join("demo");
+        std::fs::create_dir_all(project_dir.join("components"))?;
+        std::fs::write(
+            project_dir.join("components").join("html.hero-title.js"),
+            "export function mount() {}\nexport function update() {}\n",
+        )?;
+        let composition = serde_json::json!({
+            "id": "launch-open",
+            "name": "Launch Open",
+            "duration": "4s",
+            "tracks": [{
+                "id": "hero",
+                "kind": "component",
+                "component": "html.hero-title",
+                "time": { "start": "0s", "end": "4s" },
+                "style": { "x": 50 },
+                "params": { "title": "Hello" }
+            }]
+        });
+
+        let report = validate_composition_components(&storage, "demo", &composition)?;
+
+        assert!(report.ok, "{:?}", report.errors);
+        assert_eq!(report.available_components, vec!["html.hero-title"]);
+        assert_eq!(report.components[0].id, "html.hero-title");
+        assert_eq!(report.components[0].params, vec!["title", "x"]);
+        assert!(report.components[0].exports.mount);
+        assert!(report.components[0].exports.update);
+        cleanup(storage.root())?;
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_component_without_update_export() -> Result<(), Box<dyn std::error::Error>> {
+        let storage = test_storage("component-contract-fail")?;
+        let project_dir = storage.root().join("demo");
+        std::fs::create_dir_all(project_dir.join("components"))?;
+        std::fs::write(
+            project_dir.join("components").join("html.hero-title.js"),
+            "export function mount() {}\n",
+        )?;
+        let composition = serde_json::json!({
+            "id": "launch-open",
+            "name": "Launch Open",
+            "duration": "4s",
+            "tracks": [{
+                "id": "hero",
+                "kind": "component",
+                "component": "html.hero-title",
+                "time": { "start": "0s", "end": "4s" }
+            }]
+        });
+
+        let report = validate_composition_components(&storage, "demo", &composition)?;
+
+        assert!(!report.ok);
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("missing export function update"))
+        );
         cleanup(storage.root())?;
         Ok(())
     }

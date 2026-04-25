@@ -1,0 +1,19 @@
+{
+  "version": "v0.17.0",
+  "session": "41256e05",
+  "dialogue": [
+    {
+      "role": "user",
+      "text": "下个版本做啥"
+    },
+    {
+      "role": "assistant",
+      "text": "推荐 v0.17.0 做高上限 JSON 组件工程化：把组件从散落 JS 文件升级为 registry/schema/validate 契约。"
+    },
+    {
+      "role": "user",
+      "text": "好 推进吧。"
+    }
+  ],
+  "locked_decision": "Proceed with component engineering as the next feature slice after export diagnostics."
+}

@@ -20,6 +20,7 @@ Example projects live under `examples/`; runtime projects are copied to `~/.next
 `target/debug/nf devtools --project=<slug> --episode=<slug> --query=<css> --get=<prop>` — inspect live DOM, including shadow DOM selectors.
 `target/debug/nf composition show --project=<slug> --composition=<slug> [--track=<id>] [--field=<path>]` — read raw v2 composition JSON or one track field.
 `target/debug/nf composition patch --project=<slug> --composition=<slug> --track=<id> --field=<path> --value=<json-or-string>` — patch one v2 track field such as `params.title`, `style.x`, or `time.start`.
+`target/debug/nf composition validate --project=<slug> --composition=<slug>` — validate v2 component registry, files, mount/update exports, import-free ABI, used tracks, and observed params.
 `target/debug/nf export --project=<slug> --composition=<slug> --profile=draft|standard|final|final-fast --out=<mp4>` — export a v2 composition to MP4 with a named quality/speed profile.
 `target/debug/nf export --project=<slug> --composition=<slug> --profile=draft --diagnostics --out=<mp4>` — export and write a sibling diagnostics JSON with frame timings, slow spans, and top slow frames.
 `target/debug/nf export --project=<slug> --composition=<slug> --fps=30|60 --resolution=720p|1080p|4k --parallel=<1-8> --events --out=<mp4>` — override export settings and stream recorder progress JSONL before the final summary JSON.
@@ -40,9 +41,9 @@ Do not write generated videos, screenshots, node_modules, Cargo targets, or one-
 
 ## Current Focus
 
-v0.16.0 is the export diagnostics version: `showreel-24s` exports with a structured diagnostics JSON and desktop performance map so slow spans are visible without raw log archaeology.
+v0.17.0 is the component engineering version: v2 composition components now have a machine-readable validation report before preview/export.
 
 Specs and acceptance scenarios:
 
-- `spec/versions/v0.16.0/spec.json`
-- `spec/bdd/export-diagnostics/feature.json`
+- `spec/versions/v0.17.0/spec.json`
+- `spec/bdd/component-engineering/feature.json`

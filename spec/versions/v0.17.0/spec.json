@@ -1,0 +1,120 @@
+{
+  "version": "v0.17.0",
+  "type": "feature",
+  "title": "High-ceiling JSON component engineering",
+  "status": "done",
+  "verify_points": [
+    {
+      "id": "V-01",
+      "desc": "The project component registry lists available component JS files and the subset used by a composition.",
+      "scenario": "spec/bdd/component-engineering/scenarios/registry-visible.bdd.json"
+    },
+    {
+      "id": "V-02",
+      "desc": "A local CLI validates component IDs, files, required mount/update exports, import-free single-file ABI, track usage, and observed params.",
+      "scenario": "spec/bdd/component-engineering/scenarios/validate-cli.bdd.json"
+    },
+    {
+      "id": "V-03",
+      "desc": "A bad component is blocked with structured JSON errors instead of silently disappearing in preview or export.",
+      "scenario": "spec/bdd/component-engineering/scenarios/bad-component-blocked.bdd.json"
+    },
+    {
+      "id": "V-04",
+      "desc": "The same validated component source still compiles into preview/export runtime source without changing the existing showreel output path.",
+      "scenario": "spec/bdd/component-engineering/scenarios/preview-export-contract.bdd.json"
+    }
+  ],
+  "items": [
+    {
+      "id": "S-01",
+      "kind": "runtime-contract",
+      "title": "Component registry and ABI validator in nf-project",
+      "status": "done",
+      "verify_point": "V-01,V-02,V-03",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "NEXTFRAME_HOME=examples target/debug/nf composition validate --project=v2-showcase --composition=showreel-24s",
+          "expected": "JSON report has ok=true, available_components, used components, params, and empty errors"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-project/src/lib.rs",
+          "commit": null
+        }
+      ],
+      "evidence": "NEXTFRAME_HOME=examples target/debug/nf composition validate --project=v2-showcase --composition=showreel-24s reported ok=true, available=13, used=9, errors=[]"
+    },
+    {
+      "id": "S-02",
+      "kind": "cli",
+      "title": "nf composition validate",
+      "status": "done",
+      "verify_point": "V-02,V-03",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "NEXTFRAME_HOME=examples target/debug/nf composition validate --project=v2-showcase --composition=showreel-24s",
+          "expected": "passes with exit 0"
+        },
+        {
+          "tool": "state",
+          "command": "NEXTFRAME_HOME=<bad-fixture> target/debug/nf composition validate --project=bad --composition=broken",
+          "expected": "prints JSON report with ok=false and exits 2"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-cli/src/commands/compositions.rs",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-cli/src/commands/mod.rs",
+          "commit": null
+        }
+      ],
+      "evidence": "Positive validation exited 0. Negative fixture missing update printed ok=false with error \"component 'html.hero-title' missing export function update\" and exited 2."
+    },
+    {
+      "id": "S-03",
+      "kind": "regression",
+      "title": "Preview/export source compatibility",
+      "status": "done",
+      "verify_point": "V-04",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "NEXTFRAME_HOME=examples target/debug/nf export --project=v2-showcase --composition=showreel-24s --profile=draft --out=../NextFrame.archive/v0.17.0-verify/showreel-24s.mp4",
+          "expected": "showreel still exports through the same compiled source path"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-project/src/lib.rs",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-recorder/src/export_api.rs",
+          "commit": null
+        }
+      ],
+      "evidence": "Draft export wrote ../NextFrame.archive/v0.17.0-verify/showreel-24s.mp4; ffprobe duration=24.000000; source JSON contains 9 source.components keys matching validated usage."
+    }
+  ],
+  "poc_topics": [],
+  "fixed_docs_check": {
+    "spec/charter.md": "no change; product north star remains JSON compositions rendered and exported as video",
+    "spec/architecture.md": "must update component contract because nf-project now owns registry validation",
+    "spec/milestones.html": "already marks v0.17.0 current; closeout should mark done and advance v0.18.0",
+    "spec/design/DESIGN.md": "no new product UI tokens; BDD demos use existing tokens",
+    "README.md": "update with component validation CLI",
+    "CLAUDE.md": "update AI verification interface with component validation CLI"
+  },
+  "quality_review": {
+    "standards": "spec/standards/00-index.md",
+    "decision": "No new quality dimension. Existing G3 AI operability and P2 preview/export consistency cover this validator.",
+    "required_before_close": "Run nf-project tests, cargo check/build, real validate CLI, negative fixture, export regression, structure gate, and audit gate."
+  }
+}
