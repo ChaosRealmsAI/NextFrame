@@ -14,7 +14,8 @@
       "clip-local-tracks",
       "tts-subtitle-timeline",
       "export-clip-first",
-      "voice-preview-audible"
+      "voice-preview-audible",
+      "clip-all-and-local-preview"
     ],
     "status": "implemented"
   }

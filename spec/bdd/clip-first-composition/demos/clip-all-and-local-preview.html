@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>clip-all-and-local-preview</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101417;
+      --panel: #171d22;
+      --ink: #f4f6f4;
+      --muted: #a8b1ad;
+      --line: #303a40;
+      --accent: #a78bfa;
+      --clip: #5eead4;
+      --all: #f2c94c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .stage {
+      width: min(980px, calc(100vw - 32px));
+      min-height: 540px;
+      display: grid;
+      grid-template-columns: 230px 1fr;
+      grid-template-rows: 1fr 150px 44px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .clips {
+      grid-row: 1 / span 2;
+      border-right: 1px solid var(--line);
+      padding: 16px 12px;
+    }
+    .row {
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 10px;
+      margin-bottom: 8px;
+      border: 1px solid #263139;
+      color: var(--muted);
+      animation: select 10s steps(1) infinite;
+    }
+    .row:nth-child(2) { animation-delay: 5s; }
+    .row.all { color: var(--ink); }
+    .mark {
+      width: 3px;
+      height: 16px;
+      background: var(--clip);
+    }
+    .all .mark { background: var(--all); }
+    .name {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .dur {
+      font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .preview {
+      position: relative;
+      margin: 42px auto 30px;
+      width: min(650px, calc(100% - 80px));
+      aspect-ratio: 16 / 9;
+      border: 1px solid #25313a;
+      background: linear-gradient(120deg, rgba(94,234,212,.18), rgba(167,139,250,.12)), #0d1215;
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+      font-weight: 700;
+      color: rgba(244,246,244,.75);
+    }
+    .preview::after {
+      content: "stitched composition";
+      animation: previewText 10s steps(1) infinite;
+    }
+    .timeline {
+      border-top: 1px solid var(--line);
+      background: #0d1215;
+      padding: 20px 22px;
+    }
+    .track {
+      height: 28px;
+      position: relative;
+      margin-bottom: 12px;
+      border: 1px solid #2a363d;
+      background: #12181c;
+    }
+    .bar {
+      position: absolute;
+      inset: 4px auto 4px 0;
+      width: 30%;
+      background: var(--clip);
+      animation: bars 10s steps(1) infinite;
+    }
+    .track:nth-child(2) .bar { left: 34%; }
+    .track:nth-child(3) .bar { left: 68%; }
+    footer {
+      grid-column: 1 / span 2;
+      position: relative;
+      border-top: 1px solid var(--line);
+      background: #0b1013;
+    }
+    .progress {
+      height: 4px;
+      width: 100%;
+      transform-origin: left;
+      background: var(--accent);
+      animation: progress 10s linear infinite;
+    }
+    .toast {
+      position: absolute;
+      right: 14px;
+      top: 10px;
+      color: #c7f8df;
+      font-size: 13px;
+      opacity: 0;
+      animation: toast 10s linear infinite;
+    }
+    @keyframes select {
+      0%, 49% { border-color: var(--all); background: rgba(242,201,76,.08); }
+      50%, 100% { border-color: #263139; background: transparent; }
+    }
+    @keyframes previewText {
+      0%, 49% { content: "stitched composition"; }
+      50%, 100% { content: "local clip preview"; }
+    }
+    @keyframes bars {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: .28; }
+    }
+    @keyframes progress {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+    @keyframes toast {
+      0%, 84% { opacity: 0; }
+      90%, 96% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <aside class="clips">
+      <div class="row all"><span class="mark"></span><span class="name">全部</span><span class="dur">16.4s</span></div>
+      <div class="row"><span class="mark"></span><span class="name">Intro</span><span class="dur">5.2s</span></div>
+      <div class="row"><span class="mark"></span><span class="name">Local Tracks</span><span class="dur">6.2s</span></div>
+      <div class="row"><span class="mark"></span><span class="name">Voice Timeline</span><span class="dur">5.0s</span></div>
+    </aside>
+    <section class="preview"></section>
+    <section class="timeline">
+      <div class="track"><span class="bar"></span></div>
+      <div class="track"><span class="bar"></span></div>
+      <div class="track"><span class="bar"></span></div>
+    </section>
+    <footer><div class="progress"></div><div class="toast">round complete</div></footer>
+  </main>
+</body>
+</html>

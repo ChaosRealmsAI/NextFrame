@@ -8,6 +8,7 @@ import { NfTopbar } from "./components/topbar.js";
 import { NfTrack } from "./components/track.js";
 import type { ClipSelectDetail, FieldEditDetail, PlayheadMoveDetail, TimelineClipSelectDetail } from "./events.js";
 import {
+  ALL_COMPOSITION_CLIP_ID,
   escapeHtml,
   exportCancel,
   exportComposition,
@@ -25,6 +26,7 @@ import {
   updateClipPosition,
   voiceStatus,
   type NfClip as NfDataClip,
+  type NfRuntimeTrack,
   type NfRuntimeSource,
   type NfMockData,
   type NfExportProgress,
@@ -63,6 +65,15 @@ interface NfComponentApi {
   mount?: (root: HTMLElement, ctx: NfComponentContext) => void;
   update?: (root: HTMLElement, ctx: NfComponentContext) => void;
   destroy?: (root: HTMLElement) => void;
+}
+
+interface PreviewAudioClip {
+  id: string;
+  label: string;
+  src: string;
+  start: number;
+  volume?: number | undefined;
+  from_ms?: number | undefined;
 }
 
 const DEFINITIONS: Array<[string, CustomElementConstructor]> = [
@@ -449,7 +460,9 @@ function selectClip(clipId: string, clip?: NfDataClip): void {
   document.querySelector("nf-timeline")?.setAttribute("data-selected-track-id", clipId);
   const selected = clip ?? getMockData().episodes[0]?.clips.find((item) => item.id === clipId);
   if (selected) {
-    currentPreviewTime = selected.start;
+    const duration = previewDurationForClip(selected);
+    currentPreviewTime = compositionSource && selected.id !== ALL_COMPOSITION_CLIP_ID ? 0 : selected.start;
+    document.querySelector("nf-timeline")?.setAttribute("duration", String(duration));
     document.querySelector("nf-timeline")?.setAttribute("current-time", String(currentPreviewTime));
     applyShellChrome(getMockData(), selected, currentPreviewTime);
   }
@@ -475,7 +488,8 @@ function wirePlaybackControls(): void {
 function startPlayback(): void {
   const episode = getMockData().episodes[0];
   if (!episode || episode.duration <= 0) return;
-  if (currentPreviewTime >= episode.duration - 0.001) currentPreviewTime = 0;
+  const duration = previewDuration();
+  if (currentPreviewTime >= duration - 0.001) currentPreviewTime = 0;
   playing = true;
   playbackStartedAt = performance.now();
   playbackStartTime = currentPreviewTime;
@@ -492,9 +506,10 @@ function playbackTick(now: number): void {
     return;
   }
   const elapsed = (now - playbackStartedAt) / 1000;
-  const nextTime = Math.min(episode.duration, playbackStartTime + elapsed);
+  const duration = previewDuration();
+  const nextTime = Math.min(duration, playbackStartTime + elapsed);
   seekPreviewTime(nextTime, { syncTimeline: true });
-  if (nextTime >= episode.duration) {
+  if (nextTime >= duration) {
     stopPlayback({ keepButtonState: false });
     return;
   }
@@ -523,7 +538,7 @@ function seekPreviewTime(time: number, options: { syncTimeline: boolean }): void
     const data = getMockData();
     const episode = data.episodes[0];
     if (!episode) return;
-    const safeTime = Math.min(episode.duration, Math.max(0, time));
+    const safeTime = Math.min(previewDuration(), Math.max(0, time));
     currentPreviewTime = safeTime;
     if (options.syncTimeline) {
       document.querySelector("nf-timeline")?.setAttribute("current-time", safeTime.toFixed(3));
@@ -573,8 +588,11 @@ function applyShellChrome(data: NfMockData, selected: NfDataClip | undefined, ti
   if (!episode) return;
   const currentTime = Number.isFinite(time) ? Math.max(0, time ?? 0) : data.source === "ipc" ? selected?.start ?? 0 : 12.45;
   currentPreviewTime = currentTime;
-  const activeScene = activeClipAt(data, currentTime, "scene") ?? selected;
-  const pct = episode.duration > 0 ? Math.min(100, Math.max(0, currentTime / episode.duration * 100)) : 0;
+  const activeScene = compositionSource
+    ? activeCompositionDisplayClip(data, currentTime, selected)
+    : activeClipAt(data, currentTime, "scene") ?? selected;
+  const duration = previewDurationForClip(selected);
+  const pct = duration > 0 ? Math.min(100, Math.max(0, currentTime / duration * 100)) : 0;
   setText("[data-nf-preview-time]", `${formatTime(currentTime)} · T=${(episode.duration > 0 ? currentTime / episode.duration : 0).toFixed(4)}`);
   setText("[data-nf-preview-clip]", activeScene?.label ?? selected?.label ?? episode.id);
   setText("[data-nf-preview-title]", activeScene?.label ?? selected?.label ?? episode.name);
@@ -586,7 +604,7 @@ function applyShellChrome(data: NfMockData, selected: NfDataClip | undefined, ti
   applyPreviewFrame(data, currentTime, activeScene ?? selected);
   syncPreviewAudio(data, currentTime);
   setText("[data-nf-current-time]", formatTime(currentTime));
-  setText("[data-nf-total-time]", ` / ${formatTime(episode.duration)}`);
+  setText("[data-nf-total-time]", ` / ${formatTime(duration)}`);
   document.querySelector<HTMLElement>("[data-nf-scrub-fill]")?.style.setProperty("width", `${pct}%`);
   document.querySelector<HTMLElement>("[data-nf-scrub-head]")?.style.setProperty("left", `${pct}%`);
 }
@@ -619,7 +637,7 @@ function renderPreviewLayers(data: NfMockData, time: number, fallbackAccent: str
   const root = document.querySelector<HTMLElement>("[data-nf-preview-layers]");
   if (!root) return;
   if (compositionSource) {
-    renderCompositionPreview(root, compositionSource, time);
+    renderCompositionPreview(root, compositionPreviewSource(), time);
     syncPreviewAudio(data, time);
     return;
   }
@@ -974,13 +992,23 @@ function renderAudioIndicator(clip: NfDataClip): string {
 }
 
 function syncPreviewAudio(data: NfMockData, time: number): void {
-  const active = activeClipsAt(data, time, "audio").filter((item) => item.src);
+  const active = compositionSource
+    ? activeCompositionAudioClips(compositionPreviewSource(), time)
+    : activeClipsAt(data, time, "audio")
+      .filter((item) => item.src)
+      .map((item) => ({
+        id: item.id,
+        label: item.label,
+        src: item.src ?? "",
+        start: item.start,
+        volume: item.volume,
+        from_ms: item.from_ms,
+      }));
   const activeIds = new Set(active.map((clip) => clip.id));
   for (const [clipId, audio] of previewAudio) {
     if (!activeIds.has(clipId)) audio.pause();
   }
   for (const clip of active) {
-    if (!clip.src) continue;
     let audio = previewAudio.get(clip.id);
     if (!audio) {
       audio = new Audio();
@@ -1008,6 +1036,89 @@ function syncPreviewAudio(data: NfMockData, time: number): void {
       audio.pause();
     }
   }
+}
+
+function compositionPreviewSource(): NfRuntimeSource {
+  if (!compositionSource || selectedClipId === ALL_COMPOSITION_CLIP_ID) return compositionSource ?? {};
+  const clip = getMockData().episodes[0]?.composition_clips?.find((item) => item.id === selectedClipId);
+  if (!clip) return compositionSource;
+  const startMs = Math.round(clip.start * 1000);
+  const endMs = Math.round(clip.end * 1000);
+  const prefix = `${clip.id}.`;
+  const tracks: NfRuntimeTrack[] = [];
+  for (const track of compositionSource.tracks ?? []) {
+    const clips = (track.clips ?? [])
+      .filter((item) => {
+        const begin = Number(item.begin ?? 0);
+        const end = Number(item.end ?? 0);
+        const id = typeof item.id === "string" ? item.id : "";
+        const trackId = typeof track.id === "string" ? track.id : "";
+        return trackId.startsWith(prefix) || id.startsWith(prefix) || (begin < endMs && end > startMs);
+      })
+      .map((item) => ({
+        ...item,
+        begin: Math.max(0, Number(item.begin ?? 0) - startMs),
+        end: Math.max(0, Number(item.end ?? 0) - startMs),
+      }))
+      .filter((item) => Number(item.end ?? 0) > Number(item.begin ?? 0));
+    if (clips.length > 0) tracks.push({ ...track, clips });
+  }
+  return {
+    ...compositionSource,
+    duration: Math.max(0, endMs - startMs),
+    tracks,
+  };
+}
+
+function activeCompositionAudioClips(source: NfRuntimeSource, time: number): PreviewAudioClip[] {
+  const timeMs = time * 1000;
+  const out: PreviewAudioClip[] = [];
+  for (const track of source.tracks ?? []) {
+    if (track.kind !== "audio") continue;
+    for (const clip of track.clips ?? []) {
+      const begin = Number(clip.begin ?? 0);
+      const end = Number(clip.end ?? 0);
+      if (!Number.isFinite(begin) || !Number.isFinite(end) || timeMs < begin || timeMs >= end) continue;
+      const params = recordValue(clip.params);
+      const src = typeof params.src === "string" ? params.src : "";
+      if (!src) continue;
+      const label = typeof clip.id === "string" ? clip.id : typeof track.id === "string" ? track.id : "audio";
+      const volume = typeof params.volume === "number" && Number.isFinite(params.volume) ? params.volume : undefined;
+      const fromMs = typeof params.from_ms === "number" && Number.isFinite(params.from_ms) ? params.from_ms : undefined;
+      out.push({
+        id: label,
+        label,
+        src,
+        start: begin / 1000,
+        volume,
+        from_ms: fromMs,
+      });
+    }
+  }
+  return out;
+}
+
+function previewDuration(): number {
+  const selected = getClipById(selectedClipId);
+  return previewDurationForClip(selected);
+}
+
+function previewDurationForClip(selected: NfDataClip | undefined): number {
+  const episode = getMockData().episodes[0];
+  if (!episode) return 0;
+  if (compositionSource && selected && selected.id !== ALL_COMPOSITION_CLIP_ID) {
+    return Math.max(0, selected.end - selected.start);
+  }
+  return episode.duration;
+}
+
+function activeCompositionDisplayClip(data: NfMockData, time: number, selected: NfDataClip | undefined): NfDataClip | undefined {
+  if (selected?.id && selected.id !== ALL_COMPOSITION_CLIP_ID) return selected;
+  const episode = data.episodes[0];
+  return episode?.clips.find((clip) => {
+    if (clip.id === ALL_COMPOSITION_CLIP_ID || clip.kind !== "scene") return false;
+    return time >= clip.start && time < clip.end;
+  }) ?? selected;
 }
 
 function pausePreviewAudio(): void {

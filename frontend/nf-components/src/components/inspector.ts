@@ -459,7 +459,7 @@ export class NfInspector extends NfBase {
           </div>
           <div class="insp-f insp-field">
             <div class="k"><span>时长</span><span class="tag">表达式</span></div>
-            <div class="v accent">${fields.timing.expression}</div>
+            <div class="v accent">${duration.toFixed(3)} 秒</div>
           </div>
           <div class="insp-f insp-field">
             <div class="k"><span>实际</span></div>

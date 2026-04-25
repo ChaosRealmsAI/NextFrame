@@ -1,6 +1,6 @@
 import { makeSheet, NfBase } from "../_base.js";
 import type { ClipSelectDetail } from "../events.js";
-import { getEpisode, seconds } from "../storage.js";
+import { ALL_COMPOSITION_CLIP_ID, getEpisode, seconds } from "../storage.js";
 
 const sheet = makeSheet(`
   :host {
@@ -62,6 +62,7 @@ const sheet = makeSheet(`
   }
   .clip-row .mk.audio { background: var(--teal); }
   .clip-row .mk.overlay { background: var(--teal); }
+  .clip-row.all .mk { background: var(--amber-l); }
   .clip-row .nm {
     font-size: 11.5px; font-weight: 600;
     color: var(--fg);
@@ -108,11 +109,11 @@ export class NfClips extends NfBase {
     this.root.innerHTML = `
       <div class="panel-head">
         <span class="t">片段</span>
-        <span class="c">${episode.clips.length} 条</span>
+        <span class="c">${Math.max(0, episode.clips.filter((clip) => clip.id !== ALL_COMPOSITION_CLIP_ID).length)} 条</span>
       </div>
       <div class="clips-list">
         ${episode.clips.map((clip) => `
-          <div class="clip-row ${clip.id === selectedId ? "active" : ""}" data-id="${clip.id}">
+          <div class="clip-row ${clip.id === selectedId ? "active" : ""} ${clip.id === ALL_COMPOSITION_CLIP_ID ? "all" : ""}" data-id="${clip.id}">
             <div class="mk ${clip.kind === "audio" ? "audio" : clip.kind === "overlay" ? "overlay" : ""}"></div>
             <div class="nm">${escapeHtml(clip.label)}</div>
             <div class="dur">${seconds(clip.end - clip.start)}</div>
