@@ -1,0 +1,10 @@
+@import "../../../../design/tokens.css";
+html,body{margin:0;min-height:100%;font-family:var(--font);color:var(--fg)}
+body{display:grid;place-items:center;padding:32px;overflow:hidden}
+.app{width:min(1100px,96vw);height:min(620px,84vh);border:1px solid var(--bd);background:rgba(10,10,14,.72);display:grid;grid-template-rows:44px 1fr 4px;position:relative;box-shadow:0 28px 80px rgba(0,0,0,.5)}
+.top{display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--bd);font:12px/1 var(--mono);color:var(--accent-l)}
+.body{display:grid;grid-template-columns:1fr 360px;gap:18px;padding:24px}.rail{position:relative;border:1px solid var(--bd);padding:26px;background:rgba(255,255,255,.025)}
+.anchor{position:absolute;top:68px;width:2px;height:320px;background:var(--accent);animation:pulse 10s infinite}.anchor span{position:absolute;top:-28px;left:-18px;font:12px/1 var(--mono);color:var(--amber-l)}
+.track{height:34px;margin:26px 0 0;border:1px solid rgba(94,234,212,.45);background:rgba(94,234,212,.08);animation:track 10s infinite}.guide{border:1px solid var(--bd);padding:18px;font:13px/1.7 var(--mono);color:var(--fg-2)}
+.progress{background:var(--accent);transform-origin:left;animation:progress 10s linear infinite}.toast{position:absolute;right:18px;bottom:18px;padding:10px 14px;border:1px solid var(--amber-b);color:var(--amber-l);background:rgba(224,183,108,.1);opacity:0;animation:toast 10s infinite}
+@keyframes pulse{0%,25%{opacity:.35}45%,100%{opacity:1}}@keyframes track{0%,35%{transform:scaleX(.72);transform-origin:left}55%,100%{transform:scaleX(1)}}@keyframes progress{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes toast{0%,82%{opacity:0}88%,96%{opacity:1}100%{opacity:0}}

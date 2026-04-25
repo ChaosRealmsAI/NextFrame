@@ -26,7 +26,7 @@ pub fn run(args: VerifyArgs) -> Result<(), NfError> {
     let component_report =
         validate_composition_components(&storage, &args.project, &composition_json)?;
     let compiled = compile_composition_source(&storage, &args.project, &composition_json)?;
-    let report = build_report(&args, component_report, compiled);
+    let report = build_report(&args, &composition_json, component_report, compiled);
     let value = serde_json::to_value(&report)?;
 
     if let Some(out) = &args.out {
@@ -49,6 +49,7 @@ pub fn run(args: VerifyArgs) -> Result<(), NfError> {
 
 fn build_report(
     args: &VerifyArgs,
+    composition: &Value,
     component_report: ComponentValidationReport,
     compiled: SourceCompileResult,
 ) -> VerifyReport {
@@ -74,6 +75,12 @@ fn build_report(
         duration_ms,
         &args.screenshot_dir,
     );
+    let anchor_guide = build_anchor_guide(composition);
+    let intent = VerificationIntent {
+        overlap_policy: "allowed-by-default".to_string(),
+        error_policy: "only explicit contract violations become errors; designed multi-track overlap is normal".to_string(),
+        ai_time_rule: "prefer named anchors and expressions such as `layers + 1s`; avoid raw numeric track start/end values".to_string(),
+    };
     let mut checks = Vec::new();
 
     checks.push(VerifyCheck {
@@ -123,6 +130,7 @@ fn build_report(
         });
     }
 
+    checks.extend(lint_anchor_contract(&anchor_guide));
     checks.extend(lint_tracks(duration_ms, &tracks));
 
     let errors = checks
@@ -146,6 +154,8 @@ fn build_report(
             warnings,
         },
         viewport,
+        intent,
+        anchor_guide,
         component_validation: ComponentValidationSummary {
             ok: component_report.ok,
             used: component_report.components.len(),
@@ -194,6 +204,87 @@ fn collect_tracks(raw_tracks: Option<&Vec<Value>>) -> Vec<TimelineTrack> {
             })
         })
         .collect()
+}
+
+fn build_anchor_guide(composition: &Value) -> AnchorGuide {
+    let anchors = composition
+        .get("anchors")
+        .and_then(Value::as_object)
+        .map(|items| {
+            items
+                .iter()
+                .map(|(name, value)| AnchorEntry {
+                    name: name.clone(),
+                    expr: anchor_expr(value),
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let anchor_names = anchors
+        .iter()
+        .map(|anchor| anchor.name.as_str())
+        .collect::<Vec<_>>();
+    let tracks = composition
+        .get("tracks")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|track| {
+                    let object = track.as_object()?;
+                    let id = object.get("id").and_then(Value::as_str)?.to_string();
+                    let time = object.get("time").and_then(Value::as_object);
+                    let start = time
+                        .and_then(|value| value.get("start"))
+                        .or_else(|| object.get("start"));
+                    let end = time
+                        .and_then(|value| value.get("end"))
+                        .or_else(|| object.get("end"));
+                    let start_expr = start.map(anchor_expr);
+                    let end_expr = end.map(anchor_expr);
+                    Some(TrackAnchorUsage {
+                        track: id,
+                        start: start_expr.clone(),
+                        end: end_expr.clone(),
+                        start_uses_anchor: start
+                            .and_then(Value::as_str)
+                            .is_some_and(|expr| expr_uses_anchor(expr, &anchor_names)),
+                        end_uses_anchor: end
+                            .and_then(Value::as_str)
+                            .is_some_and(|expr| expr_uses_anchor(expr, &anchor_names)),
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    AnchorGuide {
+        rule: "Tracks should use named anchor expressions for start/end; anchors are the composition API for AI edits.".to_string(),
+        examples: vec![
+            "intro".to_string(),
+            "layers + 1s".to_string(),
+            "out".to_string(),
+        ],
+        anchors,
+        tracks,
+    }
+}
+
+fn anchor_expr(value: &Value) -> String {
+    match value {
+        Value::String(raw) => raw.clone(),
+        Value::Number(number) => number.to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn expr_uses_anchor(expr: &str, anchor_names: &[&str]) -> bool {
+    let tokens = expr
+        .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.'))
+        .filter(|token| !token.is_empty())
+        .collect::<Vec<_>>();
+    tokens
+        .iter()
+        .any(|token| anchor_names.iter().any(|anchor| anchor == token))
 }
 
 fn collect_clips(raw_clips: &[Value], kind: &str) -> Vec<TimelineClip> {
@@ -452,7 +543,56 @@ fn lint_tracks(duration_ms: u64, tracks: &[TimelineTrack]) -> Vec<VerifyCheck> {
         }
     }
 
-    checks.extend(lint_overlaps(tracks));
+    checks
+}
+
+fn lint_anchor_contract(anchor_guide: &AnchorGuide) -> Vec<VerifyCheck> {
+    let mut checks = Vec::new();
+    if anchor_guide.anchors.is_empty() {
+        checks.push(VerifyCheck {
+            id: "anchor.missing".to_string(),
+            level: CheckLevel::Warn,
+            message: "composition has no named anchors; AI edits should use anchor expressions instead of raw time numbers".to_string(),
+            track: None,
+        });
+    }
+    for track in &anchor_guide.tracks {
+        if track.start.is_none() || track.end.is_none() {
+            checks.push(VerifyCheck {
+                id: "anchor.track-time".to_string(),
+                level: CheckLevel::Warn,
+                message: format!(
+                    "track '{}' should declare time.start and time.end with anchor expressions",
+                    track.track
+                ),
+                track: Some(track.track.clone()),
+            });
+            continue;
+        }
+        if !track.start_uses_anchor || !track.end_uses_anchor {
+            checks.push(VerifyCheck {
+                id: "anchor.raw-time".to_string(),
+                level: CheckLevel::Warn,
+                message: format!(
+                    "track '{}' uses raw or non-anchor time; prefer named anchors such as `intro`, `layers + 1s`, or `out`",
+                    track.track
+                ),
+                track: Some(track.track.clone()),
+            });
+        }
+    }
+    if checks.is_empty() {
+        checks.push(VerifyCheck {
+            id: "anchor.contract".to_string(),
+            level: CheckLevel::Ok,
+            message: format!(
+                "{} anchor(s), {} track time range(s) use the anchor contract",
+                anchor_guide.anchors.len(),
+                anchor_guide.tracks.len()
+            ),
+            track: None,
+        });
+    }
     checks
 }
 
@@ -516,60 +656,6 @@ fn lint_text(track: &TimelineTrack, clip: &TimelineClip, text: &str) -> Vec<Veri
     checks
 }
 
-fn lint_overlaps(tracks: &[TimelineTrack]) -> Vec<VerifyCheck> {
-    let mut checks = Vec::new();
-    let visual_clips = tracks
-        .iter()
-        .flat_map(|track| {
-            track.clips.iter().filter_map(|clip| {
-                clip.layout
-                    .as_ref()
-                    .map(|layout| (track.id.as_str(), clip, layout))
-            })
-        })
-        .collect::<Vec<_>>();
-
-    for (left_index, (left_track, left_clip, left_layout)) in visual_clips.iter().enumerate() {
-        for (right_track, right_clip, right_layout) in visual_clips.iter().skip(left_index + 1) {
-            if *left_track == *right_track {
-                continue;
-            }
-            if !time_overlaps(left_clip, right_clip) || !bbox_overlaps(left_layout, right_layout) {
-                continue;
-            }
-            checks.push(VerifyCheck {
-                id: "layout.overlap".to_string(),
-                level: CheckLevel::Warn,
-                message: format!(
-                    "'{}' and '{}' overlap in time and estimated layout; inspect screenshot plan",
-                    left_clip.id, right_clip.id
-                ),
-                track: Some(format!("{left_track},{right_track}")),
-            });
-        }
-    }
-    checks
-}
-
-fn time_overlaps(left: &TimelineClip, right: &TimelineClip) -> bool {
-    left.begin_ms < right.end_ms && right.begin_ms < left.end_ms
-}
-
-fn bbox_overlaps(left: &ClipLayout, right: &ClipLayout) -> bool {
-    let left_min_x = left.x - left.w / 2.0;
-    let left_max_x = left.x + left.w / 2.0;
-    let left_min_y = left.y - left.h / 2.0;
-    let left_max_y = left.y + left.h / 2.0;
-    let right_min_x = right.x - right.w / 2.0;
-    let right_max_x = right.x + right.w / 2.0;
-    let right_min_y = right.y - right.h / 2.0;
-    let right_max_y = right.y + right.h / 2.0;
-    left_min_x < right_max_x
-        && right_min_x < left_max_x
-        && left_min_y < right_max_y
-        && right_min_y < left_max_y
-}
-
 #[derive(Debug, Serialize)]
 struct VerifyReport {
     ok: bool,
@@ -577,10 +663,44 @@ struct VerifyReport {
     composition: String,
     summary: VerifySummary,
     viewport: Value,
+    intent: VerificationIntent,
+    anchor_guide: AnchorGuide,
     component_validation: ComponentValidationSummary,
     timeline: VerifyTimeline,
     screenshot_plan: Vec<ScreenshotPoint>,
     checks: Vec<VerifyCheck>,
+}
+
+#[derive(Debug, Serialize)]
+struct VerificationIntent {
+    overlap_policy: String,
+    error_policy: String,
+    ai_time_rule: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AnchorGuide {
+    rule: String,
+    examples: Vec<String>,
+    anchors: Vec<AnchorEntry>,
+    tracks: Vec<TrackAnchorUsage>,
+}
+
+#[derive(Debug, Serialize)]
+struct AnchorEntry {
+    name: String,
+    expr: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TrackAnchorUsage {
+    track: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end: Option<String>,
+    start_uses_anchor: bool,
+    end_uses_anchor: bool,
 }
 
 #[derive(Debug, Serialize)]

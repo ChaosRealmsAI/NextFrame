@@ -1,0 +1,40 @@
+{
+  "version": "v0.20.0",
+  "type": "feature",
+  "chosen": "Intent-aware verification and anchor contract",
+  "why": "v0.19 proved AI JSON can be verified, but overlap warnings were too naive: layered video design often requires multiple tracks to overlap. The next useful step is to make verification understand product intent and teach AI to use time anchors automatically.",
+  "changed_from": "Replaces the planned showcase sample generator. User clarified that multi-track overlap is normal and the real need is detecting unexpected contract violations plus a well-designed anchor system AI can reliably use.",
+  "constraints": {
+    "no_vanity": "本版看得见的效果 = verify report 明确 overlap allowed，并输出 anchor_guide。",
+    "no_overreach": "本版只改 verifier 语义和 anchor guidance · 不做自动修复、不做样片生成器、不做像素 AI。",
+    "no_rush": "不把正常设计叠层误报成错误；只抓明确违背意图的时间/结构问题。",
+    "must_verify": "验收画面 = showreel 不再有 layout.overlap warning；裸数字时间反例会触发 anchor.raw-time。"
+  },
+  "success_picture": "AI 看到报告后知道: 轨道可以重叠；时间必须优先用 intro/layers/code/out 这类 anchor；裸数字时间会被提醒修正。",
+  "cost_estimate": "AI 尺度 1-2 小时",
+  "risks": [
+    "anchor guidance 只是静态契约，还没有自动改写 JSON。",
+    "overlap allowed by default 可能漏掉真的视觉遮挡，后续要用截图像素检测补上。",
+    "不同类型项目可能需要更细的 intent schema。"
+  ],
+  "candidates": [
+    {
+      "id": "chosen",
+      "title": "Intent-aware verifier + anchor guide",
+      "why": "直接修正 v0.19 的最大误导，并让 AI 时间编辑更稳定。",
+      "constraints_pass": true
+    },
+    {
+      "id": "rejected-auto-overlap-repair",
+      "title": "Auto repair overlap",
+      "why": "重叠本身不是错，自动修会破坏设计意图。",
+      "constraints_pass": false
+    },
+    {
+      "id": "later-pixel-unexpected-error",
+      "title": "Pixel-based unexpected visual error detector",
+      "why": "应该做，但需要截图差分/视觉规则，适合下一版。",
+      "constraints_pass": true
+    }
+  ]
+}

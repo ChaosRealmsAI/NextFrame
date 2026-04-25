@@ -1,0 +1,15 @@
+{
+  "id": "anchor-contract",
+  "title": "报告给 AI 明确时间锚点用法",
+  "given": "composition 声明 intro/layers/code/data/browser/finale/out anchors。",
+  "when": "AI 读取 verify report 的 anchor_guide。",
+  "then": "报告列出 anchor 表达式、示例和每条 track 的 start/end 是否使用 anchor。",
+  "human_actions": ["open report", "read anchor guide", "ask AI to edit time via anchors"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "jq '{anchors: .anchor_guide.anchors, tracks: .anchor_guide.tracks[0:3], anchor_checks: [.checks[] | select(.id|startswith(\"anchor.\"))]}' ../NextFrame.archive/v0.20.0-verify/showreel-verify.json"
+    }
+  ],
+  "done": true
+}

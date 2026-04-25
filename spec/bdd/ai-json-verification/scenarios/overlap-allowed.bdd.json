@@ -1,0 +1,15 @@
+{
+  "id": "overlap-allowed",
+  "title": "多轨道重叠默认是设计意图",
+  "given": "showreel-24s 有多个 component 轨道在同一时间段叠加。",
+  "when": "AI 运行 nf verify。",
+  "then": "报告声明 overlap_policy=allowed-by-default，且不输出 layout.overlap warning。",
+  "human_actions": ["read intent", "scan checks", "confirm no false overlap warning"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-24s --out ../NextFrame.archive/v0.20.0-verify/showreel-verify.json | jq '{overlap_policy: .intent.overlap_policy, overlap_checks: [.checks[] | select(.id==\"layout.overlap\")]}'"
+    }
+  ],
+  "done": true
+}
