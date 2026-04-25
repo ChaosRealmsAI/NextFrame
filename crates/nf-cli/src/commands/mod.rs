@@ -18,6 +18,7 @@ pub mod log;
 pub mod projects;
 pub mod utility;
 pub mod verify;
+pub mod verify_export;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -188,6 +189,26 @@ COMMON ERRORS:
     - invalid composition JSON -> exit 2 · hint: inspect `checks[]` and `timeline.ascii`"#
     )]
     Verify(VerifyArgs),
+    #[command(
+        name = "verify-export",
+        about = "Verify exported MP4 against render_source.v1 clip windows",
+        long_about = r#"Verify a final exported MP4 by sampling clip windows from the render_source.v1 contract.
+
+USAGE:
+    nf verify-export --source=<render_source.json> --video=<out.mp4> --out=<report.json>
+
+EXAMPLES:
+    nf verify-export --source=tmp/showreel.render_source.json --video=tmp/showreel.mp4 --out=tmp/showreel.verify-export.json
+
+EXPECTED JSON:
+    {"ok":true,"checks":[{"clip":"intro","t_ms":2600,"status":"pass"}],"frames_dir":"tmp/verify-export-frames"}
+
+COMMON ERRORS:
+    - source invalid -> exit 2 · hint: run `nf-recorder validate-source --source=<json>`
+    - video missing -> exit 2 · hint: run `nf-recorder export --source=<json> --profile=draft -o <mp4>`
+    - ffmpeg missing -> exit 2 · hint: install ffmpeg to enable frame sampling"#
+    )]
+    VerifyExport(VerifyExportArgs),
     #[command(
         name = "export-status",
         about = "Read a running desktop export job status",
@@ -416,14 +437,17 @@ USAGE:
     nf composition show --project=<slug> --composition=<slug> [--track=<id>] [--field=<path>]
     nf composition patch --project=<slug> --composition=<slug> --track=<id> --field=<path> --value=<json-or-string>
     nf composition validate --project=<slug> --composition=<slug>
+    nf composition compile --project=<slug> --composition=<slug> --out=<render_source.json>
 
 EXAMPLES:
     nf composition show --project=v2-showcase --composition=showreel-24s --track=final-title --field=params.title
     nf composition patch --project=v2-showcase --composition=showreel-24s --track=final-title --field=params.title --value='NEXTFRAME LIVE EDIT'
     nf composition validate --project=v2-showcase --composition=showreel-24s
+    nf composition compile --project=v2-showcase --composition=showreel-clip-first --out=tmp/showreel.render_source.json
 
 EXPECTED JSON:
     {"composition":{...},"source":{...},"warnings":[]}
+    {"project":"v2-showcase","composition":"showreel-clip-first","out":"tmp/showreel.render_source.json","schema_version":"nf.render_source.v1","duration_ms":16400,"warnings":[]}
     {"ok":true,"components":[...],"errors":[]}
 
 COMMON ERRORS:
@@ -925,6 +949,8 @@ pub enum CompositionSubcommand {
     Patch(CompositionPatchArgs),
     #[command(about = "Validate composition component registry and component ABI")]
     Validate(CompositionValidateArgs),
+    #[command(about = "Compile composition.json into stable render_source.v1 JSON")]
+    Compile(CompositionCompileArgs),
 }
 
 #[derive(Debug, Args)]
@@ -1011,6 +1037,34 @@ pub struct CompositionValidateArgs {
         help = "Composition slug, for example showreel-24s"
     )]
     pub composition: String,
+}
+
+#[derive(Debug, Args)]
+pub struct CompositionCompileArgs {
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Project slug, for example v2-showcase"
+    )]
+    pub project: String,
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Composition slug, for example showreel-clip-first"
+    )]
+    pub composition: String,
+    #[arg(long, value_name = "JSON", help = "Output render_source.v1 JSON path")]
+    pub out: PathBuf,
+}
+
+#[derive(Debug, Args)]
+pub struct VerifyExportArgs {
+    #[arg(long, value_name = "JSON", help = "Input render_source.v1 JSON path")]
+    pub source: PathBuf,
+    #[arg(long, value_name = "MP4", help = "Exported MP4 path to inspect")]
+    pub video: PathBuf,
+    #[arg(long, value_name = "JSON", help = "Output verification report JSON")]
+    pub out: PathBuf,
 }
 
 #[derive(Debug, Subcommand)]

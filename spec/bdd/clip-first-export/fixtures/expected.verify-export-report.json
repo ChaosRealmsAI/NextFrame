@@ -1,11 +1,12 @@
 {
   "schema_version": "nf.verify_export_report.v1",
   "ok": true,
-  "source_schema_version": "nf.render_source.v1",
+  "source": "/tmp/showreel.render_source.json",
   "video": "/tmp/showreel.video.mp4",
+  "frames_dir": "/tmp/showreel.verify-export-frames",
   "checks": [
-    { "clip_id": "intro", "t_ms": 2600, "status": "passed", "assertions": ["not_magenta", "not_blank"] },
-    { "clip_id": "proof", "t_ms": 8300, "status": "passed", "assertions": ["not_magenta", "not_blank"] },
-    { "clip_id": "outro", "t_ms": 13900, "status": "passed", "assertions": ["not_magenta", "not_blank"] }
+    { "clip": "intro", "t_ms": 2600, "status": "pass", "assertions": ["not-magenta-background", "not-blank-frame"] },
+    { "clip": "proof", "t_ms": 8300, "status": "pass", "assertions": ["not-magenta-background", "not-blank-frame"] },
+    { "clip": "outro", "t_ms": 13900, "status": "pass", "assertions": ["not-magenta-background", "not-blank-frame"] }
   ]
 }

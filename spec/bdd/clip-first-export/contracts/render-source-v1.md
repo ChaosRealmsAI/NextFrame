@@ -20,7 +20,7 @@ Primary commands:
 nf composition compile --project=<slug> --composition=<slug> --out=<source.json>
 nf-recorder validate-source --source=<source.json>
 nf-recorder export --source=<source.json> --profile=draft --out=<video.mp4> --diagnostics=<diagnostics.json>
-nf-recorder snapshot --source=<source.json> --t-ms=<ms> --out=<frame.png>
+nf-recorder snapshot-source --source=<source.json> --t-ms=<ms> --out=<frame.png>
 nf verify-export --source=<source.json> --video=<video.mp4> --out=<report.json>
 ```
 

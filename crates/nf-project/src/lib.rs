@@ -274,6 +274,95 @@ pub struct SourceCompileResult {
     pub warnings: Vec<String>,
 }
 
+const RENDER_SOURCE_SCHEMA_VERSION: &str = "nf.render_source.v1";
+
+fn finalize_render_source_v1(mut source: Value, duration_ms: u64, background: &str) -> Value {
+    let Some(root) = source.as_object_mut() else {
+        return source;
+    };
+    root.insert(
+        "schema_version".to_string(),
+        json!(RENDER_SOURCE_SCHEMA_VERSION),
+    );
+    root.insert("duration_ms".to_string(), json!(duration_ms));
+    root.entry("assets".to_string())
+        .or_insert_with(|| json!([]));
+
+    if let Some(meta) = root.get_mut("meta").and_then(Value::as_object_mut) {
+        meta.insert("duration_ms".to_string(), json!(duration_ms));
+        meta.insert(
+            "render_source_schema".to_string(),
+            json!(RENDER_SOURCE_SCHEMA_VERSION),
+        );
+    }
+
+    let theme = root
+        .entry("theme".to_string())
+        .or_insert_with(|| json!({}))
+        .as_object_mut();
+    if let Some(theme) = theme {
+        theme
+            .entry("background".to_string())
+            .or_insert_with(|| json!(background));
+    }
+
+    if let Some(tracks) = root.get_mut("tracks").and_then(Value::as_array_mut) {
+        for track in tracks {
+            let Some(clips) = track.get_mut("clips").and_then(Value::as_array_mut) else {
+                continue;
+            };
+            for clip in clips {
+                let Some(clip_object) = clip.as_object_mut() else {
+                    continue;
+                };
+                if let Some(begin) = clip_object.get("begin").cloned() {
+                    clip_object.entry("begin_ms".to_string()).or_insert(begin);
+                }
+                if let Some(end) = clip_object.get("end").cloned() {
+                    clip_object.entry("end_ms".to_string()).or_insert(end);
+                }
+            }
+        }
+    }
+
+    source
+}
+
+fn theme_background_from_css(css: &str) -> String {
+    extract_css_custom_property(css, "--nfv2-bg")
+        .and_then(sanitize_stage_background)
+        .unwrap_or_else(|| "#000".to_string())
+}
+
+fn extract_css_custom_property<'a>(css: &'a str, name: &str) -> Option<&'a str> {
+    let start = css.find(name)?;
+    let rest = &css[start + name.len()..];
+    let colon = rest.find(':')?;
+    let rest = &rest[colon + 1..];
+    let end = rest.find(';')?;
+    Some(rest[..end].trim())
+}
+
+fn sanitize_stage_background(raw: &str) -> Option<String> {
+    let value = raw.trim();
+    if value.is_empty() || value.len() > 96 || value.contains([';', '{', '}']) {
+        return None;
+    }
+    let lower = value.to_ascii_lowercase();
+    let named = matches!(
+        lower.as_str(),
+        "black" | "white" | "transparent" | "canvas" | "currentcolor"
+    );
+    let functional = lower.starts_with("rgb(")
+        || lower.starts_with("rgba(")
+        || lower.starts_with("hsl(")
+        || lower.starts_with("hsla(");
+    let hex = lower.starts_with('#')
+        && matches!(lower.len(), 4 | 5 | 7 | 9)
+        && lower[1..].chars().all(|ch| ch.is_ascii_hexdigit());
+    (named || functional || hex).then(|| value.to_string())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ComponentValidationReport {
     pub ok: bool,
@@ -663,6 +752,8 @@ pub fn compile_composition_source(
         "components": Value::Object(components),
         "tracks": source_tracks
     });
+    let source =
+        finalize_render_source_v1(source, duration_ms, &theme_background_from_css(&theme_css));
 
     Ok(SourceCompileResult { source, warnings })
 }
@@ -930,6 +1021,8 @@ fn compile_clip_composition_source(
         "components": Value::Object(components),
         "tracks": source_tracks
     });
+    let source =
+        finalize_render_source_v1(source, duration_ms, &theme_background_from_css(&theme_css));
 
     Ok(SourceCompileResult { source, warnings })
 }
@@ -1512,8 +1605,13 @@ pub fn compile_episode_source(
         },
         "duration": duration_ms,
         "anchors": {},
+        "theme": {
+            "id": "episode-default",
+            "background": "#000"
+        },
         "tracks": tracks
     });
+    let source = finalize_render_source_v1(source, duration_ms, "#000");
 
     Ok(SourceCompileResult { source, warnings })
 }

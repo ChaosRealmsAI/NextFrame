@@ -1937,6 +1937,7 @@ dependencies = [
  "interprocess",
  "nf-project",
  "nf-recorder",
+ "png",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
