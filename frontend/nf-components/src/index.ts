@@ -185,7 +185,7 @@ function wireApp(): void {
       const clipId = inspector.getAttribute("clip-id");
       const voice = voiceValue(detail.value);
       if (!clipId || !voice) return;
-      startVoiceFlow(route.project, route.episode, clipId, voice, inspector);
+      startVoiceFlow(route.project, route.episode, clipId, voice, inspector, route.composition);
     }
     if (detail.field === "open-export") {
       const path = typeof detail.value === "string" && detail.value.length > 0
@@ -238,14 +238,22 @@ function saveCompositionFieldFromRoute(track: string, field: string, value: unkn
   saveCompositionField(route.project, route.composition, track, field, value);
 }
 
-function startVoiceFlow(project: string, episode: string, clipId: string, voice: NfTtsSpec & { text: string }, inspector: Element): void {
+function startVoiceFlow(
+  project: string,
+  episode: string,
+  clipId: string,
+  voice: NfTtsSpec & { text: string },
+  inspector: Element,
+  composition?: string,
+): void {
   inspector.setAttribute("voice-status", "running");
   inspector.removeAttribute("voice-error");
   inspector.removeAttribute("voice-audio");
-  void synthesizeVoice(project, episode, clipId, voice.text, voice)
+  const voiceOptions = composition ? { ...voice, composition } : voice;
+  void synthesizeVoice(project, episode, clipId, voice.text, voiceOptions)
     .then((started) => {
       inspector.setAttribute("voice-audio", started.audio);
-      pollVoice(started.job_id, project, episode, clipId, inspector);
+      pollVoice(started.job_id, project, episode, clipId, inspector, composition);
     })
     .catch((error) => {
       inspector.setAttribute("voice-status", "failed");
@@ -253,7 +261,14 @@ function startVoiceFlow(project: string, episode: string, clipId: string, voice:
     });
 }
 
-function pollVoice(jobId: string, project: string, episode: string, clipId: string, inspector: Element): void {
+function pollVoice(
+  jobId: string,
+  project: string,
+  episode: string,
+  clipId: string,
+  inspector: Element,
+  composition?: string,
+): void {
   window.setTimeout(() => {
     void voiceStatus(jobId)
       .then((status) => {
@@ -261,11 +276,14 @@ function pollVoice(jobId: string, project: string, episode: string, clipId: stri
         inspector.setAttribute("voice-audio", status.audio);
         if (status.error) inspector.setAttribute("voice-error", status.error);
         if (status.status === "running") {
-          pollVoice(jobId, project, episode, clipId, inspector);
+          pollVoice(jobId, project, episode, clipId, inspector, composition);
           return;
         }
         if (status.status === "succeeded") {
-          void loadProjectData(project, episode, { explicitRoute: true })
+          const reload = composition
+            ? loadCompositionData(project, composition, { explicitRoute: true }).then((loaded) => loaded.data)
+            : loadProjectData(project, episode, { explicitRoute: true });
+          void reload
             .then((data) => applyData(data, clipId))
             .catch((error) => {
               inspector.setAttribute("voice-status", "failed");
@@ -418,7 +436,7 @@ function hasGeneratedAudioForClip(clipId: string): boolean {
   const expectedAudioId = `voice-${clipId}`;
   return episode?.clips.some((clip) => {
     if (clip.kind !== "audio" || !clip.src) return false;
-    return clip.id === expectedAudioId || clip.tts?.audio_clip === expectedAudioId || clip.tts?.text != null;
+    return clip.id === expectedAudioId || clip.tts?.text != null;
   }) ?? false;
 }
 
@@ -1117,14 +1135,14 @@ function patchCompositionSourceField(source: NfRuntimeSource, trackId: string, f
     if (track.id !== trackId) continue;
     for (const clip of track.clips ?? []) {
       const params = recordValue(clip.params);
-      if (track.kind === "subtitle" && field === "params.words") {
+      if (track.kind === "subtitle" && field === "source.words") {
         const nested = recordValue(params.source);
         nested.words = value;
         params.source = nested;
-      } else if (track.kind === "subtitle" && field.startsWith("params.words.")) {
+      } else if (track.kind === "subtitle" && field.startsWith("source.words.")) {
         const nested = recordValue(params.source);
         const words = Array.isArray(nested.words) ? nested.words : [];
-        setFieldPath(words, field.slice("params.words.".length), value);
+        setFieldPath(words, field.slice("source.words.".length), value);
         nested.words = words;
         params.source = nested;
       } else if (field.startsWith("params.")) {

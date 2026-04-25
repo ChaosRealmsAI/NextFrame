@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use serde_json::{Value, json};
 
 use crate::errors::NfError;
-use crate::handlers::{ensure_episode, now_iso, optional_str, required_str};
+use crate::handlers::{ensure_episode, ensure_project, now_iso, optional_str, required_str};
 use crate::ipc_server::{IpcRequest, OpHandler};
 use crate::storage::{JsonStorage, Storage, validate_slug};
 
@@ -52,17 +52,31 @@ impl VoiceOpHandler {
 
     fn start(&self, params: &Value) -> Result<Value, NfError> {
         let project = required_str(params, "project")?;
-        let episode_slug = required_str(params, "episode")?;
+        let composition_slug = optional_str(params, "composition");
+        let episode_slug = optional_str(params, "episode");
         let clip = optional_str(params, "clip").unwrap_or_else(|| "narration".to_string());
         let text = required_str(params, "text")?;
         let voice = optional_str(params, "voice");
         let backend = optional_str(params, "backend");
         let rate = optional_str(params, "rate");
         validate_slug(&project)?;
-        validate_slug(&episode_slug)?;
-        let episode = ensure_episode(&self.storage, &project, &episode_slug)?;
+        let target = if let Some(composition) = composition_slug {
+            validate_slug(&composition)?;
+            ensure_project(&self.storage, &project)?;
+            let value = self.storage.load_composition(&project, &composition)?;
+            VoiceTarget::Composition {
+                slug: composition,
+                value,
+            }
+        } else {
+            let episode = episode_slug.ok_or_else(|| {
+                NfError::ValidationFailed("missing episode or composition".to_string())
+            })?;
+            validate_slug(&episode)?;
+            VoiceTarget::Episode(ensure_episode(&self.storage, &project, &episode)?)
+        };
 
-        let job_id = voice_job_id(&project, &episode_slug);
+        let job_id = voice_job_id(&project, target.slug());
         let base_slug = safe_slug(&format!("voice-{clip}"));
         let audio_dir = self.storage.root().join(&project).join("audio");
         let audio = audio_dir.join(format!("{base_slug}.mp3"));
@@ -94,7 +108,7 @@ impl VoiceOpHandler {
             let update = run_voice_job(VoiceJobRequest {
                 storage,
                 project,
-                episode,
+                target,
                 clip,
                 text,
                 voice,
@@ -166,7 +180,7 @@ impl OpHandler for VoiceOpHandler {
 struct VoiceJobRequest {
     storage: JsonStorage,
     project: String,
-    episode: nf_project::Episode,
+    target: VoiceTarget,
     clip: String,
     text: String,
     voice: Option<String>,
@@ -176,6 +190,21 @@ struct VoiceJobRequest {
     base_slug: String,
     audio: PathBuf,
     timeline: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+enum VoiceTarget {
+    Episode(nf_project::Episode),
+    Composition { slug: String, value: Value },
+}
+
+impl VoiceTarget {
+    fn slug(&self) -> &str {
+        match self {
+            Self::Episode(episode) => &episode.slug,
+            Self::Composition { slug, .. } => slug,
+        }
+    }
 }
 
 fn run_voice_job(request: VoiceJobRequest) -> Result<Value, String> {
@@ -233,8 +262,128 @@ fn run_voice_job(request: VoiceJobRequest) -> Result<Value, String> {
         &request.text,
         fallback_duration_ms(&request.text),
     )?;
-    let updated = update_episode_with_voice(&request, duration_ms, words)?;
+    if !request.timeline.exists() {
+        std::fs::write(
+            &request.timeline,
+            serde_json::to_string_pretty(&json!({
+                "duration_ms": duration_ms,
+                "words": words
+            }))
+            .map_err(|err| format!("failed to serialize fallback timeline: {err}"))?,
+        )
+        .map_err(|err| {
+            format!(
+                "failed to write fallback timeline {}: {err}",
+                request.timeline.display()
+            )
+        })?;
+    }
+    let updated = match &request.target {
+        VoiceTarget::Composition { .. } => update_composition_with_voice(&request, duration_ms)?,
+        VoiceTarget::Episode(_) => update_episode_with_voice(&request, duration_ms, words)?,
+    };
     Ok(updated)
+}
+
+fn update_composition_with_voice(
+    request: &VoiceJobRequest,
+    duration_ms: u64,
+) -> Result<Value, String> {
+    let VoiceTarget::Composition { slug, value } = &request.target else {
+        return Err("voice target is not a composition".to_string());
+    };
+    let mut composition = value.clone();
+    let clip = composition
+        .get_mut("clips")
+        .and_then(Value::as_array_mut)
+        .and_then(|clips| {
+            clips.iter_mut().find(|clip| {
+                clip.get("id")
+                    .or_else(|| clip.get("slug"))
+                    .and_then(Value::as_str)
+                    == Some(request.clip.as_str())
+            })
+        })
+        .ok_or_else(|| format!("composition clip not found: {}", request.clip))?;
+    let tracks = clip
+        .get_mut("tracks")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| {
+            format!(
+                "composition clip '{}' tracks must be an array",
+                request.clip
+            )
+        })?;
+    let timeline_rel = format!("audio/{}.timeline.json", request.base_slug);
+    let audio_rel = format!("audio/{}.mp3", request.base_slug);
+
+    upsert_track(
+        tracks,
+        "voice",
+        json!({
+            "id": "voice",
+            "kind": "tts",
+            "timeline": timeline_rel,
+            "tts": {
+                "text": request.text,
+                "voice": request.voice,
+                "backend": request.backend,
+                "rate": request.rate
+            },
+            "items": [{
+                "id": "main",
+                "time": { "start": "in", "end": "out" },
+                "audio": audio_rel,
+                "volume": 1.0
+            }]
+        }),
+    );
+    upsert_track(
+        tracks,
+        "subtitle-words",
+        json!({
+            "id": "subtitle-words",
+            "kind": "subtitle_timeline",
+            "source": "voice",
+            "timeline": timeline_rel
+        }),
+    );
+    upsert_track(
+        tracks,
+        "subtitles",
+        json!({
+            "id": "subtitles",
+            "kind": "subtitle",
+            "z": 80,
+            "source": "subtitle-words",
+            "style": {
+                "active_color": "#fbbf24",
+                "color": "#ffffff",
+                "size_px": 34,
+                "position": "bottom",
+                "padding": 62
+            },
+            "items": [{
+                "id": "karaoke",
+                "time": { "start": "in", "end": "out" }
+            }]
+        }),
+    );
+
+    request
+        .storage
+        .save_composition(&request.project, slug, &composition)
+        .map_err(|err| format!("failed to save composition: {err}"))?;
+
+    Ok(json!({
+        "clip": request.clip,
+        "tts_track": "voice",
+        "subtitle_timeline_track": "subtitle-words",
+        "subtitle_track": "subtitles",
+        "audio": request.audio.display().to_string(),
+        "timeline": request.timeline.display().to_string(),
+        "duration_ms": duration_ms
+    }))
 }
 
 fn update_episode_with_voice(
@@ -248,7 +397,10 @@ fn update_episode_with_voice(
     let subtitle_label = format!("Subtitle · {}", request.clip);
     let end = format_seconds(duration_ms);
 
-    let mut episode = request.episode.clone();
+    let VoiceTarget::Episode(source_episode) = &request.target else {
+        return Err("voice target is not an episode".to_string());
+    };
+    let mut episode = source_episode.clone();
     episode.clips.retain(|clip| {
         clip_slug(clip) != Some(audio_slug.as_str())
             && clip_slug(clip) != Some(subtitle_slug.as_str())
@@ -265,8 +417,7 @@ fn update_episode_with_voice(
             "text": request.text,
             "voice": request.voice,
             "backend": request.backend,
-            "rate": request.rate,
-            "timeline_clip": subtitle_slug
+            "rate": request.rate
         },
         "effects": ["tts-generated"]
     }));
@@ -278,7 +429,7 @@ fn update_episode_with_voice(
         "end": end,
         "accent_color": "#fbbf24",
         "tts": {
-            "audio_clip": request.base_slug,
+            "audio_track": request.base_slug,
             "source": "timeline"
         },
         "words": words,
@@ -297,12 +448,17 @@ fn update_episode_with_voice(
         .map_err(|err| format!("failed to save episode: {err}"))?;
 
     Ok(json!({
-        "audio_clip": request.base_slug,
-        "subtitle_clip": subtitle_slug,
+        "audio_track": request.base_slug,
+        "subtitle_track": subtitle_slug,
         "audio": request.audio.display().to_string(),
         "timeline": request.timeline.display().to_string(),
         "duration_ms": duration_ms
     }))
+}
+
+fn upsert_track(tracks: &mut Vec<Value>, track_id: &str, replacement: Value) {
+    tracks.retain(|track| track.get("id").and_then(Value::as_str) != Some(track_id));
+    tracks.push(replacement);
 }
 
 fn load_timeline_or_fallback(
