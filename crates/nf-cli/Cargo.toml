@@ -13,6 +13,7 @@ name = "nf"
 path = "src/main.rs"
 
 [dependencies]
+base64 = "0.22"
 clap.workspace = true
 directories.workspace = true
 interprocess.workspace = true

@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>voice-preview-audible</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101417;
+      --panel: #182025;
+      --ink: #f2f4f2;
+      --muted: #aab4af;
+      --line: #334148;
+      --voice: #48c78e;
+      --subtitle: #f2c94c;
+      --clip: #7aa2ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .stage {
+      width: min(960px, calc(100vw - 32px));
+      min-height: 520px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+    .transport {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .play {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--voice);
+      position: relative;
+      animation: pulse 9s linear infinite;
+    }
+    .play::after {
+      content: "";
+      position: absolute;
+      left: 13px;
+      top: 9px;
+      border-left: 12px solid #07100b;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+    }
+    .body {
+      padding: 28px 30px;
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      gap: 26px;
+      align-items: stretch;
+    }
+    .clips, .timeline {
+      border: 1px solid var(--line);
+      background: #12191d;
+      padding: 16px;
+    }
+    .clip {
+      height: 58px;
+      margin-bottom: 12px;
+      padding: 11px 12px;
+      border: 1px solid #26353d;
+      color: var(--muted);
+      font-size: 13px;
+      animation: selectClip 9s steps(1) infinite;
+    }
+    .clip:nth-child(2) { animation-delay: 3s; }
+    .clip:nth-child(3) { animation-delay: 6s; }
+    .clip strong {
+      display: block;
+      color: var(--ink);
+      font-size: 14px;
+      margin-bottom: 3px;
+    }
+    .rows {
+      display: grid;
+      gap: 14px;
+      margin-top: 20px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 14px;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .rail {
+      height: 28px;
+      position: relative;
+      border: 1px solid #293840;
+      background: #0d1215;
+      overflow: hidden;
+    }
+    .bar {
+      position: absolute;
+      inset: 4px auto 4px 0;
+      width: 32%;
+      background: var(--clip);
+      animation: activeBar 9s linear infinite;
+    }
+    .row.voice .bar {
+      background: var(--voice);
+    }
+    .row.subtitle .bar {
+      background: var(--subtitle);
+    }
+    .wave {
+      position: absolute;
+      left: 10px;
+      top: 7px;
+      width: 110px;
+      height: 10px;
+      background:
+        linear-gradient(90deg, transparent 0 7px, rgba(7,16,11,.65) 7px 10px) 0 0 / 12px 10px;
+      animation: wave 900ms linear infinite;
+    }
+    .caption {
+      position: absolute;
+      left: 16px;
+      bottom: 18px;
+      right: 16px;
+      padding: 12px 14px;
+      border: 1px solid #5a4a18;
+      background: #211d11;
+      color: #ffe082;
+      font-size: 16px;
+      text-align: center;
+      animation: caption 9s steps(1) infinite;
+    }
+    footer {
+      height: 50px;
+      position: relative;
+      border-top: 1px solid var(--line);
+      background: #0d1215;
+    }
+    .progress {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 4px;
+      width: 100%;
+      transform-origin: left;
+      background: var(--voice);
+      animation: progress 9s linear infinite;
+    }
+    .toast {
+      position: absolute;
+      right: 16px;
+      top: 12px;
+      padding: 7px 10px;
+      border: 1px solid #2c5a44;
+      background: #12261c;
+      color: #b5f0d0;
+      font-size: 13px;
+      opacity: 0;
+      animation: toast 9s linear infinite;
+    }
+    @keyframes progress {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+    @keyframes pulse {
+      0%, 92%, 100% { transform: scale(1); }
+      5%, 38%, 71% { transform: scale(1.12); }
+    }
+    @keyframes activeBar {
+      0%, 32% { left: 0; width: 30%; }
+      33%, 65% { left: 34%; width: 30%; }
+      66%, 100% { left: 68%; width: 30%; }
+    }
+    @keyframes selectClip {
+      0%, 32% { border-color: var(--voice); background: #17251e; }
+      33%, 100% { border-color: #26353d; background: transparent; }
+    }
+    @keyframes wave {
+      from { transform: translateX(0); }
+      to { transform: translateX(12px); }
+    }
+    @keyframes caption {
+      0%, 32% { content: "A clip is one video segment."; }
+      33%, 65% { content: "Inside that clip, tracks stay local."; }
+      66%, 100% { content: "Voice creates the subtitle timeline."; }
+    }
+    @keyframes toast {
+      0%, 82% { opacity: 0; transform: translateY(6px); }
+      88%, 96% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(6px); }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <header>
+      <h1>Clip-first voice preview</h1>
+      <div class="transport"><span class="play" aria-hidden="true"></span><span>playing audible TTS</span></div>
+    </header>
+    <section class="body">
+      <aside class="clips" aria-label="clips">
+        <div class="clip"><strong>intro</strong>tts + subtitle timeline</div>
+        <div class="clip"><strong>proof</strong>tts + subtitle timeline</div>
+        <div class="clip"><strong>outro</strong>tts + subtitle timeline</div>
+      </aside>
+      <section class="timeline" aria-label="timeline">
+        <div class="rows">
+          <div class="row"><span>scene</span><div class="rail"><div class="bar"></div></div></div>
+          <div class="row voice"><span>tts</span><div class="rail"><div class="bar"><span class="wave"></span></div></div></div>
+          <div class="row subtitle"><span>subtitle</span><div class="rail"><div class="bar"></div></div></div>
+        </div>
+        <div class="caption">A clip is one video segment.</div>
+      </section>
+    </section>
+    <footer>
+      <div class="progress"></div>
+      <div class="toast">round complete</div>
+    </footer>
+  </main>
+</body>
+</html>
