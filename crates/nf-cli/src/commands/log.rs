@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::commands::{LogCommand, LogSubcommand, send_ipc};
+use crate::commands::{send_ipc, LogCommand, LogSubcommand};
 use crate::errors::NfError;
 
 pub fn dispatch(args: LogCommand) -> Result<(), NfError> {

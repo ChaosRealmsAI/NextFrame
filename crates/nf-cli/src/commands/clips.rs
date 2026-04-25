@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::commands::{ClipCommand, ClipSubcommand, send_ipc};
+use crate::commands::{send_ipc, ClipCommand, ClipSubcommand};
 use crate::errors::NfError;
 
 pub fn dispatch(args: ClipCommand) -> Result<(), NfError> {

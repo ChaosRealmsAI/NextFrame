@@ -256,6 +256,67 @@ const sheet = makeSheet(`
     font-size: 9.5px;
     color: var(--fg-4);
   }
+  .diagnostics {
+    margin: 0 0 12px;
+    padding: 10px;
+    border: 1px solid var(--bd);
+    background: rgba(255, 255, 255, 0.025);
+  }
+  .diag-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 10px;
+    color: var(--accent-l);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .diag-head span {
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--fg-4);
+    font-family: var(--mono);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .diag-map {
+    position: relative;
+    height: 18px;
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+  }
+  .diag-span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    min-width: 3px;
+    border: 1px solid var(--amber-b);
+    background: rgba(224, 183, 108, 0.32);
+  }
+  .diag-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .diag-summary div {
+    min-width: 0;
+    padding: 6px 7px;
+    border: 1px solid var(--bd-2);
+    background: rgba(0, 0, 0, 0.22);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--fg-4);
+  }
+  .diag-summary b {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--fg);
+    font: 12px var(--font);
+  }
   @keyframes export-run {
     from { transform: translateX(-110%); }
     to { transform: translateX(260%); }
@@ -275,6 +336,7 @@ export class NfInspector extends NfBase {
       "export-open-status",
       "export-profile",
       "export-progress",
+      "export-diagnostics",
       "voice-status",
       "voice-error",
       "voice-audio",
@@ -320,6 +382,7 @@ export class NfInspector extends NfBase {
     const exportOpenStatus = this.getAttribute("export-open-status") ?? "";
     const exportProfile = this.getAttribute("export-profile") ?? "final";
     const exportProgress = exportProgressValue(this.getAttribute("export-progress"));
+    const exportDiagnostics = exportDiagnosticsValue(this.getAttribute("export-diagnostics"));
     const voiceStatus = this.getAttribute("voice-status") ?? "idle";
     const voiceError = this.getAttribute("voice-error") ?? "";
     const voiceAudio = this.getAttribute("voice-audio") ?? "";
@@ -340,12 +403,13 @@ export class NfInspector extends NfBase {
         exportOpenStatus,
         exportProfile,
         exportProgress,
+        exportDiagnostics,
       });
       return;
     }
     this.root.innerHTML = `
       <div class="insp">
-        ${renderExportPanel({ exportStatus, exportJobId, exportPath, exportError, exportOpenStatus, exportProfile, exportProgress })}
+        ${renderExportPanel({ exportStatus, exportJobId, exportPath, exportError, exportOpenStatus, exportProfile, exportProgress, exportDiagnostics })}
         ${exportStatus === "succeeded" ? `
           <div class="export-actions">
             <div class="status ok">${escapeHtml(exportOpenStatus === "opened" ? "已打开 · " : "")}${escapeHtml(exportPath)}</div>
@@ -483,6 +547,7 @@ export class NfInspector extends NfBase {
     exportOpenStatus: string;
     exportProfile: string;
     exportProgress: ExportProgressState;
+    exportDiagnostics: ExportDiagnosticsState | null;
   }): void {
     const kind = stringValue(state.track.kind) ?? "component";
     const component = stringValue(state.track.component) ?? kind;
@@ -614,6 +679,7 @@ function renderExportPanel(state: {
   exportOpenStatus?: string;
   exportProfile: string;
   exportProgress: ExportProgressState;
+  exportDiagnostics?: ExportDiagnosticsState | null;
 }): string {
   const active = EXPORT_PROFILES.find((profile) => profile.id === state.exportProfile) ?? EXPORT_PROFILES[2];
   const percent = Math.max(0, Math.min(100, state.exportProgress.percent));
@@ -644,7 +710,15 @@ function renderExportPanel(state: {
     ${state.exportStatus === "cancelled" ? `
       <div class="status err">导出已取消</div>
     ` : ""}
+    ${state.exportStatus === "succeeded" && state.exportDiagnostics ? renderDiagnostics(state.exportDiagnostics) : ""}
   `;
+}
+
+interface ExportDiagnosticsState {
+  path: string;
+  summary: Record<string, number>;
+  slowSpans: Array<Record<string, number>>;
+  topFrames: Array<Record<string, number>>;
 }
 
 function exportProgressValue(raw: string | null): ExportProgressState {
@@ -663,8 +737,76 @@ function exportProgressValue(raw: string | null): ExportProgressState {
   }
 }
 
+function exportDiagnosticsValue(raw: string | null): ExportDiagnosticsState | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Record<string, unknown>;
+    const summary = recordValue(value.summary);
+    return {
+      path: typeof value.path === "string" ? value.path : "",
+      summary: numbersRecord(summary),
+      slowSpans: arrayRecords(value.slow_spans).map(numbersRecord),
+      topFrames: arrayRecords(value.top_frames).map(numbersRecord),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function renderDiagnostics(diagnostics: ExportDiagnosticsState): string {
+  const duration = diagnostics.summary.duration_ms || 24_000;
+  const spans = diagnostics.slowSpans.slice(0, 8);
+  const map = spans.length === 0
+    ? `<i class="diag-span" data-diagnostics-slow-span style="left:0;width:0"></i>`
+    : spans.map((span) => {
+        const left = percentOf(span.start_ms || 0, duration);
+        const width = Math.max(2, percentOf(Math.max(1, (span.end_ms || 0) - (span.start_ms || 0)), duration));
+        const title = `${msLabel(span.start_ms)}-${msLabel(span.end_ms)} · ${numLabel(span.avg_ms_per_frame)}ms`;
+        return `<i class="diag-span" data-diagnostics-slow-span title="${escapeAttr(title)}" style="left:${left.toFixed(2)}%;width:${width.toFixed(2)}%"></i>`;
+      }).join("");
+  return `
+    <div class="diagnostics" data-export-diagnostics-summary>
+      <div class="diag-head">性能地图<span title="${escapeAttr(diagnostics.path)}">${escapeHtml(diagnostics.path)}</span></div>
+      <div class="diag-map" data-export-performance-map>${map}</div>
+      <div class="diag-summary">
+        <div><b>${numLabel(diagnostics.summary.avg_ms_per_frame)}ms</b>avg/frame</div>
+        <div><b>${numLabel(diagnostics.summary.max_ms_per_frame)}ms</b>max frame</div>
+        <div><b>${numLabel(diagnostics.summary.slow_spans)}</b>slow spans</div>
+        <div><b>${numLabel(diagnostics.summary.frames)}</b>frames</div>
+      </div>
+    </div>
+  `;
+}
+
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function numbersRecord(value: Record<string, unknown>): Record<string, number> {
+  const result: Record<string, number> = {};
+  Object.entries(value).forEach(([key, raw]) => {
+    if (typeof raw === "number" && Number.isFinite(raw)) result[key] = raw;
+  });
+  return result;
+}
+
+function arrayRecords(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => item != null && typeof item === "object" && !Array.isArray(item))
+    : [];
+}
+
+function percentOf(value: number, total: number): number {
+  return total > 0 ? Math.max(0, Math.min(100, value / total * 100)) : 0;
+}
+
+function msLabel(value: number | undefined): string {
+  return `${((value ?? 0) / 1000).toFixed(1)}s`;
+}
+
+function numLabel(value: number | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "0";
+  return value >= 100 ? value.toFixed(0) : value.toFixed(1).replace(/\.0$/, "");
 }
 
 function escapeHtml(value: string): string {

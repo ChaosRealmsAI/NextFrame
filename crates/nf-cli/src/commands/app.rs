@@ -1,8 +1,8 @@
 use serde_json::json;
 
 use crate::commands::{
-    CaptureArgs, ClickArgs, DevtoolsArgs, OpenArgs, ProjectEpisodeFilter, ScreenshotArgs,
-    SelectArgs, StateArgs, TabArgs, WindowTargetArgs, send_ipc,
+    send_ipc, CaptureArgs, ClickArgs, DevtoolsArgs, OpenArgs, ProjectEpisodeFilter, ScreenshotArgs,
+    SelectArgs, StateArgs, TabArgs, WindowTargetArgs,
 };
 use crate::errors::NfError;
 
@@ -105,7 +105,9 @@ pub fn state(args: StateArgs) -> Result<(), NfError> {
 }
 
 pub fn devtools(args: DevtoolsArgs) -> Result<(), NfError> {
-    let action = args.action.or_else(|| args.fill.as_ref().map(|_| "fill".to_string()));
+    let action = args
+        .action
+        .or_else(|| args.fill.as_ref().map(|_| "fill".to_string()));
     let value = args.value.or(args.fill);
     send_ipc(
         "devtools-query",

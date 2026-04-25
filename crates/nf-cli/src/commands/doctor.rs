@@ -615,8 +615,8 @@ mod tests {
     use std::time::Duration;
 
     use super::{
-        CheckResult, CheckStatus, PROBE_TIMEOUT, Version, fail, overall_status, parse_version,
-        pass, probe_path, summarize,
+        fail, overall_status, parse_version, pass, probe_path, summarize, CheckResult, CheckStatus,
+        Version, PROBE_TIMEOUT,
     };
 
     #[test]

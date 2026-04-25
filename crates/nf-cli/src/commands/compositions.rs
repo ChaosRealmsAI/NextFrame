@@ -1,6 +1,6 @@
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
-use crate::commands::{CompositionCommand, CompositionSubcommand, send_ipc};
+use crate::commands::{send_ipc, CompositionCommand, CompositionSubcommand};
 use crate::errors::NfError;
 
 pub fn dispatch(args: CompositionCommand) -> Result<(), NfError> {

@@ -4,7 +4,7 @@ use std::process::{Command, Stdio};
 
 use nf_project::{compile_composition_source, compile_episode_source, JsonStorage, Storage};
 use nf_recorder::{ExportOpts, ExportResolution};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::commands::{print_json, ExportArgs};
 use crate::errors::NfError;
@@ -54,6 +54,7 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
     } else {
         Some(RecorderEventQuietGuard::new())
     };
+    let capture = args.diagnostics.then(nf_recorder::events::start_capture);
     let stats = runtime
         .block_on(nf_recorder::run_export_from_source(
             &source_path,
@@ -68,6 +69,9 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
             },
         ))
         .map_err(record_error)?;
+    let captured_events = capture
+        .map(nf_recorder::events::EventCaptureGuard::finish)
+        .unwrap_or_default();
 
     let audio_muxed = match mux_audio_tracks(&compiled.source, &args.out, duration_s) {
         Ok(muxed) => muxed,
@@ -77,7 +81,25 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
         }
     };
 
-    print_json(&json!({
+    let diagnostics = if args.diagnostics {
+        let diagnostics_path = diagnostics_path_for_output(&args.out);
+        let report = build_diagnostics_report(
+            &captured_events,
+            &args.out,
+            &source_path,
+            &diagnostics_path,
+            &stats,
+            &preset,
+            audio_muxed,
+            &warnings,
+        );
+        write_json_file(&diagnostics_path, &report)?;
+        Some((diagnostics_path, report))
+    } else {
+        None
+    };
+
+    let mut summary = json!({
         "out": args.out.display().to_string(),
         "source": source_path.display().to_string(),
         "profile": preset.name,
@@ -89,7 +111,17 @@ pub fn run(args: ExportArgs) -> Result<(), NfError> {
         "duration_ms": stats.duration_ms,
         "audio_muxed": audio_muxed,
         "warnings": warnings
-    }))
+    });
+    if let Some((path, report)) = diagnostics {
+        summary["diagnostics_path"] = json!(path.display().to_string());
+        summary["diagnostics"] = json!({
+            "path": path.display().to_string(),
+            "summary": diagnostics_summary(&report),
+            "slow_spans": report.get("slow_spans").cloned().unwrap_or(Value::Null),
+            "top_frames": report.get("top_frames").cloned().unwrap_or(Value::Null)
+        });
+    }
+    print_json(&summary)
 }
 
 #[derive(Debug, Clone)]
@@ -366,6 +398,155 @@ fn source_path_for_output(out: &Path) -> PathBuf {
     let mut raw = out.as_os_str().to_os_string();
     raw.push(".source.json");
     PathBuf::from(raw)
+}
+
+fn diagnostics_path_for_output(out: &Path) -> PathBuf {
+    out.with_extension("json")
+}
+
+fn build_diagnostics_report(
+    events: &[Value],
+    out: &Path,
+    source_path: &Path,
+    diagnostics_path: &Path,
+    stats: &nf_recorder::OutputStats,
+    preset: &ExportProfile,
+    audio_muxed: bool,
+    warnings: &[String],
+) -> Value {
+    let mut frames = events
+        .iter()
+        .filter(|event| event.get("event").and_then(Value::as_str) == Some("record.frame"))
+        .filter_map(frame_diagnostic)
+        .collect::<Vec<_>>();
+    frames.sort_by_key(|frame| frame.seq);
+    let avg = if frames.is_empty() {
+        0.0
+    } else {
+        frames.iter().map(|frame| frame.encode_ms).sum::<f64>() / frames.len() as f64
+    };
+    let max = frames
+        .iter()
+        .map(|frame| frame.encode_ms)
+        .fold(0.0_f64, f64::max);
+    let frame_budget = 1000.0 / f64::from(preset.fps);
+    let slow_threshold = frame_budget.mul_add(1.5, 0.0).max(avg * 1.5).max(50.0);
+    let top_frames = top_frames(&frames, 10);
+    let slow_spans = slow_spans(&frames, slow_threshold);
+    json!({
+        "schema": "nextframe.export.diagnostics.v1",
+        "out": out.display().to_string(),
+        "source": source_path.display().to_string(),
+        "diagnostics_path": diagnostics_path.display().to_string(),
+        "profile": preset.name,
+        "resolution": preset.resolution.as_str(),
+        "fps": preset.fps,
+        "parallel": preset.parallel,
+        "duration_ms": stats.duration_ms,
+        "frames": stats.frames,
+        "size_bytes": stats.size_bytes,
+        "audio_muxed": audio_muxed,
+        "avg_ms_per_frame": round2(avg),
+        "max_ms_per_frame": round2(max),
+        "frame_budget_ms": round2(frame_budget),
+        "slow_threshold_ms": round2(slow_threshold),
+        "slow_spans": slow_spans,
+        "top_frames": top_frames,
+        "warnings": warnings
+    })
+}
+
+#[derive(Debug, Clone)]
+struct FrameDiagnostic {
+    seq: u64,
+    t_ms: u64,
+    t_exact_ms: f64,
+    encode_ms: f64,
+}
+
+fn frame_diagnostic(value: &Value) -> Option<FrameDiagnostic> {
+    Some(FrameDiagnostic {
+        seq: value.get("seq")?.as_u64()?,
+        t_ms: value.get("t_ms")?.as_u64()?,
+        t_exact_ms: value
+            .get("t_exact_ms")
+            .and_then(Value::as_f64)
+            .unwrap_or_else(|| value.get("t_ms").and_then(Value::as_u64).unwrap_or(0) as f64),
+        encode_ms: value.get("encode_ms")?.as_f64()?,
+    })
+}
+
+fn top_frames(frames: &[FrameDiagnostic], limit: usize) -> Vec<Value> {
+    let mut sorted = frames.to_vec();
+    sorted.sort_by(|a, b| {
+        b.encode_ms
+            .total_cmp(&a.encode_ms)
+            .then_with(|| a.seq.cmp(&b.seq))
+    });
+    sorted
+        .into_iter()
+        .take(limit)
+        .map(|frame| {
+            json!({
+                "seq": frame.seq,
+                "t_ms": frame.t_ms,
+                "t_exact_ms": round2(frame.t_exact_ms),
+                "encode_ms": round2(frame.encode_ms)
+            })
+        })
+        .collect()
+}
+
+fn slow_spans(frames: &[FrameDiagnostic], threshold: f64) -> Vec<Value> {
+    let mut spans = Vec::new();
+    let mut current: Vec<&FrameDiagnostic> = Vec::new();
+    for frame in frames {
+        if frame.encode_ms >= threshold {
+            current.push(frame);
+        } else if !current.is_empty() {
+            spans.push(span_json(&current));
+            current.clear();
+        }
+    }
+    if !current.is_empty() {
+        spans.push(span_json(&current));
+    }
+    spans
+}
+
+fn span_json(frames: &[&FrameDiagnostic]) -> Value {
+    let first = frames.first().expect("slow span must have first frame");
+    let last = frames.last().expect("slow span must have last frame");
+    let avg = frames.iter().map(|frame| frame.encode_ms).sum::<f64>() / frames.len() as f64;
+    let max = frames
+        .iter()
+        .map(|frame| frame.encode_ms)
+        .fold(0.0_f64, f64::max);
+    json!({
+        "start_frame": first.seq,
+        "end_frame": last.seq,
+        "start_ms": first.t_ms,
+        "end_ms": last.t_ms,
+        "frames": frames.len(),
+        "avg_ms_per_frame": round2(avg),
+        "max_ms_per_frame": round2(max)
+    })
+}
+
+fn diagnostics_summary(report: &Value) -> Value {
+    json!({
+        "duration_ms": report.get("duration_ms").cloned().unwrap_or(Value::Null),
+        "frames": report.get("frames").cloned().unwrap_or(Value::Null),
+        "avg_ms_per_frame": report.get("avg_ms_per_frame").cloned().unwrap_or(Value::Null),
+        "max_ms_per_frame": report.get("max_ms_per_frame").cloned().unwrap_or(Value::Null),
+        "slow_threshold_ms": report.get("slow_threshold_ms").cloned().unwrap_or(Value::Null),
+        "slow_spans": report.get("slow_spans").and_then(Value::as_array).map_or(0, Vec::len),
+        "top_frames": report.get("top_frames").and_then(Value::as_array).map_or(0, Vec::len)
+    })
+}
+
+fn round2(value: f64) -> f64 {
+    (value * 100.0).round() / 100.0
 }
 
 fn write_json_file(path: &Path, value: &serde_json::Value) -> Result<(), NfError> {

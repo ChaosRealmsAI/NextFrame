@@ -163,6 +163,7 @@ function wireApp(): void {
     if (detail.field === "export-profile" && typeof detail.value === "string") {
       inspector.setAttribute("export-profile", detail.value);
       inspector.removeAttribute("export-progress");
+      inspector.removeAttribute("export-diagnostics");
     }
     if (detail.field === "export-cancel") {
       const jobId = typeof detail.value === "string" && detail.value.length > 0
@@ -289,9 +290,10 @@ function startExportFlow(project: string, episode: string, inspector: Element, c
   inspector.removeAttribute("export-open-status");
   inspector.removeAttribute("export-error");
   inspector.removeAttribute("export-job-id");
+  inspector.removeAttribute("export-diagnostics");
   inspector.setAttribute("export-progress", JSON.stringify({ stage: "queued", percent: 0 }));
   const profile = inspector.getAttribute("export-profile") || "final";
-  const options = { profile };
+  const options = { profile, diagnostics: true };
   const start = composition ? exportComposition(project, composition, options) : exportEpisode(project, episode, options);
   void start
     .then((started) => {
@@ -315,6 +317,7 @@ function pollExport(jobId: string, inspector: Element): void {
         inspector.setAttribute("export-path", status.out);
         if (status.profile) inspector.setAttribute("export-profile", status.profile);
         setExportProgress(inspector, status.progress);
+        setExportDiagnostics(inspector, status.diagnostics);
         if (status.error) inspector.setAttribute("export-error", status.error);
         if (status.status === "running") {
           pollExport(jobId, inspector);
@@ -330,6 +333,11 @@ function pollExport(jobId: string, inspector: Element): void {
 function setExportProgress(inspector: Element, progress?: NfExportProgress): void {
   if (!progress) return;
   inspector.setAttribute("export-progress", JSON.stringify(progress));
+}
+
+function setExportDiagnostics(inspector: Element, diagnostics: unknown): void {
+  if (!diagnostics) return;
+  inspector.setAttribute("export-diagnostics", JSON.stringify(diagnostics));
 }
 
 function routeFromUrl(): { project: string; episode: string; composition?: string; explicit: boolean } {
