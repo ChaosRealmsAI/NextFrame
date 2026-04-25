@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>export-stage-background</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; background: #05070a; color: #f6f7f2; font: 16px/1.4 Inter, system-ui, sans-serif; overflow: hidden; }
+    .stage { position: fixed; inset: 0; display: grid; place-items: center; background: #05070a; }
+    .frame { width: min(980px, 86vw); aspect-ratio: 16 / 9; position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,.18); background: #05070a; }
+    .bad, .good { position: absolute; inset: 0; display: grid; place-items: end center; padding-bottom: 42px; box-sizing: border-box; animation: swap 10s infinite; }
+    .bad { background: #ff00ff; }
+    .good { background: #05070a; opacity: 0; }
+    .good i { position: absolute; width: 7px; height: 7px; background: #62f5d2; left: 58%; top: 34%; box-shadow: -210px 30px #c8ff5d, 170px 70px #78a7ff, 60px 180px #62f5d2, -40px 230px #78a7ff; }
+    .subtitle { font-size: 30px; text-shadow: 0 2px 14px rgba(0,0,0,.7); }
+    .toast { position: fixed; right: 24px; bottom: 24px; padding: 10px 14px; border: 1px solid rgba(255,255,255,.18); background: rgba(5,7,10,.82); animation: toast 10s infinite; }
+    .bar { position: fixed; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.14); }
+    .bar::after { content: ""; display: block; height: 100%; width: 100%; background: #62f5d2; transform-origin: left; animation: progress 10s linear infinite; }
+    @keyframes swap {
+      0%, 38% { opacity: 1; }
+      48%, 100% { opacity: 0; }
+    }
+    .good { animation-name: swapGood; }
+    @keyframes swapGood {
+      0%, 42% { opacity: 0; }
+      52%, 100% { opacity: 1; }
+    }
+    @keyframes progress {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+    @keyframes toast {
+      0%, 82% { opacity: 0; transform: translateY(8px); }
+      88%, 100% { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="frame" aria-label="Export stage background regression">
+      <div class="bad"><div class="subtitle">Transparent clip exposes magenta canary.</div></div>
+      <div class="good"><i></i><div class="subtitle">Transparent clip renders on the stage background.</div></div>
+    </section>
+  </main>
+  <div class="toast">本轮完成</div>
+  <div class="bar"></div>
+</body>
+</html>
