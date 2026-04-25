@@ -48,11 +48,11 @@ export class NfTrack extends NfBase {
     `;
     this.root.querySelector(".tl-row")?.addEventListener("click", (event) => {
       if (!trackId) return;
+      if ((event.target as Element | null)?.closest("slot")) return;
       this.emit<TimelineTrackSelectDetail>("track-select", {
         track: kind as ClipKind,
         "track-id": trackId,
       });
-      if ((event.target as Element | null)?.closest("slot")) return;
     });
   }
 }

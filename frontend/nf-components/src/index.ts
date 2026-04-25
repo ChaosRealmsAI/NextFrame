@@ -452,13 +452,14 @@ function hasGeneratedAudioForClip(clipId: string): boolean {
 }
 
 function selectClip(clipId: string, clip?: NfDataClip): void {
+  const selected = clip ?? getMockData().episodes[0]?.clips.find((item) => item.id === clipId);
+  if (clipId === selectedClipId && selected) return;
   stopPlayback({ keepButtonState: false });
   selectedClipId = clipId;
   document.querySelector("nf-clips")?.setAttribute("selected-id", clipId);
   document.querySelector("nf-inspector")?.setAttribute("clip-id", clipId);
   document.querySelector("nf-timeline")?.setAttribute("selected-id", clipId);
   document.querySelector("nf-timeline")?.setAttribute("data-selected-track-id", clipId);
-  const selected = clip ?? getMockData().episodes[0]?.clips.find((item) => item.id === clipId);
   if (selected) {
     const duration = previewDurationForClip(selected);
     currentPreviewTime = compositionSource && selected.id !== ALL_COMPOSITION_CLIP_ID ? 0 : selected.start;

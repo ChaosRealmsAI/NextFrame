@@ -268,29 +268,18 @@ export class NfTimeline extends NfBase {
     });
     this.root.addEventListener("track-select", (event) => {
       const detail = (event as CustomEvent<TimelineTrackSelectDetail>).detail;
+      if (this.dataset.mode === "clip-first") {
+        const clipId = this.dataset.selectedClipId;
+        if (!clipId) return;
+        this.emit<TimelineClipSelectDetail>("clip-select", {
+          track: detail.track,
+          "clip-id": clipId,
+        });
+        return;
+      }
       this.emit<TimelineClipSelectDetail>("clip-select", {
         track: detail.track,
         "clip-id": detail["track-id"],
-      });
-    });
-    this.root.querySelectorAll<HTMLElement>("nf-track[data-track-id]").forEach((row) => {
-      row.addEventListener("click", () => {
-        if (this.dataset.mode === "clip-first") {
-          const clipId = this.dataset.selectedClipId;
-          if (!clipId) return;
-          this.emit<TimelineClipSelectDetail>("clip-select", {
-            track: (row.getAttribute("kind") ?? "component") as TimelineClipSelectDetail["track"],
-            "clip-id": clipId,
-          });
-          return;
-        }
-        if (this.dataset.mode === "clip-all") return;
-        const trackId = row.dataset.trackId ?? "";
-        if (!trackId) return;
-        this.emit<TimelineClipSelectDetail>("clip-select", {
-          track: (row.getAttribute("kind") ?? "component") as TimelineClipSelectDetail["track"],
-          "clip-id": trackId,
-        });
       });
     });
     this.root.addEventListener("anchor-hover", (event) => {
