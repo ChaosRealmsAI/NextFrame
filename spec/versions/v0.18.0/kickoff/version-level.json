@@ -1,0 +1,61 @@
+{
+  "version": "v0.18.0",
+  "type": "feature",
+  "chosen": "Online editing becomes actually usable for v2 composition fields.",
+  "why": "After v0.17.0 made components machine-checkable, the next bottleneck is the human editing loop: selecting a track, typing in inspector fields, seeing preview update, saving JSON, and exporting the same saved source must feel stable instead of fragile.",
+  "changed_from": "v0.17.0 completed component registry validation and advanced milestones to v0.18.0.",
+  "constraints": {
+    "no_vanity": "本版看得见的效果 = inspector 输入不掉焦点、保存状态清楚、导出使用保存后的 JSON。",
+    "no_overreach": "本版只做 v2 composition 在线编辑可用性 · 不做 TTS 生成闭环 / 新组件体系 / 云导出 / 大改设计。",
+    "no_rush": "不是临时绕过。输入、预览、保存、CLI devtools 验证都走同一事件路径。",
+    "must_verify": "验收画面 = 打开 showreel-24s, 选 final-title, 改 params.title, 预览和 JSON 同步, draft export source 也同步。自验方法 = devtools fill + composition show + export source jq。"
+  },
+  "success_picture": "PM 看到编辑器里选中一条轨道，直接在右侧字段输入标题，预览马上变；离开输入框后状态变 saved；导出后 source JSON 仍是这个标题。",
+  "cost_estimate": "AI 尺度 2-4h",
+  "risks": [
+    "Inspector attribute rerender may interrupt active inputs.",
+    "Devtools fill must not bypass the same input/change path as a human edit.",
+    "Verification must avoid permanently mutating source examples without restoring them."
+  ],
+  "candidates": [
+    {
+      "id": "C-01",
+      "title": "Online editing usability",
+      "selected": true,
+      "why": "Current roadmap item and highest PM-visible bottleneck.",
+      "constraints_check": "One visible editing loop, easy to verify with CLI and screenshot."
+    },
+    {
+      "id": "C-02",
+      "title": "TTS/subtitle generation loop",
+      "selected": false,
+      "why": "Valuable, but should not mix with editor usability.",
+      "constraints_check": "Would add generation/backend concerns; defer to v0.19.0."
+    },
+    {
+      "id": "C-03",
+      "title": "Editor quality audit",
+      "selected": false,
+      "why": "Useful quality slice, but v0.18 already has a concrete PM-visible feature.",
+      "constraints_check": "Keep audit as closeout gate rather than main version theme."
+    }
+  ],
+  "verify_points": [
+    {
+      "id": "V-01",
+      "desc": "Selecting a v2 composition track exposes stable editable inspector fields with AI-addressable selectors."
+    },
+    {
+      "id": "V-02",
+      "desc": "Typing into a composition field updates preview immediately without rerendering away the active input."
+    },
+    {
+      "id": "V-03",
+      "desc": "Blur/change saves the typed value through the same IPC path, preserving numeric values as numbers."
+    },
+    {
+      "id": "V-04",
+      "desc": "A draft export after save uses the saved composition JSON in its source sidecar."
+    }
+  ]
+}

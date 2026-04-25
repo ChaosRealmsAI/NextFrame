@@ -1,0 +1,15 @@
+{
+  "version": "v0.18.0",
+  "session": "41256e05",
+  "dialogue": [
+    {
+      "role": "user",
+      "text": "好  继续后续的推进吧。"
+    },
+    {
+      "role": "assistant",
+      "text": "继续 v0.18.0，按 milestones 推进“在线编辑真正可用”。范围锁定为选轨、字段编辑、预览同步、保存、导出同步，不把 TTS/云导出/新组件混进本版。"
+    }
+  ],
+  "locked_decision": "Proceed with v0.18.0 online editing usability for existing v2-editor-authoring."
+}

@@ -3,25 +3,29 @@
   "title": "修改组件参数后预览立即联动",
   "given": "用户已选中 final-title 轨道，inspector 正在显示该组件 params.title 和 params.subtitle。",
   "when": "用户把 params.title 改为 NEXTFRAME LIVE EDIT，并离开输入框。",
-  "then": "中间预览里的标题立即变成 NEXTFRAME LIVE EDIT，timeline 不需要重新打开，保存状态进入 dirty。",
+  "then": "中间预览里的标题立即变成 NEXTFRAME LIVE EDIT，输入框不掉焦点；离开输入框后保存状态进入 saved。",
   "human_actions": ["select final-title row", "focus title input", "type new title", "blur input", "watch preview"],
   "ai_tools": [
     {
       "tool": "click",
-      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --click '[data-track-id=\"final-title\"]'"
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-timeline::shadow [data-track-id=\"final-title\"]' --get outerHTML"
     },
     {
       "tool": "type",
-      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --fill '[data-field-path=\"params.title\"]' 'NEXTFRAME LIVE EDIT'"
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-inspector::shadow [data-field-path=\"params.title\"]' --fill 'NEXTFRAME LIVE EDIT'"
     },
     {
       "tool": "state",
-      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-preview-root]' --contains 'NEXTFRAME LIVE EDIT'"
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query '[data-nf-preview-layers]' --get textContent"
     },
     {
       "tool": "state",
-      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-save-state]' --get textContent"
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-inspector::shadow [data-save-state]' --get textContent"
+    },
+    {
+      "tool": "state",
+      "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track final-title --field params.x | jq '.selected, (.selected|type)'"
     }
   ],
-  "done": false
+  "done": true
 }

@@ -150,7 +150,7 @@ function wireApp(): void {
       patchCompositionTrackField(patch.track, patch.field, patch.value);
       patchCompositionSourceField(compositionSource, patch.track, patch.field, patch.value);
       renderCurrentCompositionPreview();
-      inspector.setAttribute("save-status", "dirty");
+      markCompositionDirty(inspector);
     }
     if (detail.field === "composition-save") {
       const patch = compositionFieldValue(detail.value);
@@ -220,6 +220,16 @@ function saveCompositionField(project: string, composition: string, track: strin
       inspector.setAttribute("save-status", "failed");
       inspector.setAttribute("save-error", error instanceof Error ? error.message : String(error));
     });
+}
+
+function markCompositionDirty(inspector: Element): void {
+  const status = inspector.shadowRoot?.querySelector<HTMLElement>("[data-save-state]");
+  if (!status) {
+    inspector.setAttribute("save-status", "dirty");
+    return;
+  }
+  status.textContent = "dirty";
+  status.classList.remove("ok", "err");
 }
 
 function saveCompositionFieldFromRoute(track: string, field: string, value: unknown): void {
