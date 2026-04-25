@@ -1,0 +1,165 @@
+{
+  "version": "v0.18.0",
+  "type": "feature",
+  "title": "Online editing becomes actually usable",
+  "status": "done",
+  "verify_points": [
+    {
+      "id": "V-01",
+      "desc": "Selecting a v2 composition track exposes stable editable inspector fields with AI-addressable selectors.",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/select-track.bdd.json"
+    },
+    {
+      "id": "V-02",
+      "desc": "Typing into a composition field updates preview immediately without rerendering away the active input.",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/edit-params.bdd.json"
+    },
+    {
+      "id": "V-03",
+      "desc": "Blur/change saves the typed value through the same IPC path, preserving numeric values as numbers.",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/edit-params.bdd.json"
+    },
+    {
+      "id": "V-04",
+      "desc": "A draft export after save uses the saved composition JSON in its source sidecar.",
+      "scenario": "spec/bdd/v2-editor-authoring/scenarios/export-after-save.bdd.json"
+    }
+  ],
+  "items": [
+    {
+      "id": "S-01",
+      "kind": "bdd-scenario",
+      "title": "Select v2 track and expose editor fields",
+      "status": "done",
+      "verify_point": "V-01",
+      "ai_tools": [
+        {
+          "tool": "click",
+          "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-timeline::shadow [data-track-id=\"final-title\"]' --get outerHTML",
+          "expected": "timeline exposes final-title row"
+        },
+        {
+          "tool": "state",
+          "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-inspector::shadow [data-inspector-track-id=\"final-title\"]' --get outerHTML",
+          "expected": "inspector exposes final-title editor"
+        }
+      ],
+      "citations": [
+        {
+          "path": "frontend/nf-components/src/components/inspector.ts",
+          "commit": null
+        },
+        {
+          "path": "frontend/nf-components/src/components/timeline.ts",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-timeline::shadow [data-track-id=\"final-title\"]' --get outerHTML",
+          "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-inspector::shadow [data-inspector-track-id=\"final-title\"]' --get outerHTML",
+          "target/debug/nf capture --project v2-showcase --episode showreel-24s --out ../NextFrame.archive/v0.18.0-verify/editor-final-title.png"
+        ],
+        "result": "final-title row and inspector fields were visible; capture wrote a 3016x1936 PNG."
+      }
+    },
+    {
+      "id": "S-02",
+      "kind": "bdd-scenario",
+      "title": "Stable field typing and preview update",
+      "status": "done",
+      "verify_point": "V-02,V-03",
+      "ai_tools": [
+        {
+          "tool": "type",
+          "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-inspector::shadow [data-field-path=\"params.title\"]' --fill 'NEXTFRAME LIVE EDIT'",
+          "expected": "same input/change path updates preview then saves"
+        },
+        {
+          "tool": "state",
+          "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track final-title --field params.title",
+          "expected": "selected value equals NEXTFRAME LIVE EDIT"
+        },
+        {
+          "tool": "state",
+          "command": "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track final-title --field params.x | jq '.selected, (.selected|type)'",
+          "expected": "numeric params fields remain JSON numbers after devtools fill/save"
+        }
+      ],
+      "citations": [
+        {
+          "path": "frontend/nf-components/src/index.ts",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-shell/src/handlers/app.rs",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-inspector::shadow [data-field-path=\"params.title\"]' --fill 'NEXTFRAME LIVE EDIT' --get value",
+          "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query '[data-nf-preview-layers]' --get textContent",
+          "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-inspector::shadow [data-save-state]' --get textContent",
+          "target/debug/nf composition show --project v2-showcase --composition showreel-24s --track final-title --field params.x | jq '.selected, (.selected|type)'"
+        ],
+        "result": "preview text contained NEXTFRAME LIVE EDIT, save state was saved, and params.x persisted as 61 / number."
+      }
+    },
+    {
+      "id": "S-03",
+      "kind": "bdd-scenario",
+      "title": "Export uses saved edited JSON",
+      "status": "done",
+      "verify_point": "V-04",
+      "ai_tools": [
+        {
+          "tool": "state",
+          "command": "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --out ../NextFrame.archive/v0.18.0-verify/showreel-edit.mp4",
+          "expected": "export succeeds"
+        },
+        {
+          "tool": "state",
+          "command": "jq -r '.tracks[] | select(.id==\"final-title\") | .clips[0].params.params.title' ../NextFrame.archive/v0.18.0-verify/showreel-edit.mp4.source.json",
+          "expected": "source sidecar title equals saved edit"
+        },
+        {
+          "tool": "state",
+          "command": "jq -r '.tracks[] | select(.id==\"final-title\") | .clips[0].params.params.x | type' ../NextFrame.archive/v0.18.0-verify/showreel-edit.mp4.source.json",
+          "expected": "source sidecar x remains number"
+        }
+      ],
+      "citations": [
+        {
+          "path": "crates/nf-shell/src/handlers/compositions.rs",
+          "commit": null
+        },
+        {
+          "path": "crates/nf-cli/src/commands/export_cmd.rs",
+          "commit": null
+        }
+      ],
+      "evidence": {
+        "commands": [
+          "target/debug/nf export --project v2-showcase --composition showreel-24s --profile draft --out ../NextFrame.archive/v0.18.0-verify/showreel-edit.mp4",
+          "jq -r '.tracks[] | select(.id==\"final-title\") | [.clips[0].params.params.title, (.clips[0].params.params.x|tostring), (.clips[0].params.params.x|type)] | @tsv' ../NextFrame.archive/v0.18.0-verify/showreel-edit.mp4.source.json",
+          "ffprobe -v error -show_entries format=duration -of default=nokey=1:noprint_wrappers=1 ../NextFrame.archive/v0.18.0-verify/showreel-edit.mp4"
+        ],
+        "result": "draft export succeeded with bytes=3804694, frames=720, duration_ms=24000; sidecar title was NEXTFRAME LIVE EDIT and x remained number."
+      }
+    }
+  ],
+  "fixed_docs_check": {
+    "spec/charter.md": "no change; north star already states edit/preview/export same source",
+    "spec/architecture.md": "no new module boundary; same frontend -> shell IPC -> nf-project composition patch path",
+    "spec/milestones.html": "updated at closeout; v0.18.0 marked done and v0.19.0 set current",
+    "spec/design/DESIGN.md": "no new tokens or visual system change",
+    "README.md": "update only if verification command surface changes",
+    "CLAUDE.md": "updated with nf click, devtools fill, and v0.18.0 current focus"
+  },
+  "quality_review": {
+    "standards": "spec/standards/00-index.md",
+    "decision": "No new dimension. This is covered by G3 AI operability and P2 preview/export consistency.",
+    "required_before_close": "Run frontend checks, cargo check/build, devtools edit path, composition show, draft export source sidecar check, structure gate, and audit gate."
+  }
+}

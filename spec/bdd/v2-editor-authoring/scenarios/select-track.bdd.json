@@ -1,10 +1,10 @@
 {
   "id": "select-track",
   "title": "点选 v2 多轨道后 inspector 显示真实组件参数",
-  "given": "桌面端已打开 v2-showcase 的 showreel-24s composition，底部 timeline 有 10 行 component 轨道。",
-  "when": "用户点击 timeline 中的 code-terminal 轨道行。",
-  "then": "该轨道出现选中态，右侧 inspector 显示 track id、component id、start/end、x/y 和 params.lines 等真实 JSON 字段。",
-  "human_actions": ["open composition", "scan timeline rows", "click code-terminal row", "read inspector fields"],
+  "given": "桌面端已打开 v2-showcase 的 showreel-24s composition，底部 timeline 有多行 component 轨道。",
+  "when": "用户点击 timeline 中的 final-title 轨道行。",
+  "then": "该轨道出现选中态，右侧 inspector 显示 track id、component id、time、params.x/y 和 params.title 等真实 JSON 字段。",
+  "human_actions": ["open composition", "scan timeline rows", "click final-title row", "read inspector fields"],
   "ai_tools": [
     {
       "tool": "open",
@@ -12,16 +12,16 @@
     },
     {
       "tool": "click",
-      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --click '[data-track-id=\"code-terminal\"]'"
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-timeline::shadow [data-track-id=\"final-title\"]' --get outerHTML"
     },
     {
       "tool": "state",
-      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-24s --query '[data-inspector-track-id]' --get textContent"
+      "command": "target/debug/nf devtools --project v2-showcase --episode showreel-24s --query 'nf-inspector::shadow [data-inspector-track-id=\"final-title\"]' --get outerHTML"
     },
     {
       "tool": "screenshot",
-      "command": "target/debug/nf screenshot --project v2-showcase --composition showreel-24s --region editor"
+      "command": "target/debug/nf capture --project v2-showcase --episode showreel-24s --out ../NextFrame.archive/v0.18.0-verify/editor-final-title.png"
     }
   ],
-  "done": false
+  "done": true
 }

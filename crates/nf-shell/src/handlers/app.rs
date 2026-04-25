@@ -410,15 +410,6 @@ fn devtools_script(query: &str, get: &str, action: Option<&str>, value: Option<&
     el.value = actionValue;
     el.dispatchEvent(new Event("input", {{ bubbles: true, composed: true }}));
     el.dispatchEvent(new Event("change", {{ bubbles: true, composed: true }}));
-    const rootNode = el.getRootNode && el.getRootNode();
-    const host = rootNode && rootNode.host;
-    const trackRoot = el.closest && el.closest("[data-inspector-track-id]");
-    if (host && host.tagName === "NF-INSPECTOR" && el.dataset && el.dataset.fieldPath && trackRoot) {{
-      const payload = {{ track: trackRoot.dataset.inspectorTrackId, field: el.dataset.fieldPath, value: actionValue }};
-      host.dispatchEvent(new CustomEvent("field-edit", {{ detail: {{ field: "composition-preview", value: payload }}, bubbles: true, composed: true }}));
-      host.dispatchEvent(new CustomEvent("field-edit", {{ detail: {{ field: "composition-save", value: payload }}, bubbles: true, composed: true }}));
-      if (window.__NF_COMPOSITION_FIELD__) window.__NF_COMPOSITION_FIELD__(payload.track, payload.field, payload.value);
-    }}
   }}
   let result;
   if (get.startsWith("computed-style:")) {{
