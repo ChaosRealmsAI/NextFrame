@@ -1,0 +1,12 @@
+{
+  "id": "voice-preview-audible",
+  "given": "A clip-first composition has tts tracks with real audio data and subtitle_timeline tracks from nftts.",
+  "when": "The desktop editor opens the composition and the user presses play.",
+  "then": "The preview plays audible voice and export muxes an audio stream.",
+  "human_actions": ["open composition", "press play", "listen for voice"],
+  "ai_tools": [
+    { "tool": "open", "command": "NEXTFRAME_HOME=examples target/debug/nf open --project v2-showcase --composition showreel-clip-first --t 0" },
+    { "tool": "click", "command": "NEXTFRAME_HOME=examples target/debug/nf click --project v2-showcase --episode showreel-clip-first --selector '[data-nf-play]'" },
+    { "tool": "export", "command": "NEXTFRAME_HOME=examples target/debug/nf export --project v2-showcase --composition showreel-clip-first --profile draft --diagnostics --out ../NextFrame.archive/v0.21.0-verify/showreel-clip-first-audio-datauri.mp4 | jq '.audio_muxed'" }
+  ]
+}

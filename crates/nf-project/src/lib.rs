@@ -1677,8 +1677,15 @@ fn composition_audio_src(root: &Path, project_slug: &str, src: &str) -> String {
 }
 
 fn file_url(path: &Path) -> String {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(path))
+            .unwrap_or_else(|_| path.to_path_buf())
+    };
     let mut encoded = String::new();
-    for byte in path.to_string_lossy().as_bytes() {
+    for byte in absolute.to_string_lossy().as_bytes() {
         match *byte {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
                 encoded.push(char::from(*byte))

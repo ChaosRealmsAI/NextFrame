@@ -561,7 +561,14 @@ fn fallback_duration_ms(text: &str) -> u64 {
 }
 
 fn file_url(path: &Path) -> String {
-    format!("file://{}", path.display())
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map(|cwd| cwd.join(path))
+            .unwrap_or_else(|_| path.to_path_buf())
+    };
+    format!("file://{}", absolute.display())
 }
 
 fn clip_slug(clip: &Value) -> Option<&str> {

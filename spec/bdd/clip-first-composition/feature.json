@@ -9,7 +9,13 @@
     "Subtitles reuse the TTS timeline instead of inventing a separate word timeline."
   ],
   "completion": {
-    "scenarios": ["clip-list", "clip-local-tracks", "tts-subtitle-timeline", "export-clip-first"],
+    "scenarios": [
+      "clip-list",
+      "clip-local-tracks",
+      "tts-subtitle-timeline",
+      "export-clip-first",
+      "voice-preview-audible"
+    ],
     "status": "implemented"
   }
 }

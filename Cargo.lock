@@ -1931,6 +1931,7 @@ dependencies = [
 name = "nf-cli"
 version = "0.4.0"
 dependencies = [
+ "base64",
  "clap",
  "directories",
  "interprocess",

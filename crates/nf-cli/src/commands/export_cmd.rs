@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use base64::Engine;
 use nf_project::{JsonStorage, Storage, compile_composition_source, compile_episode_source};
 use nf_recorder::{ExportOpts, ExportResolution};
 use serde_json::{Value, json};
@@ -213,10 +214,14 @@ fn mux_audio_tracks(
         "audio tracks found, but ffmpeg is unavailable; exported MP4 is video-only".to_string()
     })?;
     let mut audio_paths = Vec::new();
-    for clip in &audio {
-        match audio_src_to_path(&clip.src) {
+    let mut temp_audio_paths = Vec::new();
+    for (index, clip) in audio.iter().enumerate() {
+        match audio_src_to_path(&clip.src, video_path, index) {
             Some(path) if path.exists() => audio_paths.push((clip.clone(), path)),
             _ => {}
+        }
+        if let Some(path) = data_audio_temp_path(&clip.src, video_path, index) {
+            temp_audio_paths.push(path);
         }
     }
     if audio_paths.is_empty() {
@@ -264,6 +269,9 @@ fn mux_audio_tracks(
     }
     fs::rename(&muxed_path, video_path)
         .map_err(|err| format!("replace video with audio mux failed: {err}"))?;
+    for path in temp_audio_paths {
+        let _ = fs::remove_file(path);
+    }
     Ok(true)
 }
 
@@ -323,9 +331,51 @@ fn audio_filter(audio_paths: &[(AudioClip, PathBuf)], duration_s: f64) -> String
     parts.join(";")
 }
 
-fn audio_src_to_path(src: &str) -> Option<PathBuf> {
-    let raw = src.strip_prefix("file://")?;
-    Some(PathBuf::from(percent_decode(raw).ok()?))
+fn audio_src_to_path(src: &str, video_path: &Path, index: usize) -> Option<PathBuf> {
+    if let Some(raw) = src.strip_prefix("file://") {
+        return Some(PathBuf::from(percent_decode(raw).ok()?));
+    }
+    write_data_audio(src, video_path, index)
+}
+
+fn data_audio_temp_path(src: &str, video_path: &Path, index: usize) -> Option<PathBuf> {
+    src.strip_prefix("data:audio/")?;
+    Some(temp_audio_path(
+        video_path,
+        index,
+        data_audio_extension(src),
+    ))
+}
+
+fn write_data_audio(src: &str, video_path: &Path, index: usize) -> Option<PathBuf> {
+    if !src.starts_with("data:audio/") {
+        return None;
+    }
+    let (_metadata, encoded) = src.split_once(";base64,")?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .ok()?;
+    let path = temp_audio_path(video_path, index, data_audio_extension(src));
+    fs::write(&path, bytes).ok()?;
+    Some(path)
+}
+
+fn temp_audio_path(video_path: &Path, index: usize, extension: &str) -> PathBuf {
+    let stem = video_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("nextframe-export");
+    video_path.with_file_name(format!("{stem}.audio-{index}.{extension}"))
+}
+
+fn data_audio_extension(src: &str) -> &'static str {
+    if src.starts_with("data:audio/wav") || src.starts_with("data:audio/wave") {
+        "wav"
+    } else if src.starts_with("data:audio/mp4") || src.starts_with("data:audio/aac") {
+        "m4a"
+    } else {
+        "mp3"
+    }
 }
 
 fn percent_decode(value: &str) -> Result<String, String> {
