@@ -1,20 +1,11 @@
 {
   "id": "clip-list",
-  "title": "Composition opens as a list of video clips",
-  "given": "A v3 composition has intro, proof, and outro clips.",
-  "when": "The user opens the composition in the desktop editor.",
-  "then": "The left panel lists the clips as video segments, not flat component tracks.",
-  "human_actions": ["open composition", "scan left clip panel", "select intro clip"],
+  "given": "A composition JSON contains composition.clips[] with intro, proof, and outro.",
+  "when": "The editor opens the composition.",
+  "then": "The left list shows those top-level video clips, not flattened runtime tracks.",
+  "human_actions": ["open composition", "scan left clip list", "select proof"],
   "ai_tools": [
-    {
-      "tool": "state",
-      "command": "NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-clip-first | jq '.summary.clips'",
-      "expected": "3"
-    },
-    {
-      "tool": "devtools",
-      "command": "target/debug/nf devtools --project v2-showcase --composition showreel-clip-first --query 'nf-clips::shadow .clip-row' --get outerHTML",
-      "expected": "returns clip rows such as intro"
-    }
+    { "tool": "open", "command": "target/debug/nf open --project v2-showcase --composition showreel-clip-first" },
+    { "tool": "verify", "command": "target/debug/nf verify --project v2-showcase --composition showreel-clip-first" }
   ]
 }

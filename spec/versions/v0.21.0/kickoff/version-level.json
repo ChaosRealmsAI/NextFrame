@@ -1,39 +1,11 @@
 {
   "version": "v0.21.0",
-  "type": "refactor",
-  "chosen": "Clip-first composition data model: one video is multiple clips, and each clip owns local anchors plus multi-kind tracks including tts, subtitle_timeline, and subtitle.",
-  "why": "The current v2 model flattened all authoring tracks at the composition level, which makes AI write the whole video at once and caused dirty TTS/subtitle duplication. The new model makes clip the AI authoring unit and keeps TTS-generated timing in a dedicated track.",
-  "changed_from": "v0.20.0 verified flat tracks with global anchors. v0.21.0 changes the authoring model itself.",
-  "constraints": {
-    "no_vanity": "PM-visible effect is a left clip list where each clip previews as a video segment and expands into local tracks.",
-    "no_overreach": "This version refactors composition authoring and TTS/subtitle timeline flow only; no new visual component marketplace or cloud export.",
-    "no_rush": "Old public episode/clips wording is removed instead of patched around; v3 is the only documented authoring path.",
-    "must_verify": "Acceptance is CLI verify/export plus desktop UI evidence that clips and clip-local tracks render."
-  },
-  "success_picture": "A PM opens the editor, sees several clips on the left, clicks one clip, sees that clip's component/tts/subtitle_timeline/subtitle tracks, previews it, and exports a full MP4 from the same v3 JSON.",
-  "cost_estimate": "AI scale 4-8 hours",
-  "risks": [
-    "Compiler flattening can break preview/export if local clip anchors are resolved incorrectly.",
-    "Frontend currently normalizes runtime source into clips, so it needs raw v3 composition context for clip list and clip-local timeline.",
-    "Verifier must stop treating top-level tracks as the only source of truth."
-  ],
-  "candidates": [
-    {
-      "id": "chosen",
-      "label": "v3 clip-first refactor",
-      "status": "chosen"
-    },
-    {
-      "id": "rejected-v2-patch",
-      "label": "Patch v2 tracks with optional clip fields",
-      "status": "rejected",
-      "reason": "Keeps the confusing flat-track authoring model."
-    },
-    {
-      "id": "rejected-doc-only",
-      "label": "Only update docs",
-      "status": "rejected",
-      "reason": "Does not remove dirty code paths or make AI authoring easier."
-    }
+  "type": "minor",
+  "theme": "clip-first composition model",
+  "constraints": [
+    "composition is the whole video",
+    "clip is one video segment and the AI authoring unit",
+    "each clip owns local anchors and tracks",
+    "tts and subtitles are track kinds; subtitle_timeline reuses TTS word timings"
   ]
 }

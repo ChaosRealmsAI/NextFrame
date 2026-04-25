@@ -1,41 +1,10 @@
 {
-  "duration_ms": 4600,
-  "voice": "en-US-AriaNeural",
+  "duration_ms": 5000,
   "words": [
-    { "text": "The", "start_ms": 0, "end_ms": 220 },
-    { "text": "compiler", "start_ms": 220, "end_ms": 820 },
-    { "text": "flattens", "start_ms": 820, "end_ms": 1380 },
-    { "text": "clips", "start_ms": 1380, "end_ms": 1780 },
-    { "text": "into", "start_ms": 1780, "end_ms": 2140 },
-    { "text": "the", "start_ms": 2140, "end_ms": 2340 },
-    { "text": "same", "start_ms": 2340, "end_ms": 2720 },
-    { "text": "runtime", "start_ms": 2720, "end_ms": 3260 },
-    { "text": "used", "start_ms": 3260, "end_ms": 3600 },
-    { "text": "by", "start_ms": 3600, "end_ms": 3820 },
-    { "text": "preview", "start_ms": 3820, "end_ms": 4300 },
-    { "text": "and", "start_ms": 4300, "end_ms": 4540 },
-    { "text": "export.", "start_ms": 4540, "end_ms": 5200 }
-  ],
-  "segments": [
-    {
-      "text": "The compiler flattens clips into the same runtime used by preview and export.",
-      "start_ms": 0,
-      "end_ms": 5200,
-      "words": [
-        { "text": "The", "start_ms": 0, "end_ms": 220 },
-        { "text": "compiler", "start_ms": 220, "end_ms": 820 },
-        { "text": "flattens", "start_ms": 820, "end_ms": 1380 },
-        { "text": "clips", "start_ms": 1380, "end_ms": 1780 },
-        { "text": "into", "start_ms": 1780, "end_ms": 2140 },
-        { "text": "the", "start_ms": 2140, "end_ms": 2340 },
-        { "text": "same", "start_ms": 2340, "end_ms": 2720 },
-        { "text": "runtime", "start_ms": 2720, "end_ms": 3260 },
-        { "text": "used", "start_ms": 3260, "end_ms": 3600 },
-        { "text": "by", "start_ms": 3600, "end_ms": 3820 },
-        { "text": "preview", "start_ms": 3820, "end_ms": 4300 },
-        { "text": "and", "start_ms": 4300, "end_ms": 4540 },
-        { "text": "export.", "start_ms": 4540, "end_ms": 5200 }
-      ]
-    }
+    { "text": "Voice", "start_ms": 0, "end_ms": 420 },
+    { "text": "creates", "start_ms": 420, "end_ms": 900 },
+    { "text": "the", "start_ms": 900, "end_ms": 1120 },
+    { "text": "subtitle", "start_ms": 1120, "end_ms": 1800 },
+    { "text": "timeline.", "start_ms": 1800, "end_ms": 2560 }
   ]
 }

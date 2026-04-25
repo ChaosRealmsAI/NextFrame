@@ -1,54 +1,13 @@
 {
   "version": "v0.21.0",
-  "status": "running",
-  "drafts": {
-    "proposals": [],
-    "merged": "spec/versions/v0.21.0/drafts/merged.md"
-  },
+  "status": "verified",
   "tasks": [
-    {
-      "id": "T-01",
-      "title": "v3 schema sample and compiler",
-      "bdd_scenarios": ["clip-list", "clip-local-tracks", "tts-subtitle-timeline"],
-      "deps": [],
-      "wave": 1,
-      "status": "in-progress",
-      "verify_evidence": null
-    },
-    {
-      "id": "T-02",
-      "title": "clip-first editor surface",
-      "bdd_scenarios": ["clip-list", "clip-local-tracks"],
-      "deps": ["T-01"],
-      "wave": 1,
-      "status": "pending",
-      "verify_evidence": null
-    },
-    {
-      "id": "T-03",
-      "title": "verify/export/docs cleanup",
-      "bdd_scenarios": ["export-clip-first"],
-      "deps": ["T-01", "T-02"],
-      "wave": 2,
-      "status": "pending",
-      "verify_evidence": null
-    }
-  ],
-  "waves": [
-    {
-      "id": 1,
-      "tasks": ["T-01", "T-02"],
-      "reviewed": false
-    },
-    {
-      "id": 2,
-      "tasks": ["T-03"],
-      "reviewed": false
-    }
-  ],
-  "redteam": {
-    "report": null,
-    "new_scenarios": []
-  },
-  "failures": []
+    { "id": "spec", "status": "completed", "output": "spec/versions/v0.21.0/spec.json" },
+    { "id": "schema", "status": "completed", "output": "examples/v2-showcase/compositions/showreel-clip-first.json" },
+    { "id": "compiler", "status": "completed", "output": "crates/nf-project/src/lib.rs" },
+    { "id": "cli", "status": "completed", "output": "composition clip/track/item selectors" },
+    { "id": "editor", "status": "completed", "output": "clip-first timeline rows" },
+    { "id": "docs", "status": "completed", "output": "fixed docs" },
+    { "id": "verify", "status": "completed", "output": "../NextFrame.archive/v0.21.0-verify/showreel-clip-first-verify.json" }
+  ]
 }

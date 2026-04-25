@@ -1,21 +1,11 @@
 {
   "version": "v0.21.0",
-  "turns": [
-    {
-      "user": "Next version is not pixel detection; it is designing how voice plugs in. nf-tts already generates a timeline.",
-      "decision": "Do not duplicate words in composition JSON; TTS timeline must remain authoritative."
-    },
-    {
-      "user": "Concept alignment: JSON makes a video. A video is multiple clips. AI writes JSON by clip. Each clip has anchors, tracks, components, TTS, audio, subtitles, and subtitle timing.",
-      "decision": "Clip becomes the authoring unit; tracks move inside clip."
-    },
-    {
-      "user": "Subtitle and TTS are track kinds, and subtitle timeline is also its own track.",
-      "decision": "Use track kinds tts, subtitle_timeline, and subtitle."
-    },
-    {
-      "user": "Do not consider old data; refactor.",
-      "decision": "v3 is the documented model; old episode/clips public wording is removed."
-    }
+  "source": "user alignment discussion",
+  "decisions": [
+    "AI writes JSON by clip, not by one global flat timeline",
+    "a video is composed from multiple clips",
+    "one clip contains anchors, tracks, and track items",
+    "TTS audio, subtitle_timeline, and subtitles are all tracks with explicit kind values",
+    "old dirty wording around clips as tiny track fragments should be removed"
   ]
 }

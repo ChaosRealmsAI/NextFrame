@@ -960,11 +960,11 @@ pub struct CompositionCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum CompositionSubcommand {
-    #[command(about = "Show a v2 composition, track, or field")]
+    #[command(about = "Show a composition, clip, track, item, or field")]
     Show(CompositionShowArgs),
-    #[command(about = "Patch one v2 composition track field by dot path")]
+    #[command(about = "Patch one composition track or clip item field by dot path")]
     Patch(CompositionPatchArgs),
-    #[command(about = "Validate v2 composition component registry and component ABI")]
+    #[command(about = "Validate composition component registry and component ABI")]
     Validate(CompositionValidateArgs),
 }
 
@@ -982,12 +982,20 @@ pub struct CompositionShowArgs {
         help = "Composition slug, for example showreel-24s"
     )]
     pub composition: String,
+    #[arg(long, value_name = "ID", help = "Optional top-level clip id to return")]
+    pub clip: Option<String>,
     #[arg(long, value_name = "ID", help = "Optional track id to return")]
     pub track: Option<String>,
     #[arg(
         long,
+        value_name = "ID",
+        help = "Optional item id inside the selected track"
+    )]
+    pub item: Option<String>,
+    #[arg(
+        long,
         value_name = "PATH",
-        help = "Optional field path inside the track"
+        help = "Optional field path inside the selected clip, track, or item"
     )]
     pub field: Option<String>,
 }
@@ -1006,12 +1014,20 @@ pub struct CompositionPatchArgs {
         help = "Composition slug, for example showreel-24s"
     )]
     pub composition: String,
+    #[arg(
+        long,
+        value_name = "ID",
+        help = "Top-level clip id for clip-first compositions"
+    )]
+    pub clip: Option<String>,
     #[arg(long, value_name = "ID", help = "Track id to patch")]
     pub track: String,
+    #[arg(long, value_name = "ID", help = "Item id inside the selected track")]
+    pub item: Option<String>,
     #[arg(
         long,
         value_name = "PATH",
-        help = "Field path, for example params.title or style.x"
+        help = "Field path, for example params.title, style.x, or time.start"
     )]
     pub field: String,
     #[arg(

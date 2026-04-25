@@ -45,6 +45,23 @@ export interface NfClip {
   tts?: NfTtsSpec | undefined;
 }
 
+export interface NfCompositionClip {
+  id: string;
+  label: string;
+  start: number;
+  end: number;
+  anchors: Record<string, number>;
+  tracks: NfCompositionTrack[];
+}
+
+export interface NfCompositionTrack {
+  id: string;
+  kind: ClipKind | "tts" | "subtitle_timeline";
+  label: string;
+  z: number;
+  items: NfClip[];
+}
+
 export interface NfSubtitleWord {
   text: string;
   start_ms: number;
@@ -83,6 +100,7 @@ export interface NfEpisode {
   duration: number;
   anchors: Record<string, number>;
   clips: NfClip[];
+  composition_clips?: NfCompositionClip[] | undefined;
   log: NfLogEntry[];
   inspector_fields: NfInspectorFields;
 }
@@ -412,7 +430,7 @@ export async function loadCompositionData(
       project: projectSlug,
       composition: compositionSlug,
     });
-    const data = normalizeCompositionData(project, compositionSlug, loaded.source);
+    const data = normalizeCompositionData(project, compositionSlug, loaded.source, loaded.composition);
     cachedComposition = loaded.composition;
     cached = data;
     dispatchDataReady(cached);
@@ -498,7 +516,7 @@ export async function updateCompositionTrackParams(
     params,
   });
   const project = await shellRequest<RealProject>("projects.show", { project: projectSlug });
-  const data = normalizeCompositionData(project, compositionSlug, loaded.source);
+  const data = normalizeCompositionData(project, compositionSlug, loaded.source, loaded.composition);
   cachedComposition = loaded.composition;
   cached = data;
   dispatchDataReady(cached);
@@ -520,7 +538,7 @@ export async function updateCompositionTrackField(
     value,
   });
   const project = await shellRequest<RealProject>("projects.show", { project: projectSlug });
-  const data = normalizeCompositionData(project, compositionSlug, loaded.source);
+  const data = normalizeCompositionData(project, compositionSlug, loaded.source, loaded.composition);
   cachedComposition = loaded.composition;
   cached = data;
   dispatchDataReady(cached);
@@ -652,8 +670,44 @@ function normalizeEpisode(episode: RealEpisode): NfEpisode {
   };
 }
 
-function normalizeCompositionData(project: RealProject, compositionSlug: string, source: NfRuntimeSource): NfMockData {
+function normalizeCompositionData(
+  project: RealProject,
+  compositionSlug: string,
+  source: NfRuntimeSource,
+  composition?: Record<string, unknown>,
+): NfMockData {
   const duration = finiteNumber(source.duration, 60_000) / 1000;
+  const compositionClips = normalizeCompositionClips(composition);
+  if (compositionClips.length > 0) {
+    const clipRows = compositionClips.map((clip, index) => ({
+      id: clip.id,
+      label: clip.label,
+      kind: "scene" as ClipKind,
+      track: 0,
+      start: clip.start,
+      end: clip.end,
+      effects: [`${clip.tracks.length} tracks`],
+      position: { x: 50, y: 50 },
+      track_id: `clip-${index + 1}`,
+    }));
+    return {
+      source: "ipc",
+      project: {
+        id: projectId(project, "project"),
+        name: projectName(project, "Project"),
+      },
+      episodes: [{
+        id: compositionSlug,
+        name: stringValue(source.meta?.name) ?? stringValue(composition?.name) ?? compositionSlug,
+        duration,
+        anchors: {},
+        clips: clipRows,
+        composition_clips: compositionClips,
+        log: [],
+        inspector_fields: defaultInspectorFields(clipRows),
+      }],
+    };
+  }
   const clips: NfClip[] = [];
   for (const track of source.tracks ?? []) {
     for (const clip of track.clips ?? []) {
@@ -708,6 +762,96 @@ function normalizeCompositionData(project: RealProject, compositionSlug: string,
       log: [],
       inspector_fields: defaultInspectorFields(clips),
     }],
+  };
+}
+
+function normalizeCompositionClips(composition?: Record<string, unknown>): NfCompositionClip[] {
+  const rawClips = Array.isArray(composition?.clips) ? composition.clips : [];
+  let cursor = 0;
+  return rawClips
+    .map((value, clipIndex) => {
+      const clip = asRecord(value);
+      const id = stringValue(clip.id) ?? stringValue(clip.slug) ?? `clip-${clipIndex + 1}`;
+      const duration = parseTimeSeconds(clip.duration, 0);
+      const start = cursor;
+      const end = start + duration;
+      cursor = end;
+      const anchors = {
+        start: 0,
+        in: 0,
+        end: duration,
+        out: duration,
+        ...normalizeClipAnchors(clip.anchors, duration),
+      };
+      const tracks = Array.isArray(clip.tracks)
+        ? clip.tracks.map((track, trackIndex) => normalizeCompositionTrack(track, trackIndex, anchors, duration))
+        : [];
+      return {
+        id,
+        label: stringValue(clip.name) ?? stringValue(clip.label) ?? id,
+        start,
+        end,
+        anchors,
+        tracks,
+      };
+    })
+    .filter((clip) => clip.end > clip.start);
+}
+
+function normalizeCompositionTrack(
+  value: unknown,
+  index: number,
+  anchors: Record<string, number>,
+  duration: number,
+): NfCompositionTrack {
+  const track = asRecord(value);
+  const id = stringValue(track.id) ?? `track-${index + 1}`;
+  const rawKind = stringValue(track.kind) ?? "component";
+  const kind = rawKind === "tts" || rawKind === "subtitle_timeline" ? rawKind : normalizeKind(rawKind);
+  const z = finiteNumber(track.z, index);
+  const rawItems = Array.isArray(track.items) && track.items.length > 0 ? track.items : [track];
+  const items = rawItems.map((item, itemIndex) => {
+    const object = asRecord(item);
+    const itemId = stringValue(object.id) ?? `${id}-${itemIndex + 1}`;
+    const itemParams = asRecord(object.params);
+    const trackParams = asRecord(track.params);
+    const params = { ...trackParams, ...itemParams };
+    const itemStyle = asRecord(object.style);
+    const trackStyle = asRecord(track.style);
+    const style = { ...trackStyle, ...itemStyle };
+    const start = resolveLocalTime(object, track, anchors, "start", 0);
+    const end = resolveLocalTime(object, track, anchors, "end", duration);
+    const clipKind = kind === "tts" ? "audio" : kind === "subtitle_timeline" ? "subtitle" : kind;
+    const words = subtitleWords(object.words) ?? subtitleWords(params.words);
+    return {
+      id: itemId,
+      label: stringValue(object.label)
+        ?? stringValue(params.title)
+        ?? stringValue(params.text)
+        ?? subtitleLabel(words, itemId),
+      kind: clipKind as ClipKind,
+      track: z,
+      track_id: id,
+      component: stringValue(object.component) ?? stringValue(track.component),
+      start,
+      end: Math.max(start, end),
+      effects: [rawKind],
+      position: normalizePosition({ x: style.x ?? params.x, y: style.y ?? params.y }),
+      src: stringValue(object.src) ?? stringValue(object.audio) ?? stringValue(track.src) ?? stringValue(track.audio),
+      words,
+      accent_color: stringValue(style.active_color),
+      color: stringValue(style.color),
+      size_px: numberValue(style.size_px),
+      style: stringValue(style.position),
+      tts: ttsSpec(object.tts ?? track.tts),
+    };
+  });
+  return {
+    id,
+    kind,
+    label: `${id} · ${rawKind}`,
+    z,
+    items,
   };
 }
 
@@ -870,8 +1014,55 @@ function resolveTime(value: unknown, anchors: Record<string, number>, fallback: 
   if (typeof value === "number") return finiteNumber(value, fallback);
   if (typeof value !== "string") return fallback;
   if (Object.hasOwn(anchors, value)) return anchors[value]!;
+  if (value.endsWith("ms")) {
+    const parsed = Number(value.slice(0, -2).trim());
+    return Number.isFinite(parsed) ? parsed / 1000 : fallback;
+  }
+  if (value.endsWith("s")) {
+    const parsed = Number(value.slice(0, -1).trim());
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  const parts = value.trim().split(/\s+/);
+  if (parts.length === 3 && (parts[1] === "+" || parts[1] === "-") && Object.hasOwn(anchors, parts[0]!)) {
+    const base = anchors[parts[0]!]!;
+    const delta = parseTimeSeconds(parts[2], 0);
+    return parts[1] === "+" ? base + delta : Math.max(0, base - delta);
+  }
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseTimeSeconds(value: unknown, fallback: number): number {
+  return resolveTime(value, {}, fallback);
+}
+
+function normalizeClipAnchors(value: unknown, duration: number): Record<string, number> {
+  const anchors: Record<string, number> = { start: 0, in: 0, end: duration, out: duration };
+  const raw = asRecord(value);
+  for (let pass = 0; pass < Math.max(1, Object.keys(raw).length); pass += 1) {
+    for (const [name, time] of Object.entries(raw)) {
+      if (Object.hasOwn(anchors, name)) continue;
+      const resolved = resolveTime(time, anchors, Number.NaN);
+      if (Number.isFinite(resolved)) anchors[name] = resolved;
+    }
+  }
+  return anchors;
+}
+
+function resolveLocalTime(
+  item: Record<string, unknown>,
+  track: Record<string, unknown>,
+  anchors: Record<string, number>,
+  key: "start" | "end",
+  fallback: number,
+): number {
+  const itemTime = asRecord(item.time);
+  const trackTime = asRecord(track.time);
+  return resolveTime(
+    itemTime[key] ?? item[key] ?? trackTime[key] ?? track[key],
+    anchors,
+    fallback,
+  );
 }
 
 function normalizeKind(value: string): ClipKind {

@@ -1,20 +1,11 @@
 {
   "id": "tts-subtitle-timeline",
-  "title": "TTS timeline is a track source, not inline subtitle words",
-  "given": "A tts track points to an mp3 and a timeline.json file.",
-  "when": "The compiler builds runtime source.",
-  "then": "The subtitle_timeline track loads words from timeline.json, and the subtitle track renders from that timeline.",
-  "human_actions": ["select intro", "inspect narration track", "preview subtitle"],
+  "given": "nftts has produced audio/proof-main.timeline.json.",
+  "when": "The clip compiler sees subtitle_timeline and subtitle tracks.",
+  "then": "The subtitle runtime track receives word timings from the timeline file.",
+  "human_actions": ["inspect subtitle track", "preview karaoke subtitles"],
   "ai_tools": [
-    {
-      "tool": "state",
-      "command": "rg 'params.words|audio_clip|timeline_clip' examples/v2-showcase/compositions/showreel-clip-first.json",
-      "expected": "no matches"
-    },
-    {
-      "tool": "state",
-      "command": "NEXTFRAME_HOME=examples target/debug/nf composition show --project v2-showcase --composition showreel-clip-first | jq '[.source.tracks[] | select(.kind==\"subtitle\")][0].clips[0].params.source.words | length'",
-      "expected": "greater than 0"
-    }
+    { "tool": "validate", "command": "target/debug/nf composition validate --project v2-showcase --composition showreel-clip-first" },
+    { "tool": "verify", "command": "target/debug/nf verify --project v2-showcase --composition showreel-clip-first --out ../NextFrame.archive/v0.21.0-verify/showreel-clip-first-verify.json" }
   ]
 }

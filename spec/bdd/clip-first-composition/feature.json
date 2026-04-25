@@ -1,16 +1,15 @@
 {
-  "feature": "clip-first-composition",
-  "name": "Clip-first composition model",
-  "summary": "一个完整视频由多个 clip 组成；AI 以 clip 为单位写 JSON；每个 clip 内有局部 anchors 和多类 tracks，包括 tts、subtitle_timeline、subtitle。",
-  "status": "active",
-  "scenarios": [
-    "clip-list",
-    "clip-local-tracks",
-    "tts-subtitle-timeline",
-    "export-clip-first"
+  "id": "clip-first-composition",
+  "name": "Clip-first composition JSON",
+  "rules": [
+    "A composition is the whole video.",
+    "A clip is one video segment and the AI authoring unit.",
+    "Each clip owns local anchors, tracks, and track items.",
+    "TTS, subtitle_timeline, and subtitle are explicit track kinds.",
+    "Subtitles reuse the TTS timeline instead of inventing a separate word timeline."
   ],
   "completion": {
-    "total": 4,
-    "done": 4
+    "scenarios": ["clip-list", "clip-local-tracks", "tts-subtitle-timeline", "export-clip-first"],
+    "status": "implemented"
   }
 }

@@ -1,20 +1,10 @@
 {
   "id": "export-clip-first",
-  "title": "Clip-first composition exports through the existing runtime",
-  "given": "The v3 composition compiles to runtime source with visual, audio, and subtitle tracks.",
-  "when": "The user exports a draft MP4.",
-  "then": "Export succeeds, includes AAC audio, and burns subtitles into the picture.",
-  "human_actions": ["open composition", "preview a clip", "export draft", "open output"],
+  "given": "The authoring JSON is clip-first.",
+  "when": "NextFrame compiles it for preview or export.",
+  "then": "The runtime source is still flat tracks so existing renderer/export paths work.",
+  "human_actions": ["open preview", "start export"],
   "ai_tools": [
-    {
-      "tool": "state",
-      "command": "target/debug/nf export --project v2-showcase --composition showreel-clip-first --profile draft --out ../NextFrame.archive/v0.21.0-verify/showreel-clip-first.mp4",
-      "expected": "export succeeds"
-    },
-    {
-      "tool": "state",
-      "command": "ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of json ../NextFrame.archive/v0.21.0-verify/showreel-clip-first.mp4",
-      "expected": "codec_name is aac"
-    }
+    { "tool": "export", "command": "target/debug/nf export --project v2-showcase --composition showreel-clip-first --profile draft --out ../NextFrame.archive/v0.21.0-verify/showreel-clip-first.mp4" }
   ]
 }

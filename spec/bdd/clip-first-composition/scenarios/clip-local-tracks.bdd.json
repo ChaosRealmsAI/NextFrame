@@ -1,15 +1,11 @@
 {
   "id": "clip-local-tracks",
-  "title": "One clip expands into local tracks",
-  "given": "The intro clip contains component, tts, subtitle_timeline, and subtitle tracks.",
-  "when": "The user selects intro.",
-  "then": "The timeline shows only intro's local tracks and local anchors.",
-  "human_actions": ["click intro clip", "read timeline rows", "scrub inside intro"],
+  "given": "The proof clip has local anchors and component, tts, subtitle_timeline, and subtitle tracks.",
+  "when": "The user selects the proof clip.",
+  "then": "The timeline shows tracks inside proof with local in/out anchor timing.",
+  "human_actions": ["select proof clip", "inspect timeline rows"],
   "ai_tools": [
-    {
-      "tool": "state",
-      "command": "NEXTFRAME_HOME=examples target/debug/nf verify --project v2-showcase --composition showreel-clip-first | jq '.clips[] | select(.id==\"intro\") | .tracks'",
-      "expected": "contains component, tts, subtitle_timeline, subtitle"
-    }
+    { "tool": "show", "command": "target/debug/nf composition show --project v2-showcase --composition showreel-clip-first --clip proof" },
+    { "tool": "show-track", "command": "target/debug/nf composition show --project v2-showcase --composition showreel-clip-first --clip proof --track stack" }
   ]
 }

@@ -1,16 +1,9 @@
-@import "../../../design/tokens.css";
-body { margin: 0; background: #090a0f; color: #f8fafc; font: 15px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; }
-main { height: 100vh; display: grid; grid-template-rows: 56px 1fr; }
-header { display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid rgba(255,255,255,.12); }
-header span { color: rgba(255,255,255,.58); font-family: ui-monospace, Menlo, monospace; }
-section { position: relative; padding: 42px 48px; display: grid; align-content: center; gap: 14px; }
-.row { position: relative; height: 46px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.025); }
-label { position: absolute; left: 12px; top: 13px; color: rgba(255,255,255,.62); }
-i { position: absolute; top: 8px; bottom: 8px; display: flex; align-items: center; padding-left: 12px; border: 1px solid rgba(167,139,250,.45); background: rgba(167,139,250,.17); font-style: normal; animation: glow 9s infinite; }
-em { position: absolute; top: 24px; bottom: 24px; width: 2px; left: 14%; background: #f8fafc; animation: scrub 9s infinite linear; }
-.progress { position: fixed; left: 0; bottom: 0; height: 4px; background: #7dd3fc; animation: bar 9s linear infinite; }
-.toast { position: fixed; right: 22px; bottom: 18px; opacity: 0; animation: toast 9s infinite; }
-@keyframes scrub { to { left: 84%; } }
-@keyframes glow { 50% { filter: brightness(1.5); } }
-@keyframes bar { from { width: 0; } to { width: 100%; } }
-@keyframes toast { 86%,100% { opacity: 1; } }
+body { margin: 0; background: #101318; color: #f7f3ea; font: 14px system-ui, sans-serif; }
+.timeline { padding: 34px; }
+header { color: #ffca66; margin-bottom: 22px; }
+.row { height: 46px; border-top: 1px solid #303946; position: relative; display: flex; align-items: center; gap: 24px; }
+.row b { width: 170px; font-weight: 600; }
+.row span { height: 22px; width: 0; background: #4fd1c5; border-radius: 4px; animation: grow 10s infinite; animation-delay: calc(var(--i) * 180ms); }
+.toast { position: fixed; right: 24px; bottom: 24px; padding: 10px 12px; background: #1f6f52; border-radius: 6px; opacity: 0; animation: done 10s infinite; }
+@keyframes grow { 0%,20% { width: 0; } 60%,100% { width: 62vw; } }
+@keyframes done { 0%,75% { opacity: 0; } 82%,100% { opacity: 1; } }

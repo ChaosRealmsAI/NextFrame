@@ -1,39 +1,11 @@
 {
-  "duration_ms": 6600,
-  "voice": "en-US-AriaNeural",
+  "duration_ms": 5200,
   "words": [
-    { "text": "NextFrame", "start_ms": 0, "end_ms": 620 },
-    { "text": "now", "start_ms": 620, "end_ms": 920 },
-    { "text": "treats", "start_ms": 920, "end_ms": 1320 },
-    { "text": "each", "start_ms": 1320, "end_ms": 1620 },
-    { "text": "clip", "start_ms": 1620, "end_ms": 1960 },
-    { "text": "as", "start_ms": 1960, "end_ms": 2180 },
-    { "text": "the", "start_ms": 2180, "end_ms": 2380 },
-    { "text": "unit", "start_ms": 2380, "end_ms": 2760 },
-    { "text": "AI", "start_ms": 2760, "end_ms": 3140 },
-    { "text": "writes", "start_ms": 3140, "end_ms": 3600 },
-    { "text": "and", "start_ms": 3600, "end_ms": 3860 },
-    { "text": "previews.", "start_ms": 3860, "end_ms": 4700 }
-  ],
-  "segments": [
-    {
-      "text": "NextFrame now treats each clip as the unit AI writes and previews.",
-      "start_ms": 0,
-      "end_ms": 4700,
-      "words": [
-        { "text": "NextFrame", "start_ms": 0, "end_ms": 620 },
-        { "text": "now", "start_ms": 620, "end_ms": 920 },
-        { "text": "treats", "start_ms": 920, "end_ms": 1320 },
-        { "text": "each", "start_ms": 1320, "end_ms": 1620 },
-        { "text": "clip", "start_ms": 1620, "end_ms": 1960 },
-        { "text": "as", "start_ms": 1960, "end_ms": 2180 },
-        { "text": "the", "start_ms": 2180, "end_ms": 2380 },
-        { "text": "unit", "start_ms": 2380, "end_ms": 2760 },
-        { "text": "AI", "start_ms": 2760, "end_ms": 3140 },
-        { "text": "writes", "start_ms": 3140, "end_ms": 3600 },
-        { "text": "and", "start_ms": 3600, "end_ms": 3860 },
-        { "text": "previews.", "start_ms": 3860, "end_ms": 4700 }
-      ]
-    }
+    { "text": "A", "start_ms": 0, "end_ms": 260 },
+    { "text": "clip", "start_ms": 260, "end_ms": 660 },
+    { "text": "is", "start_ms": 660, "end_ms": 860 },
+    { "text": "one", "start_ms": 860, "end_ms": 1180 },
+    { "text": "video", "start_ms": 1180, "end_ms": 1660 },
+    { "text": "segment.", "start_ms": 1660, "end_ms": 2300 }
   ]
 }

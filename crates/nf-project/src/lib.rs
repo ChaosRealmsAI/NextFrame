@@ -312,6 +312,14 @@ pub struct ComponentUsage {
     pub end_ms: u64,
 }
 
+#[derive(Debug, Clone)]
+struct ClipWindow {
+    id: String,
+    start_ms: u64,
+    end_ms: u64,
+    anchors: BTreeMap<String, f64>,
+}
+
 pub fn validate_composition_components(
     storage: &JsonStorage,
     project_slug: &str,
@@ -326,7 +334,7 @@ pub fn validate_composition_components(
         .filter(|value| !value.is_empty())
         .ok_or_else(|| ProjectError::ValidationFailed("composition.id is required".to_string()))?;
     if object.get("clips").and_then(Value::as_array).is_some() {
-        return validate_composition_components_v3(storage, project_slug, object, composition_id);
+        return validate_clip_composition_components(storage, project_slug, composition_id, object);
     }
     let duration_ms = time_value_ms(object.get("duration"), &BTreeMap::new(), "duration")?;
     let anchors = resolve_composition_anchors(object.get("anchors"), duration_ms)?;
@@ -453,152 +461,6 @@ pub fn validate_composition_components(
     })
 }
 
-fn validate_composition_components_v3(
-    storage: &JsonStorage,
-    project_slug: &str,
-    object: &serde_json::Map<String, Value>,
-    composition_id: &str,
-) -> Result<ComponentValidationReport, ProjectError> {
-    let clip_windows = v3_clip_windows(object)?;
-    let mut components: BTreeMap<String, ComponentValidationComponent> = BTreeMap::new();
-    let mut warnings = Vec::new();
-    let mut errors = Vec::new();
-
-    for clip in &clip_windows {
-        let Some(tracks) = clip
-            .value
-            .get("tracks")
-            .and_then(Value::as_array)
-        else {
-            warnings.push(format!("clip '{}' has no tracks", clip.id));
-            continue;
-        };
-        for (track_index, track_value) in tracks.iter().enumerate() {
-            let Some(track) = track_value.as_object() else {
-                warnings.push(format!(
-                    "ignored non-object track at index {track_index} in clip '{}'",
-                    clip.id
-                ));
-                continue;
-            };
-            let kind = track.get("kind").and_then(Value::as_str).unwrap_or("component");
-            if kind != "component" {
-                continue;
-            }
-            let track_id = value_id(track, &format!("track-{}", track_index + 1));
-            let items = track.get("items").and_then(Value::as_array);
-            let fallback_item = json!({
-                "id": track_id,
-                "component": track.get("component").cloned().unwrap_or(Value::Null),
-                "time": track.get("time").cloned().unwrap_or_else(|| json!({ "start": "in", "end": "out" })),
-                "params": track.get("params").cloned().unwrap_or_else(|| json!({})),
-                "style": track.get("style").cloned().unwrap_or_else(|| json!({}))
-            });
-            let item_values: Vec<&Value> = match items {
-                Some(items) => items.iter().collect(),
-                None => vec![&fallback_item],
-            };
-            for (item_index, item_value) in item_values.into_iter().enumerate() {
-                let Some(item) = item_value.as_object() else {
-                    warnings.push(format!(
-                        "ignored non-object item at index {item_index} in track '{}.{}'",
-                        clip.id, track_id
-                    ));
-                    continue;
-                };
-                let item_id = value_id(item, &format!("item-{}", item_index + 1));
-                let component_id = item
-                    .get("component")
-                    .or_else(|| track.get("component"))
-                    .and_then(Value::as_str)
-                    .filter(|value| !value.is_empty());
-                let Some(component_id) = component_id else {
-                    errors.push(format!(
-                        "component item '{}.{}.{}' missing component",
-                        clip.id, track_id, item_id
-                    ));
-                    continue;
-                };
-                if let Err(err) = validate_component_id(component_id) {
-                    errors.push(format!("track '{}.{}' {err}", clip.id, track_id));
-                    continue;
-                }
-                let (local_start, local_end) =
-                    match v3_item_time_ms(item, &clip.anchors, clip.duration_ms, &item_id) {
-                        Ok((start, end)) if end > start => (start, end),
-                        Ok((_start, _end)) => {
-                            errors.push(format!(
-                                "item '{}.{}.{}' end must be greater than start",
-                                clip.id, track_id, item_id
-                            ));
-                            (0, 0)
-                        }
-                        Err(err) => {
-                            errors.push(err.to_string());
-                            (0, 0)
-                        }
-                    };
-
-                let entry = components
-                    .entry(component_id.to_string())
-                    .or_insert_with(|| {
-                        inspect_component_source(storage.root(), project_slug, component_id, &mut errors)
-                    });
-                entry.used_by.push(ComponentUsage {
-                    track: format!("{}.{}.{}", clip.id, track_id, item_id),
-                    start_ms: clip.start_ms + local_start,
-                    end_ms: clip.start_ms + local_end,
-                });
-                for source in [track.get("params"), item.get("params"), track.get("style"), item.get("style")] {
-                    if let Some(params) = source.and_then(Value::as_object) {
-                        for key in params.keys() {
-                            if !entry.params.contains(key) {
-                                entry.params.push(key.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let mut component_list: Vec<_> = components.into_values().collect();
-    for component in &mut component_list {
-        component.params.sort();
-        component
-            .used_by
-            .sort_by(|left, right| left.track.cmp(&right.track));
-        if component.exists && !component.exports.mount {
-            errors.push(format!(
-                "component '{}' missing export function mount",
-                component.id
-            ));
-        }
-        if component.exists && !component.exports.update {
-            errors.push(format!(
-                "component '{}' missing export function update",
-                component.id
-            ));
-        }
-        if component.exports.imports || component.exports.dynamic_imports {
-            errors.push(format!(
-                "component '{}' must be single-file and cannot use import",
-                component.id
-            ));
-        }
-    }
-
-    Ok(ComponentValidationReport {
-        ok: errors.is_empty(),
-        project: project_slug.to_string(),
-        composition: composition_id.to_string(),
-        available_components: list_project_components(storage.root(), project_slug)?,
-        components: component_list,
-        warnings,
-        errors,
-    })
-}
-
 pub fn compile_composition_source(
     storage: &JsonStorage,
     project_slug: &str,
@@ -613,14 +475,14 @@ pub fn compile_composition_source(
         .filter(|value| !value.is_empty())
         .ok_or_else(|| ProjectError::ValidationFailed("composition.id is required".to_string()))?;
     validate_slug(id)?;
-    if object.get("clips").and_then(Value::as_array).is_some() {
-        return compile_composition_v3_source(storage, project_slug, object, id);
-    }
     let name = object
         .get("name")
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
         .unwrap_or(id);
+    if object.get("clips").and_then(Value::as_array).is_some() {
+        return compile_clip_composition_source(storage, project_slug, object, id, name);
+    }
     let duration_ms = time_value_ms(object.get("duration"), &BTreeMap::new(), "duration")?;
     if duration_ms == 0 {
         return Err(ProjectError::ValidationFailed(
@@ -805,45 +667,37 @@ pub fn compile_composition_source(
     Ok(SourceCompileResult { source, warnings })
 }
 
-#[derive(Debug, Clone)]
-struct V3ClipWindow<'a> {
-    id: String,
-    title: String,
-    value: &'a serde_json::Map<String, Value>,
-    start_ms: u64,
-    duration_ms: u64,
-    anchors: BTreeMap<String, f64>,
-}
-
-fn compile_composition_v3_source(
+fn compile_clip_composition_source(
     storage: &JsonStorage,
     project_slug: &str,
     object: &serde_json::Map<String, Value>,
     id: &str,
+    name: &str,
 ) -> Result<SourceCompileResult, ProjectError> {
-    let name = object
-        .get("name")
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-        .unwrap_or(id);
-    let clip_windows = v3_clip_windows(object)?;
-    if clip_windows.is_empty() {
+    let clips = object
+        .get("clips")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            ProjectError::ValidationFailed("composition.clips must be an array".to_string())
+        })?;
+    if clips.is_empty() {
         return Err(ProjectError::ValidationFailed(
-            "composition.clips must contain at least one clip".to_string(),
+            "composition.clips must not be empty".to_string(),
         ));
     }
+
+    let windows = clip_windows(object)?;
     let duration_ms = object
         .get("duration")
-        .filter(|value| value.as_str() != Some("auto"))
         .map(|value| time_value_ms(Some(value), &BTreeMap::new(), "duration"))
         .transpose()?
-        .unwrap_or_else(|| {
-            clip_windows
-                .iter()
-                .map(|clip| clip.start_ms + clip.duration_ms)
-                .max()
-                .unwrap_or(0)
-        });
+        .unwrap_or_else(|| windows.iter().map(|clip| clip.end_ms).max().unwrap_or(0));
+    if duration_ms == 0 {
+        return Err(ProjectError::ValidationFailed(
+            "composition duration must be greater than zero".to_string(),
+        ));
+    }
+
     let viewport = composition_viewport(object.get("viewport"));
     let theme_id = object
         .get("theme")
@@ -851,57 +705,80 @@ fn compile_composition_v3_source(
         .filter(|value| !value.is_empty())
         .unwrap_or("default");
     let theme_css = load_theme_css(storage.root(), project_slug, theme_id)?;
-
     let mut warnings = Vec::new();
-    let mut components = serde_json::Map::new();
     let mut source_tracks = Vec::new();
+    let mut components = serde_json::Map::new();
+    let mut subtitle_timelines = BTreeMap::<String, Vec<Value>>::new();
     let mut has_visual = false;
 
-    for clip in &clip_windows {
-        let timeline_sources = collect_v3_subtitle_timelines(storage, project_slug, clip, &mut warnings)?;
-        let Some(tracks) = clip.value.get("tracks").and_then(Value::as_array) else {
-            warnings.push(format!("clip '{}' has no tracks", clip.id));
+    for (clip_index, clip_value) in clips.iter().enumerate() {
+        let Some(clip) = clip_value.as_object() else {
+            warnings.push(format!("ignored non-object clip at index {clip_index}"));
             continue;
         };
+        let clip_window = &windows[clip_index];
+        collect_clip_subtitle_timelines(
+            storage,
+            project_slug,
+            clip,
+            clip_window,
+            &mut subtitle_timelines,
+            &mut warnings,
+        )?;
+    }
+
+    for (clip_index, clip_value) in clips.iter().enumerate() {
+        let Some(clip) = clip_value.as_object() else {
+            continue;
+        };
+        let clip_window = &windows[clip_index];
+        let tracks = clip
+            .get("tracks")
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                ProjectError::ValidationFailed(format!(
+                    "clip '{}' tracks must be an array",
+                    clip_window.id
+                ))
+            })?;
         for (track_index, track_value) in tracks.iter().enumerate() {
             let Some(track) = track_value.as_object() else {
                 warnings.push(format!(
-                    "ignored non-object track at index {track_index} in clip '{}'",
-                    clip.id
+                    "ignored non-object track at clip '{}' index {track_index}",
+                    clip_window.id
                 ));
                 continue;
             };
-            let kind = track.get("kind").and_then(Value::as_str).unwrap_or("component");
+            let kind = track
+                .get("kind")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("component");
             if kind == "subtitle_timeline" {
                 continue;
             }
-            let track_id = value_id(track, &format!("track-{}", track_index + 1));
-            let z = track
-                .get("z")
-                .cloned()
-                .unwrap_or_else(|| json!(track_index));
-            let mut clips = Vec::new();
-            let items = normalized_track_items(track, &track_id);
-            for (item_index, item_value) in items.iter().enumerate() {
-                let Some(item) = item_value.as_object() else {
-                    warnings.push(format!(
-                        "ignored non-object item at index {item_index} in track '{}.{}'",
-                        clip.id, track_id
-                    ));
-                    continue;
-                };
-                let item_id = value_id(item, &format!("item-{}", item_index + 1));
-                let (local_begin, local_end) =
-                    v3_item_time_ms(item, &clip.anchors, clip.duration_ms, &item_id)?;
-                if local_end <= local_begin {
+            let track_id = value_id(track, "track", track_index + 1);
+            let items = normalized_track_items(track);
+            for (item_index, item) in items.iter().enumerate() {
+                let item_id = value_id(item, "item", item_index + 1);
+                let source_track_id = format!("{}.{}", clip_window.id, track_id);
+                let runtime_clip_id = format!("{}.{}.{}", clip_window.id, track_id, item_id);
+                let (local_start, local_end) = item_time_ms(
+                    item,
+                    track,
+                    &clip_window.anchors,
+                    clip_window.end_ms - clip_window.start_ms,
+                    &runtime_clip_id,
+                )?;
+                if local_end <= local_start {
                     return Err(ProjectError::ValidationFailed(format!(
-                        "item '{}.{}.{}' end must be greater than start",
-                        clip.id, track_id, item_id
+                        "item '{runtime_clip_id}' end must be greater than start"
                     )));
                 }
-                let begin = clip.start_ms + local_begin;
-                let end = clip.start_ms + local_end;
-                let params = match kind {
+                let begin = clip_window.start_ms + local_start;
+                let end = clip_window.start_ms + local_end;
+                let mut params = serde_json::Map::new();
+                let runtime_kind = match kind {
                     "component" => {
                         let component_id = item
                             .get("component")
@@ -910,130 +787,121 @@ fn compile_composition_v3_source(
                             .filter(|value| !value.is_empty())
                             .ok_or_else(|| {
                                 ProjectError::ValidationFailed(format!(
-                                    "component item '{}.{}.{}' missing component",
-                                    clip.id, track_id, item_id
+                                    "component track '{source_track_id}' missing component"
                                 ))
                             })?;
                         if !components.contains_key(component_id) {
-                            let src = load_component_js(storage.root(), project_slug, component_id)?;
+                            let src =
+                                load_component_js(storage.root(), project_slug, component_id)?;
                             components.insert(component_id.to_string(), Value::String(src));
                         }
-                        let mut component_params = merge_json_objects(track.get("params"), item.get("params"));
-                        if let Some(style) = merge_json_objects(track.get("style"), item.get("style")).as_object() {
-                            for key in ["x", "y"] {
-                                if let Some(value) = style.get(key) {
-                                    if let Some(target) = component_params.as_object_mut() {
-                                        target.insert(key.to_string(), value.clone());
-                                    }
-                                }
-                            }
-                        }
+                        params.insert("component".to_string(), json!(component_id));
+                        params.insert(
+                            "params".to_string(),
+                            merge_json_objects(track.get("params"), item.get("params")),
+                        );
+                        params.insert(
+                            "style".to_string(),
+                            merge_json_objects(track.get("style"), item.get("style")),
+                        );
                         has_visual = true;
-                        json!({
-                            "component": component_id,
-                            "params": component_params,
-                            "style": merge_json_objects(track.get("style"), item.get("style")),
-                            "track": {
-                                "id": format!("{}.{}", clip.id, track_id),
-                                "clip": clip.id,
-                                "clip_title": clip.title,
-                                "z": z,
-                                "kind": kind
-                            }
-                        })
+                        "component"
                     }
-                    "tts" => {
-                        let params = merge_json_objects(track.get("params"), item.get("params"));
-                        let src = params
-                            .get("audio")
-                            .or_else(|| params.get("src"))
-                            .and_then(Value::as_str)
-                            .ok_or_else(|| {
-                                ProjectError::ValidationFailed(format!(
-                                    "tts item '{}.{}.{}' missing params.audio",
-                                    clip.id, track_id, item_id
-                                ))
-                            })?;
-                        let mut out = serde_json::Map::new();
-                        out.insert("src".to_string(), json!(composition_audio_src(storage.root(), project_slug, src)));
-                        out.insert("tts".to_string(), params);
-                        copy_number_param(track, &mut out, "volume");
-                        copy_number_param(item, &mut out, "volume");
-                        Value::Object(out)
-                    }
-                    "audio" => {
-                        let params = merge_json_objects(track.get("params"), item.get("params"));
-                        let src = params
+                    "audio" | "tts" => {
+                        let src = item
                             .get("src")
-                            .or_else(|| item.get("src"))
+                            .or_else(|| item.get("audio"))
                             .or_else(|| track.get("src"))
-                            .and_then(Value::as_str)
-                            .ok_or_else(|| {
-                                ProjectError::ValidationFailed(format!(
-                                    "audio item '{}.{}.{}' missing src",
-                                    clip.id, track_id, item_id
-                                ))
-                            })?;
-                        let mut out = serde_json::Map::new();
-                        out.insert("src".to_string(), json!(composition_audio_src(storage.root(), project_slug, src)));
+                            .or_else(|| track.get("audio"))
+                            .and_then(Value::as_str);
+                        let Some(src) = src else {
+                            warnings.push(format!(
+                                "ignored audio item '{runtime_clip_id}' without src"
+                            ));
+                            continue;
+                        };
+                        params.insert(
+                            "src".to_string(),
+                            json!(composition_audio_src(storage.root(), project_slug, src)),
+                        );
                         for key in ["from_ms", "to_ms", "volume"] {
-                            if let Some(value) = params.get(key).and_then(Value::as_f64) {
-                                out.insert(key.to_string(), json!(value));
+                            if let Some(value) = item
+                                .get(key)
+                                .or_else(|| track.get(key))
+                                .and_then(Value::as_f64)
+                            {
+                                params.insert(key.to_string(), json!(value));
                             }
                         }
-                        Value::Object(out)
+                        if let Some(tts) = item
+                            .get("tts")
+                            .or_else(|| track.get("tts"))
+                            .filter(|value| value.is_object())
+                        {
+                            params.insert("tts".to_string(), tts.clone());
+                        }
+                        "audio"
                     }
                     "subtitle" => {
-                        let source = item
+                        let source_ref = item
                             .get("source")
+                            .or_else(|| item.get("timeline"))
                             .or_else(|| track.get("source"))
-                            .and_then(Value::as_object)
-                            .ok_or_else(|| {
-                                ProjectError::ValidationFailed(format!(
-                                    "subtitle item '{}.{}.{}' missing source",
-                                    clip.id, track_id, item_id
-                                ))
-                            })?;
-                        let source_key = source_ref_key(source, &clip.id)?;
-                        let words = timeline_sources.get(&source_key).ok_or_else(|| {
-                            ProjectError::ValidationFailed(format!(
-                                "subtitle item '{}.{}.{}' references unknown subtitle timeline '{}'",
-                                clip.id, track_id, item_id, source_key
-                            ))
-                        })?;
+                            .or_else(|| track.get("timeline"))
+                            .and_then(Value::as_str)
+                            .unwrap_or(&track_id);
+                        let key = source_ref_key(&clip_window.id, source_ref);
+                        let Some(words) = subtitle_timelines.get(&key).cloned().or_else(|| {
+                            item.get("words")
+                                .or_else(|| {
+                                    item.get("params").and_then(|params| params.get("words"))
+                                })
+                                .and_then(subtitle_words)
+                        }) else {
+                            warnings.push(format!(
+                                "ignored subtitle item '{runtime_clip_id}' without timeline words"
+                            ));
+                            continue;
+                        };
+                        params.insert("source".to_string(), json!({ "words": words }));
+                        params.insert(
+                            "style".to_string(),
+                            merge_json_objects(track.get("style"), item.get("style")),
+                        );
                         has_visual = true;
-                        json!({
-                            "source": { "words": words },
-                            "style": merge_json_objects(track.get("style"), item.get("style"))
-                        })
+                        "subtitle"
                     }
                     other => {
+                        params = merge_json_objects(track.get("params"), item.get("params"))
+                            .as_object()
+                            .cloned()
+                            .unwrap_or_default();
                         if other != "audio" {
                             has_visual = true;
                         }
-                        merge_json_objects(track.get("params"), item.get("params"))
+                        other
                     }
                 };
-                clips.push(json!({
-                    "id": format!("{}.{}.{}", clip.id, track_id, item_id),
-                    "begin": begin,
-                    "end": end,
-                    "params": params
+                params.insert(
+                    "track".to_string(),
+                    json!({
+                        "id": source_track_id,
+                        "clip": clip_window.id,
+                        "kind": kind
+                    }),
+                );
+                source_tracks.push(json!({
+                    "id": source_track_id,
+                    "kind": runtime_kind,
+                    "z": item.get("z").or_else(|| track.get("z")).cloned().unwrap_or_else(|| json!(track_index)),
+                    "clips": [{
+                        "id": runtime_clip_id,
+                        "begin": begin,
+                        "end": end,
+                        "params": Value::Object(params)
+                    }]
                 }));
             }
-            if clips.is_empty() {
-                continue;
-            }
-            let runtime_kind = match kind {
-                "tts" => "audio",
-                other => other,
-            };
-            source_tracks.push(json!({
-                "id": format!("{}.{}", clip.id, track_id),
-                "kind": runtime_kind,
-                "z": z,
-                "clips": clips
-            }));
         }
     }
 
@@ -1049,12 +917,7 @@ fn compile_composition_v3_source(
             "project": project_slug,
             "composition": id,
             "version": "v3",
-            "clips": clip_windows.iter().map(|clip| json!({
-                "id": clip.id,
-                "title": clip.title,
-                "begin": clip.start_ms,
-                "end": clip.start_ms + clip.duration_ms
-            })).collect::<Vec<_>>(),
+            "authoring": "clip-first",
             "export": object.get("export").cloned().unwrap_or_else(|| json!({ "resolution": "1080p" }))
         },
         "viewport": viewport,
@@ -1071,44 +934,188 @@ fn compile_composition_v3_source(
     Ok(SourceCompileResult { source, warnings })
 }
 
-fn v3_clip_windows(
+fn validate_clip_composition_components(
+    storage: &JsonStorage,
+    project_slug: &str,
+    composition_id: &str,
     object: &serde_json::Map<String, Value>,
-) -> Result<Vec<V3ClipWindow<'_>>, ProjectError> {
+) -> Result<ComponentValidationReport, ProjectError> {
     let clips = object
         .get("clips")
         .and_then(Value::as_array)
-        .ok_or_else(|| ProjectError::ValidationFailed("composition.clips must be an array".to_string()))?;
-    let mut out = Vec::with_capacity(clips.len());
-    let mut cursor_ms = 0u64;
+        .ok_or_else(|| {
+            ProjectError::ValidationFailed("composition.clips must be an array".to_string())
+        })?;
+    let windows = clip_windows(object)?;
+    let mut components: BTreeMap<String, ComponentValidationComponent> = BTreeMap::new();
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+
+    for (clip_index, clip_value) in clips.iter().enumerate() {
+        let Some(clip) = clip_value.as_object() else {
+            warnings.push(format!("ignored non-object clip at index {clip_index}"));
+            continue;
+        };
+        let clip_window = &windows[clip_index];
+        let Some(tracks) = clip.get("tracks").and_then(Value::as_array) else {
+            errors.push(format!("clip '{}' tracks must be an array", clip_window.id));
+            continue;
+        };
+        for (track_index, track_value) in tracks.iter().enumerate() {
+            let Some(track) = track_value.as_object() else {
+                warnings.push(format!(
+                    "ignored non-object track at clip '{}' index {track_index}",
+                    clip_window.id
+                ));
+                continue;
+            };
+            let kind = track
+                .get("kind")
+                .and_then(Value::as_str)
+                .unwrap_or("component");
+            if kind != "component" {
+                continue;
+            }
+            let track_id = value_id(track, "track", track_index + 1);
+            let component_id = match track
+                .get("component")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+            {
+                Some(value) => value,
+                None => {
+                    errors.push(format!(
+                        "component track '{}.{}' missing component",
+                        clip_window.id, track_id
+                    ));
+                    continue;
+                }
+            };
+            if let Err(err) = validate_component_id(component_id) {
+                errors.push(format!("track '{}.{}' {err}", clip_window.id, track_id));
+                continue;
+            }
+            let entry = components
+                .entry(component_id.to_string())
+                .or_insert_with(|| {
+                    inspect_component_source(
+                        storage.root(),
+                        project_slug,
+                        component_id,
+                        &mut errors,
+                    )
+                });
+            for (item_index, item) in normalized_track_items(track).iter().enumerate() {
+                let item_id = value_id(item, "item", item_index + 1);
+                let runtime_id = format!("{}.{}.{}", clip_window.id, track_id, item_id);
+                let (local_start, local_end) = match item_time_ms(
+                    item,
+                    track,
+                    &clip_window.anchors,
+                    clip_window.end_ms - clip_window.start_ms,
+                    &runtime_id,
+                ) {
+                    Ok(value) if value.1 > value.0 => value,
+                    Ok(_) => {
+                        errors.push(format!(
+                            "item '{runtime_id}' end must be greater than start"
+                        ));
+                        (0, 0)
+                    }
+                    Err(err) => {
+                        errors.push(err.to_string());
+                        (0, 0)
+                    }
+                };
+                entry.used_by.push(ComponentUsage {
+                    track: runtime_id,
+                    start_ms: clip_window.start_ms + local_start,
+                    end_ms: clip_window.start_ms + local_end,
+                });
+                for source in [
+                    track.get("params"),
+                    item.get("params"),
+                    track.get("style"),
+                    item.get("style"),
+                ] {
+                    if let Some(params) = source.and_then(Value::as_object) {
+                        for key in params.keys() {
+                            if !entry.params.contains(key) {
+                                entry.params.push(key.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut component_list: Vec<_> = components.into_values().collect();
+    for component in &mut component_list {
+        component.params.sort();
+        component
+            .used_by
+            .sort_by(|left, right| left.track.cmp(&right.track));
+        if component.exists && !component.exports.mount {
+            errors.push(format!(
+                "component '{}' missing export function mount",
+                component.id
+            ));
+        }
+        if component.exists && !component.exports.update {
+            errors.push(format!(
+                "component '{}' missing export function update",
+                component.id
+            ));
+        }
+        if component.exports.imports || component.exports.dynamic_imports {
+            errors.push(format!(
+                "component '{}' must be single-file and cannot use import",
+                component.id
+            ));
+        }
+    }
+
+    Ok(ComponentValidationReport {
+        ok: errors.is_empty(),
+        project: project_slug.to_string(),
+        composition: composition_id.to_string(),
+        available_components: list_project_components(storage.root(), project_slug)?,
+        components: component_list,
+        warnings,
+        errors,
+    })
+}
+
+fn clip_windows(object: &serde_json::Map<String, Value>) -> Result<Vec<ClipWindow>, ProjectError> {
+    let clips = object
+        .get("clips")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            ProjectError::ValidationFailed("composition.clips must be an array".to_string())
+        })?;
+    let mut cursor_ms = 0_u64;
+    let mut windows = Vec::new();
     for (index, clip_value) in clips.iter().enumerate() {
         let clip = clip_value.as_object().ok_or_else(|| {
             ProjectError::ValidationFailed(format!("clip at index {index} must be an object"))
         })?;
-        let id = value_id(clip, &format!("clip-{}", index + 1));
-        validate_slug(&id)?;
-        let title = clip
-            .get("title")
-            .or_else(|| clip.get("name"))
-            .and_then(Value::as_str)
-            .unwrap_or(&id)
-            .to_string();
-        let duration_value = clip
-            .get("duration")
-            .or_else(|| clip.get("time").and_then(|time| time.get("duration")))
-            .ok_or_else(|| {
-                ProjectError::ValidationFailed(format!("clip '{id}' duration is required"))
-            })?;
-        let duration_ms = time_value_ms(Some(duration_value), &BTreeMap::new(), &format!("clip '{id}' duration"))?;
+        let id = value_id(clip, "clip", index + 1);
+        let duration_ms = time_value_ms(
+            clip.get("duration").or_else(|| clip.get("length")),
+            &BTreeMap::new(),
+            &format!("clip '{id}' duration"),
+        )?;
         if duration_ms == 0 {
             return Err(ProjectError::ValidationFailed(format!(
                 "clip '{id}' duration must be greater than zero"
             )));
         }
         let mut anchors = BTreeMap::new();
-        anchors.insert("in".to_string(), 0.0);
         anchors.insert("start".to_string(), 0.0);
-        anchors.insert("out".to_string(), duration_ms as f64 / 1000.0);
+        anchors.insert("in".to_string(), 0.0);
         anchors.insert("end".to_string(), duration_ms as f64 / 1000.0);
+        anchors.insert("out".to_string(), duration_ms as f64 / 1000.0);
         if let Some(raw_anchors) = clip.get("anchors").and_then(Value::as_object) {
             for _ in 0..raw_anchors.len().max(1) {
                 let mut changed = false;
@@ -1116,227 +1123,194 @@ fn v3_clip_windows(
                     if anchors.contains_key(name) {
                         continue;
                     }
-                    match time_value_ms(Some(raw), &anchors, &format!("clip '{id}' anchor '{name}'")) {
-                        Ok(ms) => {
-                            anchors.insert(name.clone(), ms as f64 / 1000.0);
-                            changed = true;
-                        }
-                        Err(ProjectError::ValidationFailed(_)) => {}
-                        Err(err) => return Err(err),
+                    if let Ok(ms) =
+                        time_value_ms(Some(raw), &anchors, &format!("clip '{id}' anchor '{name}'"))
+                    {
+                        anchors.insert(name.clone(), ms as f64 / 1000.0);
+                        changed = true;
                     }
                 }
                 if !changed {
                     break;
                 }
             }
-            let unresolved: Vec<_> = raw_anchors
-                .keys()
-                .filter(|name| !anchors.contains_key(*name))
-                .cloned()
-                .collect();
-            if !unresolved.is_empty() {
-                return Err(ProjectError::ValidationFailed(format!(
-                    "clip '{id}' has unresolved anchors: {}",
-                    unresolved.join(", ")
-                )));
-            }
         }
-        out.push(V3ClipWindow {
+        windows.push(ClipWindow {
             id,
-            title,
-            value: clip,
             start_ms: cursor_ms,
-            duration_ms,
+            end_ms: cursor_ms + duration_ms,
             anchors,
         });
         cursor_ms += duration_ms;
     }
-    Ok(out)
+    Ok(windows)
 }
 
-fn collect_v3_subtitle_timelines(
+fn collect_clip_subtitle_timelines(
     storage: &JsonStorage,
     project_slug: &str,
-    clip: &V3ClipWindow<'_>,
+    clip: &serde_json::Map<String, Value>,
+    clip_window: &ClipWindow,
+    subtitle_timelines: &mut BTreeMap<String, Vec<Value>>,
     warnings: &mut Vec<String>,
-) -> Result<BTreeMap<String, Vec<Value>>, ProjectError> {
-    let mut tts_timelines = BTreeMap::<String, String>::new();
-    let mut subtitle_timelines = BTreeMap::<String, Vec<Value>>::new();
-    let Some(tracks) = clip.value.get("tracks").and_then(Value::as_array) else {
-        return Ok(subtitle_timelines);
+) -> Result<(), ProjectError> {
+    let Some(tracks) = clip.get("tracks").and_then(Value::as_array) else {
+        return Ok(());
     };
     for (track_index, track_value) in tracks.iter().enumerate() {
         let Some(track) = track_value.as_object() else {
             continue;
         };
-        let track_id = value_id(track, &format!("track-{}", track_index + 1));
-        let kind = track.get("kind").and_then(Value::as_str).unwrap_or("component");
-        if kind != "tts" {
+        let kind = track
+            .get("kind")
+            .and_then(Value::as_str)
+            .unwrap_or("component");
+        if kind != "subtitle_timeline" && kind != "tts" {
             continue;
         }
-        for (item_index, item_value) in normalized_track_items(track, &track_id).iter().enumerate() {
-            let Some(item) = item_value.as_object() else {
-                continue;
-            };
-            let item_id = value_id(item, &format!("item-{}", item_index + 1));
-            let params = merge_json_objects(track.get("params"), item.get("params"));
-            if let Some(timeline) = params.get("timeline").and_then(Value::as_str) {
-                tts_timelines.insert(format!("{}.{}.{}", clip.id, track_id, item_id), timeline.to_string());
+        let track_id = value_id(track, "track", track_index + 1);
+        let mut words = None;
+        if let Some(raw_words) = track
+            .get("words")
+            .or_else(|| track.get("params").and_then(|params| params.get("words")))
+        {
+            words = subtitle_words(raw_words);
+        }
+        if words.is_none() {
+            if let Some(timeline) = track
+                .get("timeline")
+                .or_else(|| {
+                    track
+                        .get("params")
+                        .and_then(|params| params.get("timeline"))
+                })
+                .and_then(Value::as_str)
+            {
+                words = load_timeline_words(storage.root(), project_slug, timeline)?;
             }
         }
-    }
-    for (track_index, track_value) in tracks.iter().enumerate() {
-        let Some(track) = track_value.as_object() else {
-            continue;
-        };
-        let track_id = value_id(track, &format!("track-{}", track_index + 1));
-        let kind = track.get("kind").and_then(Value::as_str).unwrap_or("component");
-        if kind != "subtitle_timeline" {
-            continue;
-        }
-        for (item_index, item_value) in normalized_track_items(track, &track_id).iter().enumerate() {
-            let Some(item) = item_value.as_object() else {
-                continue;
-            };
-            let item_id = value_id(item, &format!("item-{}", item_index + 1));
-            let source = item
-                .get("source")
-                .or_else(|| track.get("source"))
-                .and_then(Value::as_object);
-            let Some(source) = source else {
-                warnings.push(format!(
-                    "subtitle_timeline '{}.{}.{}' missing source",
-                    clip.id, track_id, item_id
-                ));
-                continue;
-            };
-            let source_key = source_ref_key(source, &clip.id)?;
-            let Some(timeline) = tts_timelines.get(&source_key) else {
-                warnings.push(format!(
-                    "subtitle_timeline '{}.{}.{}' references unknown tts '{}'",
-                    clip.id, track_id, item_id, source_key
-                ));
-                continue;
-            };
-            let words = load_timeline_words(storage.root(), project_slug, timeline)?;
-            subtitle_timelines.insert(format!("{}.{}.{}", clip.id, track_id, item_id), words);
+        if let Some(words) = words {
+            subtitle_timelines.insert(source_ref_key(&clip_window.id, &track_id), words);
+        } else if kind == "subtitle_timeline" {
+            warnings.push(format!(
+                "subtitle timeline '{}.{}' has no words",
+                clip_window.id, track_id
+            ));
         }
     }
-    Ok(subtitle_timelines)
+    Ok(())
 }
 
-fn normalized_track_items(track: &serde_json::Map<String, Value>, track_id: &str) -> Vec<Value> {
-    if let Some(items) = track.get("items").and_then(Value::as_array) {
-        return items.clone();
-    }
-    vec![json!({
-        "id": track_id,
-        "component": track.get("component").cloned().unwrap_or(Value::Null),
-        "time": track.get("time").cloned().unwrap_or_else(|| json!({ "start": "in", "end": "out" })),
-        "params": track.get("params").cloned().unwrap_or_else(|| json!({})),
-        "style": track.get("style").cloned().unwrap_or_else(|| json!({})),
-        "source": track.get("source").cloned().unwrap_or(Value::Null)
-    })]
+fn normalized_track_items(
+    track: &serde_json::Map<String, Value>,
+) -> Vec<serde_json::Map<String, Value>> {
+    track
+        .get("items")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_object().cloned())
+                .collect::<Vec<_>>()
+        })
+        .filter(|items| !items.is_empty())
+        .unwrap_or_else(|| vec![track.clone()])
 }
 
-fn v3_item_time_ms(
+fn item_time_ms(
     item: &serde_json::Map<String, Value>,
+    track: &serde_json::Map<String, Value>,
     anchors: &BTreeMap<String, f64>,
     duration_ms: u64,
     item_id: &str,
 ) -> Result<(u64, u64), ProjectError> {
-    let time = item.get("time").and_then(Value::as_object);
-    let start_default = Value::String("in".to_string());
-    let end_default = Value::String("out".to_string());
-    let start_value = time
+    let item_time = item.get("time").and_then(Value::as_object);
+    let track_time = track.get("time").and_then(Value::as_object);
+    let start_default = Value::String("start".to_string());
+    let end_default = Value::String("end".to_string());
+    let start_value = item_time
         .and_then(|value| value.get("start"))
         .or_else(|| item.get("start"))
+        .or_else(|| track_time.and_then(|value| value.get("start")))
+        .or_else(|| track.get("start"))
         .unwrap_or(&start_default);
-    let end_value = time
+    let end_value = item_time
         .and_then(|value| value.get("end"))
         .or_else(|| item.get("end"))
+        .or_else(|| track_time.and_then(|value| value.get("end")))
+        .or_else(|| track.get("end"))
         .unwrap_or(&end_default);
-    let start = time_value_ms(Some(start_value), anchors, &format!("item '{item_id}' start"))?;
+    let start = time_value_ms(
+        Some(start_value),
+        anchors,
+        &format!("item '{item_id}' start"),
+    )?;
     let end = time_value_ms(Some(end_value), anchors, &format!("item '{item_id}' end"))?;
     Ok((start.min(duration_ms), end.min(duration_ms)))
 }
 
-fn source_ref_key(
-    source: &serde_json::Map<String, Value>,
-    clip_id: &str,
-) -> Result<String, ProjectError> {
-    let track = source
-        .get("track")
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| ProjectError::ValidationFailed("source.track is required".to_string()))?;
-    let item = source
-        .get("item")
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("main");
-    let source_clip = source
-        .get("clip")
-        .and_then(Value::as_str)
-        .filter(|value| !value.is_empty())
-        .unwrap_or(clip_id);
-    Ok(format!("{source_clip}.{track}.{item}"))
+fn source_ref_key(clip_id: &str, source: &str) -> String {
+    if source.contains('.') {
+        source.to_string()
+    } else {
+        format!("{clip_id}.{source}")
+    }
 }
 
 fn load_timeline_words(
     root: &Path,
     project_slug: &str,
     timeline: &str,
-) -> Result<Vec<Value>, ProjectError> {
+) -> Result<Option<Vec<Value>>, ProjectError> {
     let path = if Path::new(timeline).is_absolute() {
         PathBuf::from(timeline)
     } else {
         root.join(project_slug).join(timeline)
     };
-    let value: Value = read_json(&path)?;
-    if let Some(words) = value.get("words").and_then(subtitle_words) {
-        return Ok(words);
+    if !path.exists() {
+        return Ok(None);
     }
-    let words = value
-        .get("segments")
-        .and_then(Value::as_array)
-        .map(|segments| {
-            segments
-                .iter()
-                .filter_map(|segment| segment.get("words").and_then(subtitle_words))
-                .flatten()
-                .collect::<Vec<_>>()
+    let raw = fs::read_to_string(&path).map_err(|err| {
+        ProjectError::StorageFailed(format!("timeline read failed: {}: {err}", path.display()))
+    })?;
+    let value: Value = serde_json::from_str(&raw).map_err(|err| {
+        ProjectError::StorageFailed(format!("timeline parse failed: {}: {err}", path.display()))
+    })?;
+    Ok(value
+        .get("words")
+        .or_else(|| {
+            value
+                .get("timeline")
+                .and_then(|timeline| timeline.get("words"))
         })
-        .unwrap_or_default();
-    if words.is_empty() {
-        return Err(ProjectError::ValidationFailed(format!(
-            "timeline has no words: {}",
-            path.display()
-        )));
-    }
-    Ok(words)
+        .and_then(subtitle_words))
 }
 
-fn merge_json_objects(left: Option<&Value>, right: Option<&Value>) -> Value {
-    let mut out = serde_json::Map::new();
-    for source in [left, right] {
-        if let Some(object) = source.and_then(Value::as_object) {
-            for (key, value) in object {
-                out.insert(key.clone(), value.clone());
-            }
+fn merge_json_objects(primary: Option<&Value>, secondary: Option<&Value>) -> Value {
+    let mut merged = primary
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    if let Some(extra) = secondary.and_then(Value::as_object) {
+        for (key, value) in extra {
+            merged.insert(key.clone(), value.clone());
         }
     }
-    Value::Object(out)
+    Value::Object(merged)
 }
 
-fn value_id(object: &serde_json::Map<String, Value>, fallback: &str) -> String {
+fn value_id(
+    object: &serde_json::Map<String, Value>,
+    fallback_prefix: &str,
+    index: usize,
+) -> String {
     object
         .get("id")
         .or_else(|| object.get("slug"))
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
-        .unwrap_or(fallback)
-        .to_string()
+        .map(ToString::to_string)
+        .unwrap_or_else(|| format!("{fallback_prefix}-{index}"))
 }
 
 pub fn compile_episode_source(

@@ -123,6 +123,9 @@ export class NfTimeline extends NfBase {
     const currentTime = Number(this.getAttribute("current-time") ?? (data.source === "ipc" ? 0 : 12));
     const sceneClips = episode.clips.filter((clip) => clip.kind === "scene");
     const selectedId = this.getAttribute("selected-id") ?? sceneClips[0]?.id ?? episode.clips[0]?.id ?? "";
+    const selectedCompositionClip = episode.composition_clips?.find((clip) => clip.id === selectedId)
+      ?? episode.composition_clips?.[0];
+    const clipFirstRows = selectedCompositionClip?.tracks ?? [];
     const v2Rows = data.source === "ipc" && episode.clips.some((clip) => clip.kind === "component")
       ? v2TrackRows(episode.clips)
       : [];
@@ -133,14 +136,20 @@ export class NfTimeline extends NfBase {
     const audioClips = data.source === "ipc"
       ? episode.clips.filter((clip) => clip.kind === "audio")
       : episode.clips.filter((clip) => clip.id === "bgm-electric").slice(0, 1);
-    const anchors = Object.entries(episode.anchors);
-    const trackCount = v2Rows.length > 0
+    const anchors = Object.entries(selectedCompositionClip?.anchors ?? episode.anchors);
+    const trackCount = clipFirstRows.length > 0
+      ? clipFirstRows.length
+      : v2Rows.length > 0
       ? v2Rows.length
       : data.source === "ipc"
         ? new Set(episode.clips.map((clip) => clip.kind)).size
         : 4;
-    const clipCount = data.source === "ipc" ? episode.clips.length : 7;
-    const renderedTrackIds = v2Rows.length > 0
+    const clipCount = clipFirstRows.length > 0
+      ? clipFirstRows.reduce((sum, row) => sum + row.items.length, 0)
+      : data.source === "ipc" ? episode.clips.length : 7;
+    const renderedTrackIds = clipFirstRows.length > 0
+      ? clipFirstRows.map((row) => row.id)
+      : v2Rows.length > 0
       ? v2Rows.map((row) => row.id)
       : ["scene", "text", "subtitle", "overlay", "trans", "audio"];
     this.dataset.trackCount = String(trackCount);
@@ -148,7 +157,7 @@ export class NfTimeline extends NfBase {
     this.root.innerHTML = `
       <div class="timeline">
         <div class="tl-top">
-          <div class="t">时间轴 · ${trackCount} 轨 · ${clipCount} 片段</div>
+          <div class="t">${selectedCompositionClip ? `${escapeAttr(selectedCompositionClip.label)} · ` : ""}时间轴 · ${trackCount} 轨 · ${clipCount} 组件</div>
           <div class="anchors">
             ${anchors.map(([name, time]) => `<span><b>${name}</b> ${time.toFixed(1)}</span>`).join("")}
           </div>
@@ -162,7 +171,11 @@ export class NfTimeline extends NfBase {
           }).join("")}
         </div>
         <div class="tl-body">
-          ${v2Rows.length > 0 ? v2Rows.map((row) => `
+          ${clipFirstRows.length > 0 ? clipFirstRows.map((row) => `
+            <nf-track kind="${row.kind}" label="${escapeAttr(row.label)}" track-id="${escapeAttr(row.id)}" data-track-id="${escapeAttr(row.id)}" ${row.id === selectedId ? "selected" : ""}>
+              ${row.items.map((clip) => `<nf-clip slot="clips" id="${clip.id}" data-track-id="${escapeAttr(row.id)}" kind="${clip.kind}" start="${clip.start}" end="${clip.end}" duration="${selectedCompositionClip ? selectedCompositionClip.end - selectedCompositionClip.start : duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
+            </nf-track>
+          `).join("") : v2Rows.length > 0 ? v2Rows.map((row) => `
             <nf-track kind="${row.kind}" label="${escapeAttr(row.label)}" track-id="${escapeAttr(row.id)}" data-track-id="${escapeAttr(row.id)}" ${row.id === selectedId ? "selected" : ""}>
               ${row.clips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" data-track-id="${escapeAttr(row.id)}" kind="${clip.kind}" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId || row.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
             </nf-track>

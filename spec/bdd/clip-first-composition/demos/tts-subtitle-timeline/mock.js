@@ -1,1 +1,1 @@
-export const words = ["NextFrame", "用", "JSON", "生成", "视频"];
+export const words = ["Voice", "creates", "the", "subtitle", "timeline."];

@@ -1,1 +1,1 @@
-export const stages = ["compile clips", "flatten runtime", "mux audio", "burn subtitles", "mp4 done"];
+export const stages = ["clip JSON", "compiler", "runtime tracks", "export"];
