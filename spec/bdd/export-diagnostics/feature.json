@@ -1,0 +1,32 @@
+{
+  "feature": "export-diagnostics",
+  "name": "导出诊断和性能地图",
+  "summary": "完整导出不再是黑盒。导出过程产出结构化诊断报告，桌面端显示时间轴性能地图，AI 可以用 CLI 读取慢帧、慢区间和导出健康状态。",
+  "status": "spec",
+  "scenarios": [
+    {
+      "id": "perf-json",
+      "path": "scenarios/perf-json.bdd.json",
+      "demo": "demos/perf-json/index.html"
+    },
+    {
+      "id": "slow-span-map",
+      "path": "scenarios/slow-span-map.bdd.json",
+      "demo": "demos/slow-span-map/index.html"
+    },
+    {
+      "id": "export-report-ui",
+      "path": "scenarios/export-report-ui.bdd.json",
+      "demo": "demos/export-report-ui/index.html"
+    },
+    {
+      "id": "diagnostics-regression",
+      "path": "scenarios/diagnostics-regression.bdd.json",
+      "demo": "demos/diagnostics-regression/index.html"
+    }
+  ],
+  "completion": {
+    "total": 4,
+    "done": 0
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "diagnostics-regression",
+  "title": "诊断模式不破坏正常导出结果",
+  "given": "用户用 diagnostics 模式导出 showreel-24s。",
+  "when": "导出结束并完成音频 mux 与字幕烧录。",
+  "then": "MP4 仍是 24 秒、有 AAC 音频、有字幕；diagnostics 不留下 nf-recorder、nf export 或 ffmpeg 残留进程。",
+  "human_actions": ["enable diagnostics", "export showreel", "open output", "confirm audio and captions", "check no residual process"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "ffprobe -v error -show_entries format=duration -select_streams a:0 -show_entries stream=codec_name -of json ../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.mp4",
+      "expected": "duration is close to 24s and audio codec is aac"
+    },
+    {
+      "tool": "state",
+      "command": "ffmpeg -y -ss 00:00:19 -i ../NextFrame.archive/v0.16.0-verify/showreel-24s-diagnostics.mp4 -frames:v 1 ../NextFrame.archive/v0.16.0-verify/diagnostics-frame-19s.png",
+      "expected": "extracted frame contains burned-in subtitle text"
+    },
+    {
+      "tool": "state",
+      "command": "pgrep -fl 'nf-shell|nf-recorder|nf export|ffmpeg' || true",
+      "expected": "no residual export or recorder process remains"
+    }
+  ],
+  "done": false
+}
