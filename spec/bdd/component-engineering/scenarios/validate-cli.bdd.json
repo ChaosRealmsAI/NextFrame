@@ -1,0 +1,21 @@
+{
+  "id": "validate-cli",
+  "title": "CLI 校验组件 ABI",
+  "given": "showreel-24s 使用的组件都存在，并导出 mount/update。",
+  "when": "运行 nf composition validate。",
+  "then": "命令 exit 0，JSON 输出 ok=true，errors=[]，每个组件都有 exports、params、used_by。",
+  "human_actions": ["run CLI", "read ok flag", "open component detail", "confirm params"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=examples target/debug/nf composition validate --project=v2-showcase --composition=showreel-24s",
+      "expected": "exit 0 and output ok=true"
+    },
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=examples target/debug/nf composition validate --project=v2-showcase --composition=showreel-24s | jq -e '.ok == true and (.errors | length == 0) and all(.components[]; .exports.mount and .exports.update)'",
+      "expected": "jq succeeds"
+    }
+  ],
+  "done": true
+}

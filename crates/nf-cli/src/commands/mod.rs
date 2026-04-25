@@ -390,13 +390,16 @@ COMMON ERRORS:
 USAGE:
     nf composition show --project=<slug> --composition=<slug> [--track=<id>] [--field=<path>]
     nf composition patch --project=<slug> --composition=<slug> --track=<id> --field=<path> --value=<json-or-string>
+    nf composition validate --project=<slug> --composition=<slug>
 
 EXAMPLES:
     nf composition show --project=v2-showcase --composition=showreel-24s --track=final-title --field=params.title
     nf composition patch --project=v2-showcase --composition=showreel-24s --track=final-title --field=params.title --value='NEXTFRAME LIVE EDIT'
+    nf composition validate --project=v2-showcase --composition=showreel-24s
 
 EXPECTED JSON:
     {"composition":{...},"source":{...},"warnings":[]}
+    {"ok":true,"components":[...],"errors":[]}
 
 COMMON ERRORS:
     - unknown track -> exit 2 · hint: run `nf composition show --project=<slug> --composition=<slug>`
@@ -865,6 +868,8 @@ pub enum CompositionSubcommand {
     Show(CompositionShowArgs),
     #[command(about = "Patch one v2 composition track field by dot path")]
     Patch(CompositionPatchArgs),
+    #[command(about = "Validate v2 composition component registry and component ABI")]
+    Validate(CompositionValidateArgs),
 }
 
 #[derive(Debug, Args)]
@@ -919,6 +924,22 @@ pub struct CompositionPatchArgs {
         help = "JSON scalar/object or raw string value"
     )]
     pub value: String,
+}
+
+#[derive(Debug, Args)]
+pub struct CompositionValidateArgs {
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Project slug, for example v2-showcase"
+    )]
+    pub project: String,
+    #[arg(
+        long,
+        value_name = "SLUG",
+        help = "Composition slug, for example showreel-24s"
+    )]
+    pub composition: String,
 }
 
 #[derive(Debug, Subcommand)]

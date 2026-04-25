@@ -1,0 +1,16 @@
+{
+  "id": "registry-visible",
+  "title": "组件 registry 可见",
+  "given": "项目 v2-showcase/components 下有多个组件 JS 文件，composition showreel-24s 只使用其中一部分。",
+  "when": "AI 或开发者运行 component validation。",
+  "then": "输出同时包含 available_components 和 components，能看出项目可用组件、composition 实际使用组件、每个组件被哪些 track 使用。",
+  "human_actions": ["open project", "run validate", "scan component list", "compare used tracks"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=examples target/debug/nf composition validate --project=v2-showcase --composition=showreel-24s | jq '.available_components | length, .components | length, .components[0].used_by'",
+      "expected": "available component count is greater than used component count and each used component has track usage"
+    }
+  ],
+  "done": true
+}

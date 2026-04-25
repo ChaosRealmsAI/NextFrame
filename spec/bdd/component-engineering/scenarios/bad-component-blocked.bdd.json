@@ -1,0 +1,16 @@
+{
+  "id": "bad-component-blocked",
+  "title": "坏组件被结构化阻断",
+  "given": "一个 composition 引用的组件文件存在，但缺少 update 导出，或者组件源使用 import。",
+  "when": "运行 nf composition validate。",
+  "then": "CLI 先输出 ok=false 的 JSON 报告，再以 validation failed 退出；错误指出具体 component id 和缺失/违规原因。",
+  "human_actions": ["create bad component", "run validate", "read error row", "fix component"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=tmp/v0.17-bad target/debug/nf composition validate --project=bad --composition=broken >/tmp/v0.17-bad-report.json; test $? -eq 2; jq -e '.ok == false and (.errors[] | contains(\"missing export function update\"))' /tmp/v0.17-bad-report.json",
+      "expected": "bad component is blocked with a structured JSON error"
+    }
+  ],
+  "done": true
+}
