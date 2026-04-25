@@ -110,6 +110,8 @@ export interface NfMockData {
   source?: "mock" | "ipc" | "fallback";
 }
 
+export const ALL_COMPOSITION_CLIP_ID = "__composition_all__";
+
 export const DEFAULT_MOCK: NfMockData = {
   source: "mock",
   project: { id: "next-frame", name: "NextFrame 产品介绍" },
@@ -682,17 +684,30 @@ function normalizeCompositionData(
   const duration = finiteNumber(source.duration, 60_000) / 1000;
   const compositionClips = normalizeCompositionClips(composition);
   if (compositionClips.length > 0) {
-    const clipRows = compositionClips.map((clip, index) => ({
-      id: clip.id,
-      label: clip.label,
-      kind: "scene" as ClipKind,
-      track: 0,
-      start: clip.start,
-      end: clip.end,
-      effects: [`${clip.tracks.length} tracks`],
-      position: { x: 50, y: 50 },
-      track_id: `clip-${index + 1}`,
-    }));
+    const clipRows = [
+      {
+        id: ALL_COMPOSITION_CLIP_ID,
+        label: "全部",
+        kind: "scene" as ClipKind,
+        track: 0,
+        start: 0,
+        end: duration,
+        effects: [`${compositionClips.length} clips`],
+        position: { x: 50, y: 50 },
+        track_id: ALL_COMPOSITION_CLIP_ID,
+      },
+      ...compositionClips.map((clip, index) => ({
+        id: clip.id,
+        label: clip.label,
+        kind: "scene" as ClipKind,
+        track: index + 1,
+        start: clip.start,
+        end: clip.end,
+        effects: [`${clip.tracks.length} tracks`],
+        position: { x: 50, y: 50 },
+        track_id: `clip-${index + 1}`,
+      })),
+    ];
     return {
       source: "ipc",
       project: {

@@ -1,6 +1,6 @@
 import { makeSheet, NfBase } from "../_base.js";
 import type { AnchorHoverDetail, ClipSelectDetail, PlayheadMoveDetail, TimelineClipSelectDetail, TimelineTrackSelectDetail } from "../events.js";
-import { getEpisode, getMockData, pct } from "../storage.js";
+import { ALL_COMPOSITION_CLIP_ID, getEpisode, getMockData, pct, type NfClip } from "../storage.js";
 
 const TEXT_CLIPS = [
   { id: "title", label: "title", start: 1, end: 5 },
@@ -56,7 +56,6 @@ const sheet = makeSheet(`
   .tl-ruler {
     height: 26px; flex-shrink: 0;
     position: relative;
-    padding-left: 100px;
     border-bottom: 1px solid var(--bd-2);
     background: rgba(0, 0, 0, 0.15);
   }
@@ -123,9 +122,19 @@ export class NfTimeline extends NfBase {
     const currentTime = Number(this.getAttribute("current-time") ?? (data.source === "ipc" ? 0 : 12));
     const sceneClips = episode.clips.filter((clip) => clip.kind === "scene");
     const selectedId = this.getAttribute("selected-id") ?? sceneClips[0]?.id ?? episode.clips[0]?.id ?? "";
-    const selectedCompositionClip = episode.composition_clips?.find((clip) => clip.id === selectedId)
-      ?? episode.composition_clips?.[0];
+    const selectedCompositionClip = selectedId === ALL_COMPOSITION_CLIP_ID
+      ? undefined
+      : episode.composition_clips?.find((clip) => clip.id === selectedId)
+        ?? episode.composition_clips?.[0];
     const clipFirstRows = selectedCompositionClip?.tracks ?? [];
+    const allCompositionRows = selectedId === ALL_COMPOSITION_CLIP_ID && episode.composition_clips
+      ? episode.composition_clips.map((clip) => ({
+        id: clip.id,
+        label: clip.label,
+        kind: "scene",
+        items: [compositionClipItem(clip)],
+      }))
+      : [];
     const v2Rows = data.source === "ipc" && episode.clips.some((clip) => clip.kind === "component")
       ? v2TrackRows(episode.clips)
       : [];
@@ -137,24 +146,30 @@ export class NfTimeline extends NfBase {
       ? episode.clips.filter((clip) => clip.kind === "audio")
       : episode.clips.filter((clip) => clip.id === "bgm-electric").slice(0, 1);
     const anchors = Object.entries(selectedCompositionClip?.anchors ?? episode.anchors);
-    const trackCount = clipFirstRows.length > 0
+    const trackCount = allCompositionRows.length > 0
+      ? allCompositionRows.length
+      : clipFirstRows.length > 0
       ? clipFirstRows.length
       : v2Rows.length > 0
       ? v2Rows.length
       : data.source === "ipc"
         ? new Set(episode.clips.map((clip) => clip.kind)).size
         : 4;
-    const clipCount = clipFirstRows.length > 0
+    const clipCount = allCompositionRows.length > 0
+      ? allCompositionRows.length
+      : clipFirstRows.length > 0
       ? clipFirstRows.reduce((sum, row) => sum + row.items.length, 0)
       : data.source === "ipc" ? episode.clips.length : 7;
-    const renderedTrackIds = clipFirstRows.length > 0
+    const renderedTrackIds = allCompositionRows.length > 0
+      ? allCompositionRows.map((row) => row.id)
+      : clipFirstRows.length > 0
       ? clipFirstRows.map((row) => row.id)
       : v2Rows.length > 0
       ? v2Rows.map((row) => row.id)
       : ["scene", "text", "subtitle", "overlay", "trans", "audio"];
     this.dataset.trackCount = String(trackCount);
     this.dataset.trackIds = renderedTrackIds.join(",");
-    this.dataset.mode = clipFirstRows.length > 0 ? "clip-first" : "flat";
+    this.dataset.mode = allCompositionRows.length > 0 ? "clip-all" : clipFirstRows.length > 0 ? "clip-first" : "flat";
     this.dataset.selectedClipId = selectedCompositionClip?.id ?? "";
     this.root.innerHTML = `
       <div class="timeline">
@@ -169,11 +184,15 @@ export class NfTimeline extends NfBase {
           ${Array.from({ length: 13 }, (_, index) => {
             const value = index * 5;
             const major = index % 2 === 1 ? "maj" : "";
-            return `<div class="tick ${major}" style="left:calc(100px + ${pct(value, duration)});"><span class="n">${value}</span></div>`;
+            return `<div class="tick ${major}" style="left:${pct(value, duration)};"><span class="n">${value}</span></div>`;
           }).join("")}
         </div>
         <div class="tl-body">
-          ${clipFirstRows.length > 0 ? clipFirstRows.map((row) => `
+          ${allCompositionRows.length > 0 ? allCompositionRows.map((row) => `
+            <nf-track kind="${row.kind}" label="${escapeAttr(row.label)}" track-id="${escapeAttr(row.id)}" data-track-id="${escapeAttr(row.id)}">
+              ${row.items.map((clip) => `<nf-clip slot="clips" id="${clip.id}" data-track-id="${escapeAttr(row.id)}" kind="${clip.kind}" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
+            </nf-track>
+          `).join("") : clipFirstRows.length > 0 ? clipFirstRows.map((row) => `
             <nf-track kind="${row.kind}" label="${escapeAttr(row.label)}" track-id="${escapeAttr(row.id)}" data-track-id="${escapeAttr(row.id)}" ${row.id === selectedId ? "selected" : ""}>
               ${row.items.map((clip) => `<nf-clip slot="clips" id="${clip.id}" data-track-id="${escapeAttr(row.id)}" kind="${clip.kind}" start="${clip.start}" end="${clip.end}" duration="${selectedCompositionClip ? selectedCompositionClip.end - selectedCompositionClip.start : duration}" label="${escapeAttr(clip.label)}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
             </nf-track>
@@ -205,7 +224,7 @@ export class NfTimeline extends NfBase {
               ${audioClips.map((clip) => `<nf-clip slot="clips" id="${clip.id}" kind="audio" start="${clip.start}" end="${clip.end}" duration="${duration}" label="${escapeAttr(data.source === "ipc" ? clip.label : "bgm · -6dB")}" ${clip.id === selectedId ? "active" : ""}></nf-clip>`).join("")}
             </nf-track>
           `}
-          <div class="playhead" style="left: calc(100px + ${pct(currentTime, duration)});"></div>
+          <div class="playhead" style="left:${pct(currentTime, duration)};"></div>
           ${anchors.map(([name, time]) => `<nf-anchor name="${name}" time="${time}" duration="${duration}"></nf-anchor>`).join("")}
         </div>
       </div>
@@ -218,14 +237,21 @@ export class NfTimeline extends NfBase {
       const pointer = event as MouseEvent;
       const target = event.currentTarget as HTMLElement;
       const rect = target.getBoundingClientRect();
-      const x = Math.max(0, pointer.clientX - rect.left - 100);
-      const width = Math.max(1, rect.width - 100);
+      const x = Math.max(0, pointer.clientX - rect.left);
+      const width = Math.max(1, rect.width);
       const time = Math.min(duration, x / width * duration);
       this.setAttribute("current-time", time.toFixed(3));
       this.emit<PlayheadMoveDetail>("playhead-move", { time });
     });
     this.root.addEventListener("clip-click", (event) => {
       const detail = (event as CustomEvent<ClipSelectDetail>).detail;
+      if (this.dataset.mode === "clip-all") {
+        this.emit<TimelineClipSelectDetail>("clip-select", {
+          track: detail.kind,
+          "clip-id": detail.id,
+        });
+        return;
+      }
       if (this.dataset.mode === "clip-first") {
         const clipId = this.dataset.selectedClipId;
         if (!clipId) return;
@@ -258,6 +284,7 @@ export class NfTimeline extends NfBase {
           });
           return;
         }
+        if (this.dataset.mode === "clip-all") return;
         const trackId = row.dataset.trackId ?? "";
         if (!trackId) return;
         this.emit<TimelineClipSelectDetail>("clip-select", {
@@ -271,6 +298,20 @@ export class NfTimeline extends NfBase {
       this.emit<AnchorHoverDetail>("anchor-hover", detail);
     });
   }
+}
+
+function compositionClipItem(clip: NonNullable<ReturnType<typeof getEpisode>["composition_clips"]>[number]): NfClip {
+  return {
+    id: clip.id,
+    label: clip.label,
+    kind: "scene",
+    track: 0,
+    start: clip.start,
+    end: clip.end,
+    effects: [],
+    position: { x: 50, y: 50 },
+    track_id: clip.id,
+  };
 }
 
 function v2TrackRows(clips: ReturnType<typeof getEpisode>["clips"]): Array<{

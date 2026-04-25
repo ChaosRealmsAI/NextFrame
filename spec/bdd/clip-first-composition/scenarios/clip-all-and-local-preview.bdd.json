@@ -1,0 +1,13 @@
+{
+  "id": "clip-all-and-local-preview",
+  "given": "A clip-first composition has multiple independent clips that can be auto-stitched into the full video.",
+  "when": "The editor opens the clip list and the user switches between 全部 and one clip.",
+  "then": "全部 previews the stitched composition, one clip previews its local timeline, and timeline rows do not show a left-side track description column.",
+  "human_actions": ["open composition", "select 全部", "select one clip", "inspect timeline rows"],
+  "ai_tools": [
+    { "tool": "open", "command": "NEXTFRAME_HOME=examples target/debug/nf open --project v2-showcase --composition showreel-clip-first --t 0" },
+    { "tool": "click", "command": "NEXTFRAME_HOME=examples target/debug/nf click --project v2-showcase --episode showreel-clip-first --selector '[data-id=\"__composition_all__\"]'" },
+    { "tool": "devtools", "command": "NEXTFRAME_HOME=examples target/debug/nf devtools --project v2-showcase --episode showreel-clip-first --query 'nf-clips' --get shadowText" },
+    { "tool": "devtools", "command": "NEXTFRAME_HOME=examples target/debug/nf devtools --project v2-showcase --episode showreel-clip-first --query 'nf-track' --get shadowText" }
+  ]
+}
