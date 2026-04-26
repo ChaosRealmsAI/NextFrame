@@ -17,6 +17,7 @@ base64 = "0.22"
 clap.workspace = true
 directories.workspace = true
 interprocess.workspace = true
+nf-agent = { path = "../nf-agent" }
 nf-project = { path = "../nf-project" }
 nf-recorder = { path = "../nf-recorder" }
 png = "0.17"

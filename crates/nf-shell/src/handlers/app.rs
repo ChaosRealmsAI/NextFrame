@@ -232,6 +232,36 @@ impl AppOpHandler {
             send_shared_error(&shared_ack, request.req_id, error);
         }
     }
+
+    pub fn devtools_eval(
+        manager: &WindowManager,
+        request: IpcRequest,
+        ack: oneshot::Sender<IpcResponse>,
+    ) {
+        let shared_ack = shared_ack(ack);
+        let req_id = request.req_id.clone();
+        let result = (|| {
+            let project = required_string(&request.params, "project")?;
+            let episode = required_string(&request.params, "episode")?;
+            let js = required_string(&request.params, "js")?;
+            let window = optional_string(&request.params, "window_id")
+                .or_else(|| optional_string(&request.params, "window"));
+            let (_, webview) = manager.webview_for_target(&project, &episode, window.as_deref())?;
+            let script = devtools_eval_script(&js);
+            let callback_ack = Arc::clone(&shared_ack);
+            webview
+                .evaluate_script_with_callback(&script, move |raw| {
+                    let response = devtools_eval_response(&req_id, &js, &raw);
+                    send_shared_response(&callback_ack, response);
+                })
+                .map_err(|err| format!("devtools eval failed: {err}"))?;
+            Ok(())
+        })();
+
+        if let Err(error) = result {
+            send_shared_error(&shared_ack, request.req_id, error);
+        }
+    }
 }
 
 fn required_string(params: &Value, key: &str) -> Result<String, String> {
@@ -299,13 +329,7 @@ fn callback_for_shared(req_id: String, shared_ack: SharedAck) -> impl Fn(String)
 }
 
 fn js_callback_response(req_id: &str, raw: &str) -> IpcResponse {
-    let parsed = serde_json::from_str::<Value>(raw).and_then(|value| {
-        if let Some(inner) = value.as_str() {
-            serde_json::from_str::<Value>(inner)
-        } else {
-            Ok(value)
-        }
-    });
+    let parsed = parse_callback_json(raw);
     match parsed {
         Ok(value) if value.get("ok").and_then(Value::as_bool) == Some(false) => IpcResponse {
             req_id: req_id.to_string(),
@@ -340,6 +364,39 @@ fn js_callback_response(req_id: &str, raw: &str) -> IpcResponse {
             )),
         },
     }
+}
+
+fn devtools_eval_response(req_id: &str, js: &str, raw: &str) -> IpcResponse {
+    match parse_callback_json(raw) {
+        Ok(value) => IpcResponse {
+            req_id: req_id.to_string(),
+            ok: true,
+            data: Some(json!({
+                "eval": truncate_chars(js, 200),
+                "value": value.get("value").cloned().unwrap_or(Value::Null),
+                "error": value.get("error").cloned().unwrap_or(Value::Null)
+            })),
+            error: None,
+        },
+        Err(err) => error_response(
+            req_id.to_string(),
+            format!("invalid devtools eval JSON: {err}; raw={raw}"),
+        ),
+    }
+}
+
+fn parse_callback_json(raw: &str) -> serde_json::Result<Value> {
+    serde_json::from_str::<Value>(raw).and_then(|value| {
+        if let Some(inner) = value.as_str() {
+            serde_json::from_str::<Value>(inner)
+        } else {
+            Ok(value)
+        }
+    })
+}
+
+fn truncate_chars(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
 }
 
 fn click_script(selector: &str) -> String {
@@ -423,6 +480,41 @@ fn devtools_script(query: &str, get: &str, action: Option<&str>, value: Option<&
     result = el[get];
   }}
   return reply({{ ok: true, selector, get, value: result }});
+}})()"#
+    )
+}
+
+fn devtools_eval_script(js: &str) -> String {
+    let js_json = json_string(js);
+    format!(
+        r#"(function() {{
+  function reply(value) {{ return JSON.stringify(value); }}
+  function serialize(value) {{
+    if (value === undefined) return null;
+    if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+    if (typeof value === "bigint") return value.toString();
+    if (typeof value === "function") return value.toString();
+    try {{
+      const encoded = JSON.stringify(value);
+      return encoded === undefined ? String(value) : JSON.parse(encoded);
+    }} catch (_err) {{
+      return String(value);
+    }}
+  }}
+  const source = {js_json};
+  try {{
+    let result;
+    try {{
+      result = (0, eval)("(" + source + "\n)");
+    }} catch (exprErr) {{
+      if (!(exprErr instanceof SyntaxError)) throw exprErr;
+      result = (0, eval)(source);
+    }}
+    return reply({{ value: serialize(result), error: null }});
+  }} catch (err) {{
+    const message = err && err.stack ? err.stack : String(err);
+    return reply({{ value: null, error: message }});
+  }}
 }})()"#
     )
 }
@@ -605,7 +697,9 @@ fn json_string(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{encode_stub_png, js_callback_response};
+    use super::{
+        devtools_eval_response, devtools_eval_script, encode_stub_png, js_callback_response,
+    };
 
     #[test]
     fn screenshot_png_has_valid_signature() {
@@ -631,5 +725,56 @@ mod tests {
             "missing · see `nf <cmd> --help` for expected format"
         );
         Ok(())
+    }
+
+    #[test]
+    fn devtools_eval_response_returns_value() -> Result<(), Box<dyn std::error::Error>> {
+        let response = devtools_eval_response("r-1", "1+1", r#""{\"value\":2,\"error\":null}""#);
+
+        assert!(response.ok);
+        let data = response
+            .data
+            .ok_or_else(|| std::io::Error::other("missing eval data"))?;
+        assert_eq!(data["eval"], "1+1");
+        assert_eq!(data["value"], 2);
+        assert!(data["error"].is_null());
+        Ok(())
+    }
+
+    #[test]
+    fn devtools_eval_response_truncates_long_source() -> Result<(), Box<dyn std::error::Error>> {
+        let js = "x".repeat(201);
+        let response =
+            devtools_eval_response("r-1", &js, r#""{\"value\":null,\"error\":\"boom\"}""#);
+
+        assert!(response.ok);
+        let data = response
+            .data
+            .ok_or_else(|| std::io::Error::other("missing eval data"))?;
+        assert_eq!(
+            data["eval"].as_str().unwrap_or_default().chars().count(),
+            200
+        );
+        assert_eq!(data["error"], "boom");
+        Ok(())
+    }
+
+    #[test]
+    fn devtools_eval_response_rejects_invalid_callback_json() {
+        let response = devtools_eval_response("r-1", "1+1", "not-json");
+
+        assert!(!response.ok);
+        assert_eq!(
+            response.error.unwrap_or_default()["error"],
+            "validation failed"
+        );
+    }
+
+    #[test]
+    fn devtools_eval_script_embeds_source_as_json_string() {
+        let script = devtools_eval_script(r#"console.log("</script>", "\n")"#);
+
+        assert!(script.contains(r#"console.log(\"</script>\", \"\\n\")"#));
+        assert!(script.contains("eval)(\"(\" + source"));
     }
 }

@@ -113,6 +113,32 @@ fn initialization_script(project: &str, episode: &str, composition: Option<&str>
   }} else {{
     document.addEventListener("DOMContentLoaded", markNativeShell, {{ once: true }});
   }}
+  if (!console.__nextframeForwarded) {{
+    ["log", "warn", "error", "info"].forEach((level) => {{
+      const original = console[level];
+      console[level] = function(...args) {{
+        try {{
+          const payload = {{
+            type: "console",
+            level,
+            args: args.map((arg) => {{
+              if (typeof arg === "string") return arg;
+              if (arg === undefined) return "undefined";
+              try {{
+                const encoded = JSON.stringify(arg);
+                return encoded === undefined ? String(arg) : encoded;
+              }} catch (_err) {{
+                return String(arg);
+              }}
+            }})
+          }};
+          window.ipc && window.ipc.postMessage(JSON.stringify(payload));
+        }} catch (_err) {{}}
+        return original.apply(console, args);
+      }};
+    }});
+    Object.defineProperty(console, "__nextframeForwarded", {{ value: true }});
+  }}
 }})();"#
     )
 }

@@ -300,17 +300,6 @@ async fn dispatch(
     proxy: &EventLoopProxy<UserEvent>,
     handler: &dyn OpHandler,
 ) -> IpcResponse {
-    if is_crud_op(&req.op) {
-        return match handler.handle(&req) {
-            Ok(Some(data)) => ok_response(&req, data),
-            Ok(None) => error_response(
-                &req,
-                &NfError::ValidationFailed(format!("unknown op: {}", req.op)),
-            ),
-            Err(err) => error_response(&req, &err),
-        };
-    }
-
     match req.op.as_str() {
         "open-window" => {
             send_event(req, proxy, |request, ack| UserEvent::OpenWindow {
@@ -361,7 +350,22 @@ async fn dispatch(
             })
             .await
         }
+        "devtools.eval" => {
+            send_event(req, proxy, |request, ack| UserEvent::DevtoolsEval {
+                request,
+                ack,
+            })
+            .await
+        }
         "quit" => send_event(req, proxy, |request, ack| UserEvent::Quit { request, ack }).await,
+        _ if is_crud_op(&req.op) => match handler.handle(&req) {
+            Ok(Some(data)) => ok_response(&req, data),
+            Ok(None) => error_response(
+                &req,
+                &NfError::ValidationFailed(format!("unknown op: {}", req.op)),
+            ),
+            Err(err) => error_response(&req, &err),
+        },
         _ => IpcResponse {
             req_id: req.req_id,
             ok: false,

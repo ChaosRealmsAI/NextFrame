@@ -1,0 +1,19 @@
+{
+  "version": "v0.22.1",
+  "type": "feature",
+  "chosen": "字幕 cue-level + 卡拉 OK 加亮 + 顶部进度条 · cue 切分必走 AI(LLM)· 不机械按句号",
+  "why": "v0.22.0 当前字幕逐字 highlight + 没进度条 + 没 chrome 边框 = PM 不及格。卡拉 OK 应该是 cue 整句一行显示 · 内部已读字加亮琥珀色 · 未读暗白。cue 边界由 AI 按 3 准则判断:语义完整 / 屏幕 ≤18 字 / 停顿 ≥250ms。",
+  "constraints": {
+    "no_vanity": "PM 5 秒看到画面 · 1) 顶 4px 紫色进度条(无字)· 2) 中央 hero 图 · 3) 底独立 cue bar · 整句一次出 · 内部 word 走过加亮 · 4) 7 张图全过 cue 切割合理(不在动词中切 · 一行 ≤18 字)",
+    "no_overreach": "本版只做 · cue 切分 + cue-bar + progress-bar 2 组件 + poster-import 串接 · 不动 nf-recorder · 不动 nf-shell preview 编辑 UI",
+    "no_rush": "cue 切分必走 LLM(不允许机械 split)· 走真 nf-agent 客户端 · 不糊 ad-hoc",
+    "must_verify": "verify · 1) nf cue 出 cues[] · 每 cue 字数 ≤ 18 · 起讫时间不重叠 · 2) cue-bar 组件 mount 后 ctx.timeMs 推进时 · 当前 word 加亮 · 3) progress-bar 顶 4px · 时间推进 width 变化 · 4) mp4 截帧 5/30/90s 各帧底部有整句 cue 字幕 · 部分加亮 · 顶有进度条"
+  },
+  "success_picture": "PM 看 mp4:顶部紫色进度条慢慢长 · 中央图片切换 · 底部一句一句中文字幕 · 字一边读一边加亮琥珀色 · 不再逐字 karaoke 散在画面里 · 干净。",
+  "cost_estimate": "6-8h · 路 A LLM cue CLI 2-3h · 路 B 2 组件 1-2h · 路 C 串接 + 验证 2-3h",
+  "risks": [
+    "LLM 切 cue 不稳 · 需要 retry + JSON schema 校验",
+    "cue 边界跟 vox word timing 对不上 · 需要找最近 word boundary",
+    "cue-bar word 加亮性能 · 60fps 渲染时不能 querySelector 每帧 · 缓存 DOM"
+  ]
+}

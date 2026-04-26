@@ -99,6 +99,9 @@ fn main() {
                 UserEvent::DevtoolsQuery { request, ack } => {
                     AppOpHandler::devtools_query(&manager, request, ack);
                 }
+                UserEvent::DevtoolsEval { request, ack } => {
+                    AppOpHandler::devtools_eval(&manager, request, ack);
+                }
                 UserEvent::IpcFromJs { window_id, body } => {
                     handle_js_ipc(&manager, handler.as_ref(), &window_id, &body);
                 }
@@ -128,6 +131,10 @@ fn handle_js_ipc(manager: &WindowManager, handler: &ComposeOpHandler, window_id:
             let next = !window.is_maximized();
             window.set_maximized(next);
         }
+        return;
+    }
+    if let Some(message) = console_message(body) {
+        write_console_message(&message);
         return;
     }
     let response = dispatch_js_ipc(handler, body);
@@ -191,6 +198,45 @@ fn normalize_js_request(mut request: IpcRequest) -> IpcRequest {
     request
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct ConsoleMessage {
+    level: String,
+    message: String,
+}
+
+fn console_message(body: &str) -> Option<ConsoleMessage> {
+    let value = serde_json::from_str::<serde_json::Value>(body).ok()?;
+    if value.get("type").and_then(serde_json::Value::as_str) != Some("console") {
+        return None;
+    }
+    let level = value
+        .get("level")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("log")
+        .to_string();
+    let message = value
+        .get("args")
+        .and_then(serde_json::Value::as_array)
+        .map(|args| {
+            args.iter()
+                .map(|arg| {
+                    arg.as_str()
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| arg.to_string())
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .unwrap_or_default();
+    Some(ConsoleMessage { level, message })
+}
+
+fn write_console_message(message: &ConsoleMessage) {
+    let mut stdout = std::io::stdout().lock();
+    let _write_result = writeln!(stdout, "NFCONSOLE [{}] {}", message.level, message.message);
+    let _flush_result = stdout.flush();
+}
+
 fn log_js_ipc_issue(window_id: &str, detail: String) {
     let mut stdout = std::io::stdout().lock();
     let event = json!({
@@ -200,4 +246,43 @@ fn log_js_ipc_issue(window_id: &str, detail: String) {
     });
     let _write_result = writeln!(stdout, "{}", event);
     let _flush_result = stdout.flush();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ConsoleMessage, console_message};
+
+    #[test]
+    fn console_message_formats_string_args() {
+        let message =
+            console_message(r#"{"type":"console","level":"log","args":["hello","from eval"]}"#);
+
+        assert_eq!(
+            message,
+            Some(ConsoleMessage {
+                level: "log".to_string(),
+                message: "hello from eval".to_string()
+            })
+        );
+    }
+
+    #[test]
+    fn console_message_ignores_regular_ipc_requests() {
+        let message = console_message(r#"{"req_id":"r-1","op":"projects-list","params":{}}"#);
+
+        assert_eq!(message, None);
+    }
+
+    #[test]
+    fn console_message_defaults_missing_args() {
+        let message = console_message(r#"{"type":"console","level":"warn"}"#);
+
+        assert_eq!(
+            message,
+            Some(ConsoleMessage {
+                level: "warn".to_string(),
+                message: String::new()
+            })
+        );
+    }
 }

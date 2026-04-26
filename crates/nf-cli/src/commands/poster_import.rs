@@ -2,14 +2,28 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use nf_project::{JsonStorage, validate_slug};
-use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::commands::{PosterImportArgs, print_json};
 use crate::errors::NfError;
 
+#[path = "poster_import_io.rs"]
+mod poster_import_io;
+#[cfg(test)]
+#[path = "poster_import_tests.rs"]
+mod poster_import_tests;
+#[path = "poster_import_types.rs"]
+mod poster_import_types;
+
+use poster_import_io::{copy_file, file_url, write_json};
+use poster_import_types::{Cue, CueWord, ImportPlan, Manifest, PosterFile, SlideImport, Timeline};
+#[cfg(test)]
+use poster_import_types::{TimelineSegment, TimelineWord};
+
 const COMPOSITION_ID: &str = "main";
 const IMAGE_COMPONENT: &str = "html.image-slide";
+const PROGRESS_COMPONENT: &str = "html.progress-bar";
+const CUE_COMPONENT: &str = "html.cue-bar";
 
 pub fn run(args: PosterImportArgs) -> Result<(), NfError> {
     let runtime_root = JsonStorage::default_root()?;
@@ -22,7 +36,13 @@ fn run_with_roots(
     runtime_root: &Path,
 ) -> Result<(), NfError> {
     validate_slug(&args.out)?;
-    let import = build_import(&args.src_dir, &args.out, examples_root, runtime_root)?;
+    let import = build_import(
+        &args.src_dir,
+        &args.out,
+        examples_root,
+        runtime_root,
+        args.gap_ms,
+    )?;
     write_project_outputs(&args.src_dir, examples_root, &args.out, &import)?;
     sync_runtime_project(examples_root, runtime_root, &args.out, &import)?;
 
@@ -31,6 +51,7 @@ fn run_with_roots(
         "slides": import.slides.len(),
         "duration_ms": import.duration_ms,
         "tracks": import.tracks,
+        "cues": import.cues,
     }))
 }
 
@@ -39,6 +60,7 @@ fn build_import(
     project_slug: &str,
     examples_root: &Path,
     runtime_root: &Path,
+    gap_ms: u64,
 ) -> Result<ImportPlan, NfError> {
     if !src_dir.is_dir() {
         return Err(validation(format!(
@@ -63,10 +85,14 @@ fn build_import(
     let project_dir = examples_root.join(project_slug);
     let image_root = project_dir.join("components").join("posters");
     let audio_root = project_dir.join("audio");
-    let runtime_image_root = runtime_root.join(project_slug).join("components").join("posters");
+    let runtime_image_root = runtime_root
+        .join(project_slug)
+        .join("components")
+        .join("posters");
     let mut slides = Vec::with_capacity(manifest.entries.len());
     let mut anchors = serde_json::Map::new();
-    let mut tracks = Vec::with_capacity(manifest.entries.len() * 3);
+    let mut tracks = Vec::with_capacity(manifest.entries.len() * 2 + 2);
+    let mut cues = Vec::new();
     let mut cumulative_ms = 0_u64;
 
     for (index, entry) in manifest.entries.iter().enumerate() {
@@ -88,8 +114,9 @@ fn build_import(
         let timeline_src = timeline_path(src_dir, &entry.file)?;
         let timeline = read_timeline(&timeline_src)?;
         let duration_ms = duration_ms(&timeline)?;
-        let words = subtitle_words(&timeline)?;
+        cues.extend(extract_cues_fallback(&timeline, cumulative_ms)?);
         let slide_anchor = format!("slide-{slide}");
+        let audio_end_anchor = format!("audio-{slide}-end");
         let end_anchor = if slide == manifest.entries.len() {
             "out".to_string()
         } else {
@@ -101,6 +128,10 @@ fn build_import(
         let audio_dst = audio_root.join(&audio_name);
 
         anchors.insert(slide_anchor.clone(), json!(format!("{cumulative_ms}ms")));
+        anchors.insert(
+            audio_end_anchor.clone(),
+            json!(format!("{}ms", cumulative_ms + duration_ms)),
+        );
         tracks.push(json!({
             "id": format!("img-{slide}"),
             "kind": "component",
@@ -112,23 +143,9 @@ fn build_import(
         tracks.push(json!({
             "id": format!("audio-{slide}"),
             "kind": "audio",
-            "time": { "start": format!("slide-{slide}"), "end": if slide == manifest.entries.len() { "out".to_string() } else { format!("slide-{}", slide + 1) } },
+            "time": { "start": format!("slide-{slide}"), "end": audio_end_anchor },
             "src": format!("audio/{audio_name}"),
             "volume": 1
-        }));
-        tracks.push(json!({
-            "id": format!("sub-{slide}"),
-            "kind": "subtitle",
-            "z": 80,
-            "time": { "start": format!("slide-{slide}"), "end": if slide == manifest.entries.len() { "out".to_string() } else { format!("slide-{}", slide + 1) } },
-            "style": {
-                "active_color": "#ffca66",
-                "color": "#fff",
-                "size_px": 42,
-                "position": "bottom",
-                "padding": 68
-            },
-            "params": { "words": words }
         }));
 
         slides.push(SlideImport {
@@ -138,19 +155,85 @@ fn build_import(
             audio_dst,
         });
         cumulative_ms += duration_ms;
+        if slide < manifest.entries.len() {
+            cumulative_ms += gap_ms;
+        }
     }
 
     anchors.insert("out".to_string(), json!(format!("{cumulative_ms}ms")));
+    let cue_count = cues.len();
+    tracks.push(json!({
+        "id": "progress-bar",
+        "kind": "component",
+        "component": PROGRESS_COMPONENT,
+        "z": 90,
+        "time": { "start": "slide-1", "end": "out" },
+        "params": {}
+    }));
+    tracks.push(json!({
+        "id": "cue-bar",
+        "kind": "component",
+        "component": CUE_COMPONENT,
+        "z": 85,
+        "time": { "start": "slide-1", "end": "out" },
+        "params": { "cues": cues }
+    }));
+    // v3 clip-first: wrap all tracks into a single clip · move per-track {time, params, src}
+    // into each track's items[0]. nf-shell preview now requires composition.clips[] (post v0.21
+    // codex merge); v2 flat composition.tracks[] silently falls back to the idle hero.
+    let v3_tracks: Vec<Value> = tracks
+        .into_iter()
+        .map(|track| {
+            let mut t = track.as_object().cloned().unwrap_or_default();
+            let id = t.remove("id").unwrap_or_else(|| json!(""));
+            let kind = t.remove("kind").unwrap_or_else(|| json!("component"));
+            let z = t.remove("z").unwrap_or_else(|| json!(0));
+            let time = t.remove("time").unwrap_or_else(|| json!({}));
+            let params = t.remove("params").unwrap_or_else(|| json!({}));
+            let src = t.remove("src");
+            let component = t.remove("component");
+            let volume = t.remove("volume");
+            let style = t.remove("style").unwrap_or_else(|| json!({}));
+
+            let mut item = serde_json::Map::new();
+            item.insert("id".into(), id.clone());
+            item.insert("time".into(), time);
+            // For audio tracks v3 clip-first compile reads item.src (top-level), not item.params.src.
+            if let Some(s) = src {
+                item.insert("src".into(), s);
+            }
+            if let Some(v) = volume {
+                item.insert("volume".into(), v);
+            }
+            item.insert("params".into(), params);
+
+            let mut out = serde_json::Map::new();
+            out.insert("id".into(), id);
+            out.insert("kind".into(), kind);
+            out.insert("z".into(), z);
+            if let Some(c) = component {
+                out.insert("component".into(), c);
+            }
+            out.insert("style".into(), style);
+            out.insert("items".into(), json!([Value::Object(item)]));
+            Value::Object(out)
+        })
+        .collect();
+
     let composition = json!({
-        "schema": "nextframe.composition.v2",
+        "schema": "nextframe.composition.v3",
         "id": COMPOSITION_ID,
         "name": project_slug.replace('-', " "),
-        "duration": format!("{cumulative_ms}ms"),
         "viewport": { "w": 1920, "h": 1080, "ratio": "16:9" },
         "theme": "default",
         "export": { "resolution": "1080p" },
-        "anchors": Value::Object(anchors),
-        "tracks": tracks
+        "clips": [{
+            "id": "main",
+            "name": project_slug.replace('-', " "),
+            "duration": format!("{cumulative_ms}ms"),
+            "anchors": Value::Object(anchors),
+            "tracks": v3_tracks
+        }]
     });
 
     Ok(ImportPlan {
@@ -158,7 +241,8 @@ fn build_import(
         composition,
         slides,
         duration_ms: cumulative_ms,
-        tracks: manifest.entries.len() * 3,
+        tracks: manifest.entries.len() * 2 + 2,
+        cues: cue_count,
     })
 }
 
@@ -174,15 +258,7 @@ fn write_project_outputs(
     fs::create_dir_all(project_dir.join("compositions"))?;
     ensure_project_file(&project_dir, project_slug)?;
 
-    let component_path = project_dir
-        .join("components")
-        .join(format!("{IMAGE_COMPONENT}.js"));
-    if !component_path.is_file() {
-        return Err(validation(format!(
-            "component source not found: {}",
-            component_path.display()
-        )));
-    }
+    ensure_components_exist(&project_dir)?;
 
     for slide in &import.slides {
         copy_file(&slide.poster_src, &slide.poster_dst)?;
@@ -213,14 +289,7 @@ fn sync_runtime_project(
     fs::create_dir_all(runtime_project.join("compositions"))?;
 
     write_runtime_project_file(&runtime_project, &example_project, project_slug)?;
-    copy_file(
-        &example_project
-            .join("components")
-            .join(format!("{IMAGE_COMPONENT}.js")),
-        &runtime_project
-            .join("components")
-            .join(format!("{IMAGE_COMPONENT}.js")),
-    )?;
+    copy_components(&example_project, &runtime_project)?;
     for slide in &import.slides {
         let poster_name = slide
             .poster_dst
@@ -288,6 +357,39 @@ fn write_runtime_project_file(
             "modified": "2026-04-26T00:00:00Z"
         }),
     )
+}
+
+fn required_components() -> [&'static str; 3] {
+    [IMAGE_COMPONENT, PROGRESS_COMPONENT, CUE_COMPONENT]
+}
+
+fn ensure_components_exist(project_dir: &Path) -> Result<(), NfError> {
+    for component in required_components() {
+        let component_path = project_dir
+            .join("components")
+            .join(format!("{component}.js"));
+        if !component_path.is_file() {
+            return Err(validation(format!(
+                "component source not found: {}",
+                component_path.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn copy_components(example_project: &Path, runtime_project: &Path) -> Result<(), NfError> {
+    for component in required_components() {
+        copy_file(
+            &example_project
+                .join("components")
+                .join(format!("{component}.js")),
+            &runtime_project
+                .join("components")
+                .join(format!("{component}.js")),
+        )?;
+    }
+    Ok(())
 }
 
 fn read_manifest(path: &Path) -> Result<Manifest, NfError> {
@@ -369,306 +471,51 @@ fn duration_ms(timeline: &Timeline) -> Result<u64, NfError> {
     Ok(duration)
 }
 
-fn subtitle_words(timeline: &Timeline) -> Result<Vec<Value>, NfError> {
-    let mut words = Vec::new();
+fn extract_cues_fallback(timeline: &Timeline, cumulative_ms: u64) -> Result<Vec<Cue>, NfError> {
+    // TODO when nf-cue CLI lands · swap fallback for: spawn nf cue --timeline=... and parse stdout cues[]
+    let mut cues = Vec::with_capacity(timeline.segments.len());
     for segment in &timeline.segments {
+        let text = segment.text.trim();
+        if text.is_empty() {
+            return Err(validation("timeline segment text must not be empty"));
+        }
+        if segment.end_ms <= segment.start_ms {
+            return Err(validation(format!(
+                "timeline segment '{}' end_ms must be greater than start_ms",
+                text
+            )));
+        }
+        let mut words = Vec::with_capacity(segment.words.len());
         for word in &segment.words {
-            if word.word.trim().is_empty() {
+            let word_text = word.word.trim();
+            if word_text.is_empty() {
                 return Err(validation("timeline word must not be empty"));
             }
             if word.end_ms <= word.start_ms {
                 return Err(validation(format!(
                     "timeline word '{}' end_ms must be greater than start_ms",
-                    word.word
+                    word_text
                 )));
             }
-            words.push(json!({
-                "text": word.word,
-                "start_ms": word.start_ms,
-                "end_ms": word.end_ms
-            }));
+            words.push(CueWord {
+                text: word_text.to_string(),
+                start_ms: cumulative_ms + word.start_ms,
+                end_ms: cumulative_ms + word.end_ms,
+            });
         }
+        cues.push(Cue {
+            text: text.to_string(),
+            start_ms: cumulative_ms + segment.start_ms,
+            end_ms: cumulative_ms + segment.end_ms,
+            words,
+        });
     }
-    if words.is_empty() {
-        return Err(validation("timeline must contain at least one word"));
+    if cues.is_empty() {
+        return Err(validation("timeline must contain at least one segment"));
     }
-    Ok(words)
-}
-
-fn write_json(path: &Path, value: &Value) -> Result<(), NfError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(path, serde_json::to_string_pretty(value)?)
-        .map_err(|err| NfError::StorageFailed(format!("write failed: {}: {err}", path.display())))
-}
-
-fn copy_file(from: &Path, to: &Path) -> Result<(), NfError> {
-    if let Some(parent) = to.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::copy(from, to).map(|_| ()).map_err(|err| {
-        NfError::StorageFailed(format!(
-            "copy failed: {} -> {}: {err}",
-            from.display(),
-            to.display()
-        ))
-    })
-}
-
-fn file_url(path: &Path) -> Result<String, NfError> {
-    let path = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        std::env::current_dir()
-            .map_err(|err| NfError::StorageFailed(format!("current directory failed: {err}")))?
-            .join(path)
-    };
-    let mut encoded = String::new();
-    for byte in path.to_string_lossy().as_bytes() {
-        match *byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
-                encoded.push(char::from(*byte))
-            }
-            other => encoded.push_str(&format!("%{other:02X}")),
-        }
-    }
-    Ok(format!("file://{encoded}"))
+    Ok(cues)
 }
 
 fn validation(detail: impl Into<String>) -> NfError {
     NfError::ValidationFailed(detail.into())
-}
-
-#[derive(Debug)]
-struct ImportPlan {
-    composition_path: PathBuf,
-    composition: Value,
-    slides: Vec<SlideImport>,
-    duration_ms: u64,
-    tracks: usize,
-}
-
-#[derive(Debug)]
-struct SlideImport {
-    poster_src: PathBuf,
-    poster_dst: PathBuf,
-    audio_src: PathBuf,
-    audio_dst: PathBuf,
-}
-
-#[derive(Debug)]
-struct PosterFile {
-    number: usize,
-    path: PathBuf,
-}
-
-#[derive(Debug, Deserialize)]
-struct Manifest {
-    entries: Vec<ManifestEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ManifestEntry {
-    id: usize,
-    file: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Timeline {
-    segments: Vec<TimelineSegment>,
-}
-
-#[derive(Debug, Deserialize)]
-struct TimelineSegment {
-    end_ms: u64,
-    #[serde(default)]
-    words: Vec<TimelineWord>,
-}
-
-#[derive(Debug, Deserialize)]
-struct TimelineWord {
-    word: String,
-    start_ms: u64,
-    end_ms: u64,
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(clippy::expect_used)]
-    #![allow(clippy::unwrap_used)]
-
-    use super::*;
-
-    #[test]
-    fn builds_composition_and_copies_standardized_assets() {
-        let tmp = temp_dir("ok");
-        let src = tmp.join("src");
-        let examples = tmp.join("examples");
-        let runtime = tmp.join("runtime");
-        sample_project(&examples, "demo-video");
-        sample_import_source(&src, 2);
-
-        run_with_roots(
-            PosterImportArgs {
-                src_dir: src,
-                out: "demo-video".to_string(),
-            },
-            &examples,
-            &runtime,
-        )
-        .unwrap();
-
-        let composition_path = examples
-            .join("demo-video")
-            .join("compositions")
-            .join("main.json");
-        let composition: Value =
-            serde_json::from_str(&fs::read_to_string(composition_path).unwrap()).unwrap();
-        assert_eq!(composition["duration"], "3000ms");
-        assert_eq!(composition["anchors"]["slide-2"], "1000ms");
-        assert_eq!(composition["tracks"].as_array().unwrap().len(), 6);
-        assert_eq!(
-            composition["tracks"][2]["params"]["words"][0],
-            json!({"text":"hello","start_ms":0,"end_ms":400})
-        );
-        assert!(
-            examples
-                .join("demo-video/components/posters/slide-02.png")
-                .is_file()
-        );
-        assert!(runtime.join("demo-video/audio/slide-01.mp3").is_file());
-
-        let _ = fs::remove_dir_all(tmp);
-    }
-
-    #[test]
-    fn duration_uses_max_segment_end_ms() {
-        let timeline = Timeline {
-            segments: vec![
-                TimelineSegment {
-                    end_ms: 500,
-                    words: vec![word("a", 0, 100)],
-                },
-                TimelineSegment {
-                    end_ms: 1250,
-                    words: vec![word("b", 100, 200)],
-                },
-            ],
-        };
-
-        assert_eq!(duration_ms(&timeline).unwrap(), 1250);
-    }
-
-    #[test]
-    fn poster_files_sort_by_numeric_prefix() {
-        let tmp = temp_dir("posters");
-        let dir = tmp.join("posters");
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("10-ten.png"), b"png").unwrap();
-        fs::write(dir.join("2-two.png"), b"png").unwrap();
-        fs::write(dir.join("1-one.png"), b"png").unwrap();
-
-        let posters = poster_files(&dir).unwrap();
-        let numbers: Vec<_> = posters.iter().map(|item| item.number).collect();
-        assert_eq!(numbers, vec![1, 2, 10]);
-
-        let _ = fs::remove_dir_all(tmp);
-    }
-
-    #[test]
-    fn rejects_timeline_word_without_text_field() {
-        let tmp = temp_dir("bad-word");
-        fs::create_dir_all(&tmp).unwrap();
-        let path = tmp.join("timeline.json");
-        fs::write(
-            &path,
-            r#"{"segments":[{"end_ms":100,"words":[{"text":"oops","start_ms":0,"end_ms":100}]}]}"#,
-        )
-        .unwrap();
-
-        assert!(read_timeline(&path).is_err());
-
-        let _ = fs::remove_dir_all(tmp);
-    }
-
-    fn sample_project(root: &Path, slug: &str) {
-        let project = root.join(slug);
-        fs::create_dir_all(project.join("components")).unwrap();
-        fs::write(
-            project.join("project.json"),
-            json!({
-                "slug": slug,
-                "name": "Demo Video",
-                "created": "2026-04-26T00:00:00Z",
-                "modified": "2026-04-26T00:00:00Z"
-            })
-            .to_string(),
-        )
-        .unwrap();
-        fs::write(
-            project
-                .join("components")
-                .join(format!("{IMAGE_COMPONENT}.js")),
-            "export function mount() {}\nexport function update() {}\n",
-        )
-        .unwrap();
-    }
-
-    fn sample_import_source(root: &Path, count: usize) {
-        fs::create_dir_all(root.join("audio")).unwrap();
-        fs::create_dir_all(root.join("posters")).unwrap();
-        let mut entries = Vec::new();
-        for slide in 1..=count {
-            fs::write(
-                root.join("posters").join(format!("{slide}-demo.png")),
-                b"png",
-            )
-            .unwrap();
-            fs::write(
-                root.join("audio").join(format!("slide-{slide:02}.mp3")),
-                b"mp3",
-            )
-            .unwrap();
-            fs::write(
-                root.join("audio")
-                    .join(format!("slide-{slide:02}.timeline.json")),
-                json!({
-                    "segments": [{
-                        "text": "hello",
-                        "start_ms": 0,
-                        "end_ms": slide as u64 * 1000,
-                        "words": [{"word":"hello","start_ms":0,"end_ms":400}]
-                    }]
-                })
-                .to_string(),
-            )
-            .unwrap();
-            entries.push(json!({
-                "id": slide,
-                "text": "hello",
-                "file": format!("audio/slide-{slide:02}.mp3")
-            }));
-        }
-        fs::write(
-            root.join("audio").join("manifest.json"),
-            json!({ "entries": entries }).to_string(),
-        )
-        .unwrap();
-    }
-
-    fn word(text: &str, start_ms: u64, end_ms: u64) -> TimelineWord {
-        TimelineWord {
-            word: text.to_string(),
-            start_ms,
-            end_ms,
-        }
-    }
-
-    fn temp_dir(label: &str) -> PathBuf {
-        let path =
-            std::env::temp_dir().join(format!("nf-poster-import-{label}-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&path);
-        path
-    }
 }
