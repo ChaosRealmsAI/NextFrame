@@ -246,6 +246,7 @@ export class NfTimeline extends NfBase {
   private bind(duration: number): void {
     const ruler = this.root.querySelector<HTMLElement>(".tl-ruler");
     if (ruler) {
+      ruler.style.cursor = "ew-resize";
       let dragging = false;
       const seekFromX = (clientX: number) => {
         const rect = ruler.getBoundingClientRect();
@@ -255,24 +256,24 @@ export class NfTimeline extends NfBase {
         this.setAttribute("current-time", time.toFixed(3));
         this.emit<PlayheadMoveDetail>("playhead-move", { time });
       };
-      ruler.addEventListener("pointerdown", (event) => {
-        dragging = true;
-        try { ruler.setPointerCapture((event as PointerEvent).pointerId); } catch (_e) {}
-        seekFromX((event as PointerEvent).clientX);
-        event.preventDefault();
-      });
-      ruler.addEventListener("pointermove", (event) => {
+      const onMove = (event: MouseEvent) => {
         if (!dragging) return;
-        seekFromX((event as PointerEvent).clientX);
-      });
-      const stop = (event: Event) => {
+        seekFromX(event.clientX);
+      };
+      const onUp = () => {
         if (!dragging) return;
         dragging = false;
-        try { ruler.releasePointerCapture((event as PointerEvent).pointerId); } catch (_e) {}
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
       };
-      ruler.addEventListener("pointerup", stop);
-      ruler.addEventListener("pointercancel", stop);
-      ruler.addEventListener("pointerleave", (event) => { if (dragging) stop(event); });
+      ruler.addEventListener("mousedown", (event) => {
+        dragging = true;
+        seekFromX((event as MouseEvent).clientX);
+        // listen on document so the drag survives leaving the ruler element
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+        event.preventDefault();
+      });
     }
     this.root.addEventListener("clip-click", (event) => {
       const detail = (event as CustomEvent<ClipSelectDetail>).detail;
