@@ -77,6 +77,24 @@
       "resolves": [
         "ASK-0013"
       ]
+    },
+    {
+      "name": "nf-devtools-eval",
+      "usage": "nf devtools --project=<slug> --episode=<slug> --eval=<js> [--window=<id>] · 在目标桌面 webview 同步执行 JS，输出 {eval,value,error}",
+      "tags": [],
+      "registered_at": "2026-04-26T12:48:01.962641+00:00",
+      "resolves": [
+        "ASK-0014"
+      ]
+    },
+    {
+      "name": "nf-shell-console-forward",
+      "usage": "nf-shell stdout emits NFCONSOLE [level] <message> for webview console.log/warn/error/info · 示例: target/debug/nf-shell 2>&1 | grep NFCONSOLE",
+      "tags": [],
+      "registered_at": "2026-04-26T12:48:01.962641+00:00",
+      "resolves": [
+        "ASK-0014"
+      ]
     }
   ]
 }

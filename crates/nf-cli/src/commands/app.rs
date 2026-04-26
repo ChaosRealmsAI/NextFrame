@@ -105,6 +105,23 @@ pub fn state(args: StateArgs) -> Result<(), NfError> {
 }
 
 pub fn devtools(args: DevtoolsArgs) -> Result<(), NfError> {
+    if let Some(js) = args.eval {
+        return send_ipc(
+            "devtools.eval",
+            json!({
+                "project": args.project,
+                "episode": args.episode,
+                "js": js,
+                "window_id": args.window
+            }),
+        );
+    }
+
+    let Some(query) = args.query else {
+        return Err(NfError::ValidationFailed(
+            "missing --query or --eval for devtools".to_string(),
+        ));
+    };
     let action = args
         .action
         .or_else(|| args.fill.as_ref().map(|_| "fill".to_string()));
@@ -114,7 +131,7 @@ pub fn devtools(args: DevtoolsArgs) -> Result<(), NfError> {
         json!({
             "project": args.project,
             "episode": args.episode,
-            "query": args.query,
+            "query": query,
             "get": args.get,
             "action": action,
             "value": value,

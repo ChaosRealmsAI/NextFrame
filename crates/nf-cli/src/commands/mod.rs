@@ -371,20 +371,24 @@ COMMON ERRORS:
     State(StateArgs),
     #[command(
         about = "Inspect or modify DOM state for debugging",
-        long_about = r#"Query DOM, shadow roots, attributes, computed styles, or bounding boxes in a NextFrame window.
+        long_about = r#"Query DOM, shadow roots, attributes, computed styles, bounding boxes, or run JavaScript in a NextFrame window.
 
 USAGE:
     nf devtools --project=<slug> --episode=<slug> --query=<sel> [--get=<prop>] [--action=<action>] [--value=<value>] [--window=<id>]
+    nf devtools --project=<slug> --episode=<slug> --eval=<js> [--window=<id>]
 
 EXAMPLES:
     nf devtools --project=next-frame --episode=ep-01 --query='nf-topbar' --get=shadowRoot
     nf devtools --project=next-frame --episode=ep-01 --query='nf-timeline::shadow .playhead' --get=bounding-rect
+    nf devtools --project=next-frame --episode=ep-01 --eval='document.body.children.length'
 
 EXPECTED JSON:
     {"query":"nf-topbar","get":"shadowRoot","value":"<div>...</div>"}
+    {"eval":"document.body.children.length","value":4,"error":null}
 
 COMMON ERRORS:
     - selector not found -> exit 3 · hint: broaden the selector, then narrow through ::shadow
+    - missing target -> exit 2 · hint: pass either --query=<sel> or --eval=<js>
     - unsupported get/action -> exit 2 · hint: use outerHTML, shadowRoot, attributes, computed-style, bounding-rect, or custom-elements"#
     )]
     Devtools(DevtoolsArgs),
@@ -962,7 +966,7 @@ pub struct DevtoolsArgs {
         value_name = "CSS",
         help = "CSS selector; supports ::shadow across web component shadow roots"
     )]
-    pub query: String,
+    pub query: Option<String>,
     #[arg(
         long,
         default_value = "outerHTML",
@@ -978,6 +982,12 @@ pub struct DevtoolsArgs {
     pub action: Option<String>,
     #[arg(long, value_name = "VALUE", help = "Value used with --action")]
     pub value: Option<String>,
+    #[arg(
+        long,
+        value_name = "JS",
+        help = "JavaScript to evaluate in the target webview"
+    )]
+    pub eval: Option<String>,
     #[arg(
         long,
         value_name = "VALUE",

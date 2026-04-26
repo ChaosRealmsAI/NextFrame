@@ -5,12 +5,19 @@ NextFrame is an AI-native video editor/runtime: structured JSON compositions ren
 ## Run
 
 ```bash
+# First-time setup · build the frontend bundle (gitignored · webview loads it at runtime)
+cd frontend/nf-components && npm install && npm run build && cd -
+
 cargo build -p nf-shell -p nf-cli
 target/debug/nf-shell
 target/debug/nf open --project v2-showcase --composition showreel-clip-first
 ```
 
 Example projects live under `examples/`; runtime projects are copied to `~/.nextframe/`.
+
+**Black preview gotcha** · if the desktop window shows the idle "NextFrame · AI-FIRST CLI-DRIVEN" hero
+instead of your composition, `frontend/nf-components/dist/index.js` is missing — re-run the npm build above.
+The webview silently falls back to idle when the bundle isn't loaded; `nf devtools --eval='document.querySelectorAll("[data-nf-component]").length'` returning 0 confirms it.
 
 ## AI 验证接口
 
@@ -20,6 +27,8 @@ Example projects live under `examples/`; runtime projects are copied to `~/.next
 `target/debug/nf click --project=<slug> --episode=<slug> --selector=<css>` — simulate a real desktop click, including shadow DOM selectors.
 `target/debug/nf devtools --project=<slug> --episode=<slug> --query=<css> --get=<prop>` — inspect live DOM, including shadow DOM selectors.
 `target/debug/nf devtools --project=<slug> --episode=<slug> --query=<css> --fill=<value> [--get=<prop>]` — fill a live input through the same input/change path as human editing.
+`target/debug/nf devtools --project=<slug> --episode=<slug> --eval=<js>` — evaluate JavaScript in the live desktop webview and return `{eval,value,error}` JSON.
+`target/debug/nf-shell 2>&1 | grep NFCONSOLE` — watch forwarded webview `console.log/warn/error/info` lines from the shell process.
 `target/debug/nf cue --timeline=<vox.json> [--max-chars=18] [--min-pause-ms=250] [--out=<json>]` — use an LLM to cut a vox word-level timeline into validated cue list JSON.
 `target/debug/nf composition show --project=<slug> --composition=<slug> [--clip=<id>] [--track=<id>] [--item=<id>] [--field=<path>]` — read raw composition JSON or one clip/track/item field.
 `target/debug/nf composition patch --project=<slug> --composition=<slug> [--clip=<id>] --track=<id> [--item=<id>] --field=<path> --value=<json-or-string>` — patch one track or clip item field such as `params.title`, `style.x`, or `time.start`.

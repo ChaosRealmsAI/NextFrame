@@ -32,6 +32,10 @@ pub enum UserEvent {
         request: IpcRequest,
         ack: oneshot::Sender<IpcResponse>,
     },
+    DevtoolsEval {
+        request: IpcRequest,
+        ack: oneshot::Sender<IpcResponse>,
+    },
     IpcFromJs {
         window_id: String,
         body: String,

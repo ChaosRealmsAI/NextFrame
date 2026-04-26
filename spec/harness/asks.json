@@ -103,6 +103,14 @@
       "status": "resolved",
       "created_at": "2026-04-26T12:06:28.739941+00:00",
       "resolved_by": "nf-cue"
+    },
+    {
+      "id": "ASK-0014",
+      "feature": null,
+      "text": "Register nf devtools eval and nf-shell console forwarding tools for AI webview debugging",
+      "status": "resolved",
+      "created_at": "2026-04-26T12:47:55.574066+00:00",
+      "resolved_by": "nf-devtools-eval"
     }
   ]
 }
