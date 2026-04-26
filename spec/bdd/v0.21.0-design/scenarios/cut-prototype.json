@@ -1,0 +1,29 @@
+{
+  "id": "cut-prototype",
+  "feature": "v0.21.0-design",
+  "given": "PM 看到 composition · 想看 AI 怎么剪 / 调时长",
+  "when": "AI 出 cut 编辑 prototype HTML",
+  "then": "PM 5 秒看懂 · 时间轴 / 剪掉某段 / 拼接 / 时长调整",
+  "human_actions": [
+    "PM 双击打开 spec/versions/v0.21.0/prototypes/cut.html",
+    "看时间轴 · 看剪辑动作 · 看 AI 注释"
+  ],
+  "ai_tools": [
+    {
+      "tool": "prototype-render-check",
+      "command": "test -f spec/versions/v0.21.0/prototypes/cut.html && cat spec/versions/v0.21.0/prototypes/cut.html | wc -l",
+      "expect_exit": 0,
+      "expect_stdout_contains": ""
+    }
+  ],
+  "demo": "demos/cut-prototype.html",
+  "status": "wip",
+  "claimed_by": "v0.21.0",
+  "verified_at": "2026-04-26T07:11:55.350695+00:00",
+  "evidence": [
+    "/Users/Zhuanz/workspace/NextFrame/spec/bdd/v0.21.0-design/evidence/cut-prototype/00-prototype_render_check.stdout.txt"
+  ],
+  "bugs": [],
+  "blocked_by": [],
+  "metadata": null
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "project": "nextframe",
+  "project_type": "auto",
+  "created_at": "2026-04-26T06:29:30.598846+00:00",
+  "gates": {
+    "charter": "error",
+    "architecture": "error",
+    "design": "warn",
+    "milestones": "off",
+    "root_assets": "error",
+    "poc": "error",
+    "harness": "error"
+  },
+  "detected": {
+    "cargo_workspace": true,
+    "node_workspace": false
+  },
+  "agent_entry": "AGENTS.md"
+}

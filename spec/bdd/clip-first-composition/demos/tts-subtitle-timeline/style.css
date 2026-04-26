@@ -1,0 +1,13 @@
+@import "../../../design/tokens.css";
+body { margin: 0; background: #090a0f; color: #f8fafc; font: 16px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; }
+main { height: 100vh; display: grid; place-content: center; gap: 48px; }
+.flow { display: flex; gap: 14px; align-items: center; }
+.flow > * { border: 1px solid rgba(255,255,255,.16); padding: 14px 18px; min-width: 92px; text-align: center; }
+.flow i { color: #7dd3fc; font-style: normal; background: rgba(125,211,252,.1); }
+.caption { text-align: center; font-size: 42px; }
+.caption span { margin: 0 8px; opacity: .3; animation: word 10s infinite; animation-delay: calc(var(--i) * 1.2s); }
+.progress { position: fixed; left: 0; bottom: 0; height: 4px; background: #fbbf24; animation: bar 10s linear infinite; }
+.toast { position: fixed; right: 22px; bottom: 18px; opacity: 0; animation: toast 10s infinite; }
+@keyframes word { 10%,22% { opacity: 1; color: #ffca66; } }
+@keyframes bar { from { width: 0; } to { width: 100%; } }
+@keyframes toast { 86%,100% { opacity: 1; } }

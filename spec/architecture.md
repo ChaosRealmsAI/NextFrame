@@ -1,5 +1,45 @@
 # NextFrame Architecture
 
+## Architecture Principles · 架构原则
+
+- **JSON 是 source of truth** · preview / 导出 / 验证都从同一份 compiled source 出 · 不让任何一路读自己的复制。
+- **零框架 · 用库** · Rust 直调 platform API · 前端直调 Web Components · 禁 Electron / React / Vue / Tauri v1。
+- **AI 自验先于人审** · `nf verify` / `nf capture` 是产品内建命令 · 走真实代码路径 · 不调外部 GUI 自动化。
+- **模块单职责** · `nf-cli` 是 AI 接口 · `nf-shell` 是窗口 · `nf-recorder` 是导出 · 不互相伸手。
+- **导出与预览同源** · 任何"先 MVP 用别的渲染"= 违 · 必须 day1 同源。
+- **examples 是真示范** · 不是 fixture · 项目改 schema 必同步更 examples。
+
+## Core Object Model · 核心对象模型
+
+- **Project**(项目): 一个目录(`examples/<slug>/` 或 `~/.nextframe/<slug>/`)· 含多个 compositions 和 components。
+- **Composition**(组合): 一个 v2 JSON 文档 · 含 `tracks[]` / `source` / `metadata`。
+- **Track**(轨): composition 顶层一行 · 有 `time` / `z` / `component` / `params` / `style`。
+- **Component**(组件): JS 模块 · 在 `examples/<slug>/components/<id>.js` · export `mount` / `update` · single-file · import-free。
+- **Source**(编译源): `nf-project` 把 components 内联进 composition.source · preview / recorder 都读这一份。
+- **VerifyReport**(自验报告): `nf verify` 输出 · 含 `checks[]` / `timeline.ascii` / `anchor_guide` / `screenshot_plan[]`。
+- **ExportJob**(导出任务): `nf-shell` 主导 · 派 `nf-recorder` 子进程 · 含 `id` / `status` / `progress` / `diagnostics`。
+
+## State Machine · 状态机
+
+**Composition lifecycle**:
+```
+authored (raw JSON)
+  → validated (nf composition validate · component registry / file existence / mount/update exports OK)
+  → compiled (nf-project 内联 source · 进 composition.source)
+  → previewed (nf-shell webview 渲染同一 source)
+  → exported (nf-recorder 跑同一 source · 出 MP4)
+```
+任一步失败 → fail · 报 `next step ·` 行 · 不允许跳过下游。
+
+**ExportJob lifecycle**:
+```
+pending → running → done | failed | cancelled
+```
+- `running` · `nf-recorder` 子进程跑 · `nf-shell` 监听 stdin/stdout JSONL events
+- `done` · MP4 + sibling diagnostics.json 落盘
+- `failed` · stderr 含 `next step ·` · diagnostics 含错点
+- `cancelled` · `nf export-cancel --job-id` 触发 · SIGTERM 进程组
+
 ## Product Flow
 
 ```text

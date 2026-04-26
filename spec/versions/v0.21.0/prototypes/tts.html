@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NextFrame · v0.21.0 · TTS</title>
+<link rel="stylesheet" href="../../../design/tokens.css">
+<style>
+  html,
+  body {
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  body {
+    color: var(--fg);
+    font-family: var(--font);
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 32px;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .app {
+    width: min(1540px, calc(100vw - 64px));
+    height: min(900px, calc(100vh - 64px));
+    margin: 0 auto;
+    display: grid;
+    grid-template-rows: 46px 1fr;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .app::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 180px;
+    background: radial-gradient(ellipse 62% 100% at 50% 0%, rgba(255, 255, 255, 0.055), transparent 70%);
+    pointer-events: none;
+  }
+
+  .topbar {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 18px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--bd);
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .mark {
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--accent-b);
+    display: grid;
+    place-items: center;
+    color: var(--accent-l);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 800;
+    background: var(--accent-t);
+  }
+
+  .project {
+    color: var(--fg);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .route {
+    color: var(--accent-l);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .summary {
+    color: var(--fg-2);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .tb-dots {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+  }
+
+  .tb-dots span {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+
+  .dot-r { background: var(--amber); }
+  .dot-y { background: var(--gray-l); }
+  .dot-g { background: var(--teal); }
+
+  .workspace {
+    position: relative;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pane {
+    min-width: 0;
+    min-height: 0;
+    padding: 18px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 14px;
+    border-right: 1px solid var(--bd-2);
+  }
+
+  .pane:last-child {
+    border-right: 0;
+  }
+
+  .pane-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: end;
+  }
+
+  h1,
+  h2,
+  p {
+    margin: 0;
+  }
+
+  h1 {
+    color: var(--fg);
+    font-size: 24px;
+    line-height: 1.08;
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  h2 {
+    color: var(--accent-l);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .subline {
+    margin-top: 6px;
+    color: var(--fg-2);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .stat {
+    min-width: 148px;
+    padding: 10px 12px;
+    border: 1px solid var(--accent-b);
+    background: rgba(167, 139, 250, 0.08);
+    text-align: right;
+  }
+
+  .stat .k {
+    display: block;
+    color: var(--accent-l);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+  }
+
+  .stat .v {
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .left-body {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    gap: 14px;
+  }
+
+  .segments {
+    min-height: 0;
+    display: grid;
+    gap: 8px;
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  .segment {
+    display: grid;
+    grid-template-columns: 54px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid var(--bd);
+    background: rgba(255, 255, 255, 0.026);
+  }
+
+  .segment.active {
+    border-color: var(--teal);
+    background: rgba(123, 201, 181, 0.075);
+    box-shadow: inset 2px 0 0 var(--teal);
+  }
+
+  .seg-no {
+    color: var(--accent-l);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .seg-text {
+    color: var(--fg);
+    font-size: 14px;
+    font-weight: 650;
+  }
+
+  .seg-source {
+    margin-top: 4px;
+    color: var(--fg-2);
+    font-size: 11px;
+  }
+
+  .play-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--amber-l);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 800;
+    padding: 7px 9px;
+    border: 1px solid var(--amber-b);
+    background: rgba(224, 183, 108, 0.1);
+    white-space: nowrap;
+  }
+
+  .vox-card {
+    padding: 15px;
+    border: 1px solid var(--bd);
+    background: rgba(8, 8, 12, 0.38);
+    backdrop-filter: blur(40px) saturate(1.35);
+    -webkit-backdrop-filter: blur(40px) saturate(1.35);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  }
+
+  .vox-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .vox-title strong {
+    color: var(--fg);
+    font-size: 13px;
+  }
+
+  .vox-title span {
+    color: var(--teal-l);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .param-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .param {
+    border: 1px solid var(--bd);
+    background: rgba(255, 255, 255, 0.026);
+    padding: 10px;
+  }
+
+  .param .k {
+    color: var(--accent-l);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+  }
+
+  .param .v {
+    margin-top: 5px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 750;
+    word-break: break-word;
+  }
+
+  .right-body {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    gap: 14px;
+  }
+
+  .wave-stack {
+    min-height: 0;
+    display: grid;
+    gap: 8px;
+    overflow: auto;
+    padding-right: 4px;
+  }
+
+  .wave-row {
+    display: grid;
+    grid-template-columns: 44px 142px 1fr;
+    gap: 12px;
+    align-items: center;
+    min-height: 70px;
+    padding: 10px 12px;
+    border: 1px solid var(--bd);
+    background: rgba(255, 255, 255, 0.024);
+  }
+
+  .wave-row.active {
+    border-color: var(--teal);
+    background: rgba(123, 201, 181, 0.07);
+  }
+
+  .tc {
+    color: var(--amber-l);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  svg.wave {
+    width: 142px;
+    height: 44px;
+    overflow: visible;
+  }
+
+  .base-line {
+    stroke: rgba(255, 255, 255, 0.16);
+    stroke-width: 1;
+  }
+
+  .wave-path {
+    fill: none;
+    stroke: var(--teal-l);
+    stroke-width: 3;
+    stroke-linecap: square;
+    stroke-linejoin: bevel;
+  }
+
+  .wordline {
+    min-width: 0;
+    color: var(--fg);
+  }
+
+  .wordline .quote {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .sync {
+    margin-top: 7px;
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    color: var(--fg-2);
+    font-size: 12px;
+  }
+
+  .sync span {
+    padding: 1px 4px 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .sync .hot {
+    color: var(--bg);
+    background: var(--amber);
+    border-bottom-color: var(--amber);
+    font-weight: 800;
+  }
+
+  .sync .under {
+    color: var(--fg);
+    border-bottom: 2px solid var(--teal);
+  }
+
+  .mini-label {
+    margin-top: 7px;
+    color: var(--accent-l);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .log-panel {
+    padding: 12px;
+    border: 1px solid var(--bd);
+    background: rgba(8, 8, 12, 0.42);
+    backdrop-filter: blur(26px) saturate(1.2);
+    -webkit-backdrop-filter: blur(26px) saturate(1.2);
+  }
+
+  .log-head {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 9px;
+  }
+
+  .log-head strong {
+    color: var(--fg);
+  }
+
+  .log-head span {
+    color: var(--teal-l);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .logs {
+    display: grid;
+    gap: 6px;
+  }
+
+  .log {
+    display: grid;
+    grid-template-columns: 54px 1fr;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--bd-2);
+    background: rgba(255, 255, 255, 0.022);
+  }
+
+  .log time {
+    color: var(--amber-l);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .log span {
+    color: var(--fg);
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .ok {
+    color: var(--teal-l);
+    font-family: var(--mono);
+    font-weight: 900;
+  }
+
+  @media (max-width: 1120px) {
+    body {
+      overflow: auto;
+    }
+
+    .app {
+      height: auto;
+      min-height: calc(100vh - 64px);
+    }
+
+    .workspace {
+      grid-template-columns: 1fr;
+    }
+
+    .pane {
+      border-right: 0;
+      border-bottom: 1px solid var(--bd-2);
+    }
+  }
+</style>
+</head>
+<body class="nf-bg">
+  <main class="app nf-glass">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">NF</div>
+        <div class="project">NextFrame</div>
+        <div class="route">v0.21.0-design · TTS 路</div>
+        <div class="summary">AI 选了晓晓 · 加了 7 段配音 · 字幕跟上</div>
+      </div>
+      <div class="tb-dots" aria-label="mac window controls">
+        <span class="dot-r"></span>
+        <span class="dot-y"></span>
+        <span class="dot-g"></span>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <section class="pane">
+        <div class="pane-head">
+          <div>
+            <h2>Text to Track</h2>
+            <h1>TTS(文字转语音) · 文本变音轨</h1>
+            <p class="subline">从 charter 句子切成 7 段，逐段生成 voice clip，再回写 composition timeline。</p>
+          </div>
+          <div class="stat">
+            <span class="k">SEGMENTS</span>
+            <span class="v">7</span>
+          </div>
+        </div>
+
+        <div class="left-body">
+          <div class="segments">
+            <article class="segment active">
+              <div class="seg-no">段 1</div>
+              <div>
+                <div class="seg-text">NextFrame turns structured JSON atoms into editable, verifiable, and exportable video.</div>
+                <div class="seg-source">source · spec/charter.md</div>
+              </div>
+              <div class="play-pill">▷ 0:00-0:04</div>
+            </article>
+
+            <article class="segment">
+              <div class="seg-no">段 2</div>
+              <div>
+                <div class="seg-text">JSON is the source of truth.</div>
+                <div class="seg-source">source · spec/charter.md</div>
+              </div>
+              <div class="play-pill">▷ 0:04-0:07</div>
+            </article>
+
+            <article class="segment">
+              <div class="seg-no">段 3</div>
+              <div>
+                <div class="seg-text">AI-authored JSON must be self-verifiable before a human is asked to judge it.</div>
+                <div class="seg-source">source · spec/charter.md</div>
+              </div>
+              <div class="play-pill">▷ 0:07-0:13</div>
+            </article>
+
+            <article class="segment">
+              <div class="seg-no">段 4</div>
+              <div>
+                <div class="seg-text">Preview and export must use the same compiled source.</div>
+                <div class="seg-source">source · spec/charter.md</div>
+              </div>
+              <div class="play-pill">▷ 0:13-0:18</div>
+            </article>
+
+            <article class="segment">
+              <div class="seg-no">段 5</div>
+              <div>
+                <div class="seg-text">HTML/CSS/SVG/Canvas/JS components are first-class video building blocks.</div>
+                <div class="seg-source">source · spec/charter.md</div>
+              </div>
+              <div class="play-pill">▷ 0:18-0:24</div>
+            </article>
+
+            <article class="segment">
+              <div class="seg-no">段 6</div>
+              <div>
+                <div class="seg-text">The desktop editor is an inspection and authoring surface for AI-generated compositions, not a pile of feature-specific tabs.</div>
+                <div class="seg-source">source · spec/charter.md</div>
+              </div>
+              <div class="play-pill">▷ 0:24-0:32</div>
+            </article>
+
+            <article class="segment">
+              <div class="seg-no">段 7</div>
+              <div>
+                <div class="seg-text">Local export must be interruptible and conservative by default.</div>
+                <div class="seg-source">source · spec/charter.md</div>
+              </div>
+              <div class="play-pill">▷ 0:32-0:37</div>
+            </article>
+          </div>
+
+          <aside class="vox-card">
+            <div class="vox-title">
+              <strong>配音参数 · vox / doubao-cdp</strong>
+              <span>voice plan locked</span>
+            </div>
+            <div class="param-grid">
+              <div class="param">
+                <div class="k">音色</div>
+                <div class="v">晓晓 · zh-CN-XiaoxiaoNeural</div>
+              </div>
+              <div class="param">
+                <div class="k">语速</div>
+                <div class="v">1.0x</div>
+              </div>
+              <div class="param">
+                <div class="k">后端</div>
+                <div class="v">vox doubao-cdp</div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="pane">
+        <div class="pane-head">
+          <div>
+            <h2>Audio Sync</h2>
+            <h1>音频波形 + 字幕轨</h1>
+            <p class="subline">字幕轨使用 word-level(逐词) timing，当前词高亮，播放头和音轨同源。</p>
+          </div>
+          <div class="stat">
+            <span class="k">VOICE</span>
+            <span class="v">晓晓</span>
+          </div>
+        </div>
+
+        <div class="right-body">
+          <div class="wave-stack">
+            <article class="wave-row active">
+              <div class="tc">00:00</div>
+              <svg class="wave" viewBox="0 0 142 44" role="img" aria-label="segment 1 waveform">
+                <path class="base-line" d="M0 22H142"></path>
+                <path class="wave-path" d="M1 23L8 21L15 18L22 12L29 8L36 14L43 28L50 35L57 25L64 11L71 7L78 13L85 21L92 31L99 33L106 24L113 17L120 19L127 25L134 22L141 20"></path>
+              </svg>
+              <div class="wordline">
+                <span class="quote">NextFrame turns structured JSON atoms...</span>
+                <div class="sync"><span class="hot">NextFrame</span><span>turns</span><span>structured</span><span>JSON</span><span class="under">atoms</span><span>into</span><span>video</span></div>
+                <div class="mini-label">字幕轨 · word-level(逐词)</div>
+              </div>
+            </article>
+
+            <article class="wave-row">
+              <div class="tc">00:04</div>
+              <svg class="wave" viewBox="0 0 142 44" role="img" aria-label="segment 2 waveform">
+                <path class="base-line" d="M0 22H142"></path>
+                <path class="wave-path" d="M1 22L11 19L21 9L31 6L41 16L51 30L61 36L71 29L81 15L91 10L101 18L111 26L121 25L131 21L141 22"></path>
+              </svg>
+              <div class="wordline">
+                <span class="quote">JSON is the source of truth.</span>
+                <div class="sync"><span>JSON</span><span>is</span><span class="hot">the</span><span class="under">source</span><span>of</span><span>truth</span></div>
+                <div class="mini-label">字幕轨 · word-level(逐词)</div>
+              </div>
+            </article>
+
+            <article class="wave-row">
+              <div class="tc">00:07</div>
+              <svg class="wave" viewBox="0 0 142 44" role="img" aria-label="segment 3 waveform">
+                <path class="base-line" d="M0 22H142"></path>
+                <path class="wave-path" d="M1 24L7 21L13 16L19 18L25 11L31 7L37 13L43 26L49 34L55 32L61 20L67 10L73 9L79 18L85 30L91 36L97 27L103 15L109 12L115 20L121 29L127 31L133 25L141 18"></path>
+              </svg>
+              <div class="wordline">
+                <span class="quote">AI-authored JSON must be self-verifiable...</span>
+                <div class="sync"><span>AI-authored</span><span>JSON</span><span>must</span><span class="hot">be</span><span class="under">self-verifiable</span><span>before</span><span>judge</span></div>
+                <div class="mini-label">字幕轨 · word-level(逐词)</div>
+              </div>
+            </article>
+
+            <article class="wave-row">
+              <div class="tc">00:13</div>
+              <svg class="wave" viewBox="0 0 142 44" role="img" aria-label="segment 4 waveform">
+                <path class="base-line" d="M0 22H142"></path>
+                <path class="wave-path" d="M1 21L9 18L17 13L25 14L33 20L41 28L49 31L57 25L65 17L73 11L81 13L89 19L97 24L105 23L113 16L121 12L129 17L137 26L141 28"></path>
+              </svg>
+              <div class="wordline">
+                <span class="quote">Preview and export must use the same...</span>
+                <div class="sync"><span>Preview</span><span>and</span><span>export</span><span class="hot">must</span><span>use</span><span class="under">same</span><span>source</span></div>
+                <div class="mini-label">字幕轨 · word-level(逐词)</div>
+              </div>
+            </article>
+
+            <article class="wave-row">
+              <div class="tc">00:18</div>
+              <svg class="wave" viewBox="0 0 142 44" role="img" aria-label="segment 5 waveform">
+                <path class="base-line" d="M0 22H142"></path>
+                <path class="wave-path" d="M1 28L8 18L15 31L22 12L29 34L36 9L43 18L50 26L57 13L64 30L71 8L78 11L85 20L92 35L99 17L106 12L113 27L120 31L127 18L134 14L141 24"></path>
+              </svg>
+              <div class="wordline">
+                <span class="quote">HTML/CSS/SVG/Canvas/JS components...</span>
+                <div class="sync"><span>HTML</span><span>CSS</span><span>SVG</span><span class="hot">Canvas</span><span>JS</span><span class="under">components</span><span>first-class</span></div>
+                <div class="mini-label">字幕轨 · word-level(逐词)</div>
+              </div>
+            </article>
+
+            <article class="wave-row">
+              <div class="tc">00:24</div>
+              <svg class="wave" viewBox="0 0 142 44" role="img" aria-label="segment 6 waveform">
+                <path class="base-line" d="M0 22H142"></path>
+                <path class="wave-path" d="M1 20L6 15L11 16L16 27L21 35L26 30L31 17L36 8L41 7L46 18L51 32L56 37L61 29L66 16L71 10L76 12L81 22L86 33L91 34L96 24L101 13L106 10L111 15L116 23L121 29L126 27L131 20L136 17L141 22"></path>
+              </svg>
+              <div class="wordline">
+                <span class="quote">The desktop editor is an inspection...</span>
+                <div class="sync"><span>The</span><span>desktop</span><span>editor</span><span>is</span><span class="hot">inspection</span><span>and</span><span class="under">authoring</span></div>
+                <div class="mini-label">字幕轨 · word-level(逐词)</div>
+              </div>
+            </article>
+
+            <article class="wave-row">
+              <div class="tc">00:32</div>
+              <svg class="wave" viewBox="0 0 142 44" role="img" aria-label="segment 7 waveform">
+                <path class="base-line" d="M0 22H142"></path>
+                <path class="wave-path" d="M1 19L13 13L25 10L37 14L49 24L61 32L73 35L85 31L97 21L109 12L121 15L133 26L141 33"></path>
+              </svg>
+              <div class="wordline">
+                <span class="quote">Local export must be interruptible...</span>
+                <div class="sync"><span>Local</span><span>export</span><span class="hot">must</span><span>be</span><span class="under">interruptible</span><span>conservative</span><span>default</span></div>
+                <div class="mini-label">字幕轨 · word-level(逐词)</div>
+              </div>
+            </article>
+          </div>
+
+          <aside class="log-panel">
+            <div class="log-head">
+              <strong>AI 操作日志</strong>
+              <span>vox batch</span>
+            </div>
+            <div class="logs">
+              <div class="log"><time>14:30</time><span>切句 7 段 · charter excerpts</span></div>
+              <div class="log"><time>14:30</time><span>选择音色 · 晓晓 zh-CN-XiaoxiaoNeural</span></div>
+              <div class="log"><time>14:30</time><span>派 vox batch · doubao-cdp 并行生成</span></div>
+              <div class="log"><time>14:31</time><span><b class="ok">OK</b> 7/7 mp3 + timeline words</span></div>
+              <div class="log"><time>14:31</time><span>字幕轨自动对齐 · word-level(逐词)</span></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

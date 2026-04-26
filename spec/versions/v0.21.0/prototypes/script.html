@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NextFrame · v0.21.0 · Script Prototype</title>
+<link rel="stylesheet" href="../../../design/tokens.css">
+<style>
+html,body{margin:0;min-height:100vh}
+body{font-family:var(--font);color:var(--fg);font-size:13px;line-height:1.5;padding:32px;overflow-x:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+svg{display:block}.app{width:min(1440px,calc(100vw - 64px));min-height:calc(100vh - 64px);margin:0 auto;display:grid;grid-template-rows:46px 1fr;background:var(--panel-2);border:1px solid var(--bd);backdrop-filter:blur(50px) saturate(1.5);-webkit-backdrop-filter:blur(50px) saturate(1.5);box-shadow:0 30px 90px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08),inset 0 0 0 .5px rgba(255,255,255,.03);position:relative;overflow:hidden}
+.app::before{content:"";position:absolute;inset:0 0 auto;height:180px;background:radial-gradient(ellipse 60% 100% at 50% 0%,rgba(255,255,255,.04),transparent 70%);pointer-events:none}
+.topbar{min-width:0;display:grid;grid-template-columns:1fr auto;align-items:center;gap:18px;border-bottom:1px solid var(--bd);background:rgba(8,8,12,.42);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2);padding:0 14px;position:relative;z-index:2}
+.brand{min-width:0;display:flex;align-items:center;gap:10px;white-space:nowrap}.brand-mark{width:22px;height:22px;color:var(--accent-l);flex:0 0 auto}.brand-name{color:var(--fg);font-weight:800;letter-spacing:.01em}.crumb,.mono{font-family:var(--mono);font-size:11px}.crumb{color:var(--fg-2)}.mono{color:var(--amber-l)}
+.version,.route{font-family:var(--mono);font-size:11px;padding:4px 8px}.version{color:var(--accent-l);border:1px solid var(--accent-b);background:var(--accent-t)}.route{color:var(--amber-l);border:1px solid var(--amber-b);background:var(--amber-t)}
+.tb-dots{display:flex;align-items:center;gap:8px;padding-left:10px}.tb-dots span{width:12px;height:12px;border-radius:50%;border:1px solid var(--bd);box-shadow:inset 0 1px 0 rgba(255,255,255,.16)}.close{background:var(--accent-d)}.min{background:var(--amber)}.max{background:var(--ok)}
+.workspace{min-height:0;display:grid;grid-template-columns:40% 60%;position:relative;z-index:1}.pane{min-width:0;min-height:0;display:flex;flex-direction:column}.left{border-right:1px solid var(--bd);background:rgba(8,8,12,.32);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2)}.right{background:rgba(255,255,255,.018)}
+.pane-head{height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 16px;border-bottom:1px solid var(--bd-2)}.label{color:var(--accent-l);font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+.script-wrap{min-height:0;flex:1;display:grid;grid-template-rows:auto 1fr auto;gap:14px;padding:16px}.term-grid{display:grid;grid-template-columns:1fr 1fr}.term-grid,.script-card,.ai-notes,.source-line,.mini-panel,.timeline{border:1px solid var(--bd);background:rgba(8,8,12,.42);backdrop-filter:blur(40px) saturate(2);-webkit-backdrop-filter:blur(40px) saturate(2)}
+.term{padding:12px;border-right:1px solid var(--bd-2)}.term:last-child{border-right:0}.term .k{color:var(--accent-l);font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}.term .v{color:var(--fg);font-weight:650}
+.script-card{min-height:0;display:grid;grid-template-rows:auto 1fr;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}.script-toolbar,.timeline-head,.mini-head{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--bd-2)}.script-toolbar{height:38px;padding:0 12px}.textarea-mock{padding:16px;font-size:15px;color:var(--fg);line-height:1.7;overflow:auto}.textarea-mock p{margin:0 0 14px}.cursor{display:inline-block;width:1px;height:17px;margin-left:2px;background:var(--accent-l);vertical-align:-3px}
+.ai-notes{padding:12px}.ai-notes h3{margin:0 0 10px;color:var(--accent-l);font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}.note{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:8px;min-height:28px;border-top:1px solid var(--bd-2);color:var(--fg-2)}.note:first-of-type{border-top:0}.dot{width:6px;height:6px;border-radius:50%;background:var(--accent-l);box-shadow:0 0 0 3px var(--accent-t)}.note:nth-of-type(3) .dot{background:var(--amber);box-shadow:0 0 0 3px var(--amber-t)}.note:nth-of-type(4) .dot{background:var(--teal);box-shadow:0 0 0 3px rgba(123,201,181,.12)}.note .tag{color:var(--amber-l);font-family:var(--mono);font-size:10px}
+.composition{min-height:0;display:grid;grid-template-rows:auto 1fr auto;gap:14px;padding:16px}.source-line{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:12px}.source-line strong{color:var(--fg);font-weight:750}.source-line code{color:var(--amber-l);font-family:var(--mono);font-size:11px}
+.flow{min-height:0;display:grid;grid-template-columns:1fr 34px 1.34fr;gap:12px}.mini-panel{min-height:0;display:flex;flex-direction:column}.mini-head{min-height:38px;padding:0 12px}.mini-head .sub{color:var(--fg-2);font-family:var(--mono);font-size:10px}.analysis-list{padding:12px;display:grid;gap:8px;overflow:auto}.analysis-row{display:grid;grid-template-columns:42px 1fr;gap:10px;align-items:start;border:1px solid var(--bd-2);background:var(--surf);padding:10px}.analysis-row .num{color:var(--amber-l);font-family:var(--mono);font-weight:800}.analysis-row .copy{color:var(--fg-2)}.analysis-row b{color:var(--fg)}
+.flow-arrow{display:grid;place-items:center;color:var(--accent-l);font-size:28px;font-family:var(--mono)}.tracks{min-height:0;padding:12px;display:grid;grid-template-rows:repeat(4,minmax(84px,1fr));gap:9px;overflow:auto}.track{display:grid;grid-template-columns:100px 1fr 84px;gap:10px;border:1px solid var(--bd);background:var(--surf);padding:10px}.track.active{background:var(--accent-t);border-color:var(--accent-b);box-shadow:inset 2px 0 0 var(--accent-l)}.time{color:var(--amber-l);font-family:var(--mono);font-size:11px;font-weight:800}.name{color:var(--fg);font-weight:760;margin-top:4px}.desc{color:var(--fg-2);margin-top:3px;font-size:12px}
+.components{display:flex;flex-wrap:wrap;align-content:start;gap:6px}.pill{color:var(--fg-2);border:1px solid var(--bd);background:rgba(255,255,255,.035);padding:3px 6px;font-family:var(--mono);font-size:10px}.z{align-self:start;justify-self:end;color:var(--accent-l);font-family:var(--mono);font-size:10px;border:1px solid var(--accent-b);background:var(--accent-t);padding:4px 6px}
+.timeline-head{height:34px;padding:0 12px}.ascii{padding:12px;font-family:var(--mono);font-size:17px;color:var(--fg);letter-spacing:0;white-space:nowrap;overflow:hidden}.ascii .a{color:var(--accent-l)}.ascii .b{color:var(--amber-l)}.ascii .c{color:var(--teal-l)}
+.anchor-row{display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--bd-2);color:var(--fg-2);font-family:var(--mono);font-size:10px}.anchor{padding:8px 6px;border-right:1px solid var(--bd-2);min-width:0}.anchor:last-child{border-right:0}.anchor b{color:var(--amber-l);display:block;font-weight:800}
+.legend{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--fg-2);font-size:12px}.swatches{display:flex;gap:10px;flex-wrap:wrap}.swatch{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}.sq{width:10px;height:10px;background:var(--accent-b);border:1px solid var(--accent-l)}.sq.amber{background:var(--amber-t);border-color:var(--amber-l)}.sq.teal{background:rgba(123,201,181,.16);border-color:var(--teal-l)}.sq.gray{background:var(--gray);border-color:var(--gray-l)}
+@media (max-width:980px){body{padding:18px}.app{width:calc(100vw - 36px)}.workspace{grid-template-columns:1fr}.left{border-right:0;border-bottom:1px solid var(--bd)}.flow{grid-template-columns:1fr}.flow-arrow{min-height:28px;transform:rotate(90deg)}.track{grid-template-columns:1fr}.z{justify-self:start}.topbar{grid-template-columns:1fr;height:auto;min-height:46px;padding:8px 12px}.tb-dots{justify-content:flex-end}}
+</style>
+</head>
+<body class="nf-bg">
+<main class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 9h8M8 12h5M8 15h7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="square"/></svg>
+      <span class="brand-name">NextFrame</span><span class="crumb">/</span><span class="version">v0.21.0-design</span><span class="route">script 路</span>
+    </div>
+    <div class="tb-dots" aria-label="关闭 / 最小化 / 最大化"><span class="close" title="关闭"></span><span class="min" title="最小化"></span><span class="max" title="最大化"></span></div>
+  </header>
+  <section class="workspace">
+    <aside class="pane left">
+      <div class="pane-head"><div class="label">Script 输入区</div><div class="mono">AI parsing</div></div>
+      <div class="script-wrap">
+        <div class="term-grid">
+          <div class="term"><div class="k">composition(合成)</div><div class="v">一段视频 · JSON source of truth</div></div>
+          <div class="term"><div class="k">track(轨道)</div><div class="v">一行画面 · 有时间 / 组件 / 参数</div></div>
+        </div>
+        <div class="script-card">
+          <div class="script-toolbar"><div class="label">script.txt</div><div class="mono">24s · 16:9 · 1080p</div></div>
+          <div class="textarea-mock" aria-label="textarea mock">
+            <p>今天发布 NextFrame V2 showreel。</p>
+            <p>开头 3 秒讲清楚：One JSON controls a live HTML video。</p>
+            <p>中段展示 HTML、SVG、Canvas、CSS motion 都共享同一条 timeline。</p>
+            <p>最后落到编辑器现场修改、预览和 MP4 导出都读同一份 JSON。<span class="cursor"></span></p>
+          </div>
+        </div>
+        <div class="ai-notes">
+          <h3>AI 旁注</h3>
+          <div class="note"><span class="dot"></span><span>AI 在分句：把脚本拆成 intro / layers / code / data / browser / finale</span><span class="tag">anchors</span></div>
+          <div class="note"><span class="dot"></span><span>AI 在标节奏：映射到 0s / 3.2s / 7.2s / 11.6s / 15.6s / 19.2s / 24s</span><span class="tag">timing</span></div>
+          <div class="note"><span class="dot"></span><span>AI 在挑组件：选择 HTML、SVG、Canvas 和字幕轨道承载每段信息</span><span class="tag">component</span></div>
+          <div class="note"><span class="dot"></span><span>AI 在生成参数：把标题、subtitle、metrics、tabs 写入 track.params</span><span class="tag">params</span></div>
+        </div>
+      </div>
+    </aside>
+    <section class="pane right">
+      <div class="pane-head"><div class="label">AI 生成的 composition mock</div><div class="mono">showreel-24s · 12 tracks</div></div>
+      <div class="composition">
+        <div class="source-line">
+          <div><strong>真实 mock 数据来自</strong> <code>examples/v2-showcase/compositions/showreel-24s.json</code></div>
+          <code>duration 24s · viewport 1920x1080</code>
+        </div>
+        <div class="flow">
+          <div class="mini-panel">
+            <div class="mini-head"><div class="label">AI 结构化理解</div><div class="sub">script → anchors</div></div>
+            <div class="analysis-list">
+              <div class="analysis-row"><div class="num">01</div><div class="copy"><b>intro</b> 先建立主题：One JSON controls a live HTML video</div></div>
+              <div class="analysis-row"><div class="num">02</div><div class="copy"><b>layers + code</b> 展示 DOM / SVG / Canvas / CSS motion 的层级</div></div>
+              <div class="analysis-row"><div class="num">03</div><div class="copy"><b>data + browser</b> 转成可检查的 dashboard 和 editor preview</div></div>
+              <div class="analysis-row"><div class="num">04</div><div class="copy"><b>finale</b> 落到 edit live / export same timeline 的 PM 结论</div></div>
+            </div>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="mini-panel">
+            <div class="mini-head"><div class="label">composition(合成) · 一段视频</div><div class="sub">track(轨道) · 一行画面</div></div>
+            <div class="tracks">
+              <article class="track active">
+                <div><div class="time">0s–3.2s</div><div class="name">intro</div><div class="desc">开场背景、粒子和主标题同时进入</div></div>
+                <div class="components"><span class="pill">stage-bg · html.stage-background</span><span class="pill">particle-field · canvas.particle-field</span><span class="pill">main-title · html.sequence-title</span><span class="pill">status-ribbon · html.timeline-ribbon</span></div>
+                <div class="z">z 0–52</div>
+              </article>
+              <article class="track">
+                <div><div class="time">3.2s–11.6s</div><div class="name">layers / code</div><div class="desc">把结构解释成可见层栈和代码终端</div></div>
+                <div class="components"><span class="pill">layer-stack · html.layer-stack</span><span class="pill">circuit-map · svg.circuit-map</span><span class="pill">code-terminal · html.code-terminal</span></div>
+                <div class="z">z 18–36</div>
+              </article>
+              <article class="track">
+                <div><div class="time">11.6s–19.2s</div><div class="name">data / browser</div><div class="desc">用 metrics 和 desktop-preview 承接编辑器心智</div></div>
+                <div class="components"><span class="pill">data-dashboard · html.data-dashboard</span><span class="pill">browser-frame · html.browser-frame</span><span class="pill">subtitle-main · subtitle</span><span class="pill">voice-intro · audio</span></div>
+                <div class="z">z 30–80</div>
+              </article>
+              <article class="track">
+                <div><div class="time">19.2s–24s</div><div class="name">finale / out</div><div class="desc">收束到同一 JSON 预览、编辑、导出</div></div>
+                <div class="components"><span class="pill">final-title · html.sequence-title</span><span class="pill">browser-frame · html.browser-frame</span><span class="pill">voice-outro · audio</span><span class="pill">subtitle-main · subtitle</span></div>
+                <div class="z">z 42–80</div>
+              </article>
+            </div>
+          </div>
+        </div>
+        <div class="timeline">
+          <div class="timeline-head">
+            <div class="label">ASCII timeline</div>
+            <div class="legend"><div class="swatches"><span class="swatch"><span class="sq"></span>画面</span><span class="swatch"><span class="sq amber"></span>文字 / 时间</span><span class="swatch"><span class="sq teal"></span>音频</span><span class="swatch"><span class="sq gray"></span>结构</span></div></div>
+          </div>
+          <div class="ascii" aria-label="timeline">|<span class="a">■■■</span>|<span class="b">■■■■</span>|<span class="a">■■■■</span>|<span class="c">■■■■</span>|<span class="a">■■■■</span>|<span class="b">■■■</span>|</div>
+          <div class="anchor-row">
+            <div class="anchor"><b>intro</b>0s</div><div class="anchor"><b>layers</b>3.2s</div><div class="anchor"><b>code</b>7.2s</div><div class="anchor"><b>data</b>11.6s</div><div class="anchor"><b>browser</b>15.6s</div><div class="anchor"><b>finale</b>19.2s</div><div class="anchor"><b>out</b>24s</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </section>
+</main>
+</body>
+</html>

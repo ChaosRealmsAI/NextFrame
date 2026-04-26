@@ -1,0 +1,15 @@
+@import "../../../design/tokens.css";
+body { margin: 0; background: #090a0f; color: #f8fafc; font: 16px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; }
+.demo { width: 100vw; height: 100vh; display: grid; grid-template-columns: 220px 1fr; overflow: hidden; }
+aside { border-right: 1px solid rgba(255,255,255,.12); padding: 18px; display: grid; align-content: start; gap: 10px; background: rgba(255,255,255,.035); }
+button { height: 48px; border: 1px solid rgba(255,255,255,.14); background: transparent; color: inherit; text-align: left; padding: 0 14px; }
+button.active { border-color: #a78bfa; background: rgba(167,139,250,.18); }
+section { padding: 28px; display: grid; grid-template-rows: 1fr auto; gap: 18px; }
+.stage { display: grid; place-items: center; border: 1px solid rgba(255,255,255,.14); background: radial-gradient(circle at 50% 35%, rgba(167,139,250,.22), transparent 42%); font-size: 42px; animation: pulse 10s infinite; }
+.tracks { display: grid; gap: 8px; }
+i { height: 24px; border: 1px solid rgba(125,211,252,.36); background: rgba(125,211,252,.12); }
+.progress { position: fixed; left: 0; bottom: 0; height: 4px; background: #a78bfa; animation: bar 10s linear infinite; }
+.toast { position: fixed; right: 22px; bottom: 18px; opacity: 0; animation: toast 10s infinite; }
+@keyframes bar { from { width: 0; } to { width: 100%; } }
+@keyframes toast { 85%,100% { opacity: 1; } }
+@keyframes pulse { 50% { filter: brightness(1.4); } }

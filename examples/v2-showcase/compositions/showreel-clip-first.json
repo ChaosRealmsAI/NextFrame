@@ -1,0 +1,296 @@
+{
+  "schema": "nextframe.composition.v3",
+  "id": "showreel-clip-first",
+  "name": "Clip-first Showreel",
+  "duration": "auto",
+  "viewport": { "w": 1920, "h": 1080, "ratio": "16:9" },
+  "theme": "launch.dark",
+  "export": { "resolution": "1080p" },
+  "clips": [
+    {
+      "id": "intro",
+      "title": "Opening",
+      "duration": "7s",
+      "anchors": {
+        "in": "0s",
+        "voice": "0.4s",
+        "title": "0.8s",
+        "out": "7s"
+      },
+      "tracks": [
+        {
+          "id": "background",
+          "kind": "component",
+          "z": 0,
+          "items": [
+            {
+              "id": "stage",
+              "component": "html.stage-background",
+              "time": { "start": "in", "end": "out" },
+              "params": { "pulse": 0.92 }
+            }
+          ]
+        },
+        {
+          "id": "visuals",
+          "kind": "component",
+          "z": 30,
+          "items": [
+            {
+              "id": "title",
+              "component": "html.sequence-title",
+              "time": { "start": "title", "end": "out" },
+              "params": {
+                "eyebrow": "CLIP-FIRST JSON",
+                "title": "One video, many clips",
+                "subtitle": "AI writes one segment at a time.",
+                "x": 48,
+                "y": 42,
+                "align": "left"
+              }
+            }
+          ]
+        },
+        {
+          "id": "narration",
+          "kind": "tts",
+          "z": 50,
+          "items": [
+            {
+              "id": "main",
+              "time": { "start": "voice", "end": "out" },
+              "params": {
+                "text": "NextFrame now treats each clip as the unit AI writes and previews.",
+                "voice": "en-US-AriaNeural",
+                "backend": "edge",
+                "rate": "-10%",
+                "audio": "audio/showreel-narration.mp3",
+                "timeline": "audio/intro-main.timeline.json"
+              }
+            }
+          ]
+        },
+        {
+          "id": "caption-timeline",
+          "kind": "subtitle_timeline",
+          "z": 60,
+          "items": [
+            {
+              "id": "main",
+              "time": { "start": "voice", "end": "out" },
+              "source": { "type": "tts", "track": "narration", "item": "main" }
+            }
+          ]
+        },
+        {
+          "id": "caption",
+          "kind": "subtitle",
+          "z": 80,
+          "items": [
+            {
+              "id": "main",
+              "time": { "start": "voice", "end": "out" },
+              "source": { "type": "subtitle_timeline", "track": "caption-timeline", "item": "main" },
+              "style": {
+                "active_color": "#ffca66",
+                "color": "#ffffff",
+                "size_px": 34,
+                "position": "bottom",
+                "padding": 62
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "proof",
+      "title": "Local tracks",
+      "duration": "8s",
+      "anchors": {
+        "in": "0s",
+        "voice": "0.4s",
+        "demo": "1s",
+        "out": "8s"
+      },
+      "tracks": [
+        {
+          "id": "background",
+          "kind": "component",
+          "z": 0,
+          "items": [
+            {
+              "id": "stage",
+              "component": "html.stage-background",
+              "time": { "start": "in", "end": "out" },
+              "params": { "pulse": 1.05 }
+            }
+          ]
+        },
+        {
+          "id": "visuals",
+          "kind": "component",
+          "z": 34,
+          "items": [
+            {
+              "id": "stack",
+              "component": "html.layer-stack",
+              "time": { "start": "demo", "end": "out" },
+              "params": {
+                "x": 50,
+                "y": 52,
+                "layers": ["clip", "anchors", "component", "tts", "subtitle_timeline", "subtitle"]
+              }
+            }
+          ]
+        },
+        {
+          "id": "narration",
+          "kind": "tts",
+          "z": 50,
+          "items": [
+            {
+              "id": "main",
+              "time": { "start": "voice", "end": "out" },
+              "params": {
+                "text": "Inside a clip, tracks are local and the subtitle timeline is its own track.",
+                "voice": "en-US-AriaNeural",
+                "backend": "edge",
+                "rate": "-10%",
+                "audio": "audio/showreel-narration-2.mp3",
+                "timeline": "audio/proof-main.timeline.json"
+              }
+            }
+          ]
+        },
+        {
+          "id": "caption-timeline",
+          "kind": "subtitle_timeline",
+          "z": 60,
+          "items": [
+            {
+              "id": "main",
+              "time": { "start": "voice", "end": "out" },
+              "source": { "type": "tts", "track": "narration", "item": "main" }
+            }
+          ]
+        },
+        {
+          "id": "caption",
+          "kind": "subtitle",
+          "z": 80,
+          "items": [
+            {
+              "id": "main",
+              "time": { "start": "voice", "end": "out" },
+              "source": { "type": "subtitle_timeline", "track": "caption-timeline", "item": "main" },
+              "style": {
+                "active_color": "#ffca66",
+                "color": "#ffffff",
+                "size_px": 34,
+                "position": "bottom",
+                "padding": 62
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "title": "Export",
+      "duration": "5s",
+      "anchors": {
+        "in": "0s",
+        "voice": "0.4s",
+        "title": "0.8s",
+        "out": "5s"
+      },
+      "tracks": [
+        {
+          "id": "background",
+          "kind": "component",
+          "z": 0,
+          "items": [
+            {
+              "id": "stage",
+              "component": "html.stage-background",
+              "time": { "start": "in", "end": "out" },
+              "params": { "pulse": 0.98 }
+            }
+          ]
+        },
+        {
+          "id": "visuals",
+          "kind": "component",
+          "z": 38,
+          "items": [
+            {
+              "id": "final",
+              "component": "html.sequence-title",
+              "time": { "start": "title", "end": "out" },
+              "params": {
+                "eyebrow": "SAME RUNTIME",
+                "title": "Clips flatten into export tracks",
+                "subtitle": "Preview and MP4 still share one compiled source.",
+                "x": 50,
+                "y": 40,
+                "align": "center"
+              }
+            }
+          ]
+        },
+        {
+          "id": "narration",
+          "kind": "tts",
+          "z": 50,
+          "items": [
+            {
+              "id": "main",
+              "time": { "start": "voice", "end": "out" },
+              "params": {
+                "text": "The compiler flattens clips into the same runtime used by preview and export.",
+                "voice": "en-US-AriaNeural",
+                "backend": "edge",
+                "rate": "-10%",
+                "audio": "audio/showreel-narration-2.mp3",
+                "timeline": "audio/outro-main.timeline.json"
+              }
+            }
+          ]
+        },
+        {
+          "id": "caption-timeline",
+          "kind": "subtitle_timeline",
+          "z": 60,
+          "items": [
+            {
+              "id": "main",
+              "time": { "start": "voice", "end": "out" },
+              "source": { "type": "tts", "track": "narration", "item": "main" }
+            }
+          ]
+        },
+        {
+          "id": "caption",
+          "kind": "subtitle",
+          "z": 80,
+          "items": [
+            {
+              "id": "main",
+              "time": { "start": "voice", "end": "out" },
+              "source": { "type": "subtitle_timeline", "track": "caption-timeline", "item": "main" },
+              "style": {
+                "active_color": "#ffca66",
+                "color": "#ffffff",
+                "size_px": 34,
+                "position": "bottom",
+                "padding": 62
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "tts-subtitle-timeline",
+  "title": "TTS timeline is a track source, not inline subtitle words",
+  "given": "A tts track points to an mp3 and a timeline.json file.",
+  "when": "The compiler builds runtime source.",
+  "then": "The subtitle_timeline track loads words from timeline.json, and the subtitle track renders from that timeline.",
+  "human_actions": ["select intro", "inspect narration track", "preview subtitle"],
+  "ai_tools": [
+    {
+      "tool": "state",
+      "command": "rg 'params.words|audio_clip|timeline_clip' examples/v2-showcase/compositions/showreel-clip-first.json",
+      "expected": "no matches"
+    },
+    {
+      "tool": "state",
+      "command": "NEXTFRAME_HOME=examples target/debug/nf composition show --project v2-showcase --composition showreel-clip-first | jq '[.source.tracks[] | select(.kind==\"subtitle\")][0].clips[0].params.source.words | length'",
+      "expected": "greater than 0"
+    }
+  ]
+}

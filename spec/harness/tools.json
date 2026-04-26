@@ -34,6 +34,33 @@
       "tags": [],
       "registered_at": "2026-04-26T03:18:52.508377+00:00",
       "resolves": []
+    },
+    {
+      "name": "nf-composition",
+      "usage": "nf-composition · 读/改 v2 composition JSON\n\n读 · target/debug/nf composition show --project=<slug> --composition=<slug> [--track=<id>] [--field=<path>]\n改 · target/debug/nf composition patch --project=<slug> --composition=<slug> --track=<id> --field=<path> --value=<json-or-string>\n验 · target/debug/nf composition validate --project=<slug> --composition=<slug>\n\n字段路径例\n  params.title · style.x · style.fontSize · time.start · time.duration",
+      "tags": [],
+      "registered_at": "2026-04-26T06:48:27.073702+00:00",
+      "resolves": [
+        "ASK-0006"
+      ]
+    },
+    {
+      "name": "nf-export",
+      "usage": "nf-export · 触发 MP4 导出 + 监控\n\n启动 · target/debug/nf export --project=<slug> --composition=<slug> --profile=draft|standard|final|final-fast --out=<mp4>\n诊断 · target/debug/nf export --... --diagnostics --out=<mp4>  (sibling diagnostics.json)\n进度 · target/debug/nf export-status --job-id=<id>\n取消 · target/debug/nf export-cancel --job-id=<id>\n\nprofile 含义\n  draft · 快预览 · 720p 30fps · 用于 AI 自验\n  standard · 1080p 30fps\n  final · 1080p/4K 60fps · 高质\n  final-fast · 1080p/4K 30fps",
+      "tags": [],
+      "registered_at": "2026-04-26T06:48:27.083333+00:00",
+      "resolves": [
+        "ASK-0007"
+      ]
+    },
+    {
+      "name": "nf-window",
+      "usage": "nf-window · 启动 / 关闭 / 列窗口\n\n启动 · target/debug/nf open --project=<slug> --composition=<slug>\n列窗口 · target/debug/nf ps\n状态 · target/debug/nf state --key=<KEY>\n关 app · target/debug/nf quit",
+      "tags": [],
+      "registered_at": "2026-04-26T06:48:27.092574+00:00",
+      "resolves": [
+        "ASK-0008"
+      ]
     }
   ]
 }

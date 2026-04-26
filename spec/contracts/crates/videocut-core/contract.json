@@ -1,0 +1,21 @@
+{
+  "depends_on": [],
+  "fixtures": [
+    {
+      "created_at": "generated-by-quality-init",
+      "expected_path": "fixtures/placeholder.expected.json",
+      "input_path": "fixtures/placeholder.in.json",
+      "name": "placeholder"
+    }
+  ],
+  "forbids": [],
+  "id": "crates/videocut-core",
+  "introduced_at": "generated-by-quality-init",
+  "metadata": {
+    "quality_init_placeholder": true
+  },
+  "name": "crates/videocut-core",
+  "schema_in": "schema/in.schema.json",
+  "schema_out": "schema/out.schema.json",
+  "schema_version": 1
+}

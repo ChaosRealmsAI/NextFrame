@@ -1,0 +1,29 @@
+{
+  "id": "script-prototype",
+  "feature": "v0.21.0-design",
+  "given": "PM 进 NextFrame 想看 AI 怎么从 script 生 composition",
+  "when": "AI 出 script 输入 prototype HTML",
+  "then": "PM 5 秒看懂 · script → composition 的流程 · 含 AI 标注",
+  "human_actions": [
+    "PM 双击打开 spec/versions/v0.21.0/prototypes/script.html",
+    "看左侧输入区 · 看 AI 标注 · 看右侧出来的 composition mock"
+  ],
+  "ai_tools": [
+    {
+      "tool": "prototype-render-check",
+      "command": "test -f spec/versions/v0.21.0/prototypes/script.html && cat spec/versions/v0.21.0/prototypes/script.html | wc -l",
+      "expect_exit": 0,
+      "expect_stdout_contains": ""
+    }
+  ],
+  "demo": "demos/script-prototype.html",
+  "status": "wip",
+  "claimed_by": "v0.21.0",
+  "verified_at": "2026-04-26T07:11:55.334254+00:00",
+  "evidence": [
+    "/Users/Zhuanz/workspace/NextFrame/spec/bdd/v0.21.0-design/evidence/script-prototype/00-prototype_render_check.stdout.txt"
+  ],
+  "bugs": [],
+  "blocked_by": [],
+  "metadata": null
+}

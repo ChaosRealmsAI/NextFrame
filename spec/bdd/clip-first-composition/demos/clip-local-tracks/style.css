@@ -1,0 +1,16 @@
+@import "../../../design/tokens.css";
+body { margin: 0; background: #090a0f; color: #f8fafc; font: 15px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; }
+main { height: 100vh; display: grid; grid-template-rows: 56px 1fr; }
+header { display: flex; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid rgba(255,255,255,.12); }
+header span { color: rgba(255,255,255,.58); font-family: ui-monospace, Menlo, monospace; }
+section { position: relative; padding: 42px 48px; display: grid; align-content: center; gap: 14px; }
+.row { position: relative; height: 46px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.025); }
+label { position: absolute; left: 12px; top: 13px; color: rgba(255,255,255,.62); }
+i { position: absolute; top: 8px; bottom: 8px; display: flex; align-items: center; padding-left: 12px; border: 1px solid rgba(167,139,250,.45); background: rgba(167,139,250,.17); font-style: normal; animation: glow 9s infinite; }
+em { position: absolute; top: 24px; bottom: 24px; width: 2px; left: 14%; background: #f8fafc; animation: scrub 9s infinite linear; }
+.progress { position: fixed; left: 0; bottom: 0; height: 4px; background: #7dd3fc; animation: bar 9s linear infinite; }
+.toast { position: fixed; right: 22px; bottom: 18px; opacity: 0; animation: toast 9s infinite; }
+@keyframes scrub { to { left: 84%; } }
+@keyframes glow { 50% { filter: brightness(1.5); } }
+@keyframes bar { from { width: 0; } to { width: 100%; } }
+@keyframes toast { 86%,100% { opacity: 1; } }

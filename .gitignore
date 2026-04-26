@@ -79,3 +79,7 @@ gallery-index.html
 preview-*.html
 __pycache__/
 *.pyc
+/target
+/tmp/
+/.ally/
+spec/quality/locks/

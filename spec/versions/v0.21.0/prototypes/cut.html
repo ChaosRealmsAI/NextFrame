@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NextFrame · v0.21.0 · cut</title>
+<link rel="stylesheet" href="../../../design/tokens.css">
+<style>
+  html,
+  body {
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  body {
+    font-family: var(--font);
+    color: var(--fg);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+
+  .shell {
+    min-height: 100vh;
+    padding: 24px;
+    display: grid;
+    place-items: center;
+  }
+
+  .app {
+    width: min(1360px, calc(100vw - 48px));
+    height: min(860px, calc(100vh - 48px));
+    min-height: 720px;
+    display: grid;
+    grid-template-rows: 48px 35fr 65fr;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .app::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 180px;
+    background: radial-gradient(ellipse 60% 100% at 50% 0%, rgba(255,255,255,0.04), transparent 70%);
+    pointer-events: none;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px 0 18px;
+    border-bottom: 1px solid var(--bd);
+    background: rgba(8, 8, 12, 0.42);
+    backdrop-filter: blur(30px) saturate(1.4);
+    -webkit-backdrop-filter: blur(30px) saturate(1.4);
+    position: relative;
+    z-index: 1;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .mark {
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--accent-b);
+    position: relative;
+  }
+
+  .mark::before,
+  .mark::after {
+    content: "";
+    position: absolute;
+    background: var(--accent);
+  }
+
+  .mark::before {
+    width: 8px;
+    height: 1px;
+    left: 4px;
+    top: 8px;
+  }
+
+  .mark::after {
+    width: 1px;
+    height: 8px;
+    left: 8px;
+    top: 4px;
+  }
+
+  .brand strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--fg);
+  }
+
+  .crumb {
+    color: var(--accent-l);
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .route {
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  .dots {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .dots span {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--bd);
+    background: var(--accent-b);
+  }
+
+  .dots span:nth-child(2) { background: var(--amber-b); }
+  .dots span:nth-child(3) { background: rgba(123, 201, 181, 0.28); }
+
+  .preview {
+    display: grid;
+    grid-template-columns: minmax(460px, 1fr) 320px;
+    gap: 18px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--bd);
+    background:
+      linear-gradient(90deg, rgba(167,139,250,0.06), transparent 42%),
+      rgba(0, 0, 0, 0.06);
+    min-height: 0;
+  }
+
+  .frame {
+    position: relative;
+    min-height: 0;
+    border: 1px solid var(--bd);
+    background:
+      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+      radial-gradient(ellipse 60% 70% at 48% 42%, rgba(167,139,250,0.2), transparent 70%),
+      rgba(8, 8, 12, 0.5);
+    background-size: 34px 34px, 34px 34px, auto, auto;
+    overflow: hidden;
+  }
+
+  .frame::before {
+    content: "";
+    position: absolute;
+    inset: 22px;
+    border: 1px solid var(--bd-2);
+    background:
+      linear-gradient(90deg, rgba(167,139,250,0.22), transparent 34%),
+      rgba(255,255,255,0.018);
+  }
+
+  .screen-title {
+    position: absolute;
+    left: 54px;
+    top: 48px;
+    max-width: 440px;
+  }
+
+  .eyebrow {
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .screen-title h1 {
+    margin: 10px 0 8px;
+    font-size: clamp(32px, 4.6vw, 56px);
+    line-height: 0.96;
+    letter-spacing: -0.02em;
+  }
+
+  .screen-title p {
+    margin: 0;
+    color: var(--fg-2);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .ai-callout {
+    position: absolute;
+    right: 54px;
+    top: 48px;
+    width: 270px;
+    padding: 12px;
+    border: 1px solid var(--accent-b);
+    background: rgba(14, 14, 19, 0.58);
+    backdrop-filter: blur(26px) saturate(1.5);
+    -webkit-backdrop-filter: blur(26px) saturate(1.5);
+  }
+
+  .ai-callout .label {
+    color: var(--accent-l);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .ai-callout p {
+    margin: 8px 0 0;
+    color: var(--fg);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .focus-box {
+    position: absolute;
+    left: 44%;
+    top: 45%;
+    width: 28%;
+    height: 30%;
+    border: 1px solid var(--amber-b);
+    background: var(--amber-t);
+  }
+
+  .focus-box::after {
+    content: "正在改这段";
+    position: absolute;
+    left: 10px;
+    top: -28px;
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .summary {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 12px;
+    min-height: 0;
+  }
+
+  .metric-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .metric,
+  .terms {
+    border: 1px solid var(--bd);
+    background: rgba(8, 8, 12, 0.42);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  }
+
+  .metric {
+    padding: 10px;
+    min-width: 0;
+  }
+
+  .metric .k {
+    color: var(--accent-l);
+    font-size: 10px;
+    font-weight: 750;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .metric .v {
+    margin-top: 8px;
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 750;
+  }
+
+  .terms {
+    padding: 14px;
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  .term {
+    border-left: 2px solid var(--accent-b);
+    padding-left: 10px;
+  }
+
+  .term strong {
+    display: block;
+    color: var(--fg);
+    font-size: 13px;
+  }
+
+  .term span {
+    display: block;
+    margin-top: 3px;
+    color: var(--fg-2);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .timeline {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 8px;
+    padding: 16px 20px 18px;
+    min-height: 0;
+    background: rgba(8, 8, 12, 0.28);
+  }
+
+  .tl-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .tl-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .tl-title h2 {
+    margin: 0;
+    color: var(--fg);
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .tl-title span,
+  .tl-note {
+    color: var(--accent-l);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .tl-note {
+    color: var(--fg-2);
+    font-family: var(--mono);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .tl-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: 154px 1fr;
+    grid-template-rows: 22px repeat(6, minmax(42px, 1fr)) 28px;
+    gap: 6px 12px;
+    min-height: 0;
+  }
+
+  .ruler {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: end;
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  .ruler span {
+    border-left: 1px solid var(--amber-b);
+    padding-left: 6px;
+    height: 18px;
+  }
+
+  .track-label {
+    display: grid;
+    align-content: center;
+    gap: 3px;
+    padding: 0 10px;
+    border: 1px solid var(--bd-2);
+    background: rgba(255,255,255,0.018);
+    min-width: 0;
+  }
+
+  .track-label strong {
+    color: var(--fg);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .track-label span {
+    color: var(--accent-l);
+    font-family: var(--mono);
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .lane {
+    position: relative;
+    border: 1px solid var(--bd-2);
+    background:
+      linear-gradient(90deg, transparent calc(25% - 1px), var(--bd-2) calc(25% - 1px), var(--bd-2) 25%, transparent 25%),
+      linear-gradient(90deg, transparent calc(50% - 1px), var(--bd-2) calc(50% - 1px), var(--bd-2) 50%, transparent 50%),
+      linear-gradient(90deg, transparent calc(75% - 1px), var(--bd-2) calc(75% - 1px), var(--bd-2) 75%, transparent 75%),
+      rgba(255,255,255,0.014);
+    overflow: hidden;
+  }
+
+  .clip,
+  .ghost {
+    position: absolute;
+    top: 8px;
+    height: calc(100% - 16px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 10px;
+    border: 1px solid var(--bd);
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 64px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .clip code {
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+
+  .clip .time {
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .clip.purple {
+    background: rgba(167,139,250,0.2);
+    border-color: var(--accent-b);
+  }
+
+  .clip.amber {
+    background: var(--amber-t);
+    border-color: var(--amber-b);
+  }
+
+  .clip.teal {
+    background: rgba(123,201,181,0.15);
+    border-color: rgba(123,201,181,0.34);
+  }
+
+  .clip.gray {
+    background: rgba(255,255,255,0.07);
+    border-color: var(--gray);
+  }
+
+  .clip.active {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22);
+  }
+
+  .ghost {
+    top: 8px;
+    background: repeating-linear-gradient(
+      90deg,
+      rgba(224,183,108,0.08) 0,
+      rgba(224,183,108,0.08) 8px,
+      rgba(224,183,108,0.03) 8px,
+      rgba(224,183,108,0.03) 16px
+    );
+    border: 1px dashed var(--amber-b);
+    color: var(--amber-l);
+    justify-content: flex-end;
+    z-index: 0;
+  }
+
+  .cut-badge {
+    position: absolute;
+    right: 13.1%;
+    top: -16px;
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .playhead {
+    position: absolute;
+    left: calc(75% + 154px + 12px);
+    top: 28px;
+    bottom: 34px;
+    width: 1px;
+    background: rgba(255,255,255,0.68);
+    z-index: 4;
+  }
+
+  .playhead::before {
+    content: "18s";
+    position: absolute;
+    left: -16px;
+    top: -20px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .timecode {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 12px;
+    border-top: 1px solid var(--bd-2);
+  }
+
+  .timecode span {
+    border-left: 1px solid var(--amber-b);
+    padding-left: 6px;
+  }
+
+  .ai-log {
+    position: absolute;
+    right: 20px;
+    bottom: 18px;
+    width: 370px;
+    padding: 12px;
+    border: 1px solid var(--bd);
+    background: rgba(8, 8, 12, 0.68);
+    backdrop-filter: blur(26px) saturate(1.4);
+    -webkit-backdrop-filter: blur(26px) saturate(1.4);
+    z-index: 5;
+  }
+
+  .ai-log h3 {
+    margin: 0 0 9px;
+    color: var(--accent-l);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .ai-log ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .ai-log li {
+    color: var(--fg-2);
+    display: grid;
+    grid-template-columns: 45px 1fr;
+    gap: 8px;
+  }
+
+  .ai-log time {
+    color: var(--amber);
+  }
+
+  .ai-log code {
+    color: var(--accent-l);
+    font-family: var(--mono);
+  }
+
+  @media (max-width: 980px) {
+    body { overflow: auto; }
+    .shell { align-items: start; }
+    .app {
+      width: calc(100vw - 32px);
+      height: auto;
+      min-height: 980px;
+      grid-template-rows: 48px 360px 620px;
+    }
+    .preview { grid-template-columns: 1fr; }
+    .summary { display: none; }
+    .ai-log { width: calc(100% - 40px); }
+  }
+</style>
+</head>
+<body class="nf-bg">
+  <main class="shell">
+    <section class="app nf-glass" aria-label="NextFrame cut prototype">
+      <header class="topbar">
+        <div class="brand">
+          <span class="mark" aria-hidden="true"></span>
+          <strong>NextFrame</strong>
+          <span class="crumb">v0.21.0-design</span>
+          <span class="route">cut 路</span>
+        </div>
+        <div class="dots" aria-label="mac window controls"><span></span><span></span><span></span></div>
+      </header>
+
+      <section class="preview" aria-label="preview">
+        <div class="frame">
+          <div class="screen-title">
+            <div class="eyebrow">showreel-24s · current frame</div>
+            <h1>One JSON controls a live HTML video</h1>
+            <p>AI 正在把 body 段压短，让后面的 browser-frame 和 final-title 自动前移。</p>
+          </div>
+          <div class="ai-callout">
+            <div class="label">AI annotation</div>
+            <p>正在改这段：<strong>data-dashboard</strong> 保留核心画面，把 duration(时长) 从 12s 缩到 9s。</p>
+          </div>
+          <div class="focus-box" aria-hidden="true"></div>
+        </div>
+
+        <aside class="summary" aria-label="composition summary">
+          <div class="metric-row">
+            <div class="metric"><div class="k">composition</div><div class="v">24s</div></div>
+            <div class="metric"><div class="k">tracks</div><div class="v">13</div></div>
+            <div class="metric"><div class="k">cut</div><div class="v">-3s</div></div>
+          </div>
+          <div class="terms">
+            <div class="term">
+              <strong>composition(合成)</strong>
+              <span>一段视频 JSON：showreel-24s，duration 24s。</span>
+            </div>
+            <div class="term">
+              <strong>track(轨道)</strong>
+              <span>时间轴一行：组件、字幕或音频都按 start / end 排列。</span>
+            </div>
+            <div class="term">
+              <strong>duration(时长)</strong>
+              <span>一个 track 从 start 到 end 的持续时间。</span>
+            </div>
+            <div class="term">
+              <strong>validate(校验)</strong>
+              <span>AI 改完后检查 component、时间重叠和 JSON 契约。</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="timeline" aria-label="timeline">
+        <div class="tl-head">
+          <div class="tl-title">
+            <h2>AI 怎么剪辑 composition</h2>
+            <span>timeline-driven</span>
+          </div>
+          <div class="tl-note">showreel-24s.json · anchors: intro / layers / code / data / browser / finale / out</div>
+        </div>
+
+        <div class="tl-body">
+          <div></div>
+          <div class="ruler"><span>0s</span><span>6s</span><span>12s</span><span>18s</span><span>24s</span></div>
+
+          <div class="track-label"><strong>Track 1</strong><span>main-title · html.sequence-title</span></div>
+          <div class="lane">
+            <div class="clip purple" style="left: 0%; width: 23.333%;"><code>main-title</code><span class="time">0-5.6s</span></div>
+          </div>
+
+          <div class="track-label"><strong>Track 2</strong><span>layer-stack · html.layer-stack</span></div>
+          <div class="lane">
+            <div class="clip amber" style="left: 13.333%; width: 21.667%;"><code>layer-stack</code><span class="time">3.2-8.4s</span></div>
+          </div>
+
+          <div class="track-label"><strong>Track 3</strong><span>code-terminal · html.code-terminal</span></div>
+          <div class="lane">
+            <div class="clip teal" style="left: 30%; width: 28.333%;"><code>code-terminal</code><span class="time">7.2-14s</span></div>
+          </div>
+
+          <div class="track-label"><strong>Track 4</strong><span>data-dashboard · body cut</span></div>
+          <div class="lane">
+            <div class="ghost" style="left: 37.5%; width: 50%;">原 body 9-21s · 12s</div>
+            <div class="clip amber active" style="left: 37.5%; width: 37.5%;"><code>data-dashboard</code><span class="time">9s → 18s · 9s</span></div>
+            <div class="cut-badge">duration 12s → 9s</div>
+          </div>
+
+          <div class="track-label"><strong>Track 5</strong><span>browser-frame · html.browser-frame</span></div>
+          <div class="lane">
+            <div class="clip purple" style="left: 65%; width: 35%;"><code>browser-frame</code><span class="time">15.6-24s</span></div>
+          </div>
+
+          <div class="track-label"><strong>Track 6</strong><span>voice-outro · audio</span></div>
+          <div class="lane">
+            <div class="clip teal" style="left: 48.333%; width: 51.667%;"><code>voice-outro</code><span class="time">11.6-24s</span></div>
+          </div>
+
+          <div></div>
+          <div class="timecode"><span>0s</span><span>6s</span><span>12s</span><span>18s</span><span>24s</span></div>
+
+          <div class="playhead" aria-hidden="true"></div>
+        </div>
+
+        <aside class="ai-log" aria-label="AI operation log">
+          <h3>AI 操作日志</h3>
+          <ul>
+            <li><time>14:22</time><span>检测到 <code>data-dashboard</code> body 太长</span></li>
+            <li><time>14:22</time><span>把 <code>duration(时长)</code> 从 12s 改到 9s</span></li>
+            <li><time>14:22</time><span>剪掉 18-21s，并把后段拼接到 18s</span></li>
+            <li><time>14:22</time><span>调整 <code>browser-frame</code> start 21s → 18s</span></li>
+            <li><time>14:22</time><span><code>validate(校验)</code> · passed</span></li>
+          </ul>
+        </aside>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

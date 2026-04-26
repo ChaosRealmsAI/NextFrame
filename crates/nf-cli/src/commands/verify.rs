@@ -76,6 +76,7 @@ fn build_report(
         &args.screenshot_dir,
     );
     let anchor_guide = build_anchor_guide(composition);
+    let clips = collect_authoring_clips(composition);
     let intent = VerificationIntent {
         overlap_policy: "allowed-by-default".to_string(),
         error_policy: "only explicit contract violations become errors; designed multi-track overlap is normal".to_string(),
@@ -148,6 +149,7 @@ fn build_report(
         composition: args.composition.clone(),
         summary: VerifySummary {
             duration_ms,
+            clips: clips.len(),
             tracks: tracks.len(),
             checks: checks.len(),
             errors,
@@ -168,9 +170,84 @@ fn build_report(
             ascii,
             tracks,
         },
+        clips,
         screenshot_plan,
         checks,
     }
+}
+
+fn collect_authoring_clips(composition: &Value) -> Vec<AuthoringClip> {
+    composition
+        .get("clips")
+        .and_then(Value::as_array)
+        .map(|clips| {
+            clips
+                .iter()
+                .filter_map(|clip| {
+                    let object = clip.as_object()?;
+                    let id = object.get("id").and_then(Value::as_str)?.to_string();
+                    let title = object
+                        .get("title")
+                        .or_else(|| object.get("name"))
+                        .and_then(Value::as_str)
+                        .unwrap_or(&id)
+                        .to_string();
+                    let anchors = object
+                        .get("anchors")
+                        .and_then(Value::as_object)
+                        .map(|items| {
+                            items
+                                .iter()
+                                .map(|(name, value)| AnchorEntry {
+                                    name: name.clone(),
+                                    expr: anchor_expr(value),
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    let tracks = object
+                        .get("tracks")
+                        .and_then(Value::as_array)
+                        .map(|tracks| {
+                            tracks
+                                .iter()
+                                .filter_map(|track| {
+                                    let track = track.as_object()?;
+                                    Some(AuthoringTrack {
+                                        id: track
+                                            .get("id")
+                                            .and_then(Value::as_str)
+                                            .unwrap_or("track")
+                                            .to_string(),
+                                        kind: track
+                                            .get("kind")
+                                            .and_then(Value::as_str)
+                                            .unwrap_or("component")
+                                            .to_string(),
+                                        items: track
+                                            .get("items")
+                                            .and_then(Value::as_array)
+                                            .map(|items| items.len())
+                                            .unwrap_or(1),
+                                    })
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    Some(AuthoringClip {
+                        id,
+                        title,
+                        duration: object
+                            .get("duration")
+                            .map(anchor_expr)
+                            .unwrap_or_else(|| "auto".to_string()),
+                        anchors,
+                        tracks,
+                    })
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default()
 }
 
 fn collect_tracks(raw_tracks: Option<&Vec<Value>>) -> Vec<TimelineTrack> {
@@ -207,6 +284,97 @@ fn collect_tracks(raw_tracks: Option<&Vec<Value>>) -> Vec<TimelineTrack> {
 }
 
 fn build_anchor_guide(composition: &Value) -> AnchorGuide {
+    if let Some(clips) = composition.get("clips").and_then(Value::as_array) {
+        let mut anchors = Vec::new();
+        let mut tracks = Vec::new();
+        for clip in clips {
+            let Some(clip_object) = clip.as_object() else {
+                continue;
+            };
+            let clip_id = clip_object
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or("clip");
+            let clip_anchors = clip_object
+                .get("anchors")
+                .and_then(Value::as_object)
+                .map(|items| {
+                    items
+                        .iter()
+                        .map(|(name, value)| AnchorEntry {
+                            name: format!("{clip_id}.{name}"),
+                            expr: anchor_expr(value),
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let anchor_names = clip_anchors
+                .iter()
+                .filter_map(|anchor| anchor.name.split('.').next_back())
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
+            let anchor_name_refs = anchor_names.iter().map(String::as_str).collect::<Vec<_>>();
+            anchors.extend(clip_anchors);
+            if let Some(raw_tracks) = clip_object.get("tracks").and_then(Value::as_array) {
+                for track in raw_tracks {
+                    let Some(track_object) = track.as_object() else {
+                        continue;
+                    };
+                    let track_id = track_object
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("track");
+                    let kind = track_object
+                        .get("kind")
+                        .and_then(Value::as_str)
+                        .unwrap_or("component");
+                    let items = track_object
+                        .get("items")
+                        .and_then(Value::as_array)
+                        .cloned()
+                        .unwrap_or_else(|| vec![track.clone()]);
+                    for item in items {
+                        let Some(item_object) = item.as_object() else {
+                            continue;
+                        };
+                        let item_id = item_object
+                            .get("id")
+                            .and_then(Value::as_str)
+                            .unwrap_or("item");
+                        let time = item_object
+                            .get("time")
+                            .and_then(Value::as_object)
+                            .or_else(|| track_object.get("time").and_then(Value::as_object));
+                        let start = time
+                            .and_then(|value| value.get("start"))
+                            .or_else(|| item_object.get("start"))
+                            .or_else(|| track_object.get("start"));
+                        let end = time
+                            .and_then(|value| value.get("end"))
+                            .or_else(|| item_object.get("end"))
+                            .or_else(|| track_object.get("end"));
+                        tracks.push(TrackAnchorUsage {
+                            track: format!("{clip_id}.{track_id}.{item_id}:{kind}"),
+                            start: start.map(anchor_expr),
+                            end: end.map(anchor_expr),
+                            start_uses_anchor: start
+                                .and_then(Value::as_str)
+                                .is_some_and(|expr| expr_uses_anchor(expr, &anchor_name_refs)),
+                            end_uses_anchor: end
+                                .and_then(Value::as_str)
+                                .is_some_and(|expr| expr_uses_anchor(expr, &anchor_name_refs)),
+                        });
+                    }
+                }
+            }
+        }
+        return AnchorGuide {
+            rule: "Clip-local tracks should use clip-local anchors such as `in`, `voice`, and `out`.".to_string(),
+            examples: vec!["in".to_string(), "voice + 1s".to_string(), "out".to_string()],
+            anchors,
+            tracks,
+        };
+    }
     let anchors = composition
         .get("anchors")
         .and_then(Value::as_object)
@@ -667,6 +835,7 @@ struct VerifyReport {
     anchor_guide: AnchorGuide,
     component_validation: ComponentValidationSummary,
     timeline: VerifyTimeline,
+    clips: Vec<AuthoringClip>,
     screenshot_plan: Vec<ScreenshotPoint>,
     checks: Vec<VerifyCheck>,
 }
@@ -706,10 +875,27 @@ struct TrackAnchorUsage {
 #[derive(Debug, Serialize)]
 struct VerifySummary {
     duration_ms: u64,
+    clips: usize,
     tracks: usize,
     checks: usize,
     errors: usize,
     warnings: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct AuthoringClip {
+    id: String,
+    title: String,
+    duration: String,
+    anchors: Vec<AnchorEntry>,
+    tracks: Vec<AuthoringTrack>,
+}
+
+#[derive(Debug, Serialize)]
+struct AuthoringTrack {
+    id: String,
+    kind: String,
+    items: usize,
 }
 
 #[derive(Debug, Serialize)]
