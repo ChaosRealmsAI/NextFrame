@@ -37,7 +37,7 @@
               "params": {},
               "src": "audio/slide-01.mp3",
               "time": {
-                "end": "audio-end",
+                "end": "out",
                 "start": "in"
               },
               "volume": 1
@@ -56,9 +56,9 @@
               "params": {
                 "cues": [
                   {
-                    "end_ms": 920,
+                    "end_ms": 2781,
                     "start_ms": 560,
-                    "text": "v0.",
+                    "text": "v0210是design版本",
                     "words": [
                       {
                         "end_ms": 780,
@@ -69,14 +69,7 @@
                         "end_ms": 920,
                         "start_ms": 780,
                         "text": "0"
-                      }
-                    ]
-                  },
-                  {
-                    "end_ms": 1301,
-                    "start_ms": 1121,
-                    "text": "21.",
-                    "words": [
+                      },
                       {
                         "end_ms": 1141,
                         "start_ms": 1121,
@@ -86,14 +79,7 @@
                         "end_ms": 1301,
                         "start_ms": 1141,
                         "text": "1"
-                      }
-                    ]
-                  },
-                  {
-                    "end_ms": 12366,
-                    "start_ms": 1481,
-                    "text": "0 是 design 版本 · 一句话 · 就 3 张图 · 让 PM 5 秒看懂下版要做啥 · AI 把一段话变视频 · 看怎么生 · 怎么剪 · 怎么配音 · 三件事",
-                    "words": [
+                      },
                       {
                         "end_ms": 1741,
                         "start_ms": 1481,
@@ -143,7 +129,14 @@
                         "end_ms": 2781,
                         "start_ms": 2621,
                         "text": "本"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 7004,
+                    "start_ms": 3022,
+                    "text": "一句话就3张图让PM5秒看懂下版要做",
+                    "words": [
                       {
                         "end_ms": 3162,
                         "start_ms": 3022,
@@ -233,7 +226,14 @@
                         "end_ms": 7004,
                         "start_ms": 6823,
                         "text": "做"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 9405,
+                    "start_ms": 7004,
+                    "text": "啥AI把一段话变视频",
+                    "words": [
                       {
                         "end_ms": 7304,
                         "start_ms": 7004,
@@ -283,7 +283,14 @@
                         "end_ms": 9405,
                         "start_ms": 9105,
                         "text": "频"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 12366,
+                    "start_ms": 9685,
+                    "text": "看怎么生怎么剪怎么配音三件事",
+                    "words": [
                       {
                         "end_ms": 9925,
                         "start_ms": 9685,
@@ -374,7 +381,10 @@
           "items": [
             {
               "id": "bar",
-              "params": {},
+              "params": {
+                "clip_offset_ms": 0,
+                "composition_duration_ms": 116486
+              },
               "time": {
                 "end": "out",
                 "start": "in"
@@ -424,7 +434,7 @@
               "params": {},
               "src": "audio/slide-02.mp3",
               "time": {
-                "end": "audio-end",
+                "end": "out",
                 "start": "in"
               },
               "volume": 1
@@ -443,9 +453,9 @@
               "params": {
                 "cues": [
                   {
-                    "end_ms": 14473,
+                    "end_ms": 2943,
                     "start_ms": 260,
-                    "text": "之前 PM 听 AI 说 我做了 X 功能 · PM 看不到 · 凭想象 · 动手了发现不是这意思 · 返工拆版沟通成本爆 · 现在 AI 出 3 张 hifi 图 · PM 看图 5 秒懂 · 点头才动工 · 不返工",
+                    "text": "之前PM听AI说我做了X功能",
                     "words": [
                       {
                         "end_ms": 400,
@@ -516,7 +526,14 @@
                         "end_ms": 2943,
                         "start_ms": 2722,
                         "text": "能"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 6506,
+                    "start_ms": 3283,
+                    "text": "PM看不到凭想象动手了发现不是这意思",
+                    "words": [
                       {
                         "end_ms": 3483,
                         "start_ms": 3283,
@@ -606,7 +623,14 @@
                         "end_ms": 6506,
                         "start_ms": 6386,
                         "text": "思"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 8748,
+                    "start_ms": 6886,
+                    "text": "返工拆版沟通成本爆",
+                    "words": [
                       {
                         "end_ms": 7066,
                         "start_ms": 6886,
@@ -651,7 +675,14 @@
                         "end_ms": 8748,
                         "start_ms": 8588,
                         "text": "爆"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 11490,
+                    "start_ms": 9088,
+                    "text": "现在AI出3张hifi图",
+                    "words": [
                       {
                         "end_ms": 9288,
                         "start_ms": 9088,
@@ -711,7 +742,14 @@
                         "end_ms": 11490,
                         "start_ms": 10970,
                         "text": "图"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 12831,
+                    "start_ms": 11650,
+                    "text": "PM看图5秒懂",
+                    "words": [
                       {
                         "end_ms": 11731,
                         "start_ms": 11650,
@@ -746,7 +784,14 @@
                         "end_ms": 12831,
                         "start_ms": 12691,
                         "text": "懂"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 14473,
+                    "start_ms": 13092,
+                    "text": "点头才动工不返工",
+                    "words": [
                       {
                         "end_ms": 13272,
                         "start_ms": 13092,
@@ -807,7 +852,10 @@
           "items": [
             {
               "id": "bar",
-              "params": {},
+              "params": {
+                "clip_offset_ms": 13866,
+                "composition_duration_ms": 116486
+              },
               "time": {
                 "end": "out",
                 "start": "in"
@@ -857,7 +905,7 @@
               "params": {},
               "src": "audio/slide-03.mp3",
               "time": {
-                "end": "audio-end",
+                "end": "out",
                 "start": "in"
               },
               "volume": 1
@@ -876,9 +924,9 @@
               "params": {
                 "cues": [
                   {
-                    "end_ms": 801,
+                    "end_ms": 2584,
                     "start_ms": 300,
-                    "text": "v0.",
+                    "text": "v0210全部3件",
                     "words": [
                       {
                         "end_ms": 581,
@@ -889,14 +937,7 @@
                         "end_ms": 801,
                         "start_ms": 581,
                         "text": "0"
-                      }
-                    ]
-                  },
-                  {
-                    "end_ms": 1342,
-                    "start_ms": 981,
-                    "text": "21.",
-                    "words": [
+                      },
                       {
                         "end_ms": 1162,
                         "start_ms": 981,
@@ -906,14 +947,7 @@
                         "end_ms": 1342,
                         "start_ms": 1162,
                         "text": "1"
-                      }
-                    ]
-                  },
-                  {
-                    "end_ms": 16623,
-                    "start_ms": 1542,
-                    "text": "0 全部 3 件 · 一张图看完 · 看 是 script · 从一段话 → composition · 剪 是 cut · 调时长拼接剪掉 · 配 是 TTS · 文字到配音加字幕 · 都是静态图 · 看了点头 · 才动工",
-                    "words": [
+                      },
                       {
                         "end_ms": 1903,
                         "start_ms": 1542,
@@ -938,7 +972,14 @@
                         "end_ms": 2584,
                         "start_ms": 2564,
                         "text": "件"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 3865,
+                    "start_ms": 2924,
+                    "text": "一张图看完",
+                    "words": [
                       {
                         "end_ms": 3044,
                         "start_ms": 2924,
@@ -963,7 +1004,14 @@
                         "end_ms": 3865,
                         "start_ms": 3665,
                         "text": "完"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 6709,
+                    "start_ms": 4226,
+                    "text": "看是script从一段话→compo",
+                    "words": [
                       {
                         "end_ms": 4526,
                         "start_ms": 4226,
@@ -1053,7 +1101,14 @@
                         "end_ms": 6709,
                         "start_ms": 6649,
                         "text": "o"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 7110,
+                    "start_ms": 6709,
+                    "text": "sition",
+                    "words": [
                       {
                         "end_ms": 6770,
                         "start_ms": 6709,
@@ -1083,7 +1138,14 @@
                         "end_ms": 7110,
                         "start_ms": 7090,
                         "text": "n"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 10274,
+                    "start_ms": 7390,
+                    "text": "剪是cut调时长拼接剪掉",
+                    "words": [
                       {
                         "end_ms": 7691,
                         "start_ms": 7390,
@@ -1143,7 +1205,14 @@
                         "end_ms": 10274,
                         "start_ms": 10094,
                         "text": "掉"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 15422,
+                    "start_ms": 10695,
+                    "text": "配是TTS文字到配音加字幕都是静态图",
+                    "words": [
                       {
                         "end_ms": 10996,
                         "start_ms": 10695,
@@ -1233,7 +1302,14 @@
                         "end_ms": 15422,
                         "start_ms": 14901,
                         "text": "图"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 16623,
+                    "start_ms": 15442,
+                    "text": "看了点头才动工",
+                    "words": [
                       {
                         "end_ms": 15582,
                         "start_ms": 15442,
@@ -1289,7 +1365,10 @@
           "items": [
             {
               "id": "bar",
-              "params": {},
+              "params": {
+                "clip_offset_ms": 29839,
+                "composition_duration_ms": 116486
+              },
               "time": {
                 "end": "out",
                 "start": "in"
@@ -1339,7 +1418,7 @@
               "params": {},
               "src": "audio/slide-04.mp3",
               "time": {
-                "end": "audio-end",
+                "end": "out",
                 "start": "in"
               },
               "volume": 1
@@ -1358,9 +1437,9 @@
               "params": {
                 "cues": [
                   {
-                    "end_ms": 9984,
+                    "end_ms": 5042,
                     "start_ms": 280,
-                    "text": "看 这张 · 三格漫画 · 给定 · PM 想看 AI 怎么从 script 生 composition · 当 · AI 出 script.",
+                    "text": "看这张三格漫画给定PM想看AI怎么从",
                     "words": [
                       {
                         "end_ms": 460,
@@ -1451,7 +1530,14 @@
                         "end_ms": 5042,
                         "start_ms": 4782,
                         "text": "从"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 7063,
+                    "start_ms": 5042,
+                    "text": "script生composition",
+                    "words": [
                       {
                         "end_ms": 5062,
                         "start_ms": 5042,
@@ -1541,7 +1627,14 @@
                         "end_ms": 7063,
                         "start_ms": 7003,
                         "text": "n"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 11845,
+                    "start_ms": 7363,
+                    "text": "当AI出scripthtml真静态图",
+                    "words": [
                       {
                         "end_ms": 7623,
                         "start_ms": 7363,
@@ -1591,14 +1684,7 @@
                         "end_ms": 9984,
                         "start_ms": 9964,
                         "text": "t"
-                      }
-                    ]
-                  },
-                  {
-                    "end_ms": 18308,
-                    "start_ms": 10224,
-                    "text": "html 真静态图 · 那么 · PM 看到 4 个 track 时间轴 + AI 标注 · 5 秒看懂 · 不用读代码",
-                    "words": [
+                      },
                       {
                         "end_ms": 10364,
                         "start_ms": 10224,
@@ -1638,7 +1724,14 @@
                         "end_ms": 11845,
                         "start_ms": 11825,
                         "text": "图"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 15287,
+                    "start_ms": 12485,
+                    "text": "那么PM看到4个track时间轴",
+                    "words": [
                       {
                         "end_ms": 12605,
                         "start_ms": 12485,
@@ -1718,7 +1811,14 @@
                         "end_ms": 15287,
                         "start_ms": 15026,
                         "text": "轴"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 18308,
+                    "start_ms": 15467,
+                    "text": "AI标注5秒看懂不用读代码",
+                    "words": [
                       {
                         "end_ms": 15767,
                         "start_ms": 15467,
@@ -1804,7 +1904,10 @@
           "items": [
             {
               "id": "bar",
-              "params": {},
+              "params": {
+                "clip_offset_ms": 47962,
+                "composition_duration_ms": 116486
+              },
               "time": {
                 "end": "out",
                 "start": "in"
@@ -1854,7 +1957,7 @@
               "params": {},
               "src": "audio/slide-05.mp3",
               "time": {
-                "end": "audio-end",
+                "end": "out",
                 "start": "in"
               },
               "volume": 1
@@ -1873,9 +1976,9 @@
               "params": {
                 "cues": [
                   {
-                    "end_ms": 15161,
+                    "end_ms": 2964,
                     "start_ms": 401,
-                    "text": "剪 这张 · 给定 · composition body 段太长 · 节奏拖 · 当 · AI 缩短 body 3 秒 · 12 秒变 9 秒 · 自动重对齐 · 那么 · 时间轴干净 · outro 跟着挪 · revalidate 通过",
+                    "text": "剪这张给定compositionbo",
                     "words": [
                       {
                         "end_ms": 741,
@@ -1966,7 +2069,14 @@
                         "end_ms": 2964,
                         "start_ms": 2924,
                         "text": "o"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 4947,
+                    "start_ms": 2964,
+                    "text": "dy段太长节奏拖",
+                    "words": [
                       {
                         "end_ms": 3044,
                         "start_ms": 2964,
@@ -2006,7 +2116,14 @@
                         "end_ms": 4947,
                         "start_ms": 4666,
                         "text": "拖"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 7590,
+                    "start_ms": 5407,
+                    "text": "当AI缩短body3秒",
+                    "words": [
                       {
                         "end_ms": 5648,
                         "start_ms": 5407,
@@ -2061,7 +2178,14 @@
                         "end_ms": 7590,
                         "start_ms": 7370,
                         "text": "秒"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 8872,
+                    "start_ms": 7851,
+                    "text": "12秒变9秒",
+                    "words": [
                       {
                         "end_ms": 7991,
                         "start_ms": 7851,
@@ -2091,7 +2215,14 @@
                         "end_ms": 8872,
                         "start_ms": 8852,
                         "text": "秒"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 10414,
+                    "start_ms": 9333,
+                    "text": "自动重对齐",
+                    "words": [
                       {
                         "end_ms": 9453,
                         "start_ms": 9333,
@@ -2116,7 +2247,14 @@
                         "end_ms": 10414,
                         "start_ms": 10174,
                         "text": "齐"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 13759,
+                    "start_ms": 10875,
+                    "text": "那么时间轴干净outro跟着挪",
+                    "words": [
                       {
                         "end_ms": 10975,
                         "start_ms": 10875,
@@ -2191,7 +2329,14 @@
                         "end_ms": 13759,
                         "start_ms": 13418,
                         "text": "挪"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 15161,
+                    "start_ms": 13979,
+                    "text": "revalidate通过",
+                    "words": [
                       {
                         "end_ms": 14039,
                         "start_ms": 13979,
@@ -2272,7 +2417,10 @@
           "items": [
             {
               "id": "bar",
-              "params": {},
+              "params": {
+                "clip_offset_ms": 67770,
+                "composition_duration_ms": 116486
+              },
               "time": {
                 "end": "out",
                 "start": "in"
@@ -2322,7 +2470,7 @@
               "params": {},
               "src": "audio/slide-06.mp3",
               "time": {
-                "end": "audio-end",
+                "end": "out",
                 "start": "in"
               },
               "volume": 1
@@ -2341,9 +2489,9 @@
               "params": {
                 "cues": [
                   {
-                    "end_ms": 14147,
+                    "end_ms": 3101,
                     "start_ms": 260,
-                    "text": "配音 这张 · 给定 · composition 缺配音 · 视频默片 · 当 · AI 切句 7 段 · 派 vox 并行配音 · mp3 一个个出 · 那么 · 7 行波形齐 · word-level 字幕同步 · 7 段全 ok",
+                    "text": "配音这张给定composition缺",
                     "words": [
                       {
                         "end_ms": 400,
@@ -2434,7 +2582,14 @@
                         "end_ms": 3101,
                         "start_ms": 2841,
                         "text": "缺"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 4322,
+                    "start_ms": 3101,
+                    "text": "配音视频默片",
+                    "words": [
                       {
                         "end_ms": 3262,
                         "start_ms": 3101,
@@ -2464,7 +2619,14 @@
                         "end_ms": 4322,
                         "start_ms": 4282,
                         "text": "片"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 8324,
+                    "start_ms": 4742,
+                    "text": "当AI切句7段派vox并行配音",
+                    "words": [
                       {
                         "end_ms": 4962,
                         "start_ms": 4742,
@@ -2539,7 +2701,14 @@
                         "end_ms": 8324,
                         "start_ms": 7984,
                         "text": "音"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 9564,
+                    "start_ms": 8444,
+                    "text": "mp3一个个出",
+                    "words": [
                       {
                         "end_ms": 8524,
                         "start_ms": 8444,
@@ -2574,7 +2743,14 @@
                         "end_ms": 9564,
                         "start_ms": 9384,
                         "text": "出"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 12746,
+                    "start_ms": 10045,
+                    "text": "那么7行波形齐wordlevel字幕",
+                    "words": [
                       {
                         "end_ms": 10125,
                         "start_ms": 10045,
@@ -2664,7 +2840,14 @@
                         "end_ms": 12746,
                         "start_ms": 12586,
                         "text": "幕"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 14147,
+                    "start_ms": 12746,
+                    "text": "同步7段全ok",
+                    "words": [
                       {
                         "end_ms": 13006,
                         "start_ms": 12746,
@@ -2720,7 +2903,10 @@
           "items": [
             {
               "id": "bar",
-              "params": {},
+              "params": {
+                "clip_offset_ms": 84431,
+                "composition_duration_ms": 116486
+              },
               "time": {
                 "end": "out",
                 "start": "in"
@@ -2770,7 +2956,7 @@
               "params": {},
               "src": "audio/slide-07.mp3",
               "time": {
-                "end": "audio-end",
+                "end": "out",
                 "start": "in"
               },
               "volume": 1
@@ -2789,9 +2975,9 @@
               "params": {
                 "cues": [
                   {
-                    "end_ms": 700,
+                    "end_ms": 4262,
                     "start_ms": 280,
-                    "text": "v0.",
+                    "text": "v0210交付就6张图3张hifip",
                     "words": [
                       {
                         "end_ms": 520,
@@ -2802,14 +2988,7 @@
                         "end_ms": 700,
                         "start_ms": 520,
                         "text": "0"
-                      }
-                    ]
-                  },
-                  {
-                    "end_ms": 1381,
-                    "start_ms": 840,
-                    "text": "21.",
-                    "words": [
+                      },
                       {
                         "end_ms": 1201,
                         "start_ms": 840,
@@ -2819,14 +2998,7 @@
                         "end_ms": 1381,
                         "start_ms": 1201,
                         "text": "1"
-                      }
-                    ]
-                  },
-                  {
-                    "end_ms": 16408,
-                    "start_ms": 1641,
-                    "text": "0 交付就 6 张图 · 3 张 hifi prototype · 3 张 BDD 分镜 · 验收方式 · 双击打开看 · 看 GIVEN WHEN THEN · 5 秒能描述清楚就过 · 不用读代码 · 不用跑 demo · PM 看一遍点头 · 才动工",
-                    "words": [
+                      },
                       {
                         "end_ms": 1661,
                         "start_ms": 1641,
@@ -2896,7 +3068,14 @@
                         "end_ms": 4262,
                         "start_ms": 4242,
                         "text": "p"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 7283,
+                    "start_ms": 4262,
+                    "text": "rototype3张BDD分镜验收方",
+                    "words": [
                       {
                         "end_ms": 4402,
                         "start_ms": 4262,
@@ -2986,7 +3165,14 @@
                         "end_ms": 7283,
                         "start_ms": 7103,
                         "text": "方"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 10545,
+                    "start_ms": 7283,
+                    "text": "式双击打开看看GIVENWHENTH",
+                    "words": [
                       {
                         "end_ms": 7303,
                         "start_ms": 7283,
@@ -3076,7 +3262,14 @@
                         "end_ms": 10545,
                         "start_ms": 10505,
                         "text": "H"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 13226,
+                    "start_ms": 10545,
+                    "text": "EN5秒能描述清楚就过不用读代码",
+                    "words": [
                       {
                         "end_ms": 10645,
                         "start_ms": 10545,
@@ -3156,7 +3349,14 @@
                         "end_ms": 13226,
                         "start_ms": 13206,
                         "text": "码"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 14347,
+                    "start_ms": 13526,
+                    "text": "不用跑demo",
+                    "words": [
                       {
                         "end_ms": 13586,
                         "start_ms": 13526,
@@ -3191,7 +3391,14 @@
                         "end_ms": 14347,
                         "start_ms": 14187,
                         "text": "o"
-                      },
+                      }
+                    ]
+                  },
+                  {
+                    "end_ms": 16408,
+                    "start_ms": 14707,
+                    "text": "PM看一遍点头才动工",
+                    "words": [
                       {
                         "end_ms": 15027,
                         "start_ms": 14707,
@@ -3262,7 +3469,10 @@
           "items": [
             {
               "id": "bar",
-              "params": {},
+              "params": {
+                "clip_offset_ms": 100078,
+                "composition_duration_ms": 116486
+              },
               "time": {
                 "end": "out",
                 "start": "in"

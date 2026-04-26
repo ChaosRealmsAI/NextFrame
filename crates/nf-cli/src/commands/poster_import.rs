@@ -16,9 +16,11 @@ mod poster_import_tests;
 mod poster_import_types;
 
 use poster_import_io::{copy_file, file_url, write_json};
-use poster_import_types::{Cue, CueWord, ImportPlan, Manifest, PosterFile, SlideImport, Timeline};
+use poster_import_types::{
+    Cue, CueWord, ImportPlan, Manifest, PosterFile, SlideImport, Timeline, TimelineWord,
+};
 #[cfg(test)]
-use poster_import_types::{TimelineSegment, TimelineWord};
+use poster_import_types::TimelineSegment;
 
 const COMPOSITION_ID: &str = "main";
 const IMAGE_COMPONENT: &str = "html.image-slide";
@@ -89,6 +91,23 @@ fn build_import(
         .join(project_slug)
         .join("components")
         .join("posters");
+    // First pass · compute total composition duration so progress-bar items can carry
+    // composition_duration_ms / clip_offset_ms (clip-local components otherwise see only
+    // their own clip span).
+    let mut clip_durations: Vec<u64> = Vec::with_capacity(manifest.entries.len());
+    for (idx, entry) in manifest.entries.iter().enumerate() {
+        let timeline_src = timeline_path(src_dir, &entry.file)?;
+        let timeline = read_timeline(&timeline_src)?;
+        let audio_dur = duration_ms(&timeline)?;
+        let clip_dur = if idx + 1 == manifest.entries.len() {
+            audio_dur
+        } else {
+            audio_dur + gap_ms
+        };
+        clip_durations.push(clip_dur);
+    }
+    let composition_total_ms: u64 = clip_durations.iter().sum();
+
     let mut slides = Vec::with_capacity(manifest.entries.len());
     let mut clips: Vec<Value> = Vec::with_capacity(manifest.entries.len());
     let mut total_cues = 0_usize;
@@ -155,7 +174,11 @@ fn build_import(
                 "style": {},
                 "items": [{
                     "id": "voice",
-                    "time": { "start": "in", "end": "audio-end" },
+                    // Audio spans the full clip · gap silence is expressed via anchors
+                    // (audio-end < out) not by truncating the audio track. The mp3 file
+                    // is only audio-end ms long, so the runtime naturally stops at end-of-file
+                    // and the remaining clip time is silence — no forced pause/cutoff.
+                    "time": { "start": "in", "end": "out" },
                     "src": format!("audio/{audio_name}"),
                     "volume": 1,
                     "params": {}
@@ -182,7 +205,10 @@ fn build_import(
                 "items": [{
                     "id": "bar",
                     "time": { "start": "in", "end": "out" },
-                    "params": {}
+                    "params": {
+                        "composition_duration_ms": composition_total_ms,
+                        "clip_offset_ms": total_duration_ms
+                    }
                 }]
             }),
         ];
@@ -453,48 +479,102 @@ fn duration_ms(timeline: &Timeline) -> Result<u64, NfError> {
 }
 
 fn extract_cues_fallback(timeline: &Timeline, cumulative_ms: u64) -> Result<Vec<Cue>, NfError> {
-    // TODO when nf-cue CLI lands · swap fallback for: spawn nf cue --timeline=... and parse stdout cues[]
-    let mut cues = Vec::with_capacity(timeline.segments.len());
-    for segment in &timeline.segments {
-        let text = segment.text.trim();
-        if text.is_empty() {
-            return Err(validation("timeline segment text must not be empty"));
-        }
-        if segment.end_ms <= segment.start_ms {
+    // Rule-based cue splitter · keeps each cue ≤ MAX_CHARS visible chars and breaks on the
+    // longest natural pause inside a segment. LLM-driven `nf cue` is the proper path · this
+    // fallback exists so playback is sensible even when the LLM endpoint is slow/down.
+    const MIN_CHARS: usize = 5; // never break before this · avoids 'v0' / '21' fragments
+    const SOFT_CHARS: usize = 12; // start looking for a pause once we hit this
+    const MAX_CHARS: usize = 18; // hard cap · break regardless of pause
+    const SOFT_PAUSE_MS: u64 = 80;
+    const STRONG_PAUSE_MS: u64 = 250;
+
+    // Flatten segments · vox splits on '.' so segment boundaries don't reflect natural cue
+    // breaks. Treat the whole timeline as one word stream and rely on inter-word pauses
+    // (already preserved across segments since words[].end_ms / start_ms are absolute).
+    let flat_words: Vec<&TimelineWord> = timeline
+        .segments
+        .iter()
+        .flat_map(|seg| seg.words.iter())
+        .filter(|w| !w.word.trim().is_empty())
+        .collect();
+
+    let mut cues: Vec<Cue> = Vec::new();
+    let mut buf_words: Vec<CueWord> = Vec::new();
+    let mut buf_chars: usize = 0;
+
+    for (i, word) in flat_words.iter().enumerate() {
+        let word_text = word.word.trim();
+        if word.end_ms <= word.start_ms {
             return Err(validation(format!(
-                "timeline segment '{}' end_ms must be greater than start_ms",
-                text
+                "timeline word '{}' end_ms must be greater than start_ms",
+                word_text
             )));
         }
-        let mut words = Vec::with_capacity(segment.words.len());
-        for word in &segment.words {
-            let word_text = word.word.trim();
-            if word_text.is_empty() {
-                return Err(validation("timeline word must not be empty"));
-            }
-            if word.end_ms <= word.start_ms {
-                return Err(validation(format!(
-                    "timeline word '{}' end_ms must be greater than start_ms",
-                    word_text
-                )));
-            }
-            words.push(CueWord {
-                text: word_text.to_string(),
-                start_ms: cumulative_ms + word.start_ms,
-                end_ms: cumulative_ms + word.end_ms,
-            });
-        }
-        cues.push(Cue {
-            text: text.to_string(),
-            start_ms: cumulative_ms + segment.start_ms,
-            end_ms: cumulative_ms + segment.end_ms,
-            words,
+        buf_words.push(CueWord {
+            text: word_text.to_string(),
+            start_ms: cumulative_ms + word.start_ms,
+            end_ms: cumulative_ms + word.end_ms,
         });
+        buf_chars += visible_char_count(word_text);
+
+        let next_pause = flat_words
+            .get(i + 1)
+            .map(|nw| nw.start_ms.saturating_sub(word.end_ms))
+            .unwrap_or(u64::MAX);
+        let is_last = i + 1 == flat_words.len();
+
+        let should_break = is_last
+            || buf_chars >= MAX_CHARS
+            || (buf_chars >= MIN_CHARS && {
+                (buf_chars >= SOFT_CHARS && next_pause >= SOFT_PAUSE_MS)
+                    || next_pause >= STRONG_PAUSE_MS
+            });
+
+        if should_break {
+            cues.push(finalize_cue(buf_words.drain(..).collect()));
+            buf_chars = 0;
+        }
     }
     if cues.is_empty() {
-        return Err(validation("timeline must contain at least one segment"));
+        return Err(validation("timeline must contain at least one cue-eligible word"));
     }
     Ok(cues)
+}
+
+fn finalize_cue(words: Vec<CueWord>) -> Cue {
+    let text = words
+        .iter()
+        .map(|w| w.text.as_str())
+        .collect::<Vec<_>>()
+        .join("");
+    let start_ms = words.first().map(|w| w.start_ms).unwrap_or(0);
+    let end_ms = words.last().map(|w| w.end_ms).unwrap_or(start_ms);
+    Cue {
+        text,
+        start_ms,
+        end_ms,
+        words,
+    }
+}
+
+fn visible_char_count(s: &str) -> usize {
+    // CJK chars count as 1; ascii letters/digits collapse so "AI" = 1 not 2.
+    let mut count = 0usize;
+    let mut in_ascii_run = false;
+    for ch in s.chars() {
+        if ch.is_ascii_alphanumeric() {
+            if !in_ascii_run {
+                count += 1;
+                in_ascii_run = true;
+            }
+        } else {
+            in_ascii_run = false;
+            if !ch.is_whitespace() && !ch.is_ascii_punctuation() {
+                count += 1;
+            }
+        }
+    }
+    count
 }
 
 fn validation(detail: impl Into<String>) -> NfError {

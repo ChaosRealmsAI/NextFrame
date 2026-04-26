@@ -65,7 +65,13 @@ export function update(root, ctx) {
 
   const params = ctx && typeof ctx === "object" && ctx.params && typeof ctx.params === "object" ? ctx.params : {};
   const cues = Array.isArray(params.cues) ? params.cues : [];
-  const timeMs = finiteNumber(ctx && ctx.timeMs, 0);
+  // Cues are clip-local (0-based per slide). Use ctx.localTimeMs when the runtime
+  // is rendering inside a multi-clip composition; fall back to ctx.timeMs for the
+  // legacy single-clip case where local and global coincide.
+  const timeMs = finiteNumber(
+    ctx && (typeof ctx.localTimeMs === "number" ? ctx.localTimeMs : ctx.timeMs),
+    0,
+  );
   const sizePx = finiteNumber(params.size_px, 38);
   const cue = currentCue(cues, timeMs);
 

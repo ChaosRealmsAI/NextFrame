@@ -42,9 +42,20 @@ export function update(root, ctx) {
   const params = ctx && typeof ctx === "object" && ctx.params && typeof ctx.params === "object" ? ctx.params : {};
   const color = nonEmptyString(params.color, "#a78bfa");
   const trackColor = nonEmptyString(params.track_color, "#2a2a32");
-  const timeMs = finiteNumber(ctx && ctx.timeMs, 0);
-  const durationMs = finiteNumber(ctx && ctx.durationMs, 0);
-  const progress = durationMs > 0 ? clamp(timeMs / durationMs, 0, 1) : 0;
+  // Global progress: caller passes composition_duration_ms + clip_offset_ms
+  // so the bar reflects the whole video, not the local clip. Falls back to
+  // ctx.timeMs/durationMs (single-clip mode) for backward compat.
+  const compositionDurationMs = finiteNumber(params.composition_duration_ms, 0);
+  const clipOffsetMs = finiteNumber(params.clip_offset_ms, 0);
+  const localTimeMs = finiteNumber(ctx && ctx.localTimeMs, finiteNumber(ctx && ctx.timeMs, 0));
+  let progress;
+  if (compositionDurationMs > 0) {
+    progress = clamp((clipOffsetMs + localTimeMs) / compositionDurationMs, 0, 1);
+  } else {
+    const durationMs = finiteNumber(ctx && ctx.durationMs, 0);
+    const timeMs = finiteNumber(ctx && ctx.timeMs, 0);
+    progress = durationMs > 0 ? clamp(timeMs / durationMs, 0, 1) : 0;
+  }
 
   instance.outer.style.background = trackColor;
   instance.fill.style.background = color;
