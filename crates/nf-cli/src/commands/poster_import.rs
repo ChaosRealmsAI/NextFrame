@@ -90,10 +90,9 @@ fn build_import(
         .join("components")
         .join("posters");
     let mut slides = Vec::with_capacity(manifest.entries.len());
-    let mut anchors = serde_json::Map::new();
-    let mut tracks = Vec::with_capacity(manifest.entries.len() * 2 + 2);
-    let mut cues = Vec::new();
-    let mut cumulative_ms = 0_u64;
+    let mut clips: Vec<Value> = Vec::with_capacity(manifest.entries.len());
+    let mut total_cues = 0_usize;
+    let mut total_duration_ms = 0_u64;
 
     for (index, entry) in manifest.entries.iter().enumerate() {
         let slide = index + 1;
@@ -113,39 +112,87 @@ fn build_import(
         let audio_src = src_dir.join(&entry.file);
         let timeline_src = timeline_path(src_dir, &entry.file)?;
         let timeline = read_timeline(&timeline_src)?;
-        let duration_ms = duration_ms(&timeline)?;
-        cues.extend(extract_cues_fallback(&timeline, cumulative_ms)?);
-        let slide_anchor = format!("slide-{slide}");
-        let audio_end_anchor = format!("audio-{slide}-end");
-        let end_anchor = if slide == manifest.entries.len() {
-            "out".to_string()
+        let audio_dur = duration_ms(&timeline)?;
+        let local_cues = extract_cues_fallback(&timeline, 0)?;
+        total_cues += local_cues.len();
+        let local_cues_value = serde_json::to_value(&local_cues).map_err(|e| {
+            NfError::ValidationFailed(format!("serialize cues: {e}"))
+        })?;
+        let clip_dur = if slide == manifest.entries.len() {
+            audio_dur
         } else {
-            format!("slide-{}", slide + 1)
+            audio_dur + gap_ms
         };
+
         let audio_name = format!("slide-{slide:02}.mp3");
         let poster_name = format!("slide-{slide:02}.png");
         let image_dst = image_root.join(&poster_name);
         let audio_dst = audio_root.join(&audio_name);
 
-        anchors.insert(slide_anchor.clone(), json!(format!("{cumulative_ms}ms")));
-        anchors.insert(
-            audio_end_anchor.clone(),
-            json!(format!("{}ms", cumulative_ms + duration_ms)),
-        );
-        tracks.push(json!({
-            "id": format!("img-{slide}"),
-            "kind": "component",
-            "component": IMAGE_COMPONENT,
-            "z": 10,
-            "time": { "start": slide_anchor, "end": end_anchor },
-            "params": { "src": file_url(&runtime_image_root.join(&poster_name))? }
-        }));
-        tracks.push(json!({
-            "id": format!("audio-{slide}"),
-            "kind": "audio",
-            "time": { "start": format!("slide-{slide}"), "end": audio_end_anchor },
-            "src": format!("audio/{audio_name}"),
-            "volume": 1
+        let clip_anchors = json!({
+            "in": "0ms",
+            "audio-end": format!("{audio_dur}ms"),
+            "out": format!("{clip_dur}ms"),
+        });
+
+        let clip_tracks = vec![
+            json!({
+                "id": "image",
+                "kind": "component",
+                "component": IMAGE_COMPONENT,
+                "z": 10,
+                "style": {},
+                "items": [{
+                    "id": "frame",
+                    "time": { "start": "in", "end": "out" },
+                    "params": { "src": file_url(&runtime_image_root.join(&poster_name))? }
+                }]
+            }),
+            json!({
+                "id": "audio",
+                "kind": "audio",
+                "z": 1,
+                "style": {},
+                "items": [{
+                    "id": "voice",
+                    "time": { "start": "in", "end": "audio-end" },
+                    "src": format!("audio/{audio_name}"),
+                    "volume": 1,
+                    "params": {}
+                }]
+            }),
+            json!({
+                "id": "cue-bar",
+                "kind": "component",
+                "component": CUE_COMPONENT,
+                "z": 85,
+                "style": {},
+                "items": [{
+                    "id": "cues",
+                    "time": { "start": "in", "end": "audio-end" },
+                    "params": { "cues": local_cues_value }
+                }]
+            }),
+            json!({
+                "id": "progress-bar",
+                "kind": "component",
+                "component": PROGRESS_COMPONENT,
+                "z": 90,
+                "style": {},
+                "items": [{
+                    "id": "bar",
+                    "time": { "start": "in", "end": "out" },
+                    "params": {}
+                }]
+            }),
+        ];
+
+        clips.push(json!({
+            "id": format!("slide-{slide}"),
+            "name": format!("slide {slide}"),
+            "duration": format!("{clip_dur}ms"),
+            "anchors": clip_anchors,
+            "tracks": clip_tracks,
         }));
 
         slides.push(SlideImport {
@@ -154,71 +201,11 @@ fn build_import(
             audio_src,
             audio_dst,
         });
-        cumulative_ms += duration_ms;
-        if slide < manifest.entries.len() {
-            cumulative_ms += gap_ms;
-        }
+        total_duration_ms += clip_dur;
     }
 
-    anchors.insert("out".to_string(), json!(format!("{cumulative_ms}ms")));
-    let cue_count = cues.len();
-    tracks.push(json!({
-        "id": "progress-bar",
-        "kind": "component",
-        "component": PROGRESS_COMPONENT,
-        "z": 90,
-        "time": { "start": "slide-1", "end": "out" },
-        "params": {}
-    }));
-    tracks.push(json!({
-        "id": "cue-bar",
-        "kind": "component",
-        "component": CUE_COMPONENT,
-        "z": 85,
-        "time": { "start": "slide-1", "end": "out" },
-        "params": { "cues": cues }
-    }));
-    // v3 clip-first: wrap all tracks into a single clip · move per-track {time, params, src}
-    // into each track's items[0]. nf-shell preview now requires composition.clips[] (post v0.21
-    // codex merge); v2 flat composition.tracks[] silently falls back to the idle hero.
-    let v3_tracks: Vec<Value> = tracks
-        .into_iter()
-        .map(|track| {
-            let mut t = track.as_object().cloned().unwrap_or_default();
-            let id = t.remove("id").unwrap_or_else(|| json!(""));
-            let kind = t.remove("kind").unwrap_or_else(|| json!("component"));
-            let z = t.remove("z").unwrap_or_else(|| json!(0));
-            let time = t.remove("time").unwrap_or_else(|| json!({}));
-            let params = t.remove("params").unwrap_or_else(|| json!({}));
-            let src = t.remove("src");
-            let component = t.remove("component");
-            let volume = t.remove("volume");
-            let style = t.remove("style").unwrap_or_else(|| json!({}));
-
-            let mut item = serde_json::Map::new();
-            item.insert("id".into(), id.clone());
-            item.insert("time".into(), time);
-            // For audio tracks v3 clip-first compile reads item.src (top-level), not item.params.src.
-            if let Some(s) = src {
-                item.insert("src".into(), s);
-            }
-            if let Some(v) = volume {
-                item.insert("volume".into(), v);
-            }
-            item.insert("params".into(), params);
-
-            let mut out = serde_json::Map::new();
-            out.insert("id".into(), id);
-            out.insert("kind".into(), kind);
-            out.insert("z".into(), z);
-            if let Some(c) = component {
-                out.insert("component".into(), c);
-            }
-            out.insert("style".into(), style);
-            out.insert("items".into(), json!([Value::Object(item)]));
-            Value::Object(out)
-        })
-        .collect();
+    let cue_count = total_cues;
+    let cumulative_ms = total_duration_ms;
 
     let composition = json!({
         "schema": "nextframe.composition.v3",
@@ -227,13 +214,7 @@ fn build_import(
         "viewport": { "w": 1920, "h": 1080, "ratio": "16:9" },
         "theme": "default",
         "export": { "resolution": "1080p" },
-        "clips": [{
-            "id": "main",
-            "name": project_slug.replace('-', " "),
-            "duration": format!("{cumulative_ms}ms"),
-            "anchors": Value::Object(anchors),
-            "tracks": v3_tracks
-        }]
+        "clips": clips,
     });
 
     Ok(ImportPlan {

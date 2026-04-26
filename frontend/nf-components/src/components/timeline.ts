@@ -107,8 +107,19 @@ export class NfTimeline extends NfBase {
     document.removeEventListener("nf-data-ready", this.handleDataReady);
   }
 
-  attributeChangedCallback(): void {
-    if (this.isConnected) this.render();
+  attributeChangedCallback(name: string): void {
+    if (!this.isConnected) return;
+    // Updating current-time only nudges the playhead; full re-render would rebuild
+    // .tl-ruler mid-drag and detach pointermove/pointerup handlers, breaking scrubbing.
+    if (name === "current-time") {
+      const duration = Number(this.getAttribute("duration") ?? 0);
+      const time = Number(this.getAttribute("current-time") ?? 0);
+      const pct = duration > 0 ? Math.max(0, Math.min(100, (time / duration) * 100)) : 0;
+      const head = this.root.querySelector<HTMLElement>(".playhead");
+      if (head) head.style.left = `${pct}%`;
+      return;
+    }
+    this.render();
   }
 
   private readonly handleDataReady = (): void => {
@@ -233,16 +244,36 @@ export class NfTimeline extends NfBase {
   }
 
   private bind(duration: number): void {
-    this.root.querySelector(".tl-ruler")?.addEventListener("click", (event) => {
-      const pointer = event as MouseEvent;
-      const target = event.currentTarget as HTMLElement;
-      const rect = target.getBoundingClientRect();
-      const x = Math.max(0, pointer.clientX - rect.left);
-      const width = Math.max(1, rect.width);
-      const time = Math.min(duration, x / width * duration);
-      this.setAttribute("current-time", time.toFixed(3));
-      this.emit<PlayheadMoveDetail>("playhead-move", { time });
-    });
+    const ruler = this.root.querySelector<HTMLElement>(".tl-ruler");
+    if (ruler) {
+      let dragging = false;
+      const seekFromX = (clientX: number) => {
+        const rect = ruler.getBoundingClientRect();
+        const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+        const width = Math.max(1, rect.width);
+        const time = Math.min(duration, (x / width) * duration);
+        this.setAttribute("current-time", time.toFixed(3));
+        this.emit<PlayheadMoveDetail>("playhead-move", { time });
+      };
+      ruler.addEventListener("pointerdown", (event) => {
+        dragging = true;
+        try { ruler.setPointerCapture((event as PointerEvent).pointerId); } catch (_e) {}
+        seekFromX((event as PointerEvent).clientX);
+        event.preventDefault();
+      });
+      ruler.addEventListener("pointermove", (event) => {
+        if (!dragging) return;
+        seekFromX((event as PointerEvent).clientX);
+      });
+      const stop = (event: Event) => {
+        if (!dragging) return;
+        dragging = false;
+        try { ruler.releasePointerCapture((event as PointerEvent).pointerId); } catch (_e) {}
+      };
+      ruler.addEventListener("pointerup", stop);
+      ruler.addEventListener("pointercancel", stop);
+      ruler.addEventListener("pointerleave", (event) => { if (dragging) stop(event); });
+    }
     this.root.addEventListener("clip-click", (event) => {
       const detail = (event as CustomEvent<ClipSelectDetail>).detail;
       if (this.dataset.mode === "clip-all") {
