@@ -1,0 +1,43 @@
+{
+  "id": "poster-import-roundtrip",
+  "feature": "v022-poster-pipeline",
+  "given": "tmp/v021-explain 已有 7 张图 + 7 段 mp3 + 7 timeline + batch.json",
+  "when": "跑 nf poster-import tmp/v021-explain --out=examples/v021-explain · 然后 nf open + nf export",
+  "then": "examples/v021-explain composition validate 通过 · 桌面播放看到图+听音+字幕 · nf export 出 mp4 文件 > 1MB",
+  "human_actions": [
+    "扫描 tmp/v021-explain 目录 · 解析 batch.json + timeline · 累计 audio duration_ms 算 anchor",
+    "拼 composition.json (7 image-slide tracks + 7 audio tracks + 7 subtitle tracks · anchor 命名 slide-1..slide-7)",
+    "复制 PNG/MP3/timeline.json 到 examples/v021-explain/{components,audio}",
+    "nf composition validate 跑通 · 0 error 0 critical",
+    "nf open + nf capture 截图证据 · 看到第 1 张图渲染",
+    "nf export → mp4 文件落盘 + 大小 > 1MB"
+  ],
+  "ai_tools": [
+    {
+      "tool": "nf-composition-validate",
+      "command": "target/debug/nf composition validate --project=v021-explain --composition=main",
+      "expect_exit": 0,
+      "expect_stdout_contains": null
+    },
+    {
+      "tool": "nf-capture",
+      "command": "target/debug/nf capture --project=v021-explain --episode=main --out=spec/versions/v0.22.0/evidence/desktop.png",
+      "expect_exit": 0,
+      "expect_stdout_contains": null
+    },
+    {
+      "tool": "nf-export",
+      "command": "target/debug/nf export --project=v021-explain --composition=main --profile=draft --out=spec/versions/v0.22.0/evidence/v021-explain.mp4",
+      "expect_exit": 0,
+      "expect_stdout_contains": null
+    }
+  ],
+  "demo": "",
+  "status": "todo",
+  "claimed_by": null,
+  "verified_at": null,
+  "evidence": [],
+  "bugs": [],
+  "blocked_by": [],
+  "metadata": null
+}

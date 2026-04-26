@@ -369,8 +369,14 @@ fn build_anchor_guide(composition: &Value) -> AnchorGuide {
             }
         }
         return AnchorGuide {
-            rule: "Clip-local tracks should use clip-local anchors such as `in`, `voice`, and `out`.".to_string(),
-            examples: vec!["in".to_string(), "voice + 1s".to_string(), "out".to_string()],
+            rule:
+                "Clip-local tracks should use clip-local anchors such as `in`, `voice`, and `out`."
+                    .to_string(),
+            examples: vec![
+                "in".to_string(),
+                "voice + 1s".to_string(),
+                "out".to_string(),
+            ],
             anchors,
             tracks,
         };

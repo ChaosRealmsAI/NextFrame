@@ -83,3 +83,5 @@ __pycache__/
 /tmp/
 /.ally/
 spec/quality/locks/
+spec/versions/v*/evidence/*.mp4
+spec/versions/v*/evidence/*.png

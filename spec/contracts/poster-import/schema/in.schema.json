@@ -1,0 +1,1 @@
+{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","title":"poster-import.in","properties":{"src_dir":{"type":"string"},"out_project":{"type":"string"}},"required":["src_dir","out_project"]}

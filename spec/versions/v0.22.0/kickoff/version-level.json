@@ -1,0 +1,50 @@
+{
+  "version": "v0.22.0",
+  "type": "feature",
+  "chosen": "poster-show 产物(N 张图 + N 段 mp3 + word-level timeline)接入 NextFrame · 桌面端能播 + 能导出 mp4",
+  "why": "AI 视角 · 我们一直在用 poster-show 出讲解 HTML(image2gen + vox + word-level 字幕)· 但脱离 NextFrame · 不能桌面播 / 不能出 mp4 · 等于自家工具不吃自家饭。NextFrame 已具备 audio + subtitle(word-level)track + voice-subtitle preview(v0.14)+ stable export(v0.15/v0.16)· 0 改 schema 就能接通。用户视角 · 任何讲解视频都走 NextFrame 一条路 · PM 能直接拿 mp4。",
+  "changed_from": null,
+
+  "constraints": {
+    "no_vanity": "PM 5 秒看到的画面 · 1) 桌面 nf 打开 examples/v021-explain · 看到 7 张图轮换 + 听配音 + word-level 字幕高亮 · 2) nf export 出 mp4 · 双击系统播放器播放 · 视听同步",
+    "no_overreach": "本版只做 'poster-show 产物 → NextFrame composition' 这一条接通路径 · 不优化 image2gen / 不优化 vox / 不改 nf-shell 编辑界面 / 不动 nf-recorder 性能 / 不做 nf script 自动生成 composition(留给后续版本)",
+    "no_rush": "走真 nf-shell + nf-recorder · 不糊 'MVP 用 ffmpeg 拼一下'· image-slide 组件直接走 v2 schema kind=component 的 single-file ABI · poster-import 走 nf-cli 子命令稳定接口",
+    "must_verify": "验收画面 · 1) tmp/v021-explain (7 slide + 7 mp3 + 7 timeline + batch.json) 已存在(v0.21.0 explain 产物)· 2) nf poster-import 跑通 · 出 examples/v021-explain/{components,audio,compositions/main.json}· 3) nf composition validate 通过 · 4) nf capture 截图证据 · 5) nf export 出 mp4 文件存在 + 大小 > 1MB · 6) macOS open mp4 系统播放器播放(用户后续验)"
+  },
+
+  "success_picture": "用户从 tmp/v021-explain 打开 nf 看到 7 张图轮换的视频 + 听到讲解声 + 看到 word-level 字幕跟读 · 然后 nf export 出 mp4 双击播放完整内容。",
+  "cost_estimate": "4-6h · 2 路 ally 并行(image-slide 组件 + poster-import CLI)",
+  "risks": [
+    "image-slide 组件首次进 NextFrame · 可能踩 single-file/import-free ABI 限制",
+    "poster-import 算时长 · 需要正确累加 audio duration_ms 当 anchor 偏移",
+    "桌面播放可能切换闪烁(图换瞬间黑屏)· 需要 z-index 叠层方案",
+    "导出 mp4 帧率/分辨率 + audio 同步 · v0.16 diagnostics 暴露但本版不优化"
+  ],
+  "candidates": [
+    {
+      "label": "A · script→真 JSON",
+      "summary": "AI 一段话生成 composition.json",
+      "rejected_reason": "范围太大 · 不止接通 · 留下版"
+    },
+    {
+      "label": "B · TTS 真闭环",
+      "summary": "nf 内置切句 + 派 vox 配音",
+      "rejected_reason": "范围太大 · 留下版"
+    },
+    {
+      "label": "C · 端到端真路",
+      "summary": "一段话 → script + TTS + export 一条龙",
+      "rejected_reason": "需要 A + B 都先做完 · 太大"
+    },
+    {
+      "label": "D · NextFrame self-intro 60s",
+      "summary": "做一个 self-intro composition",
+      "rejected_reason": "PM 主动改方向为 poster-show 接通"
+    },
+    {
+      "label": "E (chosen) · poster-show → NextFrame",
+      "summary": "把现有 poster-show 产物接通到 NextFrame",
+      "chosen_reason": "用户主动提 + 0 改 schema + 自家工具吃自家饭 + 通用化(任何讲解视频都走 NextFrame)"
+    }
+  ]
+}

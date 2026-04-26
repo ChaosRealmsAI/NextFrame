@@ -15,6 +15,7 @@ pub mod episodes;
 pub mod export_cmd;
 pub mod karaoke;
 pub mod log;
+pub mod poster_import;
 pub mod projects;
 pub mod utility;
 pub mod verify;
@@ -188,6 +189,30 @@ COMMON ERRORS:
     - invalid composition JSON -> exit 2 · hint: inspect `checks[]` and `timeline.ascii`"#
     )]
     Verify(VerifyArgs),
+    #[command(
+        name = "poster-import",
+        about = "Import poster-show images, audio, and word timelines into a v2 composition",
+        long_about = r#"Import a poster-show output directory into a NextFrame v2 composition.
+
+The source directory must contain posters/<N>-<slug>.png, audio/manifest.json,
+audio/slide-NN.mp3, and audio/slide-NN.timeline.json. The importer writes
+examples/<project>/compositions/main.json, copies media into the project, and syncs
+the same project into the local NextFrame runtime storage for validation/open/export.
+
+USAGE:
+    nf poster-import <src_dir> [--out=<project_slug>]
+
+EXAMPLES:
+    nf poster-import tmp/v021-explain --out=v021-explain
+
+EXPECTED JSON:
+    {"composition_path":"examples/v021-explain/compositions/main.json","slides":7,"duration_ms":105000,"tracks":21}
+
+COMMON ERRORS:
+    - missing source files -> exit 2 · hint: ensure posters/, audio/manifest.json, mp3, and timeline JSON exist
+    - invalid timeline words -> exit 2 · hint: timeline words must use word/start_ms/end_ms"#
+    )]
+    PosterImport(PosterImportArgs),
     #[command(
         name = "export-status",
         about = "Read a running desktop export job status",
@@ -735,6 +760,22 @@ pub struct VerifyArgs {
         help = "ASCII timeline width, clamped to 24..96"
     )]
     pub ascii_width: Option<u16>,
+}
+
+#[derive(Debug, Args)]
+pub struct PosterImportArgs {
+    #[arg(
+        value_name = "SRC_DIR",
+        help = "Poster-show output directory containing posters/ and audio/"
+    )]
+    pub src_dir: PathBuf,
+    #[arg(
+        long,
+        value_name = "PROJECT_SLUG",
+        default_value = "v021-explain",
+        help = "Output project slug under examples/ and local NextFrame storage"
+    )]
+    pub out: String,
 }
 
 #[derive(Debug, Args)]
