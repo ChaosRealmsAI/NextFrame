@@ -1,0 +1,36 @@
+{
+  "asks": [
+    {
+      "id": "ASK-0001",
+      "feature": "simulate-keyboard",
+      "text": "需要 nf type 模拟键盘输入(现在只能 click + devtools fill · 缺像人一样打字的能力)",
+      "status": "open",
+      "created_at": "2026-04-26T03:19:01.820215+00:00",
+      "resolved_by": null
+    },
+    {
+      "id": "ASK-0002",
+      "feature": "wait-event",
+      "text": "需要 nf wait '<event>' · 等动画 / 加载完(避免 capture 拍到中间帧)",
+      "status": "open",
+      "created_at": "2026-04-26T03:19:01.827415+00:00",
+      "resolved_by": null
+    },
+    {
+      "id": "ASK-0003",
+      "feature": "code-compliance",
+      "text": "需要代码合规检查 CLI · 找 hardcode 颜色 / 用框架 / 单文件 HTML 等违规模式",
+      "status": "open",
+      "created_at": "2026-04-26T03:19:01.832108+00:00",
+      "resolved_by": null
+    },
+    {
+      "id": "ASK-0004",
+      "feature": "window-zoom",
+      "text": "需要 nf zoom · 放大窗口某区域看像素细节(改 chrome 量对齐时用)",
+      "status": "open",
+      "created_at": "2026-04-26T03:19:01.838350+00:00",
+      "resolved_by": null
+    }
+  ]
+}

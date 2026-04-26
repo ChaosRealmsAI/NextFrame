@@ -1,0 +1,39 @@
+{
+  "tools": [
+    {
+      "name": "nf-capture",
+      "usage": "nf capture --project=<slug> --episode=<slug> --out=<png> · 真窗口 PNG(含 chrome / 阴影 / titlebar)· 改 UI / window chrome 必跑\n\n例:\n  nf capture --project=v2-showcase --episode=showreel-24s --out=/tmp/x.png\n\n跟 screenshot 区别:\n  capture · 真窗口 · 用户实际看到的画面\n  screenshot · DOM-only · 看不到 chrome 对齐",
+      "tags": [],
+      "registered_at": "2026-04-26T03:18:52.485586+00:00",
+      "resolves": []
+    },
+    {
+      "name": "nf-screenshot",
+      "usage": "nf screenshot --project=<slug> --episode=<slug> --region=<editor|...> --out=<png> · DOM-only / 局部截图(不含 chrome)",
+      "tags": [],
+      "registered_at": "2026-04-26T03:18:52.491747+00:00",
+      "resolves": []
+    },
+    {
+      "name": "nf-click",
+      "usage": "nf click --project=<slug> --episode=<slug> --selector=<css> · 模拟真实点击(支持 shadow DOM)",
+      "tags": [],
+      "registered_at": "2026-04-26T03:18:52.497263+00:00",
+      "resolves": []
+    },
+    {
+      "name": "nf-devtools",
+      "usage": "nf devtools --project=<slug> --episode=<slug> --query=<css> --get=<prop> · 查 DOM\nnf devtools --query=<css> --fill=<value> [--get=<prop>] · 填 input(走真实 input/change 事件 · 跟人类编辑同路径)",
+      "tags": [],
+      "registered_at": "2026-04-26T03:18:52.502126+00:00",
+      "resolves": []
+    },
+    {
+      "name": "nf-verify",
+      "usage": "nf verify --project=<slug> --composition=<slug> [--out=<json>] [--screenshot-dir=<dir>] · 自验 AI 撰写的 composition JSON\n- 校验 component ABI / compiled source / overlap intent\n- anchor guide / ASCII timeline / layout/text checks\n- 输出典型 screenshot 命令清单",
+      "tags": [],
+      "registered_at": "2026-04-26T03:18:52.508377+00:00",
+      "resolves": []
+    }
+  ]
+}
