@@ -1,7 +1,7 @@
 {
   "anchors": {},
   "components": {
-    "html.image-slide": "export function mount(root, params, ctx) {\n  const context = normalizeContext(params, ctx);\n  root.innerHTML = [\n    '<div data-image-slide-root=\"1\" style=\"position:absolute;inset:0;width:100%;height:100%;overflow:hidden;background:#000;\">',\n    '  <img data-image-slide-img=\"1\" alt=\"\" draggable=\"false\" style=\"display:block;width:100%;height:100%;object-fit:cover;\">',\n    '</div>'\n  ].join(\"\");\n  const instance = { root };\n  update(instance, context.params, context);\n  return instance;\n}\n\nexport function update(instance, params, ctx) {\n  const root = instance && instance.root ? instance.root : instance;\n  if (!root) return;\n  const context = normalizeContext(params, ctx);\n  const p = context.params;\n  const frame = root.querySelector('[data-image-slide-root=\"1\"]');\n  const img = root.querySelector('[data-image-slide-img=\"1\"]');\n  if (!frame || !img) return;\n\n  const fit = p.fit === \"contain\" ? \"contain\" : \"cover\";\n  const bgColor = typeof p.bg_color === \"string\" && p.bg_color.trim() ? p.bg_color : \"#000\";\n  const src = typeof p.src === \"string\" ? p.src.trim() : \"\";\n  frame.style.background = bgColor;\n  img.style.objectFit = fit;\n\n  if (!src) {\n    img.removeAttribute(\"src\");\n    root.dataset.imageSlideSrc = \"\";\n    return;\n  }\n\n  const nextSrc = resolveSrc(src, context);\n  if (root.dataset.imageSlideSrc === nextSrc) return;\n  root.dataset.imageSlidePending = nextSrc;\n  const preload = new Image();\n  preload.onload = function () {\n    if (root.dataset.imageSlidePending !== nextSrc) return;\n    img.src = nextSrc;\n    root.dataset.imageSlideSrc = nextSrc;\n    delete root.dataset.imageSlidePending;\n  };\n  preload.onerror = function () {\n    if (root.dataset.imageSlidePending === nextSrc) delete root.dataset.imageSlidePending;\n  };\n  preload.src = nextSrc;\n}\n\nexport function unmount(instance) {\n  const root = instance && instance.root ? instance.root : instance;\n  if (root) root.innerHTML = \"\";\n}\n\nexport function destroy(root) {\n  unmount(root);\n}\n\nfunction normalizeContext(params, ctx) {\n  if (ctx && typeof ctx === \"object\") {\n    return { params: params && typeof params === \"object\" ? params : {}, ctx };\n  }\n  if (params && typeof params === \"object\" && params.params) {\n    return { params: params.params || {}, ctx: params };\n  }\n  return { params: params && typeof params === \"object\" ? params : {}, ctx: {} };\n}\n\nfunction resolveSrc(src, context) {\n  if (/^(file:|data:|blob:|https?:)/.test(src) || src.startsWith(\"/\")) return src;\n  const base = resolveBaseUrl(context.ctx);\n  if (!base) return src;\n  try {\n    return new URL(src, base).href;\n  } catch (_err) {\n    return src;\n  }\n}\n\nfunction resolveBaseUrl(ctx) {\n  const keys = [\"assetBaseUrl\", \"assetsBaseUrl\", \"projectBaseUrl\", \"baseUrl\", \"base_url\"];\n  for (const key of keys) {\n    if (ctx && typeof ctx[key] === \"string\" && ctx[key]) return ctx[key];\n  }\n  if (ctx && ctx.ctx) return resolveBaseUrl(ctx.ctx);\n  if (typeof document !== \"undefined\" && document.baseURI) return document.baseURI;\n  return \"\";\n}\n"
+    "html.image-slide": "export function mount(root, ctx) {\n  root.innerHTML = [\n    '<div data-image-slide-root=\"1\" style=\"position:absolute;inset:0;width:100%;height:100%;overflow:hidden;background:#000;\">',\n    '  <img data-image-slide-img=\"1\" alt=\"\" draggable=\"false\" style=\"display:block;width:100%;height:100%;object-fit:cover;\">',\n    '</div>'\n  ].join(\"\");\n  update(root, ctx);\n}\n\nexport function update(root, ctx) {\n  if (!root) return;\n  const params = (ctx && typeof ctx === \"object\" && ctx.params && typeof ctx.params === \"object\") ? ctx.params : {};\n  const frame = root.querySelector('[data-image-slide-root=\"1\"]');\n  const img = root.querySelector('[data-image-slide-img=\"1\"]');\n  if (!frame || !img) return;\n\n  const fit = params.fit === \"contain\" ? \"contain\" : \"cover\";\n  const bgColor = typeof params.bg_color === \"string\" && params.bg_color.trim() ? params.bg_color : \"#000\";\n  const rawSrc = typeof params.src === \"string\" ? params.src.trim() : \"\";\n  frame.style.background = bgColor;\n  img.style.objectFit = fit;\n\n  if (!rawSrc) {\n    img.removeAttribute(\"src\");\n    delete root.dataset.imageSlideSrc;\n    return;\n  }\n\n  const nextSrc = playableImageSrc(rawSrc);\n  if (root.dataset.imageSlideSrc === nextSrc) return;\n  root.dataset.imageSlidePending = nextSrc;\n  const preload = new Image();\n  preload.onload = function () {\n    if (root.dataset.imageSlidePending !== nextSrc) return;\n    img.src = nextSrc;\n    root.dataset.imageSlideSrc = nextSrc;\n    delete root.dataset.imageSlidePending;\n  };\n  preload.onerror = function () {\n    if (root.dataset.imageSlidePending === nextSrc) delete root.dataset.imageSlidePending;\n  };\n  preload.src = nextSrc;\n}\n\nexport function destroy(root) {\n  if (root) root.innerHTML = \"\";\n}\n\nfunction playableImageSrc(src) {\n  if (!src.startsWith(\"file://\")) return src;\n  try {\n    if (typeof window === \"undefined\" || window.location.protocol !== \"nextframe:\") return src;\n    const path = decodeURIComponent(new URL(src).pathname);\n    return `nextframe://media/?path=${encodeURIComponent(path)}`;\n  } catch (_e) {\n    return src;\n  }\n}\n"
   },
   "duration": 107486,
   "meta": {
@@ -27,7 +27,7 @@
           "params": {
             "component": "html.image-slide",
             "params": {
-              "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-01.png"
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-01.png"
             },
             "style": {},
             "track": {
@@ -372,7 +372,7 @@
           "params": {
             "component": "html.image-slide",
             "params": {
-              "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-02.png"
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-02.png"
             },
             "style": {},
             "track": {
@@ -777,7 +777,7 @@
           "params": {
             "component": "html.image-slide",
             "params": {
-              "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-03.png"
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-03.png"
             },
             "style": {},
             "track": {
@@ -1217,7 +1217,7 @@
           "params": {
             "component": "html.image-slide",
             "params": {
-              "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-04.png"
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-04.png"
             },
             "style": {},
             "track": {
@@ -1697,7 +1697,7 @@
           "params": {
             "component": "html.image-slide",
             "params": {
-              "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-05.png"
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-05.png"
             },
             "style": {},
             "track": {
@@ -2137,7 +2137,7 @@
           "params": {
             "component": "html.image-slide",
             "params": {
-              "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-06.png"
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-06.png"
             },
             "style": {},
             "track": {
@@ -2557,7 +2557,7 @@
           "params": {
             "component": "html.image-slide",
             "params": {
-              "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-07.png"
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-07.png"
             },
             "style": {},
             "track": {

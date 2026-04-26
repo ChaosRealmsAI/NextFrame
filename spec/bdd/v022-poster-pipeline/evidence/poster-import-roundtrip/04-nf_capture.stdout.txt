@@ -1,0 +1,1 @@
+{"bytes":1848473,"height":1936,"out":"spec/versions/v0.22.0/evidence/desktop.png","width":3016,"window_id":"w-1","window_number":12976}

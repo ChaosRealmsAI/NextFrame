@@ -22,7 +22,7 @@ fn run_with_roots(
     runtime_root: &Path,
 ) -> Result<(), NfError> {
     validate_slug(&args.out)?;
-    let import = build_import(&args.src_dir, &args.out, examples_root)?;
+    let import = build_import(&args.src_dir, &args.out, examples_root, runtime_root)?;
     write_project_outputs(&args.src_dir, examples_root, &args.out, &import)?;
     sync_runtime_project(examples_root, runtime_root, &args.out, &import)?;
 
@@ -38,6 +38,7 @@ fn build_import(
     src_dir: &Path,
     project_slug: &str,
     examples_root: &Path,
+    runtime_root: &Path,
 ) -> Result<ImportPlan, NfError> {
     if !src_dir.is_dir() {
         return Err(validation(format!(
@@ -62,6 +63,7 @@ fn build_import(
     let project_dir = examples_root.join(project_slug);
     let image_root = project_dir.join("components").join("posters");
     let audio_root = project_dir.join("audio");
+    let runtime_image_root = runtime_root.join(project_slug).join("components").join("posters");
     let mut slides = Vec::with_capacity(manifest.entries.len());
     let mut anchors = serde_json::Map::new();
     let mut tracks = Vec::with_capacity(manifest.entries.len() * 3);
@@ -105,7 +107,7 @@ fn build_import(
             "component": IMAGE_COMPONENT,
             "z": 10,
             "time": { "start": slide_anchor, "end": end_anchor },
-            "params": { "src": file_url(&image_dst)? }
+            "params": { "src": file_url(&runtime_image_root.join(&poster_name))? }
         }));
         tracks.push(json!({
             "id": format!("audio-{slide}"),

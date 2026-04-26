@@ -1,0 +1,1 @@
+{"audio_muxed":true,"bytes":9396140,"duration_ms":107500,"fps":30,"frames":3225,"out":"spec/versions/v0.22.0/evidence/v021-explain.mp4","parallel":1,"profile":"draft","resolution":"720p","source":"spec/versions/v0.22.0/evidence/v021-explain.mp4.source.json","warnings":[]}

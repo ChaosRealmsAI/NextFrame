@@ -23,7 +23,7 @@
       "id": "img-1",
       "kind": "component",
       "params": {
-        "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-01.png"
+        "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-01.png"
       },
       "time": {
         "end": "slide-2",
@@ -346,7 +346,7 @@
       "id": "img-2",
       "kind": "component",
       "params": {
-        "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-02.png"
+        "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-02.png"
       },
       "time": {
         "end": "slide-3",
@@ -729,7 +729,7 @@
       "id": "img-3",
       "kind": "component",
       "params": {
-        "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-03.png"
+        "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-03.png"
       },
       "time": {
         "end": "slide-4",
@@ -1147,7 +1147,7 @@
       "id": "img-4",
       "kind": "component",
       "params": {
-        "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-04.png"
+        "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-04.png"
       },
       "time": {
         "end": "slide-5",
@@ -1605,7 +1605,7 @@
       "id": "img-5",
       "kind": "component",
       "params": {
-        "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-05.png"
+        "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-05.png"
       },
       "time": {
         "end": "slide-6",
@@ -2023,7 +2023,7 @@
       "id": "img-6",
       "kind": "component",
       "params": {
-        "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-06.png"
+        "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-06.png"
       },
       "time": {
         "end": "slide-7",
@@ -2421,7 +2421,7 @@
       "id": "img-7",
       "kind": "component",
       "params": {
-        "src": "file:///Users/Zhuanz/workspace/NextFrame/.worktrees/v0.22.0-0e3c8b70/examples/v021-explain/components/posters/slide-07.png"
+        "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-07.png"
       },
       "time": {
         "end": "out",

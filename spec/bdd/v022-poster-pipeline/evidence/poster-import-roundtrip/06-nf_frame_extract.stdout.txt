@@ -1,0 +1,2 @@
+frame=    1 fps=0.0 q=-0.0 Lsize=N/A time=00:00:00.03 bitrate=N/A speed=0.829x    
+-rw-r--r--@ 1 Zhuanz  staff  317919  4月 26 18:00 spec/versions/v0.22.0/evidence/frame-5s.png

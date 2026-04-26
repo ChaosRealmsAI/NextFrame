@@ -1,0 +1,3 @@
+
+--- stderr ---
+{"error":"socket failed","detail":"IPC socket failed: No such file or directory (os error 2)","hint":"start nf-shell (`cargo run --bin nf-shell` in dev) or check the socket path","exit_code":1}
