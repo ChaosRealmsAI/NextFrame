@@ -61,6 +61,13 @@
       "resolves": [
         "ASK-0008"
       ]
+    },
+    {
+      "name": "nf-poster-import",
+      "usage": "nf poster-import <src_dir> --out=<project_slug> · 吃 poster-show 产物(images/ + audio/manifest.json + audio/*.mp3 + audio/*.timeline.json + batch.json)拼成 v2 composition · 7 张 slide → 21 tracks(image/audio/subtitle 各 7)· 输出 examples/<slug>/{components,audio,compositions/main.json}",
+      "tags": [],
+      "registered_at": "2026-04-26T09:04:50.084673+00:00",
+      "resolves": []
     }
   ]
 }

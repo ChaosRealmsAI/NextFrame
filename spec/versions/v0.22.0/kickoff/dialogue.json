@@ -1,0 +1,33 @@
+{
+  "version": "v0.22.0",
+  "rounds": [
+    {
+      "round": 1,
+      "timestamp": "2026-04-26T16:25:00+08:00",
+      "question": "v0.22.0 做啥? AI 推 4 候选(A script→JSON · B TTS 闭环 · C 端到端 · D self-intro)",
+      "answer": "用户跳过候选 · 主动提 'poster-show 产物 + tts 用我们那个模式可以走通· 桌面端和导出视频都可以'",
+      "decision": "锁定 E · poster-show → NextFrame composition 接通"
+    },
+    {
+      "round": 2,
+      "timestamp": "2026-04-26T16:30:00+08:00",
+      "question": "可行性核 · NextFrame 当前 audio + subtitle + image 能力够不够",
+      "answer": "audio + subtitle(word-level)已有 · vox timeline 字段{text, start_ms, end_ms}跟 nf subtitle 完全对齐 · 缺 image kind 但用 html.image-slide 组件走 component 通 · 0 改 schema",
+      "decision": "可行 · 走 component 路线"
+    },
+    {
+      "round": 3,
+      "timestamp": "2026-04-26T16:35:00+08:00",
+      "question": "范围怎么拆? 派几路 ally?",
+      "answer": "AI 推 2 路并行 · 路 A html.image-slide 组件(前端) · 路 B nf poster-import CLI(Rust) · scope 不冲突",
+      "decision": "2 路 ally 并行 ≈ 2-3h"
+    },
+    {
+      "round": 4,
+      "timestamp": "2026-04-26T16:38:00+08:00",
+      "question": "用户授权全自动化",
+      "answer": "好 你自动化做吧 我只要结果",
+      "decision": "主 agent 自跑 5 phase · 卡住才回报"
+    }
+  ]
+}

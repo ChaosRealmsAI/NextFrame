@@ -1,0 +1,1 @@
+{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","title":"poster-import.out","properties":{"composition_path":{"type":"string"},"slides":{"type":"integer"},"duration_ms":{"type":"integer"}},"required":["composition_path","slides","duration_ms"]}
