@@ -1935,6 +1935,7 @@ dependencies = [
  "clap",
  "directories",
  "interprocess",
+ "nf-agent",
  "nf-project",
  "nf-recorder",
  "png",

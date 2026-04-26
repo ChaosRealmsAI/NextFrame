@@ -20,6 +20,7 @@ Example projects live under `examples/`; runtime projects are copied to `~/.next
 `target/debug/nf click --project=<slug> --episode=<slug> --selector=<css>` — simulate a real desktop click, including shadow DOM selectors.
 `target/debug/nf devtools --project=<slug> --episode=<slug> --query=<css> --get=<prop>` — inspect live DOM, including shadow DOM selectors.
 `target/debug/nf devtools --project=<slug> --episode=<slug> --query=<css> --fill=<value> [--get=<prop>]` — fill a live input through the same input/change path as human editing.
+`target/debug/nf cue --timeline=<vox.json> [--max-chars=18] [--min-pause-ms=250] [--out=<json>]` — use an LLM to cut a vox word-level timeline into validated cue list JSON.
 `target/debug/nf composition show --project=<slug> --composition=<slug> [--clip=<id>] [--track=<id>] [--item=<id>] [--field=<path>]` — read raw composition JSON or one clip/track/item field.
 `target/debug/nf composition patch --project=<slug> --composition=<slug> [--clip=<id>] --track=<id> [--item=<id>] --field=<path> --value=<json-or-string>` — patch one track or clip item field such as `params.title`, `style.x`, or `time.start`.
 `target/debug/nf composition validate --project=<slug> --composition=<slug>` — validate component registry, files, mount/update exports, import-free ABI, used tracks, and observed params.

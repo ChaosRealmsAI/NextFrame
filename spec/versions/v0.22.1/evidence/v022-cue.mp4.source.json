@@ -1,0 +1,2942 @@
+{
+  "anchors": {},
+  "assets": [],
+  "components": {
+    "html.cue-bar": "const cueBarInstances = new WeakMap();\n\nexport function mount(root, ctx) {\n  if (!root) return;\n  const doc = root.ownerDocument || document;\n  root.innerHTML = \"\";\n\n  const frame = doc.createElement(\"div\");\n  frame.className = \"cue-bar\";\n  frame.style.position = \"absolute\";\n  frame.style.inset = \"0\";\n  frame.style.width = \"100%\";\n  frame.style.height = \"100%\";\n  frame.style.overflow = \"hidden\";\n  frame.style.pointerEvents = \"none\";\n\n  const bar = doc.createElement(\"div\");\n  bar.className = \"cue-bar-inner\";\n  bar.style.position = \"absolute\";\n  bar.style.left = \"0\";\n  bar.style.right = \"0\";\n  bar.style.bottom = \"0\";\n  bar.style.height = \"12%\";\n  bar.style.display = \"flex\";\n  bar.style.alignItems = \"center\";\n  bar.style.justifyContent = \"center\";\n  bar.style.padding = \"0 72px\";\n  bar.style.overflow = \"hidden\";\n  bar.style.background = \"#0a0c10\";\n  bar.style.borderTop = \"1px solid #1a1a22\";\n  bar.style.boxSizing = \"border-box\";\n\n  const line = doc.createElement(\"div\");\n  line.className = \"cue-bar-line\";\n  line.style.display = \"flex\";\n  line.style.alignItems = \"baseline\";\n  line.style.justifyContent = \"center\";\n  line.style.maxWidth = \"100%\";\n  line.style.whiteSpace = \"nowrap\";\n  line.style.overflow = \"hidden\";\n  line.style.fontFamily = '\"PingFang SC\", \"Noto Sans CJK SC\", \"Noto Sans CJK\", -apple-system, BlinkMacSystemFont, \"Helvetica Neue\", \"Segoe UI\", Arial, sans-serif';\n  line.style.fontWeight = \"600\";\n  line.style.letterSpacing = \"0.04em\";\n\n  bar.appendChild(line);\n  frame.appendChild(bar);\n  root.appendChild(frame);\n\n  cueBarInstances.set(root, {\n    line,\n    currentCue: null,\n    spans: [],\n  });\n  update(root, ctx);\n}\n\nexport function update(root, ctx) {\n  if (!root) return;\n  let instance = cueBarInstances.get(root);\n  if (!instance) {\n    mount(root, ctx);\n    instance = cueBarInstances.get(root);\n    if (!instance) return;\n  }\n\n  const params = ctx && typeof ctx === \"object\" && ctx.params && typeof ctx.params === \"object\" ? ctx.params : {};\n  const cues = Array.isArray(params.cues) ? params.cues : [];\n  const timeMs = finiteNumber(ctx && ctx.timeMs, 0);\n  const sizePx = finiteNumber(params.size_px, 38);\n  const cue = currentCue(cues, timeMs);\n\n  instance.line.style.fontSize = `${Math.max(1, sizePx)}px`;\n\n  if (instance.currentCue !== cue) {\n    instance.currentCue = cue;\n    instance.spans = [];\n    instance.line.replaceChildren();\n    if (cue) renderCue(instance, cue, root.ownerDocument || document);\n  }\n\n  for (const item of instance.spans) {\n    item.span.style.color = item.endMs <= timeMs ? \"#fbbf24\" : \"rgba(255,255,255,0.6)\";\n  }\n}\n\nexport function destroy(root) {\n  if (!root) return;\n  cueBarInstances.delete(root);\n  root.innerHTML = \"\";\n}\n\nfunction renderCue(instance, cue, doc) {\n  const words = Array.isArray(cue.words) && cue.words.length > 0\n    ? cue.words\n    : [{ text: typeof cue.text === \"string\" ? cue.text : \"\", end_ms: cue.end_ms }];\n  for (const word of words) {\n    const span = doc.createElement(\"span\");\n    span.textContent = typeof word.text === \"string\" ? word.text : \"\";\n    span.style.display = \"inline-block\";\n    span.style.color = \"rgba(255,255,255,0.6)\";\n    span.style.transition = \"color 0.08s linear\";\n    instance.line.appendChild(span);\n    instance.spans.push({\n      span,\n      endMs: finiteNumber(word.end_ms, Number.POSITIVE_INFINITY),\n    });\n  }\n}\n\nfunction currentCue(cues, timeMs) {\n  for (const cue of cues) {\n    if (!cue || typeof cue !== \"object\") continue;\n    const startMs = finiteNumber(cue.start_ms, Number.POSITIVE_INFINITY);\n    const endMs = finiteNumber(cue.end_ms, Number.NEGATIVE_INFINITY);\n    if (startMs <= timeMs && timeMs < endMs) return cue;\n  }\n  return null;\n}\n\nfunction finiteNumber(value, fallback) {\n  const number = Number(value);\n  return Number.isFinite(number) ? number : fallback;\n}\n",
+    "html.image-slide": "export function mount(root, ctx) {\n  root.innerHTML = [\n    '<div data-image-slide-root=\"1\" style=\"position:absolute;inset:0;width:100%;height:100%;overflow:hidden;background:#000;\">',\n    '  <img data-image-slide-img=\"1\" alt=\"\" draggable=\"false\" style=\"display:block;width:100%;height:100%;object-fit:cover;\">',\n    '</div>'\n  ].join(\"\");\n  update(root, ctx);\n}\n\nexport function update(root, ctx) {\n  if (!root) return;\n  const params = (ctx && typeof ctx === \"object\" && ctx.params && typeof ctx.params === \"object\") ? ctx.params : {};\n  const frame = root.querySelector('[data-image-slide-root=\"1\"]');\n  const img = root.querySelector('[data-image-slide-img=\"1\"]');\n  if (!frame || !img) return;\n\n  const fit = params.fit === \"contain\" ? \"contain\" : \"cover\";\n  const bgColor = typeof params.bg_color === \"string\" && params.bg_color.trim() ? params.bg_color : \"#000\";\n  const rawSrc = typeof params.src === \"string\" ? params.src.trim() : \"\";\n  frame.style.background = bgColor;\n  img.style.objectFit = fit;\n\n  if (!rawSrc) {\n    img.removeAttribute(\"src\");\n    delete root.dataset.imageSlideSrc;\n    return;\n  }\n\n  const nextSrc = playableImageSrc(rawSrc);\n  if (root.dataset.imageSlideSrc === nextSrc) return;\n  root.dataset.imageSlidePending = nextSrc;\n  const preload = new Image();\n  preload.onload = function () {\n    if (root.dataset.imageSlidePending !== nextSrc) return;\n    img.src = nextSrc;\n    root.dataset.imageSlideSrc = nextSrc;\n    delete root.dataset.imageSlidePending;\n  };\n  preload.onerror = function () {\n    if (root.dataset.imageSlidePending === nextSrc) delete root.dataset.imageSlidePending;\n  };\n  preload.src = nextSrc;\n}\n\nexport function destroy(root) {\n  if (root) root.innerHTML = \"\";\n}\n\nfunction playableImageSrc(src) {\n  if (!src.startsWith(\"file://\")) return src;\n  try {\n    if (typeof window === \"undefined\" || window.location.protocol !== \"nextframe:\") return src;\n    const path = decodeURIComponent(new URL(src).pathname);\n    return `nextframe://media/?path=${encodeURIComponent(path)}`;\n  } catch (_e) {\n    return src;\n  }\n}\n",
+    "html.progress-bar": "const progressBarInstances = new WeakMap();\n\nexport function mount(root, ctx) {\n  if (!root) return;\n  const doc = root.ownerDocument || document;\n  root.innerHTML = \"\";\n\n  const outer = doc.createElement(\"div\");\n  outer.className = \"progress-bar\";\n  outer.style.position = \"absolute\";\n  outer.style.left = \"0\";\n  outer.style.right = \"0\";\n  outer.style.top = \"0\";\n  outer.style.width = \"100%\";\n  outer.style.height = \"4px\";\n  outer.style.overflow = \"hidden\";\n  outer.style.pointerEvents = \"none\";\n  outer.style.background = \"#2a2a32\";\n\n  const fill = doc.createElement(\"div\");\n  fill.className = \"progress-bar-fill\";\n  fill.style.width = \"0%\";\n  fill.style.height = \"100%\";\n  fill.style.background = \"#a78bfa\";\n  fill.style.transition = \"width 0.05s linear\";\n\n  outer.appendChild(fill);\n  root.appendChild(outer);\n  progressBarInstances.set(root, { outer, fill });\n  update(root, ctx);\n}\n\nexport function update(root, ctx) {\n  if (!root) return;\n  let instance = progressBarInstances.get(root);\n  if (!instance) {\n    mount(root, ctx);\n    instance = progressBarInstances.get(root);\n    if (!instance) return;\n  }\n\n  const params = ctx && typeof ctx === \"object\" && ctx.params && typeof ctx.params === \"object\" ? ctx.params : {};\n  const color = nonEmptyString(params.color, \"#a78bfa\");\n  const trackColor = nonEmptyString(params.track_color, \"#2a2a32\");\n  const timeMs = finiteNumber(ctx && ctx.timeMs, 0);\n  const durationMs = finiteNumber(ctx && ctx.durationMs, 0);\n  const progress = durationMs > 0 ? clamp(timeMs / durationMs, 0, 1) : 0;\n\n  instance.outer.style.background = trackColor;\n  instance.fill.style.background = color;\n  instance.fill.style.width = `${progress * 100}%`;\n}\n\nexport function destroy(root) {\n  if (!root) return;\n  progressBarInstances.delete(root);\n  root.innerHTML = \"\";\n}\n\nfunction nonEmptyString(value, fallback) {\n  return typeof value === \"string\" && value.trim() ? value : fallback;\n}\n\nfunction finiteNumber(value, fallback) {\n  const number = Number(value);\n  return Number.isFinite(number) ? number : fallback;\n}\n\nfunction clamp(value, min, max) {\n  return Math.min(max, Math.max(min, value));\n}\n"
+  },
+  "duration": 116486,
+  "duration_ms": 116486,
+  "meta": {
+    "authoring": "clip-first",
+    "composition": "main",
+    "duration_ms": 116486,
+    "export": {
+      "resolution": "1080p"
+    },
+    "name": "v021 explain",
+    "project": "v021-explain",
+    "render_source_schema": "nf.render_source.v1",
+    "version": "v3"
+  },
+  "schema_version": "nf.render_source.v1",
+  "theme": {
+    "background": "#000",
+    "css": "",
+    "id": "default"
+  },
+  "tracks": [
+    {
+      "clips": [
+        {
+          "begin": 0,
+          "begin_ms": 0,
+          "end": 13866,
+          "end_ms": 13866,
+          "id": "main.img-1.img-1",
+          "params": {
+            "component": "html.image-slide",
+            "params": {
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-01.png"
+            },
+            "style": {},
+            "track": {
+              "clip": "main",
+              "id": "main.img-1",
+              "kind": "component"
+            }
+          }
+        }
+      ],
+      "id": "main.img-1",
+      "kind": "component",
+      "z": 10
+    },
+    {
+      "clips": [
+        {
+          "begin": 13866,
+          "begin_ms": 13866,
+          "end": 29839,
+          "end_ms": 29839,
+          "id": "main.img-2.img-2",
+          "params": {
+            "component": "html.image-slide",
+            "params": {
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-02.png"
+            },
+            "style": {},
+            "track": {
+              "clip": "main",
+              "id": "main.img-2",
+              "kind": "component"
+            }
+          }
+        }
+      ],
+      "id": "main.img-2",
+      "kind": "component",
+      "z": 10
+    },
+    {
+      "clips": [
+        {
+          "begin": 29839,
+          "begin_ms": 29839,
+          "end": 47962,
+          "end_ms": 47962,
+          "id": "main.img-3.img-3",
+          "params": {
+            "component": "html.image-slide",
+            "params": {
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-03.png"
+            },
+            "style": {},
+            "track": {
+              "clip": "main",
+              "id": "main.img-3",
+              "kind": "component"
+            }
+          }
+        }
+      ],
+      "id": "main.img-3",
+      "kind": "component",
+      "z": 10
+    },
+    {
+      "clips": [
+        {
+          "begin": 47962,
+          "begin_ms": 47962,
+          "end": 67770,
+          "end_ms": 67770,
+          "id": "main.img-4.img-4",
+          "params": {
+            "component": "html.image-slide",
+            "params": {
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-04.png"
+            },
+            "style": {},
+            "track": {
+              "clip": "main",
+              "id": "main.img-4",
+              "kind": "component"
+            }
+          }
+        }
+      ],
+      "id": "main.img-4",
+      "kind": "component",
+      "z": 10
+    },
+    {
+      "clips": [
+        {
+          "begin": 67770,
+          "begin_ms": 67770,
+          "end": 84431,
+          "end_ms": 84431,
+          "id": "main.img-5.img-5",
+          "params": {
+            "component": "html.image-slide",
+            "params": {
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-05.png"
+            },
+            "style": {},
+            "track": {
+              "clip": "main",
+              "id": "main.img-5",
+              "kind": "component"
+            }
+          }
+        }
+      ],
+      "id": "main.img-5",
+      "kind": "component",
+      "z": 10
+    },
+    {
+      "clips": [
+        {
+          "begin": 84431,
+          "begin_ms": 84431,
+          "end": 100078,
+          "end_ms": 100078,
+          "id": "main.img-6.img-6",
+          "params": {
+            "component": "html.image-slide",
+            "params": {
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-06.png"
+            },
+            "style": {},
+            "track": {
+              "clip": "main",
+              "id": "main.img-6",
+              "kind": "component"
+            }
+          }
+        }
+      ],
+      "id": "main.img-6",
+      "kind": "component",
+      "z": 10
+    },
+    {
+      "clips": [
+        {
+          "begin": 100078,
+          "begin_ms": 100078,
+          "end": 116486,
+          "end_ms": 116486,
+          "id": "main.img-7.img-7",
+          "params": {
+            "component": "html.image-slide",
+            "params": {
+              "src": "file:///Users/Zhuanz/.nextframe/v021-explain/components/posters/slide-07.png"
+            },
+            "style": {},
+            "track": {
+              "clip": "main",
+              "id": "main.img-7",
+              "kind": "component"
+            }
+          }
+        }
+      ],
+      "id": "main.img-7",
+      "kind": "component",
+      "z": 10
+    },
+    {
+      "clips": [
+        {
+          "begin": 0,
+          "begin_ms": 0,
+          "end": 116486,
+          "end_ms": 116486,
+          "id": "main.progress-bar.progress-bar",
+          "params": {
+            "component": "html.progress-bar",
+            "params": {},
+            "style": {},
+            "track": {
+              "clip": "main",
+              "id": "main.progress-bar",
+              "kind": "component"
+            }
+          }
+        }
+      ],
+      "id": "main.progress-bar",
+      "kind": "component",
+      "z": 90
+    },
+    {
+      "clips": [
+        {
+          "begin": 0,
+          "begin_ms": 0,
+          "end": 116486,
+          "end_ms": 116486,
+          "id": "main.cue-bar.cue-bar",
+          "params": {
+            "component": "html.cue-bar",
+            "params": {
+              "cues": [
+                {
+                  "end_ms": 920,
+                  "start_ms": 560,
+                  "text": "v0.",
+                  "words": [
+                    {
+                      "end_ms": 780,
+                      "start_ms": 560,
+                      "text": "v"
+                    },
+                    {
+                      "end_ms": 920,
+                      "start_ms": 780,
+                      "text": "0"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 1301,
+                  "start_ms": 1121,
+                  "text": "21.",
+                  "words": [
+                    {
+                      "end_ms": 1141,
+                      "start_ms": 1121,
+                      "text": "2"
+                    },
+                    {
+                      "end_ms": 1301,
+                      "start_ms": 1141,
+                      "text": "1"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 12366,
+                  "start_ms": 1481,
+                  "text": "0 是 design 版本 · 一句话 · 就 3 张图 · 让 PM 5 秒看懂下版要做啥 · AI 把一段话变视频 · 看怎么生 · 怎么剪 · 怎么配音 · 三件事",
+                  "words": [
+                    {
+                      "end_ms": 1741,
+                      "start_ms": 1481,
+                      "text": "0"
+                    },
+                    {
+                      "end_ms": 1921,
+                      "start_ms": 1741,
+                      "text": "是"
+                    },
+                    {
+                      "end_ms": 1981,
+                      "start_ms": 1921,
+                      "text": "d"
+                    },
+                    {
+                      "end_ms": 2061,
+                      "start_ms": 1981,
+                      "text": "e"
+                    },
+                    {
+                      "end_ms": 2101,
+                      "start_ms": 2061,
+                      "text": "s"
+                    },
+                    {
+                      "end_ms": 2241,
+                      "start_ms": 2101,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 2281,
+                      "start_ms": 2241,
+                      "text": "g"
+                    },
+                    {
+                      "end_ms": 2421,
+                      "start_ms": 2281,
+                      "text": "n"
+                    },
+                    {
+                      "end_ms": 2621,
+                      "start_ms": 2421,
+                      "text": "版"
+                    },
+                    {
+                      "end_ms": 2781,
+                      "start_ms": 2621,
+                      "text": "本"
+                    },
+                    {
+                      "end_ms": 3162,
+                      "start_ms": 3022,
+                      "text": "一"
+                    },
+                    {
+                      "end_ms": 3362,
+                      "start_ms": 3162,
+                      "text": "句"
+                    },
+                    {
+                      "end_ms": 3522,
+                      "start_ms": 3362,
+                      "text": "话"
+                    },
+                    {
+                      "end_ms": 3862,
+                      "start_ms": 3702,
+                      "text": "就"
+                    },
+                    {
+                      "end_ms": 4022,
+                      "start_ms": 3862,
+                      "text": "3"
+                    },
+                    {
+                      "end_ms": 4242,
+                      "start_ms": 4022,
+                      "text": "张"
+                    },
+                    {
+                      "end_ms": 4742,
+                      "start_ms": 4242,
+                      "text": "图"
+                    },
+                    {
+                      "end_ms": 5083,
+                      "start_ms": 4762,
+                      "text": "让"
+                    },
+                    {
+                      "end_ms": 5343,
+                      "start_ms": 5083,
+                      "text": "P"
+                    },
+                    {
+                      "end_ms": 5583,
+                      "start_ms": 5343,
+                      "text": "M"
+                    },
+                    {
+                      "end_ms": 5823,
+                      "start_ms": 5583,
+                      "text": "5"
+                    },
+                    {
+                      "end_ms": 5883,
+                      "start_ms": 5823,
+                      "text": "秒"
+                    },
+                    {
+                      "end_ms": 6083,
+                      "start_ms": 5883,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 6323,
+                      "start_ms": 6083,
+                      "text": "懂"
+                    },
+                    {
+                      "end_ms": 6523,
+                      "start_ms": 6323,
+                      "text": "下"
+                    },
+                    {
+                      "end_ms": 6643,
+                      "start_ms": 6523,
+                      "text": "版"
+                    },
+                    {
+                      "end_ms": 6823,
+                      "start_ms": 6643,
+                      "text": "要"
+                    },
+                    {
+                      "end_ms": 7004,
+                      "start_ms": 6823,
+                      "text": "做"
+                    },
+                    {
+                      "end_ms": 7304,
+                      "start_ms": 7004,
+                      "text": "啥"
+                    },
+                    {
+                      "end_ms": 7784,
+                      "start_ms": 7664,
+                      "text": "A"
+                    },
+                    {
+                      "end_ms": 8064,
+                      "start_ms": 7784,
+                      "text": "I"
+                    },
+                    {
+                      "end_ms": 8204,
+                      "start_ms": 8064,
+                      "text": "把"
+                    },
+                    {
+                      "end_ms": 8304,
+                      "start_ms": 8204,
+                      "text": "一"
+                    },
+                    {
+                      "end_ms": 8544,
+                      "start_ms": 8304,
+                      "text": "段"
+                    },
+                    {
+                      "end_ms": 8724,
+                      "start_ms": 8544,
+                      "text": "话"
+                    },
+                    {
+                      "end_ms": 8925,
+                      "start_ms": 8724,
+                      "text": "变"
+                    },
+                    {
+                      "end_ms": 9105,
+                      "start_ms": 8925,
+                      "text": "视"
+                    },
+                    {
+                      "end_ms": 9405,
+                      "start_ms": 9105,
+                      "text": "频"
+                    },
+                    {
+                      "end_ms": 9925,
+                      "start_ms": 9685,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 10025,
+                      "start_ms": 9925,
+                      "text": "怎"
+                    },
+                    {
+                      "end_ms": 10165,
+                      "start_ms": 10025,
+                      "text": "么"
+                    },
+                    {
+                      "end_ms": 10425,
+                      "start_ms": 10165,
+                      "text": "生"
+                    },
+                    {
+                      "end_ms": 10665,
+                      "start_ms": 10565,
+                      "text": "怎"
+                    },
+                    {
+                      "end_ms": 10825,
+                      "start_ms": 10665,
+                      "text": "么"
+                    },
+                    {
+                      "end_ms": 11146,
+                      "start_ms": 10825,
+                      "text": "剪"
+                    },
+                    {
+                      "end_ms": 11266,
+                      "start_ms": 11166,
+                      "text": "怎"
+                    },
+                    {
+                      "end_ms": 11386,
+                      "start_ms": 11266,
+                      "text": "么"
+                    },
+                    {
+                      "end_ms": 11546,
+                      "start_ms": 11386,
+                      "text": "配"
+                    },
+                    {
+                      "end_ms": 11726,
+                      "start_ms": 11546,
+                      "text": "音"
+                    },
+                    {
+                      "end_ms": 12146,
+                      "start_ms": 11966,
+                      "text": "三"
+                    },
+                    {
+                      "end_ms": 12346,
+                      "start_ms": 12146,
+                      "text": "件"
+                    },
+                    {
+                      "end_ms": 12366,
+                      "start_ms": 12346,
+                      "text": "事"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 28339,
+                  "start_ms": 14126,
+                  "text": "之前 PM 听 AI 说 我做了 X 功能 · PM 看不到 · 凭想象 · 动手了发现不是这意思 · 返工拆版沟通成本爆 · 现在 AI 出 3 张 hifi 图 · PM 看图 5 秒懂 · 点头才动工 · 不返工",
+                  "words": [
+                    {
+                      "end_ms": 14266,
+                      "start_ms": 14126,
+                      "text": "之"
+                    },
+                    {
+                      "end_ms": 14507,
+                      "start_ms": 14266,
+                      "text": "前"
+                    },
+                    {
+                      "end_ms": 14747,
+                      "start_ms": 14507,
+                      "text": "P"
+                    },
+                    {
+                      "end_ms": 14867,
+                      "start_ms": 14747,
+                      "text": "M"
+                    },
+                    {
+                      "end_ms": 15107,
+                      "start_ms": 14867,
+                      "text": "听"
+                    },
+                    {
+                      "end_ms": 15207,
+                      "start_ms": 15107,
+                      "text": "A"
+                    },
+                    {
+                      "end_ms": 15447,
+                      "start_ms": 15207,
+                      "text": "I"
+                    },
+                    {
+                      "end_ms": 15688,
+                      "start_ms": 15447,
+                      "text": "说"
+                    },
+                    {
+                      "end_ms": 15848,
+                      "start_ms": 15688,
+                      "text": "我"
+                    },
+                    {
+                      "end_ms": 16008,
+                      "start_ms": 15848,
+                      "text": "做"
+                    },
+                    {
+                      "end_ms": 16108,
+                      "start_ms": 16008,
+                      "text": "了"
+                    },
+                    {
+                      "end_ms": 16408,
+                      "start_ms": 16108,
+                      "text": "X"
+                    },
+                    {
+                      "end_ms": 16588,
+                      "start_ms": 16408,
+                      "text": "功"
+                    },
+                    {
+                      "end_ms": 16809,
+                      "start_ms": 16588,
+                      "text": "能"
+                    },
+                    {
+                      "end_ms": 17349,
+                      "start_ms": 17149,
+                      "text": "P"
+                    },
+                    {
+                      "end_ms": 17449,
+                      "start_ms": 17349,
+                      "text": "M"
+                    },
+                    {
+                      "end_ms": 17629,
+                      "start_ms": 17449,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 17709,
+                      "start_ms": 17629,
+                      "text": "不"
+                    },
+                    {
+                      "end_ms": 17910,
+                      "start_ms": 17709,
+                      "text": "到"
+                    },
+                    {
+                      "end_ms": 18230,
+                      "start_ms": 18050,
+                      "text": "凭"
+                    },
+                    {
+                      "end_ms": 18430,
+                      "start_ms": 18230,
+                      "text": "想"
+                    },
+                    {
+                      "end_ms": 18630,
+                      "start_ms": 18430,
+                      "text": "象"
+                    },
+                    {
+                      "end_ms": 18971,
+                      "start_ms": 18790,
+                      "text": "动"
+                    },
+                    {
+                      "end_ms": 19131,
+                      "start_ms": 18971,
+                      "text": "手"
+                    },
+                    {
+                      "end_ms": 19471,
+                      "start_ms": 19131,
+                      "text": "了"
+                    },
+                    {
+                      "end_ms": 19591,
+                      "start_ms": 19471,
+                      "text": "发"
+                    },
+                    {
+                      "end_ms": 19731,
+                      "start_ms": 19591,
+                      "text": "现"
+                    },
+                    {
+                      "end_ms": 19831,
+                      "start_ms": 19731,
+                      "text": "不"
+                    },
+                    {
+                      "end_ms": 19951,
+                      "start_ms": 19831,
+                      "text": "是"
+                    },
+                    {
+                      "end_ms": 20072,
+                      "start_ms": 19951,
+                      "text": "这"
+                    },
+                    {
+                      "end_ms": 20252,
+                      "start_ms": 20072,
+                      "text": "意"
+                    },
+                    {
+                      "end_ms": 20372,
+                      "start_ms": 20252,
+                      "text": "思"
+                    },
+                    {
+                      "end_ms": 20932,
+                      "start_ms": 20752,
+                      "text": "返"
+                    },
+                    {
+                      "end_ms": 21193,
+                      "start_ms": 20932,
+                      "text": "工"
+                    },
+                    {
+                      "end_ms": 21413,
+                      "start_ms": 21193,
+                      "text": "拆"
+                    },
+                    {
+                      "end_ms": 21653,
+                      "start_ms": 21413,
+                      "text": "版"
+                    },
+                    {
+                      "end_ms": 21833,
+                      "start_ms": 21653,
+                      "text": "沟"
+                    },
+                    {
+                      "end_ms": 22033,
+                      "start_ms": 21833,
+                      "text": "通"
+                    },
+                    {
+                      "end_ms": 22233,
+                      "start_ms": 22033,
+                      "text": "成"
+                    },
+                    {
+                      "end_ms": 22454,
+                      "start_ms": 22233,
+                      "text": "本"
+                    },
+                    {
+                      "end_ms": 22614,
+                      "start_ms": 22454,
+                      "text": "爆"
+                    },
+                    {
+                      "end_ms": 23154,
+                      "start_ms": 22954,
+                      "text": "现"
+                    },
+                    {
+                      "end_ms": 23395,
+                      "start_ms": 23154,
+                      "text": "在"
+                    },
+                    {
+                      "end_ms": 23495,
+                      "start_ms": 23395,
+                      "text": "A"
+                    },
+                    {
+                      "end_ms": 23755,
+                      "start_ms": 23495,
+                      "text": "I"
+                    },
+                    {
+                      "end_ms": 24015,
+                      "start_ms": 23755,
+                      "text": "出"
+                    },
+                    {
+                      "end_ms": 24215,
+                      "start_ms": 24015,
+                      "text": "3"
+                    },
+                    {
+                      "end_ms": 24435,
+                      "start_ms": 24215,
+                      "text": "张"
+                    },
+                    {
+                      "end_ms": 24455,
+                      "start_ms": 24435,
+                      "text": "h"
+                    },
+                    {
+                      "end_ms": 24596,
+                      "start_ms": 24455,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 24656,
+                      "start_ms": 24596,
+                      "text": "f"
+                    },
+                    {
+                      "end_ms": 24836,
+                      "start_ms": 24656,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 25356,
+                      "start_ms": 24836,
+                      "text": "图"
+                    },
+                    {
+                      "end_ms": 25597,
+                      "start_ms": 25516,
+                      "text": "P"
+                    },
+                    {
+                      "end_ms": 25697,
+                      "start_ms": 25597,
+                      "text": "M"
+                    },
+                    {
+                      "end_ms": 25937,
+                      "start_ms": 25697,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 26317,
+                      "start_ms": 25937,
+                      "text": "图"
+                    },
+                    {
+                      "end_ms": 26337,
+                      "start_ms": 26317,
+                      "text": "5"
+                    },
+                    {
+                      "end_ms": 26557,
+                      "start_ms": 26337,
+                      "text": "秒"
+                    },
+                    {
+                      "end_ms": 26697,
+                      "start_ms": 26557,
+                      "text": "懂"
+                    },
+                    {
+                      "end_ms": 27138,
+                      "start_ms": 26958,
+                      "text": "点"
+                    },
+                    {
+                      "end_ms": 27358,
+                      "start_ms": 27138,
+                      "text": "头"
+                    },
+                    {
+                      "end_ms": 27518,
+                      "start_ms": 27358,
+                      "text": "才"
+                    },
+                    {
+                      "end_ms": 27698,
+                      "start_ms": 27518,
+                      "text": "动"
+                    },
+                    {
+                      "end_ms": 27839,
+                      "start_ms": 27698,
+                      "text": "工"
+                    },
+                    {
+                      "end_ms": 28139,
+                      "start_ms": 27999,
+                      "text": "不"
+                    },
+                    {
+                      "end_ms": 28319,
+                      "start_ms": 28139,
+                      "text": "返"
+                    },
+                    {
+                      "end_ms": 28339,
+                      "start_ms": 28319,
+                      "text": "工"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 30640,
+                  "start_ms": 30139,
+                  "text": "v0.",
+                  "words": [
+                    {
+                      "end_ms": 30420,
+                      "start_ms": 30139,
+                      "text": "v"
+                    },
+                    {
+                      "end_ms": 30640,
+                      "start_ms": 30420,
+                      "text": "0"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 31181,
+                  "start_ms": 30820,
+                  "text": "21.",
+                  "words": [
+                    {
+                      "end_ms": 31001,
+                      "start_ms": 30820,
+                      "text": "2"
+                    },
+                    {
+                      "end_ms": 31181,
+                      "start_ms": 31001,
+                      "text": "1"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 46462,
+                  "start_ms": 31381,
+                  "text": "0 全部 3 件 · 一张图看完 · 看 是 script · 从一段话 → composition · 剪 是 cut · 调时长拼接剪掉 · 配 是 TTS · 文字到配音加字幕 · 都是静态图 · 看了点头 · 才动工",
+                  "words": [
+                    {
+                      "end_ms": 31742,
+                      "start_ms": 31381,
+                      "text": "0"
+                    },
+                    {
+                      "end_ms": 31982,
+                      "start_ms": 31742,
+                      "text": "全"
+                    },
+                    {
+                      "end_ms": 32202,
+                      "start_ms": 31982,
+                      "text": "部"
+                    },
+                    {
+                      "end_ms": 32403,
+                      "start_ms": 32202,
+                      "text": "3"
+                    },
+                    {
+                      "end_ms": 32423,
+                      "start_ms": 32403,
+                      "text": "件"
+                    },
+                    {
+                      "end_ms": 32883,
+                      "start_ms": 32763,
+                      "text": "一"
+                    },
+                    {
+                      "end_ms": 33124,
+                      "start_ms": 32883,
+                      "text": "张"
+                    },
+                    {
+                      "end_ms": 33304,
+                      "start_ms": 33124,
+                      "text": "图"
+                    },
+                    {
+                      "end_ms": 33504,
+                      "start_ms": 33304,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 33704,
+                      "start_ms": 33504,
+                      "text": "完"
+                    },
+                    {
+                      "end_ms": 34365,
+                      "start_ms": 34065,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 34506,
+                      "start_ms": 34365,
+                      "text": "是"
+                    },
+                    {
+                      "end_ms": 34526,
+                      "start_ms": 34506,
+                      "text": "s"
+                    },
+                    {
+                      "end_ms": 34666,
+                      "start_ms": 34526,
+                      "text": "c"
+                    },
+                    {
+                      "end_ms": 34906,
+                      "start_ms": 34666,
+                      "text": "r"
+                    },
+                    {
+                      "end_ms": 34966,
+                      "start_ms": 34906,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 34986,
+                      "start_ms": 34966,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 35066,
+                      "start_ms": 34986,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 35467,
+                      "start_ms": 35227,
+                      "text": "从"
+                    },
+                    {
+                      "end_ms": 35587,
+                      "start_ms": 35467,
+                      "text": "一"
+                    },
+                    {
+                      "end_ms": 35847,
+                      "start_ms": 35587,
+                      "text": "段"
+                    },
+                    {
+                      "end_ms": 36028,
+                      "start_ms": 35847,
+                      "text": "话"
+                    },
+                    {
+                      "end_ms": 36288,
+                      "start_ms": 36028,
+                      "text": "→"
+                    },
+                    {
+                      "end_ms": 36388,
+                      "start_ms": 36288,
+                      "text": "c"
+                    },
+                    {
+                      "end_ms": 36408,
+                      "start_ms": 36388,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 36448,
+                      "start_ms": 36408,
+                      "text": "m"
+                    },
+                    {
+                      "end_ms": 36488,
+                      "start_ms": 36448,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 36548,
+                      "start_ms": 36488,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 36609,
+                      "start_ms": 36548,
+                      "text": "s"
+                    },
+                    {
+                      "end_ms": 36749,
+                      "start_ms": 36609,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 36889,
+                      "start_ms": 36749,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 36909,
+                      "start_ms": 36889,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 36929,
+                      "start_ms": 36909,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 36949,
+                      "start_ms": 36929,
+                      "text": "n"
+                    },
+                    {
+                      "end_ms": 37530,
+                      "start_ms": 37229,
+                      "text": "剪"
+                    },
+                    {
+                      "end_ms": 37810,
+                      "start_ms": 37530,
+                      "text": "是"
+                    },
+                    {
+                      "end_ms": 37850,
+                      "start_ms": 37810,
+                      "text": "c"
+                    },
+                    {
+                      "end_ms": 38091,
+                      "start_ms": 37850,
+                      "text": "u"
+                    },
+                    {
+                      "end_ms": 38531,
+                      "start_ms": 38091,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 38792,
+                      "start_ms": 38551,
+                      "text": "调"
+                    },
+                    {
+                      "end_ms": 38972,
+                      "start_ms": 38792,
+                      "text": "时"
+                    },
+                    {
+                      "end_ms": 39312,
+                      "start_ms": 38972,
+                      "text": "长"
+                    },
+                    {
+                      "end_ms": 39513,
+                      "start_ms": 39312,
+                      "text": "拼"
+                    },
+                    {
+                      "end_ms": 39693,
+                      "start_ms": 39513,
+                      "text": "接"
+                    },
+                    {
+                      "end_ms": 39933,
+                      "start_ms": 39693,
+                      "text": "剪"
+                    },
+                    {
+                      "end_ms": 40113,
+                      "start_ms": 39933,
+                      "text": "掉"
+                    },
+                    {
+                      "end_ms": 40835,
+                      "start_ms": 40534,
+                      "text": "配"
+                    },
+                    {
+                      "end_ms": 41135,
+                      "start_ms": 40835,
+                      "text": "是"
+                    },
+                    {
+                      "end_ms": 41255,
+                      "start_ms": 41135,
+                      "text": "T"
+                    },
+                    {
+                      "end_ms": 41375,
+                      "start_ms": 41255,
+                      "text": "T"
+                    },
+                    {
+                      "end_ms": 41876,
+                      "start_ms": 41375,
+                      "text": "S"
+                    },
+                    {
+                      "end_ms": 42156,
+                      "start_ms": 41916,
+                      "text": "文"
+                    },
+                    {
+                      "end_ms": 42357,
+                      "start_ms": 42156,
+                      "text": "字"
+                    },
+                    {
+                      "end_ms": 42597,
+                      "start_ms": 42357,
+                      "text": "到"
+                    },
+                    {
+                      "end_ms": 42777,
+                      "start_ms": 42597,
+                      "text": "配"
+                    },
+                    {
+                      "end_ms": 43038,
+                      "start_ms": 42777,
+                      "text": "音"
+                    },
+                    {
+                      "end_ms": 43298,
+                      "start_ms": 43038,
+                      "text": "加"
+                    },
+                    {
+                      "end_ms": 43418,
+                      "start_ms": 43298,
+                      "text": "字"
+                    },
+                    {
+                      "end_ms": 43939,
+                      "start_ms": 43418,
+                      "text": "幕"
+                    },
+                    {
+                      "end_ms": 44119,
+                      "start_ms": 43959,
+                      "text": "都"
+                    },
+                    {
+                      "end_ms": 44319,
+                      "start_ms": 44119,
+                      "text": "是"
+                    },
+                    {
+                      "end_ms": 44520,
+                      "start_ms": 44319,
+                      "text": "静"
+                    },
+                    {
+                      "end_ms": 44740,
+                      "start_ms": 44520,
+                      "text": "态"
+                    },
+                    {
+                      "end_ms": 45261,
+                      "start_ms": 44740,
+                      "text": "图"
+                    },
+                    {
+                      "end_ms": 45421,
+                      "start_ms": 45281,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 45541,
+                      "start_ms": 45421,
+                      "text": "了"
+                    },
+                    {
+                      "end_ms": 45721,
+                      "start_ms": 45541,
+                      "text": "点"
+                    },
+                    {
+                      "end_ms": 45741,
+                      "start_ms": 45721,
+                      "text": "头"
+                    },
+                    {
+                      "end_ms": 46242,
+                      "start_ms": 46082,
+                      "text": "才"
+                    },
+                    {
+                      "end_ms": 46442,
+                      "start_ms": 46242,
+                      "text": "动"
+                    },
+                    {
+                      "end_ms": 46462,
+                      "start_ms": 46442,
+                      "text": "工"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 57946,
+                  "start_ms": 48242,
+                  "text": "看 这张 · 三格漫画 · 给定 · PM 想看 AI 怎么从 script 生 composition · 当 · AI 出 script.",
+                  "words": [
+                    {
+                      "end_ms": 48422,
+                      "start_ms": 48242,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 48562,
+                      "start_ms": 48422,
+                      "text": "这"
+                    },
+                    {
+                      "end_ms": 48582,
+                      "start_ms": 48562,
+                      "text": "张"
+                    },
+                    {
+                      "end_ms": 49143,
+                      "start_ms": 48962,
+                      "text": "三"
+                    },
+                    {
+                      "end_ms": 49283,
+                      "start_ms": 49143,
+                      "text": "格"
+                    },
+                    {
+                      "end_ms": 49563,
+                      "start_ms": 49283,
+                      "text": "漫"
+                    },
+                    {
+                      "end_ms": 49963,
+                      "start_ms": 49563,
+                      "text": "画"
+                    },
+                    {
+                      "end_ms": 50223,
+                      "start_ms": 49983,
+                      "text": "给"
+                    },
+                    {
+                      "end_ms": 50823,
+                      "start_ms": 50223,
+                      "text": "定"
+                    },
+                    {
+                      "end_ms": 51584,
+                      "start_ms": 51023,
+                      "text": "P"
+                    },
+                    {
+                      "end_ms": 51604,
+                      "start_ms": 51584,
+                      "text": "M"
+                    },
+                    {
+                      "end_ms": 51824,
+                      "start_ms": 51604,
+                      "text": "想"
+                    },
+                    {
+                      "end_ms": 52124,
+                      "start_ms": 51824,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 52224,
+                      "start_ms": 52124,
+                      "text": "A"
+                    },
+                    {
+                      "end_ms": 52504,
+                      "start_ms": 52224,
+                      "text": "I"
+                    },
+                    {
+                      "end_ms": 52604,
+                      "start_ms": 52504,
+                      "text": "怎"
+                    },
+                    {
+                      "end_ms": 52744,
+                      "start_ms": 52604,
+                      "text": "么"
+                    },
+                    {
+                      "end_ms": 53004,
+                      "start_ms": 52744,
+                      "text": "从"
+                    },
+                    {
+                      "end_ms": 53024,
+                      "start_ms": 53004,
+                      "text": "s"
+                    },
+                    {
+                      "end_ms": 53184,
+                      "start_ms": 53024,
+                      "text": "c"
+                    },
+                    {
+                      "end_ms": 53304,
+                      "start_ms": 53184,
+                      "text": "r"
+                    },
+                    {
+                      "end_ms": 53364,
+                      "start_ms": 53304,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 53404,
+                      "start_ms": 53364,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 53624,
+                      "start_ms": 53404,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 54265,
+                      "start_ms": 53624,
+                      "text": "生"
+                    },
+                    {
+                      "end_ms": 54285,
+                      "start_ms": 54265,
+                      "text": "c"
+                    },
+                    {
+                      "end_ms": 54425,
+                      "start_ms": 54285,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 54465,
+                      "start_ms": 54425,
+                      "text": "m"
+                    },
+                    {
+                      "end_ms": 54485,
+                      "start_ms": 54465,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 54585,
+                      "start_ms": 54485,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 54625,
+                      "start_ms": 54585,
+                      "text": "s"
+                    },
+                    {
+                      "end_ms": 54765,
+                      "start_ms": 54625,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 54785,
+                      "start_ms": 54765,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 54805,
+                      "start_ms": 54785,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 54965,
+                      "start_ms": 54805,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 55025,
+                      "start_ms": 54965,
+                      "text": "n"
+                    },
+                    {
+                      "end_ms": 55585,
+                      "start_ms": 55325,
+                      "text": "当"
+                    },
+                    {
+                      "end_ms": 56005,
+                      "start_ms": 55865,
+                      "text": "A"
+                    },
+                    {
+                      "end_ms": 56306,
+                      "start_ms": 56005,
+                      "text": "I"
+                    },
+                    {
+                      "end_ms": 56526,
+                      "start_ms": 56306,
+                      "text": "出"
+                    },
+                    {
+                      "end_ms": 56546,
+                      "start_ms": 56526,
+                      "text": "s"
+                    },
+                    {
+                      "end_ms": 56726,
+                      "start_ms": 56546,
+                      "text": "c"
+                    },
+                    {
+                      "end_ms": 57606,
+                      "start_ms": 56726,
+                      "text": "r"
+                    },
+                    {
+                      "end_ms": 57806,
+                      "start_ms": 57606,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 57926,
+                      "start_ms": 57806,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 57946,
+                      "start_ms": 57926,
+                      "text": "t"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 66270,
+                  "start_ms": 58186,
+                  "text": "html 真静态图 · 那么 · PM 看到 4 个 track 时间轴 + AI 标注 · 5 秒看懂 · 不用读代码",
+                  "words": [
+                    {
+                      "end_ms": 58326,
+                      "start_ms": 58186,
+                      "text": "h"
+                    },
+                    {
+                      "end_ms": 58346,
+                      "start_ms": 58326,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 58426,
+                      "start_ms": 58346,
+                      "text": "m"
+                    },
+                    {
+                      "end_ms": 59047,
+                      "start_ms": 58426,
+                      "text": "l"
+                    },
+                    {
+                      "end_ms": 59327,
+                      "start_ms": 59047,
+                      "text": "真"
+                    },
+                    {
+                      "end_ms": 59547,
+                      "start_ms": 59327,
+                      "text": "静"
+                    },
+                    {
+                      "end_ms": 59787,
+                      "start_ms": 59547,
+                      "text": "态"
+                    },
+                    {
+                      "end_ms": 59807,
+                      "start_ms": 59787,
+                      "text": "图"
+                    },
+                    {
+                      "end_ms": 60567,
+                      "start_ms": 60447,
+                      "text": "那"
+                    },
+                    {
+                      "end_ms": 60587,
+                      "start_ms": 60567,
+                      "text": "么"
+                    },
+                    {
+                      "end_ms": 61188,
+                      "start_ms": 61008,
+                      "text": "P"
+                    },
+                    {
+                      "end_ms": 61388,
+                      "start_ms": 61188,
+                      "text": "M"
+                    },
+                    {
+                      "end_ms": 61608,
+                      "start_ms": 61388,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 61948,
+                      "start_ms": 61608,
+                      "text": "到"
+                    },
+                    {
+                      "end_ms": 62088,
+                      "start_ms": 61948,
+                      "text": "4"
+                    },
+                    {
+                      "end_ms": 62208,
+                      "start_ms": 62088,
+                      "text": "个"
+                    },
+                    {
+                      "end_ms": 62228,
+                      "start_ms": 62208,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 62268,
+                      "start_ms": 62228,
+                      "text": "r"
+                    },
+                    {
+                      "end_ms": 62548,
+                      "start_ms": 62268,
+                      "text": "a"
+                    },
+                    {
+                      "end_ms": 62568,
+                      "start_ms": 62548,
+                      "text": "c"
+                    },
+                    {
+                      "end_ms": 62588,
+                      "start_ms": 62568,
+                      "text": "k"
+                    },
+                    {
+                      "end_ms": 62748,
+                      "start_ms": 62588,
+                      "text": "时"
+                    },
+                    {
+                      "end_ms": 62988,
+                      "start_ms": 62748,
+                      "text": "间"
+                    },
+                    {
+                      "end_ms": 63249,
+                      "start_ms": 62988,
+                      "text": "轴"
+                    },
+                    {
+                      "end_ms": 63729,
+                      "start_ms": 63429,
+                      "text": "A"
+                    },
+                    {
+                      "end_ms": 64029,
+                      "start_ms": 63729,
+                      "text": "I"
+                    },
+                    {
+                      "end_ms": 64289,
+                      "start_ms": 64029,
+                      "text": "标"
+                    },
+                    {
+                      "end_ms": 64769,
+                      "start_ms": 64289,
+                      "text": "注"
+                    },
+                    {
+                      "end_ms": 65069,
+                      "start_ms": 64889,
+                      "text": "5"
+                    },
+                    {
+                      "end_ms": 65109,
+                      "start_ms": 65069,
+                      "text": "秒"
+                    },
+                    {
+                      "end_ms": 65349,
+                      "start_ms": 65109,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 65490,
+                      "start_ms": 65349,
+                      "text": "懂"
+                    },
+                    {
+                      "end_ms": 65750,
+                      "start_ms": 65650,
+                      "text": "不"
+                    },
+                    {
+                      "end_ms": 65930,
+                      "start_ms": 65750,
+                      "text": "用"
+                    },
+                    {
+                      "end_ms": 66090,
+                      "start_ms": 65930,
+                      "text": "读"
+                    },
+                    {
+                      "end_ms": 66250,
+                      "start_ms": 66090,
+                      "text": "代"
+                    },
+                    {
+                      "end_ms": 66270,
+                      "start_ms": 66250,
+                      "text": "码"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 82931,
+                  "start_ms": 68171,
+                  "text": "剪 这张 · 给定 · composition body 段太长 · 节奏拖 · 当 · AI 缩短 body 3 秒 · 12 秒变 9 秒 · 自动重对齐 · 那么 · 时间轴干净 · outro 跟着挪 · revalidate 通过",
+                  "words": [
+                    {
+                      "end_ms": 68511,
+                      "start_ms": 68171,
+                      "text": "剪"
+                    },
+                    {
+                      "end_ms": 68731,
+                      "start_ms": 68511,
+                      "text": "这"
+                    },
+                    {
+                      "end_ms": 68972,
+                      "start_ms": 68731,
+                      "text": "张"
+                    },
+                    {
+                      "end_ms": 69392,
+                      "start_ms": 69152,
+                      "text": "给"
+                    },
+                    {
+                      "end_ms": 69813,
+                      "start_ms": 69392,
+                      "text": "定"
+                    },
+                    {
+                      "end_ms": 69953,
+                      "start_ms": 69933,
+                      "text": "c"
+                    },
+                    {
+                      "end_ms": 69973,
+                      "start_ms": 69953,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 70013,
+                      "start_ms": 69973,
+                      "text": "m"
+                    },
+                    {
+                      "end_ms": 70073,
+                      "start_ms": 70013,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 70093,
+                      "start_ms": 70073,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 70133,
+                      "start_ms": 70093,
+                      "text": "s"
+                    },
+                    {
+                      "end_ms": 70313,
+                      "start_ms": 70133,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 70454,
+                      "start_ms": 70313,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 70474,
+                      "start_ms": 70454,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 70494,
+                      "start_ms": 70474,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 70554,
+                      "start_ms": 70494,
+                      "text": "n"
+                    },
+                    {
+                      "end_ms": 70694,
+                      "start_ms": 70554,
+                      "text": "b"
+                    },
+                    {
+                      "end_ms": 70734,
+                      "start_ms": 70694,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 70814,
+                      "start_ms": 70734,
+                      "text": "d"
+                    },
+                    {
+                      "end_ms": 70914,
+                      "start_ms": 70814,
+                      "text": "y"
+                    },
+                    {
+                      "end_ms": 71215,
+                      "start_ms": 70914,
+                      "text": "段"
+                    },
+                    {
+                      "end_ms": 71515,
+                      "start_ms": 71215,
+                      "text": "太"
+                    },
+                    {
+                      "end_ms": 71775,
+                      "start_ms": 71515,
+                      "text": "长"
+                    },
+                    {
+                      "end_ms": 72176,
+                      "start_ms": 71996,
+                      "text": "节"
+                    },
+                    {
+                      "end_ms": 72436,
+                      "start_ms": 72176,
+                      "text": "奏"
+                    },
+                    {
+                      "end_ms": 72717,
+                      "start_ms": 72436,
+                      "text": "拖"
+                    },
+                    {
+                      "end_ms": 73418,
+                      "start_ms": 73177,
+                      "text": "当"
+                    },
+                    {
+                      "end_ms": 73698,
+                      "start_ms": 73558,
+                      "text": "A"
+                    },
+                    {
+                      "end_ms": 74039,
+                      "start_ms": 73698,
+                      "text": "I"
+                    },
+                    {
+                      "end_ms": 74279,
+                      "start_ms": 74039,
+                      "text": "缩"
+                    },
+                    {
+                      "end_ms": 74559,
+                      "start_ms": 74279,
+                      "text": "短"
+                    },
+                    {
+                      "end_ms": 74699,
+                      "start_ms": 74559,
+                      "text": "b"
+                    },
+                    {
+                      "end_ms": 74719,
+                      "start_ms": 74699,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 74739,
+                      "start_ms": 74719,
+                      "text": "d"
+                    },
+                    {
+                      "end_ms": 74960,
+                      "start_ms": 74739,
+                      "text": "y"
+                    },
+                    {
+                      "end_ms": 75140,
+                      "start_ms": 74960,
+                      "text": "3"
+                    },
+                    {
+                      "end_ms": 75360,
+                      "start_ms": 75140,
+                      "text": "秒"
+                    },
+                    {
+                      "end_ms": 75761,
+                      "start_ms": 75621,
+                      "text": "1"
+                    },
+                    {
+                      "end_ms": 75901,
+                      "start_ms": 75761,
+                      "text": "2"
+                    },
+                    {
+                      "end_ms": 76161,
+                      "start_ms": 75901,
+                      "text": "秒"
+                    },
+                    {
+                      "end_ms": 76382,
+                      "start_ms": 76161,
+                      "text": "变"
+                    },
+                    {
+                      "end_ms": 76622,
+                      "start_ms": 76382,
+                      "text": "9"
+                    },
+                    {
+                      "end_ms": 76642,
+                      "start_ms": 76622,
+                      "text": "秒"
+                    },
+                    {
+                      "end_ms": 77223,
+                      "start_ms": 77103,
+                      "text": "自"
+                    },
+                    {
+                      "end_ms": 77443,
+                      "start_ms": 77223,
+                      "text": "动"
+                    },
+                    {
+                      "end_ms": 77683,
+                      "start_ms": 77443,
+                      "text": "重"
+                    },
+                    {
+                      "end_ms": 77944,
+                      "start_ms": 77683,
+                      "text": "对"
+                    },
+                    {
+                      "end_ms": 78184,
+                      "start_ms": 77944,
+                      "text": "齐"
+                    },
+                    {
+                      "end_ms": 78745,
+                      "start_ms": 78645,
+                      "text": "那"
+                    },
+                    {
+                      "end_ms": 78925,
+                      "start_ms": 78745,
+                      "text": "么"
+                    },
+                    {
+                      "end_ms": 79206,
+                      "start_ms": 79045,
+                      "text": "时"
+                    },
+                    {
+                      "end_ms": 79406,
+                      "start_ms": 79206,
+                      "text": "间"
+                    },
+                    {
+                      "end_ms": 79626,
+                      "start_ms": 79406,
+                      "text": "轴"
+                    },
+                    {
+                      "end_ms": 79846,
+                      "start_ms": 79626,
+                      "text": "干"
+                    },
+                    {
+                      "end_ms": 80387,
+                      "start_ms": 79846,
+                      "text": "净"
+                    },
+                    {
+                      "end_ms": 80507,
+                      "start_ms": 80487,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 80527,
+                      "start_ms": 80507,
+                      "text": "u"
+                    },
+                    {
+                      "end_ms": 80547,
+                      "start_ms": 80527,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 80628,
+                      "start_ms": 80547,
+                      "text": "r"
+                    },
+                    {
+                      "end_ms": 80848,
+                      "start_ms": 80628,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 81028,
+                      "start_ms": 80848,
+                      "text": "跟"
+                    },
+                    {
+                      "end_ms": 81188,
+                      "start_ms": 81028,
+                      "text": "着"
+                    },
+                    {
+                      "end_ms": 81529,
+                      "start_ms": 81188,
+                      "text": "挪"
+                    },
+                    {
+                      "end_ms": 81809,
+                      "start_ms": 81749,
+                      "text": "r"
+                    },
+                    {
+                      "end_ms": 81909,
+                      "start_ms": 81809,
+                      "text": "e"
+                    },
+                    {
+                      "end_ms": 81969,
+                      "start_ms": 81909,
+                      "text": "v"
+                    },
+                    {
+                      "end_ms": 82110,
+                      "start_ms": 81969,
+                      "text": "a"
+                    },
+                    {
+                      "end_ms": 82170,
+                      "start_ms": 82110,
+                      "text": "l"
+                    },
+                    {
+                      "end_ms": 82250,
+                      "start_ms": 82170,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 82290,
+                      "start_ms": 82250,
+                      "text": "d"
+                    },
+                    {
+                      "end_ms": 82450,
+                      "start_ms": 82290,
+                      "text": "a"
+                    },
+                    {
+                      "end_ms": 82510,
+                      "start_ms": 82450,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 82650,
+                      "start_ms": 82510,
+                      "text": "e"
+                    },
+                    {
+                      "end_ms": 82911,
+                      "start_ms": 82650,
+                      "text": "通"
+                    },
+                    {
+                      "end_ms": 82931,
+                      "start_ms": 82911,
+                      "text": "过"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 98578,
+                  "start_ms": 84691,
+                  "text": "配音 这张 · 给定 · composition 缺配音 · 视频默片 · 当 · AI 切句 7 段 · 派 vox 并行配音 · mp3 一个个出 · 那么 · 7 行波形齐 · word-level 字幕同步 · 7 段全 ok",
+                  "words": [
+                    {
+                      "end_ms": 84831,
+                      "start_ms": 84691,
+                      "text": "配"
+                    },
+                    {
+                      "end_ms": 85071,
+                      "start_ms": 84831,
+                      "text": "音"
+                    },
+                    {
+                      "end_ms": 85231,
+                      "start_ms": 85071,
+                      "text": "这"
+                    },
+                    {
+                      "end_ms": 85592,
+                      "start_ms": 85231,
+                      "text": "张"
+                    },
+                    {
+                      "end_ms": 85952,
+                      "start_ms": 85752,
+                      "text": "给"
+                    },
+                    {
+                      "end_ms": 86432,
+                      "start_ms": 85952,
+                      "text": "定"
+                    },
+                    {
+                      "end_ms": 86552,
+                      "start_ms": 86532,
+                      "text": "c"
+                    },
+                    {
+                      "end_ms": 86572,
+                      "start_ms": 86552,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 86592,
+                      "start_ms": 86572,
+                      "text": "m"
+                    },
+                    {
+                      "end_ms": 86632,
+                      "start_ms": 86592,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 86692,
+                      "start_ms": 86632,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 86752,
+                      "start_ms": 86692,
+                      "text": "s"
+                    },
+                    {
+                      "end_ms": 86912,
+                      "start_ms": 86752,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 87092,
+                      "start_ms": 86912,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 87112,
+                      "start_ms": 87092,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 87212,
+                      "start_ms": 87112,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 87272,
+                      "start_ms": 87212,
+                      "text": "n"
+                    },
+                    {
+                      "end_ms": 87532,
+                      "start_ms": 87272,
+                      "text": "缺"
+                    },
+                    {
+                      "end_ms": 87693,
+                      "start_ms": 87532,
+                      "text": "配"
+                    },
+                    {
+                      "end_ms": 88073,
+                      "start_ms": 87693,
+                      "text": "音"
+                    },
+                    {
+                      "end_ms": 88353,
+                      "start_ms": 88173,
+                      "text": "视"
+                    },
+                    {
+                      "end_ms": 88513,
+                      "start_ms": 88353,
+                      "text": "频"
+                    },
+                    {
+                      "end_ms": 88713,
+                      "start_ms": 88513,
+                      "text": "默"
+                    },
+                    {
+                      "end_ms": 88753,
+                      "start_ms": 88713,
+                      "text": "片"
+                    },
+                    {
+                      "end_ms": 89393,
+                      "start_ms": 89173,
+                      "text": "当"
+                    },
+                    {
+                      "end_ms": 89593,
+                      "start_ms": 89493,
+                      "text": "A"
+                    },
+                    {
+                      "end_ms": 89894,
+                      "start_ms": 89593,
+                      "text": "I"
+                    },
+                    {
+                      "end_ms": 90094,
+                      "start_ms": 89894,
+                      "text": "切"
+                    },
+                    {
+                      "end_ms": 90434,
+                      "start_ms": 90094,
+                      "text": "句"
+                    },
+                    {
+                      "end_ms": 90634,
+                      "start_ms": 90434,
+                      "text": "7"
+                    },
+                    {
+                      "end_ms": 90814,
+                      "start_ms": 90634,
+                      "text": "段"
+                    },
+                    {
+                      "end_ms": 91394,
+                      "start_ms": 90994,
+                      "text": "派"
+                    },
+                    {
+                      "end_ms": 91514,
+                      "start_ms": 91394,
+                      "text": "v"
+                    },
+                    {
+                      "end_ms": 91634,
+                      "start_ms": 91514,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 91874,
+                      "start_ms": 91634,
+                      "text": "x"
+                    },
+                    {
+                      "end_ms": 92055,
+                      "start_ms": 91874,
+                      "text": "并"
+                    },
+                    {
+                      "end_ms": 92255,
+                      "start_ms": 92055,
+                      "text": "行"
+                    },
+                    {
+                      "end_ms": 92415,
+                      "start_ms": 92255,
+                      "text": "配"
+                    },
+                    {
+                      "end_ms": 92755,
+                      "start_ms": 92415,
+                      "text": "音"
+                    },
+                    {
+                      "end_ms": 92955,
+                      "start_ms": 92875,
+                      "text": "m"
+                    },
+                    {
+                      "end_ms": 93115,
+                      "start_ms": 92955,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 93375,
+                      "start_ms": 93115,
+                      "text": "3"
+                    },
+                    {
+                      "end_ms": 93495,
+                      "start_ms": 93375,
+                      "text": "一"
+                    },
+                    {
+                      "end_ms": 93615,
+                      "start_ms": 93495,
+                      "text": "个"
+                    },
+                    {
+                      "end_ms": 93815,
+                      "start_ms": 93615,
+                      "text": "个"
+                    },
+                    {
+                      "end_ms": 93995,
+                      "start_ms": 93815,
+                      "text": "出"
+                    },
+                    {
+                      "end_ms": 94556,
+                      "start_ms": 94476,
+                      "text": "那"
+                    },
+                    {
+                      "end_ms": 94576,
+                      "start_ms": 94556,
+                      "text": "么"
+                    },
+                    {
+                      "end_ms": 95076,
+                      "start_ms": 94896,
+                      "text": "7"
+                    },
+                    {
+                      "end_ms": 95316,
+                      "start_ms": 95076,
+                      "text": "行"
+                    },
+                    {
+                      "end_ms": 95516,
+                      "start_ms": 95316,
+                      "text": "波"
+                    },
+                    {
+                      "end_ms": 95796,
+                      "start_ms": 95516,
+                      "text": "形"
+                    },
+                    {
+                      "end_ms": 96176,
+                      "start_ms": 95796,
+                      "text": "齐"
+                    },
+                    {
+                      "end_ms": 96316,
+                      "start_ms": 96236,
+                      "text": "w"
+                    },
+                    {
+                      "end_ms": 96377,
+                      "start_ms": 96316,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 96397,
+                      "start_ms": 96377,
+                      "text": "r"
+                    },
+                    {
+                      "end_ms": 96437,
+                      "start_ms": 96397,
+                      "text": "d"
+                    },
+                    {
+                      "end_ms": 96517,
+                      "start_ms": 96497,
+                      "text": "l"
+                    },
+                    {
+                      "end_ms": 96637,
+                      "start_ms": 96517,
+                      "text": "e"
+                    },
+                    {
+                      "end_ms": 96677,
+                      "start_ms": 96637,
+                      "text": "v"
+                    },
+                    {
+                      "end_ms": 96797,
+                      "start_ms": 96677,
+                      "text": "e"
+                    },
+                    {
+                      "end_ms": 96897,
+                      "start_ms": 96797,
+                      "text": "l"
+                    },
+                    {
+                      "end_ms": 97017,
+                      "start_ms": 96897,
+                      "text": "字"
+                    },
+                    {
+                      "end_ms": 97177,
+                      "start_ms": 97017,
+                      "text": "幕"
+                    },
+                    {
+                      "end_ms": 97437,
+                      "start_ms": 97177,
+                      "text": "同"
+                    },
+                    {
+                      "end_ms": 97577,
+                      "start_ms": 97437,
+                      "text": "步"
+                    },
+                    {
+                      "end_ms": 97977,
+                      "start_ms": 97817,
+                      "text": "7"
+                    },
+                    {
+                      "end_ms": 98237,
+                      "start_ms": 97977,
+                      "text": "段"
+                    },
+                    {
+                      "end_ms": 98417,
+                      "start_ms": 98237,
+                      "text": "全"
+                    },
+                    {
+                      "end_ms": 98558,
+                      "start_ms": 98417,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 98578,
+                      "start_ms": 98558,
+                      "text": "k"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 100778,
+                  "start_ms": 100358,
+                  "text": "v0.",
+                  "words": [
+                    {
+                      "end_ms": 100598,
+                      "start_ms": 100358,
+                      "text": "v"
+                    },
+                    {
+                      "end_ms": 100778,
+                      "start_ms": 100598,
+                      "text": "0"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 101459,
+                  "start_ms": 100918,
+                  "text": "21.",
+                  "words": [
+                    {
+                      "end_ms": 101279,
+                      "start_ms": 100918,
+                      "text": "2"
+                    },
+                    {
+                      "end_ms": 101459,
+                      "start_ms": 101279,
+                      "text": "1"
+                    }
+                  ]
+                },
+                {
+                  "end_ms": 116486,
+                  "start_ms": 101719,
+                  "text": "0 交付就 6 张图 · 3 张 hifi prototype · 3 张 BDD 分镜 · 验收方式 · 双击打开看 · 看 GIVEN WHEN THEN · 5 秒能描述清楚就过 · 不用读代码 · 不用跑 demo · PM 看一遍点头 · 才动工",
+                  "words": [
+                    {
+                      "end_ms": 101739,
+                      "start_ms": 101719,
+                      "text": "0"
+                    },
+                    {
+                      "end_ms": 102059,
+                      "start_ms": 101739,
+                      "text": "交"
+                    },
+                    {
+                      "end_ms": 102239,
+                      "start_ms": 102059,
+                      "text": "付"
+                    },
+                    {
+                      "end_ms": 102439,
+                      "start_ms": 102239,
+                      "text": "就"
+                    },
+                    {
+                      "end_ms": 102639,
+                      "start_ms": 102439,
+                      "text": "6"
+                    },
+                    {
+                      "end_ms": 102899,
+                      "start_ms": 102639,
+                      "text": "张"
+                    },
+                    {
+                      "end_ms": 103480,
+                      "start_ms": 102899,
+                      "text": "图"
+                    },
+                    {
+                      "end_ms": 103660,
+                      "start_ms": 103600,
+                      "text": "3"
+                    },
+                    {
+                      "end_ms": 103860,
+                      "start_ms": 103660,
+                      "text": "张"
+                    },
+                    {
+                      "end_ms": 103880,
+                      "start_ms": 103860,
+                      "text": "h"
+                    },
+                    {
+                      "end_ms": 104080,
+                      "start_ms": 103880,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 104120,
+                      "start_ms": 104080,
+                      "text": "f"
+                    },
+                    {
+                      "end_ms": 104320,
+                      "start_ms": 104120,
+                      "text": "i"
+                    },
+                    {
+                      "end_ms": 104340,
+                      "start_ms": 104320,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 104480,
+                      "start_ms": 104340,
+                      "text": "r"
+                    },
+                    {
+                      "end_ms": 104520,
+                      "start_ms": 104480,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 104540,
+                      "start_ms": 104520,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 104620,
+                      "start_ms": 104540,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 104640,
+                      "start_ms": 104620,
+                      "text": "t"
+                    },
+                    {
+                      "end_ms": 104660,
+                      "start_ms": 104640,
+                      "text": "y"
+                    },
+                    {
+                      "end_ms": 104680,
+                      "start_ms": 104660,
+                      "text": "p"
+                    },
+                    {
+                      "end_ms": 105300,
+                      "start_ms": 104680,
+                      "text": "e"
+                    },
+                    {
+                      "end_ms": 105481,
+                      "start_ms": 105441,
+                      "text": "3"
+                    },
+                    {
+                      "end_ms": 105761,
+                      "start_ms": 105481,
+                      "text": "张"
+                    },
+                    {
+                      "end_ms": 105881,
+                      "start_ms": 105761,
+                      "text": "B"
+                    },
+                    {
+                      "end_ms": 106021,
+                      "start_ms": 105881,
+                      "text": "D"
+                    },
+                    {
+                      "end_ms": 106221,
+                      "start_ms": 106021,
+                      "text": "D"
+                    },
+                    {
+                      "end_ms": 106441,
+                      "start_ms": 106221,
+                      "text": "分"
+                    },
+                    {
+                      "end_ms": 106801,
+                      "start_ms": 106441,
+                      "text": "镜"
+                    },
+                    {
+                      "end_ms": 106981,
+                      "start_ms": 106821,
+                      "text": "验"
+                    },
+                    {
+                      "end_ms": 107181,
+                      "start_ms": 106981,
+                      "text": "收"
+                    },
+                    {
+                      "end_ms": 107361,
+                      "start_ms": 107181,
+                      "text": "方"
+                    },
+                    {
+                      "end_ms": 107381,
+                      "start_ms": 107361,
+                      "text": "式"
+                    },
+                    {
+                      "end_ms": 108262,
+                      "start_ms": 108062,
+                      "text": "双"
+                    },
+                    {
+                      "end_ms": 108362,
+                      "start_ms": 108262,
+                      "text": "击"
+                    },
+                    {
+                      "end_ms": 108542,
+                      "start_ms": 108362,
+                      "text": "打"
+                    },
+                    {
+                      "end_ms": 108742,
+                      "start_ms": 108542,
+                      "text": "开"
+                    },
+                    {
+                      "end_ms": 108942,
+                      "start_ms": 108742,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 109422,
+                      "start_ms": 109122,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 109442,
+                      "start_ms": 109422,
+                      "text": "G"
+                    },
+                    {
+                      "end_ms": 109543,
+                      "start_ms": 109442,
+                      "text": "I"
+                    },
+                    {
+                      "end_ms": 109563,
+                      "start_ms": 109543,
+                      "text": "V"
+                    },
+                    {
+                      "end_ms": 109683,
+                      "start_ms": 109563,
+                      "text": "E"
+                    },
+                    {
+                      "end_ms": 109743,
+                      "start_ms": 109683,
+                      "text": "N"
+                    },
+                    {
+                      "end_ms": 109763,
+                      "start_ms": 109743,
+                      "text": "W"
+                    },
+                    {
+                      "end_ms": 109783,
+                      "start_ms": 109763,
+                      "text": "H"
+                    },
+                    {
+                      "end_ms": 109963,
+                      "start_ms": 109783,
+                      "text": "E"
+                    },
+                    {
+                      "end_ms": 109983,
+                      "start_ms": 109963,
+                      "text": "N"
+                    },
+                    {
+                      "end_ms": 110583,
+                      "start_ms": 109983,
+                      "text": "T"
+                    },
+                    {
+                      "end_ms": 110623,
+                      "start_ms": 110583,
+                      "text": "H"
+                    },
+                    {
+                      "end_ms": 110723,
+                      "start_ms": 110623,
+                      "text": "E"
+                    },
+                    {
+                      "end_ms": 110743,
+                      "start_ms": 110723,
+                      "text": "N"
+                    },
+                    {
+                      "end_ms": 110963,
+                      "start_ms": 110763,
+                      "text": "5"
+                    },
+                    {
+                      "end_ms": 111003,
+                      "start_ms": 110963,
+                      "text": "秒"
+                    },
+                    {
+                      "end_ms": 111163,
+                      "start_ms": 111003,
+                      "text": "能"
+                    },
+                    {
+                      "end_ms": 111403,
+                      "start_ms": 111163,
+                      "text": "描"
+                    },
+                    {
+                      "end_ms": 111583,
+                      "start_ms": 111403,
+                      "text": "述"
+                    },
+                    {
+                      "end_ms": 111804,
+                      "start_ms": 111583,
+                      "text": "清"
+                    },
+                    {
+                      "end_ms": 111964,
+                      "start_ms": 111804,
+                      "text": "楚"
+                    },
+                    {
+                      "end_ms": 112164,
+                      "start_ms": 111964,
+                      "text": "就"
+                    },
+                    {
+                      "end_ms": 112644,
+                      "start_ms": 112164,
+                      "text": "过"
+                    },
+                    {
+                      "end_ms": 112744,
+                      "start_ms": 112664,
+                      "text": "不"
+                    },
+                    {
+                      "end_ms": 112944,
+                      "start_ms": 112744,
+                      "text": "用"
+                    },
+                    {
+                      "end_ms": 113104,
+                      "start_ms": 112944,
+                      "text": "读"
+                    },
+                    {
+                      "end_ms": 113284,
+                      "start_ms": 113104,
+                      "text": "代"
+                    },
+                    {
+                      "end_ms": 113304,
+                      "start_ms": 113284,
+                      "text": "码"
+                    },
+                    {
+                      "end_ms": 113664,
+                      "start_ms": 113604,
+                      "text": "不"
+                    },
+                    {
+                      "end_ms": 113845,
+                      "start_ms": 113664,
+                      "text": "用"
+                    },
+                    {
+                      "end_ms": 114065,
+                      "start_ms": 113845,
+                      "text": "跑"
+                    },
+                    {
+                      "end_ms": 114085,
+                      "start_ms": 114065,
+                      "text": "d"
+                    },
+                    {
+                      "end_ms": 114245,
+                      "start_ms": 114085,
+                      "text": "e"
+                    },
+                    {
+                      "end_ms": 114265,
+                      "start_ms": 114245,
+                      "text": "m"
+                    },
+                    {
+                      "end_ms": 114425,
+                      "start_ms": 114265,
+                      "text": "o"
+                    },
+                    {
+                      "end_ms": 115105,
+                      "start_ms": 114785,
+                      "text": "P"
+                    },
+                    {
+                      "end_ms": 115125,
+                      "start_ms": 115105,
+                      "text": "M"
+                    },
+                    {
+                      "end_ms": 115305,
+                      "start_ms": 115125,
+                      "text": "看"
+                    },
+                    {
+                      "end_ms": 115425,
+                      "start_ms": 115305,
+                      "text": "一"
+                    },
+                    {
+                      "end_ms": 115645,
+                      "start_ms": 115425,
+                      "text": "遍"
+                    },
+                    {
+                      "end_ms": 115846,
+                      "start_ms": 115645,
+                      "text": "点"
+                    },
+                    {
+                      "end_ms": 116106,
+                      "start_ms": 115846,
+                      "text": "头"
+                    },
+                    {
+                      "end_ms": 116286,
+                      "start_ms": 116146,
+                      "text": "才"
+                    },
+                    {
+                      "end_ms": 116466,
+                      "start_ms": 116286,
+                      "text": "动"
+                    },
+                    {
+                      "end_ms": 116486,
+                      "start_ms": 116466,
+                      "text": "工"
+                    }
+                  ]
+                }
+              ]
+            },
+            "style": {},
+            "track": {
+              "clip": "main",
+              "id": "main.cue-bar",
+              "kind": "component"
+            }
+          }
+        }
+      ],
+      "id": "main.cue-bar",
+      "kind": "component",
+      "z": 85
+    }
+  ],
+  "viewport": {
+    "h": 1080,
+    "ratio": "16:9",
+    "w": 1920
+  }
+}

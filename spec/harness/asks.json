@@ -95,6 +95,14 @@
       "status": "open",
       "created_at": "2026-04-26T06:48:27.087126+00:00",
       "resolved_by": null
+    },
+    {
+      "id": "ASK-0013",
+      "feature": "cue",
+      "text": "需要 nf cue 将 vox word-level timeline 经 LLM 切成 cue list JSON，并校验字数、时间不重叠、word 全覆盖",
+      "status": "resolved",
+      "created_at": "2026-04-26T12:06:28.739941+00:00",
+      "resolved_by": "nf-cue"
     }
   ]
 }

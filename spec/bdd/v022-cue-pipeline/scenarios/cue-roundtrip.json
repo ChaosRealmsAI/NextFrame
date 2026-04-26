@@ -1,0 +1,102 @@
+{
+  "id": "cue-roundtrip",
+  "feature": "v022-cue-pipeline",
+  "given": "tmp/v021-explain 已有 7 段 vox timeline",
+  "when": "nf poster-import → composition with cues + chrome → nf export",
+  "then": "mp4 含整句 cue 字幕加亮 + 顶部进度条",
+  "human_actions": [
+    "扫描 tmp/v021-explain/audio/manifest.json 与 7 段 timeline，按 slide 累计 duration_ms + gap_ms 生成全局 anchors",
+    "从 timeline segments[] fallback 提取 cue，segment.text 作为整句字幕，segment.words[].word 映射为 words[].text",
+    "拼 composition.json：7 image-slide tracks + 7 audio tracks + progress-bar + cue-bar，共 16 tracks，无 word-level subtitle track",
+    "复制 PNG/MP3/component 到 examples/v021-explain 与 runtime storage，并让 cue-bar 接收全量绝对时间 cues[]",
+    "nf composition validate 跑通，确认 html.image-slide/html.progress-bar/html.cue-bar 均存在且 ABI 合格",
+    "nf open + nf capture 截图证据，确认桌面预览包含 poster 画面、底部 cue bar、顶部 progress bar",
+    "nf export 输出 MP4 并抽取 5s frame，确认导出链路包含音频 mux 与画面证据"
+  ],
+  "ai_tools": [
+    {
+      "tool": "nf-poster-import",
+      "command": "target/debug/nf poster-import tmp/v021-explain --out=v021-explain --gap-ms=1500",
+      "expect_exit": 0,
+      "expect_stdout_contains": null,
+      "asserts": [
+        "stdout-json:.tracks=16",
+        "stdout-json:.slides=7",
+        "stdout-json:.cues=14",
+        "file-exists:examples/v021-explain/compositions/main.json"
+      ]
+    },
+    {
+      "tool": "nf-composition-validate",
+      "command": "target/debug/nf composition validate --project=v021-explain --composition=main",
+      "expect_exit": 0,
+      "expect_stdout_contains": null,
+      "asserts": [
+        "stdout-json:.ok=true"
+      ]
+    },
+    {
+      "tool": "nf-shell-startup",
+      "command": "pkill -f 'target/debug/nf-shell' 2>/dev/null; sleep 1; (target/debug/nf-shell > /tmp/shell-bdd.log 2>&1 &) && sleep 4 && head -1 /tmp/shell-bdd.log",
+      "expect_exit": 0,
+      "expect_stdout_contains": null,
+      "asserts": [
+        "stdout-contains:\"event\":\"ready\""
+      ]
+    },
+    {
+      "tool": "nf-open",
+      "command": "target/debug/nf open --project=v021-explain --composition=main --episode=main && sleep 3",
+      "expect_exit": 0,
+      "expect_stdout_contains": null,
+      "asserts": [
+        "stdout-json:.window_id=w-1"
+      ]
+    },
+    {
+      "tool": "nf-capture",
+      "command": "mkdir -p spec/versions/v0.22.1/evidence && target/debug/nf capture --project=v021-explain --episode=main --out=spec/versions/v0.22.1/evidence/desktop.png",
+      "expect_exit": 0,
+      "expect_stdout_contains": null,
+      "asserts": [
+        "file-min-bytes:spec/versions/v0.22.1/evidence/desktop.png:500000"
+      ]
+    },
+    {
+      "tool": "nf-export",
+      "command": "mkdir -p spec/versions/v0.22.1/evidence && target/debug/nf export --project=v021-explain --composition=main --profile=draft --out=spec/versions/v0.22.1/evidence/v022.mp4",
+      "expect_exit": 0,
+      "expect_stdout_contains": null,
+      "asserts": [
+        "stdout-json:.audio_muxed=true",
+        "file-min-bytes:spec/versions/v0.22.1/evidence/v022.mp4:5000000"
+      ]
+    },
+    {
+      "tool": "nf-frame-extract",
+      "command": "ffmpeg -y -ss 5 -i spec/versions/v0.22.1/evidence/v022.mp4 -vframes 1 spec/versions/v0.22.1/evidence/frame-5s.png 2>&1 | tail -1; ls -la spec/versions/v0.22.1/evidence/frame-5s.png",
+      "expect_exit": 0,
+      "expect_stdout_contains": null,
+      "asserts": [
+        "file-min-bytes:spec/versions/v0.22.1/evidence/frame-5s.png:200000"
+      ]
+    },
+    {
+      "tool": "nf-shell-quit",
+      "command": "target/debug/nf quit 2>&1 || true",
+      "expect_exit": 0,
+      "expect_stdout_contains": null,
+      "asserts": [
+        "stdout-contains:quit"
+      ]
+    }
+  ],
+  "demo": "",
+  "status": "todo",
+  "claimed_by": null,
+  "verified_at": null,
+  "evidence": [],
+  "bugs": [],
+  "blocked_by": [],
+  "metadata": null
+}

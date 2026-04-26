@@ -22,6 +22,7 @@ fn run() -> Result<(), NfError> {
         Command::Screenshot(args) => commands::app::screenshot(args),
         Command::Capture(args) => commands::app::capture(args),
         Command::Karaoke(args) => commands::karaoke::run(&args.episode_dir),
+        Command::Cue(args) => commands::cue::run(args),
         Command::Export(args) => commands::export_cmd::run(args),
         Command::Verify(args) => commands::verify::run(args),
         Command::PosterImport(args) => commands::poster_import::run(args),

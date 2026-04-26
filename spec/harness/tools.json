@@ -64,10 +64,19 @@
     },
     {
       "name": "nf-poster-import",
-      "usage": "nf poster-import <src_dir> --out=<project_slug> · 吃 poster-show 产物(images/ + audio/manifest.json + audio/*.mp3 + audio/*.timeline.json + batch.json)拼成 v2 composition · 7 张 slide → 21 tracks(image/audio/subtitle 各 7)· 输出 examples/<slug>/{components,audio,compositions/main.json}",
+      "usage": "nf poster-import <src_dir> --out=<project_slug> [--gap-ms=<ms>] · 吃 poster-show 产物(posters/ + audio/manifest.json + audio/*.mp3 + audio/*.timeline.json + batch.json)拼成 v2 composition · 7 张 slide → 16 tracks(7 image + 7 audio + progress-bar + cue-bar)· 输出 cues + examples/<slug>/{components,audio,compositions/main.json}",
       "tags": [],
-      "registered_at": "2026-04-26T09:04:50.084673+00:00",
+      "registered_at": "2026-04-26T12:17:21.413051+00:00",
       "resolves": []
+    },
+    {
+      "name": "nf-cue",
+      "usage": "nf cue --timeline=<vox.json> [--max-chars=18] [--min-pause-ms=250] [--out=<json>] · 调 LLM 将 vox word-level timeline 切成 cue list JSON，校验字数、时间不重叠、word 全覆盖",
+      "tags": [],
+      "registered_at": "2026-04-26T12:06:33.411449+00:00",
+      "resolves": [
+        "ASK-0013"
+      ]
     }
   ]
 }

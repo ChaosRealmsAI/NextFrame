@@ -10,6 +10,7 @@ pub mod anchors;
 pub mod app;
 pub mod clips;
 pub mod compositions;
+pub mod cue;
 pub mod doctor;
 pub mod episodes;
 pub mod export_cmd;
@@ -142,6 +143,32 @@ COMMON ERRORS:
     )]
     Karaoke(KaraokeArgs),
     #[command(
+        about = "Use an LLM to cut a vox word timeline into subtitle cues",
+        long_about = r#"Use an OpenAI-compatible LLM provider to cut a vox word-level timeline into cue JSON.
+
+USAGE:
+    nf cue --timeline=<vox.json> [--max-chars=18] [--min-pause-ms=250] [--out=<json>]
+
+EXAMPLES:
+    nf cue --timeline=examples/v2-showcase/audio/intro-main.timeline.json --max-chars=18
+    nf cue --timeline=tmp/v021-explain/audio/slide-02.timeline.json --out=tmp/slide-02.cues.json
+
+EXPECTED JSON:
+    {"ok":true,"cues_count":5,"duration_ms":12366,"max_chars":18,"cues":[...],"warnings":[]}
+
+ENV:
+    NF_CUE_BASE_URL overrides the OpenAI-compatible base URL.
+    NF_CUE_MODEL overrides the model.
+    NF_CUE_API_KEY_ENV overrides the API key env var name.
+    NF_CUE_TIMEOUT_SEC overrides the per-attempt LLM request timeout.
+
+COMMON ERRORS:
+    - missing API key -> exit 2 · hint: set SILICONFLOW_API_KEY or NF_CUE_API_KEY_ENV
+    - invalid timeline -> exit 2 · hint: words need text/word plus start_ms/end_ms
+    - invalid LLM output -> exit 2 · hint: rerun; the command retries schema failures three times"#
+    )]
+    Cue(CueArgs),
+    #[command(
         about = "Export an episode JSON timeline to MP4",
         long_about = r#"Export the current project episode or v2 composition to MP4 through the NextFrame recorder runtime.
 
@@ -201,13 +228,13 @@ examples/<project>/compositions/main.json, copies media into the project, and sy
 the same project into the local NextFrame runtime storage for validation/open/export.
 
 USAGE:
-    nf poster-import <src_dir> [--out=<project_slug>]
+    nf poster-import <src_dir> [--out=<project_slug>] [--gap-ms=<ms>]
 
 EXAMPLES:
-    nf poster-import tmp/v021-explain --out=v021-explain
+    nf poster-import tmp/v021-explain --out=v021-explain --gap-ms=1500
 
 EXPECTED JSON:
-    {"composition_path":"examples/v021-explain/compositions/main.json","slides":7,"duration_ms":105000,"tracks":21}
+    {"composition_path":"examples/v021-explain/compositions/main.json","slides":7,"duration_ms":105000,"tracks":16,"cues":7}
 
 COMMON ERRORS:
     - missing source files -> exit 2 · hint: ensure posters/, audio/manifest.json, mp3, and timeline JSON exist
@@ -704,6 +731,32 @@ pub struct KaraokeArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct CueArgs {
+    #[arg(
+        long,
+        value_name = "VOX_JSON",
+        help = "Vox word-level timeline JSON path"
+    )]
+    pub timeline: PathBuf,
+    #[arg(
+        long = "max-chars",
+        value_name = "N",
+        default_value_t = 18,
+        help = "Maximum visible characters per cue"
+    )]
+    pub max_chars: usize,
+    #[arg(
+        long = "min-pause-ms",
+        value_name = "MS",
+        default_value_t = 250,
+        help = "Preferred natural pause gap for cue boundaries"
+    )]
+    pub min_pause_ms: u64,
+    #[arg(long, value_name = "JSON", help = "Optional output JSON path")]
+    pub out: Option<PathBuf>,
+}
+
+#[derive(Debug, Args)]
 pub struct ExportArgs {
     #[arg(long, value_name = "SLUG", help = "Project slug to export")]
     pub project: String,
@@ -800,6 +853,13 @@ pub struct PosterImportArgs {
         help = "Output project slug under examples/ and local NextFrame storage"
     )]
     pub out: String,
+    #[arg(
+        long = "gap-ms",
+        value_name = "MS",
+        default_value_t = 1500,
+        help = "Silent gap between slide audio end and the next slide"
+    )]
+    pub gap_ms: u64,
 }
 
 #[derive(Debug, Args)]
