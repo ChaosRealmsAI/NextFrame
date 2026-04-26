@@ -92,7 +92,7 @@
   "demo": "demos/poster-import-roundtrip.html",
   "status": "done",
   "claimed_by": "opus-1777186154",
-  "verified_at": "2026-04-26T10:00:51.802020+00:00",
+  "verified_at": "2026-04-26T10:48:35.575453+00:00",
   "evidence": [
     "/Users/Zhuanz/workspace/NextFrame/spec/bdd/v022-poster-pipeline/evidence/poster-import-roundtrip/00-nf_composition_validate.stdout.txt",
     "/Users/Zhuanz/workspace/NextFrame/spec/bdd/v022-poster-pipeline/evidence/poster-import-roundtrip/01-nf_capture.stdout.txt",
